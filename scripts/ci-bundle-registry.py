@@ -20,7 +20,7 @@ MAX_ARCHIVE = 8 * 1024 ** 3
 MAX_EXTRACTED = 24 * 1024 ** 3
 UPLOAD_CHUNK_SIZE = 64 * 1024 ** 2
 PROGRESS_INTERVAL_SECONDS = 10
-BUNDLE_GROUPS = {'default', 'direct', 'unit', 'sandbox', 'gpui'} | set(
+BUNDLE_GROUPS = {'default', 'direct', 'unit', 'sandbox', 'workspace', 'gpui'} | set(
     json.loads((Path(__file__).parent / 'ci-test-bundle-groups.json').read_text())['groups']
 )
 SPEC = importlib.util.spec_from_file_location('bundle', Path(__file__).with_name('ci-test-bundle.py'))

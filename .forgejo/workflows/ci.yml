@@ -143,7 +143,7 @@ jobs:
   gpui-tests:
     if: github.event_name != 'push'
     runs-on: any-host
-    needs: [pin-revision, test-build]
+    needs: [pin-revision, gpui-build]
     timeout-minutes: 45
     env:
       CARGO_BUILD_JOBS: 4
@@ -381,7 +381,7 @@ jobs:
         run: |
           cd src
           mapfile -t publish_groups < <(python3 -c 'import json; config=json.load(open("scripts/ci-test-bundle-groups.json")); fallback = ["direct", "consumers", "driver-core", "driver-analytics", "driver-extended", "pg-release", "socket-ssh", "driver-tls", "keyring"]; print(*(config.get("providers", {}).get("forgejo", fallback)), sep="\n")')
-          publish_groups+=(unit sandbox gpui)
+          publish_groups+=(workspace)
           for group in "${publish_groups[@]}"; do
             python3 scripts/ci-bundle-registry.py publish "$GITHUB_WORKSPACE/test-bundles/$group" "${{ needs.pin-revision.outputs.revision }}" "$group"
           done
@@ -422,6 +422,79 @@ jobs:
           else
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
+  gpui-build:
+    if: github.event_name != 'push'
+    runs-on: build-host
+    needs: [pin-revision]
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    env:
+      CARGO_TARGET_DIR: /target/bookie-${{ github.job }}
+      TMPDIR: /target/tmp-${{ github.run_id }}-${{ github.job }}
+      CARGO_HOME: /cargo
+      BOOKIE_TOOL_DIR: /tools
+      CARGO_BUILD_JOBS: "8"
+      SCCACHE_DIR: /cargo/sccache
+      RUSTC_WRAPPER: sccache
+      SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+      CMAKE_C_COMPILER_LAUNCHER: /tools/sccache
+      CMAKE_CXX_COMPILER_LAUNCHER: /tools/sccache
+      SCCACHE_BASEDIRS: /target/bookie-${{ github.job }}
+      SCCACHE_SERVER_UDS: /target/tmp-${{ github.run_id }}-${{ github.job }}/sccache.sock
+      PATH: /tools:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
+      BOOKIE_BUILD_IMAGE: sha256:f21a3d99fb08a940f7fbf775ad6878d52a3fc957876970ae7d0f607b89696ec4
+    steps:
+      - name: Prepare runner workspace
+        run: |
+          mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
+          touch "$CARGO_TARGET_DIR/.bookie-last-used" /target/.bookie-build-cache.lock
+          sccache --start-server
+          rm -rf src
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
+      - name: Install the GPUI linker dependency
+        run: |
+          apt-get update -qq
+          apt-get install -y --no-install-recommends libxkbcommon-x11-dev
+      - name: Build the GPUI test bundle
+        run: |
+          exec 9>>/target/.bookie-build-cache.lock
+          flock --exclusive 9
+          cd src && bash scripts/build-test-bundles.sh "$GITHUB_WORKSPACE/test-bundles" gpui
+      - name: Publish the source-pinned GPUI bundle
+        env:
+          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
+          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
+        run: cd src && python3 scripts/ci-bundle-registry.py publish "$GITHUB_WORKSPACE/test-bundles/gpui" "${{ needs.pin-revision.outputs.revision }}" gpui
+      - name: Clean builder scratch
+        if: always()
+        run: |
+          if [[ -S "$SCCACHE_SERVER_UDS" ]]; then
+            sccache --show-stats
+            sccache --stop-server
+          fi
+          rm -rf -- "$TMPDIR"
+          if [[ -f src/scripts/ci-cache.py ]]; then
+            python3 src/scripts/ci-cache.py --root /target --lock /target/.bookie-build-cache.lock cleanup --min-free-gib 30
+          fi
+
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
   unit:
     runs-on: any-host
     needs: [pin-revision, test-build]
@@ -446,7 +519,7 @@ jobs:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
           BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" unit
+        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" workspace
       - name: Unit tests
         env:
           BOOKIE_TOOL_DIR: /var/cache/ci/tools
@@ -509,7 +582,7 @@ jobs:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
           BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" sandbox
+        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" workspace
       - name: Sandbox tier
         env:
           BOOKIE_TOOL_DIR: /var/cache/ci/tools
@@ -1259,6 +1332,7 @@ jobs:
       - pin-revision
       - guards
       - gpui-tests
+      - gpui-build
       - gtk-build
       - clippy
       - test-build

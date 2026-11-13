@@ -692,8 +692,8 @@
   },
   "gpui-tests": {
     "needs": [
-      "pin-revision",
-      "test-build"
+      "gpui-build",
+      "pin-revision"
     ],
     "timeout_minutes": 45,
     "condition": "github.event_name != 'push'",
@@ -702,6 +702,14 @@
   "gtk-build": {
     "needs": [
       "guards",
+      "pin-revision"
+    ],
+    "timeout_minutes": 45,
+    "condition": "github.event_name != 'push'",
+    "matrix": {}
+  },
+  "gpui-build": {
+    "needs": [
       "pin-revision"
     ],
     "timeout_minutes": 45,
@@ -910,6 +918,7 @@
       "driver",
       "driver-tls",
       "floor-build",
+      "gpui-build",
       "gpui-tests",
       "gtk",
       "gtk-build",
