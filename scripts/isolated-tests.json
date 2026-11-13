@@ -2015,6 +2015,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::sidebar_row::responsive_layout_tests::row_actions_reflow_at_supported_sidebar_widths_with_names_and_focus_order"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::sidebar_row::columns_affordance_tests::a_table_has_a_separate_keyboard_reachable_columns_expander"
     ],
     [
