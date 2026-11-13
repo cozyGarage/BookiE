@@ -41,6 +41,25 @@ fn postgres_unkeyed_browse_pages_have_a_stable_generated_order() {
 }
 
 #[test]
+fn custom_browse_page_size_is_used_as_the_exact_limit() {
+    let columns = [column("group_name", false)];
+    let filter = FilterSet::default();
+    let target = BrowseTarget {
+        driver_id: "postgres",
+        schema: Some("public"),
+        table: "items",
+        columns: &columns,
+        filter: &filter,
+        hidden_columns: None,
+        long_text_preview: false,
+    };
+    let PageQuery::Sql(page) = target.page_by_row_id(0, 2_347, None, None).unwrap() else {
+        panic!("PostgreSQL unkeyed browse pages require ordered SQL")
+    };
+    assert!(page.sql.ends_with("ORDER BY ctid ASC LIMIT 2347 OFFSET 0"));
+}
+
+#[test]
 fn a_page_without_the_row_id_order_never_mentions_ctid_so_a_view_still_browses() {
     let columns = [column("group_name", false)];
     let filter = FilterSet::default();

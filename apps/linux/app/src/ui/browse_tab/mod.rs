@@ -4,12 +4,11 @@ use relm4::prelude::*;
 use relm4::{adw, gtk};
 use uuid::Uuid;
 
+use bookie_app_services::preferences::bounded_page_size;
 use bookie_core::{ColumnInfo, ForeignKeyInfo, QueryResult, Value};
 
 use crate::ui::grid::{GridMsg, TabGridContext, build_column_view};
 
-const PAGE_SIZE_OPTIONS: &[u64] = &[100, 500, 1_000, 5_000, 10_000];
-const DEFAULT_PAGE_SIZE: u64 = 1_000;
 /// Bulk-delete safety net: when the user marks at least this many
 /// rows pending-delete in one shot, surface a confirmation dialog
 /// before tracking. The marker is reversible via Discard / Ctrl+Z,
@@ -386,7 +385,8 @@ impl SimpleComponent for BrowseTab {
         inner_stack.add_named(&initial_loading, Some("loading"));
         inner_stack.set_visible_child_name("loading");
 
-        let paginator = Self::build_paginator(sender.clone(), init.page_size, init.browse_filters);
+        let page_size = bounded_page_size(init.page_size);
+        let paginator = Self::build_paginator(sender.clone(), page_size, init.browse_filters);
         let pending = Self::build_pending_revealer(sender.clone());
 
         // Per-HIG banner rule: banners persist hard constraints the
@@ -664,7 +664,7 @@ impl SimpleComponent for BrowseTab {
             persistence: init.persistence,
             database: init.database,
             current_offset: init.initial_offset,
-            page_size: init.page_size,
+            page_size,
             current_sort: init.initial_sort,
             current_sort_keys: init.initial_sort.into_iter().collect(),
             current_filter: initial_filter,
@@ -1042,6 +1042,7 @@ impl SimpleComponent for BrowseTab {
                 let _ = sender.output(BrowseTabOutput::StateChanged);
             }
             BrowseTabInput::PageSizeChanged(size) => {
+                let size = bounded_page_size(size);
                 if self.page_size == size {
                     return;
                 }

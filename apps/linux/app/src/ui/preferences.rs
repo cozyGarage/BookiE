@@ -5,18 +5,11 @@ use relm4::{adw, gtk};
 use crate::services::preferences::{
     ColorSchemePref, DateFormatPref, NullDisplayPref, Preferences, PreferencesStore, ThemePref,
 };
-use crate::ui::count_format::format_thousands;
-
-/// Must match `browse_tab`'s own `PAGE_SIZE_OPTIONS` (duplicated there and
-/// in `workspace_state.rs`, the same way those two already duplicate each
-/// other): the per-tab paginator only ever offers this fixed set, so a
-/// default outside it would silently snap back to 1,000 on restart instead
-/// of the value chosen here.
-const PAGE_SIZE_OPTIONS: &[u64] = &[100, 500, 1_000, 5_000, 10_000];
+use bookie_app_services::preferences::{MAX_PAGE_SIZE, MIN_PAGE_SIZE};
 
 struct BrowseGroup {
     group: adw::PreferencesGroup,
-    page_size: adw::ComboRow,
+    page_size: adw::SpinRow,
     confirm: adw::SwitchRow,
     preview_tab: adw::SwitchRow,
 }
@@ -30,7 +23,7 @@ struct EditorPage {
 }
 
 struct LiveSaveRows {
-    page_size: adw::ComboRow,
+    page_size: adw::SpinRow,
     confirm: adw::SwitchRow,
     preview_tab: adw::SwitchRow,
     font_size: adw::SpinRow,
@@ -172,23 +165,14 @@ fn browse_group(parent: &impl IsA<gtk::Widget>, preferences: &PreferencesStore, 
     }
 }
 
-fn page_size_row(current: &Preferences) -> adw::ComboRow {
-    let page_size_row = adw::ComboRow::new();
+fn page_size_row(current: &Preferences) -> adw::SpinRow {
+    let page_size_row = adw::SpinRow::with_range(MIN_PAGE_SIZE as f64, MAX_PAGE_SIZE as f64, 1.0);
     page_size_row.set_title(&bookie_app_services::tr!("Default page size"));
     page_size_row.set_subtitle(&bookie_app_services::tr!(
-        "Rows fetched per request when browsing a table"
+        "Rows fetched per request when browsing a table, up to 5,000 rows."
     ));
-    let page_size_labels: Vec<String> = PAGE_SIZE_OPTIONS
-        .iter()
-        .map(|n| format_thousands(u128::from(*n)))
-        .collect();
-    let page_size_strs: Vec<&str> = page_size_labels.iter().map(String::as_str).collect();
-    page_size_row.set_model(Some(&gtk::StringList::new(&page_size_strs)));
-    let initial_page_size_idx = PAGE_SIZE_OPTIONS
-        .iter()
-        .position(|n| *n == current.default_page_size)
-        .unwrap_or(2) as u32;
-    page_size_row.set_selected(initial_page_size_idx);
+    page_size_row.set_digits(0);
+    page_size_row.set_value(current.default_page_size as f64);
     page_size_row
 }
 
@@ -470,7 +454,7 @@ fn wire_live_save(preferences: &PreferencesStore, rows: LiveSaveRows) {
     // immediately (no Apply button); same model here. The previous
     // close-only save lost edits on a crash between change and close.
     let save_all = save_all_closure(preferences, &rows);
-    rows.page_size.connect_selected_notify({
+    rows.page_size.connect_value_notify({
         let s = save_all.clone();
         move |_| s()
     });
@@ -515,10 +499,7 @@ fn save_all_closure(preferences: &PreferencesStore, rows: &LiveSaveRows) -> std:
     let timeout = rows.timeout.clone();
     let preferences = preferences.clone();
     std::rc::Rc::new(move || {
-        let default_page_size = PAGE_SIZE_OPTIONS
-            .get(page_size.selected() as usize)
-            .copied()
-            .unwrap_or(1_000);
+        let default_page_size = page_size.value().round() as u64;
         if let Err(error) = preferences.update(|prefs| {
             prefs.default_page_size = default_page_size;
             prefs.confirm_destructive = confirm.is_active();
@@ -560,15 +541,6 @@ mod tests {
     use bookie_core::Value;
 
     #[test]
-    fn format_thousands_matches_the_browse_tab_paginator() {
-        assert_eq!(format_thousands(100), "100");
-        assert_eq!(format_thousands(500), "500");
-        assert_eq!(format_thousands(1_000), "1,000");
-        assert_eq!(format_thousands(5_000), "5,000");
-        assert_eq!(format_thousands(10_000), "10,000");
-    }
-
-    #[test]
     fn the_standard_null_choice_uses_the_editable_null_marker() {
         set_null_display(NullDisplayPref::Standard);
         assert_eq!(
@@ -584,17 +556,6 @@ mod tests {
         for (index, format) in DateFormatPref::ALL.into_iter().enumerate() {
             assert_eq!(DateFormatPref::from_index(index as u32), format);
             assert!(!date_format_choices()[index].is_empty());
-        }
-    }
-
-    /// The stored default must always be one of the choices the per-tab
-    /// paginator actually offers, so it survives a restart unchanged
-    /// instead of silently reverting to 1,000.
-    #[test]
-    fn every_page_size_option_round_trips_through_its_own_index() {
-        for (index, &size) in PAGE_SIZE_OPTIONS.iter().enumerate() {
-            let found = PAGE_SIZE_OPTIONS.iter().position(|n| *n == size);
-            assert_eq!(found, Some(index));
         }
     }
 }
