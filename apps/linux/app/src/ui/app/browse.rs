@@ -146,7 +146,7 @@ impl App {
             sender.input(AppMsg::LoadFailed(
                 Some(tab_id),
                 BrowseLoadFailure {
-                    request: Some(page.request.clone()),
+                    request: Some(page.request),
                     message: "no active connection".into(),
                 },
             ));
