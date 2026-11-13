@@ -9,6 +9,7 @@ use relm4::adw;
 use super::config_io::{atomic_write_bytes, atomic_write_json, xdg_config_path};
 use super::state_file::StateFile;
 
+use bookie_app_services::preferences::bounded_page_size;
 pub use bookie_app_services::preferences::{ColorSchemePref, DateFormatPref, NullDisplayPref, Preferences, ThemePref};
 
 pub fn color_scheme_style(scheme: ColorSchemePref) -> adw::ColorScheme {
@@ -62,7 +63,7 @@ impl PreferencesStore {
     pub fn load(&self) -> Preferences {
         match &self.0 {
             Backend::GSettings { settings, .. } => read_settings(settings),
-            Backend::Json(file) => file.read(Clone::clone).unwrap_or_default(),
+            Backend::Json(file) => bounded_preferences(file.read(Clone::clone).unwrap_or_default()),
         }
     }
 
@@ -80,6 +81,7 @@ impl PreferencesStore {
                 let previous = read_settings(settings);
                 let mut updated = previous.clone();
                 mutate(&mut updated);
+                updated = bounded_preferences(updated);
                 write_settings(settings, &updated)?;
                 gio::Settings::sync();
                 if let Some(path) = legacy_path
@@ -93,7 +95,10 @@ impl PreferencesStore {
                 }
                 Ok(())
             }
-            Backend::Json(file) => file.update(mutate),
+            Backend::Json(file) => file.update(|prefs| {
+                mutate(prefs);
+                prefs.default_page_size = bounded_page_size(prefs.default_page_size);
+            }),
         }
     }
 
@@ -175,7 +180,7 @@ fn open_settings() -> Result<gio::Settings, String> {
 }
 
 fn read_settings(settings: &gio::Settings) -> Preferences {
-    Preferences {
+    bounded_preferences(Preferences {
         default_page_size: settings.uint64("default-page-size"),
         confirm_destructive: settings.boolean("confirm-destructive"),
         editor_font_size: settings.uint("editor-font-size"),
@@ -190,13 +195,18 @@ fn read_settings(settings: &gio::Settings) -> Preferences {
         date_format: DateFormatPref::from_key(settings.string("date-format").as_str()),
         show_invisible_characters: settings.boolean("show-invisible-characters"),
         open_tables_in_preview_tab: settings.boolean("open-tables-in-preview-tab"),
-    }
+    })
+}
+
+fn bounded_preferences(mut preferences: Preferences) -> Preferences {
+    preferences.default_page_size = bounded_page_size(preferences.default_page_size);
+    preferences
 }
 
 fn write_settings(settings: &gio::Settings, prefs: &Preferences) -> Result<(), String> {
     settings.delay();
     let writes = [
-        settings.set_uint64("default-page-size", prefs.default_page_size),
+        settings.set_uint64("default-page-size", bounded_page_size(prefs.default_page_size)),
         settings.set_boolean("confirm-destructive", prefs.confirm_destructive),
         settings.set_uint("editor-font-size", prefs.editor_font_size),
         settings.set_uint("history-retention-days", prefs.history_retention_days),
@@ -248,7 +258,8 @@ fn migrate_json_preferences(settings: &gio::Settings, path: Option<&Path>) -> Re
         preserve_migration_backup(&backup, &bytes)?;
         write_settings(settings, &legacy)?;
         gio::Settings::sync();
-        if read_settings(settings) != legacy {
+        let expected = bounded_preferences(legacy.clone());
+        if read_settings(settings) != expected {
             return Err("migrated preferences did not verify against GSettings".into());
         }
     }
@@ -280,10 +291,11 @@ fn sync_rollback_preferences(settings: &gio::Settings, path: Option<&Path>) -> R
     }
     let bytes = std::fs::read(path).map_err(|error| error.to_string())?;
     let legacy: Preferences = serde_json::from_slice(&bytes).map_err(|error| error.to_string())?;
-    if read_settings(settings) != legacy {
+    let expected = bounded_preferences(legacy.clone());
+    if read_settings(settings) != expected {
         write_settings(settings, &legacy)?;
         gio::Settings::sync();
-        if read_settings(settings) != legacy {
+        if read_settings(settings) != expected {
             return Err("rollback preferences did not verify against GSettings".into());
         }
     }
