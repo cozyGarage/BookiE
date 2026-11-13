@@ -175,11 +175,6 @@ impl Component for HistoryDialog {
     fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>, _root: &Self::Root) {
         match msg {
             HistoryDialogInput::Refresh => self.run_search(sender),
-            // SearchChanged + FiltersChanged go through the debounce —
-            // every keystroke and every dropdown flip would otherwise
-            // fire its own SQL search. After a 150 ms idle window the
-            // scheduled timeout re-enters update with Refresh, which
-            // does the actual work.
             HistoryDialogInput::SearchChanged | HistoryDialogInput::FiltersChanged => {
                 self.schedule_debounced_search(sender);
             }
@@ -470,11 +465,6 @@ impl HistoryDialog {
     }
 
     fn confirm_delete_selected(&self, sender: ComponentSender<Self>) {
-        // Bulk deletion is irreversible and can wipe pinned
-        // entries the user marked as important; gate it
-        // behind an AdwAlertDialog confirmation before
-        // touching the database. Mirrors the Clear-All
-        // pattern below.
         let n = self.selected_ids.len();
         if n == 0 {
             return;
