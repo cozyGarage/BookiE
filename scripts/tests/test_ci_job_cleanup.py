@@ -52,6 +52,16 @@ class CiJobCleanupTests(unittest.TestCase):
             script = (ROOT / f"scripts/test-gtk-{server}.sh").read_text(encoding="utf-8")
             self.assertIn('com.bookie.test-run=${BOOKIE_TEST_RUN_ID:-local-$$}', script)
 
+    def test_clickhouse_driver_fixtures_have_job_scoped_cleanup_labels(self):
+        for relative in (
+            "crates/drivers/clickhouse/tests/support/clickhouse.rs",
+            "crates/drivers/clickhouse/tests/conformance.rs",
+        ):
+            with self.subTest(file=relative):
+                source = (ROOT / relative).read_text(encoding="utf-8")
+                self.assertIn('"com.bookie.test-run"', source)
+                self.assertIn('"BOOKIE_TEST_RUN_ID"', source)
+
     def test_every_runner_job_finishes_with_the_finalizer(self):
         for workflow in WORKFLOWS:
             with self.subTest(workflow=workflow.name):

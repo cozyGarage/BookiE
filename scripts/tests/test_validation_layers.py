@@ -303,7 +303,7 @@ class LayerRunnerTests(unittest.TestCase):
     def test_no_default_features_layer_is_in_both_hosted_gates(self):
         layer = runner.catalog()["no-default-features"]
 
-        self.assertIn("Build Linux / reusable-test-builds", layer["hosted_gate"])
+        self.assertIn("Build Linux / test-build", layer["hosted_gate"])
         self.assertIn("lab-ci / test-build", layer["hosted_gate"])
         self.assertEqual(
             layer["steps"][0]["argv"],

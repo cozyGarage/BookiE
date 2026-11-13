@@ -18,6 +18,10 @@ pub async fn start_clickhouse() -> (ContainerAsync<GenericImage>, ConnectOptions
         .with_env_var("CLICKHOUSE_DB", "default")
         .with_env_var("CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT", "1")
         .with_startup_timeout(std::time::Duration::from_secs(180))
+        .with_label(
+            "com.bookie.test-run",
+            std::env::var("BOOKIE_TEST_RUN_ID").unwrap_or_else(|_| format!("local-{}", std::process::id())),
+        )
         .start()
         .await
         .expect("start clickhouse container");
