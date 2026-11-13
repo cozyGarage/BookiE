@@ -2862,21 +2862,12 @@ GLib.MainLoop().run()
         assert mongodb_name() == "clientedit"
         row = json.loads(mongodb("JSON.stringify(db.people.findOne({_id: 2}))"))
         assert row == {"_id": 2, "name": "clientedit", "note": "untouched"}, row
-    def clickhouse_enum_grid_edit_preserves_native_label_and_siblings(database, base):
+    def clickhouse_enum_grid_displays_native_labels_without_unique_row_identity(database, base):
         ui.open_saved_connection(ui.CLICKHOUSE_CONNECTION_NAME)
         ui.wait_for_frame_containing(f"{ui.CLICKHOUSE_CONNECTION_NAME} — BookiE")
         ui.invoke_named_action_within("default.enum_grid", "Open enum_grid")
-        ui.wait_for_node(name="low8", role=pyatspi.ROLE_LABEL)
-        click_cell("low8", count=2)
-        for key in "high8":
-            ui.press_x11_key(key)
-        ui.press_x11_key("Return")
-        ui.wait_for_node(name="1 unsaved change")
-        click_cell("low16", count=2)
-        for key in "high16":
-            ui.press_x11_key(key)
-        ui.press_x11_key("Return")
-        ui.wait_for_node(name="2 unsaved changes")
+        for label in ("low8", "low16", "NULL", "high8", "high16"):
+            ui.wait_for_node(name=label, role=pyatspi.ROLE_LABEL)
 
         query = (
             "SELECT toString(id), "
@@ -2886,27 +2877,16 @@ GLib.MainLoop().run()
             "ifNull(toString(state16), '<SQL_NULL>') "
             "FROM default.enum_grid ORDER BY id FORMAT TabSeparatedRaw"
         )
-        before_save = "\n".join((
+        before = "\n".join((
             "1\t0\t-128\tlow8\t0\t-32768\tlow16",
             "2\t0\t0\tNULL\t0\t0\tNULL",
             "3\t1\t0\t<SQL_NULL>\t1\t0\t<SQL_NULL>",
             "4\t0\t1\t\t0\t1\t",
             "5\t0\t127\thigh8\t0\t32767\thigh16",
         ))
-        after_save = "\n".join((
-            "1\t0\t127\thigh8\t0\t32767\thigh16",
-            "2\t0\t0\tNULL\t0\t0\tNULL",
-            "3\t1\t0\t<SQL_NULL>\t1\t0\t<SQL_NULL>",
-            "4\t0\t1\t\t0\t1\t",
-            "5\t0\t127\thigh8\t0\t32767\thigh16",
-        ))
-        assert clickhouse(query) == before_save, "pending grid edits reached ClickHouse"
-        ui.press_x11_key("s", ("Control_L",))
-        approval = ui.find_node(name="Approve once")
-        if approval is not None:
-            ui.invoke(approval)
-        wait_for_oracle(clickhouse, query, after_save)
-        ui.wait_for_node(name="2 unsaved changes", present=False)
+        click_cell("low8", count=2)
+        assert ui.find_node(name="1 unsaved change") is None, "a read-only ClickHouse grid allowed a row edit"
+        assert clickhouse(query) == before, "a read-only ClickHouse enum grid changed server values"
 
     def postgres_grid_edit_and_delete_commit_to_the_server(database, base):
         grid_edit_and_delete_commit_to_the_server(ui.POSTGRES_CONNECTION_NAME, "public.people", psql)
@@ -3300,7 +3280,7 @@ GLib.MainLoop().run()
     if os.environ.get("BOOKIE_GTK_MONGODB_CONTAINER"):
         result.append(mongodb_grid_observes_cursor_values_until_refresh_and_edits_native_row)
     if os.environ.get("BOOKIE_GTK_CLICKHOUSE_CONTAINER"):
-        result.append(clickhouse_enum_grid_edit_preserves_native_label_and_siblings)
+        result.append(clickhouse_enum_grid_displays_native_labels_without_unique_row_identity)
     if os.environ.get("BOOKIE_GTK_POSTGRES_PORT"):
         result.append(postgres_completion_uses_each_editor_session_search_path)
         result.append(postgres_session_transaction_confirmation_cancels_or_rolls_back)
