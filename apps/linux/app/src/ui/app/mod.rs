@@ -42,6 +42,7 @@ mod whats_new;
 mod window_close_prompt;
 mod workspace_chrome;
 mod workspace_close;
+mod workspace_editing_messages;
 mod workspace_overview;
 mod workspace_persist;
 mod workspace_preview;
@@ -845,47 +846,19 @@ impl SimpleComponent for App {
                 self.dispatch_to_tab(tab_id, BrowseTabInput::FlashErrorRow(source.clone()));
                 self.dispatch_to_editor(tab_id, SqlEditorInput::ResultFlashError(source));
             }
-            AppMsg::FocusActiveGrid => {
-                if let Some(id) = self.selected_editor_tab_id() {
-                    self.dispatch_to_editor(id, crate::ui::editor::SqlEditorInput::FocusResultGrid);
-                } else if let Some(id) = self.selected_browse_tab_id() {
-                    self.dispatch_to_tab(id, BrowseTabInput::FocusGrid);
-                }
-            }
-            AppMsg::FocusActiveEditor => {
-                if let Some(id) = self.selected_editor_tab_id() {
-                    self.dispatch_to_editor(id, crate::ui::editor::SqlEditorInput::FocusEditor);
-                }
-            }
-            AppMsg::SaveActiveBrowseTab => {
-                if let Some(id) = self.selected_editor_tab_id() {
-                    if self.change_trackers.with_tab_ref(id, |tracker| tracker.has_pending()) == Some(true) {
-                        self.dispatch_to_editor(id, SqlEditorInput::CommitResultEdits);
-                    } else {
-                        self.save_editor_file(id, false, sender);
-                    }
-                } else if let Some(id) = self.selected_browse_tab_id() {
-                    self.dispatch_to_tab(id, BrowseTabInput::CommitSave);
-                }
-            }
-            AppMsg::SaveActiveBrowseTabById(id) => {
-                self.dispatch_to_tab(id, BrowseTabInput::CommitSave);
-            }
+            AppMsg::FocusActiveGrid => workspace_editing_messages::focus_active_grid(self),
+            AppMsg::FocusActiveEditor => workspace_editing_messages::focus_active_editor(self),
+            AppMsg::SaveActiveBrowseTab => workspace_editing_messages::save_active_browse_tab(self, sender),
+            AppMsg::SaveActiveBrowseTabById(id) => workspace_editing_messages::save_browse_tab_by_id(self, id),
             AppMsg::UndoActiveBrowseTab => {
                 // Ctrl+Z routes to BrowseTab undo only. Structure
                 // editing follows the snapshot+diff model — DDL undo
                 // is a session-level Discard, not a per-keystroke
                 // history. Inside a Structure-mode Entry, the native
                 // `gtk::Text` undo handles per-field text revert.
-                if let Some(id) = self.selected_browse_tab_id() {
-                    self.dispatch_to_tab(id, BrowseTabInput::Undo);
-                }
+                workspace_editing_messages::undo_active_browse_tab(self)
             }
-            AppMsg::RedoActiveBrowseTab => {
-                if let Some(id) = self.selected_browse_tab_id() {
-                    self.dispatch_to_tab(id, BrowseTabInput::Redo);
-                }
-            }
+            AppMsg::RedoActiveBrowseTab => workspace_editing_messages::redo_active_browse_tab(self),
             AppMsg::WorkspaceTabClosed(id) => self.close_workspace_tab_by_id(id, sender),
             AppMsg::FinishCloseWorkspaceTab(id) => {
                 if let Some(tab_view) = self.workspace_tab_view.clone() {
