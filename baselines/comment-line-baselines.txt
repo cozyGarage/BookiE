@@ -20,9 +20,9 @@ apps/linux/app/src/ui/app/mod.rs 106
 apps/linux/app/src/ui/app/msg.rs 3
 apps/linux/app/src/ui/app/organization.rs 13
 apps/linux/app/src/ui/app/row_ops.rs 51
-apps/linux/app/src/ui/app/status_pages.rs 20
+apps/linux/app/src/ui/app/status_pages.rs 4
 apps/linux/app/src/ui/app/structure.rs 16
-apps/linux/app/src/ui/app/workspace_chrome.rs 21
+apps/linux/app/src/ui/app/workspace_chrome.rs 4
 apps/linux/app/src/ui/app/workspace_persist.rs 9
 apps/linux/app/src/ui/app/workspace_tabs.rs 111
 apps/linux/app/src/ui/browse_tab/chrome.rs 42
@@ -32,7 +32,7 @@ apps/linux/app/src/ui/browse_tab/row_ops.rs 142
 apps/linux/app/src/ui/browse_tab/selection.rs 3
 apps/linux/app/src/ui/browse_tab/tests.rs 2
 apps/linux/app/src/ui/browse_tab/value_parse.rs 4
-apps/linux/app/src/ui/cell_editor.rs 15
+apps/linux/app/src/ui/cell_editor.rs 6
 apps/linux/app/src/ui/connect_dialog/identity.rs 6
 apps/linux/app/src/ui/connect_dialog/mod.rs 16
 apps/linux/app/src/ui/connection_bundle/export.rs 3
