@@ -664,12 +664,15 @@ class CiWorkflowTests(unittest.TestCase):
         driver = re.search(r"(?ms)^  driver:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
         self.assertIn('prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" "${{ matrix.group }}"', driver)
 
-    def test_forgejo_prunes_old_source_pinned_test_bundles(self):
+    def test_forgejo_prunes_only_after_complete_reference_discovery(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         builder = re.search(r"(?ms)^  test-build:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
-        self.assertIn("Remove expired test bundles", builder)
+        self.assertIn("Remove expired test bundles with reference protection", builder)
+        self.assertIn("if: github.event_name == 'push' || github.event_name == 'schedule'", builder)
         self.assertIn("BOOKIE_REGISTRY_API_URL: ${{ github.server_url }}/api/v1/packages/trung", builder)
-        self.assertIn('ci-bundle-registry.py prune "${{ needs.pin-revision.outputs.revision }}" --retention-days 14', builder)
+        self.assertIn("BOOKIE_FORGEJO_API_URL: ${{ github.server_url }}/api/v1/repos/${{ github.repository }}", builder)
+        self.assertIn("BOOKIE_FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}", builder)
+        self.assertIn('ci-bundle-registry.py prune "${{ needs.pin-revision.outputs.revision }}" --retention-days 14 --delete --discover-references', builder)
 
     def test_github_runs_the_same_gpui_tests_in_the_shared_linux_image(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
@@ -1044,7 +1047,7 @@ class CiWorkflowTests(unittest.TestCase):
                 self.assertRegex(block, r"(?m)^    timeout-minutes: [1-9][0-9]*$", heading.group(1))
 
             self.assertNotIn("git clone --quiet", workflow)
-            self.assertNotIn("TOKEN: ${{ secrets.FORGEJO_TOKEN }}", workflow)
+            self.assertEqual(workflow.count("BOOKIE_FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}"), 1 if name == "ci" else 0)
             self.assertEqual(workflow.count("uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683"), expected_checkouts)
             self.assertEqual(workflow.count("token: ${{ secrets.FORGEJO_TOKEN }}"), expected_checkouts)
             self.assertEqual(workflow.count("persist-credentials: false"), expected_checkouts)
