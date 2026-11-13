@@ -15,7 +15,7 @@ apps/linux/app/src/ui/app/connection.rs 35
 apps/linux/app/src/ui/app/import.rs 10
 apps/linux/app/src/ui/app/init_css.rs 5
 apps/linux/app/src/ui/app/init_window.rs 18
-apps/linux/app/src/ui/app/init_workspace.rs 17
+apps/linux/app/src/ui/app/init_workspace.rs 3
 apps/linux/app/src/ui/app/mod.rs 106
 apps/linux/app/src/ui/app/msg.rs 3
 apps/linux/app/src/ui/app/organization.rs 13
@@ -25,7 +25,7 @@ apps/linux/app/src/ui/app/structure.rs 119
 apps/linux/app/src/ui/app/workspace_chrome.rs 21
 apps/linux/app/src/ui/app/workspace_persist.rs 9
 apps/linux/app/src/ui/app/workspace_tabs.rs 111
-apps/linux/app/src/ui/browse_tab/chrome.rs 87
+apps/linux/app/src/ui/browse_tab/chrome.rs 42
 apps/linux/app/src/ui/browse_tab/grid_render.rs 126
 apps/linux/app/src/ui/browse_tab/mod.rs 212
 apps/linux/app/src/ui/browse_tab/row_ops.rs 142
@@ -57,7 +57,7 @@ apps/linux/app/src/ui/ssh_section.rs 9
 apps/linux/app/src/ui/structure_tab/columns.rs 3
 apps/linux/app/src/ui/structure_tab/fks.rs 5
 apps/linux/app/src/ui/structure_tab/indexes.rs 5
-apps/linux/app/src/ui/structure_tab/mod.rs 231
+apps/linux/app/src/ui/structure_tab/mod.rs 146
 apps/linux/app/src/ui/structure_tab_dialogs.rs 4
 crates/agentd/src/audit_isolation_tests.rs 1
 crates/agentd/src/lib.rs 4
