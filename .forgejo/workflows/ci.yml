@@ -610,6 +610,8 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
           path: src
+      - name: Mark checkout safe for Git in container
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE/src"
       - name: Install package validation tools
         run: |
           apt-get update -qq
