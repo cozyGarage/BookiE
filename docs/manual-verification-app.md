@@ -51,6 +51,8 @@ Main menu, then Catalog, on a PostgreSQL connection with a few objects of each k
 - [ ] Open Preferences and confirm the page navigation separates General, Appearance, Editor and MCP.
 - [ ] Change Appearance between System, Light and Dark; confirm the active application style changes and the choice survives a restart.
 - [ ] Confirm the Data browser, Query history and SQL editor controls retain their current values and live-save behavior.
+- [ ] Leave typography overrides at their defaults, then set font family, size and weight independently for Application interface, SQL editor, Result grid and Error and output text. Each change applies to already-open windows and grids and survives restart. Blank family, size 0 and System weight restore the default for that property.
+- [ ] Test size minimum and maximum for each surface. Repeat with desktop text scaling at 1 and enlarged, high-contrast light/dark themes, and at 2x display scale. Text remains readable and controls do not clip; grid size remains within its keyboard zoom range.
 - [ ] Open About and confirm project credits and third-party attribution are presented separately, and the copyright attribution remains visible.
 - [ ] Check the BookiE launcher icon at small and large sizes in the application menu and task switcher; confirm the same artwork is used by the installed package.
 
