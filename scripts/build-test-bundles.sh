@@ -23,14 +23,6 @@ nextest="$(bash scripts/ensure-nextest.sh)"
 build_provider_bundles() {
   cargo metadata --manifest-path apps/gpui/Cargo.toml --locked --format-version 1 >/dev/null
   local config="$ROOT/scripts/ci-test-bundle-groups.json"
-  sandbox_packages=(
-    bookie-core bookie-policy bookie-storage bookie-transport bookie-app-services bookie-results
-    bookie-ssh bookie-dump bookie-mcp bookie-agentd bookie-driver-sqlite bookie-driver-redis
-  )
-  package_args=()
-  for package in "${sandbox_packages[@]}"; do package_args+=(-p "$package"); done
-  sandbox_package_args=()
-  for package in "${sandbox_packages[@]}"; do sandbox_package_args+=(--package "$package"); done
   build_messages="$output/default-build.jsonl"
   if [[ ! -f "$build_messages" ]]; then
     cargo test --locked --workspace --lib --bins --tests --no-run --message-format=json-render-diagnostics > "$build_messages"
@@ -47,19 +39,10 @@ build_provider_bundles() {
     )
     python3 scripts/ci-test-bundle.py create "$output/$group" "$revision" "${args[@]}"
   done
-  "$nextest" nextest archive --locked --workspace --lib --bins --archive-file "$output/unit-nextest.tar.zst"
-  python3 scripts/ci-test-bundle.py create "$output/unit" "$revision" --messages "$build_messages" \
-    --group unit --archive "$output/unit-nextest.tar.zst" --archive-only --test-kind lib --test-kind bin
-  "$nextest" nextest archive --locked "${package_args[@]}" --test '*' --archive-file "$output/sandbox-nextest.tar.zst"
-  python3 scripts/ci-test-bundle.py create "$output/sandbox" "$revision" --messages "$build_messages" \
-    --group sandbox --archive "$output/sandbox-nextest.tar.zst" --archive-only --test-kind test \
-    "${sandbox_package_args[@]}"
-  cargo test --locked --manifest-path apps/gpui/Cargo.toml --lib --bins --tests --no-run \
-    --message-format=json-render-diagnostics > "$output/gpui-build.jsonl"
-  "$nextest" nextest archive --locked --manifest-path apps/gpui/Cargo.toml --lib --bins --tests \
-    --archive-file "$output/gpui-nextest.tar.zst"
-  python3 scripts/ci-test-bundle.py create "$output/gpui" "$revision" --messages "$output/gpui-build.jsonl" \
-    --group gpui --archive "$output/gpui-nextest.tar.zst" --archive-only
+  "$nextest" nextest archive --locked --workspace --lib --bins --tests \
+    --archive-file "$output/workspace-nextest.tar.zst"
+  python3 scripts/ci-test-bundle.py create "$output/workspace" "$revision" --messages "$build_messages" \
+    --group workspace --archive "$output/workspace-nextest.tar.zst" --archive-only
 }
 for group in "${groups[@]}"; do
   selection=(--workspace)
