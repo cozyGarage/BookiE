@@ -429,7 +429,7 @@
     "gtk-postgres": {
       "purpose": "Installed GTK database flows against PostgreSQL",
       "prerequisites": "GTK 4.24; Docker with postgres:17-alpine; gnome-keyring; libsecret tools; Xvfb; PyAT-SPI; private D-Bus",
-      "hosted_gate": "Build Linux / gtk-server; lab-ci / e2e",
+      "hosted_gate": "Build Linux / gtk-server; lab-ci / gtk-server",
       "steps": [
         {
           "argv": [
@@ -444,7 +444,7 @@
     "gtk-mysql": {
       "purpose": "Installed GTK database flows against MySQL",
       "prerequisites": "GTK 4.24; Docker with mysql:8.0; gnome-keyring; libsecret tools; Xvfb; PyAT-SPI; private D-Bus",
-      "hosted_gate": "Build Linux / gtk-server; lab-ci / e2e",
+      "hosted_gate": "Build Linux / gtk-server; lab-ci / gtk-server",
       "steps": [
         {
           "argv": [

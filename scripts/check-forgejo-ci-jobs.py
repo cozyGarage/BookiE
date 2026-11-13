@@ -15,7 +15,6 @@ REQUIRED = {
     "widgets",
     "driver",
     "b4-rollback",
-    "e2e",
     "security-policy",
     "consumers",
     "gtk",

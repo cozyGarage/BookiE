@@ -40,7 +40,7 @@ def runner_jobs(path):
 class CiJobCleanupTests(unittest.TestCase):
     def test_gtk_server_fixtures_have_job_scoped_cleanup_labels(self):
         jobs = runner_jobs(WORKFLOWS[0])
-        for job in ("e2e", "gtk-server"):
+        for job in ("gtk-server",):
             self.assertIn("BOOKIE_TEST_RUN_ID:", jobs[job])
             self.assertIn("${{ matrix.server }}", jobs[job])
         for server in ("postgres", "mysql", "mysql-approval", "mongodb", "clickhouse"):
