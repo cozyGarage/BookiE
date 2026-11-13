@@ -59,7 +59,6 @@ apps/linux/app/src/ui/structure_tab/fks.rs 10
 apps/linux/app/src/ui/structure_tab/indexes.rs 14
 apps/linux/app/src/ui/structure_tab/mod.rs 231
 apps/linux/app/src/ui/structure_tab_dialogs.rs 4
-apps/linux/app/src/ui/welcome_view.rs 24
 crates/agentd/src/audit_isolation_tests.rs 1
 crates/agentd/src/lib.rs 4
 crates/agentd/src/main.rs 16
