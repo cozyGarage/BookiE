@@ -321,10 +321,50 @@ impl App {
         let Some(origin) = CatalogOrigin::capture(self.connection_id, &self.database) else {
             return;
         };
+        let connection = origin.connection(&self.database);
+        let timeout_secs =
+            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
+        let sender_for_cmd = sender.clone();
+        sender.command(move |_, shutdown| {
+            shutdown
+                .register(async move {
+                    let control = crate::services::operation_control::bounded(timeout_secs);
+                    let inbound = match connection {
+                        Some(conn) => conn
+                            .fetch_inbound_foreign_keys_controlled(schema.as_deref(), &table, &control)
+                            .await
+                            .unwrap_or_default(),
+                        None => Vec::new(),
+                    };
+                    let referencing = bookie_app_services::referencing_tables::referencing_tables(
+                        &inbound,
+                        schema.as_deref(),
+                        &table,
+                    );
+                    sender_for_cmd.input(AppMsg::DropTablePromptReady {
+                        origin,
+                        schema,
+                        table,
+                        referencing,
+                    });
+                })
+                .drop_on_shutdown()
+        });
+    }
+
+    pub(super) fn present_drop_table_prompt(
+        &mut self,
+        origin: CatalogOrigin,
+        schema: Option<String>,
+        table: String,
+        referencing: &[String],
+        sender: ComponentSender<Self>,
+    ) {
+        if !origin.owns_window(self.connection_id, &self.database) {
+            return;
+        }
         let title = bookie_app_services::tr!("Drop {table}?").replace("{table}", &table);
-        let body = bookie_app_services::tr!(
-            "All rows and the table definition will be removed. This can't be undone from inside BookiE."
-        );
+        let body = drop_table_body(referencing);
         let dialog = adw::AlertDialog::new(Some(&title), Some(&body));
         dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
         dialog.add_response("drop", &bookie_app_services::tr!("Drop"));
@@ -1216,5 +1256,33 @@ impl App {
             .unwrap_or(false);
         page.set_needs_attention(combined_dirty && !is_selected);
         self.refresh_window_title();
+    }
+}
+
+fn drop_table_body(referencing: &[String]) -> String {
+    let warning = bookie_app_services::tr!(
+        "All rows and the table definition will be removed. This can't be undone from inside BookiE."
+    );
+    if referencing.is_empty() {
+        return warning;
+    }
+    let referenced = bookie_app_services::tr!(
+        "These tables reference it: {tables}. The database may refuse the drop or change their rows."
+    )
+    .replace("{tables}", &referencing.join(", "));
+    format!("{warning}\n\n{referenced}")
+}
+
+#[cfg(test)]
+mod drop_prompt_tests {
+    use super::drop_table_body;
+
+    #[test]
+    fn the_drop_confirmation_names_the_tables_that_reference_the_table() {
+        let plain = drop_table_body(&[]);
+        let warned = drop_table_body(&["orders".into(), "billing.invoices".into()]);
+        assert!(warned.starts_with(&plain));
+        assert!(warned.contains("orders, billing.invoices"));
+        assert!(!plain.contains("reference"));
     }
 }
