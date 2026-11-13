@@ -192,6 +192,24 @@ fn force_dismissing_pending_connection_switch_preserves_workspace() {
 
 #[test]
 #[ignore = "requires an isolated GTK display"]
+fn deleting_a_connection_dismisses_the_saved_connections_popover() {
+    let DirtyEditor {
+        controller, _directory, ..
+    } = dirty_editor();
+    controller.model().connections_popover.popup();
+    spin_until(|| controller.model().connections_popover.is_visible());
+    controller.emit(AppMsg::DeleteConnection(uuid::Uuid::new_v4()));
+    spin_until(|| controller.widget().visible_dialog().is_some());
+    spin_until(|| !controller.model().connections_popover.is_visible());
+    assert!(
+        !controller.model().connections_popover.is_visible(),
+        "saved-connections popover must close before the delete dialog accepts clicks"
+    );
+    controller.widget().visible_dialog().unwrap().force_close();
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
 fn force_dismissing_running_query_switch_preserves_the_editor() {
     let DirtyEditor {
         controller,

@@ -2141,6 +2141,11 @@
       "bookie-app",
       "--lib",
       "ui::app::connection::dismiss_tests::force_dismissing_running_query_switch_preserves_the_editor"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::connection::dismiss_tests::deleting_a_connection_dismisses_the_saved_connections_popover"
     ]
   ],
   "keyring": [

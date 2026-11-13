@@ -59,6 +59,7 @@ impl App {
             self.show_toast(&bookie_app_services::tr!("A connection change is already in progress."));
             return;
         }
+        self.dismiss_saved_connections_popover();
         self.switch.transition = ConnectionTransition::Connecting;
         let hidden_schemas = prefill
             .as_ref()
@@ -311,6 +312,10 @@ impl App {
         }
     }
 
+    pub(super) fn dismiss_saved_connections_popover(&self) {
+        self.connections_popover.popdown();
+    }
+
     pub(super) fn on_delete_connection(&self, id: Uuid, sender: ComponentSender<Self>) {
         // Connection deletion wipes the saved entry and ALL associated
         // keyring credentials (db password, SSH password, SSH passphrase).
@@ -319,6 +324,7 @@ impl App {
         // preference gate let users skip it, but per HIG (and GNOME
         // Files' bookmark-delete behaviour) destructive keyring writes
         // need confirmation regardless of preferences.
+        self.dismiss_saved_connections_popover();
         let connection_name = self
             .saved_connections
             .iter()
