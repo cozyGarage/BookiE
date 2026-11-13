@@ -18,6 +18,10 @@ api_get() {
   curl -fsS --retry 5 --retry-delay 5 --retry-all-errors --max-time 60 \
     --config <(printf 'header = "Authorization: token %s"\n' "$token") "$@"
 }
+api_post() {
+  curl -fsS --max-time 60 \
+    --config <(printf 'header = "Authorization: token %s"\n' "$token") "$@"
+}
 
 docs_only() {
   git fetch --quiet "$remote" main || return 1
@@ -66,18 +70,22 @@ runs = json.load(sys.stdin)["workflow_runs"]
 print(runs[0]["id"] if runs else 0)
 '
 }
+after="$(latest_run_id)"
 remote_sha="$(git ls-remote "$remote" "refs/heads/$target" | cut -f1)"
-if [ "$remote_sha" = "$sha" ]; then
-  after=0
-  echo "$target already points at $sha on $remote; using its latest ci run, which may be older than this check"
-else
-  after="$(latest_run_id)"
+if [ "$remote_sha" != "$sha" ]; then
+  if [ "$target" = main ]; then
+    echo "refusing to update protected Forgejo main; gate a task branch instead" >&2
+    exit 1
+  fi
   for attempt in 1 2 3; do
     git push --quiet "$remote" "$sha:refs/heads/$target" && break
     [ "$attempt" -lt 3 ] || exit 1
     sleep 10
   done
 fi
+dispatch_payload="$(python3 -c 'import json,sys; print(json.dumps({"ref": sys.argv[1], "inputs": {"ref": sys.argv[2]}}))' "$target" "$sha")"
+api_post --request POST --header 'Content-Type: application/json' \
+  --data-binary "$dispatch_payload" "$api/actions/workflows/ci.yml/dispatches" >/dev/null
 deadline=$((SECONDS + timeout_minutes * 60))
 
 summarize() {

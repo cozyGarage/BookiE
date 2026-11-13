@@ -72,3 +72,12 @@ fn the_driver_declares_itself_experimental_on_the_oracle_port() {
     assert_eq!(OracleDriver.default_port(), 1521);
     assert!(!OracleDriver.id().is_empty());
 }
+
+#[test]
+fn browse_filters_stay_off_until_bound_queries_exist() {
+    let capabilities = OracleDriver.capabilities();
+    assert!(
+        !capabilities.supports_browse_filters,
+        "Oracle has no query_params path; advertising filters would open a UI that cannot run"
+    );
+}

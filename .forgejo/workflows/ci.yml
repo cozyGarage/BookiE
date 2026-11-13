@@ -1083,6 +1083,7 @@ jobs:
       CARGO_TARGET_DIR: /var/cache/ci/target/gtk-build
       BOOKIE_GTK_SCENARIO_RETRIES: "0"
       BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-gtk-server-${{ matrix.server }}
+      BOOKIE_GTK_SERVER_IMAGE_GROUP: ${{ matrix.server == 'mysql-approval' && 'mysql' || matrix.server }}
     strategy:
       fail-fast: false
       matrix:
@@ -1126,6 +1127,8 @@ jobs:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: bash src/scripts/docker-hub-login.sh
+      - name: Pre-pull GTK fixture image with retries
+        run: bash src/scripts/prepull-test-images.sh "$BOOKIE_GTK_SERVER_IMAGE_GROUP"
       - name: Select isolated MCP HTTP port
         run: cd src && python3 scripts/ci-mcp-port.py "${{ matrix.mcp_port_slot }}"
       - name: Installed GTK scenarios against a real server

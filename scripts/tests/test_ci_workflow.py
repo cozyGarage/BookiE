@@ -10,6 +10,7 @@ import sys
 import tempfile
 import tomllib
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 spec = importlib.util.spec_from_file_location("ci_jobs", ROOT / "scripts/check-ci-jobs.py")
@@ -219,13 +220,63 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertFalse(bundle_helper.target_selected("bookie-driver-duckdb", "test", set(), direct))
         self.assertEqual(
             set(bundle_groups),
-            {"direct", "consumers", "driver-core", "driver-analytics", "driver-extended", "drivers",
+            {"direct", "sandbox", "consumers", "driver-core", "driver-analytics", "driver-extended", "drivers",
              "pg-release", "socket-ssh", "driver-tls", "keyring"},
         )
         self.assertTrue({"bookie-app", "bookie-mcp", "bookie-policy"} <= set(bundle_groups["consumers"]["lib"] + bundle_groups["consumers"]["test"]))
         self.assertIn("bookie-app", bundle_groups["consumers"]["test"])
+        required_binaries = {
+            "direct": {"bookie-app"},
+            "consumers": {"bookie-app"},
+            "sandbox": {"bookie-agentd", "bookie-ssh"},
+            "pg-release": {"bookie-agentd", "bookie-app"},
+            "socket-ssh": {"bookie-agentd", "bookie-ssh"},
+            "keyring": {"bookie-agentd"},
+        }
+        for group, packages in required_binaries.items():
+            with self.subTest(group=group):
+                self.assertTrue(packages <= set(bundle_groups[group]["bin"]))
         for group in ("driver-core", "driver-analytics", "driver-extended"):
             self.assertTrue(bundle_groups[group]["test"])
+
+    def test_test_bundle_copies_only_binaries_declared_for_its_group(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            messages = root / "build.jsonl"
+            app_binary = root / "bookie-app"
+            test_binary = root / "postgres-test"
+            app_binary.write_bytes(b"app")
+            test_binary.write_bytes(b"test")
+            packages = [
+                {"id": "app", "name": "bookie-app", "manifest_path": str(ROOT / "apps/linux/app/Cargo.toml")},
+                {"id": "postgres", "name": "bookie-driver-postgres", "manifest_path": str(ROOT / "crates/drivers/postgres/Cargo.toml")},
+            ]
+            messages.write_text("\n".join(json.dumps(message) for message in (
+                {"reason": "compiler-artifact", "package_id": "app", "target": {"kind": ["bin"], "name": "bookie-app"},
+                 "profile": {"test": False}, "executable": str(app_binary)},
+                {"reason": "compiler-artifact", "package_id": "postgres", "target": {"kind": ["test"], "name": "integration"},
+                 "profile": {"test": True}, "executable": str(test_binary)},
+            )) + "\n")
+
+            def check_output(command, **kwargs):
+                if command[0] == "cargo":
+                    return json.dumps({"packages": packages}).encode()
+                return "rustc 1.98.0" if kwargs.get("text") else b"rustc 1.98.0"
+
+            with patch.object(bundle_helper.subprocess, "check_output", side_effect=check_output), \
+                    patch.object(bundle_helper.subprocess, "run"):
+                bundle_helper.create(root / "bundle", messages, "revision", "driver-core", package_kinds={
+                    ("bookie-driver-postgres", "test"),
+                })
+                bundle_helper.create(root / "direct", messages, "revision", "direct", package_kinds={
+                    ("bookie-app", "bin"), ("bookie-driver-postgres", "test"),
+                })
+
+            index = json.loads((root / "bundle/index.json").read_text())
+            self.assertEqual(index["binaries"], {})
+            self.assertNotIn("bin/bookie-app", index["files"])
+            direct_index = json.loads((root / "direct/index.json").read_text())
+            self.assertEqual(direct_index["binaries"], {"bookie-app": "bin/bookie-app"})
 
     def test_forgejo_driver_core_bundle_includes_pg_dump_targets(self):
         bundle_groups = json.loads((ROOT / "scripts/ci-test-bundle-groups.json").read_text())["groups"]
@@ -377,6 +428,20 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("if: matrix.group == 'driver-core'", driver)
         self.assertIn("python3 scripts/run-test-layer.py pg-dump", driver)
 
+    def test_gtk_server_jobs_retry_prepulling_their_fixture_image(self):
+        for path in (".github/workflows/build-linux.yml", ".forgejo/workflows/ci.yml"):
+            workflow = (ROOT / path).read_text()
+            job = re.search(r"(?ms)^  gtk-server:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+            script_root = "src/scripts" if path.startswith(".forgejo/") else "scripts"
+
+            self.assertIn(
+                "BOOKIE_GTK_SERVER_IMAGE_GROUP: ${{ matrix.server == 'mysql-approval' && 'mysql' || matrix.server }}",
+                job,
+            )
+            prepull = job.index(f"bash {script_root}/prepull-test-images.sh \"$BOOKIE_GTK_SERVER_IMAGE_GROUP\"")
+            scenario = job.index('python3 scripts/run-test-layer.py "gtk-${{ matrix.server }}"')
+            self.assertLess(prepull, scenario)
+
     def test_github_quick_and_forgejo_sandbox_use_the_same_test_script(self):
         github = (ROOT / ".github/workflows/build-linux.yml").read_text()
         forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
@@ -521,14 +586,14 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertLess(checkout, safe_directory)
         self.assertLess(safe_directory, git_call)
 
-    def test_fast_checks_fetch_exact_pull_request_base_before_change_contracts(self):
+    def test_fast_checks_fetch_the_comparison_base_before_change_contracts(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         job = re.search(r"(?ms)^  fast:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
-        step = "      - name: Fetch pull request base for changed-path tests"
+        step = "      - name: Fetch comparison base for changed-path tests"
         self.assertIn(step, job)
         fetch_step = job.split(step, 1)[1].split("      - ", 1)[0]
-        self.assertIn("if: github.event_name == 'pull_request'", fetch_step)
-        self.assertIn("BOOKIE_CHANGE_BASE: ${{ github.event.pull_request.base.sha }}", fetch_step)
+        self.assertIn("if: github.event_name == 'pull_request' || github.event_name == 'push'", fetch_step)
+        self.assertIn("BOOKIE_CHANGE_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}", fetch_step)
         self.assertIn('git fetch --no-tags --depth=1 origin "$BOOKIE_CHANGE_BASE"', fetch_step)
         self.assertLess(job.index(step), job.index("python3 scripts/run-test-layer.py change-contracts"))
         self.assertIn("fetch-depth: 1", job)

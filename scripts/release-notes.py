@@ -166,7 +166,7 @@ def cut(text, version, date):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Release notes from CHANGELOG.md or Release-Note trailers.")
+    parser = argparse.ArgumentParser(description="Release notes from changelog.d fragments and CHANGELOG.md.")
     commands = parser.add_subparsers(dest="command", required=True)
     notes = commands.add_parser("notes", help="print the body of one version's section")
     notes.add_argument("version")

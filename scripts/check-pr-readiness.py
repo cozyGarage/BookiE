@@ -22,7 +22,7 @@ REQUIRED_CODE_CHECKS = (
 REQUIRED_CONTRACT_CHECKS = ("harness", "workflow-lint", "workflow-security")
 REQUIRED_MANIFEST_CHECKS = ("unused-dependencies",)
 MANIFEST_FILES = ("Cargo.toml", "Cargo.lock")
-REQUIRED_ALWAYS = ("pr-title", "release-note")
+REQUIRED_ALWAYS = ("pr-title",)
 CONTRACT_PREFIXES = (".github/workflows/", ".github/actions/", "scripts/", "apps/linux/packaging/", "docs/")
 HEAD_SHA = re.compile(r"^[0-9a-f]{40}$")
 

@@ -2,6 +2,7 @@
 
 - **Status**: Accepted
 - **Date**: 2026-10-07
+- **Implementation**: Shipped. The catalog sidebar is a `GtkListView` over `GtkTreeListModel` (`apps/linux/app` sidebar tree). Older Relm4 `GtkListBox` factories remain only for non-catalog lists.
 
 ## Context
 

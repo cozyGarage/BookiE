@@ -207,6 +207,10 @@ fn optimistic_assignments(
     let mut assignments = Vec::with_capacity(edits.len());
     for (col_idx, _, new_value) in edits {
         let name = quote_ident(driver_id, &columns[*col_idx].name);
+        if driver_id == "mssql" && matches!(new_value, Value::Null) {
+            assignments.push(format!("{name} = NULL"));
+            continue;
+        }
         if is_mysql_empty_text(driver_id, new_value) {
             assignments.push(format!("{name} = SPACE(0)"));
             continue;
@@ -256,6 +260,9 @@ fn optimistic_predicate(
     }
     if let Some(predicate) = exact_original_predicate(driver_id, name, column, old_value, params) {
         return Ok(predicate);
+    }
+    if driver_id == "mssql" && matches!(old_value, Value::Null) {
+        return Ok(format!("{name} IS NULL"));
     }
     let placeholder = placeholder_for(driver_id, params.len());
     let old_value = &crate::numeric_input::widened_single_precision(driver_id, column, old_value);

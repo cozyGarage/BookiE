@@ -77,7 +77,7 @@ fn clicking_another_table_of_a_live_connection_loads_it_into_the_grid(cx: &mut T
         assert_eq!(view.catalog.grid_table, table_info("orders"));
         assert_eq!(view.catalog.tables, [table_info("customers"), table_info("orders")]);
         assert_eq!(view.source.total(), 6);
-        assert!(view.source.origin().contains("concurrent changes may shift rows"));
+        assert!(view.source.origin().contains("concurrent changes may skip or repeat rows"));
     });
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
@@ -94,7 +94,7 @@ fn clicking_another_table_of_a_live_connection_loads_it_into_the_grid(cx: &mut T
             view.tabs.current(),
             &bookie_gpui::shell::Tab::Table(table_info("customers"))
         );
-        assert!(view.source.origin().contains("concurrent changes may shift rows"));
+        assert!(view.source.origin().contains("concurrent changes may skip or repeat rows"));
         assert!(view.status.is_empty(), "{}", view.status);
     });
 }
@@ -1039,6 +1039,14 @@ fn a_new_query_tab_focuses_its_editor_so_typing_lands_there(cx: &mut TestAppCont
     cx.simulate_input("select 1");
     view.read_with(cx, |view, cx| {
         assert_eq!(view.sql_input.read(cx).value(), "select 1");
+    });
+    cx.simulate_keystrokes("ctrl-b");
+    view.read_with(cx, |view, _| {
+        assert!(!view.sidebar_open, "the sidebar shortcut still works in the editor");
+    });
+    cx.simulate_keystrokes("ctrl-b");
+    view.read_with(cx, |view, _| {
+        assert!(view.sidebar_open, "the sidebar shortcut still reopens the sidebar");
     });
     cx.simulate_keystrokes("ctrl-shift-p");
     view.read_with(cx, |view, _| {
