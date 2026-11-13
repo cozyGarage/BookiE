@@ -22,7 +22,7 @@ apps/linux/app/src/ui/app/organization.rs 13
 apps/linux/app/src/ui/app/row_ops.rs 51
 apps/linux/app/src/ui/app/status_pages.rs 20
 apps/linux/app/src/ui/app/structure.rs 119
-apps/linux/app/src/ui/app/workspace_chrome.rs 21
+apps/linux/app/src/ui/app/workspace_chrome.rs 4
 apps/linux/app/src/ui/app/workspace_persist.rs 9
 apps/linux/app/src/ui/app/workspace_tabs.rs 111
 apps/linux/app/src/ui/browse_tab/chrome.rs 42
