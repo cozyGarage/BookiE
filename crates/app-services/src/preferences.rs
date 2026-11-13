@@ -1,5 +1,17 @@
 use serde::{Deserialize, Serialize};
 
+pub const DEFAULT_PAGE_SIZE: u64 = 1_000;
+pub const MIN_PAGE_SIZE: u64 = 1;
+pub const MAX_PAGE_SIZE: u64 = bookie_core::MAX_QUERY_CURSOR_PAGE_ROWS as u64;
+
+pub fn bounded_page_size(page_size: u64) -> u64 {
+    if page_size == 0 {
+        DEFAULT_PAGE_SIZE
+    } else {
+        page_size.min(MAX_PAGE_SIZE)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Preferences {
     pub default_page_size: u64,
@@ -219,7 +231,7 @@ fn default_show_invisible_characters() -> bool {
 impl Default for Preferences {
     fn default() -> Self {
         Self {
-            default_page_size: 1_000,
+            default_page_size: DEFAULT_PAGE_SIZE,
             confirm_destructive: true,
             editor_font_size: 12,
             history_retention_days: default_history_retention_days(),
@@ -234,6 +246,20 @@ impl Default for Preferences {
             show_invisible_characters: default_show_invisible_characters(),
             open_tables_in_preview_tab: default_open_tables_in_preview_tab(),
         }
+    }
+}
+
+#[cfg(test)]
+mod page_size_tests {
+    use super::{DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MIN_PAGE_SIZE, bounded_page_size};
+
+    #[test]
+    fn page_size_bounds_preserve_custom_values_and_repair_invalid_ones() {
+        assert_eq!(bounded_page_size(MIN_PAGE_SIZE), MIN_PAGE_SIZE);
+        assert_eq!(bounded_page_size(2_347), 2_347);
+        assert_eq!(bounded_page_size(MAX_PAGE_SIZE), MAX_PAGE_SIZE);
+        assert_eq!(bounded_page_size(0), DEFAULT_PAGE_SIZE);
+        assert_eq!(bounded_page_size(MAX_PAGE_SIZE + 1), MAX_PAGE_SIZE);
     }
 }
 

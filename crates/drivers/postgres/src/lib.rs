@@ -65,6 +65,10 @@ impl DatabaseDriver for PgDriver {
     fn supports_snapshot_export(&self) -> bool {
         true
     }
+    fn supports_reverse_keyset(&self) -> bool {
+        true
+    }
+
 
     fn supports_updatable_views(&self) -> bool {
         true

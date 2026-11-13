@@ -81,6 +81,10 @@ pub(super) fn primary_menu_model() -> gio::Menu {
         Some(&bookie_app_services::tr!("Keyboard Shortcuts")),
         Some("win.shortcuts"),
     );
+    app_section.append(
+        Some(&bookie_app_services::tr!("Check for Updates")),
+        Some("win.check-for-updates"),
+    );
     app_section.append(Some(&bookie_app_services::tr!("About BookiE")), Some("win.about"));
     app_section.append(Some(&bookie_app_services::tr!("Quit")), Some("win.quit"));
     menu.append_section(None, &app_section);
@@ -109,6 +113,15 @@ fn add_window_input_actions(
     window: &adw::ApplicationWindow,
     sender: ComponentSender<App>,
 ) {
+    add_shell_input_actions(group, window, sender.clone());
+    add_workspace_input_actions(group, sender);
+}
+
+fn add_shell_input_actions(
+    group: &gio::SimpleActionGroup,
+    window: &adw::ApplicationWindow,
+    sender: ComponentSender<App>,
+) {
     macro_rules! input_action {
         ($name:expr, $msg:expr) => {{
             let s = sender.clone();
@@ -128,12 +141,9 @@ fn add_window_input_actions(
     group.add_action_entries([
         input_action!("shortcuts", AppMsg::ShowShortcuts),
         input_action!("about", AppMsg::ShowAbout),
+        input_action!("check-for-updates", AppMsg::CheckForUpdates),
         quit,
         remembered_approvals,
-        input_action!("open-editor", AppMsg::NewEditorTab),
-        input_action!("open-file", AppMsg::OpenSqlFile),
-        input_action!("save-file-as", AppMsg::SaveActiveEditorFileAs),
-        input_action!("close-current", AppMsg::CloseActiveWorkspaceTab),
         input_action!("preferences", AppMsg::ShowPreferences),
         input_action!("new-window", AppMsg::NewWindow),
         input_action!("show-history", AppMsg::ShowHistory),
@@ -142,6 +152,25 @@ fn add_window_input_actions(
         input_action!("show-audit", AppMsg::ShowAuditLog),
         input_action!("show-catalog", AppMsg::ShowCatalog),
         input_action!("explain-query", AppMsg::ExplainActiveQuery),
+        input_action!("open-quickly", AppMsg::ShowQuickSwitcher),
+        input_action!("search-database-values", AppMsg::SearchDatabaseValues),
+    ]);
+}
+
+fn add_workspace_input_actions(group: &gio::SimpleActionGroup, sender: ComponentSender<App>) {
+    macro_rules! input_action {
+        ($name:expr, $msg:expr) => {{
+            let s = sender.clone();
+            gio::ActionEntry::builder($name)
+                .activate(move |_, _, _| s.input($msg))
+                .build()
+        }};
+    }
+    group.add_action_entries([
+        input_action!("open-editor", AppMsg::NewEditorTab),
+        input_action!("open-file", AppMsg::OpenSqlFile),
+        input_action!("save-file-as", AppMsg::SaveActiveEditorFileAs),
+        input_action!("close-current", AppMsg::CloseActiveWorkspaceTab),
         input_action!("refresh-page", AppMsg::RefreshPage),
         input_action!("refresh-sidebar", AppMsg::RefreshSidebar),
         input_action!("jump-column", AppMsg::JumpToColumn),
@@ -157,14 +186,10 @@ fn add_window_input_actions(
         input_action!("redo-change", AppMsg::RedoActiveBrowseTab),
         input_action!("reopen-closed-tab", AppMsg::ReopenClosedTab),
         input_action!("open-filter", AppMsg::ShowFilterDialog),
-        input_action!("open-quickly", AppMsg::ShowQuickSwitcher),
         input_action!("save-favorite", AppMsg::SaveQueryAsFavorite),
         input_action!("show-saved-queries", AppMsg::ShowSavedQueries),
         input_action!("back-up-database", AppMsg::BackUpDatabase),
         input_action!("restore-database", AppMsg::RestoreDatabase),
-        input_action!("search-database-values", AppMsg::SearchDatabaseValues),
-    ]);
-    group.add_action_entries([
         input_action!("focus-grid", AppMsg::FocusActiveGrid),
         input_action!("focus-editor", AppMsg::FocusActiveEditor),
         input_action!("export-results", AppMsg::ExportFrontResults),

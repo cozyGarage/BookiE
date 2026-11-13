@@ -159,7 +159,7 @@ fn gsettings_updates_are_visible_to_reopened_handles() {
     let store = PreferencesStore::from_settings(settings, None);
     store
         .update(|prefs| {
-            prefs.default_page_size = 424_242;
+            prefs.default_page_size = 2_347;
             prefs.csv_include_header = false;
         })
         .unwrap();
@@ -167,8 +167,20 @@ fn gsettings_updates_are_visible_to_reopened_handles() {
 
     let reopened = test_settings_with_backend("/com/bookie/linux/test/", backend);
     let reopened = PreferencesStore::from_settings(reopened, None);
-    assert_eq!(reopened.load().default_page_size, 424_242);
+    assert_eq!(reopened.load().default_page_size, 2_347);
     assert!(!reopened.load().csv_include_header);
+}
+
+#[test]
+fn invalid_default_page_sizes_are_bounded_on_load_and_update() {
+    let (settings, _) = make_test_settings("/com/bookie/linux/page-size-bounds/");
+    settings.set_uint64("default-page-size", 0).unwrap();
+    let store = PreferencesStore::from_settings(settings.clone(), None);
+    assert_eq!(store.load().default_page_size, Preferences::default().default_page_size);
+
+    store.update(|prefs| prefs.default_page_size = 9_999).unwrap();
+    assert_eq!(store.load().default_page_size, 5_000);
+    assert_eq!(settings.uint64("default-page-size"), 5_000);
 }
 
 #[test]
@@ -210,7 +222,7 @@ fn gsettings_keyfile_child() {
         "write" => {
             store
                 .update(|prefs| {
-                    prefs.default_page_size = 313_131;
+                    prefs.default_page_size = 3_131;
                     prefs.csv_include_header = false;
                 })
                 .unwrap();
@@ -218,7 +230,7 @@ fn gsettings_keyfile_child() {
         }
         "read" => {
             let prefs = store.load();
-            assert_eq!(prefs.default_page_size, 313_131);
+            assert_eq!(prefs.default_page_size, 3_131);
             assert!(!prefs.csv_include_header);
         }
         _ => {}

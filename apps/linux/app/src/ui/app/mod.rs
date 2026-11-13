@@ -33,6 +33,7 @@ mod sidebar_layout;
 mod sidebar_state;
 mod status_pages;
 mod structure;
+mod whats_new;
 mod tab_session;
 mod tab_title;
 mod types;
@@ -669,6 +670,7 @@ impl SimpleComponent for App {
         };
         open_request::forward_open_signal(sender.input_sender());
         sender.input(AppMsg::ReloadConnections);
+        sender.input(AppMsg::MaybeShowWhatsNew);
         model.content_holder.set_content(Some(&model.history_paned));
         model.set_sidebar_connected(false);
         model.show_welcome_page(sender.clone());
@@ -1052,6 +1054,10 @@ impl SimpleComponent for App {
             AppMsg::RefreshPage => self.on_refresh_active_tab(),
             AppMsg::ShowShortcuts => self.on_show_shortcuts(),
             AppMsg::ShowAbout => self.on_show_about(),
+            AppMsg::CheckForUpdates => whats_new::start_update_check(self, sender.clone()),
+            AppMsg::UpdateCheckFinished(result) => whats_new::present_update_check_result(self, result),
+            AppMsg::MaybeShowWhatsNew => whats_new::maybe_show_whats_new(self, sender.clone()),
+            AppMsg::WhatsNewDismissed => {}
             AppMsg::ShowAuditLog => {
                 crate::ui::audit_dialog::present(self.window.upcast_ref::<gtk::Window>(), &self.database)
             }
