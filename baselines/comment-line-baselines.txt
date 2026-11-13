@@ -56,7 +56,7 @@ apps/linux/app/src/ui/sidebar_row.rs 61
 apps/linux/app/src/ui/ssh_section.rs 9
 apps/linux/app/src/ui/structure_tab/columns.rs 3
 apps/linux/app/src/ui/structure_tab/fks.rs 10
-apps/linux/app/src/ui/structure_tab/indexes.rs 14
+apps/linux/app/src/ui/structure_tab/indexes.rs 5
 apps/linux/app/src/ui/structure_tab/mod.rs 231
 apps/linux/app/src/ui/structure_tab_dialogs.rs 4
 crates/agentd/src/audit_isolation_tests.rs 1
