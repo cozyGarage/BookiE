@@ -1015,6 +1015,9 @@ class CiWorkflowTests(unittest.TestCase):
             self.assertIn("/opt/cargo/bin", cargo_path, name)
             self.assertIn("/home/runner/.cargo/bin", cargo_path, name)
             self.assertIn("/home/ubuntu/.cargo/bin", cargo_path, name)
+        workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        supply_chain = re.search(r"(?ms)^  supply-chain:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
+        self.assertIn("PATH: /cargo/bin:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin", supply_chain)
 
     def test_acceptance_jobs_use_any_host_and_builder_pools(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
