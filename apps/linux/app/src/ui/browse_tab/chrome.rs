@@ -119,12 +119,6 @@ impl BrowseTab {
         let sender_for_last = sender.clone();
         last_button.connect_clicked(move |_| sender_for_last.input(BrowseTabInput::LastPage));
 
-        // Paginator lives in a native `gtk::ActionBar` to match the
-        // mutations bar and the Structure tab's bottom action bar.
-        // Prev/Next/label are start-packed; page-size + export are
-        // end-packed — which gives the same visual as before but
-        // through the toolkit's intended widget so spacing, dim-label
-        // background, and high-contrast theming come for free.
         let paginator_bar = gtk::ActionBar::new();
 
         let export_button = gtk::Button::builder()
@@ -137,20 +131,7 @@ impl BrowseTab {
             "Export results"
         ))]);
 
-        // Filter button — opens the rule editor for server-side WHERE.
-        // Action `win.open-filter` is registered in app/mod.rs and
-        // reads the active tab's controller, so the button implicitly
-        // targets this tab when this tab is active.
-        //
-        // Text-only label (no icon) because there is no canonical GNOME
-        // symbolic icon for "filter rows" in adwaita-icon-theme — the
-        // alternatives (system-search-symbolic, edit-find-symbolic)
-        // clash with Ctrl+F (now bound here). GNOME HIG accepts text-
-        // labeled toolbar buttons; the surrounding paginator strip is
-        // already text-heavy (`Rows 1–12 of 12`, `Rows: 100`) so a
-        // text label reads as native here. The `filter_badge` label
-        // shows the active rule count next to the word when ≥1 rule
-        // applies; hidden otherwise.
+        // Search icons conflict with Ctrl+F, so the filter control stays text-only.
         let filter_label = gtk::Label::new(Some(&bookie_app_services::tr!("Filter")));
         let filter_badge = gtk::Label::builder().label("").visible(false).build();
         filter_badge.add_css_class("numeric");
@@ -174,9 +155,6 @@ impl BrowseTab {
             filter_button.set_sensitive(false);
         }
 
-        // First / Prev / Next / Last sit in a `linked` group so they
-        // read as one navigation control — same pattern GNOME Files
-        // uses on its back/forward toolbar buttons.
         let nav_box = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).build();
         nav_box.add_css_class("linked");
         nav_box.append(&first_button);
@@ -233,14 +211,6 @@ impl BrowseTab {
         }
     }
 
-    /// Pending-changes footer: a `gtk::ActionBar` wrapped in a
-    /// `GtkRevealer` so the entire bar slides in only when there are
-    /// unsaved edits. Mirrors GNOME Text Editor / Builder's behaviour
-    /// of revealing a transient action footer rather than reserving a
-    /// permanent strip for occasionally-used controls.
-    ///
-    /// Layout: pending-count label on the left ("3 unsaved changes"),
-    /// Discard + Save on the right (Save is `.suggested-action`).
     pub(super) fn build_pending_revealer(sender: ComponentSender<Self>) -> PendingRevealer {
         let pending_label = gtk::Label::new(None);
         pending_label.add_css_class("dim-label");
@@ -290,11 +260,6 @@ impl BrowseTab {
         }
     }
 
-    /// Toggle visibility / label of the pending-changeset cluster in
-    /// the mutation bar. Hidden when there are no pending edits; shows
-    /// "{n} unsaved change(s)" with Save (.suggested-action) + Discard.
-    /// The tab-title bullet (App-side) plus this footer cluster cover
-    /// the dirty-state communication — no banner.
     pub(super) fn refresh_pending_bar(&self, count: usize) {
         let visible = count > 0;
         if visible {
@@ -363,12 +328,6 @@ impl BrowseTab {
         self.allows_row_mutations() && self.current_columns.iter().any(|column| column.primary_key)
     }
 
-    /// Update the Filter button's count badge + tooltip based on the
-    /// current FilterSet. Active filters reveal a small numeric badge
-    /// next to the funnel icon and a count-aware tooltip; empty hides
-    /// the badge and falls back to the generic shortcut hint. Called
-    /// from FilterApplied + once on init so a restored filter shows
-    /// immediately.
     pub(super) fn apply_filter(&mut self, set: bookie_core::FilterSet, sender: &ComponentSender<Self>) {
         // No change to the rule list → don't churn the disk
         // or refetch. Re-fetch on identical filter would just
@@ -458,7 +417,12 @@ impl BrowseTab {
             self.update_sort_status_label();
             return;
         };
-        self.set_paginator_text(&paginator_summary(result, self.current_offset, self.current_total_rows));
+        self.set_paginator_text(&paginator_summary(
+            result,
+            self.current_offset,
+            self.current_total_rows,
+            self.last_page_elapsed,
+        ));
         self.update_sort_status_label();
     }
 
@@ -562,30 +526,57 @@ fn retry_button(sender: &ComponentSender<BrowseTab>) -> gtk::Button {
     button
 }
 
-fn paginator_summary(result: &QueryResult, offset: u64, total: Option<u64>) -> String {
+fn paginator_summary(
+    result: &QueryResult,
+    offset: u64,
+    total: Option<u64>,
+    elapsed: Option<std::time::Duration>,
+) -> String {
     let n_rows = result.rows.len();
-    if n_rows == 0 {
-        return if result.truncated {
+    let range = if n_rows == 0 {
+        if result.truncated {
             bookie_app_services::tr!("No rows on this page (result truncated)")
         } else {
             bookie_app_services::tr!("No rows on this page")
+        }
+    } else {
+        let template = match (total.is_some(), result.truncated) {
+            (true, true) => bookie_app_services::tr!("Rows {start} – {end} of {total} (result truncated)"),
+            (true, false) => bookie_app_services::tr!("Rows {start} – {end} of {total}"),
+            (false, true) => bookie_app_services::tr!("Rows {start} – {end} (result truncated)"),
+            (false, false) => bookie_app_services::tr!("Rows {start} – {end}"),
         };
-    }
-    let template = match (total.is_some(), result.truncated) {
-        (true, true) => bookie_app_services::tr!("Rows {start} – {end} of {total} (result truncated)"),
-        (true, false) => bookie_app_services::tr!("Rows {start} – {end} of {total}"),
-        (false, true) => bookie_app_services::tr!("Rows {start} – {end} (result truncated)"),
-        (false, false) => bookie_app_services::tr!("Rows {start} – {end}"),
+        template
+            .replace("{start}", &format_thousands(u128::from(offset + 1)))
+            .replace("{end}", &format_thousands(u128::from(offset + n_rows as u64)))
+            .replace(
+                "{total}",
+                &total
+                    .map(|count| format_thousands(u128::from(count)))
+                    .unwrap_or_default(),
+            )
     };
-    template
-        .replace("{start}", &format_thousands(u128::from(offset + 1)))
-        .replace("{end}", &format_thousands(u128::from(offset + n_rows as u64)))
-        .replace(
-            "{total}",
-            &total
-                .map(|count| format_thousands(u128::from(count)))
-                .unwrap_or_default(),
-        )
+    match elapsed {
+        Some(elapsed) => bookie_app_services::tr!("{range} · {time}")
+            .replace("{range}", &range)
+            .replace("{time}", &page_elapsed_text(elapsed)),
+        None => range,
+    }
+}
+
+fn page_elapsed_text(elapsed: std::time::Duration) -> String {
+    if elapsed.as_millis() == 0 {
+        bookie_app_services::tr!("<1 ms")
+    } else if elapsed.as_secs() == 0 {
+        let millis = (elapsed.as_micros() + 500) / 1000;
+        bookie_app_services::tr!("{n} ms").replace("{n}", &millis.to_string())
+    } else if elapsed.as_secs() < 60 {
+        bookie_app_services::tr!("{n} s").replace("{n}", &format!("{:.2}", elapsed.as_secs_f64()))
+    } else {
+        bookie_app_services::tr!("{minutes}m {seconds}s")
+            .replace("{minutes}", &(elapsed.as_secs() / 60).to_string())
+            .replace("{seconds}", &(elapsed.as_secs() % 60).to_string())
+    }
 }
 
 pub(super) fn next_page_offset(
@@ -655,8 +646,6 @@ pub(super) fn clear_box(b: &gtk::Box) {
         b.remove(&child);
     }
 }
-/// Bundle of widgets returned by `build_paginator` so the builder
-/// signature stays narrow.
 pub(super) struct Paginator {
     pub(super) bar: gtk::ActionBar,
     pub(super) insert_button: gtk::Button,
@@ -675,7 +664,6 @@ pub(super) struct Paginator {
     pub(super) inspector_button: gtk::ToggleButton,
 }
 
-/// Bundle of widgets returned by `build_pending_revealer`.
 pub(super) struct PendingRevealer {
     pub(super) widget: gtk::Revealer,
     pub(super) save_button: gtk::Button,
@@ -698,9 +686,11 @@ pub(super) fn bind_inspector(
 #[cfg(test)]
 mod tests {
     use super::{
-        extract_first_keyset_cursor, extract_keyset_cursor, format_thousands, paginator_summary, sort_status_summary,
+        extract_first_keyset_cursor, extract_keyset_cursor, format_thousands, page_elapsed_text, paginator_summary,
+        sort_status_summary,
     };
     use bookie_core::{ColumnInfo, QueryResult, Value};
+    use std::time::Duration;
 
     #[test]
     fn projected_keyset_cursor_maps_primary_keys_to_result_positions() {
@@ -783,11 +773,11 @@ mod tests {
     #[test]
     fn truncated_browse_pages_disclose_the_result_limit() {
         assert_eq!(
-            paginator_summary(&page(37, true), 1_000, Some(5_000)),
+            paginator_summary(&page(37, true), 1_000, Some(5_000), None),
             "Rows 1,001 – 1,037 of 5,000 (result truncated)"
         );
         assert_eq!(
-            paginator_summary(&page(37, true), 0, None),
+            paginator_summary(&page(37, true), 0, None, None),
             "Rows 1 – 37 (result truncated)"
         );
     }
@@ -795,7 +785,7 @@ mod tests {
     #[test]
     fn a_truncated_browse_page_without_rows_still_discloses_the_result_limit() {
         assert_eq!(
-            paginator_summary(&page(0, true), 0, Some(5_000)),
+            paginator_summary(&page(0, true), 0, Some(5_000), None),
             "No rows on this page (result truncated)"
         );
     }
@@ -803,13 +793,33 @@ mod tests {
     #[test]
     fn untruncated_browse_pages_have_no_result_limit_suffix() {
         assert_eq!(
-            paginator_summary(&page(100, false), 1_000, Some(5_000)),
+            paginator_summary(&page(100, false), 1_000, Some(5_000), None),
             "Rows 1,001 – 1,100 of 5,000"
         );
-        assert_eq!(paginator_summary(&page(100, false), 0, None), "Rows 1 – 100");
+        assert_eq!(paginator_summary(&page(100, false), 0, None, None), "Rows 1 – 100");
         assert_eq!(
-            paginator_summary(&page(0, false), 0, Some(5_000)),
+            paginator_summary(&page(0, false), 0, Some(5_000), None),
             "No rows on this page"
+        );
+    }
+
+    #[test]
+    fn a_page_read_is_timed_after_the_row_range() {
+        assert_eq!(page_elapsed_text(Duration::from_micros(200)), "<1 ms");
+        assert_eq!(page_elapsed_text(Duration::ZERO), "<1 ms");
+        assert_eq!(page_elapsed_text(Duration::from_millis(1)), "1 ms");
+        assert_eq!(page_elapsed_text(Duration::from_micros(5_600)), "6 ms");
+        assert_eq!(page_elapsed_text(Duration::from_millis(999)), "999 ms");
+        assert_eq!(page_elapsed_text(Duration::from_millis(1_234)), "1.23 s");
+        assert_eq!(page_elapsed_text(Duration::from_secs(60)), "1m 0s");
+        assert_eq!(page_elapsed_text(Duration::from_secs(125)), "2m 5s");
+        assert_eq!(
+            paginator_summary(&page(2, false), 0, Some(2), Some(Duration::from_millis(5))),
+            "Rows 1 – 2 of 2 · 5 ms"
+        );
+        assert_eq!(
+            paginator_summary(&page(0, false), 0, Some(0), Some(Duration::from_millis(5))),
+            "No rows on this page · 5 ms"
         );
     }
 

@@ -21,7 +21,9 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 - [ ] Ctrl+S on a browse or structure tab still saves pending edits there.
 - [ ] A `.sql` file above the size limit is refused with an explanation, not truncated.
 - [ ] A `.sql` file containing an excessively long line exceeding the per-line length ceiling is refused with an explanation before loading.
-- [ ] Ctrl+Shift+D lists saved queries; open, rename and delete all work.
+- [ ] Ctrl+Shift+B lists saved queries; open, rename, organize, keyword search and delete work.
+- [ ] Create, rename and delete a folder; deleting a populated folder leaves its queries unfiled.
+- [ ] After several successful editor runs on the current connection, Ctrl+P lists those past queries (at most 50, duplicates once). Choosing one opens a new editor tab with that SQL.
 - [ ] Saving a structure change or edited rows appears in history, and the history dialog can filter those out.
 - [ ] `BOOKIE_LOG_FORMAT=json ./target/debug/bookie` writes lines that parse as JSON; unset keeps the human format.
 

@@ -18,20 +18,15 @@ pub(super) fn install(view: &gtk::ColumnView, menus: &GridMenus) {
                 return glib::Propagation::Proceed;
             };
             let popover = prepare_cell_menu(&menus, &view, &widget, &options);
-            popover.set_pointing_to(
-                widget
-                    .compute_bounds(&view)
-                    .map(|bounds| {
-                        gtk::gdk::Rectangle::new(
-                            bounds.x() as i32,
-                            bounds.y() as i32,
-                            bounds.width() as i32,
-                            bounds.height() as i32,
-                        )
-                    })
-                    .as_ref(),
-            );
-            popover.popup();
+            let pointing = widget.compute_bounds(&view).map(|bounds| {
+                gtk::gdk::Rectangle::new(
+                    bounds.x() as i32,
+                    bounds.y() as i32,
+                    bounds.width() as i32,
+                    bounds.height() as i32,
+                )
+            });
+            crate::ui::context_menu::popup_at(&popover, pointing);
             glib::Propagation::Stop
         }))
         .build();

@@ -65,6 +65,19 @@ fn ticking_nothing_imports_nothing() {
 }
 
 #[tokio::test]
+async fn sqlite_files_are_routed_to_the_dbx_importer() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("dbx.db");
+    let mut bytes = b"SQLite format 3\0".to_vec();
+    bytes.extend_from_slice(&[0xff; 16]);
+    tokio::fs::write(&path, bytes).await.unwrap();
+
+    let error = read_peer_connections_at(&path).await.unwrap_err();
+
+    assert!(!error.contains("valid UTF-8"));
+}
+
+#[tokio::test]
 async fn an_import_failure_stops_before_saving_later_connections() {
     let items = vec![item("first"), item("failed"), item("later")];
     let attempted = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));

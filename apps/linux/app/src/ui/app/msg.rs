@@ -64,6 +64,7 @@ pub enum AppMsg {
         crate::ui::browse_tab::BrowsePageRequest,
         QueryResult,
         Option<Vec<usize>>,
+        std::time::Duration,
     ),
     LoadFailed(Option<Uuid>, crate::ui::browse_tab::BrowseLoadFailure),
     RowOpStarted,
@@ -134,6 +135,7 @@ pub enum AppMsg {
     SavedQueriesChanged(Vec<bookie_storage::SavedQuery>),
     SavedQueriesDialogClosed,
     ShowQuickSwitcher,
+    QuickSwitcherHistoryLoaded(Vec<crate::services::quick_switcher::QuickItem>),
     QuickSwitcherChose(crate::services::quick_switcher::QuickTarget),
     ShowHistory,
     CloseHistory,
@@ -325,6 +327,12 @@ pub enum AppMsg {
     DropTablePrompt {
         schema: Option<String>,
         table: String,
+    },
+    DropTablePromptReady {
+        origin: crate::services::catalog::CatalogOrigin,
+        schema: Option<String>,
+        table: String,
+        referencing: Vec<String>,
     },
     DropTableConfirmed {
         origin: crate::services::catalog::CatalogOrigin,

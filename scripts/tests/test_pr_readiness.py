@@ -21,16 +21,10 @@ class PullRequestReadinessTests(unittest.TestCase):
             "pr-title": ("pr-title.yml", "  pr-title:"),
             "Pin tested revision": ("build-linux.yml", "name: Pin tested revision"),
             "Ensure CI debian-testing GTK image": ("build-linux.yml", "name: Ensure CI debian-testing GTK image"),
-            "Preflight and sandbox tier (no GTK app)": ("build-linux.yml", "name: Preflight and sandbox tier (no GTK app)"),
-            "Fast checks (GTK)": ("build-linux.yml", "name: Fast checks (GTK)"),
-            "Driver TLS fixture (docker)": ("build-linux.yml", "name: Driver TLS fixture (docker)"),
-            "resolve-ref": ("linux-security.yml", "  resolve-ref:"),
-            "Security (security-policy)": ("linux-security.yml", "name: Security (${{ matrix.layer }})"),
-            "Security (supply-chain)": ("linux-security.yml", "layer: [security-policy, supply-chain]"),
+            "Linux regression gate": ("build-linux.yml", "name: Linux regression gate"),
             "workflow-lint": ("linux-ci-contracts.yml", "  workflow-lint:"),
             "workflow-security": ("linux-ci-contracts.yml", "  workflow-security:"),
             "harness": ("linux-ci-contracts.yml", "  harness:"),
-            "unused-dependencies": ("linux-ci-contracts.yml", "  unused-dependencies:"),
         }
 
         for context, (filename, marker) in sources.items():
@@ -46,34 +40,29 @@ class PullRequestReadinessTests(unittest.TestCase):
                 "pr-title",
                 "Pin tested revision",
                 "Ensure CI debian-testing GTK image",
-                "Preflight and sandbox tier (no GTK app)",
-                "Fast checks (GTK)",
-                "Driver TLS fixture (docker)",
-                "resolve-ref",
-                "Security (security-policy)",
-                "Security (supply-chain)",
+                "Linux regression gate",
             }.issubset(required)
         )
         self.assertNotIn("harness", required)
 
-    def test_a_manifest_change_requires_the_unused_dependency_check(self):
+    def test_a_manifest_change_requires_the_full_regression_gate(self):
         for path in ["crates/agentd/Cargo.toml", "Cargo.lock", "apps/gpui/Cargo.lock", "Cargo.toml"]:
             with self.subTest(path=path):
                 required = readiness.required_contexts([path])
 
-                self.assertIn("unused-dependencies", required)
+                self.assertIn("Linux regression gate", required)
 
     def test_a_source_only_change_does_not_require_the_unused_dependency_check(self):
         required = readiness.required_contexts(["crates/core/src/query.rs"])
 
-        self.assertNotIn("unused-dependencies", required)
+        self.assertIn("Linux regression gate", required)
 
     def test_the_contracts_workflow_runs_when_a_manifest_changes(self):
-        workflow = (ROOT / ".github/workflows/linux-ci-contracts.yml").read_text()
-        triggers = workflow.split("concurrency:")[0]
-
-        self.assertEqual(triggers.count('"**/Cargo.toml"'), 2, "push and pull_request")
-        self.assertEqual(triggers.count('"Cargo.lock"'), 2, "push and pull_request")
+        contracts = (ROOT / ".github/workflows/linux-ci-contracts.yml").read_text()
+        build = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        self.assertNotIn('"**/Cargo.toml"', contracts)
+        self.assertNotIn('"Cargo.lock"', contracts)
+        self.assertIn('"**"', build.split("on:", 1)[1].split("permissions:", 1)[0])
 
     def test_docs_only_changes_require_only_the_harness_and_hygiene_checks(self):
         required = readiness.required_contexts(["docs/testing.md", "README.md"])
@@ -83,7 +72,7 @@ class PullRequestReadinessTests(unittest.TestCase):
     def test_mixed_changes_require_code_and_contract_checks(self):
         required = readiness.required_contexts(["docs/testing.md", "scripts/check-pr-title.py"])
 
-        self.assertIn("Fast checks (GTK)", required)
+        self.assertIn("Linux regression gate", required)
         self.assertIn("harness", required)
         self.assertIn("workflow-lint", required)
 
@@ -123,7 +112,7 @@ class PullRequestReadinessTests(unittest.TestCase):
 
         self.assertIn("crates/core/src/query.rs", paths)
         self.assertIn("docs/query.md", paths)
-        self.assertIn("Fast checks (GTK)", required)
+        self.assertIn("Linux regression gate", required)
         self.assertIn("harness", required)
 
     def test_missing_checks_remain_pending(self):

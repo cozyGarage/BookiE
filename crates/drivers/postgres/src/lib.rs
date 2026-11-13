@@ -69,7 +69,6 @@ impl DatabaseDriver for PgDriver {
         true
     }
 
-
     fn supports_updatable_views(&self) -> bool {
         true
     }
@@ -607,7 +606,15 @@ impl Connection for PgConnection {
                 (SELECT c.conname::text FROM pg_catalog.pg_constraint c
                  WHERE c.conindid = ix.indexrelid AND c.conrelid = ix.indrelid
                    AND c.contype IN ('p', 'u', 'x') LIMIT 1) AS constraint_name,
-                0 = ANY(ix.indkey::int2[]) AS has_expression_key
+                0 = ANY(ix.indkey::int2[]) AS has_expression_key,
+                (SELECT pg_catalog.substr(d.definition, h.at + pg_catalog.length(h.head))
+                 FROM (SELECT pg_catalog.pg_get_indexdef(ix.indexrelid) AS definition) d
+                 CROSS JOIN LATERAL (
+                     SELECT q.head, pg_catalog.strpos(d.definition, q.head) AS at
+                     FROM (SELECT pg_catalog.quote_ident(n.nspname) || '.' || pg_catalog.quote_ident(t.relname)
+                                  || ' USING ' AS head) q
+                 ) h
+                 WHERE h.at > 0) AS using_clause
             FROM pg_catalog.pg_class t
             JOIN pg_catalog.pg_namespace n ON t.relnamespace = n.oid
             JOIN pg_catalog.pg_index ix ON ix.indrelid = t.oid
@@ -633,6 +640,7 @@ impl Connection for PgConnection {
                     predicate: r.try_get(4).map_err(map_sqlx_error)?,
                     constraint: r.try_get(5).map_err(map_sqlx_error)?,
                     has_expression_key: r.try_get(6).map_err(map_sqlx_error)?,
+                    using_clause: r.try_get(7).map_err(map_sqlx_error)?,
                 })
             })
             .collect()

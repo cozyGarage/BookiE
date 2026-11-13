@@ -307,6 +307,7 @@ fn spawn_master(
 }
 
 fn die_if_parent_is_gone(expected_parent: u32) -> std::io::Result<()> {
+    #[cfg(target_os = "linux")]
     if unsafe { libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL, 0, 0, 0) } != 0 {
         return Err(std::io::Error::last_os_error());
     }
@@ -566,5 +567,11 @@ mod tests {
         assert_eq!(MasterDir::new(kept.clone()).keep(), kept);
         assert!(!removed.exists());
         assert!(kept.exists());
+    }
+
+    #[test]
+    fn die_if_parent_is_gone_accepts_the_live_parent() {
+        let parent = unsafe { libc::getppid() } as u32;
+        die_if_parent_is_gone(parent).expect("the current parent must still be alive");
     }
 }

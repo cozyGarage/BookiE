@@ -70,6 +70,7 @@ async fn a_created_table_matches_the_drafted_columns_indexes_and_keys() {
                 primary: false,
                 predicate: None,
                 has_expression_key: false,
+                using_clause: None,
             }],
             fks: vec![],
             default_collation: None,

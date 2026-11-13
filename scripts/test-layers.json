@@ -4,7 +4,7 @@
     "harness": {
       "purpose": "Test the test runners, function-size guard and workflow contracts",
       "prerequisites": "Python 3",
-      "hosted_gate": "Linux CI contracts / harness; lab-ci / guards",
+      "hosted_gate": "Linux CI contracts / harness; lab-ci / guards; lab-ci-contracts / harness",
       "steps": [
         {
           "argv": [
@@ -33,7 +33,7 @@
     "quick": {
       "purpose": "Non-GTK formatting, Clippy, unit and sandbox regressions",
       "prerequisites": "Rust 1.98; native non-GTK development libraries",
-      "hosted_gate": "Build Linux / preflight",
+      "hosted_gate": "Build Linux / guards, clippy, unit and sandbox; lab-ci / guards, clippy, unit and sandbox",
       "steps": [
         {
           "argv": [
@@ -49,7 +49,7 @@
     "full": {
       "purpose": "Default workspace formatting, Clippy, unit and sandbox regressions",
       "prerequisites": "Rust 1.98; GTK 4.24 development stack",
-      "hosted_gate": "Build Linux / fast",
+      "hosted_gate": "Build Linux / guards, clippy, unit and sandbox; lab-ci / guards, clippy, unit and sandbox",
       "steps": [
         {
           "argv": [
@@ -86,9 +86,9 @@
       ]
     },
     "gtk-app": {
-      "purpose": "GTK app Clippy and library/binary unit regressions after the non-GTK preflight tier",
+      "purpose": "GTK app Clippy and library/binary unit regressions for focused local validation",
       "prerequisites": "Rust 1.98; GTK 4.24 development stack",
-      "hosted_gate": "Build Linux / fast; lab-ci / clippy and unit",
+      "hosted_gate": "Build Linux / clippy and unit; lab-ci / clippy and unit",
       "steps": [
         {
           "argv": [
@@ -104,7 +104,7 @@
     "change-contracts": {
       "purpose": "Run focused, required regressions for changed Data-lane value-path Rust files",
       "prerequisites": "Python 3; Rust 1.98; mapped crates' native development libraries",
-      "hosted_gate": "Build Linux / fast; lab-ci / unit",
+      "hosted_gate": "Build Linux / unit; lab-ci / unit",
       "steps": [
         {
           "argv": [
@@ -119,7 +119,7 @@
     "sandbox": {
       "purpose": "Tests without database containers or a display",
       "prerequisites": "Rust 1.98; native non-GTK development libraries; local sockets permitted",
-      "hosted_gate": "Build Linux / preflight; lab-ci / sandbox",
+      "hosted_gate": "Build Linux / sandbox; lab-ci / sandbox",
       "steps": [
         {
           "argv": [
@@ -134,7 +134,7 @@
     "drivers": {
       "purpose": "Database drivers, MCP BSON, policy PostgreSQL sessions, sockets and SSH fixtures",
       "prerequisites": "Rust 1.98; Docker; OpenSSH client tools",
-      "hosted_gate": "Build Linux / integration (driver-core, driver-analytics, driver-extended, socket-ssh); lab-ci / driver (core, analytics, extended), consumers and socket-ssh",
+      "hosted_gate": "Build Linux / driver matrix; lab-ci / driver matrix",
       "steps": [
         {
           "argv": [
@@ -150,7 +150,7 @@
     "driver-core": {
       "purpose": "PostgreSQL, MySQL and SQL Server integration tests",
       "prerequisites": "Rust 1.98; Docker; source-pinned test bundle",
-      "hosted_gate": "Build Linux / integration (driver-core); lab-ci / driver (core)",
+      "hosted_gate": "Build Linux / driver (driver-core); lab-ci / driver (driver-core)",
       "steps": [
         {
           "argv": [
@@ -166,7 +166,7 @@
     "driver-analytics": {
       "purpose": "ClickHouse, MongoDB and Redis integration tests",
       "prerequisites": "Rust 1.98; Docker; source-pinned test bundle",
-      "hosted_gate": "Build Linux / integration (driver-analytics); lab-ci / driver (analytics)",
+      "hosted_gate": "Build Linux / driver (driver-analytics); lab-ci / driver (driver-analytics)",
       "steps": [
         {
           "argv": [
@@ -182,7 +182,7 @@
     "driver-extended": {
       "purpose": "Cassandra, DuckDB and Oracle integration tests",
       "prerequisites": "Rust 1.98; Docker; source-pinned test bundle",
-      "hosted_gate": "Build Linux / integration (driver-extended); lab-ci / driver (extended)",
+      "hosted_gate": "Build Linux / driver (driver-extended); lab-ci / driver (driver-extended)",
       "steps": [
         {
           "argv": [
@@ -275,7 +275,7 @@
     "ssh": {
       "purpose": "Agent authentication and OpenSSH sessions",
       "prerequisites": "Rust 1.98; Docker; ssh, ssh-agent, ssh-add, ssh-keygen",
-      "hosted_gate": "Build Linux / integration (socket-ssh); lab-ci / socket-ssh",
+      "hosted_gate": "Build Linux / driver (socket-ssh); lab-ci / driver (socket-ssh)",
       "steps": [
         {
           "argv": [
@@ -290,7 +290,7 @@
     "socket-ssh": {
       "purpose": "PostgreSQL Unix-socket and OpenSSH integration tests",
       "prerequisites": "Rust 1.98; Docker; ssh, ssh-agent, ssh-add, ssh-keygen",
-      "hosted_gate": "Build Linux / integration (socket-ssh); lab-ci / socket-ssh",
+      "hosted_gate": "Build Linux / driver (socket-ssh); lab-ci / driver (socket-ssh)",
       "steps": [
         {
           "argv": ["bash", "scripts/test-postgres-socket.sh"],
@@ -322,7 +322,7 @@
     "pg-dump": {
       "purpose": "PostgreSQL dump and restore integration through the packaged client tools",
       "prerequisites": "Rust 1.98; Docker with postgres:18-alpine; source-pinned test bundle",
-      "hosted_gate": "Build Linux / integration (driver-core); lab-ci / driver (core)",
+      "hosted_gate": "Build Linux / driver (driver-core); lab-ci / driver (driver-core)",
       "steps": [
         {
           "argv": [
@@ -353,7 +353,7 @@
     "app-server": {
       "purpose": "App parser and grid edit contracts against PostgreSQL, MongoDB, MySQL, and SQL Server",
       "prerequisites": "Rust 1.98; GTK 4.24 development stack; Docker",
-      "hosted_gate": "Build Linux / fast; lab-ci / consumers",
+      "hosted_gate": "Build Linux / consumers; lab-ci / consumers",
       "steps": [
         {
           "argv": [
@@ -369,7 +369,7 @@
     "widgets": {
       "purpose": "Isolated GTK widget contracts",
       "prerequisites": "Rust 1.98; GTK 4.24 development stack; Xvfb; private D-Bus",
-      "hosted_gate": "Build Linux / fast; lab-ci / widgets",
+      "hosted_gate": "Build Linux / widgets; lab-ci / widgets",
       "steps": [
         {
           "argv": [
@@ -384,7 +384,7 @@
     "keyring": {
       "purpose": "Secret Service persistence and transport contracts",
       "prerequisites": "Rust 1.98; gnome-keyring; libsecret tools; private D-Bus",
-      "hosted_gate": "Build Linux / gtk-safety; lab-ci / keyring",
+      "hosted_gate": "Build Linux / keyring; lab-ci / keyring",
       "steps": [
         {
           "argv": [
@@ -399,7 +399,7 @@
     "ui": {
       "purpose": "Installed application safety flows through AT-SPI under X11",
       "prerequisites": "GTK 4.24; Rust 1.98 or BOOKIE_GTK_BINARY; Xvfb; PyAT-SPI; private D-Bus",
-      "hosted_gate": "Build Linux / gtk-safety; lab-ci / gtk; GTK Safety Soak",
+      "hosted_gate": "Build Linux / gtk; lab-ci / gtk; GTK Safety Soak",
       "steps": [
         {
           "argv": [
@@ -429,7 +429,7 @@
     "gtk-postgres": {
       "purpose": "Installed GTK database flows against PostgreSQL",
       "prerequisites": "GTK 4.24; Docker with postgres:17-alpine; gnome-keyring; libsecret tools; Xvfb; PyAT-SPI; private D-Bus",
-      "hosted_gate": "Build Linux / gtk-server; lab-ci / e2e",
+      "hosted_gate": "Build Linux / gtk-server; lab-ci / gtk-server",
       "steps": [
         {
           "argv": [
@@ -444,7 +444,7 @@
     "gtk-mysql": {
       "purpose": "Installed GTK database flows against MySQL",
       "prerequisites": "GTK 4.24; Docker with mysql:8.0; gnome-keyring; libsecret tools; Xvfb; PyAT-SPI; private D-Bus",
-      "hosted_gate": "Build Linux / gtk-server; lab-ci / e2e",
+      "hosted_gate": "Build Linux / gtk-server; lab-ci / gtk-server",
       "steps": [
         {
           "argv": [
@@ -527,7 +527,7 @@
     "supply-chain": {
       "purpose": "Dependency advisory, license and source checks using repository exceptions",
       "prerequisites": "cargo-deny; cargo-audit; network to registries and advisory database",
-      "hosted_gate": "Linux Security / supply-chain; lab-ci / supply-chain",
+      "hosted_gate": "Build Linux / supply-chain; Linux Security / scheduled supply-chain; lab-ci / supply-chain",
       "steps": [
         {
           "argv": [
@@ -575,7 +575,7 @@
     "packaging-contracts": {
       "purpose": "Candidate archive and Debian package validator regressions, not installation acceptance",
       "prerequisites": "Python 3; Git; tar; dpkg-deb",
-      "hosted_gate": "Linux CI contracts / harness; lab-ci / guards",
+      "hosted_gate": "Linux CI contracts / harness; lab-ci / guards; lab-ci-contracts / harness",
       "steps": [
         {
           "argv": [
@@ -602,18 +602,34 @@
         }
       ]
     },
+    "unused-dependencies": {
+      "purpose": "Find unused or misplaced workspace dependencies",
+      "prerequisites": "cargo-shear 1.13.4",
+      "hosted_gate": "Build Linux / supply-chain; lab-ci / supply-chain",
+      "steps": [
+        {
+          "argv": ["cargo", "shear"],
+          "timeout_seconds": 900,
+          "evidence": "exit",
+          "required_tools": ["cargo-shear"]
+        }
+      ]
+    },
     "workflow-lint": {
       "purpose": "GitHub and Forgejo workflow schema, expressions and embedded shell validation",
       "prerequisites": "actionlint v1.7.12 and shellcheck",
-      "hosted_gate": "Linux CI contracts / workflow-lint",
+      "hosted_gate": "Linux CI contracts / workflow-lint; lab-ci-contracts / workflow-lint",
       "steps": [
         {
           "argv": [
             "actionlint",
             ".forgejo/workflows/ci.yml",
+            ".forgejo/workflows/ci-contracts.yml",
             ".forgejo/workflows/nightly.yml",
+            ".forgejo/workflows/pr-title.yml",
             ".github/workflows/build-linux.yml",
             ".github/workflows/gtk-soak.yml",
+            ".github/workflows/gpui-macos.yml",
             ".github/workflows/linux-quality.yml",
             ".github/workflows/linux-security.yml",
             ".github/workflows/linux-ci-contracts.yml",
@@ -633,7 +649,7 @@
     "no-default-features": {
       "purpose": "Workspace and test targets compile without the default Kerberos feature",
       "prerequisites": "Rust 1.98; GTK 4.24 development stack",
-      "hosted_gate": "Build Linux / reusable-test-builds; lab-ci / test-build",
+      "hosted_gate": "Build Linux / test-build; lab-ci / test-build",
       "steps": [
         {
           "argv": [
@@ -649,5 +665,278 @@
         }
       ]
     }
+  },
+  "push_required_jobs": [
+    "pin-revision",
+    "guards",
+    "clippy",
+    "test-build",
+    "unit",
+    "sandbox",
+    "widgets"
+  ],
+  "gate_jobs": {
+  "pin-revision": {
+    "needs": [],
+    "timeout_minutes": 5,
+    "condition": null,
+    "matrix": {}
+  },
+  "guards": {
+    "needs": [
+      "pin-revision"
+    ],
+    "timeout_minutes": 90,
+    "condition": null,
+    "matrix": {}
+  },
+  "gpui-tests": {
+    "needs": [
+      "gpui-build",
+      "pin-revision"
+    ],
+    "timeout_minutes": 45,
+    "condition": "github.event_name != 'push'",
+    "matrix": {}
+  },
+  "gtk-build": {
+    "needs": [
+      "guards",
+      "pin-revision"
+    ],
+    "timeout_minutes": 45,
+    "condition": "github.event_name != 'push'",
+    "matrix": {}
+  },
+  "gpui-build": {
+    "needs": [
+      "pin-revision"
+    ],
+    "timeout_minutes": 45,
+    "condition": "github.event_name != 'push'",
+    "matrix": {}
+  },
+  "clippy": {
+    "needs": [
+      "pin-revision"
+    ],
+    "timeout_minutes": 90,
+    "condition": null,
+    "matrix": {}
+  },
+  "test-build": {
+    "needs": [
+      "pin-revision"
+    ],
+    "timeout_minutes": 45,
+    "condition": null,
+    "matrix": {}
+  },
+  "unit": {
+    "needs": [
+      "pin-revision",
+      "test-build"
+    ],
+    "timeout_minutes": 90,
+    "condition": null,
+    "matrix": {}
+  },
+  "sandbox": {
+    "needs": [
+      "pin-revision",
+      "test-build"
+    ],
+    "timeout_minutes": 90,
+    "condition": null,
+    "matrix": {}
+  },
+  "widgets": {
+    "needs": [
+      "pin-revision",
+      "test-build"
+    ],
+    "timeout_minutes": 90,
+    "condition": null,
+    "matrix": {}
+  },
+  "floor-build": {
+    "needs": [
+      "clippy",
+      "guards",
+      "pin-revision"
+    ],
+    "timeout_minutes": 45,
+    "condition": "github.event_name != 'push'",
+    "matrix": {}
+  },
+  "distro-floor-scenarios": {
+    "needs": [
+      "floor-build",
+      "pin-revision"
+    ],
+    "timeout_minutes": 90,
+    "condition": "github.event_name != 'push'",
+    "matrix": {
+      "max-parallel": 2,
+      "shard_group": [
+        "1",
+        "2"
+      ]
+    }
+  },
+  "driver": {
+    "needs": [
+      "clippy",
+      "guards",
+      "pin-revision",
+      "test-build"
+    ],
+    "timeout_minutes": 90,
+    "condition": "github.event_name != 'push'",
+    "matrix": {
+      "group": [
+        "driver-core",
+        "driver-analytics",
+        "driver-extended",
+        "socket-ssh"
+      ]
+    }
+  },
+  "b4-rollback": {
+    "needs": [
+      "pin-revision"
+    ],
+    "timeout_minutes": 45,
+    "condition": "github.event_name != 'push'",
+    "matrix": {}
+  },
+  "security-policy": {
+    "needs": [
+      "pin-revision",
+      "test-build"
+    ],
+    "timeout_minutes": 45,
+    "condition": "github.event_name != 'push'",
+    "matrix": {}
+  },
+  "consumers": {
+    "needs": [
+      "clippy",
+      "guards",
+      "pin-revision",
+      "test-build"
+    ],
+    "timeout_minutes": 45,
+    "condition": "github.event_name != 'push'",
+    "matrix": {}
+  },
+  "gtk": {
+    "needs": [
+      "clippy",
+      "gtk-build",
+      "guards",
+      "pin-revision"
+    ],
+    "timeout_minutes": 60,
+    "condition": "github.event_name != 'push'",
+    "matrix": {
+      "shard": [
+        "1",
+        "2",
+        "3"
+      ]
+    }
+  },
+  "pg-release": {
+    "needs": [
+      "clippy",
+      "guards",
+      "pin-revision",
+      "test-build"
+    ],
+    "timeout_minutes": 45,
+    "condition": "github.event_name != 'push'",
+    "matrix": {}
+  },
+  "gtk-server": {
+    "needs": [
+      "clippy",
+      "gtk-build",
+      "guards",
+      "pin-revision"
+    ],
+    "timeout_minutes": 45,
+    "condition": "github.event_name != 'push'",
+    "matrix": {
+      "server": [
+        "clickhouse",
+        "mongodb",
+        "postgres",
+        "mysql",
+        "mysql-approval"
+      ]
+    }
+  },
+  "driver-tls": {
+    "needs": [
+      "clippy",
+      "guards",
+      "pin-revision",
+      "test-build"
+    ],
+    "timeout_minutes": 45,
+    "condition": "github.event_name != 'push'",
+    "matrix": {}
+  },
+  "keyring": {
+    "needs": [
+      "clippy",
+      "guards",
+      "pin-revision",
+      "test-build"
+    ],
+    "timeout_minutes": 30,
+    "condition": "github.event_name != 'push'",
+    "matrix": {}
+  },
+  "supply-chain": {
+    "needs": [
+      "clippy",
+      "guards",
+      "pin-revision"
+    ],
+    "timeout_minutes": 45,
+    "condition": "github.event_name != 'push'",
+    "matrix": {}
+  },
+  "regression-gate": {
+    "needs": [
+      "b4-rollback",
+      "clippy",
+      "consumers",
+      "distro-floor-scenarios",
+      "driver",
+      "driver-tls",
+      "floor-build",
+      "gpui-build",
+      "gpui-tests",
+      "gtk",
+      "gtk-build",
+      "gtk-server",
+      "guards",
+      "keyring",
+      "pg-release",
+      "pin-revision",
+      "sandbox",
+      "security-policy",
+      "supply-chain",
+      "test-build",
+      "unit",
+      "widgets"
+    ],
+    "timeout_minutes": 5,
+    "condition": "always() && !cancelled()",
+    "matrix": {}
   }
+}
 }

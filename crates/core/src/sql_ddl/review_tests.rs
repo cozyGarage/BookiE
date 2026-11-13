@@ -27,6 +27,7 @@ fn index(name: &str, primary: bool) -> IndexInfo {
         predicate: None,
         constraint: None,
         has_expression_key: false,
+        using_clause: None,
     }
 }
 

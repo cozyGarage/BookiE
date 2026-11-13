@@ -54,7 +54,7 @@ Value tests cover the path from the native driver through each relevant consumer
 
 The sandbox tier selects `--test '*'` so every integration target in its crate list is discovered, including new files. Library and binary unit tests belong to the unit tier; Cargo's broader `--tests` flag also selects those targets and would execute them twice.
 
-The unit and sandbox tiers run under [cargo-nextest](https://nexte.st), one process per test. `scripts/ensure-nextest.sh` downloads the pinned release and verifies its SHA-256. `.config/nextest.toml` disables retries so flaky tests fail instead of passing on a hidden retry, and stops a test that runs for five minutes. Driver, release, GTK and keyring tiers remain on `cargo test`. Shared database fixtures require explicit ownership and isolation before they can run one process per test. The GitHub fast job runs non-GTK unit and sandbox tiers in preflight, then runs the GTK app unit tier (`bookie-app` library and binary targets) in the GTK container. `scripts/ci-local.sh full` remains the single local workspace gate. Doc tests are not part of these tiers.
+The unit and sandbox tiers run under [cargo-nextest](https://nexte.st), one process per test. `scripts/ensure-nextest.sh` downloads the pinned release and verifies its SHA-256. `.config/nextest.toml` disables retries so flaky tests fail instead of passing on a hidden retry, and stops a test that runs for five minutes. Driver, release, GTK and keyring tiers remain on `cargo test`. Shared database fixtures require explicit ownership and isolation before they can run one process per test. GitHub `Build Linux` and Forgejo `lab-ci` run the same required job graph and test layers; provider-specific setup differs for hosted images, runner labels and artifact actions. The GTK app unit tier (`bookie-app` library and binary targets) is part of `unit`. `scripts/ci-local.sh full` remains the single local workspace gate. Doc tests are not part of these tiers.
 
 Container images are not part of that retry rule: a dropped image download is not a flaky test. Before running a test group that uses containers, use `scripts/prepull-test-images.sh <group>` to fetch the images listed for it in `ci/test-images.txt`. Each group must list exactly the images its tests start, including the default image a testcontainers module uses when a test sets no tag; `scripts/tests/test_prepull_test_images.py` fails when a group and its tests differ. When you add a fixture or change an image tag, update the group in the same change.
 
@@ -232,7 +232,7 @@ It runs `pg_dump` and `pg_restore` from the `postgres:18-alpine` image through w
 
 The [manual checklist](manual-verification-0.2-features.md) records installed GTK workflows and layouts that need visual acceptance. Unit and widget tests do not establish installed desktop behavior. Keep run results in private verification records.
 
-The [GPUI app](../apps/gpui/README.md) has its own tests. Run them when changing it; they do not replace the product's GTK or database acceptance tests.
+The [GPUI app](../apps/gpui/README.md) has its own tests. Run them when changing it; they do not replace the product's GTK or database acceptance tests. On GitHub, the `gpui` layer runs in the Linux gate; [gpui-macos.yml](../.github/workflows/gpui-macos.yml) also builds and tests `apps/gpui` on macOS when that tree changes. GPUI remains unshipped until [ADR 0052](decisions/0052-gpui-is-the-cross-platform-frontend.md) conditions hold.
 
 ## Regression case selection
 

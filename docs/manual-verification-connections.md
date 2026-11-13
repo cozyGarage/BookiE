@@ -62,6 +62,12 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 - [ ] Importing a bundle whose id already exists locally against a different server creates a new connection and leaves the local one untouched.
 - [ ] The import plan lists every connection with its disposition and can be unticked before anything is written.
 
+## DBX connection import
+
+- [ ] Select a DBX `dbx.db` file. Supported direct connections appear as editable drafts with credentials empty; unsupported engines and SSH/proxy connections appear in the skipped list.
+- [ ] Confirm the source database and its `connection_secrets` rows are unchanged after previewing and cancelling the import.
+- [ ] Confirm saved SQL is not imported.
+
 ## Built-in SSH host keys and tunnel loss
 
 - [ ] A new host shows its fingerprint before trust; decline/cancel writes no key and opens no database connection. Explicit acceptance persists only that key.

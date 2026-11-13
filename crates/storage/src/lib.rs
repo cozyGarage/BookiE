@@ -5,6 +5,7 @@ mod connection_color;
 mod connection_import_another_redis;
 mod connection_import_datagrip;
 mod connection_import_dbeaver;
+mod connection_import_dbx;
 mod connection_import_navicat;
 mod connection_import_peer;
 mod connection_import_resp;
@@ -34,6 +35,7 @@ pub use connection_color::{
 pub use connection_import_another_redis::{MAX_ANOTHER_REDIS_BYTES, parse_another_redis_connections};
 pub use connection_import_datagrip::{MAX_DATAGRIP_BYTES, parse_datagrip_data_sources};
 pub use connection_import_dbeaver::{MAX_DBEAVER_BYTES, parse_dbeaver_data_sources};
+pub use connection_import_dbx::{MAX_DBX_CONFIG_BYTES, parse_dbx_connection_database};
 pub use connection_import_navicat::{MAX_NAVICAT_BYTES, parse_navicat_connections};
 pub use connection_import_peer::PeerImport;
 pub use connection_import_resp::{MAX_RESP_BYTES, looks_like_resp_export, parse_resp_connections};
@@ -50,7 +52,9 @@ pub use connections::{
 };
 pub use error::{KeyringFailure, StorageError};
 pub use favorites::{
-    SavedQuery, delete_favorite, load_favorites, matches_filter, rank_favorites, save_favorite, touch_favorite,
+    SavedQuery, SavedQueryFolder, SavedQueryLibrary, delete_favorite, delete_saved_query_folder, load_favorites,
+    load_saved_query_library, matches_filter, organize_saved_query, rank_favorites, save_favorite,
+    save_saved_query_folder, touch_favorite,
 };
 pub use legacy_state::migrate_legacy_state;
 pub use paths::{config_path, connections_config_path, data_path, secret_schema, storage_dir_name};

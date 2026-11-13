@@ -358,7 +358,8 @@ impl SqlEditor {
     }
 
     fn visible_stream_page(&self, generation: u64) -> Option<u64> {
-        super::stream_view::visible_page_index(self.results_surface(), generation)
+        let root = self.results_surface().clone().upcast::<gtk::Widget>();
+        super::stream_view::visible_page_index(&root, generation)
     }
 
     fn restore_stream_page(&self, generation: u64, page_index: Option<u64>) {

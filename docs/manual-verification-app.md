@@ -11,7 +11,7 @@ Run the core grid/editor/connection screens in light, dark, high-contrast light 
 - [ ] Show ordinary, selected, focused, edited, inserted, deleted and failed cells, including Boolean, NULL, empty text and long values. Pending state remains distinguishable without hue and is announced by Orca; recycling a row clears its previous state. Keep the existing production badge and window-title marker readable.
 - [ ] Toggle light/dark and high contrast while both SQL panes are open. Check syntax text, selection, caret, gutter marks, statement band, completion and error highlights; compare with the native controls beside them.
 - [ ] Measure custom text against its actual composited background, including selected rows and translucent state tints. Record foreground/background colors, ratio and screenshot. Use 4.5:1 as the target for normal text and 3:1 for meaningful non-text indicators; class names and uncomposited palette values alone do not prove a pass.
-- [ ] Resize connection forms/popovers, editor toolbars, the browse pager, import mapping controls and result panes. Use long translated labels and large fonts. Run, Stop, transaction state, primary dialog actions and secondary menu actions remain reachable without overlap or clipped labels. Refresh row counts and change page size while narrow, then widen again.
+- [ ] Resize connection forms/popovers, editor toolbars, the browse pager, import mapping controls and result panes. Use long translated labels and large fonts. Run, Stop, transaction state, primary dialog actions and secondary menu actions remain reachable without overlap or clipped labels. Refresh row counts and change page size (including a custom size from 1 to 5,000) while narrow, then widen again. After a page load, the status line shows the load duration beside the row count.
 - [ ] Navigate with keyboard only through text, Boolean and editable cells, menus and dialogs. Focus stays visible on selected rows and returns to its origin after dismissal. With animations disabled, a failed edit retains an understandable error indication.
 - [ ] Scroll to the final grid row and rightmost column with wrapped/multiline values. Inspect text baselines, descenders, focus borders, bottom bars and popover edges at each tested scale. Copy and full-value editing preserve the underlying value; a display preview never becomes the saved value.
 
@@ -45,12 +45,15 @@ Main menu, then Catalog, on a PostgreSQL connection with a few objects of each k
 - [ ] Type in the sidebar search: groups holding a match open even if collapsed; clearing the search restores your collapsed groups. Quit and reopen the connection: the groups you collapsed are still collapsed.
 - [ ] New Table and Table from CSV on a Tables group still open their dialogs for that schema. Light and dark look right.
 - [ ] With a table tab open on a connection with many tables, collapse its group, type something that does not match it in the sidebar search, and scroll the list away. Press Ctrl+Shift+L: the search clears, the group opens, and the table's row is selected, in view and focused. From a SQL editor tab it says to open a table first. For a table in a hidden schema it says the schema is hidden.
+- [ ] On a table that other tables reference, choose **Drop Table…**. The confirmation names the referencing tables before you confirm. Cancel leaves the table; confirm runs through the usual approval and audit path.
 
 ## Preferences, About and application icons
 
 - [ ] Open Preferences and confirm the page navigation separates General, Appearance, Editor and MCP.
 - [ ] Change Appearance between System, Light and Dark; confirm the active application style changes and the choice survives a restart.
 - [ ] Confirm the Data browser, Query history and SQL editor controls retain their current values and live-save behavior.
+- [ ] Leave typography overrides at their defaults, then set font family, size and weight independently for Application interface, SQL editor, Result grid and Error and output text. Each change applies to already-open windows and grids and survives restart. Blank family, size 0 and System weight restore the default for that property.
+- [ ] Test size minimum and maximum for each surface. Repeat with desktop text scaling at 1 and enlarged, high-contrast light/dark themes, and at 2x display scale. Text remains readable and controls do not clip; grid size remains within its keyboard zoom range.
 - [ ] Open About and confirm project credits and third-party attribution are presented separately, and the copyright attribution remains visible.
 - [ ] Check the BookiE launcher icon at small and large sizes in the application menu and task switcher; confirm the same artwork is used by the installed package.
 

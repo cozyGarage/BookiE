@@ -12,16 +12,9 @@ PAGE_SIZE = 100
 REQUIRED_CODE_CHECKS = (
     "Pin tested revision",
     "Ensure CI debian-testing GTK image",
-    "Preflight and sandbox tier (no GTK app)",
-    "Fast checks (GTK)",
-    "Driver TLS fixture (docker)",
-    "resolve-ref",
-    "Security (security-policy)",
-    "Security (supply-chain)",
+    "Linux regression gate",
 )
 REQUIRED_CONTRACT_CHECKS = ("harness", "workflow-lint", "workflow-security")
-REQUIRED_MANIFEST_CHECKS = ("unused-dependencies",)
-MANIFEST_FILES = ("Cargo.toml", "Cargo.lock")
 REQUIRED_ALWAYS = ("pr-title",)
 CONTRACT_PREFIXES = (".github/workflows/", ".github/actions/", "scripts/", "apps/linux/packaging/", "docs/")
 HEAD_SHA = re.compile(r"^[0-9a-f]{40}$")
@@ -45,8 +38,6 @@ def required_contexts(paths):
         required.update(REQUIRED_CODE_CHECKS)
     if contract_change:
         required.update(REQUIRED_CONTRACT_CHECKS)
-    if any(path.endswith(MANIFEST_FILES) for path in paths):
-        required.update(REQUIRED_MANIFEST_CHECKS)
     return sorted(required)
 
 

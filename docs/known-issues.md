@@ -87,5 +87,7 @@ This page is an index of ledger IDs to issues. Do not track evidence, owners or 
 | CI-1 | [#2597](https://github.com/cozyGarage/BookiE/issues/2597) | UX |
 | CI-2 | [#2617](https://github.com/cozyGarage/BookiE/issues/2617) | UX |
 | CI-3 | [#2616](https://github.com/cozyGarage/BookiE/issues/2616) | UX |
+| CI-4 | [#573](https://github.com/cozyGarage/BookiE/issues/573) | UX |
+| CI-5 | [#3042](https://github.com/cozyGarage/BookiE/issues/3042) | UX |
 
 When you finish a row, close or move the GitHub issue on the project. Remove its index line in the same docs change. When you move work between lanes, change the project **Lane** field (and `lane:*` label) and update the Lane column here in the same commit.

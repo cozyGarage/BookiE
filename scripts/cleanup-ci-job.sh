@@ -35,7 +35,7 @@ if [[ "${GITHUB_RUN_ID:-}" =~ ^[0-9]+$ ]]; then
   fi
 fi
 
-if [[ "${GITHUB_JOB:-}" == driver && "${TMPDIR:-}" =~ ^/var/cache/ci/tmp/bookie-driver-[0-9]+-[0-9]+-(core|analytics|extended|postgres|mysql|mssql|clickhouse|redis|mongodb|oracle|duckdb)$ ]]; then
+if [[ "${GITHUB_JOB:-}" == driver && "${TMPDIR:-}" =~ ^/var/cache/ci/tmp/bookie-driver-[0-9]+-[0-9]+-(core|analytics|extended|postgres|mysql|mssql|clickhouse|redis|mongodb|oracle|duckdb|driver-core|driver-analytics|driver-extended|socket-ssh)$ ]]; then
   rm -rf -- "$TMPDIR" || status=$?
 fi
 if [[ "${GITHUB_JOB:-}" == b4-rollback && "${GITHUB_RUN_ID:-}" =~ ^[0-9]+$ && "${GITHUB_RUN_ATTEMPT:-}" =~ ^[0-9]+$ && "${TMPDIR:-}" == "/var/cache/ci/tmp/bookie-b4-rollback-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" ]]; then

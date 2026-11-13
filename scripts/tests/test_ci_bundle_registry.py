@@ -5,20 +5,144 @@ import json
 import os
 import platform
 from contextlib import redirect_stdout
-from unittest.mock import patch
 from pathlib import Path
 import tarfile
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
 
 SPEC = importlib.util.spec_from_file_location('registry', Path(__file__).resolve().parents[1] / 'ci-bundle-registry.py')
 registry = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(registry)
 
 
+class JsonResponse:
+    def __init__(self, body, headers=None):
+        self.body = json.dumps(body).encode()
+        self.headers = headers or {}
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        return False
+
+    def read(self, *_):
+        return self.body
+
+
+def forgejo_api_request(responses, requests=None):
+    def request(url, **options):
+        parsed = registry.urllib.parse.urlsplit(url)
+        key = parsed.path.removeprefix('/api/v1/repos/trung/bookie') + '?' + parsed.query
+        if requests is not None:
+            requests.append((url, options.get('token')))
+        return JsonResponse(responses[key])
+
+    return request
+
+
 class RegistryExtractionTests(unittest.TestCase):
-    def test_prune_deletes_only_expired_bookie_bundles_and_keeps_current_revision(self):
+    def test_forgejo_list_reads_all_pages_using_link_and_total_count(self):
+        requests = []
+
+        def request(url, **_):
+            requests.append(url)
+            page = int(registry.urllib.parse.parse_qs(registry.urllib.parse.urlsplit(url).query)['page'][0])
+            if page == 1:
+                return JsonResponse([{'name': str(index)} for index in range(50)], {
+                    'Link': '<https://forgejo.example/branches?page=2>; rel="next"',
+                    'X-Total-Count': '51',
+                })
+            return JsonResponse([{'name': 'last'}], {'X-Total-Count': '51'})
+
+        with patch.object(registry, 'request', side_effect=request):
+            branches = registry.forgejo_list('https://forgejo.example/api', 'branches', {}, 'repo-token')
+
+        self.assertEqual(len(branches), 51)
+        self.assertIn('page=2', requests[1])
+
+    def test_forgejo_list_rejects_invalid_total_count(self):
+        with patch.object(registry, 'request', return_value=JsonResponse([], {'X-Total-Count': 'invalid'})):
+            with self.assertRaisesRegex(ValueError, 'invalid branches reference count'):
+                registry.forgejo_list('https://forgejo.example/api', 'branches', {}, 'repo-token')
+
+    def test_forgejo_list_rejects_incomplete_and_inconsistent_pages(self):
+        cases = [
+            ([], {'X-Total-Count': '2'}, 'incomplete branches reference inventory'),
+            ([{'name': 'too-many'}], {'X-Total-Count': '0'}, 'inconsistent branches reference count'),
+        ]
+        for body, headers, error in cases:
+            with self.subTest(error=error), patch.object(
+                    registry, 'request', return_value=JsonResponse(body, headers)):
+                with self.assertRaisesRegex(ValueError, error):
+                    registry.forgejo_list('https://forgejo.example/api', 'branches', {}, 'repo-token')
+
+    def test_discover_protected_revisions_from_branches_open_prs_and_active_runs(self):
+        responses = {
+            '/branches?limit=50&page=1': [{'commit': {'id': 'a' * 40}}],
+            '/pulls?limit=50&page=1&state=open': [{'state': 'open', 'head': {'sha': 'b' * 40}}],
+            '/actions/runs?limit=50&page=1&status=waiting&status=running': {
+                'total_count': 1, 'workflow_runs': [{'status': 'running', 'commit_sha': 'c' * 40}]
+            },
+        }
+        requests = []
+
+        with patch.dict('os.environ', {
+                'BOOKIE_FORGEJO_API_URL': 'https://forgejo.example/api/v1/repos/trung/bookie',
+                'BOOKIE_FORGEJO_TOKEN': 'repo-token'}), patch.object(
+                    registry, 'request', side_effect=forgejo_api_request(responses, requests)):
+            revisions = registry.discover_protected_revisions()
+
+        self.assertEqual(revisions, {'a' * 40, 'b' * 40, 'c' * 40})
+        self.assertEqual({token for _, token in requests}, {'repo-token'})
+
+    def test_discovery_ignores_closed_pull_requests_and_finished_runs(self):
+        responses = {
+            '/branches?limit=50&page=1': [],
+            '/pulls?limit=50&page=1&state=open': [{'state': 'closed', 'head': {'sha': 'b' * 40}}],
+            '/actions/runs?limit=50&page=1&status=waiting&status=running': {
+                'total_count': 1, 'workflow_runs': [{'status': 'completed', 'commit_sha': 'c' * 40}]
+            },
+        }
+
+        with patch.dict('os.environ', {
+                'BOOKIE_FORGEJO_API_URL': 'https://forgejo.example/api/v1/repos/trung/bookie',
+                'BOOKIE_FORGEJO_TOKEN': 'repo-token'}), patch.object(
+                    registry, 'request', side_effect=forgejo_api_request(responses)):
+            revisions = registry.discover_protected_revisions()
+
+        self.assertEqual(revisions, set())
+
+    def test_discovery_rejects_invalid_branch_revision(self):
+        responses = {
+            '/branches?limit=50&page=1': [{'commit': {'id': 'not-a-commit'}}],
+            '/pulls?limit=50&page=1&state=open': [],
+            '/actions/runs?limit=50&page=1&status=waiting&status=running': {
+                'total_count': 0, 'workflow_runs': []
+            },
+        }
+
+        with patch.dict('os.environ', {
+                'BOOKIE_FORGEJO_API_URL': 'https://forgejo.example/api/v1/repos/trung/bookie',
+                'BOOKIE_FORGEJO_TOKEN': 'repo-token'}), patch.object(
+                    registry, 'request', side_effect=forgejo_api_request(responses)):
+            with self.assertRaisesRegex(ValueError, 'invalid protected source revision'):
+                registry.discover_protected_revisions()
+
+    def test_discovery_rejects_incomplete_action_run_revisions(self):
+        def request(url, **_):
+            return JsonResponse({'total_count': 1} if '/actions/runs?' in url else [])
+
+        with patch.dict('os.environ', {
+                'BOOKIE_FORGEJO_API_URL': 'https://forgejo.example/api/v1/repos/trung/bookie',
+                'BOOKIE_FORGEJO_TOKEN': 'repo-token'}), \
+                patch.object(registry, 'request', side_effect=request):
+            with self.assertRaisesRegex(ValueError, 'incomplete actions/runs reference inventory'):
+                registry.discover_protected_revisions()
+
+    def test_prune_dry_run_lists_expired_bundles_without_deleting(self):
         now = datetime.now(timezone.utc)
         old = (now - timedelta(days=20)).isoformat()
         recent = (now - timedelta(days=2)).isoformat()
@@ -50,15 +174,59 @@ class RegistryExtractionTests(unittest.TestCase):
             requests.append((method, url))
             return Response(200, json.dumps(packages).encode()) if method == 'GET' else Response(204)
 
+        output = io.StringIO()
+        with patch.dict('os.environ', {'BOOKIE_REGISTRY_API_URL': 'https://forgejo.example/api/v1/packages/trung',
+                                       'BOOKIE_REGISTRY_TOKEN': 'test-token'}), \
+                patch.object(registry, 'request', side_effect=request), redirect_stdout(output):
+            registry.prune('c' * 40, 14, set(), dry_run=True)
+
+        deleted = [url for method, url in requests if method == 'DELETE']
+        self.assertEqual(deleted, [])
+        self.assertIn('expired candidate ' + 'a' * 40 + '-direct', output.getvalue())
+        self.assertNotIn('expired candidate ' + 'c' * 40, output.getvalue())
+
+    def test_prune_does_not_delete_old_protected_revisions(self):
+        old = (datetime.now(timezone.utc) - timedelta(days=20)).isoformat()
+        packages = [
+            {'type': 'generic', 'name': 'bookie-test-bundles', 'version': 'a' * 40 + '-direct', 'created_at': old},
+            {'type': 'generic', 'name': 'bookie-test-bundles', 'version': 'b' * 40 + '-direct', 'created_at': old},
+        ]
+        requests = []
+
+        class Response:
+            def __init__(self, status=200):
+                self.status = status
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_):
+                return False
+
+            def read(self, *_):
+                return json.dumps(packages).encode()
+
+        def request(url, method='GET', data=None, size=None):
+            requests.append((method, url))
+            return Response(204 if method == 'DELETE' else 200)
+
         with patch.dict('os.environ', {'BOOKIE_REGISTRY_API_URL': 'https://forgejo.example/api/v1/packages/trung',
                                        'BOOKIE_REGISTRY_TOKEN': 'test-token'}), \
                 patch.object(registry, 'request', side_effect=request):
-            registry.prune('c' * 40, 14)
+            registry.prune('c' * 40, 14, {'b' * 40}, dry_run=False, references_complete=True)
 
         deleted = [url for method, url in requests if method == 'DELETE']
         self.assertEqual(deleted, [
             'https://forgejo.example/api/v1/packages/trung/generic/bookie-test-bundles/' + 'a' * 40 + '-direct'
         ])
+
+    def test_prune_delete_requires_an_explicit_protected_revision(self):
+        with self.assertRaisesRegex(ValueError, 'protected revisions and complete reference discovery'):
+            registry.prune('c' * 40, 14, set(), dry_run=False)
+
+    def test_prune_delete_requires_complete_reference_discovery(self):
+        with self.assertRaisesRegex(ValueError, 'protected revisions and complete reference discovery'):
+            registry.prune('c' * 40, 14, {'b' * 40}, dry_run=False)
 
     def test_prune_reads_all_pages_before_deleting_versions(self):
         recent = (datetime.now(timezone.utc) - timedelta(days=2)).isoformat()
@@ -91,12 +259,12 @@ class RegistryExtractionTests(unittest.TestCase):
                 return Response(204)
             page = int(registry.urllib.parse.parse_qs(registry.urllib.parse.urlsplit(url).query)['page'][0])
             selection = packages[(page - 1) * 50:page * 50]
-            return Response(body=json.dumps(selection).encode())
+            return Response(204) if method == 'DELETE' else Response(body=json.dumps(selection).encode())
 
         with patch.dict('os.environ', {'BOOKIE_REGISTRY_API_URL': 'https://forgejo.example/api/v1/packages/trung',
                                        'BOOKIE_REGISTRY_TOKEN': 'test-token'}), \
                 patch.object(registry, 'request', side_effect=request):
-            registry.prune('c' * 40, 14)
+            registry.prune('c' * 40, 14, {'d' * 40}, dry_run=False, references_complete=True)
 
         self.assertEqual([method for method, _ in requests[:2]], ['GET', 'GET'])
         self.assertEqual([method for method, _ in requests[2:]], ['DELETE'])
@@ -136,10 +304,22 @@ class RegistryExtractionTests(unittest.TestCase):
         error = registry.urllib.error.HTTPError(
             'https://registry.example/bundle/bundle.tar.gz', 500, 'Internal Server Error', {}, None)
         with patch.dict('os.environ', {'BOOKIE_REGISTRY_TOKEN': 'test-token'}), \
-                patch.object(registry.urllib.request, 'urlopen', side_effect=error), \
+                patch.object(registry.urllib.request, 'build_opener') as opener, \
                 self.assertRaisesRegex(registry.urllib.error.HTTPError, 'PUT /bundle/bundle.tar.gz returned HTTP 500') as raised:
+            opener.return_value.open.side_effect = error
             registry.request('https://registry.example/bundle/bundle.tar.gz', 'PUT')
         self.assertEqual(raised.exception.code, 500)
+
+    def test_registry_redirect_drops_credentials_on_origin_change(self):
+        request = registry.urllib.request.Request(
+            'https://forgejo.example/api', headers={'Authorization': 'token test-token'})
+        redirect = registry.ArtifactRedirect()
+        same_origin = redirect.redirect_request(request, None, 302, 'Found', {}, 'https://forgejo.example/next')
+        downgrade = redirect.redirect_request(request, None, 302, 'Found', {}, 'http://forgejo.example/next')
+        other_host = redirect.redirect_request(request, None, 302, 'Found', {}, 'https://other.example/next')
+        self.assertEqual(same_origin.get_header('Authorization'), 'token test-token')
+        self.assertIsNone(downgrade.get_header('Authorization'))
+        self.assertIsNone(other_host.get_header('Authorization'))
 
     def test_download_progress_is_quiet_until_the_interval_then_reports_rate(self):
         output = io.StringIO()
@@ -156,7 +336,8 @@ class RegistryExtractionTests(unittest.TestCase):
     def test_missing_registry_manifest_remains_a_cache_miss(self):
         error = registry.urllib.error.HTTPError('https://registry.example/bundle/manifest.json', 404, 'Not Found', {}, None)
         with patch.dict('os.environ', {'BOOKIE_REGISTRY_TOKEN': 'test-token'}), \
-                patch.object(registry.urllib.request, 'urlopen', side_effect=error):
+                patch.object(registry.urllib.request, 'build_opener') as opener:
+            opener.return_value.open.side_effect = error
             self.assertIsNone(registry.existing_manifest('https://registry.example/bundle/', 'a' * 40, 'default'))
 
     def check_archive(self, name, kind=tarfile.REGTYPE):

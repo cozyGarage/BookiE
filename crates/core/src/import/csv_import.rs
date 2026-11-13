@@ -208,7 +208,12 @@ pub fn read_csv(bytes: &[u8], options: &CsvImportOptions, limit: Option<usize>) 
         false => Vec::new(),
     };
     check_width(headers.len())?;
-    let (rows, truncated) = collect_rows(&mut reader, options, limit)?;
+    let blanks = SkippedBlankRows {
+        source: decoded.as_bytes(),
+        from: 0,
+        single_column: options.has_header.then_some(headers.len() == 1),
+    };
+    let (rows, truncated) = collect_rows(&mut reader, blanks, options, limit)?;
     finish_sheet(headers, rows, truncated)
 }
 
@@ -243,28 +248,86 @@ fn reader_for<'a>(bytes: &'a [u8], options: &CsvImportOptions) -> csv::Reader<&'
     builder.from_reader(bytes)
 }
 
+struct SkippedBlankRows<'a> {
+    source: &'a [u8],
+    from: usize,
+    single_column: Option<bool>,
+}
+
+impl SkippedBlankRows<'_> {
+    fn before(&mut self, start: usize, record_width: Option<usize>) -> usize {
+        let at_end = record_width.is_none();
+        let from = if at_end { self.from } else { start };
+        self.from = start;
+        if !*self.single_column.get_or_insert(record_width.unwrap_or(1) == 1) {
+            return 0;
+        }
+        let reader_stopped_inside_crlf = !at_end && from > 0 && self.source.get(from - 1..=from) == Some(b"\r\n");
+        let mut rest = self
+            .source
+            .get(from + usize::from(reader_stopped_inside_crlf)..)
+            .unwrap_or_default();
+        let mut breaks = 0usize;
+        while let Some(shorter) = strip_line_break(rest, at_end) {
+            rest = shorter;
+            breaks += 1;
+        }
+        let last_record_terminator = usize::from(at_end && !rest.is_empty());
+        breaks.saturating_sub(last_record_terminator)
+    }
+}
+
+fn strip_line_break(text: &[u8], from_end: bool) -> Option<&[u8]> {
+    match from_end {
+        true => text
+            .strip_suffix(b"\r\n")
+            .or_else(|| text.strip_suffix(b"\n"))
+            .or_else(|| text.strip_suffix(b"\r")),
+        false => text
+            .strip_prefix(b"\r\n")
+            .or_else(|| text.strip_prefix(b"\n"))
+            .or_else(|| text.strip_prefix(b"\r")),
+    }
+}
+
 fn collect_rows(
     reader: &mut csv::Reader<&[u8]>,
+    mut blanks: SkippedBlankRows<'_>,
     options: &CsvImportOptions,
     limit: Option<usize>,
 ) -> Result<(Vec<Vec<String>>, bool), ImportError> {
     let header_offset = usize::from(options.has_header);
     let mut rows: Vec<Vec<String>> = Vec::new();
-    for (index, record) in reader.records().enumerate() {
-        if let Some(limit) = limit
-            && rows.len() >= limit
-        {
+    let mut records = reader.records().enumerate();
+    loop {
+        if limit.is_some_and(|limit| rows.len() >= limit) {
+            return Ok((rows, records.next().is_some()));
+        }
+        let next = records.next().map(|(index, record)| (index, record.map_err(malformed)));
+        let (start, width) = match &next {
+            Some((_, Ok(record))) => (record.position().map(csv::Position::byte), Some(record.len())),
+            Some((_, Err(_))) => (None, None),
+            None => (Some(blanks.source.len() as u64), None),
+        };
+        let blank_rows = start.map_or(0, |start| blanks.before(start as usize, width));
+        let room = limit.unwrap_or(usize::MAX).saturating_sub(rows.len());
+        if rows.len().saturating_add(blank_rows.min(room)) > MAX_IMPORT_ROWS {
+            return Err(ImportError::TooManyRows { limit: MAX_IMPORT_ROWS });
+        }
+        rows.extend(std::iter::repeat_n(vec![String::new()], blank_rows.min(room)));
+        let Some((index, record)) = next else {
+            return Ok((rows, blank_rows > room));
+        };
+        if blank_rows >= room {
             return Ok((rows, true));
         }
         if rows.len() >= MAX_IMPORT_ROWS {
             return Err(ImportError::TooManyRows { limit: MAX_IMPORT_ROWS });
         }
-        let record = record.map_err(malformed)?;
-        let line = index + header_offset + 1;
+        let record = record?;
         check_width(record.len())?;
-        rows.push(record_strings(&record, line)?);
+        rows.push(record_strings(&record, index + header_offset + 1)?);
     }
-    Ok((rows, false))
 }
 
 fn finish_sheet(headers: Vec<String>, mut rows: Vec<Vec<String>>, truncated: bool) -> Result<CsvSheet, ImportError> {

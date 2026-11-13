@@ -7,6 +7,7 @@ mod cell_editor;
 mod connect_dialog;
 pub(crate) mod connection_bundle;
 mod connection_row;
+mod context_menu;
 mod count_format;
 mod diagram;
 mod editor;
@@ -44,6 +45,7 @@ mod ssh_section;
 mod structure_tab;
 mod structure_tab_dialogs;
 mod theme;
+pub(crate) mod typography;
 mod value_search;
 mod welcome_view;
 

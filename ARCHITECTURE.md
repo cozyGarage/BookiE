@@ -24,7 +24,8 @@ DuckDB is a built-in driver. The diagrams below give the detail.
 | Path | Holds |
 | --- | --- |
 | `crates/` | GTK-free workspace crates: `core`, `policy`, `storage`, `ssh`, `transport`, `results`, `app-services`, `dump`, `mcp`, `agentd`, and `drivers/*`. None depends on GTK. |
-| `apps/linux/` | The GTK application (`app/`) and what only it needs: `data/`, `po/`, `flatpak/`, `packaging/`. |
+| `apps/linux/` | The shipped GTK application (`app/`) and what only it needs: `data/`, `po/`, `flatpak/`, `packaging/`. |
+| `apps/gpui/` | The chosen cross-platform GPUI frontend ([ADR 0052](docs/decisions/0052-gpui-is-the-cross-platform-frontend.md)); own lockfile, not packaged until that ADR's shipping conditions hold. |
 | `tests/` | Cross-crate test crates (`release/`, `driver-tls/`), fixtures and shared test data (`data/`). Unit tests stay beside their code; per-crate integration tests stay in `crates/<name>/tests`. |
 | `scripts/`, `ci/`, `vendor/`, `docs/` | Tooling, CI helpers, vendored patches and documentation. |
 | root | `Cargo.toml` workspace, toolchain and lint config, `meson.build`, this file, `AGENTS.md`, `README.md`. |
@@ -461,7 +462,7 @@ Workspace Clippy and unit checks include the DuckDB driver like every other crat
 | No embedded browser | Native GTK widgets only. |
 | No in-process user scripting | Reduces attack surface beside SQL policy. |
 | Redis topology | Single endpoint; unsupported topologies and release status are in [known limitations](docs/known-limitations.md#editing-and-connections). |
-| Packaging | GitHub releases provide an Arch package and an AppImage (0.2.4 also has Debian and Flatpak; see ADRs 0031 and 0032). Native package requirements are listed in [platforms](docs/platforms.md). |
+| Packaging | Current GitHub releases provide an Arch package and an AppImage; 0.2.4 also has Debian and Flatpak (ADRs 0031 and 0032). Native package requirements, OpenSSL sonames and AppImage toolkit notes are in [platforms](docs/platforms.md). |
 
 ## How to read this architecture map
 

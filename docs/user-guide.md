@@ -22,7 +22,7 @@ BookiE is a database client for Linux. It opens PostgreSQL, MySQL and MariaDB, S
 - **CLI launch**: Open databases directly from a terminal: `bookie books.db` or `bookie postgres://user@host:5432/db`.
 - **Attached SQLite databases**: The SQLite driver can use configured attachments, but the connection form does not currently provide controls to add or edit them. Existing attachment lists are preserved when editing the same connection.
 - **Bundles**: Export or import connections with optional passphrase encryption to share configurations across machines.
-- **Peer import**: Import connection drafts from DBeaver, DataGrip, Navicat, RESP.app or Another Redis Desktop Manager. BookiE fills host, user and engine only; passwords stay out of the file. Save each draft to put credentials in Secret Service. Connections that use an SSH tunnel are skipped by name.
+- **Peer import**: Import connection drafts from DBX, DBeaver, DataGrip, Navicat, RESP.app or Another Redis Desktop Manager. DBX import reads connection settings only; saved SQL and credentials are not imported. Other peer importers do not import credentials. Save each draft to enter credentials through Secret Service. Unsupported engines and active transport settings are listed in the import preview.
 
 ## Browse a table
 
@@ -33,7 +33,7 @@ BookiE is a database client for Linux. It opens PostgreSQL, MySQL and MariaDB, S
 
 Click any table in the sidebar to open it in a preview tab. Editing the table or selecting **Keep Tab** makes it permanent.
 
-Navigation uses **First**, **Previous**, **Next**, and **Last**. Unsorted tables with primary keys use fast keyset seeks.
+Navigation uses **First**, **Previous**, **Next**, and **Last**. Choose a page size from 1 to 5,000 rows on the pager; Preferences sets the default. The status line shows how long the current page took to load beside its row count. Unsorted tables with primary keys use fast keyset seeks.
 
 ![Structured filter presets and condition builder](images/filter-builder.png)
 
@@ -104,7 +104,7 @@ Single-statement PostgreSQL `SELECT` queries stream progressively:
 - **Session mode**: Toggle **Session** to bind the tab to a dedicated connection for transactions and temporary tables. When a transaction is active, use **Commit & close session** or **Roll back & close session**.
 - **Explain plans**: Click **Explain** to inspect execution plans. PostgreSQL displays a visual **Tree** with cost-distribution bars alongside raw text; SQLite provides an indented tree.
 - **Query history**: Press `Ctrl+H` to toggle the bottom history drawer. Statements containing secrets are automatically excluded.
-- **Favorites & Open Quickly**: Press `Ctrl+D` to save a favorite query, `Ctrl+Shift+B` to view saved favorites, and `Ctrl+P` for Open Quickly across tabs, favorites, and connections.
+- **Saved queries & Open Quickly**: Press `Ctrl+D` to save a query, `Ctrl+Shift+B` to browse queries, create folders, assign queries and keywords, and `Ctrl+P` for Open Quickly across tabs, saved queries, connections and up to 50 recent successful editor queries from the current connection. Choosing a past query opens it in a new editor tab. Search matches query names, SQL, and keywords. Deleting a folder leaves its queries available as unfiled.
 
 ## Search database values
 
@@ -120,10 +120,18 @@ A search covers at most 200 tables, 24 columns in each table and 25 matching row
 
 ![Export scope dialog choosing data scope before format](images/export-wizard.png)
 
-- **Export**: Press `Ctrl+Shift+E`, or use Export Results from a result grid, to export the front tab's shown rows. Select **Scope** (Current table page or loaded query result) before choosing your format: CSV, JSON, Markdown, HTML, XML, SQL, or Excel (`.xlsx`). On PostgreSQL, **All matching table rows** exports the whole table, or the active filter and sort, from one consistent snapshot taken when the export starts. Other engines refuse a full-table export; export the current page or a query result instead.
+- **Export**: Press `Ctrl+Shift+E`, or use Export Results from a result grid, to export the front tab. Select **Scope** before choosing your format: CSV, JSON, Markdown, HTML, XML, SQL, or Excel (`.xlsx`). For a browse tab, Scope offers the current table page; for a SQL result it offers the visible page or the complete saved result. On PostgreSQL, **All matching table rows** exports the whole table, or the active filter and sort, from one consistent snapshot taken when the export starts. Other engines refuse a full-table export; export the current page or a query result instead.
 - **Import**: Right-click any table and choose **Import CSV…**, or import from a schema header to create a new table. Excel `.xlsx` files read the first populated sheet. Delimiters, headers, encodings (UTF-8, Windows-1252, UTF-16), and column mappings are detected automatically and can be remembered per table.
 - **Update existing rows**: When you import into an existing table on PostgreSQL, SQLite, DuckDB, MySQL or MariaDB, **Existing rows** offers **Update the existing row**. Pick the key under **Match rows by**: the table's primary key or one of its unique indexes. A row in the file whose key is already in the table replaces the other mapped columns of that row, and a row with a new key is added. A table with no primary key or unique index cannot use this mode. The approval prompt and the audit record state that existing rows may change. Without this mode, a duplicate key stops the import.
 - **Several files**: In the file chooser of **Import CSV…** for an existing table, select up to 20 files. You set the separator, header, mapping and write mode once, for the first file, and the same choices apply to the others, so every file needs the same columns in the same order. Each file asks for its own approval and is written in batches as for a single file. **Cancel** stops the file in progress and cancels the rest. The run stops at the first file that fails, and the final message lists every file as written, stopped, cancelled or not started. A run is limited to 256 MB of files and 2,000,000 rows.
+
+## Preferences and updates
+
+Open **Preferences** from the primary menu.
+
+- **Default page size** sets how many rows a new browse tab loads (1 to 5,000).
+- **Appearance** can set font family, size and weight independently for the application interface, SQL editor, result grid and error text. Blank family, size 0 and System weight restore each default.
+- **Check for Updates** reports whether a newer release is available. The first launch of a new version shows a What's new dialog with that version's AppStream notes. A quieter startup check can show a dismissible banner when a newer release exists.
 
 ## Safety
 

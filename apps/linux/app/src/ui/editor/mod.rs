@@ -80,6 +80,10 @@ use statement_cursor::{
     PlannedStatements, adjacent_statement_start, cursor_byte_offset, script_statements, statement_at_cursor,
 };
 
+pub(crate) fn apply_font_preferences(preferences: &crate::services::preferences::Preferences) {
+    schema::apply_editor_font_preferences(preferences);
+}
+
 pub struct SqlEditor {
     catalog_changes: crate::services::catalog::CatalogChanges,
     catalog_origin: Option<crate::services::catalog::CatalogOrigin>,
@@ -147,6 +151,14 @@ mod messages;
 pub use messages::{SqlEditorInput, SqlEditorOutput, StatementIdentity, StatementOutcome, StatementOutcomeKind};
 
 pub(super) const MAX_SQL_FILE_BYTES: u64 = bookie_app_services::sql_text::EDITOR_MAX_SQL_BYTES;
+
+fn set_initial_sql_buffer_text(buffer: &sourceview5::Buffer, text: &str) {
+    if text.len() > query_changes::MAX_SYNTAX_HIGHLIGHT_BYTES {
+        buffer.set_highlight_syntax(false);
+        buffer.set_language(None);
+    }
+    buffer.set_text(text);
+}
 
 #[derive(Debug)]
 struct ExecutionContext {
@@ -229,6 +241,7 @@ impl SimpleComponent for SqlEditor {
                         #[name = "warnings_button"]
                         append = &gtk::MenuButton {
                             set_label: &bookie_app_services::tr!("SQL warnings"),
+                            set_can_shrink: true,
                             set_tooltip_text: Some(bookie_app_services::tr!("Character suggestions; SQL is not changed").as_str()),
                             set_visible: false,
                         },
@@ -236,6 +249,7 @@ impl SimpleComponent for SqlEditor {
                         #[name = "pin_button"]
                         append = &gtk::Button {
                             set_label: &bookie_app_services::tr!("Pin results"),
+                            set_can_shrink: true,
                             set_tooltip_text: Some(bookie_app_services::tr!("Keep these results above the results of the next run").as_str()),
                             set_sensitive: false,
                             add_css_class: "flat",
@@ -245,6 +259,7 @@ impl SimpleComponent for SqlEditor {
                         #[name = "compare_button"]
                         append = &gtk::Button {
                             set_label: &bookie_app_services::tr!("Compare…"),
+                            set_can_shrink: true,
                             set_tooltip_text: Some(bookie_app_services::tr!("Compare two results row by row").as_str()),
                             set_sensitive: false,
                             add_css_class: "flat",
@@ -254,6 +269,7 @@ impl SimpleComponent for SqlEditor {
                         #[name = "explain_button"]
                         append = &gtk::Button {
                             set_label: &bookie_app_services::tr!("Explain"),
+                            set_can_shrink: true,
                             set_tooltip_text: Some(bookie_app_services::tr!("Explain query plan").as_str()),
                             add_css_class: "flat",
                             connect_clicked => SqlEditorInput::Explain,
@@ -262,6 +278,7 @@ impl SimpleComponent for SqlEditor {
                         #[name = "split_button"]
                         append = &gtk::ToggleButton {
                             set_label: &bookie_app_services::tr!("Split"),
+                            set_can_shrink: true,
                             set_tooltip_text: Some(bookie_app_services::tr!("Show or hide a second SQL editor pane").as_str()),
                             add_css_class: "flat",
                             connect_toggled[sender] => move |button| {
@@ -287,6 +304,7 @@ impl SimpleComponent for SqlEditor {
                         #[name = "run_button"]
                         append = &gtk::Button {
                             set_label: &bookie_app_services::tr!("Run"),
+                            set_can_shrink: true,
                             set_tooltip_text: Some(bookie_app_services::tr!("Run query (Ctrl+Return)").as_str()),
                             add_css_class: "suggested-action",
                             connect_clicked => SqlEditorInput::Run,
@@ -303,6 +321,7 @@ impl SimpleComponent for SqlEditor {
                 #[name = "longer_timeout_button"]
                 add_top_bar = &gtk::Button {
                         set_visible: false,
+                        set_can_shrink: true,
                         set_halign: gtk::Align::End,
                         set_margin_end: 8,
                         set_margin_bottom: 8,
@@ -372,13 +391,14 @@ impl SimpleComponent for SqlEditor {
         } else {
             initial_text
         };
-        if let Some(lang) = lang_manager.language("sql") {
-            let buffer = sourceview5::Buffer::with_language(&lang);
-            buffer.set_text(&initial_text);
+        let sql_language = lang_manager.language("sql");
+        if let Some(lang) = sql_language.as_ref() {
+            let buffer = sourceview5::Buffer::with_language(lang);
+            set_initial_sql_buffer_text(&buffer, &initial_text);
             widgets.source_view.set_buffer(Some(&buffer));
         } else {
             let buffer = sourceview5::Buffer::new(None::<&gtk::TextTagTable>);
-            buffer.set_text(&initial_text);
+            set_initial_sql_buffer_text(&buffer, &initial_text);
             widgets.source_view.set_buffer(Some(&buffer));
         }
         let split_view =
@@ -479,6 +499,7 @@ impl SimpleComponent for SqlEditor {
             widgets.status.clone(),
             sender.clone(),
             refresh_completion,
+            sql_language,
         );
         split_view::install_shortcuts(&widgets.source_view, &sender, EditorPane::Primary);
         split_view::install_shortcuts(split_view.secondary_view(), &sender, EditorPane::Secondary);

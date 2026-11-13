@@ -16,6 +16,7 @@ Create `items(id int primary key, name text)`, `v_items` as `SELECT id, name FRO
 
 Open a result, then Export Results.
 
+- [ ] Scope appears before Format. For a browse tab it offers the current table page; for a completed SQL result it offers the visible page and the complete saved result.
 - [ ] The Format list offers CSV, JSON, Markdown, HTML, XML, SQL and Excel.
 - [ ] SQL is absent for a MongoDB or Redis connection, present for the others.
 - [ ] The CSV options group shows for CSV and hides for every other format.

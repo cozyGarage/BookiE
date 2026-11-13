@@ -22,6 +22,7 @@ class GtkFailureCleanupTests(unittest.TestCase):
         namespace = dict(Path=Path, tempfile=tempfile, os=os, json=json, shutil=shutil,
                          write_fixture=lambda *_a, **_kw: (None, {}),
                          start_application=lambda *_a: object(),
+                         dismiss_release_notes=lambda: None,
                          stop_application=lambda process: stopped.append(process) or "",
                          accessible_snapshot=snapshot)
         exec(compile(ast.Module(body=[node], type_ignores=[]), str(source), "exec"), namespace)

@@ -13,8 +13,7 @@ pub(super) fn install(view: &gtk::ColumnView, menus: &GridMenus, empty: gtk::Pop
         let Some(view) = weak_view.upgrade() else { return };
         if let Some(popover) = popover_at(&view, &menus, &empty, x, y) {
             gesture.set_state(gtk::EventSequenceState::Claimed);
-            popover.set_pointing_to(Some(&gtk::gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
-            popover.popup();
+            crate::ui::context_menu::popup_at(&popover, Some(gtk::gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
         }
     });
     view.add_controller(gesture);

@@ -22,6 +22,7 @@ pub(in crate::ui::editor) fn build_streamed_result_widget(
     };
     let page_switcher = build_page_stack(outcome, result, &target, sender);
     let progress = gtk::Label::new(Some(&stream_progress_text(result)));
+    progress.add_css_class("bookie-output-font");
     if matches!(result.terminal, StreamTerminal::Loading) {
         page_switcher.set_widget_name(super::super::stream_view::LIVE_PAGES);
         progress.set_widget_name(super::super::stream_view::LIVE_PROGRESS);
@@ -33,13 +34,14 @@ pub(in crate::ui::editor) fn build_streamed_result_widget(
     if let Some(notice) = stream_terminal_notice(result) {
         let banner = adw::Banner::new(&notice);
         banner.set_use_markup(false);
+        banner.add_css_class("bookie-output-font");
         banner.set_revealed(true);
         holder.append(&banner);
     }
     let pager = super::super::stream_view::build_pager(&page_switcher);
     header.append(&pager);
     append_result_tools(&holder, &header, &page_switcher, outcome, result, sender);
-    append_stream_export(&header, result, grid_sender);
+    append_stream_export(&header, &page_switcher, result, grid_sender);
     if matches!(result.terminal, StreamTerminal::Complete) && sender.is_some() {
         super::super::stream_view::install_continuous(&holder, &header, &pager, &page_switcher, result, &target);
     }
@@ -102,28 +104,54 @@ fn append_result_tools(
     });
 }
 
-fn append_stream_export(holder: &adw::WrapBox, result: &StreamedResult, grid_sender: &relm4::Sender<GridMsg>) {
+fn append_stream_export(
+    holder: &adw::WrapBox,
+    pages: &gtk::Stack,
+    result: &StreamedResult,
+    grid_sender: &relm4::Sender<GridMsg>,
+) {
     if matches!(result.terminal, StreamTerminal::Loading) {
         let notice = gtk::Label::new(Some(&bookie_app_services::tr!(
             "Export all rows is available when the query completes."
         )));
         notice.set_ellipsize(gtk::pango::EllipsizeMode::End);
         notice.set_max_width_chars(40);
+        notice.add_css_class("bookie-output-font");
         holder.append(&notice);
     }
     if matches!(result.terminal, StreamTerminal::Complete)
         && let Some(request) = result.export.clone().filter(|request| request.spool.is_some())
     {
-        let export = gtk::Button::with_label(&bookie_app_services::tr!("Export all rows…"));
+        let export = gtk::Button::with_label(&bookie_app_services::tr!("Export rows…"));
         export.add_css_class("flat");
+        let pages = pages.downgrade();
+        let result = result.clone();
         export.connect_clicked({
             let grid_sender = grid_sender.clone();
             move |_| {
-                let _ = grid_sender.send(GridMsg::ExportStreamedResults(request.clone()));
+                let mut request = request.clone();
+                request.current_page = pages.upgrade().and_then(|pages| visible_result_page(&pages, &result));
+                let _ = grid_sender.send(GridMsg::ExportStreamedResults(request));
             }
         });
         holder.append(&export);
     }
+}
+
+fn visible_result_page(
+    pages: &gtk::Stack,
+    result: &StreamedResult,
+) -> Option<std::sync::Arc<bookie_core::QueryResult>> {
+    let root = pages.clone().upcast::<gtk::Widget>();
+    let index = super::super::stream_view::visible_page_index(&root, result.generation)?;
+    result.resident_pages.get(index).or_else(|| {
+        result
+            .pages
+            .iter()
+            .zip(result.page_indices.iter())
+            .find(|(_, page_index)| **page_index == index)
+            .and_then(|(page, _)| page.upgrade())
+    })
 }
 
 pub(in crate::ui::editor) fn stream_page_container(

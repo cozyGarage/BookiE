@@ -3,9 +3,35 @@ use std::collections::VecDeque;
 use bookie_storage::SavedConnection;
 use relm4::ComponentSender;
 use relm4::adw::prelude::*;
+use relm4::prelude::*;
 use uuid::Uuid;
 
-use super::{App, AppMsg};
+use super::{App, AppInit, AppMsg};
+
+pub(super) fn open_extra_window(app: &mut App, sender: ComponentSender<App>) {
+    let ctrl = App::builder()
+        .launch(AppInit {
+            registry: app.registry.clone(),
+            persistence: app.persistence.clone(),
+            workspace: app.workspace.clone(),
+            history: app.history.clone(),
+            database: app.database.clone(),
+            preferences: app.preferences.clone(),
+            mcp_bridge: app.mcp_bridge.clone(),
+        })
+        .detach();
+    if let Some(application) = app.window.application() {
+        ctrl.widget().set_application(Some(&application));
+    }
+    ctrl.widget().present();
+    let key = ctrl.widget().as_ptr() as usize;
+    let destroy_sender = sender.clone();
+    forget_group_on_close(ctrl.widget().upcast_ref(), key, sender);
+    ctrl.widget().connect_destroy(move |_| {
+        destroy_sender.input(AppMsg::ExtraWindowClosed(key));
+    });
+    app.extra_windows.push((key, ctrl));
+}
 
 pub(super) fn next_restore_target(queue: &mut VecDeque<Uuid>, can_open: impl Fn(Uuid) -> bool) -> Option<Uuid> {
     while let Some(id) = queue.pop_front() {

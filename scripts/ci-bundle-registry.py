@@ -21,7 +21,7 @@ MAX_EXTRACTED = 24 * 1024 ** 3
 UPLOAD_CHUNK_SIZE = 64 * 1024 ** 2
 PROGRESS_INTERVAL_SECONDS = 10
 TEMP_BUNDLE_PREFIX = 'bookie-bundle-'
-BUNDLE_GROUPS = {'default', 'direct', 'unit', 'sandbox', 'gpui'} | set(
+BUNDLE_GROUPS = {'default', 'direct', 'unit', 'sandbox', 'workspace', 'gpui'} | set(
     json.loads((Path(__file__).parent / 'ci-test-bundle-groups.json').read_text())['groups']
 )
 SPEC = importlib.util.spec_from_file_location('bundle', Path(__file__).with_name('ci-test-bundle.py'))
@@ -29,12 +29,14 @@ bundle = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(bundle)
 
 
-def request(url, method='GET', data=None, size=None):
-    headers = {'Authorization': 'token ' + os.environ['BOOKIE_REGISTRY_TOKEN']}
+def request(url, method='GET', data=None, size=None, token=None):
+    token = token if token is not None else os.environ['BOOKIE_REGISTRY_TOKEN']
+    headers = {'Authorization': 'token ' + token}
     if size is not None:
         headers.update({'Content-Type': 'application/octet-stream', 'Content-Length': str(size)})
     try:
-        return urllib.request.urlopen(urllib.request.Request(url, data=data, method=method, headers=headers), timeout=180)
+        return urllib.request.build_opener(ArtifactRedirect()).open(
+            urllib.request.Request(url, data=data, method=method, headers=headers), timeout=180)
     except urllib.error.HTTPError as error:
         path = urllib.parse.urlsplit(url).path
         error.msg = f'registry {method} {path} returned HTTP {error.code}'
@@ -215,8 +217,11 @@ def fetch(directory, revision, group, url):
 class ArtifactRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, request, stream, code, message, headers, url):
         result = super().redirect_request(request, stream, code, message, headers, url)
-        if result is not None and urllib.parse.urlsplit(url).netloc != urllib.parse.urlsplit(request.full_url).netloc:
-            result.remove_header('Authorization')
+        if result is not None:
+            source = urllib.parse.urlsplit(request.full_url)
+            target = urllib.parse.urlsplit(url)
+            if (target.scheme, target.netloc) != (source.scheme, source.netloc):
+                result.remove_header('Authorization')
         return result
 
 
@@ -280,13 +285,72 @@ def github_fetch(directory, revision, group):
     raise ValueError('no successful GitHub build supplies the exact requested artifact')
 
 
-def prune(revision, retention_days):
+def forgejo_list(api, endpoint, parameters, token, key=None):
+    items = []
+    page = 1
+    while True:
+        query = urllib.parse.urlencode({'limit': 50, 'page': page, **parameters}, doseq=True)
+        with request(f'{api}/{endpoint}?{query}', token=token) as response:
+            data = json.load(response)
+            headers = getattr(response, 'headers', {})
+        page_items = data if key is None else data.get(key) if isinstance(data, dict) else None
+        if not isinstance(page_items, list):
+            raise ValueError(f'Forgejo returned an incomplete {endpoint} reference inventory')
+        items.extend(page_items)
+        total = data.get('total_count') if isinstance(data, dict) else None
+        if key is not None and type(total) is not int:
+            raise ValueError(f'Forgejo returned an incomplete {endpoint} reference inventory')
+        if total is None and hasattr(headers, 'get') and headers.get('X-Total-Count'):
+            try:
+                total = int(headers['X-Total-Count'])
+            except ValueError as error:
+                raise ValueError(f'Forgejo returned an invalid {endpoint} reference count') from error
+        next_page = 'rel="next"' in headers.get('Link', '') if hasattr(headers, 'get') else False
+        if type(total) is int:
+            if len(items) > total:
+                raise ValueError(f'Forgejo returned an inconsistent {endpoint} reference count')
+            if len(items) >= total:
+                return items
+            if not page_items:
+                raise ValueError(f'Forgejo returned an incomplete {endpoint} reference inventory')
+        elif not next_page and len(page_items) < 50:
+            return items
+        page += 1
+
+
+def discover_protected_revisions():
+    api = os.environ['BOOKIE_FORGEJO_API_URL'].rstrip('/')
+    token = os.environ['BOOKIE_FORGEJO_TOKEN']
+    revisions = set()
+    branches = forgejo_list(api, 'branches', {}, token)
+    pulls = forgejo_list(api, 'pulls', {'state': 'open'}, token)
+    runs = forgejo_list(api, 'actions/runs', {'status': ['waiting', 'running']}, token, 'workflow_runs')
+    for branch in branches:
+        revisions.add(branch['commit']['id'])
+    for pull in pulls:
+        if pull['state'] == 'open':
+            revisions.add(pull['head']['sha'])
+    for run in runs:
+        if run['status'] in ('waiting', 'running'):
+            revisions.add(run['commit_sha'])
+    if any(not isinstance(revision, str) or not re.fullmatch(r'[0-9a-f]{40}', revision)
+           for revision in revisions):
+        raise ValueError('Forgejo returned an invalid protected source revision')
+    return revisions
+
+
+def prune(revision, retention_days, protected_revisions, dry_run=True, references_complete=False):
     if not re.fullmatch(r'[0-9a-f]{40}', revision):
         raise ValueError('a full source commit is required')
     if not 1 <= retention_days <= 90:
         raise ValueError('package retention must be between 1 and 90 days')
+    if any(not re.fullmatch(r'[0-9a-f]{40}', item) for item in protected_revisions):
+        raise ValueError('protected revisions must be full source commits')
+    if not dry_run and (not protected_revisions or not references_complete):
+        raise ValueError('deletion requires protected revisions and complete reference discovery')
     api = os.environ['BOOKIE_REGISTRY_API_URL'].rstrip('/')
     package_name = 'bookie-test-bundles'
+    protected_revisions = set(protected_revisions) | {revision}
     cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
     page = 1
     packages = []
@@ -294,11 +358,27 @@ def prune(revision, retention_days):
         query = urllib.parse.urlencode({'type': 'generic', 'q': package_name, 'limit': 50, 'page': page})
         with request(f'{api}?{query}') as response:
             page_packages = json.load(response)
+            headers = getattr(response, 'headers', {})
+        if not isinstance(page_packages, list):
+            raise ValueError('registry returned an incomplete bundle inventory')
         packages.extend(page_packages)
-        if len(page_packages) < 50:
+        next_page = 'rel="next"' in headers.get('Link', '') if hasattr(headers, 'get') else False
+        total = headers.get('X-Total-Count') if hasattr(headers, 'get') else None
+        if total is not None:
+            try:
+                total = int(total)
+            except ValueError as error:
+                raise ValueError('registry returned an invalid bundle inventory count') from error
+            if len(packages) > total:
+                raise ValueError('registry returned an inconsistent bundle inventory count')
+            if len(packages) >= total:
+                break
+            if not page_packages:
+                raise ValueError('registry returned an incomplete bundle inventory')
+        elif not next_page and len(page_packages) < 50:
             break
         page += 1
-    removed = 0
+    expired = []
     for package in packages:
         version = package.get('version', '')
         created = package.get('created_at', '')
@@ -310,15 +390,19 @@ def prune(revision, retention_days):
             created_at = datetime.fromisoformat(created.replace('Z', '+00:00'))
         except ValueError:
             continue
-        if created_at.tzinfo is None or created_at >= cutoff:
+        if created_at.tzinfo is None or created_at >= cutoff or version.split('-', 1)[0] in protected_revisions:
             continue
-        path = '/'.join(urllib.parse.quote(segment, safe='')
-                        for segment in ('generic', package_name, version))
+        expired.append((version, created))
+    for version, created in expired:
+        if dry_run:
+            print(f'expired candidate {version} created {created}', flush=True)
+            continue
+        path = '/'.join(urllib.parse.quote(segment, safe='') for segment in ('generic', package_name, version))
         with request(f'{api}/{path}', 'DELETE') as response:
             if response.status != 204:
                 raise ValueError('registry did not delete an expired test bundle')
-        removed += 1
-    print(f'removed {removed} expired test bundle versions; retained {retention_days} days', flush=True)
+    action = 'would remove' if dry_run else 'removed'
+    print(f'{action} {len(expired)} expired test bundle versions; retained {retention_days} days', flush=True)
 
 
 def main():
@@ -332,9 +416,17 @@ def main():
     prune_command = commands.add_parser('prune')
     prune_command.add_argument('revision')
     prune_command.add_argument('--retention-days', type=int, default=14)
+    prune_command.add_argument('--discover-references', action='store_true')
+    prune_command.add_argument('--delete', action='store_true')
+    prune_command.add_argument('--dry-run', action='store_true')
     args = parser.parse_args()
     if args.operation == 'prune':
-        prune(args.revision, args.retention_days)
+        if args.delete and args.dry_run:
+            parser.error('--delete and --dry-run cannot be combined')
+        protected = discover_protected_revisions() if args.discover_references else set()
+        if args.delete and not args.discover_references:
+            parser.error('--delete requires --discover-references')
+        prune(args.revision, args.retention_days, protected, not args.delete, args.discover_references)
         return
     if not re.fullmatch('[0-9a-f]{40}', args.revision):
         parser.error('a full source commit is required')

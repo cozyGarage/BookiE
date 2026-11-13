@@ -1,0 +1,153 @@
+name: lab-ci-contracts
+
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/**", ".forgejo/workflows/**", ".github/actionlint.yaml", ".github/actions/**", "scripts/**", "apps/linux/packaging/**", "docs/**", "**.md"]
+  pull_request:
+    branches: [main]
+    paths: [".github/workflows/**", ".forgejo/workflows/**", ".github/actionlint.yaml", ".github/actions/**", "scripts/**", "apps/linux/packaging/**", "docs/**", "**.md"]
+  workflow_dispatch:
+
+concurrency:
+  group: linux-ci-contracts-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+
+defaults:
+  run:
+    shell: /usr/local/libexec/bookie-ci-cache run {0}
+
+env:
+  CARGO_TERM_COLOR: never
+  CARGO_INCREMENTAL: "0"
+  CARGO_TARGET_DIR: /var/cache/ci/target/contracts-${{ github.run_id }}-${{ github.job }}
+  TMPDIR: /var/cache/ci/tmp/contracts-${{ github.run_id }}-${{ github.job }}
+
+jobs:
+  workflow-lint:
+    runs-on: any-host
+    timeout-minutes: 10
+    steps:
+      - name: Prepare runner workspace
+        run: mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
+      - name: Set up Go for pinned workflow validator
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
+        with:
+          go-version: 1.25.12
+      - name: Install pinned workflow validator
+        working-directory: src/scripts/tools/actionlint
+        env:
+          GOBIN: ${{ env.TMPDIR }}/actionlint
+          GOFLAGS: -mod=readonly
+          GOTOOLCHAIN: local
+        run: |
+          go install github.com/rhysd/actionlint/cmd/actionlint
+          echo "$GOBIN" >> "$GITHUB_PATH"
+      - uses: https://github.com/taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283
+        with:
+          tool: shellcheck@0.10.0
+      - name: Validate workflows and embedded shell
+        run: cd src && python3 scripts/run-test-layer.py workflow-lint
+      - name: Prepare artifact runtime
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Retain workflow diagnostics
+        if: always()
+        uses: https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
+        with:
+          name: workflow-lint-${{ github.run_id }}-${{ github.run_attempt }}
+          path: src/target/quality/*-layers
+          if-no-files-found: error
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          rm -rf -- "$TMPDIR" "$CARGO_TARGET_DIR"
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src
+          fi
+
+  workflow-security:
+    runs-on: any-host
+    timeout-minutes: 10
+    steps:
+      - name: Prepare runner workspace
+        run: mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
+      - uses: https://github.com/taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283
+        with:
+          tool: zizmor@1.30.1
+      - name: Audit GitHub Actions workflows
+        run: cd src && zizmor --offline --format=github --min-severity=medium --min-confidence=medium .github/workflows/*.yml
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          rm -rf -- "$TMPDIR" "$CARGO_TARGET_DIR"
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src
+          fi
+
+  harness:
+    runs-on: any-host
+    timeout-minutes: 10
+    steps:
+      - name: Prepare runner workspace
+        run: mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: src
+      - uses: https://github.com/dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
+        with:
+          toolchain: 1.98
+      - name: Fetch locked application dependencies
+        run: cd src && cargo fetch --locked --manifest-path apps/linux/app/Cargo.toml
+      - name: Check gettext tools for generated catalog checks
+        run: command -v msgfmt >/dev/null
+      - name: Test runner failures and workflow contracts
+        run: cd src && python3 scripts/run-test-layer.py harness packaging-contracts
+      - name: Prepare artifact runtime
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Retain evidence even after failure
+        if: always()
+        uses: https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
+        with:
+          name: ci-contracts-${{ github.run_id }}-${{ github.run_attempt }}
+          path: src/target/quality/*-layers
+          if-no-files-found: error
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          rm -rf -- "$TMPDIR" "$CARGO_TARGET_DIR"
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src
+          fi

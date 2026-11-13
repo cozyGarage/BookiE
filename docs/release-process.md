@@ -15,7 +15,7 @@ A release is a tag named `linux-vX.Y.Z` on the protected `main` branch. The GitH
 3. Review the draft and release-note categories. Verify each asset against `SHA256SUMS` and the build provenance. Install and launch at least one package before publishing.
 4. Publish the reviewed draft. Do not substitute pull-request artifacts for tag-run assets.
 
-The Arch and AppImage artifact names (0.2.4 also has Debian and Flatpak) and installation notes are in the [platform guide](platforms.md).
+Artifact naming for the Arch package and AppImage, the historical 0.2.4 Debian and Flatpak assets, and installation notes are in the [platform guide](platforms.md).
 
 ## Recovering publication after successful package builds
 

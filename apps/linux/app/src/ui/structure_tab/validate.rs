@@ -87,6 +87,7 @@ mod tests {
             predicate: None,
             constraint: None,
             has_expression_key: false,
+            using_clause: None,
         }
     }
 

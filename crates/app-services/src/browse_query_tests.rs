@@ -255,7 +255,7 @@ fn preview_projection_is_opt_in_and_per_engine() {
         filter: &filter,
         hidden_columns: None,
         long_text_preview,
-    
+
         supports_reverse_keyset: false,
     };
     let PageQuery::Sql(on) = target("postgres", true).page(0, 10, None, None).unwrap() else {

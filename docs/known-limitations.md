@@ -51,16 +51,16 @@ This page describes user-visible behavior and limits in the current source. Curr
 ## Platforms and packaging
 
 - Native builds require GTK 4.24, libadwaita 1.10 and GtkSourceView 5.22 or newer ([ADR 0021](decisions/0021-toolkit-floor.md)). Older toolkit stacks are unsupported for native packages.
-- Windows and macOS are unsupported; the application is built for Linux with GTK 4 and libadwaita.
+- The shipped product is the Linux GTK 4 and libadwaita client. Windows and macOS have no shipped package. [ADR 0052](decisions/0052-gpui-is-the-cross-platform-frontend.md) chooses GPUI as the cross-platform frontend and keeps GTK in parallel; GPUI is not packaged or released until that ADR's conditions hold. See [platforms](platforms.md) for Arch and AppImage install paths.
 
 ## Operation outcomes
 
 - **PostgreSQL transaction outcome can remain unknown after session loss.** A disconnected session cannot confirm whether its transaction committed. BookiE records an unknown outcome and blocks governed writes for that connection. A fresh session can run reads and end its read-only snapshot with ROLLBACK. Commits and other governed writes stay blocked until the outcome is reconciled. The app has no in-app reconciliation action ([#947](https://github.com/cozyGarage/BookiE/issues/947)).
 
-## GPUI prototype (`apps/gpui`) after the DataTable change
+## GPUI frontend (`apps/gpui`, not shipped)
 
-- **Keyboard page crossing:** the grid's rows are drawn by gpui-component's DataTable, which moves within the loaded page. Moving past the page edge with the keyboard does not load the next page yet; `the_cursor_crosses_to_the_next_page_and_back` is ignored until it does ([#2673](https://github.com/cozyGarage/BookiE/issues/2673) covers the bounded loader).
+Limits of the GPUI frontend after the DataTable change. It is the chosen cross-platform frontend ([ADR 0052](decisions/0052-gpui-is-the-cross-platform-frontend.md)) and is not included in packages or releases yet.
+
 - **Cell selection:** a cell is always selected while rows are shown (the top-left cell at first), so the cursor is always visible.
-- **Range selection:** Shift+arrow extends the table's row range; the grid's own selection count does not follow it yet.
 - **Sidebar:** the narrow header label clips; the regex, locate and show-active-only controls are placeholders; the import menu entries do nothing yet.
 - **Settings:** one switch (Dark theme); the palette opens the page.

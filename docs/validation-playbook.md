@@ -47,7 +47,7 @@ python3 scripts/run-test-layer.py widgets app-server keyring ui
 python3 scripts/run-test-layer.py values
 ```
 
-The fast Build Linux job runs `change-contracts` before the GTK app unit layer. The non-GTK unit, sandbox and lint checks run in preflight; the GTK app layer runs only `bookie-app` Clippy and library/binary tests. This avoids rerunning the non-GTK suites in the GTK job. The focused layer compares the checked-out commit with the pull request base or prior push commit, runs mapped exact regression tests for changed value-path files, and retains a report and per-command logs under `target/quality/`. Locally, check uncommitted work against `HEAD`, or compare a branch with its base explicitly:
+The `unit` job runs the source-pinned workspace unit archive and focused `change-contracts`; `sandbox` runs independently from the same `test-build` output. `guards` and `clippy` run in parallel with that build. The focused layer compares the checked-out commit with the pull request base or prior push commit, runs mapped exact regression tests for changed value-path files, and retains a report and per-command logs under `target/quality/`. Locally, check uncommitted work against `HEAD`, or compare a branch with its base explicitly:
 
 ```bash
 python3 scripts/run-change-contract-tests.py
@@ -85,10 +85,10 @@ Missing tools, nonzero exits, timeouts, cancellations and absent required test s
 | `quick` | Guards, formatting, non-GTK Clippy, units and sandbox | Rust 1.98 and native libraries |
 | `full` | Default workspace checks including app logic | GTK 4.24 development stack; no display automation or DuckDB |
 | `gtk-app` | GTK app Clippy and library/binary unit tests | GTK 4.24 development stack |
-| `gpui` | GPUI model and simulated interaction tests | GPUI native build libraries; no display |
-| `no-default-features` | The workspace and its test targets compile without the default Kerberos feature (`cargo check`, no tests run) | GTK 4.24 development stack; not yet run by any CI job |
+| `gpui` | GPUI model and simulated interaction tests (Linux gate job `gpui-tests`; macOS build/test in [gpui-macos.yml](../.github/workflows/gpui-macos.yml) when `apps/gpui` changes) | GPUI native build libraries; no display |
+| `no-default-features` | The workspace and its test targets compile without the default Kerberos feature (`cargo check`, no tests run) | GTK 4.24 development stack; `test-build` on both providers |
 | `sandbox` | Integration tests without external servers or a display | Local sockets/processes must be allowed |
-| `drivers` | PostgreSQL, MySQL, MSSQL, ClickHouse, Redis, MongoDB, MCP BSON, policy sessions, PostgreSQL socket and SSH | Docker and OpenSSH; SQLite is in sandbox, DuckDB has its own Build job |
+| `drivers` | PostgreSQL, MySQL, MSSQL, ClickHouse, Redis, MongoDB, DuckDB, Oracle, Cassandra, MCP BSON, policy sessions, PostgreSQL socket and SSH | Docker and OpenSSH; SQLite is in sandbox |
 | `b4-rollback` | MySQL failed-batch rollback and PostgreSQL rollback-failure handling | Docker and native TLS build dependencies |
 | `values` | Exact values across eight drivers, core, app and MCP | Docker, GTK build dependencies, DuckDB build; strict selected-test counts |
 | `tls` | CA, hostname, encryption and plaintext refusal against real servers | Docker Compose and generated private fixture certificates |
@@ -97,7 +97,7 @@ Missing tools, nonzero exits, timeouts, cancellations and absent required test s
 | `security-policy` | Policy/MCP permissions, allowlists, bounds and audit behavior | Non-GTK dependencies; does not prove every server authorization mode |
 | `supply-chain` | Advisory, license and dependency-source policy | `cargo-deny`, `cargo-audit`, network; repository exceptions remain explicit |
 | `widgets` | Named GTK widget regressions in isolated processes | GTK 4.24, Xvfb and private D-Bus |
-| `app-server` | App parser and grid-edit contracts against PostgreSQL, MySQL, MongoDB and SQL Server | GTK 4.24 build libraries and Docker; hosted GTK fast job |
+| `app-server` | App parser and grid-edit contracts against PostgreSQL, MySQL, MongoDB and SQL Server | GTK 4.24 build libraries and Docker; `consumers` on both providers |
 | `keyring` | Registered Secret Service contracts | Private D-Bus, gnome-keyring and libsecret tools |
 | `ui` | Real application actions and database postconditions via AT-SPI | GTK 4.24, Xvfb, PyAT-SPI; X11 automation, not Wayland acceptance |
 | `mssql-kerberos` | SQL Server integrated authentication, SPN refusal and verified TLS against an isolated test domain | Docker Compose with privileged-container support; opt-in local fixture |
@@ -204,19 +204,19 @@ CI is split into fast feedback and slower integration or acceptance checks. Read
 
 ### Build Linux
 
-[`build-linux.yml`](../.github/workflows/build-linux.yml) pins the tested revision, then runs the required regression jobs on every pull request and every push to `main` (docs-only path filters still skip the whole workflow). `scripts/check-ci-jobs.py` accepts a skipped required job only for `current-stable-clippy` on push and pull_request.
+[`build-linux.yml`](../.github/workflows/build-linux.yml) and Forgejo's [`ci.yml`](../.forgejo/workflows/ci.yml) pin the tested revision and run the same gate graph on pull requests and pushes to `main` (docs-only path filters still skip the whole workflow). Pull requests, schedules and manual dispatches run the full T1 gate; pushes to `main` run the lighter T0 profile. Provider setup differs, but job names, dependencies, timeouts, matrices, event profiles and selected test layers are checked for parity by `scripts/tests/test_ci_workflow.py`. `current-stable-clippy` is a scheduled/manual GitHub-only check outside the required regression gate.
 
 | Job | Runs on |
 |---|---|
-| `pin-revision`, `ensure-ci-gtk-image`, `preflight`, `fast` | pull_request, push, schedule, workflow_dispatch |
-| `gtk-safety`, `b4-rollback`, `integration`, `driver-tls`, `postgres-release` | pull_request, push, schedule, workflow_dispatch |
-| `reusable-test-builds` | push, schedule, workflow_dispatch (not pull_request) |
-| `current-stable-clippy` | schedule, workflow_dispatch |
-| `regression-gate` | always; requires every `REQUIRED` job to succeed |
+| Required on every gate: `pin-revision`, `guards`, `clippy`, `test-build`, `unit`, `sandbox`, `gpui-tests`, `widgets`, `gtk-build`, `gtk`, `gtk-server`, `driver`, `driver-tls`, `b4-rollback`, `security-policy`, `consumers`, `pg-release`, `keyring`, `supply-chain` | pull_request, push, schedule, workflow_dispatch |
+| Full-gate only: `floor-build`, `distro-floor-scenarios` | pull_request, schedule, workflow_dispatch; skipped on push to `main` |
+| `regression-gate` | always; requires every required job to succeed or be an allowed pull-request skip |
+| `ensure-ci-gtk-image` | GitHub-only image preparation; not a regression job |
+| `current-stable-clippy` | GitHub-only scheduled/manual check; outside the regression gate |
 
 Changing this table also updates `scripts/check-ci-jobs.py` and `scripts/tests/test_ci_workflow.py` in the same change.
 
-`scripts/forgejo-gate.sh` ensures the requested commit exists on its gate ref, then dispatches `ci.yml` for that exact SHA. The workflow's push trigger is limited to `main`, so a standalone gate ref must use `workflow_dispatch`. The Debian floor package build and scenarios run on `main`, scheduled runs and manual dispatches. The Forgejo driver matrix includes every workspace driver crate, with the fixture image list checked against each driver's tests.
+`scripts/forgejo-gate.sh` ensures the requested commit exists on its gate ref, then dispatches `ci.yml` for that exact SHA. The workflow's push trigger is limited to `main`, so a standalone gate ref must use `workflow_dispatch`. The Debian floor package build and scenarios run for pull requests, scheduled runs and manual dispatches, but not for pushes to `main`. The Forgejo driver matrix includes every workspace driver crate, with the fixture image list checked against each driver's tests.
 
 ### Pull request hygiene checks
 

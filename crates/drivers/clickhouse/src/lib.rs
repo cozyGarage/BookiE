@@ -66,7 +66,6 @@ impl DatabaseDriver for ClickhouseDriver {
         true
     }
 
-
     fn default_database(&self) -> &'static str {
         "default"
     }
@@ -494,6 +493,7 @@ impl Connection for ClickhouseConnection {
             primary: true,
             predicate: None,
             has_expression_key: false,
+            using_clause: None,
         }])
     }
 

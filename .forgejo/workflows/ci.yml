@@ -121,8 +121,11 @@ jobs:
           bash scripts/check-file-size.sh
           bash scripts/check-bounded-operations.sh
           bash scripts/check-panic-sites.sh
+          python3 scripts/check-crate-boundaries.py
+          python3 scripts/check-driver-id-branches.py
           python3 scripts/check-function-size.py
           python3 scripts/check-comment-lines.py
+          python3 scripts/release-notes.py fragments
           cargo fmt --all -- --check
       - name: Clean pilot scratch
         if: always()
@@ -138,8 +141,9 @@ jobs:
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
   gpui-tests:
+    if: github.event_name != 'push'
     runs-on: any-host
-    needs: [pin-revision, test-build]
+    needs: [pin-revision, gpui-build]
     timeout-minutes: 45
     env:
       CARGO_BUILD_JOBS: 4
@@ -186,9 +190,10 @@ jobs:
             rm -rf -- src
           fi
   gtk-build:
+    if: github.event_name != 'push'
     runs-on: build-host
     needs: [pin-revision, guards]
-    timeout-minutes: 20
+    timeout-minutes: 45
     defaults:
       run:
         shell: bash
@@ -325,7 +330,7 @@ jobs:
           fi
   test-build:
     runs-on: build-host
-    needs: [pin-revision, guards, clippy]
+    needs: [pin-revision]
     timeout-minutes: 45
     defaults:
       run:
@@ -376,17 +381,20 @@ jobs:
         run: |
           cd src
           mapfile -t publish_groups < <(python3 -c 'import json; config=json.load(open("scripts/ci-test-bundle-groups.json")); fallback = ["direct", "consumers", "driver-core", "driver-analytics", "driver-extended", "pg-release", "socket-ssh", "driver-tls", "keyring"]; print(*(config.get("providers", {}).get("forgejo", fallback)), sep="\n")')
-          publish_groups+=(unit sandbox gpui)
+          publish_groups+=(workspace)
           for group in "${publish_groups[@]}"; do
             python3 scripts/ci-bundle-registry.py publish "$GITHUB_WORKSPACE/test-bundles/$group" "${{ needs.pin-revision.outputs.revision }}" "$group"
           done
-      - name: Remove expired test bundles
+      - name: Remove expired test bundles with reference protection
+        if: github.event_name == 'push' || github.event_name == 'schedule'
         env:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
           BOOKIE_REGISTRY_API_URL: ${{ github.server_url }}/api/v1/packages/trung
+          BOOKIE_FORGEJO_API_URL: ${{ github.server_url }}/api/v1/repos/${{ github.repository }}
+          BOOKIE_FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
         run: |
           cd src
-          python3 scripts/ci-bundle-registry.py prune "${{ needs.pin-revision.outputs.revision }}" --retention-days 14
+          python3 scripts/ci-bundle-registry.py prune "${{ needs.pin-revision.outputs.revision }}" --retention-days 14 --delete --discover-references
       - name: Check the no-default-features layer
         run: |
           exec 9>>/target/.bookie-build-cache.lock
@@ -404,6 +412,79 @@ jobs:
             python3 src/scripts/ci-cache.py --root /target --lock /target/.bookie-build-cache.lock cleanup --min-free-gib 30
           fi
 
+
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
+  gpui-build:
+    if: github.event_name != 'push'
+    runs-on: build-host
+    needs: [pin-revision]
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    env:
+      CARGO_TARGET_DIR: /target/bookie-${{ github.job }}
+      TMPDIR: /target/tmp-${{ github.run_id }}-${{ github.job }}
+      CARGO_HOME: /cargo
+      BOOKIE_TOOL_DIR: /tools
+      CARGO_BUILD_JOBS: "8"
+      SCCACHE_DIR: /cargo/sccache
+      RUSTC_WRAPPER: sccache
+      SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+      CMAKE_C_COMPILER_LAUNCHER: /tools/sccache
+      CMAKE_CXX_COMPILER_LAUNCHER: /tools/sccache
+      SCCACHE_BASEDIRS: /target/bookie-${{ github.job }}
+      SCCACHE_SERVER_UDS: /target/tmp-${{ github.run_id }}-${{ github.job }}/sccache.sock
+      PATH: /tools:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
+      BOOKIE_BUILD_IMAGE: sha256:f21a3d99fb08a940f7fbf775ad6878d52a3fc957876970ae7d0f607b89696ec4
+    steps:
+      - name: Prepare runner workspace
+        run: |
+          mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
+          touch "$CARGO_TARGET_DIR/.bookie-last-used" /target/.bookie-build-cache.lock
+          sccache --start-server
+          rm -rf src
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
+      - name: Install the GPUI linker dependency
+        run: |
+          apt-get update -qq
+          apt-get install -y --no-install-recommends libxkbcommon-x11-dev
+      - name: Build the GPUI test bundle
+        run: |
+          exec 9>>/target/.bookie-build-cache.lock
+          flock --exclusive 9
+          cd src && bash scripts/build-test-bundles.sh "$GITHUB_WORKSPACE/test-bundles" gpui
+      - name: Publish the source-pinned GPUI bundle
+        env:
+          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
+          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
+        run: cd src && python3 scripts/ci-bundle-registry.py publish "$GITHUB_WORKSPACE/test-bundles/gpui" "${{ needs.pin-revision.outputs.revision }}" gpui
+      - name: Clean builder scratch
+        if: always()
+        run: |
+          if [[ -S "$SCCACHE_SERVER_UDS" ]]; then
+            sccache --show-stats
+            sccache --stop-server
+          fi
+          rm -rf -- "$TMPDIR"
+          if [[ -f src/scripts/ci-cache.py ]]; then
+            python3 src/scripts/ci-cache.py --root /target --lock /target/.bookie-build-cache.lock cleanup --min-free-gib 30
+          fi
 
       - name: Finalize runner job
         if: always()
@@ -438,7 +519,7 @@ jobs:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
           BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" unit
+        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" workspace
       - name: Unit tests
         env:
           BOOKIE_TOOL_DIR: /var/cache/ci/tools
@@ -501,7 +582,7 @@ jobs:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
           BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" sandbox
+        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" workspace
       - name: Sandbox tier
         env:
           BOOKIE_TOOL_DIR: /var/cache/ci/tools
@@ -545,6 +626,16 @@ jobs:
         run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" direct
       - name: GTK widget tests
         run: cd src && python3 scripts/run-test-layer.py widgets
+      - name: Prepare artifact runtime
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Retain GTK widget diagnostics
+        if: always()
+        uses: https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
+        with:
+          name: widgets-${{ github.run_id }}-${{ github.run_attempt }}
+          path: src/target/quality/*-layers
+          if-no-files-found: error
+          retention-days: 2
 
       - name: Finalize runner job
         if: always()
@@ -558,7 +649,7 @@ jobs:
   floor-build:
     runs-on: build-host
     needs: [pin-revision, guards, clippy]
-    if: github.ref == 'refs/heads/main' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: github.event_name != 'push'
     timeout-minutes: 45
     defaults:
       run:
@@ -592,6 +683,8 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
           path: src
+      - name: Mark checkout safe for Git in container
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE/src"
       - name: Install package validation tools
         run: |
           apt-get update -qq
@@ -638,7 +731,7 @@ jobs:
   distro-floor-scenarios:
     runs-on: any-host
     needs: [pin-revision, floor-build]
-    if: github.ref == 'refs/heads/main' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: github.event_name != 'push'
     timeout-minutes: 90
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/floor-debian:testing
@@ -700,20 +793,22 @@ jobs:
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
   driver:
+    if: github.event_name != 'push'
     runs-on: any-host
     needs: [pin-revision, guards, clippy, test-build]
-    timeout-minutes: 45
+    timeout-minutes: 90
     env:
-      CARGO_TARGET_DIR: /var/cache/ci/target/driver-${{ matrix.driver }}
-      TMPDIR: /var/cache/ci/tmp/bookie-driver-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.driver }}
-      BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.driver }}
+      CARGO_TARGET_DIR: /var/cache/ci/target/${{ matrix.group }}
+      TMPDIR: /var/cache/ci/tmp/bookie-driver-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}
+      BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}
     strategy:
       fail-fast: false
       matrix:
-        driver: [core, analytics, extended]
+        group: [driver-core, driver-analytics, driver-extended, socket-ssh]
     steps:
       - name: Prepare runner workspace
         run: |
+          mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"
           rm -rf src
       - name: Check runner space before checkout
         shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
@@ -731,19 +826,34 @@ jobs:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
           BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" "driver-${{ matrix.driver }}"
+        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" "${{ matrix.group }}"
       - name: Docker Hub login
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: bash src/scripts/docker-hub-login.sh
+      - name: Pre-pull PostgreSQL socket fixture image
+        if: matrix.group == 'socket-ssh'
+        run: bash src/scripts/prepull-test-images.sh socket-ssh
       - name: Driver integration
-        run: cd src && python3 scripts/run-test-layer.py "driver-${{ matrix.driver }}"
+        env:
+          BOOKIE_TEST_LAYER: ${{ matrix.group }}
+        run: |
+          cd src
+          if [[ "$BOOKIE_TEST_LAYER" == socket-ssh ]]; then
+            cleanup_testcontainers() {
+              python3 scripts/cleanup-testcontainers.py "$BOOKIE_TEST_RUN_ID"
+            }
+            trap cleanup_testcontainers EXIT
+            trap 'cleanup_testcontainers; exit 143' TERM
+            trap 'cleanup_testcontainers; exit 130' INT
+          fi
+          python3 scripts/run-test-layer.py "$BOOKIE_TEST_LAYER"
       - name: Pre-pull pg_dump image
-        if: matrix.driver == 'core'
+        if: matrix.group == 'driver-core'
         run: bash src/scripts/prepull-test-images.sh pg-dump
       - name: PostgreSQL dump and restore
-        if: matrix.driver == 'core'
+        if: matrix.group == 'driver-core'
         run: cd src && python3 scripts/run-test-layer.py pg-dump
 
       - name: Finalize runner job
@@ -756,6 +866,7 @@ jobs:
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
   b4-rollback:
+    if: github.event_name != 'push'
     needs: [pin-revision]
     runs-on: any-host
     timeout-minutes: 45
@@ -799,70 +910,8 @@ jobs:
           else
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
-  e2e:
-    runs-on: any-host
-    needs: [pin-revision, guards, clippy, gtk-build]
-    timeout-minutes: 45
-    env:
-      CARGO_TARGET_DIR: /var/cache/ci/target/gtk-build
-      BOOKIE_GTK_SCENARIO_RETRIES: "0"
-      BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-e2e-${{ matrix.server }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - server: postgres
-            mcp_port_slot: 5
-          - server: mysql
-            mcp_port_slot: 6
-    steps:
-      - name: Prepare runner workspace
-        run: |
-          rm -rf src
-      - name: Check runner space before checkout
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        run: true
-      - name: Check out source revision
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-        with:
-          ref: ${{ needs.pin-revision.outputs.revision }}
-          token: ${{ secrets.FORGEJO_TOKEN }}
-          persist-credentials: false
-          fetch-depth: 1
-          path: src
-      - name: Prepare artifact runtime
-        env:
-          BOOKIE_TOOL_DIR: /var/cache/ci/tools
-        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
-      - name: Download the shared GTK binary
-        uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
-        with:
-          name: gtk-ci-${{ github.run_id }}-${{ needs.pin-revision.outputs.revision }}
-          path: gtk-artifact/
-      - name: Verify the shared GTK binary
-        run: |
-          binary=$(python3 src/scripts/ci-gtk-artifact.py verify "$GITHUB_WORKSPACE/gtk-artifact" "${{ needs.pin-revision.outputs.revision }}")
-          printf 'BOOKIE_GTK_BINARY=%s\nGSETTINGS_SCHEMA_DIR=%s/schemas\n' "$binary" "$GITHUB_WORKSPACE/gtk-artifact" >> "$GITHUB_ENV"
-      - name: Docker Hub login
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-        run: bash src/scripts/docker-hub-login.sh
-      - name: Select isolated MCP HTTP port
-        run: cd src && python3 scripts/ci-mcp-port.py "${{ matrix.mcp_port_slot }}"
-      - name: Real server end to end
-        run: cd src && python3 scripts/run-test-layer.py "gtk-${{ matrix.server }}"
-
-      - name: Finalize runner job
-        if: always()
-        shell: bash
-        run: |
-          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
-            bash src/scripts/cleanup-ci-job.sh
-          else
-            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
-          fi
   security-policy:
+    if: github.event_name != 'push'
     runs-on: any-host
     needs: [pin-revision, test-build]
     timeout-minutes: 45
@@ -900,6 +949,7 @@ jobs:
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
   consumers:
+    if: github.event_name != 'push'
     runs-on: any-host
     needs: [pin-revision, guards, clippy, test-build]
     timeout-minutes: 45
@@ -951,6 +1001,7 @@ jobs:
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
   gtk:
+    if: github.event_name != 'push'
     runs-on: any-host
     needs: [pin-revision, guards, clippy, gtk-build]
     timeout-minutes: 60
@@ -1009,6 +1060,7 @@ jobs:
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
   pg-release:
+    if: github.event_name != 'push'
     runs-on: any-host
     needs: [pin-revision, guards, clippy, test-build]
     timeout-minutes: 45
@@ -1059,65 +1111,11 @@ jobs:
           else
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
-  socket-ssh:
-    runs-on: any-host
-    needs: [pin-revision, guards, clippy, test-build]
-    timeout-minutes: 45
-    env:
-      CARGO_TARGET_DIR: /var/cache/ci/target/socket-ssh
-      BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-socket-ssh
-    steps:
-      - name: Prepare runner workspace
-        run: |
-          rm -rf src
-      - name: Check runner space before checkout
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        run: true
-      - name: Check out source revision
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-        with:
-          ref: ${{ needs.pin-revision.outputs.revision }}
-          token: ${{ secrets.FORGEJO_TOKEN }}
-          persist-credentials: false
-          fetch-depth: 1
-          path: src
-      - name: Obtain the source-pinned test bundle
-        env:
-          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
-          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" socket-ssh
-      - name: Docker Hub login
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-        run: bash src/scripts/docker-hub-login.sh
-      - name: Pre-pull PostgreSQL socket fixture image
-        run: bash src/scripts/prepull-test-images.sh socket-ssh
-      - name: PostgreSQL socket and SSH fixtures
-        run: |
-          cd src
-          cleanup_testcontainers() {
-            python3 scripts/cleanup-testcontainers.py "$BOOKIE_TEST_RUN_ID"
-          }
-          trap cleanup_testcontainers EXIT
-          trap 'cleanup_testcontainers; exit 143' TERM
-          trap 'cleanup_testcontainers; exit 130' INT
-          python3 scripts/run-test-layer.py socket-ssh
-
-      - name: Finalize runner job
-        if: always()
-        shell: bash
-        run: |
-          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
-            bash src/scripts/cleanup-ci-job.sh
-          else
-            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
-          fi
   gtk-server:
+    if: github.event_name != 'push'
     runs-on: any-host
     needs: [pin-revision, guards, clippy, gtk-build]
-    timeout-minutes: 60
+    timeout-minutes: 45
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/gtk-build
       BOOKIE_GTK_SCENARIO_RETRIES: "0"
@@ -1128,10 +1126,14 @@ jobs:
       matrix:
         include:
           - server: clickhouse
-            mcp_port_slot: 7
-          - server: mysql-approval
-            mcp_port_slot: 8
+            mcp_port_slot: 5
           - server: mongodb
+            mcp_port_slot: 6
+          - server: postgres
+            mcp_port_slot: 7
+          - server: mysql
+            mcp_port_slot: 8
+          - server: mysql-approval
             mcp_port_slot: 9
     steps:
       - name: Prepare runner workspace
@@ -1182,6 +1184,7 @@ jobs:
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
   driver-tls:
+    if: github.event_name != 'push'
     runs-on: any-host
     needs: [pin-revision, guards, clippy, test-build]
     timeout-minutes: 45
@@ -1229,6 +1232,7 @@ jobs:
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
   keyring:
+    if: github.event_name != 'push'
     runs-on: any-host
     needs: [pin-revision, guards, clippy, test-build]
     timeout-minutes: 30
@@ -1268,6 +1272,7 @@ jobs:
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
   supply-chain:
+    if: github.event_name != 'push'
     runs-on: build-host
     needs: [pin-revision, guards, clippy]
     timeout-minutes: 45
@@ -1277,7 +1282,7 @@ jobs:
     env:
       CARGO_HOME: /cargo
       RUSTC_WRAPPER: ""
-      PATH: /opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
+      PATH: /cargo/bin:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
       CARGO_TARGET_DIR: /target/${{ github.run_id }}/${{ github.job }}
       TMPDIR: /target/${{ github.run_id }}/${{ github.job }}
     steps:
@@ -1297,9 +1302,13 @@ jobs:
         run: |
           command -v cargo-deny >/dev/null || cargo install --locked cargo-deny --version 0.20.2
           command -v cargo-audit >/dev/null || cargo install --locked cargo-audit --version 0.22.2
+          command -v cargo-shear >/dev/null || cargo install --locked cargo-shear --version 1.13.4
       - name: Advisories, licenses and sources
         run: |
           cd src && python3 scripts/run-test-layer.py supply-chain
+      - name: Unused dependency check
+        run: |
+          cd src && python3 scripts/run-test-layer.py unused-dependencies
       - name: Vendored crates equal upstream plus their patches
         run: |
           cd src && python3 scripts/vendor-patches.py check
@@ -1323,6 +1332,7 @@ jobs:
       - pin-revision
       - guards
       - gpui-tests
+      - gpui-build
       - gtk-build
       - clippy
       - test-build
@@ -1333,12 +1343,10 @@ jobs:
       - floor-build
       - distro-floor-scenarios
       - driver
-      - e2e
       - security-policy
       - consumers
       - gtk
       - pg-release
-      - socket-ssh
       - gtk-server
       - driver-tls
       - keyring
@@ -1360,7 +1368,7 @@ jobs:
       - name: Evaluate finalized job results
         env:
           CI_JOB_RESULTS: ${{ toJSON(needs) }}
-        run: python3 src/scripts/check-forgejo-ci-jobs.py
+        run: python3 src/scripts/check-ci-jobs.py
       - name: Finalize runner job
         if: always()
         shell: bash

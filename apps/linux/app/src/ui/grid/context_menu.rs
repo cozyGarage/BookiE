@@ -813,10 +813,9 @@ fn set_action_enabled(group: &gio::SimpleActionGroup, name: &str, enabled: bool)
 fn build_menu_popovers(column_view: &gtk::ColumnView, models: MenuModels) -> MenuPopovers {
     let editable = gtk::PopoverMenu::from_model_full(&models.editable, gtk::PopoverMenuFlags::NESTED);
     let readonly = gtk::PopoverMenu::from_model_full(&models.readonly, gtk::PopoverMenuFlags::NESTED);
-    let empty = gtk::PopoverMenu::from_model(Some(&models.empty));
-    editable.set_has_arrow(true);
-    readonly.set_has_arrow(true);
-    empty.set_has_arrow(true);
+    let empty = crate::ui::context_menu::from_model(Some(&models.empty));
+    crate::ui::context_menu::configure(&editable);
+    crate::ui::context_menu::configure(&readonly);
     editable.set_parent(column_view);
     readonly.set_parent(column_view);
     empty.set_parent(column_view);
