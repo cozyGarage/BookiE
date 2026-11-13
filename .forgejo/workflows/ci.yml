@@ -1267,7 +1267,7 @@ jobs:
       - name: Evaluate finalized job results
         env:
           CI_JOB_RESULTS: ${{ toJSON(needs) }}
-        run: python3 src/scripts/check-forgejo-ci-jobs.py
+        run: python3 src/scripts/check-ci-jobs.py
       - name: Finalize runner job
         if: always()
         shell: bash

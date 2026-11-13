@@ -17,11 +17,6 @@ ROOT = Path(__file__).resolve().parents[2]
 spec = importlib.util.spec_from_file_location("ci_jobs", ROOT / "scripts/check-ci-jobs.py")
 checker = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(checker)
-forgejo_spec = importlib.util.spec_from_file_location(
-    "forgejo_ci_jobs", ROOT / "scripts/check-forgejo-ci-jobs.py"
-)
-checker_forgejo = importlib.util.module_from_spec(forgejo_spec)
-forgejo_spec.loader.exec_module(checker_forgejo)
 bounded_spec = importlib.util.spec_from_file_location("bounded_operations", ROOT / "scripts/check-bounded-operations.py")
 bounded_checker = importlib.util.module_from_spec(bounded_spec)
 bounded_spec.loader.exec_module(bounded_checker)
@@ -1334,6 +1329,12 @@ class CiWorkflowTests(unittest.TestCase):
                 self.assertEqual(checker.assess(results, "push")[0], [name], (name, state))
         self.assertEqual(set(checker.assess({}, "push")[0]), checker.REQUIRED)
 
+    def test_unexpected_job_results_fail_the_final_gate(self):
+        results = {name: {"result": "success"} for name in checker.REQUIRED}
+        results["unreviewed-job"] = {"result": "success"}
+
+        self.assertEqual(checker.assess(results, "push")[0], ["unreviewed-job"])
+
     def test_only_pull_request_runs_are_cancelled_when_a_newer_run_starts(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         self.assertIn("cancel-in-progress: ${{ github.event_name == 'pull_request' }}", workflow)
@@ -1469,8 +1470,8 @@ class CiWorkflowTests(unittest.TestCase):
 
         self.assertIn("if: always() && !cancelled()", section)
         self.assertIn("CI_JOB_RESULTS: ${{ toJSON(needs) }}", section)
-        self.assertIn("python3 src/scripts/check-forgejo-ci-jobs.py", section)
-        self.assertEqual(set(job_names), checker_forgejo.REQUIRED | checker_forgejo.OPTIONAL_ON_NON_MAIN)
+        self.assertIn("python3 src/scripts/check-ci-jobs.py", section)
+        self.assertEqual(set(job_names), checker.REQUIRED)
         for name in job_names:
             with self.subTest(job=name):
                 self.assertIn(f"      - {name}\n", section)

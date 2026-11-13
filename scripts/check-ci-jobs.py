@@ -31,7 +31,7 @@ OPTIONAL_ON_PULL_REQUEST = {"floor-build", "distro-floor-scenarios"}
 
 
 def assess(results, event):
-    expected = REQUIRED
+    expected = REQUIRED | results.keys()
     failures = []
     rows = []
     for name in sorted(expected | results.keys()):
@@ -39,7 +39,7 @@ def assess(results, event):
         allowed_skip = status == "skipped" and (
             name in OPTIONAL_ON_PULL_REQUEST and event == "pull_request"
         )
-        accepted = name in expected and (status == "success" or allowed_skip)
+        accepted = name in REQUIRED and (status == "success" or allowed_skip)
         if not accepted:
             failures.append(name)
         if allowed_skip:
@@ -53,7 +53,7 @@ def assess(results, event):
 def main():
     results = json.loads(os.environ["CI_JOB_RESULTS"])
     failures, rows = assess(results, os.environ["GITHUB_EVENT_NAME"])
-    report = "## Linux regression jobs\n\n| Job | Result | Gate |\n| --- | --- | --- |\n" + "\n".join(rows) + "\n"
+    report = "## BookiE regression jobs\n\n| Job | Result | Gate |\n| --- | --- | --- |\n" + "\n".join(rows) + "\n"
     report += "\nMutation/coverage and installed Wayland acceptance are separate checks.\n"
     print(report)
     if summary := os.environ.get("GITHUB_STEP_SUMMARY"):
