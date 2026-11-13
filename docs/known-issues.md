@@ -18,8 +18,6 @@ This page is an index of ledger IDs to issues. Do not track evidence, owners or 
 | UI-53 | [#2630](https://github.com/cozyGarage/BookiE/issues/2630) | UX |
 | UI-58 | [#2673](https://github.com/cozyGarage/BookiE/issues/2673) | UX |
 | UI-60 | [#2725](https://github.com/cozyGarage/BookiE/issues/2725) | UX |
-| UI-61 | [#3013](https://github.com/cozyGarage/BookiE/issues/3013) | UX |
-| UI-62 | [#3014](https://github.com/cozyGarage/BookiE/issues/3014) | UX |
 | PEER-4 | [#1026](https://github.com/cozyGarage/BookiE/issues/1026) | UX |
 | PEER-7 | [#1029](https://github.com/cozyGarage/BookiE/issues/1029) | UX |
 | PEER-8 | [#1030](https://github.com/cozyGarage/BookiE/issues/1030) | Data |
@@ -28,7 +26,6 @@ This page is an index of ledger IDs to issues. Do not track evidence, owners or 
 | PEER-11 | [#1033](https://github.com/cozyGarage/BookiE/issues/1033) | Data |
 | PEER-12 | [#1034](https://github.com/cozyGarage/BookiE/issues/1034) | UX |
 | PEER-16 | [#1065](https://github.com/cozyGarage/BookiE/issues/1065) | Data |
-| RV-4 | [#1174](https://github.com/cozyGarage/BookiE/issues/1174) | Policy |
 | RV-5 | [#1175](https://github.com/cozyGarage/BookiE/issues/1175) | Data |
 | RV-6 | [#1176](https://github.com/cozyGarage/BookiE/issues/1176) | Data |
 | RV-7 | [#1177](https://github.com/cozyGarage/BookiE/issues/1177) | Data |
