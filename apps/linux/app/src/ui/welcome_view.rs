@@ -80,10 +80,6 @@ impl SimpleComponent for WelcomeView {
         let empty_page = empty_page(&sender);
         root.add_named(&empty_page, Some("empty"));
 
-        // Populated page — saved connections list. AdwClamp is the
-        // GNOME pattern for "constrain reading width to a sensible
-        // max in a scrollable area"; it centres + caps width without
-        // the manual `gtk::Box` halign/margin gymnastics.
         let scroller = gtk::ScrolledWindow::builder()
             .hexpand(true)
             .vexpand(true)
@@ -129,12 +125,6 @@ impl SimpleComponent for WelcomeView {
         recent_group.add(&recent_items);
         outer.append(&recent_group);
 
-        // Single CTA on the populated page: the "+" button in the
-        // group header. Previously we also rendered a bottom pill
-        // labelled "New connection", which duplicated the affordance —
-        // ambiguity at different visual weights. Empty-page pill
-        // stays (it's the only CTA there); on this page the header
-        // suffix is sufficient.
         let group = adw::PreferencesGroup::builder()
             .title(bookie_app_services::tr!("Saved connections"))
             .build();
@@ -146,10 +136,6 @@ impl SimpleComponent for WelcomeView {
         header_btn.add_css_class("flat");
         let s_header = sender.clone();
         header_btn.connect_clicked(move |_| s_header.input(WelcomeViewInput::OpenConnect));
-        // Import sits beside Add rather than inside a menu: pasting a
-        // connection URL is the fastest path in from another tool, and
-        // GNOME puts sibling create-actions side by side in the group
-        // header (Software's "Add" / "Install File…" pattern).
         let import_btn = gtk::Button::builder()
             .icon_name("insert-link-symbolic")
             .tooltip_text(bookie_app_services::tr!("Import from URL"))
@@ -195,10 +181,6 @@ impl SimpleComponent for WelcomeView {
         header_actions.append(&header_btn);
         group.set_header_suffix(Some(&header_actions));
 
-        // Filter box above the list. Hidden until there are enough
-        // connections to be worth filtering — a search field over three
-        // rows is noise, and GNOME only reveals search once a list can
-        // outgrow the viewport.
         let search = gtk::SearchEntry::builder()
             .placeholder_text(bookie_app_services::tr!("Filter by name, group, tag or driver"))
             .hexpand(true)
@@ -216,9 +198,6 @@ impl SimpleComponent for WelcomeView {
             .build();
         outer.append(&sections_box);
 
-        // Shown in place of the list when every connection is filtered
-        // out. Distinct from the "no connections yet" page: the fix is
-        // to clear the filter, not to add a connection.
         let empty_filter_page = adw::StatusPage::builder()
             .icon_name("system-search-symbolic")
             .title(bookie_app_services::tr!("No matches"))
@@ -304,9 +283,6 @@ impl SimpleComponent for WelcomeView {
     }
 }
 
-/// Connections a filter cannot outgrow. Below this the filter box stays
-/// hidden, so the field only appears once scanning the list by eye stops
-/// being the faster option.
 const FILTER_REVEAL_THRESHOLD: usize = 6;
 
 fn recent_connections(connections: &[SavedConnection]) -> Vec<&SavedConnection> {
