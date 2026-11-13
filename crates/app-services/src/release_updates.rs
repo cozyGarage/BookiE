@@ -85,6 +85,26 @@ pub fn compare_running_to_latest(running: &str, latest: &LatestRelease) -> Updat
     }
 }
 
+pub fn should_show_update_banner(
+    running: &str,
+    latest: &LatestRelease,
+    dismissed: Option<&str>,
+) -> bool {
+    let Some(running_version) = ReleaseVersion::parse(running) else {
+        return false;
+    };
+    if !latest.version.is_newer_than(running_version) {
+        return false;
+    }
+    let Some(dismissed_raw) = dismissed.map(str::trim).filter(|value| !value.is_empty()) else {
+        return true;
+    };
+    let Some(dismissed_version) = ReleaseVersion::parse(dismissed_raw) else {
+        return true;
+    };
+    latest.version.is_newer_than(dismissed_version)
+}
+
 pub fn parse_github_release_json(body: &str) -> Option<LatestRelease> {
     let value: serde_json::Value = serde_json::from_str(body).ok()?;
     if value.get("draft").and_then(|draft| draft.as_bool()) == Some(true) {
@@ -268,5 +288,19 @@ mod tests {
             Some("<p>Release after 0.2.6: notes for seven.</p>")
         );
         assert_eq!(metainfo_release_notes(xml, "0.9.9"), None);
+    }
+
+    #[test]
+    fn update_banner_respects_dismissed_version() {
+        let latest = LatestRelease {
+            version: ReleaseVersion::parse("0.2.8").expect("parse"),
+            tag_name: "linux-v0.2.8".into(),
+            html_url: "https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.8".into(),
+            body: String::new(),
+        };
+        assert!(should_show_update_banner("0.2.7", &latest, None));
+        assert!(!should_show_update_banner("0.2.7", &latest, Some("0.2.8")));
+        assert!(should_show_update_banner("0.2.7", &latest, Some("0.2.7")));
+        assert!(!should_show_update_banner("0.2.8", &latest, None));
     }
 }
