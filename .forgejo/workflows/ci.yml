@@ -141,6 +141,7 @@ jobs:
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
   gpui-tests:
+    if: github.event_name != 'push'
     runs-on: any-host
     needs: [pin-revision, test-build]
     timeout-minutes: 45
@@ -189,6 +190,7 @@ jobs:
             rm -rf -- src
           fi
   gtk-build:
+    if: github.event_name != 'push'
     runs-on: build-host
     needs: [pin-revision, guards]
     timeout-minutes: 20
@@ -561,7 +563,7 @@ jobs:
   floor-build:
     runs-on: build-host
     needs: [pin-revision, guards, clippy]
-    if: github.ref == 'refs/heads/main' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: github.event_name != 'push'
     timeout-minutes: 45
     defaults:
       run:
@@ -641,7 +643,7 @@ jobs:
   distro-floor-scenarios:
     runs-on: any-host
     needs: [pin-revision, floor-build]
-    if: github.ref == 'refs/heads/main' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: github.event_name != 'push'
     timeout-minutes: 90
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/floor-debian:testing
@@ -703,6 +705,7 @@ jobs:
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
   driver:
+    if: github.event_name != 'push'
     runs-on: any-host
     needs: [pin-revision, guards, clippy, test-build]
     timeout-minutes: 90
@@ -775,6 +778,7 @@ jobs:
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
   b4-rollback:
+    if: github.event_name != 'push'
     needs: [pin-revision]
     runs-on: any-host
     timeout-minutes: 45
@@ -819,6 +823,7 @@ jobs:
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
   security-policy:
+    if: github.event_name != 'push'
     runs-on: any-host
     needs: [pin-revision, test-build]
     timeout-minutes: 45
@@ -856,6 +861,7 @@ jobs:
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
   consumers:
+    if: github.event_name != 'push'
     runs-on: any-host
     needs: [pin-revision, guards, clippy, test-build]
     timeout-minutes: 45
@@ -907,6 +913,7 @@ jobs:
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
   gtk:
+    if: github.event_name != 'push'
     runs-on: any-host
     needs: [pin-revision, guards, clippy, gtk-build]
     timeout-minutes: 60
@@ -965,6 +972,7 @@ jobs:
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
   pg-release:
+    if: github.event_name != 'push'
     runs-on: any-host
     needs: [pin-revision, guards, clippy, test-build]
     timeout-minutes: 45
@@ -1016,6 +1024,7 @@ jobs:
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
   gtk-server:
+    if: github.event_name != 'push'
     runs-on: any-host
     needs: [pin-revision, guards, clippy, gtk-build]
     timeout-minutes: 45
@@ -1087,6 +1096,7 @@ jobs:
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
   driver-tls:
+    if: github.event_name != 'push'
     runs-on: any-host
     needs: [pin-revision, guards, clippy, test-build]
     timeout-minutes: 45
@@ -1134,6 +1144,7 @@ jobs:
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
   keyring:
+    if: github.event_name != 'push'
     runs-on: any-host
     needs: [pin-revision, guards, clippy, test-build]
     timeout-minutes: 30
@@ -1173,6 +1184,7 @@ jobs:
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
   supply-chain:
+    if: github.event_name != 'push'
     runs-on: build-host
     needs: [pin-revision, guards, clippy]
     timeout-minutes: 45

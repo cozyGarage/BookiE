@@ -665,6 +665,15 @@
       ]
     }
   },
+  "push_required_jobs": [
+    "pin-revision",
+    "guards",
+    "clippy",
+    "test-build",
+    "unit",
+    "sandbox",
+    "widgets"
+  ],
   "gate_jobs": {
   "pin-revision": {
     "needs": [],
@@ -686,7 +695,7 @@
       "test-build"
     ],
     "timeout_minutes": 45,
-    "condition": null,
+    "condition": "github.event_name != 'push'",
     "matrix": {}
   },
   "gtk-build": {
@@ -695,7 +704,7 @@
       "pin-revision"
     ],
     "timeout_minutes": 20,
-    "condition": null,
+    "condition": "github.event_name != 'push'",
     "matrix": {}
   },
   "clippy": {
@@ -748,7 +757,7 @@
       "pin-revision"
     ],
     "timeout_minutes": 45,
-    "condition": "github.ref == 'refs/heads/main' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'",
+    "condition": "github.event_name != 'push'",
     "matrix": {}
   },
   "distro-floor-scenarios": {
@@ -757,7 +766,7 @@
       "pin-revision"
     ],
     "timeout_minutes": 90,
-    "condition": "github.ref == 'refs/heads/main' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'",
+    "condition": "github.event_name != 'push'",
     "matrix": {
       "max-parallel": 2,
       "shard_group": [
@@ -774,7 +783,7 @@
       "test-build"
     ],
     "timeout_minutes": 90,
-    "condition": null,
+    "condition": "github.event_name != 'push'",
     "matrix": {
       "group": [
         "driver-core",
@@ -789,7 +798,7 @@
       "pin-revision"
     ],
     "timeout_minutes": 45,
-    "condition": null,
+    "condition": "github.event_name != 'push'",
     "matrix": {}
   },
   "security-policy": {
@@ -798,7 +807,7 @@
       "test-build"
     ],
     "timeout_minutes": 45,
-    "condition": null,
+    "condition": "github.event_name != 'push'",
     "matrix": {}
   },
   "consumers": {
@@ -809,7 +818,7 @@
       "test-build"
     ],
     "timeout_minutes": 45,
-    "condition": null,
+    "condition": "github.event_name != 'push'",
     "matrix": {}
   },
   "gtk": {
@@ -820,7 +829,7 @@
       "pin-revision"
     ],
     "timeout_minutes": 60,
-    "condition": null,
+    "condition": "github.event_name != 'push'",
     "matrix": {
       "shard": [
         "1",
@@ -837,7 +846,7 @@
       "test-build"
     ],
     "timeout_minutes": 45,
-    "condition": null,
+    "condition": "github.event_name != 'push'",
     "matrix": {}
   },
   "gtk-server": {
@@ -848,7 +857,7 @@
       "pin-revision"
     ],
     "timeout_minutes": 45,
-    "condition": null,
+    "condition": "github.event_name != 'push'",
     "matrix": {
       "server": [
         "clickhouse",
@@ -867,7 +876,7 @@
       "test-build"
     ],
     "timeout_minutes": 45,
-    "condition": null,
+    "condition": "github.event_name != 'push'",
     "matrix": {}
   },
   "keyring": {
@@ -878,7 +887,7 @@
       "test-build"
     ],
     "timeout_minutes": 30,
-    "condition": null,
+    "condition": "github.event_name != 'push'",
     "matrix": {}
   },
   "supply-chain": {
@@ -888,7 +897,7 @@
       "pin-revision"
     ],
     "timeout_minutes": 45,
-    "condition": null,
+    "condition": "github.event_name != 'push'",
     "matrix": {}
   },
   "regression-gate": {

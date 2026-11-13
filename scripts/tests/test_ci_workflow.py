@@ -94,6 +94,23 @@ def workflow_job_test_layers(path):
 
 
 class CiWorkflowTests(unittest.TestCase):
+    def test_forgejo_ci_contracts_fetch_unmirrored_actions_from_github(self):
+        workflow = (ROOT / ".forgejo/workflows/ci-contracts.yml").read_text()
+        actionlint = (ROOT / ".github/actionlint.yaml").read_text()
+
+        self.assertEqual(
+            workflow.count("uses: https://github.com/taiki-e/install-action@"),
+            2,
+        )
+        self.assertIn(
+            "uses: https://github.com/dtolnay/rust-toolchain@",
+            workflow,
+        )
+        self.assertIn(
+            "https://github\\.com/(taiki-e/install-action|dtolnay/rust-toolchain)",
+            actionlint,
+        )
+
     def test_forgejo_workflow_omits_unsupported_permissions_block(self):
         forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         github = (ROOT / ".github/workflows/build-linux.yml").read_text()
@@ -676,7 +693,7 @@ class CiWorkflowTests(unittest.TestCase):
                 self.assertIn(f"path: reusable-builds/{group}/", builder)
         self.assertIn('path: reusable-builds/gpui/', builder)
         self.assertIn('RUSTC_WRAPPER: ""', job)
-        self.assertIn('"gpui-tests"', (ROOT / "scripts/check-ci-jobs.py").read_text())
+        self.assertIn('"gpui-tests"', (ROOT / "scripts/test-layers.json").read_text())
         self.assertIn("libxkbcommon-x11-dev", (ROOT / "ci/debian-testing-gtk/Dockerfile").read_text())
 
     def test_test_bundle_publication_contains_only_provider_consumed_groups(self):
@@ -1326,7 +1343,8 @@ class CiWorkflowTests(unittest.TestCase):
         for name in checker.REQUIRED:
             for state in ["failure", "skipped", "cancelled", "missing"]:
                 results = success | {name: {"result": state}}
-                self.assertEqual(checker.assess(results, "push")[0], [name], (name, state))
+                expected = [] if state == "skipped" and name in checker.OPTIONAL_ON_PUSH else [name]
+                self.assertEqual(checker.assess(results, "push")[0], expected, (name, state))
         self.assertEqual(set(checker.assess({}, "push")[0]), checker.REQUIRED)
 
     def test_unexpected_job_results_fail_the_final_gate(self):
@@ -1340,39 +1358,39 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("cancel-in-progress: ${{ github.event_name == 'pull_request' }}", workflow)
         self.assertNotIn("event_name == 'push' }}", workflow.split("concurrency:", 1)[1].split("jobs:", 1)[0])
 
-    def test_push_and_pull_request_require_every_regression_job(self):
-        self.assertEqual(checker.OPTIONAL_ON_PULL_REQUEST, {"floor-build", "distro-floor-scenarios"})
+    def test_push_requires_t0_and_pull_request_requires_the_full_gate(self):
+        self.assertEqual(
+            checker.PUSH_REQUIRED,
+            {"pin-revision", "guards", "clippy", "test-build", "unit", "sandbox", "widgets"},
+        )
         success = {name: {"result": "success"} for name in checker.REQUIRED}
         for name in checker.REQUIRED:
             results = success | {name: {"result": "skipped"}}
-            expected_pr = [] if name in checker.OPTIONAL_ON_PULL_REQUEST else [name]
-            self.assertEqual(checker.assess(results, "pull_request")[0], expected_pr, name)
-            self.assertEqual(checker.assess(results, "push")[0], [name], name)
+            self.assertEqual(checker.assess(results, "pull_request")[0], [name], name)
+            expected_push = [] if name in checker.OPTIONAL_ON_PUSH else [name]
+            self.assertEqual(checker.assess(results, "push")[0], expected_push, name)
         results = success | {"driver-tls": {"result": "skipped"}}
         self.assertEqual(checker.assess(results, "pull_request")[0], ["driver-tls"])
-        self.assertEqual(checker.assess(results, "push")[0], ["driver-tls"])
+        self.assertEqual(checker.assess(results, "push")[0], [])
 
     def test_scheduled_quality_jobs_are_separate_from_the_required_gate(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
-        guarded = set()
+        scheduled = set()
+        t1 = set()
         for match in re.finditer(r"^  ([a-z0-9-]+):\n(.*?)(?=^  [a-z0-9-]+:|\Z)", workflow, re.M | re.S):
             header = match.group(2).split("\n    steps:\n", 1)[0]
             if re.search(
                 r"(?m)^    if: github.event_name == 'schedule' \|\| github.event_name == 'workflow_dispatch'\s*$",
                 header,
             ):
-                guarded.add(match.group(1))
-        self.assertEqual(guarded, {"current-stable-clippy"})
+                scheduled.add(match.group(1))
+            if re.search(r"(?m)^    if: github.event_name != 'push'\s*$", header):
+                t1.add(match.group(1))
+        self.assertEqual(scheduled, {"current-stable-clippy"})
+        self.assertEqual(t1, checker.OPTIONAL_ON_PUSH)
         self.assertNotIn("current-stable-clippy", checker.REQUIRED)
         gate = workflow.split("  regression-gate:\n", 1)[1]
         self.assertNotIn("- current-stable-clippy", gate)
-        for name in ["gtk", "driver", "b4-rollback", "driver-tls", "pg-release", "security-policy", "supply-chain"]:
-            section = re.search(rf"^  {name}:\n(.*?)(?=^  [a-z0-9-]+:|\Z)", workflow, re.M | re.S).group(1)
-            self.assertNotRegex(
-                section.split("\n    steps:\n", 1)[0],
-                r"(?m)^    if: ",
-                name,
-            )
 
     def test_github_docker_hub_jobs_authenticate_when_secrets_exist(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
@@ -1414,22 +1432,20 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("secrets.DOCKERHUB_USERNAME", soak)
         self.assertIn("secrets.DOCKERHUB_TOKEN", soak)
 
-    def test_only_pull_requests_can_skip_the_distro_floor_jobs(self):
+    def test_only_pushes_can_skip_the_distro_floor_jobs(self):
         results = {name: {"result": "success"} for name in checker.REQUIRED}
-        for name in checker.OPTIONAL_ON_PULL_REQUEST:
+        for name in ("floor-build", "distro-floor-scenarios"):
             results[name] = {"result": "skipped"}
-        self.assertEqual(checker.assess(results, "pull_request")[0], [])
-        for event in ["push", "schedule", "workflow_dispatch"]:
-            self.assertEqual(checker.assess(results, event)[0], sorted(checker.OPTIONAL_ON_PULL_REQUEST))
+        self.assertEqual(checker.assess(results, "push")[0], [])
+        for event in ["pull_request", "schedule", "workflow_dispatch"]:
+            self.assertEqual(checker.assess(results, event)[0], ["distro-floor-scenarios", "floor-build"])
 
-    def test_distro_floor_is_not_a_pull_request_gate(self):
+    def test_distro_floor_is_in_the_full_gate(self):
         results = {name: {"result": "success"} for name in checker.REQUIRED}
         results["floor-build"] = {"result": "skipped"}
         results["distro-floor-scenarios"] = {"result": "skipped"}
-        self.assertEqual(checker.assess(results, "pull_request")[0], [])
-        self.assertEqual(
-            checker.assess(results, "push")[0], sorted(checker.OPTIONAL_ON_PULL_REQUEST)
-        )
+        self.assertEqual(checker.assess(results, "pull_request")[0], ["distro-floor-scenarios", "floor-build"])
+        self.assertEqual(checker.assess(results, "push")[0], [])
 
     def test_distro_floor_profiles_match_between_github_and_forgejo(self):
         github = (ROOT / ".github/workflows/build-linux.yml").read_text()
@@ -1440,14 +1456,12 @@ class CiWorkflowTests(unittest.TestCase):
         forgejo_jobs = re.search(
             r"(?ms)^  floor-build:\n(.*?)(?=^  driver:\n|\Z)", forgejo
         ).group(1)
-        full_profile = (
-            "github.ref == 'refs/heads/main' || github.event_name == 'schedule' "
-            "|| github.event_name == 'workflow_dispatch'"
-        )
+        full_profile = "github.event_name != 'push'"
 
         self.assertIn(full_profile, github_job)
         self.assertEqual(forgejo_jobs.count(f"if: {full_profile}"), 2)
-        self.assertEqual(checker.OPTIONAL_ON_PULL_REQUEST, {"floor-build", "distro-floor-scenarios"})
+        self.assertIn("floor-build", checker.OPTIONAL_ON_PUSH)
+        self.assertIn("distro-floor-scenarios", checker.OPTIONAL_ON_PUSH)
 
     def test_summary_depends_on_every_required_job_and_always_runs(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
@@ -1457,7 +1471,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("python3 scripts/check-ci-jobs.py", section)
         for name in checker.REQUIRED:
             self.assertIn(f"      - {name}\n", section)
-        for name in checker.OPTIONAL_ON_PULL_REQUEST:
+        for name in checker.OPTIONAL_ON_PUSH:
             self.assertIn(f"      - {name}\n", section)
 
     def test_forgejo_regression_gate_waits_for_every_workflow_job(self):
@@ -1929,7 +1943,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("scripts/build-deb.sh", producer)
         self.assertNotIn("scripts/test-deb-package.sh", workflow)
         self.assertIn("needs: [pin-revision, floor-build]", scenarios)
-        full_profile = "github.ref == 'refs/heads/main' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'"
+        full_profile = "github.event_name != 'push'"
         self.assertIn(f"if: {full_profile}", producer)
         self.assertIn(f"if: {full_profile}", scenarios)
         self.assertIn("ci-gtk-artifact.py create --package", producer)

@@ -33,9 +33,9 @@ permissions:
   contents: read
   packages: read
 
-# A newer pull request push supersedes its in-flight run. Pull requests and
-# Default-branch pushes run the full required regression jobs. Current-stable
-# Clippy stays schedule or dispatch only. Scheduled and dispatched runs keep
+# A newer pull request push supersedes its in-flight run. Default-branch pushes
+# run the T0 checks. Pull requests, schedules and
+# dispatch run the full T1 regression gate. Scheduled and dispatched runs keep
 # their own concurrency group so a manual full Build Linux is never cancelled
 # by ordinary branch traffic.
 concurrency:
@@ -382,6 +382,7 @@ jobs:
           retention-days: 14
 
   gpui-tests:
+    if: github.event_name != 'push'
     name: GPUI model and simulated interaction tests
     runs-on: ubuntu-24.04
     needs: [pin-revision, ensure-ci-gtk-image, test-build]
@@ -455,6 +456,7 @@ jobs:
           python3 scripts/run-test-layer.py widgets
 
   consumers:
+    if: github.event_name != 'push'
     name: MCP, policy and app server tests
     timeout-minutes: 45
     runs-on: ubuntu-24.04
@@ -511,6 +513,7 @@ jobs:
         run: python3 scripts/run-test-layer.py app-server
 
   gtk-build:
+    if: github.event_name != 'push'
     name: Build shared GTK binary
     timeout-minutes: 20
     runs-on: ubuntu-24.04
@@ -551,6 +554,7 @@ jobs:
           retention-days: 1
 
   gtk:
+    if: github.event_name != 'push'
     name: Installed GTK safety scenarios (${{ matrix.shard }})
     timeout-minutes: 60
     runs-on: ubuntu-24.04
@@ -620,6 +624,7 @@ jobs:
           if-no-files-found: error
 
   keyring:
+    if: github.event_name != 'push'
     name: Secret Service acceptance
     timeout-minutes: 30
     runs-on: ubuntu-24.04
@@ -665,6 +670,7 @@ jobs:
           if-no-files-found: error
 
   gtk-server:
+    if: github.event_name != 'push'
     name: Installed GTK server scenarios (${{ matrix.server }})
     timeout-minutes: 45
     runs-on: ubuntu-24.04
@@ -799,6 +805,7 @@ jobs:
         run: cargo +stable clippy --workspace --all-targets -- -D warnings
 
   driver:
+    if: github.event_name != 'push'
     name: Driver integration tests (docker) (${{ matrix.group }})
     timeout-minutes: 90
     runs-on: ubuntu-24.04
@@ -880,6 +887,7 @@ jobs:
           if-no-files-found: error
 
   b4-rollback:
+    if: github.event_name != 'push'
     name: Policy rollback acceptance (docker)
     timeout-minutes: 45
     runs-on: ubuntu-24.04
@@ -931,6 +939,7 @@ jobs:
           if-no-files-found: error
 
   driver-tls:
+    if: github.event_name != 'push'
     name: Driver TLS fixture (docker)
     timeout-minutes: 45
     runs-on: ubuntu-24.04
@@ -999,7 +1008,7 @@ jobs:
   floor-build:
     runs-on: ubuntu-24.04
     needs: [pin-revision, ensure-ci-gtk-image, guards, clippy]
-    if: github.ref == 'refs/heads/main' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: github.event_name != 'push'
     timeout-minutes: 45
     container:
       image: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}
@@ -1043,6 +1052,7 @@ jobs:
           retention-days: 2
 
   pg-release:
+    if: github.event_name != 'push'
     name: PostgreSQL release fixture (docker)
     timeout-minutes: 45
     runs-on: ubuntu-24.04
@@ -1104,7 +1114,7 @@ jobs:
 
   distro-floor-scenarios:
     name: Debian testing package GTK scenarios (${{ matrix.shard_group }})
-    if: github.ref == 'refs/heads/main' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: github.event_name != 'push'
     timeout-minutes: 90
     runs-on: ubuntu-24.04
     needs: [pin-revision, ensure-ci-gtk-image, floor-build]
@@ -1163,6 +1173,7 @@ jobs:
 
 
   security-policy:
+    if: github.event_name != 'push'
     timeout-minutes: 45
     runs-on: ubuntu-24.04
     needs: [pin-revision, ensure-ci-gtk-image, test-build]
@@ -1195,6 +1206,7 @@ jobs:
         run: python3 scripts/run-test-layer.py security-policy
 
   supply-chain:
+    if: github.event_name != 'push'
     timeout-minutes: 45
     runs-on: ubuntu-24.04
     needs: [pin-revision, ensure-ci-gtk-image, guards, clippy]
