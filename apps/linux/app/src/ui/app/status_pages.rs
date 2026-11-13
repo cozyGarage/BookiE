@@ -9,9 +9,7 @@ const ABOUT_DEVELOPERS: &[&str] = &["BookiE contributors https://github.com/cozy
 
 impl App {
     pub(super) fn show_welcome_page(&self, _sender: ComponentSender<Self>) {
-        // Welcome lives outside the ViewStack — it's the disconnected mode.
-        // The ViewSwitcherBar is hidden via on_disconnect so the welcome
-        // view occupies the full toolbar surface.
+        // Welcome stays outside the ViewStack; disconnect hides the ViewSwitcherBar.
         self.show_in_content_holder(self.welcome_view.widget());
     }
 
@@ -24,20 +22,11 @@ impl App {
         }
     }
 
-    /// Used during connect to convey "Connecting…". Persistent toast
-    /// (timeout 0) — held in `connect_progress_toast` until the connect
-    /// resolves, at which point `dismiss_loading_page` clears it. Replaces
-    /// the prior fire-and-forget toast which auto-dismissed at 2 s, well
-    /// before remote / SSH-tunnelled connections resolve.
+    /// Keep a persistent connect toast until remote and SSH connection attempts resolve.
     pub(super) fn set_loading_page(&mut self, title: &str, description: &str, sender: &ComponentSender<Self>) {
         if let Some(prev) = self.connect_progress_toast.take() {
             prev.dismiss();
         }
-        // GNOME inline-metadata separator (` · `) keeps the two
-        // strings reading as one phrase rather than two sentences
-        // colliding ("Connecting… Opening MyDB" → "Connecting… ·
-        // Opening MyDB"). Same convention used in the browse
-        // paginator label and the editor status line.
         let body = if description.is_empty() {
             title.to_string()
         } else {
@@ -58,10 +47,7 @@ impl App {
         }
     }
 
-    /// Convenience for `set_status_page(Error, ...)` and similar; in the
-    /// connected state, browse-tab errors flow through BrowseTabInput::ShowError.
-    /// Used here only for app-level (non-tab-scoped) failures — surfaces
-    /// as an alert dialog so the user actually notices.
+    /// Surface app-level failures in an alert; tab-scoped failures use BrowseTab.
     pub(super) fn set_status_page(&self, _kind: super::StatusKind, title: &str, description: &str) {
         self.show_error_alert(title, description);
     }
@@ -72,9 +58,7 @@ impl App {
 
     pub(super) fn show_error_alert(&self, title: &str, message: &str) {
         let dialog = adw::AlertDialog::new(Some(title), Some(message));
-        // GNOME HIG dismiss-only alert: "Close" reads cleaner than "OK"
-        // (which implies acknowledgement of an action the user took)
-        // and matches GNOME Settings' info-alert convention.
+        // "Close" avoids implying acknowledgement of a completed action.
         dialog.add_response("close", &bookie_app_services::tr!("Close"));
         dialog.set_default_response(Some("close"));
         dialog.set_close_response("close");

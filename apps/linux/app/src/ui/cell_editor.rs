@@ -56,7 +56,7 @@ mod imp {
         }
 
         fn dispose(&self) {
-            // GTK custom widgets must unparent children during disposal.
+            // Unparent child widgets during custom-widget disposal.
             if let Some(entry) = self.entry.borrow().as_ref() {
                 entry.unparent();
             }
@@ -89,9 +89,7 @@ impl CellEditor {
         glib::Object::new()
     }
 
-    /// Current displayed text. In edit mode reads from the entry
-    /// (so a still-editing cell returns the user's in-progress
-    /// value); otherwise reads from the label.
+    /// Return the in-progress entry value while editing, otherwise the displayed label text.
     pub fn text(&self) -> glib::GString {
         if self.is_editing() {
             self.entry_widget().text()
@@ -118,9 +116,7 @@ impl CellEditor {
         self.imp().inline_editable.get()
     }
 
-    /// Apply or clear a Pango strikethrough attribute on the display
-    /// Label. Edit-mode `GtkText` is intentionally unaffected — a row
-    /// marked for deletion is read-only by definition.
+    /// Strike through the display label; deleted rows are not editable.
     pub fn set_strikethrough(&self, on: bool) {
         let label = self.label_widget();
         if on {
@@ -141,10 +137,7 @@ impl CellEditor {
         self.start_editing_with(&seed);
     }
 
-    /// Like `start_editing`, but seeds the entry from `seed` instead of
-    /// the label. The label can hold a truncated display string for a
-    /// long value, so a caller holding the untruncated text passes it
-    /// here to avoid editing (and saving) the truncated copy.
+    /// Seed from the full text when the label holds a truncated preview.
     pub fn start_editing_with(&self, seed: &str) {
         if !self.is_inline_editable() {
             return;
@@ -194,9 +187,7 @@ impl CellEditor {
         })
     }
 
-    /// The inner `GtkText` widget. Exposed so callers that need the
-    /// IME-aware delegate (preedit-changed, etc.) can hook directly
-    /// onto it.
+    /// Expose GtkText so callers can observe IME preedit changes.
     pub fn entry(&self) -> gtk4::Text {
         self.entry_widget()
     }
