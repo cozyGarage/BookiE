@@ -256,8 +256,11 @@ impl GridView {
                         column: *column,
                     };
                     this.cell_cursor = Some(cursor);
-                    let names = this.column_names();
-                    this.status = cursor.label(&names);
+                    let dataset = this.base() + *row as u64;
+                    this.status = match this.selection {
+                        Some(selection) if selection.focus == dataset => selection.label(),
+                        _ => cursor.label(&this.column_names()),
+                    };
                     cx.notify();
                 }
                 gpui_kit::component::table::TableEvent::DoubleClickedRow(row) => {
