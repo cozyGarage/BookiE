@@ -66,7 +66,6 @@ impl DatabaseDriver for ClickhouseDriver {
         true
     }
 
-
     fn default_database(&self) -> &'static str {
         "default"
     }

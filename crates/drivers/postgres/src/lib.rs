@@ -69,7 +69,6 @@ impl DatabaseDriver for PgDriver {
         true
     }
 
-
     fn supports_updatable_views(&self) -> bool {
         true
     }

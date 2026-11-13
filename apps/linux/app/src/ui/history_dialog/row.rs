@@ -163,12 +163,7 @@ pub(super) fn attach_context_menu(row: &adw::ActionRow, popover_menu: &gtk::Popo
             move |_, _| {
                 let pointing = row.upgrade().and_then(|row| {
                     row.compute_bounds(&row).map(|bounds| {
-                        gtk::gdk::Rectangle::new(
-                            (bounds.width() / 2.0) as i32,
-                            (bounds.height() / 2.0) as i32,
-                            1,
-                            1,
-                        )
+                        gtk::gdk::Rectangle::new((bounds.width() / 2.0) as i32, (bounds.height() / 2.0) as i32, 1, 1)
                     })
                 });
                 crate::ui::context_menu::popup_at(&popover, pointing);

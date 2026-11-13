@@ -1,8 +1,6 @@
 use std::time::Duration;
 
-use bookie_app_services::release_updates::{
-    self, LatestRelease, UpdateCheckOutcome, GITHUB_LATEST_RELEASE_URL,
-};
+use bookie_app_services::release_updates::{self, GITHUB_LATEST_RELEASE_URL, LatestRelease, UpdateCheckOutcome};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UpdateCheckError {
@@ -30,17 +28,11 @@ fn fetch_latest_release_body() -> Result<String, String> {
         .new_agent();
     let response = agent
         .get(GITHUB_LATEST_RELEASE_URL)
-        .header(
-            "User-Agent",
-            &format!("BookiE/{}", crate::config::VERSION),
-        )
+        .header("User-Agent", &format!("BookiE/{}", crate::config::VERSION))
         .header("Accept", "application/vnd.github+json")
         .call()
         .map_err(|error| error.to_string())?;
-    response
-        .into_body()
-        .read_to_string()
-        .map_err(|error| error.to_string())
+    response.into_body().read_to_string().map_err(|error| error.to_string())
 }
 
 #[cfg(test)]
