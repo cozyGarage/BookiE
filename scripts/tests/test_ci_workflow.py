@@ -140,6 +140,23 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertEqual(expected, forgejo)
         self.assertEqual(github, forgejo)
 
+    def test_forgejo_contract_workflow_matches_github_contracts(self):
+        github_path = ROOT / ".github/workflows/linux-ci-contracts.yml"
+        forgejo_path = ROOT / ".forgejo/workflows/ci-contracts.yml"
+        github = github_path.read_text()
+        forgejo = forgejo_path.read_text()
+        github_triggers = github.split("\non:\n", 1)[1].split("\npermissions:\n", 1)[0]
+        forgejo_triggers = forgejo.split("\non:\n", 1)[1].split("\nconcurrency:\n", 1)[0]
+        github_jobs = workflow_job_graph(github_path)
+        forgejo_jobs = workflow_job_graph(forgejo_path)
+
+        self.assertEqual(github_triggers, forgejo_triggers)
+        self.assertEqual(set(github_jobs), {"workflow-lint", "workflow-security", "harness"})
+        self.assertEqual(github_jobs, forgejo_jobs)
+        self.assertIn("python3 scripts/run-test-layer.py workflow-lint", forgejo)
+        self.assertIn("zizmor --offline", forgejo)
+        self.assertIn("python3 scripts/run-test-layer.py harness packaging-contracts", forgejo)
+
     def test_forgejo_and_github_pin_dispatch_revisions_with_the_same_script(self):
         workflows = {
             ".github/workflows/build-linux.yml": (ROOT / ".github/workflows/build-linux.yml").read_text(),
@@ -423,7 +440,7 @@ class CiWorkflowTests(unittest.TestCase):
         harness = (ROOT / "scripts/test-harness.sh").read_text()
 
         self.assertEqual(layers["packaging-contracts"]["hosted_gate"],
-                         "Linux CI contracts / harness; lab-ci / guards")
+                         "Linux CI contracts / harness; lab-ci / guards; lab-ci-contracts / harness")
         github = (ROOT / ".github/workflows/build-linux.yml").read_text()
         github_guards = re.search(r"(?ms)^  guards:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", github).group(1)
         self.assertIn("bash scripts/test-harness.sh", guards)
@@ -1841,6 +1858,9 @@ class CiWorkflowTests(unittest.TestCase):
     def test_forgejo_artifact_actions_are_pinned_and_bootstrap_their_runtime(self):
         allowed = {
             "actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+            "actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c",
+            "taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283",
+            "dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772",
             "https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5",
             "https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a",
         }

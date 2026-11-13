@@ -8,8 +8,13 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-WORKFLOWS = (ROOT / ".forgejo/workflows/ci.yml", ROOT / ".forgejo/workflows/nightly.yml")
+WORKFLOWS = (
+    ROOT / ".forgejo/workflows/ci.yml",
+    ROOT / ".forgejo/workflows/ci-contracts.yml",
+    ROOT / ".forgejo/workflows/nightly.yml",
+)
 CLEANUP = ROOT / "scripts/cleanup-ci-job.sh"
+NIGHTLY = ROOT / ".forgejo/workflows/nightly.yml"
 
 
 def runner_jobs(path):
@@ -444,7 +449,7 @@ class CiJobCleanupTests(unittest.TestCase):
         self.assertIn('--project-name "${BOOKIE_TEST_RUN_ID:-driver-tls}"', script)
 
     def test_nightly_outputs_do_not_use_tmp(self):
-        self.assertNotIn("/tmp/", WORKFLOWS[1].read_text(encoding="utf-8"))
+        self.assertNotIn("/tmp/", NIGHTLY.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
