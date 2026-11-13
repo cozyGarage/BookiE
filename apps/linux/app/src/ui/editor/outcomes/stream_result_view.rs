@@ -22,6 +22,7 @@ pub(in crate::ui::editor) fn build_streamed_result_widget(
     };
     let page_switcher = build_page_stack(outcome, result, &target, sender);
     let progress = gtk::Label::new(Some(&stream_progress_text(result)));
+    progress.add_css_class("bookie-output-font");
     if matches!(result.terminal, StreamTerminal::Loading) {
         page_switcher.set_widget_name(super::super::stream_view::LIVE_PAGES);
         progress.set_widget_name(super::super::stream_view::LIVE_PROGRESS);
@@ -33,6 +34,7 @@ pub(in crate::ui::editor) fn build_streamed_result_widget(
     if let Some(notice) = stream_terminal_notice(result) {
         let banner = adw::Banner::new(&notice);
         banner.set_use_markup(false);
+        banner.add_css_class("bookie-output-font");
         banner.set_revealed(true);
         holder.append(&banner);
     }
@@ -114,6 +116,7 @@ fn append_stream_export(
         )));
         notice.set_ellipsize(gtk::pango::EllipsizeMode::End);
         notice.set_max_width_chars(40);
+        notice.add_css_class("bookie-output-font");
         holder.append(&notice);
     }
     if matches!(result.terminal, StreamTerminal::Complete)

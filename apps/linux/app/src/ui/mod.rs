@@ -45,6 +45,7 @@ mod ssh_section;
 mod structure_tab;
 mod structure_tab_dialogs;
 mod theme;
+pub(crate) mod typography;
 mod value_search;
 mod welcome_view;
 

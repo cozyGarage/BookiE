@@ -97,7 +97,7 @@ impl PreferencesStore {
             }
             Backend::Json(file) => file.update(|prefs| {
                 mutate(prefs);
-                prefs.default_page_size = bounded_page_size(prefs.default_page_size);
+                *prefs = bounded_preferences(prefs.clone());
             }),
         }
     }
@@ -195,12 +195,52 @@ fn read_settings(settings: &gio::Settings) -> Preferences {
         date_format: DateFormatPref::from_key(settings.string("date-format").as_str()),
         show_invisible_characters: settings.boolean("show-invisible-characters"),
         open_tables_in_preview_tab: settings.boolean("open-tables-in-preview-tab"),
+        ui_typography: read_typography(settings, "ui"),
+        editor_font_weight: settings.uint("editor-font-weight"),
+        grid_typography: read_typography(settings, "grid"),
+        output_typography: read_typography(settings, "output"),
     })
 }
 
 fn bounded_preferences(mut preferences: Preferences) -> Preferences {
     preferences.default_page_size = bounded_page_size(preferences.default_page_size);
+    preferences.editor_font_size =
+        bookie_app_services::preferences::bounded_typography_size(preferences.editor_font_size);
+    preferences.ui_typography = bounded_typography(
+        preferences.ui_typography,
+        bookie_app_services::preferences::MAX_TYPOGRAPHY_SIZE,
+    );
+    preferences.grid_typography = bounded_typography(
+        preferences.grid_typography,
+        bookie_app_services::preferences::MAX_GRID_TYPOGRAPHY_SIZE,
+    );
+    preferences.output_typography = bounded_typography(
+        preferences.output_typography,
+        bookie_app_services::preferences::MAX_TYPOGRAPHY_SIZE,
+    );
+    preferences.editor_font_weight =
+        bookie_app_services::preferences::bounded_typography_weight(preferences.editor_font_weight);
     preferences
+}
+
+fn bounded_typography(
+    mut typography: bookie_app_services::preferences::TypographyOverride,
+    max_size: u32,
+) -> bookie_app_services::preferences::TypographyOverride {
+    typography.font_size = bookie_app_services::preferences::bounded_typography_size(typography.font_size);
+    if typography.font_size > 0 {
+        typography.font_size = typography.font_size.min(max_size);
+    }
+    typography.font_weight = bookie_app_services::preferences::bounded_typography_weight(typography.font_weight);
+    typography
+}
+
+fn read_typography(settings: &gio::Settings, surface: &str) -> bookie_app_services::preferences::TypographyOverride {
+    bookie_app_services::preferences::TypographyOverride {
+        font_family: settings.string(format!("{surface}-font-family").as_str()).to_string(),
+        font_size: settings.uint(format!("{surface}-font-size").as_str()),
+        font_weight: settings.uint(format!("{surface}-font-weight").as_str()),
+    }
 }
 
 fn write_settings(settings: &gio::Settings, prefs: &Preferences) -> Result<(), String> {
@@ -220,6 +260,16 @@ fn write_settings(settings: &gio::Settings, prefs: &Preferences) -> Result<(), S
         settings.set_string("date-format", prefs.date_format.key()),
         settings.set_boolean("show-invisible-characters", prefs.show_invisible_characters),
         settings.set_boolean("open-tables-in-preview-tab", prefs.open_tables_in_preview_tab),
+        settings.set_string("ui-font-family", &prefs.ui_typography.font_family),
+        settings.set_uint("ui-font-size", prefs.ui_typography.font_size),
+        settings.set_uint("ui-font-weight", prefs.ui_typography.font_weight),
+        settings.set_uint("editor-font-weight", prefs.editor_font_weight),
+        settings.set_string("grid-font-family", &prefs.grid_typography.font_family),
+        settings.set_uint("grid-font-size", prefs.grid_typography.font_size),
+        settings.set_uint("grid-font-weight", prefs.grid_typography.font_weight),
+        settings.set_string("output-font-family", &prefs.output_typography.font_family),
+        settings.set_uint("output-font-size", prefs.output_typography.font_size),
+        settings.set_uint("output-font-weight", prefs.output_typography.font_weight),
     ];
     if let Some(error) = writes.into_iter().find_map(Result::err) {
         settings.revert();

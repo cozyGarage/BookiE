@@ -5,7 +5,9 @@ use relm4::{adw, gtk};
 use crate::services::preferences::{
     ColorSchemePref, DateFormatPref, NullDisplayPref, Preferences, PreferencesStore, ThemePref,
 };
-use bookie_app_services::preferences::{MAX_PAGE_SIZE, MIN_PAGE_SIZE};
+use bookie_app_services::preferences::{
+    MAX_GRID_TYPOGRAPHY_SIZE, MAX_PAGE_SIZE, MAX_TYPOGRAPHY_SIZE, MIN_PAGE_SIZE, TypographyOverride,
+};
 
 struct BrowseGroup {
     group: adw::PreferencesGroup,
@@ -18,8 +20,24 @@ struct EditorPage {
     page: adw::PreferencesPage,
     font_size: adw::SpinRow,
     font_family: adw::EntryRow,
+    font_weight: adw::ComboRow,
     vim: adw::SwitchRow,
     timeout: adw::SpinRow,
+}
+
+struct AppearancePage {
+    page: adw::PreferencesPage,
+    ui: SurfaceTypographyRows,
+    grid: SurfaceTypographyRows,
+    output: SurfaceTypographyRows,
+}
+
+#[derive(Clone)]
+struct SurfaceTypographyRows {
+    group: adw::PreferencesGroup,
+    family: adw::EntryRow,
+    size: adw::SpinRow,
+    weight: adw::ComboRow,
 }
 
 struct LiveSaveRows {
@@ -28,6 +46,10 @@ struct LiveSaveRows {
     preview_tab: adw::SwitchRow,
     font_size: adw::SpinRow,
     font_family: adw::EntryRow,
+    font_weight: adw::ComboRow,
+    ui_typography: SurfaceTypographyRows,
+    grid_typography: SurfaceTypographyRows,
+    output_typography: SurfaceTypographyRows,
     vim: adw::SwitchRow,
     retention: adw::SpinRow,
     timeout: adw::SpinRow,
@@ -55,10 +77,11 @@ pub fn present(
     general.add(&browse.group);
     let (history_group, retention) = history_group(&window, history, &current);
     general.add(&history_group);
+    let appearance = appearance_page(preferences, &current);
     let editor = editor_page(&current);
 
     window.add(&general);
-    window.add(&appearance_page(preferences, &current));
+    window.add(&appearance.page);
     window.add(&editor.page);
     window.add(&super::mcp_preferences::build_page(database, mcp_bridge));
 
@@ -70,6 +93,10 @@ pub fn present(
             preview_tab: browse.preview_tab,
             font_size: editor.font_size,
             font_family: editor.font_family,
+            font_weight: editor.font_weight,
+            ui_typography: appearance.ui,
+            grid_typography: appearance.grid,
+            output_typography: appearance.output,
             vim: editor.vim,
             retention,
             timeout: editor.timeout,
@@ -80,17 +107,43 @@ pub fn present(
     window.present(Some(parent));
 }
 
-fn appearance_page(preferences: &PreferencesStore, current: &Preferences) -> adw::PreferencesPage {
+fn appearance_page(preferences: &PreferencesStore, current: &Preferences) -> AppearancePage {
     let appearance = adw::PreferencesPage::builder()
         .title(bookie_app_services::tr!("Appearance"))
         .icon_name("preferences-desktop-appearance-symbolic")
         .build();
+    appearance.add(&appearance_style_group(preferences, current));
+    let ui = surface_typography_group(
+        bookie_app_services::tr!("Application interface"),
+        &current.ui_typography,
+        MAX_TYPOGRAPHY_SIZE,
+    );
+    let grid = surface_typography_group(
+        bookie_app_services::tr!("Result grid"),
+        &current.grid_typography,
+        MAX_GRID_TYPOGRAPHY_SIZE,
+    );
+    let output = surface_typography_group(
+        bookie_app_services::tr!("Error and output text"),
+        &current.output_typography,
+        MAX_TYPOGRAPHY_SIZE,
+    );
+    appearance.add(&ui.group);
+    appearance.add(&grid.group);
+    appearance.add(&output.group);
+    AppearancePage {
+        page: appearance,
+        ui,
+        grid,
+        output,
+    }
+}
 
-    let appearance_group = adw::PreferencesGroup::builder()
+fn appearance_style_group(preferences: &PreferencesStore, current: &Preferences) -> adw::PreferencesGroup {
+    let group = adw::PreferencesGroup::builder()
         .title(bookie_app_services::tr!("Appearance"))
         .description(bookie_app_services::tr!("Choose how BookiE looks on this desktop."))
         .build();
-
     let scheme_row = adw::ComboRow::new();
     scheme_row.set_title(&bookie_app_services::tr!("Appearance"));
     scheme_row.set_subtitle(&bookie_app_services::tr!(
@@ -136,10 +189,83 @@ fn appearance_page(preferences: &PreferencesStore, current: &Preferences) -> adw
         }
     });
 
-    appearance_group.add(&scheme_row);
-    appearance_group.add(&theme_row);
-    appearance.add(&appearance_group);
-    appearance
+    group.add(&scheme_row);
+    group.add(&theme_row);
+    group
+}
+
+fn surface_typography_group(title: String, current: &TypographyOverride, max_size: u32) -> SurfaceTypographyRows {
+    let group = adw::PreferencesGroup::builder().title(title).build();
+    let family = adw::EntryRow::builder()
+        .title(bookie_app_services::tr!("Font family (blank uses system)"))
+        .text(current.font_family.as_str())
+        .build();
+    let size = adw::SpinRow::with_range(0.0, f64::from(max_size), 1.0);
+    size.set_title(&bookie_app_services::tr!("Font size"));
+    size.set_subtitle(&bookie_app_services::tr!("0 uses the system size"));
+    size.set_digits(0);
+    size.set_value(f64::from(current.font_size));
+    let weight = font_weight_row(current.font_weight);
+    group.add(&family);
+    group.add(&size);
+    group.add(&weight);
+    SurfaceTypographyRows {
+        group,
+        family,
+        size,
+        weight,
+    }
+}
+
+fn font_weight_row(weight: u32) -> adw::ComboRow {
+    let choices = [
+        bookie_app_services::tr!("System"),
+        bookie_app_services::tr!("Thin"),
+        bookie_app_services::tr!("Extra light"),
+        bookie_app_services::tr!("Light"),
+        bookie_app_services::tr!("Regular"),
+        bookie_app_services::tr!("Medium"),
+        bookie_app_services::tr!("Semibold"),
+        bookie_app_services::tr!("Bold"),
+        bookie_app_services::tr!("Extra bold"),
+        bookie_app_services::tr!("Heavy"),
+    ];
+    let row = adw::ComboRow::builder()
+        .title(bookie_app_services::tr!("Font weight"))
+        .model(&gtk::StringList::new(
+            &choices.iter().map(String::as_str).collect::<Vec<_>>(),
+        ))
+        .build();
+    row.set_selected(font_weight_index(weight));
+    row
+}
+
+fn font_weight_index(weight: u32) -> u32 {
+    [0, 100, 200, 300, 400, 500, 600, 700, 800, 900]
+        .iter()
+        .position(|candidate| *candidate == weight)
+        .unwrap_or(0) as u32
+}
+
+fn font_weight_value(index: u32) -> u32 {
+    [0, 100, 200, 300, 400, 500, 600, 700, 800, 900]
+        .get(index as usize)
+        .copied()
+        .unwrap_or(0)
+}
+
+#[cfg(test)]
+mod typography_preferences_tests {
+    use super::{font_weight_index, font_weight_value};
+
+    #[test]
+    fn font_weight_choices_round_trip_system_and_supported_weights() {
+        for weight in [0, 100, 200, 300, 400, 500, 600, 700, 800, 900] {
+            assert_eq!(font_weight_value(font_weight_index(weight)), weight);
+        }
+        assert_eq!(font_weight_value(u32::MAX), 0);
+        assert_eq!(font_weight_index(650), 0);
+    }
 }
 
 fn browse_group(parent: &impl IsA<gtk::Widget>, preferences: &PreferencesStore, current: &Preferences) -> BrowseGroup {
@@ -409,16 +535,20 @@ fn editor_page(current: &Preferences) -> EditorPage {
         ))
         .build();
 
-    let font_size_row = adw::SpinRow::with_range(8.0, 32.0, 1.0);
+    let font_size_row = adw::SpinRow::with_range(0.0, f64::from(MAX_TYPOGRAPHY_SIZE), 1.0);
     font_size_row.set_title(&bookie_app_services::tr!("Editor font size"));
+    font_size_row.set_subtitle(&bookie_app_services::tr!("0 uses the system size"));
+    font_size_row.set_digits(0);
     font_size_row.set_value(current.editor_font_size as f64);
     editor_group.add(&font_size_row);
 
     let font_family_row = adw::EntryRow::builder()
-        .title(bookie_app_services::tr!("Editor font family"))
+        .title(bookie_app_services::tr!("Editor font family (blank uses system)"))
         .text(current.editor_font_family.as_str())
         .build();
     editor_group.add(&font_family_row);
+    let font_weight = font_weight_row(current.editor_font_weight);
+    editor_group.add(&font_weight);
 
     let vim_row = adw::SwitchRow::builder()
         .title(bookie_app_services::tr!("Vim keys in the SQL editor"))
@@ -443,6 +573,7 @@ fn editor_page(current: &Preferences) -> EditorPage {
         page: editor,
         font_size: font_size_row,
         font_family: font_family_row,
+        font_weight,
         vim: vim_row,
         timeout: timeout_row,
     }
@@ -470,6 +601,24 @@ fn wire_live_save(preferences: &PreferencesStore, rows: LiveSaveRows) {
         let s = save_all.clone();
         move |_| s()
     });
+    rows.font_weight.connect_selected_notify({
+        let s = save_all.clone();
+        move |_| s()
+    });
+    for typography in [&rows.ui_typography, &rows.grid_typography, &rows.output_typography] {
+        typography.family.connect_changed({
+            let s = save_all.clone();
+            move |_| s()
+        });
+        typography.size.connect_value_notify({
+            let s = save_all.clone();
+            move |_| s()
+        });
+        typography.weight.connect_selected_notify({
+            let s = save_all.clone();
+            move |_| s()
+        });
+    }
     rows.retention.connect_value_notify({
         let s = save_all.clone();
         move |_| s()
@@ -494,6 +643,10 @@ fn save_all_closure(preferences: &PreferencesStore, rows: &LiveSaveRows) -> std:
     let preview_tab = rows.preview_tab.clone();
     let font = rows.font_size.clone();
     let family = rows.font_family.clone();
+    let editor_weight = rows.font_weight.clone();
+    let ui = rows.ui_typography.clone();
+    let grid = rows.grid_typography.clone();
+    let output = rows.output_typography.clone();
     let vim = rows.vim.clone();
     let retention = rows.retention.clone();
     let timeout = rows.timeout.clone();
@@ -506,13 +659,28 @@ fn save_all_closure(preferences: &PreferencesStore, rows: &LiveSaveRows) -> std:
             prefs.open_tables_in_preview_tab = preview_tab.is_active();
             prefs.editor_font_size = font.value() as u32;
             prefs.editor_font_family = family.text().trim().to_string();
+            prefs.editor_font_weight = font_weight_value(editor_weight.selected());
+            update_typography(&mut prefs.ui_typography, &ui);
+            update_typography(&mut prefs.grid_typography, &grid);
+            update_typography(&mut prefs.output_typography, &output);
             prefs.editor_vim_mode = vim.is_active();
             prefs.history_retention_days = retention.value() as u32;
             prefs.query_timeout_secs = timeout.value() as u32;
         }) {
             tracing::warn!(%error, "preferences: update rejected");
+        } else {
+            let current = preferences.load();
+            crate::ui::typography::apply(&current);
+            crate::ui::editor::apply_font_preferences(&current);
+            crate::ui::grid::apply_typography(&current.grid_typography);
         }
     })
+}
+
+fn update_typography(target: &mut TypographyOverride, rows: &SurfaceTypographyRows) {
+    target.font_family = rows.family.text().trim().to_string();
+    target.font_size = rows.size.value() as u32;
+    target.font_weight = font_weight_value(rows.weight.selected());
 }
 
 fn null_display_choices() -> [String; 3] {

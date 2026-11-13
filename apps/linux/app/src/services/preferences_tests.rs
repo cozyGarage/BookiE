@@ -385,6 +385,57 @@ fn the_editor_font_family_survives_a_gsettings_round_trip_and_defaults_to_empty(
 }
 
 #[test]
+fn typography_overrides_survive_a_gsettings_round_trip_and_zero_uses_system_defaults() {
+    let (before, after) = after_a_round_trip("/com/bookie/linux/typography/", |prefs| {
+        prefs.ui_typography = bookie_app_services::preferences::TypographyOverride {
+            font_family: "Inter".into(),
+            font_size: 18,
+            font_weight: 600,
+        };
+        prefs.editor_font_weight = 500;
+        prefs.grid_typography.font_size = 14;
+        prefs.output_typography.font_family = "Noto Sans".into();
+    });
+    assert_eq!(before.ui_typography.font_size, 0);
+    assert_eq!(before.grid_typography.font_size, 0);
+    assert_eq!(before.output_typography.font_weight, 0);
+    assert_eq!(after.ui_typography.font_family, "Inter");
+    assert_eq!(after.ui_typography.font_weight, 600);
+    assert_eq!(after.editor_font_weight, 500);
+    assert_eq!(after.grid_typography.font_size, 14);
+    assert_eq!(after.output_typography.font_family, "Noto Sans");
+}
+
+#[test]
+fn typography_overrides_are_bounded_when_saved() {
+    let store = PreferencesStore::from_settings(make_test_settings("/com/bookie/linux/typography-bounds/").0, None);
+    store
+        .update(|prefs| {
+            prefs.ui_typography.font_size = u32::MAX;
+            prefs.ui_typography.font_weight = u32::MAX;
+            prefs.grid_typography.font_size = u32::MAX;
+            prefs.output_typography.font_size = 1;
+            prefs.editor_font_weight = 1;
+        })
+        .unwrap();
+    let loaded = store.load();
+    assert_eq!(
+        loaded.ui_typography.font_size,
+        bookie_app_services::preferences::MAX_TYPOGRAPHY_SIZE
+    );
+    assert_eq!(loaded.ui_typography.font_weight, 900);
+    assert_eq!(
+        loaded.grid_typography.font_size,
+        bookie_app_services::preferences::MAX_GRID_TYPOGRAPHY_SIZE
+    );
+    assert_eq!(
+        loaded.output_typography.font_size,
+        bookie_app_services::preferences::MIN_TYPOGRAPHY_SIZE
+    );
+    assert_eq!(loaded.editor_font_weight, 100);
+}
+
+#[test]
 fn the_theme_defaults_to_default_and_survives_a_gsettings_round_trip() {
     let (before, after) = after_a_round_trip("/com/bookie/linux/theme/", |prefs| {
         prefs.theme = ThemePref::Gruvbox;

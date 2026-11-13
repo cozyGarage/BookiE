@@ -33,11 +33,11 @@ mod sidebar_layout;
 mod sidebar_state;
 mod status_pages;
 mod structure;
-mod whats_new;
 mod tab_session;
 mod tab_title;
 mod types;
 mod value_search;
+mod whats_new;
 mod window_close_prompt;
 mod workspace_chrome;
 mod workspace_close;
@@ -548,14 +548,20 @@ impl SimpleComponent for App {
                 WelcomeViewOutput::Delete(id) => AppMsg::DeleteConnection(id),
             });
 
+        let current_preferences = preferences.load();
         adw::StyleManager::default().set_color_scheme(crate::services::preferences::color_scheme_style(
-            preferences.load().color_scheme,
+            current_preferences.color_scheme,
         ));
-        crate::ui::theme::apply(preferences.load().theme);
-        crate::ui::grid::set_null_display(preferences.load().null_display);
-        crate::ui::grid::set_date_format(preferences.load().date_format);
-        crate::ui::grid::full_value_editor::set_show_invisible_characters(preferences.load().show_invisible_characters);
-        let default_page_size = preferences.load().default_page_size;
+        crate::ui::theme::apply(current_preferences.theme);
+        crate::ui::typography::apply(&current_preferences);
+        crate::ui::editor::apply_font_preferences(&current_preferences);
+        crate::ui::grid::apply_typography(&current_preferences.grid_typography);
+        crate::ui::grid::set_null_display(current_preferences.null_display);
+        crate::ui::grid::set_date_format(current_preferences.date_format);
+        crate::ui::grid::full_value_editor::set_show_invisible_characters(
+            current_preferences.show_invisible_characters,
+        );
+        let default_page_size = current_preferences.default_page_size;
         let mut model = App {
             change_trackers,
             structure_trackers,
@@ -1067,9 +1073,7 @@ impl SimpleComponent for App {
             AppMsg::RefreshPage => self.on_refresh_active_tab(),
             AppMsg::ShowShortcuts => self.on_show_shortcuts(),
             AppMsg::ShowAbout => self.on_show_about(),
-            AppMsg::CheckForUpdates => {
-                whats_new::start_update_check(self, UpdateCheckSource::Manual, sender.clone())
-            }
+            AppMsg::CheckForUpdates => whats_new::start_update_check(self, UpdateCheckSource::Manual, sender.clone()),
             AppMsg::QuietCheckForUpdates => {
                 whats_new::start_update_check(self, UpdateCheckSource::Quiet, sender.clone())
             }
