@@ -614,6 +614,7 @@
             ".forgejo/workflows/nightly.yml",
             ".github/workflows/build-linux.yml",
             ".github/workflows/gtk-soak.yml",
+            ".github/workflows/gpui-macos.yml",
             ".github/workflows/linux-quality.yml",
             ".github/workflows/linux-security.yml",
             ".github/workflows/linux-ci-contracts.yml",
