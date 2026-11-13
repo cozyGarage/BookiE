@@ -75,21 +75,13 @@ pub fn compare_running_to_latest(running: &str, latest: &LatestRelease) -> Updat
         return UpdateCheckOutcome::InvalidLatest;
     };
     if latest.version.is_newer_than(running_version) {
-        UpdateCheckOutcome::UpdateAvailable {
-            latest: latest.clone(),
-        }
+        UpdateCheckOutcome::UpdateAvailable { latest: latest.clone() }
     } else {
-        UpdateCheckOutcome::UpToDate {
-            latest: latest.clone(),
-        }
+        UpdateCheckOutcome::UpToDate { latest: latest.clone() }
     }
 }
 
-pub fn should_show_update_banner(
-    running: &str,
-    latest: &LatestRelease,
-    dismissed: Option<&str>,
-) -> bool {
+pub fn should_show_update_banner(running: &str, latest: &LatestRelease, dismissed: Option<&str>) -> bool {
     let Some(running_version) = ReleaseVersion::parse(running) else {
         return false;
     };
@@ -148,8 +140,7 @@ pub fn metainfo_release_notes(metainfo_xml: &str, version: &str) -> Option<Strin
     Some(html.to_owned())
 }
 
-pub const GITHUB_LATEST_RELEASE_URL: &str =
-    "https://api.github.com/repos/cozyGarage/BookiE/releases/latest";
+pub const GITHUB_LATEST_RELEASE_URL: &str = "https://api.github.com/repos/cozyGarage/BookiE/releases/latest";
 
 #[cfg(test)]
 mod tests {
@@ -196,18 +187,9 @@ mod tests {
 
     #[test]
     fn first_launch_and_upgrades_show_whats_new_once() {
-        assert_eq!(
-            should_show_whats_new(None, "0.2.7"),
-            WhatsNewDecision::Show
-        );
-        assert_eq!(
-            should_show_whats_new(Some(""), "0.2.7"),
-            WhatsNewDecision::Show
-        );
-        assert_eq!(
-            should_show_whats_new(Some("0.2.6"), "0.2.7"),
-            WhatsNewDecision::Show
-        );
+        assert_eq!(should_show_whats_new(None, "0.2.7"), WhatsNewDecision::Show);
+        assert_eq!(should_show_whats_new(Some(""), "0.2.7"), WhatsNewDecision::Show);
+        assert_eq!(should_show_whats_new(Some("0.2.6"), "0.2.7"), WhatsNewDecision::Show);
         assert_eq!(
             should_show_whats_new(Some("0.2.7"), "0.2.7"),
             WhatsNewDecision::SkipAndRemember

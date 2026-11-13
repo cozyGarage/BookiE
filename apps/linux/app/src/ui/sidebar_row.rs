@@ -559,10 +559,7 @@ impl FactoryComponent for SidebarRow {
                 return;
             };
             let popover = context_popover(&popover_for_right, &root, kind_for_right);
-            crate::ui::context_menu::popup_at(
-                &popover,
-                Some(gdk::Rectangle::new(x as i32, y as i32, 1, 1)),
-            );
+            crate::ui::context_menu::popup_at(&popover, Some(gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
         });
         root.add_controller(right_click);
 
@@ -577,12 +574,7 @@ impl FactoryComponent for SidebarRow {
                 if let Some(root) = root_for_menu.upgrade() {
                     let popover = context_popover(&popover_for_menu, &root, kind_for_menu);
                     let pointing = root.compute_bounds(&root).map(|bounds| {
-                        gdk::Rectangle::new(
-                            (bounds.width() / 2.0) as i32,
-                            (bounds.height() / 2.0) as i32,
-                            1,
-                            1,
-                        )
+                        gdk::Rectangle::new((bounds.width() / 2.0) as i32, (bounds.height() / 2.0) as i32, 1, 1)
                     });
                     crate::ui::context_menu::popup_at(&popover, pointing);
                 }
@@ -730,10 +722,7 @@ fn attach_schema_popover(root: &gtk::ListBoxRow, popover: &gtk::PopoverMenu) {
     let popover_for_right = popover.clone();
     right_click.connect_pressed(move |gesture, _, x, y| {
         gesture.set_state(gtk::EventSequenceState::Claimed);
-        crate::ui::context_menu::popup_at(
-            &popover_for_right,
-            Some(gdk::Rectangle::new(x as i32, y as i32, 1, 1)),
-        );
+        crate::ui::context_menu::popup_at(&popover_for_right, Some(gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
     });
     root.add_controller(right_click);
     let popover_for_shortcut = popover.clone();
@@ -743,12 +732,7 @@ fn attach_schema_popover(root: &gtk::ListBoxRow, popover: &gtk::PopoverMenu) {
         .action(&gtk::CallbackAction::new(move |_, _| {
             let pointing = root_for_shortcut.upgrade().and_then(|root| {
                 root.compute_bounds(&root).map(|bounds| {
-                    gdk::Rectangle::new(
-                        (bounds.width() / 2.0) as i32,
-                        (bounds.height() / 2.0) as i32,
-                        1,
-                        1,
-                    )
+                    gdk::Rectangle::new((bounds.width() / 2.0) as i32, (bounds.height() / 2.0) as i32, 1, 1)
                 })
             });
             crate::ui::context_menu::popup_at(&popover_for_shortcut, pointing);

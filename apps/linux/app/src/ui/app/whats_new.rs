@@ -1,8 +1,8 @@
 use bookie_app_services::release_updates::{self, LatestRelease, UpdateCheckOutcome, WhatsNewDecision};
 use gtk4::prelude::*;
+use relm4::ComponentSender;
 use relm4::adw;
 use relm4::adw::prelude::*;
-use relm4::ComponentSender;
 
 use super::{App, AppMsg, UpdateCheckSource};
 use crate::services::{launch_version, update_check};
@@ -123,17 +123,10 @@ pub(super) fn dismiss_available_update(app: &mut App) {
     app.clear_update_banner();
 }
 
-fn present_update_dialog(
-    app: &App,
-    latest: &LatestRelease,
-    sender: ComponentSender<App>,
-    dismiss_on_not_now: bool,
-) {
+fn present_update_dialog(app: &App, latest: &LatestRelease, sender: ComponentSender<App>, dismiss_on_not_now: bool) {
     let version = latest.version.display();
-    let body = bookie_app_services::tr!(
-        "BookiE {version} is available. Open the release page to download it."
-    )
-    .replace("{version}", &version);
+    let body = bookie_app_services::tr!("BookiE {version} is available. Open the release page to download it.")
+        .replace("{version}", &version);
     let dialog = adw::AlertDialog::builder()
         .heading(bookie_app_services::tr!("Update available"))
         .body(body)
@@ -161,12 +154,9 @@ fn open_uri(parent: &impl IsA<gtk4::Window>, uri: &str) {
 }
 
 impl App {
-    pub(super) fn reveal_update_banner(
-        &mut self,
-        latest: &bookie_app_services::release_updates::LatestRelease,
-    ) {
-        let title = bookie_app_services::tr!("BookiE {version} is available")
-            .replace("{version}", &latest.version.display());
+    pub(super) fn reveal_update_banner(&mut self, latest: &bookie_app_services::release_updates::LatestRelease) {
+        let title =
+            bookie_app_services::tr!("BookiE {version} is available").replace("{version}", &latest.version.display());
         self.update_banner.set_title(&title);
         self.update_banner.set_revealed(true);
         self.available_update = Some(latest.clone());
