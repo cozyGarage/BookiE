@@ -85,7 +85,7 @@ Missing tools, nonzero exits, timeouts, cancellations and absent required test s
 | `quick` | Guards, formatting, non-GTK Clippy, units and sandbox | Rust 1.98 and native libraries |
 | `full` | Default workspace checks including app logic | GTK 4.24 development stack; no display automation or DuckDB |
 | `gtk-app` | GTK app Clippy and library/binary unit tests | GTK 4.24 development stack |
-| `gpui` | GPUI model and simulated interaction tests | GPUI native build libraries; no display |
+| `gpui` | GPUI model and simulated interaction tests (Linux gate job `gpui-tests`; macOS build/test in [gpui-macos.yml](../.github/workflows/gpui-macos.yml) when `apps/gpui` changes) | GPUI native build libraries; no display |
 | `no-default-features` | The workspace and its test targets compile without the default Kerberos feature (`cargo check`, no tests run) | GTK 4.24 development stack; `test-build` on both providers |
 | `sandbox` | Integration tests without external servers or a display | Local sockets/processes must be allowed |
 | `drivers` | PostgreSQL, MySQL, MSSQL, ClickHouse, Redis, MongoDB, DuckDB, Oracle, Cassandra, MCP BSON, policy sessions, PostgreSQL socket and SSH | Docker and OpenSSH; SQLite is in sandbox |

@@ -46,7 +46,7 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
 </picture>
 
 - Click a table or view in the sidebar to open it in a preview tab. Edit or keep the tab to make it permanent.
-- Tables are read in bounded pages. Deep forward navigation uses primary-key seeks where supported; previous-page, last-page and explicitly sorted paths may use offsets on some engines. See [known limitations](known-limitations.md#data-and-values).
+- Tables are read in bounded pages. The pager accepts a custom page size from 1 to 5,000 rows (Preferences sets the default). The status line shows how long the current page took to load beside its row count. Deep forward navigation uses primary-key seeks where supported; previous-page, last-page and explicitly sorted paths may use offsets on some engines. See [known limitations](known-limitations.md#data-and-values).
 - Edit a cell with a double-click, F2 or Enter. Edits stay pending, with a dot on the tab, until Ctrl+S. Undo and redo apply to pending edits.
 - On PostgreSQL, a view that is automatically updatable, maps to one table and exposes every primary-key column of that table opens editable, through the same staged edits, approval and audit as a table. Insert is offered only when the view accepts inserts. A view with an INSTEAD OF trigger or rule, an aggregate, a join or a missing key column stays read-only and says which of these applies. MySQL, MariaDB and SQL Server views stay read-only ([#2203](https://github.com/cozyGarage/BookiE/issues/2203)).
 - Insert rows, delete rows and set a cell to NULL. Changes are saved in one transaction where the engine supports it.
@@ -91,7 +91,7 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
 - Session mode: Binds tabs to dedicated connections for temporary tables and transactions, displaying live transaction state.
 - Visual explain plans: PostgreSQL displays execution trees with relative cost bars; SQLite displays indented trees.
 - Timeout retry: Queries that hit timeouts offer an instant extended retry button.
-- Query history & saved queries: Toggle history with `Ctrl+H`, save queries with `Ctrl+D`, organize them into folders and search keywords with `Ctrl+Shift+B`, and use Open Quickly with `Ctrl+P`.
+- Query history & saved queries: Toggle history with `Ctrl+H`, save queries with `Ctrl+D`, organize them into folders and search keywords with `Ctrl+Shift+B`, and use Open Quickly with `Ctrl+P`. Open Quickly also lists up to 50 recent successful editor queries from the current connection; choosing one opens it in a new editor tab.
 
 ### Split editor and streaming
 
@@ -108,9 +108,10 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
 
 The sidebar table menu has Edit Structure, Show CREATE TABLE, Show ER Diagram, Import CSV, Rename Table, Truncate Table and Drop Table.
 
-- Edit Structure has tabs for columns, indexes and foreign keys, and an SQL Preview tab.
+- Edit Structure has tabs for columns, indexes and foreign keys, and an SQL Preview tab. On PostgreSQL, Show CREATE TABLE and structure changes keep expression, partial, descending, INCLUDE and non-btree indexes as the server defines them.
 - Rename Table is refused while the table has open tabs, so no pending change is lost.
 - Truncate Table asks for confirmation and runs through the same guard as every other statement. SQLite does not support it.
+- Drop Table asks for confirmation and names the tables that reference it before you confirm.
 - Show ER Diagram (also on a schema row) draws the schema's tables as cards with their columns, key badges and foreign-key relations. It reads at most 150 tables with the connection's metadata calls, under the operation timeout, and can be cancelled. Pan by dragging, zoom with the buttons or Ctrl+scroll, and pick a table in the list to centre it. Cards are laid out automatically; they cannot be moved, and the diagram cannot be exported yet.
 
 ![The structure view of a table](images/structure-light.png)
@@ -121,7 +122,7 @@ The sidebar table menu has Edit Structure, Show CREATE TABLE, Show ER Diagram, I
 
 ![Export scope dialog choosing data scope before format](images/export-wizard.png)
 
-- Export a table page or a query result as CSV, JSON, Markdown, HTML, XML, SQL or an Excel workbook. Ctrl+Shift+E exports the front tab's shown rows. On PostgreSQL, a table can also be exported in full from one consistent read snapshot.
+- Export a table page or a query result as CSV, JSON, Markdown, HTML, XML, SQL or an Excel workbook. Ctrl+Shift+E exports the front tab. For a SQL result, Scope can target the visible page or the complete saved result. On PostgreSQL, a table can also be exported in full from one consistent read snapshot.
 - CSV export can protect cells that start like formulas, and can keep plain numbers unprotected so they import back into numeric columns.
 - Import CSV into an existing table, or create a new table from a CSV file. Separator, header row and column mapping are detected and can be changed. The quote character, backslash escaping and file encoding (UTF-8, Windows-1252, UTF-16) can be set.
 - Import accepts Excel `.xlsx` files. The first worksheet with data is read.
@@ -129,9 +130,14 @@ The sidebar table menu has Edit Structure, Show CREATE TABLE, Show ER Diagram, I
 - Import into an existing table can take up to 20 files in one run. The first file's separator, header and column choices apply to every file, each file must have the same columns, and each file asks for its own approval. One Cancel stops the file in progress and the rest. The run stops at the first file that fails, and the report names it. Together the files can hold up to 256 MB and 2,000,000 rows.
 - Mappings can be remembered per connection and table.
 
-## Safety and records
+## Preferences and updates
 
 ![Application preferences and connection safety configuration](images/preferences.png)
+
+- Preferences set the default browse page size and independent font family, size and weight for the application interface, SQL editor, result grid and error text.
+- **Check for Updates** in the primary menu reports whether a newer release is available. The first launch of a new version shows a What's new dialog with the AppStream notes for that version. A quieter startup check can show a dismissible banner when a newer release exists.
+
+## Safety and records
 
 - Every statement is checked before it runs. Writes on a read-only connection are refused.
 - Depending on the environment and policy, risky statements ask for approval first.
@@ -151,6 +157,6 @@ BookiE can let an AI assistant use saved connections through the Model Context P
 - No account, hosted service or paid tier.
 - No browser interface and no runtime driver plugins.
 - No database snapshots. [ADR 0015](decisions/0015-database-snapshots.md) records the accepted design; snapshots are not available in the current application.
-- Linux only ([platforms](platforms.md)).
+- Shipped packages are Linux only ([platforms](platforms.md)). GPUI is the chosen cross-platform frontend and is not packaged yet ([ADR 0052](decisions/0052-gpui-is-the-cross-platform-frontend.md)).
 
 Detailed behavior, keyboard shortcuts, and limits are documented in the [user guide](user-guide.md) and [known limitations](known-limitations.md).
