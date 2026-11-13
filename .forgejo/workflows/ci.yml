@@ -380,13 +380,16 @@ jobs:
           for group in "${publish_groups[@]}"; do
             python3 scripts/ci-bundle-registry.py publish "$GITHUB_WORKSPACE/test-bundles/$group" "${{ needs.pin-revision.outputs.revision }}" "$group"
           done
-      - name: Remove expired test bundles
+      - name: Remove expired test bundles with reference protection
+        if: github.event_name == 'push' || github.event_name == 'schedule'
         env:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
           BOOKIE_REGISTRY_API_URL: ${{ github.server_url }}/api/v1/packages/trung
+          BOOKIE_FORGEJO_API_URL: ${{ github.server_url }}/api/v1/repos/${{ github.repository }}
+          BOOKIE_FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
         run: |
           cd src
-          python3 scripts/ci-bundle-registry.py prune "${{ needs.pin-revision.outputs.revision }}" --retention-days 14
+          python3 scripts/ci-bundle-registry.py prune "${{ needs.pin-revision.outputs.revision }}" --retention-days 14 --delete --discover-references
       - name: Check the no-default-features layer
         run: |
           exec 9>>/target/.bookie-build-cache.lock
