@@ -72,6 +72,7 @@ fn hidden_filter_column_stays_in_predicate_but_not_projection() {
         filter: &filter,
         hidden_columns: Some(&hidden),
         long_text_preview: false,
+        supports_reverse_keyset: true,
     };
 
     let PageQuery::Sql(page) = target.page(0, 100, None, None).unwrap() else {
@@ -103,6 +104,7 @@ fn hidden_sort_column_stays_in_order_clause_and_composite_keys_stay_projected() 
         filter: &FilterSet::default(),
         hidden_columns: Some(&hidden),
         long_text_preview: false,
+        supports_reverse_keyset: true,
     };
 
     let PageQuery::Sql(page) = target.page(0, 100, Some((3, true)), None).unwrap() else {
@@ -128,6 +130,7 @@ fn hidden_projection_falls_back_without_a_key() {
         filter: &FilterSet::default(),
         hidden_columns: Some(&hidden),
         long_text_preview: false,
+        supports_reverse_keyset: true,
     };
     assert_eq!(target.projected_columns(), None);
 }
@@ -145,6 +148,7 @@ fn hidden_projection_stays_disabled_when_no_non_key_column_is_hidden() {
             filter: &FilterSet::default(),
             hidden_columns: Some(&hidden),
             long_text_preview: false,
+            supports_reverse_keyset: true,
         };
         assert_eq!(target.projected_columns(), None);
     }
@@ -163,6 +167,7 @@ fn hidden_projection_stays_disabled_for_native_document_and_key_browsing() {
             filter: &FilterSet::default(),
             hidden_columns: Some(&hidden),
             long_text_preview: false,
+            supports_reverse_keyset: false,
         };
         assert_eq!(target.projected_columns(), None);
         assert!(matches!(target.page(0, 100, None, None).unwrap(), PageQuery::Native));
@@ -185,6 +190,7 @@ fn hidden_raw_filter_column_stays_in_sql_but_not_projection() {
         filter: &filter,
         hidden_columns: Some(&hidden),
         long_text_preview: false,
+        supports_reverse_keyset: true,
     };
 
     let PageQuery::Sql(page) = target.page(0, 100, None, None).unwrap() else {
@@ -206,6 +212,7 @@ fn value_query_fetches_one_column_by_primary_key() {
         filter: &FilterSet::default(),
         hidden_columns: None,
         long_text_preview: false,
+        supports_reverse_keyset: true,
     };
     let query = target
         .value_query(2, &[Value::Text("acme".into()), Value::Int(7)])
@@ -230,6 +237,7 @@ fn unfiltered_unsorted_non_sql_fetch_stays_native_with_a_primary_key() {
             filter: &FilterSet::default(),
             hidden_columns: None,
             long_text_preview: false,
+            supports_reverse_keyset: false,
         };
         assert!(matches!(target.page(0, 100, None, None).unwrap(), PageQuery::Native));
     }
@@ -247,6 +255,8 @@ fn preview_projection_is_opt_in_and_per_engine() {
         filter: &filter,
         hidden_columns: None,
         long_text_preview,
+    
+        supports_reverse_keyset: false,
     };
     let PageQuery::Sql(on) = target("postgres", true).page(0, 10, None, None).unwrap() else {
         panic!("preview pages run as SQL")

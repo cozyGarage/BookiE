@@ -19,6 +19,7 @@ pub struct BrowseTarget<'a> {
     pub filter: &'a FilterSet,
     pub hidden_columns: Option<&'a HashSet<String>>,
     pub long_text_preview: bool,
+    pub supports_reverse_keyset: bool,
 }
 
 #[derive(Debug)]
@@ -171,13 +172,13 @@ impl BrowseTarget<'_> {
             .filter(|c| c.primary_key)
             .map(|c| c.name.as_str())
             .collect();
-        let before_is_supported = direction != PageDirection::Before || supports_reverse_keyset(self.driver_id);
+        let before_is_supported = direction != PageDirection::Before || self.supports_reverse_keyset;
         let cursor = valid_keyset_cursor(cursor, offset, sort, &keys).filter(|_| before_is_supported);
         let seek_last = direction == PageDirection::Last
             && offset >= KEYSET_OFFSET_THRESHOLD
             && sort.is_none()
             && !keys.is_empty()
-            && supports_reverse_keyset(self.driver_id);
+            && self.supports_reverse_keyset;
         let before = direction == PageDirection::Before;
         let cursor_applied = !seek_last
             && append_keyset_clause(
@@ -252,10 +253,6 @@ fn valid_keyset_cursor<'a>(
     cursor.filter(|values| {
         offset >= KEYSET_OFFSET_THRESHOLD && sort.is_none() && !keys.is_empty() && values.len() == keys.len()
     })
-}
-
-fn supports_reverse_keyset(driver_id: &str) -> bool {
-    matches!(driver_id, "postgres" | "mysql" | "sqlite" | "mssql" | "clickhouse")
 }
 
 fn page_order(driver_id: &str, keys: &[&str], order: Option<String>, reverse: bool) -> Option<String> {

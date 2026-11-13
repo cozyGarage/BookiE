@@ -70,6 +70,10 @@ impl DatabaseDriver for MssqlDriver {
     fn supports_value_search(&self) -> bool {
         true
     }
+    fn supports_reverse_keyset(&self) -> bool {
+        true
+    }
+
 
     fn display_name(&self) -> &'static str {
         "SQL Server"

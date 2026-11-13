@@ -47,6 +47,7 @@ mod tests {
             filter: &FilterSet::default(),
             hidden_columns: None,
             long_text_preview: false,
+            supports_reverse_keyset: false,
         };
         let key = Value::Text("id' OR 1=1 --".into());
         let query = target.value_query(1, std::slice::from_ref(&key)).unwrap();

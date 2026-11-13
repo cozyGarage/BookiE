@@ -47,6 +47,10 @@ impl DatabaseDriver for SqliteDriver {
     fn supports_value_search(&self) -> bool {
         true
     }
+    fn supports_reverse_keyset(&self) -> bool {
+        true
+    }
+
 
     fn import_upsert(&self) -> bookie_core::ImportUpsertStyle {
         bookie_core::ImportUpsertStyle::OnConflict
