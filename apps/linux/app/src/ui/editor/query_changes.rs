@@ -17,16 +17,18 @@ pub(super) fn install(
     status: gtk::Label,
     sender: ComponentSender<SqlEditor>,
     refresh: Rc<dyn Fn()>,
+    language: Option<sourceview5::Language>,
 ) {
     let depth = Rc::new(Cell::new(0u32));
     let pending = Rc::new(Cell::new(false));
     let buffer = view.buffer();
     let (start, end) = buffer.bounds();
     let bytes = Rc::new(Cell::new(buffer.text(&start, &end, true).len()));
-    update_syntax_highlighting(&buffer, view, bytes.get());
+    update_syntax_highlighting(&buffer, view, bytes.get(), language.as_ref());
     let deleted_text = install_edit_guards(&buffer, status, bytes.clone());
     let highlight_bytes = bytes.clone();
     let highlight_view = view.downgrade();
+    let highlight_language = language;
     let publish_bytes = bytes;
     let publish = Rc::new(move |buffer: &gtk::TextBuffer| {
         if let Some(buffer) = buffer.downcast_ref::<sourceview5::Buffer>() {
@@ -54,7 +56,7 @@ pub(super) fn install(
     buffer.connect_changed(move |buffer| {
         generation.changed();
         if let Some(view) = highlight_view.upgrade() {
-            update_syntax_highlighting(buffer, &view, highlight_bytes.get());
+            update_syntax_highlighting(buffer, &view, highlight_bytes.get(), highlight_language.as_ref());
         }
         if depth.get() > 0 {
             pending.set(true);
@@ -64,17 +66,33 @@ pub(super) fn install(
     });
 }
 
-fn update_syntax_highlighting(buffer: &gtk::TextBuffer, view: &sourceview5::View, bytes: usize) {
+fn update_syntax_highlighting(
+    buffer: &gtk::TextBuffer,
+    view: &sourceview5::View,
+    bytes: usize,
+    language: Option<&sourceview5::Language>,
+) {
     let Some(buffer) = buffer.downcast_ref::<sourceview5::Buffer>() else {
         return;
     };
     let enabled = bytes <= MAX_SYNTAX_HIGHLIGHT_BYTES;
     if buffer.is_highlight_syntax() != enabled {
         buffer.set_highlight_syntax(enabled);
-        let tooltip = (!enabled).then(|| {
-            bookie_app_services::tr!("SQL syntax highlighting is paused for large scripts to keep editing responsive.")
-        });
+    }
+    let tooltip = (!enabled).then(|| {
+        bookie_app_services::tr!("SQL syntax highlighting is paused for large scripts to keep editing responsive.")
+    });
+    if view.tooltip_text().as_deref() != tooltip.as_deref() {
         view.set_tooltip_text(tooltip.as_deref());
+    }
+    if enabled {
+        if buffer.language().is_none()
+            && let Some(language) = language
+        {
+            buffer.set_language(Some(language));
+        }
+    } else if buffer.language().is_some() {
+        buffer.set_language(None);
     }
 }
 
