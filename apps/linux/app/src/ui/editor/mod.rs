@@ -80,6 +80,10 @@ use statement_cursor::{
     PlannedStatements, adjacent_statement_start, cursor_byte_offset, script_statements, statement_at_cursor,
 };
 
+pub(crate) fn apply_font_preferences(preferences: &crate::services::preferences::Preferences) {
+    schema::apply_editor_font_preferences(preferences);
+}
+
 pub struct SqlEditor {
     catalog_changes: crate::services::catalog::CatalogChanges,
     catalog_origin: Option<crate::services::catalog::CatalogOrigin>,

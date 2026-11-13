@@ -753,7 +753,7 @@ fn error_page(idx: usize, message: &super::StatementFailure) -> gtk::Box {
         .build();
     let title = gtk::Label::builder()
         .label(bookie_app_services::tr!("Statement {n} failed").replace("{n}", &(idx + 1).to_string()))
-        .css_classes(["title-3"])
+        .css_classes(["title-3", "bookie-output-font"])
         .xalign(0.0)
         .wrap(true)
         .build();
@@ -774,6 +774,7 @@ fn error_page(idx: usize, message: &super::StatementFailure) -> gtk::Box {
     }
     let description = gtk::Label::builder()
         .label(message.as_ref())
+        .css_classes(["bookie-output-font"])
         .selectable(true)
         .wrap(true)
         .wrap_mode(gtk::pango::WrapMode::WordChar)
@@ -802,6 +803,7 @@ fn append_audit_actions(holder: &gtk::Box, actions: &gtk::FlowBox, message: &sup
             .join(", ");
         let label = gtk::Label::builder()
             .label(bookie_app_services::tr!("Audit operation: {id}").replace("{id}", &audit_ids))
+            .css_classes(["bookie-output-font"])
             .xalign(0.0)
             .selectable(true)
             .wrap(true)

@@ -424,8 +424,7 @@ impl HistoryDialog {
         let s_act = sender.clone();
         row.connect_activated(move |_| s_act.input(HistoryDialogInput::Activate(id)));
 
-        let popover_menu = gtk::PopoverMenu::from_model(Some(&row::row_menu(entry)));
-        popover_menu.set_has_arrow(true);
+        let popover_menu = crate::ui::context_menu::from_model(Some(&row::row_menu(entry)));
         popover_menu.set_parent(&row);
         row.insert_action_group("history-row", Some(&row::row_actions(entry, &row, &sender)));
         row::attach_context_menu(&row, &popover_menu);

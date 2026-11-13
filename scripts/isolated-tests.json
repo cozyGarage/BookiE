@@ -1070,6 +1070,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::export_dialog::scope::tests::query_scope_names_the_page_and_saved_filtered_result"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::editor::outcomes::tests::streamed_result_widgets_keep_pages_visible_during_loading_and_terminal_states"
     ],
     [
@@ -2011,6 +2016,11 @@
       "bookie-app",
       "--lib",
       "ui::sidebar_row::catalog_entry_tests::a_catalog_entry_is_a_leaf_row_without_a_chevron_and_with_an_icon"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::sidebar_row::responsive_layout_tests::row_actions_reflow_at_supported_sidebar_widths_with_names_and_focus_order"
     ],
     [
       "bookie-app",

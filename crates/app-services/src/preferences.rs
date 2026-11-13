@@ -3,6 +3,9 @@ use serde::{Deserialize, Serialize};
 pub const DEFAULT_PAGE_SIZE: u64 = 1_000;
 pub const MIN_PAGE_SIZE: u64 = 1;
 pub const MAX_PAGE_SIZE: u64 = bookie_core::MAX_QUERY_CURSOR_PAGE_ROWS as u64;
+pub const MIN_TYPOGRAPHY_SIZE: u32 = 8;
+pub const MAX_TYPOGRAPHY_SIZE: u32 = 32;
+pub const MAX_GRID_TYPOGRAPHY_SIZE: u32 = 24;
 
 pub fn bounded_page_size(page_size: u64) -> u64 {
     if page_size == 0 {
@@ -10,6 +13,32 @@ pub fn bounded_page_size(page_size: u64) -> u64 {
     } else {
         page_size.min(MAX_PAGE_SIZE)
     }
+}
+
+pub fn bounded_typography_size(size: u32) -> u32 {
+    if size == 0 {
+        0
+    } else {
+        size.clamp(MIN_TYPOGRAPHY_SIZE, MAX_TYPOGRAPHY_SIZE)
+    }
+}
+
+pub fn bounded_typography_weight(weight: u32) -> u32 {
+    if weight == 0 {
+        0
+    } else {
+        (weight.saturating_add(50) / 100 * 100).clamp(100, 900)
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct TypographyOverride {
+    #[serde(default)]
+    pub font_family: String,
+    #[serde(default)]
+    pub font_size: u32,
+    #[serde(default)]
+    pub font_weight: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -39,6 +68,14 @@ pub struct Preferences {
     pub show_invisible_characters: bool,
     #[serde(default = "default_open_tables_in_preview_tab")]
     pub open_tables_in_preview_tab: bool,
+    #[serde(default)]
+    pub ui_typography: TypographyOverride,
+    #[serde(default)]
+    pub editor_font_weight: u32,
+    #[serde(default)]
+    pub grid_typography: TypographyOverride,
+    #[serde(default)]
+    pub output_typography: TypographyOverride,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -233,7 +270,7 @@ impl Default for Preferences {
         Self {
             default_page_size: DEFAULT_PAGE_SIZE,
             confirm_destructive: true,
-            editor_font_size: 12,
+            editor_font_size: 0,
             history_retention_days: default_history_retention_days(),
             query_timeout_secs: default_query_timeout_secs(),
             csv_include_header: default_csv_include_header(),
@@ -245,6 +282,10 @@ impl Default for Preferences {
             date_format: DateFormatPref::default(),
             show_invisible_characters: default_show_invisible_characters(),
             open_tables_in_preview_tab: default_open_tables_in_preview_tab(),
+            ui_typography: TypographyOverride::default(),
+            editor_font_weight: 0,
+            grid_typography: TypographyOverride::default(),
+            output_typography: TypographyOverride::default(),
         }
     }
 }
@@ -264,8 +305,44 @@ mod page_size_tests {
 }
 
 #[cfg(test)]
+mod typography_tests {
+    use super::*;
+
+    #[test]
+    fn typography_size_and_weight_keep_system_defaults_and_bound_overrides() {
+        assert_eq!(bounded_typography_size(0), 0);
+        assert_eq!(bounded_typography_size(1), MIN_TYPOGRAPHY_SIZE);
+        assert_eq!(bounded_typography_size(20), 20);
+        assert_eq!(bounded_typography_size(99), MAX_TYPOGRAPHY_SIZE);
+        assert_eq!(bounded_typography_weight(0), 0);
+        assert_eq!(bounded_typography_weight(1), 100);
+        assert_eq!(bounded_typography_weight(650), 700);
+        assert_eq!(bounded_typography_weight(1_000), 900);
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn typography_defaults_leave_non_editor_surfaces_on_system_settings() {
+        let preferences = Preferences::default();
+        assert_eq!(preferences.ui_typography.font_size, 0);
+        assert_eq!(preferences.grid_typography.font_size, 0);
+        assert_eq!(preferences.output_typography.font_size, 0);
+        assert_eq!(preferences.editor_font_size, 0);
+    }
+
+    #[test]
+    fn old_editor_font_settings_deserialize_into_the_editor_surface() {
+        let preferences: Preferences = serde_json::from_str(
+            r#"{"default_page_size":1000,"confirm_destructive":true,"editor_font_size":16,"editor_font_family":"Iosevka"}"#,
+        )
+        .unwrap();
+        assert_eq!(preferences.editor_font_size, 16);
+        assert_eq!(preferences.editor_font_family, "Iosevka");
+    }
+
     #[test]
     fn a_preferences_file_from_before_the_setting_keeps_the_preview_tab_on() {
         let prefs: Preferences =

@@ -9,7 +9,7 @@
     <key name="window-maximized" type="b"><default>false</default></key>
     <key name="default-page-size" type="t"><default>1000</default></key>
     <key name="confirm-destructive" type="b"><default>true</default></key>
-    <key name="editor-font-size" type="u"><default>12</default></key>
+    <key name="editor-font-size" type="u"><default>0</default></key>
     <key name="history-retention-days" type="u"><default>30</default></key>
     <key name="query-timeout-secs" type="u"><default>60</default></key>
     <key name="csv-include-header" type="b"><default>true</default></key>
@@ -21,6 +21,16 @@
     <key name="date-format" type="s"><default>'iso'</default></key>
     <key name="show-invisible-characters" type="b"><default>true</default></key>
     <key name="open-tables-in-preview-tab" type="b"><default>true</default></key>
+    <key name="ui-font-family" type="s"><default>''</default></key>
+    <key name="ui-font-size" type="u"><default>0</default></key>
+    <key name="ui-font-weight" type="u"><default>0</default></key>
+    <key name="editor-font-weight" type="u"><default>0</default></key>
+    <key name="grid-font-family" type="s"><default>''</default></key>
+    <key name="grid-font-size" type="u"><default>0</default></key>
+    <key name="grid-font-weight" type="u"><default>0</default></key>
+    <key name="output-font-family" type="s"><default>''</default></key>
+    <key name="output-font-size" type="u"><default>0</default></key>
+    <key name="output-font-weight" type="u"><default>0</default></key>
     <key name="last-launched-version" type="s"><default>''</default></key>
     <key name="dismissed-update-version" type="s"><default>''</default></key>
   </schema>
@@ -33,7 +43,7 @@
     <key name="window-maximized" type="b"><default>false</default></key>
     <key name="default-page-size" type="t"><default>1000</default></key>
     <key name="confirm-destructive" type="b"><default>true</default></key>
-    <key name="editor-font-size" type="u"><default>12</default></key>
+    <key name="editor-font-size" type="u"><default>0</default></key>
     <key name="history-retention-days" type="u"><default>30</default></key>
     <key name="query-timeout-secs" type="u"><default>60</default></key>
     <key name="csv-include-header" type="b"><default>true</default></key>
@@ -45,6 +55,16 @@
     <key name="date-format" type="s"><default>'iso'</default></key>
     <key name="show-invisible-characters" type="b"><default>true</default></key>
     <key name="open-tables-in-preview-tab" type="b"><default>true</default></key>
+    <key name="ui-font-family" type="s"><default>''</default></key>
+    <key name="ui-font-size" type="u"><default>0</default></key>
+    <key name="ui-font-weight" type="u"><default>0</default></key>
+    <key name="editor-font-weight" type="u"><default>0</default></key>
+    <key name="grid-font-family" type="s"><default>''</default></key>
+    <key name="grid-font-size" type="u"><default>0</default></key>
+    <key name="grid-font-weight" type="u"><default>0</default></key>
+    <key name="output-font-family" type="s"><default>''</default></key>
+    <key name="output-font-size" type="u"><default>0</default></key>
+    <key name="output-font-weight" type="u"><default>0</default></key>
     <key name="last-launched-version" type="s"><default>''</default></key>
     <key name="dismissed-update-version" type="s"><default>''</default></key>
   </schema>

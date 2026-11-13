@@ -11,6 +11,7 @@ pub enum BrowseTabInput {
         request: BrowsePageRequest,
         result: QueryResult,
         projected_columns: Option<Vec<usize>>,
+        elapsed: std::time::Duration,
     },
     ColumnsLoaded(Vec<ColumnInfo>),
     ViewRestriction(Option<bookie_app_services::view_edit::ViewEditRestriction>),

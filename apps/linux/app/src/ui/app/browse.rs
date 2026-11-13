@@ -146,7 +146,7 @@ impl App {
             sender.input(AppMsg::LoadFailed(
                 Some(tab_id),
                 BrowseLoadFailure {
-                    request: Some(page.request.clone()),
+                    request: Some(page.request),
                     message: "no active connection".into(),
                 },
             ));
@@ -252,6 +252,7 @@ impl App {
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
+                    let started = std::time::Instant::now();
                     let control = crate::services::operation_control::bounded_with(timeout_secs, token);
                     let (result, projected_columns) = match query {
                         PageQuery::Native => (
@@ -268,12 +269,19 @@ impl App {
                             (page, projected_columns)
                         }
                     };
+                    let elapsed = started.elapsed();
                     match result {
                         Ok(mut query_result) => {
                             if reverse_rows {
                                 query_result.rows.reverse();
                             }
-                            sender_clone.input(AppMsg::RowsLoaded(tab_id, request, query_result, projected_columns))
+                            sender_clone.input(AppMsg::RowsLoaded(
+                                tab_id,
+                                request,
+                                query_result,
+                                projected_columns,
+                                elapsed,
+                            ))
                         }
                         Err(_) if control.cancellation_token().is_cancelled() => {}
                         Err(e) => sender_clone.input(AppMsg::LoadFailed(
@@ -523,6 +531,7 @@ impl App {
         request: BrowsePageRequest,
         result: QueryResult,
         projected_columns: Option<Vec<usize>>,
+        elapsed: std::time::Duration,
     ) {
         self.dispatch_to_tab(
             tab_id,
@@ -530,6 +539,7 @@ impl App {
                 request,
                 result,
                 projected_columns,
+                elapsed,
             },
         );
     }
@@ -693,17 +703,25 @@ impl App {
             rows: Vec::new().into(),
             truncated: false,
         };
+        let scope = if request.current_page.is_some() {
+            crate::ui::export_dialog::ExportScope::QueryPage {
+                filtered: request.filtered,
+            }
+        } else {
+            crate::ui::export_dialog::ExportScope::QueryStored
+        };
+        let result = request.current_page.unwrap_or_else(|| std::sync::Arc::new(result));
         crate::ui::export_dialog::present_with_format(
             &self.window,
             &self.toast_overlay,
             crate::ui::export_dialog::ExportRequest {
-                scope: crate::ui::export_dialog::ExportScope::QueryStored,
+                scope,
                 paged: Some(crate::ui::export_dialog::PagedExport {
                     mode: crate::ui::export_dialog::PagedExportMode::StoredQuery,
                     total_rows: Some(request.total_rows),
                     open: fetcher,
                 }),
-                result: std::sync::Arc::new(result),
+                result,
                 suggested_name: request.query.suggested_name,
                 driver_id: request.query.driver_id,
             },
