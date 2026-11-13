@@ -64,6 +64,7 @@ pub enum AppMsg {
         crate::ui::browse_tab::BrowsePageRequest,
         QueryResult,
         Option<Vec<usize>>,
+        std::time::Duration,
     ),
     LoadFailed(Option<Uuid>, crate::ui::browse_tab::BrowseLoadFailure),
     RowOpStarted,
