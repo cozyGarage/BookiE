@@ -1070,6 +1070,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::export_dialog::scope::tests::query_scope_names_the_page_and_saved_filtered_result"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::editor::outcomes::tests::streamed_result_widgets_keep_pages_visible_during_loading_and_terminal_states"
     ],
     [
