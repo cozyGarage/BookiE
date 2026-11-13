@@ -2,6 +2,7 @@
 
 - **Status**: Accepted
 - **Date**: 2026-10-08
+- **Implementation**: Not built. The Snapshots panel, `snapshot_support` capability and restore flow described below are the target design; nothing in the shipped app exposes them yet.
 
 ## Context
 

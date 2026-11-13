@@ -456,7 +456,7 @@ Workspace Clippy and unit checks include the DuckDB driver like every other crat
 
 | Limit | Why |
 |---|---|
-| Linux only | GTK/libadwaita desktop and Linux packaging are the product target. UI-free crates support the headless daemon and test boundaries; another desktop platform is out of scope. |
+| Shipped surface is Linux GTK | The shipped product is the GTK/libadwaita Linux client and its packaging. [ADR 0052](docs/decisions/0052-gpui-is-the-cross-platform-frontend.md) chooses GPUI as the cross-platform frontend and keeps GTK in parallel; GPUI is not packaged or released until that ADR's accessibility, packaging and security conditions hold. UI-free crates serve both frontends, the headless daemon and tests. |
 | Static drivers | Compile-time registration; no plugin ABI. |
 | No embedded browser | Native GTK widgets only. |
 | No in-process user scripting | Reduces attack surface beside SQL policy. |
