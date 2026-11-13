@@ -61,8 +61,6 @@ This page describes user-visible behavior and limits in the current source. Curr
 
 Limits of the GPUI frontend after the DataTable change. It is the chosen cross-platform frontend ([ADR 0052](decisions/0052-gpui-is-the-cross-platform-frontend.md)) and is not included in packages or releases yet.
 
-- **Keyboard page crossing:** the grid's rows are drawn by gpui-component's DataTable, which moves within the loaded page. Moving past the page edge with the keyboard does not load the next page yet; `the_cursor_crosses_to_the_next_page_and_back` is ignored until it does ([#2673](https://github.com/cozyGarage/BookiE/issues/2673) covers the bounded loader).
 - **Cell selection:** a cell is always selected while rows are shown (the top-left cell at first), so the cursor is always visible.
-- **Range selection:** Shift+arrow extends the table's row range; the grid's own selection count does not follow it yet.
 - **Sidebar:** the narrow header label clips; the regex, locate and show-active-only controls are placeholders; the import menu entries do nothing yet.
 - **Settings:** one switch (Dark theme); the palette opens the page.

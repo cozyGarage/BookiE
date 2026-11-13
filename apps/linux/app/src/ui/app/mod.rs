@@ -16,6 +16,7 @@ mod init_css;
 mod init_sidebar;
 mod init_window;
 mod init_workspace;
+mod lifecycle_messages;
 mod msg;
 mod multi_session;
 mod open_request;
@@ -741,10 +742,7 @@ impl SimpleComponent for App {
             return;
         }
         match msg {
-            AppMsg::FlushWindowEdits => {
-                self.grid_close.window_ready.set(true);
-                self.window.close();
-            }
+            AppMsg::FlushWindowEdits => lifecycle_messages::flush_window_edits(self),
             AppMsg::GridEditsPrepared { intent, ticket, result } => {
                 self.grid_edits_prepared(intent, ticket, result, sender)
             }
@@ -762,39 +760,14 @@ impl SimpleComponent for App {
                 width,
                 height,
                 maximized,
-            } => {
-                let mut state = self.window_state.borrow_mut();
-                state.width = width;
-                state.height = height;
-                state.maximized = maximized;
-                drop(state);
-                self.persist_window_state(sender, true);
-            }
-            AppMsg::WindowStatePersisted(result) => {
-                if let Err(error) = result {
-                    tracing::warn!(error = %error, "window state write failed");
-                }
-            }
+            } => lifecycle_messages::persist_window_state_for_close(self, width, height, maximized, sender),
+            AppMsg::WindowStatePersisted(result) => lifecycle_messages::window_state_persisted(result),
             AppMsg::WindowStatePersistedForClose(result) => {
-                self.window_close_state_pending.set(false);
-                if let Err(error) = result {
-                    tracing::warn!(error = %error, "window state write failed before close");
-                }
-                self.window_close_state_saved.set(true);
-                self.window.close();
+                lifecycle_messages::window_state_persisted_for_close(self, result)
             }
             AppMsg::ConnectionDeleted(id) => self.on_connection_deleted(id, sender),
             AppMsg::ConfirmSessionTeardown(action) => self.prepare_editor_sessions(action, sender),
-            AppMsg::CancelSessionTeardown(action) => match action {
-                SessionTeardownAction::WindowClose => self.session_teardown_pending.set(false),
-                SessionTeardownAction::ConnectionSwitch => {
-                    self.switch.transition = ConnectionTransition::Idle;
-                    self.switch.prepared = None;
-                    self.switch.saves_pending.clear();
-                    self.switch.cancel_audit_was_disabled = None;
-                }
-                SessionTeardownAction::CloseTab(_) | SessionTeardownAction::Disconnect => {}
-            },
+            AppMsg::CancelSessionTeardown(action) => lifecycle_messages::cancel_session_teardown(self, action),
             AppMsg::SessionTeardownCompleted { action, result } => {
                 self.on_session_teardown_completed(action, result, sender);
             }

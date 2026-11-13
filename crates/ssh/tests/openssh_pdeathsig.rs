@@ -9,8 +9,8 @@ mod linux {
     use std::time::{Duration, Instant};
 
     use bookie_ssh::openssh::{
-        OpenSshAuth, OpenSshConfig, OpenSshContext, OpenSshRuntime, OpenSshSession, OpenSshTimeouts,
-        SshDestination, UnattendedPrompter,
+        OpenSshAuth, OpenSshConfig, OpenSshContext, OpenSshRuntime, OpenSshSession, OpenSshTimeouts, SshDestination,
+        UnattendedPrompter,
     };
     use tokio_util::sync::CancellationToken;
 

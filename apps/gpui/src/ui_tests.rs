@@ -180,7 +180,28 @@ fn the_arrow_keys_move_the_active_cell_and_space_selects_its_row(cx: &mut TestAp
     view.read_with(cx, |view, _| assert_eq!(view.selection.map(|s| s.count()), Some(1)));
     cx.simulate_keystrokes("shift-down shift-down");
     view.read_with(cx, |view, _| {
-        assert_eq!(view.cell_cursor, Some(Cursor { row: 2, column: 1 }));
+        assert_eq!(view.cell_cursor, Some(Cursor { row: 4, column: 1 }));
+        assert_eq!(view.selection.map(|s| s.count()), Some(3));
+        assert_eq!(view.selection.map(|s| s.anchor), Some(2));
+        assert_eq!(view.selection.map(|s| s.focus), Some(4));
+        assert_eq!(view.status, "3 rows selected");
+    });
+}
+
+#[gpui::test]
+fn shift_arrow_seeds_a_range_from_the_active_cell(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("down down");
+    view.read_with(cx, |view, _| {
+        assert!(view.selection.is_none());
+        assert_eq!(view.cell_cursor, Some(Cursor { row: 2, column: 0 }));
+    });
+    cx.simulate_keystrokes("shift-down");
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.cell_cursor, Some(Cursor { row: 3, column: 0 }));
+        assert_eq!(view.selection.map(|s| s.count()), Some(2));
+        assert_eq!(view.selection.map(|s| s.anchor), Some(2));
+        assert_eq!(view.selection.map(|s| s.focus), Some(3));
     });
 }
 
