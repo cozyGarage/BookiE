@@ -1225,3 +1225,48 @@ fn a_postgres_index_is_rebuilt_from_the_server_definition_for_the_target_table()
     let other_engine = build_create_index("mysql", None, "users", &idx).unwrap_err();
     assert!(matches!(other_engine, BuildDdlError::PartialIndex));
 }
+
+#[test]
+fn an_index_edited_after_it_was_read_is_rebuilt_from_its_new_columns() {
+    let read = IndexInfo {
+        constraint: None,
+        name: "swap_idx".into(),
+        columns: vec!["a".into()],
+        unique: false,
+        primary: false,
+        predicate: None,
+        has_expression_key: false,
+        using_clause: Some("btree (a)".into()),
+    };
+    let edited = IndexInfo {
+        columns: vec!["a".into(), "b".into()],
+        unique: true,
+        ..read.clone()
+    };
+    let renamed = IndexInfo {
+        name: "swap_idx_new".into(),
+        ..read.clone()
+    };
+    for (current, expected) in [
+        (edited, "CREATE UNIQUE INDEX \"swap_idx\" ON \"swap\" (\"a\", \"b\")"),
+        (renamed, "CREATE INDEX \"swap_idx_new\" ON \"swap\" USING btree (a)"),
+    ] {
+        let ops = diff_to_ops(
+            None,
+            TableState {
+                table: "swap",
+                columns: &[],
+                indexes: std::slice::from_ref(&read),
+                fks: &[],
+            },
+            TableState {
+                table: "swap",
+                columns: &[],
+                indexes: std::slice::from_ref(&current),
+                fks: &[],
+            },
+        );
+        let statements = materialize_ops(&ops, "postgres").unwrap();
+        assert_eq!(statements.last().map(String::as_str), Some(expected), "{statements:?}");
+    }
+}
