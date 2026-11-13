@@ -6,3 +6,4 @@ paths:
   .forgejo/workflows/**/*.yml:
     ignore:
       - '^specifying action "https://code\.forgejo\.org/actions/(upload|download)-artifact@[0-9a-f]{40}" in invalid format because owner and repo and ref should not be empty\. available formats are "\{owner\}/\{repo\}@\{ref\}" or "\{owner\}/\{repo\}/\{path\}@\{ref\}"$'
+      - '^specifying action "https://github\.com/(taiki-e/install-action|dtolnay/rust-toolchain)@[0-9a-f]{40}" in invalid format because owner and repo and ref should not be empty\. available formats are "\{owner\}/\{repo\}@\{ref\}" or "\{owner\}/\{repo\}/\{path\}@\{ref\}"$'
