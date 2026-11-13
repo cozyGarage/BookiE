@@ -137,7 +137,7 @@ When changing storage behavior:
 
 ## Query favorites
 
-`$XDG_CONFIG_HOME/bookie/favorites.json` holds saved queries as `{version, favorites[]}`, written through a temporary file and a rename. Each entry keeps an id, name, statement, optional driver and connection ids, a creation time, and a last-used time. Saving a name that already exists replaces that entry's statement and keeps its id. The file is capped at 500 entries, and a name or statement that is only whitespace is rejected.
+`$XDG_CONFIG_HOME/bookie/favorites.json` holds saved queries as `{version, favorites[], folders[]}`, written through a temporary file and a rename. Each query keeps an id, name, statement, optional driver and connection ids, a creation time, and a last-used time. Folder assignment and keywords are optional query fields, so older flat files load as unfiled queries. Saving a name that already exists replaces its statement and keeps its id, folder and keywords. Deleting a folder keeps its queries and keywords and removes only their folder assignment. Folder and query mutations reread the file while holding its lock. Unknown fields are carried forward when records are rewritten. The file is capped at 500 queries and 200 folders; names, statements and keywords are bounded, and invalid folder references are rejected without replacing the file.
 
 ## Connection bundles
 
