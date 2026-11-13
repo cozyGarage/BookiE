@@ -18,6 +18,56 @@ SPEC.loader.exec_module(registry)
 
 
 class RegistryExtractionTests(unittest.TestCase):
+    def test_forgejo_list_reads_all_pages_using_link_and_total_count(self):
+        requests = []
+
+        class Response:
+            def __init__(self, body, headers=None):
+                self.body = body
+                self.headers = headers or {}
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_):
+                return False
+
+            def read(self, *_):
+                return json.dumps(self.body).encode()
+
+        def request(url, **_):
+            requests.append(url)
+            page = int(registry.urllib.parse.parse_qs(registry.urllib.parse.urlsplit(url).query)['page'][0])
+            if page == 1:
+                return Response([{'name': str(index)} for index in range(50)], {
+                    'Link': '<https://forgejo.example/branches?page=2>; rel="next"',
+                    'X-Total-Count': '51',
+                })
+            return Response([{'name': 'last'}], {'X-Total-Count': '51'})
+
+        with patch.object(registry, 'request', side_effect=request):
+            branches = registry.forgejo_list('https://forgejo.example/api', 'branches', {}, 'repo-token')
+
+        self.assertEqual(len(branches), 51)
+        self.assertIn('page=2', requests[1])
+
+    def test_forgejo_list_rejects_invalid_total_count(self):
+        class Response:
+            headers = {'X-Total-Count': 'invalid'}
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_):
+                return False
+
+            def read(self, *_):
+                return b'[]'
+
+        with patch.object(registry, 'request', return_value=Response()):
+            with self.assertRaisesRegex(ValueError, 'invalid branches reference count'):
+                registry.forgejo_list('https://forgejo.example/api', 'branches', {}, 'repo-token')
+
     def test_discover_protected_revisions_from_branches_open_prs_and_active_runs(self):
         responses = {
             '/branches?limit=50&page=1': [{'commit': {'id': 'a' * 40}}],
@@ -54,6 +104,75 @@ class RegistryExtractionTests(unittest.TestCase):
 
         self.assertEqual(revisions, {'a' * 40, 'b' * 40, 'c' * 40})
         self.assertEqual({token for _, token in requests}, {'repo-token'})
+
+    def test_discovery_ignores_closed_pull_requests_and_finished_runs(self):
+        responses = {
+            '/branches?limit=50&page=1': [],
+            '/pulls?limit=50&page=1&state=open': [{'state': 'closed', 'head': {'sha': 'b' * 40}}],
+            '/actions/runs?limit=50&page=1&status=waiting&status=running': {
+                'total_count': 1, 'workflow_runs': [{'status': 'completed', 'commit_sha': 'c' * 40}]
+            },
+        }
+
+        class Response:
+            def __init__(self, body):
+                self.body = body
+                self.headers = {}
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_):
+                return False
+
+            def read(self, *_):
+                return json.dumps(self.body).encode()
+
+        def request(url, **_):
+            parsed = registry.urllib.parse.urlsplit(url)
+            key = parsed.path.removeprefix('/api/v1/repos/trung/bookie') + '?' + parsed.query
+            return Response(responses[key])
+
+        with patch.dict('os.environ', {
+                'BOOKIE_FORGEJO_API_URL': 'https://forgejo.example/api/v1/repos/trung/bookie',
+                'BOOKIE_FORGEJO_TOKEN': 'repo-token'}), patch.object(registry, 'request', side_effect=request):
+            revisions = registry.discover_protected_revisions()
+
+        self.assertEqual(revisions, set())
+
+    def test_discovery_rejects_invalid_branch_revision(self):
+        responses = {
+            '/branches?limit=50&page=1': [{'commit': {'id': 'not-a-commit'}}],
+            '/pulls?limit=50&page=1&state=open': [],
+            '/actions/runs?limit=50&page=1&status=waiting&status=running': {
+                'total_count': 0, 'workflow_runs': []
+            },
+        }
+
+        class Response:
+            def __init__(self, body):
+                self.body = body
+                self.headers = {}
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_):
+                return False
+
+            def read(self, *_):
+                return json.dumps(self.body).encode()
+
+        def request(url, **_):
+            parsed = registry.urllib.parse.urlsplit(url)
+            key = parsed.path.removeprefix('/api/v1/repos/trung/bookie') + '?' + parsed.query
+            return Response(responses[key])
+
+        with patch.dict('os.environ', {
+                'BOOKIE_FORGEJO_API_URL': 'https://forgejo.example/api/v1/repos/trung/bookie',
+                'BOOKIE_FORGEJO_TOKEN': 'repo-token'}), patch.object(registry, 'request', side_effect=request):
+            with self.assertRaisesRegex(ValueError, 'invalid protected source revision'):
+                registry.discover_protected_revisions()
 
     def test_discovery_rejects_incomplete_action_run_revisions(self):
         class Response:
