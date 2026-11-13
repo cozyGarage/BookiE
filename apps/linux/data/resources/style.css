@@ -114,7 +114,7 @@ columnview.data-table > listview > row > cell > .row-number-cell {
   margin-bottom: 8px;
 }
 
-.tp-env-local { background-color: @success_color; }
+.tp-env-local { background-color: @borders; }
 .tp-env-dev { background-color: @accent_color; }
 .tp-env-staging { background-color: @warning_color; }
 .tp-env-prod { background-color: @error_color; }

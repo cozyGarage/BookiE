@@ -1,6 +1,8 @@
 use super::*;
 use bookie_core::{Environment, TlsMode};
 
+const ENVIRONMENT_STYLES: &str = include_str!("../../../data/resources/style.css");
+
 fn saved(username: &str, auth_mode: AuthMode) -> SavedConnection {
     SavedConnection {
         auth_source: None,
@@ -294,4 +296,13 @@ fn each_environment_has_its_own_colour_class() {
     assert_eq!(environment_css_class(Environment::Dev), "tp-env-dev");
     assert_eq!(environment_css_class(Environment::Staging), "tp-env-staging");
     assert_eq!(environment_css_class(Environment::Prod), "tp-env-prod");
+}
+
+#[test]
+fn local_environment_marker_uses_a_neutral_theme_colour() {
+    assert!(
+        ENVIRONMENT_STYLES
+            .lines()
+            .any(|line| line.trim() == ".tp-env-local { background-color: @borders; }")
+    );
 }
