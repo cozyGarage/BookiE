@@ -6,39 +6,44 @@ import sys
 
 REQUIRED = {
     "pin-revision",
-    "reusable-test-builds",
+    "guards",
     "gpui-tests",
-    "preflight",
-    "fast",
-    "gtk-safety",
-    "keyring",
-    "gtk-server",
+    "gtk-build",
+    "clippy",
+    "test-build",
+    "unit",
+    "sandbox",
+    "widgets",
+    "floor-build",
     "distro-floor-scenarios",
-    "integration",
+    "driver",
     "b4-rollback",
+    "security-policy",
+    "consumers",
+    "gtk",
+    "pg-release",
+    "gtk-server",
     "driver-tls",
-    "postgres-release",
+    "keyring",
+    "supply-chain",
 }
-SCHEDULED = "current-stable-clippy"
-MERGE_ONLY = set()
-OPTIONAL_ON_PULL_REQUEST = {"distro-floor-scenarios"}
+OPTIONAL_ON_PULL_REQUEST = {"floor-build", "distro-floor-scenarios"}
 
 
 def assess(results, event):
-    expected = REQUIRED | {SCHEDULED}
+    expected = REQUIRED
     failures = []
     rows = []
     for name in sorted(expected | results.keys()):
         status = results.get(name, {}).get("result", "missing")
         allowed_skip = status == "skipped" and (
-            (name == SCHEDULED and event in {"push", "pull_request"})
-            or (name in OPTIONAL_ON_PULL_REQUEST and event == "pull_request")
+            name in OPTIONAL_ON_PULL_REQUEST and event == "pull_request"
         )
         accepted = name in expected and (status == "success" or allowed_skip)
         if not accepted:
             failures.append(name)
         if allowed_skip:
-            detail = "not a pull-request gate" if name in OPTIONAL_ON_PULL_REQUEST else "scheduled/manual only"
+            detail = "not a pull-request gate"
         else:
             detail = status
         rows.append(f"| {name} | {detail} | {'accepted' if accepted else 'FAILED'} |")

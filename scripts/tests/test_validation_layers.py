@@ -263,15 +263,19 @@ class LayerRunnerTests(unittest.TestCase):
     def test_security_and_contract_workflows_use_shared_runner(self):
         workflows = ROOT / ".github/workflows"
         security = (workflows / "linux-security.yml").read_text()
-        for text in ["security-policy", "supply-chain", "fail-fast: false", "if: always()", "if-no-files-found: error", "run-test-layer.py"]:
+        for text in ["supply-chain", "fail-fast: false", "if: always()", "if-no-files-found: error", "run-test-layer.py"]:
             self.assertIn(text, security)
+        self.assertNotIn("security-policy", security)
+        self.assertIn("schedule:", security)
+        self.assertNotIn("pull_request:", security)
+        self.assertNotIn("push:", security)
         self.assertNotIn("continue-on-error:", security)
         build = (workflows / "build-linux.yml").read_text()
-        for layer in ["quick", "gtk-app", "b4-rollback", "tls", "postgres-release", "ui", "widgets", "keyring"]:
+        for layer in ["sandbox", "change-contracts", "b4-rollback", "tls", "postgres-release", "ui", "widgets", "keyring", "security-policy"]:
             self.assertIn(f"run-test-layer.py {layer}", build)
-        integration = build.split("  integration:\n", 1)[1].split("  b4-rollback:\n", 1)[0]
-        self.assertIn("group: [driver-core, driver-analytics, driver-extended, socket-ssh]", integration)
-        self.assertIn('python3 scripts/run-test-layer.py "$BOOKIE_TEST_LAYER"', integration)
+        driver = build.split("  driver:\n", 1)[1].split("  b4-rollback:\n", 1)[0]
+        self.assertIn("group: [driver-core, driver-analytics, driver-extended, socket-ssh]", driver)
+        self.assertIn('python3 scripts/run-test-layer.py "$BOOKIE_TEST_LAYER"', driver)
         self.assertNotIn("if-no-files-found: ignore", build)
         contracts = (workflows / "linux-ci-contracts.yml").read_text()
         self.assertIn("run-test-layer.py harness", contracts)
@@ -325,13 +329,13 @@ class LayerRunnerTests(unittest.TestCase):
 
     def test_driver_layer_timeout_fits_hosted_integration_job(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
-        integration = re.search(r"(?ms)^  integration:\n(.*?)(?=^  [a-z][a-z-]*:\n)", workflow)
-        self.assertIsNotNone(integration)
-        job_timeout = re.search(r"(?m)^    timeout-minutes:\s+(\d+)$", integration.group(1))
+        driver = re.search(r"(?ms)^  driver:\n(.*?)(?=^  [a-z][a-z-]*:\n)", workflow)
+        self.assertIsNotNone(driver)
+        job_timeout = re.search(r"(?m)^    timeout-minutes:\s+(\d+)$", driver.group(1))
         self.assertIsNotNone(job_timeout)
         forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
-        driver = re.search(r"(?ms)^  driver:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n)", forgejo)
-        forgejo_timeout = re.search(r"(?m)^    timeout-minutes:\s+(\d+)$", driver.group(1))
+        forgejo_driver = re.search(r"(?ms)^  driver:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n)", forgejo)
+        forgejo_timeout = re.search(r"(?m)^    timeout-minutes:\s+(\d+)$", forgejo_driver.group(1))
         self.assertIsNotNone(forgejo_timeout)
         self.assertEqual(job_timeout.group(1), forgejo_timeout.group(1))
         layer_timeout = runner.catalog()["drivers"]["steps"][0]["timeout_seconds"]

@@ -223,11 +223,12 @@ class PrepullTestImagesTests(unittest.TestCase):
                 script = (ROOT / "scripts" / name).read_text()
                 self.assertLess(script.index(needle), script.index("docker build"))
 
-    def test_the_github_fast_job_pre_pulls_before_the_app_server_tests(self):
+    def test_the_github_consumers_job_pre_pulls_before_its_database_fixtures(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
-        fast = workflow.split("  fast:\n", 1)[1].split("  gtk-safety:\n", 1)[0]
-        prepull = fast.index("bash scripts/prepull-test-images.sh app-server")
-        self.assertLess(prepull, fast.index("run-test-layer.py app-server"))
+        consumers = workflow.split("  consumers:\n", 1)[1].split("  gtk-build:\n", 1)[0]
+        prepull = consumers.index("bash scripts/prepull-test-images.sh app-server")
+        self.assertLess(prepull, consumers.index("MCP and policy session fixtures"))
+        self.assertLess(prepull, consumers.index("run-test-layer.py app-server"))
 
     def test_the_fast_job_image_can_run_the_pre_pull_script(self):
         dockerfile = (ROOT / "ci/debian-testing-gtk/Dockerfile").read_text()

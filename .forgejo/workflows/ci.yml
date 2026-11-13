@@ -121,8 +121,11 @@ jobs:
           bash scripts/check-file-size.sh
           bash scripts/check-bounded-operations.sh
           bash scripts/check-panic-sites.sh
+          python3 scripts/check-crate-boundaries.py
+          python3 scripts/check-driver-id-branches.py
           python3 scripts/check-function-size.py
           python3 scripts/check-comment-lines.py
+          python3 scripts/release-notes.py fragments
           cargo fmt --all -- --check
       - name: Clean pilot scratch
         if: always()

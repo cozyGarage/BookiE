@@ -527,7 +527,7 @@
     "supply-chain": {
       "purpose": "Dependency advisory, license and source checks using repository exceptions",
       "prerequisites": "cargo-deny; cargo-audit; network to registries and advisory database",
-      "hosted_gate": "Linux Security / supply-chain; lab-ci / supply-chain",
+      "hosted_gate": "Build Linux / supply-chain; Linux Security / scheduled supply-chain; lab-ci / supply-chain",
       "steps": [
         {
           "argv": [
@@ -605,7 +605,7 @@
     "unused-dependencies": {
       "purpose": "Find unused or misplaced workspace dependencies",
       "prerequisites": "cargo-shear 1.13.4",
-      "hosted_gate": "Linux CI contracts / unused-dependencies; lab-ci / supply-chain",
+      "hosted_gate": "Build Linux / supply-chain; lab-ci / supply-chain",
       "steps": [
         {
           "argv": ["cargo", "shear"],
