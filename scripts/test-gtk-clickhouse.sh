@@ -83,5 +83,5 @@ BOOKIE_GTK_KEYRING_READY=1 \
   BOOKIE_GTK_CLICKHOUSE_CONTAINER="$container" \
   BOOKIE_GTK_CLICKHOUSE_HOST=127.0.0.1 \
   BOOKIE_GTK_CLICKHOUSE_PORT="$port" \
-  BOOKIE_GTK_SCENARIO="${BOOKIE_GTK_SCENARIO:-clickhouse_enum_grid_edit_preserves_native_label_and_siblings,clickhouse_structure_distinguishes_unavailable_foreign_keys}" \
+  BOOKIE_GTK_SCENARIO="${BOOKIE_GTK_SCENARIO:-clickhouse_enum_grid_displays_native_labels_without_unique_row_identity,clickhouse_structure_distinguishes_unavailable_foreign_keys}" \
   bash "$ROOT/scripts/test-gtk-safety.sh"
