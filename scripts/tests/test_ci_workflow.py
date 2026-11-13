@@ -1013,6 +1013,11 @@ class CiWorkflowTests(unittest.TestCase):
             self.assertIn("/home/runner/.cargo/bin", cargo_path, name)
             self.assertIn("/home/ubuntu/.cargo/bin", cargo_path, name)
 
+    def test_driver_tls_mssql_healthchecks_wait_for_the_seeded_database(self):
+        compose = (ROOT / "tests/fixtures/driver-tls/docker-compose.yml").read_text()
+        mssql_services = compose[compose.index("  mssql:"):]
+        self.assertEqual(mssql_services.count('-d bookie -Q "SELECT 1"'), 3)
+
     def test_acceptance_jobs_use_any_host_and_builder_pools(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         jobs = dict(re.findall(r"(?ms)^  ([a-z][a-z0-9-]*):\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow))
