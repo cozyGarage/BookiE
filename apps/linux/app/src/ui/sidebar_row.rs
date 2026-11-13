@@ -125,8 +125,7 @@ fn context_popover(
     if let Some(popover) = state.borrow().as_ref() {
         return popover.clone();
     }
-    let popover = gtk::PopoverMenu::from_model(Some(&context_menu_model(kind)));
-    popover.set_has_arrow(true);
+    let popover = crate::ui::context_menu::from_model(Some(&context_menu_model(kind)));
     popover.set_parent(root);
     *state.borrow_mut() = Some(popover.clone());
     popover
@@ -560,8 +559,10 @@ impl FactoryComponent for SidebarRow {
                 return;
             };
             let popover = context_popover(&popover_for_right, &root, kind_for_right);
-            popover.set_pointing_to(Some(&gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
-            popover.popup();
+            crate::ui::context_menu::popup_at(
+                &popover,
+                Some(gdk::Rectangle::new(x as i32, y as i32, 1, 1)),
+            );
         });
         root.add_controller(right_click);
 
@@ -574,7 +575,16 @@ impl FactoryComponent for SidebarRow {
             .trigger(&crate::ui::shortcut::parse("Menu"))
             .action(&gtk::CallbackAction::new(move |_, _| {
                 if let Some(root) = root_for_menu.upgrade() {
-                    context_popover(&popover_for_menu, &root, kind_for_menu).popup();
+                    let popover = context_popover(&popover_for_menu, &root, kind_for_menu);
+                    let pointing = root.compute_bounds(&root).map(|bounds| {
+                        gdk::Rectangle::new(
+                            (bounds.width() / 2.0) as i32,
+                            (bounds.height() / 2.0) as i32,
+                            1,
+                            1,
+                        )
+                    });
+                    crate::ui::context_menu::popup_at(&popover, pointing);
                 }
                 glib::Propagation::Stop
             }))
@@ -669,7 +679,7 @@ impl SidebarRow {
     fn wire_schema_menu(&mut self, root: &gtk::ListBoxRow, sender: &FactorySender<Self>) {
         let compare_enabled = std::env::var_os("BOOKIE_SCHEMA_COMPARE").is_some();
         let menu = schema_menu(compare_enabled, self.schema_actions);
-        let popover = gtk::PopoverMenu::from_model(Some(&menu));
+        let popover = crate::ui::context_menu::from_model(Some(&menu));
         popover.set_parent(root);
         root.insert_action_group(
             "sidebar-row",
@@ -720,15 +730,28 @@ fn attach_schema_popover(root: &gtk::ListBoxRow, popover: &gtk::PopoverMenu) {
     let popover_for_right = popover.clone();
     right_click.connect_pressed(move |gesture, _, x, y| {
         gesture.set_state(gtk::EventSequenceState::Claimed);
-        popover_for_right.set_pointing_to(Some(&gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
-        popover_for_right.popup();
+        crate::ui::context_menu::popup_at(
+            &popover_for_right,
+            Some(gdk::Rectangle::new(x as i32, y as i32, 1, 1)),
+        );
     });
     root.add_controller(right_click);
     let popover_for_shortcut = popover.clone();
+    let root_for_shortcut = root.downgrade();
     let menu_shortcut = gtk::Shortcut::builder()
         .trigger(&crate::ui::shortcut::parse("Menu"))
         .action(&gtk::CallbackAction::new(move |_, _| {
-            popover_for_shortcut.popup();
+            let pointing = root_for_shortcut.upgrade().and_then(|root| {
+                root.compute_bounds(&root).map(|bounds| {
+                    gdk::Rectangle::new(
+                        (bounds.width() / 2.0) as i32,
+                        (bounds.height() / 2.0) as i32,
+                        1,
+                        1,
+                    )
+                })
+            });
+            crate::ui::context_menu::popup_at(&popover_for_shortcut, pointing);
             glib::Propagation::Stop
         }))
         .build();
