@@ -588,9 +588,27 @@ fn stream_export_button(widget: &gtk::Widget) -> Option<gtk::Button> {
     let mut pending = std::collections::VecDeque::from([widget.clone()]);
     while let Some(current) = pending.pop_front() {
         if let Ok(button) = current.clone().downcast::<gtk::Button>()
-            && button.label().as_deref() == Some("Export all rows…")
+            && button.label().as_deref() == Some("Export rows…")
         {
             return Some(button);
+        }
+        let mut child = current.first_child();
+        while let Some(node) = child {
+            child = node.next_sibling();
+            pending.push_back(node);
+        }
+    }
+    None
+}
+
+fn completed_pages_stack(widget: &gtk::Widget, generation: u64) -> Option<gtk::Stack> {
+    let name = super::super::stream_view::completed_page_stack_name(generation);
+    let mut pending = std::collections::VecDeque::from([widget.clone()]);
+    while let Some(current) = pending.pop_front() {
+        if current.widget_name() == name
+            && let Ok(stack) = current.clone().downcast::<gtk::Stack>()
+        {
+            return Some(stack);
         }
         let mut child = current.first_child();
         while let Some(node) = child {
