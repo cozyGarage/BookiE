@@ -707,8 +707,6 @@
   },
   "test-build": {
     "needs": [
-      "clippy",
-      "guards",
       "pin-revision"
     ],
     "timeout_minutes": 45,

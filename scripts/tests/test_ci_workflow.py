@@ -1279,14 +1279,14 @@ class CiWorkflowTests(unittest.TestCase):
         quality = (ROOT / ".github/workflows/linux-quality.yml").read_text()
         self.assertEqual(quality.count("ref: ${{ needs.resolve-ref.outputs.commit }}"), 2)
 
-    def test_guards_and_clippy_feed_the_shared_test_bundle_build(self):
+    def test_shared_test_bundle_build_starts_without_waiting_for_quality_gates(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         graph = workflow_job_graph(
             ROOT / ".github/workflows/build-linux.yml",
             {"ensure-ci-gtk-image", "current-stable-clippy"},
         )
         for job, expected in {
-            "test-build": {"pin-revision", "guards", "clippy"},
+            "test-build": {"pin-revision"},
             "unit": {"pin-revision", "test-build"},
             "sandbox": {"pin-revision", "test-build"},
             "driver": {"pin-revision", "guards", "clippy", "test-build"},
@@ -1296,6 +1296,9 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("image: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}", workflow)
         self.assertIn('echo "tag=${tag}" >> "$GITHUB_OUTPUT"', workflow)
         self.assertNotIn("needs.ensure-ci-gtk-image.outputs.image", workflow)
+        final_gate = graph["regression-gate"]["needs"]
+        self.assertIn("guards", final_gate)
+        self.assertIn("clippy", final_gate)
 
     def test_quality_workflow_only_saves_caches_from_the_scheduled_default_branch(self):
         workflow = (ROOT / ".github/workflows/linux-quality.yml").read_text().splitlines()
@@ -1618,7 +1621,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIsNotNone(workspace_toolchain)
         self.assertEqual(toolchain.group(1), workspace_toolchain.group(1))
         builder = re.search(r"(?ms)^  test-build:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", (ROOT / ".github/workflows/build-linux.yml").read_text()).group(1)
-        self.assertIn("needs: [pin-revision, ensure-ci-gtk-image, guards, clippy]", builder)
+        self.assertIn("needs: [pin-revision, ensure-ci-gtk-image]", builder)
         self.assertIn("bash scripts/build-test-bundles.sh", builder)
         self.assertIn("pg-release", builder)
 

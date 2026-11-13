@@ -271,7 +271,7 @@ jobs:
   test-build:
     name: Build and publish test bundles
     runs-on: ubuntu-24.04
-    needs: [pin-revision, ensure-ci-gtk-image, guards, clippy]
+    needs: [pin-revision, ensure-ci-gtk-image]
     timeout-minutes: 45
     container:
       image: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}

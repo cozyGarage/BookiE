@@ -328,7 +328,7 @@ jobs:
           fi
   test-build:
     runs-on: build-host
-    needs: [pin-revision, guards, clippy]
+    needs: [pin-revision]
     timeout-minutes: 45
     defaults:
       run:
