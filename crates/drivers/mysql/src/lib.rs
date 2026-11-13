@@ -439,6 +439,7 @@ impl Connection for MysqlConnection {
                 primary: name == "PRIMARY",
                 predicate: None,
                 has_expression_key: false,
+                using_clause: None,
             });
             entry.has_expression_key |= expression;
             entry.columns.push(key);

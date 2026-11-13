@@ -307,6 +307,7 @@ fn spawn_master(
 }
 
 fn die_if_parent_is_gone(expected_parent: u32) -> std::io::Result<()> {
+    #[cfg(target_os = "linux")]
     if unsafe { libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL, 0, 0, 0) } != 0 {
         return Err(std::io::Error::last_os_error());
     }

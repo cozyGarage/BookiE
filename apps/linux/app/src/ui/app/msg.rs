@@ -135,6 +135,7 @@ pub enum AppMsg {
     SavedQueriesChanged(Vec<bookie_storage::SavedQuery>),
     SavedQueriesDialogClosed,
     ShowQuickSwitcher,
+    QuickSwitcherHistoryLoaded(Vec<crate::services::quick_switcher::QuickItem>),
     QuickSwitcherChose(crate::services::quick_switcher::QuickTarget),
     ShowHistory,
     CloseHistory,

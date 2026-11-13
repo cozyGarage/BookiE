@@ -1052,6 +1052,7 @@ impl SimpleComponent for App {
                 self.on_favorites_loaded(ticket, saved);
             }
             AppMsg::ShowQuickSwitcher => self.on_show_quick_switcher(sender),
+            AppMsg::QuickSwitcherHistoryLoaded(history) => self.present_quick_switcher(history, sender),
             AppMsg::QuickSwitcherChose(target) => self.on_quick_switcher_chose(target, sender),
             AppMsg::ShowHistory => self.on_show_history(sender),
             AppMsg::CloseHistory => self.hide_history_panel(),

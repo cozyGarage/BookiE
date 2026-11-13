@@ -492,14 +492,13 @@ impl Connection for SqliteConnection {
             let unique: i64 = r.try_get(2).unwrap_or(0);
             let origin: String = r.try_get(3).unwrap_or_default();
             let primary = origin == "pk";
-            if primary {
-                saw_primary = true;
-            }
+            saw_primary |= primary;
             let keys = index_keys(&mut connection, target_schema, &name).await?;
             out.push(IndexInfo {
                 constraint: None,
                 name,
                 has_expression_key: keys.iter().any(Option::is_none),
+                using_clause: None,
                 columns: keys
                     .into_iter()
                     .map(|key| key.unwrap_or_else(|| "(expression)".into()))
@@ -523,6 +522,7 @@ impl Connection for SqliteConnection {
                     primary: true,
                     predicate: None,
                     has_expression_key: false,
+                    using_clause: None,
                 });
             }
         }

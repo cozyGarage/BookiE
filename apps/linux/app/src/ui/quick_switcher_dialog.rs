@@ -104,6 +104,7 @@ where
                     QuickTarget::Connection(_) => "network-server-symbolic",
                     QuickTarget::Relation { .. } => "view-list-symbolic",
                     QuickTarget::Command(_) => "system-run-symbolic",
+                    QuickTarget::History(_) => "document-open-recent-symbolic",
                 };
                 row.add_prefix(&gtk::Image::from_icon_name(icon));
                 let open_label = tr!("Open {name}").replace("{name}", &item.title);
