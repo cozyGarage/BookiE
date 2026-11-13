@@ -22,7 +22,7 @@ BookiE is a database client for Linux. It opens PostgreSQL, MySQL and MariaDB, S
 - **CLI launch**: Open databases directly from a terminal: `bookie books.db` or `bookie postgres://user@host:5432/db`.
 - **Attached SQLite databases**: The SQLite driver can use configured attachments, but the connection form does not currently provide controls to add or edit them. Existing attachment lists are preserved when editing the same connection.
 - **Bundles**: Export or import connections with optional passphrase encryption to share configurations across machines.
-- **Peer import**: Import connection drafts from DBeaver, DataGrip, Navicat, RESP.app or Another Redis Desktop Manager. BookiE fills host, user and engine only; passwords stay out of the file. Save each draft to put credentials in Secret Service. Connections that use an SSH tunnel are skipped by name.
+- **Peer import**: Import connection drafts from DBX, DBeaver, DataGrip, Navicat, RESP.app or Another Redis Desktop Manager. DBX import reads connection settings only; saved SQL and credentials are not imported. Other peer importers do not import credentials. Save each draft to enter credentials through Secret Service. Unsupported engines and active transport settings are listed in the import preview.
 
 ## Browse a table
 
@@ -104,7 +104,7 @@ Single-statement PostgreSQL `SELECT` queries stream progressively:
 - **Session mode**: Toggle **Session** to bind the tab to a dedicated connection for transactions and temporary tables. When a transaction is active, use **Commit & close session** or **Roll back & close session**.
 - **Explain plans**: Click **Explain** to inspect execution plans. PostgreSQL displays a visual **Tree** with cost-distribution bars alongside raw text; SQLite provides an indented tree.
 - **Query history**: Press `Ctrl+H` to toggle the bottom history drawer. Statements containing secrets are automatically excluded.
-- **Favorites & Open Quickly**: Press `Ctrl+D` to save a favorite query, `Ctrl+Shift+B` to view saved favorites, and `Ctrl+P` for Open Quickly across tabs, favorites, and connections.
+- **Saved queries & Open Quickly**: Press `Ctrl+D` to save a query, `Ctrl+Shift+B` to browse queries, create folders, assign queries and keywords, and `Ctrl+P` for Open Quickly across tabs, saved queries, and connections. Search matches query names, SQL, and keywords. Deleting a folder leaves its queries available as unfiled.
 
 ## Search database values
 

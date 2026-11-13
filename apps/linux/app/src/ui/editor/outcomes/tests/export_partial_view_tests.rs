@@ -14,6 +14,8 @@ fn an_incomplete_stream_does_not_offer_full_result_export() {
         columns: page.columns.clone(),
         spool: None,
         total_rows: 4,
+        current_page: None,
+        filtered: false,
     };
     let streamed = StreamedResult {
         pages: vec![std::sync::Arc::downgrade(&page)],
@@ -67,13 +69,16 @@ fn an_incomplete_stream_does_not_offer_full_result_export() {
 fn a_completed_stream_offers_its_saved_result_for_export() {
     relm4::adw::init().unwrap();
     let (runtime, database, origin) = stream_export_origin();
-    let page = std::sync::Arc::new(cursor_page(&[1, 2], false).result);
+    let first_page = std::sync::Arc::new(cursor_page(&[1, 2], false).result);
+    let second_page = std::sync::Arc::new(cursor_page(&[3, 4], false).result);
     let spool = bookie_app_services::stream_result_spool::StreamResultSpoolManager::default()
         .create()
         .unwrap();
-    runtime.block_on(spool.append_page(0, page.clone())).unwrap();
+    runtime.block_on(spool.append_page(0, first_page.clone())).unwrap();
+    runtime.block_on(spool.append_page(1, second_page.clone())).unwrap();
     let mut cache = super::super::super::stream_pages::StreamPageCache::default();
-    cache.append(0, page.clone()).unwrap();
+    cache.append(0, first_page).unwrap();
+    cache.append_with_storage_status(1, second_page.clone(), false).unwrap();
     let streamed = cache.snapshot_with_spool(
         StreamTerminal::Complete,
         Some(crate::ui::export_dialog::StreamExportQuery {
@@ -102,12 +107,25 @@ fn a_completed_stream_offers_its_saved_result_for_export() {
         Default::default(),
         None,
     );
+    let pages = super::completed_pages_stack(&widget, streamed.generation).unwrap();
+    let second_page_widget = pages
+        .child_by_name(&super::super::super::stream_view::page_widget_name(
+            streamed.generation,
+            1,
+        ))
+        .unwrap();
+    pages.set_visible_child(&second_page_widget);
     stream_export_button(&widget).unwrap().emit_clicked();
     let Some(crate::ui::grid::GridMsg::ExportStreamedResults(request)) = receiver.recv_sync() else {
         panic!("expected a saved result export");
     };
-    assert_eq!(request.total_rows, 2);
-    assert_eq!(request.spool.unwrap().page_count(), 1);
+    assert_eq!(request.total_rows, 4);
+    assert_eq!(
+        request.current_page.as_ref().map(|page| page.rows.clone()),
+        Some(second_page.rows.clone())
+    );
+    assert!(!request.filtered);
+    assert_eq!(request.spool.unwrap().page_count(), 2);
 }
 
 #[test]
@@ -144,9 +162,13 @@ fn a_filtered_result_exports_only_its_own_saved_rows() {
     .unwrap();
     let outcome =
         super::super::super::result_tools::derived_outcome(StatementIdentity::default(), &source, filtered, "3");
-    let StatementOutcomeKind::Streamed(derived) = outcome.kind.clone() else {
+    let StatementOutcomeKind::Streamed(mut derived) = outcome.kind.clone() else {
         panic!("a derived outcome is streamed");
     };
+    derived.resident_pages = super::super::super::stream_pages::ResidentPageStore::from_pages([(
+        0,
+        std::sync::Arc::new(cursor_page(&[3], false).result),
+    )]);
     let (sender, receiver) = relm4::channel::<crate::ui::grid::GridMsg>();
     let widget = super::super::build_streamed_result_widget(
         &outcome,
@@ -162,6 +184,8 @@ fn a_filtered_result_exports_only_its_own_saved_rows() {
         panic!("expected a saved result export");
     };
     assert_eq!(request.total_rows, 1);
+    assert_eq!(request.current_page.as_ref().map(|page| page.rows.len()), Some(1));
+    assert!(request.filtered);
     assert_eq!(request.query.suggested_name, "items-filtered");
     assert_eq!(request.spool.unwrap().page_count(), 1);
     assert!(contains_label(

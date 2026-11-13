@@ -35,7 +35,7 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
 - The sidebar Catalog group lists functions, procedures and triggers (and the other catalog kinds the engine supports). Click a kind to load its objects under it, up to 200 shown; schemas hidden in the sidebar filter stay hidden. Click an object, or "Show all in Catalog…", to open the Catalog dialog on that kind.
 - A connection can be filled from a URL such as `postgres://user@host:5432/db`.
 - Connections can be exported and imported. An export encrypted with a passphrase includes stored credentials. A plaintext export contains none.
-- Connection drafts can be imported from DBeaver `data-sources.json`, DataGrip `dataSources.xml`, Navicat `.ncx`, RESP.app (Redis Desktop Manager) `connections.json` and Another Redis Desktop Manager exports. Host, user and engine are filled; passwords are never read from those files. Save each draft to store credentials in Secret Service. DBeaver and DataGrip folders become nested connection groups when present.
+- Connection drafts can be imported from DBX `dbx.db`, DBeaver `data-sources.json`, DataGrip `dataSources.xml`, Navicat `.ncx`, RESP.app `connections.json` and Another Redis Desktop Manager exports. DBX import reads supported connection settings only; it does not import saved SQL or credentials. The other peer importers do not import credentials. Unsupported engines and active transports are listed in the import preview. Save each draft to enter credentials through Secret Service. DBeaver and DataGrip folders become nested connection groups when present.
 - Saved connections can live in nested groups (for example `Prod / EU`). The welcome list shows the hierarchy and can collapse or expand each folder. Organisation stays in the local sidecar beside `connections.json`; connection files never gain secrets.
 
 ## Browse and edit tables
@@ -91,7 +91,7 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
 - Session mode: Binds tabs to dedicated connections for temporary tables and transactions, displaying live transaction state.
 - Visual explain plans: PostgreSQL displays execution trees with relative cost bars; SQLite displays indented trees.
 - Timeout retry: Queries that hit timeouts offer an instant extended retry button.
-- Query history & favorites: Toggle history with `Ctrl+H`, save favorites with `Ctrl+D`, view favorites with `Ctrl+Shift+B`, and use Open Quickly with `Ctrl+P`.
+- Query history & saved queries: Toggle history with `Ctrl+H`, save queries with `Ctrl+D`, organize them into folders and search keywords with `Ctrl+Shift+B`, and use Open Quickly with `Ctrl+P`.
 
 ### Split editor and streaming
 

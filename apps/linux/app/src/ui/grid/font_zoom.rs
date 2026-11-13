@@ -1,5 +1,6 @@
 use std::cell::{Cell, RefCell};
 
+use bookie_app_services::preferences::TypographyOverride;
 use gtk4::prelude::*;
 use gtk4::{self as gtk, gio, glib};
 
@@ -9,7 +10,10 @@ pub(super) const MIN_PT: u32 = 8;
 pub(super) const MAX_PT: u32 = 24;
 
 thread_local! {
-    static SESSION_PT: Cell<u32> = const { Cell::new(DEFAULT_PT) };
+    static SESSION_PT: Cell<Option<u32>> = const { Cell::new(None) };
+    static TYPOGRAPHY: RefCell<TypographyOverride> = const { RefCell::new(TypographyOverride {
+        font_family: String::new(), font_size: 0, font_weight: 0,
+    }) };
     static PROVIDER: RefCell<Option<gtk::CssProvider>> = const { RefCell::new(None) };
     static SKIP_WIDTH_SAVE: Cell<bool> = const { Cell::new(false) };
     static LIVE: RefCell<Vec<glib::WeakRef<gtk::ColumnView>>> = const { RefCell::new(Vec::new()) };
@@ -19,7 +23,7 @@ pub(super) fn width_save_suppressed() -> bool {
     SKIP_WIDTH_SAVE.get()
 }
 
-pub(super) fn session_pt() -> u32 {
+pub(super) fn session_pt() -> Option<u32> {
     SESSION_PT.get()
 }
 
@@ -35,9 +39,16 @@ pub(super) fn step_out(pt: u32) -> u32 {
     clamp_pt(pt.saturating_sub(1))
 }
 
-pub(super) fn grid_font_css(pt: u32) -> String {
-    let pt = clamp_pt(pt);
-    format!(".{CSS_CLASS}, .{CSS_CLASS} label {{ font-size: {pt}pt; }}")
+pub(super) fn apply_typography(typography: &TypographyOverride) {
+    let before = SESSION_PT.get().unwrap_or(DEFAULT_PT);
+    let after = (typography.font_size > 0).then(|| clamp_pt(typography.font_size));
+    TYPOGRAPHY.set(typography.clone());
+    SESSION_PT.set(after);
+    apply_css(after);
+    let after_pt = after.unwrap_or(DEFAULT_PT);
+    if before != after_pt {
+        remeasure_live(before, after_pt);
+    }
 }
 
 pub(super) fn scaled_fixed_width(width: i32, from_pt: u32, to_pt: u32) -> i32 {
@@ -53,7 +64,7 @@ pub(super) fn install(view: &gtk::ColumnView, actions: &gio::SimpleActionGroup) 
     register_live(view);
     let pt = session_pt();
     apply_css(pt);
-    if pt != DEFAULT_PT {
+    if let Some(pt) = pt {
         SKIP_WIDTH_SAVE.set(true);
         scale_columns(view, DEFAULT_PT, pt);
         SKIP_WIDTH_SAVE.set(false);
@@ -102,21 +113,22 @@ fn add_action(actions: &gio::SimpleActionGroup, view: &gtk::ColumnView, name: &s
 }
 
 fn apply_step(step: ZoomStep) {
-    let before = session_pt();
+    let previous = session_pt();
+    let before = previous.unwrap_or(DEFAULT_PT);
     let after = match step {
-        ZoomStep::In => step_in(before),
-        ZoomStep::Out => step_out(before),
-        ZoomStep::Reset => DEFAULT_PT,
+        ZoomStep::In => Some(step_in(before)),
+        ZoomStep::Out => Some(step_out(before)),
+        ZoomStep::Reset => None,
     };
-    if after == before {
+    if after == previous {
         return;
     }
     SESSION_PT.set(after);
     apply_css(after);
-    remeasure_live(before, after);
+    remeasure_live(before, after.unwrap_or(DEFAULT_PT));
 }
 
-fn apply_css(pt: u32) {
+fn apply_css(pt: Option<u32>) {
     let Some(display) = gtk::gdk::Display::default() else {
         return;
     };
@@ -125,10 +137,26 @@ fn apply_css(pt: u32) {
             gtk::style_context_remove_provider_for_display(&display, &prev);
         }
         let provider = gtk::CssProvider::new();
-        provider.load_from_string(&grid_font_css(pt));
+        provider.load_from_string(&TYPOGRAPHY.with(|settings| grid_css(pt, &settings.borrow())));
         gtk::style_context_add_provider_for_display(&display, &provider, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
         *cell.borrow_mut() = Some(provider);
     });
+}
+
+fn grid_css(pt: Option<u32>, typography: &TypographyOverride) -> String {
+    let mut declarations = pt
+        .map(|pt| format!("font-size: {}pt;", clamp_pt(pt)))
+        .unwrap_or_default();
+    if let Some(family) = crate::ui::typography::safe_font_family(&typography.font_family) {
+        declarations.push_str(&format!("font-family: \"{family}\";"));
+    }
+    if typography.font_weight > 0 {
+        declarations.push_str(&format!("font-weight: {};", typography.font_weight));
+    }
+    if declarations.is_empty() {
+        return String::new();
+    }
+    format!(".{CSS_CLASS}, .{CSS_CLASS} label {{ {declarations} }}")
 }
 
 fn register_live(view: &gtk::ColumnView) {
@@ -184,10 +212,21 @@ mod tests {
     }
 
     #[test]
-    fn grid_font_css_scopes_the_session_point_size() {
-        let css = grid_font_css(14);
+    fn grid_typography_uses_system_size_when_unset_and_scopes_overrides() {
+        let system_css = grid_css(None, &TypographyOverride::default());
+        assert!(system_css.is_empty());
+        let css = grid_css(
+            Some(14),
+            &TypographyOverride {
+                font_family: "Iosevka Term".into(),
+                font_size: 0,
+                font_weight: 600,
+            },
+        );
         assert!(css.contains(&format!(".{CSS_CLASS}")));
         assert!(css.contains("font-size: 14pt;"));
+        assert!(css.contains("font-family: \"Iosevka Term\";"));
+        assert!(css.contains("font-weight: 600;"));
         assert!(!css.contains("textview"));
     }
 
@@ -204,7 +243,7 @@ mod tests {
     #[ignore = "requires an isolated GTK display"]
     fn zooming_the_grid_font_rescales_fixed_column_widths_without_saving() {
         gtk::init().unwrap();
-        SESSION_PT.set(DEFAULT_PT);
+        SESSION_PT.set(None);
         let view = gtk::ColumnView::new(None::<gtk::MultiSelection>);
         let column = gtk::ColumnViewColumn::new(Some("value"), None::<gtk::SignalListItemFactory>);
         column.set_fixed_width(100);
@@ -219,10 +258,13 @@ mod tests {
             context.iteration(true);
         }
         assert!(view.activate_action("grid.zoom-in", None).is_ok());
-        assert_eq!(session_pt(), step_in(DEFAULT_PT));
-        assert_eq!(column.fixed_width(), scaled_fixed_width(100, DEFAULT_PT, session_pt()));
+        assert_eq!(session_pt(), Some(step_in(DEFAULT_PT)));
+        assert_eq!(
+            column.fixed_width(),
+            scaled_fixed_width(100, DEFAULT_PT, session_pt().unwrap_or(DEFAULT_PT))
+        );
         assert!(view.activate_action("grid.zoom-reset", None).is_ok());
-        assert_eq!(session_pt(), DEFAULT_PT);
+        assert_eq!(session_pt(), None);
         assert_eq!(column.fixed_width(), 100);
     }
 }

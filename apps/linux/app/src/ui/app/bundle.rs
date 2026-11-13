@@ -128,6 +128,12 @@ impl App {
         dbeaver.set_name(Some(&bookie_app_services::tr!("DBeaver data-sources.json")));
         dbeaver.add_suffix("json");
         filters.append(&dbeaver);
+        let dbx = relm4::gtk::FileFilter::new();
+        dbx.set_name(Some(&bookie_app_services::tr!(
+            "DBX connection database (connections only)"
+        )));
+        dbx.add_suffix("db");
+        filters.append(&dbx);
         let another_redis = relm4::gtk::FileFilter::new();
         another_redis.set_name(Some(&bookie_app_services::tr!("Another Redis Desktop Manager export")));
         another_redis.add_suffix("ano");
@@ -403,11 +409,19 @@ pub(super) fn read_bundle_file(bytes: &[u8]) -> Result<ParsedBundle, BundleError
 }
 
 async fn read_bundle_at(path: &std::path::Path) -> Result<ParsedBundle, BundleError> {
+    if is_sqlite_file(path).await? {
+        return Err(BundleError::NotABundle);
+    }
     let bytes = read_bounded(path, bookie_storage::MAX_BUNDLE_BYTES).await?;
     read_bundle_file(&bytes)
 }
 
 async fn read_peer_connections_at(path: &std::path::Path) -> Result<bookie_storage::PeerImport, String> {
+    if is_sqlite_file(path).await.map_err(|error| error.to_string())? {
+        return bookie_storage::parse_dbx_connection_database(path)
+            .await
+            .map_err(|error| error.to_string());
+    }
     let limit = bookie_storage::MAX_DBEAVER_BYTES
         .max(bookie_storage::MAX_ANOTHER_REDIS_BYTES)
         .max(bookie_storage::MAX_DATAGRIP_BYTES)
@@ -431,6 +445,17 @@ async fn read_peer_connections_at(path: &std::path::Path) -> Result<bookie_stora
             .or_else(|error| bookie_storage::parse_another_redis_connections(&text).map_err(|_| error))
     };
     import.map_err(|error| error.to_string())
+}
+
+async fn is_sqlite_file(path: &std::path::Path) -> Result<bool, BundleError> {
+    use tokio::io::AsyncReadExt;
+    let file = tokio::fs::File::open(path).await.map_err(|_| BundleError::NotABundle)?;
+    let mut header = Vec::with_capacity(16);
+    file.take(16)
+        .read_to_end(&mut header)
+        .await
+        .map_err(|_| BundleError::NotABundle)?;
+    Ok(header.starts_with(b"SQLite format 3\0"))
 }
 
 async fn read_bounded(path: &std::path::Path, limit: usize) -> Result<Vec<u8>, BundleError> {

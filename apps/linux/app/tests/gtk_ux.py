@@ -790,6 +790,26 @@ GLib.MainLoop().run()
     def welcome_connection_removal_confirms_once_and_preserves_the_database(database, base):
         check_saved_connection_removal(database, base, True)
 
+    def header_connection_removal_works_on_the_first_pointer_click(database, base):
+        before = saved_connections(base)
+        target = next(record for record in before if record["name"] == ui.CONNECTION_B_NAME)
+        database_file = Path(target["database"])
+        database_before = database_file.read_bytes()
+        ui.invoke(ui.wait_for_node(name="Open saved connection", role=pyatspi.ROLE_TOGGLE_BUTTON))
+        saved_connection_action(ui.CONNECTION_B_NAME, "Remove connection")
+        heading = f"Delete {ui.CONNECTION_B_NAME}?"
+        ui.wait_for_node(name=heading)
+        button = ui.wait_for_node(name="Delete", role=pyatspi.ROLE_PUSH_BUTTON)
+        bounds = button.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+        x11_click(bounds.x + bounds.width // 2, bounds.y + bounds.height // 2, button=1)
+        ui.wait_for_node(name=heading, present=False)
+        expected = [record for record in before if record["id"] != target["id"]]
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        while saved_connections(base) != expected and time.monotonic() < deadline:
+            time.sleep(ui.POLL_SECONDS)
+        assert saved_connections(base) == expected
+        assert database_file.read_bytes() == database_before
+
     def editing_a_saved_connection_prefills_it_and_saves_the_new_name(database, base):
         before = saved_connections(base)
         ui.invoke(ui.wait_for_node(name="Open saved connection", role=pyatspi.ROLE_TOGGLE_BUTTON))
@@ -3220,6 +3240,7 @@ GLib.MainLoop().run()
         editing_a_saved_connection_prefills_it_and_saves_the_new_name,
         workspace_connection_removal_confirms_once_and_preserves_the_database,
         welcome_connection_removal_confirms_once_and_preserves_the_database,
+        header_connection_removal_works_on_the_first_pointer_click,
         find_bar_replaces_every_match_in_the_editor,
         view_value_preserves_duplicate_json_keys_and_text_formatting,
         large_result_value_viewer_opens_without_stalling,

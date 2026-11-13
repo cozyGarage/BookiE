@@ -30,6 +30,11 @@ pub fn default_level(profile: Profile) -> &'static str {
 }
 
 pub const STATEMENT_LOG_TARGET: &str = "sqlx::query";
+const RELM4_COMPONENT_INPUT_TARGETS: [&str; 3] = [
+    "relm4::component::worker",
+    "relm4::component::sync::builder",
+    "relm4::component::async::builder",
+];
 
 pub fn without_statement_text(filter: EnvFilter, requested: Option<&str>) -> EnvFilter {
     if requested.is_some_and(|requested| requested.contains(STATEMENT_LOG_TARGET)) {
@@ -39,6 +44,15 @@ pub fn without_statement_text(filter: EnvFilter, requested: Option<&str>) -> Env
         Ok(directive) => filter.add_directive(directive),
         Err(_) => filter,
     }
+}
+
+fn without_component_inputs(filter: EnvFilter) -> EnvFilter {
+    RELM4_COMPONENT_INPUT_TARGETS
+        .iter()
+        .fold(filter, |filter, target| match format!("{target}=off").parse() {
+            Ok(directive) => filter.add_directive(directive),
+            Err(_) => filter,
+        })
 }
 
 pub fn log_format(requested: Option<&str>) -> Option<LogFormat> {
@@ -74,10 +88,10 @@ pub fn init(profile: Profile) -> Result<(), LoggingError> {
     let requested = std::env::var_os("RUST_LOG");
     let parsed = EnvFilter::try_from_default_env();
     let unparsable = requested.is_some() && parsed.is_err();
-    let filter = without_statement_text(
+    let filter = without_component_inputs(without_statement_text(
         parsed.unwrap_or_else(|_| EnvFilter::new(default_level(profile))),
         requested.as_deref().and_then(|requested| requested.to_str()),
-    );
+    ));
 
     let requested_format = std::env::var(LOG_FORMAT_ENV).ok();
     let selected = log_format(requested_format.as_deref());
@@ -156,7 +170,7 @@ mod tests {
     fn logged(filter: &str, requested: Option<&str>) -> String {
         let captured = Captured::default();
         let writer = captured.clone();
-        let filter = without_statement_text(EnvFilter::new(filter), requested);
+        let filter = without_component_inputs(without_statement_text(EnvFilter::new(filter), requested));
         let subscriber = build_subscriber(LogFormat::Human, filter, move || writer.clone());
         tracing::subscriber::with_default(subscriber, || {
             tracing::warn!(target: "sqlx::query", statement = "CREATE USER u PASSWORD 'secret-marker'", "slow statement");
@@ -181,6 +195,53 @@ mod tests {
         }
         let output = logged("info,sqlx::query=warn", Some("info,sqlx::query=warn"));
         assert!(output.contains("secret-marker"), "{output}");
+    }
+
+    #[derive(Clone, Copy)]
+    enum ComponentTarget {
+        Worker,
+        SyncBuilder,
+        AsyncBuilder,
+    }
+
+    fn logged_component_input(target: ComponentTarget, filter: &str, requested: Option<&str>) -> String {
+        let captured = Captured::default();
+        let writer = captured.clone();
+        let filter = without_component_inputs(without_statement_text(EnvFilter::new(filter), requested));
+        let subscriber = build_subscriber(LogFormat::Human, filter, move || writer.clone());
+        macro_rules! log_update {
+            ($target:literal) => {{
+                let input = "secret-sql-marker";
+                let span = tracing::info_span!(target: $target, "update_with_view", input = ?input);
+                let _entered = span.enter();
+                tracing::warn!("component warning");
+            }};
+        }
+        tracing::subscriber::with_default(subscriber, || match target {
+            ComponentTarget::Worker => log_update!("relm4::component::worker"),
+            ComponentTarget::SyncBuilder => log_update!("relm4::component::sync::builder"),
+            ComponentTarget::AsyncBuilder => log_update!("relm4::component::async::builder"),
+        });
+        String::from_utf8(captured.0.lock().unwrap().clone()).unwrap()
+    }
+
+    #[test]
+    fn relm4_component_update_inputs_never_reach_the_log() {
+        for target in [
+            (ComponentTarget::Worker, "worker"),
+            (ComponentTarget::SyncBuilder, "sync builder"),
+            (ComponentTarget::AsyncBuilder, "async builder"),
+        ] {
+            let output = logged_component_input(target.0, "trace", Some("trace"));
+            assert!(output.contains("component warning"), "{}: {output}", target.1);
+            assert!(!output.contains("secret-sql-marker"), "{}: {output}", target.1);
+        }
+        let output = logged_component_input(
+            ComponentTarget::Worker,
+            "trace,relm4::component::worker=trace",
+            Some("trace,relm4::component::worker=trace"),
+        );
+        assert!(!output.contains("secret-sql-marker"), "{output}");
     }
 
     #[test]

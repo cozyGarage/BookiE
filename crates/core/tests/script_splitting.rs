@@ -68,3 +68,85 @@ fn a_very_long_script_splits_in_linear_time_and_keeps_every_statement() {
     let text = "SELECT 1;\n".repeat(20_000);
     assert_eq!(statements(&text, SqlGrammar::PostgreSql).len(), 20_000);
 }
+
+#[test]
+fn a_mysql_routine_body_with_if_else_stays_one_statement() {
+    let routine = "CREATE PROCEDURE p() BEGIN IF 1 THEN SELECT 1; ELSE SELECT 2; END IF; END";
+    let found = statements(&format!("{routine}; SELECT 3"), SqlGrammar::MySql);
+    assert_eq!(found, vec![routine, "SELECT 3"]);
+}
+
+#[test]
+fn mysql_loops_case_statements_and_labels_close_their_routine_body() {
+    for body in [
+        "BEGIN WHILE 1 DO SELECT 1; END WHILE; END",
+        "BEGIN CASE 1 WHEN 1 THEN SELECT 1; END CASE; END",
+        "BEGIN SELECT CASE WHEN 1 THEN 2 END; REPEAT SELECT 1; UNTIL 1 END REPEAT; END",
+        "body: BEGIN l: LOOP LEAVE l; END LOOP l; END body",
+    ] {
+        let routine = format!("CREATE DEFINER = app PROCEDURE p() {body}");
+        let found = statements(&format!("{routine}; SELECT 3"), SqlGrammar::MySql);
+        assert_eq!(found, vec![routine.as_str(), "SELECT 3"]);
+    }
+}
+
+#[test]
+fn a_mysql_trigger_or_event_body_stays_one_statement() {
+    for head in [
+        "CREATE TRIGGER t BEFORE INSERT ON a FOR EACH ROW",
+        "CREATE EVENT e ON SCHEDULE EVERY 1 DAY DO",
+    ] {
+        let program = format!("{head} BEGIN SET @a = 1; SET @b = 2; END");
+        let found = statements(&format!("{program}; SELECT 3"), SqlGrammar::MySql);
+        assert_eq!(found, vec![program.as_str(), "SELECT 3"]);
+    }
+}
+
+#[test]
+fn a_one_statement_routine_body_does_not_swallow_the_next_statement() {
+    for (text, grammar) in [
+        ("CREATE PROCEDURE p() SELECT 1; SELECT 2", SqlGrammar::MySql),
+        (
+            "CREATE TRIGGER t BEFORE INSERT ON a FOR EACH ROW SET NEW.x = 1; SELECT 2",
+            SqlGrammar::MySql,
+        ),
+        (
+            "CREATE FUNCTION f() RETURNS int RETURN 1; SELECT 2",
+            SqlGrammar::PostgreSql,
+        ),
+    ] {
+        let found = statements(text, grammar);
+        assert_eq!(found.len(), 2, "{found:?}");
+        assert_eq!(found[1], "SELECT 2");
+    }
+}
+
+#[test]
+fn a_mysql_transaction_begin_still_ends_at_its_semicolon() {
+    let script = "BEGIN; UPDATE t SET a = 1; COMMIT; CREATE TABLE event (id int); BEGIN; \
+                  CREATE VIEW v AS SELECT event, begin FROM t; SELECT 1";
+    let found = statements(script, SqlGrammar::MySql);
+    assert_eq!(found.len(), 7, "{found:?}");
+}
+
+#[test]
+fn a_mysql_delimiter_script_splits_only_at_the_declared_delimiter() {
+    let routine = "CREATE PROCEDURE p() BEGIN IF 1 THEN SELECT 1; ELSE SELECT 2; END IF; END";
+    let script = format!("DELIMITER $$\n{routine}$$\nCREATE PROCEDURE q() BEGIN SELECT 1;$$\nDELIMITER ;\nSELECT 3;");
+    let found = statements(&script, SqlGrammar::MySql);
+    assert_eq!(found.len(), 3, "{found:?}");
+    assert_eq!(found[2], "SELECT 3");
+}
+
+#[test]
+fn a_word_ending_before_a_quote_or_dollar_sign_is_not_a_string_prefix() {
+    for text in [
+        "SELECT 1 WHERE 'a' LIKE'\\'; SELECT 2",
+        "SELECT 1 AS typE'x'; SELECT 2",
+        "SELECT a$$ FROM t; SELECT 2",
+    ] {
+        let found = statements(text, SqlGrammar::PostgreSql);
+        assert_eq!(found.len(), 2, "{found:?}");
+        assert_eq!(found[1], "SELECT 2");
+    }
+}

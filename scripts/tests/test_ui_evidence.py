@@ -25,6 +25,7 @@ class UiEvidenceTests(unittest.TestCase):
 
         namespace = dict(Path=Path, tempfile=tempfile, os=os, json=json, shutil=shutil)
         namespace.update(write_fixture=write_fixture, start_application=lambda *a: object(),
+                         dismiss_release_notes=lambda: None,
                          open_editor=lambda: None, stop_application=stop_application,
                          accessible_snapshot=lambda: "fixture accessibility")
         exec(compile(ast.Module(body=[function], type_ignores=[]), str(source), "exec"), namespace)

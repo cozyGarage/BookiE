@@ -1,0 +1,1 @@
+Running a MySQL or MariaDB script no longer cuts a stored procedure, function, trigger or event body at the semicolons inside its BEGIN … END block, and a PostgreSQL word ending in "e" directly before a quote no longer swallows the statements after it.

@@ -62,6 +62,7 @@ async fn a_huge_text_cell_arrives_as_a_small_partial_marker_and_a_normal_one_is_
         filter: &filter,
         hidden_columns: None,
         long_text_preview: true,
+        supports_reverse_keyset: true,
     };
     let PageQuery::Sql(query) = target.page(0, 10, None, None).unwrap() else {
         panic!("a preview page must run as SQL, not through the driver's whole-row fetch")

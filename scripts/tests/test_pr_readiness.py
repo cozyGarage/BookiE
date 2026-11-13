@@ -19,19 +19,12 @@ class PullRequestReadinessTests(unittest.TestCase):
     def test_required_contexts_still_match_the_workflow_job_names(self):
         sources = {
             "pr-title": ("pr-title.yml", "  pr-title:"),
-            "release-note": ("release-note-check.yml", "  release-note:"),
             "Pin tested revision": ("build-linux.yml", "name: Pin tested revision"),
             "Ensure CI debian-testing GTK image": ("build-linux.yml", "name: Ensure CI debian-testing GTK image"),
-            "Preflight and sandbox tier (no GTK app)": ("build-linux.yml", "name: Preflight and sandbox tier (no GTK app)"),
-            "Fast checks (GTK)": ("build-linux.yml", "name: Fast checks (GTK)"),
-            "Driver TLS fixture (docker)": ("build-linux.yml", "name: Driver TLS fixture (docker)"),
-            "resolve-ref": ("linux-security.yml", "  resolve-ref:"),
-            "Security (security-policy)": ("linux-security.yml", "name: Security (${{ matrix.layer }})"),
-            "Security (supply-chain)": ("linux-security.yml", "layer: [security-policy, supply-chain]"),
+            "Linux regression gate": ("build-linux.yml", "name: Linux regression gate"),
             "workflow-lint": ("linux-ci-contracts.yml", "  workflow-lint:"),
             "workflow-security": ("linux-ci-contracts.yml", "  workflow-security:"),
             "harness": ("linux-ci-contracts.yml", "  harness:"),
-            "unused-dependencies": ("linux-ci-contracts.yml", "  unused-dependencies:"),
         }
 
         for context, (filename, marker) in sources.items():
@@ -45,47 +38,41 @@ class PullRequestReadinessTests(unittest.TestCase):
         self.assertTrue(
             {
                 "pr-title",
-                "release-note",
                 "Pin tested revision",
                 "Ensure CI debian-testing GTK image",
-                "Preflight and sandbox tier (no GTK app)",
-                "Fast checks (GTK)",
-                "Driver TLS fixture (docker)",
-                "resolve-ref",
-                "Security (security-policy)",
-                "Security (supply-chain)",
+                "Linux regression gate",
             }.issubset(required)
         )
         self.assertNotIn("harness", required)
 
-    def test_a_manifest_change_requires_the_unused_dependency_check(self):
+    def test_a_manifest_change_requires_the_full_regression_gate(self):
         for path in ["crates/agentd/Cargo.toml", "Cargo.lock", "apps/gpui/Cargo.lock", "Cargo.toml"]:
             with self.subTest(path=path):
                 required = readiness.required_contexts([path])
 
-                self.assertIn("unused-dependencies", required)
+                self.assertIn("Linux regression gate", required)
 
     def test_a_source_only_change_does_not_require_the_unused_dependency_check(self):
         required = readiness.required_contexts(["crates/core/src/query.rs"])
 
-        self.assertNotIn("unused-dependencies", required)
+        self.assertIn("Linux regression gate", required)
 
     def test_the_contracts_workflow_runs_when_a_manifest_changes(self):
-        workflow = (ROOT / ".github/workflows/linux-ci-contracts.yml").read_text()
-        triggers = workflow.split("concurrency:")[0]
-
-        self.assertEqual(triggers.count('"**/Cargo.toml"'), 2, "push and pull_request")
-        self.assertEqual(triggers.count('"Cargo.lock"'), 2, "push and pull_request")
+        contracts = (ROOT / ".github/workflows/linux-ci-contracts.yml").read_text()
+        build = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        self.assertNotIn('"**/Cargo.toml"', contracts)
+        self.assertNotIn('"Cargo.lock"', contracts)
+        self.assertIn('"**"', build.split("on:", 1)[1].split("permissions:", 1)[0])
 
     def test_docs_only_changes_require_only_the_harness_and_hygiene_checks(self):
         required = readiness.required_contexts(["docs/testing.md", "README.md"])
 
-        self.assertEqual(set(required), {"pr-title", "release-note", "harness"})
+        self.assertEqual(set(required), {"pr-title", "harness"})
 
     def test_mixed_changes_require_code_and_contract_checks(self):
         required = readiness.required_contexts(["docs/testing.md", "scripts/check-pr-title.py"])
 
-        self.assertIn("Fast checks (GTK)", required)
+        self.assertIn("Linux regression gate", required)
         self.assertIn("harness", required)
         self.assertIn("workflow-lint", required)
 
@@ -125,7 +112,7 @@ class PullRequestReadinessTests(unittest.TestCase):
 
         self.assertIn("crates/core/src/query.rs", paths)
         self.assertIn("docs/query.md", paths)
-        self.assertIn("Fast checks (GTK)", required)
+        self.assertIn("Linux regression gate", required)
         self.assertIn("harness", required)
 
     def test_missing_checks_remain_pending(self):
@@ -136,12 +123,12 @@ class PullRequestReadinessTests(unittest.TestCase):
 
     def test_a_failure_takes_precedence_over_checks_that_are_still_waiting(self):
         result = readiness.evaluate_checks(
-            ["pr-title", "release-note"],
+            ["pr-title", "harness"],
             [{"name": "pr-title", "status": "completed", "conclusion": "failure", "id": 1}],
         )
 
         self.assertEqual(result["state"], "failed")
-        self.assertEqual(result["waiting"], ["release-note: missing"])
+        self.assertEqual(result["waiting"], ["harness: missing"])
         self.assertEqual(result["failed"], ["pr-title: failure"])
 
     def test_a_pending_latest_attempt_does_not_inherit_an_older_success(self):
@@ -178,13 +165,13 @@ class PullRequestReadinessTests(unittest.TestCase):
     def test_all_required_checks_must_succeed(self):
         runs = [
             {"name": name, "status": "completed", "conclusion": "success", "started_at": "2026-01-01T00:00:00Z", "id": index}
-            for index, name in enumerate(("pr-title", "release-note"), start=1)
+            for index, name in enumerate(("pr-title", "harness"), start=1)
         ]
 
-        result = readiness.evaluate_checks(["pr-title", "release-note"], runs)
+        result = readiness.evaluate_checks(["pr-title", "harness"], runs)
 
         self.assertEqual(result["state"], "passed")
-        self.assertEqual(result["passed"], ["pr-title", "release-note"])
+        self.assertEqual(result["passed"], ["pr-title", "harness"])
 
     def test_a_transient_github_api_error_retries_before_reporting_readiness(self):
         class Client:
@@ -388,7 +375,7 @@ class PullRequestReadinessTests(unittest.TestCase):
                     {
                         "name": name,
                         "status": "completed",
-                        "conclusion": "failure" if name == "release-note" else "success",
+                        "conclusion": "failure" if name == "pr-title" else "success",
                         "id": index,
                     }
                     for index, name in enumerate(required, start=1)

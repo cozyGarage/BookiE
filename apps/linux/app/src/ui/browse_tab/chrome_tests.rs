@@ -134,6 +134,31 @@ fn page_size_changes_apply_after_a_failed_first_load() {
 
 #[test]
 #[ignore = "requires isolated GTK display"]
+fn custom_page_size_changes_the_exact_fetch_limit() {
+    let (controller, outputs) = launch_tab(false);
+    let bar = controller
+        .model()
+        .first_button
+        .ancestor(gtk::ActionBar::static_type())
+        .unwrap();
+    let page_size = descendants(&bar)
+        .into_iter()
+        .find_map(|widget| widget.downcast::<gtk::SpinButton>().ok())
+        .unwrap();
+
+    page_size.set_value(2_347.0);
+    let fetched = pump(&outputs);
+
+    assert_eq!(controller.model().page_size, 2_347);
+    assert!(
+        fetched
+            .iter()
+            .any(|output| matches!(output, BrowseTabOutput::FetchPage))
+    );
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
 fn a_page_reload_retires_a_pending_cell_value_request() {
     let (controller, outputs) = launch_tab(false);
     let pending = controller.model().cell_value_requests.begin();
@@ -195,10 +220,15 @@ fn paginator_controls_have_accessible_names() {
         .ancestor(gtk::ActionBar::static_type())
         .unwrap();
     let controls = descendants(&bar);
+    let page_size = controls
+        .iter()
+        .find_map(|widget| widget.downcast_ref::<gtk::SpinButton>())
+        .unwrap();
     let icon_buttons: Vec<_> = controls
         .iter()
         .filter_map(|widget| widget.downcast_ref::<gtk::Button>())
         .filter(|button| button.icon_name().is_some())
+        .filter(|button| button.ancestor(gtk::SpinButton::static_type()).is_none())
         .collect();
     assert!(icon_buttons.len() >= 6);
     for button in icon_buttons {
@@ -208,12 +238,10 @@ fn paginator_controls_have_accessible_names() {
             button.icon_name()
         );
     }
-    let dropdown = controls
-        .iter()
-        .find_map(|widget| widget.downcast_ref::<gtk::DropDown>())
-        .unwrap();
+    assert_eq!(page_size.adjustment().lower(), 1.0);
+    assert_eq!(page_size.adjustment().upper(), 5_000.0);
     assert!(gtk::test_accessible_has_relation(
-        dropdown,
+        page_size,
         gtk::AccessibleRelation::LabelledBy
     ));
 }

@@ -2,6 +2,7 @@
 
 - **Status**: Accepted
 - **Date**: 2026-10-12
+- **Implementation**: Incomplete. Production `bookie-agentd` still uses the hand-written MCP server; the `rmcp` adapter remains an optional prototype behind the governed seam.
 
 ## Context
 

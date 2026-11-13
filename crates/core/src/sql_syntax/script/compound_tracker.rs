@@ -23,6 +23,24 @@ enum TriggerToken {
 }
 
 const ROUTINE_WORDS: [&str; 5] = ["create", "function", "procedure", "or", "replace"];
+const PROGRAM_WORDS: [&str; 4] = ["function", "procedure", "trigger", "event"];
+const OBJECTS_WITHOUT_A_BODY: [&str; 10] = [
+    "table",
+    "view",
+    "index",
+    "database",
+    "schema",
+    "user",
+    "role",
+    "server",
+    "tablespace",
+    "sequence",
+];
+const BLOCKS_CLOSED_BY_END_KEYWORD_PAIR: [&str; 4] = ["if", "loop", "while", "repeat"];
+
+fn is_any(word: &str, known: &[&str]) -> bool {
+    known.iter().any(|candidate| word.eq_ignore_ascii_case(candidate))
+}
 
 #[derive(Debug, Clone)]
 pub(crate) struct CompoundTracker {
@@ -32,6 +50,7 @@ pub(crate) struct CompoundTracker {
     identifier_count: usize,
     identifiers: [u8; 4],
     begin_depth: u32,
+    after_end: bool,
     trigger: TriggerState,
 }
 
@@ -44,6 +63,7 @@ impl CompoundTracker {
             identifier_count: 0,
             identifiers: [0; 4],
             begin_depth: 0,
+            after_end: false,
             trigger: TriggerState::Start,
         }
     }
@@ -61,6 +81,7 @@ impl CompoundTracker {
                     self.observe_routine_word(text);
                 }
             }
+            CompoundRule::StoredProgramBody => self.observe_program_token(kind, text),
             CompoundRule::TriggerBody => self.trigger = advance_trigger(self.trigger, classify_trigger(kind, text)),
         }
     }
@@ -70,6 +91,12 @@ impl CompoundTracker {
             CompoundRule::None => !(self.parens_hold_semicolons && self.paren_depth > 0),
             CompoundRule::RoutineBody => {
                 !(self.parens_hold_semicolons && self.paren_depth > 0) && self.begin_depth == 0
+            }
+            CompoundRule::StoredProgramBody => {
+                if std::mem::take(&mut self.after_end) {
+                    self.begin_depth = self.begin_depth.saturating_sub(1);
+                }
+                self.begin_depth == 0
             }
             CompoundRule::TriggerBody => !matches!(self.trigger, TriggerState::Trigger | TriggerState::Semi),
         };
@@ -83,6 +110,43 @@ impl CompoundTracker {
 
     pub fn reset(&mut self) {
         *self = Self::new(self.rule, self.parens_hold_semicolons);
+    }
+
+    fn observe_program_token(&mut self, kind: ScriptTokenKind, text: &str) {
+        let word = (kind == ScriptTokenKind::Word).then_some(text);
+        if std::mem::take(&mut self.after_end) {
+            if word.is_some_and(|word| is_any(word, &BLOCKS_CLOSED_BY_END_KEYWORD_PAIR)) {
+                return;
+            }
+            self.begin_depth = self.begin_depth.saturating_sub(1);
+            if word.is_some_and(|word| word.eq_ignore_ascii_case("case")) {
+                return;
+            }
+        }
+        let Some(word) = word else { return };
+        if self.paren_depth != 0 {
+            return;
+        }
+        self.identifier_count += 1;
+        let [creates, program, ..] = &mut self.identifiers;
+        if self.identifier_count == 1 {
+            *creates = u8::from(word.eq_ignore_ascii_case("create"));
+        }
+        if *creates == 0 {
+            return;
+        }
+        if *program == 0 {
+            *program = u8::from(is_any(word, &PROGRAM_WORDS));
+            *creates = u8::from(!is_any(word, &OBJECTS_WITHOUT_A_BODY));
+        } else if word.eq_ignore_ascii_case("begin") {
+            self.begin_depth += 1;
+        } else if word.eq_ignore_ascii_case("case") {
+            if self.begin_depth >= 1 {
+                self.begin_depth += 1;
+            }
+        } else if word.eq_ignore_ascii_case("end") {
+            self.after_end = true;
+        }
     }
 
     fn observe_routine_word(&mut self, word: &str) {

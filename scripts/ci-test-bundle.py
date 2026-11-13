@@ -9,9 +9,8 @@ import shutil
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
-BUNDLE_GROUPS = {'default', 'direct', 'unit', 'sandbox', 'gpui'} | set(
-    json.loads((ROOT / 'scripts/ci-test-bundle-groups.json').read_text())['groups']
-)
+BUNDLE_GROUP_CONFIG = json.loads((ROOT / 'scripts/ci-test-bundle-groups.json').read_text())['groups']
+BUNDLE_GROUPS = {'default', 'direct', 'unit', 'sandbox', 'gpui'} | set(BUNDLE_GROUP_CONFIG)
 
 
 def digest(path):
@@ -93,6 +92,8 @@ def create(bundle, messages, revision, group, archive=None, archive_only=False, 
                 shutil.copy2(source, bundle / destination)
             index['tests'].append({'package': name, 'kind': kind, 'name': target['name'], 'path': destination})
         else:
+            if group != 'default' and name not in BUNDLE_GROUP_CONFIG.get(group, {}).get('bin', []):
+                continue
             destination = 'bin/' + target['name']
             shutil.copy2(source, bundle / destination)
             index['binaries'][target['name']] = destination

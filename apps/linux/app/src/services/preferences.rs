@@ -9,6 +9,7 @@ use relm4::adw;
 use super::config_io::{atomic_write_bytes, atomic_write_json, xdg_config_path};
 use super::state_file::StateFile;
 
+use bookie_app_services::preferences::bounded_page_size;
 pub use bookie_app_services::preferences::{ColorSchemePref, DateFormatPref, NullDisplayPref, Preferences, ThemePref};
 
 pub fn color_scheme_style(scheme: ColorSchemePref) -> adw::ColorScheme {
@@ -62,7 +63,7 @@ impl PreferencesStore {
     pub fn load(&self) -> Preferences {
         match &self.0 {
             Backend::GSettings { settings, .. } => read_settings(settings),
-            Backend::Json(file) => file.read(Clone::clone).unwrap_or_default(),
+            Backend::Json(file) => bounded_preferences(file.read(Clone::clone).unwrap_or_default()),
         }
     }
 
@@ -80,6 +81,7 @@ impl PreferencesStore {
                 let previous = read_settings(settings);
                 let mut updated = previous.clone();
                 mutate(&mut updated);
+                updated = bounded_preferences(updated);
                 write_settings(settings, &updated)?;
                 gio::Settings::sync();
                 if let Some(path) = legacy_path
@@ -93,7 +95,10 @@ impl PreferencesStore {
                 }
                 Ok(())
             }
-            Backend::Json(file) => file.update(mutate),
+            Backend::Json(file) => file.update(|prefs| {
+                mutate(prefs);
+                *prefs = bounded_preferences(prefs.clone());
+            }),
         }
     }
 
@@ -175,7 +180,7 @@ fn open_settings() -> Result<gio::Settings, String> {
 }
 
 fn read_settings(settings: &gio::Settings) -> Preferences {
-    Preferences {
+    bounded_preferences(Preferences {
         default_page_size: settings.uint64("default-page-size"),
         confirm_destructive: settings.boolean("confirm-destructive"),
         editor_font_size: settings.uint("editor-font-size"),
@@ -190,13 +195,58 @@ fn read_settings(settings: &gio::Settings) -> Preferences {
         date_format: DateFormatPref::from_key(settings.string("date-format").as_str()),
         show_invisible_characters: settings.boolean("show-invisible-characters"),
         open_tables_in_preview_tab: settings.boolean("open-tables-in-preview-tab"),
+        ui_typography: read_typography(settings, "ui"),
+        editor_font_weight: settings.uint("editor-font-weight"),
+        grid_typography: read_typography(settings, "grid"),
+        output_typography: read_typography(settings, "output"),
+    })
+}
+
+fn bounded_preferences(mut preferences: Preferences) -> Preferences {
+    preferences.default_page_size = bounded_page_size(preferences.default_page_size);
+    preferences.editor_font_size =
+        bookie_app_services::preferences::bounded_typography_size(preferences.editor_font_size);
+    preferences.ui_typography = bounded_typography(
+        preferences.ui_typography,
+        bookie_app_services::preferences::MAX_TYPOGRAPHY_SIZE,
+    );
+    preferences.grid_typography = bounded_typography(
+        preferences.grid_typography,
+        bookie_app_services::preferences::MAX_GRID_TYPOGRAPHY_SIZE,
+    );
+    preferences.output_typography = bounded_typography(
+        preferences.output_typography,
+        bookie_app_services::preferences::MAX_TYPOGRAPHY_SIZE,
+    );
+    preferences.editor_font_weight =
+        bookie_app_services::preferences::bounded_typography_weight(preferences.editor_font_weight);
+    preferences
+}
+
+fn bounded_typography(
+    mut typography: bookie_app_services::preferences::TypographyOverride,
+    max_size: u32,
+) -> bookie_app_services::preferences::TypographyOverride {
+    typography.font_size = bookie_app_services::preferences::bounded_typography_size(typography.font_size);
+    if typography.font_size > 0 {
+        typography.font_size = typography.font_size.min(max_size);
+    }
+    typography.font_weight = bookie_app_services::preferences::bounded_typography_weight(typography.font_weight);
+    typography
+}
+
+fn read_typography(settings: &gio::Settings, surface: &str) -> bookie_app_services::preferences::TypographyOverride {
+    bookie_app_services::preferences::TypographyOverride {
+        font_family: settings.string(format!("{surface}-font-family").as_str()).to_string(),
+        font_size: settings.uint(format!("{surface}-font-size").as_str()),
+        font_weight: settings.uint(format!("{surface}-font-weight").as_str()),
     }
 }
 
 fn write_settings(settings: &gio::Settings, prefs: &Preferences) -> Result<(), String> {
     settings.delay();
     let writes = [
-        settings.set_uint64("default-page-size", prefs.default_page_size),
+        settings.set_uint64("default-page-size", bounded_page_size(prefs.default_page_size)),
         settings.set_boolean("confirm-destructive", prefs.confirm_destructive),
         settings.set_uint("editor-font-size", prefs.editor_font_size),
         settings.set_uint("history-retention-days", prefs.history_retention_days),
@@ -210,6 +260,16 @@ fn write_settings(settings: &gio::Settings, prefs: &Preferences) -> Result<(), S
         settings.set_string("date-format", prefs.date_format.key()),
         settings.set_boolean("show-invisible-characters", prefs.show_invisible_characters),
         settings.set_boolean("open-tables-in-preview-tab", prefs.open_tables_in_preview_tab),
+        settings.set_string("ui-font-family", &prefs.ui_typography.font_family),
+        settings.set_uint("ui-font-size", prefs.ui_typography.font_size),
+        settings.set_uint("ui-font-weight", prefs.ui_typography.font_weight),
+        settings.set_uint("editor-font-weight", prefs.editor_font_weight),
+        settings.set_string("grid-font-family", &prefs.grid_typography.font_family),
+        settings.set_uint("grid-font-size", prefs.grid_typography.font_size),
+        settings.set_uint("grid-font-weight", prefs.grid_typography.font_weight),
+        settings.set_string("output-font-family", &prefs.output_typography.font_family),
+        settings.set_uint("output-font-size", prefs.output_typography.font_size),
+        settings.set_uint("output-font-weight", prefs.output_typography.font_weight),
     ];
     if let Some(error) = writes.into_iter().find_map(Result::err) {
         settings.revert();
@@ -248,7 +308,8 @@ fn migrate_json_preferences(settings: &gio::Settings, path: Option<&Path>) -> Re
         preserve_migration_backup(&backup, &bytes)?;
         write_settings(settings, &legacy)?;
         gio::Settings::sync();
-        if read_settings(settings) != legacy {
+        let expected = bounded_preferences(legacy.clone());
+        if read_settings(settings) != expected {
             return Err("migrated preferences did not verify against GSettings".into());
         }
     }
@@ -280,10 +341,11 @@ fn sync_rollback_preferences(settings: &gio::Settings, path: Option<&Path>) -> R
     }
     let bytes = std::fs::read(path).map_err(|error| error.to_string())?;
     let legacy: Preferences = serde_json::from_slice(&bytes).map_err(|error| error.to_string())?;
-    if read_settings(settings) != legacy {
+    let expected = bounded_preferences(legacy.clone());
+    if read_settings(settings) != expected {
         write_settings(settings, &legacy)?;
         gio::Settings::sync();
-        if read_settings(settings) != legacy {
+        if read_settings(settings) != expected {
             return Err("rollback preferences did not verify against GSettings".into());
         }
     }

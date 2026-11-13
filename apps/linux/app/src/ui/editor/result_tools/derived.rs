@@ -59,6 +59,8 @@ fn export_request(
         columns: columns.to_vec(),
         spool: Some(filtered.spool.clone()),
         total_rows: filtered.total_rows as usize,
+        current_page: None,
+        filtered: true,
     })
 }
 
