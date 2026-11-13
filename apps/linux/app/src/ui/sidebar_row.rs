@@ -1,9 +1,10 @@
+use relm4::adw;
+use relm4::adw::prelude::*;
 use relm4::factory::{DynamicIndex, FactoryComponent, FactorySender};
 use relm4::gtk;
 use relm4::gtk::gdk;
 use relm4::gtk::glib;
 use relm4::gtk::pango;
-use relm4::gtk::prelude::*;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -124,8 +125,7 @@ fn context_popover(
     if let Some(popover) = state.borrow().as_ref() {
         return popover.clone();
     }
-    let popover = gtk::PopoverMenu::from_model(Some(&context_menu_model(kind)));
-    popover.set_has_arrow(true);
+    let popover = crate::ui::context_menu::from_model(Some(&context_menu_model(kind)));
     popover.set_parent(root);
     *state.borrow_mut() = Some(popover.clone());
     popover
@@ -289,38 +289,58 @@ impl FactoryComponent for SidebarRow {
             #[name = "row_content"]
             #[wrap(Some)]
             set_child = &gtk::Box {
+                set_orientation: gtk::Orientation::Vertical,
+
+                #[name = "row_layout"]
+                adw::BreakpointBin {
+                    set_width_request: 180,
+                    set_height_request: 36,
+                    #[wrap(Some)]
+                    set_child = &gtk::Box {
                 set_orientation: gtk::Orientation::Horizontal,
-                // Icon-to-label spacing matches GtkPlacesSidebar's
-                // ~8px standard. 12 was loose enough to read as two
-                // separate columns rather than one labelled icon.
                 set_spacing: 8,
                 set_margin_start: 12 + 14 * i32::from(self.depth),
                 set_margin_end: 12,
                 set_margin_top: 6,
                 set_margin_bottom: 6,
 
-                append: &self.chevron,
+                        #[name = "title_row"]
+                        gtk::Box {
+                            set_orientation: gtk::Orientation::Horizontal,
+                            set_spacing: 8,
+                            set_hexpand: true,
 
-                gtk::Image {
-                    set_icon_name: Some(sidebar_icon(self.kind)),
-                    set_pixel_size: 16,
-                    set_visible: self.group.as_ref().is_none_or(|group| group.entry),
+                            append: &self.chevron,
+
+                            gtk::Image {
+                                set_icon_name: Some(sidebar_icon(self.kind)),
+                                set_pixel_size: 16,
+                                set_visible: self.group.as_ref().is_none_or(|group| group.entry),
+                            },
+
+                            gtk::Label {
+                                set_label: &self.title(),
+                                set_xalign: 0.0,
+                                set_hexpand: true,
+                                set_ellipsize: pango::EllipsizeMode::End,
+                                set_css_classes: if self.group.as_ref().is_some_and(|group| !group.entry) { &["caption-heading"] } else { &[] },
+                            },
+
+                            gtk::Label {
+                                set_label: &self.group.as_ref().map(|group| group.count.to_string()).unwrap_or_default(),
+                                set_visible: self.group.as_ref().is_some_and(|group| !group.entry),
+                                set_css_classes: &["dim-label", "caption"],
+                            },
+                        },
+
+                        #[name = "actions_row"]
+                        gtk::Box {
+                            set_orientation: gtk::Orientation::Horizontal,
+                            set_spacing: 4,
+                            set_halign: gtk::Align::End,
+                        },
                 },
-
-                gtk::Label {
-                    set_label: &self.title(),
-                    set_xalign: 0.0,
-                    set_hexpand: true,
-                    set_ellipsize: pango::EllipsizeMode::End,
-                    set_css_classes: if self.group.as_ref().is_some_and(|group| !group.entry) { &["caption-heading"] } else { &[] },
-                },
-
-                gtk::Label {
-                    set_label: &self.group.as_ref().map(|group| group.count.to_string()).unwrap_or_default(),
-                    set_visible: self.group.as_ref().is_some_and(|group| !group.entry),
-                    set_css_classes: &["dim-label", "caption"],
-                },
-
+                    },
             },
         }
     }
@@ -401,17 +421,29 @@ impl FactoryComponent for SidebarRow {
         sender: FactorySender<Self>,
     ) -> Self::Widgets {
         let widgets = view_output!();
+        let narrow = adw::Breakpoint::new(adw::BreakpointCondition::new_length(
+            adw::BreakpointConditionLengthType::MaxWidth,
+            260.0,
+            adw::LengthUnit::Px,
+        ));
+        if let Some(row_layout) = widgets.row_layout.child().and_downcast::<gtk::Box>() {
+            narrow.add_setter(&row_layout, "orientation", Some(&gtk::Orientation::Vertical.into()));
+        }
+        widgets.row_layout.add_breakpoint(narrow);
+        if self.group.is_none() {
+            self.columns.install(&root, &widgets.actions_row, &sender);
+        }
         if let Some(button) = &self.new_table_button {
-            widgets.row_content.append(button);
+            widgets.actions_row.append(button);
         }
         if let Some(button) = &self.csv_button {
-            widgets.row_content.append(button);
+            widgets.actions_row.append(button);
         }
         if let Some(button) = &self.new_schema_button {
-            widgets.row_content.append(button);
+            widgets.actions_row.append(button);
         }
         if let Some(button) = &self.open_button {
-            widgets.row_content.append(button);
+            widgets.actions_row.append(button);
         }
         if self.group.is_some() {
             self.describe_group(&root);
@@ -421,7 +453,6 @@ impl FactoryComponent for SidebarRow {
             }
             return widgets;
         }
-        self.columns.install(&root, &sender);
         if let Some(button) = &self.open_button {
             let sender_for_open_button = sender.clone();
             button.connect_clicked(move |_| sender_for_open_button.input(SidebarRowMsg::Open));
@@ -528,8 +559,10 @@ impl FactoryComponent for SidebarRow {
                 return;
             };
             let popover = context_popover(&popover_for_right, &root, kind_for_right);
-            popover.set_pointing_to(Some(&gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
-            popover.popup();
+            crate::ui::context_menu::popup_at(
+                &popover,
+                Some(gdk::Rectangle::new(x as i32, y as i32, 1, 1)),
+            );
         });
         root.add_controller(right_click);
 
@@ -542,7 +575,16 @@ impl FactoryComponent for SidebarRow {
             .trigger(&crate::ui::shortcut::parse("Menu"))
             .action(&gtk::CallbackAction::new(move |_, _| {
                 if let Some(root) = root_for_menu.upgrade() {
-                    context_popover(&popover_for_menu, &root, kind_for_menu).popup();
+                    let popover = context_popover(&popover_for_menu, &root, kind_for_menu);
+                    let pointing = root.compute_bounds(&root).map(|bounds| {
+                        gdk::Rectangle::new(
+                            (bounds.width() / 2.0) as i32,
+                            (bounds.height() / 2.0) as i32,
+                            1,
+                            1,
+                        )
+                    });
+                    crate::ui::context_menu::popup_at(&popover, pointing);
                 }
                 glib::Propagation::Stop
             }))
@@ -637,7 +679,7 @@ impl SidebarRow {
     fn wire_schema_menu(&mut self, root: &gtk::ListBoxRow, sender: &FactorySender<Self>) {
         let compare_enabled = std::env::var_os("BOOKIE_SCHEMA_COMPARE").is_some();
         let menu = schema_menu(compare_enabled, self.schema_actions);
-        let popover = gtk::PopoverMenu::from_model(Some(&menu));
+        let popover = crate::ui::context_menu::from_model(Some(&menu));
         popover.set_parent(root);
         root.insert_action_group(
             "sidebar-row",
@@ -688,15 +730,28 @@ fn attach_schema_popover(root: &gtk::ListBoxRow, popover: &gtk::PopoverMenu) {
     let popover_for_right = popover.clone();
     right_click.connect_pressed(move |gesture, _, x, y| {
         gesture.set_state(gtk::EventSequenceState::Claimed);
-        popover_for_right.set_pointing_to(Some(&gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
-        popover_for_right.popup();
+        crate::ui::context_menu::popup_at(
+            &popover_for_right,
+            Some(gdk::Rectangle::new(x as i32, y as i32, 1, 1)),
+        );
     });
     root.add_controller(right_click);
     let popover_for_shortcut = popover.clone();
+    let root_for_shortcut = root.downgrade();
     let menu_shortcut = gtk::Shortcut::builder()
         .trigger(&crate::ui::shortcut::parse("Menu"))
         .action(&gtk::CallbackAction::new(move |_, _| {
-            popover_for_shortcut.popup();
+            let pointing = root_for_shortcut.upgrade().and_then(|root| {
+                root.compute_bounds(&root).map(|bounds| {
+                    gdk::Rectangle::new(
+                        (bounds.width() / 2.0) as i32,
+                        (bounds.height() / 2.0) as i32,
+                        1,
+                        1,
+                    )
+                })
+            });
+            crate::ui::context_menu::popup_at(&popover_for_shortcut, pointing);
             glib::Propagation::Stop
         }))
         .build();
@@ -867,6 +922,84 @@ mod catalog_entry_tests {
         let row = factory.get(0).unwrap();
         assert!(!row.chevron.is_visible());
         assert_eq!(sidebar_icon(row.kind), "emblem-system-symbolic");
+    }
+}
+
+#[cfg(test)]
+mod responsive_layout_tests {
+    use super::*;
+    use relm4::factory::FactoryVecDeque;
+
+    fn row_at_width(width: i32) -> (gtk::Window, FactoryVecDeque<SidebarRow>, gtk::ListBoxRow) {
+        relm4::adw::init().unwrap();
+        let list = gtk::ListBox::new();
+        let mut factory = FactoryVecDeque::<SidebarRow>::builder().launch(list.clone()).detach();
+        factory.guard().push_back(SidebarRowInit {
+            info: TableInfo {
+                schema: Some("public".into()),
+                name: "a_very_long_table_name_for_narrow_sidebar_testing".into(),
+            },
+            kind: SidebarObjectKind::Table,
+            depth: 1,
+            group: None,
+            column_source: None,
+            schema_actions: SchemaCatalogActions::default(),
+        });
+        let window = gtk::Window::builder()
+            .default_width(width)
+            .default_height(180)
+            .child(&list)
+            .build();
+        window.present();
+        let context = glib::MainContext::default();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+        while factory.get(0).is_none_or(|_| list.row_at_index(0).is_none()) && std::time::Instant::now() < deadline {
+            context.iteration(false);
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+        while context.iteration(false) {}
+        (window, factory, list.row_at_index(0).unwrap())
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn row_actions_reflow_at_supported_sidebar_widths_with_names_and_focus_order() {
+        for (width, orientation) in [(220, gtk::Orientation::Vertical), (280, gtk::Orientation::Horizontal)] {
+            let (window, _factory, row) = row_at_width(width);
+            let body = row.child().and_downcast::<gtk::Box>().unwrap();
+            let breakpoint = body.first_child().and_downcast::<relm4::adw::BreakpointBin>().unwrap();
+            let row_content = breakpoint.child().and_downcast::<gtk::Box>().unwrap();
+            assert_eq!(
+                row_content.orientation(),
+                orientation,
+                "requested={width}, window={}, row={}, breakpoint={}, active={}",
+                window.width(),
+                row.width(),
+                breakpoint.width(),
+                breakpoint.current_breakpoint().is_some()
+            );
+            let title = row_content.first_child().and_downcast::<gtk::Box>().unwrap();
+            let actions = title.next_sibling().and_downcast::<gtk::Box>().unwrap();
+            let title_y = title.compute_bounds(&row_content).unwrap().y();
+            let actions_y = actions.compute_bounds(&row_content).unwrap().y();
+            assert_eq!(
+                actions_y > title_y,
+                width <= 260,
+                "requested={width}, title_y={title_y}, actions_y={actions_y}"
+            );
+            let columns = actions.first_child().and_downcast::<gtk::ToggleButton>().unwrap();
+            let open = columns.next_sibling().and_downcast::<gtk::Button>().unwrap();
+            assert!(columns.is_focusable());
+            assert!(open.is_focusable());
+            assert!(columns.grab_focus());
+            assert!(actions.child_focus(gtk::DirectionType::TabForward));
+            assert_eq!(gtk::prelude::GtkWindowExt::focus(&window), Some(open.clone().upcast()));
+            assert_eq!(
+                open.tooltip_text().as_deref(),
+                Some("Open a_very_long_table_name_for_narrow_sidebar_testing")
+            );
+            assert!(gtk::test_accessible_has_property(&open, gtk::AccessibleProperty::Label));
+        }
     }
 }
 

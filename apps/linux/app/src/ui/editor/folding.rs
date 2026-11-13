@@ -73,9 +73,13 @@ impl FoldController {
         self.render(buffer);
     }
 
-    pub(super) fn clear(&mut self, buffer: &sourceview5::Buffer) {
+    pub(super) fn clear(&mut self, buffer: &sourceview5::Buffer) -> bool {
+        if self.folded.is_empty() {
+            return false;
+        }
         self.folded.clear();
         self.render(buffer);
+        true
     }
 
     fn apply(&mut self, buffer: &sourceview5::Buffer, region: FoldRange) {
@@ -447,6 +451,7 @@ mod tests {
         let sql = "SELECT CASE\n  WHEN ready THEN 1\nEND;";
         buffer.set_text(sql);
         let mut controller = FoldController::new(buffer.upcast_ref());
+        assert!(!controller.clear(&buffer));
         buffer.place_cursor(&buffer.iter_at_offset(sql.find("ready").unwrap() as i32));
         controller.toggle_at_cursor(
             &buffer,
@@ -457,7 +462,8 @@ mod tests {
         assert_eq!(buffer.text(&start, &end, true), sql);
         let hidden_line = buffer.iter_at_line(1).unwrap();
         assert!(hidden_line.has_tag(&controller.tag));
-        controller.clear(&buffer);
+        assert!(controller.clear(&buffer));
         assert!(!hidden_line.has_tag(&controller.tag));
+        assert!(!controller.clear(&buffer));
     }
 }

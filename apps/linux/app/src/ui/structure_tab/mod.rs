@@ -1,35 +1,3 @@
-//! Structure workspace tab — full schema-management UI for CREATE /
-//! DROP / ALTER TABLE, indexes, and foreign keys.
-//!
-//! Layout (adw::ToolbarView, no internal HeaderBar — the wrapper's
-//! Data/Structure HeaderBar already provides one toolbar strip):
-//!
-//!   ┌─ Content ────────────────────────────────────────────────┐
-//!   │   (New mode) AdwPreferencesGroup { name entry }          │
-//!   │   Centred AdwViewSwitcher: Columns | Indexes | FKs | SQL │
-//!   │ ┌─ ViewStack ─────────────────────────────────────────┐  │
-//!   │ │ Columns: boxed-list of AdwExpanderRow (per column,  │  │
-//!   │ │   header = Name + summary, body = Name/Type/Null/   │  │
-//!   │ │   Default/PK/AutoInc rows) + AdwButtonRow add row   │  │
-//!   │ │ Indexes: boxed-list (Name, Cols, Unique, trash)     │  │
-//!   │ │ FKs: boxed-list (Name, Cols, Refs, RefCols, trash)  │  │
-//!   │ │ SQL Preview: SourceView5 (read-only, sql highlight) │  │
-//!   │ └─────────────────────────────────────────────────────┘  │
-//!   ├─ ActionBar { pending count | Discard | Save | Drop } ────┤
-//!   └──────────────────────────────────────────────────────────┘
-//!
-//! Editing flow (snapshot + diff). On load we capture the canonical
-//! schema into `original_*` snapshots. Every cell mutation updates
-//! the live model and calls `recompute_dirty_state`, which runs
-//! `sql_ddl::diff_to_ops` against the snapshot, regenerates the SQL
-//! preview from the resulting `Vec<StructureOp>`, and stores those
-//! ops in a passive per-tab `StructureChangeTracker` so out-of-band
-//! callers (close-with-pending dialog, save dispatcher) can read the
-//! current dirty state without touching the UI. There is no per-op
-//! undo / redo — the snapshot is the only restore point, exposed via
-//! the Discard button. Save calls `materialize_ops` against the same
-//! diff and dispatches `ExecuteTransaction` to App.
-
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 

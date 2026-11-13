@@ -246,7 +246,11 @@ class LayerRunnerTests(unittest.TestCase):
         github = ROOT / ".github/workflows"
         forgejo = ROOT / ".forgejo/workflows"
         expected = {f".github/workflows/{path.name}" for path in github.glob("*linux*.yml")}
-        expected.update({".github/workflows/gtk-soak.yml", ".github/workflows/release.yml"})
+        expected.update({
+            ".github/workflows/gtk-soak.yml",
+            ".github/workflows/gpui-macos.yml",
+            ".github/workflows/release.yml",
+        })
         expected.update(f".forgejo/workflows/{path.name}" for path in forgejo.glob("*.yml"))
         selected = set(runner.catalog()["workflow-lint"]["steps"][0]["argv"][1:])
         self.assertEqual(selected, expected)

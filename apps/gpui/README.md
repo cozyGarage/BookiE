@@ -86,6 +86,8 @@ Forgejo runs the model and simulated interaction tests without a display. Native
 
 The window needs a Wayland or X11 session with a Vulkan driver that can present.
 
+The GitHub macOS check builds this standalone GPUI workspace on a macOS 15 arm64 runner with Rust 1.98 and Xcode command line tools. GPUI uses Metal on macOS. The check compiles the application and runs headless tests; it does not verify native rendering, accessibility, clipboard behavior, packaging or macOS support. The Arch package remains a separate GTK build of `bookie-app`.
+
 ## Scroll and memory measurement
 
 To measure scrolling, run `experiments/profile.sh` from a desktop session (`ROWS=500000 RUNS=5 experiments/profile.sh` changes the size). It builds the app in release mode and prints one JSON line per run: scroll time, and resident and proportional memory. Compare `elapsed_ms` and the `pss_kib` peaks, and the GPUI frame-paced `frame_p95_ms`. Close other heavy applications first and repeat a run; one machine and one GPU driver is all this shows.

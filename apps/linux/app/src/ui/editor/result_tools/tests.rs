@@ -206,6 +206,8 @@ fn source_result(spool: StreamResultSpool, counts: Vec<usize>) -> StreamedResult
             columns: id_column(),
             spool: Some(spool.clone()),
             total_rows: total,
+            current_page: None,
+            filtered: false,
         }),
         generation: 7,
         spool: Some(spool),

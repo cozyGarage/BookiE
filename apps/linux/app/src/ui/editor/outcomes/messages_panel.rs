@@ -53,6 +53,7 @@ fn scrolled_rows(view: &MessagesView) -> gtk::ScrolledWindow {
     }
     if let Some(notice) = view.omitted_notice() {
         let label = gtk::Label::builder().label(notice).halign(gtk::Align::Start).build();
+        label.add_css_class("bookie-output-font");
         label.add_css_class("dim-label");
         rows.append(&label);
     }
@@ -71,6 +72,7 @@ fn row_widget(row: &MessageRow) -> gtk::Box {
         .halign(gtk::Align::Start)
         .valign(gtk::Align::Start)
         .build();
+    severity.add_css_class("bookie-output-font");
     if let Some(class) = severity_class(row.severity) {
         severity.add_css_class(class);
     }
@@ -81,6 +83,7 @@ fn row_widget(row: &MessageRow) -> gtk::Box {
             .halign(gtk::Align::Start)
             .valign(gtk::Align::Start)
             .build();
+        code.add_css_class("bookie-output-font");
         code.add_css_class("dim-label");
         code.add_css_class("monospace");
         line.append(&code);
@@ -93,6 +96,7 @@ fn row_widget(row: &MessageRow) -> gtk::Box {
         .xalign(0.0)
         .selectable(true)
         .build();
+    text.add_css_class("bookie-output-font");
     line.append(&text);
     line
 }
