@@ -252,6 +252,7 @@ impl App {
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
+                    let started = std::time::Instant::now();
                     let control = crate::services::operation_control::bounded_with(timeout_secs, token);
                     let (result, projected_columns) = match query {
                         PageQuery::Native => (
@@ -268,12 +269,19 @@ impl App {
                             (page, projected_columns)
                         }
                     };
+                    let elapsed = started.elapsed();
                     match result {
                         Ok(mut query_result) => {
                             if reverse_rows {
                                 query_result.rows.reverse();
                             }
-                            sender_clone.input(AppMsg::RowsLoaded(tab_id, request, query_result, projected_columns))
+                            sender_clone.input(AppMsg::RowsLoaded(
+                                tab_id,
+                                request,
+                                query_result,
+                                projected_columns,
+                                elapsed,
+                            ))
                         }
                         Err(_) if control.cancellation_token().is_cancelled() => {}
                         Err(e) => sender_clone.input(AppMsg::LoadFailed(
@@ -523,6 +531,7 @@ impl App {
         request: BrowsePageRequest,
         result: QueryResult,
         projected_columns: Option<Vec<usize>>,
+        elapsed: std::time::Duration,
     ) {
         self.dispatch_to_tab(
             tab_id,
@@ -530,6 +539,7 @@ impl App {
                 request,
                 result,
                 projected_columns,
+                elapsed,
             },
         );
     }

@@ -817,8 +817,8 @@ impl SimpleComponent for App {
             AppMsg::InboundForeignKeysLoaded(tab_id, inbound) => {
                 self.on_browse_inbound_foreign_keys_loaded(tab_id, inbound)
             }
-            AppMsg::RowsLoaded(tab_id, request, result, projected_columns) => {
-                self.on_browse_rows_loaded(tab_id, request, result, projected_columns)
+            AppMsg::RowsLoaded(tab_id, request, result, projected_columns, elapsed) => {
+                self.on_browse_rows_loaded(tab_id, request, result, projected_columns, elapsed)
             }
             AppMsg::LoadFailed(tab_id, msg) => self.on_browse_load_failed(tab_id, msg),
             AppMsg::RowCountLoaded(tab_id, request, count) => self.on_browse_row_count_loaded(tab_id, request, count),

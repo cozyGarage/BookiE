@@ -107,6 +107,7 @@ pub struct BrowseTab {
     choice_labels: crate::ui::grid::ChoiceMap,
     ambiguous_keys: crate::ui::grid::AmbiguousKeys,
     current_result: Option<std::sync::Arc<QueryResult>>,
+    last_page_elapsed: Option<std::time::Duration>,
     current_projection: Option<Vec<usize>>,
     /// Last row's primary-key values from the most recent page. Used
     /// for keyset seek when offset exceeds `KEYSET_OFFSET_THRESHOLD`.
@@ -674,6 +675,7 @@ impl SimpleComponent for BrowseTab {
             choice_labels: Default::default(),
             ambiguous_keys: Default::default(),
             current_result: None,
+            last_page_elapsed: None,
             current_projection: None,
             keyset_cursor: None,
             keyset_first_cursor: None,
@@ -775,10 +777,12 @@ impl SimpleComponent for BrowseTab {
                 request,
                 result,
                 projected_columns,
+                elapsed,
             } => {
                 if !self.page_requests.accepts(request, self.current_offset) {
                     return;
                 }
+                self.last_page_elapsed = Some(elapsed);
                 // Driver fallback: every shipping driver derives the
                 // `QueryResult.columns` list from the FIRST returned
                 // row, so a zero-row page comes back with an empty
@@ -889,6 +893,7 @@ impl SimpleComponent for BrowseTab {
                 // RowsLoaded arrives. Paginator label is left empty
                 // until next RowCountLoaded.
                 self.current_result = None;
+                self.last_page_elapsed = None;
                 self.current_total_rows = None;
                 self.set_paginator_text("");
                 self.first_button.set_sensitive(false);
