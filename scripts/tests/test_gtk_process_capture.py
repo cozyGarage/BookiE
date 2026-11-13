@@ -16,6 +16,10 @@ PROCESS_PATH = Path(__file__).resolve().parents[2] / "apps/linux/app/tests/gtk_p
 PROCESS_SPEC = importlib.util.spec_from_file_location("gtk_process", PROCESS_PATH)
 gtk_process = importlib.util.module_from_spec(PROCESS_SPEC)
 PROCESS_SPEC.loader.exec_module(gtk_process)
+TRIM_PATH = Path(__file__).resolve().parents[2] / "apps/linux/app/tests/gtk_allocator_trim.py"
+TRIM_SPEC = importlib.util.spec_from_file_location("gtk_allocator_trim", TRIM_PATH)
+gtk_allocator_trim = importlib.util.module_from_spec(TRIM_SPEC)
+TRIM_SPEC.loader.exec_module(gtk_allocator_trim)
 
 
 class GtkProcessCaptureTests(unittest.TestCase):
@@ -33,7 +37,8 @@ class GtkProcessCaptureTests(unittest.TestCase):
                 time.sleep(0.01)
             raise AssertionError("the child did not finish writing its diagnostics")
 
-        namespace = dict(os=os, subprocess=subprocess, signal=signal, tempfile=tempfile, gtk_process=gtk_process, _owned_application=None,
+        namespace = dict(os=os, subprocess=subprocess, signal=signal, tempfile=tempfile, gtk_process=gtk_process,
+                         gtk_allocator_trim=gtk_allocator_trim, _owned_application=None,
                          wait_for_node=wait_for_window, CONNECTION_NAME="fixture", pyatspi=SimpleNamespace(ROLE_FRAME=1))
         exec(compile(ast.Module(body=functions, type_ignores=[]), str(source), "exec"), namespace)
         return namespace
@@ -115,6 +120,38 @@ class GtkProcessCaptureTests(unittest.TestCase):
             self.assertEqual(len(processes), 1)
             self.assertIsNotNone(processes[0].poll())
             self.assertTrue(processes[0].stderr.closed)
+
+    def test_allocator_trim_profile_handles_signal_without_terminating_application(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            ready = root / "ready"
+            result = root / "malloc-trim.txt"
+            harness = self.harness(ready)
+            environment = {
+                **os.environ,
+                "CAPTURE_MARKER": str(ready),
+                "BOOKIE_PROFILE_MALLOC_TRIM_RESULT": str(result),
+                "XDG_RUNTIME_DIR": str(root),
+            }
+            environment.pop("BOOKIE_GTK_APP_LD_PRELOAD", None)
+            environment.pop("BOOKIE_GTK_APP_HEAPTRACK_OUTPUT", None)
+            binary = root / "application"
+            binary.write_text(
+                f"#!{sys.executable}\n"
+                "import os\nfrom pathlib import Path\nimport time\n"
+                "Path(os.environ['CAPTURE_MARKER']).touch()\n"
+                "time.sleep(30)\n"
+            )
+            binary.chmod(0o700)
+            process = harness["start_application"](binary, environment, restored="empty")
+            self.addCleanup(harness["stop_application"], process)
+            os.kill(process.pid, signal.SIGUSR2)
+            deadline = time.monotonic() + 3
+            while time.monotonic() < deadline and not result.exists():
+                time.sleep(0.01)
+            self.assertTrue(result.exists())
+            self.assertRegex(result.read_text(), r"malloc_trim=[01]\n")
+            self.assertIsNone(process.poll())
 
 
 if __name__ == "__main__":
