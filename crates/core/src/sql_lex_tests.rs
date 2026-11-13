@@ -223,3 +223,17 @@ fn an_unterminated_span_keeps_the_tail_as_one_statement() {
         vec!["SELECT 1", "/* open ; SELECT 2"]
     );
 }
+
+#[test]
+fn a_word_ending_in_e_before_a_quote_is_not_an_escape_string() {
+    let sql = "SELECT 1 WHERE 'a' LIKE'\\'; SELECT 2";
+    assert_eq!(
+        split_statements(sql, "postgres"),
+        vec!["SELECT 1 WHERE 'a' LIKE'\\'", "SELECT 2"]
+    );
+    assert_eq!(
+        statement_at_cursor(sql, "postgres", sql.len()).as_deref(),
+        Some("SELECT 2")
+    );
+    assert_eq!(split_statements("SELECT E'a\\';b'; SELECT 2", "postgres").len(), 2);
+}
