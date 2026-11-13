@@ -568,4 +568,10 @@ mod tests {
         assert!(!removed.exists());
         assert!(kept.exists());
     }
+
+    #[test]
+    fn die_if_parent_is_gone_accepts_the_live_parent() {
+        let parent = unsafe { libc::getppid() } as u32;
+        die_if_parent_is_gone(parent).expect("the current parent must still be alive");
+    }
 }
