@@ -20,6 +20,7 @@ MAX_ARCHIVE = 8 * 1024 ** 3
 MAX_EXTRACTED = 24 * 1024 ** 3
 UPLOAD_CHUNK_SIZE = 64 * 1024 ** 2
 PROGRESS_INTERVAL_SECONDS = 10
+TEMP_BUNDLE_PREFIX = 'bookie-bundle-'
 BUNDLE_GROUPS = {'default', 'direct', 'unit', 'sandbox', 'gpui'} | set(
     json.loads((Path(__file__).parent / 'ci-test-bundle-groups.json').read_text())['groups']
 )
@@ -155,7 +156,7 @@ def fetch(directory, revision, group, url):
     verify_manifest(manifest, revision, group)
     print(f"downloading {manifest['size'] / 1024**3:.2f} GiB {group} test bundle", flush=True)
     directory.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(dir=directory.parent) as temporary:
+    with tempfile.TemporaryDirectory(prefix=TEMP_BUNDLE_PREFIX, dir=directory.parent) as temporary:
         temporary = Path(temporary)
         archive = temporary / 'bundle.tar.gz'
         parts = manifest.get('chunks', [{'name': 'bundle.tar.gz', 'size': manifest['size'], 'sha256': manifest['sha256']}])

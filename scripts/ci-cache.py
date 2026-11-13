@@ -17,6 +17,7 @@ DIRECTORY_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
 BUNDLE_GROUPS = {'default', 'duckdb', 'unit', 'sandbox', 'gpui'}
 BUNDLE_GROUPS.update(json.loads(Path(__file__).with_name('ci-test-bundle-groups.json').read_text())['groups'])
 BUNDLE_DIRECTORY = re.compile(r'[0-9a-f]{40}-(?:' + '|'.join(map(re.escape, sorted(BUNDLE_GROUPS))) + r')\Z')
+TEMP_BUNDLE_DIRECTORY = re.compile(r'(?:tmp|bookie-bundle-)[A-Za-z0-9_]{8}\Z')
 DEFAULT_MIN_FREE_GIB = 30
 
 
@@ -143,9 +144,10 @@ def prune_bundles(root, reserve, revision):
         candidates = []
         current_prefix = revision + '-' if re.fullmatch(r'[0-9a-f]{40}', revision) else None
         for name in os.listdir(directory):
-            if not BUNDLE_DIRECTORY.fullmatch(name):
+            is_bundle = BUNDLE_DIRECTORY.fullmatch(name)
+            if not is_bundle and not TEMP_BUNDLE_DIRECTORY.fullmatch(name):
                 continue
-            if current_prefix is not None and name.startswith(current_prefix):
+            if is_bundle and current_prefix is not None and name.startswith(current_prefix):
                 continue
             entry = metadata(name, directory)
             if entry is not None and stat.S_ISDIR(entry.st_mode):
