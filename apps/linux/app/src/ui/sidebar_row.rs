@@ -942,7 +942,7 @@ mod responsive_layout_tests {
     #[ignore = "requires an isolated GTK display"]
     fn row_actions_reflow_at_supported_sidebar_widths_with_names_and_focus_order() {
         for (width, orientation) in [(220, gtk::Orientation::Vertical), (280, gtk::Orientation::Horizontal)] {
-            let (_window, _factory, row) = row_at_width(width);
+            let (window, _factory, row) = row_at_width(width);
             let body = row.child().and_downcast::<gtk::Box>().unwrap();
             let breakpoint = body.first_child().and_downcast::<relm4::adw::BreakpointBin>().unwrap();
             let row_content = breakpoint.child().and_downcast::<gtk::Box>().unwrap();
@@ -950,7 +950,7 @@ mod responsive_layout_tests {
                 row_content.orientation(),
                 orientation,
                 "requested={width}, window={}, row={}, breakpoint={}, active={}",
-                _window.width(),
+                window.width(),
                 row.width(),
                 breakpoint.width(),
                 breakpoint.current_breakpoint().is_some()
@@ -968,6 +968,9 @@ mod responsive_layout_tests {
             let open = columns.next_sibling().and_downcast::<gtk::Button>().unwrap();
             assert!(columns.is_focusable());
             assert!(open.is_focusable());
+            assert!(columns.grab_focus());
+            assert!(actions.child_focus(gtk::DirectionType::TabForward));
+            assert_eq!(gtk::prelude::GtkWindowExt::focus(&window), Some(open.clone().upcast()));
             assert_eq!(
                 open.tooltip_text().as_deref(),
                 Some("Open a_very_long_table_name_for_narrow_sidebar_testing")

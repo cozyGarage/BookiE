@@ -53,6 +53,7 @@ fn custom_browse_page_size_is_used_as_the_exact_limit() {
         filter: &filter,
         hidden_columns: None,
         long_text_preview: false,
+        supports_reverse_keyset: true,
     };
     let PageQuery::Sql(page) = target.page_by_row_id(0, 2_347, None, None).unwrap() else {
         panic!("PostgreSQL unkeyed browse pages require ordered SQL")
