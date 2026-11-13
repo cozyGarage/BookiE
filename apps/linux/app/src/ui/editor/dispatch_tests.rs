@@ -1118,6 +1118,15 @@ fn large_sql_buffers_pause_syntax_highlighting_and_resume_after_shrinking() {
     let view = fixture.controller.model().source_view.clone();
     let large = "SELECT 1;\n".repeat(super::query_changes::MAX_SYNTAX_HIGHLIGHT_BYTES / 10 + 1);
     assert!(large.len() > super::query_changes::MAX_SYNTAX_HIGHLIGHT_BYTES);
+    let language = sourceview5::LanguageManager::default().language("sql").unwrap();
+    let initial_buffer = sourceview5::Buffer::with_language(&language);
+    let highlight_during_initial_load = Arc::new(AtomicUsize::new(usize::MAX));
+    let observed_highlight = highlight_during_initial_load.clone();
+    initial_buffer.connect_changed(move |buffer| {
+        observed_highlight.store(usize::from(buffer.is_highlight_syntax()), Ordering::SeqCst);
+    });
+    super::set_initial_sql_buffer_text(&initial_buffer, &large);
+    assert_eq!(highlight_during_initial_load.load(Ordering::SeqCst), 0);
 
     buffer.set_text(&large);
 
