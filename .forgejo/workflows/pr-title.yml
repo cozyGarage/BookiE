@@ -1,0 +1,56 @@
+name: PR title
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, edited, reopened, synchronize, ready_for_review]
+
+concurrency:
+  group: pr-title-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: /usr/local/libexec/bookie-ci-cache run {0}
+
+jobs:
+  pr-title:
+    runs-on: any-host
+    timeout-minutes: 5
+    steps:
+      - name: Prepare runner workspace
+        run: rm -rf src
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 2
+          path: src
+      - name: Title is a Conventional Commits subject
+        working-directory: src
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: python3 scripts/check-pr-title.py "$TITLE"
+      - name: Only a release pull request edits CHANGELOG.md
+        working-directory: src
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+          case "$TITLE" in 'chore(release)'*) exit 0 ;; esac
+          if [ -n "$(git diff --no-renames --name-only HEAD^1 HEAD -- CHANGELOG.md)" ]; then
+            echo "::error title=Changelog::Only a chore(release) pull request edits CHANGELOG.md. Add a changelog.d fragment for the user-facing change instead (ADR 0053)."
+            exit 1
+          fi
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src
+          fi
