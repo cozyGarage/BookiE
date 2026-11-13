@@ -67,6 +67,7 @@ async fn mongodb_guarded_refetch_preserves_long_text_and_binary_values() {
         filter: &bookie_core::FilterSet::default(),
         hidden_columns: None,
         long_text_preview: false,
+        supports_reverse_keyset: false,
     };
     assert_refetched_value(
         &target,

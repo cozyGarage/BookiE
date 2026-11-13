@@ -96,6 +96,7 @@ pub struct DriverCapabilities {
     pub supports_table_health_report: bool,
     pub import_upsert: ImportUpsertStyle,
     pub supports_value_search: bool,
+    pub supports_reverse_keyset: bool,
 }
 
 #[async_trait]
@@ -141,6 +142,7 @@ pub trait DatabaseDriver: Send + Sync {
             supports_table_health_report: self.supports_table_health_report(),
             import_upsert: self.import_upsert(),
             supports_value_search: self.supports_value_search(),
+            supports_reverse_keyset: self.supports_reverse_keyset(),
         }
     }
 
@@ -246,6 +248,10 @@ pub trait DatabaseDriver: Send + Sync {
     }
 
     fn supports_value_search(&self) -> bool {
+        false
+    }
+
+    fn supports_reverse_keyset(&self) -> bool {
         false
     }
 

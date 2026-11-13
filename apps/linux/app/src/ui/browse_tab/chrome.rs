@@ -1,5 +1,6 @@
 use relm4::{ComponentSender, adw, gtk};
 
+use bookie_app_services::preferences::{MAX_PAGE_SIZE, MIN_PAGE_SIZE};
 use bookie_core::{ColumnInfo, QueryResult};
 
 use crate::ui::count_format::format_thousands;
@@ -96,37 +97,18 @@ impl BrowseTab {
             }
         });
 
-        // Use thousands-separated labels (100 / 500 / 1,000 / 5,000 /
-        // 10,000) instead of "1 K" abbreviations. With a visible
-        // "Rows:" label inline (below) the dropdown's purpose is
-        // obvious without needing a tooltip, matching how Evince
-        // labels its zoom dropdown.
-        let page_size_labels: Vec<String> = PAGE_SIZE_OPTIONS
-            .iter()
-            .map(|n| format_thousands(u128::from(*n)))
-            .collect();
-        let page_size_strs: Vec<&str> = page_size_labels.iter().map(String::as_str).collect();
-        let page_size_combo = gtk::DropDown::from_strings(&page_size_strs);
-        let initial_idx = PAGE_SIZE_OPTIONS
-            .iter()
-            .position(|n| *n == page_size)
-            .unwrap_or_else(|| {
-                PAGE_SIZE_OPTIONS
-                    .iter()
-                    .position(|n| *n == DEFAULT_PAGE_SIZE)
-                    .unwrap_or(2)
-            }) as u32;
-        page_size_combo.set_selected(initial_idx);
+        let page_size_spin = gtk::SpinButton::with_range(MIN_PAGE_SIZE as f64, MAX_PAGE_SIZE as f64, 1.0);
+        page_size_spin.set_numeric(true);
+        page_size_spin.set_digits(0);
+        page_size_spin.set_width_chars(5);
+        page_size_spin.set_value(page_size as f64);
         let sender_for_size = sender.clone();
-        page_size_combo.connect_selected_notify(move |dd| {
-            let idx = dd.selected() as usize;
-            if let Some(&size) = PAGE_SIZE_OPTIONS.get(idx) {
-                sender_for_size.input(BrowseTabInput::PageSizeChanged(size));
-            }
+        page_size_spin.connect_value_changed(move |spin| {
+            sender_for_size.input(BrowseTabInput::PageSizeChanged(spin.value().round() as u64));
         });
         let page_size_label = gtk::Label::builder().label(bookie_app_services::tr!("Rows:")).build();
         page_size_label.add_css_class("dim-label");
-        page_size_combo.update_relation(&[gtk::accessible::Relation::LabelledBy(&[page_size_label.upcast_ref()])]);
+        page_size_spin.update_relation(&[gtk::accessible::Relation::LabelledBy(&[page_size_label.upcast_ref()])]);
 
         let sender_for_first = sender.clone();
         first_button.connect_clicked(move |_| sender_for_first.input(BrowseTabInput::FirstPage));
@@ -229,7 +211,7 @@ impl BrowseTab {
         paginator_bar.pack_end(&inspector_button);
         paginator_bar.pack_end(&export_button);
         paginator_bar.pack_end(&filter_button);
-        paginator_bar.pack_end(&page_size_combo);
+        paginator_bar.pack_end(&page_size_spin);
         paginator_bar.pack_end(&page_size_label);
 
         Paginator {

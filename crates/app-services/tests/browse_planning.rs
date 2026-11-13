@@ -15,6 +15,7 @@ fn unfiltered_native_browsing_needs_no_gui_or_sql_execution() {
             filter: &filter,
             hidden_columns: None,
             long_text_preview: false,
+            supports_reverse_keyset: false,
         };
         assert!(matches!(target.page(0, 100, None, None).unwrap(), PageQuery::Native));
     }

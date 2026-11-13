@@ -10,6 +10,20 @@ use crate::ui::browse_tab::{BrowseLoadFailure, BrowsePageRequest, BrowseRowCount
 use super::{App, AppMsg, ExportFormat, OpenMode};
 use crate::services::read_scopes::ReadScope;
 
+struct PreparedBrowsePage {
+    schema: Option<String>,
+    table: String,
+    request: BrowsePageRequest,
+    limit: u64,
+    sort: Option<(usize, bool)>,
+    filter: bookie_core::FilterSet,
+    columns: Vec<ColumnInfo>,
+    driver_id: String,
+    keyset_cursor: Option<Vec<bookie_core::Value>>,
+    reverse_page: bool,
+    last_page: bool,
+}
+
 impl App {
     fn browse_cell_value_context(&self, tab_id: Uuid) -> Option<(Option<String>, String, Vec<ColumnInfo>, String)> {
         let tabs = self.workspace_tabs.borrow();
@@ -125,42 +139,59 @@ impl App {
     /// dialect-specific. Past `KEYSET_OFFSET_THRESHOLD`, sequential Next
     /// uses a primary-key seek when PKs and a cursor are available.
     pub(super) fn fetch_browse_page(&self, tab_id: Uuid, sender: ComponentSender<Self>) {
-        let (schema, table, request, limit, sort, filter, columns, driver_id, keyset_cursor, reverse_page, last_page) = {
-            let tabs = self.workspace_tabs.borrow();
-            let Some(controller) = tabs.get(&tab_id).and_then(|t| t.browse_controller()) else {
-                return;
-            };
-            let model = controller.model();
-            (
-                model.schema().map(str::to_owned),
-                model.table().to_string(),
-                model.begin_page_request(),
-                model.page_size(),
-                model.current_sort(),
-                model.current_filter().clone(),
-                model.columns().to_vec(),
-                model.driver_id().to_string(),
-                if model.reverse_page() {
-                    model.keyset_before_cursor().map(|v| v.to_vec())
-                } else {
-                    model.keyset_cursor().map(|v| v.to_vec())
-                },
-                model.reverse_page(),
-                model.last_page(),
-            )
+        let Some(page) = self.browse_page_request(tab_id) else {
+            return;
         };
-
-        let offset = request.offset;
         let Some(conn) = self.tab_connection(tab_id) else {
             sender.input(AppMsg::LoadFailed(
                 Some(tab_id),
                 BrowseLoadFailure {
-                    request: Some(request),
+                    request: Some(page.request.clone()),
                     message: "no active connection".into(),
                 },
             ));
             return;
         };
+        let query = match self.plan_browse_page_query(tab_id, &page) {
+            Ok(query) => query,
+            Err(message) => {
+                sender.input(AppMsg::LoadFailed(
+                    Some(tab_id),
+                    BrowseLoadFailure {
+                        request: Some(page.request),
+                        message,
+                    },
+                ));
+                return;
+            }
+        };
+        self.spawn_browse_page_load(tab_id, sender, conn, page, query);
+    }
+
+    fn browse_page_request(&self, tab_id: Uuid) -> Option<PreparedBrowsePage> {
+        let tabs = self.workspace_tabs.borrow();
+        let controller = tabs.get(&tab_id).and_then(|t| t.browse_controller())?;
+        let model = controller.model();
+        Some(PreparedBrowsePage {
+            schema: model.schema().map(str::to_owned),
+            table: model.table().to_string(),
+            request: model.begin_page_request(),
+            limit: model.page_size(),
+            sort: model.current_sort(),
+            filter: model.current_filter().clone(),
+            columns: model.columns().to_vec(),
+            driver_id: model.driver_id().to_string(),
+            keyset_cursor: if model.reverse_page() {
+                model.keyset_before_cursor().map(|v| v.to_vec())
+            } else {
+                model.keyset_cursor().map(|v| v.to_vec())
+            },
+            reverse_page: model.reverse_page(),
+            last_page: model.last_page(),
+        })
+    }
+
+    fn plan_browse_page_query(&self, tab_id: Uuid, page: &PreparedBrowsePage) -> Result<PageQuery, String> {
         let pending = self
             .change_trackers
             .with_tab_ref(tab_id, |tracker| tracker.has_pending())
@@ -171,46 +202,53 @@ impl App {
             self.resolve_tab_connection(tab_id)
                 .ok()
                 .zip(self.persistence.column_widths.as_ref())
-                .map(|(connection_id, store)| store.hidden_columns(connection_id, &table))
+                .map(|(connection_id, store)| store.hidden_columns(connection_id, &page.table))
                 .unwrap_or_default()
         };
+        let supports_reverse_keyset = self
+            .registry
+            .get(&page.driver_id)
+            .is_some_and(|driver| driver.capabilities().supports_reverse_keyset);
         let target = BrowseTarget {
-            driver_id: &driver_id,
-            schema: schema.as_deref(),
-            table: &table,
-            columns: &columns,
-            filter: &filter,
+            driver_id: &page.driver_id,
+            schema: page.schema.as_deref(),
+            table: &page.table,
+            columns: &page.columns,
+            filter: &page.filter,
             hidden_columns: Some(&hidden_columns),
-            long_text_preview: columns.iter().any(|column| column.primary_key),
+            long_text_preview: page.columns.iter().any(|column| column.primary_key),
+            supports_reverse_keyset,
         };
-        let row_id_order = self.relation_is_ordinary_table(schema.as_deref(), &table);
-        let page = if reverse_page {
-            target.page_before(offset, limit, sort, keyset_cursor.as_deref())
-        } else if last_page {
-            target.page_last(offset, limit, sort)
+        let row_id_order = self.relation_is_ordinary_table(page.schema.as_deref(), &page.table);
+        let offset = page.request.offset;
+        if page.reverse_page {
+            target.page_before(offset, page.limit, page.sort, page.keyset_cursor.as_deref())
+        } else if page.last_page {
+            target.page_last(offset, page.limit, page.sort)
         } else if row_id_order {
-            target.page_by_row_id(offset, limit, sort, keyset_cursor.as_deref())
+            target.page_by_row_id(offset, page.limit, page.sort, page.keyset_cursor.as_deref())
         } else {
-            target.page(offset, limit, sort, keyset_cursor.as_deref())
-        };
-        let query = match page {
-            Ok(query) => query,
-            Err(message) => {
-                sender.input(AppMsg::LoadFailed(
-                    Some(tab_id),
-                    BrowseLoadFailure {
-                        request: Some(request),
-                        message,
-                    },
-                ));
-                return;
-            }
-        };
+            target.page(offset, page.limit, page.sort, page.keyset_cursor.as_deref())
+        }
+    }
 
+    fn spawn_browse_page_load(
+        &self,
+        tab_id: Uuid,
+        sender: ComponentSender<Self>,
+        conn: std::sync::Arc<dyn bookie_core::Connection>,
+        page: PreparedBrowsePage,
+        query: PageQuery,
+    ) {
         let timeout_secs = self.tab_timeout_secs(tab_id);
         let token = self.read_scopes.borrow_mut().start(tab_id, ReadScope::Page);
         let sender_clone = sender.clone();
         let reverse_rows = matches!(&query, PageQuery::Sql(bound) if bound.reverse_rows);
+        let offset = page.request.offset;
+        let limit = page.limit;
+        let schema = page.schema;
+        let table = page.table;
+        let request = page.request;
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
@@ -382,6 +420,7 @@ impl App {
             filter: &filter,
             hidden_columns: None,
             long_text_preview: false,
+            supports_reverse_keyset: false,
         };
         let query = match target.count() {
             Ok(query) => query,
@@ -892,6 +931,7 @@ fn browse_cell_value_query(
         filter: &bookie_core::FilterSet::default(),
         hidden_columns: None,
         long_text_preview: false,
+        supports_reverse_keyset: false,
     }
     .value_query(col_index, row_key)
 }
