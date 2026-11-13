@@ -39,6 +39,7 @@ import gtk_input
 import gtk_runner
 import gtk_shard
 import gtk_process
+import gtk_allocator_trim
 
 _owned_application = None
 
@@ -1076,7 +1077,12 @@ def start_application(binary, environment, restored=False):
     heaptrack_output = os.environ.get("BOOKIE_GTK_APP_HEAPTRACK_OUTPUT")
     if (heaptrack_preload is None) != (heaptrack_output is None):
         raise AssertionError("Heaptrack requires both an app preload library and output pipe")
-    if heaptrack_preload is not None and heaptrack_output is not None:
+    trim_preload = gtk_allocator_trim.preload(environment)
+    if trim_preload is not None:
+        if heaptrack_preload is not None or environment.get("LD_PRELOAD"):
+            raise AssertionError("allocator trim profiling cannot be combined with another preload")
+        environment["LD_PRELOAD"] = trim_preload
+    elif heaptrack_preload is not None and heaptrack_output is not None:
         environment["LD_PRELOAD"] = heaptrack_preload
         environment["DUMP_HEAPTRACK_OUTPUT"] = heaptrack_output
     stderr_capture = tempfile.TemporaryFile(mode="w+", encoding="utf-8")
