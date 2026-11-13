@@ -155,6 +155,7 @@ pub(super) const MAX_SQL_FILE_BYTES: u64 = bookie_app_services::sql_text::EDITOR
 fn set_initial_sql_buffer_text(buffer: &sourceview5::Buffer, text: &str) {
     if text.len() > query_changes::MAX_SYNTAX_HIGHLIGHT_BYTES {
         buffer.set_highlight_syntax(false);
+        buffer.set_language(None);
     }
     buffer.set_text(text);
 }
@@ -390,8 +391,9 @@ impl SimpleComponent for SqlEditor {
         } else {
             initial_text
         };
-        if let Some(lang) = lang_manager.language("sql") {
-            let buffer = sourceview5::Buffer::with_language(&lang);
+        let sql_language = lang_manager.language("sql");
+        if let Some(lang) = sql_language.as_ref() {
+            let buffer = sourceview5::Buffer::with_language(lang);
             set_initial_sql_buffer_text(&buffer, &initial_text);
             widgets.source_view.set_buffer(Some(&buffer));
         } else {
@@ -497,6 +499,7 @@ impl SimpleComponent for SqlEditor {
             widgets.status.clone(),
             sender.clone(),
             refresh_completion,
+            sql_language,
         );
         split_view::install_shortcuts(&widgets.source_view, &sender, EditorPane::Primary);
         split_view::install_shortcuts(split_view.secondary_view(), &sender, EditorPane::Secondary);
