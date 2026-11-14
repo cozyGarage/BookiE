@@ -4,6 +4,10 @@ set -u
 workspace="${GITHUB_WORKSPACE:-$PWD}"
 status=0
 
+if [[ -n "${SCCACHE_SERVER_UDS:-}" && -S "$SCCACHE_SERVER_UDS" ]]; then
+  sccache --stop-server || status=$?
+fi
+
 if [[ -n "${BOOKIE_TEST_RUN_ID:-}" && -f "$workspace/src/scripts/cleanup-testcontainers.py" ]]; then
   python3 "$workspace/src/scripts/cleanup-testcontainers.py" "$BOOKIE_TEST_RUN_ID" || status=$?
 fi
