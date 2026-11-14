@@ -315,6 +315,24 @@ async fn mysql_session_allows_a_statement_stable_under_its_reported_lexical_mode
 }
 
 #[tokio::test]
+async fn mysql_mode_change_cannot_retokenize_later_statements_in_the_same_request() {
+    let script = SessionScript {
+        lexical_settings: Some(LexicalSettings::default_for(bookie_core::sql_syntax::SqlGrammar::MySql)),
+        ..SessionScript::default()
+    };
+    let h = harness_with_driver(script, false, "mysql");
+    let mut session = h.guard.open_session().await.expect("open session");
+    let sql = "SET SESSION sql_mode = 'NO_BACKSLASH_ESCAPES'; SELECT 'x\\'; DROP TABLE users; SELECT 'z'";
+
+    let error = run(&mut session, sql)
+        .await
+        .expect_err("a mode change cannot alter policy token boundaries mid-request");
+
+    assert!(matches!(error, DriverError::PolicyDenied(_)), "{error:?}");
+    assert!(h.script.sent.lock().expect("sent lock").is_empty());
+}
+
+#[tokio::test]
 async fn mysql_session_skips_lexical_settings_lookup_for_mode_stable_sql() {
     let h = harness_with_driver(SessionScript::default(), false, "mysql");
     let mut session = h.guard.open_session().await.expect("open session");

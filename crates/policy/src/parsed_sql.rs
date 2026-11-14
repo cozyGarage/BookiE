@@ -75,10 +75,20 @@ fn lexical_mode_ambiguous(sql: &str, driver_id: &str, actual: Option<LexicalSett
         .tokens(0..sql.len())
         .collect::<Vec<_>>();
     if let Some(actual) = actual {
-        return actual != default
-            && ScriptPlan::build(sql, grammar, actual)
-                .tokens(0..sql.len())
-                .ne(reference.iter().cloned());
+        let plan = ScriptPlan::build(sql, grammar, actual);
+        let tokens = plan.tokens(0..sql.len()).collect::<Vec<_>>();
+        let differs_from_default = actual != default && tokens != reference;
+        return differs_from_default
+            || (lexical_mode_changes_before_later_statement(sql, &plan)
+                && LexicalSettings::ALL
+                    .into_iter()
+                    .filter(|settings| grammar != SqlGrammar::PostgreSql || !settings.ansi_quotes)
+                    .filter(|settings| *settings != actual)
+                    .any(|settings| {
+                        ScriptPlan::build(sql, grammar, settings)
+                            .tokens(0..sql.len())
+                            .ne(tokens.iter().cloned())
+                    }));
     }
     LexicalSettings::ALL
         .into_iter()
@@ -89,6 +99,28 @@ fn lexical_mode_ambiguous(sql: &str, driver_id: &str, actual: Option<LexicalSett
                 .tokens(0..sql.len())
                 .ne(reference.iter().cloned())
         })
+}
+
+fn lexical_mode_changes_before_later_statement(sql: &str, plan: &ScriptPlan) -> bool {
+    let Some(last_statement) = plan.statements().len().checked_sub(1) else {
+        return false;
+    };
+    plan.statements().iter().take(last_statement).any(|statement| {
+        let mut words = plan
+            .tokens(statement.range.clone())
+            .filter(|token| {
+                matches!(
+                    token.kind,
+                    bookie_core::sql_syntax::script::ScriptTokenKind::Word
+                        | bookie_core::sql_syntax::script::ScriptTokenKind::QuotedIdentifier
+                )
+            })
+            .map(|token| sql[token.range].trim_matches(['`', '"', '[', ']']));
+        words.next().is_some_and(|word| word.eq_ignore_ascii_case("SET"))
+            && words.any(|word| {
+                word.eq_ignore_ascii_case("sql_mode") || word.eq_ignore_ascii_case("standard_conforming_strings")
+            })
+    })
 }
 
 #[cfg(test)]
