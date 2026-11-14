@@ -1072,6 +1072,7 @@ jobs:
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
+      options: --add-host=host.docker.internal:host-gateway
       volumes:
         - /var/run/docker.sock:/var/run/docker.sock
       env:
@@ -1105,6 +1106,7 @@ jobs:
         run: python3 scripts/ci-mcp-port.py 4
       - name: PostgreSQL release fixture
         env:
+          BOOKIE_FIXTURE_HOST: host.docker.internal
           BOOKIE_TEST_BUNDLE: ${{ runner.temp }}/bookie-pg-release-bundle
           BOOKIE_REQUIRE_PREBUILT: "1"
           BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}

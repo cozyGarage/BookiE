@@ -16,6 +16,18 @@ if ! docker compose version >/dev/null 2>&1; then
 fi
 
 KEEP_UP="${BOOKIE_FIXTURE_KEEP_UP:-0}"
+fixture_host="${BOOKIE_FIXTURE_HOST:-127.0.0.1}"
+fixture_bind_address="${BOOKIE_FIXTURE_BIND_ADDRESS:-$fixture_host}"
+
+if [[ "$fixture_bind_address" == "$fixture_host" && "$fixture_host" != 127.0.0.1 ]]; then
+  fixture_bind_address="$(getent ahostsv4 "$fixture_host" | awk 'NR == 1 { print $1; exit}')"
+fi
+
+if [[ -z "$fixture_bind_address" ]]; then
+  echo "could not resolve the Docker fixture host address: $fixture_host" >&2
+  exit 1
+fi
+export BOOKIE_FIXTURE_BIND_ADDRESS="$fixture_bind_address"
 
 compose() {
   docker compose --project-directory "$FIXTURE" -f "$FIXTURE/docker-compose.yml" "$@"
@@ -60,9 +72,9 @@ else
   exit "$startup_status"
 fi
 
-wait_for_port 127.0.0.1 8474 "toxiproxy api"
-wait_for_port 127.0.0.1 5433 "postgres path"
-wait_for_port 127.0.0.1 2223 "bastion path"
+wait_for_port "$fixture_host" 8474 "toxiproxy api"
+wait_for_port "$fixture_host" 5433 "postgres path"
+wait_for_port "$fixture_host" 2223 "bastion path"
 
 # A forwarded Unix socket's path (under XDG_RUNTIME_DIR) is capped at
 # 100 bytes, so the isolated runtime dir has to stay short -- the
@@ -83,6 +95,9 @@ RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" \
   XDG_STATE_HOME="$secret_root/state" \
   XDG_RUNTIME_DIR="$secret_root/runtime" \
   BOOKIE_FIXTURE_POSTGRES_RELEASE=1 \
+  BOOKIE_FIXTURE_PROXY_HOST="$fixture_host" \
+  BOOKIE_FIXTURE_SSH_HOST="$fixture_host" \
+  BOOKIE_FIXTURE_TOXIPROXY="$fixture_host:8474" \
   BOOKIE_FIXTURE_MATERIALS="$FIXTURE/materials" \
   BOOKIE_TARGET_DIR="$target_dir" \
   BOOKIE_GTK_POSTGRES_CONTAINER="$(compose ps -q db)" \
