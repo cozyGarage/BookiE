@@ -7,6 +7,34 @@ use zeroize::Zeroizing;
 
 use crate::DumpError;
 
+const PREFIX: &str = "bookie-pgpass-";
+const LEGACY_MAX_AGE: std::time::Duration = std::time::Duration::from_secs(24 * 3600);
+
+fn remove_abandoned(runtime_dir: &Path) {
+    let Ok(entries) = std::fs::read_dir(runtime_dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let Some(rest) = name.to_str().and_then(|name| name.strip_prefix(PREFIX)) else {
+            continue;
+        };
+        if !entry.file_type().is_ok_and(|kind| kind.is_file()) {
+            continue;
+        }
+        let owner_gone = match rest.strip_prefix('p').and_then(|rest| rest.split('-').next()) {
+            Some(pid) if pid.parse::<u32>().is_ok() => !Path::new("/proc").join(pid).exists(),
+            _ => entry
+                .metadata()
+                .and_then(|meta| meta.modified())
+                .is_ok_and(|modified| modified.elapsed().is_ok_and(|age| age > LEGACY_MAX_AGE)),
+        };
+        if owner_gone {
+            let _ = std::fs::remove_file(entry.path());
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct PassFile {
     path: PathBuf,
@@ -15,7 +43,8 @@ pub(crate) struct PassFile {
 impl PassFile {
     pub(crate) fn create(runtime_dir: &Path, password: &SecretString) -> Result<Self, DumpError> {
         let line = Zeroizing::new(passfile_line(password.expose_secret())?);
-        let path = runtime_dir.join(format!("bookie-pgpass-{}", uuid::Uuid::new_v4()));
+        remove_abandoned(runtime_dir);
+        let path = runtime_dir.join(format!("{PREFIX}p{}-{}", std::process::id(), uuid::Uuid::new_v4()));
         let mut file = std::fs::OpenOptions::new()
             .write(true)
             .create_new(true)
@@ -68,6 +97,37 @@ mod tests {
     #[test]
     fn a_password_with_a_line_break_is_refused() {
         assert!(matches!(passfile_line("a\nb"), Err(DumpError::Unsupported(_))));
+    }
+
+    fn write(dir: &Path, name: &str) -> PathBuf {
+        let path = dir.join(name);
+        std::fs::write(&path, "*:*:*:*:old\n").unwrap();
+        path
+    }
+
+    #[test]
+    fn a_new_password_file_sweeps_the_ones_a_crash_left_behind() {
+        let dir = tempfile::tempdir().unwrap();
+        let dead = write(dir.path(), "bookie-pgpass-p4294967000-aaaa");
+        let live = write(dir.path(), &format!("bookie-pgpass-p{}-bbbb", std::process::id()));
+        let old_legacy = write(dir.path(), "bookie-pgpass-cccc");
+        let two_days_ago = std::time::SystemTime::now() - std::time::Duration::from_secs(2 * 24 * 3600);
+        std::fs::File::options()
+            .write(true)
+            .open(&old_legacy)
+            .unwrap()
+            .set_modified(two_days_ago)
+            .unwrap();
+        let new_legacy = write(dir.path(), "bookie-pgpass-dddd");
+        let unrelated = write(dir.path(), "something-else");
+
+        let _fresh = PassFile::create(dir.path(), &SecretString::from("secret")).unwrap();
+
+        assert!(!dead.exists(), "a file whose process is gone is removed");
+        assert!(!old_legacy.exists(), "an old file without a process id is removed");
+        assert!(live.exists(), "a file of a running process is kept");
+        assert!(new_legacy.exists(), "a recent file without a process id is kept");
+        assert!(unrelated.exists(), "other files are never touched");
     }
 
     #[test]
