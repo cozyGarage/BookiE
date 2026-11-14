@@ -10,6 +10,21 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class PostgresReleaseStartupTests(unittest.TestCase):
+    def test_server_certificate_covers_the_container_host_alias(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = Path(temporary) / "postgres-release"
+            fixture.mkdir()
+            generator = fixture / "generate-materials.sh"
+            shutil.copy(ROOT / "tests/fixtures/postgres-release/generate-materials.sh", generator)
+            subprocess.run(["bash", str(generator)], check=True, capture_output=True, text=True)
+            certificate = subprocess.run(
+                ["openssl", "x509", "-in", str(fixture / "materials/server.crt"), "-noout", "-ext", "subjectAltName"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            self.assertIn("DNS:host.docker.internal", certificate.stdout)
+
     def test_private_umask_keeps_seed_readable_without_exposing_keys(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
