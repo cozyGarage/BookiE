@@ -16,7 +16,7 @@ if ! docker compose version >/dev/null 2>&1; then
 fi
 
 KEEP_UP="${BOOKIE_FIXTURE_KEEP_UP:-0}"
-fixture_host="${BOOKIE_FIXTURE_HOST:-127.0.0.1}"
+fixture_host="${BOOKIE_FIXTURE_HOST:-localhost}"
 fixture_bind_address="${BOOKIE_FIXTURE_BIND_ADDRESS:-$fixture_host}"
 
 if [[ "$fixture_bind_address" == "$fixture_host" && "$fixture_host" != 127.0.0.1 ]]; then

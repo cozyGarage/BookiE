@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class PostgresReleaseStartupTests(unittest.TestCase):
-    def test_server_certificate_covers_container_and_loopback_hosts(self):
+    def test_server_certificate_covers_local_and_container_hostnames(self):
         with tempfile.TemporaryDirectory() as temporary:
             fixture = Path(temporary) / "postgres-release"
             fixture.mkdir()
@@ -23,8 +23,9 @@ class PostgresReleaseStartupTests(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
+            self.assertIn("DNS:localhost", certificate.stdout)
             self.assertIn("DNS:host.docker.internal", certificate.stdout)
-            self.assertIn("IP Address:127.0.0.1", certificate.stdout)
+            self.assertNotIn("IP Address:127.0.0.1", certificate.stdout)
 
     def test_private_umask_keeps_seed_readable_without_exposing_keys(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -113,6 +114,7 @@ if "up" in sys.argv:
         self.assertEqual(compose.count('${BOOKIE_FIXTURE_BIND_ADDRESS:-127.0.0.1}:'), 3)
 
         script = (ROOT / "scripts/test-postgres-release.sh").read_text()
+        self.assertIn('fixture_host="${BOOKIE_FIXTURE_HOST:-localhost}"', script)
         self.assertIn('BOOKIE_GTK_POSTGRES_MTLS_HOST="$BOOKIE_FIXTURE_PROXY_HOST"', script)
         self.assertIn('BOOKIE_GTK_POSTGRES_SSH_AUDIT_HOST="$BOOKIE_FIXTURE_SSH_HOST"', script)
 
