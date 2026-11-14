@@ -169,6 +169,60 @@ class CiCacheTests(unittest.TestCase):
         self.assertTrue((unrelated / 'payload').is_file())
         self.assertTrue((target / 'debug/deps/artifact').exists())
 
+    def test_pressure_cleanup_evicts_orphaned_bundle_download_directories(self):
+        target = self.target('current-build', 0.1)
+        bundle_root = self.directory / 'shared-bundles'
+        bundle_root.mkdir()
+        old_temp = Path(tempfile.mkdtemp(dir=bundle_root))
+        new_temp = Path(tempfile.mkdtemp(prefix='bookie-bundle-', dir=bundle_root))
+        current = bundle_root / ('c' * 40 + '-direct')
+        unrelated = bundle_root / 'tmp-unrelated'
+        for path in (current, unrelated):
+            path.mkdir()
+            (path / 'payload').write_text('keep')
+        (old_temp / 'partial').write_text('interrupted download')
+        (new_temp / 'partial').write_text('interrupted download')
+        os.utime(old_temp, (1, 1))
+        spec = importlib.util.spec_from_file_location('ci_cache', SCRIPT)
+        helper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(helper)
+
+        def disk_usage(_):
+            recovered = not old_temp.exists()
+            return SimpleNamespace(free=100 if recovered else 0)
+
+        with patch.object(helper.shutil, 'disk_usage', side_effect=disk_usage), patch.dict(
+            os.environ, {'GITHUB_SHA': 'c' * 40, 'BOOKIE_BUNDLE_CACHE': str(bundle_root)}
+        ):
+            result = helper.cleanup(self.cache, 50)
+
+        self.assertEqual(result, 0)
+        self.assertFalse(old_temp.exists())
+        self.assertTrue((new_temp / 'partial').exists())
+        self.assertTrue((current / 'payload').exists())
+        self.assertTrue((unrelated / 'payload').exists())
+        self.assertTrue((target / 'debug/deps/artifact').exists())
+
+    def test_pressure_cleanup_preserves_recent_bundle_downloads_if_reserve_is_still_low(self):
+        bundle_root = self.directory / 'shared-bundles'
+        bundle_root.mkdir()
+        old_temp = Path(tempfile.mkdtemp(prefix='bookie-bundle-', dir=bundle_root))
+        active_temp = Path(tempfile.mkdtemp(prefix='bookie-bundle-', dir=bundle_root))
+        (old_temp / 'partial').write_text('interrupted download')
+        (active_temp / 'partial').write_text('active download')
+        os.utime(old_temp, (1, 1))
+        spec = importlib.util.spec_from_file_location('ci_cache', SCRIPT)
+        helper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(helper)
+
+        with patch.object(helper.shutil, 'disk_usage', return_value=SimpleNamespace(free=0)), patch.dict(
+            os.environ, {'BOOKIE_BUNDLE_CACHE': str(bundle_root)}
+        ):
+            helper.prune_bundles(self.cache, 50, '')
+
+        self.assertFalse(old_temp.exists())
+        self.assertTrue((active_temp / 'partial').exists())
+
     def test_pressure_cleanup_evicts_each_supported_test_bundle_group(self):
         spec = importlib.util.spec_from_file_location('ci_cache', SCRIPT)
         helper = importlib.util.module_from_spec(spec)

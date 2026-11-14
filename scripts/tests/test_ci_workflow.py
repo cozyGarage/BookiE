@@ -1317,7 +1317,13 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("nextest run --archive-file", unit)
         self.assertIn("GSETTINGS_SCHEMA_DIR: ${{ runner.temp }}/bookie-unit-bundle/schemas", unit)
         self.assertIn("GSETTINGS_SCHEMA_DIR: ${{ runner.temp }}/bookie-direct-bundle/schemas", widgets)
-        self.assertIn('find "$BOOKIE_TEST_BUNDLE/tests" "$BOOKIE_TEST_BUNDLE/bin" -type f -exec chmod u+x {} +', widgets)
+        self.assertEqual(workflow.count('find "$BOOKIE_TEST_BUNDLE" -type f \\( -path'), 6)
+        self.assertNotIn('find "$BOOKIE_TEST_BUNDLE/tests" "$BOOKIE_TEST_BUNDLE/bin"', workflow)
+        self.assertIn(
+            'find "$BOOKIE_TEST_BUNDLE" -type f \\( -path "$BOOKIE_TEST_BUNDLE/tests/*" -o '
+            '-path "$BOOKIE_TEST_BUNDLE/bin/*" \\) -exec chmod u+x {} +',
+            widgets,
+        )
         self.assertIn("bash scripts/test-harness.sh", preflight)
         self.assertNotIn("run-test-layer.py full", unit)
         gate = workflow.split("  regression-gate:\n", 1)[1]
@@ -1327,6 +1333,54 @@ class CiWorkflowTests(unittest.TestCase):
                 self.assertNotIn("github.ref", line)
         quality = (ROOT / ".github/workflows/linux-quality.yml").read_text()
         self.assertEqual(quality.count("ref: ${{ needs.resolve-ref.outputs.commit }}"), 2)
+
+    def test_downloaded_test_bundle_can_omit_empty_bin_directory(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        chmod_command = next(
+            line.strip()
+            for line in workflow.splitlines()
+            if line.strip().startswith('find "$BOOKIE_TEST_BUNDLE') and "-exec chmod u+x" in line
+        )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            bundle = Path(temporary) / "bundle"
+            tests = bundle / "tests"
+            tests.mkdir(parents=True)
+            executable = tests / "test-binary"
+            executable.write_text("binary")
+            executable.chmod(0o644)
+            schema = bundle / "schemas" / "settings.gschema.xml"
+            schema.parent.mkdir()
+            schema.write_text("schema")
+            schema.chmod(0o644)
+
+            result = subprocess.run(
+                ["bash", "-e", "-c", chmod_command],
+                env={**os.environ, "BOOKIE_TEST_BUNDLE": str(bundle)},
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(os.access(executable, os.X_OK))
+            self.assertFalse(os.access(schema, os.X_OK))
+
+            binaries = bundle / "bin"
+            binaries.mkdir()
+            binary = binaries / "test-helper"
+            binary.write_text("binary")
+            binary.chmod(0o644)
+            result = subprocess.run(
+                ["bash", "-e", "-c", chmod_command],
+                env={**os.environ, "BOOKIE_TEST_BUNDLE": str(bundle)},
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(os.access(binary, os.X_OK))
 
     def test_shared_test_bundle_build_starts_without_waiting_for_quality_gates(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
