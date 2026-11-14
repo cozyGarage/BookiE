@@ -295,3 +295,17 @@ fn each_environment_has_its_own_colour_class() {
     assert_eq!(environment_css_class(Environment::Staging), "tp-env-staging");
     assert_eq!(environment_css_class(Environment::Prod), "tp-env-prod");
 }
+
+#[test]
+fn local_environment_swatch_is_not_success_green() {
+    let css = include_str!("../../../data/resources/style.css");
+    let rule = css
+        .split(".tp-env-local")
+        .nth(1)
+        .and_then(|rest| rest.split('}').next())
+        .expect("tp-env-local rule");
+    assert!(
+        !rule.contains("@success_color"),
+        "Local rail must not use success green; it reads as live connection status: {rule}"
+    );
+}

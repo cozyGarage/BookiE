@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::workspace_disk;
+use crate::preferences::{DEFAULT_PAGE_SIZE, bounded_page_size};
 
 #[derive(Clone)]
 pub struct WorkspaceStore {
@@ -140,9 +141,6 @@ const MAX_COLLAPSED_GROUPS: usize = 256;
 const MAX_COLLAPSED_KEY_BYTES: usize = 600;
 const MAX_SCHEMA_NAME_BYTES: usize = 256;
 const MAX_HIDDEN_SCHEMAS: usize = 256;
-
-const PAGE_SIZE_OPTIONS: &[u64] = &[100, 500, 1_000, 5_000, 10_000];
-const DEFAULT_PAGE_SIZE: u64 = 1_000;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct WorkspaceState {
@@ -917,9 +915,7 @@ fn normalize_tab(tab: &mut WorkspaceTabRecord) {
                 let boundary = floor_char_boundary(s, MAX_SCHEMA_NAME_BYTES);
                 s.truncate(boundary);
             }
-            if !PAGE_SIZE_OPTIONS.contains(page_size) {
-                *page_size = DEFAULT_PAGE_SIZE;
-            }
+            *page_size = bounded_page_size(*page_size);
         }
         WorkspaceTabRecord::Browse { .. } | WorkspaceTabRecord::Structure { .. } => {}
         WorkspaceTabRecord::Unknown => {}

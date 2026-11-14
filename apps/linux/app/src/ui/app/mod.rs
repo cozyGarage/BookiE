@@ -37,6 +37,7 @@ mod tab_session;
 mod tab_title;
 mod types;
 mod value_search;
+mod whats_new;
 mod window_close_prompt;
 mod workspace_chrome;
 mod workspace_close;
@@ -76,6 +77,12 @@ pub(crate) enum SessionTeardownAction {
     Disconnect,
     ConnectionSwitch,
     WindowClose,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum UpdateCheckSource {
+    Manual,
+    Quiet,
 }
 
 #[derive(Clone)]
@@ -143,6 +150,8 @@ pub struct App {
     connect_progress_toast: Option<adw::Toast>,
     connect_cancel: Option<tokio_util::sync::CancellationToken>,
     reconnect_banner: adw::Banner,
+    update_banner: adw::Banner,
+    available_update: Option<bookie_app_services::release_updates::LatestRelease>,
     connections_factory: FactoryVecDeque<ConnectionRow>,
     connections_popover: gtk::Popover,
     databases_button: gtk::MenuButton,
@@ -451,20 +460,18 @@ impl SimpleComponent for App {
                         #[wrap(Some)]
                         #[name = "content_holder"]
                         set_child = &adw::ToolbarView {
+                            #[name = "update_banner"]
+                            add_top_bar = &adw::Banner {
+                                set_revealed: false,
+                                set_use_markup: false,
+                                set_button_label: Some(bookie_app_services::tr!("Review").as_str()),
+                            },
                             #[name = "reconnect_banner"]
                             add_top_bar = &adw::Banner {
                                 set_revealed: false,
                                 set_use_markup: false,
                                 set_button_label: Some(bookie_app_services::tr!("Retry").as_str()),
                             },
-                            // Content is set imperatively at the end of
-                            // init() — show_welcome_page swaps in the
-                            // WelcomeView for the disconnected state,
-                            // and on_connected swaps in the workspace
-                            // tab strip on connect. The previously-
-                            // inlined "Connect to a database" StatusPage
-                            // here was dead UI: built once, replaced
-                            // immediately, never seen.
                         },
                     },
                 },
@@ -541,14 +548,20 @@ impl SimpleComponent for App {
                 WelcomeViewOutput::Delete(id) => AppMsg::DeleteConnection(id),
             });
 
+        let current_preferences = preferences.load();
         adw::StyleManager::default().set_color_scheme(crate::services::preferences::color_scheme_style(
-            preferences.load().color_scheme,
+            current_preferences.color_scheme,
         ));
-        crate::ui::theme::apply(preferences.load().theme);
-        crate::ui::grid::set_null_display(preferences.load().null_display);
-        crate::ui::grid::set_date_format(preferences.load().date_format);
-        crate::ui::grid::full_value_editor::set_show_invisible_characters(preferences.load().show_invisible_characters);
-        let default_page_size = preferences.load().default_page_size;
+        crate::ui::theme::apply(current_preferences.theme);
+        crate::ui::typography::apply(&current_preferences);
+        crate::ui::editor::apply_font_preferences(&current_preferences);
+        crate::ui::grid::apply_typography(&current_preferences.grid_typography);
+        crate::ui::grid::set_null_display(current_preferences.null_display);
+        crate::ui::grid::set_date_format(current_preferences.date_format);
+        crate::ui::grid::full_value_editor::set_show_invisible_characters(
+            current_preferences.show_invisible_characters,
+        );
+        let default_page_size = current_preferences.default_page_size;
         let mut model = App {
             change_trackers,
             structure_trackers,
@@ -601,6 +614,8 @@ impl SimpleComponent for App {
             connect_progress_toast: None,
             connect_cancel: None,
             reconnect_banner: widgets.reconnect_banner.clone(),
+            update_banner: widgets.update_banner.clone(),
+            available_update: None,
             connections_factory: workspace_chrome.connections_factory,
             connections_popover: widgets.connections_popover.clone(),
             databases_button: widgets.databases_button.clone(),
@@ -669,6 +684,8 @@ impl SimpleComponent for App {
         };
         open_request::forward_open_signal(sender.input_sender());
         sender.input(AppMsg::ReloadConnections);
+        sender.input(AppMsg::MaybeShowWhatsNew);
+        sender.input(AppMsg::QuietCheckForUpdates);
         model.content_holder.set_content(Some(&model.history_paned));
         model.set_sidebar_connected(false);
         model.show_welcome_page(sender.clone());
@@ -686,6 +703,10 @@ impl SimpleComponent for App {
         let banner_sender = sender.clone();
         widgets.reconnect_banner.connect_button_clicked(move |_| {
             banner_sender.input(AppMsg::RefreshPage);
+        });
+        let update_banner_sender = sender.clone();
+        widgets.update_banner.connect_button_clicked(move |_| {
+            update_banner_sender.input(AppMsg::ReviewAvailableUpdate);
         });
 
         let poll_sender = sender.clone();
@@ -802,8 +823,8 @@ impl SimpleComponent for App {
             AppMsg::InboundForeignKeysLoaded(tab_id, inbound) => {
                 self.on_browse_inbound_foreign_keys_loaded(tab_id, inbound)
             }
-            AppMsg::RowsLoaded(tab_id, request, result, projected_columns) => {
-                self.on_browse_rows_loaded(tab_id, request, result, projected_columns)
+            AppMsg::RowsLoaded(tab_id, request, result, projected_columns, elapsed) => {
+                self.on_browse_rows_loaded(tab_id, request, result, projected_columns, elapsed)
             }
             AppMsg::LoadFailed(tab_id, msg) => self.on_browse_load_failed(tab_id, msg),
             AppMsg::RowCountLoaded(tab_id, request, count) => self.on_browse_row_count_loaded(tab_id, request, count),
@@ -948,6 +969,12 @@ impl SimpleComponent for App {
                 self.on_truncate_table_confirmed(origin, schema, table, sender)
             }
             AppMsg::DropTablePrompt { schema, table } => self.on_drop_table_prompt(schema, table, sender),
+            AppMsg::DropTablePromptReady {
+                origin,
+                schema,
+                table,
+                referencing,
+            } => self.present_drop_table_prompt(origin, schema, table, &referencing, sender),
             AppMsg::DropTableConfirmed { origin, schema, table } => {
                 self.on_drop_table_confirmed(origin, schema, table, sender)
             }
@@ -1031,6 +1058,7 @@ impl SimpleComponent for App {
                 self.on_favorites_loaded(ticket, saved);
             }
             AppMsg::ShowQuickSwitcher => self.on_show_quick_switcher(sender),
+            AppMsg::QuickSwitcherHistoryLoaded(history) => self.present_quick_switcher(history, sender),
             AppMsg::QuickSwitcherChose(target) => self.on_quick_switcher_chose(target, sender),
             AppMsg::ShowHistory => self.on_show_history(sender),
             AppMsg::CloseHistory => self.hide_history_panel(),
@@ -1052,6 +1080,17 @@ impl SimpleComponent for App {
             AppMsg::RefreshPage => self.on_refresh_active_tab(),
             AppMsg::ShowShortcuts => self.on_show_shortcuts(),
             AppMsg::ShowAbout => self.on_show_about(),
+            AppMsg::CheckForUpdates => whats_new::start_update_check(self, UpdateCheckSource::Manual, sender.clone()),
+            AppMsg::QuietCheckForUpdates => {
+                whats_new::start_update_check(self, UpdateCheckSource::Quiet, sender.clone())
+            }
+            AppMsg::UpdateCheckFinished { source, result } => {
+                whats_new::present_update_check_result(self, source, result, sender.clone())
+            }
+            AppMsg::ReviewAvailableUpdate => whats_new::review_available_update(self, sender.clone()),
+            AppMsg::DismissAvailableUpdate => whats_new::dismiss_available_update(self),
+            AppMsg::MaybeShowWhatsNew => whats_new::maybe_show_whats_new(self, sender.clone()),
+            AppMsg::WhatsNewDismissed => {}
             AppMsg::ShowAuditLog => {
                 crate::ui::audit_dialog::present(self.window.upcast_ref::<gtk::Window>(), &self.database)
             }

@@ -430,6 +430,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::browse_tab::chrome_tests::custom_page_size_changes_the_exact_fetch_limit"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::browse_tab::chrome_tests::a_row_count_queued_before_refresh_is_not_shown"
     ],
     [
@@ -1061,6 +1066,11 @@
       "bookie-app",
       "--lib",
       "ui::editor::outcomes::tests::export_partial_view::an_incomplete_stream_does_not_offer_full_result_export"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::export_dialog::scope::tests::query_scope_names_the_page_and_saved_filtered_result"
     ],
     [
       "bookie-app",
@@ -2010,6 +2020,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::sidebar_row::responsive_layout_tests::row_actions_reflow_at_supported_sidebar_widths_with_names_and_focus_order"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::sidebar_row::columns_affordance_tests::a_table_has_a_separate_keyboard_reachable_columns_expander"
     ],
     [
@@ -2141,6 +2156,11 @@
       "bookie-app",
       "--lib",
       "ui::app::connection::dismiss_tests::force_dismissing_running_query_switch_preserves_the_editor"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::connection::dismiss_tests::deleting_a_connection_dismisses_the_saved_connections_popover"
     ]
   ],
   "keyring": [

@@ -62,6 +62,9 @@ impl DatabaseDriver for ClickhouseDriver {
     fn default_port(&self) -> u16 {
         8123
     }
+    fn supports_reverse_keyset(&self) -> bool {
+        true
+    }
 
     fn default_database(&self) -> &'static str {
         "default"
@@ -490,6 +493,7 @@ impl Connection for ClickhouseConnection {
             primary: true,
             predicate: None,
             has_expression_key: false,
+            using_clause: None,
         }])
     }
 

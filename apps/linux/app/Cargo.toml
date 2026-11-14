@@ -57,6 +57,7 @@ gettext-rs = { version = "0.8", features = ["gettext-system"] }
 libc = "0.2"
 whoami = "2"
 async-trait.workspace = true
+ureq = { version = "3.5", default-features = false, features = ["rustls"] }
 
 [dev-dependencies]
 futures.workspace = true

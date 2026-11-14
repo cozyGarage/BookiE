@@ -10,7 +10,7 @@ apps/gpui/src/text_input.rs 1
 apps/linux/app/src/lib.rs 1
 apps/linux/app/src/services/gtk_approval.rs 1
 apps/linux/app/src/ui/activity_dialog.rs 1
-apps/linux/app/src/ui/app/browse.rs 1
+apps/linux/app/src/ui/app/browse.rs 0
 apps/linux/app/src/ui/app/connection.rs 1
 apps/linux/app/src/ui/app/init_window.rs 1
 apps/linux/app/src/ui/app/init_workspace.rs 1
@@ -31,7 +31,7 @@ apps/linux/app/src/ui/export_dialog.rs 1
 apps/linux/app/src/ui/export_dialog/file.rs 1
 apps/linux/app/src/ui/grid/column.rs 1
 apps/linux/app/src/ui/grid/column_jump.rs 1
-apps/linux/app/src/ui/grid/context_menu.rs 1
+apps/linux/app/src/ui/grid/context_menu.rs 0
 apps/linux/app/src/ui/grid/editing.rs 1
 apps/linux/app/src/ui/grid/mod.rs 1
 apps/linux/app/src/ui/parameters_dialog.rs 1

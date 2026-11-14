@@ -69,6 +69,8 @@ pub(crate) struct StreamExportRequest {
     pub(crate) columns: Vec<bookie_core::ColumnInfo>,
     pub(crate) spool: Option<bookie_app_services::stream_result_spool::StreamResultSpool>,
     pub(crate) total_rows: usize,
+    pub(crate) current_page: Option<std::sync::Arc<QueryResult>>,
+    pub(crate) filtered: bool,
 }
 
 pub(crate) struct ExportRequest {
@@ -302,7 +304,7 @@ fn present_export(
         suggested_name,
         driver_id,
     } = request;
-    let (paged, snapshot) = split_snapshot(scope, paged);
+    let (paged, full_export) = split_full_export(scope, paged);
     let null_marker = if paged.is_some() {
         "\\N".to_string()
     } else {
@@ -310,7 +312,7 @@ fn present_export(
     };
     let page = adw::PreferencesPage::new();
 
-    let (scope_group, scope_choice) = scope::build(scope, &result, paged.as_ref(), snapshot.is_some());
+    let (scope_group, scope_choice) = scope::build(scope, &result, paged.as_ref(), full_export.is_some());
     page.add(&scope_group);
     let format_group = adw::PreferencesGroup::builder()
         .title(bookie_app_services::tr!("Format"))
@@ -401,12 +403,12 @@ fn present_export(
         .label(bookie_app_services::tr!("Export\u{2026}"))
         .build();
     export_button.add_css_class("suggested-action");
-    let snapshot_available = snapshot.is_some();
+    let full_export_available = full_export.is_some();
     if let Some(choice) = scope_choice.as_ref() {
         let export_button = export_button.downgrade();
         choice.connect_selected_notify(move |choice| {
             if let Some(export_button) = export_button.upgrade() {
-                export_button.set_sensitive(choice.selected() == 0 || snapshot_available);
+                export_button.set_sensitive(choice.selected() == 0 || full_export_available);
             }
         });
     }
@@ -444,7 +446,7 @@ fn present_export(
             return;
         };
         let all_rows = scope_choice.as_ref().is_some_and(|choice| choice.selected() != 0);
-        if all_rows && snapshot.is_none() {
+        if all_rows && full_export.is_none() {
             return;
         }
         let format = selected_format(&formats, format_row.selected());
@@ -458,7 +460,7 @@ fn present_export(
                 suggested_name: suggested_name.clone(),
                 driver_id: driver_id.clone(),
                 result: result.clone(),
-                paged: if all_rows { snapshot.clone() } else { paged.clone() },
+                paged: if all_rows { full_export.clone() } else { paged.clone() },
                 include_header,
                 sanitize_formulas: safe_csv.is_active(),
                 spare_plain_numbers: spare_numbers.is_active(),
@@ -558,7 +560,7 @@ fn save_with_file_dialog(parent: &adw::ApplicationWindow, toast_overlay: &adw::T
     });
 }
 
-fn split_snapshot(scope: ExportScope, paged: Option<PagedExport>) -> (Option<PagedExport>, Option<PagedExport>) {
+fn split_full_export(scope: ExportScope, paged: Option<PagedExport>) -> (Option<PagedExport>, Option<PagedExport>) {
     match (scope, paged) {
         (
             ExportScope::TablePage { .. },
@@ -569,6 +571,15 @@ fn split_snapshot(scope: ExportScope, paged: Option<PagedExport>) -> (Option<Pag
                 },
             ),
         ) => (None, Some(snapshot)),
+        (
+            ExportScope::QueryPage { .. },
+            Some(
+                stored @ PagedExport {
+                    mode: PagedExportMode::StoredQuery,
+                    ..
+                },
+            ),
+        ) => (None, Some(stored)),
         (_, paged) => (paged, None),
     }
 }

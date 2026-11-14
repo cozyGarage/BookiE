@@ -51,6 +51,8 @@ Main menu, then Catalog, on a PostgreSQL connection with a few objects of each k
 - [ ] Open Preferences and confirm the page navigation separates General, Appearance, Editor and MCP.
 - [ ] Change Appearance between System, Light and Dark; confirm the active application style changes and the choice survives a restart.
 - [ ] Confirm the Data browser, Query history and SQL editor controls retain their current values and live-save behavior.
+- [ ] Leave typography overrides at their defaults, then set font family, size and weight independently for Application interface, SQL editor, Result grid and Error and output text. Each change applies to already-open windows and grids and survives restart. Blank family, size 0 and System weight restore the default for that property.
+- [ ] Test size minimum and maximum for each surface. Repeat with desktop text scaling at 1 and enlarged, high-contrast light/dark themes, and at 2x display scale. Text remains readable and controls do not clip; grid size remains within its keyboard zoom range.
 - [ ] Open About and confirm project credits and third-party attribution are presented separately, and the copyright attribution remains visible.
 - [ ] Check the BookiE launcher icon at small and large sizes in the application menu and task switcher; confirm the same artwork is used by the installed package.
 
@@ -101,4 +103,15 @@ Use a PostgreSQL database with a table that has had many rows deleted, an index 
 - [ ] Hide a schema in the sidebar and reopen the dialog. Its objects are not listed. Connect as a role without table privileges: those tables are not listed.
 - [ ] On a row, choose **Copy diagnostic SQL** and paste elsewhere: a `VACUUM (ANALYZE)` or `DROP INDEX CONCURRENTLY IF EXISTS` statement with quoted names. Choose **Open diagnostic SQL in an editor tab**: a new tab holds the statement and nothing runs.
 - [ ] Start a report on a large catalog and close the dialog. The server query is cancelled.
+
+## Check for updates and What's new
+
+Use an installed Arch package or AppImage build whose version matches `config::VERSION`. Clear `last-launched-version` in GSettings when testing the first-launch dialog (`gsettings reset com.bookie.linux last-launched-version` or the Devel schema). Reset `dismissed-update-version` the same way when re-testing the update banner.
+
+- [ ] Primary menu → **Check for Updates** while online against the current published release: a toast says BookiE is up to date.
+- [ ] Primary menu → **Check for Updates** while offline or with DNS blocked: a toast reports the network failure; the main window stays usable.
+- [ ] After clearing `last-launched-version`, launch the app once: a What's new dialog shows the AppStream notes for the running version. Close it, quit, and launch again: the dialog does not appear.
+- [ ] About BookiE shows the running version and release notes for that version, and a Releases link opens the GitHub releases page.
+- [ ] With a build whose version is older than the published latest release, and `dismissed-update-version` cleared: launch online. A banner reports the newer version without a blocking toast. **Review** opens the update dialog; **Not now** hides the banner and stores the dismissed version so the next launch stays quiet for that release.
+- [ ] Launch offline after resetting `dismissed-update-version`: no toast, no banner, and the main window stays usable.
 

@@ -371,6 +371,7 @@ fn deep_previous_page_uses_the_first_row_as_its_reverse_keyset_anchor() {
                 truncated: false,
             },
             projected_columns: None,
+            elapsed: std::time::Duration::ZERO,
         })
         .unwrap();
     spin_until(&context, || controller.model().current_result.is_some());
@@ -448,6 +449,7 @@ fn browse_next_page_is_disabled_when_known_total_matches_page_end() {
                 truncated: false,
             },
             projected_columns: None,
+            elapsed: std::time::Duration::ZERO,
         })
         .unwrap();
     spin_until(&context, || controller.model().current_result.is_some());

@@ -2,6 +2,7 @@
 
 - **Status**: Accepted
 - **Date**: 2026-10-07
+- **Implementation**: PostgreSQL editor streaming through a server cursor and spool is shipped; other engines keep the capped path until each has a tested cursor. A read-only “snapshot session” wording in older notes means this cursor session, not ADR 0014 or 0015.
 
 ## Context
 

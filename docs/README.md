@@ -25,7 +25,7 @@ Rules for contributors are in [AGENTS.md](../AGENTS.md). Accepted ADRs define ar
 | Build and test commands | [Validation playbook](validation-playbook.md) and [testing](testing.md) |
 | User-visible restrictions | [Known limitations](known-limitations.md) |
 | User guidance | [User guide](user-guide.md) |
-| User-facing change note | `Release-Note:` in the pull request body and squash commit, per [ADR 0022](decisions/0022-release-notes-from-merge-commits.md) |
+| User-facing change note | One `changelog.d/<slug>.<category>.md` fragment per change, per [ADR 0053](decisions/0053-changelog-fragments.md) |
 
 Run-specific evidence, profiling output, research notes and review records are maintained outside the public source tree. Keep reproducible tests, fixtures, test commands, stable product behavior and architecture decisions here. Do not commit machine-specific paths, credentials, customer data or raw run output.
 

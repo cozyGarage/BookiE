@@ -55,9 +55,9 @@ pub(super) fn completed_page_stack_name(generation: u64) -> String {
     format!("{COMPLETED_PAGES_PREFIX}{generation}")
 }
 
-pub(super) fn visible_page_index(holder: &gtk::Box, generation: u64) -> Option<u64> {
-    let root = holder.clone().upcast::<gtk::Widget>();
-    let pages = named::<gtk::Stack>(&root, LIVE_PAGES)?;
+pub(super) fn visible_page_index(root: &gtk::Widget, generation: u64) -> Option<u64> {
+    let pages = named::<gtk::Stack>(root, &completed_page_stack_name(generation))
+        .or_else(|| named::<gtk::Stack>(root, LIVE_PAGES))?;
     let visible = pages.visible_child()?;
     page_index_from_name(&visible, generation)
 }

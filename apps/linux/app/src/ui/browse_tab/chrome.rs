@@ -1,5 +1,6 @@
 use relm4::{ComponentSender, adw, gtk};
 
+use bookie_app_services::preferences::{MAX_PAGE_SIZE, MIN_PAGE_SIZE};
 use bookie_core::{ColumnInfo, QueryResult};
 
 use crate::ui::count_format::format_thousands;
@@ -96,37 +97,18 @@ impl BrowseTab {
             }
         });
 
-        // Use thousands-separated labels (100 / 500 / 1,000 / 5,000 /
-        // 10,000) instead of "1 K" abbreviations. With a visible
-        // "Rows:" label inline (below) the dropdown's purpose is
-        // obvious without needing a tooltip, matching how Evince
-        // labels its zoom dropdown.
-        let page_size_labels: Vec<String> = PAGE_SIZE_OPTIONS
-            .iter()
-            .map(|n| format_thousands(u128::from(*n)))
-            .collect();
-        let page_size_strs: Vec<&str> = page_size_labels.iter().map(String::as_str).collect();
-        let page_size_combo = gtk::DropDown::from_strings(&page_size_strs);
-        let initial_idx = PAGE_SIZE_OPTIONS
-            .iter()
-            .position(|n| *n == page_size)
-            .unwrap_or_else(|| {
-                PAGE_SIZE_OPTIONS
-                    .iter()
-                    .position(|n| *n == DEFAULT_PAGE_SIZE)
-                    .unwrap_or(2)
-            }) as u32;
-        page_size_combo.set_selected(initial_idx);
+        let page_size_spin = gtk::SpinButton::with_range(MIN_PAGE_SIZE as f64, MAX_PAGE_SIZE as f64, 1.0);
+        page_size_spin.set_numeric(true);
+        page_size_spin.set_digits(0);
+        page_size_spin.set_width_chars(5);
+        page_size_spin.set_value(page_size as f64);
         let sender_for_size = sender.clone();
-        page_size_combo.connect_selected_notify(move |dd| {
-            let idx = dd.selected() as usize;
-            if let Some(&size) = PAGE_SIZE_OPTIONS.get(idx) {
-                sender_for_size.input(BrowseTabInput::PageSizeChanged(size));
-            }
+        page_size_spin.connect_value_changed(move |spin| {
+            sender_for_size.input(BrowseTabInput::PageSizeChanged(spin.value().round() as u64));
         });
         let page_size_label = gtk::Label::builder().label(bookie_app_services::tr!("Rows:")).build();
         page_size_label.add_css_class("dim-label");
-        page_size_combo.update_relation(&[gtk::accessible::Relation::LabelledBy(&[page_size_label.upcast_ref()])]);
+        page_size_spin.update_relation(&[gtk::accessible::Relation::LabelledBy(&[page_size_label.upcast_ref()])]);
 
         let sender_for_first = sender.clone();
         first_button.connect_clicked(move |_| sender_for_first.input(BrowseTabInput::FirstPage));
@@ -229,7 +211,7 @@ impl BrowseTab {
         paginator_bar.pack_end(&inspector_button);
         paginator_bar.pack_end(&export_button);
         paginator_bar.pack_end(&filter_button);
-        paginator_bar.pack_end(&page_size_combo);
+        paginator_bar.pack_end(&page_size_spin);
         paginator_bar.pack_end(&page_size_label);
 
         Paginator {
@@ -476,7 +458,12 @@ impl BrowseTab {
             self.update_sort_status_label();
             return;
         };
-        self.set_paginator_text(&paginator_summary(result, self.current_offset, self.current_total_rows));
+        self.set_paginator_text(&paginator_summary(
+            result,
+            self.current_offset,
+            self.current_total_rows,
+            self.last_page_elapsed,
+        ));
         self.update_sort_status_label();
     }
 
@@ -580,30 +567,57 @@ fn retry_button(sender: &ComponentSender<BrowseTab>) -> gtk::Button {
     button
 }
 
-fn paginator_summary(result: &QueryResult, offset: u64, total: Option<u64>) -> String {
+fn paginator_summary(
+    result: &QueryResult,
+    offset: u64,
+    total: Option<u64>,
+    elapsed: Option<std::time::Duration>,
+) -> String {
     let n_rows = result.rows.len();
-    if n_rows == 0 {
-        return if result.truncated {
+    let range = if n_rows == 0 {
+        if result.truncated {
             bookie_app_services::tr!("No rows on this page (result truncated)")
         } else {
             bookie_app_services::tr!("No rows on this page")
+        }
+    } else {
+        let template = match (total.is_some(), result.truncated) {
+            (true, true) => bookie_app_services::tr!("Rows {start} – {end} of {total} (result truncated)"),
+            (true, false) => bookie_app_services::tr!("Rows {start} – {end} of {total}"),
+            (false, true) => bookie_app_services::tr!("Rows {start} – {end} (result truncated)"),
+            (false, false) => bookie_app_services::tr!("Rows {start} – {end}"),
         };
-    }
-    let template = match (total.is_some(), result.truncated) {
-        (true, true) => bookie_app_services::tr!("Rows {start} – {end} of {total} (result truncated)"),
-        (true, false) => bookie_app_services::tr!("Rows {start} – {end} of {total}"),
-        (false, true) => bookie_app_services::tr!("Rows {start} – {end} (result truncated)"),
-        (false, false) => bookie_app_services::tr!("Rows {start} – {end}"),
+        template
+            .replace("{start}", &format_thousands(u128::from(offset + 1)))
+            .replace("{end}", &format_thousands(u128::from(offset + n_rows as u64)))
+            .replace(
+                "{total}",
+                &total
+                    .map(|count| format_thousands(u128::from(count)))
+                    .unwrap_or_default(),
+            )
     };
-    template
-        .replace("{start}", &format_thousands(u128::from(offset + 1)))
-        .replace("{end}", &format_thousands(u128::from(offset + n_rows as u64)))
-        .replace(
-            "{total}",
-            &total
-                .map(|count| format_thousands(u128::from(count)))
-                .unwrap_or_default(),
-        )
+    match elapsed {
+        Some(elapsed) => bookie_app_services::tr!("{range} · {time}")
+            .replace("{range}", &range)
+            .replace("{time}", &page_elapsed_text(elapsed)),
+        None => range,
+    }
+}
+
+fn page_elapsed_text(elapsed: std::time::Duration) -> String {
+    if elapsed.as_millis() == 0 {
+        bookie_app_services::tr!("<1 ms")
+    } else if elapsed.as_secs() == 0 {
+        let millis = (elapsed.as_micros() + 500) / 1000;
+        bookie_app_services::tr!("{n} ms").replace("{n}", &millis.to_string())
+    } else if elapsed.as_secs() < 60 {
+        bookie_app_services::tr!("{n} s").replace("{n}", &format!("{:.2}", elapsed.as_secs_f64()))
+    } else {
+        bookie_app_services::tr!("{minutes}m {seconds}s")
+            .replace("{minutes}", &(elapsed.as_secs() / 60).to_string())
+            .replace("{seconds}", &(elapsed.as_secs() % 60).to_string())
+    }
 }
 
 pub(super) fn next_page_offset(
@@ -716,9 +730,11 @@ pub(super) fn bind_inspector(
 #[cfg(test)]
 mod tests {
     use super::{
-        extract_first_keyset_cursor, extract_keyset_cursor, format_thousands, paginator_summary, sort_status_summary,
+        extract_first_keyset_cursor, extract_keyset_cursor, format_thousands, page_elapsed_text, paginator_summary,
+        sort_status_summary,
     };
     use bookie_core::{ColumnInfo, QueryResult, Value};
+    use std::time::Duration;
 
     #[test]
     fn projected_keyset_cursor_maps_primary_keys_to_result_positions() {
@@ -801,11 +817,11 @@ mod tests {
     #[test]
     fn truncated_browse_pages_disclose_the_result_limit() {
         assert_eq!(
-            paginator_summary(&page(37, true), 1_000, Some(5_000)),
+            paginator_summary(&page(37, true), 1_000, Some(5_000), None),
             "Rows 1,001 – 1,037 of 5,000 (result truncated)"
         );
         assert_eq!(
-            paginator_summary(&page(37, true), 0, None),
+            paginator_summary(&page(37, true), 0, None, None),
             "Rows 1 – 37 (result truncated)"
         );
     }
@@ -813,7 +829,7 @@ mod tests {
     #[test]
     fn a_truncated_browse_page_without_rows_still_discloses_the_result_limit() {
         assert_eq!(
-            paginator_summary(&page(0, true), 0, Some(5_000)),
+            paginator_summary(&page(0, true), 0, Some(5_000), None),
             "No rows on this page (result truncated)"
         );
     }
@@ -821,13 +837,33 @@ mod tests {
     #[test]
     fn untruncated_browse_pages_have_no_result_limit_suffix() {
         assert_eq!(
-            paginator_summary(&page(100, false), 1_000, Some(5_000)),
+            paginator_summary(&page(100, false), 1_000, Some(5_000), None),
             "Rows 1,001 – 1,100 of 5,000"
         );
-        assert_eq!(paginator_summary(&page(100, false), 0, None), "Rows 1 – 100");
+        assert_eq!(paginator_summary(&page(100, false), 0, None, None), "Rows 1 – 100");
         assert_eq!(
-            paginator_summary(&page(0, false), 0, Some(5_000)),
+            paginator_summary(&page(0, false), 0, Some(5_000), None),
             "No rows on this page"
+        );
+    }
+
+    #[test]
+    fn a_page_read_is_timed_after_the_row_range() {
+        assert_eq!(page_elapsed_text(Duration::from_micros(200)), "<1 ms");
+        assert_eq!(page_elapsed_text(Duration::ZERO), "<1 ms");
+        assert_eq!(page_elapsed_text(Duration::from_millis(1)), "1 ms");
+        assert_eq!(page_elapsed_text(Duration::from_micros(5_600)), "6 ms");
+        assert_eq!(page_elapsed_text(Duration::from_millis(999)), "999 ms");
+        assert_eq!(page_elapsed_text(Duration::from_millis(1_234)), "1.23 s");
+        assert_eq!(page_elapsed_text(Duration::from_secs(60)), "1m 0s");
+        assert_eq!(page_elapsed_text(Duration::from_secs(125)), "2m 5s");
+        assert_eq!(
+            paginator_summary(&page(2, false), 0, Some(2), Some(Duration::from_millis(5))),
+            "Rows 1 – 2 of 2 · 5 ms"
+        );
+        assert_eq!(
+            paginator_summary(&page(0, false), 0, Some(0), Some(Duration::from_millis(5))),
+            "No rows on this page · 5 ms"
         );
     }
 

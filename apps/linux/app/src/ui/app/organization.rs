@@ -72,6 +72,7 @@ impl App {
     }
 
     pub(super) fn on_organize_connection(&self, saved: SavedConnection, sender: ComponentSender<Self>) {
+        self.dismiss_saved_connections_popover();
         let current = self.connection_organization.get(saved.id);
         let dialog = organize_dialog(&saved.name);
         let (group_row, tags_row, selected_color) =

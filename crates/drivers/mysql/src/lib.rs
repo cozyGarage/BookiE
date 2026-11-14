@@ -68,6 +68,9 @@ impl DatabaseDriver for MysqlDriver {
     fn supports_value_search(&self) -> bool {
         true
     }
+    fn supports_reverse_keyset(&self) -> bool {
+        true
+    }
 
     fn import_upsert(&self) -> bookie_core::ImportUpsertStyle {
         bookie_core::ImportUpsertStyle::OnDuplicateKey
@@ -436,6 +439,7 @@ impl Connection for MysqlConnection {
                 primary: name == "PRIMARY",
                 predicate: None,
                 has_expression_key: false,
+                using_clause: None,
             });
             entry.has_expression_key |= expression;
             entry.columns.push(key);

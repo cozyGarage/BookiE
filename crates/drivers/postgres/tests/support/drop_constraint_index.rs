@@ -92,7 +92,7 @@ async fn replacing_an_index_and_a_foreign_key_under_the_same_name_changes_the_ta
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn an_expression_index_is_marked_and_not_rebuilt_as_a_column_index() {
+async fn an_expression_index_is_marked_and_rebuilt_from_its_definition() {
     let (_c, opts) = start_pg().await;
     let conn = connect(opts).await;
     conn.execute("CREATE TABLE people (id int PRIMARY KEY, email text)")
@@ -109,11 +109,46 @@ async fn an_expression_index_is_marked_and_not_rebuilt_as_a_column_index() {
     let functional = indexes.iter().find(|index| index.name == "people_email_lower").unwrap();
     assert!(functional.has_expression_key);
     assert_eq!(functional.columns, ["lower(email)", "id"]);
-    let error = bookie_core::sql_ddl::build_create_index("postgres", None, "people", functional).unwrap_err();
-    assert!(
-        matches!(error, bookie_core::sql_ddl::BuildDdlError::ExpressionIndex),
-        "{error:?}"
-    );
+    let rebuilt = bookie_core::sql_ddl::build_create_index("postgres", None, "people", functional).unwrap();
+    assert!(rebuilt.ends_with("USING btree (lower(email), id)"), "{rebuilt}");
     let plain = indexes.iter().find(|index| index.name == "people_email").unwrap();
     assert!(!plain.has_expression_key);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn expression_partial_gin_and_descending_indexes_survive_a_rebuild_in_another_schema() {
+    let (_c, opts) = start_pg().await;
+    let conn = connect(opts).await;
+    for statement in [
+        "CREATE TABLE items (id int PRIMARY KEY, name text, tags text[])",
+        "CREATE INDEX i_expression ON items (lower(name))",
+        "CREATE INDEX i_gin ON items USING gin (tags)",
+        "CREATE INDEX i_descending ON items (id DESC NULLS LAST) INCLUDE (name)",
+        "CREATE UNIQUE INDEX i_partial ON items (name text_pattern_ops) WHERE id > 0",
+        "CREATE SCHEMA copy",
+        "CREATE TABLE copy.items (id int PRIMARY KEY, name text, tags text[])",
+    ] {
+        conn.execute(statement).await.unwrap();
+    }
+
+    let indexes = conn.fetch_indexes(Some("public"), "items").await.unwrap();
+    for index in indexes.iter().filter(|index| !index.primary) {
+        let rebuilt = bookie_core::sql_ddl::build_create_index("postgres", Some("copy"), "items", index).unwrap();
+        conn.execute(&rebuilt).await.unwrap();
+    }
+
+    let definitions = conn
+        .query(
+            "SELECT pg_catalog.replace(pg_catalog.pg_get_indexdef(indexrelid), ' ON copy.', ' ON public.') \
+             FROM pg_catalog.pg_index WHERE indrelid IN ('public.items'::regclass, 'copy.items'::regclass) \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    let texts: Vec<String> = definitions.rows.iter().map(|row| format!("{:?}", row[0])).collect();
+    assert_eq!(texts.len(), 10, "{texts:?}");
+    for pair in texts.chunks(2) {
+        assert_eq!(pair[0], pair[1], "{texts:?}");
+    }
 }

@@ -1,6 +1,3 @@
-//! Foreign-key row builder used by the Foreign Keys page of the
-//! Structure tab.
-
 use relm4::adw::prelude::*;
 use relm4::{ComponentSender, adw, gtk};
 
@@ -16,9 +13,6 @@ pub(super) fn can_add_foreign_key(driver_id: &str, mode: &StructureMode) -> bool
     driver_id != "sqlite" || matches!(mode, StructureMode::New)
 }
 
-/// Foreign-key row as a native `AdwActionRow`. Subtitle encodes both
-/// local columns and the reference target so users see the full
-/// relationship in a glance: `col_a, col_b → other_table (ref_a, ref_b)`.
 pub(super) fn build_fk_row(
     index: usize,
     fk: &ForeignKeyInfo,

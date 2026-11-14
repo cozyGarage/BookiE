@@ -65,6 +65,9 @@ impl DatabaseDriver for PgDriver {
     fn supports_snapshot_export(&self) -> bool {
         true
     }
+    fn supports_reverse_keyset(&self) -> bool {
+        true
+    }
 
     fn supports_updatable_views(&self) -> bool {
         true
@@ -629,6 +632,7 @@ impl Connection for PgConnection {
                     predicate: r.try_get(4).map_err(map_sqlx_error)?,
                     constraint: r.try_get(5).map_err(map_sqlx_error)?,
                     has_expression_key: r.try_get(6).map_err(map_sqlx_error)?,
+                    using_clause: r.try_get(7).map_err(map_sqlx_error)?,
                 })
             })
             .collect()

@@ -90,6 +90,7 @@ fn snapshot_query(plan: &PagePlan) -> Result<BoundQuery, ExportError> {
         filter: &plan.filter,
         hidden_columns: None,
         long_text_preview: false,
+        supports_reverse_keyset: false,
     }
     .full_select(plan.sort, plan.row_id_order)
     .map_err(ExportError::Source)

@@ -467,27 +467,53 @@ fn clamp_handles_mixed_browse_and_editor_tabs() {
 }
 
 #[test]
-fn clamp_replaces_foreign_browse_page_size() {
+fn clamp_bounds_persisted_browse_page_sizes_and_preserves_custom_values() {
     let mut conn = ConnectionWorkspaceState {
-        tabs: vec![WorkspaceTabRecord::Browse {
-            schema: None,
-            table: "t".into(),
-            offset: 0,
-            page_size: 999_999,
-            sort_col: None,
-            sort_asc: None,
-        }],
+        tabs: vec![
+            WorkspaceTabRecord::Browse {
+                schema: None,
+                table: "custom".into(),
+                offset: 0,
+                page_size: 2_347,
+                sort_col: None,
+                sort_asc: None,
+            },
+            WorkspaceTabRecord::Browse {
+                schema: None,
+                table: "above-limit".into(),
+                offset: 0,
+                page_size: 9_999,
+                sort_col: None,
+                sort_asc: None,
+            },
+            WorkspaceTabRecord::Browse {
+                schema: None,
+                table: "zero".into(),
+                offset: 0,
+                page_size: 0,
+                sort_col: None,
+                sort_asc: None,
+            },
+        ],
         active_idx: 0,
         ..Default::default()
     };
     clamp_connection(&mut conn);
-    match &conn.tabs[0] {
-        WorkspaceTabRecord::Table { mode, page_size, .. } => {
-            assert_eq!(*mode, PersistedTableMode::Data);
-            assert_eq!(*page_size, DEFAULT_PAGE_SIZE);
+    for (tab, expected) in conn.tabs.iter().zip([2_347, 5_000, DEFAULT_PAGE_SIZE]) {
+        match tab {
+            WorkspaceTabRecord::Table { mode, page_size, .. } => {
+                assert_eq!(*mode, PersistedTableMode::Data);
+                assert_eq!(*page_size, expected);
+            }
+            _ => panic!("expected Table after migration"),
         }
-        _ => panic!("expected Table after migration"),
     }
+    let mut restored: ConnectionWorkspaceState = serde_json::from_value(serde_json::to_value(&conn).unwrap()).unwrap();
+    clamp_connection(&mut restored);
+    assert!(matches!(
+        &restored.tabs[0],
+        WorkspaceTabRecord::Table { page_size: 2_347, .. }
+    ));
 }
 
 #[test]

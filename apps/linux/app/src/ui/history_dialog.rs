@@ -175,11 +175,6 @@ impl Component for HistoryDialog {
     fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>, _root: &Self::Root) {
         match msg {
             HistoryDialogInput::Refresh => self.run_search(sender),
-            // SearchChanged + FiltersChanged go through the debounce —
-            // every keystroke and every dropdown flip would otherwise
-            // fire its own SQL search. After a 150 ms idle window the
-            // scheduled timeout re-enters update with Refresh, which
-            // does the actual work.
             HistoryDialogInput::SearchChanged | HistoryDialogInput::FiltersChanged => {
                 self.schedule_debounced_search(sender);
             }
@@ -424,8 +419,7 @@ impl HistoryDialog {
         let s_act = sender.clone();
         row.connect_activated(move |_| s_act.input(HistoryDialogInput::Activate(id)));
 
-        let popover_menu = gtk::PopoverMenu::from_model(Some(&row::row_menu(entry)));
-        popover_menu.set_has_arrow(true);
+        let popover_menu = crate::ui::context_menu::from_model(Some(&row::row_menu(entry)));
         popover_menu.set_parent(&row);
         row.insert_action_group("history-row", Some(&row::row_actions(entry, &row, &sender)));
         row::attach_context_menu(&row, &popover_menu);
@@ -471,11 +465,6 @@ impl HistoryDialog {
     }
 
     fn confirm_delete_selected(&self, sender: ComponentSender<Self>) {
-        // Bulk deletion is irreversible and can wipe pinned
-        // entries the user marked as important; gate it
-        // behind an AdwAlertDialog confirmation before
-        // touching the database. Mirrors the Clear-All
-        // pattern below.
         let n = self.selected_ids.len();
         if n == 0 {
             return;

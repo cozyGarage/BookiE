@@ -374,3 +374,38 @@ fn other_encodings_decode_before_parsing() {
         Err(ImportError::NotDecodable { .. })
     ));
 }
+
+#[test]
+fn a_single_column_export_keeps_its_null_and_empty_rows_through_import() {
+    use crate::Value;
+    use crate::export::{CsvOptions, render_csv, write_csv_row};
+
+    let columns = vec![crate::export::test_support::column("note")];
+    let rows = vec![
+        vec![Value::Null],
+        vec![Value::Text("a".into())],
+        vec![Value::Text(String::new())],
+        vec![Value::Null],
+    ];
+    let rendered = render_csv(&columns, &rows, &CsvOptions::default());
+    let sheet = read_csv(rendered.as_bytes(), &options(), None).unwrap();
+    assert_eq!(sheet.rows, vec![vec![""], vec!["a"], vec![""], vec![""]]);
+
+    let mut streamed = b"note\n".to_vec();
+    for row in &rows {
+        write_csv_row(&mut streamed, row).unwrap();
+    }
+    let sheet = read_csv(&streamed, &options(), None).unwrap();
+    assert_eq!(sheet.rows.len(), rows.len());
+
+    let wide = read_csv(b"a,b\n\n1,2\n\n", &options(), None).unwrap();
+    assert_eq!(
+        wide.rows.len(),
+        1,
+        "blank lines stay skipped when there are several columns"
+    );
+    let windows = read_csv(b"note\r\n\r\na\r\n\r\n", &options(), None).unwrap();
+    assert_eq!(windows.rows, vec![vec![""], vec!["a"], vec![""]]);
+    let preview = read_csv(b"note\n\n\na\n", &options(), Some(2)).unwrap();
+    assert_eq!((preview.rows.len(), preview.truncated), (2, true));
+}

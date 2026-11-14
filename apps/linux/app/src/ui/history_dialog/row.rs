@@ -147,8 +147,10 @@ pub(super) fn attach_context_menu(row: &adw::ActionRow, popover_menu: &gtk::Popo
     gesture.set_button(gtk::gdk::BUTTON_SECONDARY);
     let popover_for_gesture = popover_menu.clone();
     gesture.connect_pressed(move |gesture, _n, x, y| {
-        popover_for_gesture.set_pointing_to(Some(&gtk::gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
-        popover_for_gesture.popup();
+        crate::ui::context_menu::popup_at(
+            &popover_for_gesture,
+            Some(gtk::gdk::Rectangle::new(x as i32, y as i32, 1, 1)),
+        );
         gesture.set_state(gtk::EventSequenceState::Claimed);
     });
     row.add_controller(gesture);
@@ -157,8 +159,14 @@ pub(super) fn attach_context_menu(row: &adw::ActionRow, popover_menu: &gtk::Popo
         .trigger(&crate::ui::shortcut::parse("Menu"))
         .action(&gtk::CallbackAction::new({
             let popover = popover_menu.clone();
+            let row = row.downgrade();
             move |_, _| {
-                popover.popup();
+                let pointing = row.upgrade().and_then(|row| {
+                    row.compute_bounds(&row).map(|bounds| {
+                        gtk::gdk::Rectangle::new((bounds.width() / 2.0) as i32, (bounds.height() / 2.0) as i32, 1, 1)
+                    })
+                });
+                crate::ui::context_menu::popup_at(&popover, pointing);
                 glib::Propagation::Stop
             }
         }))

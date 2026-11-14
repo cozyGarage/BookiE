@@ -118,11 +118,11 @@ impl App {
     }
 
     pub(super) fn on_show_about(&self) {
-        let dialog = adw::AboutDialog::builder()
+        let mut builder = adw::AboutDialog::builder()
             .application_name(bookie_app_services::tr!("BookiE"))
             .application_icon(crate::config::APP_ID)
             .developer_name(bookie_app_services::tr!("BookiE contributors"))
-            .version(env!("CARGO_PKG_VERSION"))
+            .version(crate::config::VERSION)
             .website("https://github.com/cozyGarage/BookiE")
             .issue_url("https://github.com/cozyGarage/BookiE/issues")
             .support_url("https://github.com/cozyGarage/BookiE/discussions")
@@ -130,10 +130,17 @@ impl App {
             .license_type(gtk::License::Agpl30)
             .comments(bookie_app_services::tr!(
                 "A native Linux database client built with GTK4 + libadwaita."
-            ))
-            .build();
+            ));
+        if let Some((version, notes)) = super::whats_new::running_release_notes() {
+            builder = builder.release_notes_version(version).release_notes(notes);
+        }
+        let dialog = builder.build();
         dialog.set_developers(ABOUT_DEVELOPERS);
         dialog.set_translator_credits(&bookie_app_services::tr!("translator-credits"));
+        dialog.add_link(
+            &bookie_app_services::tr!("Releases"),
+            "https://github.com/cozyGarage/BookiE/releases",
+        );
         crate::ui::leak_probe::track("about", &dialog);
         dialog.present(Some(&self.window));
     }

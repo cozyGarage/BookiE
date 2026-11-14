@@ -45,6 +45,10 @@ impl DatabaseDriver for OracleDriver {
         false
     }
 
+    fn supports_browse_filters(&self) -> bool {
+        false
+    }
+
     async fn connect(&self, opts: ConnectOptions) -> Result<Box<dyn Connection>, DriverError> {
         let config = connect_config(&opts)?;
         probe_listener(&opts).await?;

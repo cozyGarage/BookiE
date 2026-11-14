@@ -14,6 +14,7 @@ pub(crate) mod driver_diagnostics;
 pub(crate) mod error_text;
 pub mod export_pages;
 pub mod gtk_approval;
+pub mod launch_version;
 pub mod mcp_service;
 pub mod named_filter_presets;
 pub mod open_request;
@@ -27,6 +28,7 @@ pub mod sidebar_tree;
 pub mod single_instance;
 pub mod structure_tracker;
 pub mod ui_stall;
+pub mod update_check;
 
 pub mod window_registry;
 pub mod window_state;

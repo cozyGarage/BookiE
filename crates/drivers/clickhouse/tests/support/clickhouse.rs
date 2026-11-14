@@ -6,7 +6,7 @@ use testcontainers::runners::AsyncRunner;
 use testcontainers::{ContainerAsync, GenericImage, ImageExt};
 
 pub async fn start_clickhouse() -> (ContainerAsync<GenericImage>, ConnectOptions) {
-    let container = GenericImage::new("clickhouse/clickhouse-server", "24.8")
+    let image = GenericImage::new("clickhouse/clickhouse-server", "24.8")
         .with_exposed_port(8123.tcp())
         .with_wait_for(WaitFor::http(
             HttpWaitStrategy::new("/ping")
@@ -17,10 +17,12 @@ pub async fn start_clickhouse() -> (ContainerAsync<GenericImage>, ConnectOptions
         .with_env_var("CLICKHOUSE_PASSWORD", "bookie")
         .with_env_var("CLICKHOUSE_DB", "default")
         .with_env_var("CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT", "1")
-        .with_startup_timeout(std::time::Duration::from_secs(180))
-        .start()
-        .await
-        .expect("start clickhouse container");
+        .with_startup_timeout(std::time::Duration::from_secs(180));
+    let image = match std::env::var("BOOKIE_TEST_RUN_ID") {
+        Ok(run_id) => image.with_label("com.bookie.test-run", run_id),
+        Err(_) => image,
+    };
+    let container = image.start().await.expect("start clickhouse container");
     let host = container.get_host().await.expect("host").to_string();
     let port = container.get_host_port_ipv4(8123).await.expect("port");
     let opts = ConnectOptions {

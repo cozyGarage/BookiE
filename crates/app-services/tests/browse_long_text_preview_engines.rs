@@ -42,6 +42,7 @@ async fn assert_preview_column(
         filter: &filter,
         hidden_columns: None,
         long_text_preview: true,
+        supports_reverse_keyset: false,
     };
     let PageQuery::Sql(query) = target.page(0, 10, None, None).unwrap() else {
         panic!("{driver_id}: a preview page must run as SQL")
@@ -112,6 +113,7 @@ async fn sqlite_previews_a_huge_text_cell() {
         filter: &filter,
         hidden_columns: None,
         long_text_preview: true,
+        supports_reverse_keyset: true,
     };
     let PageQuery::Sql(query) = target.page(0, 10, None, None).unwrap() else {
         panic!("SQL preview")
@@ -254,6 +256,7 @@ async fn postgres_previews_huge_json_and_jsonb_cells() {
         filter: &filter,
         hidden_columns: None,
         long_text_preview: true,
+        supports_reverse_keyset: true,
     };
     let PageQuery::Sql(query) = target.page(0, 10, None, None).unwrap() else {
         panic!("a preview page must run as SQL")
@@ -351,6 +354,7 @@ async fn sql_server_previews_huge_legacy_text_and_ntext_cells() {
         filter: &filter,
         hidden_columns: None,
         long_text_preview: true,
+        supports_reverse_keyset: true,
     };
     let PageQuery::Sql(query) = target.page(0, 10, None, None).unwrap() else {
         panic!("a preview page must run as SQL")

@@ -96,6 +96,14 @@ class ClassifyCiFailureTests(unittest.TestCase):
         text = "container bookie-driver-tls-mongo-1 exited (48)\nJob failed"
         self.assertEqual(self.tag(text), "infra")
 
+    def test_a_fixture_port_collision_is_infrastructure_even_when_the_test_panics(self):
+        text = (
+            "thread 'a_scylladb_keyspace_reads_back_values' panicked at integration.rs:42:10:\n"
+            'start container: failed to set up container networking: Bind for 0.0.0.0:9042 '
+            "failed: port is already allocated\nJob failed"
+        )
+        self.assertEqual(self.tag(text), "infra")
+
     def test_an_unrecognised_log_is_unknown(self):
         self.assertEqual(self.tag("everything is fine\nJob failed"), "unknown")
 

@@ -150,16 +150,12 @@ impl SidebarColumns {
         }
     }
 
-    pub(super) fn install(&self, row: &gtk::ListBoxRow, sender: &FactorySender<SidebarRow>) {
-        let Some(header) = row.child().and_downcast::<gtk::Box>() else {
+    pub(super) fn install(&self, row: &gtk::ListBoxRow, actions: &gtk::Box, sender: &FactorySender<SidebarRow>) {
+        let Some(body) = row.child().and_downcast::<gtk::Box>() else {
             return;
         };
-        row.set_child(gtk::Widget::NONE);
-        let body = gtk::Box::new(gtk::Orientation::Vertical, 0);
-        header.prepend(&self.toggle);
-        body.append(&header);
+        actions.append(&self.toggle);
         body.append(&self.reveal);
-        row.set_child(Some(&body));
         let sender = sender.clone();
         self.toggle
             .connect_toggled(move |button| sender.input(SidebarRowMsg::ToggleColumns(button.is_active())));

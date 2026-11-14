@@ -333,6 +333,8 @@ impl StreamPageCache {
                     columns,
                     spool: spool.clone(),
                     total_rows: self.index.total_rows(),
+                    current_page: None,
+                    filtered: false,
                 })
         } else {
             None

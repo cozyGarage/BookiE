@@ -159,7 +159,7 @@ fn gsettings_updates_are_visible_to_reopened_handles() {
     let store = PreferencesStore::from_settings(settings, None);
     store
         .update(|prefs| {
-            prefs.default_page_size = 424_242;
+            prefs.default_page_size = 2_347;
             prefs.csv_include_header = false;
         })
         .unwrap();
@@ -167,8 +167,20 @@ fn gsettings_updates_are_visible_to_reopened_handles() {
 
     let reopened = test_settings_with_backend("/com/bookie/linux/test/", backend);
     let reopened = PreferencesStore::from_settings(reopened, None);
-    assert_eq!(reopened.load().default_page_size, 424_242);
+    assert_eq!(reopened.load().default_page_size, 2_347);
     assert!(!reopened.load().csv_include_header);
+}
+
+#[test]
+fn invalid_default_page_sizes_are_bounded_on_load_and_update() {
+    let (settings, _) = make_test_settings("/com/bookie/linux/page-size-bounds/");
+    settings.set_uint64("default-page-size", 0).unwrap();
+    let store = PreferencesStore::from_settings(settings.clone(), None);
+    assert_eq!(store.load().default_page_size, Preferences::default().default_page_size);
+
+    store.update(|prefs| prefs.default_page_size = 9_999).unwrap();
+    assert_eq!(store.load().default_page_size, 5_000);
+    assert_eq!(settings.uint64("default-page-size"), 5_000);
 }
 
 #[test]
@@ -210,7 +222,7 @@ fn gsettings_keyfile_child() {
         "write" => {
             store
                 .update(|prefs| {
-                    prefs.default_page_size = 313_131;
+                    prefs.default_page_size = 3_131;
                     prefs.csv_include_header = false;
                 })
                 .unwrap();
@@ -218,7 +230,7 @@ fn gsettings_keyfile_child() {
         }
         "read" => {
             let prefs = store.load();
-            assert_eq!(prefs.default_page_size, 313_131);
+            assert_eq!(prefs.default_page_size, 3_131);
             assert!(!prefs.csv_include_header);
         }
         _ => {}
@@ -370,6 +382,57 @@ fn the_editor_font_family_survives_a_gsettings_round_trip_and_defaults_to_empty(
     });
     assert_eq!(before.editor_font_family, "");
     assert_eq!(after.editor_font_family, "Iosevka");
+}
+
+#[test]
+fn typography_overrides_survive_a_gsettings_round_trip_and_zero_uses_system_defaults() {
+    let (before, after) = after_a_round_trip("/com/bookie/linux/typography/", |prefs| {
+        prefs.ui_typography = bookie_app_services::preferences::TypographyOverride {
+            font_family: "Inter".into(),
+            font_size: 18,
+            font_weight: 600,
+        };
+        prefs.editor_font_weight = 500;
+        prefs.grid_typography.font_size = 14;
+        prefs.output_typography.font_family = "Noto Sans".into();
+    });
+    assert_eq!(before.ui_typography.font_size, 0);
+    assert_eq!(before.grid_typography.font_size, 0);
+    assert_eq!(before.output_typography.font_weight, 0);
+    assert_eq!(after.ui_typography.font_family, "Inter");
+    assert_eq!(after.ui_typography.font_weight, 600);
+    assert_eq!(after.editor_font_weight, 500);
+    assert_eq!(after.grid_typography.font_size, 14);
+    assert_eq!(after.output_typography.font_family, "Noto Sans");
+}
+
+#[test]
+fn typography_overrides_are_bounded_when_saved() {
+    let store = PreferencesStore::from_settings(make_test_settings("/com/bookie/linux/typography-bounds/").0, None);
+    store
+        .update(|prefs| {
+            prefs.ui_typography.font_size = u32::MAX;
+            prefs.ui_typography.font_weight = u32::MAX;
+            prefs.grid_typography.font_size = u32::MAX;
+            prefs.output_typography.font_size = 1;
+            prefs.editor_font_weight = 1;
+        })
+        .unwrap();
+    let loaded = store.load();
+    assert_eq!(
+        loaded.ui_typography.font_size,
+        bookie_app_services::preferences::MAX_TYPOGRAPHY_SIZE
+    );
+    assert_eq!(loaded.ui_typography.font_weight, 900);
+    assert_eq!(
+        loaded.grid_typography.font_size,
+        bookie_app_services::preferences::MAX_GRID_TYPOGRAPHY_SIZE
+    );
+    assert_eq!(
+        loaded.output_typography.font_size,
+        bookie_app_services::preferences::MIN_TYPOGRAPHY_SIZE
+    );
+    assert_eq!(loaded.editor_font_weight, 100);
 }
 
 #[test]

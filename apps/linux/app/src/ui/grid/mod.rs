@@ -59,6 +59,10 @@ pub(crate) use display::focused_cell_draft_id;
 pub(crate) use display::focused_row_position;
 pub(crate) use display::preview_to_display_text;
 pub use display::{focused_cell_identity, last_clicked_cell, set_date_format, set_null_display, value_to_display_text};
+
+pub(crate) fn apply_typography(typography: &bookie_app_services::preferences::TypographyOverride) {
+    font_zoom::apply_typography(typography);
+}
 pub use display_refresh::refresh_date_displays_under;
 pub use pinned_numbers::wrap_in_scrolled as wrap_grid_scrolled;
 pub(crate) use value_viewer::present as present_value_viewer;

@@ -24,14 +24,14 @@ TOOLKIT = {
 class GtkArtifactWorkflowTests(unittest.TestCase):
     def test_github_gtk_jobs_consume_the_verified_binary_and_schema_artifact(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
-        fast = workflow.split("  fast:\n", 1)[1].split("  gtk-safety:\n", 1)[0]
-        for name, end in (("gtk-safety", "current-stable-clippy"), ("gtk-server", "integration")):
+        build = workflow.split("  gtk-build:\n", 1)[1].split("  gtk:\n", 1)[0]
+        for name, end in (("gtk", "gtk-server"), ("gtk-server", "current-stable-clippy")):
             job = workflow.split(f"  {name}:\n", 1)[1].split(f"  {end}:\n", 1)[0]
             self.assertIn("ci-gtk-artifact.py verify", job)
             self.assertIn("BOOKIE_GTK_BINARY=", job)
             self.assertIn("GSETTINGS_SCHEMA_DIR=", job)
-        self.assertIn("ci-gtk-artifact.py create target/ci/bookie-app target/gtk-safety", fast)
-        self.assertIn("path: target/gtk-safety/", fast)
+        self.assertIn("ci-gtk-artifact.py create target/ci/bookie-app target/gtk-safety", build)
+        self.assertIn("path: target/gtk-safety/", build)
 
     def test_native_scenario_jobs_consume_the_single_verified_build(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
@@ -47,7 +47,7 @@ class GtkArtifactWorkflowTests(unittest.TestCase):
         self.assertNotIn("--no-default-features", build_job)
         self.assertNotRegex(build_job, r"cargo build[^\n]*--features")
         self.assertEqual(len(re.findall(r"ci-gtk-artifact\.py create (?!--package)", workflow)), 1)
-        for name in ("e2e", "gtk", "gtk-server"):
+        for name in ("gtk", "gtk-server"):
             job = jobs[name]
             self.assertRegex(job, r"needs: \[[^\]]*gtk-build[^\]]*\]")
             self.assertNotIn("test-build", job)

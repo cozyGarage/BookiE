@@ -730,6 +730,7 @@ pub(super) fn load_two_rows(controller: &relm4::Controller<BrowseTab>, observed:
                 truncated: false,
             },
             projected_columns: None,
+            elapsed: std::time::Duration::ZERO,
         })
         .unwrap();
     pump(observed);
@@ -778,6 +779,7 @@ fn load_keyless_row(controller: &relm4::Controller<BrowseTab>, observed: &Receiv
                 truncated: false,
             },
             projected_columns: None,
+            elapsed: std::time::Duration::ZERO,
         })
         .unwrap();
     pump(observed);
@@ -808,6 +810,7 @@ fn load_generated_column_row(controller: &relm4::Controller<BrowseTab>, observed
                 truncated: false,
             },
             projected_columns: None,
+            elapsed: std::time::Duration::ZERO,
         })
         .unwrap();
     pump(observed);
@@ -838,6 +841,7 @@ fn load_undecodable_cell_row(controller: &relm4::Controller<BrowseTab>, observed
                 truncated: false,
             },
             projected_columns: None,
+            elapsed: std::time::Duration::ZERO,
         })
         .unwrap();
     pump(observed);
