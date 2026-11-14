@@ -132,6 +132,9 @@ fn bytes_copy_text(bytes: &[u8]) -> String {
 }
 
 pub fn format_temporal_for_display(value: &Value, format: DateFormatPref) -> Option<String> {
+    if let Some(text) = bookie_core::sql_literal::postgres_extended_temporal_text(value) {
+        return Some(text);
+    }
     match value {
         Value::Date(day) => Some(match format.day_pattern() {
             Some(pattern) => day.format(pattern).to_string(),
@@ -193,6 +196,28 @@ mod tests {
                 Some(expected_stamp),
                 "{format:?}"
             );
+        }
+    }
+
+    #[test]
+    fn postgres_extended_temporals_keep_the_database_era_spelling() {
+        let date = NaiveDate::from_ymd_opt(-43, 3, 15).unwrap();
+        let time = NaiveDate::from_ymd_opt(-4712, 1, 1)
+            .unwrap()
+            .and_hms_opt(0, 0, 0)
+            .unwrap();
+        let values = [
+            (Value::Date(date), "0044-03-15 BC"),
+            (Value::DateTime(time), "4713-01-01 00:00:00 BC"),
+            (
+                Value::TimestampTz(Utc.from_utc_datetime(&time)),
+                "4713-01-01 00:00:00+00:00 BC",
+            ),
+        ];
+        for format in [DateFormatPref::Iso, DateFormatPref::UsShort, DateFormatPref::EuLong] {
+            for (value, expected) in &values {
+                assert_eq!(format_temporal_for_display(value, format).as_deref(), Some(*expected));
+            }
         }
     }
 
