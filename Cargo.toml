@@ -1,5 +1,6 @@
 [workspace]
 resolver = "3"
+exclude = ["vendor/sqlx-core"]
 members = [
     "apps/linux/app",
     "crates/app-services",
@@ -91,6 +92,7 @@ libc = "0.2"
 regex = "1"
 
 [patch.crates-io]
+sqlx-core = { path = "vendor/sqlx-core" }
 sqlx-mysql = { path = "vendor/sqlx-mysql" }
 sqlx-sqlite = { path = "vendor/sqlx-sqlite" }
 sqlx-postgres = { path = "vendor/sqlx-postgres" }
