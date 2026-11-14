@@ -885,7 +885,7 @@ fn plan_one(
             organization,
         };
     };
-    if endpoint_key(existing) != endpoint_key(&candidate) {
+    if endpoint_key(existing) != endpoint_key(&candidate) || hop_ids_cross_positions(existing, &candidate) {
         let mut remapped = candidate;
         remapped.id = Uuid::new_v4();
         return ImportItem {
@@ -905,6 +905,26 @@ fn plan_one(
     }
 }
 
+/// A saved hop password is stored under its connection id and hop id. An
+/// update that gave one hop the id of another would make the next
+/// connect send that stored password to a different SSH server.
+fn hop_ids_cross_positions(local: &SavedConnection, incoming: &SavedConnection) -> bool {
+    let hop_ids = |saved: &SavedConnection| -> Vec<Uuid> {
+        saved
+            .ssh
+            .as_ref()
+            .map(|root| root.flatten_hops().into_iter().map(|hop| hop.hop_id).collect())
+            .unwrap_or_default()
+    };
+    let local_ids = hop_ids(local);
+    hop_ids(incoming).iter().enumerate().any(|(position, id)| {
+        local_ids
+            .iter()
+            .position(|local_id| local_id == id)
+            .is_some_and(|at| at != position)
+    })
+}
+
 /// Settings a bundle may change, with the safety ones ratcheted: an
 /// import can tighten a local connection and never loosen it.
 fn merge_without_downgrade(local: &SavedConnection, incoming: SavedConnection) -> SavedConnection {
@@ -921,6 +941,7 @@ fn merge_without_downgrade(local: &SavedConnection, incoming: SavedConnection) -
         use_tls: tls_mode.encrypts(),
         tls_mode: Some(tls_mode),
         tls_root_cert: local.tls_root_cert.clone().or(incoming.tls_root_cert.clone()),
+        tls_strict_encryption: local.tls_strict_encryption || incoming.tls_strict_encryption,
         last_opened_at: local.last_opened_at,
         connect_timeout_secs: local.connect_timeout_secs,
         query_timeout_secs: local.query_timeout_secs,

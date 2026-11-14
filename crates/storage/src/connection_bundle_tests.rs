@@ -708,6 +708,67 @@ fn a_different_ssh_hop_chain_is_a_different_endpoint() {
     assert_eq!(plan.items[0].disposition, ImportDisposition::Remapped);
 }
 
+fn local_with_two_hops() -> SavedConnection {
+    let mut local = saved("sales");
+    local.ssh = Some(ssh_chain(2));
+    local
+}
+
+#[test]
+fn a_hop_id_moved_to_another_position_never_updates_in_place() {
+    let local = local_with_two_hops();
+    let local_ids: Vec<Uuid> = local
+        .ssh
+        .as_ref()
+        .unwrap()
+        .flatten_hops()
+        .iter()
+        .map(|hop| hop.hop_id)
+        .collect();
+    let mut incoming = local.clone();
+    let outer = incoming.ssh.as_mut().unwrap();
+    outer.hop_id = Uuid::new_v4();
+    let inner = outer.jump.as_mut().unwrap();
+    inner.hop_id = local_ids[0];
+    inner.credential_revision = 5;
+    let plan = plan_import(std::slice::from_ref(&local), &body_of(&[incoming])).expect("plan");
+
+    assert_eq!(plan.items[0].disposition, ImportDisposition::Remapped);
+    assert_ne!(plan.items[0].connection.id, local.id);
+    assert!(plan.items[0].previous.is_none());
+}
+
+#[test]
+fn hop_ids_that_stay_in_their_own_positions_update_in_place() {
+    let local = local_with_two_hops();
+    let mut incoming = local.clone();
+    incoming.ssh.as_mut().unwrap().credential_revision = 3;
+    let plan = plan_import(std::slice::from_ref(&local), &body_of(&[incoming])).expect("plan");
+
+    assert_eq!(plan.items[0].disposition, ImportDisposition::UpdateInPlace);
+}
+
+#[test]
+fn fresh_hop_ids_on_the_same_endpoints_update_in_place() {
+    let local = local_with_two_hops();
+    let mut incoming = local.clone();
+    incoming.ssh = Some(ssh_chain(2));
+    let plan = plan_import(std::slice::from_ref(&local), &body_of(&[incoming])).expect("plan");
+
+    assert_eq!(plan.items[0].disposition, ImportDisposition::UpdateInPlace);
+}
+
+#[test]
+fn an_in_place_update_cannot_turn_off_strict_encryption() {
+    let mut local = saved("sales");
+    local.tls_strict_encryption = true;
+    let mut incoming = local.clone();
+    incoming.tls_strict_encryption = false;
+    let plan = plan_import(std::slice::from_ref(&local), &body_of(&[incoming])).expect("plan");
+
+    assert!(plan.items[0].connection.tls_strict_encryption);
+}
+
 #[test]
 fn a_bundle_listing_one_id_twice_is_rejected_whole() {
     let connection = saved("sales");
