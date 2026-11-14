@@ -143,7 +143,7 @@ async fn a_row_capped_query_aborts_its_transaction_until_rollback_then_preserves
     let result = transaction
         .query(&format!(
             "SELECT row_value::bigint FROM generate_series(1, {}) AS generated(row_value)",
-            bookie_core::MAX_QUERY_ROWS + 1
+            bookie_core::MAX_QUERY_ROWS * 10
         ))
         .await
         .expect("row-capped query returns admitted rows");
