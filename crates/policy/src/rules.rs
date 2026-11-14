@@ -176,7 +176,7 @@ fn evaluate_categorical_decisions(
 ) -> Vec<Decision> {
     let effects = facts.effects;
     let mut decisions = Vec::new();
-    if connection_read_only && effects.writes() {
+    if connection_read_only && (facts.writes() || effects.writes()) {
         decisions.push(Decision::Deny {
             rule: "connection_read_only".into(),
             message: "connection is marked read-only; statements that may write are not permitted".into(),

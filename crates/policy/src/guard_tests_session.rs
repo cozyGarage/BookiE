@@ -496,6 +496,30 @@ fn outcomes_of(audit: &SequenceAuditSink, class: AuditOperationClass) -> Vec<Aud
 }
 
 #[tokio::test]
+async fn a_mysql_session_transaction_refuses_a_statement_that_would_commit_it() {
+    let h = harness_with_driver(SessionScript::default(), false, "mysql");
+    let mut session = h.guard.open_session().await.expect("open session");
+
+    run(&mut session, "BEGIN").await.expect("begin");
+    run(&mut session, "UPDATE items SET v = 1 WHERE id = 1")
+        .await
+        .expect("write");
+    let ddl = run(&mut session, "CREATE TABLE audit_copy (id INT)")
+        .await
+        .expect_err("DDL would commit the open transaction");
+    assert!(matches!(ddl, DriverError::PolicyDenied { .. }), "{ddl:?}");
+    assert!(session.transaction_open());
+    let sent = h.script.sent.lock().expect("sent lock").clone();
+    assert!(!sent.iter().any(|sql| sql.contains("CREATE TABLE")), "{sent:?}");
+
+    run(&mut session, "SAVEPOINT s").await.expect("savepoint");
+    run(&mut session, "SELECT 1").await.expect("read");
+    run(&mut session, "ROLLBACK").await.expect("rollback");
+    let rollbacks = outcomes_of(&h.audit, AuditOperationClass::TransactionRollback);
+    assert_eq!(rollbacks[0].transaction_outcome, AuditTransactionOutcome::RolledBack);
+}
+
+#[tokio::test]
 async fn a_session_runs_its_own_transaction_and_audits_the_rollback_against_its_batch() {
     let h = harness(SessionScript::default(), false);
     let mut session = h.guard.open_session().await.expect("open session");
@@ -601,6 +625,61 @@ async fn policy_still_denies_a_write_inside_a_session_on_a_read_only_connection(
             .expect("sent lock")
             .iter()
             .any(|sql| sql.starts_with("DELETE"))
+    );
+}
+
+#[tokio::test]
+async fn a_read_only_mysql_connection_cannot_enable_read_write_transactions() {
+    let h = harness_with_driver(SessionScript::default(), true, "mysql");
+    let mut session = h.guard.open_session().await.expect("open session");
+
+    for sql in [
+        "SET SESSION TRANSACTION READ WRITE",
+        "SET SESSION transaction_read_only = OFF",
+        "SET SESSION tx_read_only = 0",
+        "SET @@session.transaction_read_only = 0",
+        "SET @@session.tx_read_only = 0",
+    ] {
+        let error = run(&mut session, sql)
+            .await
+            .expect_err("read-only connection must refuse a read-write session mode");
+        assert!(
+            matches!(error, DriverError::PolicyDenied(_) | DriverError::ReadOnly),
+            "{sql}: {error:?}"
+        );
+    }
+    assert!(h.script.sent.lock().expect("sent lock").is_empty());
+}
+
+#[tokio::test]
+async fn a_read_only_mysql_connection_does_not_execute_routines() {
+    let h = harness_with_driver(SessionScript::default(), true, "mysql");
+    let mut session = h.guard.open_session().await.expect("open session");
+
+    for sql in ["CALL change_read_only_mode()", "SELECT change_read_only_mode()"] {
+        let error = run(&mut session, sql)
+            .await
+            .expect_err(&format!("read-only connection must refuse {sql}"));
+        assert!(
+            matches!(error, DriverError::PolicyDenied(_) | DriverError::ReadOnly),
+            "{sql}: {error:?}"
+        );
+    }
+    assert!(h.script.sent.lock().expect("sent lock").is_empty());
+}
+
+#[tokio::test]
+async fn a_read_only_mysql_connection_allows_known_pure_functions() {
+    let h = harness_with_driver(SessionScript::default(), true, "mysql");
+    let mut session = h.guard.open_session().await.expect("open session");
+
+    run(&mut session, "SELECT CONCAT('book', UPPER('ie'))")
+        .await
+        .expect("known pure functions are safe on read-only connections");
+
+    assert_eq!(
+        h.script.sent.lock().expect("sent lock").as_slice(),
+        ["SELECT CONCAT('book', UPPER('ie'))"],
     );
 }
 
