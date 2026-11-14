@@ -2,6 +2,7 @@
 
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use std::{borrow::Cow, future::Future};
 
 use async_trait::async_trait;
 use bookie_core::{ConnectOptions, Connection, DatabaseDriver, DriverError, Environment, OperationControl, Value};
@@ -11,10 +12,200 @@ use bookie_policy::{
     classify,
 };
 use drivers_mssql::MssqlDriver;
-use testcontainers::ImageExt;
+use testcontainers::core::WaitFor;
 use testcontainers::runners::AsyncRunner;
+use testcontainers::{ContainerAsync, Image, ImageExt};
 use testcontainers_modules::mssql_server::MssqlServer;
+use tokio::io::AsyncReadExt;
+use tokio::net::TcpStream;
 use uuid::Uuid;
+
+const MSSQL_STARTUP_TIMEOUT: Duration = Duration::from_secs(180);
+const MSSQL_LOG_LIMIT: u64 = 32 * 1024;
+
+#[derive(Debug, Clone)]
+struct PolicyMssqlImage(MssqlServer);
+
+impl Image for PolicyMssqlImage {
+    fn name(&self) -> &str {
+        self.0.name()
+    }
+
+    fn tag(&self) -> &str {
+        self.0.tag()
+    }
+
+    fn ready_conditions(&self) -> Vec<WaitFor> {
+        vec![WaitFor::Nothing]
+    }
+
+    fn env_vars(&self) -> impl IntoIterator<Item = (impl Into<Cow<'_, str>>, impl Into<Cow<'_, str>>)> {
+        self.0.env_vars()
+    }
+}
+
+async fn start_policy_mssql() -> (ContainerAsync<PolicyMssqlImage>, Arc<dyn Connection>) {
+    let image = PolicyMssqlImage(MssqlServer::default().with_accept_eula()).with_startup_timeout(MSSQL_STARTUP_TIMEOUT);
+    let deadline = tokio::time::Instant::now() + MSSQL_STARTUP_TIMEOUT;
+    let container = tokio::time::timeout_at(deadline, image.start())
+        .await
+        .unwrap_or_else(|_| panic!("SQL Server container creation exceeded 180 seconds"))
+        .unwrap_or_else(|error| panic!("SQL Server container creation failed: {error}"));
+    let host = container
+        .get_host()
+        .await
+        .unwrap_or_else(|error| panic!("SQL Server host lookup failed: {error}"))
+        .to_string();
+    let port = container
+        .get_host_port_ipv4(1433)
+        .await
+        .unwrap_or_else(|error| panic!("SQL Server port lookup failed: {error}"));
+    let options = ConnectOptions {
+        host: host.clone(),
+        port,
+        database: "master".into(),
+        username: "sa".into(),
+        password: secrecy::SecretString::new(MssqlServer::DEFAULT_SA_PASSWORD.to_string().into()),
+        tls: bookie_core::TlsConfig::disabled(),
+        ..Default::default()
+    };
+    if let Err(error) = wait_for_log_markers(&container, deadline).await {
+        panic!(
+            "SQL Server log readiness failed: {error}\n{}",
+            container_diagnostics(&container).await
+        );
+    }
+    if let Err(error) = wait_for_tcp(&host, port, deadline).await {
+        panic!(
+            "SQL Server TCP readiness failed: {error}\n{}",
+            container_diagnostics(&container).await
+        );
+    }
+    let connection = wait_for_authenticated_mssql(deadline, || async {
+        let connection = MssqlDriver.connect(options.clone()).await?;
+        connection.query("SELECT 1").await?;
+        Ok(Arc::from(connection) as Arc<dyn Connection>)
+    })
+    .await;
+    match connection {
+        Ok(connection) => (container, connection),
+        Err(error) => panic!(
+            "SQL Server authenticated readiness failed: {error}\n{}",
+            container_diagnostics(&container).await
+        ),
+    }
+}
+
+async fn wait_for_tcp(host: &str, port: u16, deadline: tokio::time::Instant) -> Result<(), DriverError> {
+    loop {
+        match tokio::time::timeout_at(deadline, TcpStream::connect((host, port))).await {
+            Err(_) => return Err(DriverError::TimedOut),
+            Ok(Ok(stream)) => {
+                drop(stream);
+                return Ok(());
+            }
+            Ok(Err(error)) if error.kind() == std::io::ErrorKind::ConnectionRefused => {
+                let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+                if remaining.is_zero() {
+                    return Err(DriverError::TimedOut);
+                }
+                tokio::time::sleep(Duration::from_millis(250).min(remaining)).await;
+            }
+            Ok(Err(_)) => return Err(DriverError::ConnectionRefused),
+        }
+    }
+}
+
+async fn wait_for_log_markers(
+    container: &ContainerAsync<PolicyMssqlImage>,
+    deadline: tokio::time::Instant,
+) -> Result<(), DriverError> {
+    loop {
+        let stdout = read_log_prefix(container.stdout(false)).await;
+        if has_mssql_readiness_markers(&stdout) {
+            return Ok(());
+        }
+        if matches!(container.is_running().await, Ok(false)) {
+            return Err(DriverError::ConnectionRefused);
+        }
+        if tokio::time::Instant::now() >= deadline {
+            return Err(DriverError::TimedOut);
+        }
+        let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+        tokio::time::sleep(Duration::from_millis(500).min(remaining)).await;
+    }
+}
+
+fn has_mssql_readiness_markers(stdout: &str) -> bool {
+    stdout.contains("SQL Server is now ready for client connections") && stdout.contains("Recovery is complete")
+}
+
+async fn wait_for_authenticated_mssql<F, Fut, T>(
+    deadline: tokio::time::Instant,
+    mut attempt: F,
+) -> Result<T, DriverError>
+where
+    F: FnMut() -> Fut,
+    Fut: Future<Output = Result<T, DriverError>>,
+{
+    loop {
+        match tokio::time::timeout_at(deadline, attempt()).await {
+            Err(_) => return Err(DriverError::TimedOut),
+            Ok(Ok(value)) => return Ok(value),
+            Ok(Err(DriverError::AuthFailed)) => {
+                let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+                if remaining.is_zero() {
+                    return Err(DriverError::TimedOut);
+                }
+                tokio::time::sleep(Duration::from_millis(500).min(remaining)).await;
+            }
+            Ok(Err(error)) => return Err(error),
+        }
+    }
+}
+
+async fn container_diagnostics(container: &ContainerAsync<PolicyMssqlImage>) -> String {
+    let running = container.is_running().await;
+    let exit_code = container.exit_code().await;
+    let stdout = read_log_prefix(container.stdout(false)).await;
+    let stderr = read_log_prefix(container.stderr(false)).await;
+    let marker_status = format!(
+        "SQL Server is now ready for client connections={}, Recovery is complete={}",
+        stdout.contains("SQL Server is now ready for client connections"),
+        stdout.contains("Recovery is complete")
+    );
+    let state = inspect_container_state(container.id()).await;
+    format!(
+        "container={} running={running:?} exit_code={exit_code:?} inspect={state}\nreadiness markers in captured stdout: {marker_status}\nstdout prefix:\n{stdout}\nstderr prefix:\n{stderr}",
+        container.id()
+    )
+}
+
+async fn read_log_prefix(reader: impl tokio::io::AsyncRead + Unpin) -> String {
+    let mut bytes = Vec::new();
+    let _ = reader.take(MSSQL_LOG_LIMIT).read_to_end(&mut bytes).await;
+    redact_mssql_secret(&String::from_utf8_lossy(&bytes))
+}
+
+fn redact_mssql_secret(log: &str) -> String {
+    log.replace(MssqlServer::DEFAULT_SA_PASSWORD, "[redacted]")
+}
+
+async fn inspect_container_state(container_id: &str) -> String {
+    let result = tokio::process::Command::new("docker")
+        .args([
+            "inspect",
+            "--format={{.State.Status}} oom={{.State.OOMKilled}} exit={{.State.ExitCode}} error={{.State.Error}}",
+            container_id,
+        ])
+        .output()
+        .await;
+    match result {
+        Ok(output) if output.status.success() => String::from_utf8_lossy(&output.stdout).trim().to_string(),
+        Ok(output) => format!("unavailable (docker inspect status {})", output.status),
+        Err(_) => "unavailable (docker inspect command not found or failed)".to_string(),
+    }
+}
 
 #[derive(Default)]
 struct CapturingAudit(Mutex<Vec<AuditEvent>>);
@@ -39,25 +230,7 @@ async fn run_session(
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn sql_server_tran_forms_are_refused_shared_and_tracked_in_sessions() {
-    let container = MssqlServer::default()
-        .with_accept_eula()
-        .with_startup_timeout(Duration::from_secs(180))
-        .start()
-        .await
-        .unwrap();
-    let connection = MssqlDriver
-        .connect(ConnectOptions {
-            host: container.get_host().await.unwrap().to_string(),
-            port: container.get_host_port_ipv4(1433).await.unwrap(),
-            database: "master".into(),
-            username: "sa".into(),
-            password: secrecy::SecretString::new(MssqlServer::DEFAULT_SA_PASSWORD.to_string().into()),
-            tls: bookie_core::TlsConfig::disabled(),
-            ..Default::default()
-        })
-        .await
-        .unwrap();
-    let connection: Arc<dyn Connection> = Arc::from(connection);
+    let (_container, connection) = start_policy_mssql().await;
     let table = format!("dbo.b4_transaction_{}", Uuid::new_v4().simple());
     connection
         .execute(&format!(
@@ -119,25 +292,7 @@ async fn sql_server_tran_forms_are_refused_shared_and_tracked_in_sessions() {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn sql_server_batches_with_mutations_are_classified_and_denied_before_dispatch() {
-    let container = MssqlServer::default()
-        .with_accept_eula()
-        .with_startup_timeout(Duration::from_secs(180))
-        .start()
-        .await
-        .unwrap();
-    let connection = MssqlDriver
-        .connect(ConnectOptions {
-            host: container.get_host().await.unwrap().to_string(),
-            port: container.get_host_port_ipv4(1433).await.unwrap(),
-            database: "master".into(),
-            username: "sa".into(),
-            password: secrecy::SecretString::new(MssqlServer::DEFAULT_SA_PASSWORD.to_string().into()),
-            tls: bookie_core::TlsConfig::disabled(),
-            ..Default::default()
-        })
-        .await
-        .unwrap();
-    let connection: Arc<dyn Connection> = Arc::from(connection);
+    let (_container, connection) = start_policy_mssql().await;
     connection
         .execute(
             "CREATE TABLE dbo.batch_target (id int PRIMARY KEY, value int NOT NULL); \
@@ -230,4 +385,62 @@ async fn sql_server_batches_with_mutations_are_classified_and_denied_before_disp
             .iter()
             .all(|event| event.terminal_status == AuditTerminalStatus::Denied)
     );
+}
+
+#[tokio::test(start_paused = true)]
+async fn mssql_startup_retries_authentication_until_system_databases_are_ready() {
+    let mut attempts = 0;
+    wait_for_authenticated_mssql(tokio::time::Instant::now() + MSSQL_STARTUP_TIMEOUT, || {
+        attempts += 1;
+        async move {
+            if attempts < 3 {
+                Err(DriverError::AuthFailed)
+            } else {
+                Ok(())
+            }
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(attempts, 3);
+}
+
+#[tokio::test(start_paused = true)]
+async fn mssql_startup_does_not_retry_terminal_connection_errors() {
+    let mut attempts = 0;
+    let error = wait_for_authenticated_mssql(tokio::time::Instant::now() + MSSQL_STARTUP_TIMEOUT, || {
+        attempts += 1;
+        async { Err::<(), _>(DriverError::ConnectionRefused) }
+    })
+    .await
+    .unwrap_err();
+    assert!(matches!(error, DriverError::ConnectionRefused));
+    assert_eq!(attempts, 1);
+}
+
+#[tokio::test(start_paused = true)]
+async fn mssql_startup_retry_is_bounded_by_the_existing_deadline() {
+    let error = wait_for_authenticated_mssql(tokio::time::Instant::now() + Duration::from_secs(1), || async {
+        Err::<(), _>(DriverError::AuthFailed)
+    })
+    .await
+    .unwrap_err();
+    assert!(matches!(error, DriverError::TimedOut));
+}
+
+#[test]
+fn mssql_readiness_requires_both_system_database_markers() {
+    assert!(!has_mssql_readiness_markers(
+        "SQL Server is now ready for client connections"
+    ));
+    assert!(!has_mssql_readiness_markers("Recovery is complete"));
+    assert!(has_mssql_readiness_markers(
+        "SQL Server is now ready for client connections\nRecovery is complete"
+    ));
+}
+
+#[test]
+fn mssql_startup_log_redacts_the_fixture_password() {
+    let log = format!("MSSQL_SA_PASSWORD={}", MssqlServer::DEFAULT_SA_PASSWORD);
+    assert_eq!(redact_mssql_secret(&log), "MSSQL_SA_PASSWORD=[redacted]");
 }
