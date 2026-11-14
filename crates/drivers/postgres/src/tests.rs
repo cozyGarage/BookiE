@@ -47,7 +47,7 @@ fn undecodable_cell_cannot_be_bound_as_null() {
 
 #[test]
 fn server_termination_states_are_disconnections_but_query_cancel_is_not() {
-    for sqlstate in ["57P01", "57P02", "57P03", "57P04"] {
+    for sqlstate in ["25P03", "57P01", "57P02", "57P03", "57P04"] {
         assert!(is_server_disconnect_sqlstate(Some(sqlstate)), "{sqlstate}");
     }
     assert!(!is_server_disconnect_sqlstate(Some("57014")));
