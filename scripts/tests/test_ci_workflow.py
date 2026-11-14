@@ -988,6 +988,8 @@ class CiWorkflowTests(unittest.TestCase):
                 self.assertIn("sccache --start-server", job)
                 self.assertIn("sccache --show-stats", job)
                 self.assertIn("ci-cache.py --root /target", job)
+                if name == "linux-build":
+                    self.assertIn("python3 src/scripts/ci-cache.py --root /target", job)
                 stop = job.index("sccache --stop-server")
                 cleanup = job.index('rm -rf -- "$TMPDIR"')
                 self.assertLess(stop, cleanup)
