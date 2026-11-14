@@ -34,6 +34,8 @@ pub enum ExportError {
         "The text {marker} that stands for NULL also appears as a value at row {row}. Export as JSON or choose another format"
     )]
     NullMarkerCollision { marker: String, row: usize },
+    #[error("Export stopped because row {row} has {actual} values but its header has {expected} columns")]
+    RowWidthMismatch { row: usize, expected: usize, actual: usize },
     #[error("The rows could not be read: {0}")]
     Source(String),
     #[error("The Excel workbook could not be built")]

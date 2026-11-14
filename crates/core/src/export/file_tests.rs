@@ -48,6 +48,30 @@ fn duplicate_label_result() -> QueryResult {
     }
 }
 
+#[test]
+fn mismatched_materialized_rows_refuse_without_replacing_existing_exports() {
+    for (format, extension) in [(ResultFormat::Csv, "csv"), (ResultFormat::Json, "json")] {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join(format!("out.{extension}"));
+        std::fs::write(&path, "previous export").unwrap();
+        let data = QueryResult {
+            columns: vec![column("id"), column("text")],
+            rows: vec![vec![
+                Value::Int(1),
+                Value::Text("row".into()),
+                Value::Text("late".into()),
+            ]]
+            .into(),
+            truncated: false,
+        };
+        let options = CsvOptions::default();
+        let result = write_result_file(&path, &data, &plain(format, &options), || false, |_| {});
+
+        assert!(matches!(result, Err(ExportError::RowWidthMismatch { .. })));
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "previous export");
+    }
+}
+
 fn workbook_parts(bytes: Vec<u8>) -> (String, String) {
     use std::io::Read;
 
