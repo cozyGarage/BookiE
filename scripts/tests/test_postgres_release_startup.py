@@ -111,6 +111,10 @@ if "up" in sys.argv:
         compose = (ROOT / "tests/fixtures/postgres-release/docker-compose.yml").read_text()
         self.assertEqual(compose.count('${BOOKIE_FIXTURE_BIND_ADDRESS:-127.0.0.1}:'), 3)
 
+        script = (ROOT / "scripts/test-postgres-release.sh").read_text()
+        self.assertIn('BOOKIE_GTK_POSTGRES_MTLS_HOST="$BOOKIE_FIXTURE_PROXY_HOST"', script)
+        self.assertIn('BOOKIE_GTK_POSTGRES_SSH_AUDIT_HOST="$BOOKIE_FIXTURE_SSH_HOST"', script)
+
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         job = workflow.split("  pg-release:\n", 1)[1].split("  distro-floor-scenarios:\n", 1)[0]
         self.assertIn("options: --add-host=host.docker.internal:host-gateway", job)
