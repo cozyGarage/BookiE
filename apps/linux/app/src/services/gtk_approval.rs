@@ -6,8 +6,6 @@ use std::{
 use async_trait::async_trait;
 use bookie_policy::{ApprovalOutcome, ApprovalRequest, ApprovalSink};
 
-/// GTK approval sink. Posts a modal `adw::AlertDialog` on the glib main
-/// context and parks the async caller until the user responds.
 pub struct GtkApprovalSink;
 
 const APPROVAL_TIMEOUT: Duration = Duration::from_secs(120);
@@ -20,9 +18,7 @@ const APPROVE_REMEMBER_RESPONSE: &str = "remember";
 const APPROVE_REMEMBER_LABEL: &str = "Approve and don't ask again";
 const CLOSE_RESPONSE: &str = DENY_RESPONSE;
 
-/// The window that actually owns the triggering connection wins over
-/// whichever window last had focus, which wins over any other visible
-/// window, which wins over anything still on screen at all.
+// Keep approval on the window that owns the connection, not another focused window.
 fn preferred_approval_window<T>(
     registered_and_visible: Option<T>,
     active: Option<T>,
@@ -121,8 +117,7 @@ async fn acquire_dialog_permit(
 #[async_trait]
 impl ApprovalSink for GtkApprovalSink {
     async fn request(&self, req: ApprovalRequest) -> ApprovalOutcome {
-        // The deadline includes time spent waiting behind another dialog, so
-        // a burst of agent writes cannot build an unbounded modal queue.
+        // Include dialog-queue wait in the deadline to bound queued approvals.
         let deadline = tokio::time::Instant::now() + APPROVAL_TIMEOUT;
         let gate = APPROVAL_DIALOG
             .get_or_init(|| Arc::new(tokio::sync::Semaphore::new(1)))
@@ -207,8 +202,7 @@ impl ApprovalSink for GtkApprovalSink {
                 if !cancelled && tokio::time::Instant::now() < deadline {
                     return glib::ControlFlow::Continue;
                 }
-                // This source is firing; clear its ID so force_close cannot
-                // try to remove the active source via the response callback.
+                // Clear the active source before force_close triggers its response callback.
                 if let Ok(mut timer) = timer_timeout.lock() {
                     timer.take();
                 }
@@ -227,10 +221,7 @@ impl ApprovalSink for GtkApprovalSink {
                 *timer = Some(source);
             }
 
-            // Prefer the window that actually owns the connection this
-            // statement runs on -- active_window() answers with whatever
-            // window last had focus, which in a multi-window session can
-            // be a different connection than the one being approved.
+            // Active window may belong to a different connection in a multi-window session.
             let application = gtk::Application::default();
             let window = preferred_approval_window(
                 crate::services::window_registry::window_for(connection_id).filter(|window| window.is_visible()),
