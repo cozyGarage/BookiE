@@ -211,6 +211,7 @@ fn administrative_analysis(operation: AdministrativeOperation) -> StatementAnaly
             is_multi_statement: false,
             parse_error: None,
         },
+        lexical_mode_ambiguous: false,
         blast_radius: None,
         rolls_back_to_savepoint: false,
         sensitive_positions: None,
