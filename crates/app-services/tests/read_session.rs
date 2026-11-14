@@ -336,6 +336,34 @@ async fn a_page_command_returns_the_requested_rows_with_its_epoch() {
 }
 
 #[tokio::test]
+async fn a_status_command_returns_the_active_connection_with_its_epoch() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("session.db");
+    seeded(&path).await;
+    let session = session(&path, Uuid::new_v4(), Arc::new(DatabaseService::new_isolated())).await;
+    let (sender, mut receiver) = tokio::sync::mpsc::channel(1);
+    let sink = ChannelEventSink::new(sender);
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(5));
+
+    dispatch(
+        &session,
+        Command::ReadConnectionStatus { epoch: Epoch(45) },
+        &control,
+        &sink,
+    )
+    .await
+    .unwrap();
+
+    let Event::ConnectionStatusRead { epoch, outcome } = receiver.try_recv().unwrap() else {
+        panic!("status command returned a different event");
+    };
+    assert_eq!(epoch, Epoch(45));
+    assert_eq!(outcome.len(), 1);
+    assert_eq!(outcome[0].name, "session");
+    assert_eq!(outcome[0].driver_id, "sqlite");
+}
+
+#[tokio::test]
 async fn a_denied_write_command_does_not_change_the_database() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("session.db");
