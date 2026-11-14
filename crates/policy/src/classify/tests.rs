@@ -224,6 +224,33 @@ fn mysql_executable_comment_cannot_hide_a_file_write_from_policy() {
 }
 
 #[test]
+fn postgres_unicode_escaped_identifier_cannot_hide_a_name_from_policy() {
+    for sql in [
+        r#"SELECT U&"pg_terminate\005Fbackend"(pid) FROM pg_stat_activity"#,
+        r#"SELECT u&"p\0061n" AS x FROM cards"#,
+        r#"SELECT U&"p!0061n" UESCAPE '!' FROM cards"#,
+        r#"SELECT t.U&"p\0061n" FROM cards t"#,
+    ] {
+        let facts = classify(sql, "postgres");
+        assert_eq!(facts.class, StatementClass::Unparseable, "SQL: {sql}, facts: {facts:?}");
+        assert!(facts.writes(), "SQL: {sql}, facts: {facts:?}");
+    }
+
+    for sql in [
+        r#"SELECT u & "flags" FROM t"#,
+        r#"SELECT U&'d\0061ta'"#,
+        r#"SELECT 'U&"pan"'"#,
+        r#"SELECT cpu&"mask" FROM t"#,
+        r#"SELECT "U"&"flags" FROM t"#,
+        r#"SELECT u/**/&"flags" FROM t"#,
+    ] {
+        let facts = classify(sql, "postgres");
+        assert_eq!(facts.class, StatementClass::Select, "SQL: {sql}, facts: {facts:?}");
+        assert!(!facts.writes(), "SQL: {sql}, facts: {facts:?}");
+    }
+}
+
+#[test]
 fn mssql_update() {
     let f = classify("UPDATE dbo.t SET a = 1 WHERE a = 2", "mssql");
     assert_eq!(f.class, StatementClass::Update);
