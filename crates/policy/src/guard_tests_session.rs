@@ -496,6 +496,30 @@ fn outcomes_of(audit: &SequenceAuditSink, class: AuditOperationClass) -> Vec<Aud
 }
 
 #[tokio::test]
+async fn a_mysql_session_transaction_refuses_a_statement_that_would_commit_it() {
+    let h = harness_with_driver(SessionScript::default(), false, "mysql");
+    let mut session = h.guard.open_session().await.expect("open session");
+
+    run(&mut session, "BEGIN").await.expect("begin");
+    run(&mut session, "UPDATE items SET v = 1 WHERE id = 1")
+        .await
+        .expect("write");
+    let ddl = run(&mut session, "CREATE TABLE audit_copy (id INT)")
+        .await
+        .expect_err("DDL would commit the open transaction");
+    assert!(matches!(ddl, DriverError::PolicyDenied { .. }), "{ddl:?}");
+    assert!(session.transaction_open());
+    let sent = h.script.sent.lock().expect("sent lock").clone();
+    assert!(!sent.iter().any(|sql| sql.contains("CREATE TABLE")), "{sent:?}");
+
+    run(&mut session, "SAVEPOINT s").await.expect("savepoint");
+    run(&mut session, "SELECT 1").await.expect("read");
+    run(&mut session, "ROLLBACK").await.expect("rollback");
+    let rollbacks = outcomes_of(&h.audit, AuditOperationClass::TransactionRollback);
+    assert_eq!(rollbacks[0].transaction_outcome, AuditTransactionOutcome::RolledBack);
+}
+
+#[tokio::test]
 async fn a_session_runs_its_own_transaction_and_audits_the_rollback_against_its_batch() {
     let h = harness(SessionScript::default(), false);
     let mut session = h.guard.open_session().await.expect("open session");

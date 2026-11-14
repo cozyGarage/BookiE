@@ -25,7 +25,30 @@ pub(crate) fn projection_from_statements(statements: &[Statement], patterns: &Se
     let [Statement::Query(query)] = statements else {
         return None;
     };
+    if reads_column_statistics(&query.to_string()) {
+        return None;
+    }
     select_projection_sensitivity(query, patterns)
+}
+
+fn reads_column_statistics(rendered: &str) -> bool {
+    text_identifiers(rendered).any(|identifier| {
+        let name = identifier.to_ascii_lowercase();
+        matches!(
+            name.as_str(),
+            "pg_stats"
+                | "pg_statistic"
+                | "pg_stats_ext"
+                | "pg_stats_ext_exprs"
+                | "pg_statistic_ext_data"
+                | "column_statistics"
+                | "column_stats"
+                | "dm_db_stats_histogram"
+                | "sqlite_stat3"
+                | "sqlite_stat4"
+        ) || name.ends_with("_histograms")
+            || name.ends_with("_col_statistics")
+    })
 }
 
 fn select_projection_sensitivity(query: &Query, patterns: &SensitivePatterns) -> Option<Vec<bool>> {

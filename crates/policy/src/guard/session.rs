@@ -688,10 +688,21 @@ impl PolicySession {
                 .refuse(sql, "read_only_snapshot_refusal", DriverError::ReadOnly)
                 .await;
         }
-        let authorization = self
-            .guard
-            .authorize_classified(sql, analysis, Some(control), Some(Counter::Session(&mut *self.inner)))
-            .await?;
+        let commits_open_transaction = self
+            .batch
+            .and_then(|_| interactive_transaction_decision(&self.guard.ctx.driver_id, parsed, &analysis.facts));
+        let authorization = match commits_open_transaction {
+            Some(decision) => {
+                self.guard
+                    .resolve_authorization(sql, analysis, decision, None, Some(control))
+                    .await?
+            }
+            None => {
+                self.guard
+                    .authorize_classified(sql, analysis, Some(control), Some(Counter::Session(&mut *self.inner)))
+                    .await?
+            }
+        };
         let writes = authorization.analysis.facts.writes();
         let rolls_back_to_savepoint = authorization.analysis.rolls_back_to_savepoint;
         let result = match self.batch {
