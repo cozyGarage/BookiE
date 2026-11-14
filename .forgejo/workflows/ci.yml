@@ -1152,6 +1152,16 @@ jobs:
         run: bash src/scripts/prepull-test-images.sh driver-tls
       - name: Driver TLS fixtures
         run: cd src && python3 scripts/run-test-layer.py tls
+      - name: Prepare artifact runtime
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Retain driver TLS diagnostics
+        if: always()
+        uses: https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
+        with:
+          name: driver-tls-${{ github.run_id }}-${{ github.run_attempt }}
+          path: src/target/quality/*-layers
+          if-no-files-found: error
+          retention-days: 2
 
       - name: Finalize runner job
         if: always()
