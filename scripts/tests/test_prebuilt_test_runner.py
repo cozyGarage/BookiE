@@ -110,10 +110,28 @@ class PrebuiltTestRunnerTests(unittest.TestCase):
             self.assertEqual(len(runner.commands(self.root, ["-p", "sample", "--test", "integration"])), 1)
 
     def test_bundle_preparation_rejects_a_different_checkout(self):
-        result = subprocess.run(['bash', str(ROOT / 'scripts/prepare-test-bundle.sh'), '0' * 40, 'default'],
+        result = subprocess.run(['bash', str(ROOT / 'scripts/prepare-test-bundle.sh'), '0' * 40, 'default', str(self.root)],
                                 capture_output=True, text=True)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('differs from the checkout', result.stderr)
+
+    def test_bundle_preparation_verifies_the_download_and_exports_runner_environment(self):
+        revision = subprocess.run(['git', '-C', str(ROOT), 'rev-parse', 'HEAD'], check=True, capture_output=True, text=True).stdout.strip()
+        self.index['source_commit'] = revision
+        self.index['build_group'] = 'default'
+        (self.root / 'index.json').write_text(json.dumps(self.index))
+        environment = self.root / 'github-env'
+        result = subprocess.run(
+            ['bash', str(ROOT / 'scripts/prepare-test-bundle.sh'), revision, 'default', str(self.root)],
+            env={**os.environ, 'GITHUB_ENV': str(environment)}, capture_output=True, text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        values = environment.read_text()
+        self.assertIn(f'BOOKIE_TEST_BUNDLE={self.root}', values)
+        self.assertIn(f'BOOKIE_SOURCE_COMMIT={revision}', values)
+        self.assertIn(f'GSETTINGS_SCHEMA_DIR={self.root}/schemas', values)
+        self.assertIn('BOOKIE_REQUIRE_PREBUILT=1', values)
+        self.assertTrue(self.binary.stat().st_mode & 0o100)
 
     def test_bundle_builder_rejects_a_different_checkout(self):
         result = subprocess.run(['bash', str(ROOT / 'scripts/build-test-bundles.sh'), str(self.root / 'out')],
