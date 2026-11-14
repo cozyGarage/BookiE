@@ -586,7 +586,7 @@ jobs:
           apt-get install -y --no-install-recommends desktop-file-utils
       - name: Build the Linux application binaries once
         env:
-          DEB_OUT: ${{ github.workspace }}/floor-package
+          DEB_OUT: ${{ github.workspace }}/.floor-package
           BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
