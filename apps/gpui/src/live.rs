@@ -2,9 +2,11 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
-use bookie_app_services::command_bridge::{ChannelEventSink, Command, Epoch, Event, dispatch};
+use bookie_app_services::command_bridge::{
+    ChannelEventSink, Command, DispatchContext, Epoch, Event, dispatch,
+};
 use bookie_app_services::database_service::ConnectionOverview;
-use bookie_app_services::read_session::{ReadSession, list_saved_connections};
+use bookie_app_services::read_session::{ConnectionSummary, ReadSession};
 use bookie_core::{ColumnInfo, OperationControl, QueryResult, QueryResultBudget, QueryRows, TableInfo};
 use bookie_results::result_scan::ScanSource;
 use bookie_results::stream_result_spool::StreamResultSpoolManager;
@@ -14,11 +16,14 @@ use crate::model::{Cell, ColumnMeta, Diff, FindResult, PAGE_ROWS, Predicate};
 use crate::shell::table_label;
 use crate::source::{ResultSource, filter_in, find_in};
 
-pub fn saved_connections() -> Result<Vec<bookie_app_services::read_session::ConnectionSummary>, String> {
+pub fn saved_connections() -> Result<Vec<ConnectionSummary>, String> {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .build()
         .map_err(|error| error.to_string())?;
-    runtime.block_on(list_saved_connections())
+    let epoch = Epoch(1);
+    let current_epoch = AtomicU64::new(epoch.0);
+    let control = OperationControl::with_timeout(Duration::from_secs(5));
+    runtime.block_on(bridge_saved_connections(&control, epoch, &current_epoch))
 }
 
 #[derive(Clone, Debug)]
@@ -97,7 +102,7 @@ impl LiveSession {
         let epoch = Epoch(self.epoch.load(Ordering::Relaxed));
         let control = OperationControl::with_timeout(Duration::from_secs(5));
         let event = self.runtime.block_on(dispatch_read(
-            session,
+            DispatchContext::Session(session),
             Command::ReadConnectionStatus { epoch },
             &control,
             epoch,
@@ -196,7 +201,13 @@ async fn open_session(origin: &Origin, cancellation: CancellationToken) -> Resul
     let registry = Arc::new(drivers_registry::default_registry());
     let (opened, label) = match origin {
         Origin::Saved(connection) => {
-            let saved = list_saved_connections().await?;
+            let epoch = Epoch(1);
+            let current_epoch = AtomicU64::new(epoch.0);
+            let control = OperationControl::new(
+                cancellation.clone(),
+                Some(tokio::time::Instant::now() + Duration::from_secs(30)),
+            );
+            let saved = bridge_saved_connections(&control, epoch, &current_epoch).await?;
             let summary = saved
                 .iter()
                 .find(|saved| saved.id.to_string() == *connection || saved.name == *connection)
@@ -380,7 +391,7 @@ async fn bridge_query(
     current_epoch: &AtomicU64,
 ) -> Result<QueryResult, String> {
     let event = dispatch_read(
-        session,
+        DispatchContext::Session(session),
         Command::RunQuery {
             epoch,
             sql: sql.to_owned(),
@@ -406,7 +417,7 @@ async fn bridge_read_page(
     current_epoch: &AtomicU64,
 ) -> Result<QueryResult, String> {
     let event = dispatch_read(
-        session,
+        DispatchContext::Session(session),
         Command::ReadPage {
             epoch,
             table: table.clone(),
@@ -425,7 +436,7 @@ async fn bridge_read_page(
 }
 
 async fn dispatch_read(
-    session: &ReadSession,
+    context: DispatchContext<'_>,
     command: Command,
     control: &OperationControl,
     epoch: Epoch,
@@ -436,7 +447,7 @@ async fn dispatch_read(
     }
     let (sender, mut receiver) = tokio::sync::mpsc::channel(1);
     let sink = ChannelEventSink::new(sender);
-    dispatch(session, command, control, &sink)
+    dispatch(context, command, control, &sink)
         .await
         .map_err(|error| format!("{error:?}"))?;
     receiver
@@ -444,6 +455,25 @@ async fn dispatch_read(
         .map_err(|error| format!("{error:?}"))?
         .into_current(Epoch(current_epoch.load(Ordering::Relaxed)))
         .ok_or_else(|| "The request was superseded.".into())
+}
+
+async fn bridge_saved_connections(
+    control: &OperationControl,
+    epoch: Epoch,
+    current_epoch: &AtomicU64,
+) -> Result<Vec<ConnectionSummary>, String> {
+    let event = dispatch_read(
+        DispatchContext::SavedConnections,
+        Command::ListSavedConnections { epoch },
+        control,
+        epoch,
+        current_epoch,
+    )
+    .await?;
+    let Event::SavedConnectionsListed { outcome, .. } = event else {
+        return Err("The command bridge returned an unexpected event.".into());
+    };
+    outcome
 }
 
 fn bound_query_result(result: &mut QueryResult, cap: usize, budget: &mut QueryResultBudget) -> bool {
