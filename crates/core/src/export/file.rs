@@ -59,6 +59,19 @@ pub(super) fn writer_for(export: &ResultExport<'_>, row_count: usize) -> Result<
     })
 }
 
+pub(crate) fn validate_row_width(columns: &[ColumnInfo], row: &[Value], row_index: usize) -> Result<(), ExportError> {
+    let expected = columns.len();
+    let actual = row.len();
+    if expected == actual {
+        return Ok(());
+    }
+    Err(ExportError::RowWidthMismatch {
+        row: row_index.saturating_add(1),
+        expected,
+        actual,
+    })
+}
+
 /// Export an already materialized result. Extra memory is bounded to one row.
 /// Cancellation is cooperative; publishing a completed file is the commit point.
 pub fn write_result_file(
@@ -83,6 +96,7 @@ pub fn write_result_file(
             writer.begin(output, &result.columns)?;
             for (index, row) in result.rows.iter().enumerate() {
                 check()?;
+                validate_row_width(&result.columns, row, index)?;
                 writer.write_row(output, index, row)?;
                 progress(index + 1);
             }

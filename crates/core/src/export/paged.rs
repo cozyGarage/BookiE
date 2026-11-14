@@ -2,7 +2,7 @@ use std::path::Path;
 
 use super::csv::CsvOptions;
 use super::error::ExportError;
-use super::file::{ResultExport, ResultFormat, writer_for};
+use super::file::{ResultExport, ResultFormat, validate_row_width, writer_for};
 use super::value_to_text;
 use super::write_atomically_checked;
 use crate::query::{ColumnInfo, Value};
@@ -49,6 +49,7 @@ pub fn write_paged_file(
             while let Some(page) = next_page()? {
                 for row in &page {
                     check()?;
+                    validate_row_width(columns, row, index)?;
                     if csv_marker {
                         refuse_marker_collision(row, index, export.csv)?;
                     }
@@ -136,6 +137,39 @@ mod tests {
         assert!(matches!(result, Err(ExportError::Source(_))));
         assert!(!path.exists());
         assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn a_page_row_with_the_wrong_width_is_refused_without_replacing_existing_exports() {
+        for (format, extension) in [(ResultFormat::Csv, "csv"), (ResultFormat::Json, "json")] {
+            for row in [
+                vec![Value::Int(1)],
+                vec![Value::Int(1), Value::Text("row 1".into()), Value::Text("late".into())],
+            ] {
+                let directory = tempfile::tempdir().unwrap();
+                let path = directory.path().join(format!("out.{extension}"));
+                std::fs::write(&path, "previous export").unwrap();
+                let options = CsvOptions::default();
+                let export = ResultExport {
+                    format,
+                    csv: &options,
+                    sql: None,
+                };
+                let mut pending = Some(row);
+                let result = write_paged_file(
+                    &path,
+                    &[column("id"), column("text")],
+                    1,
+                    &export,
+                    || Ok(pending.take().map(|row| vec![row])),
+                    || false,
+                    |_| {},
+                );
+
+                assert!(matches!(result, Err(ExportError::RowWidthMismatch { .. })));
+                assert_eq!(std::fs::read_to_string(&path).unwrap(), "previous export");
+            }
+        }
     }
 
     #[test]
