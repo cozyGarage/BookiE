@@ -124,4 +124,17 @@ mod tests {
 
         assert_eq!(sink.try_emit(event()), Err(EventSinkError::Full));
     }
+
+    #[tokio::test]
+    async fn a_closed_channel_reports_that_events_cannot_be_delivered() {
+        let (sender, receiver) = mpsc::channel(1);
+        drop(receiver);
+        let sink = ChannelEventSink::new(sender);
+        let event = Event::QueryCompleted {
+            epoch: Epoch(1),
+            outcome: Err(DriverFailurePresentation::Cancelled),
+        };
+
+        assert_eq!(sink.try_emit(event), Err(EventSinkError::Closed));
+    }
 }
