@@ -30,6 +30,33 @@ class PrebuiltTestRunnerTests(unittest.TestCase):
         ], "build_group": "default", "files": {"test-program": {"sha256": hashlib.sha256(self.binary.read_bytes()).hexdigest(), "size": self.binary.stat().st_size}}, "binaries": {}, "package_directories": {"sample": "crates/sample"}}
         (self.root / "index.json").write_text(json.dumps(self.index))
 
+    def test_source_revision_read_trusts_only_the_checkout(self):
+        with patch.object(runner, 'ROOT', self.root), \
+             patch.object(runner.subprocess, 'check_output', return_value='a' * 40) as check_output:
+            runner.load_index(self.root)
+
+        self.assertEqual(
+            check_output.call_args.args[0],
+            ['git', '-c', f'safe.directory={self.root.resolve()}', 'rev-parse', 'HEAD'],
+        )
+        self.assertEqual(check_output.call_args.kwargs['cwd'], self.root)
+
+    def test_source_revision_read_handles_a_different_owner_checkout(self):
+        repository = self.root / 'repository'
+        repository.mkdir()
+        subprocess.run(['git', 'init', '--quiet', str(repository)], check=True)
+        subprocess.run(['git', '-C', str(repository), 'config', 'user.name', 'Bookie Test'], check=True)
+        subprocess.run(['git', '-C', str(repository), 'config', 'user.email', 'bookie@example.test'], check=True)
+        tracked_file = repository / 'revision.txt'
+        tracked_file.write_text('revision\n')
+        subprocess.run(['git', '-C', str(repository), 'add', 'revision.txt'], check=True)
+        subprocess.run(['git', '-C', str(repository), 'commit', '--quiet', '-m', 'fixture'], check=True)
+        expected = subprocess.check_output(['git', '-C', str(repository), 'rev-parse', 'HEAD'], text=True).strip()
+
+        with patch.object(runner, 'ROOT', repository), \
+             patch.dict(os.environ, {'GIT_TEST_ASSUME_DIFFERENT_OWNER': '1'}):
+            self.assertEqual(runner.source_revision(), expected)
+
     def test_preserves_libtest_filters_and_single_process_fixture_lifetime(self):
         args = ["--locked", "-p", "sample", "--test", "integration", "rollback", "--", "--include-ignored", "--test-threads=1"]
         with patch.object(runner, "ROOT", self.root), patch.dict(os.environ, {"GITHUB_SHA": "a" * 40}, clear=True):
