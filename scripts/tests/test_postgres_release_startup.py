@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class PostgresReleaseStartupTests(unittest.TestCase):
-    def test_server_certificate_covers_the_container_host_alias(self):
+    def test_server_certificate_covers_container_and_loopback_hosts(self):
         with tempfile.TemporaryDirectory() as temporary:
             fixture = Path(temporary) / "postgres-release"
             fixture.mkdir()
@@ -24,6 +24,7 @@ class PostgresReleaseStartupTests(unittest.TestCase):
                 text=True,
             )
             self.assertIn("DNS:host.docker.internal", certificate.stdout)
+            self.assertIn("IP Address:127.0.0.1", certificate.stdout)
 
     def test_private_umask_keeps_seed_readable_without_exposing_keys(self):
         with tempfile.TemporaryDirectory() as temporary:

@@ -43,7 +43,7 @@ openssl req -x509 -newkey rsa:2048 -sha256 -days 3650 -nodes \
 cat > server.ext <<EXT
 basicConstraints=CA:FALSE
 extendedKeyUsage=serverAuth
-subjectAltName=DNS:${DB_HOSTNAME},DNS:localhost,DNS:host.docker.internal
+subjectAltName=DNS:${DB_HOSTNAME},DNS:localhost,DNS:host.docker.internal,IP:127.0.0.1
 EXT
 
 cat > client.ext <<EXT
