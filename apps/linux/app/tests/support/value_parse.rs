@@ -919,9 +919,9 @@ fn empty_on_nullable_yields_null() {
 }
 
 #[test]
-fn empty_on_not_null_with_default_yields_null() {
-    let r = parse_input_for_column("", Some(&col_with_default("timestamp", "now()"))).unwrap();
-    assert!(matches!(r, Value::Null));
+fn empty_on_not_null_with_default_is_rejected() {
+    let error = parse_input_for_column("", Some(&col_with_default("timestamp", "now()"))).unwrap_err();
+    assert!(error.contains("required"));
 }
 
 #[test]
