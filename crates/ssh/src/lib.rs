@@ -108,6 +108,8 @@ pub enum SshError {
     },
     #[error("known_hosts: {0}")]
     KnownHosts(String),
+    #[error("{0}")]
+    HostKeyRevoked(String),
     #[error("ssh-agent: {0}")]
     Agent(String),
     #[error(
@@ -657,6 +659,7 @@ async fn connect_and_auth(
         ),
         Some(HostKeyOutcome::Trusted) => tracing::debug!(host = %cfg.host, "ssh: host key matches known_hosts"),
         Some(HostKeyOutcome::KnownHostsIo(e)) => return Err(SshError::KnownHosts(e)),
+        Some(HostKeyOutcome::Revoked(e)) => return Err(SshError::HostKeyRevoked(e)),
         Some(HostKeyOutcome::Unknown { fingerprint }) => {
             return Err(unknown_host_key(&cfg.host, cfg.port, fingerprint, &known_hosts_path));
         }
@@ -813,6 +816,7 @@ fn map_connect_error(
             known_hosts: known_hosts.to_path_buf(),
         },
         Some(HostKeyOutcome::KnownHostsIo(e)) => SshError::KnownHosts(e),
+        Some(HostKeyOutcome::Revoked(e)) => SshError::HostKeyRevoked(e),
         Some(HostKeyOutcome::Unknown { fingerprint }) => unknown_host_key(host, port, fingerprint, known_hosts),
         _ => algorithm_refusal(&err).unwrap_or_else(|| SshError::Connect(err.to_string())),
     }
