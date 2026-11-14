@@ -14,7 +14,6 @@ This page is an index of ledger IDs to issues. Do not track evidence, owners or 
 | PEER-11 | [#1033](https://github.com/cozyGarage/BookiE/issues/1033) | Data |
 | PEER-12 | [#1034](https://github.com/cozyGarage/BookiE/issues/1034) | UX |
 | PEER-16 | [#1065](https://github.com/cozyGarage/BookiE/issues/1065) | Data |
-| RV-9 | [#1179](https://github.com/cozyGarage/BookiE/issues/1179) | Policy |
 | RV-11 | [#1181](https://github.com/cozyGarage/BookiE/issues/1181) | Policy |
 | UP-2 | [#1140](https://github.com/cozyGarage/BookiE/issues/1140) | Data |
 | UP-4 | [#1142](https://github.com/cozyGarage/BookiE/issues/1142) | Policy |
