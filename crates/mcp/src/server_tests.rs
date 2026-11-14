@@ -402,6 +402,62 @@ async fn disconnecting_during_agent_approval_records_cancellation_and_never_exec
     assert!(server.await.expect("server task").is_ok());
 }
 
+#[tokio::test]
+async fn the_http_transport_refuses_calls_beyond_the_in_flight_limit() {
+    use tokio::io::AsyncReadExt;
+
+    let ApprovalFixture {
+        _directory,
+        bridge,
+        connection_id,
+        plaintext,
+        ..
+    } = approval_fixture();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let server = tokio::spawn(async move { axum::serve(listener, http_router(bridge)).await });
+    let body = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/call",
+        "params": {
+            "name": "execute_write",
+            "arguments": {
+                "connection_id": connection_id,
+                "sql": "INSERT INTO jobs(id) VALUES (1)",
+                "preview": false,
+                "token": plaintext,
+            }
+        }
+    })
+    .to_string();
+    let request = format!(
+        "POST /mcp HTTP/1.1\r\nHost: {address}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        body.len()
+    );
+
+    let mut waiting = Vec::new();
+    for _ in 0..MAX_IN_FLIGHT_CALLS {
+        let mut stream = TcpStream::connect(address).await.unwrap();
+        stream.write_all(request.as_bytes()).await.unwrap();
+        waiting.push(stream);
+    }
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
+    let mut extra = TcpStream::connect(address).await.unwrap();
+    extra.write_all(request.as_bytes()).await.unwrap();
+    let mut head = [0u8; 12];
+    let read = tokio::time::timeout(std::time::Duration::from_secs(3), extra.read_exact(&mut head)).await;
+    server.abort();
+
+    assert!(
+        read.is_ok(),
+        "the call over the limit must be refused at once, not held open"
+    );
+    assert_eq!(&head, b"HTTP/1.1 429", "{}", String::from_utf8_lossy(&head));
+    drop(waiting);
+}
+
 struct StdioClient {
     input: tokio::io::WriteHalf<tokio::io::DuplexStream>,
     output: BufReader<tokio::io::ReadHalf<tokio::io::DuplexStream>>,

@@ -579,19 +579,32 @@ fn http_router(bridge: Arc<McpBridge>) -> axum::Router {
     use axum::response::IntoResponse;
     use axum::{Json, Router, http::StatusCode, routing::post};
 
+    let slots = Arc::new(tokio::sync::Semaphore::new(MAX_IN_FLIGHT_CALLS));
     Router::new()
         .route(
             "/mcp",
             post(move |headers: HeaderMap, Json(body): Json<JsonValue>| {
                 let bridge = bridge.clone();
+                let slots = slots.clone();
                 async move {
+                    let Ok(slot) = slots.try_acquire_owned() else {
+                        return (
+                            StatusCode::TOO_MANY_REQUESTS,
+                            Json(json_rpc_error(
+                                &JsonValue::Null,
+                                -32000,
+                                format!("too many concurrent requests (limit {MAX_IN_FLIGHT_CALLS})"),
+                            )),
+                        )
+                            .into_response();
+                    };
                     let cancellation = bridge.request_cancellation();
                     let request_cancellation = cancellation.clone();
                     let (response_tx, response_rx) = tokio::sync::oneshot::channel();
-                    let operation = crate::bridge::scope_request_cancellation(
-                        request_cancellation,
-                        process_http_request(bridge, headers, body),
-                    );
+                    let operation = crate::bridge::scope_request_cancellation(request_cancellation, async move {
+                        let _slot = slot;
+                        process_http_request(bridge, headers, body).await
+                    });
                     tokio::spawn(supervise_disconnect_aware(response_tx, cancellation, operation));
                     response_rx.await.unwrap_or_else(|_| {
                         (
