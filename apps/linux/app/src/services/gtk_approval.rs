@@ -14,6 +14,10 @@ const APPROVAL_TIMEOUT: Duration = Duration::from_secs(120);
 const MAX_SQL_PREVIEW_CHARS: usize = 16_384;
 static APPROVAL_DIALOG: OnceLock<Arc<tokio::sync::Semaphore>> = OnceLock::new();
 
+pub(crate) fn has_pending() -> bool {
+    APPROVAL_DIALOG.get().is_some_and(|gate| gate.available_permits() == 0)
+}
+
 const DENY_RESPONSE: &str = "deny";
 const APPROVE_ONCE_RESPONSE: &str = "once";
 const APPROVE_REMEMBER_RESPONSE: &str = "remember";
