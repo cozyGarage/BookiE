@@ -805,11 +805,11 @@ jobs:
     timeout-minutes: 45
     env:
       TMPDIR: /var/cache/ci/tmp/bookie-b4-rollback-${{ github.run_id }}-${{ github.run_attempt }}
+      SCCACHE_SERVER_UDS: /var/cache/ci/tmp/bookie-b4-rollback-${{ github.run_id }}-${{ github.run_attempt }}/sccache.sock
       BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-b4-rollback
     steps:
       - name: Prepare runner workspace
         run: |
-          mkdir -p "$TMPDIR"
           rm -rf src
       - name: Check runner space before checkout
         shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
@@ -822,6 +822,10 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
           path: src
+      - name: Start job-scoped compiler cache
+        run: |
+          mkdir -p "$TMPDIR"
+          sccache --start-server
       - name: Docker Hub login
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
