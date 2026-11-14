@@ -79,7 +79,7 @@ fn activity_template(driver_id: &str, kind: ActivityQuery, session_id: Option<u6
     match (driver_id, kind) {
         ("postgres", ActivityQuery::Sessions) => Some(
             "SELECT pid, usename, datname, state, wait_event_type, wait_event, \
-             (now() - query_start)::text AS duration, left(query, 200) AS query \
+             (clock_timestamp() - query_start)::text AS duration, left(query, 200) AS query \
              FROM pg_stat_activity \
              WHERE backend_type = 'client backend' \
              ORDER BY query_start NULLS LAST"
@@ -108,10 +108,10 @@ fn activity_template(driver_id: &str, kind: ActivityQuery, session_id: Option<u6
                 .into(),
         ),
         ("postgres", ActivityQuery::LongRunning) => Some(
-            "SELECT pid, usename, datname, (now() - query_start)::text AS duration, \
+            "SELECT pid, usename, datname, (clock_timestamp() - query_start)::text AS duration, \
              left(query, 200) AS query \
              FROM pg_stat_activity \
-             WHERE state = 'active' AND query_start < now() - interval '30 seconds' \
+             WHERE state = 'active' AND query_start < clock_timestamp() - interval '30 seconds' \
              ORDER BY query_start"
                 .into(),
         ),
@@ -159,6 +159,15 @@ mod tests {
     fn postgres_sessions_sql() {
         let sql = activity_sql("postgres", ActivityQuery::Sessions, None).unwrap();
         assert!(sql.contains("pg_stat_activity"));
+    }
+
+    #[test]
+    fn postgres_activity_durations_use_wall_clock_time() {
+        for kind in [ActivityQuery::Sessions, ActivityQuery::LongRunning] {
+            let sql = activity_sql("postgres", kind, None).unwrap();
+            assert!(sql.contains("clock_timestamp()"), "{kind:?}: {sql}");
+            assert!(!sql.contains("now()"), "{kind:?}: {sql}");
+        }
     }
 
     #[test]
