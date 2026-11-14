@@ -119,3 +119,52 @@ async fn a_byte_capped_query_aborts_its_transaction_until_rollback_then_reuses_t
         .expect("pooled connection recovers after rollback");
     assert_eq!(next.rows, vec![vec![Value::Int(42)]]);
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_row_capped_query_aborts_its_transaction_until_rollback_then_preserves_data_and_reuses_connection() {
+    let (_container, opts) = super::start_pg().await;
+    let observer = super::connect(opts.clone()).await;
+    let connection = super::connect(opts).await;
+    connection
+        .query("CREATE TABLE bookie_row_cap_transaction (id integer PRIMARY KEY, value integer NOT NULL)")
+        .await
+        .expect("create fixture table");
+    connection
+        .query("INSERT INTO bookie_row_cap_transaction VALUES (1, 0)")
+        .await
+        .expect("seed fixture row");
+
+    let mut transaction = connection.begin().await.expect("begin transaction");
+    transaction
+        .query("UPDATE bookie_row_cap_transaction SET value = 1 WHERE id = 1")
+        .await
+        .expect("update inside transaction");
+    let result = transaction
+        .query(&format!(
+            "SELECT row_value::bigint FROM generate_series(1, {}) AS generated(row_value)",
+            bookie_core::MAX_QUERY_ROWS + 1
+        ))
+        .await
+        .expect("row-capped query returns admitted rows");
+
+    assert!(result.truncated);
+    assert_eq!(result.rows.len(), bookie_core::MAX_QUERY_ROWS);
+    let aborted = transaction
+        .query("SELECT 42")
+        .await
+        .expect_err("cancelled statement aborts the PostgreSQL transaction");
+    assert!(matches!(aborted, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "25P02"));
+    transaction.rollback().await.expect("rollback aborted transaction");
+
+    let stored = observer
+        .query("SELECT value::bigint FROM bookie_row_cap_transaction WHERE id = 1")
+        .await
+        .expect("read fixture row after rollback");
+    assert_eq!(stored.rows, vec![vec![Value::Int(0)]]);
+    let next = connection
+        .query("SELECT 42::bigint")
+        .await
+        .expect("pooled connection recovers after rollback");
+    assert_eq!(next.rows, vec![vec![Value::Int(42)]]);
+}
