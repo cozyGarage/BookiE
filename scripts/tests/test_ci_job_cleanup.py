@@ -44,6 +44,17 @@ def runner_jobs(path):
 
 
 class CiJobCleanupTests(unittest.TestCase):
+    def test_linux_builder_cache_cleanup_uses_the_source_checkout_path(self):
+        job = runner_jobs(WORKFLOWS[0])["linux-build"]
+        self.assertIn("if [[ -f src/scripts/ci-cache.py ]]", job)
+        cleanup = (
+            "python3 src/scripts/ci-cache.py --root /target --lock /target/.bookie-build-cache.lock "
+            "cleanup --min-free-gib 30"
+        )
+        self.assertIn(
+            cleanup, job
+        )
+
     def test_gtk_server_fixtures_have_job_scoped_cleanup_labels(self):
         jobs = runner_jobs(WORKFLOWS[0])
         self.assertIn("BOOKIE_TEST_RUN_ID:", jobs["gtk-server"])

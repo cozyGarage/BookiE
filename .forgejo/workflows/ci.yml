@@ -270,7 +270,7 @@ jobs:
           fi
           rm -rf -- "$TMPDIR"
           if [[ -f src/scripts/ci-cache.py ]]; then
-            python3 scripts/ci-cache.py --root /target --lock /target/.bookie-build-cache.lock cleanup --min-free-gib 30
+            python3 src/scripts/ci-cache.py --root /target --lock /target/.bookie-build-cache.lock cleanup --min-free-gib 30
           fi
       - name: Finalize runner job
         if: always()
