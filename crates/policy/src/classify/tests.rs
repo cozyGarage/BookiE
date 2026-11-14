@@ -31,6 +31,25 @@ fn guard_analysis_supplies_classification_masking_and_blast_radius_from_one_pars
 }
 
 #[test]
+fn clickhouse_backslash_string_does_not_hide_a_sensitive_projection() {
+    let patterns = crate::mask::SensitivePatterns::new(&["*password*".to_owned()]);
+    let analysis = analyze_statement(
+        r#"SELECT 'x\'' , password AS p FROM users -- '"#,
+        "clickhouse",
+        Some(&patterns),
+    );
+
+    assert_eq!(analysis.sensitive_positions, Some(vec![false, true]));
+}
+
+#[test]
+fn mysql_no_backslash_escapes_does_not_hide_a_following_write() {
+    let facts = classify(r#"SELECT 'x\'; DELETE FROM users WHERE id = 1 -- '"#, "mysql");
+
+    assert!(facts.writes(), "{facts:?}");
+}
+
+#[test]
 fn insert_is_mutating_dml() {
     let f = classify("INSERT INTO t (a) VALUES (1)", "postgres");
     assert!(f.writes());
@@ -218,6 +237,33 @@ fn mysql_executable_comment_cannot_hide_a_file_write_from_policy() {
         "SELECT 1 /* INTO OUTFILE '/tmp/file' */",
     ] {
         let facts = classify(sql, "mysql");
+        assert_eq!(facts.class, StatementClass::Select, "SQL: {sql}, facts: {facts:?}");
+        assert!(!facts.writes(), "SQL: {sql}, facts: {facts:?}");
+    }
+}
+
+#[test]
+fn postgres_unicode_escaped_identifier_cannot_hide_a_name_from_policy() {
+    for sql in [
+        r#"SELECT U&"pg_terminate\005Fbackend"(pid) FROM pg_stat_activity"#,
+        r#"SELECT u&"p\0061n" AS x FROM cards"#,
+        r#"SELECT U&"p!0061n" UESCAPE '!' FROM cards"#,
+        r#"SELECT t.U&"p\0061n" FROM cards t"#,
+    ] {
+        let facts = classify(sql, "postgres");
+        assert_eq!(facts.class, StatementClass::Unparseable, "SQL: {sql}, facts: {facts:?}");
+        assert!(facts.writes(), "SQL: {sql}, facts: {facts:?}");
+    }
+
+    for sql in [
+        r#"SELECT u & "flags" FROM t"#,
+        r#"SELECT U&'d\0061ta'"#,
+        r#"SELECT 'U&"pan"'"#,
+        r#"SELECT cpu&"mask" FROM t"#,
+        r#"SELECT "U"&"flags" FROM t"#,
+        r#"SELECT u/**/&"flags" FROM t"#,
+    ] {
+        let facts = classify(sql, "postgres");
         assert_eq!(facts.class, StatementClass::Select, "SQL: {sql}, facts: {facts:?}");
         assert!(!facts.writes(), "SQL: {sql}, facts: {facts:?}");
     }

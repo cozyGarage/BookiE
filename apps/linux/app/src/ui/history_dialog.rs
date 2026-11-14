@@ -26,11 +26,6 @@ pub struct HistoryDialog {
     filter_status: adw::ComboRow,
     filter_window: adw::ComboRow,
     filter_source: adw::ComboRow,
-    /// Pending debounced search timeout. Replaces the previous fire-
-    /// on-every-keystroke behaviour: typing or flipping a filter
-    /// schedules a Refresh 150 ms later and cancels any earlier
-    /// scheduled one, so we send a single SQL search per pause —
-    /// matches GNOME Files' search debounce.
     filter_debounce: std::rc::Rc<std::cell::RefCell<Option<gtk::glib::SourceId>>>,
     search_generation: std::cell::Cell<u64>,
     mutation_order: std::sync::Arc<tokio::sync::Mutex<()>>,
@@ -243,8 +238,6 @@ impl Component for HistoryDialog {
 }
 
 impl HistoryDialog {
-    /// Run the search immediately. Triggered by Refresh (initial load
-    /// + after any mutation) and by the debounced timeout firing.
     fn run_search(&self, sender: ComponentSender<Self>) {
         self.run_search_after(sender, async {});
     }
@@ -275,10 +268,7 @@ impl HistoryDialog {
         });
     }
 
-    /// Cancel any pending debounce timeout and schedule a new Refresh
-    /// 150 ms from now. The 150 ms idle threshold matches GNOME Files'
-    /// search-typing debounce — short enough to feel responsive, long
-    /// enough that a fast typer never fires more than one query.
+    // Coalesce rapid filter changes into one history query.
     fn schedule_debounced_search(&self, sender: ComponentSender<Self>) {
         if let Some(prev) = self.filter_debounce.borrow_mut().take() {
             prev.remove();

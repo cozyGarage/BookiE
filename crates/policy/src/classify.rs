@@ -4,7 +4,9 @@ use sqlparser::ast::{
     GrantObjects, Insert, ObjectName, Query, SelectItem, SetExpr, Statement, TableFactor, TableObject, TableWithJoins,
     Update, UpdateTableFromKind, UtilityOption,
 };
-use sqlparser::dialect::{Dialect, GenericDialect, MsSqlDialect, MySqlDialect, PostgreSqlDialect, SQLiteDialect};
+use sqlparser::dialect::{
+    ClickHouseDialect, Dialect, GenericDialect, MsSqlDialect, MySqlDialect, PostgreSqlDialect, SQLiteDialect,
+};
 
 use crate::admin_functions::is_administrative_function_name;
 use crate::constant_predicate::is_constant_true;
@@ -59,6 +61,7 @@ pub(crate) struct StatementDetails {
 
 pub(crate) struct StatementAnalysis {
     pub(crate) facts: StatementFacts,
+    pub(crate) lexical_mode_ambiguous: bool,
     pub(crate) rolls_back_to_savepoint: bool,
     pub(crate) blast_radius: Option<blast_radius::BlastRadiusRewrite>,
     pub(crate) sensitive_positions: Option<Vec<bool>>,
@@ -117,6 +120,9 @@ pub(crate) fn analyze_parsed(
     mask_patterns: Option<&SensitivePatterns>,
     include_execution_plans: bool,
 ) -> StatementAnalysis {
+    if parsed.lexical_mode_ambiguous() {
+        return lexical_mode_ambiguous_analysis();
+    }
     let dialect = parsed.dialect();
     let dialect = dialect.as_ref();
     let trimmed = parsed.trimmed();
@@ -164,6 +170,7 @@ pub(crate) fn analyze_parsed(
     };
     StatementAnalysis {
         facts,
+        lexical_mode_ambiguous: false,
         rolls_back_to_savepoint: statements
             .iter()
             .any(|statement| matches!(statement, Statement::Rollback { savepoint: Some(_), .. })),
@@ -223,11 +230,18 @@ fn classify_statements(
 fn failed_analysis(message: impl Into<String>) -> StatementAnalysis {
     StatementAnalysis {
         facts: StatementFacts::unparseable(message),
+        lexical_mode_ambiguous: false,
         rolls_back_to_savepoint: false,
         blast_radius: None,
         sensitive_positions: None,
         known_statement_rows: Vec::new(),
     }
+}
+
+fn lexical_mode_ambiguous_analysis() -> StatementAnalysis {
+    let mut analysis = failed_analysis("SQL token boundaries differ across supported session lexical modes");
+    analysis.lexical_mode_ambiguous = true;
+    analysis
 }
 
 /// Detect administrative calls anywhere in a successfully parsed statement.
@@ -240,6 +254,7 @@ pub(crate) fn dialect_for(driver_id: &str) -> Box<dyn Dialect> {
     match driver_id {
         "postgres" => Box::new(PostgreSqlDialect {}),
         "mysql" => Box::new(MySqlDialect {}),
+        "clickhouse" => Box::new(ClickHouseDialect {}),
         "sqlite" => Box::new(SQLiteDialect {}),
         "mssql" => Box::new(MsSqlDialect {}),
         _ => Box::new(GenericDialect {}),

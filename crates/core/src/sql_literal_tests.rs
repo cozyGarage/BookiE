@@ -41,13 +41,13 @@ fn value_contract_postgres_dates_preserve_eras_and_extended_years() {
     }
     for year in [1, 2026, 9999] {
         let date = chrono::NaiveDate::from_ymd_opt(year, 2, 3).unwrap();
-        assert_eq!(postgres_extended_date(&Value::Date(date)), None);
+        assert_eq!(postgres_extended_temporal_text(&Value::Date(date)), None);
         assert_eq!(
             render_sql_literal("postgres", &Value::Date(date)).unwrap(),
             format!("'{year:04}-02-03'")
         );
     }
-    assert_eq!(postgres_extended_date(&Value::Text("0000-02-03".into())), None);
+    assert_eq!(postgres_extended_temporal_text(&Value::Text("0000-02-03".into())), None);
 }
 
 fn column(name: &str) -> ColumnInfo {

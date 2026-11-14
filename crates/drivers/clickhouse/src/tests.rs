@@ -5,6 +5,7 @@ async fn open_session_is_refused() {
     let conn = ClickhouseConnection {
         client: clickhouse::Client::default(),
         database: "default".into(),
+        output_settings_allowed: false,
     };
     assert!(matches!(conn.open_session().await, Err(DriverError::Unsupported(_))));
 }
@@ -357,6 +358,20 @@ fn json_to_value_maps_common_types() {
         json_to_value(serde_json::json!("[[1, 2], [3, 4]]"), "Array(Array(UInt8))"),
         Value::Json(Box::new(serde_json::json!([[1, 2], [3, 4]])))
     );
+}
+
+#[test]
+fn readonly_float_nulls_are_marked_ambiguous_without_changing_regular_nulls() {
+    let value = response_cell(RowCell::Json(serde_json::Value::Null), "Nullable(Float64)", true).unwrap();
+    assert!(matches!(value, Value::Undecodable(reason) if reason.contains("ambiguous")));
+    assert_eq!(
+        response_cell(RowCell::Json(serde_json::Value::Null), "Nullable(Float64)", false).unwrap(),
+        Value::Null
+    );
+    assert!(matches!(
+        response_cell(RowCell::Json(serde_json::json!(1.25)), "Float64", true).unwrap(),
+        Value::Float(value) if value == 1.25
+    ));
 }
 
 #[test]

@@ -87,6 +87,10 @@ fn text_that_cannot_be_parsed_is_not_a_plain_read_for_an_agent() {
     for (sql, driver) in [
         ("SELECT mysql_func /*!50000 , sleep(5) */ 1", "mysql"),
         ("SELEC 1 FRM", "postgres"),
+        (
+            r#"SELECT U&"pg_terminate\005Fbackend"(pid) FROM pg_stat_activity"#,
+            "postgres",
+        ),
         ("", "postgres"),
     ] {
         assert!(denied(sql, driver, WritePolicy::Deny, false), "{driver}: {sql:?}");

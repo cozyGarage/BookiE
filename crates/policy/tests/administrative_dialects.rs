@@ -86,9 +86,9 @@ fn an_ordinary_read_stays_a_read_on_every_engine() {
 }
 
 #[test]
-fn corrected_lexer_keeps_reads_intact_and_following_mutations_denied() {
+fn stable_reads_keep_following_mutations_denied() {
     for (driver, read) in [
-        ("mysql", "SELECT 'a\\';b'"),
+        ("mysql", "SELECT 'a;b'"),
         ("postgres", "SELECT 1 /* outer /* inner */ ; outer */"),
     ] {
         let sql = format!("{read}; DELETE FROM protected_items");

@@ -112,7 +112,7 @@ impl DatabaseDriver for SqliteDriver {
             .after_connect(move |conn, _| {
                 let attached = attached_for_pool.clone();
                 Box::pin(async move {
-                    attach_databases_to_connection(conn, &attached).await;
+                    attach_databases_to_connection(conn, &attached).await?;
                     Ok(())
                 })
             })
@@ -130,7 +130,7 @@ impl DatabaseDriver for SqliteDriver {
 pub(crate) async fn attach_databases_to_connection(
     conn: &mut SqlxSqliteConnection,
     attached: &[bookie_core::AttachedDatabase],
-) {
+) -> Result<(), sqlx::Error> {
     for db in attached {
         let expanded = expand_tilde(&db.path);
         if std::path::Path::new(&expanded).exists() {
@@ -139,9 +139,10 @@ pub(crate) async fn attach_databases_to_connection(
                 expanded.replace('\'', "''"),
                 quote_ident(&db.name)
             );
-            let _ = sqlx::query(sqlx::AssertSqlSafe(sql)).execute(&mut *conn).await;
+            sqlx::query(sqlx::AssertSqlSafe(sql)).execute(&mut *conn).await?;
         }
     }
+    Ok(())
 }
 
 fn expand_tilde(path: &str) -> String {

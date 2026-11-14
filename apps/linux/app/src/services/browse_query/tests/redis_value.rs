@@ -43,7 +43,10 @@ async fn redis_guarded_refetch_preserves_binary_key_and_value() {
         supports_reverse_keyset: false,
     };
     let key_value = Value::Bytes(key.clone());
-    let query = target.value_query(3, std::slice::from_ref(&key_value)).unwrap();
+    let value_column = columns.iter().position(|column| column.name == "Value").unwrap();
+    let query = target
+        .value_query(value_column, std::slice::from_ref(&key_value))
+        .unwrap();
     let result = guarded_value_refetch(connection, "redis", &query, &control).await;
     assert_eq!(result.rows, vec![vec![Value::Bytes(bytes.clone())]]);
     assert_eq!(redis_command(&mut native, &[b"GET", &key]).await, bytes);

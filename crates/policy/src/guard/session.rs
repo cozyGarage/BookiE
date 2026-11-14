@@ -150,7 +150,21 @@ impl Session for PolicySession {
         control: &OperationControl,
     ) -> Result<QueryResult, DriverError> {
         self.require_query_ready(sql).await?;
-        let parsed = ParsedSql::new(sql, &self.guard.ctx.driver_id);
+        let lexical_settings = if ParsedSql::needs_lexical_settings(sql, &self.guard.ctx.driver_id) {
+            self.lexical_settings_controlled(control).await?
+        } else {
+            None
+        };
+        let parsed = ParsedSql::with_lexical_settings(sql, &self.guard.ctx.driver_id, lexical_settings);
+        if parsed.lexical_mode_ambiguous() {
+            return self
+                .refuse_policy(
+                    sql,
+                    "session_lexical_mode_ambiguous",
+                    "SQL token boundaries depend on the database session lexical mode",
+                )
+                .await;
+        }
         match transaction_control_parsed(&parsed, &self.guard.ctx.driver_id) {
             Some(TransactionControl::BeginReadWrite) if self.guard.ctx.read_only => {
                 self.refuse_policy(
