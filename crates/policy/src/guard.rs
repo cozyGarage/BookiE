@@ -299,6 +299,20 @@ impl PolicyGuard {
         control: Option<&OperationControl>,
     ) -> Result<Authorization, DriverError> {
         let facts = &analysis.facts;
+        let decision = match decision {
+            Decision::RequireApproval { .. }
+                if matches!(self.ctx.principal, Principal::Agent { .. })
+                    && !crate::approval::sql_is_reviewable(sql) =>
+            {
+                Decision::Deny {
+                    rule: "agent_sql_not_reviewable".into(),
+                    message: "This statement is too long or contains invisible or direction-changing characters, so \
+                              a person cannot review it in the approval dialog"
+                        .into(),
+                }
+            }
+            other => other,
+        };
         match decision {
             Decision::Allow { .. } => Ok(Authorization {
                 decision,
