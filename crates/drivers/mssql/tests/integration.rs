@@ -37,6 +37,8 @@ mod single_precision;
 mod sql_variant;
 #[path = "support/temporal_boundaries.rs"]
 mod temporal_boundaries;
+#[path = "support/transaction_cleanup.rs"]
+mod transaction_cleanup;
 #[path = "support/unicode_object_names.rs"]
 mod unicode_object_names;
 
