@@ -682,7 +682,10 @@ impl PolicySession {
         let analysis = self.guard.analyze_parsed(parsed);
         let external_effects = Effects::SESSION_STATE.union(Effects::HOST_OR_FILE_ACCESS);
         if self.batch.is_some_and(|batch| {
-            batch.read_only && (analysis.facts.effects.writes() || analysis.facts.effects.contains(external_effects))
+            batch.read_only
+                && (analysis.facts.writes()
+                    || analysis.facts.effects.writes()
+                    || analysis.facts.effects.contains(external_effects))
         }) {
             return self
                 .refuse(sql, "read_only_snapshot_refusal", DriverError::ReadOnly)
