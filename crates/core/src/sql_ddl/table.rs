@@ -152,7 +152,7 @@ pub fn build_rename_table(
         // identifiers, and the bare @newname isn't quoted at all.
         let old_qualified = sql_literal(&qualified_table(driver_id, schema, old_name));
         let new_bare = sql_literal(new_name.trim());
-        return Ok(format!("EXEC sp_rename '{}', '{}'", old_qualified, new_bare));
+        return Ok(format!("EXEC sp_rename N'{}', N'{}'", old_qualified, new_bare));
     }
     let old_qualified = qualified_table(driver_id, schema, old_name);
     match driver_id {

@@ -81,7 +81,7 @@ pub fn build_rename_column(
             quote_ident(driver_id, old_name)
         ));
         let new_bare = sql_literal(new_name.trim());
-        return Ok(format!("EXEC sp_rename '{}', '{}', 'COLUMN'", object_name, new_bare));
+        return Ok(format!("EXEC sp_rename N'{}', N'{}', 'COLUMN'", object_name, new_bare));
     }
     Ok(format!(
         "ALTER TABLE {} RENAME COLUMN {} TO {}",

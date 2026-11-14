@@ -283,11 +283,11 @@ fn a_renamed_table_stays_in_its_own_database() {
 fn rename_table_mssql() {
     assert_eq!(
         build_rename_table("mssql", None, "old", "new").unwrap(),
-        "EXEC sp_rename '[old]', 'new'"
+        "EXEC sp_rename N'[old]', N'new'"
     );
     assert_eq!(
         build_rename_table("mssql", Some("dbo"), "old", "new").unwrap(),
-        "EXEC sp_rename '[dbo].[old]', 'new'"
+        "EXEC sp_rename N'[dbo].[old]', N'new'"
     );
 }
 
@@ -297,7 +297,7 @@ fn rename_table_mssql_escapes_embedded_quote() {
     // `'` in a name must be doubled or it would close the literal
     // early and splice the remainder in as a second statement.
     let sql = build_rename_table("mssql", None, "o'brien", "new'table").unwrap();
-    assert_eq!(sql, "EXEC sp_rename '[o''brien]', 'new''table'");
+    assert_eq!(sql, "EXEC sp_rename N'[o''brien]', N'new''table'");
 }
 
 #[test]
@@ -374,18 +374,18 @@ fn rename_column_each_driver() {
 fn rename_column_mssql() {
     assert_eq!(
         build_rename_column("mssql", None, "t", "old", "new").unwrap(),
-        "EXEC sp_rename '[t].[old]', 'new', 'COLUMN'"
+        "EXEC sp_rename N'[t].[old]', N'new', 'COLUMN'"
     );
     assert_eq!(
         build_rename_column("mssql", Some("dbo"), "t", "old", "new").unwrap(),
-        "EXEC sp_rename '[dbo].[t].[old]', 'new', 'COLUMN'"
+        "EXEC sp_rename N'[dbo].[t].[old]', N'new', 'COLUMN'"
     );
 }
 
 #[test]
 fn rename_column_mssql_escapes_embedded_quote() {
     let sql = build_rename_column("mssql", None, "t", "o'brien", "new'name").unwrap();
-    assert_eq!(sql, "EXEC sp_rename '[t].[o''brien]', 'new''name', 'COLUMN'");
+    assert_eq!(sql, "EXEC sp_rename N'[t].[o''brien]', N'new''name', 'COLUMN'");
 }
 
 #[test]
@@ -589,8 +589,8 @@ fn alter_column_mssql_default_only_replaces_the_constraint() {
     assert_eq!(stmts.len(), 2);
     assert!(!stmts[0].contains("ALTER COLUMN"));
     assert!(stmts[0].contains("sys.default_constraints"));
-    assert!(stmts[0].contains("OBJECT_ID('[t]')"));
-    assert!(stmts[0].contains("c.name = 'x'"));
+    assert!(stmts[0].contains("OBJECT_ID(N'[t]')"));
+    assert!(stmts[0].contains("c.name = N'x'"));
     assert_eq!(stmts[1], "ALTER TABLE [t] ADD DEFAULT ('pending') FOR [x]");
 }
 
@@ -712,8 +712,8 @@ fn alter_column_mssql_drop_default_escapes_literals() {
         collation: None,
     };
     let stmts = build_alter_column("mssql", Some("s'x"), "t'q", &col).unwrap();
-    assert!(stmts[0].contains("OBJECT_ID('[s''x].[t''q]')"));
-    assert!(stmts[0].contains("c.name = 'o''brien'"));
+    assert!(stmts[0].contains("OBJECT_ID(N'[s''x].[t''q]')"));
+    assert!(stmts[0].contains("c.name = N'o''brien'"));
 }
 
 #[test]
@@ -1105,7 +1105,7 @@ fn materialize_ops_mssql_orders_rename_alter_then_add() {
     ];
     let stmts = materialize_ops(&ops, "mssql").unwrap();
     assert_eq!(stmts.len(), 4);
-    assert_eq!(stmts[0], "EXEC sp_rename '[old_t]', 'new_t'");
+    assert_eq!(stmts[0], "EXEC sp_rename N'[old_t]', N'new_t'");
     assert!(stmts[1].contains("DROP CONSTRAINT"));
     assert_eq!(stmts[2], "ALTER TABLE [new_t] ADD DEFAULT ('x') FOR [x]");
     assert_eq!(stmts[3], "ALTER TABLE [new_t] ADD [flag] BIT NOT NULL");
@@ -1202,7 +1202,7 @@ fn a_pure_column_rename_needs_no_alter_on_any_dialect() {
     );
     assert_eq!(
         materialize_ops(&ops, "mssql").unwrap(),
-        vec!["EXEC sp_rename '[t].[label]', 'title', 'COLUMN'".to_string()]
+        vec!["EXEC sp_rename N'[t].[label]', N'title', 'COLUMN'".to_string()]
     );
 }
 
@@ -1269,4 +1269,32 @@ fn an_index_edited_after_it_was_read_is_rebuilt_from_its_new_columns() {
         let statements = materialize_ops(&ops, "postgres").unwrap();
         assert_eq!(statements.last().map(String::as_str), Some(expected), "{statements:?}");
     }
+}
+
+#[test]
+fn mssql_object_names_travel_as_unicode_literals() {
+    assert_eq!(
+        build_rename_table("mssql", None, "bảng", "bảng_mới").unwrap(),
+        "EXEC sp_rename N'[bảng]', N'bảng_mới'"
+    );
+    assert_eq!(
+        build_rename_column("mssql", None, "t", "cột", "cột_mới").unwrap(),
+        "EXEC sp_rename N'[t].[cột]', N'cột_mới', 'COLUMN'"
+    );
+
+    let drop_default = super::types::mssql_drop_default_constraint("mssql", None, "bảng", "cột");
+    assert!(
+        drop_default.contains("OBJECT_ID(N'[bảng]') AND c.name = N'cột'"),
+        "{drop_default}"
+    );
+
+    let comment = super::types::mssql_set_column_comment("mssql", Some("lược_đồ"), "bảng", "cột", Some("ghi chú"));
+    assert!(comment.contains("COALESCE(N'lược_đồ', SCHEMA_NAME())"), "{comment}");
+    assert!(comment.contains("@level1name = N'bảng', "), "{comment}");
+    assert!(comment.contains("@level2name = N'cột'"), "{comment}");
+    assert!(comment.contains("OBJECT_ID(N'[lược_đồ].[bảng]')"), "{comment}");
+    assert!(
+        comment.contains("COLUMNPROPERTY(OBJECT_ID(N'[lược_đồ].[bảng]'), N'cột', 'ColumnId')"),
+        "{comment}"
+    );
 }
