@@ -18,6 +18,11 @@ fi
 KEEP_UP="${BOOKIE_FIXTURE_KEEP_UP:-0}"
 fixture_host="${BOOKIE_FIXTURE_HOST:-localhost}"
 fixture_bind_address="${BOOKIE_FIXTURE_BIND_ADDRESS:-$fixture_host}"
+fixture_ssh_host="${BOOKIE_FIXTURE_SSH_HOST:-$fixture_host}"
+
+if [[ -z "${BOOKIE_FIXTURE_SSH_HOST:-}" && "$fixture_ssh_host" == localhost ]]; then
+  fixture_ssh_host=127.0.0.1
+fi
 
 if [[ "$fixture_bind_address" == "$fixture_host" && "$fixture_host" != 127.0.0.1 ]]; then
   fixture_bind_address="$(getent ahostsv4 "$fixture_host" | awk 'NR == 1 { print $1; exit}')"
@@ -28,6 +33,7 @@ if [[ -z "$fixture_bind_address" ]]; then
   exit 1
 fi
 export BOOKIE_FIXTURE_BIND_ADDRESS="$fixture_bind_address"
+export BOOKIE_FIXTURE_SSH_HOST="$fixture_ssh_host"
 
 compose() {
   docker compose --project-directory "$FIXTURE" -f "$FIXTURE/docker-compose.yml" "$@"
@@ -74,7 +80,7 @@ fi
 
 wait_for_port "$fixture_host" 8474 "toxiproxy api"
 wait_for_port "$fixture_host" 5433 "postgres path"
-wait_for_port "$fixture_host" 2223 "bastion path"
+wait_for_port "$fixture_ssh_host" 2223 "bastion path"
 
 # A forwarded Unix socket's path (under XDG_RUNTIME_DIR) is capped at
 # 100 bytes, so the isolated runtime dir has to stay short -- the
@@ -96,7 +102,7 @@ RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" \
   XDG_RUNTIME_DIR="$secret_root/runtime" \
   BOOKIE_FIXTURE_POSTGRES_RELEASE=1 \
   BOOKIE_FIXTURE_PROXY_HOST="$fixture_host" \
-  BOOKIE_FIXTURE_SSH_HOST="$fixture_host" \
+  BOOKIE_FIXTURE_SSH_HOST="$fixture_ssh_host" \
   BOOKIE_FIXTURE_TOXIPROXY="$fixture_host:8474" \
   BOOKIE_FIXTURE_MATERIALS="$FIXTURE/materials" \
   BOOKIE_TARGET_DIR="$target_dir" \

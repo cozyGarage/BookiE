@@ -67,7 +67,7 @@ if "up" in sys.argv:
             self.assertEqual(materials.stat().st_mode & 0o777, 0o700)
             self.assertEqual(key.stat().st_mode & 0o777, 0o600)
 
-    def test_container_job_uses_the_resolved_docker_host_for_fixture_ports(self):
+    def test_fixture_hosts_route_container_and_local_ssh(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             (root / "scripts").mkdir()
@@ -86,28 +86,48 @@ import os, sys
 from pathlib import Path
 if "up" in sys.argv:
     Path(os.environ["CAPTURE_BIND_ADDRESS"]).write_text(os.environ["BOOKIE_FIXTURE_BIND_ADDRESS"])
+    Path(os.environ["CAPTURE_SSH_HOST"]).write_text(os.environ["BOOKIE_FIXTURE_SSH_HOST"])
     sys.exit(42)
 ''')
             docker.chmod(0o755)
             getent = bin_dir / "getent"
-            getent.write_text('#!/bin/sh\nprintf "172.17.0.1 STREAM host.docker.internal\\n"\n')
+            getent.write_text('''#!/usr/bin/env python3
+import sys
+hosts = {"localhost": "127.0.0.1", "host.docker.internal": "172.17.0.1"}
+print(hosts[sys.argv[-1]], "STREAM", sys.argv[-1])
+''')
             getent.chmod(0o755)
             captured = root / "bind-address"
-            result = subprocess.run(
-                ["bash", str(root / "scripts/test-postgres-release.sh")],
-                env=dict(
-                    os.environ,
-                    PATH=f"{bin_dir}:{os.environ['PATH']}",
-                    BOOKIE_FIXTURE_HOST="host.docker.internal",
-                    CAPTURE_BIND_ADDRESS=str(captured),
-                    PG_FIXTURE_ROOT=str(fixture),
-                ),
-                text=True,
-                capture_output=True,
+            captured_ssh = root / "ssh-host"
+            cases = (
+                ("host.docker.internal", "172.17.0.1", "host.docker.internal"),
+                (None, "127.0.0.1", "127.0.0.1"),
             )
 
-            self.assertEqual(result.returncode, 42, result.stderr)
-            self.assertEqual(captured.read_text(), "172.17.0.1")
+            for fixture_host, expected_bind, expected_ssh in cases:
+                with self.subTest(fixture_host=fixture_host):
+                    env = dict(
+                        os.environ,
+                        PATH=f"{bin_dir}:{os.environ['PATH']}",
+                        CAPTURE_BIND_ADDRESS=str(captured),
+                        CAPTURE_SSH_HOST=str(captured_ssh),
+                        PG_FIXTURE_ROOT=str(fixture),
+                    )
+                    env.pop("BOOKIE_FIXTURE_HOST", None)
+                    env.pop("BOOKIE_FIXTURE_SSH_HOST", None)
+                    env.pop("BOOKIE_FIXTURE_BIND_ADDRESS", None)
+                    if fixture_host is not None:
+                        env["BOOKIE_FIXTURE_HOST"] = fixture_host
+                    result = subprocess.run(
+                        ["bash", str(root / "scripts/test-postgres-release.sh")],
+                        env=env,
+                        text=True,
+                        capture_output=True,
+                    )
+
+                    self.assertEqual(result.returncode, 42, result.stderr)
+                    self.assertEqual(captured.read_text(), expected_bind)
+                    self.assertEqual(captured_ssh.read_text(), expected_ssh)
 
     def test_container_fixture_ports_are_bound_to_the_configured_address(self):
         compose = (ROOT / "tests/fixtures/postgres-release/docker-compose.yml").read_text()
