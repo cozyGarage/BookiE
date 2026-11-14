@@ -96,7 +96,7 @@ fn an_over_limit_later_file_is_rejected_before_the_queue_can_start() {
 
 #[cfg(unix)]
 #[test]
-fn an_unreadable_later_file_is_rejected_before_the_queue_can_start() {
+fn a_later_file_follows_the_current_users_read_permissions() {
     use std::os::unix::fs::PermissionsExt;
 
     let directory = tempfile::tempdir().expect("directory");
@@ -106,6 +106,7 @@ fn an_unreadable_later_file_is_rejected_before_the_queue_can_start() {
     std::fs::write(&unreadable, b"id,name\n2,Grace\n").expect("unreadable file");
     std::fs::set_permissions(&unreadable, std::fs::Permissions::from_mode(0o000)).expect("remove read access");
 
+    let cannot_read = std::fs::File::open(&unreadable).is_err();
     let result = super::super::check_file_queue(&first, &[unreadable]);
 
     std::fs::set_permissions(
@@ -113,7 +114,7 @@ fn an_unreadable_later_file_is_rejected_before_the_queue_can_start() {
         std::fs::Permissions::from_mode(0o600),
     )
     .expect("restore read access");
-    assert!(result.is_err());
+    assert_eq!(result.is_err(), cannot_read);
 }
 
 #[test]
