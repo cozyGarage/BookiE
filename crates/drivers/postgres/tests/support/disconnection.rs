@@ -75,6 +75,25 @@ pub(super) async fn wait_for_tagged_query(connection: &dyn Connection, tag: &str
     panic!("query tag {tag} did not reach active={active}");
 }
 
+async fn wait_for_tagged_lock_wait(connection: &dyn Connection, tag: &str) {
+    tokio::time::timeout(std::time::Duration::from_secs(10), async {
+        loop {
+            let result = connection
+                .query(&format!(
+                    "SELECT count(*)::bigint FROM pg_stat_activity WHERE pid <> pg_backend_pid() AND state = 'active' AND wait_event_type = 'Lock' AND query LIKE '%{tag}%'"
+                ))
+                .await
+                .expect("inspect PostgreSQL lock waits");
+            if matches!(result.rows.first().and_then(|row| row.first()), Some(Value::Int(count)) if *count > 0) {
+                return;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+        }
+    })
+    .await
+    .expect("query must reach a PostgreSQL lock wait");
+}
+
 async fn tagged_query_pid(connection: &dyn Connection, tag: &str) -> Option<i64> {
     let sql = format!(
         "SELECT pid::bigint FROM pg_stat_activity WHERE state = 'active' AND query LIKE '%{tag}%' AND pid <> pg_backend_pid()"
@@ -467,6 +486,62 @@ async fn controlled_transaction_cancel_allows_rollback() {
         .await
         .expect("count rows");
     assert_eq!(result.rows, vec![vec![Value::Int(0)]]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn controlled_transaction_cancel_during_lock_wait_rolls_back_and_reuses_connection() {
+    let (_container, opts) = start_pg().await;
+    let target_connection = connect(opts.clone()).await;
+    let blocker_connection = connect(opts.clone()).await;
+    let observer = connect(opts).await;
+    target_connection
+        .execute("CREATE TABLE lock_wait_cancel (id integer PRIMARY KEY, value integer NOT NULL)")
+        .await
+        .expect("create lock target");
+    target_connection
+        .execute("INSERT INTO lock_wait_cancel VALUES (1, 0)")
+        .await
+        .expect("insert lock target");
+    let mut blocker = blocker_connection.begin().await.expect("begin blocker transaction");
+    blocker
+        .execute("UPDATE lock_wait_cancel SET value = 1 WHERE id = 1")
+        .await
+        .expect("lock row in blocker transaction");
+    let mut target = target_connection.begin().await.expect("begin target transaction");
+    let token = CancellationToken::new();
+    let control = OperationControl::new(token.clone(), None);
+    let task = tokio::spawn(async move {
+        let result = target
+            .execute_controlled(
+                "UPDATE lock_wait_cancel SET value = 2 WHERE id = 1 /* bookie_lock_wait_cancel */",
+                &control,
+            )
+            .await;
+        (target, result)
+    });
+
+    wait_for_tagged_lock_wait(observer.as_ref(), "bookie_lock_wait_cancel").await;
+    token.cancel();
+    let (target, result) = tokio::time::timeout(std::time::Duration::from_secs(10), task)
+        .await
+        .expect("cancelled lock wait must settle")
+        .expect("lock wait task");
+    assert!(matches!(result, Err(DriverError::Cancelled)), "{result:?}");
+    target.rollback().await.expect("rollback cancelled transaction");
+    blocker.rollback().await.expect("release blocker transaction");
+    wait_for_tagged_query(observer.as_ref(), "bookie_lock_wait_cancel", false).await;
+
+    let persisted = observer
+        .query("SELECT value FROM lock_wait_cancel WHERE id = 1")
+        .await
+        .unwrap();
+    assert_eq!(persisted.rows, vec![vec![Value::Int(0)]]);
+    let usable = target_connection
+        .query("SELECT 1")
+        .await
+        .expect("target pool remains usable");
+    assert_eq!(usable.rows, vec![vec![Value::Int(1)]]);
 }
 
 #[tokio::test]

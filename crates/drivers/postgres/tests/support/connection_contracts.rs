@@ -1,6 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use crate::{connect, start_pg};
+use bookie_core::{DriverError, Value};
 
 #[tokio::test]
 #[ignore = "requires docker"]
@@ -30,6 +31,53 @@ async fn a_failed_statement_reports_the_character_position_of_the_error() {
     };
     assert_eq!(sqlstate.as_deref(), Some("42P01"));
     assert_eq!(position, Some(20));
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_parameter_description_failure_aborts_transaction_until_rollback_then_reuses_connection() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts.clone()).await;
+    let observer = connect(opts).await;
+    connection
+        .execute("CREATE TABLE metadata_failure_recovery (id integer PRIMARY KEY, value integer NOT NULL)")
+        .await
+        .expect("create fixture table");
+    connection
+        .execute("INSERT INTO metadata_failure_recovery VALUES (1, 0)")
+        .await
+        .expect("seed fixture row");
+
+    let mut transaction = connection.begin().await.expect("begin transaction");
+    transaction
+        .execute("UPDATE metadata_failure_recovery SET value = 1 WHERE id = 1")
+        .await
+        .expect("update inside transaction");
+    let error = transaction
+        .query_params(
+            "SELECT value FROM metadata_failure_missing WHERE value = $1",
+            &[Value::Text("probe".into())],
+        )
+        .await
+        .expect_err("parameter description must fail for a missing relation");
+    assert!(matches!(error, DriverError::Query { sqlstate: Some(code), .. } if code == "42P01"));
+    let aborted = transaction
+        .query("SELECT 42")
+        .await
+        .expect_err("a description error aborts the active transaction");
+    assert!(matches!(aborted, DriverError::Query { sqlstate: Some(code), .. } if code == "25P02"));
+    transaction.rollback().await.expect("rollback aborted transaction");
+
+    let stored = observer
+        .query("SELECT value::bigint FROM metadata_failure_recovery WHERE id = 1")
+        .await
+        .expect("read fixture row after rollback");
+    assert_eq!(stored.rows, vec![vec![Value::Int(0)]]);
+    let next = connection
+        .query("SELECT 42::bigint")
+        .await
+        .expect("pooled connection recovers after rollback");
+    assert_eq!(next.rows, vec![vec![Value::Int(42)]]);
 }
 
 #[tokio::test]
