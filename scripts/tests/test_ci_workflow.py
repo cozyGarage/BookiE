@@ -1343,6 +1343,8 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("GSETTINGS_SCHEMA_DIR: ${{ runner.temp }}/bookie-direct-bundle/schemas", widgets)
         self.assertEqual(workflow.count('find "$BOOKIE_TEST_BUNDLE" -type f \\( -path'), 6)
         self.assertNotIn('find "$BOOKIE_TEST_BUNDLE/tests" "$BOOKIE_TEST_BUNDLE/bin"', workflow)
+        self.assertNotRegex(workflow, r'find "\$[^\"]+/(?:tests|bin)"')
+        self.assertIn('find "$RUNNER_TEMP/bookie-consumers-bundle" -type f \\( -path', workflow)
         self.assertIn(
             'find "$BOOKIE_TEST_BUNDLE" -type f \\( -path "$BOOKIE_TEST_BUNDLE/tests/*" -o '
             '-path "$BOOKIE_TEST_BUNDLE/bin/*" \\) -exec chmod u+x {} +',
@@ -1389,6 +1391,29 @@ class CiWorkflowTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertTrue(os.access(executable, os.X_OK))
             self.assertFalse(os.access(schema, os.X_OK))
+
+            consumers = Path(temporary) / "bookie-consumers-bundle"
+            consumers_tests = consumers / "tests"
+            consumers_tests.mkdir(parents=True)
+            consumers_executable = consumers_tests / "test-binary"
+            consumers_executable.write_text("binary")
+            consumers_executable.chmod(0o644)
+            consumers_command = next(
+                line.strip()
+                for line in workflow.splitlines()
+                if line.strip().startswith('find "$RUNNER_TEMP/bookie-consumers-bundle"')
+                and "-exec chmod u+x" in line
+            )
+            result = subprocess.run(
+                ["bash", "-e", "-c", consumers_command],
+                env={**os.environ, "RUNNER_TEMP": temporary},
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(os.access(consumers_executable, os.X_OK))
 
             binaries = bundle / "bin"
             binaries.mkdir()
