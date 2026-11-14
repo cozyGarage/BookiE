@@ -555,6 +555,7 @@ async fn value_contract_browsing_binary_string_values_preserves_the_native_bytes
             Value::Text("browse_binary_value".into()),
             Value::Text("string".into()),
             Value::Int(-1),
+            Value::Null,
             Value::Bytes(native_bytes),
         ]
     );
