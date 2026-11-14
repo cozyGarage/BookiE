@@ -261,14 +261,15 @@ struct WindowPair {
 fn primary_and_secondary_window() -> WindowPair {
     relm4::adw::init().unwrap();
     gtk4::gio::resources_register_include!("bookie.gresource").unwrap();
-    relm4::main_application()
-        .register(None::<&gtk4::gio::Cancellable>)
-        .unwrap();
+    let application = relm4::main_application();
+    application.register(None::<&gtk4::gio::Cancellable>).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let controller = launch(directory.path());
+    controller.widget().set_application(Some(&application));
     controller.widget().present();
     controller.emit(AppMsg::NewWindow);
     spin_until(|| controller.model().extra_windows.len() == 1);
+    assert_eq!(application.windows().len(), 2);
     let key = controller.model().extra_windows[0].0;
     let primary = uuid::Uuid::new_v4();
     let secondary = uuid::Uuid::new_v4();
