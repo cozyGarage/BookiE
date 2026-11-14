@@ -151,16 +151,26 @@ static HOST_KEY_ALGORITHMS: [Algorithm; 6] = [
     },
 ];
 
-fn client_config() -> Config {
+fn client_config(recorded: &[Algorithm]) -> Config {
+    let recorded_first = |known: bool| {
+        HOST_KEY_ALGORITHMS
+            .iter()
+            .filter(move |candidate| recorded.iter().any(|stored| same_key_family(candidate, stored)) == known)
+            .cloned()
+    };
     Config {
         nodelay: true,
         keepalive_interval: Some(KEEPALIVE_INTERVAL),
         preferred: Preferred {
-            key: std::borrow::Cow::Borrowed(&HOST_KEY_ALGORITHMS),
+            key: std::borrow::Cow::Owned(recorded_first(true).chain(recorded_first(false)).collect()),
             ..Preferred::DEFAULT
         },
         ..Default::default()
     }
+}
+
+fn same_key_family(candidate: &Algorithm, recorded: &Algorithm) -> bool {
+    matches!((candidate, recorded), (Algorithm::Rsa { .. }, Algorithm::Rsa { .. })) || candidate == recorded
 }
 
 fn timeout_error(stage: &'static str, cfg: &SshConfig, limit: Duration) -> SshError {
@@ -621,7 +631,11 @@ async fn connect_and_auth(
         outcome: outcome.clone(),
     };
 
-    let config = Arc::new(client_config());
+    let recorded: Vec<Algorithm> =
+        russh::keys::known_hosts::known_host_keys_path(&cfg.host, cfg.port, &known_hosts_path)
+            .map(|keys| keys.iter().map(|(_, key)| key.algorithm()).collect())
+            .unwrap_or_default();
+    let config = Arc::new(client_config(&recorded));
     let connecting = client::connect(config, (tcp_host, tcp_port), handler);
     let mut session = match wait_for_handshake(connecting, prompt_event_receiver, CONNECT_TIMEOUT).await {
         Ok(s) => s,
