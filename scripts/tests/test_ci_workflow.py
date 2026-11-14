@@ -365,6 +365,7 @@ class CiWorkflowTests(unittest.TestCase):
                 self.assertTrue(packages <= set(bundle_groups[group]["bin"]))
         for group in ("driver-core", "driver-analytics", "driver-extended"):
             self.assertTrue(bundle_groups[group]["test"])
+        self.assertIn("bookie-policy", bundle_groups["driver-extended"]["test"])
 
     def test_test_bundle_copies_only_binaries_declared_for_its_group(self):
         with tempfile.TemporaryDirectory() as temporary:
