@@ -1,4 +1,5 @@
 use super::*;
+use bookie_core::{MAX_QUERY_RESULT_BYTES, QueryResultBudget, Value};
 
 #[test]
 fn value_contract_bit_strings_keep_leading_zeroes_and_reject_malformed_wire_values() {
@@ -178,6 +179,31 @@ fn value_contract_bit_wire_lengths_pin_byte_boundaries_and_padding() {
     for length in 0..4 {
         assert_eq!(decode_pg_binary_text("BIT", &vec![0; length]), None);
     }
+}
+
+#[test]
+fn bit_preflight_rejects_expansion_before_decoding() {
+    let bit_length = 67_108_865_usize;
+    let mut wire = i32::try_from(bit_length).unwrap().to_be_bytes().to_vec();
+    wire.resize(4 + bit_length.div_ceil(8), 0);
+    let decoded_length = decoded_payload_length("VARBIT", &wire);
+    let mut budget = QueryResultBudget::default();
+    let mut decoded = Vec::new();
+    let mut decode_called = false;
+
+    let admitted = budget
+        .decode_and_admit_row_into(1, decoded_length, &mut decoded, |values| {
+            decode_called = true;
+            values.push(Value::Text("0".repeat(bit_length)));
+            Ok::<(), ()>(())
+        })
+        .unwrap();
+
+    assert!(wire.len() < MAX_QUERY_RESULT_BYTES);
+    assert!(decoded_length > MAX_QUERY_RESULT_BYTES);
+    assert!(!admitted);
+    assert!(!decode_called);
+    assert!(decoded.is_empty());
 }
 
 #[test]
