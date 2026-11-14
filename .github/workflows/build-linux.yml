@@ -529,7 +529,7 @@ jobs:
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           python3 scripts/ci-test-bundle.py verify "$RUNNER_TEMP/bookie-consumers-bundle" "$BOOKIE_SOURCE_COMMIT" --expected-group consumers
-          find "$RUNNER_TEMP/bookie-consumers-bundle/tests" "$RUNNER_TEMP/bookie-consumers-bundle/bin" -type f -exec chmod u+x {} +
+          find "$RUNNER_TEMP/bookie-consumers-bundle" -type f \( -path "$RUNNER_TEMP/bookie-consumers-bundle/tests/*" -o -path "$RUNNER_TEMP/bookie-consumers-bundle/bin/*" \) -exec chmod u+x {} +
       - name: Docker Hub login
         uses: ./.github/actions/dockerhub-login
         with:
