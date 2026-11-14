@@ -52,7 +52,7 @@ apps/linux/app/src/ui/mcp_preferences.rs 1
 apps/linux/app/src/ui/preferences.rs 27
 apps/linux/app/src/ui/row_object.rs 9
 apps/linux/app/src/ui/row_store.rs 5
-apps/linux/app/src/ui/sidebar_row.rs 61
+apps/linux/app/src/ui/sidebar_row.rs 11
 apps/linux/app/src/ui/ssh_section.rs 9
 apps/linux/app/src/ui/structure_tab/columns.rs 3
 apps/linux/app/src/ui/structure_tab/fks.rs 5
