@@ -12,12 +12,18 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def source_revision():
+    return subprocess.check_output(
+        ['git', '-c', f'safe.directory={ROOT.resolve()}', 'rev-parse', 'HEAD'], cwd=ROOT, text=True
+    ).strip()
+
+
 def load_index(bundle):
     spec = importlib.util.spec_from_file_location('ci_test_bundle', Path(__file__).resolve().with_name('ci-test-bundle.py'))
     verifier = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(verifier)
     revision = os.environ.get('BOOKIE_SOURCE_COMMIT') or os.environ.get('GITHUB_SHA')
-    checkout = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
+    checkout = source_revision()
     if revision and revision != checkout:
         raise ValueError('test bundle source revision differs from the checkout')
     index = verifier.verify(bundle, checkout)

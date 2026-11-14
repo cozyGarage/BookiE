@@ -1112,7 +1112,7 @@ jobs:
           BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
           BOOKIE_TOOL_DIR: /var/cache/ci/tools
           CARGO_TARGET_DIR: ${{ runner.temp }}/bookie-pg-release-target
-          TMPDIR: ${{ runner.temp }}/bookie-pg-release-tmp
+          TMPDIR: /tmp
         run: |
           mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"
           python3 scripts/run-test-layer.py postgres-release

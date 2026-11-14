@@ -885,6 +885,14 @@ class CiWorkflowTests(unittest.TestCase):
         control_path = Path("/var/cache/ci/tmp/bookie.XXXXXX/runtime/bookie/ssh/0123456789abcdef/01234567/control.0123456789abcdef")
         self.assertLess(len(os.fsencode(control_path)), 108)
 
+    def test_github_postgres_release_temp_directory_stays_short_for_unix_sockets(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        job = re.search(r"(?ms)^  pg-release:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+        self.assertIn("TMPDIR: /tmp\n", job)
+        self.assertIn('mkdir -p "$TMPDIR"', job)
+        control_path = Path("/tmp/bookie.XXXXXX/runtime/bookie/ssh/0123456789abcdef/01234567/control.0123456789abcdef")
+        self.assertLess(len(os.fsencode(control_path)), 108)
+
     def test_postgres_socket_fixture_waits_for_server_readiness(self):
         script = (ROOT / "scripts/test-postgres-socket.sh").read_text()
         self.assertIn('docker exec "$container_name" pg_isready', script)
