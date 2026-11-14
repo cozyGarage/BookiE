@@ -552,10 +552,10 @@ jobs:
           BOOKIE_REQUIRE_PREBUILT: "1"
         run: python3 scripts/run-test-layer.py app-server
 
-  gtk-build:
+  linux-build:
     if: github.event_name != 'push'
-    name: Build shared GTK binary
-    timeout-minutes: 45
+    name: Build Linux app and package artifacts
+    timeout-minutes: 60
     runs-on: ubuntu-24.04
     needs: [pin-revision, ensure-ci-gtk-image, guards]
     container:
@@ -566,6 +566,8 @@ jobs:
     env:
       CARGO_INCREMENTAL: "0"
       CARGO_BUILD_JOBS: "4"
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      BOOKIE_BUILD_PROFILE: dist
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
@@ -577,14 +579,21 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
         with:
           workspaces: .
-          shared-key: linux-gtk-build
-      - name: Build the GTK safety binary
+          shared-key: linux-app-dist
+      - name: Install package validation tools
+        run: |
+          apt-get update -qq
+          apt-get install -y --no-install-recommends desktop-file-utils
+      - name: Build the Linux application binaries once
         env:
+          DEB_OUT: ${{ github.workspace }}/floor-package
           BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          cargo build --profile ci --locked -p bookie-app --bin bookie-app
-          python3 scripts/ci-gtk-artifact.py create target/ci/bookie-app target/gtk-safety "$BOOKIE_SOURCE_COMMIT"
+          bash scripts/build-deb.sh
+          python3 scripts/ci-gtk-artifact.py create --profile dist target/dist/bookie-app target/gtk-safety "$BOOKIE_SOURCE_COMMIT"
+          package=$(find "$DEB_OUT" -maxdepth 1 -name '*.deb' -print -quit)
+          python3 scripts/ci-gtk-artifact.py create --package "$package" floor-artifact "$BOOKIE_SOURCE_COMMIT"
       - name: Upload the source-pinned GTK binary
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
@@ -592,6 +601,13 @@ jobs:
           path: target/gtk-safety/
           if-no-files-found: error
           retention-days: 1
+      - name: Upload the source-pinned Debian package
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: floor-package-${{ github.run_id }}-${{ github.run_attempt }}
+          path: floor-artifact/
+          if-no-files-found: error
+          retention-days: 2
 
   gtk:
     if: github.event_name != 'push'
@@ -602,7 +618,7 @@ jobs:
       fail-fast: false
       matrix:
         shard: [1, 2, 3]
-    needs: [pin-revision, ensure-ci-gtk-image, guards, clippy, gtk-build]
+    needs: [pin-revision, ensure-ci-gtk-image, guards, linux-build]
     container:
       image: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}
       credentials:
@@ -635,7 +651,7 @@ jobs:
         env:
           BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
         run: |
-          binary=$(python3 scripts/ci-gtk-artifact.py verify target/gtk-safety "$BOOKIE_SOURCE_COMMIT")
+          binary=$(python3 scripts/ci-gtk-artifact.py verify --profile dist target/gtk-safety "$BOOKIE_SOURCE_COMMIT")
           printf 'BOOKIE_GTK_BINARY=%s\nGSETTINGS_SCHEMA_DIR=%s/target/gtk-safety/schemas\n' \
             "$binary" "$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
       - name: Install GTK test dependencies
@@ -714,7 +730,7 @@ jobs:
     name: Installed GTK server scenarios (${{ matrix.server }})
     timeout-minutes: 45
     runs-on: ubuntu-24.04
-    needs: [pin-revision, ensure-ci-gtk-image, guards, clippy, gtk-build]
+    needs: [pin-revision, ensure-ci-gtk-image, guards, linux-build]
     container:
       image: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}
       credentials:
@@ -758,7 +774,7 @@ jobs:
         env:
           BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
         run: |
-          binary=$(python3 scripts/ci-gtk-artifact.py verify target/gtk-safety "$BOOKIE_SOURCE_COMMIT")
+          binary=$(python3 scripts/ci-gtk-artifact.py verify --profile dist target/gtk-safety "$BOOKIE_SOURCE_COMMIT")
           printf 'BOOKIE_GTK_BINARY=%s\nGSETTINGS_SCHEMA_DIR=%s/target/gtk-safety/schemas\n' \
             "$binary" "$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
       - name: Log in to Docker Hub
@@ -1045,54 +1061,6 @@ jobs:
           path: target/quality/*-layers
           if-no-files-found: error
 
-  floor-build:
-    runs-on: ubuntu-24.04
-    needs: [pin-revision, ensure-ci-gtk-image, guards, clippy]
-    if: github.event_name != 'push'
-    timeout-minutes: 45
-    container:
-      image: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-      volumes:
-        - /var/run/docker.sock:/var/run/docker.sock
-      env:
-        DEBIAN_FRONTEND: noninteractive
-        DOCKER_CONFIG: /github/home/.docker
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-        with:
-          ref: ${{ needs.pin-revision.outputs.revision }}
-          persist-credentials: false
-      - name: Mark checkout safe for Git in container
-        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
-      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
-        with:
-          toolchain: 1.98
-      - name: Install package validation tools
-        run: |
-          apt-get update -qq
-          apt-get install -y --no-install-recommends desktop-file-utils
-      - name: Log in to Docker Hub
-        uses: ./.github/actions/dockerhub-login
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Build the shared release package
-        run: |
-          DEB_OUT="$GITHUB_WORKSPACE/floor-package" bash scripts/build-deb.sh
-          package=$(find "$GITHUB_WORKSPACE/floor-package" -maxdepth 1 -name '*.deb' -print -quit)
-          python3 scripts/ci-gtk-artifact.py create --package "$package" \
-            "$GITHUB_WORKSPACE/floor-artifact" "${{ needs.pin-revision.outputs.revision }}"
-      - name: Upload the Debian package for distro-floor scenarios
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
-        with:
-          name: floor-package-${{ github.run_id }}-${{ github.run_attempt }}
-          path: floor-artifact/
-          if-no-files-found: error
-          retention-days: 2
-
   pg-release:
     if: github.event_name != 'push'
     name: PostgreSQL release fixture (docker)
@@ -1159,7 +1127,7 @@ jobs:
     if: github.event_name != 'push'
     timeout-minutes: 90
     runs-on: ubuntu-24.04
-    needs: [pin-revision, ensure-ci-gtk-image, floor-build]
+    needs: [pin-revision, ensure-ci-gtk-image, linux-build]
     container:
       image: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}
       credentials:
@@ -1290,14 +1258,13 @@ jobs:
       - gpui-tests
       - widgets
       - consumers
-      - gtk-build
+      - linux-build
       - gtk
       - keyring
       - gtk-server
       - driver
       - b4-rollback
       - driver-tls
-      - floor-build
       - pg-release
       - security-policy
       - supply-chain

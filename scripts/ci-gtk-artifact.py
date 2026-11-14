@@ -79,7 +79,9 @@ def verify_toolkit_runtime(required, current):
             raise ValueError(f"Build artifact toolkit runtime is incompatible: {package}")
 
 
-def create(binary, output, expected_sha, *, package=False):
+def create(binary, output, expected_sha, *, package=False, profile="ci"):
+    if profile not in {"ci", "dist"}:
+        raise ValueError("Build artifact profile must be ci or dist")
     if source_identity() != expected_sha:
         raise ValueError("Build artifact source does not match the requested commit")
     binary_digest = digest(binary)
@@ -117,7 +119,7 @@ def create(binary, output, expected_sha, *, package=False):
         "artifact_type": "debian-package" if package else "native-binary",
         "source_commit": expected_sha,
         "architecture": platform.machine(),
-        "profile": "release-package" if package else "ci",
+        "profile": "release-package" if package else profile,
         "features": feature_identity(),
         "toolkit_runtime": None if package else toolkit_identity(),
         "gsettings_schema_sha256": schema_digest,
@@ -127,7 +129,7 @@ def create(binary, output, expected_sha, *, package=False):
     return output
 
 
-def verify(directory, expected_sha, *, package=False):
+def verify(directory, expected_sha, *, package=False, profile="ci"):
     manifest_path = directory / "manifest.json"
     if manifest_path.is_symlink() or not manifest_path.is_file() or manifest_path.stat().st_size > 4096:
         raise ValueError("Build artifact requires a small regular manifest")
@@ -141,9 +143,9 @@ def verify(directory, expected_sha, *, package=False):
         raise ValueError("Build artifact source does not match the requested commit")
     if manifest.get("architecture") != platform.machine():
         raise ValueError("Build artifact architecture does not match this worker")
-    profile = "release-package" if package else "ci"
-    if manifest.get("profile") != profile:
-        raise ValueError(f"Build artifact profile must be {profile}")
+    expected_profile = "release-package" if package else profile
+    if manifest.get("profile") != expected_profile:
+        raise ValueError(f"Build artifact profile must be {expected_profile}")
     if manifest.get("features") != feature_identity():
         raise ValueError("Build artifact feature set does not match this checkout")
     if package:
@@ -172,20 +174,22 @@ def main():
     publish.add_argument("directory", type=Path)
     publish.add_argument("source_commit")
     publish.add_argument("--package", action="store_true")
+    publish.add_argument("--profile", choices=("ci", "dist"), default="ci")
     consume = subcommands.add_parser("verify")
     consume.add_argument("directory", type=Path)
     consume.add_argument("source_commit")
     consume.add_argument("--package", action="store_true")
+    consume.add_argument("--profile", choices=("ci", "dist"), default="ci")
     args = parser.parse_args()
     try:
         if not re.fullmatch(r"[0-9a-f]{40}", args.source_commit):
             raise ValueError("Build artifact requires a full source commit")
         if args.command == "create":
-            result = create(args.binary, args.directory, args.source_commit, package=args.package)
+            result = create(args.binary, args.directory, args.source_commit, package=args.package, profile=args.profile)
         else:
             if source_identity() != args.source_commit:
                 raise ValueError("Build artifact source does not match this checkout")
-            result = verify(args.directory, args.source_commit, package=args.package)
+            result = verify(args.directory, args.source_commit, package=args.package, profile=args.profile)
         print(result)
         return 0
     except (OSError, ValueError, subprocess.CalledProcessError) as error:

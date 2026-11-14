@@ -189,11 +189,11 @@ jobs:
           else
             rm -rf -- src
           fi
-  gtk-build:
+  linux-build:
     if: github.event_name != 'push'
     runs-on: build-host
     needs: [pin-revision, guards]
-    timeout-minutes: 45
+    timeout-minutes: 60
     defaults:
       run:
         shell: bash
@@ -210,7 +210,8 @@ jobs:
       CARGO_TARGET_DIR: /target/bookie-${{ github.job }}
       TMPDIR: /target/tmp-${{ github.run_id }}-${{ github.job }}
       BOOKIE_TOOL_DIR: /tools
-      CARGO_PROFILE_CI_STRIP: symbols
+      CARGO_BUILD_JOBS: "8"
+      BOOKIE_BUILD_PROFILE: dist
     steps:
       - name: Prepare runner workspace
         run: |
@@ -226,22 +227,38 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
           path: src
-      - name: Prepare artifact runtime
-        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
-      - name: Build the shared GTK binary
+      - name: Mark checkout safe for Git in container
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE/src"
+      - name: Install package validation tools
+        run: |
+          apt-get update -qq
+          apt-get install -y --no-install-recommends desktop-file-utils
+      - name: Build native application and package artifacts once
         env:
-          CARGO_BUILD_JOBS: "8"
+          BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
+          DEB_OUT: ${{ github.workspace }}/floor-package
         run: |
           exec 9>>/target/.bookie-build-cache.lock
           flock --exclusive 9
           cd src
-          cargo build --profile ci --locked -p bookie-app --bin bookie-app
-          python3 scripts/ci-gtk-artifact.py create "$CARGO_TARGET_DIR/ci/bookie-app" "$GITHUB_WORKSPACE/gtk-artifact" "${{ needs.pin-revision.outputs.revision }}"
+          DEB_OUT="$DEB_OUT" bash scripts/build-deb.sh
+          python3 scripts/ci-gtk-artifact.py create --profile dist "$CARGO_TARGET_DIR/dist/bookie-app" "$GITHUB_WORKSPACE/gtk-artifact" "$BOOKIE_SOURCE_COMMIT"
+          package=$(find "$DEB_OUT" -maxdepth 1 -name '*.deb' -print -quit)
+          python3 scripts/ci-gtk-artifact.py create --package "$package" "$GITHUB_WORKSPACE/floor-artifact" "$BOOKIE_SOURCE_COMMIT"
+      - name: Prepare artifact runtime
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
       - name: Upload the source-pinned GTK binary
         uses: https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
         with:
           name: gtk-ci-${{ github.run_id }}-${{ needs.pin-revision.outputs.revision }}
           path: gtk-artifact/
+          if-no-files-found: error
+          retention-days: 2
+      - name: Upload the source-pinned Debian package
+        uses: https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
+        with:
+          name: floor-package-${{ github.run_id }}-${{ needs.pin-revision.outputs.revision }}
+          path: floor-artifact/
           if-no-files-found: error
           retention-days: 2
       - name: Clean builder scratch
@@ -253,10 +270,8 @@ jobs:
           fi
           rm -rf -- "$TMPDIR"
           if [[ -f src/scripts/ci-cache.py ]]; then
-            python3 src/scripts/ci-cache.py --root /target --lock /target/.bookie-build-cache.lock cleanup --min-free-gib 30
+            python3 scripts/ci-cache.py --root /target --lock /target/.bookie-build-cache.lock cleanup --min-free-gib 30
           fi
-
-
       - name: Finalize runner job
         if: always()
         shell: bash
@@ -264,8 +279,9 @@ jobs:
           if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
             bash src/scripts/cleanup-ci-job.sh
           else
-            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+            rm -rf -- src gtk-artifact floor-artifact floor-package floor-package-path
           fi
+
   clippy:
     needs: [pin-revision]
     runs-on: build-host
@@ -646,95 +662,12 @@ jobs:
           else
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
-  floor-build:
-    runs-on: build-host
-    needs: [pin-revision, guards, clippy]
-    if: github.event_name != 'push'
-    timeout-minutes: 45
-    defaults:
-      run:
-        shell: bash
-    env:
-      CARGO_TARGET_DIR: /target/bookie-${{ github.job }}
-      TMPDIR: /target/tmp-${{ github.run_id }}-${{ github.job }}
-      CARGO_HOME: /cargo
-      BOOKIE_TOOL_DIR: /tools
-      CARGO_BUILD_JOBS: "8"
-      SCCACHE_DIR: /cargo/sccache
-      RUSTC_WRAPPER: sccache
-      SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-      CMAKE_C_COMPILER_LAUNCHER: /tools/sccache
-      CMAKE_CXX_COMPILER_LAUNCHER: /tools/sccache
-      SCCACHE_BASEDIRS: /target/bookie-${{ github.job }}
-      SCCACHE_SERVER_UDS: /target/tmp-${{ github.run_id }}-${{ github.job }}/sccache.sock
-      PATH: /tools:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
-    steps:
-      - name: Prepare runner workspace
-        run: |
-          mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
-          touch "$CARGO_TARGET_DIR/.bookie-last-used" /target/.bookie-build-cache.lock
-          sccache --start-server
-          rm -rf src
-      - name: Check out source revision
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-        with:
-          ref: ${{ needs.pin-revision.outputs.revision }}
-          token: ${{ secrets.FORGEJO_TOKEN }}
-          persist-credentials: false
-          fetch-depth: 1
-          path: src
-      - name: Mark checkout safe for Git in container
-        run: git config --global --add safe.directory "$GITHUB_WORKSPACE/src"
-      - name: Install package validation tools
-        run: |
-          apt-get update -qq
-          apt-get install -y --no-install-recommends desktop-file-utils
-      - name: Build the shared release package
-        run: |
-          exec 9>>/target/.bookie-build-cache.lock
-          flock --exclusive 9
-          cd src
-          DEB_OUT="$GITHUB_WORKSPACE/floor-package" bash scripts/build-deb.sh
-          package=$(find "$GITHUB_WORKSPACE/floor-package" -maxdepth 1 -name '*.deb' -print -quit)
-          python3 scripts/ci-gtk-artifact.py create --package "$package" "$GITHUB_WORKSPACE/floor-artifact" "${{ needs.pin-revision.outputs.revision }}"
-      - name: Prepare artifact runtime
-        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
-      - name: Upload the shared release package
-        uses: https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
-        with:
-          name: floor-package-${{ github.run_id }}-${{ needs.pin-revision.outputs.revision }}
-          path: floor-artifact/
-          if-no-files-found: error
-          retention-days: 2
-      - name: Clean builder scratch
-        if: always()
-        run: |
-          if [[ -S "$SCCACHE_SERVER_UDS" ]]; then
-            sccache --show-stats
-            sccache --stop-server
-          fi
-          rm -rf -- "$TMPDIR"
-          if [[ -f src/scripts/ci-cache.py ]]; then
-            python3 src/scripts/ci-cache.py --root /target --lock /target/.bookie-build-cache.lock cleanup --min-free-gib 30
-          fi
 
-
-      - name: Finalize runner job
-        if: always()
-        shell: bash
-        run: |
-          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
-            bash src/scripts/cleanup-ci-job.sh
-          else
-            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
-          fi
   distro-floor-scenarios:
     runs-on: any-host
-    needs: [pin-revision, floor-build]
+    needs: [pin-revision, linux-build]
     if: github.event_name != 'push'
     timeout-minutes: 90
-    env:
-      CARGO_TARGET_DIR: /var/cache/ci/target/floor-debian:testing
     strategy:
       fail-fast: false
       max-parallel: 2
@@ -1003,10 +936,8 @@ jobs:
   gtk:
     if: github.event_name != 'push'
     runs-on: any-host
-    needs: [pin-revision, guards, clippy, gtk-build]
+    needs: [pin-revision, guards, linux-build]
     timeout-minutes: 60
-    env:
-      CARGO_TARGET_DIR: /var/cache/ci/target/gtk-build
     strategy:
       fail-fast: false
       matrix:
@@ -1037,7 +968,7 @@ jobs:
           path: gtk-artifact/
       - name: Verify the shared GTK binary
         run: |
-          binary=$(python3 src/scripts/ci-gtk-artifact.py verify "$GITHUB_WORKSPACE/gtk-artifact" "${{ needs.pin-revision.outputs.revision }}")
+          binary=$(python3 src/scripts/ci-gtk-artifact.py verify --profile dist "$GITHUB_WORKSPACE/gtk-artifact" "${{ needs.pin-revision.outputs.revision }}")
           printf 'BOOKIE_GTK_BINARY=%s\nGSETTINGS_SCHEMA_DIR=%s/schemas\n' "$binary" "$GITHUB_WORKSPACE/gtk-artifact" >> "$GITHUB_ENV"
       - name: Docker Hub login
         env:
@@ -1114,10 +1045,9 @@ jobs:
   gtk-server:
     if: github.event_name != 'push'
     runs-on: any-host
-    needs: [pin-revision, guards, clippy, gtk-build]
+    needs: [pin-revision, guards, linux-build]
     timeout-minutes: 45
     env:
-      CARGO_TARGET_DIR: /var/cache/ci/target/gtk-build
       BOOKIE_GTK_SCENARIO_RETRIES: "0"
       BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-gtk-server-${{ matrix.server }}
       BOOKIE_GTK_SERVER_IMAGE_GROUP: ${{ matrix.server == 'mysql-approval' && 'mysql' || matrix.server }}
@@ -1161,7 +1091,7 @@ jobs:
           path: gtk-artifact/
       - name: Verify the shared GTK binary
         run: |
-          binary=$(python3 src/scripts/ci-gtk-artifact.py verify "$GITHUB_WORKSPACE/gtk-artifact" "${{ needs.pin-revision.outputs.revision }}")
+          binary=$(python3 src/scripts/ci-gtk-artifact.py verify --profile dist "$GITHUB_WORKSPACE/gtk-artifact" "${{ needs.pin-revision.outputs.revision }}")
           printf 'BOOKIE_GTK_BINARY=%s\nGSETTINGS_SCHEMA_DIR=%s/schemas\n' "$binary" "$GITHUB_WORKSPACE/gtk-artifact" >> "$GITHUB_ENV"
       - name: Docker Hub login
         env:
@@ -1333,14 +1263,13 @@ jobs:
       - guards
       - gpui-tests
       - gpui-build
-      - gtk-build
+      - linux-build
       - clippy
       - test-build
       - b4-rollback
       - unit
       - sandbox
       - widgets
-      - floor-build
       - distro-floor-scenarios
       - driver
       - security-policy

@@ -699,12 +699,12 @@
     "condition": "github.event_name != 'push'",
     "matrix": {}
   },
-  "gtk-build": {
+  "linux-build": {
     "needs": [
       "guards",
       "pin-revision"
     ],
-    "timeout_minutes": 45,
+    "timeout_minutes": 60,
     "condition": "github.event_name != 'push'",
     "matrix": {}
   },
@@ -759,19 +759,9 @@
     "condition": null,
     "matrix": {}
   },
-  "floor-build": {
-    "needs": [
-      "clippy",
-      "guards",
-      "pin-revision"
-    ],
-    "timeout_minutes": 45,
-    "condition": "github.event_name != 'push'",
-    "matrix": {}
-  },
   "distro-floor-scenarios": {
     "needs": [
-      "floor-build",
+      "linux-build",
       "pin-revision"
     ],
     "timeout_minutes": 90,
@@ -832,9 +822,8 @@
   },
   "gtk": {
     "needs": [
-      "clippy",
-      "gtk-build",
       "guards",
+      "linux-build",
       "pin-revision"
     ],
     "timeout_minutes": 60,
@@ -860,9 +849,8 @@
   },
   "gtk-server": {
     "needs": [
-      "clippy",
-      "gtk-build",
       "guards",
+      "linux-build",
       "pin-revision"
     ],
     "timeout_minutes": 45,
@@ -917,14 +905,13 @@
       "distro-floor-scenarios",
       "driver",
       "driver-tls",
-      "floor-build",
       "gpui-build",
       "gpui-tests",
       "gtk",
-      "gtk-build",
       "gtk-server",
       "guards",
       "keyring",
+      "linux-build",
       "pg-release",
       "pin-revision",
       "sandbox",
