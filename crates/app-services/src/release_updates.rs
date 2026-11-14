@@ -1,3 +1,5 @@
+use quick_xml::{Reader, events::Event as XmlEvent};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ReleaseVersion {
     pub major: u32,
@@ -137,7 +139,87 @@ pub fn metainfo_release_notes(metainfo_xml: &str, version: &str) -> Option<Strin
     if html.is_empty() {
         return None;
     }
-    Some(html.to_owned())
+    appstream_markup_to_text(html)
+}
+
+fn appstream_markup_to_text(markup: &str) -> Option<String> {
+    let document = format!("<notes>{markup}</notes>");
+    let mut reader = Reader::from_str(&document);
+    reader.config_mut().trim_text(false);
+    let mut output = String::new();
+    loop {
+        match reader.read_event().ok()? {
+            XmlEvent::Start(element) => match element.local_name().as_ref() {
+                "p" | "ul" | "ol" => ensure_line_breaks(&mut output, 2),
+                "li" => start_list_item(&mut output),
+                _ => {}
+            },
+            XmlEvent::End(element) => match element.local_name().as_ref() {
+                "p" | "ul" | "ol" => ensure_line_breaks(&mut output, 2),
+                "li" => ensure_line_breaks(&mut output, 1),
+                _ => {}
+            },
+            XmlEvent::Empty(element) if element.local_name().as_ref() == "br" => {
+                ensure_line_breaks(&mut output, 1);
+            }
+            XmlEvent::Text(text) => {
+                let unescaped = quick_xml::escape::unescape(text.as_ref()).ok()?;
+                append_text(&mut output, &unescaped);
+            }
+            XmlEvent::CData(text) => {
+                append_text(&mut output, text.as_ref());
+            }
+            XmlEvent::GeneralRef(reference) => {
+                let character = reference
+                    .resolve_char_ref()
+                    .ok()?
+                    .or_else(|| match reference.as_ref() {
+                        "amp" => Some('&'),
+                        "lt" => Some('<'),
+                        "gt" => Some('>'),
+                        "apos" => Some('\''),
+                        "quot" => Some('"'),
+                        _ => None,
+                    })?;
+                append_text(&mut output, &character.to_string());
+            }
+            XmlEvent::Eof => break,
+            _ => {}
+        }
+    }
+    Some(output.trim().to_owned())
+}
+
+fn start_list_item(output: &mut String) {
+    if !output.is_empty() {
+        ensure_line_breaks(output, 1);
+    }
+    output.push_str("• ");
+}
+
+fn ensure_line_breaks(output: &mut String, count: usize) {
+    while output.ends_with(' ') {
+        output.pop();
+    }
+    let existing = output.chars().rev().take_while(|character| *character == '\n').count();
+    for _ in existing..count {
+        output.push('\n');
+    }
+}
+
+fn append_text(output: &mut String, text: &str) {
+    let normalized = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    if normalized.is_empty() {
+        return;
+    }
+    if text.starts_with(char::is_whitespace) && !output.is_empty() && !output.ends_with(' ') && !output.ends_with('\n')
+    {
+        output.push(' ');
+    }
+    output.push_str(quick_xml::escape::escape(normalized).as_ref());
+    if text.ends_with(char::is_whitespace) {
+        output.push(' ');
+    }
 }
 
 pub const GITHUB_LATEST_RELEASE_URL: &str = "https://api.github.com/repos/cozyGarage/BookiE/releases/latest";
@@ -254,7 +336,7 @@ mod tests {
     }
 
     #[test]
-    fn metainfo_notes_extract_the_matching_release_html() {
+    fn metainfo_notes_convert_the_matching_release_to_readable_markup() {
         let xml = r#"
         <releases>
           <release version="0.2.7" type="stable" date="2026-11-12">
@@ -267,9 +349,28 @@ mod tests {
         "#;
         assert_eq!(
             metainfo_release_notes(xml, "0.2.7").as_deref(),
-            Some("<p>Release after 0.2.6: notes for seven.</p>")
+            Some("Release after 0.2.6: notes for seven.")
         );
         assert_eq!(metainfo_release_notes(xml, "0.9.9"), None);
+    }
+
+    #[test]
+    fn metainfo_notes_preserve_paragraphs_lists_and_entities_as_text() {
+        let xml = r#"
+        <releases>
+          <release version="0.2.7">
+            <description>
+              <p>Read &amp; write <em>exactly</em>.</p>
+              <p>More details:</p>
+              <ul><li>First &lt;value&gt;</li><li><a href="https://example.invalid">Help &amp; support</a></li></ul>
+            </description>
+          </release>
+        </releases>
+        "#;
+        assert_eq!(
+            metainfo_release_notes(xml, "0.2.7").as_deref(),
+            Some("Read &amp; write exactly.\n\nMore details:\n\n• First &lt;value&gt;\n• Help &amp; support")
+        );
     }
 
     #[test]
