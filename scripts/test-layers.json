@@ -180,7 +180,7 @@
       ]
     },
     "driver-extended": {
-      "purpose": "Cassandra, DuckDB and Oracle integration tests",
+      "purpose": "Cassandra, DuckDB and Oracle integration tests, including guarded Oracle stored-function denial",
       "prerequisites": "Rust 1.98; Docker; source-pinned test bundle",
       "hosted_gate": "Build Linux / driver (driver-extended); lab-ci / driver (driver-extended)",
       "steps": [

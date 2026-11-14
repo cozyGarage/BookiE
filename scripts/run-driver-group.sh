@@ -41,5 +41,9 @@ for driver in "${drivers[@]}"; do
     bash scripts/run-rust-tests.sh --locked -p "bookie-driver-$driver" \
       --test integration -- --include-ignored --test-threads=1
   fi
+  if [[ "$driver" == oracle ]]; then
+    bash scripts/run-rust-tests.sh --locked -p bookie-policy \
+      --test oracle_stored_function -- --include-ignored --test-threads=1
+  fi
   cleanup_current
 done
