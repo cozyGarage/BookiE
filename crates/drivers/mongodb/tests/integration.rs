@@ -5,6 +5,8 @@ mod auth_source;
 mod disconnection;
 #[path = "support/hostile_scram.rs"]
 mod hostile_scram;
+#[path = "support/metadata_sample_batch_budget.rs"]
+mod metadata_sample_batch_budget;
 #[path = "../../shared/server_restart.rs"]
 mod server_restart;
 #[path = "support/value_refetch_and_server_info.rs"]
