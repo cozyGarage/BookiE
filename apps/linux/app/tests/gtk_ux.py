@@ -2868,6 +2868,10 @@ GLib.MainLoop().run()
         ui.invoke_named_action_within("default.enum_grid", "Open enum_grid")
         for label in ("low8", "low16", "NULL", "high8", "high16"):
             ui.wait_for_node(name=label, role=pyatspi.ROLE_LABEL)
+        click_cell("low8", count=2)
+        for key in ("apostrophe", *"high8", "apostrophe"):
+            ui.press_x11_key(key)
+        ui.press_x11_key("Return")
 
         query = (
             "SELECT toString(id), "
@@ -2884,8 +2888,8 @@ GLib.MainLoop().run()
             "4\t0\t1\t\t0\t1\t",
             "5\t0\t127\thigh8\t0\t32767\thigh16",
         ))
-        click_cell("low8", count=2)
         assert ui.find_node(name="1 unsaved change") is None, "a read-only ClickHouse grid allowed a row edit"
+        ui.wait_for_node(name="low8", role=pyatspi.ROLE_LABEL)
         assert clickhouse(query) == before, "a read-only ClickHouse enum grid changed server values"
 
     def postgres_grid_edit_and_delete_commit_to_the_server(database, base):
