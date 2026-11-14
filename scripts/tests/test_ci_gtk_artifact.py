@@ -2,6 +2,7 @@ import importlib.util
 import json
 from pathlib import Path
 import re
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -22,6 +23,17 @@ TOOLKIT = {
 
 
 class GtkArtifactWorkflowTests(unittest.TestCase):
+    def test_github_package_output_does_not_dirty_the_artifact_source_checkout(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        build = workflow.split("  linux-build:\n", 1)[1].split("  gtk:\n", 1)[0]
+        self.assertIn("DEB_OUT: ${{ github.workspace }}/.floor-package", build)
+
+        generated_package = ROOT / ".floor-package/bookie.deb"
+        ignored = subprocess.run(
+            ["git", "check-ignore", "--quiet", str(generated_package)], cwd=ROOT, check=False
+        )
+        self.assertEqual(ignored.returncode, 0)
+
     def test_linux_release_artifacts_feed_gtk_and_package_scenarios(self):
         github = (ROOT / ".github/workflows/build-linux.yml").read_text()
         forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()

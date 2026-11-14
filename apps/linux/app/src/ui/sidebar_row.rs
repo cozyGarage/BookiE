@@ -144,11 +144,7 @@ pub struct SidebarRow {
     new_schema_button: Option<gtk::Button>,
     open_button: Option<gtk::Button>,
     schema_actions: SchemaCatalogActions,
-    /// The eagerly-parented context-menu popover. Held on the model
-    /// so `shutdown` can `unparent()` it before the row's root widget
-    /// is finalized — without this, GTK warns
-    /// "Finalizing widget, but it still has children left" whenever
-    /// the sidebar rebuilds.
+    // Keep the parented popover so shutdown can unparent it before GTK finalizes the row.
     popover: Rc<RefCell<Option<gtk::PopoverMenu>>>,
     columns: super::sidebar_columns::SidebarColumns,
 }
@@ -193,25 +189,16 @@ pub enum SidebarRowOutput {
         schema: Option<String>,
         name: String,
     },
-    /// Ctrl+click or right-click "Open in new tab" — App always appends a
-    /// new tab even if the same table is already open. Plain click /
-    /// Enter activation does NOT flow through here; it's handled at the
-    /// parent ListBox via the `row-activated` signal, which is the only
-    /// GTK signal that fires for both mouse and keyboard activation.
+    /// Ctrl+click and the context menu always append a tab, even when the table is already open.
+    /// Plain click and Enter use the parent ListBox activation.
     OpenInNewTab {
         schema: Option<String>,
         name: String,
     },
-    /// Right-click "Edit Structure" → opens an Edit-mode Structure tab
-    /// for this table.
     EditStructure {
         schema: Option<String>,
         name: String,
     },
-    /// Right-click "Show CREATE TABLE" → App synthesises the full
-    /// CREATE statement (columns + indexes + foreign keys) and opens
-    /// it in a fresh editor tab. Useful for schema export, sharing,
-    /// or just reading the canonical DDL without going through pg_dump.
     ShowCreateTable {
         schema: Option<String>,
         name: String,
@@ -220,11 +207,6 @@ pub enum SidebarRowOutput {
         schema: Option<String>,
         name: String,
     },
-    /// Right-click "Drop Table…" → App presents the AdwAlertDialog
-    /// confirmation; on confirm runs DROP TABLE and closes any open
-    /// tabs for the dropped table.
-    /// Right-click "Import CSV…" → App reads the file, asks the user how
-    /// to map its fields, and loads it into this table.
     ImportCsv {
         schema: Option<String>,
         name: String,
@@ -268,22 +250,10 @@ impl FactoryComponent for SidebarRow {
     type ParentWidget = gtk::ListBox;
 
     view! {
-        // Compact navigation row matching GNOME Files / Builder density
-        // (~36-40px). AdwActionRow was the wrong widget here — it's for
-        // settings entries (title + subtitle + suffix) and forces
-        // ~50px height even with single-line content. The parent
-        // ListBox carries the `.navigation-sidebar` style class which
-        // does the rest of the visual work.
+        // Avoid AdwActionRow's settings-row height; the parent ListBox supplies sidebar styling.
         gtk::ListBoxRow {
             set_activatable: true,
-            // No connect_activate here: gtk::ListBoxRow::activate is a
-            // keybinding signal that fires only on Enter, not on mouse
-            // click. The unified handler lives on the parent ListBox
-            // (`row-activated`), which fires for both keyboard and mouse.
-            //
-            // Stash the table name for filter_func / sync_sidebar_selection
-            // / row-activated lookup. widget-name is unused for CSS in
-            // this app, so no styling collision risk.
+            // The parent row-activated handler covers mouse and Enter; retain the name for its selection lookup.
             set_widget_name: &self.info.name,
 
             #[name = "row_content"]
@@ -402,10 +372,7 @@ impl FactoryComponent for SidebarRow {
     }
 
     fn shutdown(&mut self, _widgets: &mut Self::Widgets, _output: relm4::Sender<Self::Output>) {
-        // Eagerly-parented popovers must be unparented before the
-        // row is finalized — GTK warns about leftover children
-        // otherwise. shutdown() runs on factory removal (sidebar
-        // rebuild, disconnect, search filter), the natural hook.
+        // GTK requires unparenting a factory row's popover before finalizing the row.
         self.columns.close();
         if let Some(popover) = self.popover.borrow_mut().take() {
             popover.popdown();
@@ -458,21 +425,14 @@ impl FactoryComponent for SidebarRow {
             button.connect_clicked(move |_| sender_for_open_button.input(SidebarRowMsg::Open));
         }
 
-        // Tooltip surfaces the fully-qualified name (`schema.table`)
-        // for multi-schema connections so the user can disambiguate
-        // sibling tables without a tab open. Single-schema connections
-        // get a plain table-name tooltip — redundant with the visible
-        // label, but harmless and keeps screen-reader output uniform.
+        // Qualified tooltips disambiguate schemas; plain-name tooltips keep single-schema accessibility consistent.
         let tooltip = match self.info.schema.as_deref().filter(|s| !s.is_empty()) {
             Some(schema) => format!("{schema}.{}", self.info.name),
             None => self.info.name.clone(),
         };
         root.set_tooltip_text(Some(&tooltip));
 
-        // Ctrl+click → "Open in new tab". A button=1 GestureClick fires
-        // before the ListBoxRow's own activate signal, so we can intercept
-        // and short-circuit when CONTROL is held; without claiming the
-        // gesture, normal clicks fall through to connect_activate.
+        // Claim Ctrl+click before row activation so the parent opens a new tab.
         let click_gesture = gtk::GestureClick::builder().button(1).build();
         let sender_for_ctrl = sender.clone();
         click_gesture.connect_pressed(move |gesture, _, _, _| {
@@ -484,10 +444,7 @@ impl FactoryComponent for SidebarRow {
         });
         root.add_controller(click_gesture);
 
-        // Action group on the row (same widget the popover is
-        // parented to). The muxer walks up from the popover surface
-        // through its set_parent anchor; the row is the first widget
-        // in that chain that holds an action group.
+        // The popover resolves actions through its row parent.
         let group = gtk::gio::SimpleActionGroup::new();
         let sender_open = sender.clone();
         let open_action = gtk::gio::ActionEntry::builder("open-in-new-tab")
@@ -538,10 +495,7 @@ impl FactoryComponent for SidebarRow {
         ]);
         root.insert_action_group("sidebar-row", Some(&group));
 
-        // Defence against the factory-clears-row-while-menu-is-open
-        // race: if the row is being removed from the view, the menu
-        // pops down before disposal so the popover doesn't get
-        // finalised mid-display.
+        // Pop down before row removal so GTK cannot finalize an open popover.
         let popover_for_unmap = self.popover.clone();
         root.connect_unmap(move |_| {
             if let Some(popover) = popover_for_unmap.borrow().as_ref() {
@@ -563,8 +517,7 @@ impl FactoryComponent for SidebarRow {
         });
         root.add_controller(right_click);
 
-        // Keyboard Menu key opens the same context menu, anchored to
-        // the row centre (no pointer position).
+        // The Menu key anchors to the row center because no pointer position exists.
         let popover_for_menu = self.popover.clone();
         let root_for_menu = root.downgrade();
         let kind_for_menu = self.kind;

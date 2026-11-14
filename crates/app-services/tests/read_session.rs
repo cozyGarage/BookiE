@@ -3,6 +3,7 @@
 
 use std::sync::Arc;
 
+use bookie_app_services::command_bridge::{ChannelEventSink, Command, Epoch, Event, dispatch};
 use bookie_app_services::database_service::DatabaseService;
 use bookie_app_services::driver_error_presentation::DriverFailurePresentation;
 use bookie_app_services::read_session::ReadSession;
@@ -264,4 +265,105 @@ async fn sql_runs_through_the_guard_and_a_write_is_refused_on_a_read_only_sessio
         .await
         .expect("count");
     assert_eq!(still.rows.iter().next().map(|row| row[0].clone()), Some(Value::Int(3)));
+}
+
+#[tokio::test]
+async fn a_read_command_returns_its_epoch_and_guarded_query_result() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("session.db");
+    seeded(&path).await;
+    let session = session(&path, Uuid::new_v4(), Arc::new(DatabaseService::new_isolated())).await;
+    let (sender, mut receiver) = tokio::sync::mpsc::channel(1);
+    let sink = ChannelEventSink::new(sender);
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(5));
+
+    dispatch(
+        &session,
+        Command::RunQuery {
+            epoch: Epoch(42),
+            sql: "SELECT id FROM items ORDER BY id".into(),
+        },
+        &control,
+        &sink,
+    )
+    .await
+    .unwrap();
+
+    let Event::QueryCompleted { epoch, outcome } = receiver.try_recv().unwrap() else {
+        panic!("query command returned a different event");
+    };
+    assert_eq!(epoch, Epoch(42));
+    let result = outcome.unwrap();
+    assert_eq!(result.rows.len(), 3);
+    assert_eq!(result.rows.iter().next().unwrap()[0], Value::Int(1));
+}
+
+#[tokio::test]
+async fn a_page_command_returns_the_requested_rows_with_its_epoch() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("session.db");
+    seeded(&path).await;
+    let session = session(&path, Uuid::new_v4(), Arc::new(DatabaseService::new_isolated())).await;
+    let table = session
+        .tables
+        .iter()
+        .find(|table| table.name == "items")
+        .unwrap()
+        .clone();
+    let (sender, mut receiver) = tokio::sync::mpsc::channel(1);
+    let sink = ChannelEventSink::new(sender);
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(5));
+
+    dispatch(
+        &session,
+        Command::ReadPage {
+            epoch: Epoch(44),
+            table,
+            offset: 1,
+            limit: 1,
+        },
+        &control,
+        &sink,
+    )
+    .await
+    .unwrap();
+
+    let Event::PageRead { epoch, outcome } = receiver.try_recv().unwrap() else {
+        panic!("page command returned a different event");
+    };
+    assert_eq!(epoch, Epoch(44));
+    assert_eq!(outcome.unwrap().rows.iter().next().unwrap()[0], Value::Int(2));
+}
+
+#[tokio::test]
+async fn a_denied_write_command_does_not_change_the_database() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("session.db");
+    seeded(&path).await;
+    let session = session(&path, Uuid::new_v4(), Arc::new(DatabaseService::new_isolated())).await;
+    let (sender, mut receiver) = tokio::sync::mpsc::channel(1);
+    let sink = ChannelEventSink::new(sender);
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(5));
+
+    dispatch(
+        &session,
+        Command::RunQuery {
+            epoch: Epoch(43),
+            sql: "DELETE FROM items".into(),
+        },
+        &control,
+        &sink,
+    )
+    .await
+    .unwrap();
+
+    let Event::QueryCompleted { outcome, .. } = receiver.try_recv().unwrap() else {
+        panic!("query command returned a different event");
+    };
+    assert!(matches!(
+        outcome,
+        Err(DriverFailurePresentation::ReadOnly | DriverFailurePresentation::PolicyDenied(_))
+    ));
+    let rows = session.run_query("SELECT count(*) FROM items", &control).await.unwrap();
+    assert_eq!(rows.rows.iter().next().unwrap()[0], Value::Int(3));
 }

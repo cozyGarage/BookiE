@@ -171,12 +171,32 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertEqual(expected, forgejo)
         self.assertEqual(github, forgejo)
 
+    def test_every_forgejo_gate_job_finalizes_its_runner(self):
+        source = (ROOT / ".forgejo/workflows/ci.yml").read_text().split("\njobs:\n", 1)[1]
+        headings = list(re.finditer(r"(?m)^  ([A-Za-z0-9_-]+):\s*$", source))
+        for index, heading in enumerate(headings):
+            end = headings[index + 1].start() if index + 1 < len(headings) else len(source)
+            job = source[heading.start():end]
+            with self.subTest(job=heading.group(1)):
+                self.assertRegex(job, r"(?m)^      - name: Finalize runner job\n        if: always\(\)")
+                self.assertIn("bash src/scripts/cleanup-ci-job.sh", job)
+
     def test_forgejo_and_github_run_the_same_test_layers_per_gate_job(self):
         github = workflow_job_test_layers(ROOT / ".github/workflows/build-linux.yml")
         forgejo = workflow_job_test_layers(ROOT / ".forgejo/workflows/ci.yml")
         github.pop("ensure-ci-gtk-image")
         github.pop("current-stable-clippy")
         self.assertEqual(github, forgejo)
+
+    def test_driver_bundle_permissions_handle_missing_empty_directories(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        section = workflow.split("\njobs:\n", 1)[1]
+        driver = re.search(r"(?ms)^  driver:\n(.*?)(?=^  [A-Za-z0-9_-]+:\s*$|\Z)", section).group(1)
+        self.assertIn('find "$RUNNER_TEMP/bookie-test-bundle" -type f \\', driver)
+        self.assertNotIn(
+            'find "$RUNNER_TEMP/bookie-test-bundle/tests" "$RUNNER_TEMP/bookie-test-bundle/bin"',
+            driver,
+        )
 
     def test_forgejo_contract_workflow_matches_github_contracts(self):
         github_path = ROOT / ".github/workflows/linux-ci-contracts.yml"
@@ -365,6 +385,7 @@ class CiWorkflowTests(unittest.TestCase):
                 self.assertTrue(packages <= set(bundle_groups[group]["bin"]))
         for group in ("driver-core", "driver-analytics", "driver-extended"):
             self.assertTrue(bundle_groups[group]["test"])
+        self.assertIn("bookie-policy", bundle_groups["driver-extended"]["test"])
 
     def test_test_bundle_copies_only_binaries_declared_for_its_group(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -988,6 +1009,8 @@ class CiWorkflowTests(unittest.TestCase):
                 self.assertIn("sccache --start-server", job)
                 self.assertIn("sccache --show-stats", job)
                 self.assertIn("ci-cache.py --root /target", job)
+                if name == "linux-build":
+                    self.assertIn("python3 src/scripts/ci-cache.py --root /target", job)
                 stop = job.index("sccache --stop-server")
                 cleanup = job.index('rm -rf -- "$TMPDIR"')
                 self.assertLess(stop, cleanup)

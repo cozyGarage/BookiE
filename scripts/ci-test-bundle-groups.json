@@ -21,7 +21,7 @@
       "test": ["bookie-driver-clickhouse", "bookie-driver-mongodb", "bookie-driver-redis"]
     },
     "driver-extended": {
-      "test": ["bookie-driver-cassandra", "bookie-driver-duckdb", "bookie-driver-oracle"]
+      "test": ["bookie-driver-cassandra", "bookie-driver-duckdb", "bookie-driver-oracle", "bookie-policy"]
     },
     "drivers": {
       "test": [

@@ -12,6 +12,24 @@ fn decimal_preservation_rejects_a_filter_that_would_round() {
 }
 
 #[test]
+fn postgres_extended_temporal_filters_keep_database_era_spelling() {
+    let date = chrono::NaiveDate::from_ymd_opt(-43, 3, 15).unwrap();
+    let timestamp = chrono::NaiveDate::from_ymd_opt(-4712, 1, 1)
+        .unwrap()
+        .and_hms_opt(0, 0, 0)
+        .unwrap();
+    for (value, expected) in [
+        (Value::Date(date), "0044-03-15 BC"),
+        (Value::DateTime(timestamp), "4713-01-01 00:00:00 BC"),
+        (Value::TimestampTz(timestamp.and_utc()), "4713-01-01 00:00:00+00:00 BC"),
+        (Value::Text("24:00:00".into()), "24:00:00"),
+    ] {
+        let rule = cell_filter_rule("value", &value, false).unwrap();
+        assert_eq!(rule.value, Some(FilterValue::Single(expected.into())));
+    }
+}
+
+#[test]
 fn duckdb_temporal_filters_refuse_values_the_column_would_truncate() {
     let unrepresentable = [
         ("TIME", "12:34:56.123456789"),
