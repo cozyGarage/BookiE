@@ -7,7 +7,7 @@ apps/linux/app/src/services/mcp_service.rs 3
 apps/linux/app/src/services/preferences.rs 3
 apps/linux/app/src/services/single_instance.rs 4
 apps/linux/app/src/services/window_registry.rs 3
-apps/linux/app/src/ui/activity_dialog.rs 6
+apps/linux/app/src/ui/activity_dialog.rs 3
 apps/linux/app/src/ui/app/app_helpers.rs 6
 apps/linux/app/src/ui/app/browse.rs 18
 apps/linux/app/src/ui/app/bundle.rs 9
@@ -16,7 +16,7 @@ apps/linux/app/src/ui/app/import.rs 10
 apps/linux/app/src/ui/app/init_css.rs 5
 apps/linux/app/src/ui/app/init_window.rs 18
 apps/linux/app/src/ui/app/init_workspace.rs 3
-apps/linux/app/src/ui/app/mod.rs 106
+apps/linux/app/src/ui/app/mod.rs 98
 apps/linux/app/src/ui/app/msg.rs 3
 apps/linux/app/src/ui/app/organization.rs 13
 apps/linux/app/src/ui/app/row_ops.rs 9
@@ -25,7 +25,7 @@ apps/linux/app/src/ui/app/structure.rs 16
 apps/linux/app/src/ui/app/workspace_chrome.rs 4
 apps/linux/app/src/ui/app/workspace_persist.rs 9
 apps/linux/app/src/ui/app/workspace_tabs.rs 111
-apps/linux/app/src/ui/browse_tab/chrome.rs 42
+apps/linux/app/src/ui/browse_tab/chrome.rs 38
 apps/linux/app/src/ui/browse_tab/grid_render.rs 12
 apps/linux/app/src/ui/browse_tab/mod.rs 212
 apps/linux/app/src/ui/browse_tab/row_ops.rs 142
@@ -40,7 +40,6 @@ apps/linux/app/src/ui/connection_bundle/import.rs 7
 apps/linux/app/src/ui/connection_bundle/mod.rs 8
 apps/linux/app/src/ui/connection_row.rs 8
 apps/linux/app/src/ui/editor/schema.rs 3
-apps/linux/app/src/ui/explain_dialog.rs 3
 apps/linux/app/src/ui/filter_strip.rs 3
 apps/linux/app/src/ui/grid/display.rs 8
 apps/linux/app/src/ui/grid/export.rs 1
@@ -49,7 +48,7 @@ apps/linux/app/src/ui/grid/presentation.rs 2
 apps/linux/app/src/ui/history_dialog.rs 13
 apps/linux/app/src/ui/import_dialog.rs 11
 apps/linux/app/src/ui/mcp_preferences.rs 1
-apps/linux/app/src/ui/preferences.rs 27
+apps/linux/app/src/ui/preferences.rs 19
 apps/linux/app/src/ui/row_object.rs 9
 apps/linux/app/src/ui/row_store.rs 5
 apps/linux/app/src/ui/sidebar_row.rs 11
