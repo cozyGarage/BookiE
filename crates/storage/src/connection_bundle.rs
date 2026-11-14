@@ -905,9 +905,6 @@ fn plan_one(
     }
 }
 
-/// A saved hop password is stored under its connection id and hop id. An
-/// update that gave one hop the id of another would make the next
-/// connect send that stored password to a different SSH server.
 fn hop_ids_cross_positions(local: &SavedConnection, incoming: &SavedConnection) -> bool {
     let hop_ids = |saved: &SavedConnection| -> Vec<Uuid> {
         saved
