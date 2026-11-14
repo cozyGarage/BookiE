@@ -83,6 +83,20 @@ async fn a_readonly_user_can_connect_and_a_grid_save_still_waits_for_its_mutatio
         "a readonly=1 user must be able to connect: {:?}",
         connection.err()
     );
+    let connection = connection.unwrap();
+    let floats = connection
+        .query(
+            "SELECT toFloat64('nan') AS nan_value, toFloat64('inf') AS positive_infinity, CAST(NULL AS Nullable(Float64)) AS actual_null",
+        )
+        .await
+        .expect("a readonly=1 user must browse floating-point results");
+    assert_eq!(floats.rows.len(), 1);
+    for value in &floats.rows[0] {
+        assert!(
+            matches!(value, Value::Undecodable(reason) if reason.contains("ambiguous")),
+            "a readonly floating-point null must be marked ambiguous, got {value:?}"
+        );
+    }
     admin
         .execute("ALTER TABLE default.notes UPDATE note = 'b' WHERE id = 1")
         .await
