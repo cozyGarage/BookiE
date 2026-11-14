@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use bookie_app_services::command_bridge::{ChannelEventSink, Command, Epoch, Event, dispatch};
+use bookie_app_services::command_bridge::{ChannelEventSink, Command, DispatchContext, Epoch, Event, dispatch};
 use bookie_app_services::database_service::DatabaseService;
 use bookie_app_services::driver_error_presentation::DriverFailurePresentation;
 use bookie_app_services::read_session::ReadSession;
@@ -278,7 +278,7 @@ async fn a_read_command_returns_its_epoch_and_guarded_query_result() {
     let control = OperationControl::with_timeout(std::time::Duration::from_secs(5));
 
     dispatch(
-        &session,
+        DispatchContext::Session(&session),
         Command::RunQuery {
             epoch: Epoch(42),
             sql: "SELECT id FROM items ORDER BY id".into(),
@@ -315,7 +315,7 @@ async fn a_page_command_returns_the_requested_rows_with_its_epoch() {
     let control = OperationControl::with_timeout(std::time::Duration::from_secs(5));
 
     dispatch(
-        &session,
+        DispatchContext::Session(&session),
         Command::ReadPage {
             epoch: Epoch(44),
             table,
@@ -346,7 +346,7 @@ async fn a_status_command_returns_the_active_connection_with_its_epoch() {
     let control = OperationControl::with_timeout(std::time::Duration::from_secs(5));
 
     dispatch(
-        &session,
+        DispatchContext::Session(&session),
         Command::ReadConnectionStatus { epoch: Epoch(45) },
         &control,
         &sink,
@@ -364,6 +364,30 @@ async fn a_status_command_returns_the_active_connection_with_its_epoch() {
 }
 
 #[tokio::test]
+async fn a_cancelled_saved_connection_list_emits_its_epoch_without_loading_storage() {
+    let cancellation = tokio_util::sync::CancellationToken::new();
+    cancellation.cancel();
+    let control = OperationControl::new(cancellation, None);
+    let (sender, mut receiver) = tokio::sync::mpsc::channel(1);
+    let sink = ChannelEventSink::new(sender);
+
+    dispatch(
+        DispatchContext::SavedConnections,
+        Command::ListSavedConnections { epoch: Epoch(47) },
+        &control,
+        &sink,
+    )
+    .await
+    .unwrap();
+
+    let Event::SavedConnectionsListed { epoch, outcome } = receiver.try_recv().unwrap() else {
+        panic!("saved-connection command returned a different event");
+    };
+    assert_eq!(epoch, Epoch(47));
+    assert!(outcome.is_err());
+}
+
+#[tokio::test]
 async fn a_denied_write_command_does_not_change_the_database() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("session.db");
@@ -374,7 +398,7 @@ async fn a_denied_write_command_does_not_change_the_database() {
     let control = OperationControl::with_timeout(std::time::Duration::from_secs(5));
 
     dispatch(
-        &session,
+        DispatchContext::Session(&session),
         Command::RunQuery {
             epoch: Epoch(43),
             sql: "DELETE FROM items".into(),
