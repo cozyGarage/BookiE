@@ -189,6 +189,69 @@ fn a_view_also_returned_as_a_table_appears_only_in_views() {
 }
 
 #[test]
+fn repeated_table_and_view_entries_are_deduplicated_by_schema_and_name() {
+    let nodes = build_nodes(
+        &[
+            info(Some("public"), "users"),
+            info(Some("public"), "users"),
+            info(Some("archive"), "users"),
+        ],
+        &[
+            info(Some("public"), "users"),
+            info(Some("public"), "users"),
+            info(Some("public"), "recent_users"),
+            info(Some("public"), "recent_users"),
+        ],
+    );
+
+    assert_eq!(nodes.len(), 7);
+    assert_eq!(
+        nodes
+            .iter()
+            .find(|node| node.key == "schema:archive")
+            .map(|node| node.count),
+        Some(1)
+    );
+    assert_eq!(
+        nodes
+            .iter()
+            .find(|node| node.key == "schema:public")
+            .map(|node| node.count),
+        Some(2)
+    );
+    assert_eq!(
+        labels(&nodes, &visible_nodes(&nodes, &CollapseState::default(), "users")),
+        [
+            "archive",
+            "  Tables",
+            "    users",
+            "public",
+            "  Views",
+            "    users",
+            "    recent_users"
+        ]
+    );
+}
+
+#[test]
+fn filtering_after_a_progressive_duplicate_load_does_not_add_rows() {
+    let initial = build_nodes(&[info(Some("public"), "users")], &[]);
+    let progressively_loaded = build_nodes(
+        &[
+            info(Some("public"), "users"),
+            info(Some("public"), "users"),
+            info(Some("public"), "orders"),
+        ],
+        &[],
+    );
+    let initial_matches = visible_nodes(&initial, &CollapseState::default(), "users");
+    let loaded_matches = visible_nodes(&progressively_loaded, &CollapseState::default(), "users");
+
+    assert_eq!(labels(&initial, &initial_matches), ["Tables", "  users"]);
+    assert_eq!(labels(&progressively_loaded, &loaded_matches), ["Tables", "  users"]);
+}
+
+#[test]
 fn an_empty_group_is_left_out() {
     let nodes = build_nodes(&[], &[info(None, "only_view")]);
     assert_eq!(labels(&nodes, &all(&nodes)), ["Views", "  only_view"]);
