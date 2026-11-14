@@ -2,8 +2,8 @@ use bookie_core::sql_syntax::SqlGrammar;
 use bookie_core::sql_syntax::script::{LexicalSettings, ScriptPlan};
 
 pub(crate) fn script_statements(sql: &str, driver_id: &str) -> Vec<String> {
-    if driver_id == "mssql" && !is_mssql_routine_definition(sql) {
-        return bookie_core::sql_lex::split_statements(sql, driver_id);
+    if driver_id == "mssql" {
+        return mssql_script_statements(sql);
     }
     let Some(grammar) = script_grammar(driver_id) else {
         return bookie_core::sql_lex::split_statements(sql, driver_id);
@@ -14,6 +14,24 @@ pub(crate) fn script_statements(sql: &str, driver_id: &str) -> Vec<String> {
         .map(|statement| statement.text(sql).trim())
         .filter(|text| !text.is_empty())
         .map(str::to_string)
+        .collect()
+}
+
+fn mssql_script_statements(sql: &str) -> Vec<String> {
+    let grammar = SqlGrammar::MsSql;
+    let plan = ScriptPlan::build(sql, grammar, LexicalSettings::default_for(grammar));
+    plan.statements()
+        .iter()
+        .flat_map(|statement| {
+            let batch = statement.text(sql).trim();
+            if batch.is_empty() {
+                return Vec::new();
+            }
+            if is_mssql_routine_definition(batch) {
+                return vec![batch.to_string()];
+            }
+            bookie_core::sql_lex::split_statements(batch, "mssql")
+        })
         .collect()
 }
 
@@ -120,6 +138,26 @@ mod tests {
             }
         }
         assert!(failures.is_empty(), "{failures:?}");
+    }
+
+    #[test]
+    fn mssql_routine_with_go_keeps_the_body_and_following_batch_separate() {
+        let sql = "CREATE PROCEDURE p AS BEGIN SELECT 1; END;\nGO\nSELECT 2;";
+        let statements = script_statements(sql, "mssql");
+
+        assert_eq!(statements.len(), 2, "{statements:?}");
+        assert!(statements[0].starts_with("CREATE PROCEDURE"), "{statements:?}");
+        assert!(statements[0].contains("END"), "{statements:?}");
+        assert!(statements[1].starts_with("SELECT 2"), "{statements:?}");
+        assert!(shared_connection_decision(sql, "mssql", &classify(sql, "mssql")).is_none());
+    }
+
+    #[test]
+    fn mssql_transaction_after_a_routine_go_batch_is_still_refused() {
+        let sql = "CREATE PROCEDURE p AS BEGIN SELECT 1; END;\nGO\nBEGIN TRAN; UPDATE t SET n = 1;";
+        let decision = shared_connection_decision(sql, "mssql", &classify(sql, "mssql"));
+
+        assert!(decision.is_some(), "{decision:?}");
     }
 
     #[test]
