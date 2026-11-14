@@ -111,9 +111,208 @@ async fn connection_loss_while_building_a_browse_page_fails_the_whole_page() {
             Value::Text("fixture:key".into()),
             Value::Text("string".into()),
             Value::Int(-1),
+            Value::Null,
             Value::Text("value".into()),
         ]]
     );
+
+    drop(connection);
+    server.abort();
+}
+
+async fn read_resp_command(read: &mut (impl tokio::io::AsyncBufRead + Unpin)) -> std::io::Result<Option<Vec<Vec<u8>>>> {
+    use tokio::io::{AsyncBufReadExt, AsyncReadExt};
+
+    let mut line = String::new();
+    if read.read_line(&mut line).await? == 0 {
+        return Ok(None);
+    }
+    let count = line.trim().strip_prefix('*').unwrap().parse::<usize>().unwrap();
+    let mut args = Vec::with_capacity(count);
+    for _ in 0..count {
+        line.clear();
+        read.read_line(&mut line).await?;
+        let len = line.trim().strip_prefix('$').unwrap().parse::<usize>().unwrap();
+        let mut bytes = vec![0; len];
+        read.read_exact(&mut bytes).await?;
+        let mut crlf = [0; 2];
+        read.read_exact(&mut crlf).await?;
+        args.push(bytes);
+    }
+    Ok(Some(args))
+}
+
+#[tokio::test]
+async fn oversized_string_refetch_is_refused_before_reading_the_value() {
+    use std::sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    };
+    use tokio::io::{AsyncWriteExt, BufReader};
+    use tokio::net::TcpListener;
+
+    let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let value_read = Arc::new(AtomicBool::new(false));
+    let server = tokio::spawn({
+        let value_read = Arc::clone(&value_read);
+        async move {
+            loop {
+                let Ok((stream, _)) = listener.accept().await else {
+                    return;
+                };
+                let value_read = Arc::clone(&value_read);
+                tokio::spawn(async move {
+                    let (read, mut write) = stream.into_split();
+                    let mut read = BufReader::new(read);
+                    loop {
+                        let Ok(Some(args)) = read_resp_command(&mut read).await else {
+                            return;
+                        };
+                        match args.first().map(Vec::as_slice) {
+                            Some(b"CLIENT") | Some(b"SELECT") => write.write_all(b"+OK\r\n").await.unwrap(),
+                            Some(b"TYPE") => write.write_all(b"+string\r\n").await.unwrap(),
+                            Some(b"STRLEN") => {
+                                let length = bookie_core::MAX_QUERY_RESULT_BYTES + 1;
+                                write.write_all(format!(":{length}\r\n").as_bytes()).await.unwrap();
+                            }
+                            Some(b"GET") | Some(b"GETRANGE") => {
+                                value_read.store(true, Ordering::SeqCst);
+                                write.write_all(b"$0\r\n\r\n").await.unwrap();
+                            }
+                            command => panic!("unexpected Redis command: {command:?}"),
+                        }
+                        write.flush().await.unwrap();
+                    }
+                });
+            }
+        }
+    });
+
+    let connection = RedisDriver.connect(opts("127.0.0.1", port, "0")).await.unwrap();
+    let result = connection
+        .query_params(
+            "SELECT \"Value\" FROM \"db0\" WHERE \"Key\" = ?",
+            &[Value::Text("oversized".into())],
+        )
+        .await;
+    assert!(matches!(result, Err(DriverError::Unsupported(_))), "{result:?}");
+    assert!(!value_read.load(Ordering::SeqCst));
+
+    drop(connection);
+    server.abort();
+}
+
+#[tokio::test]
+async fn deleted_string_refetch_returns_no_row_instead_of_an_empty_value() {
+    use tokio::io::{AsyncWriteExt, BufReader};
+    use tokio::net::TcpListener;
+
+    let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let server = tokio::spawn(async move {
+        loop {
+            let Ok((stream, _)) = listener.accept().await else {
+                return;
+            };
+            tokio::spawn(async move {
+                let (read, mut write) = stream.into_split();
+                let mut read = BufReader::new(read);
+                let mut in_transaction = false;
+                loop {
+                    let Ok(Some(args)) = read_resp_command(&mut read).await else {
+                        return;
+                    };
+                    let response = match args.first().map(Vec::as_slice) {
+                        Some(b"CLIENT") | Some(b"SELECT") => b"+OK\r\n".as_slice(),
+                        Some(b"TYPE") => b"+string\r\n".as_slice(),
+                        Some(b"STRLEN") if !in_transaction => b":1\r\n".as_slice(),
+                        Some(b"MULTI") => {
+                            in_transaction = true;
+                            b"+OK\r\n".as_slice()
+                        }
+                        Some(b"EXISTS") | Some(b"STRLEN") | Some(b"GETRANGE") => b"+QUEUED\r\n".as_slice(),
+                        Some(b"EXEC") => {
+                            in_transaction = false;
+                            b"*3\r\n:0\r\n:0\r\n$0\r\n\r\n".as_slice()
+                        }
+                        command => panic!("unexpected Redis command: {command:?}, args: {args:?}"),
+                    };
+                    write.write_all(response).await.unwrap();
+                    write.flush().await.unwrap();
+                }
+            });
+        }
+    });
+
+    let connection = RedisDriver.connect(opts("127.0.0.1", port, "0")).await.unwrap();
+    let result = connection
+        .query_params(
+            "SELECT \"Value\" FROM \"db0\" WHERE \"Key\" = ?",
+            &[Value::Text("deleted-during-read".into())],
+        )
+        .await
+        .unwrap();
+    assert!(result.rows.is_empty());
+
+    drop(connection);
+    server.abort();
+}
+
+#[tokio::test]
+async fn collection_browse_uses_cardinality_without_reading_members() {
+    use std::sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    };
+    use tokio::io::{AsyncWriteExt, BufReader};
+    use tokio::net::TcpListener;
+
+    let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let member_read = Arc::new(AtomicBool::new(false));
+    let server = tokio::spawn({
+        let member_read = Arc::clone(&member_read);
+        async move {
+            loop {
+                let Ok((stream, _)) = listener.accept().await else {
+                    return;
+                };
+                let member_read = Arc::clone(&member_read);
+                tokio::spawn(async move {
+                    let (read, mut write) = stream.into_split();
+                    let mut read = BufReader::new(read);
+                    loop {
+                        let Ok(Some(args)) = read_resp_command(&mut read).await else {
+                            return;
+                        };
+                        match args.first().map(Vec::as_slice) {
+                            Some(b"CLIENT") | Some(b"SELECT") => write.write_all(b"+OK\r\n").await.unwrap(),
+                            Some(b"SCAN") => write.write_all(b"*2\r\n:0\r\n*1\r\n$3\r\nkey\r\n").await.unwrap(),
+                            Some(b"TYPE") => write.write_all(b"+hash\r\n").await.unwrap(),
+                            Some(b"TTL") => write.write_all(b":-1\r\n").await.unwrap(),
+                            Some(b"HLEN") => write.write_all(b":1\r\n").await.unwrap(),
+                            Some(b"HSCAN") | Some(b"HGETALL") => {
+                                member_read.store(true, Ordering::SeqCst);
+                                write
+                                    .write_all(b"*2\r\n:0\r\n*2\r\n$5\r\nfield\r\n$5\r\nvalue\r\n")
+                                    .await
+                                    .unwrap();
+                            }
+                            command => panic!("unexpected Redis command: {command:?}"),
+                        }
+                        write.flush().await.unwrap();
+                    }
+                });
+            }
+        }
+    });
+
+    let connection = RedisDriver.connect(opts("127.0.0.1", port, "0")).await.unwrap();
+    let result = connection.fetch_rows(None, "db0", 0, 10).await.unwrap();
+    assert_eq!(result.rows[0].get(3), Some(&Value::Int(1)));
+    assert!(matches!(result.rows[0].get(4), Some(Value::Undecodable(_))));
+    assert!(!member_read.load(Ordering::SeqCst));
 
     drop(connection);
     server.abort();
@@ -391,6 +590,7 @@ async fn value_contract_browsing_binary_keys_preserves_the_native_bytes() {
             Value::Bytes(key),
             Value::Text("string".into()),
             Value::Int(-1),
+            Value::Null,
             Value::Text("value".into()),
         ]
     );
@@ -468,7 +668,7 @@ async fn value_contract_redis_scan_keeps_fetching_until_the_requested_page_is_fu
         observed.is_subset(&native_keys),
         "every browsed key must exist natively"
     );
-    assert!(result.rows.iter().all(|row| row[3] == Value::Text("value".into())));
+    assert!(result.rows.iter().all(|row| row[4] == Value::Text("value".into())));
 }
 
 #[tokio::test]

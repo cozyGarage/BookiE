@@ -19,7 +19,7 @@ apps/linux/app/src/ui/app/init_workspace.rs 3
 apps/linux/app/src/ui/app/mod.rs 106
 apps/linux/app/src/ui/app/msg.rs 3
 apps/linux/app/src/ui/app/organization.rs 13
-apps/linux/app/src/ui/app/row_ops.rs 51
+apps/linux/app/src/ui/app/row_ops.rs 9
 apps/linux/app/src/ui/app/status_pages.rs 4
 apps/linux/app/src/ui/app/structure.rs 16
 apps/linux/app/src/ui/app/workspace_chrome.rs 4

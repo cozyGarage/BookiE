@@ -787,9 +787,9 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn('export CARGO_PROFILE_TEST_STRIP="${CARGO_PROFILE_TEST_STRIP:-symbols}"', build)
         self.assertIn('--message-format=json-render-diagnostics', build)
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
-        gtk_build = re.search(r"(?ms)^  gtk-build:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
-        self.assertIn("CARGO_PROFILE_CI_STRIP: symbols", gtk_build)
-        self.assertNotIn('mkdir -p "$GITHUB_WORKSPACE/gtk-artifact/schemas"', gtk_build)
+        linux_build = re.search(r"(?ms)^  linux-build:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+        self.assertIn("BOOKIE_BUILD_PROFILE: dist", linux_build)
+        self.assertNotIn('mkdir -p "$GITHUB_WORKSPACE/gtk-artifact/schemas"', linux_build)
 
     def test_gpui_lockfile_is_checked_before_building_workspace_test_bundles(self):
         build = (ROOT / "scripts/build-test-bundles.sh").read_text()
@@ -806,7 +806,7 @@ class CiWorkflowTests(unittest.TestCase):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         self.assertIn("TMPDIR: /var/cache/ci/target\n", workflow)
         self.assertIn("BOOKIE_BUNDLE_CACHE: /var/cache/ci/bundles", workflow)
-        for name in ("gtk-build", "clippy", "test-build", "floor-build"):
+        for name in ("linux-build", "clippy", "test-build"):
             with self.subTest(job=name):
                 job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
                 self.assertIn("CARGO_TARGET_DIR: /target/bookie-${{ github.job }}", job)
@@ -828,7 +828,7 @@ class CiWorkflowTests(unittest.TestCase):
 
     def test_build_host_jobs_ignore_sccache_server_io_errors(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
-        for name in ("gtk-build", "clippy", "test-build", "floor-build"):
+        for name in ("linux-build", "clippy", "test-build"):
             with self.subTest(job=name):
                 job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
                 self.assertIn("SCCACHE_IGNORE_SERVER_IO_ERROR: \"1\"", job)
@@ -896,7 +896,7 @@ class CiWorkflowTests(unittest.TestCase):
                 self.assertIn("test-build", re.search(r"(?m)^    needs: \[(.+)\]$", job).group(1))
         driver = re.search(r"(?ms)^  driver:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
         gtk = re.search(r"(?ms)^  gtk:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
-        self.assertIn("gtk-build", re.search(r"(?m)^    needs: \[(.+)\]$", gtk).group(1))
+        self.assertIn("linux-build", re.search(r"(?m)^    needs: \[(.+)\]$", gtk).group(1))
         workspace_driver_names = {
             tomllib.loads(path.read_text())["package"]["name"].removeprefix("bookie-driver-")
             for path in (ROOT / "crates/drivers").glob("*/Cargo.toml")
@@ -973,7 +973,7 @@ class CiWorkflowTests(unittest.TestCase):
 
     def test_native_duckdb_build_jobs_normalize_and_clean_the_shared_compiler_cache(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
-        for name in ("gtk-build", "clippy", "test-build", "floor-build"):
+        for name in ("linux-build", "clippy", "test-build"):
             with self.subTest(job=name):
                 job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
                 self.assertIn("RUSTC_WRAPPER: sccache", job)
@@ -987,7 +987,7 @@ class CiWorkflowTests(unittest.TestCase):
                 self.assertIn("SCCACHE_SERVER_UDS: /target/tmp-${{ github.run_id }}-${{ github.job }}/sccache.sock", job)
                 self.assertIn("sccache --start-server", job)
                 self.assertIn("sccache --show-stats", job)
-                self.assertIn("python3 src/scripts/ci-cache.py --root /target", job)
+                self.assertIn("ci-cache.py --root /target", job)
                 stop = job.index("sccache --stop-server")
                 cleanup = job.index('rm -rf -- "$TMPDIR"')
                 self.assertLess(stop, cleanup)
@@ -1008,7 +1008,8 @@ class CiWorkflowTests(unittest.TestCase):
                 if name not in {"supply-chain", "gtk", "gtk-server"}:
                     expected.add("test-build")
                 if name in {"gtk", "gtk-server"}:
-                    expected.add("gtk-build")
+                    expected.remove("clippy")
+                    expected.add("linux-build")
                 self.assertEqual({item.strip() for item in dependencies.split(",")}, expected)
         for name in ("unit", "sandbox", "widgets"):
             job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
@@ -1033,7 +1034,7 @@ class CiWorkflowTests(unittest.TestCase):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         jobs = dict(re.findall(r"(?ms)^  ([a-z][a-z0-9-]*):\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow))
         self.assertNotIn("ci-pilot", workflow)
-        for name in ("gtk-build", "clippy", "test-build", "floor-build", "supply-chain"):
+        for name in ("linux-build", "clippy", "test-build", "supply-chain"):
             with self.subTest(job=name):
                 self.assertIn("runs-on: build-host", jobs[name])
         for name in (
@@ -1052,7 +1053,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("compose logs --no-color --tail 50", script)
 
     def test_forgejo_jobs_bound_runtime_and_scope_checkout_credentials(self):
-        for name, expected_checkouts in (("ci", 23), ("nightly", 6)):
+        for name, expected_checkouts in (("ci", 22), ("nightly", 6)):
             workflow = (ROOT / f".forgejo/workflows/{name}.yml").read_text()
             jobs = workflow.split("\njobs:\n", 1)[1]
             headings = list(re.finditer(r"^  ([A-Za-z0-9_-]+):\s*$", jobs, re.MULTILINE))
@@ -1532,17 +1533,17 @@ class CiWorkflowTests(unittest.TestCase):
 
     def test_only_pushes_can_skip_the_distro_floor_jobs(self):
         results = {name: {"result": "success"} for name in checker.REQUIRED}
-        for name in ("floor-build", "distro-floor-scenarios"):
+        for name in ("linux-build", "distro-floor-scenarios"):
             results[name] = {"result": "skipped"}
         self.assertEqual(checker.assess(results, "push")[0], [])
         for event in ["pull_request", "schedule", "workflow_dispatch"]:
-            self.assertEqual(checker.assess(results, event)[0], ["distro-floor-scenarios", "floor-build"])
+            self.assertEqual(checker.assess(results, event)[0], ["distro-floor-scenarios", "linux-build"])
 
     def test_distro_floor_is_in_the_full_gate(self):
         results = {name: {"result": "success"} for name in checker.REQUIRED}
-        results["floor-build"] = {"result": "skipped"}
+        results["linux-build"] = {"result": "skipped"}
         results["distro-floor-scenarios"] = {"result": "skipped"}
-        self.assertEqual(checker.assess(results, "pull_request")[0], ["distro-floor-scenarios", "floor-build"])
+        self.assertEqual(checker.assess(results, "pull_request")[0], ["distro-floor-scenarios", "linux-build"])
         self.assertEqual(checker.assess(results, "push")[0], [])
 
     def test_distro_floor_profiles_match_between_github_and_forgejo(self):
@@ -1552,13 +1553,13 @@ class CiWorkflowTests(unittest.TestCase):
             r"(?ms)^  distro-floor-scenarios:\n(.*?)(?=^  [a-z0-9-]+:\n|\Z)", github
         ).group(1)
         forgejo_jobs = re.search(
-            r"(?ms)^  floor-build:\n(.*?)(?=^  driver:\n|\Z)", forgejo
+            r"(?ms)^  linux-build:\n(.*?)(?=^  driver:\n|\Z)", forgejo
         ).group(1)
         full_profile = "github.event_name != 'push'"
 
         self.assertIn(full_profile, github_job)
-        self.assertEqual(forgejo_jobs.count(f"if: {full_profile}"), 2)
-        self.assertIn("floor-build", checker.OPTIONAL_ON_PUSH)
+        self.assertEqual(forgejo_jobs.count(f"if: {full_profile}"), 3)
+        self.assertIn("linux-build", checker.OPTIONAL_ON_PUSH)
         self.assertIn("distro-floor-scenarios", checker.OPTIONAL_ON_PUSH)
 
     def test_summary_depends_on_every_required_job_and_always_runs(self):
@@ -1694,13 +1695,13 @@ class CiWorkflowTests(unittest.TestCase):
 
     def test_gtk_safety_reuses_the_binary_built_by_gtk_build(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
-        builder = re.search(r"(?ms)^  gtk-build:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
+        builder = re.search(r"(?ms)^  linux-build:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
         gtk = re.search(r"(?ms)^  gtk:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
-        self.assertIn("cargo build --profile ci --locked -p bookie-app --bin bookie-app", builder)
-        self.assertIn("ci-gtk-artifact.py create target/ci/bookie-app target/gtk-safety", builder)
+        self.assertIn("bash scripts/build-deb.sh", builder)
+        self.assertIn("ci-gtk-artifact.py create --profile dist target/dist/bookie-app target/gtk-safety", builder)
         self.assertIn("gtk-safety-binary-${{ github.run_id }}-${{ github.run_attempt }}", builder)
-        self.assertIn("gtk-build", gtk)
-        self.assertIn("ci-gtk-artifact.py verify target/gtk-safety", gtk)
+        self.assertIn("linux-build", gtk)
+        self.assertIn("ci-gtk-artifact.py verify --profile dist target/gtk-safety", gtk)
         self.assertNotIn("cargo build", gtk)
 
     def test_github_keyring_uses_a_source_pinned_prebuilt_bundle(self):
@@ -2038,11 +2039,11 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertNotIn("\n  distro-floor:\n", workflow)
         self.assertNotIn("tablepro_0.1.5-1_amd64.deb", workflow)
         scenarios = workflow.split("\n  distro-floor-scenarios:\n", 1)[1].split("\n  driver:\n", 1)[0]
-        producer = workflow.split("\n  floor-build:\n", 1)[1].split("\n  distro-floor-scenarios:\n", 1)[0]
+        producer = workflow.split("\n  linux-build:\n", 1)[1].split("\n  distro-floor-scenarios:\n", 1)[0]
         self.assertIn("runs-on: build-host", producer)
         self.assertIn("scripts/build-deb.sh", producer)
         self.assertNotIn("scripts/test-deb-package.sh", workflow)
-        self.assertIn("needs: [pin-revision, floor-build]", scenarios)
+        self.assertIn("needs: [pin-revision, linux-build]", scenarios)
         full_profile = "github.event_name != 'push'"
         self.assertIn(f"if: {full_profile}", producer)
         self.assertIn(f"if: {full_profile}", scenarios)
@@ -2089,9 +2090,9 @@ class CiWorkflowTests(unittest.TestCase):
     def test_distro_scenarios_share_the_package_and_partition_all_six_shards(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         scenarios = workflow.split("\n  distro-floor-scenarios:\n", 1)[1].split("\n  driver:\n", 1)[0]
-        builder = workflow.split("\n  floor-build:\n", 1)[1].split("\n  distro-floor-scenarios:\n", 1)[0]
+        builder = workflow.split("\n  linux-build:\n", 1)[1].split("\n  distro-floor-scenarios:\n", 1)[0]
         self.assertIn("ci-gtk-artifact.py create --package", builder)
-        self.assertIn("needs: [pin-revision, floor-build]", scenarios)
+        self.assertIn("needs: [pin-revision, linux-build]", scenarios)
         self.assertIn("max-parallel: 2", scenarios)
         self.assertIn("shard_group: [1, 2]", scenarios)
         self.assertIn("ci-gtk-artifact.py verify --package", scenarios)

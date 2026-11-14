@@ -51,38 +51,69 @@ pub(super) async fn fetch_string_value(
     let mut conn = browse_connection(connection, query.database).await?;
     let key_type: String = conn.key_type(&query.key).await.map_err(map_redis_error)?;
     if key_type == "none" {
-        return Ok(QueryResult {
-            columns: vec![text_col("Value")],
-            rows: Vec::new().into(),
-            truncated: false,
-        });
+        return Ok(empty_value_result());
     }
     if key_type != "string" {
         return Err(DriverError::Unsupported(
-            "Redis full-value refetch only supports string keys".into(),
+            "Redis collection values cannot be fetched with a hard byte bound".into(),
         ));
     }
-    let Some(bytes) = conn
-        .get::<_, Option<Vec<u8>>>(&query.key)
+    let max_bytes = u64::try_from(MAX_QUERY_RESULT_BYTES)
+        .map_err(|_| DriverError::Unsupported("Redis value limit exceeds the protocol range".into()))?;
+    let length: u64 = redis::cmd("STRLEN")
+        .arg(&query.key)
+        .query_async(&mut conn)
         .await
-        .map_err(map_redis_error)?
-    else {
-        return Ok(QueryResult {
-            columns: vec![text_col("Value")],
-            rows: Vec::new().into(),
-            truncated: false,
-        });
-    };
-    if bytes.len() > MAX_QUERY_RESULT_BYTES {
+        .map_err(map_redis_error)?;
+    if length > max_bytes {
         return Err(DriverError::Unsupported(
             "Redis value exceeds the 64 MiB query limit".into(),
         ));
+    }
+    let range_end = i64::try_from(MAX_QUERY_RESULT_BYTES - 1)
+        .map_err(|_| DriverError::Unsupported("Redis value limit exceeds the protocol range".into()))?;
+    let (exists, current_length, bytes): (u8, u64, Option<Vec<u8>>) = redis::pipe()
+        .atomic()
+        .cmd("EXISTS")
+        .arg(&query.key)
+        .cmd("STRLEN")
+        .arg(&query.key)
+        .cmd("GETRANGE")
+        .arg(&query.key)
+        .arg(0)
+        .arg(range_end)
+        .query_async(&mut conn)
+        .await
+        .map_err(map_redis_error)?;
+    if exists == 0 {
+        return Ok(empty_value_result());
+    }
+    let Some(bytes) = bytes else {
+        if current_length == 0 {
+            return Ok(empty_value_result());
+        }
+        return Err(changed_value_error());
+    };
+    if current_length > max_bytes || usize::try_from(current_length).ok() != Some(bytes.len()) {
+        return Err(changed_value_error());
     }
     Ok(QueryResult {
         columns: vec![text_col("Value")],
         rows: vec![vec![bytes_to_value(bytes)]].into(),
         truncated: false,
     })
+}
+
+fn empty_value_result() -> QueryResult {
+    QueryResult {
+        columns: vec![text_col("Value")],
+        rows: Vec::new().into(),
+        truncated: false,
+    }
+}
+
+fn changed_value_error() -> DriverError {
+    DriverError::Unsupported("Redis value changed while it was being read".into())
 }
 
 #[cfg(test)]

@@ -7,7 +7,7 @@ use crate::{opts, start_redis};
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn every_key_type_lists_with_its_type_and_a_preview() {
+async fn every_key_type_lists_with_type_and_complete_or_unavailable_value() {
     let (_container, host, port) = start_redis().await;
     let native = redis::Client::open(format!("redis://{host}:{port}/0")).unwrap();
     let mut native_connection = native.get_multiplexed_async_connection().await.unwrap();
@@ -36,19 +36,24 @@ async fn every_key_type_lists_with_its_type_and_a_preview() {
     };
 
     assert_eq!(find("k_string")[1], Value::Text("string".into()));
-    assert_eq!(find("k_string")[3], Value::Text("hello".into()));
+    assert_eq!(find("k_string")[4], Value::Text("hello".into()));
     assert_eq!(find("k_hash")[1], Value::Text("hash".into()));
-    assert_eq!(find("k_hash")[3], Value::Text(r#"[("field", "value")]"#.into()));
-    assert_eq!(find("k_list")[3], Value::Text(r#"["a", "b"]"#.into()));
-    assert_eq!(find("k_set")[3], Value::Text(r#"["m"]"#.into()));
-    assert_eq!(find("k_zset")[3], Value::Text(r#"["z"]"#.into()));
-    assert_eq!(find("k_stream")[3], Value::Text("<stream>".into()));
+    assert_eq!(find("k_hash")[3], Value::Int(1));
+    assert_eq!(find("k_list")[3], Value::Int(2));
+    assert_eq!(find("k_set")[3], Value::Int(1));
+    assert_eq!(find("k_zset")[3], Value::Int(1));
+    for key in ["k_hash", "k_list", "k_set", "k_zset", "k_stream"] {
+        assert!(
+            matches!(find(key)[4], Value::Undecodable(_)),
+            "{key} has no complete value"
+        );
+    }
     assert_eq!(find("k_string")[2], Value::Int(-1), "no expiry is reported as -1");
 }
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn a_browse_preview_of_a_large_value_stays_small() {
+async fn collection_browse_reads_counts_without_member_values() {
     let (_container, host, port) = start_redis().await;
     let native = redis::Client::open(format!("redis://{host}:{port}/0")).unwrap();
     let mut native_connection = native.get_multiplexed_async_connection().await.unwrap();
@@ -73,18 +78,44 @@ async fn a_browse_preview_of_a_large_value_stays_small() {
             .await
             .unwrap();
     }
+    redis::cmd("LPUSH")
+        .arg("big_list")
+        .arg("first")
+        .arg("second")
+        .query_async::<()>(&mut native_connection)
+        .await
+        .unwrap();
+    redis::cmd("ZADD")
+        .arg("big_zset")
+        .arg(1)
+        .arg("first")
+        .arg(2)
+        .arg("second")
+        .query_async::<()>(&mut native_connection)
+        .await
+        .unwrap();
+    redis::cmd("HSET")
+        .arg("large_hash_value")
+        .arg("field")
+        .arg(vec![b'x'; 8 * 1024 * 1024])
+        .query_async::<()>(&mut native_connection)
+        .await
+        .unwrap();
 
     let connection = RedisDriver.connect(opts(&host, port, "0")).await.unwrap();
     let rows = connection.fetch_rows(None, "db0", 0, 50).await.unwrap().rows;
-    let preview = |key: &str| match &rows.iter().find(|row| row[0] == Value::Text(key.into())).unwrap()[3] {
-        Value::Text(text) => text.clone(),
-        Value::Undecodable(kind) => bookie_core::parse_partial(kind).unwrap().1.to_owned(),
-        other => panic!("{key} has no bounded preview: {other:?}"),
-    };
+    let row = |key: &str| rows.iter().find(|row| row[0] == Value::Text(key.into())).unwrap();
+    let unavailable = Value::Undecodable("Redis collection preview omitted".into());
 
-    assert!(preview("big_string").len() < 8_192, "{}", preview("big_string").len());
-    assert!(preview("big_set").matches("member-").count() <= 100);
-    assert!(preview("big_hash").matches("field-").count() <= 100);
+    assert_eq!(row("big_set")[3], Value::Int(5_000));
+    assert_eq!(row("big_hash")[3], Value::Int(5_000));
+    assert_eq!(row("big_list")[3], Value::Int(2));
+    assert_eq!(row("big_zset")[3], Value::Int(2));
+    assert_eq!(row("big_set")[4], unavailable);
+    assert_eq!(row("big_hash")[4], unavailable);
+    assert_eq!(row("big_list")[4], unavailable);
+    assert_eq!(row("big_zset")[4], unavailable);
+    assert_eq!(row("large_hash_value")[4], unavailable);
 }
 
 #[tokio::test]
@@ -113,7 +144,7 @@ async fn bounded_string_previews_distinguish_complete_values_from_partial_cells(
             .rows
             .iter()
             .find(|row| row[0] == Value::Text(name.into()))
-            .unwrap()[3]
+            .unwrap()[4]
     };
     assert_eq!(cell("boundary"), &Value::Text("x".repeat(4096)));
     assert_eq!(cell("marker"), &Value::Text("partial 9999 bytes\u{1}prefix".into()));

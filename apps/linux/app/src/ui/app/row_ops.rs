@@ -15,13 +15,6 @@ use super::{App, AppMsg};
 const MAX_COPIED_STATEMENT_ROWS: usize = 5_000;
 
 impl App {
-    /// Atomic Save handler for the inline-spreadsheet pattern.
-    /// Receives a fully-materialised `Vec<(SQL, params)>` from a
-    /// BrowseTab's `TabChangeTracker` and runs them all inside one
-    /// transaction. On success, dispatches `BrowseTabInput::
-    /// SaveCompleted` so the tab clears its tracker + refetches. On
-    /// failure, the entire transaction has already been rolled back
-    /// by the driver; we just surface the error message.
     pub(super) fn on_execute_browse_transaction(
         &mut self,
         tab_id: Uuid,
@@ -35,20 +28,14 @@ impl App {
             return;
         };
         self.active_browse_saves.insert(tab_id, save_id);
-        // Drivers that cannot report a row count for UPDATE / DELETE
-        // return 0 for every statement, which the concurrency guard
-        // below would read as "every row vanished". Skip the guard for
-        // them rather than warn on every successful save.
+        // Unsupported affected-row counts would trigger false concurrency warnings.
         let reports_rows_affected = self
             .registry
             .get(&tab_driver_id)
             .is_none_or(|driver| driver.capabilities().reports_rows_affected);
         let checked_writes = checked_write_indexes(Some(&tab_driver_id), &sources);
         self.set_row_op_in_flight(true);
-        // Increment the in-flight counter so window-close blocks until
-        // the transaction resolves. Decrement happens in the
-        // SaveCompletedForTab / SaveFailedForTab handlers regardless of
-        // outcome.
+        // Window-close waits for this transaction; completion handlers decrement the counter.
         self.in_flight_saves.set(self.in_flight_saves.get() + 1);
         let sender_for_cmd = sender.clone();
         let mut recorded = self.ran_statements(tab_id, Source::Browse, &sql_without_parameters(&statements));
@@ -65,16 +52,8 @@ impl App {
                     };
                     match result {
                         Ok(affected) => {
-                            // Optimistic-concurrency guard: every UPDATE
-                            // and DELETE in our materialised set targets
-                            // a single PK-identified row, so each must
-                            // affect exactly one row. Zero affected for
-                            // any of them means the row was modified or
-                            // deleted by another session between fetch
-                            // and save. The transaction still committed
-                            // — there's nothing to roll back — but the
-                            // user must hear about it so a phantom save
-                            // doesn't pass silently.
+                            // Each materialized UPDATE or DELETE targets one primary-key row. A zero count signals a
+                            // concurrent change; the transaction has already committed.
                             let warning = reports_rows_affected
                                 .then(|| compute_concurrency_warning(&statements, &affected))
                                 .flatten();
@@ -84,12 +63,7 @@ impl App {
                             sender_for_cmd.input(AppMsg::SaveCompletedForTab(tab_id, save_id, warning));
                         }
                         Err(e) => {
-                            // If the driver pinpointed which statement
-                            // failed, look up its source and ask the
-                            // tab to scroll-and-select that row before
-                            // showing the error dialog. The user sees
-                            // the row in question without scanning the
-                            // whole grid.
+                            // Select the failed grid row before presenting the driver error.
                             let failed_statement = match &e {
                                 DriverError::Transaction { statement_index, .. }
                                 | DriverError::PartiallyApplied { statement_index, .. }
@@ -147,10 +121,7 @@ impl App {
             (
                 model.columns().to_vec(),
                 model.driver_id().to_string(),
-                // Reads the live grid row at this position (sort order,
-                // any prepended drafts), not `snapshot().rows[row_position]`
-                // -- that's fetch order and drifts by one row per pending
-                // draft, copying a different row's values to the clipboard.
+                // Use live display order, including drafts; snapshot order can select a different row.
                 row_positions
                     .iter()
                     .map(|position| model.row_cells_at(*position))
@@ -203,17 +174,8 @@ fn copied_statements(
         .map_err(|error| error_text::build_sql_message(&error))
 }
 
-/// Inspect the SQL prefix of each statement and compare its expected
-/// affected-row count against the driver's reported count. Returns
-/// `Some(message)` if any UPDATE / DELETE matched zero rows.
-///
-/// `materialize` always emits one UPDATE / DELETE per PK-identified
-/// row, so each is expected to affect exactly one row. Zero means the
-/// target row was modified or deleted out-of-band between fetch and
-/// save. INSERTs are ignored — auto-increment / generated-column rows
-/// can plausibly affect zero according to driver quirks (e.g. ON
-/// CONFLICT DO NOTHING in user-extended SQL), and we don't produce
-/// those today.
+// Each materialized UPDATE or DELETE should affect one primary-key row; a zero count may mean it changed out of band.
+// INSERTs are ignored because driver quirks or ON CONFLICT DO NOTHING can legitimately report zero.
 fn compute_concurrency_warning(statements: &[(String, Vec<Value>)], affected: &[u64]) -> Option<String> {
     let mut zero_updates = 0usize;
     let mut zero_deletes = 0usize;
@@ -241,9 +203,6 @@ fn compute_concurrency_warning(statements: &[(String, Vec<Value>)], affected: &[
     )
 }
 
-/// Render a `Value` as a SQL literal — used by the "Copy row as
-/// INSERT" clipboard helper to produce a self-contained statement
-/// that round-trips through any SQL client.
 #[cfg(test)]
 mod tests {
     use super::{MAX_COPIED_STATEMENT_ROWS, compute_concurrency_warning, copied_statements, copy_limit_refusal};
@@ -276,8 +235,7 @@ mod tests {
 
     #[test]
     fn warning_ignores_zero_inserts() {
-        // INSERT with affected=0 is unusual but not necessarily a phantom
-        // — keep the warning specific to UPDATE / DELETE for now.
+        // INSERT can legitimately report zero, so warnings stay limited to UPDATE and DELETE.
         let stmts = vec![stmt("INSERT INTO t (a) VALUES (?)"), stmt("UPDATE t SET …")];
         assert!(compute_concurrency_warning(&stmts, &[0, 1]).is_none());
     }

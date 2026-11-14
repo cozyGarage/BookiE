@@ -120,59 +120,28 @@ struct RedisConnection {
 
 fn redis_columns() -> Vec<ColumnInfo> {
     vec![
-        ColumnInfo {
-            name: "Key".into(),
-            data_type: "string".into(),
-            nullable: false,
-            primary_key: true,
-            is_auto_increment: false,
-            default_value: None,
-            is_generated: false,
-            comment: None,
-            collation: None,
-            enum_type: None,
-            domain_type: None,
-        },
-        ColumnInfo {
-            name: "Type".into(),
-            data_type: "string".into(),
-            nullable: false,
-            primary_key: false,
-            is_auto_increment: false,
-            default_value: None,
-            is_generated: false,
-            comment: None,
-            collation: None,
-            enum_type: None,
-            domain_type: None,
-        },
-        ColumnInfo {
-            name: "TTL".into(),
-            data_type: "integer".into(),
-            nullable: false,
-            primary_key: false,
-            is_auto_increment: false,
-            default_value: None,
-            is_generated: false,
-            comment: None,
-            collation: None,
-            enum_type: None,
-            domain_type: None,
-        },
-        ColumnInfo {
-            name: "Value".into(),
-            data_type: "string".into(),
-            nullable: true,
-            primary_key: false,
-            is_auto_increment: false,
-            default_value: None,
-            is_generated: false,
-            comment: None,
-            collation: None,
-            enum_type: None,
-            domain_type: None,
-        },
+        redis_column("Key", "string", false, true),
+        redis_column("Type", "string", false, false),
+        redis_column("TTL", "integer", false, false),
+        redis_column("Cardinality", "integer", true, false),
+        redis_column("Value", "string", true, false),
     ]
+}
+
+fn redis_column(name: &str, data_type: &str, nullable: bool, primary_key: bool) -> ColumnInfo {
+    ColumnInfo {
+        name: name.into(),
+        data_type: data_type.into(),
+        nullable,
+        primary_key,
+        is_auto_increment: false,
+        default_value: None,
+        is_generated: false,
+        comment: None,
+        collation: None,
+        enum_type: None,
+        domain_type: None,
+    }
 }
 
 #[async_trait]
@@ -375,7 +344,7 @@ async fn scan_keys(
 }
 
 const PREVIEW_BYTES: isize = 4096;
-const PREVIEW_ITEMS: usize = 20;
+const COLLECTION_PREVIEW_OMITTED: &str = "Redis collection preview omitted";
 
 async fn string_preview(conn: &mut redis::aio::MultiplexedConnection, key: &[u8]) -> Result<Value, DriverError> {
     let (length, bytes): (u64, Vec<u8>) = redis::pipe()
@@ -406,69 +375,40 @@ async fn key_row_into(
 ) -> Result<(), DriverError> {
     let key_type: String = conn.key_type(key).await.map_err(map_redis_error)?;
     let ttl: i64 = conn.ttl(key).await.map_err(map_redis_error)?;
+    let cardinality = match collection_count_command(&key_type) {
+        Some(command) => {
+            let count: i64 = redis::cmd(command)
+                .arg(key)
+                .query_async(conn)
+                .await
+                .map_err(map_redis_error)?;
+            Value::Int(count)
+        }
+        None => Value::Null,
+    };
     let preview = match key_type.as_str() {
         "string" => string_preview(conn, key).await?,
-        "hash" => {
-            let (_, v): (u64, HashEntries) = redis::cmd("HSCAN")
-                .arg(key)
-                .arg(0)
-                .arg("COUNT")
-                .arg(PREVIEW_ITEMS)
-                .query_async(conn)
-                .await
-                .map_err(map_redis_error)?;
-            preview_pairs(v)
-        }
-        "list" => {
-            let v: Vec<Vec<u8>> = conn.lrange(key, 0, 20).await.map_err(map_redis_error)?;
-            preview_members(v)
-        }
-        "set" => {
-            let (_, v): (u64, Vec<Vec<u8>>) = redis::cmd("SSCAN")
-                .arg(key)
-                .arg(0)
-                .arg("COUNT")
-                .arg(PREVIEW_ITEMS)
-                .query_async(conn)
-                .await
-                .map_err(map_redis_error)?;
-            preview_members(v)
-        }
-        "zset" => {
-            let v: Vec<Vec<u8>> = conn.zrange(key, 0, 20).await.map_err(map_redis_error)?;
-            preview_members(v)
-        }
-        other => Value::Text(format!("<{other}>")),
+        "hash" | "list" | "set" | "zset" => Value::Undecodable(COLLECTION_PREVIEW_OMITTED.into()),
+        other => Value::Undecodable(format!("Redis {other} value preview unavailable")),
     };
     row.extend([
         bytes_to_value(key.to_vec()),
         Value::Text(key_type),
         Value::Int(ttl),
+        cardinality,
         preview,
     ]);
     Ok(())
 }
 
-type HashEntries = Vec<(Vec<u8>, Vec<u8>)>;
-
-fn preview_text(bytes: Vec<u8>) -> String {
-    String::from_utf8(bytes).unwrap_or_else(|error| {
-        let hex: String = error.into_bytes().iter().map(|byte| format!("{byte:02x}")).collect();
-        format!("<hex:{hex}>")
-    })
-}
-
-fn preview_members(members: Vec<Vec<u8>>) -> Value {
-    let text: Vec<String> = members.into_iter().map(preview_text).collect();
-    Value::Text(format!("{text:?}"))
-}
-
-fn preview_pairs(pairs: HashEntries) -> Value {
-    let text: Vec<(String, String)> = pairs
-        .into_iter()
-        .map(|(field, value)| (preview_text(field), preview_text(value)))
-        .collect();
-    Value::Text(format!("{text:?}"))
+fn collection_count_command(key_type: &str) -> Option<&'static str> {
+    match key_type {
+        "hash" => Some("HLEN"),
+        "list" => Some("LLEN"),
+        "set" => Some("SCARD"),
+        "zset" => Some("ZCARD"),
+        _ => None,
+    }
 }
 
 fn redis_value_to_result(value: RedisValue) -> QueryResult {
