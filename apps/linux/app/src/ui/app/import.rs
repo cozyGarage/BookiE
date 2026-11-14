@@ -847,13 +847,19 @@ fn check_file_queue(first: &std::path::Path, more: &[PathBuf]) -> Result<(), Str
         if !metadata.is_file() {
             return Err(bookie_app_services::tr!("The import file could not be read."));
         }
-        if metadata.len() > MAX_FILE_BYTES {
+        let file =
+            std::fs::File::open(path).map_err(|_| bookie_app_services::tr!("The import file could not be read."))?;
+        let bytes = file
+            .metadata()
+            .map_err(|_| bookie_app_services::tr!("The import file could not be read."))?
+            .len();
+        if bytes > MAX_FILE_BYTES {
             return Err(
                 bookie_app_services::tr!("The file is larger than the {limit} MB import limit.")
                     .replace("{limit}", &(MAX_FILE_BYTES / (1024 * 1024)).to_string()),
             );
         }
-        sizes.push((path.to_path_buf(), metadata.len()));
+        sizes.push((path.to_path_buf(), bytes));
     }
     bookie_app_services::import_queue::check_queue(&sizes).map_err(|error| error.to_string())
 }

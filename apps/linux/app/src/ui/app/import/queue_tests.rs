@@ -94,6 +94,28 @@ fn an_over_limit_later_file_is_rejected_before_the_queue_can_start() {
     assert!(super::super::check_file_queue(&first, &[oversized]).is_err());
 }
 
+#[cfg(unix)]
+#[test]
+fn an_unreadable_later_file_is_rejected_before_the_queue_can_start() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let directory = tempfile::tempdir().expect("directory");
+    let first = directory.path().join("first.csv");
+    let unreadable = directory.path().join("unreadable.csv");
+    std::fs::write(&first, b"id,name\n1,Ada\n").expect("first file");
+    std::fs::write(&unreadable, b"id,name\n2,Grace\n").expect("unreadable file");
+    std::fs::set_permissions(&unreadable, std::fs::Permissions::from_mode(0o000)).expect("remove read access");
+
+    let result = super::super::check_file_queue(&first, &[unreadable]);
+
+    std::fs::set_permissions(
+        directory.path().join("unreadable.csv"),
+        std::fs::Permissions::from_mode(0o600),
+    )
+    .expect("restore read access");
+    assert!(result.is_err());
+}
+
 #[test]
 fn the_toast_names_the_rows_the_files_and_the_table() {
     let queue = QueueReport {
