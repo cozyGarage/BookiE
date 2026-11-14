@@ -16,6 +16,7 @@ pub(super) enum HostKeyOutcome {
     Changed { fingerprint: String, line: usize },
     Unknown { fingerprint: String },
     KnownHostsIo(String),
+    Revoked(String),
 }
 
 pub(super) fn verify_or_learn(
@@ -98,7 +99,7 @@ fn check_known_host(
     match is_revoked(host, port, key, known_hosts) {
         Ok(false) => {}
         Ok(true) => {
-            return Err(HostKeyOutcome::KnownHostsIo(format!(
+            return Err(HostKeyOutcome::Revoked(format!(
                 "the host key of {host}:{port} is marked @revoked in {}; refusing to connect",
                 known_hosts.display()
             )));
