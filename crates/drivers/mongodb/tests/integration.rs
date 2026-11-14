@@ -12,15 +12,18 @@ mod value_refetch_and_server_info;
 
 use bookie_core::{ConnectOptions, DatabaseDriver, DriverError, TlsConfig, Value};
 use drivers_mongodb::MongodbDriver;
+use std::time::Duration;
 use testcontainers::core::IntoContainerPort;
 use testcontainers::{ContainerAsync, ImageExt};
 use testcontainers_modules::mongo::Mongo;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
+use tokio::io::AsyncReadExt;
 
 /// The module's own default tag is MongoDB 5.0.6, which is long out of
 /// support and is not the server this driver is verified against. Pin the
 /// same major the TLS fixture uses so both tiers exercise one version.
 const MONGO_TAG: &str = "7";
+const MONGO_DIAGNOSTIC_LOG_BYTES: usize = 8 * 1024;
 
 async fn start_mongo() -> (ContainerAsync<Mongo>, String, u16) {
     let container = Mongo::default()
@@ -78,19 +81,7 @@ async fn wrong_mongodb_credentials_are_classified_as_auth_failed() {
 
     let mut valid_options = connection_options.clone();
     valid_options.password = secrecy::SecretString::new("correct-password".to_string().into());
-    let ready = tokio::time::timeout(std::time::Duration::from_secs(120), async {
-        loop {
-            match MongodbDriver.connect(valid_options.clone()).await {
-                Ok(connection) => break connection,
-                Err(DriverError::ConnectionRefused) => {
-                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-                }
-                Err(error) => panic!("valid MongoDB credentials failed during readiness: {error:?}"),
-            }
-        }
-    })
-    .await
-    .expect("authenticated MongoDB must become ready within 120 seconds");
+    let ready = wait_for_authenticated_mongo(&container, &valid_options).await;
     drop(ready);
 
     let error = match MongodbDriver.connect(connection_options).await {
@@ -98,6 +89,76 @@ async fn wrong_mongodb_credentials_are_classified_as_auth_failed() {
         Err(error) => error,
     };
     assert!(matches!(error, DriverError::AuthFailed), "{error:?}");
+}
+
+async fn wait_for_authenticated_mongo(
+    container: &ContainerAsync<Mongo>,
+    options: &ConnectOptions,
+) -> Box<dyn bookie_core::Connection> {
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(120);
+    let mut last_probe_error;
+    loop {
+        match MongodbDriver.connect(options.clone()).await {
+            Ok(connection) => return connection,
+            Err(DriverError::ConnectionRefused) => last_probe_error = "connection refused",
+            Err(error) => {
+                let details = mongo_readiness_diagnostics(container, readiness_error_kind(&error)).await;
+                panic!("valid MongoDB credentials failed during readiness; {details}");
+            }
+        }
+        if tokio::time::Instant::now() >= deadline {
+            let details = mongo_readiness_diagnostics(container, last_probe_error).await;
+            panic!("authenticated MongoDB did not become ready within 120 seconds; {details}");
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+}
+
+fn readiness_error_kind(error: &DriverError) -> &'static str {
+    match error {
+        DriverError::ConnectionRefused => "connection refused",
+        DriverError::AuthFailed => "authentication failed",
+        _ => "non-retryable driver error",
+    }
+}
+
+async fn mongo_readiness_diagnostics(container: &ContainerAsync<Mongo>, last_probe_error: &str) -> String {
+    let stdout = bounded_mongo_log(container.stdout(false)).await;
+    let stderr = bounded_mongo_log(container.stderr(false)).await;
+    format!("last_probe_error={last_probe_error}; mongodb_stdout={stdout}; mongodb_stderr={stderr}")
+}
+
+async fn bounded_mongo_log<R>(reader: R) -> String
+where
+    R: tokio::io::AsyncRead + Unpin,
+{
+    let mut bytes = Vec::with_capacity(MONGO_DIAGNOSTIC_LOG_BYTES);
+    let read = tokio::time::timeout(
+        Duration::from_secs(2),
+        reader.take(MONGO_DIAGNOSTIC_LOG_BYTES as u64).read_to_end(&mut bytes),
+    )
+    .await;
+    if !matches!(read, Ok(Ok(_))) {
+        return "[unavailable]".into();
+    }
+    String::from_utf8_lossy(&bytes)
+        .replace("correct-password", "[redacted]")
+        .replace("wrong-password", "[redacted]")
+}
+
+#[tokio::test]
+async fn mongodb_startup_log_diagnostics_are_bounded_and_redact_fixture_passwords() {
+    use tokio::io::AsyncWriteExt;
+
+    let input = format!("correct-password{}", "x".repeat(MONGO_DIAGNOSTIC_LOG_BYTES));
+    let (mut writer, reader) = tokio::io::duplex(input.len());
+    writer.write_all(input.as_bytes()).await.unwrap();
+    drop(writer);
+
+    let output = bounded_mongo_log(reader).await;
+    assert!(!output.contains("correct-password"));
+    assert!(output.len() <= MONGO_DIAGNOSTIC_LOG_BYTES);
+    assert!(output.starts_with("[redacted]"));
 }
 
 #[tokio::test]
