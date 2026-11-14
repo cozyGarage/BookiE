@@ -230,6 +230,13 @@ impl PolicyGuard {
         control: Option<&OperationControl>,
         counter: Option<Counter<'_>>,
     ) -> Result<Authorization, DriverError> {
+        if analysis.lexical_mode_ambiguous {
+            let decision = Decision::Deny {
+                rule: "session_lexical_mode_ambiguous".into(),
+                message: "SQL token boundaries depend on the database session lexical mode".into(),
+            };
+            return self.resolve_authorization(sql, analysis, decision, None, control).await;
+        }
         let facts = &analysis.facts;
         let effects = facts.effects;
         let env_policy = self

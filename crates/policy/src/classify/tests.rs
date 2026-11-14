@@ -31,6 +31,25 @@ fn guard_analysis_supplies_classification_masking_and_blast_radius_from_one_pars
 }
 
 #[test]
+fn clickhouse_backslash_string_does_not_hide_a_sensitive_projection() {
+    let patterns = crate::mask::SensitivePatterns::new(&["*password*".to_owned()]);
+    let analysis = analyze_statement(
+        r#"SELECT 'x\'' , password AS p FROM users -- '"#,
+        "clickhouse",
+        Some(&patterns),
+    );
+
+    assert_eq!(analysis.sensitive_positions, Some(vec![false, true]));
+}
+
+#[test]
+fn mysql_no_backslash_escapes_does_not_hide_a_following_write() {
+    let facts = classify(r#"SELECT 'x\'; DELETE FROM users WHERE id = 1 -- '"#, "mysql");
+
+    assert!(facts.writes(), "{facts:?}");
+}
+
+#[test]
 fn insert_is_mutating_dml() {
     let f = classify("INSERT INTO t (a) VALUES (1)", "postgres");
     assert!(f.writes());

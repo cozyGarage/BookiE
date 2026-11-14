@@ -1,6 +1,66 @@
 use super::*;
 use crate::approval::AutoApproveSink;
 
+struct ProjectionResultConnection;
+
+#[async_trait]
+impl Connection for ProjectionResultConnection {
+    async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
+        Ok(vec![])
+    }
+
+    async fn fetch_columns(&self, _: Option<&str>, _: &str) -> Result<Vec<ColumnInfo>, DriverError> {
+        Ok(vec![])
+    }
+
+    async fn fetch_rows(&self, _: Option<&str>, _: &str, _: u64, _: u64) -> Result<QueryResult, DriverError> {
+        Ok(empty_result())
+    }
+
+    async fn query(&self, _: &str) -> Result<QueryResult, DriverError> {
+        Ok(QueryResult {
+            columns: vec!["id", "p"]
+                .into_iter()
+                .map(|name| ColumnInfo {
+                    name: name.into(),
+                    data_type: "text".into(),
+                    nullable: true,
+                    primary_key: false,
+                    is_auto_increment: false,
+                    default_value: None,
+                    is_generated: false,
+                    comment: None,
+                    collation: None,
+                    enum_type: None,
+                    domain_type: None,
+                })
+                .collect(),
+            rows: vec![vec![Value::Text("1".into()), Value::Text("canary-secret".into())]].into(),
+            truncated: false,
+        })
+    }
+
+    async fn execute(&self, _: &str) -> Result<ExecResult, DriverError> {
+        Ok(ExecResult { rows_affected: 0 })
+    }
+
+    async fn execute_params(&self, _: &str, _: &[Value]) -> Result<ExecResult, DriverError> {
+        Ok(ExecResult { rows_affected: 0 })
+    }
+
+    async fn execute_in_transaction(&self, _: &[(String, Vec<Value>)]) -> Result<Vec<u64>, DriverError> {
+        Ok(vec![])
+    }
+
+    async fn ping(&self) -> Result<(), DriverError> {
+        Ok(())
+    }
+
+    async fn close(self: Box<Self>) -> Result<(), DriverError> {
+        Ok(())
+    }
+}
+
 const SECRET: &str = "duplicate key value (card 4111111111111111)";
 
 fn leak() -> DriverError {
@@ -149,4 +209,26 @@ fn only_a_guard_that_masks_results_analyzes_their_projection() {
 
     let agent = guard_for(agent(), leak).analyze_statement(sql);
     assert_eq!(agent.sensitive_positions, Some(vec![true]));
+}
+
+#[tokio::test]
+async fn clickhouse_policy_projection_masks_only_the_sensitive_result_column() {
+    let mut guard_context = context(
+        agent(),
+        Environment::Local,
+        PolicyConfig::default(),
+        Arc::new(AutoApproveSink),
+        Arc::new(SequenceAuditSink::new(vec![])),
+        Arc::new(AuditState::new()),
+    );
+    guard_context.driver_id = "clickhouse".into();
+    let guard = PolicyGuard::new(Arc::new(ProjectionResultConnection), guard_context);
+
+    let result = guard
+        .query("SELECT id, password AS p FROM users")
+        .await
+        .expect("the read is allowed");
+
+    assert_eq!(result.rows[0][0], Value::Text("1".into()));
+    assert_ne!(result.rows[0][1], Value::Text("canary-secret".into()));
 }

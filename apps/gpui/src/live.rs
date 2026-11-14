@@ -1,6 +1,8 @@
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
+use bookie_app_services::command_bridge::{ChannelEventSink, Command, Epoch, Event, dispatch};
 use bookie_app_services::read_session::{ReadSession, list_saved_connections};
 use bookie_core::{ColumnInfo, OperationControl, QueryResult, QueryResultBudget, QueryRows, TableInfo};
 use bookie_results::result_scan::ScanSource;
@@ -31,6 +33,7 @@ const PAGE_TIMEOUT: Duration = Duration::from_secs(30);
 pub struct LiveSession {
     runtime: tokio::runtime::Runtime,
     session: Option<ReadSession>,
+    epoch: AtomicU64,
     pub driver_id: String,
     pub label: String,
     pub tables: Vec<TableInfo>,
@@ -53,6 +56,7 @@ impl LiveSession {
             driver_id: session.driver_id.clone(),
             runtime,
             session: Some(session),
+            epoch: AtomicU64::new(0),
             label,
             tables,
         }))
@@ -72,9 +76,10 @@ impl LiveSession {
             return Err(format!("Row limit must be between 1 and {ROW_CAP}."));
         }
         let session = self.session.as_ref().ok_or("the session is closed")?;
+        let epoch = self.next_epoch();
         let (columns, rows, scan, truncated) =
             self.runtime
-                .block_on(query_pages(session, sql, max_rows, cancellation))?;
+                .block_on(query_pages(session, sql, max_rows, cancellation, epoch, &self.epoch))?;
         Ok(LiveTable {
             session: self.clone(),
             columns,
@@ -122,9 +127,10 @@ impl LiveSession {
             return Err(format!("Row limit must be between 1 and {ROW_CAP}."));
         }
         let session = self.session.as_ref().ok_or("the session is closed")?;
+        let epoch = self.next_epoch();
         let (columns, rows, scan, truncated) =
             self.runtime
-                .block_on(read_pages(session, table, max_rows, cancellation))?;
+                .block_on(read_pages(session, table, max_rows, cancellation, epoch, &self.epoch))?;
         Ok(LiveTable {
             session: self.clone(),
             columns,
@@ -134,6 +140,10 @@ impl LiveSession {
             snapshot_consistent: session.supports_snapshot_cursor(),
             table: Some(table.clone()),
         })
+    }
+
+    fn next_epoch(&self) -> Epoch {
+        Epoch(self.epoch.fetch_add(1, Ordering::Relaxed) + 1)
     }
 }
 
@@ -200,6 +210,8 @@ async fn read_pages(
     table: &TableInfo,
     max_rows: u64,
     cancellation: &CancellationToken,
+    epoch: Epoch,
+    current_epoch: &AtomicU64,
 ) -> Result<Pages, String> {
     let table = find_table(&session.tables, table)?;
     let open_control = OperationControl::new(cancellation.clone(), Some(tokio::time::Instant::now() + PAGE_TIMEOUT));
@@ -207,7 +219,16 @@ async fn read_pages(
         .open_table_cursor(&table, &open_control)
         .await
         .map_err(|failure| format!("{failure:?}"))?;
-    let result = collect_pages(session, &table, max_rows, cancellation, &mut cursor).await;
+    let result = collect_pages(
+        session,
+        &table,
+        max_rows,
+        cancellation,
+        &mut cursor,
+        epoch,
+        current_epoch,
+    )
+    .await;
     let close_result = if let Some(cursor) = cursor {
         cursor.close().await.map_err(|failure| format!("{failure:?}"))
     } else {
@@ -231,6 +252,8 @@ async fn collect_pages(
     max_rows: u64,
     cancellation: &CancellationToken,
     cursor: &mut Option<bookie_app_services::read_session::PostgresTableCursor>,
+    epoch: Epoch,
+    current_epoch: &AtomicU64,
 ) -> Result<Pages, String> {
     let spool = StreamResultSpoolManager::from_environment()
         .create()
@@ -252,10 +275,7 @@ async fn collect_pages(
                 (page.result, page.has_next_page)
             }
             None => (
-                session
-                    .read_page(table, rows.len() as u64, limit, &control)
-                    .await
-                    .map_err(|failure| format!("{failure:?}"))?,
+                bridge_read_page(session, table, rows.len() as u64, limit, &control, epoch, current_epoch).await?,
                 false,
             ),
         };
@@ -298,12 +318,11 @@ async fn query_pages(
     sql: &str,
     max_rows: u64,
     cancellation: &CancellationToken,
+    epoch: Epoch,
+    current_epoch: &AtomicU64,
 ) -> Result<Pages, String> {
     let control = OperationControl::new(cancellation.clone(), Some(tokio::time::Instant::now() + PAGE_TIMEOUT));
-    let mut result = session
-        .run_query(sql, &control)
-        .await
-        .map_err(|failure| format!("{failure:?}"))?;
+    let mut result = bridge_query(session, sql, &control, epoch, current_epoch).await?;
     if cancellation.is_cancelled() {
         return Err("The operation was cancelled.".into());
     }
@@ -337,6 +356,80 @@ async fn query_pages(
     let total = result.rows.len() as u64;
     let columns = infos.iter().map(column_meta).collect();
     Ok((columns, result.rows, ScanSource::new(spool, infos, total), truncated))
+}
+
+async fn bridge_query(
+    session: &ReadSession,
+    sql: &str,
+    control: &OperationControl,
+    epoch: Epoch,
+    current_epoch: &AtomicU64,
+) -> Result<QueryResult, String> {
+    let event = dispatch_read(
+        session,
+        Command::RunQuery {
+            epoch,
+            sql: sql.to_owned(),
+        },
+        control,
+        epoch,
+        current_epoch,
+    )
+    .await?;
+    let Event::QueryCompleted { outcome, .. } = event else {
+        return Err("The command bridge returned an unexpected event.".into());
+    };
+    outcome.map_err(|failure| format!("{failure:?}"))
+}
+
+async fn bridge_read_page(
+    session: &ReadSession,
+    table: &TableInfo,
+    offset: u64,
+    limit: u64,
+    control: &OperationControl,
+    epoch: Epoch,
+    current_epoch: &AtomicU64,
+) -> Result<QueryResult, String> {
+    let event = dispatch_read(
+        session,
+        Command::ReadPage {
+            epoch,
+            table: table.clone(),
+            offset,
+            limit,
+        },
+        control,
+        epoch,
+        current_epoch,
+    )
+    .await?;
+    let Event::PageRead { outcome, .. } = event else {
+        return Err("The command bridge returned an unexpected event.".into());
+    };
+    outcome.map_err(|failure| format!("{failure:?}"))
+}
+
+async fn dispatch_read(
+    session: &ReadSession,
+    command: Command,
+    control: &OperationControl,
+    epoch: Epoch,
+    current_epoch: &AtomicU64,
+) -> Result<Event, String> {
+    if current_epoch.load(Ordering::Relaxed) != epoch.0 {
+        return Err("The request was superseded.".into());
+    }
+    let (sender, mut receiver) = tokio::sync::mpsc::channel(1);
+    let sink = ChannelEventSink::new(sender);
+    dispatch(session, command, control, &sink)
+        .await
+        .map_err(|error| format!("{error:?}"))?;
+    receiver
+        .try_recv()
+        .map_err(|error| format!("{error:?}"))?
+        .into_current(Epoch(current_epoch.load(Ordering::Relaxed)))
+        .ok_or_else(|| "The request was superseded.".into())
 }
 
 fn bound_query_result(result: &mut QueryResult, cap: usize, budget: &mut QueryResultBudget) -> bool {
@@ -702,6 +795,7 @@ mod tests {
             tables: session.tables.clone(),
             session: Some(session),
             runtime,
+            epoch: AtomicU64::new(0),
             label: "fixture".into(),
         });
         assert!(live.run_query("DELETE FROM orders", 100).is_err());

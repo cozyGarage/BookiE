@@ -170,7 +170,7 @@ Use current source behavior and the change acceptance criteria to select value c
 | --- | --- | --- |
 | Rounded wide integers/decimals | Shared value corpus, core XLSX, PostgreSQL numeric contracts | Consumer edits and remaining numeric representations |
 | Time 24:00 became midnight | PostgreSQL temporal units and real-server contracts | Temporal arrays, infinities and intervals |
-| BC/year 10000 SQL export failed | Core SQL literal unit and PostgreSQL date round-trip | Remaining driver-specific calendar limits and non-SQL consumer parity |
+| PostgreSQL BC/year 10000 spelling differs between consumers | Core SQL literal and export units, app-services and GTK display tests, PostgreSQL filter round-trip | Remaining driver-specific calendar limits and temporal arrays |
 | Decoder and oracle shared the same bug | Array size literal and numeric variant assertions | Independent oracles for other driver decoders |
 | Green CI omitted eight SSH tests | SSH runner, ignored-test inventory and workflow regression | Audit new ignored targets whenever added |
 | Empty/failed mutation report looked complete | Mutation summary fixtures and workflow regression | Triage survivors and timeouts from the exact run report; counts vary by source revision, so do not carry an old total forward |

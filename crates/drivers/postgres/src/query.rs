@@ -449,7 +449,7 @@ where
             column_origins = metadata.column_origins;
             type_names = metadata.type_names;
         }
-        let payload_bytes = pg_row_payload_bytes(&row).unwrap_or(usize::MAX);
+        let payload_bytes = pg_row_decoded_payload_bytes(&row, &type_names).unwrap_or(usize::MAX);
         if !budget.decode_and_admit_row_into(row.len(), payload_bytes, &mut decoded, |values| {
             for (index, type_name) in type_names.iter().enumerate() {
                 values.push(extract_value(&row, index, type_name)?);
@@ -472,13 +472,15 @@ where
     ))
 }
 
-fn pg_row_payload_bytes(row: &PgRow) -> Option<usize> {
+fn pg_row_decoded_payload_bytes(row: &PgRow, type_names: &[String]) -> Option<usize> {
     (0..row.len()).try_fold(0usize, |total, index| {
         let value = row.try_get_raw(index).ok()?;
         if value.is_null() {
             return Some(total);
         }
-        Some(total.saturating_add(value.as_bytes().ok()?.len()))
+        let bytes = value.as_bytes().ok()?;
+        let type_name = type_names.get(index)?.as_str();
+        Some(total.saturating_add(decode::decoded_payload_length(type_name, bytes)))
     })
 }
 

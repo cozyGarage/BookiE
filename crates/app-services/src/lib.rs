@@ -16,6 +16,7 @@ pub mod catalog;
 pub mod catalog_changes;
 pub mod column_selection;
 pub mod column_widths;
+pub mod command_bridge;
 pub mod completion;
 pub mod completion_identifiers;
 pub mod completion_proposals;
