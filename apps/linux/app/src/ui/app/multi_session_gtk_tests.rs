@@ -294,8 +294,17 @@ fn recorded_groups() -> Vec<Vec<uuid::Uuid>> {
 fn closing_a_secondary_window_forgets_only_its_own_group() {
     let pair = primary_and_secondary_window();
     let window = pair.controller.model().extra_windows[0].1.widget().clone();
+    spin_until(|| window.is_mapped());
+    let expected = vec![vec![pair.primary]];
     window.close();
-    spin_until(|| recorded_groups() == vec![vec![pair.primary]]);
+    spin_until(|| {
+        if recorded_groups() == expected {
+            return true;
+        }
+        window.emit_by_name::<bool>("close-request", &[]);
+        false
+    });
+    window.destroy();
 }
 
 #[test]
