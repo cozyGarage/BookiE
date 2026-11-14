@@ -126,7 +126,7 @@ impl<S: ApprovalSink> RememberingApprovalSink<S> {
 #[async_trait]
 impl<S: ApprovalSink> ApprovalSink for RememberingApprovalSink<S> {
     async fn request(&self, req: ApprovalRequest) -> ApprovalOutcome {
-        let may_remember = req.environment != Environment::Prod;
+        let may_remember = req.environment != Environment::Prod && matches!(req.principal, Principal::Human { .. });
         let grant = grant_for(&req);
         if may_remember && self.grants.covers(&grant) {
             return ApprovalOutcome::UsedGrant;
