@@ -100,6 +100,7 @@ Build and install with the helper (`cargo build -p bookie-ssh --bin bookie-askpa
 - [ ] A saved password is used for the target host; a jump host asking for a password gets a dialog instead of the saved one.
 - [ ] A PostgreSQL connection with Verify Full through the OpenSSH tunnel verifies the database hostname.
 - [ ] After closing the app, no `ssh -M` process is left running.
+- [ ] On a non-Linux target, selecting system OpenSSH reports that the backend is unavailable and directs the user to the built-in client.
 
 ## SQLite attached databases
 
