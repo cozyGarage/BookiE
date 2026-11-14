@@ -28,7 +28,7 @@ class GtkArtifactWorkflowTests(unittest.TestCase):
         build = workflow.split("  linux-build:\n", 1)[1].split("  gtk:\n", 1)[0]
         self.assertIn("DEB_OUT: ${{ github.workspace }}/.floor-package", build)
 
-        generated_package = ROOT / ".floor-package/bookie_0.2.7-1_amd64.deb"
+        generated_package = ROOT / ".floor-package/bookie.deb"
         ignored = subprocess.run(
             ["git", "check-ignore", "--quiet", str(generated_package)], cwd=ROOT, check=False
         )
