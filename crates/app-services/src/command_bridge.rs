@@ -1,6 +1,7 @@
 use bookie_core::{OperationControl, QueryResult, TableInfo};
 use tokio::sync::mpsc;
 
+use crate::database_service::ConnectionOverview;
 use crate::driver_error_presentation::DriverFailurePresentation;
 use crate::read_session::ReadSession;
 
@@ -19,6 +20,9 @@ pub enum Command {
         offset: u64,
         limit: u64,
     },
+    ReadConnectionStatus {
+        epoch: Epoch,
+    },
 }
 
 #[derive(Debug)]
@@ -31,12 +35,18 @@ pub enum Event {
         epoch: Epoch,
         outcome: Result<QueryResult, DriverFailurePresentation>,
     },
+    ConnectionStatusRead {
+        epoch: Epoch,
+        outcome: Vec<ConnectionOverview>,
+    },
 }
 
 impl Event {
     pub fn epoch(&self) -> Epoch {
         match self {
-            Self::QueryCompleted { epoch, .. } | Self::PageRead { epoch, .. } => *epoch,
+            Self::QueryCompleted { epoch, .. }
+            | Self::PageRead { epoch, .. }
+            | Self::ConnectionStatusRead { epoch, .. } => *epoch,
         }
     }
 
@@ -94,6 +104,10 @@ pub async fn dispatch(
             let outcome = session.read_page(&table, offset, limit, control).await;
             sink.try_emit(Event::PageRead { epoch, outcome })
         }
+        Command::ReadConnectionStatus { epoch } => sink.try_emit(Event::ConnectionStatusRead {
+            epoch,
+            outcome: session.overview(),
+        }),
     }
 }
 
