@@ -2,16 +2,13 @@
 
 use bookie_core::{ConnectOptions, DriverError};
 
-use crate::{connect, start_mysql};
+use crate::{connect, start_mariadb, start_mysql};
 
 fn is_read_only_refusal(error: &DriverError) -> bool {
     matches!(error, DriverError::Query { sqlstate: Some(state), .. } if state == "25006")
 }
 
-#[tokio::test]
-#[ignore = "requires docker"]
-async fn a_read_only_connection_is_refused_writes_by_the_server() {
-    let (_c, opts) = start_mysql().await;
+async fn assert_read_only_connection_refuses_writes(opts: ConnectOptions) {
     let writer = connect(opts.clone()).await;
     writer
         .execute("CREATE TABLE jobs (id INT PRIMARY KEY) ENGINE=InnoDB")
@@ -54,4 +51,18 @@ async fn a_read_only_connection_is_refused_writes_by_the_server() {
         is_read_only_refusal(&error) || error.to_string().contains("read-only"),
         "{error:?}"
     );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_mysql_read_only_connection_is_refused_writes_by_the_server() {
+    let (_container, options) = start_mysql().await;
+    assert_read_only_connection_refuses_writes(options).await;
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_mariadb_read_only_connection_is_refused_writes_by_the_server() {
+    let (_container, options) = start_mariadb().await;
+    assert_read_only_connection_refuses_writes(options).await;
 }

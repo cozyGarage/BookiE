@@ -24,11 +24,88 @@ fn plain(format: ResultFormat, options: &CsvOptions) -> ResultExport<'_> {
 }
 
 fn exported(format: ResultFormat) -> String {
+    String::from_utf8(exported_result(&result(), format)).unwrap()
+}
+
+fn exported_result(data: &QueryResult, format: ResultFormat) -> Vec<u8> {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("result");
     let options = CsvOptions::default();
-    write_result_file(&path, &result(), &plain(format, &options), || false, |_| {}).unwrap();
-    std::fs::read_to_string(&path).unwrap()
+    write_result_file(&path, data, &plain(format, &options), || false, |_| {}).unwrap();
+    std::fs::read(path).unwrap()
+}
+
+fn duplicate_label_result() -> QueryResult {
+    QueryResult {
+        columns: vec![column("value"), column("value"), column("value")],
+        rows: vec![vec![
+            Value::Text("first".into()),
+            Value::Text("second".into()),
+            Value::Text("third".into()),
+        ]]
+        .into(),
+        truncated: false,
+    }
+}
+
+fn workbook_parts(bytes: Vec<u8>) -> (String, String) {
+    use std::io::Read;
+
+    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(bytes)).unwrap();
+    let mut sheet = String::new();
+    archive
+        .by_name("xl/worksheets/sheet1.xml")
+        .unwrap()
+        .read_to_string(&mut sheet)
+        .unwrap();
+    let mut strings = String::new();
+    archive
+        .by_name("xl/sharedStrings.xml")
+        .unwrap()
+        .read_to_string(&mut strings)
+        .unwrap();
+    (sheet, strings)
+}
+
+fn shared_string_index(strings: &str, value: &str) -> usize {
+    strings
+        .split("<si>")
+        .skip(1)
+        .position(|entry| entry.starts_with(&format!("<t>{value}</t>")))
+        .unwrap()
+}
+
+#[test]
+fn duplicate_column_labels_keep_all_values_in_source_order_across_exports() {
+    let data = duplicate_label_result();
+    let csv = String::from_utf8(exported_result(&data, ResultFormat::Csv)).unwrap();
+    assert_eq!(csv, "value,value,value\nfirst,second,third\n");
+    assert_eq!(
+        crate::export::render_tsv(&data.columns, &data.rows, true),
+        "value\tvalue\tvalue\nfirst\tsecond\tthird"
+    );
+    assert_eq!(
+        crate::export::render_markdown(&data.columns, &data.rows),
+        "| value | value | value |\n| --- | --- | --- |\n| \"first\" | \"second\" | \"third\" |"
+    );
+    let json: serde_json::Value = serde_json::from_slice(&exported_result(&data, ResultFormat::Json)).unwrap();
+    assert_eq!(json[0]["value"], "first");
+    assert_eq!(json[0]["value_2"], "second");
+    assert_eq!(json[0]["value_3"], "third");
+
+    let markdown = String::from_utf8(exported_result(&data, ResultFormat::Markdown)).unwrap();
+    assert_eq!(
+        markdown,
+        format!("{}\n", crate::export::render_markdown(&data.columns, &data.rows))
+    );
+    let (sheet, strings) = workbook_parts(exported_result(&data, ResultFormat::Xlsx));
+    for (column, value) in [("A", "first"), ("B", "second"), ("C", "third")] {
+        let index = shared_string_index(&strings, value);
+        assert!(
+            sheet.contains(&format!("<c r=\"{column}2\" t=\"s\"><v>{index}</v></c>")),
+            "{sheet}"
+        );
+    }
 }
 
 #[test]

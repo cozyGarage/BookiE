@@ -134,7 +134,13 @@ impl DatabaseDriver for MysqlDriver {
         let pool = MySqlPoolOptions::new()
             .max_connections(4)
             .acquire_timeout(acquire_timeout)
-            .after_connect(move |connection, _| Box::pin(prepare_session(connection, read_only)))
+            .after_connect(move |connection, _| {
+                Box::pin(async move {
+                    let server_read_only = prepare_session(connection, read_only).await?;
+                    report_read_only_setup(read_only, server_read_only);
+                    Ok(())
+                })
+            })
             .before_acquire(move |connection, _| {
                 let database = std::sync::Arc::clone(&database);
                 Box::pin(async move {
@@ -693,14 +699,39 @@ async fn restore_database(connection: &mut sqlx::MySqlConnection, database: &str
     Ok(())
 }
 
-async fn prepare_session(connection: &mut sqlx::MySqlConnection, read_only: bool) -> Result<(), sqlx::Error> {
+async fn prepare_session(connection: &mut sqlx::MySqlConnection, read_only: bool) -> Result<bool, sqlx::Error> {
     set_utc_timezone(connection).await?;
-    if read_only {
-        sqlx::query("SET SESSION TRANSACTION READ ONLY")
-            .execute(connection)
-            .await?;
+    if !read_only {
+        return Ok(true);
     }
-    Ok(())
+    match sqlx::query("SET SESSION TRANSACTION READ ONLY")
+        .execute(connection)
+        .await
+    {
+        Ok(_) => Ok(true),
+        Err(error) if is_unsupported_read_only_transaction_error(&error) => Ok(false),
+        Err(error) => Err(error),
+    }
+}
+
+fn is_unsupported_read_only_transaction_error(error: &sqlx::Error) -> bool {
+    error
+        .as_database_error()
+        .and_then(|error| error.try_downcast_ref::<sqlx::mysql::MySqlDatabaseError>())
+        .is_some_and(|error| unsupported_read_only_transaction_error_number(error.number()))
+}
+
+fn unsupported_read_only_transaction_error_number(number: u16) -> bool {
+    matches!(number, 1064 | 1193)
+}
+
+fn report_read_only_setup(read_only: bool, server_read_only: bool) {
+    if read_only && !server_read_only {
+        tracing::warn!(
+            server_read_only = false,
+            "MySQL server lacks session-level read-only transactions; PolicyGuard enforces this connection's read-only profile"
+        );
+    }
 }
 
 async fn session_lexical_settings<'e, E>(executor: E) -> Result<LexicalSettings, DriverError>

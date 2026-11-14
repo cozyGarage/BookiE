@@ -19,6 +19,7 @@ mod guard;
 mod input_refusal;
 mod linked_server;
 mod mask;
+mod mysql_functions;
 mod parsed_sql;
 mod principal;
 mod rules;

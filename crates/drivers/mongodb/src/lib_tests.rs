@@ -35,6 +35,23 @@ async fn sampling_stops_reading_after_an_error() {
 }
 
 #[tokio::test]
+async fn sampling_refuses_too_many_distinct_fields() {
+    let document = (0..=METADATA_SAMPLE_MAX_FIELDS)
+        .map(|index| (format!("field_{index}"), mongodb::bson::Bson::Int32(1)))
+        .collect::<mongodb::bson::Document>();
+    let result = observe_sample(futures::stream::iter([Ok(document)])).await;
+    assert!(matches!(result, Err(DriverError::Unsupported(_))), "{result:?}");
+}
+
+#[tokio::test]
+async fn sampling_refuses_oversized_field_names() {
+    let key = "k".repeat(METADATA_SAMPLE_MAX_FIELD_NAME_BYTES + 1);
+    let document = mongodb::bson::Document::from_iter([(key, mongodb::bson::Bson::Int32(1))]);
+    let result = observe_sample(futures::stream::iter([Ok(document)])).await;
+    assert!(matches!(result, Err(DriverError::Unsupported(_))), "{result:?}");
+}
+
+#[tokio::test]
 async fn open_session_is_refused() {
     let client_opts = ClientOptions::parse("mongodb://127.0.0.1:27017").await.unwrap();
     let client = Client::with_options(client_opts).unwrap();

@@ -87,3 +87,27 @@ fn read_only_transaction_error_is_a_known_failure_without_disabling_writes() {
         (AuditTerminalStatus::Failed, AuditTransactionOutcome::Failed, false)
     );
 }
+
+#[test]
+fn errors_raised_before_a_statement_is_sent_are_known_failures() {
+    for error in [
+        DriverError::ConnectionRefused,
+        DriverError::DatabaseFileNotFound("/tmp/gone.db".into()),
+        DriverError::AuthFailed,
+        DriverError::IntegratedAuth("no ticket".into()),
+        DriverError::Tls("certificate rejected".into()),
+    ] {
+        assert!(!super::super::is_ambiguous_post_dispatch(&error), "{error:?}");
+        assert_eq!(
+            super::super::write_error_outcome(&error),
+            (AuditTerminalStatus::Failed, false),
+            "{error:?}"
+        );
+        assert_eq!(
+            super::super::transaction_error_outcome(&error),
+            (AuditTerminalStatus::Failed, AuditTransactionOutcome::RolledBack, false),
+            "{error:?}"
+        );
+    }
+    assert!(super::super::is_ambiguous_post_dispatch(&DriverError::Disconnected));
+}

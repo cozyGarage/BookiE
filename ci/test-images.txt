@@ -8,6 +8,7 @@ postgres postgres:18-alpine
 postgres edoburu/pgbouncer:v1.24.1-p1
 mysql mysql:8.1
 mysql mariadb:11
+mysql mysql:5.5
 mssql mcr.microsoft.com/mssql/server:2022-CU14-ubuntu-22.04
 clickhouse clickhouse/clickhouse-server:24.8
 redis redis:5.0

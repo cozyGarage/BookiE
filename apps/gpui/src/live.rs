@@ -3,6 +3,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use bookie_app_services::command_bridge::{ChannelEventSink, Command, Epoch, Event, dispatch};
+use bookie_app_services::database_service::ConnectionOverview;
 use bookie_app_services::read_session::{ReadSession, list_saved_connections};
 use bookie_core::{ColumnInfo, OperationControl, QueryResult, QueryResultBudget, QueryRows, TableInfo};
 use bookie_results::result_scan::ScanSource;
@@ -91,8 +92,21 @@ impl LiveSession {
         })
     }
 
-    pub fn overview(&self) -> Vec<bookie_app_services::database_service::ConnectionOverview> {
-        self.session.as_ref().map(ReadSession::overview).unwrap_or_default()
+    pub fn overview(&self) -> Result<Vec<ConnectionOverview>, String> {
+        let session = self.session.as_ref().ok_or("the session is closed")?;
+        let epoch = Epoch(self.epoch.load(Ordering::Relaxed));
+        let control = OperationControl::with_timeout(Duration::from_secs(5));
+        let event = self.runtime.block_on(dispatch_read(
+            session,
+            Command::ReadConnectionStatus { epoch },
+            &control,
+            epoch,
+            &self.epoch,
+        ))?;
+        let Event::ConnectionStatusRead { outcome, .. } = event else {
+            return Err("The command bridge returned an unexpected event.".into());
+        };
+        Ok(outcome)
     }
 
     pub fn sample_pubsub(
@@ -820,6 +834,24 @@ mod tests {
         assert_eq!(table.row(1)[1], Cell::Text("Grace".into()));
         assert_eq!(table.row(1)[4], Cell::Null);
         assert_eq!(table.row(2)[4], Cell::Text(String::new()));
+    }
+
+    #[test]
+    fn connection_status_uses_the_read_command_bridge() {
+        let session = LiveSession::open(&fixture()).expect("open fixture");
+
+        let overview = session.overview().expect("connection status");
+
+        assert_eq!(overview.len(), 1);
+        assert_eq!(overview[0].driver_id, "sqlite");
+        assert_eq!(
+            overview[0].health,
+            bookie_app_services::database_service::ConnectionHealth::Healthy
+        );
+        assert_eq!(
+            overview[0].tunnel,
+            bookie_app_services::database_service::TunnelState::Direct
+        );
     }
 
     #[test]

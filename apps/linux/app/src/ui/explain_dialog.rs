@@ -1,7 +1,3 @@
-//! EXPLAIN plan dialog. Runs the engine's plan statement through the
-//! policy-gated connection owned by the calling window and shows the
-//! textual plan.
-
 use gtk::prelude::IsA;
 use relm4::adw::prelude::*;
 use relm4::{adw, gtk};

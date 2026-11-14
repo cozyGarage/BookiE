@@ -329,7 +329,7 @@ impl MssqlConnection {
     }
 
     async fn rollback_batch(&self, client: &mut MssqlClient, index: usize, source: DriverError) -> DriverError {
-        match exec_simple(client, "ROLLBACK").await {
+        match exec_simple(client, "IF @@TRANCOUNT > 0 ROLLBACK").await {
             Ok(()) => DriverError::Transaction {
                 statement_index: index,
                 source: Box::new(source),
@@ -343,6 +343,46 @@ impl MssqlConnection {
                 }
             }
         }
+    }
+
+    async fn run_transaction(
+        &self,
+        client: &mut MssqlClient,
+        statements: &[(String, Vec<Value>)],
+        expect_one: &[usize],
+    ) -> Result<Vec<u64>, DriverError> {
+        exec_simple(client, "BEGIN TRANSACTION").await?;
+        let mut affected = Vec::with_capacity(statements.len());
+        for (idx, (sql, params)) in statements.iter().enumerate() {
+            let boxes = match boxed_params(params) {
+                Ok(boxes) => boxes,
+                Err(error) => {
+                    return Err(self.rollback_batch(client, idx, error).await);
+                }
+            };
+            let refs: Vec<&dyn ToSql> = boxes.iter().map(|b| &**b as &dyn ToSql).collect();
+            match client.execute(sql.as_str(), &refs).await {
+                Ok(res) => {
+                    let total = res.total();
+                    if expect_one.contains(&idx) && total != 1 {
+                        return Err(self
+                            .rollback_batch(client, idx, DriverError::ConcurrentModification)
+                            .await);
+                    }
+                    affected.push(total);
+                }
+                Err(e) => {
+                    return Err(self.rollback_batch(client, idx, map_tiberius_error(e)).await);
+                }
+            }
+        }
+        if let Err(error) = exec_simple(client, "COMMIT").await {
+            self.retire().await?;
+            return Err(DriverError::OperationOutcomeUnknown {
+                source: Box::new(error),
+            });
+        }
+        Ok(affected)
     }
 
     async fn query_result(
@@ -610,44 +650,33 @@ impl Connection for MssqlConnection {
         self.execute_in_transaction_checked(statements, &[]).await
     }
 
+    async fn execute_in_transaction_controlled(
+        &self,
+        statements: &[(String, Vec<Value>)],
+        control: &OperationControl,
+    ) -> Result<Vec<u64>, DriverError> {
+        self.execute_in_transaction_checked_controlled(statements, &[], control)
+            .await
+    }
+
+    async fn execute_in_transaction_checked_controlled(
+        &self,
+        statements: &[(String, Vec<Value>)],
+        expect_one: &[usize],
+        control: &OperationControl,
+    ) -> Result<Vec<u64>, DriverError> {
+        let mut client = self.client().await?;
+        self.run_abandonable(self.run_transaction(&mut client, statements, expect_one), control)
+            .await
+    }
+
     async fn execute_in_transaction_checked(
         &self,
         statements: &[(String, Vec<Value>)],
         expect_one: &[usize],
     ) -> Result<Vec<u64>, DriverError> {
         let mut client = self.client().await?;
-        exec_simple(&mut client, "BEGIN TRANSACTION").await?;
-        let mut affected = Vec::with_capacity(statements.len());
-        for (idx, (sql, params)) in statements.iter().enumerate() {
-            let boxes = match boxed_params(params) {
-                Ok(boxes) => boxes,
-                Err(error) => {
-                    return Err(self.rollback_batch(&mut client, idx, error).await);
-                }
-            };
-            let refs: Vec<&dyn ToSql> = boxes.iter().map(|b| &**b as &dyn ToSql).collect();
-            match client.execute(sql.as_str(), &refs).await {
-                Ok(res) => {
-                    let total = res.total();
-                    if expect_one.contains(&idx) && total != 1 {
-                        return Err(self
-                            .rollback_batch(&mut client, idx, DriverError::ConcurrentModification)
-                            .await);
-                    }
-                    affected.push(total);
-                }
-                Err(e) => {
-                    return Err(self.rollback_batch(&mut client, idx, map_tiberius_error(e)).await);
-                }
-            }
-        }
-        if let Err(error) = exec_simple(&mut client, "COMMIT").await {
-            self.retire().await?;
-            return Err(DriverError::OperationOutcomeUnknown {
-                source: Box::new(error),
-            });
-        }
-        Ok(affected)
+        self.run_transaction(&mut client, statements, expect_one).await
     }
 
     async fn fetch_indexes(&self, schema: Option<&str>, table: &str) -> Result<Vec<IndexInfo>, DriverError> {

@@ -1062,6 +1062,11 @@ fn transaction_error_outcome(error: &DriverError) -> (AuditTerminalStatus, Audit
         DriverError::PartiallyApplied { source, .. } if !is_ambiguous_post_dispatch(source) => {
             (AuditTerminalStatus::Failed, AuditTransactionOutcome::Failed, false)
         }
+        DriverError::ConnectionRefused
+        | DriverError::DatabaseFileNotFound(_)
+        | DriverError::AuthFailed
+        | DriverError::IntegratedAuth(_)
+        | DriverError::Tls(_) => (AuditTerminalStatus::Failed, AuditTransactionOutcome::RolledBack, false),
         _ => (AuditTerminalStatus::Unknown, AuditTransactionOutcome::Unknown, true),
     }
 }
@@ -1077,12 +1082,7 @@ fn interactive_transaction_error_outcome(error: &DriverError) -> (AuditTerminalS
 
 pub fn is_ambiguous_post_dispatch(error: &DriverError) -> bool {
     match error {
-        DriverError::ConnectionRefused
-        | DriverError::DatabaseFileNotFound(_)
-        | DriverError::Disconnected
-        | DriverError::AuthFailed
-        | DriverError::IntegratedAuth(_)
-        | DriverError::Tls(_)
+        DriverError::Disconnected
         | DriverError::Internal(_)
         | DriverError::CommitUnconfirmed(_)
         | DriverError::OperationOutcomeUnknown { .. } => true,
@@ -1090,7 +1090,12 @@ pub fn is_ambiguous_post_dispatch(error: &DriverError) -> bool {
             is_ambiguous_post_dispatch(source)
         }
         DriverError::TransactionRollbackFailed { .. } => true,
-        DriverError::Query { .. }
+        DriverError::ConnectionRefused
+        | DriverError::DatabaseFileNotFound(_)
+        | DriverError::AuthFailed
+        | DriverError::IntegratedAuth(_)
+        | DriverError::Tls(_)
+        | DriverError::Query { .. }
         | DriverError::ConcurrentModification
         | DriverError::ReadOnly
         | DriverError::PolicyDenied(_)

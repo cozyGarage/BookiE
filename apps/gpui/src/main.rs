@@ -531,7 +531,16 @@ impl GridView {
         let Some(live) = self.live.clone() else {
             return;
         };
-        let lines = bookie_gpui::status_view::describe(&live.overview());
+        let overview = match live.overview() {
+            Ok(overview) => overview,
+            Err(error) => {
+                let message = format!("Could not read connection status: {error}");
+                self.status = message.clone();
+                self.messages.push(MessageKind::Error, message);
+                return;
+            }
+        };
+        let lines = bookie_gpui::status_view::describe(&overview);
         if let Some((_, headline)) = lines.first() {
             self.status = headline.clone();
         }

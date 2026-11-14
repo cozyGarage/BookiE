@@ -16,6 +16,24 @@ if ! docker compose version >/dev/null 2>&1; then
 fi
 
 KEEP_UP="${BOOKIE_FIXTURE_KEEP_UP:-0}"
+fixture_host="${BOOKIE_FIXTURE_HOST:-localhost}"
+fixture_bind_address="${BOOKIE_FIXTURE_BIND_ADDRESS:-$fixture_host}"
+fixture_ssh_host="${BOOKIE_FIXTURE_SSH_HOST:-$fixture_host}"
+
+if [[ -z "${BOOKIE_FIXTURE_SSH_HOST:-}" && "$fixture_ssh_host" == localhost ]]; then
+  fixture_ssh_host=127.0.0.1
+fi
+
+if [[ "$fixture_bind_address" == "$fixture_host" && "$fixture_host" != 127.0.0.1 ]]; then
+  fixture_bind_address="$(getent ahostsv4 "$fixture_host" | awk 'NR == 1 { print $1; exit}')"
+fi
+
+if [[ -z "$fixture_bind_address" ]]; then
+  echo "could not resolve the Docker fixture host address: $fixture_host" >&2
+  exit 1
+fi
+export BOOKIE_FIXTURE_BIND_ADDRESS="$fixture_bind_address"
+export BOOKIE_FIXTURE_SSH_HOST="$fixture_ssh_host"
 
 compose() {
   docker compose --project-directory "$FIXTURE" -f "$FIXTURE/docker-compose.yml" "$@"
@@ -60,9 +78,9 @@ else
   exit "$startup_status"
 fi
 
-wait_for_port 127.0.0.1 8474 "toxiproxy api"
-wait_for_port 127.0.0.1 5433 "postgres path"
-wait_for_port 127.0.0.1 2223 "bastion path"
+wait_for_port "$fixture_host" 8474 "toxiproxy api"
+wait_for_port "$fixture_host" 5433 "postgres path"
+wait_for_port "$fixture_ssh_host" 2223 "bastion path"
 
 # A forwarded Unix socket's path (under XDG_RUNTIME_DIR) is capped at
 # 100 bytes, so the isolated runtime dir has to stay short -- the
@@ -83,6 +101,9 @@ RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" \
   XDG_STATE_HOME="$secret_root/state" \
   XDG_RUNTIME_DIR="$secret_root/runtime" \
   BOOKIE_FIXTURE_POSTGRES_RELEASE=1 \
+  BOOKIE_FIXTURE_PROXY_HOST="$fixture_host" \
+  BOOKIE_FIXTURE_SSH_HOST="$fixture_ssh_host" \
+  BOOKIE_FIXTURE_TOXIPROXY="$fixture_host:8474" \
   BOOKIE_FIXTURE_MATERIALS="$FIXTURE/materials" \
   BOOKIE_TARGET_DIR="$target_dir" \
   BOOKIE_GTK_POSTGRES_CONTAINER="$(compose ps -q db)" \
@@ -115,14 +136,14 @@ RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" \
       BOOKIE_GTK_BINARY="${BOOKIE_GTK_BINARY:-$BOOKIE_TARGET_DIR/debug/bookie-app}" \
       BOOKIE_GTK_SCENARIO="${BOOKIE_GTK_SCENARIO:-postgres_saved_mtls_connection_authenticates_and_queries,postgres_structure_tabs_keep_backend_count_bounded,postgres_ssh_unknown_host_key_decline_is_durably_audited,postgres_ssh_multihop_trusts_both_hops_and_queries,postgres_ssh_second_hop_decline_does_not_learn_key,postgres_ssh_changed_second_hop_key_is_refused,postgres_ssh_setup_failure_is_durably_audited,postgres_ssh_tunnel_loss_retires_session_and_reconnects}" \
       BOOKIE_GTK_POSTGRES_MTLS_PORT=5433 \
-      BOOKIE_GTK_POSTGRES_MTLS_HOST=localhost \
+      BOOKIE_GTK_POSTGRES_MTLS_HOST="$BOOKIE_FIXTURE_PROXY_HOST" \
       BOOKIE_GTK_POSTGRES_MTLS_DB=bookie \
       BOOKIE_GTK_POSTGRES_MTLS_USER=bookie_mtls \
       BOOKIE_GTK_POSTGRES_MTLS_CA="$BOOKIE_FIXTURE_MATERIALS/ca.crt" \
       BOOKIE_GTK_POSTGRES_MTLS_CERT="$BOOKIE_FIXTURE_MATERIALS/client.crt" \
       BOOKIE_GTK_POSTGRES_MTLS_KEY="$BOOKIE_FIXTURE_MATERIALS/client.key" \
       BOOKIE_GTK_POSTGRES_SSH_AUDIT_PORT=2223 \
-      BOOKIE_GTK_POSTGRES_SSH_AUDIT_HOST=127.0.0.1 \
+      BOOKIE_GTK_POSTGRES_SSH_AUDIT_HOST="$BOOKIE_FIXTURE_SSH_HOST" \
       BOOKIE_GTK_POSTGRES_SSH_AUDIT_JUMP_HOST=relay \
       BOOKIE_GTK_POSTGRES_SSH_AUDIT_JUMP_PORT=22 \
       BOOKIE_GTK_POSTGRES_SSH_AUDIT_JUMP_USER=tunnel \

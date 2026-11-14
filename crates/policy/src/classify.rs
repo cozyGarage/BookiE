@@ -143,7 +143,7 @@ pub(crate) fn analyze_parsed(
         return failed_analysis("no statements parsed");
     }
 
-    let (effects, contains_administrative_call) = sql_effects_from_tokens(trimmed, dialect, driver_id);
+    let (effects, contains_administrative_call) = sql_effects_from_tokens(trimmed, dialect, driver_id, statements);
     let effects = if driver_id == "duckdb" && crate::duckdb_paths::touches_foreign_source(statements) {
         effects.union(Effects::HOST_OR_FILE_ACCESS)
     } else {

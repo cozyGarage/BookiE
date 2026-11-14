@@ -71,9 +71,9 @@ services:
     volumes:
       - ./toxiproxy/toxiproxy.json:/config/toxiproxy.json:ro
     ports:
-      - "127.0.0.1:8474:8474"
-      - "127.0.0.1:5433:5432"
-      - "127.0.0.1:2223:2222"
+      - "${BOOKIE_FIXTURE_BIND_ADDRESS:-127.0.0.1}:8474:8474"
+      - "${BOOKIE_FIXTURE_BIND_ADDRESS:-127.0.0.1}:5433:5432"
+      - "${BOOKIE_FIXTURE_BIND_ADDRESS:-127.0.0.1}:2223:2222"
     networks:
       - fixture
 
