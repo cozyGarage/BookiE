@@ -902,7 +902,7 @@ jobs:
         run: |
           test "$(git rev-parse HEAD)" = "$BOOKIE_SOURCE_COMMIT"
           python3 scripts/ci-test-bundle.py verify "$RUNNER_TEMP/bookie-test-bundle" "$BOOKIE_SOURCE_COMMIT" --expected-group "${{ matrix.group }}"
-          find "$RUNNER_TEMP/bookie-test-bundle/tests" "$RUNNER_TEMP/bookie-test-bundle/bin" -type f -exec chmod u+x {} +
+          find "$RUNNER_TEMP/bookie-test-bundle" -type f \( -path "$RUNNER_TEMP/bookie-test-bundle/tests/*" -o -path "$RUNNER_TEMP/bookie-test-bundle/bin/*" \) -exec chmod u+x {} +
       - name: Run integration layer in the shared image
         env:
           BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}

@@ -188,6 +188,16 @@ class CiWorkflowTests(unittest.TestCase):
         github.pop("current-stable-clippy")
         self.assertEqual(github, forgejo)
 
+    def test_driver_bundle_permissions_handle_missing_empty_directories(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        section = workflow.split("\njobs:\n", 1)[1]
+        driver = re.search(r"(?ms)^  driver:\n(.*?)(?=^  [A-Za-z0-9_-]+:\s*$|\Z)", section).group(1)
+        self.assertIn('find "$RUNNER_TEMP/bookie-test-bundle" -type f \\', driver)
+        self.assertNotIn(
+            'find "$RUNNER_TEMP/bookie-test-bundle/tests" "$RUNNER_TEMP/bookie-test-bundle/bin"',
+            driver,
+        )
+
     def test_forgejo_contract_workflow_matches_github_contracts(self):
         github_path = ROOT / ".github/workflows/linux-ci-contracts.yml"
         forgejo_path = ROOT / ".forgejo/workflows/ci-contracts.yml"
