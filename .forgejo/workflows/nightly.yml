@@ -91,6 +91,8 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
           path: src
+      - name: Reconcile abandoned test fixtures
+        run: cd src && python3 scripts/cleanup-stale-ci-fixtures.py
       - name: Docker Hub login
         run: bash src/scripts/docker-hub-login.sh
       - name: Coverage tools
