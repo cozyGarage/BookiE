@@ -93,6 +93,8 @@ mod query_budget_contract;
 mod query_cursor;
 #[path = "support/reverse_keyset_paging.rs"]
 mod reverse_keyset_paging;
+#[path = "support/sqlx_begin_cancellation.rs"]
+mod sqlx_begin_cancellation;
 #[path = "support/value_contracts.rs"]
 mod value_contracts;
 
