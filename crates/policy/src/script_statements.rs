@@ -2,7 +2,10 @@ use bookie_core::sql_syntax::SqlGrammar;
 use bookie_core::sql_syntax::script::{LexicalSettings, ScriptPlan};
 
 pub(crate) fn script_statements(sql: &str, driver_id: &str) -> Vec<String> {
-    let Some(grammar) = compound_body_grammar(driver_id) else {
+    if driver_id == "mssql" && !is_mssql_routine_definition(sql) {
+        return bookie_core::sql_lex::split_statements(sql, driver_id);
+    }
+    let Some(grammar) = script_grammar(driver_id) else {
         return bookie_core::sql_lex::split_statements(sql, driver_id);
     };
     ScriptPlan::build(sql, grammar, LexicalSettings::default_for(grammar))
@@ -14,9 +17,22 @@ pub(crate) fn script_statements(sql: &str, driver_id: &str) -> Vec<String> {
         .collect()
 }
 
-fn compound_body_grammar(driver_id: &str) -> Option<SqlGrammar> {
+fn is_mssql_routine_definition(sql: &str) -> bool {
+    let parsed = crate::parsed_sql::ParsedSql::new(sql, "mssql");
+    parsed.statements().is_ok_and(|statements| {
+        matches!(
+            statements.first(),
+            Some(sqlparser::ast::Statement::CreateProcedure { .. })
+        )
+    })
+}
+
+fn script_grammar(driver_id: &str) -> Option<SqlGrammar> {
     match driver_id {
+        "postgres" => Some(SqlGrammar::PostgreSql),
+        "mysql" => Some(SqlGrammar::MySql),
         "sqlite" => Some(SqlGrammar::Sqlite),
+        "mssql" => Some(SqlGrammar::MsSql),
         _ => None,
     }
 }
@@ -84,13 +100,67 @@ mod tests {
     }
 
     #[test]
-    fn the_other_drivers_keep_the_plain_splitter() {
-        for driver in ["postgres", "mysql", "mssql", "clickhouse", "duckdb", "redis"] {
+    fn routine_bodies_remain_one_statement_for_their_dialect() {
+        let mut failures = Vec::new();
+        for (driver, sql) in [
+            ("mysql", "CREATE PROCEDURE p() BEGIN SELECT 1; END; SELECT 2;"),
+            (
+                "postgres",
+                "CREATE FUNCTION f() RETURNS integer LANGUAGE SQL BEGIN ATOMIC SELECT 1; END; SELECT 2;",
+            ),
+            ("mssql", "CREATE PROCEDURE p AS BEGIN SELECT 1; END;"),
+        ] {
+            let statements = script_statements(sql, driver);
+
+            if statements.len() != if driver == "mssql" { 1 } else { 2 }
+                || !statements[0].starts_with("CREATE ")
+                || !statements[0].contains("END")
+            {
+                failures.push(format!("{driver}: {statements:?}"));
+            }
+        }
+        assert!(failures.is_empty(), "{failures:?}");
+    }
+
+    #[test]
+    fn routine_ddl_is_not_mistaken_for_an_unclosed_shared_transaction() {
+        for (driver, sql) in [
+            ("mysql", "CREATE PROCEDURE p() BEGIN SELECT 1; END; SELECT 2;"),
+            (
+                "postgres",
+                "CREATE FUNCTION f() RETURNS integer LANGUAGE SQL BEGIN ATOMIC SELECT 1; END; SELECT 2;",
+            ),
+            ("mssql", "CREATE PROCEDURE p AS BEGIN SELECT 1; END;"),
+        ] {
+            let decision = shared_connection_decision(sql, driver, &classify(sql, driver));
+
+            assert!(decision.is_none(), "{driver}: {decision:?}");
+        }
+    }
+
+    #[test]
+    fn drivers_without_a_script_grammar_keep_the_plain_splitter() {
+        for driver in ["clickhouse", "duckdb", "redis"] {
             assert_eq!(
                 script_statements("SELECT 1; BEGIN", driver),
                 bookie_core::sql_lex::split_statements("SELECT 1; BEGIN", driver),
                 "{driver}"
             );
+        }
+    }
+
+    #[test]
+    fn explicit_tsql_transaction_checks_survive_batch_planning() {
+        for (sql, driver, denied) in [
+            ("BEGIN TRAN; UPDATE t SET n = 1", "mssql", true),
+            ("BEGIN TRAN; UPDATE t SET n = 1; COMMIT", "mssql", false),
+            ("BEGIN; SELECT 1", "postgres", true),
+            ("BEGIN; SELECT 1; COMMIT", "postgres", false),
+            ("START TRANSACTION; SELECT 1", "mysql", true),
+            ("START TRANSACTION; SELECT 1; COMMIT", "mysql", false),
+        ] {
+            let decision = shared_connection_decision(sql, driver, &classify(sql, driver));
+            assert_eq!(decision.is_some(), denied, "{driver}: {sql}: {decision:?}");
         }
     }
 }
