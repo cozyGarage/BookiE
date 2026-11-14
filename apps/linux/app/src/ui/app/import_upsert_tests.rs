@@ -2,8 +2,9 @@ use super::*;
 use bookie_core::import::{CsvImportOptions, WriteMode};
 use bookie_core::{ConnectOptions, DatabaseDriver, Environment, Value};
 use bookie_policy::{
-    AuditError, AuditEvent, AuditSink, AuditState, AutoApproveSink, BulkBatch, BulkInsertEnd, BulkInsertRequest,
-    GuardContext, PolicyConfig, Principal,
+    AuditApprovalOutcome, AuditError, AuditErrorCategory, AuditEvent, AuditSink, AuditState, AuditTerminalStatus,
+    AutoApproveSink, BulkBatch, BulkInsertEnd, BulkInsertRequest, DenyApprovalSink, GuardContext, PolicyConfig,
+    Principal,
 };
 use std::time::Duration;
 use uuid::Uuid;
@@ -13,6 +14,17 @@ struct QuietAudit;
 #[async_trait::async_trait]
 impl AuditSink for QuietAudit {
     async fn record(&self, _event: AuditEvent) -> Result<(), AuditError> {
+        Ok(())
+    }
+}
+
+#[derive(Default)]
+struct RecordedAudit(std::sync::Mutex<Vec<AuditEvent>>);
+
+#[async_trait::async_trait]
+impl AuditSink for RecordedAudit {
+    async fn record(&self, event: AuditEvent) -> Result<(), AuditError> {
+        self.0.lock().expect("audit lock").push(event);
         Ok(())
     }
 }
@@ -138,6 +150,83 @@ async fn an_update_on_conflict_import_updates_the_existing_row_and_inserts_the_n
             vec![Value::Int(3), Value::Text("Grace".into()), Value::Float(3.5)],
         ]
     );
+}
+
+#[tokio::test]
+async fn denied_import_leaves_the_table_unchanged_and_records_denial() {
+    let raw: Arc<dyn Connection> = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .expect("connect to SQLite")
+        .into();
+    let setup_guard = PolicyGuard::new(
+        raw.clone(),
+        GuardContext {
+            connection_id: Uuid::new_v4(),
+            connection_name: "denied import test".into(),
+            driver_id: "sqlite".into(),
+            environment: Environment::Local,
+            read_only: false,
+            principal: Principal::human_gui(),
+            policy: Arc::new(PolicyConfig::default()),
+            approval: Arc::new(AutoApproveSink),
+            audit: Arc::new(QuietAudit),
+            audit_state: Arc::new(AuditState::new()),
+        },
+    );
+    let control = OperationControl::with_timeout(Duration::from_secs(5));
+    setup_guard
+        .execute_controlled("CREATE TABLE people (id INTEGER PRIMARY KEY, name TEXT)", &control)
+        .await
+        .expect("create table");
+    setup_guard
+        .execute_controlled("INSERT INTO people VALUES (1, 'Existing')", &control)
+        .await
+        .expect("seed table");
+    let choice = choice_for(&setup_guard, b"id,name\n1,Changed\n2,New\n", WriteMode::Insert).await;
+    let plan = plan_for("sqlite", &choice).expect("build import plan");
+    let row_budget = plan.row_count();
+    let audit = Arc::new(RecordedAudit::default());
+    let deny_guard = PolicyGuard::new(
+        raw,
+        GuardContext {
+            connection_id: Uuid::new_v4(),
+            connection_name: "denied import test".into(),
+            driver_id: "sqlite".into(),
+            environment: Environment::Prod,
+            read_only: false,
+            principal: Principal::human_gui(),
+            policy: Arc::new(PolicyConfig::default()),
+            approval: Arc::new(DenyApprovalSink),
+            audit: audit.clone(),
+            audit_state: Arc::new(AuditState::new()),
+        },
+    );
+
+    let denied = deny_guard
+        .begin_bulk_insert(BulkInsertRequest {
+            schema: None,
+            table: choice.table,
+            statement: plan.statement,
+            row_budget,
+            sequence_columns: Vec::new(),
+        })
+        .await;
+
+    assert!(denied.is_err());
+    let result = setup_guard
+        .query_controlled("SELECT id, name FROM people ORDER BY id", &control)
+        .await
+        .expect("read rows");
+    assert_eq!(result.rows, vec![vec![Value::Int(1), Value::Text("Existing".into())]]);
+    let events = audit.0.lock().expect("audit lock");
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].terminal_status, AuditTerminalStatus::Denied);
+    assert_eq!(events[0].approval_outcome, AuditApprovalOutcome::Denied);
+    assert_eq!(events[0].error_category, Some(AuditErrorCategory::Policy));
 }
 
 #[tokio::test]
