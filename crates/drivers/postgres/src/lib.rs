@@ -1275,7 +1275,7 @@ fn statement_position(error: &dyn sqlx::error::DatabaseError) -> Option<usize> {
 }
 
 fn is_server_disconnect_sqlstate(sqlstate: Option<&str>) -> bool {
-    matches!(sqlstate, Some("57P01" | "57P02" | "57P03" | "57P04"))
+    matches!(sqlstate, Some("25P03" | "57P01" | "57P02" | "57P03" | "57P04"))
 }
 
 #[cfg(test)]

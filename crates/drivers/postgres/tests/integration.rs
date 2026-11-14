@@ -285,6 +285,31 @@ async fn a_bare_begin_does_not_leave_a_pooled_session_inside_a_transaction() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn an_idle_transaction_timeout_retires_its_dedicated_session() {
+    let (_c, opts) = start_pg().await;
+    let conn = connect(opts).await;
+    conn.execute("ALTER ROLE postgres SET idle_in_transaction_session_timeout = '2s'")
+        .await
+        .unwrap();
+    let mut session = conn.open_session().await.unwrap();
+    session
+        .query_params_controlled("BEGIN", &[], &no_timeout())
+        .await
+        .unwrap();
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+
+    let error = session
+        .query_params_controlled("SELECT 1", &[], &no_timeout())
+        .await
+        .unwrap_err();
+
+    assert!(matches!(error, DriverError::Disconnected), "{error:?}");
+    assert!(!session.is_usable());
+    session.close().await.unwrap();
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn the_session_reports_the_application_name_it_was_given() {
     let (_c, mut opts) = start_pg().await;
     opts.application_name = Some("BookiE".into());
