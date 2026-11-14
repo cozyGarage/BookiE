@@ -383,7 +383,9 @@ mod structured_error_tests {
 /// reach the loopback listener.
 fn handle_tools_list(bridge: &McpBridge, params: &JsonValue) -> Result<JsonValue, String> {
     let token_str = extract_token_str(params).ok_or("missing token (pass params.token)")?;
-    let token = bridge.authenticate(token_str)?;
+    let token = bridge
+        .authenticate(token_str)
+        .map_err(|_| "authentication failed".to_string())?;
     Ok(json!({
         "tools": TOOL_NAMES.iter().filter(|name| token.allows_tool(name)).map(|name| json!({
             "name": name,

@@ -62,7 +62,7 @@ impl ServerHandler for BridgeHandler {
         let token = self
             .bridge
             .authenticate(&token)
-            .map_err(|message| ErrorData::invalid_request(message, None))?;
+            .map_err(|_| ErrorData::invalid_request("authentication failed", None))?;
         let tools = TOOL_NAMES
             .iter()
             .filter(|name| token.allows_tool(name))

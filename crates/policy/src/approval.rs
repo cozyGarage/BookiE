@@ -7,6 +7,26 @@ use crate::principal::Principal;
 use bookie_core::Environment;
 use tokio_util::sync::CancellationToken;
 
+pub const MAX_APPROVAL_SQL_CHARS: usize = 16_384;
+
+pub(crate) fn sql_is_reviewable(sql: &str) -> bool {
+    sql.chars().count() <= MAX_APPROVAL_SQL_CHARS
+        && !sql.chars().any(|c| {
+            (c.is_control() && !matches!(c, '\n' | '\r' | '\t'))
+                || matches!(
+                    c,
+                    '\u{061C}'
+                        | '\u{180E}'
+                        | '\u{200B}'..='\u{200F}'
+                        | '\u{2028}'..='\u{202E}'
+                        | '\u{2060}'..='\u{2064}'
+                        | '\u{2066}'..='\u{2069}'
+                        | '\u{FEFF}'
+                        | '\u{FFF9}'..='\u{FFFB}'
+                )
+        })
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApprovalRequest {
     pub principal: Principal,

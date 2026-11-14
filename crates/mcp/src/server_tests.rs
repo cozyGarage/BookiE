@@ -643,6 +643,18 @@ fn tools_list_is_refused_with_a_bad_token() {
 }
 
 #[test]
+fn tools_list_gives_one_static_message_for_every_authentication_failure() {
+    let (dir, bridge, token) = bridge_with_token();
+    let bad_token = handle_tools_list(&bridge, &json!({"token": "not-a-real-token"})).unwrap_err();
+    assert_eq!(bad_token, "authentication failed");
+
+    std::fs::write(dir.path().join("tokens.json"), "{ not a token store").unwrap();
+    let unreadable_store = handle_tools_list(&bridge, &json!({"token": token})).unwrap_err();
+    assert_eq!(unreadable_store, "authentication failed");
+    assert!(!unreadable_store.contains(&dir.path().display().to_string()));
+}
+
+#[test]
 fn tools_list_succeeds_with_a_valid_token() {
     let (_dir, bridge, token) = bridge_with_token();
     let result = handle_tools_list(&bridge, &json!({"token": token})).unwrap();
