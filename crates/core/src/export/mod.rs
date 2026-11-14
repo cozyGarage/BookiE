@@ -36,6 +36,9 @@ pub use text_table::render_text_table;
 pub use xlsx::MAX_WORKBOOK_ROWS;
 
 pub(crate) fn value_to_text(value: &Value) -> Option<String> {
+    if let Some(text) = crate::sql_literal::postgres_extended_temporal_text(value) {
+        return Some(text);
+    }
     match value {
         Value::Null => None,
         Value::Bool(value) => Some(value.to_string()),
@@ -307,5 +310,21 @@ mod tests {
             value_to_text(&Value::Json(Box::new(serde_json::json!({"a": 1})))),
             Some("{\"a\":1}".into())
         );
+    }
+
+    #[test]
+    fn postgres_extended_temporal_exports_keep_database_era_spelling() {
+        let date = chrono::NaiveDate::from_ymd_opt(-43, 3, 15).unwrap();
+        let stamp = chrono::NaiveDate::from_ymd_opt(-4712, 1, 1)
+            .unwrap()
+            .and_hms_opt(0, 0, 0)
+            .unwrap();
+        for (value, expected) in [
+            (Value::Date(date), "0044-03-15 BC"),
+            (Value::DateTime(stamp), "4713-01-01 00:00:00 BC"),
+            (Value::TimestampTz(stamp.and_utc()), "4713-01-01 00:00:00+00:00 BC"),
+        ] {
+            assert_eq!(value_to_text(&value).as_deref(), Some(expected));
+        }
     }
 }

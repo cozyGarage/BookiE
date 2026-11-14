@@ -233,6 +233,40 @@ mod tests {
     }
 
     #[test]
+    fn the_inspector_uses_postgres_era_spelling_for_temporal_values() {
+        let date = chrono::NaiveDate::from_ymd_opt(-43, 3, 15).unwrap();
+        let stamp = chrono::NaiveDate::from_ymd_opt(-4712, 1, 1)
+            .unwrap()
+            .and_hms_opt(0, 0, 0)
+            .unwrap();
+        let columns = [
+            column("d", "date"),
+            column("t", "time"),
+            column("ts", "timestamp"),
+            column("tstz", "timestamptz"),
+        ];
+        let fields = inspector_fields(
+            &columns,
+            &[
+                Value::Date(date),
+                Value::Text("24:00:00".into()),
+                Value::DateTime(stamp),
+                Value::TimestampTz(stamp.and_utc()),
+            ],
+        );
+
+        assert_eq!(
+            fields.iter().map(|field| field.text.as_str()).collect::<Vec<_>>(),
+            [
+                "0044-03-15 BC",
+                "24:00:00",
+                "4713-01-01 00:00:00 BC",
+                "4713-01-01 00:00:00+00:00 BC",
+            ]
+        );
+    }
+
+    #[test]
     fn every_column_distinguishes_sql_null_from_a_missing_value() {
         let columns = [column("id", "int"), column("name", "text"), column("extra", "text")];
         let fields = inspector_fields(&columns, &[Value::Int(7), Value::Null]);

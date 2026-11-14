@@ -340,6 +340,24 @@ fn display_text_temporal_variants() {
 }
 
 #[test]
+fn grid_temporal_values_use_postgres_era_spelling_and_keep_twenty_four_hour_time() {
+    set_date_format(DateFormatPref::UsShort);
+    let date = chrono::NaiveDate::from_ymd_opt(-43, 3, 15).unwrap();
+    let stamp = chrono::NaiveDate::from_ymd_opt(-4712, 1, 1)
+        .unwrap()
+        .and_hms_opt(0, 0, 0)
+        .unwrap();
+    assert_eq!(value_to_display_text(&Value::Date(date)), "0044-03-15 BC");
+    assert_eq!(value_to_display_text(&Value::Text("24:00:00".into())), "24:00:00");
+    assert_eq!(value_to_display_text(&Value::DateTime(stamp)), "4713-01-01 00:00:00 BC");
+    assert_eq!(
+        value_to_display_text(&Value::TimestampTz(stamp.and_utc())),
+        "4713-01-01 00:00:00+00:00 BC"
+    );
+    set_date_format(DateFormatPref::Iso);
+}
+
+#[test]
 fn dates_follow_the_chosen_format_and_copy_keeps_database_text() {
     let day = chrono::NaiveDate::from_ymd_opt(2024, 12, 31).unwrap();
     let at = day.and_hms_opt(23, 59, 58).unwrap();
