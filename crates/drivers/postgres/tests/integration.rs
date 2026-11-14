@@ -616,6 +616,49 @@ async fn value_roundtrip_all_types() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn postgres_extended_temporal_filter_text_round_trips_through_the_server() {
+    let (_container, options) = start_pg().await;
+    let connection = connect(options).await;
+    let selected = connection
+        .query(
+            "SELECT DATE '0044-03-15 BC', TIME '24:00:00', TIMESTAMP '4713-01-01 00:00:00 BC', \
+             TIMESTAMPTZ '4713-01-01 00:00:00+00 BC'",
+        )
+        .await
+        .unwrap();
+    let values = &selected.rows[0];
+    let filters = values
+        .iter()
+        .map(|value| {
+            bookie_core::filter::cell_filter_rule("value", value, false)
+                .and_then(|rule| rule.value)
+                .and_then(|value| match value {
+                    bookie_core::filter::FilterValue::Single(text) => Some(Value::Text(text)),
+                    _ => None,
+                })
+                .unwrap()
+        })
+        .collect::<Vec<_>>();
+
+    assert_eq!(filters[0], Value::Text("0044-03-15 BC".into()));
+    assert_eq!(filters[1], Value::Text("24:00:00".into()));
+    assert_eq!(filters[2], Value::Text("4713-01-01 00:00:00 BC".into()));
+    assert_eq!(filters[3], Value::Text("4713-01-01 00:00:00+00:00 BC".into()));
+
+    let matched = connection
+        .query_params(
+            "SELECT $1::date = DATE '0044-03-15 BC', $2::time = TIME '24:00:00', \
+             $3::timestamp = TIMESTAMP '4713-01-01 00:00:00 BC', \
+             $4::timestamptz = TIMESTAMPTZ '4713-01-01 00:00:00+00 BC'",
+            &filters,
+        )
+        .await
+        .unwrap();
+    assert_eq!(matched.rows, vec![vec![Value::Bool(true); 4]]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn pagination_and_truncated_flag() {
     let (_c, opts) = start_pg().await;
     let conn = connect(opts).await;

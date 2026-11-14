@@ -52,6 +52,40 @@ async fn read_only_denial_skips_blast_radius_query() {
 }
 
 #[tokio::test]
+async fn mysql_mode_dependent_statements_are_denied_and_audited_before_dispatch() {
+    let queries = Arc::new(AtomicUsize::new(0));
+    let approvals = Arc::new(AtomicUsize::new(0));
+    let audit = Arc::new(SequenceAuditSink::new(vec![]));
+    let mut guard_context = context(
+        Principal::human_gui(),
+        Environment::Local,
+        PolicyConfig::default(),
+        Arc::new(CountingApprovalSink {
+            calls: approvals.clone(),
+        }),
+        audit.clone(),
+        Arc::new(AuditState::new()),
+    );
+    guard_context.driver_id = "mysql".into();
+    let guard = PolicyGuard::new(query_counting_connection(queries.clone()), guard_context);
+
+    let error = guard
+        .query(r#"SELECT 'x\'; DELETE FROM users WHERE id = 1 -- '"#)
+        .await
+        .expect_err("a session-mode-dependent statement must be refused");
+
+    assert!(matches!(error, DriverError::PolicyDenied(_)), "{error:?}");
+    assert_eq!(queries.load(Ordering::SeqCst), 0);
+    assert_eq!(approvals.load(Ordering::SeqCst), 0);
+    let events = audit.events.lock().expect("audit events");
+    assert!(events.iter().any(|event| {
+        event.phase == crate::audit::AuditRecordPhase::Outcome
+            && event.terminal_status == crate::audit::AuditTerminalStatus::Denied
+            && event.error_category == Some(crate::audit::AuditErrorCategory::Policy)
+    }));
+}
+
+#[tokio::test]
 async fn dangerous_effects_ask_for_approval_without_running_a_blast_radius_query() {
     let queries = Arc::new(AtomicUsize::new(0));
     let approvals = Arc::new(AtomicUsize::new(0));

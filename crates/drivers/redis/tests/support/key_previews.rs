@@ -164,3 +164,62 @@ async fn bounded_string_previews_distinguish_complete_values_from_partial_cells(
         "a byte prefix is not a complete binary value"
     );
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_invalid_utf8_collection_members_do_not_abort_browse_page() {
+    let (_container, host, port) = start_redis().await;
+    let native = redis::Client::open(format!("redis://{host}:{port}/0")).unwrap();
+    let mut native_connection = native.get_multiplexed_async_connection().await.unwrap();
+    let invalid = [0xff];
+    let invalid_other = [0xfe];
+    redis::cmd("HSET")
+        .arg("binary_hash")
+        .arg(&invalid[..])
+        .arg(&invalid_other[..])
+        .query_async::<()>(&mut native_connection)
+        .await
+        .unwrap();
+    redis::cmd("RPUSH")
+        .arg("binary_list")
+        .arg(&invalid[..])
+        .query_async::<()>(&mut native_connection)
+        .await
+        .unwrap();
+    redis::cmd("SADD")
+        .arg("binary_set")
+        .arg(&invalid[..])
+        .query_async::<()>(&mut native_connection)
+        .await
+        .unwrap();
+    redis::cmd("ZADD")
+        .arg("binary_zset")
+        .arg(1)
+        .arg(&invalid[..])
+        .query_async::<()>(&mut native_connection)
+        .await
+        .unwrap();
+    let stored_members: Vec<Vec<u8>> = redis::cmd("LRANGE")
+        .arg("binary_list")
+        .arg(0)
+        .arg(-1)
+        .query_async(&mut native_connection)
+        .await
+        .unwrap();
+    assert_eq!(stored_members, vec![invalid.to_vec()]);
+
+    let connection = RedisDriver.connect(opts(&host, port, "0")).await.unwrap();
+    let rows = connection
+        .fetch_rows(None, "db0", 0, 50)
+        .await
+        .expect("binary collection members must not fail a key page")
+        .rows;
+
+    for key in ["binary_hash", "binary_list", "binary_set", "binary_zset"] {
+        assert!(
+            rows.iter()
+                .any(|row| matches!(&row[0], Value::Text(found) if found == key)),
+            "{key} is listed"
+        );
+    }
+}

@@ -803,7 +803,10 @@ impl SimpleComponent for App {
             AppMsg::LoadFailed(tab_id, msg) => self.on_browse_load_failed(tab_id, msg),
             AppMsg::RowCountLoaded(tab_id, request, count) => self.on_browse_row_count_loaded(tab_id, request, count),
             AppMsg::RowCountFailed(tab_id, request) => self.on_browse_row_count_failed(tab_id, request),
-            AppMsg::FetchBrowsePage(tab_id) => self.fetch_browse_page(tab_id, sender),
+            AppMsg::FetchBrowsePage(tab_id, auto_refresh) => self.fetch_browse_page(tab_id, auto_refresh, sender),
+            AppMsg::AutoRefreshFailed(tab_id, request, message) => {
+                self.on_auto_refresh_failed(tab_id, request, message)
+            }
             AppMsg::FetchBrowseCellValue(tab_id, request, col_index, column_name, row_key) => {
                 self.fetch_browse_cell_value(tab_id, request, col_index, column_name, row_key, sender)
             }

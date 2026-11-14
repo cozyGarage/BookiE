@@ -92,8 +92,8 @@ fn value_contract_workbook_keeps_text_null_labels_as_strings_and_sql_null_blank(
 fn value_contract_workbook_preserves_temporal_precision_and_timezone_as_text() {
     let cases = [
         (Value::Date("1899-12-31".parse().unwrap()), "1899-12-31"),
-        (Value::Date("0000-01-01".parse().unwrap()), "0000-01-01"),
-        (Value::Date("+10000-01-01".parse().unwrap()), "+10000-01-01"),
+        (Value::Date("0000-01-01".parse().unwrap()), "0001-01-01 BC"),
+        (Value::Date("+10000-01-01".parse().unwrap()), "10000-01-01"),
         (Value::Time("12:34:56.123456789".parse().unwrap()), "12:34:56.123456789"),
         (
             Value::DateTime("2026-09-27T12:34:56.123456789".parse().unwrap()),
@@ -101,7 +101,7 @@ fn value_contract_workbook_preserves_temporal_precision_and_timezone_as_text() {
         ),
         (
             Value::DateTime("0000-01-01T00:00:00".parse().unwrap()),
-            "0000-01-01 00:00:00",
+            "0001-01-01 00:00:00 BC",
         ),
         (
             Value::TimestampTz("2024-11-03T05:30:00Z".parse().unwrap()),

@@ -138,11 +138,19 @@ impl App {
     /// `sql_dialect::build_order_and_pagination` because the syntax is
     /// dialect-specific. Past `KEYSET_OFFSET_THRESHOLD`, sequential Next
     /// uses a primary-key seek when PKs and a cursor are available.
-    pub(super) fn fetch_browse_page(&self, tab_id: Uuid, sender: ComponentSender<Self>) {
+    pub(super) fn fetch_browse_page(&self, tab_id: Uuid, auto_refresh: bool, sender: ComponentSender<Self>) {
         let Some(page) = self.browse_page_request(tab_id) else {
             return;
         };
         let Some(conn) = self.tab_connection(tab_id) else {
+            if auto_refresh {
+                sender.input(AppMsg::AutoRefreshFailed(
+                    tab_id,
+                    page.request,
+                    bookie_app_services::tr!("No active connection").to_string(),
+                ));
+                return;
+            }
             sender.input(AppMsg::LoadFailed(
                 Some(tab_id),
                 BrowseLoadFailure {
@@ -155,6 +163,10 @@ impl App {
         let query = match self.plan_browse_page_query(tab_id, &page) {
             Ok(query) => query,
             Err(message) => {
+                if auto_refresh {
+                    sender.input(AppMsg::AutoRefreshFailed(tab_id, page.request, message));
+                    return;
+                }
                 sender.input(AppMsg::LoadFailed(
                     Some(tab_id),
                     BrowseLoadFailure {
@@ -165,7 +177,7 @@ impl App {
                 return;
             }
         };
-        self.spawn_browse_page_load(tab_id, sender, conn, page, query);
+        self.spawn_browse_page_load(tab_id, sender, conn, page, query, auto_refresh);
     }
 
     fn browse_page_request(&self, tab_id: Uuid) -> Option<PreparedBrowsePage> {
@@ -239,6 +251,7 @@ impl App {
         conn: std::sync::Arc<dyn bookie_core::Connection>,
         page: PreparedBrowsePage,
         query: PageQuery,
+        auto_refresh: bool,
     ) {
         let timeout_secs = self.tab_timeout_secs(tab_id);
         let token = self.read_scopes.borrow_mut().start(tab_id, ReadScope::Page);
@@ -284,13 +297,13 @@ impl App {
                             ))
                         }
                         Err(_) if control.cancellation_token().is_cancelled() => {}
-                        Err(e) => sender_clone.input(AppMsg::LoadFailed(
-                            Some(tab_id),
-                            BrowseLoadFailure {
-                                request: Some(request),
-                                message: crate::services::error_text::driver_message(&e),
-                            },
-                        )),
+                        Err(e) => dispatch_page_load_failure(
+                            &sender_clone,
+                            tab_id,
+                            request,
+                            crate::services::error_text::driver_message(&e),
+                            auto_refresh,
+                        ),
                     }
                 })
                 .drop_on_shutdown()
@@ -885,6 +898,38 @@ impl App {
             }
         });
         dialog.present(Some(&self.window));
+    }
+
+    pub(super) fn on_auto_refresh_failed(&self, tab_id: Uuid, request: BrowsePageRequest, message: String) {
+        let current = self
+            .workspace_tabs
+            .borrow()
+            .get(&tab_id)
+            .and_then(|tab| tab.browse_controller())
+            .is_some_and(|controller| controller.model().accepts_page_request(request));
+        if current {
+            self.dispatch_to_tab(tab_id, BrowseTabInput::AutoRefreshFailed(message));
+        }
+    }
+}
+
+fn dispatch_page_load_failure(
+    sender: &ComponentSender<App>,
+    tab_id: Uuid,
+    request: BrowsePageRequest,
+    message: String,
+    auto_refresh: bool,
+) {
+    if auto_refresh {
+        sender.input(AppMsg::AutoRefreshFailed(tab_id, request, message));
+    } else {
+        sender.input(AppMsg::LoadFailed(
+            Some(tab_id),
+            BrowseLoadFailure {
+                request: Some(request),
+                message,
+            },
+        ));
     }
 }
 

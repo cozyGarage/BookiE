@@ -228,7 +228,8 @@ pub enum AppMsg {
         row_positions: Vec<u32>,
         statement: bookie_core::sql_literal::RowStatement,
     },
-    FetchBrowsePage(Uuid),
+    FetchBrowsePage(Uuid, bool),
+    AutoRefreshFailed(Uuid, crate::ui::browse_tab::BrowsePageRequest, String),
     AttachWorkspaceTab {
         tab_id: Uuid,
         connection_id: Option<Uuid>,

@@ -142,10 +142,47 @@ exec sleep 300
 }
 
 #[cfg(not(target_os = "linux"))]
-#[test]
-fn parent_death_signal_supervision_is_unavailable_outside_linux() {
-    assert!(
-        cfg!(unix),
-        "non-Linux Unix keeps OpenSSH masters without PR_SET_PDEATHSIG"
+#[tokio::test]
+async fn system_openssh_is_refused_when_parent_death_supervision_is_unavailable() {
+    use std::path::PathBuf;
+    use std::sync::Arc;
+    use std::time::Duration;
+
+    use bookie_ssh::openssh::{
+        OpenSshAuth, OpenSshConfig, OpenSshContext, OpenSshError, OpenSshRuntime, OpenSshSession, OpenSshTimeouts,
+        SshDestination, UnattendedPrompter,
+    };
+    use tokio_util::sync::CancellationToken;
+
+    let temp = tempfile::tempdir().unwrap();
+    let context = OpenSshContext {
+        runtime: Arc::new(OpenSshRuntime::acquire(temp.path()).unwrap()),
+        ssh_program: PathBuf::from("missing-ssh"),
+        askpass_program: PathBuf::from("missing-askpass"),
+        timeouts: OpenSshTimeouts {
+            handshake: Duration::from_secs(1),
+            ..Default::default()
+        },
+    };
+    let config = OpenSshConfig {
+        destination: SshDestination::new("bastion", None, None).unwrap(),
+        jump_hosts: Vec::new(),
+        auth: OpenSshAuth::Agent,
+        local_port: None,
+    };
+
+    let error = OpenSshSession::connect(
+        &config,
+        &context,
+        Arc::new(UnattendedPrompter),
+        CancellationToken::new(),
+    )
+    .await
+    .expect_err("unsupported OpenSSH must fail before spawning a process");
+    assert_eq!(
+        error,
+        OpenSshError::ParentSupervisionUnavailable {
+            target: std::env::consts::OS.to_owned(),
+        }
     );
 }

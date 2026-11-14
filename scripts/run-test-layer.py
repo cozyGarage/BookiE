@@ -14,6 +14,11 @@ import sys
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
+CI_FIXTURE_LAYERS = {
+    "driver-core", "driver-analytics", "driver-extended", "drivers", "socket-ssh",
+    "tls", "b4-rollback", "postgres-release", "distro-floor",
+}
+CI_RUN_ID = re.compile(r"(?:forgejo|github)-\d+-\d+-[a-z0-9][a-z0-9_-]*|nightly-\d+-[a-z0-9][a-z0-9_-]*")
 
 
 def catalog():
@@ -213,6 +218,13 @@ def interrupt(*_):
     raise KeyboardInterrupt
 
 
+def reconcile_ci_fixtures(names):
+    run_id = os.environ.get("BOOKIE_TEST_RUN_ID", "")
+    has_fixture_layer = any(name in CI_FIXTURE_LAYERS or name.startswith("gtk-") for name in names)
+    if has_fixture_layer and CI_RUN_ID.fullmatch(run_id):
+        subprocess.run([sys.executable, str(ROOT / "scripts/cleanup-stale-ci-fixtures.py")], cwd=ROOT, check=True)
+
+
 def main():
     layers = catalog()
     parser = argparse.ArgumentParser(
@@ -227,6 +239,7 @@ def main():
         return 0
     if not args.layers or len(set(args.layers)) != len(args.layers) or any(name not in layers for name in args.layers):
         parser.error("select one or more distinct catalog layers; use --list")
+    reconcile_ci_fixtures(args.layers)
     base = ROOT / "target/quality"
     base.mkdir(parents=True, exist_ok=True)
     with (base / "test-layer.lock").open("w") as lock:

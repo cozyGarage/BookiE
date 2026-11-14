@@ -30,6 +30,19 @@ class LayerRunnerTests(unittest.TestCase):
                     if arg.startswith("scripts/"):
                         self.assertTrue((ROOT / arg).exists(), arg)
 
+    def test_only_ci_fixture_layers_reconcile_abandoned_resources(self):
+        with patch.dict("os.environ", {"BOOKIE_TEST_RUN_ID": "forgejo-123-1-driver-core"}), patch.object(
+            runner.subprocess, "run"
+        ) as run:
+            runner.reconcile_ci_fixtures(["sandbox"])
+            run.assert_not_called()
+            runner.reconcile_ci_fixtures(["driver-core"])
+            run.assert_called_once_with(
+                [sys.executable, str(ROOT / "scripts/cleanup-stale-ci-fixtures.py")], cwd=ROOT, check=True
+            )
+            runner.reconcile_ci_fixtures(["postgres-release"])
+            self.assertEqual(run.call_count, 2)
+
     def test_untracked_source_contents_change_evidence_identity_but_ignored_outputs_do_not(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

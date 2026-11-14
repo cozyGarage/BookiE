@@ -29,7 +29,9 @@ pub(crate) async fn open(
         .map_err(|_| DriverError::TimedOut)?
         .map_err(map_sqlx_error)?;
     connection.close_on_drop();
-    crate::attach_databases_to_connection(&mut connection, attached).await;
+    crate::attach_databases_to_connection(&mut connection, attached)
+        .await
+        .map_err(map_sqlx_error)?;
     Ok(Box::new(SqliteSession {
         connection: Some(connection),
         pool,

@@ -1057,6 +1057,12 @@ fn a_new_query_tab_focuses_its_editor_so_typing_lands_there(cx: &mut TestAppCont
 #[gpui::test]
 fn the_sql_editor_edits_at_several_carets_and_ctrl_enter_still_runs_the_whole_buffer(cx: &mut TestAppContext) {
     use bookie_gpui::live::{LiveTable, Origin};
+    #[cfg(target_os = "macos")]
+    let add_cursor_below = "cmd-alt-down";
+    #[cfg(target_os = "windows")]
+    let add_cursor_below = "ctrl-alt-down";
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    let add_cursor_below = "alt-shift-down";
     let origin = Origin::File(orders_fixture());
     let table = std::sync::Arc::new(
         LiveTable::load(
@@ -1088,7 +1094,7 @@ fn the_sql_editor_edits_at_several_carets_and_ctrl_enter_still_runs_the_whole_bu
             editor.focus(window, cx);
         });
     });
-    cx.simulate_keystrokes("shift-alt-down shift-alt-down");
+    cx.simulate_keystrokes(&format!("{add_cursor_below} {add_cursor_below}"));
     cx.simulate_input("-- ");
     view.read_with(cx, |view, cx| {
         assert_eq!(
@@ -1114,7 +1120,7 @@ fn the_sql_editor_edits_at_several_carets_and_ctrl_enter_still_runs_the_whole_bu
             editor.set_cursor_position(gpui_kit::component::input::Position::new(0, 0), window, cx);
         });
     });
-    cx.simulate_keystrokes("shift-alt-down ctrl-enter");
+    cx.simulate_keystrokes(&format!("{add_cursor_below} ctrl-enter"));
     cx.executor().advance_clock(std::time::Duration::from_secs(1));
     cx.run_until_parked();
     view.read_with(cx, |view, _| {

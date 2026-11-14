@@ -131,6 +131,23 @@ impl BrowseTab {
             "Export results"
         ))]);
 
+        let auto_refresh_button = gtk::ToggleButton::builder()
+            .icon_name("view-refresh-symbolic")
+            .tooltip_text(bookie_app_services::tr!("Refresh this page every 15 seconds"))
+            .build();
+        auto_refresh_button.add_css_class("flat");
+        auto_refresh_button.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!(
+            "Auto-refresh this page every 15 seconds"
+        ))]);
+        let sender_for_auto_refresh = sender.clone();
+        auto_refresh_button.connect_toggled(move |button| {
+            sender_for_auto_refresh.input(BrowseTabInput::AutoRefreshToggled(button.is_active()));
+        });
+        let auto_refresh_status_label = gtk::Label::new(None);
+        auto_refresh_status_label.add_css_class("dim-label");
+        auto_refresh_status_label.add_css_class("caption");
+        auto_refresh_status_label.set_accessible_role(gtk::AccessibleRole::Status);
+
         // Search icons conflict with Ctrl+F, so the filter control stays text-only.
         let filter_label = gtk::Label::new(Some(&bookie_app_services::tr!("Filter")));
         let filter_badge = gtk::Label::builder().label("").visible(false).build();
@@ -187,6 +204,8 @@ impl BrowseTab {
             "Row inspector"
         ))]);
         paginator_bar.pack_end(&inspector_button);
+        paginator_bar.pack_end(&auto_refresh_button);
+        paginator_bar.pack_end(&auto_refresh_status_label);
         paginator_bar.pack_end(&export_button);
         paginator_bar.pack_end(&filter_button);
         paginator_bar.pack_end(&page_size_spin);
@@ -208,6 +227,8 @@ impl BrowseTab {
             selection_count_label,
             selection_details_label,
             inspector_button,
+            auto_refresh_button,
+            auto_refresh_status_label,
         }
     }
 
@@ -662,6 +683,8 @@ pub(super) struct Paginator {
     pub(super) selection_count_label: gtk::Label,
     pub(super) selection_details_label: gtk::Label,
     pub(super) inspector_button: gtk::ToggleButton,
+    pub(super) auto_refresh_button: gtk::ToggleButton,
+    pub(super) auto_refresh_status_label: gtk::Label,
 }
 
 pub(super) struct PendingRevealer {

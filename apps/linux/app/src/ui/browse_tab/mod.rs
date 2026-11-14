@@ -170,6 +170,10 @@ pub struct BrowseTab {
     prev_button: gtk::Button,
     next_button: gtk::Button,
     last_button: gtk::Button,
+    auto_refresh_button: gtk::ToggleButton,
+    auto_refresh_status_label: gtk::Label,
+    auto_refresh_source: Option<glib::SourceId>,
+    auto_refresh_in_flight: std::cell::Cell<bool>,
     /// Toolbar button that toggles the filter strip. Text-only
     /// ("Filter") because adwaita-icon-theme has no canonical
     /// symbolic icon for filtering and reusing a search/find icon
@@ -204,6 +208,7 @@ pub struct BrowseTab {
 }
 
 mod accessors;
+mod auto_refresh;
 mod choices;
 mod chrome;
 #[cfg(test)]
@@ -709,6 +714,10 @@ impl SimpleComponent for BrowseTab {
             prev_button: paginator.prev_button,
             next_button: paginator.next_button,
             last_button: paginator.last_button,
+            auto_refresh_button: paginator.auto_refresh_button,
+            auto_refresh_status_label: paginator.auto_refresh_status_label,
+            auto_refresh_source: None,
+            auto_refresh_in_flight: std::cell::Cell::new(false),
             filter_button: paginator.filter_button,
             filter_badge: paginator.filter_badge,
             filter_strip: Some(filter_strip),
@@ -723,6 +732,7 @@ impl SimpleComponent for BrowseTab {
         };
         model.refresh_crud_buttons();
         model.refresh_pending_bar(0);
+        model.refresh_auto_refresh_availability();
         // If the user has a saved filter on this (connection, schema,
         // table), the button picks up the .accent badge before the
         // first fetch returns so the filter state is visible from
@@ -782,6 +792,9 @@ impl SimpleComponent for BrowseTab {
                 if !self.page_requests.accepts(request, self.current_offset) {
                     return;
                 }
+                self.auto_refresh_status_label.set_text("");
+                self.auto_refresh_status_label.set_tooltip_text(None);
+                self.auto_refresh_in_flight.set(false);
                 self.last_page_elapsed = Some(elapsed);
                 // Driver fallback: every shipping driver derives the
                 // `QueryResult.columns` list from the FIRST returned
@@ -904,12 +917,24 @@ impl SimpleComponent for BrowseTab {
                 self.inner_stack.set_visible_child_name("error");
             }
             BrowseTabInput::Refresh => {
+                self.auto_refresh_status_label.set_text("");
+                self.auto_refresh_status_label.set_tooltip_text(None);
                 self.capture_focus_for_restore();
                 self.show_loading_inner(
                     &bookie_app_services::tr!("Loading…"),
                     &bookie_app_services::tr!("Fetching rows from {table}").replace("{table}", &self.table_label()),
                 );
                 self.emit_fetch_page_and_count(&sender);
+            }
+            BrowseTabInput::AutoRefreshToggled(enabled) => self.set_auto_refresh(enabled, sender),
+            BrowseTabInput::AutoRefreshTick => self.auto_refresh_tick(&sender),
+            BrowseTabInput::AutoRefreshFlushFinished(flushed) => self.auto_refresh_after_flush(flushed, &sender),
+            BrowseTabInput::AutoRefreshDisconnected => self.stop_auto_refresh_for_disconnect(),
+            BrowseTabInput::AutoRefreshFailed(message) => {
+                self.stop_auto_refresh_after_failure();
+                self.auto_refresh_status_label
+                    .set_text(&bookie_app_services::tr!("Refresh failed"));
+                self.auto_refresh_status_label.set_tooltip_text(Some(&message));
             }
             BrowseTabInput::ColumnSelectionChanged => self.refresh_selection_chrome(),
             BrowseTabInput::CopySelectionAs(format) => self.handle_copy_selection_as(format, sender),
@@ -1169,5 +1194,9 @@ impl SimpleComponent for BrowseTab {
             BrowseTabInput::Undo => self.handle_undo(),
             BrowseTabInput::Redo => self.handle_redo(),
         }
+    }
+
+    fn shutdown(&mut self, _widgets: &mut Self::Widgets, _output: relm4::Sender<Self::Output>) {
+        self.shutdown_auto_refresh();
     }
 }

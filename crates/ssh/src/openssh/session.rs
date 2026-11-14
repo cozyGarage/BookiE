@@ -102,6 +102,9 @@ impl OpenSshSession {
         prompter: Arc<dyn Prompter>,
         cancel: CancellationToken,
     ) -> Result<Arc<OpenSshSession>, OpenSshError> {
+        if let Some(error) = parent_supervision_error(std::env::consts::OS) {
+            return Err(error);
+        }
         let runtime = context.runtime.clone();
         let master_dir = tokio::task::spawn_blocking(move || runtime.create_master_dir())
             .await
@@ -315,6 +318,12 @@ fn die_if_parent_is_gone(expected_parent: u32) -> std::io::Result<()> {
         std::process::exit(1);
     }
     Ok(())
+}
+
+fn parent_supervision_error(target: &str) -> Option<OpenSshError> {
+    (target != "linux").then(|| OpenSshError::ParentSupervisionUnavailable {
+        target: target.to_owned(),
+    })
 }
 
 pub(crate) struct HandshakeDeadline {
@@ -573,5 +582,16 @@ mod tests {
     fn die_if_parent_is_gone_accepts_the_live_parent() {
         let parent = unsafe { libc::getppid() } as u32;
         die_if_parent_is_gone(parent).expect("the current parent must still be alive");
+    }
+
+    #[test]
+    fn system_openssh_requires_parent_death_supervision() {
+        assert_eq!(parent_supervision_error("linux"), None,);
+        assert_eq!(
+            parent_supervision_error("macos"),
+            Some(OpenSshError::ParentSupervisionUnavailable {
+                target: "macos".to_owned(),
+            }),
+        );
     }
 }

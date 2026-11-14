@@ -9,8 +9,24 @@ pub(crate) fn refusal(sql: &str, driver_id: &str, dialect: &dyn Dialect) -> Opti
         "mysql" if contains_mysql_executable_comment(sql, dialect) => {
             Some("MySQL executable comments are not safely classified")
         }
+        "postgres" if contains_unicode_escaped_identifier(sql, dialect) => {
+            Some("PostgreSQL Unicode-escaped identifiers are not safely classified")
+        }
         _ => None,
     }
+}
+
+fn contains_unicode_escaped_identifier(sql: &str, dialect: &dyn Dialect) -> bool {
+    let Ok(tokens) = Tokenizer::new(dialect, sql).tokenize() else {
+        return false;
+    };
+
+    tokens.windows(3).any(|window| {
+        matches!(window, [Token::Word(prefix), Token::Ampersand, Token::Word(name)]
+            if prefix.quote_style.is_none()
+                && prefix.value.eq_ignore_ascii_case("u")
+                && name.quote_style == Some('"'))
+    })
 }
 
 fn contains_mysql_executable_comment(sql: &str, dialect: &dyn Dialect) -> bool {

@@ -285,9 +285,7 @@ fn element_text(oid: u32, text_element: bool, bytes: &[u8]) -> Option<String> {
             bytes.iter().map(|byte| format!("{byte:02x}")).collect::<String>()
         ),
         19 | 25 | 1042 | 1043 if !bytes.contains(&0) => std::str::from_utf8(bytes).ok()?.into(),
-        BIT_OID | VARBIT_OID => {
-            crate::decode::decode_pg_binary_text(if oid == BIT_OID { "BIT" } else { "VARBIT" }, bytes)?
-        }
+        BIT_OID | VARBIT_OID => crate::decode::decode_bit_string_with_limit(bytes, MAX_ARRAY_TEXT_BYTES)?,
         MACADDR_OID => crate::decode::decode_pg_binary_text("MACADDR", bytes)?,
         MACADDR8_OID => crate::decode::decode_pg_binary_text("MACADDR8", bytes)?,
         INET_OID => crate::decode::decode_pg_binary_text("INET", bytes)?,

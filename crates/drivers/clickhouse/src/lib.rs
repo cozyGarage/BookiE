@@ -113,12 +113,13 @@ pub async fn open(opts: ConnectOptions) -> Result<ClickhouseConnection, DriverEr
         Err(_) => return Err(DriverError::ConnectionRefused),
     }
 
+    let output_settings_allowed = output_settings_allowed(&client).await;
     let database = if opts.database.is_empty() {
         resolve_current_database(&client).await
     } else {
         opts.database
     };
-    Ok(open_connection(client, database))
+    Ok(open_connection(client, database, output_settings_allowed))
 }
 
 fn endpoint_url(scheme: &str, host: &str, port: u16) -> String {
@@ -143,10 +144,30 @@ async fn resolve_current_database(client: &clickhouse::Client) -> String {
 pub struct ClickhouseConnection {
     client: clickhouse::Client,
     database: String,
+    output_settings_allowed: bool,
 }
 
-fn open_connection(client: clickhouse::Client, database: String) -> ClickhouseConnection {
-    ClickhouseConnection { client, database }
+fn open_connection(
+    client: clickhouse::Client,
+    database: String,
+    output_settings_allowed: bool,
+) -> ClickhouseConnection {
+    ClickhouseConnection {
+        client,
+        database,
+        output_settings_allowed,
+    }
+}
+
+async fn output_settings_allowed(client: &clickhouse::Client) -> bool {
+    matches!(
+        client
+            .query("SELECT toString(getSetting('readonly'))")
+            .fetch_one::<String>()
+            .await
+            .as_deref(),
+        Ok("0" | "2")
+    )
 }
 
 pub fn commit_token() -> CommitToken {
@@ -330,17 +351,23 @@ impl Connection for ClickhouseConnection {
     ) -> Result<QueryResult, DriverError> {
         let qualified = qualify(self.database_of(schema), table);
         let sql = format!("SELECT * FROM {qualified} LIMIT {limit} OFFSET {offset}");
-        fetch_result(&self.client, &sql, limit as usize, None).await
+        fetch_result(&self.client, &sql, limit as usize, None, self.output_settings_allowed).await
     }
 
     async fn query(&self, sql: &str) -> Result<QueryResult, DriverError> {
-        fetch_result(&self.client, sql, MAX_QUERY_ROWS, None).await
+        fetch_result(&self.client, sql, MAX_QUERY_ROWS, None, self.output_settings_allowed).await
     }
 
     async fn query_controlled(&self, sql: &str, control: &OperationControl) -> Result<QueryResult, DriverError> {
         let query_id = new_query_id();
         run_server_cancellable(
-            fetch_result(&self.client, sql, MAX_QUERY_ROWS, Some(&query_id)),
+            fetch_result(
+                &self.client,
+                sql,
+                MAX_QUERY_ROWS,
+                Some(&query_id),
+                self.output_settings_allowed,
+            ),
             request_cancellation(&self.client, &query_id),
             confirms_cancellation,
             control,
@@ -524,12 +551,15 @@ async fn fetch_result(
     sql: &str,
     max_rows: usize,
     query_id: Option<&str>,
+    output_settings_allowed: bool,
 ) -> Result<QueryResult, DriverError> {
-    let cursor = tag_query(client.query(&escape_bind_markers(sql)), query_id)
-        .with_setting("output_format_json_quote_denormals", "1")
-        .with_setting("output_format_decimal_trailing_zeros", "1")
-        .fetch_bytes(ROW_FORMAT)
-        .map_err(map_clickhouse_error)?;
+    let mut query = tag_query(client.query(&escape_bind_markers(sql)), query_id);
+    if output_settings_allowed {
+        query = query
+            .with_setting("output_format_json_quote_denormals", "1")
+            .with_setting("output_format_decimal_trailing_zeros", "1");
+    }
+    let cursor = query.fetch_bytes(ROW_FORMAT).map_err(map_clickhouse_error)?;
     let mut reader = LineReader::new(cursor);
 
     // A statement with no result set (DDL, INSERT) sends an empty body.
@@ -567,7 +597,7 @@ async fn fetch_result(
                     position: None,
                 });
             }
-            response_row_into(raw, &columns, values)
+            response_row_into(raw, &columns, values, !output_settings_allowed)
         })? {
             truncated = true;
             break;
@@ -612,11 +642,16 @@ fn response_columns(names: Vec<String>, types: Vec<String>) -> Result<Vec<Column
 #[cfg(test)]
 fn response_row(raw: Vec<RowCell>, columns: &[ColumnInfo]) -> Result<Vec<Value>, DriverError> {
     let mut values = Vec::with_capacity(columns.len());
-    response_row_into(raw, columns, &mut values)?;
+    response_row_into(raw, columns, &mut values, false)?;
     Ok(values)
 }
 
-fn response_row_into(raw: Vec<RowCell>, columns: &[ColumnInfo], values: &mut Vec<Value>) -> Result<(), DriverError> {
+fn response_row_into(
+    raw: Vec<RowCell>,
+    columns: &[ColumnInfo],
+    values: &mut Vec<Value>,
+    ambiguous_float_nulls: bool,
+) -> Result<(), DriverError> {
     if raw.len() != columns.len() {
         return Err(DriverError::Internal(format!(
             "clickhouse response row width mismatch: {} values, {} columns",
@@ -625,13 +660,20 @@ fn response_row_into(raw: Vec<RowCell>, columns: &[ColumnInfo], values: &mut Vec
         )));
     }
     for (cell, column) in raw.into_iter().zip(columns) {
-        values.push(response_cell(cell, &column.data_type)?);
+        values.push(response_cell(cell, &column.data_type, ambiguous_float_nulls)?);
     }
     Ok(())
 }
 
-fn response_cell(cell: RowCell, data_type: &str) -> Result<Value, DriverError> {
+fn response_cell(cell: RowCell, data_type: &str, ambiguous_float_nulls: bool) -> Result<Value, DriverError> {
     match cell {
+        RowCell::Json(raw)
+            if raw.is_null() && ambiguous_float_nulls && matches!(base_type(data_type), "Float32" | "Float64") =>
+        {
+            Ok(Value::Undecodable(
+                "ClickHouse returned an ambiguous null for a floating-point value on a read-only connection".into(),
+            ))
+        }
         RowCell::Json(raw) => Ok(json_to_value(raw, data_type)),
         RowCell::StringBytes(bytes) if matches!(base_type(data_type), "String" | "FixedString") => {
             Ok(match String::from_utf8(bytes) {

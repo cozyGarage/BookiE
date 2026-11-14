@@ -1,4 +1,5 @@
 use super::*;
+use bookie_core::sql_syntax::script::LexicalSettings;
 
 #[path = "guard_tests_session/blast_radius.rs"]
 mod blast_radius;
@@ -23,6 +24,8 @@ struct SessionScript {
     completion_targets: Mutex<Vec<(Option<String>, String)>>,
     completion_timed_out: bool,
     blast_count: Option<i64>,
+    lexical_settings: Option<LexicalSettings>,
+    lexical_settings_reads: std::sync::atomic::AtomicUsize,
 }
 
 struct ScriptedSession {
@@ -105,6 +108,16 @@ impl bookie_core::Session for ScriptedSession {
             return Err(DriverError::TimedOut);
         }
         Ok(vec!["id".into()])
+    }
+
+    async fn lexical_settings_controlled(
+        &mut self,
+        _control: &OperationControl,
+    ) -> Result<Option<LexicalSettings>, DriverError> {
+        self.script
+            .lexical_settings_reads
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        Ok(self.script.lexical_settings)
     }
 
     fn is_usable(&self) -> bool {
@@ -247,6 +260,93 @@ fn harness_with_principal(
         audit,
         audit_state,
     }
+}
+
+#[tokio::test]
+async fn mysql_session_mode_cannot_hide_a_commit_inside_a_string() {
+    let h = harness_with_driver(SessionScript::default(), false, "mysql");
+    let mut session = h.guard.open_session().await.expect("open session");
+
+    let error = run(&mut session, r#"SELECT 'x\'; COMMIT -- '"#)
+        .await
+        .expect_err("session-mode-dependent SQL must be refused");
+
+    assert!(matches!(error, DriverError::PolicyDenied(_)), "{error:?}");
+    assert!(h.script.sent.lock().expect("sent lock").is_empty());
+    let events = h.audit.events.lock().expect("audit lock");
+    let outcomes = events
+        .iter()
+        .filter(|event| event.phase == AuditRecordPhase::Outcome)
+        .collect::<Vec<_>>();
+    assert_eq!(outcomes.len(), 1);
+    assert_eq!(outcomes[0].terminal_status, AuditTerminalStatus::Denied);
+    assert_eq!(outcomes[0].error_category, Some(AuditErrorCategory::Policy));
+}
+
+#[tokio::test]
+async fn mysql_session_allows_a_statement_stable_under_its_reported_lexical_mode() {
+    let script = SessionScript {
+        lexical_settings: Some(LexicalSettings::default_for(bookie_core::sql_syntax::SqlGrammar::MySql)),
+        ..SessionScript::default()
+    };
+    let h = harness_with_driver(script, false, "mysql");
+    let mut session = h.guard.open_session().await.expect("open session");
+    let sql = r#"SELECT 'x\'; COMMIT -- '"#;
+
+    run(&mut session, sql)
+        .await
+        .expect("the statement is stable under the reported backslash-escape mode");
+
+    assert_eq!(*h.script.sent.lock().expect("sent lock"), vec![sql]);
+    assert_eq!(
+        h.script
+            .lexical_settings_reads
+            .load(std::sync::atomic::Ordering::SeqCst),
+        1
+    );
+    assert!(
+        h.audit
+            .events
+            .lock()
+            .expect("audit lock")
+            .iter()
+            .all(|event| event.terminal_status != AuditTerminalStatus::Denied)
+    );
+}
+
+#[tokio::test]
+async fn mysql_mode_change_cannot_retokenize_later_statements_in_the_same_request() {
+    let script = SessionScript {
+        lexical_settings: Some(LexicalSettings::default_for(bookie_core::sql_syntax::SqlGrammar::MySql)),
+        ..SessionScript::default()
+    };
+    let h = harness_with_driver(script, false, "mysql");
+    let mut session = h.guard.open_session().await.expect("open session");
+    let sql = "SET SESSION sql_mode = 'NO_BACKSLASH_ESCAPES'; SELECT 'x\\'; DROP TABLE users; SELECT 'z'";
+
+    let error = run(&mut session, sql)
+        .await
+        .expect_err("a mode change cannot alter policy token boundaries mid-request");
+
+    assert!(matches!(error, DriverError::PolicyDenied(_)), "{error:?}");
+    assert!(h.script.sent.lock().expect("sent lock").is_empty());
+}
+
+#[tokio::test]
+async fn mysql_session_skips_lexical_settings_lookup_for_mode_stable_sql() {
+    let h = harness_with_driver(SessionScript::default(), false, "mysql");
+    let mut session = h.guard.open_session().await.expect("open session");
+
+    run(&mut session, "SELECT 1")
+        .await
+        .expect("ordinary SQL is independent of the lexical mode");
+
+    assert_eq!(
+        h.script
+            .lexical_settings_reads
+            .load(std::sync::atomic::Ordering::SeqCst),
+        0
+    );
 }
 
 #[tokio::test]
