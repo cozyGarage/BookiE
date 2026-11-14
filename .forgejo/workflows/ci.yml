@@ -1051,6 +1051,7 @@ jobs:
       BOOKIE_GTK_SCENARIO_RETRIES: "0"
       BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-gtk-server-${{ matrix.server }}
       BOOKIE_GTK_SERVER_IMAGE_GROUP: ${{ matrix.server == 'mysql-approval' && 'mysql' || matrix.server }}
+      TMPDIR: /var/cache/ci/tmp
     strategy:
       fail-fast: false
       matrix:

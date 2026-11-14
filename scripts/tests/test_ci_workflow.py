@@ -827,6 +827,8 @@ class CiWorkflowTests(unittest.TestCase):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         self.assertIn("TMPDIR: /var/cache/ci/target\n", workflow)
         self.assertIn("BOOKIE_BUNDLE_CACHE: /var/cache/ci/bundles", workflow)
+        gtk_server = re.search(r"(?ms)^  gtk-server:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+        self.assertIn("TMPDIR: /var/cache/ci/tmp", gtk_server)
         for name in ("linux-build", "clippy", "test-build"):
             with self.subTest(job=name):
                 job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
