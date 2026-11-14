@@ -37,6 +37,8 @@ mod single_precision;
 mod sql_variant;
 #[path = "support/temporal_boundaries.rs"]
 mod temporal_boundaries;
+#[path = "support/unicode_object_names.rs"]
+mod unicode_object_names;
 
 #[tokio::test]
 async fn an_unavailable_sql_server_is_classified_as_connection_refused() {

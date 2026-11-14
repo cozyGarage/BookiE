@@ -506,7 +506,7 @@ pub(crate) fn mssql_drop_default_constraint(
         "DECLARE @default_constraint sysname = (\
 SELECT dc.name FROM sys.default_constraints dc \
 JOIN sys.columns c ON c.object_id = dc.parent_object_id AND c.column_id = dc.parent_column_id \
-WHERE dc.parent_object_id = OBJECT_ID('{table_literal}') AND c.name = '{column_literal}'); \
+WHERE dc.parent_object_id = OBJECT_ID(N'{table_literal}') AND c.name = N'{column_literal}'); \
 IF @default_constraint IS NOT NULL \
 BEGIN \
 DECLARE @drop_default_sql nvarchar(max) = N'ALTER TABLE {table_literal} DROP CONSTRAINT ' + QUOTENAME(@default_constraint); \
@@ -592,18 +592,18 @@ pub(crate) fn mssql_set_column_comment(
     let table_literal = sql_literal(table.trim());
     let column_literal = sql_literal(column.trim());
     let schema_literal = match schema.map(str::trim).filter(|s| !s.is_empty()) {
-        Some(schema) => format!("'{}'", sql_literal(schema)),
+        Some(schema) => format!("N'{}'", sql_literal(schema)),
         None => "NULL".to_string(),
     };
     let levels = format!(
         "@level0type = N'SCHEMA', @level0name = @schema, \
-@level1type = N'TABLE', @level1name = '{table_literal}', \
-@level2type = N'COLUMN', @level2name = '{column_literal}'"
+@level1type = N'TABLE', @level1name = N'{table_literal}', \
+@level2type = N'COLUMN', @level2name = N'{column_literal}'"
     );
     let exists = format!(
         "EXISTS (SELECT 1 FROM sys.extended_properties \
-WHERE class = 1 AND major_id = OBJECT_ID('{object_literal}') \
-AND minor_id = COLUMNPROPERTY(OBJECT_ID('{object_literal}'), '{column_literal}', 'ColumnId') \
+WHERE class = 1 AND major_id = OBJECT_ID(N'{object_literal}') \
+AND minor_id = COLUMNPROPERTY(OBJECT_ID(N'{object_literal}'), N'{column_literal}', 'ColumnId') \
 AND name = 'MS_Description')"
     );
     let declare = format!("DECLARE @schema sysname = COALESCE({schema_literal}, SCHEMA_NAME()); ");
