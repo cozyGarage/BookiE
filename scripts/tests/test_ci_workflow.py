@@ -171,6 +171,16 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertEqual(expected, forgejo)
         self.assertEqual(github, forgejo)
 
+    def test_every_forgejo_gate_job_finalizes_its_runner(self):
+        source = (ROOT / ".forgejo/workflows/ci.yml").read_text().split("\njobs:\n", 1)[1]
+        headings = list(re.finditer(r"(?m)^  ([A-Za-z0-9_-]+):\s*$", source))
+        for index, heading in enumerate(headings):
+            end = headings[index + 1].start() if index + 1 < len(headings) else len(source)
+            job = source[heading.start():end]
+            with self.subTest(job=heading.group(1)):
+                self.assertRegex(job, r"(?m)^      - name: Finalize runner job\n        if: always\(\)")
+                self.assertIn("bash src/scripts/cleanup-ci-job.sh", job)
+
     def test_forgejo_and_github_run_the_same_test_layers_per_gate_job(self):
         github = workflow_job_test_layers(ROOT / ".github/workflows/build-linux.yml")
         forgejo = workflow_job_test_layers(ROOT / ".forgejo/workflows/ci.yml")
