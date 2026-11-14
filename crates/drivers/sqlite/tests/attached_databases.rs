@@ -280,3 +280,22 @@ async fn missing_attached_database_skipped_without_error() {
     let res = conn.query("SELECT val FROM local_data").await.unwrap();
     assert_eq!(res.rows[0][0], Value::Text("ok".into()));
 }
+
+#[tokio::test]
+async fn invalid_existing_attached_database_fails_connection() {
+    let dir = TempDir::new().unwrap();
+    let main_path = dir.path().join("main.db").to_string_lossy().to_string();
+    let invalid_path = dir.path().join("invalid.db").to_string_lossy().to_string();
+    std::fs::File::create(&main_path).unwrap();
+    std::fs::write(&invalid_path, b"not a sqlite database").unwrap();
+
+    let result = SqliteDriver
+        .connect(ConnectOptions {
+            database: main_path,
+            attached_databases: vec![AttachedDatabase::new("invalid", invalid_path)],
+            ..Default::default()
+        })
+        .await;
+
+    assert!(result.is_err());
+}
