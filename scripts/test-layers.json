@@ -767,7 +767,6 @@
     "timeout_minutes": 90,
     "condition": "github.event_name != 'push'",
     "matrix": {
-      "max-parallel": 2,
       "shard_group": [
         "1",
         "2"
@@ -784,10 +783,24 @@
     "timeout_minutes": 90,
     "condition": "github.event_name != 'push'",
     "matrix": {
-      "max-parallel": 2,
       "group": [
         "driver-core",
-        "driver-analytics",
+        "driver-analytics"
+      ]
+    }
+  },
+  "driver-followup": {
+    "needs": [
+      "clippy",
+      "driver",
+      "guards",
+      "pin-revision",
+      "test-build"
+    ],
+    "timeout_minutes": 90,
+    "condition": "always() && !cancelled() && github.event_name != 'push'",
+    "matrix": {
+      "group": [
         "driver-extended",
         "socket-ssh"
       ]
@@ -830,10 +843,23 @@
     "timeout_minutes": 60,
     "condition": "github.event_name != 'push'",
     "matrix": {
-      "max-parallel": 2,
       "shard": [
         "1",
-        "2",
+        "2"
+      ]
+    }
+  },
+  "gtk-followup": {
+    "needs": [
+      "gtk",
+      "guards",
+      "linux-build",
+      "pin-revision"
+    ],
+    "timeout_minutes": 60,
+    "condition": "always() && !cancelled() && github.event_name != 'push'",
+    "matrix": {
+      "shard": [
         "3"
       ]
     }
@@ -858,12 +884,39 @@
     "timeout_minutes": 45,
     "condition": "github.event_name != 'push'",
     "matrix": {
-      "max-parallel": 2,
       "server": [
         "clickhouse",
-        "mongodb",
+        "mongodb"
+      ]
+    }
+  },
+  "gtk-server-followup": {
+    "needs": [
+      "gtk-server",
+      "guards",
+      "linux-build",
+      "pin-revision"
+    ],
+    "timeout_minutes": 45,
+    "condition": "always() && !cancelled() && github.event_name != 'push'",
+    "matrix": {
+      "server": [
         "postgres",
-        "mysql",
+        "mysql"
+      ]
+    }
+  },
+  "gtk-server-final": {
+    "needs": [
+      "gtk-server-followup",
+      "guards",
+      "linux-build",
+      "pin-revision"
+    ],
+    "timeout_minutes": 45,
+    "condition": "always() && !cancelled() && github.event_name != 'push'",
+    "matrix": {
+      "server": [
         "mysql-approval"
       ]
     }
@@ -907,11 +960,15 @@
       "consumers",
       "distro-floor-scenarios",
       "driver",
+      "driver-followup",
       "driver-tls",
       "gpui-build",
       "gpui-tests",
       "gtk",
+      "gtk-followup",
       "gtk-server",
+      "gtk-server-final",
+      "gtk-server-followup",
       "guards",
       "keyring",
       "linux-build",

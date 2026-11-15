@@ -736,7 +736,6 @@ jobs:
     timeout-minutes: 90
     strategy:
       fail-fast: false
-      max-parallel: 2
       matrix:
         shard_group: [1, 2]
     steps:
@@ -802,9 +801,84 @@ jobs:
       BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}
     strategy:
       fail-fast: false
-      max-parallel: 2
       matrix:
-        group: [driver-core, driver-analytics, driver-extended, socket-ssh]
+        group: [driver-core, driver-analytics]
+    steps:
+      - name: Prepare runner workspace
+        run: |
+          mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"
+          rm -rf src
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
+      - name: Prepare artifact runtime
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Download the source-pinned ${{ matrix.group }} test bundle
+        uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-${{ matrix.group }}
+          path: ${{ runner.temp }}/bookie-${{ matrix.group }}-bundle
+      - name: Verify and prepare the ${{ matrix.group }} test bundle
+        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" "${{ matrix.group }}" "${{ runner.temp }}/bookie-${{ matrix.group }}-bundle"
+      - name: Docker Hub login
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: bash src/scripts/docker-hub-login.sh
+      - name: Pre-pull PostgreSQL socket fixture image
+        if: matrix.group == 'socket-ssh'
+        run: bash src/scripts/prepull-test-images.sh socket-ssh
+      - name: Driver integration
+        env:
+          BOOKIE_TEST_LAYER: ${{ matrix.group }}
+        run: |
+          cd src
+          if [[ "$BOOKIE_TEST_LAYER" == socket-ssh ]]; then
+            cleanup_testcontainers() {
+              python3 scripts/cleanup-testcontainers.py "$BOOKIE_TEST_RUN_ID"
+            }
+            trap cleanup_testcontainers EXIT
+            trap 'cleanup_testcontainers; exit 143' TERM
+            trap 'cleanup_testcontainers; exit 130' INT
+          fi
+          python3 scripts/run-test-layer.py "$BOOKIE_TEST_LAYER"
+      - name: Pre-pull pg_dump image
+        if: matrix.group == 'driver-core'
+        run: bash src/scripts/prepull-test-images.sh pg-dump
+      - name: PostgreSQL dump and restore
+        if: matrix.group == 'driver-core'
+        run: cd src && python3 scripts/run-test-layer.py pg-dump
+
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
+  driver-followup:
+    if: always() && !cancelled() && github.event_name != 'push'
+    runs-on: any-host
+    needs: [pin-revision, guards, clippy, test-build, driver]
+    timeout-minutes: 90
+    env:
+      CARGO_TARGET_DIR: /var/cache/ci/target/${{ matrix.group }}
+      TMPDIR: /var/cache/ci/tmp/bookie-driver-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}
+      BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [driver-extended, socket-ssh]
     steps:
       - name: Prepare runner workspace
         run: |
@@ -1020,9 +1094,65 @@ jobs:
     timeout-minutes: 60
     strategy:
       fail-fast: false
-      max-parallel: 2
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2]
+    steps:
+      - name: Prepare runner workspace
+        run: |
+          rm -rf src
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
+      - name: Prepare artifact runtime
+        env:
+          BOOKIE_TOOL_DIR: /var/cache/ci/tools
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Download the shared GTK binary
+        uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
+        with:
+          name: gtk-ci-${{ github.run_id }}-${{ needs.pin-revision.outputs.revision }}
+          path: gtk-artifact/
+      - name: Verify the shared GTK binary
+        run: |
+          binary=$(python3 src/scripts/ci-gtk-artifact.py verify --profile dist "$GITHUB_WORKSPACE/gtk-artifact" "${{ needs.pin-revision.outputs.revision }}")
+          printf 'BOOKIE_GTK_BINARY=%s\nGSETTINGS_SCHEMA_DIR=%s/schemas\n' "$binary" "$GITHUB_WORKSPACE/gtk-artifact" >> "$GITHUB_ENV"
+      - name: Docker Hub login
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: bash src/scripts/docker-hub-login.sh
+      - name: Select isolated MCP HTTP port
+        run: cd src && python3 scripts/ci-mcp-port.py "${{ matrix.shard }}"
+      - name: Installed GTK end-to-end suite, one third
+        run: |
+          cd src && BOOKIE_GTK_SHARD="${{ matrix.shard }}/3" python3 scripts/run-test-layer.py ui
+
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
+  gtk-followup:
+    if: always() && !cancelled() && github.event_name != 'push'
+    runs-on: any-host
+    needs: [pin-revision, guards, linux-build, gtk]
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [3]
     steps:
       - name: Prepare runner workspace
         run: |
@@ -1138,17 +1268,140 @@ jobs:
       TMPDIR: /var/cache/ci/tmp
     strategy:
       fail-fast: false
-      max-parallel: 2
       matrix:
         include:
           - server: clickhouse
             mcp_port_slot: 5
           - server: mongodb
             mcp_port_slot: 6
+    steps:
+      - name: Prepare runner workspace
+        run: |
+          rm -rf src
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
+      - name: Prepare artifact runtime
+        env:
+          BOOKIE_TOOL_DIR: /var/cache/ci/tools
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Download the shared GTK binary
+        uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
+        with:
+          name: gtk-ci-${{ github.run_id }}-${{ needs.pin-revision.outputs.revision }}
+          path: gtk-artifact/
+      - name: Verify the shared GTK binary
+        run: |
+          binary=$(python3 src/scripts/ci-gtk-artifact.py verify --profile dist "$GITHUB_WORKSPACE/gtk-artifact" "${{ needs.pin-revision.outputs.revision }}")
+          printf 'BOOKIE_GTK_BINARY=%s\nGSETTINGS_SCHEMA_DIR=%s/schemas\n' "$binary" "$GITHUB_WORKSPACE/gtk-artifact" >> "$GITHUB_ENV"
+      - name: Docker Hub login
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: bash src/scripts/docker-hub-login.sh
+      - name: Pre-pull GTK fixture image with retries
+        run: bash src/scripts/prepull-test-images.sh "$BOOKIE_GTK_SERVER_IMAGE_GROUP"
+      - name: Select isolated MCP HTTP port
+        run: cd src && python3 scripts/ci-mcp-port.py "${{ matrix.mcp_port_slot }}"
+      - name: Installed GTK scenarios against a real server
+        run: cd src && python3 scripts/run-test-layer.py "gtk-${{ matrix.server }}"
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
+  gtk-server-followup:
+    if: always() && !cancelled() && github.event_name != 'push'
+    runs-on: any-host
+    needs: [pin-revision, guards, linux-build, gtk-server]
+    timeout-minutes: 45
+    env:
+      BOOKIE_GTK_SCENARIO_RETRIES: "0"
+      BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-gtk-server-${{ matrix.server }}
+      BOOKIE_GTK_SERVER_IMAGE_GROUP: ${{ matrix.server == 'mysql-approval' && 'mysql' || matrix.server }}
+      TMPDIR: /var/cache/ci/tmp
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
           - server: postgres
             mcp_port_slot: 7
           - server: mysql
             mcp_port_slot: 8
+    steps:
+      - name: Prepare runner workspace
+        run: |
+          rm -rf src
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
+      - name: Prepare artifact runtime
+        env:
+          BOOKIE_TOOL_DIR: /var/cache/ci/tools
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Download the shared GTK binary
+        uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
+        with:
+          name: gtk-ci-${{ github.run_id }}-${{ needs.pin-revision.outputs.revision }}
+          path: gtk-artifact/
+      - name: Verify the shared GTK binary
+        run: |
+          binary=$(python3 src/scripts/ci-gtk-artifact.py verify --profile dist "$GITHUB_WORKSPACE/gtk-artifact" "${{ needs.pin-revision.outputs.revision }}")
+          printf 'BOOKIE_GTK_BINARY=%s\nGSETTINGS_SCHEMA_DIR=%s/schemas\n' "$binary" "$GITHUB_WORKSPACE/gtk-artifact" >> "$GITHUB_ENV"
+      - name: Docker Hub login
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: bash src/scripts/docker-hub-login.sh
+      - name: Pre-pull GTK fixture image with retries
+        run: bash src/scripts/prepull-test-images.sh "$BOOKIE_GTK_SERVER_IMAGE_GROUP"
+      - name: Select isolated MCP HTTP port
+        run: cd src && python3 scripts/ci-mcp-port.py "${{ matrix.mcp_port_slot }}"
+      - name: Installed GTK scenarios against a real server
+        run: cd src && python3 scripts/run-test-layer.py "gtk-${{ matrix.server }}"
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
+  gtk-server-final:
+    if: always() && !cancelled() && github.event_name != 'push'
+    runs-on: any-host
+    needs: [pin-revision, guards, linux-build, gtk-server-followup]
+    timeout-minutes: 45
+    env:
+      BOOKIE_GTK_SCENARIO_RETRIES: "0"
+      BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-gtk-server-${{ matrix.server }}
+      BOOKIE_GTK_SERVER_IMAGE_GROUP: ${{ matrix.server == 'mysql-approval' && 'mysql' || matrix.server }}
+      TMPDIR: /var/cache/ci/tmp
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
           - server: mysql-approval
             mcp_port_slot: 9
     steps:
@@ -1372,11 +1625,15 @@ jobs:
       - widgets
       - distro-floor-scenarios
       - driver
+      - driver-followup
       - security-policy
       - consumers
       - gtk
+      - gtk-followup
       - pg-release
       - gtk-server
+      - gtk-server-followup
+      - gtk-server-final
       - driver-tls
       - keyring
       - supply-chain
