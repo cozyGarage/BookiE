@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use bookie_core::sql_dialect::{explain_statement, quote_ident};
 use bookie_core::{
     ColumnInfo, Connection, DriverError, ForeignKeyInfo, IndexInfo, OperationControl, QueryResult, QueryResultBatch,
-    TableInfo, Value, check_pre_dispatch,
+    TableInfo, Value, check_pre_dispatch, estimated_row_size,
 };
 use bookie_policy::Principal;
 use bookie_storage::SavedConnection;
@@ -54,6 +54,7 @@ pub struct McpBridge {
     auth_rate_limiter: RateLimiter,
     shutdown: CancellationToken,
     pub max_rows: u64,
+    pub max_response_bytes: usize,
     pub query_timeout_secs: u64,
 }
 
@@ -63,6 +64,7 @@ const AUTH_ATTEMPT_KEY: &str = "authenticate";
 pub struct McpLimits {
     pub requests_per_minute: u32,
     pub max_rows: u64,
+    pub max_response_bytes: usize,
     pub query_timeout_secs: u64,
 }
 
@@ -71,6 +73,7 @@ impl Default for McpLimits {
         Self {
             requests_per_minute: 120,
             max_rows: 500,
+            max_response_bytes: 8 * 1024 * 1024,
             query_timeout_secs: 30,
         }
     }
@@ -106,6 +109,7 @@ impl McpBridge {
             auth_rate_limiter: RateLimiter::new(limits.requests_per_minute),
             shutdown,
             max_rows: limits.max_rows,
+            max_response_bytes: limits.max_response_bytes,
             query_timeout_secs: limits.query_timeout_secs,
         }
     }
@@ -333,6 +337,7 @@ impl McpBridge {
             );
         }
         let max_rows = self.max_rows;
+        let max_response_bytes = self.max_response_bytes;
         let sql = sql.to_string();
         self.with_connection_controlled(token, connection_id, control, move |conn, control| {
             Box::pin(async move {
@@ -342,6 +347,7 @@ impl McpBridge {
                     .map_err(|error| error.to_string())?;
                 check_pre_dispatch(&control).map_err(|error| error.to_string())?;
                 let mut remaining = max_rows;
+                let mut bytes_left = max_response_bytes;
                 for result_set in &mut result.result_sets {
                     let rows = u64::try_from(result_set.rows.len()).unwrap_or(u64::MAX);
                     if rows > remaining {
@@ -349,6 +355,9 @@ impl McpBridge {
                             .rows
                             .truncate(usize::try_from(remaining).unwrap_or(usize::MAX));
                         result_set.truncated = true;
+                        result.truncated = true;
+                    }
+                    if keep_rows_within_bytes(result_set, &mut bytes_left) {
                         result.truncated = true;
                     }
                     remaining = remaining.saturating_sub(u64::try_from(result_set.rows.len()).unwrap_or(u64::MAX));
@@ -451,6 +460,7 @@ impl McpBridge {
             ));
         }
         let capped = limit.clamp(1, self.max_rows);
+        let max_response_bytes = self.max_response_bytes;
         self.with_connection(token, connection_id, move |conn, control| {
             Box::pin(async move {
                 let mut result = conn
@@ -461,6 +471,7 @@ impl McpBridge {
                     result.rows.truncate(capped as usize);
                     result.truncated = true;
                 }
+                keep_rows_within_bytes(&mut result, &mut max_response_bytes.clone());
                 if limit > capped {
                     result.truncated = true;
                 }
@@ -748,3 +759,23 @@ fn sql_looks_like_write(sql: &str, driver_id: &str) -> bool {
 #[cfg(test)]
 #[path = "bridge_tests.rs"]
 mod tests;
+
+fn keep_rows_within_bytes(result: &mut QueryResult, bytes_left: &mut usize) -> bool {
+    let mut kept = 0;
+    let mut used = 0usize;
+    for row in result.rows.iter() {
+        let size = estimated_row_size(row);
+        if size > bytes_left.saturating_sub(used) {
+            break;
+        }
+        used += size;
+        kept += 1;
+    }
+    *bytes_left -= used;
+    let cut = kept < result.rows.len();
+    if cut {
+        result.rows.truncate(kept);
+        result.truncated = true;
+    }
+    cut
+}

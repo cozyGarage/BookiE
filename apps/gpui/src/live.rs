@@ -13,7 +13,6 @@ use bookie_app_services::read_session_store::{
 };
 use bookie_core::{ColumnInfo, OperationControl, QueryResult, QueryResultBudget, QueryRows, TableInfo};
 use bookie_results::result_scan::ScanSource;
-use bookie_results::stream_result_spool::StreamResultSpoolManager;
 use tokio_util::sync::CancellationToken;
 
 use crate::model::{Cell, ColumnMeta, Diff, FindResult, PAGE_ROWS, Predicate};
@@ -359,7 +358,7 @@ async fn collect_pages(
     epoch: Epoch,
     current_epoch: &AtomicU64,
 ) -> Result<Pages, String> {
-    let spool = StreamResultSpoolManager::from_environment()
+    let spool = crate::source::spool_manager()
         .create()
         .map_err(|error| error.to_string())?;
     let mut infos: Vec<ColumnInfo> = Vec::new();
@@ -466,7 +465,7 @@ async fn query_pages(
     if cancellation.is_cancelled() {
         return Err("The operation was cancelled.".into());
     }
-    let spool = StreamResultSpoolManager::from_environment()
+    let spool = crate::source::spool_manager()
         .create()
         .map_err(|error| error.to_string())?;
     let infos: Vec<ColumnInfo> = result.columns.clone();

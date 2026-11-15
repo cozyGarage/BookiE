@@ -46,6 +46,31 @@ enum Mode {
     },
 }
 
+#[derive(Clone, Copy)]
+enum Work {
+    Load,
+    Scan,
+}
+
+struct Ticket {
+    generation: u64,
+    cancel: CancellationToken,
+}
+
+impl Ticket {
+    fn new() -> Self {
+        Self {
+            generation: 0,
+            cancel: CancellationToken::new(),
+        }
+    }
+
+    fn invalidate(&mut self) {
+        self.generation += 1;
+        self.cancel.cancel();
+    }
+}
+
 struct GridView {
     table: gpui::Entity<gpui_kit::component::table::TableState<grid_table::GridDelegate>>,
     _table_events: gpui::Subscription,
@@ -106,11 +131,11 @@ struct GridView {
     sidebar_search: Entity<TextInput>,
     cursor: MatchCursor,
     find_capped: bool,
-    operation_cancel: CancellationToken,
+    loads: Ticket,
+    scans: Ticket,
     compare: Option<std::sync::Arc<Diff>>,
     status: String,
     selection: Option<Selection>,
-    generation: u64,
     scroll: UniformListScrollHandle,
     focus: FocusHandle,
     started: Instant,
@@ -171,7 +196,7 @@ impl GridView {
         let filter = cx.new(|cx| TextInput::new("label contains 7", cx));
         cx.subscribe(&find, |this, _, event: &InputEvent, cx| match event {
             InputEvent::Changed => {
-                this.invalidate_background();
+                this.invalidate_scans();
                 this.cursor = MatchCursor::default();
                 this.status.clear();
                 cx.notify();
@@ -182,7 +207,7 @@ impl GridView {
         .detach();
         cx.subscribe(&filter, |this, _, event: &InputEvent, cx| match event {
             InputEvent::Changed => {
-                this.invalidate_background();
+                this.invalidate_scans();
                 if this.status == "Filtering…" {
                     this.status.clear();
                 }
@@ -333,11 +358,11 @@ impl GridView {
             sidebar_search,
             cursor: MatchCursor::default(),
             find_capped: false,
-            operation_cancel: CancellationToken::new(),
+            loads: Ticket::new(),
+            scans: Ticket::new(),
             compare: None,
             status: String::new(),
             selection: None,
-            generation: 0,
             scroll: UniformListScrollHandle::new(),
             focus: table_focus,
             started,
@@ -475,6 +500,7 @@ impl GridView {
         );
         let target = pattern.clone();
         self.begin_background(
+            Work::Load,
             cx,
             move |cancel| {
                 live.sample_pubsub(
@@ -499,6 +525,7 @@ impl GridView {
     fn kafka_topics(&mut self, broker: String, cx: &mut Context<Self>) {
         self.status = format!("Listing topics at {broker}…");
         self.begin_background(
+            Work::Load,
             cx,
             move |_| bookie_gpui::net_check::kafka_topics(&broker),
             |this, outcome| {
@@ -516,6 +543,7 @@ impl GridView {
         self.status = format!("Checking {address}…");
         let target = address.clone();
         self.begin_background(
+            Work::Load,
             cx,
             move |_| bookie_gpui::net_check::run_check(&target),
             move |this, outcome| {
@@ -567,6 +595,7 @@ impl GridView {
             }
             self.status = "Running…".into();
             self.begin_background(
+                Work::Load,
                 cx,
                 {
                     let statement = sql.clone();
@@ -784,18 +813,30 @@ impl GridView {
 
     fn begin_background<T: Send + 'static>(
         &mut self,
+        work_kind: Work,
         cx: &mut Context<Self>,
         work: impl FnOnce(CancellationToken) -> T + Send + 'static,
         apply: impl FnOnce(&mut Self, T) + 'static,
     ) {
-        self.invalidate_background();
-        let generation = self.generation;
+        match work_kind {
+            Work::Load => self.invalidate_background(),
+            Work::Scan => self.invalidate_scans(),
+        }
+        let ticket = match work_kind {
+            Work::Load => &mut self.loads,
+            Work::Scan => &mut self.scans,
+        };
+        let generation = ticket.generation;
         let cancel = CancellationToken::new();
-        self.operation_cancel = cancel.clone();
+        ticket.cancel = cancel.clone();
         cx.spawn(async move |this, cx| {
             let result = cx.background_executor().spawn(async move { work(cancel) }).await;
             this.update(cx, |this, cx| {
-                if this.generation == generation {
+                let current = match work_kind {
+                    Work::Load => this.loads.generation,
+                    Work::Scan => this.scans.generation,
+                };
+                if current == generation {
                     apply(this, result);
                     cx.notify();
                 }
@@ -816,6 +857,7 @@ impl GridView {
         let (source, query) = (self.source.clone(), self.find_text(cx));
         self.status = "Searching…".into();
         self.begin_background(
+            Work::Scan,
             cx,
             move |cancel| source.find(&query, MAX_FIND_MATCHES, &cancel),
             move |this, found| match found {
@@ -877,6 +919,7 @@ impl GridView {
         let label = format!("WHERE {}", self.filter.read(cx).content());
         self.status = "Filtering…".into();
         self.begin_background(
+            Work::Scan,
             cx,
             move |cancel| source.filter(&predicate, &cancel),
             move |this, kept| {
@@ -897,7 +940,7 @@ impl GridView {
     }
 
     fn clear_filter(&mut self) {
-        self.invalidate_background();
+        self.invalidate_scans();
         self.cursor = MatchCursor::default();
         self.set_mode(Mode::All);
         self.status.clear();
@@ -910,6 +953,7 @@ impl GridView {
         let source = self.source.clone();
         self.status = "Comparing…".into();
         self.begin_background(
+            Work::Scan,
             cx,
             move |cancel| source.compare(keyed, &cancel),
             |this, result| match result {
@@ -925,8 +969,12 @@ impl GridView {
     }
 
     fn invalidate_background(&mut self) {
-        self.generation += 1;
-        self.operation_cancel.cancel();
+        self.loads.invalidate();
+        self.invalidate_scans();
+    }
+
+    fn invalidate_scans(&mut self) {
+        self.scans.invalidate();
     }
 
     fn next_page(&mut self) -> bool {

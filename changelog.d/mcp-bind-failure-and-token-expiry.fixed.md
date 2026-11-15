@@ -1,0 +1,1 @@
+The MCP settings page now says when the local MCP server could not start, for example because another program holds port 17432, and new MCP tokens expire after 90 days unless you choose a different time or never.
