@@ -16,6 +16,7 @@ pub mod rmcp_server;
 mod server;
 mod tokens;
 mod tools;
+mod unix_socket;
 
 pub use auth::{McpScope, TokenPermissions, authorize_scopes};
 pub use bridge::{ConnectionProvider, McpBridge, McpLimits, TableSchema};
@@ -24,3 +25,4 @@ pub use rate_limit::RateLimiter;
 pub use server::{McpServerConfig, serve_stdio, serve_streamable_http, serve_streamable_http_until};
 pub use tokens::{McpToken, TokenStore, generate_token};
 pub use tools::{TOOL_NAMES, dispatch};
+pub use unix_socket::{default_socket_path, relay_to_socket, serve_unix_socket_until};

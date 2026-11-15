@@ -107,6 +107,14 @@ fn status_group(database: &crate::services::database_service::DatabaseService) -
         .subtitle("http://127.0.0.1:17432/mcp")
         .build();
     status_group.add(&endpoint_row);
+    if let Some(path) = bookie_mcp::default_socket_path() {
+        let socket_row = adw::ActionRow::builder()
+            .use_markup(false)
+            .title(tr!("Socket"))
+            .subtitle(tr!("{path}. Run bookie-agentd --connect-socket as the client command; set BOOKIE_MCP_HTTP=off to close the TCP port.").replace("{path}", &path.display().to_string()))
+            .build();
+        status_group.add(&socket_row);
+    }
     status_group
 }
 
