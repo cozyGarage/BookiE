@@ -11,6 +11,7 @@ mod bridge;
 mod discovery;
 mod errors;
 mod rate_limit;
+mod response_budget;
 #[cfg(feature = "rmcp-prototype")]
 pub mod rmcp_server;
 mod server;
