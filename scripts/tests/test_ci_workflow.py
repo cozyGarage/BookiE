@@ -851,6 +851,15 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertLess(checkout, safe_directory)
         self.assertLess(safe_directory, git_call)
 
+    def test_distro_floor_container_marks_workspace_safe_before_artifact_verification(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        job = re.search(r"(?ms)^  distro-floor-scenarios:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+        checkout = job.index("actions/checkout@")
+        verify = job.index("ci-gtk-artifact.py verify --package")
+        safe_directory = job.index('git config --global --add safe.directory "$GITHUB_WORKSPACE"')
+        self.assertLess(checkout, safe_directory)
+        self.assertLess(safe_directory, verify)
+
     def test_fast_checks_fetch_the_comparison_base_before_change_contracts(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         job = re.search(r"(?ms)^  unit:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
