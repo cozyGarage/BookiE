@@ -345,6 +345,21 @@ class CiWorkflowTests(unittest.TestCase):
             ).stdout.strip()
             self.assertNotEqual(revision, tagged_revision)
             self.assertEqual(output.read_text(), f"revision={tagged_revision}\n")
+            subprocess.run(["git", "-C", str(clone), "switch", "--detach", "HEAD"], check=True, capture_output=True)
+            subprocess.run(["git", "-C", str(clone), "branch", "-D", "main"], check=True, capture_output=True)
+            environment["CI_REQUESTED_REF"] = "main"
+            branch_output = root / "branch-output"
+            environment["GITHUB_OUTPUT"] = str(branch_output)
+            subprocess.run(
+                [sys.executable, str(ROOT / "scripts/check-ci-revision.py")],
+                cwd=clone,
+                env=environment,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(branch_output.read_text(), f"revision={revision}\n")
+            environment["GITHUB_OUTPUT"] = str(output)
             environment["CI_REQUESTED_REF"] = "refs/pull/12/head"
             rejected = subprocess.run(
                 [sys.executable, str(ROOT / "scripts/check-ci-revision.py")],
@@ -666,6 +681,36 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn('socket_root="${BOOKIE_GTK_FIXTURE_SHARED_DIR:-$XDG_RUNTIME_DIR}"', mysql_script)
         self.assertIn('mktemp -d "$socket_root/mysql-socket.XXXXXX"', mysql_script)
         self.assertIn('rm -rf -- "$socket_directory"', mysql_script)
+
+    def test_driver_tls_and_postgres_release_fixtures_reach_the_docker_host(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        driver_tls = re.search(r"(?ms)^  driver-tls:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
+        pg_release = re.search(r"(?ms)^  pg-release:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
+        tls_compose = (ROOT / "tests/fixtures/driver-tls/docker-compose.yml").read_text()
+        release_compose = (ROOT / "tests/fixtures/postgres-release/docker-compose.yml").read_text()
+        tls_fixture_script = (ROOT / "scripts/test-driver-tls.sh").read_text()
+        tls_test_helpers = (ROOT / "tests/driver-tls/src/lib.rs").read_text()
+
+        self.assertIn("options: --add-host=host.docker.internal:host-gateway", driver_tls)
+        self.assertIn("BOOKIE_DRIVER_TLS_HOST: host.docker.internal", driver_tls)
+        self.assertIn("BOOKIE_DRIVER_TLS_HOSTNAME: host.docker.internal", driver_tls)
+        self.assertIn("BOOKIE_FIXTURE_BIND_ADDRESS: 0.0.0.0", driver_tls)
+        self.assertEqual(
+            len(re.findall(r"(?m)^    ports:$", tls_compose)),
+            len(re.findall(r'(?m)^\s+- "\$\{BOOKIE_FIXTURE_BIND_ADDRESS:-127\.0\.0\.1\}:\d+:\d+"$', tls_compose)),
+        )
+        self.assertIn('getent ahostsv4 "$BOOKIE_DRIVER_TLS_HOST"', tls_fixture_script)
+        self.assertIn("BOOKIE_DRIVER_TLS_WRONG_IDENTITY_HOST", tls_test_helpers)
+        self.assertIn("/var/tmp/bookie-pg-release-fixtures:/var/tmp/bookie-pg-release-fixtures", pg_release)
+        self.assertIn(
+            "BOOKIE_FIXTURE_TOXIPROXY_CONFIG: /var/tmp/bookie-pg-release-fixtures/toxiproxy.json",
+            pg_release,
+        )
+        self.assertIn(
+            'cp tests/fixtures/postgres-release/toxiproxy/toxiproxy.json "$BOOKIE_FIXTURE_TOXIPROXY_CONFIG"',
+            pg_release,
+        )
+        self.assertIn("${BOOKIE_FIXTURE_TOXIPROXY_CONFIG:-./toxiproxy/toxiproxy.json}", release_compose)
 
     def test_gtk_server_jobs_retry_prepulling_their_fixture_image(self):
         for path in (".github/workflows/build-linux.yml", ".forgejo/workflows/ci.yml"):
@@ -2231,7 +2276,9 @@ class CiWorkflowTests(unittest.TestCase):
         floor_script = (ROOT / "scripts/test-distro-floor.sh").read_text()
         self.assertIn('docker build -t "$tag"', floor_script)
         self.assertIn("apt-get update\n", floor_script)
-        self.assertIn('cd /package\n      apt install -y "./$DISTRO_FLOOR_DEB_NAME"', floor_script)
+        self.assertIn("cat > /tmp/bookie.deb", floor_script)
+        self.assertIn("apt install -y /tmp/bookie.deb", floor_script)
+        self.assertNotIn("cd /package", floor_script)
         deb_package_script = (ROOT / "scripts/test-deb-package.sh").read_text()
         self.assertIn('apt install -y -qq "$older"', deb_package_script)
         self.assertIn('apt install -y -qq "$newer"', deb_package_script)

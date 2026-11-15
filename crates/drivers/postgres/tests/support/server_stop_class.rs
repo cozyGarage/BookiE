@@ -15,7 +15,7 @@ use tokio::sync::watch;
 
 use crate::{connect, start_pg};
 
-const APPLICATION: &str = "bookie_stop_class";
+pub(crate) const APPLICATION: &str = "bookie_stop_class";
 const CANCEL_REQUEST_CODE: [u8; 4] = [0x04, 0xd2, 0x16, 0x2e];
 const STOP_AFTER: Duration = Duration::from_millis(200);
 const OBSERVE_FOR: Duration = Duration::from_secs(4);
@@ -313,7 +313,6 @@ async fn stop_once(
     connection: &Arc<dyn Connection>,
     observer: &dyn Connection,
 ) -> Result<(), String> {
-    let before = backends(observer).await;
     let cancel_requests = proxy.cancel_requests();
     proxy.withhold_reply_to(marker);
     let call = tokio::spawn((case.call)(
@@ -322,6 +321,7 @@ async fn stop_once(
     ));
     let asked = proxy.wait_for_cancel_request(cancel_requests).await;
     let reached = proxy.withheld_replies() > 0;
+    let while_withheld = backends(observer).await;
     proxy.release();
     let outcome = tokio::time::timeout(Duration::from_secs(20), call)
         .await
@@ -338,7 +338,7 @@ async fn stop_once(
     if !matches!(outcome, Err(DriverError::OperationOutcomeUnknown { .. })) {
         return Err(format!("a withheld reply was reported as {outcome:?}"));
     }
-    if !a_backend_retires(observer, &before).await {
+    if !a_backend_retires(observer, &while_withheld).await {
         return Err("the backend with the uncertain statement went back to the pool".into());
     }
     Ok(())
@@ -360,7 +360,7 @@ async fn create_fixture(admin: &dyn Connection) {
     }
 }
 
-async fn backends(observer: &dyn Connection) -> BTreeSet<i64> {
+pub(crate) async fn backends(observer: &dyn Connection) -> BTreeSet<i64> {
     let result = observer
         .query_params(
             "SELECT pid::bigint FROM pg_stat_activity WHERE application_name = $1",
@@ -378,7 +378,7 @@ async fn backends(observer: &dyn Connection) -> BTreeSet<i64> {
         .collect()
 }
 
-async fn a_backend_retires(observer: &dyn Connection, before: &BTreeSet<i64>) -> bool {
+pub(crate) async fn a_backend_retires(observer: &dyn Connection, before: &BTreeSet<i64>) -> bool {
     let deadline = tokio::time::Instant::now() + OBSERVE_FOR;
     loop {
         let now = backends(observer).await;
@@ -522,13 +522,13 @@ struct ProxyState {
     hold: watch::Sender<bool>,
 }
 
-struct StallProxy {
-    port: u16,
+pub(crate) struct StallProxy {
+    pub(crate) port: u16,
     state: Arc<ProxyState>,
 }
 
 impl StallProxy {
-    async fn start(options: &ConnectOptions) -> Self {
+    pub(crate) async fn start(options: &ConnectOptions) -> Self {
         let upstream = tokio::net::lookup_host((options.host.as_str(), options.port))
             .await
             .unwrap()
@@ -552,23 +552,34 @@ impl StallProxy {
         Self { port, state }
     }
 
-    fn withhold_reply_to(&self, marker: &'static [u8]) {
+    pub(crate) fn withhold_reply_to(&self, marker: &'static [u8]) {
         self.state.withheld.store(0, Ordering::SeqCst);
         self.state.hold.send_replace(true);
         *self.state.marker.lock().unwrap() = Some(marker);
     }
 
-    fn release(&self) {
+    pub(crate) fn release(&self) {
         *self.state.marker.lock().unwrap() = None;
         self.state.hold.send_replace(false);
     }
 
-    fn withheld_replies(&self) -> usize {
+    pub(crate) fn withheld_replies(&self) -> usize {
         self.state.withheld.load(Ordering::SeqCst)
     }
 
     fn cancel_requests(&self) -> usize {
         self.state.cancel_requests.load(Ordering::SeqCst)
+    }
+
+    pub(crate) async fn wait_for_withheld_reply(&self) -> bool {
+        let deadline = tokio::time::Instant::now() + OBSERVE_FOR;
+        while tokio::time::Instant::now() < deadline {
+            if self.withheld_replies() > 0 {
+                return true;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        false
     }
 
     async fn wait_for_cancel_request(&self, seen_before: usize) -> bool {
@@ -583,6 +594,15 @@ impl StallProxy {
     }
 }
 
+pub(crate) fn contains_marker(unmatched: &mut Vec<u8>, bytes: &[u8], marker: &[u8]) -> bool {
+    unmatched.extend_from_slice(bytes);
+    let found = unmatched.windows(marker.len()).any(|window| window == marker);
+    let keep = marker.len().saturating_sub(1);
+    let discard = unmatched.len().saturating_sub(keep);
+    unmatched.drain(..discard);
+    found
+}
+
 async fn relay(client: TcpStream, upstream: SocketAddr, state: Arc<ProxyState>) {
     let Ok(server) = TcpStream::connect(upstream).await else {
         return;
@@ -595,6 +615,7 @@ async fn relay(client: TcpStream, upstream: SocketAddr, state: Arc<ProxyState>) 
     let outbound = tokio::spawn(async move {
         let mut bytes = [0; 16384];
         let mut first = true;
+        let mut unmatched = Vec::new();
         while let Ok(count) = client_read.read(&mut bytes).await {
             if count == 0 {
                 break;
@@ -604,7 +625,14 @@ async fn relay(client: TcpStream, upstream: SocketAddr, state: Arc<ProxyState>) 
                 outbound_state.cancel_requests.fetch_add(1, Ordering::SeqCst);
             }
             let marker = *outbound_state.marker.lock().unwrap();
-            if marker.is_some_and(|marker| chunk.windows(marker.len()).any(|window| window == marker)) {
+            let found = match marker {
+                Some(marker) => contains_marker(&mut unmatched, chunk, marker),
+                None => {
+                    unmatched.clear();
+                    false
+                }
+            };
+            if found {
                 *outbound_state.marker.lock().unwrap() = None;
                 outbound_withheld.store(true, Ordering::SeqCst);
                 outbound_state.withheld.fetch_add(1, Ordering::SeqCst);

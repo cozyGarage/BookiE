@@ -12,7 +12,7 @@ use secrecy::SecretString;
 /// the fixture is down or credentials are wrong. Exercise a verified control first.
 pub async fn assert_endpoint_identity_rejected(driver: &dyn bookie_core::DatabaseDriver, options: ConnectOptions) {
     let mut rejected = options.clone();
-    rejected.host = "127.0.0.1".into();
+    rejected.host = std::env::var("BOOKIE_DRIVER_TLS_WRONG_IDENTITY_HOST").unwrap_or_else(|_| "127.0.0.1".into());
     assert_certificate_rejected(driver, options, rejected).await;
 }
 

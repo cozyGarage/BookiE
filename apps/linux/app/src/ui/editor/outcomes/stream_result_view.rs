@@ -141,16 +141,22 @@ fn append_stream_export(
 fn visible_result_page(
     pages: &gtk::Stack,
     result: &StreamedResult,
-) -> Option<std::sync::Arc<bookie_core::QueryResult>> {
+) -> Option<crate::ui::export_dialog::StreamExportPage> {
     let root = pages.clone().upcast::<gtk::Widget>();
     let index = super::super::stream_view::visible_page_index(&root, result.generation)?;
-    result.resident_pages.get(index).or_else(|| {
-        result
+    let (page, lease) = result.resident_pages.get_with_lease(index).or_else(|| {
+        let page = result
             .pages
             .iter()
             .zip(result.page_indices.iter())
             .find(|(_, page_index)| **page_index == index)
-            .and_then(|(page, _)| page.upgrade())
+            .and_then(|(page, _)| page.upgrade())?;
+        let lease = result.resident_pages.retain(&page)?;
+        Some((page, lease))
+    })?;
+    Some(crate::ui::export_dialog::StreamExportPage {
+        result: page,
+        _lease: lease,
     })
 }
 

@@ -459,6 +459,10 @@ struct SessionKey {
     tls_root_cert: Option<PathBuf>,
     auth_mode: AuthMode,
     ssh: Option<SavedSshConfig>,
+    strict_encryption: bool,
+    auth_source: Option<String>,
+    connect_timeout_secs: Option<u32>,
+    attached_databases: Vec<bookie_core::AttachedDatabase>,
     material: [u8; 32],
 }
 
@@ -476,6 +480,10 @@ impl SessionKey {
             tls_root_cert: saved.tls_root_cert.clone(),
             auth_mode: saved.auth_mode,
             ssh: saved.ssh.clone(),
+            strict_encryption: saved.tls_strict_encryption,
+            auth_source: saved.auth_source.clone(),
+            connect_timeout_secs: saved.connect_timeout_secs,
+            attached_databases: saved.attached_databases.clone(),
             material,
         }
     }

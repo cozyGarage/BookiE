@@ -12,7 +12,7 @@ use bookie_core::{
     Connection, DatabaseDriver, DriverError, DriverValueInputCapabilities, ExecResult, ForeignKeyInfo,
     InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QualifiedTypeName, QueryResult,
     QueryResultBatch, ServerMessages, TableInfo, Transport, Value, check_pre_dispatch, run_controlled_setup,
-    run_server_cancellable,
+    run_server_cancellable, run_server_cancellable_preserving_transaction_rollback,
 };
 
 mod array;
@@ -571,7 +571,7 @@ impl Connection for PgConnection {
     ) -> Result<Vec<u64>, DriverError> {
         let mut connection = acquire_controlled(&self.pool, control).await?;
         let cancel_token = connection.cancel_token();
-        let result = run_server_cancellable(
+        let result = run_server_cancellable_preserving_transaction_rollback(
             transaction::begin_and_run_checked(&mut connection, statements, expect_one),
             request_cancellation(cancel_token),
             transaction::confirms_stopped_statement,

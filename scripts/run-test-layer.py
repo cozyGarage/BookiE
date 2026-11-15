@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import codecs
 import datetime
 import fcntl
 import hashlib
@@ -7,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import re
+import select
 import shutil
 import signal
 import subprocess
@@ -137,6 +139,28 @@ def stop_process(process, force=False):
         process.wait()
 
 
+def stream_process_output(process, log, timeout):
+    decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
+    deadline = time.monotonic() + timeout
+    stream = process.stdout
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise subprocess.TimeoutExpired(process.args, timeout)
+        readable, _, _ = select.select([stream], [], [], max(remaining, 0))
+        if not readable:
+            raise subprocess.TimeoutExpired(process.args, timeout)
+        chunk = os.read(stream.fileno(), 65536)
+        text = decoder.decode(chunk, final=not chunk)
+        if text:
+            log.write(text)
+            log.flush()
+            sys.stdout.write(text)
+            sys.stdout.flush()
+        if not chunk:
+            return process.wait(timeout=max(deadline - time.monotonic(), 0))
+
+
 def execute(step, log_path, cwd=ROOT):
     started = time.monotonic()
     result = dict(step, status="running", log=log_path.name)
@@ -150,11 +174,11 @@ def execute(step, log_path, cwd=ROOT):
                 step["argv"],
                 cwd=cwd,
                 env=dict(os.environ, BOOKIE_CI_REPORT_ACTIVE="1"),
-                stdout=log,
+                stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 start_new_session=True,
             )
-            result["exit_code"] = process.wait(timeout=step["timeout_seconds"])
+            result["exit_code"] = stream_process_output(process, log, step["timeout_seconds"])
         result["status"] = "passed" if result["exit_code"] == 0 else "failed"
         if result["status"] == "passed" and not execution_evidence(step["evidence"], log_path.read_text(errors="replace")):
             result.update(status="failed", reason="required test execution evidence missing")
@@ -167,6 +191,7 @@ def execute(step, log_path, cwd=ROOT):
     finally:
         if process is not None:
             stop_process(process, result["status"] in {"timed_out", "cancelled"})
+            process.stdout.close()
         result["seconds"] = round(time.monotonic() - started, 3)
     return result
 

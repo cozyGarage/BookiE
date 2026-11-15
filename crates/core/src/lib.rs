@@ -68,6 +68,7 @@ pub use numeric_input::{
 pub use operation::{
     CANCELLATION_DISPATCH_TIMEOUT, CANCELLATION_GRACE, CONTROL_SETUP_TIMEOUT, Interruption, OperationControl,
     check_pre_dispatch, run_controlled_setup, run_server_cancellable,
+    run_server_cancellable_preserving_transaction_rollback,
 };
 pub use pagination::{
     KEYSET_OFFSET_THRESHOLD, KeysetError, keyset_before_where_clause, keyset_order_by, keyset_order_by_before,

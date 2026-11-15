@@ -136,16 +136,44 @@ fn an_altered_table_retargets_and_preserves_its_foreign_keys() {
 }
 
 #[test]
-fn a_table_only_in_the_current_schema_is_dropped_last_and_marked_destructive() {
+fn a_table_only_in_the_current_schema_is_listed_last_without_an_executable_drop() {
     let extra = table("a", "legacy", vec![column("id", "integer", true, false)]);
     let mut desired = people("b");
     desired.columns.push(column("email", "text", false, true));
     let result = compare(&[extra, people("a")], &[desired]);
     assert_eq!(result.dropped, ["legacy"]);
     let alter = result.script.find("ADD COLUMN").unwrap();
-    let drop = result.script.find("DROP TABLE \"a\".\"legacy\"").unwrap();
+    let drop = result.script.find("-- DROP TABLE \"a\".\"legacy\";").unwrap();
     assert!(alter < drop, "drops come after changes: {}", result.script);
-    assert!(result.script.contains("Dropped tables (destructive)"));
+    assert!(result.script.contains("Dropped tables (commented; not executed)"));
+    assert!(
+        result
+            .script
+            .lines()
+            .filter(|line| line.contains("DROP TABLE"))
+            .all(|line| line.trim_start().starts_with("--"))
+    );
+}
+
+#[test]
+fn every_line_of_a_multiline_drop_is_commented() {
+    let result = compare_schemas(
+        "postgres",
+        Some("a\nDROP TABLE injected"),
+        &[people("a")],
+        Some("b"),
+        &[],
+    )
+    .unwrap();
+
+    let drop_lines: Vec<&str> = result
+        .script
+        .lines()
+        .filter(|line| line.contains("DROP TABLE"))
+        .collect();
+
+    assert_eq!(drop_lines.len(), 2, "{}", result.script);
+    assert!(drop_lines.iter().all(|line| line.trim_start().starts_with("--")));
 }
 
 #[test]
