@@ -366,3 +366,21 @@ fn a_stored_empty_tool_allowlist_denies_every_tool() {
     token.tool_allowlist = None;
     assert!(token.allows_tool("list_tables"));
 }
+
+#[test]
+fn the_list_shows_tokens_issued_and_revoked_by_another_store() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("tokens.json");
+    let shown = TokenStore::open(path.clone()).unwrap();
+    let other = TokenStore::open(path).unwrap();
+    assert!(shown.list().is_empty());
+
+    let (token, _) = other
+        .issue("cli".into(), TokenPermissions::ReadOnly, vec![Uuid::new_v4()], None)
+        .unwrap();
+    let listed = shown.list();
+    assert_eq!(listed.len(), 1, "a token issued elsewhere is listed");
+
+    other.revoke(token.id).unwrap();
+    assert!(shown.list()[0].revoked, "a revoke made elsewhere is listed");
+}
