@@ -16,6 +16,7 @@ struct CellFormats {
     date: Format,
     time: Format,
     date_time: Format,
+    preserved_blank: Format,
 }
 
 impl CellFormats {
@@ -24,6 +25,7 @@ impl CellFormats {
             date: Format::new().set_num_format("yyyy\\-mm\\-dd"),
             time: Format::new().set_num_format("hh:mm:ss"),
             date_time: Format::new().set_num_format("yyyy\\-mm\\-dd hh:mm:ss"),
+            preserved_blank: Format::new().set_unlocked(),
         }
     }
 }
@@ -75,6 +77,13 @@ impl ResultWriter for XlsxWriter {
                 });
             }
             write_cell(&mut self.sheet, target, cell_column, value, &self.formats)?;
+        }
+        if matches!(row.last(), Some(Value::Null)) {
+            self.sheet.write_blank(
+                target,
+                cell_column(row.len().saturating_sub(1))?,
+                &self.formats.preserved_blank,
+            )?;
         }
         Ok(())
     }
