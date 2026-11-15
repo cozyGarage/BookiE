@@ -2279,7 +2279,7 @@ class CiWorkflowTests(unittest.TestCase):
         floor_script = (ROOT / "scripts/test-distro-floor.sh").read_text()
         self.assertIn('docker build -t "$tag"', floor_script)
         self.assertIn("apt-get update\n", floor_script)
-        self.assertIn("cat > /tmp/bookie.deb", floor_script)
+        self.assertIn("tar -xf - -C /", floor_script)
         self.assertIn("apt install -y /tmp/bookie.deb", floor_script)
         self.assertNotIn("cd /package", floor_script)
         deb_package_script = (ROOT / "scripts/test-deb-package.sh").read_text()
