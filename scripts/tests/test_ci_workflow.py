@@ -75,6 +75,11 @@ def workflow_job_graph(paths, adapter_jobs=()):
                 "condition": condition_match.group(1) if condition_match else None,
                 "matrix": matrix,
             }
+            if graph[name]["condition"]:
+                for adapter in adapter_jobs:
+                    graph[name]["condition"] = graph[name]["condition"].replace(
+                        f" && needs.{adapter}.result == 'success'", ""
+                    )
     return graph
 
 
@@ -186,6 +191,18 @@ class CiWorkflowTests(unittest.TestCase):
                 self.assertIn("gtk-server-followup", graph["gtk-server-final"]["needs"])
                 for job in ("gtk-server", "gtk-server-followup", "gtk-server-final"):
                     self.assertLessEqual(len(graph[job]["matrix"]["server"]), 2)
+                source = path.read_text()
+                for job, prerequisites in (
+                    ("driver-followup", ("needs.pin-revision.result == 'success'", "needs.guards.result == 'success'", "needs.clippy.result == 'success'", "needs.test-build.result == 'success'")),
+                    ("gtk-followup", ("needs.pin-revision.result == 'success'", "needs.guards.result == 'success'", "needs.linux-build.result == 'success'")),
+                    ("gtk-server-followup", ("needs.pin-revision.result == 'success'", "needs.guards.result == 'success'", "needs.linux-build.result == 'success'")),
+                    ("gtk-server-final", ("needs.pin-revision.result == 'success'", "needs.guards.result == 'success'", "needs.linux-build.result == 'success'", "needs.gtk-server-followup.result != 'skipped'")),
+                ):
+                    body = re.search(rf"(?ms)^  {job}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", source).group(1)
+                    condition = re.search(r"(?m)^    if: (.+)$", body).group(1)
+                    self.assertIn("always()", condition)
+                    for prerequisite in prerequisites:
+                        self.assertIn(prerequisite, condition)
 
     def test_every_forgejo_gate_job_finalizes_its_runner(self):
         source = (ROOT / ".forgejo/workflows/ci.yml").read_text().split("\njobs:\n", 1)[1]
@@ -1598,7 +1615,7 @@ class CiWorkflowTests(unittest.TestCase):
                 header,
             ):
                 scheduled.add(match.group(1))
-            if re.search(r"(?m)^    if: (?:always\(\) && !cancelled\(\) && )?github.event_name != 'push'\s*$", header):
+            if re.search(r"(?m)^    if: .*github.event_name != 'push'.*$", header):
                 t1.add(match.group(1))
         self.assertEqual(scheduled, {"current-stable-clippy"})
         self.assertEqual(t1, checker.OPTIONAL_ON_PUSH)

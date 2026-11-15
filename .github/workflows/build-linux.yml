@@ -680,7 +680,7 @@ jobs:
           if-no-files-found: error
 
   gtk-followup:
-    if: always() && !cancelled() && github.event_name != 'push'
+    if: always() && !cancelled() && github.event_name != 'push' && needs.pin-revision.result == 'success' && needs.guards.result == 'success' && needs.linux-build.result == 'success'
     name: Installed GTK safety scenarios (${{ matrix.shard }})
     timeout-minutes: 60
     runs-on: ubuntu-24.04
@@ -871,7 +871,7 @@ jobs:
           if-no-files-found: error
 
   gtk-server-followup:
-    if: always() && !cancelled() && github.event_name != 'push'
+    if: always() && !cancelled() && github.event_name != 'push' && needs.pin-revision.result == 'success' && needs.guards.result == 'success' && needs.linux-build.result == 'success'
     name: Installed GTK server scenarios (${{ matrix.server }})
     timeout-minutes: 45
     runs-on: ubuntu-24.04
@@ -946,7 +946,7 @@ jobs:
           if-no-files-found: error
 
   gtk-server-final:
-    if: always() && !cancelled() && github.event_name != 'push'
+    if: always() && !cancelled() && github.event_name != 'push' && needs.pin-revision.result == 'success' && needs.guards.result == 'success' && needs.linux-build.result == 'success' && needs.gtk-server-followup.result != 'skipped'
     name: Installed GTK server scenarios (${{ matrix.server }})
     timeout-minutes: 45
     runs-on: ubuntu-24.04
@@ -1163,7 +1163,7 @@ jobs:
           if-no-files-found: error
 
   driver-followup:
-    if: always() && !cancelled() && github.event_name != 'push'
+    if: always() && !cancelled() && github.event_name != 'push' && needs.pin-revision.result == 'success' && needs.guards.result == 'success' && needs.clippy.result == 'success' && needs.test-build.result == 'success' && needs.ensure-ci-gtk-image.result == 'success'
     name: Driver integration tests (docker) (${{ matrix.group }})
     timeout-minutes: 90
     runs-on: ubuntu-24.04

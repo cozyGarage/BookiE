@@ -798,7 +798,7 @@
       "test-build"
     ],
     "timeout_minutes": 90,
-    "condition": "always() && !cancelled() && github.event_name != 'push'",
+    "condition": "always() && !cancelled() && github.event_name != 'push' && needs.pin-revision.result == 'success' && needs.guards.result == 'success' && needs.clippy.result == 'success' && needs.test-build.result == 'success'",
     "matrix": {
       "group": [
         "driver-extended",
@@ -857,7 +857,7 @@
       "pin-revision"
     ],
     "timeout_minutes": 60,
-    "condition": "always() && !cancelled() && github.event_name != 'push'",
+    "condition": "always() && !cancelled() && github.event_name != 'push' && needs.pin-revision.result == 'success' && needs.guards.result == 'success' && needs.linux-build.result == 'success'",
     "matrix": {
       "shard": [
         "3"
@@ -898,7 +898,7 @@
       "pin-revision"
     ],
     "timeout_minutes": 45,
-    "condition": "always() && !cancelled() && github.event_name != 'push'",
+    "condition": "always() && !cancelled() && github.event_name != 'push' && needs.pin-revision.result == 'success' && needs.guards.result == 'success' && needs.linux-build.result == 'success'",
     "matrix": {
       "server": [
         "postgres",
@@ -914,7 +914,7 @@
       "pin-revision"
     ],
     "timeout_minutes": 45,
-    "condition": "always() && !cancelled() && github.event_name != 'push'",
+    "condition": "always() && !cancelled() && github.event_name != 'push' && needs.pin-revision.result == 'success' && needs.guards.result == 'success' && needs.linux-build.result == 'success' && needs.gtk-server-followup.result != 'skipped'",
     "matrix": {
       "server": [
         "mysql-approval"
