@@ -81,7 +81,6 @@ pub fn start_background(database: Arc<DatabaseService>) -> Option<RunningMcpServ
     let test_port = std::env::var("BOOKIE_TEST_MCP_HTTP_PORT").ok();
     let config = server_config(test_port.as_deref());
     let server_shutdown = shutdown.clone();
-    let port = config.bind_port;
     tracing::info!(host = %config.bind_host, port = config.bind_port, "MCP HTTP server starting");
     let thread = match std::thread::Builder::new().name("bookie-mcp".into()).spawn(move || {
         let rt = match tokio::runtime::Builder::new_current_thread().enable_all().build() {
@@ -91,12 +90,7 @@ pub fn start_background(database: Arc<DatabaseService>) -> Option<RunningMcpServ
                 return;
             }
         };
-        rt.block_on(async move {
-            if let Err(e) = bookie_mcp::serve_streamable_http_until(bridge_http, config, server_shutdown).await {
-                tracing::warn!(error = %e, "MCP HTTP server stopped");
-                record_server_failure(&e, port);
-            }
-        });
+        rt.block_on(serve_http_and_socket(bridge_http, config, server_shutdown));
     }) {
         Ok(thread) => thread,
         Err(error) => {
@@ -109,6 +103,40 @@ pub fn start_background(database: Arc<DatabaseService>) -> Option<RunningMcpServ
         shutdown,
         thread: Some(thread),
     })
+}
+
+async fn serve_http_and_socket(bridge: Arc<McpBridge>, config: McpServerConfig, shutdown: CancellationToken) {
+    let port = config.bind_port;
+    let bridge_socket = bridge.clone();
+    let socket_shutdown = shutdown.clone();
+    let http = async {
+        if http_enabled(std::env::var("BOOKIE_MCP_HTTP").ok().as_deref()) {
+            if let Err(e) = bookie_mcp::serve_streamable_http_until(bridge, config, shutdown).await {
+                tracing::warn!(error = %e, "MCP HTTP server stopped");
+                record_server_failure(&e, port);
+            }
+        } else {
+            tracing::info!("MCP HTTP endpoint disabled by BOOKIE_MCP_HTTP; the socket stays available");
+            shutdown.cancelled().await;
+        }
+    };
+    let socket = async {
+        let Some(path) = bookie_mcp::default_socket_path() else {
+            tracing::warn!("XDG_RUNTIME_DIR is not set; the MCP socket is not started");
+            return;
+        };
+        if let Err(e) = bookie_mcp::serve_unix_socket_until(bridge_socket, path, socket_shutdown).await {
+            tracing::warn!(error = %e, "MCP socket stopped");
+        }
+    };
+    tokio::join!(http, socket);
+}
+
+pub fn http_enabled(setting: Option<&str>) -> bool {
+    !matches!(
+        setting.map(str::to_ascii_lowercase).as_deref(),
+        Some("off" | "0" | "false" | "no")
+    )
 }
 
 fn server_config(test_port: Option<&str>) -> McpServerConfig {
@@ -229,7 +257,8 @@ pub fn list_tokens(bridge: Option<&Arc<McpBridge>>) -> Vec<bookie_mcp::McpToken>
 #[cfg(test)]
 mod tests {
     use super::{
-        Duration, Utc, expiry_for_choice, issue_token_with_store, record_server_failure, server_config, server_failure,
+        Duration, Utc, expiry_for_choice, http_enabled, issue_token_with_store, record_server_failure, server_config,
+        server_failure,
     };
     use std::sync::Arc;
 
@@ -355,6 +384,15 @@ mod tests {
         assert_eq!(expiry_for_choice(2, now), Some(now + Duration::days(365)));
         assert_eq!(expiry_for_choice(3, now), None);
         assert_eq!(expiry_for_choice(99, now), Some(now + Duration::days(90)));
+    }
+
+    #[test]
+    fn the_http_endpoint_is_on_unless_explicitly_switched_off() {
+        assert!(http_enabled(None));
+        assert!(http_enabled(Some("on")));
+        for off in ["off", "OFF", "0", "false", "no"] {
+            assert!(!http_enabled(Some(off)), "{off}");
+        }
     }
 
     #[test]

@@ -192,6 +192,8 @@ flowchart LR
 
 The token appears once; the dialog reports whether it was saved in the system keyring. If saving fails, copy it into your MCP client configuration before closing the dialog. Every agent statement goes through the same safety checks, and agent changes follow the approval rules of the connection's environment. `bookie-agentd` runs the same server without the window, for headless use.
 
+**Connecting without a network port.** Besides the loopback address `127.0.0.1:17432`, the desktop app listens on a Unix socket at `$XDG_RUNTIME_DIR/bookie/mcp.sock`. Only your own user can open it, and the tokens work the same way. An MCP client that can start a command should use `bookie-agentd --connect-socket` as that command; it relays the client's standard input and output to the socket and needs no policy file. Pass a path after the flag for a socket in another place. To close the TCP port completely, start BookiE with `BOOKIE_MCP_HTTP=off`; the socket stays available. The socket exists only while the desktop app is running, and **Preferences → MCP** shows its path.
+
 Open **Audit Log** from the main menu to review persisted operation records. Each record shows its connection, principal, kind, outcome, row count and duration, and expands to its operation id, policy rule, stored statement and error. Statement text appears in the redacted form the journal keeps. A Local or Dev policy may allow a human write to continue after audit-intent failure without a persisted record; see [Safety](#safety).
 
 MCP data responses use the versioned `bookie-tagged-v1` format. Check `value_format` and decode each cell by `$type`; values are tagged even when they fit in a JSON number. A wide integer is returned like this:

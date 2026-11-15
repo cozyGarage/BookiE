@@ -452,3 +452,18 @@ fn the_tool_flag_repeats_and_needs_a_token_to_issue() {
     assert_eq!(parsed.tools, ["routine_source", "schema_context"]);
     assert!(Args::try_parse_from(["bookie-agentd", "--policy", "p.toml", "--tool", "list_tables"]).is_err());
 }
+
+#[test]
+fn connect_socket_needs_no_policy_but_every_other_mode_still_does() {
+    let relay = Args::try_parse_from(["bookie-agentd", "--connect-socket"]).unwrap();
+    assert_eq!(relay.connect_socket, Some(None));
+    let explicit = Args::try_parse_from(["bookie-agentd", "--connect-socket", "/run/user/1000/x.sock"]).unwrap();
+    assert_eq!(
+        explicit.connect_socket,
+        Some(Some(PathBuf::from("/run/user/1000/x.sock")))
+    );
+    assert!(
+        Args::try_parse_from(["bookie-agentd"]).is_err(),
+        "a daemon without a policy is refused"
+    );
+}
