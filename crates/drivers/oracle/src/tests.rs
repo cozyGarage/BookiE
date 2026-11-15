@@ -139,14 +139,21 @@ async fn a_timed_out_blocking_call_retires_the_session() {
     let lifecycle = Arc::new(OracleLifecycle::default());
     let started = Arc::new(AtomicBool::new(false));
     let started_in_worker = Arc::clone(&started);
-    let control = OperationControl::with_timeout(std::time::Duration::from_millis(100));
+    let (started_sender, started_receiver) = tokio::sync::oneshot::channel();
+    let (release_sender, release_receiver) = std::sync::mpsc::channel();
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(1));
     let work = run_blocking(Arc::clone(&lifecycle), Some(&control), move || {
         started_in_worker.store(true, Ordering::Release);
-        std::thread::sleep(std::time::Duration::from_millis(250));
+        let _ = started_sender.send(());
+        let _ = release_receiver.recv();
         Ok(())
     });
+    tokio::pin!(work);
 
-    let result = work.await;
+    let result = tokio::select! {
+        _ = started_receiver => work.await,
+        result = &mut work => result,
+    };
 
     assert!(started.load(Ordering::Acquire));
     assert!(matches!(
@@ -154,6 +161,7 @@ async fn a_timed_out_blocking_call_retires_the_session() {
         Err(DriverError::OperationOutcomeUnknown { source }) if matches!(*source, DriverError::TimedOut)
     ));
     assert!(lifecycle.is_retired());
+    let _ = release_sender.send(());
 }
 
 #[tokio::test]
