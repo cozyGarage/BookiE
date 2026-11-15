@@ -26,6 +26,8 @@ mod shared_container;
 #[path = "support/wire_round_trip.rs"]
 mod wire_round_trip;
 
+#[path = "support/affected_rows.rs"]
+mod affected_rows;
 #[path = "support/catalog_lookups.rs"]
 mod catalog_lookups;
 #[path = "support/connection_contracts.rs"]

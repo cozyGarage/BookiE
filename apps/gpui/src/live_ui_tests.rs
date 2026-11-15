@@ -77,7 +77,11 @@ fn clicking_another_table_of_a_live_connection_loads_it_into_the_grid(cx: &mut T
         assert_eq!(view.catalog.grid_table, table_info("orders"));
         assert_eq!(view.catalog.tables, [table_info("customers"), table_info("orders")]);
         assert_eq!(view.source.total(), 6);
-        assert!(view.source.origin().contains("concurrent changes may skip or repeat rows"));
+        assert!(
+            view.source
+                .origin()
+                .contains("concurrent changes may skip or repeat rows")
+        );
     });
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
@@ -94,7 +98,11 @@ fn clicking_another_table_of_a_live_connection_loads_it_into_the_grid(cx: &mut T
             view.tabs.current(),
             &bookie_gpui::shell::Tab::Table(table_info("customers"))
         );
-        assert!(view.source.origin().contains("concurrent changes may skip or repeat rows"));
+        assert!(
+            view.source
+                .origin()
+                .contains("concurrent changes may skip or repeat rows")
+        );
         assert!(view.status.is_empty(), "{}", view.status);
     });
 }
@@ -154,8 +162,9 @@ fn a_live_connection_runs_typed_sql_into_a_result_tab_and_refuses_writes(cx: &mu
     run(cx, "DELETE FROM orders");
     view.read_with(cx, |view, _| {
         assert_eq!(view.runs.len(), 1, "a refused write adds no result tab");
+        let failure = view.status.to_lowercase();
         assert!(
-            view.status.contains("ReadOnly") || view.status.contains("PolicyDenied"),
+            failure.contains("read-only") || failure.contains("blocked by policy"),
             "{}",
             view.status
         );
@@ -710,7 +719,7 @@ fn cancelling_a_table_switch_keeps_the_current_table(cx: &mut TestAppContext) {
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
             view.open_table_named(&table_info("beta"), window, cx);
-            view.operation_cancel.cancel();
+            view.loads.cancel.cancel();
         });
     });
     cx.executor().advance_clock(std::time::Duration::from_secs(1));
@@ -779,8 +788,8 @@ fn a_connection_that_cannot_be_opened_keeps_the_synthetic_view_and_says_why(cx: 
         assert!(view.live.is_none());
         assert_eq!(view.catalog.grid_table, table_info("synthetic_rows"));
         assert!(
-            view.status.contains("NotADatabase") || view.status.contains("Other"),
-            "{}",
+            view.status.contains("none.sqlite"),
+            "the failure must name the file that could not be opened: {}",
             view.status
         );
     });
