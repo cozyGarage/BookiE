@@ -28,8 +28,9 @@ pub(super) fn maybe_show_whats_new(app: &App, sender: ComponentSender<App>) {
 }
 
 fn present_whats_new(app: &App, running: &str, sender: ComponentSender<App>) {
-    let notes = release_updates::metainfo_release_notes(METAINFO, running)
-        .unwrap_or_else(|| format!("<p>BookiE {running}</p>"));
+    let notes = release_updates::metainfo_release_notes_text(METAINFO, running)
+        .map(|notes| crate::ui::plain_text::escape_markup(&notes))
+        .unwrap_or_else(|| crate::ui::plain_text::escape_markup(&format!("BookiE {running}")));
     let heading = bookie_app_services::tr!("What's new in BookiE {version}").replace("{version}", running);
     let dialog = adw::AlertDialog::builder()
         .heading(heading)

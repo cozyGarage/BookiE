@@ -1,6 +1,6 @@
 use super::*;
 
-use mongodb::bson::doc;
+use mongodb::bson::{Bson, DateTime, Decimal128, doc};
 
 #[test]
 fn missing_field_marker_cannot_be_bound_as_bson_null() {
@@ -87,6 +87,33 @@ fn mixed_scalar_bson_column_keeps_canonical_type_markers() {
         .into_iter()
         .collect()
     );
+}
+
+#[test]
+fn relaxed_display_keeps_nested_values_readable_and_exact() {
+    let decimal = "12345678901234567890.1234567890123".parse::<Decimal128>().unwrap();
+    let canonical = Bson::Document(doc! {
+        "int": Bson::Int32(2),
+        "long": Bson::Int64(9_007_199_254_740_993),
+        "double": Bson::Double(1.25),
+        "date": Bson::DateTime(DateTime::from_millis(1_234)),
+        "decimal": Bson::Decimal128(decimal),
+        "array": Bson::Array(vec![Bson::Int32(7), Bson::Document(doc! { "nested": Bson::Int64(8) })]),
+    })
+    .into_canonical_extjson();
+
+    assert_eq!(
+        crate::relaxed_extended_json_for_display(&canonical),
+        Some(serde_json::json!({
+            "int": 2,
+            "long": 9_007_199_254_740_993_i64,
+            "double": 1.25,
+            "date": {"$date": "1970-01-01T00:00:01.234Z"},
+            "decimal": {"$numberDecimal": "12345678901234567890.1234567890123"},
+            "array": [7, {"nested": 8}],
+        }))
+    );
+    assert!(crate::relaxed_extended_json_for_display(&serde_json::json!({"$numberLong": 7})).is_none());
 }
 
 #[test]

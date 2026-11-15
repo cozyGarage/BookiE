@@ -507,7 +507,7 @@ impl TabChangeTracker {
             let pk_values = readable_pk_values(pk_keyvalues)?;
             if driver_id == "mongodb" {
                 out.push(build_mongodb_keyed_update(schema, table, columns, &edits, &pk_values)?);
-            } else if matches!(driver_id, "postgres" | "mysql" | "mssql" | "sqlite") {
+            } else if keyed_writes_are_checked(driver_id) {
                 out.push(build_optimistic_keyed_update(
                     driver_id, schema, table, columns, &edits, &pk_values,
                 )?);
@@ -655,3 +655,7 @@ mod materialize_tests;
 
 #[cfg(test)]
 mod tests;
+
+pub fn keyed_writes_are_checked(driver_id: &str) -> bool {
+    matches!(driver_id, "postgres" | "mysql" | "mssql" | "sqlite" | "duckdb")
+}

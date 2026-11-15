@@ -951,10 +951,7 @@ fn empty_driver_input_obeys_shared_nullable_and_required_rules() {
             parse_input_for_driver("", Some(&col(data_type, true)), driver).unwrap(),
             Value::Null
         ));
-        assert!(matches!(
-            parse_input_for_driver("", Some(&col_with_default(data_type, "default")), driver).unwrap(),
-            Value::Null
-        ));
+        assert!(parse_input_for_driver("", Some(&col_with_default(data_type, "default")), driver).is_err());
         assert!(
             parse_input_for_driver("", Some(&col(data_type, false)), driver)
                 .unwrap_err()

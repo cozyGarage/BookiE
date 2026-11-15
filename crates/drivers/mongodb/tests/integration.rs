@@ -9,6 +9,8 @@ mod hostile_scram;
 mod metadata_sample_batch_budget;
 #[path = "../../shared/server_restart.rs"]
 mod server_restart;
+#[path = "support/tls_roots.rs"]
+mod tls_roots;
 #[path = "support/value_refetch_and_server_info.rs"]
 mod value_refetch_and_server_info;
 

@@ -120,6 +120,7 @@ pub(super) struct ColumnSpec {
     pub(super) table: String,
     pub(super) sender: Option<relm4::Sender<GridMsg>>,
     pub(super) connection_id: Option<uuid::Uuid>,
+    pub(super) relaxed_mongodb_json: bool,
     pub(super) tab_ctx: TabGridContext,
     pub(super) sort_enabled: bool,
     pub(super) default_min_width: Option<i32>,
@@ -137,6 +138,7 @@ pub(super) fn build_column(
         table,
         sender,
         connection_id,
+        relaxed_mongodb_json,
         tab_ctx,
         sort_enabled,
         default_min_width,
@@ -202,6 +204,7 @@ pub(super) fn build_column(
             &row,
             &tab_ctx_for_bind,
             &display_columns_for_bind,
+            relaxed_mongodb_json,
             BoundColumn {
                 index: idx,
                 editable: editable_for_bind,
@@ -327,6 +330,7 @@ fn bind_row_cell(
     row: &crate::ui::row_object::RowObject,
     context: &TabGridContext,
     display_columns: &[ColumnInfo],
+    relaxed_mongodb_json: bool,
     bound: BoundColumn<'_>,
 ) {
     let BoundColumn {
@@ -361,8 +365,10 @@ fn bind_row_cell(
         let preview = preview_for_bind(row, index, edited);
         let value = value_for_bind(source_value, preview.as_ref(), updated_value.as_ref());
         let view = match (preview.as_ref(), value) {
-            (Some(preview), _) => CellView::from_preview(preview),
-            (None, Some(value)) => cell_view_with_column_editability(value, column, column_is_editable),
+            (Some(preview), _) => CellView::from_preview(preview, relaxed_mongodb_json),
+            (None, Some(value)) => {
+                cell_view_with_column_editability(value, column, column_is_editable, relaxed_mongodb_json)
+            }
             (None, None) => return,
         };
         let highlight_rules = context.highlight_rules.as_ref();
@@ -376,6 +382,7 @@ fn bind_row_cell(
                 pending_classes,
                 column,
                 column_index: index,
+                relaxed_mongodb_json,
             },
             row,
             highlight_rules,
@@ -476,6 +483,7 @@ fn value_for_bind<'a>(
 
 struct CellBinding<'a> {
     editable: bool,
+    relaxed_mongodb_json: bool,
     pk_values: std::sync::Arc<[Value]>,
     pending_classes: Vec<&'static str>,
     column: &'a ColumnInfo,
@@ -512,6 +520,7 @@ fn bind_cell(
             is_null,
             row,
             display_columns,
+            binding.relaxed_mongodb_json,
         )
     });
     let Some(child) = item.child() else { return };
