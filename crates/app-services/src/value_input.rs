@@ -53,7 +53,7 @@ pub fn parse_input_for_column(text: &str, col: Option<&ColumnInfo>) -> Result<Va
         return Ok(Value::Text(text.to_string()));
     };
     if text.is_empty() {
-        if col.nullable || col.default_value.is_some() {
+        if col.nullable {
             return Ok(Value::Null);
         }
         if col.enum_type.is_none() && is_character_type(&col.data_type.to_ascii_lowercase()) {

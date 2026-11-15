@@ -502,6 +502,78 @@ fn keyless_tab_refuses_to_stage_deletion_of_a_persisted_row() {
 
 #[test]
 #[ignore = "requires isolated GTK display"]
+fn blank_edit_on_not_null_default_does_not_stage_a_null() {
+    relm4::gtk::init().unwrap();
+    let tab_id = Uuid::new_v4();
+    let (mut controller, observed) = launch(tab_id);
+    let mut created_at = column("created_at", false);
+    created_at.data_type = "timestamp".into();
+    created_at.nullable = false;
+    created_at.default_value = Some("CURRENT_TIMESTAMP".into());
+    let columns = vec![column("id", true), created_at];
+    controller
+        .sender()
+        .send(BrowseTabInput::ColumnsLoaded(columns.clone()))
+        .unwrap();
+    pump(&observed);
+    let request = BrowsePageRequest {
+        id: controller
+            .model()
+            .page_requests
+            .current_id()
+            .expect("a page was requested"),
+        offset: 0,
+    };
+    let original = Value::Text("2026-11-14 12:00:00".into());
+    controller
+        .sender()
+        .send(BrowseTabInput::RowsLoaded {
+            request,
+            result: QueryResult {
+                columns,
+                rows: vec![vec![Value::Int(1), original.clone()]].into(),
+                truncated: false,
+            },
+            projected_columns: None,
+            elapsed: std::time::Duration::ZERO,
+        })
+        .unwrap();
+    pump(&observed);
+    controller
+        .sender()
+        .send(BrowseTabInput::GridCellEdited {
+            row_position: 0,
+            col_index: 1,
+            new_value: String::new(),
+            value: None,
+            row_key: vec![Value::Int(1)],
+            draft_id: None,
+        })
+        .unwrap();
+    let outputs = pump(&observed);
+    let row = controller
+        .model()
+        .list_store()
+        .expect("loaded tab has a row store")
+        .item(0)
+        .unwrap()
+        .downcast::<crate::ui::row_object::RowObject>()
+        .unwrap();
+    assert_eq!(pending(&controller), 0, "refused input must not stage a change");
+    assert_eq!(transactions(&outputs), 0, "refused input must not dispatch a save");
+    assert_eq!(row.cell_value(1), original);
+    assert_eq!(
+        outputs
+            .iter()
+            .filter(|output| matches!(output, BrowseTabOutput::ShowToast(_)))
+            .count(),
+        1
+    );
+    controller.detach_runtime();
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
 fn stale_row_edit_null_delete_and_paste_messages_do_not_mutate_the_rebound_row() {
     relm4::gtk::init().unwrap();
     let tab_id = Uuid::new_v4();

@@ -530,6 +530,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::browse_tab::save_in_flight_tests::blank_edit_on_not_null_default_does_not_stage_a_null"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::browse_tab::save_in_flight_tests::bulk_cancel_tests::dismissing_bulk_delete_preserves_selected_drafts"
     ],
     [

@@ -136,6 +136,11 @@ async fn an_agent_write_the_approval_dialog_cannot_show_in_full_is_denied_withou
         long.as_str(),
         "UPDATE items SET memo = '\u{202E}reversed' WHERE id = 1",
         "UPDATE items SET memo = 'zero\u{200B}width' WHERE id = 1",
+        "UPDATE items SET memo = 'soft\u{00AD}hyphen' WHERE id = 1",
+        "UPDATE items SET memo = 'join\u{034F}er' WHERE id = 1",
+        "UPDATE items SET memo = 'variation\u{FE0F}selector' WHERE id = 1",
+        "UPDATE items SET memo = 'tag\u{E0061}' WHERE id = 1",
+        "UPDATE items SET memo = 'reserved\u{2065}' WHERE id = 1",
     ] {
         let (guard, prompts, executes) = counting_rig(agent());
 
@@ -165,9 +170,13 @@ async fn an_ordinary_agent_write_and_a_long_human_write_are_still_asked_and_run(
         .execute("UPDATE items SET memo = 'line one\nline two' WHERE id = 1")
         .await
         .expect("a readable agent statement is approved normally");
+    guard
+        .execute("UPDATE items SET memo = 'cafe\u{0301} 東京' WHERE id = 1")
+        .await
+        .expect("combining marks and international text remain readable");
     assert_eq!(
         (prompts.load(Ordering::SeqCst), executes.load(Ordering::SeqCst)),
-        (1, 1)
+        (2, 2)
     );
 
     let (guard, prompts, executes) = counting_rig(Principal::human_gui());
