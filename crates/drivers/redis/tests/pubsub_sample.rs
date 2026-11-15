@@ -4,12 +4,15 @@ use std::time::Duration;
 use bookie_core::{ConnectOptions, TlsConfig};
 use drivers_redis::sample_pubsub;
 use testcontainers_modules::redis::Redis;
+use testcontainers_modules::testcontainers::ImageExt;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
+
+const REDIS_TEST_TAG: &str = "7.4.12-alpine3.22";
 
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn a_pattern_sample_collects_published_messages_up_to_the_limit() {
-    let container = Redis::default().start().await.unwrap();
+    let container = Redis::default().with_tag(crate::REDIS_TEST_TAG).start().await.unwrap();
     let port = container.get_host_port_ipv4(6379).await.unwrap();
     let host = container.get_host().await.unwrap().to_string();
     let options = ConnectOptions {
@@ -48,7 +51,7 @@ async fn a_pattern_sample_collects_published_messages_up_to_the_limit() {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn a_quiet_channel_ends_at_the_window_with_no_messages() {
-    let container = Redis::default().start().await.unwrap();
+    let container = Redis::default().with_tag(crate::REDIS_TEST_TAG).start().await.unwrap();
     let options = ConnectOptions {
         host: container.get_host().await.unwrap().to_string(),
         port: container.get_host_port_ipv4(6379).await.unwrap(),

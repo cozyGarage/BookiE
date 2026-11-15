@@ -16,8 +16,12 @@ async fn mysql_accepts_a_query_through_a_local_socket_file() {
     std::fs::set_permissions(socket_directory.path(), std::fs::Permissions::from_mode(0o777))
         .expect("make socket directory accessible to the container");
     let image = Mysql::default()
+        .with_tag(crate::MYSQL_TEST_TAG)
         .with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test")
-        .with_cmd(["--default-authentication-plugin=mysql_native_password"])
+        .with_cmd([
+            "--mysql-native-password=ON",
+            "--authentication-policy=mysql_native_password",
+        ])
         .with_mount(Mount::bind_mount(
             socket_directory.path().to_string_lossy().to_string(),
             "/var/run/mysqld",
