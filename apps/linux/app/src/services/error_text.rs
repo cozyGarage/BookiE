@@ -68,10 +68,6 @@ pub fn transport_message(error: bookie_transport::TransportError) -> String {
     open_failure_message(&bookie_app_services::open_failure::OpenFailure::from(error))
 }
 
-pub fn keyring_message(failure: &bookie_storage::KeyringFailure) -> String {
-    bookie_app_services::driver_failure_message::keyring_message(failure)
-}
-
 #[cfg(test)]
 #[path = "error_text_tests.rs"]
 mod tests;
