@@ -68,7 +68,7 @@ use super::history_dialog::HistoryDialog;
 use super::welcome_view::{WelcomeView, WelcomeViewInit, WelcomeViewOutput};
 use crate::services::database_service::ConnectionHealth;
 
-pub use msg::AppMsg;
+pub use msg::{AppMsg, ConnectionMessage};
 use render::qualified_label;
 use types::{CLOSED_TABS_CAPACITY, ConnectionSwitch, ConnectionTransition, ExportFormat, StatusKind, SwitchDecision};
 pub use types::{ClosedTabDescriptor, EditorTabSlot, OpenMode, StructureTabSlot, TableTabSlot, WorkspaceTab};
@@ -308,7 +308,7 @@ impl SimpleComponent for App {
                     pack_start = &gtk::Button {
                         set_icon_name: "list-add-symbolic",
                         set_tooltip_text: Some(bookie_app_services::tr!("New connection").as_str()),
-                        connect_clicked => AppMsg::OpenConnect,
+                        connect_clicked => AppMsg::Connection(ConnectionMessage::Open),
                     },
 
                     #[name = "saved_connections_button"]
@@ -538,7 +538,7 @@ impl SimpleComponent for App {
                 registry: registry.clone(),
             })
             .forward(sender.input_sender(), |out| match out {
-                WelcomeViewOutput::OpenConnect => AppMsg::OpenConnect,
+                WelcomeViewOutput::OpenConnect => AppMsg::Connection(ConnectionMessage::Open),
                 WelcomeViewOutput::ImportUrl => AppMsg::ImportConnectionUrl,
                 WelcomeViewOutput::OpenSaved(saved) => AppMsg::OpenSaved(*saved),
                 WelcomeViewOutput::ToggleFavorite(id) => AppMsg::ToggleConnectionFavorite(id),
@@ -747,12 +747,7 @@ impl SimpleComponent for App {
             AppMsg::GridEditsPrepared { intent, ticket, result } => {
                 self.grid_edits_prepared(intent, ticket, result, sender)
             }
-            AppMsg::OpenConnect => self.on_open_connect(sender),
-            AppMsg::ConnectionPrepared(prepared) => self.on_connection_prepared(prepared, sender),
-            AppMsg::ConnectionPrepareFailed(message, saved) => {
-                self.on_connection_prepare_failed(message, *saved, sender)
-            }
-            AppMsg::ConnectionSwitchDecision(decision) => self.on_connection_switch_decision(decision, sender),
+            AppMsg::Connection(message) => self.on_connection_message(message, sender),
             AppMsg::Disconnect => self.on_disconnect(sender),
             AppMsg::ForceDisconnect => self.request_disconnect(sender),
             AppMsg::PrepareWindowClose => self.prepare_window_close(sender),
@@ -772,7 +767,6 @@ impl SimpleComponent for App {
             AppMsg::SessionTeardownCompleted { action, result } => {
                 self.on_session_teardown_completed(action, result, sender);
             }
-            AppMsg::DialogClosed => self.on_connect_dialog_closed(),
             AppMsg::SelectTable {
                 schema,
                 name,
@@ -1114,8 +1108,6 @@ impl SimpleComponent for App {
                 statement,
             } => self.on_copy_row_as_statement(tab_id, &row_positions, statement),
             AppMsg::DeleteConnection(id) => self.on_delete_connection(id, sender),
-            AppMsg::CancelConnect => self.on_cancel_connect(),
-            AppMsg::ConnectionCancelled => self.on_connection_cancelled(),
             AppMsg::ContinueSessionRestore => self.continue_session_restore(sender),
             AppMsg::EditConnection(saved) => self.on_edit_connection(saved, sender),
             AppMsg::EditConnectionLoaded(prefill) => self.open_connect_dialog(Some(*prefill), sender),

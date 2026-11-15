@@ -166,9 +166,11 @@ fn force_dismissing_pending_connection_switch_preserves_workspace() {
         path,
         _directory,
     } = dirty_editor();
-    controller.emit(AppMsg::OpenConnect);
+    controller.emit(AppMsg::Connection(ConnectionMessage::Open));
     spin_until(|| controller.model().switch.transition == ConnectionTransition::Connecting);
-    controller.emit(AppMsg::ConnectionPrepared(Box::new(prepared_sqlite_connection())));
+    controller.emit(AppMsg::Connection(ConnectionMessage::Prepared(Box::new(
+        prepared_sqlite_connection(),
+    ))));
     spin_until(|| controller.widget().visible_dialog().is_some());
     let dialog = controller.widget().visible_dialog().unwrap();
     dialog.force_close();
@@ -223,9 +225,11 @@ fn force_dismissing_running_query_switch_preserves_the_editor() {
     {
         slot.running = true;
     }
-    controller.emit(AppMsg::OpenConnect);
+    controller.emit(AppMsg::Connection(ConnectionMessage::Open));
     spin_until(|| controller.model().switch.transition == ConnectionTransition::Connecting);
-    controller.emit(AppMsg::ConnectionPrepared(Box::new(prepared_sqlite_connection())));
+    controller.emit(AppMsg::Connection(ConnectionMessage::Prepared(Box::new(
+        prepared_sqlite_connection(),
+    ))));
     spin_until(|| controller.widget().visible_dialog().is_some());
     let dialog = controller.widget().visible_dialog().unwrap();
     dialog.force_close();

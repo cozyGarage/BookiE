@@ -208,7 +208,10 @@ where
     async fn handle_message(&self, request: JsonValue, calls: &mut tokio::task::JoinSet<()>) -> Result<(), String> {
         let id = request.get("id").cloned().unwrap_or(JsonValue::Null);
         let method = request.get("method").and_then(|m| m.as_str()).unwrap_or("");
-        let params = request.get("params").cloned().unwrap_or(json!({}));
+        let mut params = request.get("params").cloned().unwrap_or(json!({}));
+        if let Some(token) = self.bridge.default_token() {
+            add_token(&mut params, token);
+        }
         let response = match method {
             "notifications/initialized" | "initialized" => return Ok(()),
             "notifications/cancelled" => {
@@ -219,6 +222,7 @@ where
                 Some(refusal) => refusal,
                 None => return Ok(()),
             },
+            _ if request.get("id").is_none() => return Ok(()),
             other => immediate_response(&self.bridge, other, id, &params),
         };
         self.reply(response).await
@@ -322,12 +326,33 @@ fn call_response(id: JsonValue, result: Result<JsonValue, crate::errors::McpTool
 
 /// Shared lookup for every method that requires a token: `params.token`,
 /// `params._meta.authorization`, then (for `tools/call`) `arguments.token`.
-fn extract_token_str(params: &JsonValue) -> Option<&str> {
+pub(crate) fn extract_token_str(params: &JsonValue) -> Option<&str> {
     params
         .get("token")
         .and_then(|v| v.as_str())
         .or_else(|| params.pointer("/_meta/authorization").and_then(|v| v.as_str()))
         .or_else(|| params.pointer("/arguments/token").and_then(|v| v.as_str()))
+}
+
+fn add_token(params: &mut JsonValue, token: &str) {
+    if extract_token_str(params).is_some() {
+        return;
+    }
+    if let Some(object) = params.as_object_mut()
+        && let Some(meta) = object.entry("_meta").or_insert_with(|| json!({})).as_object_mut()
+    {
+        meta.insert("authorization".into(), json!(token));
+    }
+}
+
+fn bearer_token(headers: &HeaderMap) -> Option<&str> {
+    headers
+        .get(axum::http::header::AUTHORIZATION)?
+        .to_str()
+        .ok()?
+        .strip_prefix("Bearer ")
+        .map(str::trim)
+        .filter(|token| !token.is_empty())
 }
 
 async fn handle_tool_call(bridge: &McpBridge, params: JsonValue) -> Result<JsonValue, crate::errors::McpToolError> {
@@ -641,7 +666,13 @@ async fn process_http_request(bridge: Arc<McpBridge>, headers: HeaderMap, body: 
     }
     let id = body.get("id").cloned().unwrap_or(JsonValue::Null);
     let method = body.get("method").and_then(|m| m.as_str()).unwrap_or("");
-    let params = body.get("params").cloned().unwrap_or(json!({}));
+    if body.get("id").is_none() && !method.is_empty() {
+        return StatusCode::ACCEPTED.into_response();
+    }
+    let mut params = body.get("params").cloned().unwrap_or(json!({}));
+    if let Some(token) = bearer_token(&headers) {
+        add_token(&mut params, token);
+    }
     let result = match method {
         "tools/call" => match handle_tool_call(&bridge, params).await {
             Ok(content) => Ok(json!({
@@ -651,6 +682,7 @@ async fn process_http_request(bridge: Arc<McpBridge>, headers: HeaderMap, body: 
             Err(error) => Ok(tool_error_result(&error)),
         },
         "tools/list" => handle_tools_list(&bridge, &params),
+        "ping" => Ok(json!({})),
         "initialize" => match initialize_result(&params) {
             Ok(result) => Ok(result),
             Err(message) => return Json(json_rpc_error(&id, -32602, message)).into_response(),

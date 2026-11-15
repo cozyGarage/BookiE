@@ -14,4 +14,5 @@ pub mod stream_page_index;
 pub mod stream_page_window;
 pub mod stream_result_spool;
 pub mod text_match;
+pub mod uuid_display;
 pub mod value_exact;

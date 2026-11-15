@@ -1,5 +1,7 @@
+from contextlib import redirect_stdout
 import hashlib
 import importlib.util
+import io
 import json
 import os
 import platform
@@ -13,6 +15,18 @@ ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location("prebuilt_tests", ROOT / "scripts/run-prebuilt-tests.py")
 runner = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(runner)
+
+
+class FakeProcess:
+    def __init__(self, output, returncode=0, before_wait=None):
+        self.stdout = iter(output.splitlines(keepends=True))
+        self.returncode = returncode
+        self.before_wait = before_wait
+
+    def wait(self):
+        if self.before_wait:
+            self.before_wait()
+        return self.returncode
 
 
 class PrebuiltTestRunnerTests(unittest.TestCase):
@@ -69,14 +83,14 @@ class PrebuiltTestRunnerTests(unittest.TestCase):
         self.index['package_directories']['sample'] = '.'
         (self.root / 'index.json').write_text(json.dumps(self.index))
         command = [str(self.binary)]
-        empty = subprocess.CompletedProcess(command, 0, 'test result: ok. 0 passed; 0 failed;\n')
-        passed = subprocess.CompletedProcess(command, 0, 'test result: ok. 1 passed; 0 failed;\n')
+        empty = FakeProcess('test result: ok. 0 passed; 0 failed;\n')
+        passed = FakeProcess('test result: ok. 1 passed; 0 failed;\n')
         with patch.object(runner, 'ROOT', self.root), patch.object(runner, 'commands', return_value=[command, command]), \
-             patch.object(runner.subprocess, 'run', side_effect=[empty, passed]), \
+             patch.object(runner.subprocess, 'Popen', side_effect=[empty, passed]), \
              patch.dict(os.environ, {'BOOKIE_TEST_BUNDLE': str(self.root)}):
             self.assertEqual(runner.main(), 0)
         with patch.object(runner, 'ROOT', self.root), patch.object(runner, 'commands', return_value=[command]), \
-             patch.object(runner.subprocess, 'run', return_value=empty), \
+             patch.object(runner.subprocess, 'Popen', return_value=FakeProcess('test result: ok. 0 passed; 0 failed;\n')), \
              patch.dict(os.environ, {'BOOKIE_TEST_BUNDLE': str(self.root)}), \
              self.assertRaisesRegex(ValueError, 'no prebuilt tests executed'):
             runner.main()
@@ -87,9 +101,9 @@ class PrebuiltTestRunnerTests(unittest.TestCase):
         alias = self.root.with_name(f'{self.root.name}-alias')
         alias.symlink_to(self.root, target_is_directory=True)
         command = [str(alias / self.binary.name)]
-        result = subprocess.CompletedProcess(command, 0, 'test result: ok. 1 passed; 0 failed;\n')
+        result = FakeProcess('test result: ok. 1 passed; 0 failed;\n')
         with patch.object(runner, 'ROOT', self.root), patch.object(runner, 'commands', return_value=[command]), \
-             patch.object(runner.subprocess, 'run', return_value=result), \
+             patch.object(runner.subprocess, 'Popen', return_value=result), \
              patch.dict(os.environ, {'BOOKIE_TEST_BUNDLE': str(self.root)}):
             self.assertEqual(runner.main(), 0)
 
@@ -101,8 +115,9 @@ class PrebuiltTestRunnerTests(unittest.TestCase):
             'test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 86 filtered out\n'
             'test result: ok. 86 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out\n'
         )
+        process = FakeProcess(output)
         with patch.object(runner, 'ROOT', self.root), patch.object(runner, 'commands', return_value=[command]), \
-             patch.object(runner.subprocess, 'run', return_value=subprocess.CompletedProcess(command, 0, output)), \
+             patch.object(runner.subprocess, 'Popen', return_value=process), \
              patch.dict(os.environ, {'BOOKIE_TEST_BUNDLE': str(self.root)}):
             self.assertEqual(runner.main(), 0)
 
@@ -112,11 +127,28 @@ class PrebuiltTestRunnerTests(unittest.TestCase):
         command = [str(self.binary)]
         with patch.object(runner, 'ROOT', self.root), patch.object(runner, 'commands', return_value=[command]), \
              patch.dict(os.environ, {'BOOKIE_TEST_BUNDLE': str(self.root)}):
-            with patch.object(runner.subprocess, 'run', return_value=subprocess.CompletedProcess(command, 101, '')):
+            failed = FakeProcess('', returncode=101)
+            with patch.object(runner.subprocess, 'Popen', return_value=failed):
                 self.assertEqual(runner.main(), 101)
-            with patch.object(runner.subprocess, 'run', return_value=subprocess.CompletedProcess(command, 0, '')), \
+            completed = FakeProcess('')
+            with patch.object(runner.subprocess, 'Popen', return_value=completed), \
                  self.assertRaisesRegex(ValueError, 'execution evidence missing'):
                 runner.main()
+
+    def test_test_output_is_forwarded_before_the_process_exits(self):
+        self.index['package_directories']['sample'] = '.'
+        (self.root / 'index.json').write_text(json.dumps(self.index))
+        command = [str(self.binary)]
+        output = io.StringIO()
+        process = FakeProcess(
+            'test sample::slow_case ... ok\n'
+            'test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n',
+            before_wait=lambda: self.assertIn('test sample::slow_case ... ok\n', output.getvalue()),
+        )
+        with patch.object(runner, 'ROOT', self.root), patch.object(runner, 'commands', return_value=[command]), \
+             patch.object(runner.subprocess, 'Popen', return_value=process), \
+             patch.dict(os.environ, {'BOOKIE_TEST_BUNDLE': str(self.root)}), redirect_stdout(output):
+            self.assertEqual(runner.main(), 0)
 
     def test_missing_target_fails_instead_of_building_or_running_zero_tests(self):
         with self.assertRaises(ValueError):

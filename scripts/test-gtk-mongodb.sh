@@ -41,7 +41,9 @@ for command_name in docker dbus-run-session gnome-keyring-daemon secret-tool; do
   fi
 done
 
-container="$(docker run --rm --detach --label "com.bookie.test-run=${BOOKIE_TEST_RUN_ID:-local-$$}" --publish 127.0.0.1::27017 mongo:7 --bind_ip_all)"
+source "$ROOT/scripts/gtk-fixture-host.sh"
+
+container="$(docker run --rm --detach --label "com.bookie.test-run=${BOOKIE_TEST_RUN_ID:-local-$$}" --publish "$fixture_bind_address::27017" mongo:7 --bind_ip_all)"
 cleanup() {
   docker rm --force "$container" >/dev/null 2>&1 || true
 }
@@ -67,7 +69,7 @@ docker exec "$container" mongosh --quiet bookie_test --eval \
   'db.people.insertMany([{_id: 1, name: "Ada Lovelace", note: "keep"}, {_id: 2, name: "Grace Hopper", note: "untouched"}])' >/dev/null
 
 BOOKIE_GTK_MONGODB_CONTAINER="$container" \
-  BOOKIE_GTK_MONGODB_HOST=127.0.0.1 \
+  BOOKIE_GTK_MONGODB_HOST="$fixture_host" \
   BOOKIE_GTK_MONGODB_PORT="$port" \
   BOOKIE_GTK_SCENARIO="${BOOKIE_GTK_SCENARIO:-mongodb_grid_observes_cursor_values_until_refresh_and_edits_native_row}" \
   bash "$ROOT/scripts/test-gtk-safety.sh"

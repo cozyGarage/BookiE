@@ -41,7 +41,9 @@ for command_name in docker dbus-run-session gnome-keyring-daemon secret-tool; do
   fi
 done
 
-container="$(docker run --rm --detach --label "com.bookie.test-run=${BOOKIE_TEST_RUN_ID:-local-$$}" --publish 127.0.0.1::8123 \
+source "$ROOT/scripts/gtk-fixture-host.sh"
+
+container="$(docker run --rm --detach --label "com.bookie.test-run=${BOOKIE_TEST_RUN_ID:-local-$$}" --publish "$fixture_bind_address::8123" \
   --env CLICKHOUSE_PASSWORD=bookie \
   --env CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1 \
   clickhouse/clickhouse-server:24.8)"
@@ -81,7 +83,7 @@ printf 'bookie' | secret-tool store --label='BookiE GTK ClickHouse fixture' \
 BOOKIE_GTK_KEYRING_READY=1 \
   BOOKIE_GTK_DBUS_ACTIVE=1 \
   BOOKIE_GTK_CLICKHOUSE_CONTAINER="$container" \
-  BOOKIE_GTK_CLICKHOUSE_HOST=127.0.0.1 \
+  BOOKIE_GTK_CLICKHOUSE_HOST="$fixture_host" \
   BOOKIE_GTK_CLICKHOUSE_PORT="$port" \
   BOOKIE_GTK_SCENARIO="${BOOKIE_GTK_SCENARIO:-clickhouse_enum_grid_displays_native_labels_without_unique_row_identity,clickhouse_structure_distinguishes_unavailable_foreign_keys}" \
   bash "$ROOT/scripts/test-gtk-safety.sh"

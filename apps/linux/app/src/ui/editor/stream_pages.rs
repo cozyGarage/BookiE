@@ -62,6 +62,10 @@ impl ResidentPageStore {
         Self(Arc::new(Mutex::new(HashMap::new())), budget)
     }
 
+    pub(super) fn with_shared_budget(&self) -> Self {
+        Self::with_budget(self.1.clone())
+    }
+
     #[cfg(test)]
     pub(super) fn from_pages(pages: impl IntoIterator<Item = (u64, Arc<QueryResult>)>) -> Self {
         let budget = bookie_results::stream_page_budget::StreamPageBudget::default();

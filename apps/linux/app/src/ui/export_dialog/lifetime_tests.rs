@@ -75,6 +75,7 @@ fn a_running_export_counts_as_busy_work_until_it_finishes() {
         file::ExportJob {
             path: path.clone(),
             source: file::JobSource::Loaded(result),
+            retained_page: None,
             format: ExportFormat::Csv,
             options: bookie_core::export::CsvOptions::default(),
             driver_id: "sqlite".into(),

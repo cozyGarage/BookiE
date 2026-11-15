@@ -36,7 +36,8 @@ impl App {
         toast.set_timeout(0);
         toast.set_button_label(Some(&bookie_app_services::tr!("Cancel")));
         let cancel_sender = sender.clone();
-        toast.connect_button_clicked(move |_| cancel_sender.input(AppMsg::CancelConnect));
+        toast
+            .connect_button_clicked(move |_| cancel_sender.input(AppMsg::Connection(super::ConnectionMessage::Cancel)));
         self.toast_overlay.add_toast(toast.clone());
         self.connect_progress_toast = Some(toast);
     }

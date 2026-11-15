@@ -20,6 +20,7 @@ pub(super) enum JobSource {
 pub(super) struct ExportJob {
     pub(super) path: std::path::PathBuf,
     pub(super) source: JobSource,
+    pub(super) retained_page: Option<super::StreamExportPage>,
     pub(super) format: super::ExportFormat,
     pub(super) options: CsvOptions,
     pub(super) driver_id: String,
@@ -28,6 +29,7 @@ pub(super) struct ExportJob {
 }
 
 fn write_export(job: ExportJob, cancel: &CancellationToken, completed: &AtomicUsize) -> Result<(), ExportError> {
+    let _retained_page = job.retained_page;
     if matches!(
         &job.source,
         JobSource::Paged {

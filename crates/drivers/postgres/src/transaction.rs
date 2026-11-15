@@ -1,11 +1,26 @@
 use super::*;
 
-pub(super) async fn execute_in_transaction_checked(
-    pool: &Pool<Postgres>,
+pub(super) async fn begin_and_run_checked(
+    connection: &mut sqlx::PgConnection,
     statements: &[(String, Vec<Value>)],
     expect_one: &[usize],
 ) -> Result<Vec<u64>, DriverError> {
-    let mut tx = pool.begin().await.map_err(map_sqlx_error)?;
+    let transaction = connection.begin().await.map_err(map_sqlx_error)?;
+    run_checked(transaction, statements, expect_one).await
+}
+
+pub(super) fn confirms_stopped_statement(error: &DriverError) -> bool {
+    match error {
+        DriverError::Transaction { source, .. } => confirms_cancellation(source),
+        other => confirms_cancellation(other),
+    }
+}
+
+pub(super) async fn run_checked(
+    mut tx: sqlx::Transaction<'_, Postgres>,
+    statements: &[(String, Vec<Value>)],
+    expect_one: &[usize],
+) -> Result<Vec<u64>, DriverError> {
     let xid: i64 = sqlx::query_scalar("SELECT pg_catalog.txid_current()")
         .fetch_one(&mut *tx)
         .await
