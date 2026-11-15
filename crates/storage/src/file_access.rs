@@ -174,12 +174,13 @@ mod tests {
         let path = dir.path().join("connections.json");
         let first_marker = dir.path().join("first-acquired");
         let second_marker = dir.path().join("second-acquired");
+        let release = dir.path().join("release-first");
         let executable = std::env::current_exe().unwrap();
         let mut first = Command::new(&executable)
             .args(["--exact", "file_access::tests::subprocess_holds_path_lock", "--ignored"])
             .env("BOOKIE_LOCK_TEST_PATH", &path)
             .env("BOOKIE_LOCK_TEST_MARKER", &first_marker)
-            .env("BOOKIE_LOCK_TEST_HOLD_MS", "500")
+            .env("BOOKIE_LOCK_TEST_RELEASE", &release)
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()
@@ -189,7 +190,6 @@ mod tests {
             .args(["--exact", "file_access::tests::subprocess_holds_path_lock", "--ignored"])
             .env("BOOKIE_LOCK_TEST_PATH", &path)
             .env("BOOKIE_LOCK_TEST_MARKER", &second_marker)
-            .env("BOOKIE_LOCK_TEST_HOLD_MS", "0")
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()
@@ -197,6 +197,7 @@ mod tests {
 
         std::thread::sleep(Duration::from_millis(100));
         assert!(!second_marker.exists());
+        std::fs::write(&release, b"go").unwrap();
         assert!(first.wait().unwrap().success());
         assert!(second.wait().unwrap().success());
         assert!(second_marker.exists());
@@ -215,9 +216,10 @@ mod tests {
     async fn subprocess_holds_path_lock() {
         let path = PathBuf::from(std::env::var_os("BOOKIE_LOCK_TEST_PATH").unwrap());
         let marker = PathBuf::from(std::env::var_os("BOOKIE_LOCK_TEST_MARKER").unwrap());
-        let hold_ms: u64 = std::env::var("BOOKIE_LOCK_TEST_HOLD_MS").unwrap().parse().unwrap();
         let _guard = lock_path(&path).await.unwrap();
         std::fs::write(marker, b"acquired").unwrap();
-        std::thread::sleep(Duration::from_millis(hold_ms));
+        if let Some(release) = std::env::var_os("BOOKIE_LOCK_TEST_RELEASE") {
+            wait_for_path(Path::new(&release));
+        }
     }
 }
