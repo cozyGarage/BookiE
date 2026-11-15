@@ -44,13 +44,16 @@ source "$ROOT/scripts/gtk-fixture-host.sh"
 
 socket_root="${BOOKIE_GTK_FIXTURE_SHARED_DIR:-$XDG_RUNTIME_DIR}"
 mkdir -p "$socket_root"
-socket_directory="$(mktemp -d "$socket_root/mysql-socket.XXXXXX")"
+socket_parent="$(mktemp -d "$socket_root/mysql-socket.XXXXXX")"
+socket_directory="$socket_parent/run"
+mkdir "$socket_directory"
+chmod 0777 "$socket_directory"
 
 cleanup() {
   if [[ -n "${container:-}" ]]; then
     docker rm --force "$container" >/dev/null 2>&1 || true
   fi
-  rm -rf -- "$socket_directory"
+  rm -rf -- "$socket_parent"
 }
 trap cleanup EXIT
 
