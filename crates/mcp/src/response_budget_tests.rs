@@ -39,6 +39,23 @@ fn metadata_that_cannot_fit_is_returned_as_an_error() {
 }
 
 #[test]
+fn truncation_marker_reserves_space_before_keeping_rows() {
+    let response = json!({
+        "plan_rows": [["first row"], ["second row is long enough to fund the marker"], ["third row"]],
+    });
+    let largest_prefix_without_marker = json!({
+        "plan_rows": [["first row"], ["second row is long enough to fund the marker"]],
+    });
+    let limit = encoded_size(&largest_prefix_without_marker).unwrap();
+
+    let bounded = enforce_response_budget(response, limit).unwrap();
+
+    assert_eq!(bounded["plan_rows"].as_array().unwrap().len(), 1);
+    assert_eq!(bounded["truncated"], true);
+    assert!(encoded_size(&bounded).unwrap() <= limit);
+}
+
+#[test]
 fn row_arrays_are_counted_without_allocating_a_serialized_copy() {
     let response = json!({"rows": [["value"]]});
     let encoded = serde_json::to_vec(&response).unwrap();

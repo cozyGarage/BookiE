@@ -13,7 +13,12 @@ pub(crate) fn enforce_response_budget(mut response: Value, limit: usize) -> Resu
     if base_bytes > limit {
         return Err("tool response metadata exceeds the configured byte limit".into());
     }
-    let mut remaining = limit - base_bytes;
+    let marker_bytes = truncation_marker_growth(&response)?;
+    let mut remaining = limit.saturating_sub(base_bytes);
+    if marker_bytes > remaining {
+        return Err("tool response metadata exceeds the configured byte limit".into());
+    }
+    remaining -= marker_bytes;
     let mut truncated = false;
     fit_rows(&mut response, &mut remaining, &mut truncated)?;
     if truncated && let Some(object) = response.as_object_mut() {
@@ -23,6 +28,19 @@ pub(crate) fn enforce_response_budget(mut response: Value, limit: usize) -> Resu
         return Err("tool response exceeds the configured byte limit".into());
     }
     Ok(response)
+}
+
+fn truncation_marker_growth(response: &Value) -> Result<usize, String> {
+    let Some(object) = response.as_object() else {
+        return Ok(0);
+    };
+    let Some(existing) = object.get("truncated") else {
+        return Ok(encoded_size("truncated")?
+            .saturating_add(1)
+            .saturating_add(encoded_size(&true)?)
+            .saturating_add(usize::from(!object.is_empty())));
+    };
+    Ok(encoded_size(&true)?.saturating_sub(encoded_size(existing)?))
 }
 
 pub(crate) fn encoded_size<T: Serialize + ?Sized>(value: &T) -> Result<usize, String> {
