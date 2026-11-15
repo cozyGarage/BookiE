@@ -40,6 +40,8 @@ uuid.workspace = true
 [dev-dependencies]
 bookie-driver-postgres = { path = "../drivers/postgres" }
 tempfile.workspace = true
+serde_json.workspace = true
+tokio-util.workspace = true
 bookie-release-tests = { path = "../../tests/release" }
 
 # Kept so the `kerberos` feature can enable `bookie-driver-mssql/kerberos`; no source file names the crate.
