@@ -779,8 +779,11 @@ fn a_connection_that_cannot_be_opened_keeps_the_synthetic_view_and_says_why(cx: 
     view.read_with(cx, |view, _| {
         assert!(view.live.is_none());
         assert_eq!(view.catalog.grid_table, table_info("synthetic_rows"));
-        assert!(!view.status.is_empty(), "connection failure was not shown");
-        assert_ne!(view.status, "Connected", "{}", view.status);
+        assert!(
+            view.status.contains("none.sqlite"),
+            "the failure must name the file that could not be opened: {}",
+            view.status
+        );
     });
 }
 

@@ -205,3 +205,51 @@ impl ReadSessionStore {
         Ok(summary)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bookie_core::DatabaseDriver;
+
+    #[tokio::test]
+    async fn a_writable_saved_configuration_cannot_write_through_the_store() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("store.db");
+        std::fs::File::create(&path).unwrap();
+        let writer = drivers_sqlite::SqliteDriver
+            .connect(ConnectOptions {
+                database: path.to_string_lossy().into_owned(),
+                ..ConnectOptions::default()
+            })
+            .await
+            .unwrap();
+        writer
+            .execute("CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)")
+            .await
+            .unwrap();
+        writer.execute("INSERT INTO items VALUES (1, 'a')").await.unwrap();
+        let mut saved = crate::open_request::file_connection(&crate::open_request::classify_file(&path).unwrap());
+        saved.read_only = false;
+        let mut registry = DriverRegistry::new();
+        registry.register(Arc::new(drivers_sqlite::SqliteDriver));
+        let store = ReadSessionStore::new(Arc::new(registry), Arc::new(DatabaseService::new_isolated()));
+        let control = OperationControl::with_timeout(Duration::from_secs(5));
+
+        let opened = store.open(saved, "writable".into(), &control).await.unwrap();
+
+        let session = store.get(opened.session_id).unwrap();
+        for sql in [
+            "INSERT INTO items VALUES (2, 'x')",
+            "UPDATE items SET name = 'x'",
+            "DELETE FROM items",
+            "CREATE TABLE extra (id INTEGER)",
+        ] {
+            assert!(session.run_query(sql, &control).await.is_err(), "write accepted: {sql}");
+        }
+        let rows = writer.query("SELECT COUNT(*) FROM items").await.unwrap();
+        assert_eq!(
+            rows.rows.first().and_then(|row| row.first()),
+            Some(&bookie_core::Value::Int(1))
+        );
+    }
+}
