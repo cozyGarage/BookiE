@@ -1,5 +1,6 @@
 use super::*;
 use bookie_core::{ConnectOptions, Connection, DatabaseDriver, Value};
+use testcontainers::ImageExt;
 use testcontainers::runners::AsyncRunner;
 use testcontainers_modules::redis::Redis;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
