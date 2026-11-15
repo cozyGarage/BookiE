@@ -36,6 +36,16 @@ fn pooler_symptoms_get_a_hint_and_other_errors_are_left_alone() {
     }
 }
 
+#[tokio::test]
+async fn discarded_connection_cleanup_does_not_wait_for_an_unresponsive_peer() {
+    let result = tokio::time::timeout(
+        Duration::from_millis(20),
+        bounded_cleanup(Duration::from_millis(5), std::future::pending::<()>()),
+    )
+    .await;
+    assert_eq!(result, Ok(false), "connection cleanup must return within its bound");
+}
+
 #[test]
 fn undecodable_cell_cannot_be_bound_as_null() {
     let params = [Value::Undecodable("NUMERIC".into())];

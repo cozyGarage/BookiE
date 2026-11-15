@@ -12,6 +12,13 @@ use tokio::sync::oneshot;
 
 use crate::{connect, start_pg};
 
+#[test]
+fn recognizes_begin_split_across_socket_reads() {
+    let mut buffered = Vec::new();
+    assert!(!contains_begin(&mut buffered, b"BE"));
+    assert!(contains_begin(&mut buffered, b"GIN\0"));
+}
+
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn an_interrupted_interactive_begin_retires_the_uncertain_backend() {
@@ -31,15 +38,17 @@ async fn an_interrupted_interactive_begin_retires_the_uncertain_backend() {
         .await,
     );
     let original_pid = backend_pid(connection.as_ref()).await;
-    let control = OperationControl::with_timeout(Duration::from_millis(150));
     let begin_connection = connection.clone();
-    let begin_task = tokio::spawn(async move { begin_connection.begin_controlled(&control).await });
+    let begin_task = tokio::spawn(async move {
+        let control = OperationControl::with_timeout(Duration::from_secs(1));
+        begin_connection.begin_controlled(&control).await
+    });
 
     tokio::time::timeout(Duration::from_secs(5), begin_reply)
         .await
         .expect("BEGIN reaches PostgreSQL")
         .expect("proxy reports the BEGIN response");
-    tokio::time::sleep(Duration::from_millis(250)).await;
+    tokio::time::sleep(Duration::from_millis(1_100)).await;
     release_reply.send(()).unwrap();
     let error = match begin_task.await.unwrap() {
         Ok(_) => panic!("the timed-out BEGIN cannot be reported as successful"),
@@ -86,6 +95,14 @@ async fn begin_reply_proxy(upstream: SocketAddr) -> (u16, oneshot::Receiver<()>,
     (port, begin_rx, release_tx)
 }
 
+fn contains_begin(buffered: &mut Vec<u8>, bytes: &[u8]) -> bool {
+    buffered.extend_from_slice(bytes);
+    let found = buffered.windows(6).any(|window| window == b"BEGIN\0");
+    let discard = buffered.len().saturating_sub(5);
+    buffered.drain(..discard);
+    found
+}
+
 async fn relay_connection(mut client: TcpStream, upstream: SocketAddr) {
     if let Ok(mut server) = TcpStream::connect(upstream).await {
         let _ = tokio::io::copy_bidirectional(&mut client, &mut server).await;
@@ -107,11 +124,12 @@ async fn relay_begin_connection(
     let outbound_flag = begin_sent.clone();
     let outbound = tokio::spawn(async move {
         let mut bytes = [0; 8192];
+        let mut begin_bytes = Vec::with_capacity(8192 + 5);
         while let Ok(count) = client_read.read(&mut bytes).await {
             if count == 0 {
                 break;
             }
-            if bytes[..count].windows(6).any(|window| window == b"BEGIN\0") {
+            if contains_begin(&mut begin_bytes, &bytes[..count]) {
                 outbound_flag.store(true, Ordering::SeqCst);
             }
             if server_write.write_all(&bytes[..count]).await.is_err() {
