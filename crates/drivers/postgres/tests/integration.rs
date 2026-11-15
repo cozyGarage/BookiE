@@ -87,6 +87,8 @@ mod interval_contract;
 
 #[path = "support/enum_contract.rs"]
 mod enum_contract;
+#[path = "support/interactive_begin_cancellation.rs"]
+mod interactive_begin_cancellation;
 #[path = "support/native_oracle_contract.rs"]
 mod native_oracle_contract;
 #[path = "support/query_budget_contract.rs"]
