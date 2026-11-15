@@ -236,3 +236,13 @@ async fn the_relay_keeps_a_token_the_client_sent() {
         "the client's own token wins: {answer}"
     );
 }
+
+#[tokio::test]
+async fn the_relay_keeps_a_token_the_client_put_in_the_tool_arguments() {
+    let call = json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"list_connections","arguments":{"token":"nope"}}});
+    let answer = relayed_answer(call, Some("SERVER".into())).await;
+    assert_eq!(
+        answer["result"]["isError"], true,
+        "the client's own bad token wins over the relay's good one: {answer}"
+    );
+}
