@@ -424,7 +424,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let audit: Arc<dyn bookie_policy::AuditSink> = Arc::new(journal);
 
     let provider = Arc::new(daemon_provider(policy, audit, approval).await);
-    let bridge = Arc::new(McpBridge::new(provider, tokens));
+    let default_token = std::env::var("BOOKIE_MCP_TOKEN").ok().filter(|token| !token.is_empty());
+    let bridge = Arc::new(McpBridge::new(provider, tokens).with_default_token(default_token));
 
     serve_stdio(bridge).await?;
     Ok(())
