@@ -285,6 +285,7 @@ async fn mcp_row_cap_is_shared_across_result_sets() {
         McpLimits {
             requests_per_minute: 120,
             max_rows: 2,
+            max_response_bytes: McpLimits::default().max_response_bytes,
             query_timeout_secs: 30,
         },
     );
@@ -325,6 +326,7 @@ async fn a_capped_export_says_it_was_truncated_in_every_format() {
         McpLimits {
             requests_per_minute: 120,
             max_rows: 2,
+            max_response_bytes: McpLimits::default().max_response_bytes,
             query_timeout_secs: 30,
         },
     );

@@ -241,6 +241,10 @@ fn value_size(value: &Value) -> usize {
     }
 }
 
+pub fn estimated_row_size(row: &[Value]) -> usize {
+    row_size(row)
+}
+
 fn row_size(row: &[Value]) -> usize {
     let payload_bytes = row
         .iter()
