@@ -215,13 +215,6 @@ fn sorted_hidden_schemas(hidden_schemas: &std::collections::HashSet<String>) -> 
     schemas
 }
 
-/// `kept[i]` says whether the tab strip's raw position `i` produced a
-/// persisted record -- a Structure tab or an empty-table draft never
-/// does. Returns the active tab's position within the persisted list,
-/// which drifts from its raw position as soon as a skipped tab appears
-/// before it. Falls back to 0 when the active tab itself is one of the
-/// kinds that's never persisted, since there is nothing truthful to
-/// restore it to.
 fn active_idx_among_kept(kept: &[bool], active_raw_index: Option<usize>) -> u32 {
     let Some(active_raw_index) = active_raw_index else {
         return 0;
@@ -243,8 +236,6 @@ mod tests {
 
     #[test]
     fn a_skipped_tab_before_the_active_one_shifts_its_index_down() {
-        // Structure tab at 0, active Editor tab at raw index 2 -- only
-        // one tab (at raw index 1) was actually persisted before it.
         assert_eq!(active_idx_among_kept(&[false, true, true], Some(2)), 1);
     }
 

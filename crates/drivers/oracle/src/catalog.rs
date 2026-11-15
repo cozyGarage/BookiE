@@ -1,4 +1,4 @@
-use bookie_core::{ColumnInfo, DriverError, TableInfo, Value};
+use bookie_core::{ColumnInfo, DriverError, OperationControl, TableInfo, Value};
 use oracledb::Metadata;
 
 use crate::OracleConnection;
@@ -36,8 +36,14 @@ pub(crate) fn column_info(column: &Metadata) -> ColumnInfo {
     }
 }
 
-pub(crate) async fn list(connection: &OracleConnection, sql: &str) -> Result<Vec<TableInfo>, DriverError> {
-    let result = connection.read_query(sql, Vec::new(), usize::MAX).await?;
+pub(crate) async fn list(
+    connection: &OracleConnection,
+    sql: &str,
+    control: Option<&OperationControl>,
+) -> Result<Vec<TableInfo>, DriverError> {
+    let result = connection
+        .read_query_with_control(sql, Vec::new(), usize::MAX, control)
+        .await?;
     Ok(result
         .rows
         .iter()
@@ -55,23 +61,28 @@ pub(crate) async fn columns(
     connection: &OracleConnection,
     schema: Option<&str>,
     table: &str,
+    control: Option<&OperationControl>,
 ) -> Result<Vec<ColumnInfo>, DriverError> {
     let owner = match schema {
         Some(schema) => schema.to_string(),
-        None => current_schema(connection).await?,
+        None => current_schema(connection, control).await?,
     };
     let result = connection
-        .read_query(COLUMNS_SQL, vec![owner, table.to_string()], usize::MAX)
+        .read_query_with_control(COLUMNS_SQL, vec![owner, table.to_string()], usize::MAX, control)
         .await?;
     Ok(result.rows.iter().map(declared_column).collect())
 }
 
-async fn current_schema(connection: &OracleConnection) -> Result<String, DriverError> {
+async fn current_schema(
+    connection: &OracleConnection,
+    control: Option<&OperationControl>,
+) -> Result<String, DriverError> {
     let result = connection
-        .read_query(
+        .read_query_with_control(
             "SELECT sys_context('USERENV', 'CURRENT_SCHEMA') FROM dual",
             Vec::new(),
             1,
+            control,
         )
         .await?;
     match result.rows.iter().next().and_then(|row| row.first()) {
