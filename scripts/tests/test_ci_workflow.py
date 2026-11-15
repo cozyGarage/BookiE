@@ -640,6 +640,33 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("if: matrix.group == 'driver-core'", driver)
         self.assertIn("python3 scripts/run-test-layer.py pg-dump", driver)
 
+    def test_gtk_database_fixtures_from_a_container_use_the_host_gateway(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        job = re.search(r"(?ms)^  gtk-server:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+        host_helper = (ROOT / "scripts/gtk-fixture-host.sh").read_text()
+
+        self.assertIn("options: --add-host=host.docker.internal:host-gateway", job)
+        self.assertIn("/var/tmp/bookie-gtk-fixtures:/var/tmp/bookie-gtk-fixtures", job)
+        self.assertIn("BOOKIE_GTK_FIXTURE_HOST: host.docker.internal", job)
+        self.assertIn("BOOKIE_GTK_FIXTURE_SHARED_DIR: /var/tmp/bookie-gtk-fixtures", job)
+        self.assertIn('fixture_host="${BOOKIE_GTK_FIXTURE_HOST:-127.0.0.1}"', host_helper)
+        self.assertIn('getent ahostsv4 "$fixture_host"', host_helper)
+        for script_name, port in (
+            ("clickhouse", 8123),
+            ("mongodb", 27017),
+            ("mysql", 3306),
+            ("mysql-approval", 3306),
+            ("postgres", 5432),
+        ):
+            with self.subTest(script_name=script_name):
+                script = (ROOT / f"scripts/test-gtk-{script_name}.sh").read_text()
+                self.assertIn('source "$ROOT/scripts/gtk-fixture-host.sh"', script)
+                self.assertIn(f'--publish "$fixture_bind_address::{port}"', script)
+        mysql_script = (ROOT / "scripts/test-gtk-mysql.sh").read_text()
+        self.assertIn('socket_root="${BOOKIE_GTK_FIXTURE_SHARED_DIR:-$XDG_RUNTIME_DIR}"', mysql_script)
+        self.assertIn('mktemp -d "$socket_root/mysql-socket.XXXXXX"', mysql_script)
+        self.assertIn('rm -rf -- "$socket_directory"', mysql_script)
+
     def test_gtk_server_jobs_retry_prepulling_their_fixture_image(self):
         for path in (".github/workflows/build-linux.yml", ".forgejo/workflows/ci.yml"):
             workflow = (ROOT / path).read_text()
@@ -850,6 +877,15 @@ class CiWorkflowTests(unittest.TestCase):
         safe_directory = job.index('git config --global --add safe.directory "$GITHUB_WORKSPACE"')
         self.assertLess(checkout, safe_directory)
         self.assertLess(safe_directory, git_call)
+
+    def test_distro_floor_container_marks_workspace_safe_before_artifact_verification(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        job = re.search(r"(?ms)^  distro-floor-scenarios:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+        checkout = job.index("actions/checkout@")
+        verify = job.index("ci-gtk-artifact.py verify --package")
+        safe_directory = job.index('git config --global --add safe.directory "$GITHUB_WORKSPACE"')
+        self.assertLess(checkout, safe_directory)
+        self.assertLess(safe_directory, verify)
 
     def test_fast_checks_fetch_the_comparison_base_before_change_contracts(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
