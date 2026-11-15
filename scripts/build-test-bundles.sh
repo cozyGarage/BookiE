@@ -12,7 +12,7 @@ requested_group=${2:-default}
 case "$requested_group" in
   default) groups=(default) ;;
   gpui) groups=(gpui) ;;
-  all|forgejo|github) groups=() ;;
+  all) groups=() ;;
   *) printf 'Unknown test bundle group: %s\n' "$requested_group" >&2; exit 2 ;;
 esac
 mkdir -p "$output"
@@ -20,18 +20,14 @@ output=$(realpath "$output")
 export CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-8}
 export CARGO_PROFILE_TEST_STRIP="${CARGO_PROFILE_TEST_STRIP:-symbols}"
 nextest="$(bash scripts/ensure-nextest.sh)"
-build_provider_bundles() {
+build_workspace_bundles() {
   cargo metadata --manifest-path apps/gpui/Cargo.toml --locked --format-version 1 >/dev/null
   local config="$ROOT/scripts/ci-test-bundle-groups.json"
   build_messages="$output/default-build.jsonl"
   if [[ ! -f "$build_messages" ]]; then
     cargo test --locked --workspace --lib --bins --tests --no-run --message-format=json-render-diagnostics > "$build_messages"
   fi
-  if [[ "$requested_group" == all ]]; then
-    mapfile -t selected_groups < <(python3 -c 'import json,sys; print(*json.load(open(sys.argv[1]))["groups"], sep="\n")' "$config")
-  else
-    mapfile -t selected_groups < <(python3 -c 'import json,sys; print(*json.load(open(sys.argv[1]))["providers"][sys.argv[2]], sep="\n")' "$config" "$requested_group")
-  fi
+  mapfile -t selected_groups < <(python3 -c 'import json,sys; print(*json.load(open(sys.argv[1]))["publish_groups"], sep="\n")' "$config")
   for group in "${selected_groups[@]}"; do
     local args=(--messages "$build_messages" --group "$group")
     while IFS= read -r package_kind; do args+=(--package-kind "$package_kind"); done < <(
@@ -58,6 +54,6 @@ for group in "${groups[@]}"; do
   python3 scripts/ci-test-bundle.py create "$output/$group" "$revision" --messages "$output/$group-build.jsonl" \
     --group "$group" --archive "$output/$group-nextest.tar.zst" "${args[@]}"
 done
-if [[ "$requested_group" == forgejo || "$requested_group" == github || "$requested_group" == all ]]; then
-  build_provider_bundles
+if [[ "$requested_group" == all ]]; then
+  build_workspace_bundles
 fi
