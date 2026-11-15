@@ -13,36 +13,57 @@ use uuid::Uuid;
 
 const ROW_BYTES: usize = 4 * 1024 * 1024;
 
-struct BigRowsProvider {
+struct RowsProvider {
     connection_id: Uuid,
+    fixture: RowFixture,
 }
 
 #[async_trait]
-impl ConnectionProvider for BigRowsProvider {
+impl ConnectionProvider for RowsProvider {
     async fn list_saved_connections(&self) -> Result<Vec<SavedConnection>, String> {
         Ok(vec![saved_connection(self.connection_id)])
     }
 
     async fn connection(&self, _: Uuid, _: Principal) -> Result<Arc<dyn Connection>, String> {
-        Ok(Arc::new(BigRowsConnection))
+        Ok(Arc::new(RowsConnection { fixture: self.fixture }))
     }
 }
 
-struct BigRowsConnection;
+#[derive(Clone, Copy)]
+enum RowFixture {
+    Big,
+    Escaped,
+}
 
-fn three_big_rows() -> QueryResult {
-    QueryResult {
-        columns: Vec::new(),
-        rows: (0..3)
-            .map(|_| vec![Value::Text("x".repeat(ROW_BYTES))])
-            .collect::<Vec<_>>()
-            .into(),
-        truncated: false,
+impl RowFixture {
+    fn result(self) -> QueryResult {
+        match self {
+            Self::Big => QueryResult {
+                columns: Vec::new(),
+                rows: (0..3)
+                    .map(|_| vec![Value::Text("x".repeat(ROW_BYTES))])
+                    .collect::<Vec<_>>()
+                    .into(),
+                truncated: false,
+            },
+            Self::Escaped => QueryResult {
+                columns: Vec::new(),
+                rows: (0..4)
+                    .map(|_| vec![Value::Text("\0".repeat(10 * 1024)), Value::Bytes(vec![0; 10 * 1024])])
+                    .collect::<Vec<_>>()
+                    .into(),
+                truncated: false,
+            },
+        }
     }
+}
+
+struct RowsConnection {
+    fixture: RowFixture,
 }
 
 #[async_trait]
-impl Connection for BigRowsConnection {
+impl Connection for RowsConnection {
     async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
         Ok(Vec::new())
     }
@@ -52,11 +73,24 @@ impl Connection for BigRowsConnection {
     }
 
     async fn fetch_rows(&self, _: Option<&str>, _: &str, _: u64, _: u64) -> Result<QueryResult, DriverError> {
-        Ok(three_big_rows())
+        Ok(self.fixture.result())
     }
 
     async fn query(&self, _: &str) -> Result<QueryResult, DriverError> {
-        Ok(three_big_rows())
+        Ok(self.fixture.result())
+    }
+
+    async fn query_result_sets_controlled(
+        &self,
+        sql: &str,
+        _: &[Value],
+        _: &OperationControl,
+    ) -> Result<QueryResultBatch, DriverError> {
+        let mut batch = QueryResultBatch::single(self.fixture.result());
+        if matches!(self.fixture, RowFixture::Escaped) && !sql.contains("WHERE id = 1") {
+            batch.result_sets.push(self.fixture.result());
+        }
+        Ok(batch)
     }
 
     async fn execute(&self, _: &str) -> Result<ExecResult, DriverError> {
@@ -93,7 +127,13 @@ async fn a_query_response_is_cut_at_the_byte_budget_not_only_at_the_row_limit() 
         .issue("bytes".into(), TokenPermissions::ReadOnly, vec![connection_id], None)
         .unwrap();
     let token = tokens.authenticate(&plaintext).unwrap();
-    let bridge = McpBridge::new(Arc::new(BigRowsProvider { connection_id }), tokens);
+    let bridge = McpBridge::new(
+        Arc::new(RowsProvider {
+            connection_id,
+            fixture: RowFixture::Big,
+        }),
+        tokens,
+    );
 
     let batch = bridge
         .execute_query(&token, connection_id, "SELECT note FROM notes")
@@ -123,7 +163,10 @@ async fn escaped_text_does_not_exceed_the_serialized_tool_response_budget() {
         .unwrap();
     let token = tokens.authenticate(&plaintext).unwrap();
     let bridge = McpBridge::with_limits(
-        Arc::new(EscapedRowsProvider { connection_id }),
+        Arc::new(RowsProvider {
+            connection_id,
+            fixture: RowFixture::Escaped,
+        }),
         tokens,
         McpLimits {
             max_response_bytes: MAX_RESPONSE_BYTES,
@@ -167,90 +210,6 @@ async fn assert_tool_response_bounded(
         "{tool} encoded {bytes} bytes above its {limit} byte cap"
     );
     assert_eq!(response["truncated"], true, "{tool}");
-}
-
-struct EscapedRowsProvider {
-    connection_id: Uuid,
-}
-
-#[async_trait]
-impl ConnectionProvider for EscapedRowsProvider {
-    async fn list_saved_connections(&self) -> Result<Vec<SavedConnection>, String> {
-        Ok(vec![saved_connection(self.connection_id)])
-    }
-
-    async fn connection(&self, _: Uuid, _: Principal) -> Result<Arc<dyn Connection>, String> {
-        Ok(Arc::new(EscapedRowsConnection))
-    }
-}
-
-struct EscapedRowsConnection;
-
-#[async_trait]
-impl Connection for EscapedRowsConnection {
-    async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
-        Ok(Vec::new())
-    }
-
-    async fn fetch_columns(&self, _: Option<&str>, _: &str) -> Result<Vec<ColumnInfo>, DriverError> {
-        Ok(Vec::new())
-    }
-
-    async fn fetch_rows(&self, _: Option<&str>, _: &str, _: u64, _: u64) -> Result<QueryResult, DriverError> {
-        Ok(escaped_rows())
-    }
-
-    async fn query(&self, _: &str) -> Result<QueryResult, DriverError> {
-        Ok(escaped_rows())
-    }
-
-    async fn query_result_sets_controlled(
-        &self,
-        sql: &str,
-        _: &[Value],
-        _: &OperationControl,
-    ) -> Result<QueryResultBatch, DriverError> {
-        let mut batch = QueryResultBatch::single(escaped_rows());
-        if !sql.contains("WHERE id = 1") {
-            batch.result_sets.push(escaped_rows());
-        }
-        Ok(batch)
-    }
-
-    async fn execute(&self, _: &str) -> Result<ExecResult, DriverError> {
-        Ok(ExecResult { rows_affected: 0 })
-    }
-
-    async fn execute_params(&self, _: &str, _: &[Value]) -> Result<ExecResult, DriverError> {
-        Ok(ExecResult { rows_affected: 0 })
-    }
-
-    async fn execute_in_transaction(&self, _: &[(String, Vec<Value>)]) -> Result<Vec<u64>, DriverError> {
-        Ok(Vec::new())
-    }
-
-    async fn begin(&self) -> Result<Box<dyn Transaction>, DriverError> {
-        Err(DriverError::Unsupported("begin".into()))
-    }
-
-    async fn ping(&self) -> Result<(), DriverError> {
-        Ok(())
-    }
-
-    async fn close(self: Box<Self>) -> Result<(), DriverError> {
-        Ok(())
-    }
-}
-
-fn escaped_rows() -> QueryResult {
-    QueryResult {
-        columns: Vec::new(),
-        rows: (0..4)
-            .map(|_| vec![Value::Text("\0".repeat(10 * 1024)), Value::Bytes(vec![0; 10 * 1024])])
-            .collect::<Vec<_>>()
-            .into(),
-        truncated: false,
-    }
 }
 
 fn saved_connection(id: Uuid) -> SavedConnection {
