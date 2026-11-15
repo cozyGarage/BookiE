@@ -168,6 +168,53 @@ fn mongo_grid_paints_nested_numbers_and_dates_as_relaxed_extended_json() {
 }
 
 #[test]
+fn mongodb_extended_json_grid_display_is_relaxed_while_copy_stays_canonical() {
+    let source = serde_json::json!({
+        "nested": {
+            "int32": {"$numberInt": "2"},
+            "int64": {"$numberLong": "3"},
+            "double": {"$numberDouble": "2.5"},
+            "date": {"$date": {"$numberLong": "0"}}
+        },
+        "items": [
+            {"$numberInt": "4"},
+            {"$date": {"$numberLong": "1000"}}
+        ]
+    });
+    let value = Value::Json(Box::new(source.clone()));
+
+    let expected = r#"{"nested":{"int32":2,"int64":3,"double":2.5,"date":{"$date":"1970-01-01T00:00:00Z"}},"items":[4,{"$date":"1970-01-01T00:00:01Z"}]}"#;
+    let grid_displayed = cell_view_with_column_editability(&value, &metadata("object"), false, true).display_text;
+    let array_displayed = cell_view_with_column_editability(&value, &metadata("array"), false, true).display_text;
+    let sql_json_displayed = cell_view(&value, &metadata("json")).display_text;
+
+    assert_eq!(grid_displayed, expected);
+    assert_eq!(array_displayed, expected);
+    assert_eq!(sql_json_displayed, source.to_string());
+    assert_eq!(value_to_display_text(&value), source.to_string());
+    assert_eq!(value_to_copy_text(&value), source.to_string());
+    assert_eq!(value, Value::Json(Box::new(source)));
+}
+
+#[test]
+fn oversized_mongodb_json_keeps_the_bounded_canonical_prefix() {
+    let source = serde_json::json!({
+        "nested": {"int32": {"$numberInt": "2"}},
+        "padding": "x".repeat(GRID_CELL_DISPLAY_MAX_BYTES)
+    });
+    let value = Value::Json(Box::new(source.clone()));
+    let view = cell_view_with_column_editability(&value, &metadata("object"), false, true);
+
+    assert!(view.truncated);
+    assert!(
+        view.display_text
+            .starts_with(r#"{"nested":{"int32":{"$numberInt":"2"}}"#)
+    );
+    assert!(view.display_text.chars().count() <= GRID_CELL_DISPLAY_MAX_CHARS + 1);
+    assert_eq!(value_to_copy_text(&value), source.to_string());
+}
+
+#[test]
 fn display_text_shows_valid_utf8_bytes_as_text() {
     assert_eq!(
         value_to_display_text(&Value::Bytes(b"hello world".to_vec())),
