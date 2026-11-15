@@ -154,22 +154,39 @@ fn first_line(statement: &str) -> String {
 fn script(statements: &Statements) -> String {
     let mut out = String::from("-- Schema compare: review before running. Nothing has been applied.\n");
     let sections = [
-        ("New tables", &statements.creates),
-        ("Changed tables", &statements.alters),
-        ("Dropped tables (destructive)", &statements.drops),
+        ("New tables", &statements.creates, false),
+        ("Changed tables", &statements.alters, false),
+        ("Dropped tables (commented; not executed)", &statements.drops, true),
     ];
-    if sections.iter().all(|(_, lines)| lines.is_empty()) {
+    if sections.iter().all(|(_, lines, _)| lines.is_empty()) {
         out.push_str("-- The schemas match, so there is nothing to change.\n");
         return out;
     }
-    for (title, lines) in sections.into_iter().filter(|(_, lines)| !lines.is_empty()) {
+    for (title, lines, commented) in sections.into_iter().filter(|(_, lines, _)| !lines.is_empty()) {
         out.push_str(&format!("\n-- {title}\n"));
         for statement in lines {
-            out.push_str(statement.trim_end_matches(';'));
-            out.push_str(";\n");
+            append_statement(&mut out, statement, commented);
         }
     }
     out
+}
+
+fn append_statement(out: &mut String, statement: &str, commented: bool) {
+    let statement = statement.trim_end_matches(';');
+    if !commented {
+        out.push_str(statement);
+        out.push_str(";\n");
+        return;
+    }
+    let mut lines = statement.lines().peekable();
+    while let Some(line) = lines.next() {
+        out.push_str("-- ");
+        out.push_str(line);
+        if lines.peek().is_none() {
+            out.push(';');
+        }
+        out.push('\n');
+    }
 }
 
 #[cfg(test)]
