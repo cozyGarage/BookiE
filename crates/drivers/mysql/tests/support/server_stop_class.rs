@@ -712,30 +712,26 @@ async fn an_uncertain_write_in_a_mysql_transaction_is_never_committed_later() {
     let (_container, options) = start_mysql().await;
     let observer = connect(options.clone()).await;
     create_fixture(observer.as_ref()).await;
-    let proxy = StallProxy::start(&options).await;
-    let connection = connect(ConnectOptions {
-        host: "127.0.0.1".into(),
-        port: proxy.port,
-        ..options
-    })
-    .await;
+    let connection = connect(options).await;
+    let no_limit = OperationControl::new(tokio_util::sync::CancellationToken::new(), None);
 
+    let mut lock = observer.begin().await.unwrap();
+    lock.execute_controlled("UPDATE stop_class_rows SET note = 'locked' WHERE id = 1", &no_limit)
+        .await
+        .unwrap();
     let mut transaction = connection.begin().await.unwrap();
-    proxy.withhold_reply_to(b"stop_class_rows");
-    let write = transaction
-        .execute_controlled(
-            "UPDATE stop_class_rows SET note = 'uncertain' WHERE id = 1",
-            &OperationControl::with_timeout(STOP_AFTER),
-        )
-        .await;
-    proxy.release();
+    let abandoned_write = tokio::time::timeout(
+        STOP_AFTER,
+        transaction.execute("UPDATE stop_class_rows SET note = 'uncertain' WHERE id = 1"),
+    )
+    .await;
+    assert!(abandoned_write.is_err(), "the write behind a row lock cannot finish");
+    let abandoned_rollback = tokio::time::timeout(STOP_AFTER, transaction.rollback()).await;
     assert!(
-        matches!(write, Err(DriverError::OperationOutcomeUnknown { .. })),
-        "{write:?}"
+        abandoned_rollback.is_err(),
+        "the rollback waits behind the pending write"
     );
-    let _ = transaction
-        .rollback_controlled(&OperationControl::with_timeout(STOP_AFTER))
-        .await;
+    lock.rollback().await.unwrap();
 
     for _ in 0..8 {
         connection.begin().await.unwrap().commit().await.unwrap();
