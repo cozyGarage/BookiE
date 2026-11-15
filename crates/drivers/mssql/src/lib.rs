@@ -1001,6 +1001,7 @@ async fn collect_result_sets(
         result_sets,
         truncated,
         messages: ServerMessages::default(),
+        rows_affected: None,
     })
 }
 

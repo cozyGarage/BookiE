@@ -82,7 +82,7 @@ fn each_keyring_failure_says_what_to_do_next() {
         KeyringFailure::Other("boom".into()),
     ]
     .iter()
-    .map(keyring_message)
+    .map(bookie_app_services::driver_failure_message::keyring_message)
     .collect();
     assert!(texts[0].contains("Start"));
     assert!(texts[1].contains("Unlock"));

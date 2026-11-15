@@ -60,8 +60,10 @@ impl bookie_core::Session for PgSession {
         control: &OperationControl,
     ) -> Result<QueryResultBatch, DriverError> {
         self.reject_active_cursor()?;
-        let (rows, messages) = self.run_messaged_query_controlled(sql, params, control).await?;
-        Ok(QueryResultBatch::single(rows).with_messages(messages))
+        let (rows, messages, rows_affected) = self.run_messaged_query_controlled(sql, params, control).await?;
+        Ok(QueryResultBatch::single(rows)
+            .with_messages(messages)
+            .with_rows_affected(rows_affected))
     }
 
     async fn lexical_settings_controlled(
@@ -254,7 +256,7 @@ impl PgSession {
     ) -> Result<QueryResult, DriverError> {
         self.run_messaged_query_controlled(sql, params, control)
             .await
-            .map(|(rows, _)| rows)
+            .map(|(rows, _, _)| rows)
     }
 
     async fn run_messaged_query_controlled(

@@ -1,4 +1,4 @@
-use drivers_registry::PubSubSample;
+use bookie_app_services::read_session_store::SubscriptionSample;
 
 use crate::messages::MessageKind;
 
@@ -11,7 +11,7 @@ pub fn parse_pattern(text: &str) -> Option<String> {
     (!text.is_empty() && text.chars().count() <= 256 && !text.contains(char::is_whitespace)).then(|| text.to_string())
 }
 
-pub fn describe(pattern: &str, outcome: Result<PubSubSample, String>) -> Vec<(MessageKind, String)> {
+pub fn describe(pattern: &str, outcome: Result<SubscriptionSample, String>) -> Vec<(MessageKind, String)> {
     let sample = match outcome {
         Ok(sample) => sample,
         Err(error) => return vec![(MessageKind::Error, format!("{pattern} · could not listen · {error}"))],
@@ -39,10 +39,10 @@ pub fn describe(pattern: &str, outcome: Result<PubSubSample, String>) -> Vec<(Me
 #[cfg(test)]
 mod tests {
     use super::*;
-    use drivers_registry::PubSubMessage;
+    use bookie_app_services::read_session_store::SubscriptionMessage;
 
-    fn message(channel: &str, payload: &str, bytes: usize) -> PubSubMessage {
-        PubSubMessage {
+    fn message(channel: &str, payload: &str, bytes: usize) -> SubscriptionMessage {
+        SubscriptionMessage {
             channel: channel.into(),
             pattern: Some("news.*".into()),
             payload: payload.into(),
@@ -60,7 +60,7 @@ mod tests {
 
     #[test]
     fn a_sample_becomes_a_headline_and_one_line_per_message() {
-        let sample = PubSubSample {
+        let sample = SubscriptionSample {
             messages: vec![message("news.1", "hello", 5), message("news.2", "cut", 9000)],
             reached_limit: false,
         };
@@ -79,7 +79,7 @@ mod tests {
 
     #[test]
     fn hitting_the_limit_and_failing_are_both_reported() {
-        let full = PubSubSample {
+        let full = SubscriptionSample {
             messages: vec![message("a", "x", 1)],
             reached_limit: true,
         };
