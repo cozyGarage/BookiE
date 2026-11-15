@@ -322,7 +322,7 @@ mod save_completion_tests {
 }
 
 fn checked_write_indexes(driver_id: Option<&str>, sources: &[StatementSource]) -> Vec<usize> {
-    if !driver_id.is_some_and(|id| matches!(id, "postgres" | "mysql" | "mssql" | "sqlite")) {
+    if !driver_id.is_some_and(bookie_app_services::change_tracker::keyed_writes_are_checked) {
         return Vec::new();
     }
     sources

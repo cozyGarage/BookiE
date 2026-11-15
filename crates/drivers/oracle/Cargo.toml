@@ -21,6 +21,7 @@ tokio = { workspace = true, features = ["net", "time"] }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt"] }
+tokio-util.workspace = true
 testcontainers.workspace = true
 
 [lints]

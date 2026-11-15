@@ -70,9 +70,9 @@ impl<'a> CellView<'a> {
 }
 
 impl CellView<'static> {
-    pub(super) fn from_preview(preview: &crate::ui::row_object::CellPreview) -> Self {
+    pub(super) fn from_preview(preview: &crate::ui::row_object::CellPreview, relaxed_mongodb_json: bool) -> Self {
         Self {
-            display_text: Cow::Owned(preview_display_text(preview, 512)),
+            display_text: Cow::Owned(preview_display_text(preview, 512, relaxed_mongodb_json)),
             truncated: true,
             is_null: false,
             inline_editable: false,
@@ -85,20 +85,21 @@ impl CellView<'static> {
 #[cfg(test)]
 pub(super) fn cell_view<'a>(value: &'a Value, column: &ColumnInfo) -> CellView<'a> {
     let column_is_editable = super::presentation::column_is_editable(column);
-    cell_view_with_column_editability(value, column, column_is_editable)
+    cell_view_with_column_editability(value, column, column_is_editable, false)
 }
 
 pub(super) fn cell_view_with_column_editability<'a>(
     value: &'a Value,
     column: &ColumnInfo,
     column_is_editable: bool,
+    relaxed_mongodb_json: bool,
 ) -> CellView<'a> {
     let is_null = matches!(value, Value::Null);
     let auto_filled = column.is_auto_increment || column.is_generated;
     let (display_text, truncated) = if is_null && auto_filled {
         (Cow::Owned(auto_filled_sentinel()), false)
     } else {
-        cell_display_text(value)
+        cell_display_text(value, relaxed_mongodb_json)
     };
     CellView {
         display_text,
@@ -119,7 +120,7 @@ pub(super) fn cell_view_with_column_editability<'a>(
     }
 }
 
-fn cell_display_text(value: &Value) -> (Cow<'_, str>, bool) {
+fn cell_display_text(value: &Value, relaxed_mongodb_json: bool) -> (Cow<'_, str>, bool) {
     match value {
         Value::Text(text) => text_to_display_text_cow(text, GRID_CELL_DISPLAY_MAX_CHARS, true, None),
         Value::Bytes(bytes) if bytes.len() > GRID_CELL_DISPLAY_MAX_BYTES => {
@@ -132,6 +133,12 @@ fn cell_display_text(value: &Value) -> (Cow<'_, str>, bool) {
             _ => bounded_owned_text(value_to_display_text(value), GRID_CELL_DISPLAY_MAX_CHARS),
         },
         Value::Json(json) => {
+            let relaxed = if relaxed_mongodb_json {
+                drivers_mongodb::relaxed_extended_json_for_display(json)
+            } else {
+                None
+            };
+            let json = relaxed.as_ref().unwrap_or(json);
             json_to_display_text_with_limits(json, GRID_CELL_DISPLAY_MAX_CHARS * 4, GRID_CELL_DISPLAY_MAX_CHARS, true)
         }
         Value::JsonText(text) => text_to_display_text_cow(text, GRID_CELL_DISPLAY_MAX_CHARS, false, None),
@@ -139,8 +146,8 @@ fn cell_display_text(value: &Value) -> (Cow<'_, str>, bool) {
     }
 }
 
-pub(super) fn highlight_display_text(value: &Value, column: &ColumnInfo) -> (String, bool) {
-    let view = cell_view_with_column_editability(value, column, false);
+pub(super) fn highlight_display_text(value: &Value, column: &ColumnInfo, relaxed_mongodb_json: bool) -> (String, bool) {
+    let view = cell_view_with_column_editability(value, column, false, relaxed_mongodb_json);
     (view.text_for_bind(false).into_owned(), view.is_null)
 }
 
@@ -285,10 +292,14 @@ pub(crate) fn value_to_search_text(value: &Value) -> Cow<'_, str> {
 }
 
 pub(crate) fn preview_to_display_text(preview: &crate::ui::row_object::CellPreview) -> String {
-    preview_display_text(preview, usize::MAX)
+    preview_display_text(preview, usize::MAX, false)
 }
 
-pub(super) fn preview_display_text(preview: &crate::ui::row_object::CellPreview, text_limit: usize) -> String {
+pub(super) fn preview_display_text(
+    preview: &crate::ui::row_object::CellPreview,
+    text_limit: usize,
+    relaxed_mongodb_json: bool,
+) -> String {
     let total = match preview.byte_count {
         crate::ui::row_object::PreviewByteCount::Exact(bytes) => {
             bookie_app_services::tr!("{n} bytes total").replace("{n}", &bytes.to_string())
@@ -313,6 +324,13 @@ pub(super) fn preview_display_text(preview: &crate::ui::row_object::CellPreview,
                     character => character,
                 })
                 .collect::<String>();
+            format!("{sample}… ({total})")
+        }
+        Value::Json(json) if relaxed_mongodb_json => {
+            let text = drivers_mongodb::relaxed_extended_json_for_display(json)
+                .unwrap_or_else(|| json.as_ref().clone())
+                .to_string();
+            let sample = text.chars().take(text_limit).collect::<String>();
             format!("{sample}… ({total})")
         }
         Value::Bytes(bytes) => {
