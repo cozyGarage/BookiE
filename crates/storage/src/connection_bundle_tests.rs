@@ -689,11 +689,21 @@ fn an_import_cannot_drop_or_swap_a_pinned_certificate_authority() {
 }
 
 #[test]
-fn an_import_may_add_a_certificate_authority_to_a_connection_without_one() {
+fn an_import_cannot_add_a_certificate_authority_to_a_connection_without_one() {
     let local = saved("sales");
     let mut incoming = local.clone();
     incoming.tls_root_cert = Some(PathBuf::from("/etc/pki/company-ca.pem"));
-    let plan = plan_import(std::slice::from_ref(&local), &body_of(&[incoming.clone()])).expect("plan");
+    let plan = plan_import(std::slice::from_ref(&local), &body_of(&[incoming])).expect("plan");
+
+    assert_eq!(plan.items[0].disposition, ImportDisposition::UpdateInPlace);
+    assert_eq!(plan.items[0].connection.tls_root_cert, None);
+}
+
+#[test]
+fn a_new_connection_keeps_the_certificate_authority_of_its_bundle() {
+    let mut incoming = saved("sales");
+    incoming.tls_root_cert = Some(PathBuf::from("/etc/pki/company-ca.pem"));
+    let plan = plan_import(&[], &body_of(std::slice::from_ref(&incoming))).expect("plan");
 
     assert_eq!(plan.items[0].connection.tls_root_cert, incoming.tls_root_cert);
 }

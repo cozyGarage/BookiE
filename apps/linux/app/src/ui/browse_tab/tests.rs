@@ -518,6 +518,15 @@ fn pasted_null_and_empty_text_stay_distinct() {
 }
 
 #[test]
+fn blank_grid_and_paste_inputs_refuse_a_not_null_defaulted_value() {
+    let mut timestamp = column("created_at", "timestamp", false);
+    timestamp.nullable = false;
+    timestamp.default_value = Some("CURRENT_TIMESTAMP".into());
+    assert!(parse_grid_cell_input("", Some(&timestamp), "postgres", None).is_err());
+    assert!(parse_pasted_cell(Some(""), Some(&timestamp), "postgres", None).is_err());
+}
+
+#[test]
 fn grid_text_input_preserves_lf_and_crlf() {
     let text_column = column("value", "text", false);
     for clipboard in ["\"line1\nline2\"", "\"line1\r\nline2\""] {

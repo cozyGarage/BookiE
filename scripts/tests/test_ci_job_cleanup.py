@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import socket
 import subprocess
 import tempfile
 import unittest
@@ -312,6 +313,11 @@ class CiJobCleanupTests(unittest.TestCase):
     def test_b4_rollback_finalizer_removes_only_its_run_scoped_temp_path(self):
         job = runner_jobs(WORKFLOWS[0])["b4-rollback"]
         self.assertIn("TMPDIR: /var/cache/ci/tmp/bookie-b4-rollback-${{ github.run_id }}-${{ github.run_attempt }}", job)
+        self.assertIn(
+            "SCCACHE_SERVER_UDS: /var/cache/ci/tmp/bookie-b4-rollback-${{ github.run_id }}-${{ github.run_attempt }}/sccache.sock",
+            job,
+        )
+        self.assertIn("sccache --start-server", job)
         with tempfile.TemporaryDirectory() as temporary:
             bin_dir = Path(temporary) / "bin"
             bin_dir.mkdir()
@@ -345,6 +351,56 @@ class CiJobCleanupTests(unittest.TestCase):
                 ["-rf", "--", "/var/cache/ci/tmp/bookie-b4-rollback-123-2"],
                 [json.loads(line) for line in calls.read_text(encoding="utf-8").splitlines()],
             )
+
+    def test_finalizer_stops_job_scoped_sccache_before_removing_its_temp_path(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            events = root / "events"
+            socket_path = root / "sccache.sock"
+            sock = socket.socket(socket.AF_UNIX)
+            sock.bind(str(socket_path))
+            sccache = bin_dir / "sccache"
+            sccache.write_text(
+                "#!/usr/bin/env python3\n"
+                "import os, sys\n"
+                "with open(os.environ['EVENTS'], 'a', encoding='utf-8') as stream:\n"
+                "    stream.write('sccache ' + ' '.join(sys.argv[1:]) + '\\n')\n",
+                encoding="utf-8",
+            )
+            sccache.chmod(0o755)
+            rm = bin_dir / "rm"
+            rm.write_text(
+                "#!/usr/bin/env python3\n"
+                "import os, sys\n"
+                "with open(os.environ['EVENTS'], 'a', encoding='utf-8') as stream:\n"
+                "    stream.write('rm ' + ' '.join(sys.argv[1:]) + '\\n')\n",
+                encoding="utf-8",
+            )
+            rm.chmod(0o755)
+            result = subprocess.run(
+                ["bash", str(CLEANUP)],
+                env={
+                    **os.environ,
+                    "PATH": f"{bin_dir}:{os.environ['PATH']}",
+                    "GITHUB_JOB": "b4-rollback",
+                    "GITHUB_RUN_ID": "123",
+                    "GITHUB_RUN_ATTEMPT": "2",
+                    "TMPDIR": "/var/cache/ci/tmp/bookie-b4-rollback-123-2",
+                    "SCCACHE_SERVER_UDS": str(socket_path),
+                    "EVENTS": str(events),
+                },
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            sock.close()
+            self.assertEqual(result.returncode, 0, result.stderr)
+            lines = events.read_text(encoding="utf-8").splitlines()
+            stop = lines.index("sccache --stop-server")
+            remove = lines.index("rm -rf -- /var/cache/ci/tmp/bookie-b4-rollback-123-2")
+            self.assertLess(stop, remove)
 
     def test_another_job_cannot_remove_the_b4_rollback_temp_path(self):
         with tempfile.TemporaryDirectory() as temporary:

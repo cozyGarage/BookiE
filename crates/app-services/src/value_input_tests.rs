@@ -35,6 +35,23 @@ fn invalid_integer_returns_a_typed_error_without_localized_text() {
 }
 
 #[test]
+fn empty_non_nullable_defaulted_value_is_not_parsed_as_null() {
+    let mut timestamp = column("timestamp");
+    timestamp.default_value = Some("CURRENT_TIMESTAMP".into());
+    assert_eq!(
+        parse_input_for_column("", Some(&timestamp)),
+        Err(ValueInputError::FieldRequired)
+    );
+}
+
+#[test]
+fn empty_non_nullable_defaulted_text_remains_empty_text() {
+    let mut text = column("text");
+    text.default_value = Some("'default'".into());
+    assert_eq!(parse_input_for_column("", Some(&text)), Ok(Value::Text(String::new())));
+}
+
+#[test]
 fn mysql_range_failure_returns_an_engine_specific_error() {
     let hooks = ParseHooks::new(
         bookie_core::EnumInputStyle::RawValue,
