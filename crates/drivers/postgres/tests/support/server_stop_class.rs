@@ -422,6 +422,22 @@ async fn a_save_stopped_while_it_waits_for_a_lock_is_rolled_back_on_the_server()
         "PostgreSQL confirmed the stop, so the save is known not to have run: {error:?}"
     );
     assert_eq!(waiting_backends(observer.as_ref()).await, 0);
+    assert_eq!(open_transactions(observer.as_ref()).await, 0);
+
+    let cancelled = tokio_util::sync::CancellationToken::new();
+    let by_caller = OperationControl::new(cancelled.clone(), None);
+    let write = one_row_write();
+    let (error, ()) = tokio::join!(
+        connection.execute_in_transaction_checked_controlled(&write, &[0], &by_caller),
+        async {
+            tokio::time::sleep(STOP_AFTER).await;
+            cancelled.cancel();
+        }
+    );
+    let error = error.expect_err("a save behind a row lock cannot finish");
+    assert!(matches!(error, DriverError::Cancelled), "{error:?}");
+    assert_eq!(waiting_backends(observer.as_ref()).await, 0);
+    assert_eq!(open_transactions(observer.as_ref()).await, 0);
 
     lock.rollback().await.unwrap();
     let note = connection
@@ -429,7 +445,6 @@ async fn a_save_stopped_while_it_waits_for_a_lock_is_rolled_back_on_the_server()
         .await
         .unwrap();
     assert_eq!(note.rows, vec![vec![Value::Text("kept".into())]]);
-    assert_eq!(open_transactions(observer.as_ref()).await, 0);
 }
 
 #[tokio::test]
