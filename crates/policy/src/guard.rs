@@ -178,12 +178,7 @@ impl PolicyGuard {
         analyze_parsed(parsed, &self.ctx.driver_id, self.mask_patterns.as_deref(), true)
     }
 
-    async fn authorize(
-        &self,
-        sql: &str,
-        _is_params_exec: bool,
-        control: Option<&OperationControl>,
-    ) -> Result<Authorization, DriverError> {
+    async fn authorize(&self, sql: &str, control: Option<&OperationControl>) -> Result<Authorization, DriverError> {
         self.authorize_analysis(sql, self.analyze_statement(sql), None, control)
             .await
     }
