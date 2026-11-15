@@ -44,6 +44,21 @@ impl OpenSshSession {
         target: ForwardTarget,
         route: ForwardRoute,
     ) -> Result<OpenSshForward, OpenSshError> {
+        let retries = usize::from(route == ForwardRoute::LoopbackTcp);
+        let mut attempt = 0;
+        loop {
+            match self.forward_once(target.clone(), route.clone()).await {
+                Err(OpenSshError::ForwardRejected { .. }) if attempt < retries => attempt += 1,
+                result => return result,
+            }
+        }
+    }
+
+    async fn forward_once(
+        self: &Arc<Self>,
+        target: ForwardTarget,
+        route: ForwardRoute,
+    ) -> Result<OpenSshForward, OpenSshError> {
         if self.is_closed() {
             return Err(self.master_exited());
         }
