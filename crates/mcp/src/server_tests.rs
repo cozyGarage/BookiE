@@ -976,3 +976,54 @@ fn untrusted_browser_origins_are_rejected() {
         assert!(!origin_is_allowed(&headers_with_origin(origin)), "{origin}");
     }
 }
+
+async fn http_post(address: std::net::SocketAddr, body: &JsonValue) -> (String, JsonValue) {
+    use tokio::io::AsyncReadExt;
+
+    let body = body.to_string();
+    let request = format!(
+        "POST /mcp HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        body.len()
+    );
+    let mut stream = TcpStream::connect(address).await.unwrap();
+    stream.write_all(request.as_bytes()).await.unwrap();
+    let mut response = Vec::new();
+    let _ = stream.read_to_end(&mut response).await;
+    let text = String::from_utf8_lossy(&response).into_owned();
+    let status = text.lines().next().unwrap_or_default().to_string();
+    let json_body = text.split("\r\n\r\n").nth(1).unwrap_or_default();
+    (status, serde_json::from_str(json_body).unwrap_or(JsonValue::Null))
+}
+
+#[tokio::test]
+async fn http_accepts_notifications_without_a_reply_and_answers_ping() {
+    let (_dir, bridge, _) = bridge_with_token();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let router = http_router(Arc::new(bridge));
+    let server = tokio::spawn(async move { axum::serve(listener, router).await });
+
+    let (status, body) = http_post(address, &json!({"jsonrpc":"2.0","method":"notifications/initialized"})).await;
+    assert!(status.contains("202"), "a notification is accepted: {status}");
+    assert_eq!(body, JsonValue::Null, "and has no body");
+
+    let (_, ping) = http_post(address, &json!({"jsonrpc":"2.0","id":7,"method":"ping"})).await;
+    server.abort();
+    assert_eq!(ping["result"], json!({}), "{ping}");
+}
+
+#[tokio::test]
+async fn a_stdio_session_does_not_answer_an_unknown_notification() {
+    let (_dir, bridge, _) = bridge_with_token();
+    let mut client = start_stdio_session(Arc::new(bridge));
+    client
+        .send(json!({"jsonrpc":"2.0","method":"notifications/roots/list_changed"}))
+        .await;
+    client.send(json!({"jsonrpc":"2.0","id":2,"method":"ping"})).await;
+    let first = client
+        .next_message(std::time::Duration::from_secs(5))
+        .await
+        .expect("an answer");
+    assert_eq!(first["id"], 2, "the first reply is the ping's, not an error: {first}");
+    client.finish().await;
+}
