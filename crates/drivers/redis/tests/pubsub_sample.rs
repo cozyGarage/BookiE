@@ -4,6 +4,7 @@ use std::time::Duration;
 use bookie_core::{ConnectOptions, TlsConfig};
 use drivers_redis::sample_pubsub;
 use testcontainers_modules::redis::Redis;
+use testcontainers_modules::testcontainers::ImageExt;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
 
 const REDIS_TEST_TAG: &str = "7.4.12-alpine3.22";

@@ -9,10 +9,12 @@ use testcontainers::core::Mount;
 use testcontainers_modules::mssql_server::MssqlServer;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
 
+const MSSQL_TEST_TAG: &str = "2022-CU23-ubuntu-22.04";
+
 pub(crate) async fn start_mssql(durable: bool) -> (ContainerAsync<MssqlServer>, ConnectOptions) {
     let image = MssqlServer::default()
-        .with_tag(crate::MSSQL_TEST_TAG)
         .with_accept_eula()
+        .with_tag(MSSQL_TEST_TAG)
         .with_startup_timeout(std::time::Duration::from_secs(180));
     let container = if durable {
         image.start().await

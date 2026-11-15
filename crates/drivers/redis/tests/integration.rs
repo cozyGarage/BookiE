@@ -1,4 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+use testcontainers::ImageExt;
+
 #[path = "support/key_previews.rs"]
 mod key_previews;
 

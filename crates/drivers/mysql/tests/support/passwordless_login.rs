@@ -2,6 +2,7 @@
 
 use bookie_core::{ConnectOptions, DatabaseDriver};
 use drivers_mysql::MysqlDriver;
+use testcontainers::ImageExt;
 use testcontainers_modules::mysql::Mysql;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
 

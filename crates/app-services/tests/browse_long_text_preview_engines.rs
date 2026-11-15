@@ -171,8 +171,8 @@ async fn mysql_previews_a_huge_longtext_cell() {
 #[ignore = "requires docker"]
 async fn sql_server_previews_a_huge_varchar_max_cell() {
     let container = testcontainers_modules::mssql_server::MssqlServer::default()
-        .with_tag(MSSQL_TEST_TAG)
         .with_accept_eula()
+        .with_tag(MSSQL_TEST_TAG)
         .with_startup_timeout(std::time::Duration::from_secs(180))
         .start()
         .await
@@ -303,8 +303,8 @@ async fn postgres_previews_huge_json_and_jsonb_cells() {
 #[ignore = "requires docker"]
 async fn sql_server_previews_huge_legacy_text_and_ntext_cells() {
     let container = testcontainers_modules::mssql_server::MssqlServer::default()
-        .with_tag(MSSQL_TEST_TAG)
         .with_accept_eula()
+        .with_tag(MSSQL_TEST_TAG)
         .with_startup_timeout(std::time::Duration::from_secs(180))
         .start()
         .await

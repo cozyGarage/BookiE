@@ -46,7 +46,8 @@ impl Image for PolicyMssqlImage {
 }
 
 async fn start_policy_mssql() -> (ContainerAsync<PolicyMssqlImage>, Arc<dyn Connection>) {
-    let image = PolicyMssqlImage(MssqlServer::default().with_tag(MSSQL_TEST_TAG).with_accept_eula())
+    let image = PolicyMssqlImage(MssqlServer::default().with_accept_eula())
+        .with_tag(MSSQL_TEST_TAG)
         .with_startup_timeout(MSSQL_STARTUP_TIMEOUT);
     let deadline = tokio::time::Instant::now() + MSSQL_STARTUP_TIMEOUT;
     let container = tokio::time::timeout_at(deadline, image.start())
