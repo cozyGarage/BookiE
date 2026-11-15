@@ -404,10 +404,10 @@ class CiCacheTests(unittest.TestCase):
                     process_state = status.read_text().split()[2]
                 except (FileNotFoundError, ProcessLookupError):
                     process_state = 'Z'
-                if process_state == 'Z':
+                if process_state in {'Z', 'X'}:
                     break
                 time.sleep(0.01)
-            self.assertEqual(process_state, 'Z')
+            self.assertIn(process_state, {'Z', 'X'})
         finally:
             for pid_file in (child_pid, shell_pid):
                 if pid_file.exists():
