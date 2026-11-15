@@ -196,6 +196,10 @@ class LayerRunnerTests(unittest.TestCase):
 
     def test_timeout_and_missing_executable_fail_explicitly(self):
         self.assertEqual(self.execute(self.step("import time; time.sleep(60)", timeout=0.05))["status"], "timed_out")
+        self.assertEqual(
+            self.execute(self.step("import os,time; os.close(1); os.close(2); time.sleep(60)", timeout=0.05))["status"],
+            "timed_out",
+        )
         code = (
             "import time\n"
             "deadline = time.monotonic() + 0.2\n"

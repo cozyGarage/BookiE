@@ -158,7 +158,7 @@ def stream_process_output(process, log, timeout):
             sys.stdout.write(text)
             sys.stdout.flush()
         if not chunk:
-            return process.wait()
+            return process.wait(timeout=max(deadline - time.monotonic(), 0))
 
 
 def execute(step, log_path, cwd=ROOT):
