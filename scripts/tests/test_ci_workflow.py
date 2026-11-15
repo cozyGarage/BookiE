@@ -75,6 +75,11 @@ def workflow_job_graph(paths, adapter_jobs=()):
                 "condition": condition_match.group(1) if condition_match else None,
                 "matrix": matrix,
             }
+            if graph[name]["condition"]:
+                for adapter in adapter_jobs:
+                    graph[name]["condition"] = graph[name]["condition"].replace(
+                        f" && needs.{adapter}.result == 'success'", ""
+                    )
     return graph
 
 
@@ -170,6 +175,34 @@ class CiWorkflowTests(unittest.TestCase):
         self.maxDiff = None
         self.assertEqual(expected, forgejo)
         self.assertEqual(github, forgejo)
+
+    def test_heavy_matrix_parallelism_uses_dependency_stages(self):
+        for path, adapters in (
+            (ROOT / ".github/workflows/build-linux.yml", {"ensure-ci-gtk-image", "current-stable-clippy"}),
+            (ROOT / ".forgejo/workflows/ci.yml", set()),
+        ):
+            graph = workflow_job_graph(path, adapters)
+            with self.subTest(workflow=path.name):
+                for first, followup in (("driver", "driver-followup"), ("gtk", "gtk-followup")):
+                    self.assertIn(first, graph[followup]["needs"])
+                    self.assertLessEqual(len(next(iter(graph[first]["matrix"].values()))), 2)
+                    self.assertLessEqual(len(next(iter(graph[followup]["matrix"].values()))), 2)
+                self.assertIn("gtk-server", graph["gtk-server-followup"]["needs"])
+                self.assertIn("gtk-server-followup", graph["gtk-server-final"]["needs"])
+                for job in ("gtk-server", "gtk-server-followup", "gtk-server-final"):
+                    self.assertLessEqual(len(graph[job]["matrix"]["server"]), 2)
+                source = path.read_text()
+                for job, prerequisites in (
+                    ("driver-followup", ("needs.pin-revision.result == 'success'", "needs.guards.result == 'success'", "needs.clippy.result == 'success'", "needs.test-build.result == 'success'")),
+                    ("gtk-followup", ("needs.pin-revision.result == 'success'", "needs.guards.result == 'success'", "needs.linux-build.result == 'success'")),
+                    ("gtk-server-followup", ("needs.pin-revision.result == 'success'", "needs.guards.result == 'success'", "needs.linux-build.result == 'success'")),
+                    ("gtk-server-final", ("needs.pin-revision.result == 'success'", "needs.guards.result == 'success'", "needs.linux-build.result == 'success'", "needs.gtk-server-followup.result != 'skipped'")),
+                ):
+                    body = re.search(rf"(?ms)^  {job}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", source).group(1)
+                    condition = re.search(r"(?m)^    if: (.+)$", body).group(1)
+                    self.assertIn("always()", condition)
+                    for prerequisite in prerequisites:
+                        self.assertIn(prerequisite, condition)
 
     def test_every_forgejo_gate_job_finalizes_its_runner(self):
         source = (ROOT / ".forgejo/workflows/ci.yml").read_text().split("\njobs:\n", 1)[1]
@@ -552,11 +585,18 @@ class CiWorkflowTests(unittest.TestCase):
     def test_gtk_server_layers_use_the_shared_catalog_on_both_providers(self):
         github = (ROOT / ".github/workflows/build-linux.yml").read_text()
         forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
-        github_job = re.search(r"(?ms)^  gtk-server:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", github).group(1)
+        github_job = "".join(
+            re.findall(r"(?ms)^  gtk-server(?:-followup|-final)?:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", github)
+        )
         github_release_job = re.search(
             r"(?ms)^  pg-release:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", github
         ).group(1)
-        forgejo_job = re.search(r"(?ms)^  gtk-server:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
+        forgejo_job = "".join(
+            re.findall(
+                r"(?ms)^  gtk-server(?:-followup|-final)?:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)",
+                forgejo,
+            )
+        )
         forgejo_server_jobs = forgejo_job
 
         layers = json.loads((ROOT / "scripts/test-layers.json").read_text())["layers"]
@@ -593,7 +633,9 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("python3 scripts/cleanup-testcontainers.py", github_job)
         self.assertNotIn("  e2e:\n", forgejo)
         self.assertIn('python3 scripts/run-test-layer.py "gtk-${{ matrix.server }}"', forgejo_job)
-        driver = re.search(r"(?ms)^  driver:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
+        driver = "".join(
+            re.findall(r"(?ms)^  driver(?:-followup)?:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo)
+        )
         self.assertIn("if: matrix.group == 'driver-core'", driver)
         self.assertIn("python3 scripts/run-test-layer.py pg-dump", driver)
 
@@ -629,7 +671,9 @@ class CiWorkflowTests(unittest.TestCase):
         local = (ROOT / "scripts/ci-local.sh").read_text()
         integration = local.split("run_integration() {", 1)[1].split("run_release() {", 1)[0]
         forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
-        driver = re.search(r"(?ms)^  driver:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
+        driver = "".join(
+            re.findall(r"(?ms)^  driver(?:-followup)?:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo)
+        )
         groups = {
             "core": {"postgres", "mysql", "mssql"},
             "analytics": {"clickhouse", "redis", "mongodb"},
@@ -638,7 +682,8 @@ class CiWorkflowTests(unittest.TestCase):
         group_script = (ROOT / "scripts/run-driver-group.sh").read_text()
 
         self.assertIn('bash scripts/run-driver-group.sh "$group"', integration)
-        self.assertIn('group: [driver-core, driver-analytics, driver-extended, socket-ssh]', driver)
+        for group in ("driver-core", "driver-analytics", "driver-extended", "socket-ssh"):
+            self.assertRegex(driver, rf"(?m)^        group: \[.*\b{re.escape(group)}\b")
         self.assertIn('python3 scripts/run-test-layer.py "$BOOKIE_TEST_LAYER"', driver)
         for group, drivers in groups.items():
             with self.subTest(group=group):
@@ -687,7 +732,9 @@ class CiWorkflowTests(unittest.TestCase):
                 self.assertIn("actions/download-artifact@", job)
                 self.assertIn(f'bookie-tests-${{{{ needs.pin-revision.outputs.revision }}}}-{group}', job)
                 self.assertRegex(job, rf'prepare-test-bundle\.sh "\$\{{\{{ needs\.pin-revision\.outputs\.revision \}}\}}" {group} "\$\{{\{{ runner\.temp \}}\}}/bookie-[a-z$\{{}}.-]+-bundle"')
-        driver = re.search(r"(?ms)^  driver:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+        driver = "".join(
+            re.findall(r"(?ms)^  driver(?:-followup)?:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow)
+        )
         self.assertIn('bookie-tests-${{ needs.pin-revision.outputs.revision }}-${{ matrix.group }}', driver)
         self.assertIn('prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" "${{ matrix.group }}" "${{ runner.temp }}/bookie-${{ matrix.group }}-bundle"', driver)
 
@@ -943,15 +990,20 @@ class CiWorkflowTests(unittest.TestCase):
             with self.subTest(job=name):
                 job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
                 self.assertIn("test-build", re.search(r"(?m)^    needs: \[(.+)\]$", job).group(1))
-        driver = re.search(r"(?ms)^  driver:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+        driver = "".join(
+            re.findall(r"(?ms)^  driver(?:-followup)?:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow)
+        )
         gtk = re.search(r"(?ms)^  gtk:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
         self.assertIn("linux-build", re.search(r"(?m)^    needs: \[(.+)\]$", gtk).group(1))
         workspace_driver_names = {
             tomllib.loads(path.read_text())["package"]["name"].removeprefix("bookie-driver-")
             for path in (ROOT / "crates/drivers").glob("*/Cargo.toml")
         }
-        matrix = re.search(r"(?m)^        group: \[(.+)\]$", driver).group(1)
-        forgejo_groups = {name.strip() for name in matrix.split(",")}
+        forgejo_groups = {
+            name.strip()
+            for matrix in re.findall(r"(?m)^        group: \[(.+)\]$", driver)
+            for name in matrix.split(",")
+        }
         local_integration = (ROOT / "scripts/ci-local.sh").read_text().split("run_integration() {", 1)[1]
         group_script = (ROOT / "scripts/run-driver-group.sh").read_text()
         github_groups = set(re.findall(r"for group in ([^;]+);", local_integration)[0].split())
@@ -975,8 +1027,11 @@ class CiWorkflowTests(unittest.TestCase):
                         self.assertIn(f"--expected-group {group}", job)
                         self.assertIn(f"bookie-tests-${{{{ needs.pin-revision.outputs.revision }}}}-{group}", job)
                 self.assertNotIn("bookie-tests-${{ needs.pin-revision.outputs.revision }}-default", job)
-        integration = re.search(r"(?ms)^  driver:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
-        self.assertIn("group: [driver-core, driver-analytics, driver-extended, socket-ssh]", integration)
+        integration = "".join(
+            re.findall(r"(?ms)^  driver(?:-followup)?:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow)
+        )
+        for group in ("driver-core", "driver-analytics", "driver-extended", "socket-ssh"):
+            self.assertRegex(integration, rf"(?m)^        group: \[.*\b{re.escape(group)}\b")
         self.assertIn("bookie-tests-${{ needs.pin-revision.outputs.revision }}-${{ matrix.group }}", integration)
         self.assertIn('--expected-group "${{ matrix.group }}"', integration)
         self.assertIn('python3 scripts/run-test-layer.py "$BOOKIE_TEST_LAYER"', integration)
@@ -1104,7 +1159,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("compose logs --no-color --tail 50", script)
 
     def test_forgejo_jobs_bound_runtime_and_scope_checkout_credentials(self):
-        for name, expected_checkouts in (("ci", 22), ("nightly", 6)):
+        for name, expected_checkouts in (("ci", 26), ("nightly", 6)):
             workflow = (ROOT / f".forgejo/workflows/{name}.yml").read_text()
             jobs = workflow.split("\njobs:\n", 1)[1]
             headings = list(re.finditer(r"^  ([A-Za-z0-9_-]+):\s*$", jobs, re.MULTILINE))
@@ -1200,10 +1255,11 @@ class CiWorkflowTests(unittest.TestCase):
 
     def test_socket_ssh_job_cleans_run_scoped_containers_on_cancel(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
-        job = workflow.split("  driver:\n", 1)[1].split("  b4-rollback:\n", 1)[0]
+        job = "".join(re.findall(r"(?ms)^  driver(?:-followup)?:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow))
         script = (ROOT / "scripts/test-postgres-socket.sh").read_text()
         self.assertIn("BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}", job)
-        self.assertIn("group: [driver-core, driver-analytics, driver-extended, socket-ssh]", job)
+        for group in ("driver-core", "driver-analytics", "driver-extended", "socket-ssh"):
+            self.assertRegex(job, rf"(?m)^        group: \[.*\b{re.escape(group)}\b")
         self.assertIn("if: matrix.group == 'socket-ssh'", job)
         self.assertIn("cleanup-testcontainers.py", job)
         self.assertIn("trap 'cleanup_testcontainers; exit 143' TERM", job)
@@ -1559,7 +1615,7 @@ class CiWorkflowTests(unittest.TestCase):
                 header,
             ):
                 scheduled.add(match.group(1))
-            if re.search(r"(?m)^    if: github.event_name != 'push'\s*$", header):
+            if re.search(r"(?m)^    if: .*github.event_name != 'push'.*$", header):
                 t1.add(match.group(1))
         self.assertEqual(scheduled, {"current-stable-clippy"})
         self.assertEqual(t1, checker.OPTIONAL_ON_PUSH)
@@ -1725,9 +1781,10 @@ class CiWorkflowTests(unittest.TestCase):
 
     def test_docker_ssh_targets_run_in_hosted_and_local_integration(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
-        hosted = workflow.split("  driver:\n", 1)[1].split("  b4-rollback:\n", 1)[0]
+        hosted = "".join(re.findall(r"(?ms)^  driver(?:-followup)?:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow))
         local = (ROOT / "scripts/ci-local.sh").read_text().split("run_integration() {", 1)[1].split("run_release()", 1)[0]
-        self.assertIn("driver-core, driver-analytics, driver-extended, socket-ssh", hosted)
+        for group in ("driver-core", "driver-analytics", "driver-extended", "socket-ssh"):
+            self.assertRegex(hosted, rf"(?m)^        group: \[.*\b{re.escape(group)}\b")
         self.assertIn("socket-ssh", hosted)
         self.assertIn("scripts/test-ssh.sh", local)
         socket_layer = json.loads((ROOT / "scripts/test-layers.json").read_text())["layers"]["socket-ssh"]
@@ -2169,7 +2226,7 @@ class CiWorkflowTests(unittest.TestCase):
         builder = workflow.split("\n  linux-build:\n", 1)[1].split("\n  distro-floor-scenarios:\n", 1)[0]
         self.assertIn("ci-gtk-artifact.py create --package", builder)
         self.assertIn("needs: [pin-revision, linux-build]", scenarios)
-        self.assertIn("max-parallel: 2", scenarios)
+        self.assertNotIn("max-parallel", scenarios)
         self.assertIn("shard_group: [1, 2]", scenarios)
         self.assertIn("ci-gtk-artifact.py verify --package", scenarios)
         self.assertIn('SHARD_GROUP: ${{ matrix.shard_group }}', scenarios)
