@@ -165,7 +165,8 @@ class LayerRunnerTests(unittest.TestCase):
         ):
             for output in (other + success, success + other):
                 with self.subTest(output=output):
-                    result = self.execute(self.step(f"print({output!r})", "python-tests"))
+                    with patch.object(runner.sys, "stdout", io.StringIO()):
+                        result = self.execute(self.step(f"print({output!r})", "python-tests"))
                     self.assertEqual(result["exit_code"], 0)
                     self.assertEqual(result["status"], "failed")
 
@@ -179,7 +180,8 @@ class LayerRunnerTests(unittest.TestCase):
                 "    unittest.TextTestRunner().run(Contract())\n"
             )
             with self.subTest(outcomes=outcomes):
-                result = self.execute(self.step(code, "python-tests"))
+                with patch.object(runner.sys, "stdout", io.StringIO()):
+                    result = self.execute(self.step(code, "python-tests"))
                 self.assertEqual(result["exit_code"], 0)
                 self.assertEqual(result["status"], expected)
 
