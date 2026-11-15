@@ -81,6 +81,7 @@ pub(super) fn paint_for_bound_cell(
     shown_null: bool,
     row: &RowObject,
     columns: &[ColumnInfo],
+    relaxed_mongodb_json: bool,
 ) -> Option<HighlightPaint> {
     if rules.is_empty() {
         return None;
@@ -90,21 +91,37 @@ pub(super) fn paint_for_bound_cell(
         is_null: shown_null,
     };
     if rules.len() > u64::BITS as usize {
-        return paint_for_cell(rules, column, cell, |index| highlight_source_cell(row, index, columns));
+        return paint_for_cell(rules, column, cell, |index| {
+            highlight_source_cell(row, index, columns, relaxed_mongodb_json)
+        });
     }
     let row_matches = row.highlight_row_matches(rules, || {
-        compute_row_rule_matches(rules, |idx| highlight_source_cell(row, idx, columns))
+        compute_row_rule_matches(rules, |idx| {
+            highlight_source_cell(row, idx, columns, relaxed_mongodb_json)
+        })
     });
     paint_for_cell_with_row_matches(rules, column, cell, row_matches)
 }
 
-fn highlight_source_cell(row: &RowObject, index: usize, columns: &[ColumnInfo]) -> Option<(String, bool)> {
+fn highlight_source_cell(
+    row: &RowObject,
+    index: usize,
+    columns: &[ColumnInfo],
+    relaxed_mongodb_json: bool,
+) -> Option<(String, bool)> {
     if let Some(preview) = row.cell_preview(index) {
-        return Some((super::display::preview_display_text(&preview, 512), false));
+        return Some((
+            super::display::preview_display_text(&preview, 512, relaxed_mongodb_json),
+            false,
+        ));
     }
     row.with_cell_value(index, |value| {
         let column = columns.get(index)?;
-        Some(super::display::highlight_display_text(value, column))
+        Some(super::display::highlight_display_text(
+            value,
+            column,
+            relaxed_mongodb_json,
+        ))
     })
     .flatten()
 }
@@ -172,7 +189,7 @@ mod tests {
         .expect("prepare");
         let row = RowObject::new(vec![Value::Text("bad".into())]);
         let rules = std::sync::Arc::from(rules);
-        let paint = paint_for_bound_cell(&rules, 0, "bad", false, &row, &[column("status")]);
+        let paint = paint_for_bound_cell(&rules, 0, "bad", false, &row, &[column("status")], false);
         assert_eq!(
             paint,
             Some(HighlightPaint {
@@ -202,7 +219,7 @@ mod tests {
         ]);
         let columns = [column("name"), column("detail")];
         let rules = std::sync::Arc::from(rules);
-        let paint = paint_for_bound_cell(&rules, 0, "first", false, &row, &columns);
+        let paint = paint_for_bound_cell(&rules, 0, "first", false, &row, &columns, false);
         assert_eq!(paint, None);
     }
 }

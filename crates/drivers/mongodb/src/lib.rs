@@ -31,6 +31,12 @@ use bookie_core::{
 
 pub struct MongodbDriver;
 
+pub fn relaxed_extended_json_for_display(value: &serde_json::Value) -> Option<serde_json::Value> {
+    mongodb::bson::Bson::try_from(value.clone())
+        .ok()
+        .map(mongodb::bson::Bson::into_relaxed_extjson)
+}
+
 /// Validate text using BSON Decimal128's range and return its exact canonical text.
 /// The app uses this when Rust's narrower `Decimal` parser cannot represent an edit.
 pub fn canonical_decimal128_text(text: &str) -> Result<String, DriverError> {
