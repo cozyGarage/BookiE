@@ -481,3 +481,23 @@ fn undoing_a_delete_brings_back_the_edit_of_that_row() {
     assert!(statements[0].0.starts_with("UPDATE"), "{}", statements[0].0);
     assert_eq!(tracker.pending_count(), 1);
 }
+
+#[test]
+fn duckdb_saves_carry_the_old_value_and_are_checked_like_the_other_sql_engines() {
+    let mut tracker = TabChangeTracker::new();
+    tracker.track_cell_edit(key(1), 1, Value::Text("old".into()), Value::Text("new".into()));
+    let (statements, _) = tracker
+        .materialize("duckdb", None, "t", &schema())
+        .expect("the batch must build");
+
+    assert_eq!(
+        statements[0].0,
+        "UPDATE \"t\" SET \"note\" = ? WHERE \"id\" = ? AND \"note\" IS NOT DISTINCT FROM ?"
+    );
+    for engine in ["postgres", "mysql", "mssql", "sqlite", "duckdb"] {
+        assert!(keyed_writes_are_checked(engine), "{engine}");
+    }
+    for engine in ["clickhouse", "redis", "mongodb", "oracle", "cassandra"] {
+        assert!(!keyed_writes_are_checked(engine), "{engine}");
+    }
+}

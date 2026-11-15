@@ -585,8 +585,17 @@ impl Connection for DuckdbConnection {
     }
 
     async fn execute_in_transaction(&self, statements: &[(String, Vec<Value>)]) -> Result<Vec<u64>, DriverError> {
+        self.execute_in_transaction_checked(statements, &[]).await
+    }
+
+    async fn execute_in_transaction_checked(
+        &self,
+        statements: &[(String, Vec<Value>)],
+        expect_one: &[usize],
+    ) -> Result<Vec<u64>, DriverError> {
         let conn = Arc::clone(&self.session);
         let statements = statements.to_vec();
+        let expect_one = expect_one.to_vec();
         blocking(move || {
             let guard = conn
                 .conn
@@ -611,6 +620,13 @@ impl Connection for DuckdbConnection {
                     guard.execute(sql, params_from_iter(bind.iter()))
                 };
                 match result {
+                    Ok(n) if expect_one.contains(&idx) && n != 1 => {
+                        let _ = guard.execute_batch("ROLLBACK");
+                        return Err(DriverError::Transaction {
+                            statement_index: idx,
+                            source: Box::new(DriverError::ConcurrentModification),
+                        });
+                    }
                     Ok(n) => affected.push(n as u64),
                     Err(e) => {
                         let _ = guard.execute_batch("ROLLBACK");
