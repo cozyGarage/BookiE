@@ -5,8 +5,9 @@ use std::time::Duration;
 use bookie_app_services::command_bridge::{
     ChannelEventSink, Command, DispatchContext, Epoch, Event, dispatch,
 };
-use bookie_app_services::database_service::ConnectionOverview;
-use bookie_app_services::read_session::{ConnectionSummary, ReadSession};
+use bookie_app_services::database_service::{ConnectionOverview, DatabaseService};
+use bookie_app_services::read_session::ConnectionSummary;
+use bookie_app_services::read_session_store::{OpenedSession, ReadSessionStore, SessionId};
 use bookie_core::{ColumnInfo, OperationControl, QueryResult, QueryResultBudget, QueryRows, TableInfo};
 use bookie_results::result_scan::ScanSource;
 use bookie_results::stream_result_spool::StreamResultSpoolManager;
@@ -38,11 +39,13 @@ const PAGE_TIMEOUT: Duration = Duration::from_secs(30);
 
 pub struct LiveSession {
     runtime: tokio::runtime::Runtime,
-    session: Option<ReadSession>,
+    sessions: ReadSessionStore,
+    session_id: SessionId,
     epoch: AtomicU64,
     pub driver_id: String,
     pub label: String,
     pub tables: Vec<TableInfo>,
+    supports_snapshot_cursor: bool,
 }
 
 impl LiveSession {
@@ -56,15 +59,16 @@ impl LiveSession {
             .enable_all()
             .build()
             .map_err(|error| error.to_string())?;
-        let (session, label) = runtime.block_on(open_session(origin, cancellation.clone()))?;
-        let tables = session.tables.clone();
+        let (sessions, opened) = runtime.block_on(open_session(origin, cancellation.clone()))?;
         Ok(Arc::new(LiveSession {
-            driver_id: session.driver_id.clone(),
+            driver_id: opened.driver_id.clone(),
             runtime,
-            session: Some(session),
+            sessions,
+            session_id: opened.session_id,
             epoch: AtomicU64::new(0),
-            label,
-            tables,
+            label: opened.label,
+            tables: opened.tables,
+            supports_snapshot_cursor: opened.supports_snapshot_cursor,
         }))
     }
 
@@ -81,11 +85,10 @@ impl LiveSession {
         if max_rows == 0 || max_rows > ROW_CAP {
             return Err(format!("Row limit must be between 1 and {ROW_CAP}."));
         }
-        let session = self.session.as_ref().ok_or("the session is closed")?;
         let epoch = self.next_epoch();
         let (columns, rows, scan, truncated) =
             self.runtime
-                .block_on(query_pages(session, sql, max_rows, cancellation, epoch, &self.epoch))?;
+                .block_on(query_pages(&self.sessions, self.session_id, sql, max_rows, cancellation, epoch, &self.epoch))?;
         Ok(LiveTable {
             session: self.clone(),
             columns,
@@ -98,12 +101,11 @@ impl LiveSession {
     }
 
     pub fn overview(&self) -> Result<Vec<ConnectionOverview>, String> {
-        let session = self.session.as_ref().ok_or("the session is closed")?;
         let epoch = Epoch(self.epoch.load(Ordering::Relaxed));
         let control = OperationControl::with_timeout(Duration::from_secs(5));
         let event = self.runtime.block_on(dispatch_read(
-            DispatchContext::Session(session),
-            Command::ReadConnectionStatus { epoch },
+            DispatchContext::Sessions(&self.sessions),
+            Command::ReadConnectionStatus { epoch, session_id: self.session_id },
             &control,
             epoch,
             &self.epoch,
@@ -121,14 +123,16 @@ impl LiveSession {
         window: Duration,
         cancellation: &CancellationToken,
     ) -> Result<drivers_registry::PubSubSample, String> {
-        let session = self.session.as_ref().ok_or("the session is closed")?;
         let registry = drivers_registry::default_registry();
         let deadline = tokio::time::Instant::now() + window + Duration::from_secs(15);
         let control = OperationControl::new(cancellation.clone(), Some(deadline));
         self.runtime
-            .block_on(session.with_subscription(&registry, &control, |options| {
-                drivers_registry::sample_pubsub(options, patterns, max_messages, window)
-            }))
+            .block_on(self.sessions.with_subscription(
+                self.session_id,
+                &registry,
+                &control,
+                |options| drivers_registry::sample_pubsub(options, patterns, max_messages, window),
+            ))
             .map_err(|failure| format!("{failure:?}"))
     }
 
@@ -145,18 +149,26 @@ impl LiveSession {
         if max_rows == 0 || max_rows > ROW_CAP {
             return Err(format!("Row limit must be between 1 and {ROW_CAP}."));
         }
-        let session = self.session.as_ref().ok_or("the session is closed")?;
+        let table = find_table(&self.tables, table)?.clone();
         let epoch = self.next_epoch();
         let (columns, rows, scan, truncated) =
             self.runtime
-                .block_on(read_pages(session, table, max_rows, cancellation, epoch, &self.epoch))?;
+                .block_on(read_pages(
+                    &self.sessions,
+                    self.session_id,
+                    &table,
+                    max_rows,
+                    cancellation,
+                    epoch,
+                    &self.epoch,
+                ))?;
         Ok(LiveTable {
             session: self.clone(),
             columns,
             rows,
             scan,
             truncated,
-            snapshot_consistent: session.supports_snapshot_cursor(),
+            snapshot_consistent: self.supports_snapshot_cursor,
             table: Some(table.clone()),
         })
     }
@@ -169,7 +181,7 @@ impl LiveSession {
 impl Drop for LiveSession {
     fn drop(&mut self) {
         let _inside = self.runtime.enter();
-        drop(self.session.take());
+        self.sessions.close(self.session_id);
     }
 }
 
@@ -197,56 +209,64 @@ impl LiveTable {
     }
 }
 
-async fn open_session(origin: &Origin, cancellation: CancellationToken) -> Result<(ReadSession, String), String> {
+async fn open_session(
+    origin: &Origin,
+    cancellation: CancellationToken,
+) -> Result<(ReadSessionStore, OpenedSession), String> {
     let registry = Arc::new(drivers_registry::default_registry());
-    let (opened, label) = match origin {
+    let sessions = ReadSessionStore::new(registry, Arc::new(DatabaseService::new()));
+    let epoch = Epoch(1);
+    let current_epoch = AtomicU64::new(epoch.0);
+    let control = OperationControl::new(
+        cancellation,
+        Some(tokio::time::Instant::now() + Duration::from_secs(30)),
+    );
+    let command = match origin {
         Origin::Saved(connection) => {
-            let epoch = Epoch(1);
-            let current_epoch = AtomicU64::new(epoch.0);
-            let control = OperationControl::new(
-                cancellation.clone(),
-                Some(tokio::time::Instant::now() + Duration::from_secs(30)),
-            );
             let saved = bridge_saved_connections(&control, epoch, &current_epoch).await?;
-            let summary = saved
+            let connection_id = saved
                 .iter()
                 .find(|saved| saved.id.to_string() == *connection || saved.name == *connection)
+                .map(|saved| saved.id)
                 .ok_or_else(|| format!("no saved connection named or numbered {connection}"))?;
-            (
-                ReadSession::open_saved_controlled(summary.id, registry, cancellation).await,
-                summary.name.clone(),
-            )
+            Command::OpenSavedConnection { epoch, connection_id }
         }
-        Origin::File(path) => (
-            ReadSession::open_file_controlled(path, registry, cancellation).await,
-            path.file_name().map_or_else(
-                || path.display().to_string(),
-                |name| name.to_string_lossy().into_owned(),
-            ),
-        ),
+        Origin::File(path) => Command::OpenConnectionFile { epoch, path: path.clone() },
     };
-    Ok((opened.map_err(|failure| format!("{failure:?}"))?, label))
+    let event = dispatch_read(
+        DispatchContext::Sessions(&sessions),
+        command,
+        &control,
+        epoch,
+        &current_epoch,
+    )
+    .await?;
+    let Event::SessionOpened { outcome, .. } = event else {
+        return Err("The command bridge returned an unexpected event.".into());
+    };
+    Ok((sessions, outcome?))
 }
 
 type Pages = (Vec<ColumnMeta>, QueryRows, ScanSource, bool);
 
 async fn read_pages(
-    session: &ReadSession,
+    sessions: &ReadSessionStore,
+    session_id: SessionId,
     table: &TableInfo,
     max_rows: u64,
     cancellation: &CancellationToken,
     epoch: Epoch,
     current_epoch: &AtomicU64,
 ) -> Result<Pages, String> {
-    let table = find_table(&session.tables, table)?;
     let open_control = OperationControl::new(cancellation.clone(), Some(tokio::time::Instant::now() + PAGE_TIMEOUT));
-    let mut cursor = session
-        .open_table_cursor(&table, &open_control)
+    let mut cursor = sessions
+        .open_table_cursor(session_id, table, &open_control)
         .await
         .map_err(|failure| format!("{failure:?}"))?;
     let result = collect_pages(
-        session,
-        &table,
+        sessions,
+        session_id,
+        table,
         max_rows,
         cancellation,
         &mut cursor,
@@ -272,7 +292,8 @@ async fn read_pages(
 }
 
 async fn collect_pages(
-    session: &ReadSession,
+    sessions: &ReadSessionStore,
+    session_id: SessionId,
     table: &TableInfo,
     max_rows: u64,
     cancellation: &CancellationToken,
@@ -290,20 +311,18 @@ async fn collect_pages(
     let mut budget = QueryResultBudget::default();
     while (rows.len() as u64) < max_rows {
         let limit = PAGE_ROWS.min(max_rows - rows.len() as u64);
-        let control = OperationControl::new(cancellation.clone(), Some(tokio::time::Instant::now() + PAGE_TIMEOUT));
-        let (mut page, has_next_page) = match cursor {
-            Some(cursor) => {
-                let page = cursor
-                    .next_page(&control)
-                    .await
-                    .map_err(|failure| format!("{failure:?}"))?;
-                (page.result, page.has_next_page)
-            }
-            None => (
-                bridge_read_page(session, table, rows.len() as u64, limit, &control, epoch, current_epoch).await?,
-                false,
-            ),
-        };
+        let (mut page, has_next_page) = next_result_page(
+            sessions,
+            session_id,
+            table,
+            rows.len() as u64,
+            limit,
+            cancellation,
+            cursor,
+            epoch,
+            current_epoch,
+        )
+        .await?;
         cap_page_rows(&mut page, limit);
         if infos.is_empty() {
             infos.clone_from(&page.columns);
@@ -338,8 +357,36 @@ async fn collect_pages(
     Ok((columns, rows, ScanSource::new(spool, infos, total), truncated))
 }
 
+async fn next_result_page(
+    sessions: &ReadSessionStore,
+    session_id: SessionId,
+    table: &TableInfo,
+    offset: u64,
+    limit: u64,
+    cancellation: &CancellationToken,
+    cursor: &mut Option<bookie_app_services::read_session::PostgresTableCursor>,
+    epoch: Epoch,
+    current_epoch: &AtomicU64,
+) -> Result<(QueryResult, bool), String> {
+    let control = OperationControl::new(cancellation.clone(), Some(tokio::time::Instant::now() + PAGE_TIMEOUT));
+    match cursor {
+        Some(cursor) => {
+            let page = cursor
+                .next_page(&control)
+                .await
+                .map_err(|failure| format!("{failure:?}"))?;
+            Ok((page.result, page.has_next_page))
+        }
+        None => Ok((
+            bridge_read_page(sessions, session_id, table, offset, limit, &control, epoch, current_epoch).await?,
+            false,
+        )),
+    }
+}
+
 async fn query_pages(
-    session: &ReadSession,
+    sessions: &ReadSessionStore,
+    session_id: SessionId,
     sql: &str,
     max_rows: u64,
     cancellation: &CancellationToken,
@@ -347,7 +394,7 @@ async fn query_pages(
     current_epoch: &AtomicU64,
 ) -> Result<Pages, String> {
     let control = OperationControl::new(cancellation.clone(), Some(tokio::time::Instant::now() + PAGE_TIMEOUT));
-    let mut result = bridge_query(session, sql, &control, epoch, current_epoch).await?;
+    let mut result = bridge_query(sessions, session_id, sql, &control, epoch, current_epoch).await?;
     if cancellation.is_cancelled() {
         return Err("The operation was cancelled.".into());
     }
@@ -384,16 +431,18 @@ async fn query_pages(
 }
 
 async fn bridge_query(
-    session: &ReadSession,
+    sessions: &ReadSessionStore,
+    session_id: SessionId,
     sql: &str,
     control: &OperationControl,
     epoch: Epoch,
     current_epoch: &AtomicU64,
 ) -> Result<QueryResult, String> {
     let event = dispatch_read(
-        DispatchContext::Session(session),
+        DispatchContext::Sessions(sessions),
         Command::RunQuery {
             epoch,
+            session_id,
             sql: sql.to_owned(),
         },
         control,
@@ -408,7 +457,8 @@ async fn bridge_query(
 }
 
 async fn bridge_read_page(
-    session: &ReadSession,
+    sessions: &ReadSessionStore,
+    session_id: SessionId,
     table: &TableInfo,
     offset: u64,
     limit: u64,
@@ -417,9 +467,10 @@ async fn bridge_read_page(
     current_epoch: &AtomicU64,
 ) -> Result<QueryResult, String> {
     let event = dispatch_read(
-        DispatchContext::Session(session),
+        DispatchContext::Sessions(sessions),
         Command::ReadPage {
             epoch,
+            session_id,
             table: table.clone(),
             offset,
             limit,
@@ -450,11 +501,22 @@ async fn dispatch_read(
     dispatch(context, command, control, &sink)
         .await
         .map_err(|error| format!("{error:?}"))?;
-    receiver
-        .try_recv()
-        .map_err(|error| format!("{error:?}"))?
-        .into_current(Epoch(current_epoch.load(Ordering::Relaxed)))
-        .ok_or_else(|| "The request was superseded.".into())
+    let event = receiver.try_recv().map_err(|error| format!("{error:?}"))?;
+    keep_current_event(context, event, Epoch(current_epoch.load(Ordering::Relaxed)))
+}
+
+fn keep_current_event(
+    context: DispatchContext<'_>,
+    event: Event,
+    current: Epoch,
+) -> Result<Event, String> {
+    if event.epoch() == current {
+        return Ok(event);
+    }
+    if let (DispatchContext::Sessions(sessions), Event::SessionOpened { outcome: Ok(opened), .. }) = (context, event) {
+        sessions.close(opened.session_id);
+    }
+    Err("The request was superseded.".into())
 }
 
 async fn bridge_saved_connections(
@@ -621,6 +683,32 @@ impl ResultSource for LiveTable {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_stale_open_event_closes_its_session() {
+        let Origin::File(source) = fixture() else {
+            unreachable!()
+        };
+        let file = FixtureFile(std::env::temp_dir().join(format!("bookie-gpui-stale-{}.sqlite", uuid::Uuid::new_v4())));
+        std::fs::copy(source, &file.0).unwrap();
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let database = Arc::new(DatabaseService::new_isolated());
+        let sessions = ReadSessionStore::new(Arc::new(drivers_registry::default_registry()), database.clone());
+        let control = OperationControl::with_timeout(Duration::from_secs(5));
+        let opened = runtime.block_on(sessions.open_file(&file.0, &control)).unwrap();
+
+        let result = keep_current_event(
+            DispatchContext::Sessions(&sessions),
+            Event::SessionOpened {
+                epoch: Epoch(1),
+                outcome: Ok(opened),
+            },
+            Epoch(2),
+        );
+
+        assert!(result.is_err());
+        assert!(database.connection_overview().is_empty());
+    }
 
     #[test]
     fn declared_number_types_are_numeric_and_text_types_are_not() {
@@ -818,30 +906,14 @@ mod tests {
     }
 
     #[test]
-    fn a_writable_connection_configuration_cannot_write_from_the_query_editor() {
+    fn a_database_file_cannot_write_from_the_query_editor() {
         let Origin::File(source) = fixture() else {
             unreachable!()
         };
         let path = std::env::temp_dir().join(format!("bookie-gpui-read-only-{}.sqlite", uuid::Uuid::new_v4()));
         std::fs::copy(source, &path).unwrap();
         let file = FixtureFile(path);
-        let database_file = bookie_app_services::open_request::classify_file(&file.0).unwrap();
-        let mut saved = bookie_app_services::open_request::file_connection(&database_file);
-        saved.read_only = false;
-        let runtime = tokio::runtime::Runtime::new().unwrap();
-        let registry = drivers_registry::default_registry();
-        let database = Arc::new(bookie_app_services::database_service::DatabaseService::new());
-        let session = runtime
-            .block_on(ReadSession::open(saved, Arc::new(registry), database))
-            .unwrap();
-        let live = Arc::new(LiveSession {
-            driver_id: session.driver_id.clone(),
-            tables: session.tables.clone(),
-            session: Some(session),
-            runtime,
-            epoch: AtomicU64::new(0),
-            label: "fixture".into(),
-        });
+        let live = LiveSession::open(&Origin::File(file.0.clone())).unwrap();
         assert!(live.run_query("DELETE FROM orders", 100).is_err());
         assert_eq!(live.run_query("SELECT id FROM orders", 100).unwrap().total(), 6);
     }

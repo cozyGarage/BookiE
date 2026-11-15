@@ -50,6 +50,7 @@ pub mod ordered_refresh;
 pub mod preparation;
 pub mod read_scopes;
 pub mod read_session;
+pub mod read_session_store;
 pub mod recent_tabs;
 pub mod referencing_tables;
 pub mod release_updates;
