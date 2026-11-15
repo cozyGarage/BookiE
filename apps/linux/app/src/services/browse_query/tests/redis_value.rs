@@ -8,7 +8,11 @@ use tokio::net::TcpStream;
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn redis_guarded_refetch_preserves_binary_key_and_value() {
-    let container = Redis::default().start().await.unwrap();
+    let container = Redis::default()
+        .with_tag(crate::test_image_tags::REDIS_TEST_TAG)
+        .start()
+        .await
+        .unwrap();
     let host = container.get_host().await.unwrap().to_string();
     let port = container.get_host_port_ipv4(6379).await.unwrap();
     let key = vec![0xff, b'?', b'\n'];

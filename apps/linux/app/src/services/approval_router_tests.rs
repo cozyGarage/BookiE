@@ -100,8 +100,9 @@ async fn value_contract_mysql_unparseable_procedure_uses_human_approval_before_e
     use testcontainers_modules::mysql::Mysql;
 
     let container = Mysql::default()
+        .with_tag(crate::test_image_tags::MYSQL_TEST_TAG)
         .with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test")
-        .with_cmd(["--default-authentication-plugin=mysql_native_password"])
+        .with_cmd(["--mysql-native-password=ON"])
         .with_startup_timeout(std::time::Duration::from_secs(180))
         .start()
         .await

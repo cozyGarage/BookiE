@@ -7,6 +7,7 @@ use testcontainers_modules::mssql_server::MssqlServer;
 #[ignore = "requires docker"]
 async fn value_contract_mssql_datetimeoffset_grid_edit_preserves_local_time_offset_and_siblings() {
     let container = MssqlServer::default()
+        .with_tag(crate::test_image_tags::MSSQL_TEST_TAG)
         .with_accept_eula()
         .with_startup_timeout(std::time::Duration::from_secs(180))
         .start()

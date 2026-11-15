@@ -13,6 +13,8 @@ use bookie_core::{
 use drivers_mssql::MssqlDriver;
 use shared_container::{assert_tmpfs_data_dir, start_mssql, start_mssql_durable};
 
+const MSSQL_TEST_TAG: &str = "2022-CU23-ubuntu-22.04";
+
 #[path = "support/catalog_objects.rs"]
 mod catalog_objects;
 #[path = "support/column_defaults.rs"]

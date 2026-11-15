@@ -325,6 +325,8 @@ use testcontainers::{ContainerAsync, GenericImage};
 use testcontainers_modules::redis::Redis;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
 
+const REDIS_TEST_TAG: &str = "7.4.12-alpine3.22";
+
 struct BinaryBulk(Vec<u8>);
 impl redis::ToRedisArgs for BinaryBulk {
     fn write_redis_args<W>(&self, out: &mut W)
@@ -336,14 +338,18 @@ impl redis::ToRedisArgs for BinaryBulk {
 }
 
 async fn start_redis() -> (ContainerAsync<Redis>, String, u16) {
-    let container = Redis::default().start().await.expect("start redis container");
+    let container = Redis::default()
+        .with_tag(crate::REDIS_TEST_TAG)
+        .start()
+        .await
+        .expect("start redis container");
     let host = container.get_host().await.expect("host").to_string();
     let port = container.get_host_port_ipv4(6379).await.expect("port");
     (container, host, port)
 }
 
 async fn start_redis_resp3() -> (ContainerAsync<GenericImage>, String, u16) {
-    let container = GenericImage::new("redis", "7.4-alpine")
+    let container = GenericImage::new("redis", REDIS_TEST_TAG)
         .with_exposed_port(6379.tcp())
         .with_wait_for(WaitFor::message_on_stdout("Ready to accept connections"))
         .start()

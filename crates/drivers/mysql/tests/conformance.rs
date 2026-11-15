@@ -11,6 +11,7 @@ use testcontainers::ImageExt;
 use testcontainers_modules::mysql::Mysql as MysqlImage;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
 
+const MYSQL_TEST_TAG: &str = "8.4.13";
 static SERVER: OnceLock<ConnectOptions> = OnceLock::new();
 
 struct MySql;
@@ -55,8 +56,9 @@ impl conformance::ConformanceEngine for MySql {
 #[ignore = "requires docker"]
 async fn conformance_suite_on_a_real_mysql_server() {
     let container = MysqlImage::default()
+        .with_tag(MYSQL_TEST_TAG)
         .with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test")
-        .with_cmd(["--default-authentication-plugin=mysql_native_password"])
+        .with_cmd(["--mysql-native-password=ON"])
         .with_startup_timeout(std::time::Duration::from_secs(180))
         .start()
         .await

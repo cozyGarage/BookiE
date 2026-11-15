@@ -6,6 +6,9 @@ use secrecy::SecretString;
 use testcontainers::ImageExt;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
 
+const MYSQL_TEST_TAG: &str = "8.4.13";
+const MSSQL_TEST_TAG: &str = "2022-CU23-ubuntu-22.04";
+
 fn column(name: &str, data_type: &str, primary_key: bool) -> ColumnInfo {
     ColumnInfo {
         name: name.into(),
@@ -129,7 +132,7 @@ async fn sqlite_previews_a_huge_text_cell() {
 #[ignore = "requires docker"]
 async fn mysql_previews_a_huge_longtext_cell() {
     let container = testcontainers_modules::mysql::Mysql::default()
-        .with_tag("8.4")
+        .with_tag(MYSQL_TEST_TAG)
         .with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test")
         .start()
         .await
@@ -168,6 +171,7 @@ async fn mysql_previews_a_huge_longtext_cell() {
 #[ignore = "requires docker"]
 async fn sql_server_previews_a_huge_varchar_max_cell() {
     let container = testcontainers_modules::mssql_server::MssqlServer::default()
+        .with_tag(MSSQL_TEST_TAG)
         .with_accept_eula()
         .with_startup_timeout(std::time::Duration::from_secs(180))
         .start()
@@ -299,6 +303,7 @@ async fn postgres_previews_huge_json_and_jsonb_cells() {
 #[ignore = "requires docker"]
 async fn sql_server_previews_huge_legacy_text_and_ntext_cells() {
     let container = testcontainers_modules::mssql_server::MssqlServer::default()
+        .with_tag(MSSQL_TEST_TAG)
         .with_accept_eula()
         .with_startup_timeout(std::time::Duration::from_secs(180))
         .start()

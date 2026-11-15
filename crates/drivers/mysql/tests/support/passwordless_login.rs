@@ -8,7 +8,7 @@ use testcontainers_modules::testcontainers::runners::AsyncRunner;
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn an_account_without_a_password_signs_in_with_an_empty_password() {
-    let container = Mysql::default().start().await.unwrap();
+    let container = Mysql::default().with_tag(crate::MYSQL_TEST_TAG).start().await.unwrap();
     let port = container.get_host_port_ipv4(3306).await.unwrap();
     let options = ConnectOptions {
         host: "127.0.0.1".into(),

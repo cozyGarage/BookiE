@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/mssql/server:2022-latest
+FROM mcr.microsoft.com/mssql/server:2022-CU23-ubuntu-22.04
 
 USER root
 COPY materials/server.crt /certs/server.crt

@@ -11,6 +11,7 @@ use testcontainers_modules::testcontainers::runners::AsyncRunner;
 
 pub(crate) async fn start_mssql(durable: bool) -> (ContainerAsync<MssqlServer>, ConnectOptions) {
     let image = MssqlServer::default()
+        .with_tag(crate::MSSQL_TEST_TAG)
         .with_accept_eula()
         .with_startup_timeout(std::time::Duration::from_secs(180));
     let container = if durable {
