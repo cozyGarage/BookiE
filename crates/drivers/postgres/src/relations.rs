@@ -1,10 +1,24 @@
 use bookie_core::{DriverError, TableInfo};
-use sqlx::{Pool, Postgres, Row};
+use sqlx::Row;
 
 use crate::map_sqlx_error;
 
-pub(crate) async fn list_relations(
-    pool: &Pool<Postgres>,
+pub(crate) async fn list_tables(
+    connection: &mut sqlx::PgConnection,
+    excluded_schemas: &[String],
+) -> Result<Vec<TableInfo>, DriverError> {
+    list_relations(connection, &["r", "p"], excluded_schemas).await
+}
+
+pub(crate) async fn list_views(
+    connection: &mut sqlx::PgConnection,
+    excluded_schemas: &[String],
+) -> Result<Vec<TableInfo>, DriverError> {
+    list_relations(connection, &["v", "m"], excluded_schemas).await
+}
+
+async fn list_relations(
+    connection: &mut sqlx::PgConnection,
     relation_kinds: &[&str],
     excluded_schemas: &[String],
 ) -> Result<Vec<TableInfo>, DriverError> {
@@ -28,7 +42,7 @@ pub(crate) async fn list_relations(
     )
     .bind(relation_kinds)
     .bind(excluded_schemas)
-    .fetch_all(pool)
+    .fetch_all(&mut *connection)
     .await
     .map_err(map_sqlx_error)?;
     Ok(rows
