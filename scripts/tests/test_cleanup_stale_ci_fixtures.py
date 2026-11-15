@@ -53,6 +53,35 @@ class StaleCiFixtureCleanupTests(unittest.TestCase):
         self.assertIn(("network", "rm", "network-old"), calls)
         self.assertIn(("volume", "rm", "volume-old"), calls)
 
+    def test_removes_other_ci_run_fixtures_without_removing_the_current_run(self):
+        now = datetime.datetime(2026, 11, 14, tzinfo=datetime.timezone.utc)
+        recent = (now - datetime.timedelta(minutes=1)).isoformat().replace("+00:00", "Z")
+        rows = {
+            "previous": f"previous\t{recent}\tforgejo-10-1-driver-core\t<no value>",
+            "current": f"current\t{recent}\tforgejo-11-1-driver-tls\t<no value>",
+            "compose-previous": f"compose-previous\t{recent}\t<no value>\tforgejo-12-1-driver-tls",
+            "compose-current": f"compose-current\t{recent}\t<no value>\tforgejo-11-1-driver-tls",
+        }
+        calls = []
+
+        def fake_docker(*args):
+            calls.append(args)
+            if args[:3] == ("ps", "--all", "--quiet"):
+                return (
+                    "previous\ncurrent\n"
+                    if args[-1] == "label=com.bookie.test-run"
+                    else "compose-previous\ncompose-current\n"
+                )
+            if args[0] == "inspect":
+                return rows[args[-1]]
+            return ""
+
+        with patch.object(cleanup, "docker", side_effect=fake_docker):
+            cleanup.reconcile(now, "forgejo-11-1-driver-tls")
+
+        self.assertIn(("rm", "--force", "--volumes", "previous", "compose-previous"), calls)
+        self.assertFalse(any("current" in call for call in calls if call[0] == "rm"))
+
 
 if __name__ == "__main__":
     unittest.main()

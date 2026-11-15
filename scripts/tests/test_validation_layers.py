@@ -38,7 +38,13 @@ class LayerRunnerTests(unittest.TestCase):
             run.assert_not_called()
             runner.reconcile_ci_fixtures(["driver-core"])
             run.assert_called_once_with(
-                [sys.executable, str(ROOT / "scripts/cleanup-stale-ci-fixtures.py")], cwd=ROOT, check=True
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/cleanup-stale-ci-fixtures.py"),
+                    "forgejo-123-1-driver-core",
+                ],
+                cwd=ROOT,
+                check=True,
             )
             runner.reconcile_ci_fixtures(["postgres-release"])
             self.assertEqual(run.call_count, 2)

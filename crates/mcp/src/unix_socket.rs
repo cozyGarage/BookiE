@@ -23,8 +23,20 @@ pub async fn serve_unix_socket_until(
     path: PathBuf,
     shutdown: CancellationToken,
 ) -> Result<(), String> {
+    serve_for_owner(bridge, path, shutdown, None).await
+}
+
+async fn serve_for_owner(
+    bridge: Arc<McpBridge>,
+    path: PathBuf,
+    shutdown: CancellationToken,
+    expected_owner: Option<u32>,
+) -> Result<(), String> {
     let listener = bind_private_socket(&path).await?;
-    let owner = std::fs::metadata(&path).map_err(|error| error.to_string())?.uid();
+    let owner = match expected_owner {
+        Some(owner) => owner,
+        None => std::fs::metadata(&path).map_err(|error| error.to_string())?.uid(),
+    };
     tracing::info!(path = %path.display(), "MCP socket listening");
     let slots = Arc::new(tokio::sync::Semaphore::new(MAX_CONNECTIONS));
     loop {
@@ -105,4 +117,84 @@ where
     let result = tokio::io::copy(&mut from_socket, &mut output).await;
     upstream.abort();
     result.map(|_| ()).map_err(|error| error.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tokens::TokenStore;
+    use async_trait::async_trait;
+    use bookie_core::Connection;
+    use tokio::io::AsyncReadExt;
+
+    struct NoProvider;
+
+    #[async_trait]
+    impl crate::bridge::ConnectionProvider for NoProvider {
+        async fn list_saved_connections(&self) -> Result<Vec<bookie_storage::SavedConnection>, String> {
+            Ok(Vec::new())
+        }
+
+        async fn connection(&self, _: uuid::Uuid, _: bookie_policy::Principal) -> Result<Arc<dyn Connection>, String> {
+            Err("unused".into())
+        }
+    }
+
+    async fn answer_to_ping(expected_owner: u32) -> Vec<u8> {
+        let directory = tempfile::tempdir().unwrap();
+        let tokens = Arc::new(TokenStore::open(directory.path().join("tokens.json")).unwrap());
+        let bridge = Arc::new(McpBridge::new(Arc::new(NoProvider), tokens));
+        let path = directory.path().join("run").join("mcp.sock");
+        let shutdown = CancellationToken::new();
+        let server = tokio::spawn(serve_for_owner(
+            bridge,
+            path.clone(),
+            shutdown.clone(),
+            Some(expected_owner),
+        ));
+        for _ in 0..200 {
+            if std::fs::symlink_metadata(&path).is_ok() {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+        let stream = UnixStream::connect(&path).await.unwrap();
+        let (mut reader, mut writer) = stream.into_split();
+        let _ = writer
+            .write_all(b"{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"ping\"}\n")
+            .await;
+        let mut received = Vec::new();
+        let mut line = [0u8; 256];
+        let read = tokio::time::timeout(std::time::Duration::from_secs(5), reader.read(&mut line)).await;
+        if let Ok(Ok(count)) = read {
+            received.extend_from_slice(&line[..count]);
+        }
+        shutdown.cancel();
+        let _ = server.await;
+        received
+    }
+
+    fn own_uid() -> u32 {
+        std::fs::metadata("/proc/self").unwrap().uid()
+    }
+
+    #[tokio::test]
+    async fn a_connection_from_another_user_is_dropped_without_an_answer() {
+        let received = answer_to_ping(own_uid() + 1).await;
+        assert!(
+            received.is_empty(),
+            "a stranger got: {}",
+            String::from_utf8_lossy(&received)
+        );
+    }
+
+    #[tokio::test]
+    async fn a_connection_from_the_owner_gets_an_answer() {
+        let received = answer_to_ping(own_uid()).await;
+        assert!(
+            String::from_utf8_lossy(&received).contains("\"result\""),
+            "{}",
+            String::from_utf8_lossy(&received)
+        );
+    }
 }
