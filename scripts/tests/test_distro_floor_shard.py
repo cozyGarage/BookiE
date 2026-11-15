@@ -29,6 +29,9 @@ class DistroFloorShardTests(unittest.TestCase):
                 "import json, os, sys\n"
                 "with open(os.environ['DOCKER_ARGUMENTS'], 'a') as log:\n"
                 "    log.write(json.dumps(sys.argv[1:]) + '\\n')\n"
+                "if sys.argv[1:2] == ['run'] and '-i' in sys.argv and 'DOCKER_STDIN' in os.environ:\n"
+                "    with open(os.environ['DOCKER_STDIN'], 'wb') as stream:\n"
+                "        stream.write(sys.stdin.buffer.read())\n"
             )
             docker.chmod(0o755)
             for script in ("test-deb-package.sh", "test-arch-package-container.sh"):
@@ -83,6 +86,9 @@ class DistroFloorShardTests(unittest.TestCase):
                 "import json, os, sys\n"
                 "with open(os.environ['DOCKER_ARGUMENTS'], 'a') as log:\n"
                 "    log.write(json.dumps(sys.argv[1:]) + '\\n')\n"
+                "if sys.argv[1:2] == ['run'] and '-i' in sys.argv:\n"
+                "    with open(os.environ['DOCKER_STDIN'], 'wb') as stream:\n"
+                "        stream.write(sys.stdin.buffer.read())\n"
             )
             docker.chmod(0o755)
             package = directory / "bookie.deb"
@@ -95,6 +101,7 @@ class DistroFloorShardTests(unittest.TestCase):
                     environment.update(
                         PATH=f"{directory}{os.pathsep}{environment['PATH']}",
                         DOCKER_ARGUMENTS=str(log),
+                        DOCKER_STDIN=str(directory / f"stdin-{packaged}.bin"),
                         BOOKIE_GTK_SHARD="2/6",
                         CARGO_BUILD_JOBS="2",
                     )
@@ -117,6 +124,10 @@ class DistroFloorShardTests(unittest.TestCase):
                     position = arguments.index("CARGO_BUILD_JOBS=2")
                     self.assertEqual(arguments[position - 1], "-e")
                     self.assertLess(position, arguments.index("bash"))
+                    if packaged:
+                        self.assertIn("-i", arguments)
+                        self.assertEqual(Path(environment["DOCKER_STDIN"]).read_bytes(), b"fixture")
+                        self.assertNotIn(f"{package.parent}:/package:ro", arguments)
 
 
 if __name__ == "__main__":
