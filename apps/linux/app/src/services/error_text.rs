@@ -1,5 +1,3 @@
-use bookie_app_services::driver_error_presentation::{DriverFailurePresentation, SaveFailure, TlsFailureKind};
-use bookie_app_services::tls_failure::redacted_tls_detail;
 use bookie_core::DriverError;
 use bookie_core::sql_dialect::BuildSqlError;
 
@@ -35,128 +33,15 @@ pub fn build_sql_message(error: &BuildSqlError) -> String {
 
 pub fn driver_message(error: &DriverError) -> String {
     let presentation = bookie_app_services::driver_error_presentation::classify(error);
-    driver_presentation_message(&presentation)
-}
-
-fn driver_presentation_message(presentation: &DriverFailurePresentation) -> String {
-    match presentation {
-        DriverFailurePresentation::ConnectionRefused => bookie_app_services::tr!("Could not reach the database. Is it running?"),
-        DriverFailurePresentation::DatabaseFileNotFound(path) => bookie_app_services::tr!(
-            "The database file {path} does not exist. Check the path, or use Create a new database file in the connection form."
-        )
-        .replace("{path}", path),
-        DriverFailurePresentation::AuthFailed => bookie_app_services::tr!("Username or password is wrong."),
-        DriverFailurePresentation::Tls { detail, kind } => tls_message(*kind, detail),
-        DriverFailurePresentation::Query {
-            message,
-            sqlstate: Some(sqlstate),
-            ..
-        } => bookie_app_services::tr!("Query failed (SQLSTATE {sqlstate}): {message}")
-            .replace("{sqlstate}", sqlstate)
-            .replace("{message}", message),
-        DriverFailurePresentation::Query { message, .. } => {
-            bookie_app_services::tr!("Query failed: {message}").replace("{message}", message)
-        }
-        DriverFailurePresentation::Disconnected => bookie_app_services::tr!("The connection was closed, or all connections are busy with other queries. Try reconnecting."),
-        DriverFailurePresentation::ConcurrentModification => bookie_app_services::tr!(
-            "This row changed in the database after you loaded it. Your edits are still available; reload the row and reapply them."
-        ),
-        DriverFailurePresentation::ReadOnly => {
-            bookie_app_services::tr!("This connection is read-only. Reopen it without read-only mode to make changes.")
-        }
-        DriverFailurePresentation::PolicyDenied(detail) => {
-            bookie_app_services::tr!("Blocked by policy: {detail}").replace("{detail}", detail)
-        }
-        DriverFailurePresentation::Unsupported(detail) => {
-            bookie_app_services::tr!("This driver does not support: {detail}").replace("{detail}", detail)
-        }
-        DriverFailurePresentation::Internal(detail) => {
-            bookie_app_services::tr!("Internal driver error: {detail}").replace("{detail}", detail)
-        }
-        DriverFailurePresentation::Cancelled => bookie_app_services::tr!("The operation was cancelled."),
-        DriverFailurePresentation::TimedOut => bookie_app_services::tr!("The operation timed out."),
-        DriverFailurePresentation::OperationOutcomeUnknown(source) => bookie_app_services::tr!(
-            "The operation was interrupted, but the database outcome could not be confirmed: {detail}"
-        )
-        .replace("{detail}", &driver_presentation_message(source)),
-        DriverFailurePresentation::IntegratedAuth(detail) => bookie_app_services::tr!(
-            "Kerberos login failed: {detail}. Check that klist shows a valid ticket, run kinit if it does not, and make sure the server's SPN matches the host you typed."
-        )
-        .replace("{detail}", detail),
-        DriverFailurePresentation::Save(failure) => save_failure_message(failure),
-    }
-}
-
-fn tls_message(kind: TlsFailureKind, detail: &str) -> String {
-    let never_off = bookie_app_services::tr!("Do not turn TLS off or lower verification to get past this.");
-    let step = match kind {
-        TlsFailureKind::UnknownIssuer => bookie_app_services::tr!(
-            "The server's certificate is not trusted. Choose the certificate authority file that signed it in the TLS section."
-        ),
-        TlsFailureKind::NameMismatch => bookie_app_services::tr!(
-            "The server's certificate is for a different host name than the one you typed. Check the host name, or ask for a certificate that covers it."
-        ),
-        TlsFailureKind::Expired => {
-            bookie_app_services::tr!("The server's certificate has expired. Ask the server's owner to renew it.")
-        }
-        TlsFailureKind::NotYetValid => bookie_app_services::tr!(
-            "The server's certificate is not valid yet. Check that this computer's clock is correct, then ask the server's owner if it still fails."
-        ),
-        TlsFailureKind::Revoked => bookie_app_services::tr!(
-            "The server's certificate was revoked. Ask the server's owner for a new certificate."
-        ),
-        TlsFailureKind::ServerRefusedTls => {
-            return bookie_app_services::tr!(
-                "TLS handshake failed: {detail}. The server does not appear to use TLS. For a local container, set TLS to Disabled."
-            )
-            .replace("{detail}", &redacted_tls_detail(detail));
-        }
-        TlsFailureKind::Other => bookie_app_services::tr!(
-            "TLS handshake failed: {detail}. Check the server certificate, the certificate authority file and the TLS mode."
-        )
-        .replace("{detail}", &redacted_tls_detail(detail)),
-    };
-    format!("{step} {never_off}")
-}
-
-fn save_failure_message(failure: &SaveFailure) -> String {
-    match failure {
-        SaveFailure::RolledBack {
-            statement_index,
-            source,
-        } => {
-            bookie_app_services::tr!("Save failed at statement {n}: {error}. The rollback request succeeded; session state and other non-transactional side effects may remain.")
-                .replace("{n}", &statement_index.saturating_add(1).to_string())
-                .replace("{error}", driver_presentation_message(source).trim_end_matches('.'))
-        }
-        SaveFailure::PartiallyApplied {
-            statement_index,
-            source,
-        } => bookie_app_services::tr!(
-            "Save failed at statement {n}: {error}. This database cannot roll a save back, so the statements before it were applied. Refresh the table before saving again."
-        )
-        .replace("{n}", &statement_index.saturating_add(1).to_string())
-        .replace("{error}", driver_presentation_message(source).trim_end_matches('.')),
-        SaveFailure::RollbackFailed {
-            statement_index,
-            source,
-            rollback_error,
-        } => bookie_app_services::tr!(
-            "Save failed at statement {n}: {error}. Rollback also failed: {rollback_error}. Database changes may have been applied."
-        )
-        .replace("{n}", &statement_index.saturating_add(1).to_string())
-        .replace("{error}", driver_presentation_message(source).trim_end_matches('.'))
-        .replace(
-            "{rollback_error}",
-            driver_presentation_message(rollback_error).trim_end_matches('.'),
-        ),
-    }
+    bookie_app_services::driver_failure_message::driver_failure_message(&presentation)
 }
 
 pub fn open_failure_message(failure: &bookie_app_services::open_failure::OpenFailure) -> String {
     use bookie_app_services::open_failure::OpenFailure;
     match failure {
-        OpenFailure::Driver(presentation) => driver_presentation_message(presentation),
+        OpenFailure::Driver(presentation) => {
+            bookie_app_services::driver_failure_message::driver_failure_message(presentation)
+        }
         OpenFailure::Keyring(failure) => keyring_message(failure),
         OpenFailure::IntegratedAuthUnsupported(driver_name) => {
             bookie_app_services::tr!("The {driver} driver does not support Windows (Kerberos) authentication.")

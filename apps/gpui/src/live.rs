@@ -6,6 +6,7 @@ use std::time::Duration;
 
 use bookie_app_services::command_bridge::{ChannelEventSink, Command, DispatchContext, Epoch, Event, dispatch};
 use bookie_app_services::database_service::{ConnectionOverview, DatabaseService};
+use bookie_app_services::driver_failure_message::driver_failure_message;
 use bookie_app_services::read_session::ConnectionSummary;
 use bookie_app_services::read_session_store::{
     OpenedSession, ReadSessionStore, SessionId, SubscriptionRequest, SubscriptionSample, SubscriptionSampler,
@@ -155,7 +156,7 @@ impl LiveSession {
         let Event::SubscriptionSampled { outcome, .. } = event else {
             return Err("The command bridge returned an unexpected event.".into());
         };
-        outcome.map_err(|failure| format!("{failure:?}"))
+        outcome.map_err(|failure| driver_failure_message(&failure))
     }
 
     pub fn load_table(self: &Arc<Self>, table: &TableInfo, max_rows: u64) -> Result<LiveTable, String> {
@@ -319,7 +320,7 @@ async fn read_pages(
     let mut cursor = sessions
         .open_table_cursor(session_id, table, &open_control)
         .await
-        .map_err(|failure| format!("{failure:?}"))?;
+        .map_err(|failure| driver_failure_message(&failure))?;
     let result = collect_pages(
         sessions,
         session_id,
@@ -332,7 +333,7 @@ async fn read_pages(
     )
     .await;
     let close_result = if let Some(cursor) = cursor {
-        cursor.close().await.map_err(|failure| format!("{failure:?}"))
+        cursor.close().await.map_err(|failure| driver_failure_message(&failure))
     } else {
         Ok(())
     };
@@ -431,7 +432,7 @@ async fn next_result_page(
             let page = cursor
                 .next_page(&control)
                 .await
-                .map_err(|failure| format!("{failure:?}"))?;
+                .map_err(|failure| driver_failure_message(&failure))?;
             Ok((page.result, page.has_next_page))
         }
         None => Ok((
@@ -520,7 +521,7 @@ async fn bridge_query(
     let Event::QueryCompleted { outcome, .. } = event else {
         return Err("The command bridge returned an unexpected event.".into());
     };
-    outcome.map_err(|failure| format!("{failure:?}"))
+    outcome.map_err(|failure| driver_failure_message(&failure))
 }
 
 async fn bridge_read_page(
@@ -550,7 +551,7 @@ async fn bridge_read_page(
     let Event::PageRead { outcome, .. } = event else {
         return Err("The command bridge returned an unexpected event.".into());
     };
-    outcome.map_err(|failure| format!("{failure:?}"))
+    outcome.map_err(|failure| driver_failure_message(&failure))
 }
 
 async fn dispatch_read(

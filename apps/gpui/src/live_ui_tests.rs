@@ -154,8 +154,9 @@ fn a_live_connection_runs_typed_sql_into_a_result_tab_and_refuses_writes(cx: &mu
     run(cx, "DELETE FROM orders");
     view.read_with(cx, |view, _| {
         assert_eq!(view.runs.len(), 1, "a refused write adds no result tab");
+        let failure = view.status.to_lowercase();
         assert!(
-            view.status.contains("ReadOnly") || view.status.contains("PolicyDenied"),
+            failure.contains("read-only") || failure.contains("blocked by policy"),
             "{}",
             view.status
         );

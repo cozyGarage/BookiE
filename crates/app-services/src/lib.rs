@@ -34,6 +34,7 @@ pub mod database_subscription;
 pub mod decoded_preview;
 pub mod driver_diagnostics;
 pub mod driver_error_presentation;
+pub mod driver_failure_message;
 pub mod editor_bookmarks;
 pub mod editor_panel;
 pub mod enum_input;
