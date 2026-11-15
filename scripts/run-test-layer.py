@@ -222,7 +222,9 @@ def reconcile_ci_fixtures(names):
     run_id = os.environ.get("BOOKIE_TEST_RUN_ID", "")
     has_fixture_layer = any(name in CI_FIXTURE_LAYERS or name.startswith("gtk-") for name in names)
     if has_fixture_layer and CI_RUN_ID.fullmatch(run_id):
-        subprocess.run([sys.executable, str(ROOT / "scripts/cleanup-stale-ci-fixtures.py")], cwd=ROOT, check=True)
+        subprocess.run(
+            [sys.executable, str(ROOT / "scripts/cleanup-stale-ci-fixtures.py"), run_id], cwd=ROOT, check=True
+        )
 
 
 def main():
