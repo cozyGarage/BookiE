@@ -54,7 +54,7 @@ impl BrowseTab {
                         sender: self.grid_sender.clone(),
                     },
                 ),
-                None => crate::ui::grid::present_value_viewer(view, &column_name, value, None),
+                None => crate::ui::grid::present_value_viewer(view, &self.current_columns[col_index], value, None),
             }
         }
     }

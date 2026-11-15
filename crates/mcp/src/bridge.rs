@@ -53,6 +53,7 @@ pub struct McpBridge {
     /// revoke need.
     auth_rate_limiter: RateLimiter,
     shutdown: CancellationToken,
+    default_token: Option<String>,
     pub max_rows: u64,
     pub max_response_bytes: usize,
     pub query_timeout_secs: u64,
@@ -108,10 +109,20 @@ impl McpBridge {
             rate_limiter: RateLimiter::new(limits.requests_per_minute),
             auth_rate_limiter: RateLimiter::new(limits.requests_per_minute),
             shutdown,
+            default_token: None,
             max_rows: limits.max_rows,
             max_response_bytes: limits.max_response_bytes,
             query_timeout_secs: limits.query_timeout_secs,
         }
+    }
+
+    pub fn with_default_token(mut self, token: Option<String>) -> Self {
+        self.default_token = token;
+        self
+    }
+
+    pub(crate) fn default_token(&self) -> Option<&str> {
+        self.default_token.as_deref()
     }
 
     pub fn shutdown(&self) {

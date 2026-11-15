@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{future::Future, time::Duration};
 
 use async_trait::async_trait;
 use secrecy::ExposeSecret;
@@ -1447,10 +1447,14 @@ async fn finish_connection<T>(
 ) -> (Option<PoolConnection<Postgres>>, Result<T, DriverError>) {
     if matches!(result, Err(DriverError::OperationOutcomeUnknown { .. })) {
         let raw_connection = connection.detach();
-        let _ = raw_connection.close_hard().await;
+        let _ = bounded_cleanup(CANCELLATION_DISPATCH_TIMEOUT, raw_connection.close_hard()).await;
         return (None, result);
     }
     (Some(connection), result)
+}
+
+async fn bounded_cleanup<F: Future>(timeout: Duration, cleanup: F) -> bool {
+    tokio::time::timeout(timeout, cleanup).await.is_ok()
 }
 
 pub(crate) async fn request_cancellation(cancel_token: PgCancelToken) -> Result<(), DriverError> {

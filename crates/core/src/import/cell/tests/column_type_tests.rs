@@ -135,3 +135,31 @@ fn postgres_bit_strings_and_ranges_stay_text() {
 fn a_mysql_bit_column_is_still_a_flag() {
     assert_eq!(import_one(column("v", "bit(1)"), "1", "mysql"), Ok(Value::Bool(true)));
 }
+
+#[test]
+fn unsigned_64_bit_csv_values_keep_all_decimal_digits() {
+    let maximum = "18446744073709551615";
+    for (data_type, driver) in [
+        ("BIGINT UNSIGNED", "mysql"),
+        ("BIGINT(20) UNSIGNED", "mysql"),
+        ("UBIGINT", "duckdb"),
+        ("UInt64", "clickhouse"),
+        ("Nullable(UInt64)", "clickhouse"),
+    ] {
+        assert_eq!(
+            import_one(column("v", data_type), maximum, driver),
+            Ok(Value::Text(maximum.into())),
+            "{driver} {data_type} must not overflow signed i64"
+        );
+        assert_eq!(
+            import_one(column("v", data_type), "18446744073709551616", driver),
+            Err(CellError::NotAnInteger),
+            "{driver} {data_type} must reject values above u64"
+        );
+        assert_eq!(
+            import_one(column("v", data_type), "not a number", driver),
+            Err(CellError::NotAnInteger),
+            "{driver} {data_type} must reject non-integers"
+        );
+    }
+}

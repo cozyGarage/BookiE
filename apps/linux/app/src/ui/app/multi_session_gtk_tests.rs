@@ -1,3 +1,4 @@
+use super::super::ConnectionMessage;
 use super::*;
 use bookie_core::Value;
 use relm4::{Component, ComponentController};
@@ -91,9 +92,9 @@ fn open_connection(
     prepared: crate::services::connection_service::PreparedConnection,
 ) -> uuid::Uuid {
     let id = prepared.id();
-    controller.emit(AppMsg::OpenConnect);
+    controller.emit(AppMsg::Connection(ConnectionMessage::Open));
     spin_until(|| controller.model().switch.transition == super::super::ConnectionTransition::Connecting);
-    controller.emit(AppMsg::ConnectionPrepared(Box::new(prepared)));
+    controller.emit(AppMsg::Connection(ConnectionMessage::Prepared(Box::new(prepared))));
     spin_until(|| controller.model().multi.sessions.is_working(id));
     id
 }
