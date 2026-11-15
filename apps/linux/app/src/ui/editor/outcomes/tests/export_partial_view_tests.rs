@@ -74,10 +74,12 @@ fn a_completed_stream_offers_its_saved_result_for_export() {
     let spool = bookie_app_services::stream_result_spool::StreamResultSpoolManager::default()
         .create()
         .unwrap();
+    let budget = spool.page_budget();
+    let retained_bytes = second_page.estimated_row_bytes();
     runtime.block_on(spool.append_page(0, first_page.clone())).unwrap();
     runtime.block_on(spool.append_page(1, second_page.clone())).unwrap();
-    let mut cache = super::super::super::stream_pages::StreamPageCache::default();
-    cache.append(0, first_page).unwrap();
+    let mut cache = super::super::super::stream_pages::StreamPageCache::with_budget(budget.clone());
+    cache.append(0, first_page.clone()).unwrap();
     cache.append_with_storage_status(1, second_page.clone(), false).unwrap();
     let streamed = cache.snapshot_with_spool(
         StreamTerminal::Complete,
@@ -121,11 +123,23 @@ fn a_completed_stream_offers_its_saved_result_for_export() {
     };
     assert_eq!(request.total_rows, 4);
     assert_eq!(
-        request.current_page.as_ref().map(|page| page.rows.clone()),
+        request.current_page.as_ref().map(|page| page.result.rows.clone()),
         Some(second_page.rows.clone())
     );
     assert!(!request.filtered);
-    assert_eq!(request.spool.unwrap().page_count(), 2);
+    assert_eq!(request.spool.as_ref().unwrap().page_count(), 2);
+
+    drop(second_page_widget);
+    drop(pages);
+    drop(widget);
+    drop(outcome);
+    drop(streamed);
+    drop(cache);
+    drop(first_page);
+    drop(second_page);
+    assert_eq!(budget.used_bytes(), retained_bytes);
+    drop(request);
+    assert_eq!(budget.used_bytes(), 0);
 }
 
 #[test]
@@ -184,7 +198,10 @@ fn a_filtered_result_exports_only_its_own_saved_rows() {
         panic!("expected a saved result export");
     };
     assert_eq!(request.total_rows, 1);
-    assert_eq!(request.current_page.as_ref().map(|page| page.rows.len()), Some(1));
+    assert_eq!(
+        request.current_page.as_ref().map(|page| page.result.rows.len()),
+        Some(1)
+    );
     assert!(request.filtered);
     assert_eq!(request.query.suggested_name, "items-filtered");
     assert_eq!(request.spool.unwrap().page_count(), 1);
