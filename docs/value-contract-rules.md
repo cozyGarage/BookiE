@@ -40,8 +40,8 @@ These rules apply [ADR 0007](decisions/0007-type-and-value-preservation.md) by v
 
 ## MongoDB
 
+- **MongoDB grid cells use relaxed Extended JSON while values stay canonical.** Nested BSON documents and arrays render numeric and date values in relaxed Extended JSON for consistent display. The underlying `Value::Json`, generic value display, copy text and exported values keep canonical Extended JSON so edits and round trips retain BSON types. Oversized cells keep the bounded canonical prefix.
 - **A missing field is `Undecodable("missing BSON field")`, not `Null`.** No general missing-value type is used.
-- **Nested documents and arrays use relaxed Extended JSON in the grid.** This is paint-only: the canonical Extended JSON value remains the basis for editing, copying and export, so displayed numbers do not imply that their BSON widths changed. Decimal128 keeps its `$numberDecimal` marker; date values use relaxed RFC 3339 when supported and the canonical millisecond form otherwise.
 
 - **A sample is not a census.** MongoDB sampled metadata and type merging over fetched pages do not prove collection-wide export coverage. Verify late fields across export boundaries before claiming it.
 

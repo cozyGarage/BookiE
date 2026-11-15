@@ -21,6 +21,7 @@ struct SessionScript {
     panic_on_status: bool,
     panic_once_on_status: std::sync::atomic::AtomicBool,
     result_sets_on: Option<&'static str>,
+    query_rows_affected: Option<u64>,
     completion_targets: Mutex<Vec<(Option<String>, String)>>,
     completion_timed_out: bool,
     blast_count: Option<i64>,
@@ -90,6 +91,7 @@ impl bookie_core::Session for ScriptedSession {
             result_sets: vec![secret_set("first-secret"), secret_set("second-secret")],
             truncated: false,
             messages: Default::default(),
+            rows_affected: self.script.query_rows_affected,
         })
     }
 
@@ -1364,6 +1366,27 @@ async fn the_audit_outcome_of_a_session_batch_counts_the_rows_of_every_set() {
 
     let reads = outcomes_of(&h.audit, AuditOperationClass::Read);
     assert_eq!(reads.last().and_then(|event| event.rows_affected), Some(2));
+}
+
+#[tokio::test]
+async fn a_session_write_audits_server_affected_rows_separately_from_returning_rows() {
+    const SQL: &str = "INSERT INTO accounts VALUES (1) RETURNING id";
+    let h = harness(
+        SessionScript {
+            result_sets_on: Some(SQL),
+            query_rows_affected: Some(5),
+            ..SessionScript::default()
+        },
+        false,
+    );
+    let mut session = h.guard.open_session().await.expect("open session");
+
+    let result = run_sets(&mut session, SQL).await.expect("result");
+
+    assert_eq!(result.retained_rows(), 2);
+    assert_eq!(result.rows_affected, Some(5));
+    let writes = outcomes_of(&h.audit, AuditOperationClass::Mutation);
+    assert_eq!(writes.last().and_then(|event| event.rows_affected), Some(5));
 }
 
 #[tokio::test]

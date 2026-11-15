@@ -35,7 +35,8 @@ mod view_editability;
 
 use params::{bind_pg_params, describe_query_parameters, needs_text_type_inference};
 use query::{
-    QueryStop, execute_connection, execute_connection_once, query_connection, query_connection_once, stream_into_result,
+    QueryStop, execute_connection, execute_connection_once, query_connection, query_connection_once,
+    query_connection_once_with_rows_affected, query_connection_with_rows_affected, stream_into_result,
 };
 
 pub struct PgDriver;
@@ -487,8 +488,10 @@ impl Connection for PgConnection {
         let connection = acquire_controlled(&self.pool, control).await?;
         let (connection, result) = controlled_query_with_messages(connection, sql, params, true, control).await;
         drop(connection);
-        let (rows, messages) = result?;
-        Ok(QueryResultBatch::single(rows).with_messages(messages))
+        let (rows, messages, rows_affected) = result?;
+        Ok(QueryResultBatch::single(rows)
+            .with_messages(messages)
+            .with_rows_affected(rows_affected))
     }
 
     async fn query_params(&self, sql: &str, params: &[Value]) -> Result<QueryResult, DriverError> {
@@ -998,10 +1001,10 @@ async fn controlled_query(
 ) -> (Option<PoolConnection<Postgres>>, Result<QueryResult, DriverError>) {
     let (connection, result) =
         controlled_query_with_messages(connection, sql, params, retry_stale_type_cache, control).await;
-    (connection, result.map(|(rows, _)| rows))
+    (connection, result.map(|(rows, _, _)| rows))
 }
 
-pub(crate) type MessagedResult = Result<(QueryResult, ServerMessages), DriverError>;
+pub(crate) type MessagedResult = Result<(QueryResult, ServerMessages, Option<u64>), DriverError>;
 
 async fn controlled_query_with_messages(
     mut connection: PoolConnection<Postgres>,
@@ -1017,12 +1020,12 @@ async fn controlled_query_with_messages(
     notices::discard(&mut connection);
     let result = run_server_cancellable(
         async {
-            let rows = if retry_stale_type_cache {
-                query_connection(&mut connection, sql, params, stop).await
+            let (rows, rows_affected) = if retry_stale_type_cache {
+                query_connection_with_rows_affected(&mut connection, sql, params, stop).await
             } else {
-                query_connection_once(&mut connection, sql, params, stop).await
+                query_connection_once_with_rows_affected(&mut connection, sql, params, stop).await
             }?;
-            Ok((rows, notices::drain(&mut connection)))
+            Ok((rows, notices::drain(&mut connection), rows_affected))
         },
         request_cancellation(cancel_token),
         confirms_cancellation,

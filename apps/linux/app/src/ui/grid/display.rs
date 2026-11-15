@@ -132,15 +132,13 @@ fn cell_display_text(value: &Value, relaxed_mongodb_json: bool) -> (Cow<'_, str>
             }
             _ => bounded_owned_text(value_to_display_text(value), GRID_CELL_DISPLAY_MAX_CHARS),
         },
-        Value::Json(json) => {
-            let relaxed = if relaxed_mongodb_json {
-                drivers_mongodb::relaxed_extended_json_for_display(json)
-            } else {
-                None
-            };
-            let json = relaxed.as_ref().unwrap_or(json);
-            json_to_display_text_with_limits(json, GRID_CELL_DISPLAY_MAX_CHARS * 4, GRID_CELL_DISPLAY_MAX_CHARS, true)
-        }
+        Value::Json(json) => json_to_display_text_with_limits(
+            json,
+            GRID_CELL_DISPLAY_MAX_CHARS * 4,
+            GRID_CELL_DISPLAY_MAX_CHARS,
+            relaxed_mongodb_json,
+            true,
+        ),
         Value::JsonText(text) => text_to_display_text_cow(text, GRID_CELL_DISPLAY_MAX_CHARS, false, None),
         _ => bounded_owned_text(value_to_display_text(value), GRID_CELL_DISPLAY_MAX_CHARS),
     }
@@ -245,18 +243,34 @@ fn text_to_display_text_cow(
 }
 
 fn json_to_display_text(value: &serde_json::Value) -> String {
-    json_to_display_text_with_limits(value, DISPLAY_TEXT_BYTES_THRESHOLD, DISPLAY_TEXT_MAX_CHARS, false)
-        .0
-        .into_owned()
+    json_to_display_text_with_limits(
+        value,
+        DISPLAY_TEXT_BYTES_THRESHOLD,
+        DISPLAY_TEXT_MAX_CHARS,
+        false,
+        false,
+    )
+    .0
+    .into_owned()
 }
 
 fn json_to_display_text_with_limits(
     value: &serde_json::Value,
     byte_limit: usize,
     char_limit: usize,
+    mongodb_extended_json: bool,
     bound_complete: bool,
 ) -> (Cow<'static, str>, bool) {
-    let (text, byte_budget_exceeded) = crate::ui::row_object::bounded_json_prefix(value, byte_limit);
+    let (source_text, source_exceeded) = crate::ui::row_object::bounded_json_prefix(value, byte_limit);
+    let relaxed = if !mongodb_extended_json || source_exceeded || !source_text.contains('$') {
+        None
+    } else {
+        drivers_mongodb::relaxed_extended_json_for_display(value)
+    };
+    let (text, byte_budget_exceeded) = match relaxed {
+        Some(relaxed) => crate::ui::row_object::bounded_json_prefix(&relaxed, byte_limit),
+        None => (source_text, source_exceeded),
+    };
     let (text, truncated) = json_prefix_for_display(text, byte_budget_exceeded, char_limit);
     if truncated {
         (Cow::Owned(text), true)
