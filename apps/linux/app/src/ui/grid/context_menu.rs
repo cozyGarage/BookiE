@@ -509,6 +509,7 @@ fn add_view_value_action(group: &gio::SimpleActionGroup, setup: &MenuActionSetup
     let context = setup.context.clone();
     let sender = setup.sender.clone();
     let view = setup.column_view.downgrade();
+    let columns = setup.columns.clone();
     group.add_action_entries([gio::ActionEntry::builder("view-value")
         .activate(move |_, _, _| {
             let context = context.snapshot();
@@ -517,14 +518,17 @@ fn add_view_value_action(group: &gio::SimpleActionGroup, setup: &MenuActionSetup
             if !menu_target_matches(&view, slot) {
                 return;
             }
+            let Some(column) = columns.get(slot.col_index) else {
+                return;
+            };
             let row = row_object_at(&view, position(slot));
             if let Some(value) = pending_cell_value(&slot.widget) {
                 let null_copy_text =
                     matches!(&value, Value::Null).then(|| copy_value_text(&slot.widget, row.as_ref(), slot.col_index));
-                value_viewer::present(&view, &slot.column_name, value, null_copy_text);
+                value_viewer::present(&view, column, value, null_copy_text);
                 return;
             }
-            show_loaded_cell_value(&view, &sender, slot, row);
+            show_loaded_cell_value(&view, &sender, slot, row, column);
         })
         .build()]);
 }
@@ -534,6 +538,7 @@ fn show_loaded_cell_value(
     sender: &relm4::Sender<GridMsg>,
     slot: &CellContext,
     row: Option<crate::ui::row_object::RowObject>,
+    column: &ColumnInfo,
 ) {
     if row
         .as_ref()
@@ -544,7 +549,7 @@ fn show_loaded_cell_value(
             let Some(value) = source_value_at(view, position(slot), slot.col_index) else {
                 return;
             };
-            value_viewer::present(view, &slot.column_name, value, None);
+            value_viewer::present(view, column, value, None);
         } else {
             sender
                 .send(GridMsg::FetchCellValue {
@@ -560,7 +565,7 @@ fn show_loaded_cell_value(
     let Some(value) = row.and_then(|row| row.cell_value_in_row(slot.col_index)) else {
         return;
     };
-    value_viewer::present(view, &slot.column_name, value, None);
+    value_viewer::present(view, column, value, None);
 }
 
 fn add_show_row_json_action(group: &gio::SimpleActionGroup, setup: &MenuActionSetup) {
