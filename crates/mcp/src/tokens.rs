@@ -197,6 +197,7 @@ impl TokenStore {
     }
 
     pub fn list(&self) -> Vec<McpToken> {
+        let _ = self.refresh_cache_if_stale();
         self.cache
             .lock()
             .map(|cache| cache.tokens.values().cloned().collect())
