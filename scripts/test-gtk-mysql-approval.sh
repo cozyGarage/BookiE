@@ -40,7 +40,9 @@ for command_name in docker dbus-run-session gnome-keyring-daemon secret-tool; do
   fi
 done
 
-container="$(docker run --rm --detach --label "com.bookie.test-run=${BOOKIE_TEST_RUN_ID:-local-$$}" --publish 127.0.0.1::3306 \
+source "$ROOT/scripts/gtk-fixture-host.sh"
+
+container="$(docker run --rm --detach --label "com.bookie.test-run=${BOOKIE_TEST_RUN_ID:-local-$$}" --publish "$fixture_bind_address::3306" \
   --tmpfs /var/lib/mysql \
   --env MYSQL_ROOT_PASSWORD=bookie_test \
   --env MYSQL_ROOT_HOST=% \
@@ -74,6 +76,6 @@ BOOKIE_GTK_KEYRING_READY=1 \
   BOOKIE_GTK_DBUS_ACTIVE=1 \
   BOOKIE_GTK_SCENARIO=mysql_unparseable_routine_dialog_denial_preserves_database \
   BOOKIE_GTK_MYSQL_CONTAINER="$container" \
-  BOOKIE_GTK_MYSQL_HOST=127.0.0.1 \
+  BOOKIE_GTK_MYSQL_HOST="$fixture_host" \
   BOOKIE_GTK_MYSQL_PORT="$port" \
   bash "$ROOT/scripts/test-gtk-safety.sh"
