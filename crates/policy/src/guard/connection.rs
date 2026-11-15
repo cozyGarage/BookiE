@@ -348,7 +348,7 @@ impl Connection for PolicyGuard {
                 )
                 .await
                 .map(|batch| self.mask_result_batch_for_analysis(&authorization.analysis, batch));
-            let rows = result.as_ref().ok().map(QueryResultBatch::retained_rows);
+            let rows = result.as_ref().ok().and_then(|batch| batch.rows_affected);
             self.audit_write_result(&operation, start, &result, rows).await?;
             pending_write.disarm();
             return result;
@@ -888,8 +888,7 @@ impl PolicyGuard {
             .caught_write("a write statement", execute(&self.inner))
             .await
             .map(|value| self.mask_result_for_analysis(Some(&authorization.analysis), value));
-        let rows = result.as_ref().ok().map(|value| value.rows.len() as u64);
-        self.audit_write_result(&operation, start, &result, rows).await?;
+        self.audit_write_result(&operation, start, &result, None).await?;
         pending_write.disarm();
         result
     }
@@ -923,9 +922,8 @@ where
             .caught_write(operation_name, execution)
             .await
             .map(|value| guard.mask_result_for_analysis(Some(&authorization.analysis), value));
-        let rows = result.as_ref().ok().map(|value| value.rows.len() as u64);
         guard
-            .audit_transaction_result(&operation, start, &result, rows, TransactionAuditMode::Interactive)
+            .audit_transaction_result(&operation, start, &result, None, TransactionAuditMode::Interactive)
             .await?;
         pending_write.disarm();
         return result;

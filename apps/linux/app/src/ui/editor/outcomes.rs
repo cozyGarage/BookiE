@@ -194,17 +194,25 @@ enum Halt {
     Failed(Box<StatementOutcome>),
 }
 
+struct StatementResult {
+    kind: StatementOutcomeKind,
+    messages: ServerMessages,
+    rows_affected: Option<u64>,
+    is_write: bool,
+}
+
 async fn run_statement<F, Fut>(
     attempt: StreamAttempt<'_>,
     stream_update: &mut F,
     succeeded: &impl Fn(&str),
-) -> Result<(StatementOutcomeKind, ServerMessages), Halt>
+) -> Result<StatementResult, Halt>
 where
     F: FnMut(StreamUpdate) -> Fut,
     Fut: Future<Output = bool>,
 {
-    let (target, bound_sql, bound_params, sql, control) = (
+    let (target, driver_id, bound_sql, bound_params, sql, control) = (
         attempt.target,
+        attempt.driver_id,
         attempt.bound_sql,
         attempt.bound_params,
         attempt.sql,
@@ -215,7 +223,7 @@ where
         Ok(None) => {}
         Err(outcome) => return Err(Halt::Failed(outcome)),
     }
-    query_statement(target, bound_sql, bound_params, sql, control, succeeded)
+    query_statement(target, driver_id, bound_sql, bound_params, sql, control, succeeded)
         .await
         .map_err(Halt::Finished)
 }
@@ -261,19 +269,20 @@ fn statement_outcome(
     sql: String,
     started: std::time::Instant,
     waited_before: std::time::Duration,
-    kind: StatementOutcomeKind,
-    messages: ServerMessages,
+    result: StatementResult,
 ) -> StatementOutcome {
     StatementOutcome {
         identity,
         sql_preview: preview,
         sql,
         elapsed_ms: elapsed_without_approval_wait(started, waited_before),
-        kind,
+        kind: result.kind,
         pinned: false,
         detail: super::outcome_detail::OutcomeDetail {
-            messages,
+            messages: result.messages,
             approval_wait_ms: approval_wait_since(waited_before),
+            rows_affected: result.rows_affected,
+            is_write: result.is_write,
         },
     }
 }
@@ -314,27 +323,37 @@ fn bind_statement_for_run(
 
 async fn query_statement(
     target: &super::session_mode::StatementTarget,
+    driver_id: &str,
     bound_sql: &str,
     bound_params: &[bookie_core::Value],
     sql: &str,
     control: &OperationControl,
     succeeded: &impl Fn(&str),
-) -> Result<(StatementOutcomeKind, ServerMessages), ScriptRunResult> {
+) -> Result<StatementResult, ScriptRunResult> {
     let audited = target.query_with_audit(bound_sql, bound_params, control).await;
     match audited.result {
         Ok(result) => {
             succeeded(sql);
+            let is_write = bookie_policy::classify(bound_sql, driver_id).writes();
+            let affected_rows = if is_write { result.rows_affected } else { None };
             let rows = StatementOutcomeKind::Rows(result.result_sets.into_iter().map(std::sync::Arc::new).collect());
-            Ok((rows, result.messages))
+            Ok(StatementResult {
+                kind: rows,
+                messages: result.messages,
+                rows_affected: affected_rows,
+                is_write,
+            })
         }
         Err(DriverError::Cancelled) => Err(ScriptRunResult::Cancelled),
         Err(DriverError::TimedOut) => Err(ScriptRunResult::TimedOut),
-        Err(error) => Ok((
-            StatementOutcomeKind::Error(
+        Err(error) => Ok(StatementResult {
+            kind: StatementOutcomeKind::Error(
                 failure_message(&error, sql, bound_sql).with_audit_receipts(audited.audit_receipts),
             ),
-            ServerMessages::default(),
-        )),
+            messages: ServerMessages::default(),
+            rows_affected: None,
+            is_write: false,
+        }),
     }
 }
 
@@ -666,11 +685,10 @@ fn build_outcome_content(
             false,
         ),
         StatementOutcomeKind::Rows(_) => {
-            let ms = o.elapsed_ms.to_string();
             let number = (o.identity.statement_index + 1).to_string();
             adw::StatusPage::builder()
                 .title(bookie_app_services::tr!("Statement {n} executed").replace("{n}", &number))
-                .description(bookie_app_services::tr!("No rows returned · {ms} ms").replace("{ms}", &ms))
+                .description(crate::ui::plain_text::escape_markup(&no_result_description(o)))
                 .icon_name("emblem-default-symbolic")
                 .vexpand(true)
                 .build()
@@ -690,6 +708,19 @@ fn build_outcome_content(
             .vexpand(true)
             .build()
             .upcast(),
+    }
+}
+
+fn no_result_description(outcome: &StatementOutcome) -> String {
+    let ms = outcome.elapsed_ms.to_string();
+    match (outcome.detail.is_write, outcome.detail.rows_affected) {
+        (true, Some(1)) => bookie_app_services::tr!("1 row affected · {ms} ms").replace("{ms}", &ms),
+        (true, Some(rows)) => bookie_app_services::tr!("{rows} rows affected · {ms} ms")
+            .replace("{rows}", &rows.to_string())
+            .replace("{ms}", &ms),
+        (true, None) => bookie_app_services::tr!("Statement completed; affected row count unavailable · {ms} ms")
+            .replace("{ms}", &ms),
+        (false, _) => bookie_app_services::tr!("No rows returned · {ms} ms").replace("{ms}", &ms),
     }
 }
 
@@ -1174,6 +1205,9 @@ fn result_view_keys(outcomes: &[StatementOutcome]) -> std::collections::HashSet<
         .collect()
 }
 
+#[cfg(test)]
+#[path = "outcomes/affected_rows_tests.rs"]
+mod affected_rows_tests;
 #[cfg(test)]
 #[path = "outcomes/lexing_tests.rs"]
 mod lexing_tests;

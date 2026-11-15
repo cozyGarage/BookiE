@@ -105,7 +105,7 @@ where
         started,
         bound: &bound,
     };
-    let (kind, messages) = match run_bound_statement(context, attempt).await {
+    let result = match run_bound_statement(context, attempt).await {
         Ok(run) => run,
         Err(Halt::Finished(result)) => return Err(result),
         Err(Halt::Failed(outcome)) => {
@@ -113,15 +113,14 @@ where
             return Err(ScriptRunResult::Completed(std::mem::take(&mut context.outcomes)));
         }
     };
-    let mut next = (context.stops_on_error && matches!(kind, StatementOutcomeKind::Error(_))).then_some(None);
+    let mut next = (context.stops_on_error && matches!(result.kind, StatementOutcomeKind::Error(_))).then_some(None);
     context.outcomes.push(statement_outcome(
         identity,
         preview,
         sql,
         started,
         waited_before,
-        kind,
-        messages,
+        result,
     ));
     if next.is_none() && statement_index < context.last_index {
         match lexical_settings_change(context.target, context.settings_check, context.control).await {
@@ -143,7 +142,7 @@ struct StatementAttempt<'a> {
 async fn run_bound_statement<S, F, Fut>(
     context: &mut TrackedRunContext<'_, S, F>,
     attempt: StatementAttempt<'_>,
-) -> Result<(StatementOutcomeKind, ServerMessages), Halt>
+) -> Result<StatementResult, Halt>
 where
     S: Fn(&str),
     F: FnMut(StreamUpdate) -> Fut,
