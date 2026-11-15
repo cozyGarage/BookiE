@@ -43,6 +43,9 @@ class PostgresReleaseStartupTests(unittest.TestCase):
             key = materials / "server.key"
             key.write_text("fixture-private-material")
             key.chmod(0o600)
+            toxiproxy = fixture / "toxiproxy"
+            toxiproxy.mkdir()
+            (toxiproxy / "toxiproxy.json").write_text("[]\n")
             (fixture / "generate-materials.sh").write_text("exit 0\n")
             binary = root / "bin"
             binary.mkdir()
@@ -77,6 +80,9 @@ if "up" in sys.argv:
             seed.mkdir(parents=True)
             (seed / "01-seed.sql").write_text("SELECT 1;\n")
             (fixture / "materials").mkdir()
+            toxiproxy = fixture / "toxiproxy"
+            toxiproxy.mkdir()
+            (toxiproxy / "toxiproxy.json").write_text("[]\n")
             (fixture / "generate-materials.sh").write_text("exit 0\n")
             bin_dir = root / "bin"
             bin_dir.mkdir()
@@ -128,6 +134,31 @@ print(hosts[sys.argv[-1]], "STREAM", sys.argv[-1])
                     self.assertEqual(result.returncode, 42, result.stderr)
                     self.assertEqual(captured.read_text(), expected_bind)
                     self.assertEqual(captured_ssh.read_text(), expected_ssh)
+
+    def test_missing_toxiproxy_config_fails_before_starting_compose(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "scripts").mkdir()
+            shutil.copy(ROOT / "scripts/test-postgres-release.sh", root / "scripts")
+            binary = root / "bin"
+            binary.mkdir()
+            docker = binary / "docker"
+            docker.write_text('''#!/usr/bin/env bash
+if [[ "$1" == "compose" && "$2" == "version" ]]; then
+    exit 0
+fi
+exit 99
+''')
+            docker.chmod(0o755)
+            result = subprocess.run(
+                ["bash", str(root / "scripts/test-postgres-release.sh")],
+                env=dict(os.environ, PATH=f"{binary}:{os.environ['PATH']}"),
+                text=True,
+                capture_output=True,
+            )
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("Toxiproxy config file is missing", result.stderr)
 
     def test_container_fixture_ports_are_bound_to_the_configured_address(self):
         compose = (ROOT / "tests/fixtures/postgres-release/docker-compose.yml").read_text()
