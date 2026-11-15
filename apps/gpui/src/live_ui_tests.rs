@@ -154,8 +154,9 @@ fn a_live_connection_runs_typed_sql_into_a_result_tab_and_refuses_writes(cx: &mu
     run(cx, "DELETE FROM orders");
     view.read_with(cx, |view, _| {
         assert_eq!(view.runs.len(), 1, "a refused write adds no result tab");
+        let failure = view.status.to_lowercase();
         assert!(
-            view.status.contains("ReadOnly") || view.status.contains("PolicyDenied"),
+            failure.contains("read-only") || failure.contains("blocked by policy"),
             "{}",
             view.status
         );
@@ -779,8 +780,8 @@ fn a_connection_that_cannot_be_opened_keeps_the_synthetic_view_and_says_why(cx: 
         assert!(view.live.is_none());
         assert_eq!(view.catalog.grid_table, table_info("synthetic_rows"));
         assert!(
-            view.status.contains("NotADatabase") || view.status.contains("Other"),
-            "{}",
+            view.status.contains("none.sqlite"),
+            "the failure must name the file that could not be opened: {}",
             view.status
         );
     });

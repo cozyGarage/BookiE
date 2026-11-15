@@ -302,6 +302,7 @@ pub struct QueryResultBatch {
     pub result_sets: Vec<QueryResult>,
     pub truncated: bool,
     pub messages: ServerMessages,
+    pub rows_affected: Option<u64>,
 }
 
 impl QueryResultBatch {
@@ -311,7 +312,13 @@ impl QueryResultBatch {
             result_sets: vec![result],
             truncated,
             messages: ServerMessages::default(),
+            rows_affected: None,
         }
+    }
+
+    pub fn with_rows_affected(mut self, rows_affected: Option<u64>) -> Self {
+        self.rows_affected = rows_affected;
+        self
     }
 
     pub fn with_messages(mut self, messages: ServerMessages) -> Self {

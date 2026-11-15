@@ -97,6 +97,7 @@ impl Connection for StubConnection {
             result_sets,
             truncated: false,
             messages: Default::default(),
+            rows_affected: None,
         })
     }
 

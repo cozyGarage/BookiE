@@ -926,6 +926,7 @@ impl Connection for StubConn {
                 truncated: result_sets.iter().any(|result| result.truncated),
                 result_sets: result_sets.clone(),
                 messages: Default::default(),
+                rows_affected: None,
             },
             None => QueryResultBatch::single(self.result.clone()),
         })
