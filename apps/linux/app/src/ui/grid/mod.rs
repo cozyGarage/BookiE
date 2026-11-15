@@ -260,6 +260,11 @@ pub fn build_column_view(
         highlight_settings,
         database,
     } = env;
+    let driver_id = connection_id
+        .and_then(|id| database.metadata(id))
+        .map(|metadata| metadata.driver_id)
+        .unwrap_or_default();
+    let relaxed_mongodb_json = driver_id == "mongodb";
     let result: &QueryResult = shared;
     let store = match &tab_ctx.projected_columns {
         Some(indices) => match if tab_ctx.preview_redis_strings && !tab_ctx.pk_col_indices.is_empty() {
@@ -325,16 +330,12 @@ pub fn build_column_view(
     column_view.append_column(&numbers);
 
     if let Some(sender) = menu_sender.as_ref() {
-        let driver_id = connection_id
-            .and_then(|id| database.metadata(id))
-            .map(|metadata| metadata.driver_id)
-            .unwrap_or_default();
         install_grid_context_menus(
             &column_view,
             sender.clone(),
             columns,
             result.truncated,
-            driver_id,
+            driver_id.clone(),
             context_menu::GridMenuOptions {
                 filterable: tab_ctx.tab_id.is_some() && !tab_ctx.filters_unavailable,
                 row_mutations_allowed: tab_ctx.row_mutations_allowed,
@@ -364,6 +365,7 @@ pub fn build_column_view(
             table: table.to_string(),
             sender: edit_sender.clone(),
             connection_id,
+            relaxed_mongodb_json,
             tab_ctx: tab_ctx.clone(),
             sort_enabled: sort_sender.is_some()
                 || (tab_ctx.local_result_sort && tab_ctx.sortable_result_columns.contains(&i)),
@@ -398,10 +400,6 @@ pub fn build_column_view(
             .map(|(id, store)| (id, table.to_string(), store)),
     );
     header_alignment::install(&column_view, &display_columns);
-    let driver_id = connection_id
-        .and_then(|id| database.metadata(id))
-        .map(|metadata| metadata.driver_id)
-        .unwrap_or_default();
     column_jump::install(
         &column_view,
         &grid_actions,
