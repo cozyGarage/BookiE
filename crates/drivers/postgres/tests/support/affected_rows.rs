@@ -14,7 +14,7 @@ async fn query_batches_keep_server_reported_affected_rows_for_connection_and_ses
     let (_container, options) = start_pg().await;
     let connection = connect(options).await;
     connection
-        .execute("CREATE TEMP TABLE affected_count (id integer PRIMARY KEY)")
+        .execute("CREATE TABLE affected_count (id integer PRIMARY KEY)")
         .await
         .unwrap();
 
