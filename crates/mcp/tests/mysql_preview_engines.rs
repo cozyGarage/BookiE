@@ -12,6 +12,8 @@ use testcontainers::{ImageExt, runners::AsyncRunner};
 use testcontainers_modules::mysql::Mysql;
 use uuid::Uuid;
 
+const MYSQL_TEST_TAG: &str = "8.4.13";
+
 struct Provider {
     saved: SavedConnection,
     connection: Arc<dyn Connection>,
@@ -39,7 +41,7 @@ struct Fixture {
 
 async fn fixture() -> Fixture {
     let container = Mysql::default()
-        .with_tag("8.4")
+        .with_tag(MYSQL_TEST_TAG)
         .with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test")
         .start()
         .await

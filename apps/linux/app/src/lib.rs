@@ -9,6 +9,8 @@ pub mod config;
 mod i18n;
 pub mod logging;
 mod services;
+#[cfg(test)]
+mod test_image_tags;
 mod ui;
 
 const MIN_ASYNC_WORKERS: usize = 2;

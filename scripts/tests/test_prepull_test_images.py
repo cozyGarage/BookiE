@@ -13,6 +13,7 @@ IMAGES = ROOT / "ci/test-images.txt"
 TESTCONTAINERS_MODULES_0_15_IMAGES = {
     "Postgres": ("postgres", "11-alpine"),
     "Mysql": ("mysql", "8.1"),
+    "MysqlImage": ("mysql", "8.1"),
     "Mongo": ("mongo", "5.0.6"),
     "MssqlServer": ("mcr.microsoft.com/mssql/server", "2022-CU14-ubuntu-22.04"),
     "Redis": ("redis", "5.0"),
@@ -29,6 +30,12 @@ GROUP_SOURCES = {
     "cassandra": "crates/drivers/cassandra/tests",
     "app-server": "apps/linux/app",
 }
+GROUP_EXTRA_SOURCES = {"app-server": ("crates/policy/tests/session_mssql.rs",)}
+PINNED_TEST_SOURCES = tuple(GROUP_SOURCES.values()) + (
+    "crates/mcp/tests",
+    "crates/policy/tests",
+    "crates/app-services/tests",
+)
 DRIVER_TLS_FIXTURES = ROOT / "tests/fixtures/driver-tls"
 
 MODULE_START = re.compile(r"\b(" + "|".join(TESTCONTAINERS_MODULES_0_15_IMAGES) + r")::default\(\)")
@@ -67,7 +74,9 @@ def module_image(text, match, constants):
 
 
 def started_images(directory):
-    sources = {path: path.read_text(errors="replace") for path in (ROOT / directory).rglob("*.rs")}
+    source = ROOT / directory
+    paths = [source] if source.is_file() else source.rglob("*.rs")
+    sources = {path: path.read_text(errors="replace") for path in paths}
     constants = tag_constants(sources)
     images = set()
     for text in sources.values():
@@ -160,7 +169,9 @@ class PrepullTestImagesTests(unittest.TestCase):
         groups = listed_groups()
         for group, directory in GROUP_SOURCES.items():
             with self.subTest(group=group):
-                self.assertEqual(groups.get(group, set()), started_images(directory))
+                sources = (directory, *GROUP_EXTRA_SOURCES.get(group, ()))
+                expected = set().union(*(started_images(source) for source in sources))
+                self.assertEqual(groups.get(group, set()), expected)
 
     def test_the_tls_group_pulls_all_fixture_and_compose_images(self):
         self.assertEqual(listed_groups().get("driver-tls", set()), fixture_images())
@@ -194,13 +205,30 @@ class PrepullTestImagesTests(unittest.TestCase):
         text = "let c = Mysql::default().with_env_var(\"A\", \"b\").start();"
         self.assertEqual(module_image(text, MODULE_START.search(text), {}), "mysql:8.1")
 
+    def test_mysql_mssql_and_redis_tests_pin_their_container_images(self):
+        unpinned = []
+        for directory in PINNED_TEST_SOURCES:
+            for path in (ROOT / directory).rglob("*.rs"):
+                text = path.read_text(errors="replace")
+                for match in MODULE_START.finditer(text):
+                    if match.group(1) not in {"Mysql", "MysqlImage", "MssqlServer", "Redis"}:
+                        continue
+                    chain = text[match.end() : match.end() + 600]
+                    start = chain.find(".start()")
+                    chain = chain[:start] if start >= 0 else chain
+                    if not TAG_ARGUMENT.search(chain):
+                        unpinned.append(path.relative_to(ROOT).as_posix())
+        self.assertEqual(unpinned, [])
+
     def test_the_driver_jobs_pre_pull_before_their_tests(self):
         ci = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         driver = ci.split("  driver:\n", 1)[1].split("  b4-rollback:\n", 1)[0]
         group = (ROOT / "scripts/run-driver-group.sh").read_text()
-        self.assertIn("group: [driver-core, driver-analytics, driver-extended, socket-ssh]", driver)
+        self.assertIn("group: [driver-core, driver-analytics]", driver)
+        self.assertIn("group: [driver-extended, socket-ssh]", driver)
         self.assertIn('mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"', driver)
         self.assertIn("if: matrix.group == 'socket-ssh'", driver)
+        self.assertIn("needs: [pin-revision, guards, clippy, test-build, driver]", driver)
         self.assertIn('python3 scripts/run-test-layer.py "$BOOKIE_TEST_LAYER"', driver)
         self.assertLess(driver.index("bash src/scripts/prepull-test-images.sh socket-ssh"),
                         driver.index('python3 scripts/run-test-layer.py "$BOOKIE_TEST_LAYER"'))

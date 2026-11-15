@@ -3,45 +3,67 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use bookie_core::{
-    ColumnInfo, Connection, DriverError, Environment, ExecResult, QueryResult, TableInfo, Transaction, Value,
+    ColumnInfo, Connection, DriverError, Environment, ExecResult, OperationControl, QueryResult, QueryResultBatch,
+    TableInfo, Transaction, Value,
 };
-use bookie_mcp::{ConnectionProvider, McpBridge, TokenPermissions, TokenStore};
+use bookie_mcp::{ConnectionProvider, McpBridge, McpLimits, TokenPermissions, TokenStore, dispatch};
 use bookie_policy::Principal;
 use bookie_storage::SavedConnection;
 use uuid::Uuid;
 
 const ROW_BYTES: usize = 4 * 1024 * 1024;
 
-struct BigRowsProvider {
+struct RowsProvider {
     connection_id: Uuid,
+    fixture: RowFixture,
 }
 
 #[async_trait]
-impl ConnectionProvider for BigRowsProvider {
+impl ConnectionProvider for RowsProvider {
     async fn list_saved_connections(&self) -> Result<Vec<SavedConnection>, String> {
         Ok(vec![saved_connection(self.connection_id)])
     }
 
     async fn connection(&self, _: Uuid, _: Principal) -> Result<Arc<dyn Connection>, String> {
-        Ok(Arc::new(BigRowsConnection))
+        Ok(Arc::new(RowsConnection { fixture: self.fixture }))
     }
 }
 
-struct BigRowsConnection;
+#[derive(Clone, Copy)]
+enum RowFixture {
+    Big,
+    Escaped,
+}
 
-fn three_big_rows() -> QueryResult {
-    QueryResult {
-        columns: Vec::new(),
-        rows: (0..3)
-            .map(|_| vec![Value::Text("x".repeat(ROW_BYTES))])
-            .collect::<Vec<_>>()
-            .into(),
-        truncated: false,
+impl RowFixture {
+    fn result(self) -> QueryResult {
+        match self {
+            Self::Big => QueryResult {
+                columns: Vec::new(),
+                rows: (0..3)
+                    .map(|_| vec![Value::Text("x".repeat(ROW_BYTES))])
+                    .collect::<Vec<_>>()
+                    .into(),
+                truncated: false,
+            },
+            Self::Escaped => QueryResult {
+                columns: Vec::new(),
+                rows: (0..4)
+                    .map(|_| vec![Value::Text("\0".repeat(10 * 1024)), Value::Bytes(vec![0; 10 * 1024])])
+                    .collect::<Vec<_>>()
+                    .into(),
+                truncated: false,
+            },
+        }
     }
+}
+
+struct RowsConnection {
+    fixture: RowFixture,
 }
 
 #[async_trait]
-impl Connection for BigRowsConnection {
+impl Connection for RowsConnection {
     async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
         Ok(Vec::new())
     }
@@ -51,11 +73,24 @@ impl Connection for BigRowsConnection {
     }
 
     async fn fetch_rows(&self, _: Option<&str>, _: &str, _: u64, _: u64) -> Result<QueryResult, DriverError> {
-        Ok(three_big_rows())
+        Ok(self.fixture.result())
     }
 
     async fn query(&self, _: &str) -> Result<QueryResult, DriverError> {
-        Ok(three_big_rows())
+        Ok(self.fixture.result())
+    }
+
+    async fn query_result_sets_controlled(
+        &self,
+        sql: &str,
+        _: &[Value],
+        _: &OperationControl,
+    ) -> Result<QueryResultBatch, DriverError> {
+        let mut batch = QueryResultBatch::single(self.fixture.result());
+        if matches!(self.fixture, RowFixture::Escaped) && !sql.contains("WHERE id = 1") {
+            batch.result_sets.push(self.fixture.result());
+        }
+        Ok(batch)
     }
 
     async fn execute(&self, _: &str) -> Result<ExecResult, DriverError> {
@@ -92,7 +127,13 @@ async fn a_query_response_is_cut_at_the_byte_budget_not_only_at_the_row_limit() 
         .issue("bytes".into(), TokenPermissions::ReadOnly, vec![connection_id], None)
         .unwrap();
     let token = tokens.authenticate(&plaintext).unwrap();
-    let bridge = McpBridge::new(Arc::new(BigRowsProvider { connection_id }), tokens);
+    let bridge = McpBridge::new(
+        Arc::new(RowsProvider {
+            connection_id,
+            fixture: RowFixture::Big,
+        }),
+        tokens,
+    );
 
     let batch = bridge
         .execute_query(&token, connection_id, "SELECT note FROM notes")
@@ -109,6 +150,66 @@ async fn a_query_response_is_cut_at_the_byte_budget_not_only_at_the_row_limit() 
         .unwrap();
     assert!(table.rows.len() < 3, "browsing a table is bounded the same way");
     assert!(table.truncated);
+}
+
+#[tokio::test]
+async fn escaped_text_does_not_exceed_the_serialized_tool_response_budget() {
+    const MAX_RESPONSE_BYTES: usize = 256 * 1024;
+    let directory = tempfile::TempDir::new().unwrap();
+    let connection_id = Uuid::new_v4();
+    let tokens = Arc::new(TokenStore::open(directory.path().join("tokens.json")).unwrap());
+    let (_, plaintext) = tokens
+        .issue("bytes".into(), TokenPermissions::ReadOnly, vec![connection_id], None)
+        .unwrap();
+    let token = tokens.authenticate(&plaintext).unwrap();
+    let bridge = McpBridge::with_limits(
+        Arc::new(RowsProvider {
+            connection_id,
+            fixture: RowFixture::Escaped,
+        }),
+        tokens,
+        McpLimits {
+            max_response_bytes: MAX_RESPONSE_BYTES,
+            ..McpLimits::default()
+        },
+    );
+
+    for (tool, arguments) in [
+        (
+            "execute_query",
+            serde_json::json!({"connection_id": connection_id, "sql": "SELECT note FROM notes"}),
+        ),
+        (
+            "browse_table",
+            serde_json::json!({"connection_id": connection_id, "table": "notes", "offset": 0, "limit": 4}),
+        ),
+        (
+            "export_data",
+            serde_json::json!({"connection_id": connection_id, "sql": "SELECT note FROM notes", "format": "json"}),
+        ),
+        (
+            "export_data",
+            serde_json::json!({"connection_id": connection_id, "sql": "SELECT note FROM notes WHERE id = 1", "format": "csv"}),
+        ),
+    ] {
+        assert_tool_response_bounded(&bridge, &token, tool, arguments, MAX_RESPONSE_BYTES).await;
+    }
+}
+
+async fn assert_tool_response_bounded(
+    bridge: &McpBridge,
+    token: &bookie_mcp::McpToken,
+    tool: &str,
+    arguments: serde_json::Value,
+    limit: usize,
+) {
+    let response = dispatch(bridge, token, tool, arguments).await.unwrap();
+    let bytes = serde_json::to_vec(&response).unwrap().len();
+    assert!(
+        bytes <= limit,
+        "{tool} encoded {bytes} bytes above its {limit} byte cap"
+    );
+    assert_eq!(response["truncated"], true, "{tool}");
 }
 
 fn saved_connection(id: Uuid) -> SavedConnection {

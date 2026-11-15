@@ -125,7 +125,7 @@ services:
       - fixture
 
   redis-plain:
-    image: redis:7-alpine
+    image: redis:7.4.12-alpine3.22
     command: ["redis-server", "--requirepass", "bookie"]
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "bookie", "--no-auth-warning", "ping"]
@@ -346,7 +346,7 @@ services:
           - clickhouse.bookie.test
 
   mysql-plain:
-    image: mysql:8.4
+    image: mysql:8.4.13
     environment:
       MYSQL_ROOT_PASSWORD: bookie
       MYSQL_DATABASE: bookie

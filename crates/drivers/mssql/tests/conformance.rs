@@ -13,6 +13,8 @@ use testcontainers::core::Mount;
 use testcontainers_modules::mssql_server::MssqlServer;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
 
+const MSSQL_TEST_TAG: &str = "2022-CU23-ubuntu-22.04";
+
 static SERVER: OnceLock<ConnectOptions> = OnceLock::new();
 
 struct Mssql;
@@ -59,6 +61,7 @@ impl conformance::ConformanceEngine for Mssql {
 async fn conformance_suite_on_a_real_sql_server() {
     let container = MssqlServer::default()
         .with_accept_eula()
+        .with_tag(MSSQL_TEST_TAG)
         .with_startup_timeout(std::time::Duration::from_secs(180))
         .with_mount(Mount::tmpfs_mount("/var/opt/mssql").with_mode(0o1777))
         .start()
