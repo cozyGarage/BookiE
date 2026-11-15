@@ -8,7 +8,7 @@ use bookie_gpui::source::{ResultSource, Source};
 use gpui::{Context, Window};
 use tokio_util::sync::CancellationToken;
 
-use crate::{GridView, Mode};
+use crate::{GridView, Mode, Work};
 
 impl GridView {
     pub(super) fn attach_live(&mut self, table: Arc<LiveTable>) {
@@ -43,6 +43,7 @@ impl GridView {
         }
         self.status = "Connecting…".into();
         self.begin_background(
+            Work::Load,
             cx,
             move |cancel| open_first_table(&origin, &cancel),
             |this, opened| match opened {
@@ -130,6 +131,7 @@ impl GridView {
         self.status = format!("Loading {}…", table_label(table));
         let wanted = table.clone();
         self.begin_background(
+            Work::Load,
             cx,
             move |cancel| load(&session, &wanted, &cancel),
             move |this, loaded| match loaded {
