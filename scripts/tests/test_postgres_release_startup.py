@@ -143,6 +143,12 @@ print(hosts[sys.argv[-1]], "STREAM", sys.argv[-1])
         self.assertIn("options: --add-host=host.docker.internal:host-gateway", job)
         self.assertIn("BOOKIE_FIXTURE_HOST: host.docker.internal", job)
 
+    def test_release_waits_for_the_bastion_ssh_service(self):
+        script = (ROOT / "scripts/test-postgres-release.sh").read_text()
+        self.assertIn('ssh-keyscan -T 1 -p "$port" "$host"', script)
+        self.assertIn('wait_for_ssh_host_key "$fixture_ssh_host" 2223', script)
+        self.assertNotIn('wait_for_port "$fixture_ssh_host" 2223', script)
+
 
 if __name__ == "__main__":
     unittest.main()
