@@ -60,6 +60,18 @@ wait_for_port() {
   return 1
 }
 
+wait_for_ssh_host_key() {
+  local host="$1" port="$2"
+  for _ in $(seq 1 120); do
+    if ssh-keyscan -T 1 -p "$port" "$host" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+  echo "SSH service did not provide a host key on $host:$port" >&2
+  return 1
+}
+
 bash "$FIXTURE/generate-materials.sh"
 chmod 0755 "$FIXTURE/seed"
 chmod 0644 "$FIXTURE/seed/01-seed.sql"
@@ -80,7 +92,7 @@ fi
 
 wait_for_port "$fixture_host" 8474 "toxiproxy api"
 wait_for_port "$fixture_host" 5433 "postgres path"
-wait_for_port "$fixture_ssh_host" 2223 "bastion path"
+wait_for_ssh_host_key "$fixture_ssh_host" 2223
 
 # A forwarded Unix socket's path (under XDG_RUNTIME_DIR) is capped at
 # 100 bytes, so the isolated runtime dir has to stay short -- the
