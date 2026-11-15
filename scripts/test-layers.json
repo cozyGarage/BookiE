@@ -784,6 +784,7 @@
     "timeout_minutes": 90,
     "condition": "github.event_name != 'push'",
     "matrix": {
+      "max-parallel": 2,
       "group": [
         "driver-core",
         "driver-analytics",
@@ -829,6 +830,7 @@
     "timeout_minutes": 60,
     "condition": "github.event_name != 'push'",
     "matrix": {
+      "max-parallel": 2,
       "shard": [
         "1",
         "2",
@@ -856,6 +858,7 @@
     "timeout_minutes": 45,
     "condition": "github.event_name != 'push'",
     "matrix": {
+      "max-parallel": 2,
       "server": [
         "clickhouse",
         "mongodb",

@@ -802,6 +802,7 @@ jobs:
       BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}
     strategy:
       fail-fast: false
+      max-parallel: 2
       matrix:
         group: [driver-core, driver-analytics, driver-extended, socket-ssh]
     steps:
@@ -1019,6 +1020,7 @@ jobs:
     timeout-minutes: 60
     strategy:
       fail-fast: false
+      max-parallel: 2
       matrix:
         shard: [1, 2, 3]
     steps:
@@ -1136,6 +1138,7 @@ jobs:
       TMPDIR: /var/cache/ci/tmp
     strategy:
       fail-fast: false
+      max-parallel: 2
       matrix:
         include:
           - server: clickhouse
