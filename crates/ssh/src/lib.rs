@@ -682,10 +682,11 @@ async fn connect_and_auth(
                 .await
                 .map_err(SshError::Ssh),
             SshAuth::PrivateKey { path, passphrase } => {
-                let pp = passphrase.as_ref().map(|s| s.expose_secret().to_string());
-                let key = load_secret_key(path, pp.as_deref()).map_err(|e| SshError::Key {
-                    path: path.clone(),
-                    source: e,
+                let key = load_secret_key(path, passphrase.as_ref().map(ExposeSecret::expose_secret)).map_err(|e| {
+                    SshError::Key {
+                        path: path.clone(),
+                        source: e,
+                    }
                 })?;
                 let hash = session.best_supported_rsa_hash().await?.flatten();
                 session
