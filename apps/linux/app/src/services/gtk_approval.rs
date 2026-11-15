@@ -133,7 +133,7 @@ impl ApprovalSink for GtkApprovalSink {
         let tx = Arc::new(Mutex::new(Some(tx)));
         let permit = Arc::new(Mutex::new(Some(permit)));
 
-        let can_remember = req.environment != bookie_core::Environment::Prod;
+        let can_remember = req.may_be_remembered();
         let heading = format!("Approve write: {}", req.connection_name);
         let body = approval_body(&req);
 

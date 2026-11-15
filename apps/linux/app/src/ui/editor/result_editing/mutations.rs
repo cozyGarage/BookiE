@@ -679,11 +679,7 @@ impl SqlEditor {
         });
         match result {
             Some(Ok((statements, _))) if !statements.is_empty() => {
-                let body = statements
-                    .iter()
-                    .map(|(sql, _)| sql.as_str())
-                    .collect::<Vec<_>>()
-                    .join(";\n");
+                let body = bookie_app_services::edit_preview::preview_text(&editing.driver_id, &statements);
                 let _ = sender.output(SqlEditorOutput::ShowAlert {
                     title: bookie_app_services::tr!("Preview SQL"),
                     body,
