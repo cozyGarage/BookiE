@@ -235,24 +235,68 @@ fn statement_cases() -> Vec<StopCase> {
     ]
 }
 
+fn transaction_cases() -> Vec<StopCase> {
+    const READ: &str = "SELECT 1 AS stop_class_marker";
+    const WRITE: &str = "UPDATE stop_class_rows SET note = note";
+    vec![
+        sends(
+            "Transaction::query_controlled",
+            b"stop_class_marker",
+            |c, control| async move { c.begin().await?.query_controlled(READ, &control).await },
+        ),
+        sends(
+            "Transaction::query_params_controlled",
+            b"stop_class_marker",
+            |c, control| async move {
+                let mut transaction = c.begin().await?;
+                transaction
+                    .query_params_controlled("SELECT ? AS stop_class_marker", &[Value::Int(1)], &control)
+                    .await
+            },
+        ),
+        sends(
+            "Transaction::execute_controlled",
+            b"stop_class_rows",
+            |c, control| async move { c.begin().await?.execute_controlled(WRITE, &control).await },
+        ),
+        sends(
+            "Transaction::execute_params_controlled",
+            b"stop_class_rows",
+            |c, control| async move {
+                let mut transaction = c.begin().await?;
+                transaction
+                    .execute_params_controlled(
+                        "UPDATE stop_class_rows SET note = ?",
+                        &[Value::Text("a".into())],
+                        &control,
+                    )
+                    .await
+            },
+        ),
+        sends(
+            "Transaction::rollback_controlled",
+            b"ROLLBACK",
+            |c, control| async move { c.begin().await?.rollback_controlled(&control).await },
+        ),
+    ]
+}
+
 fn stop_cases() -> Vec<StopCase> {
     let mut cases = catalog_cases();
     cases.extend(table_metadata_cases());
     cases.extend(statement_cases());
+    cases.extend(transaction_cases());
     cases
 }
 
-#[test]
-fn every_controlled_call_of_the_contract_has_a_mysql_stop_case() {
-    let source = include_str!("../../../../core/src/connection.rs");
-    let contract = source
-        .split("pub trait Connection")
+fn controlled_calls(source: &str, contract: &str, prefix: &str) -> BTreeSet<String> {
+    source
+        .split(contract)
         .nth(1)
-        .expect("the Connection trait")
-        .split("mod controlled_default_tests")
+        .expect("the contract trait")
+        .split("#[cfg(test)]")
         .next()
-        .unwrap();
-    let declared: BTreeSet<&str> = contract
+        .unwrap_or_default()
         .split("async fn ")
         .skip(1)
         .filter(|rest| {
@@ -260,10 +304,24 @@ fn every_controlled_call_of_the_contract_has_a_mysql_stop_case() {
             signature.contains("OperationControl")
         })
         .filter_map(|rest| rest.split('(').next())
-        .map(str::trim)
-        .collect();
+        .map(|name| format!("{prefix}{}", name.trim()))
+        .collect()
+}
+
+#[test]
+fn every_controlled_call_of_the_contract_has_a_mysql_stop_case() {
+    let mut declared = controlled_calls(
+        include_str!("../../../../core/src/connection.rs"),
+        "pub trait Connection",
+        "",
+    );
+    declared.extend(controlled_calls(
+        include_str!("../../../../core/src/transaction.rs"),
+        "pub trait Transaction",
+        "Transaction::",
+    ));
     let cases = stop_cases();
-    let covered: BTreeSet<&str> = cases.iter().map(|case| case.method).collect();
+    let covered: BTreeSet<String> = cases.iter().map(|case| case.method.to_string()).collect();
     assert_eq!(covered, declared);
 }
 
@@ -646,4 +704,87 @@ async fn a_controlled_mysql_transaction_begins_writes_and_ends() {
         vec![vec![Value::Text("kept".into())], vec![Value::Text("committed".into())]]
     );
     assert_eq!(open_transactions(connection.as_ref()).await, 0);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn an_uncertain_write_in_a_mysql_transaction_is_never_committed_later() {
+    let (_container, options) = start_mysql().await;
+    let observer = connect(options.clone()).await;
+    create_fixture(observer.as_ref()).await;
+    let proxy = StallProxy::start(&options).await;
+    let connection = connect(ConnectOptions {
+        host: "127.0.0.1".into(),
+        port: proxy.port,
+        ..options
+    })
+    .await;
+
+    let mut transaction = connection.begin().await.unwrap();
+    proxy.withhold_reply_to(b"stop_class_rows");
+    let write = transaction
+        .execute_controlled(
+            "UPDATE stop_class_rows SET note = 'uncertain' WHERE id = 1",
+            &OperationControl::with_timeout(STOP_AFTER),
+        )
+        .await;
+    proxy.release();
+    assert!(
+        matches!(write, Err(DriverError::OperationOutcomeUnknown { .. })),
+        "{write:?}"
+    );
+    let _ = transaction
+        .rollback_controlled(&OperationControl::with_timeout(STOP_AFTER))
+        .await;
+
+    for _ in 0..8 {
+        connection.begin().await.unwrap().commit().await.unwrap();
+    }
+    assert_eq!(open_transactions(observer.as_ref()).await, 0);
+    let note = observer
+        .query("SELECT note FROM stop_class_rows WHERE id = 1")
+        .await
+        .unwrap();
+    assert_eq!(note.rows, vec![vec![Value::Text("kept".into())]]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_write_in_a_mysql_transaction_stopped_behind_a_lock_leaves_the_transaction_usable() {
+    let (_container, options) = start_mysql().await;
+    let observer = connect(options.clone()).await;
+    create_fixture(observer.as_ref()).await;
+    let connection = connect(options).await;
+    let no_limit = OperationControl::new(tokio_util::sync::CancellationToken::new(), None);
+
+    let mut lock = observer.begin().await.unwrap();
+    lock.execute_controlled("UPDATE stop_class_rows SET note = 'locked' WHERE id = 1", &no_limit)
+        .await
+        .unwrap();
+    let mut transaction = connection.begin().await.unwrap();
+    let error = transaction
+        .execute_controlled(
+            "UPDATE stop_class_rows SET note = 'stopped' WHERE id = 1",
+            &OperationControl::with_timeout(STOP_AFTER),
+        )
+        .await
+        .expect_err("a write behind a row lock cannot finish");
+    assert!(matches!(error, DriverError::TimedOut), "{error:?}");
+    assert_eq!(statements_still_running(observer.as_ref()).await, 0);
+
+    transaction
+        .execute_controlled("INSERT INTO stop_class_rows (note) VALUES ('second')", &no_limit)
+        .await
+        .unwrap();
+    transaction
+        .rollback_controlled(&OperationControl::with_timeout(OBSERVE_FOR))
+        .await
+        .unwrap();
+    lock.rollback().await.unwrap();
+    assert_eq!(open_transactions(observer.as_ref()).await, 0);
+    let notes = observer
+        .query("SELECT note FROM stop_class_rows ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(notes.rows, vec![vec![Value::Text("kept".into())]]);
 }

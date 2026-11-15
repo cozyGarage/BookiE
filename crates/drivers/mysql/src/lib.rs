@@ -193,6 +193,16 @@ struct MysqlConnection {
     read_only: bool,
 }
 
+impl MysqlConnection {
+    fn transaction_on(&self, connection: PoolConnection<MySql>, connection_id: u64) -> MysqlTransaction {
+        MysqlTransaction {
+            connection: Some(connection),
+            connection_id,
+            cancellation_pool: self.cancellation_pool.clone(),
+        }
+    }
+}
+
 #[async_trait]
 impl Connection for MysqlConnection {
     async fn list_collations(&self) -> Result<Vec<bookie_core::CollationInfo>, DriverError> {
@@ -538,10 +548,9 @@ impl Connection for MysqlConnection {
 
     async fn begin(&self) -> Result<Box<dyn bookie_core::Transaction>, DriverError> {
         let mut connection = self.pool.acquire().await.map_err(map_sqlx_error)?;
+        let connection_id = connection_id(&mut connection).await?;
         transaction::statement(&mut connection, "BEGIN").await?;
-        Ok(Box::new(MysqlTransaction {
-            connection: Some(connection),
-        }))
+        Ok(Box::new(self.transaction_on(connection, connection_id)))
     }
 
     async fn begin_controlled(
@@ -558,9 +567,7 @@ impl Connection for MysqlConnection {
         )
         .await;
         match result {
-            Ok(()) => Ok(Box::new(MysqlTransaction {
-                connection: Some(connection),
-            })),
+            Ok(()) => Ok(Box::new(self.transaction_on(connection, connection_id))),
             Err(error) => Err(retire_if_uncertain(connection, error).await),
         }
     }
@@ -839,6 +846,8 @@ fn atomic_batch_refusal(statement_index: usize) -> DriverError {
 
 struct MysqlTransaction {
     connection: Option<PoolConnection<MySql>>,
+    connection_id: u64,
+    cancellation_pool: Pool<MySql>,
 }
 
 impl Drop for MysqlTransaction {
@@ -853,43 +862,90 @@ impl MysqlTransaction {
     fn open(&mut self) -> Result<&mut PoolConnection<MySql>, DriverError> {
         self.connection
             .as_mut()
-            .ok_or_else(|| DriverError::Internal("transaction closed".into()))
+            .ok_or_else(|| DriverError::Internal("transaction is unusable".into()))
+    }
+
+    async fn retire_if_uncertain<T>(&mut self, result: &Result<T, DriverError>) {
+        if matches!(result, Err(DriverError::OperationOutcomeUnknown { .. }))
+            && let Some(connection) = self.connection.take()
+        {
+            let _ = connection.detach().close_hard().await;
+        }
     }
 
     async fn end(&mut self, sql: &'static str) -> Result<(), DriverError> {
-        let mut connection = self
-            .connection
-            .take()
-            .ok_or_else(|| DriverError::Internal("transaction closed".into()))?;
-        let ended = transaction::statement(&mut connection, sql).await;
-        if ended.is_err() {
-            connection.close_on_drop();
-        }
-        ended
+        let connection = self.open()?;
+        transaction::statement(connection, sql).await?;
+        self.connection = None;
+        Ok(())
     }
+}
+
+async fn transaction_query(
+    connection: &mut sqlx::MySqlConnection,
+    sql: &str,
+    params: &[Value],
+) -> Result<QueryResult, DriverError> {
+    let timestamp_is_utc = timezone_is_utc(&mut *connection).await?;
+    let mut result = params_into_result(connection, sql, params, MAX_QUERY_ROWS).await?;
+    if !timestamp_is_utc {
+        refuse_non_utc_timestamps(&mut result);
+    }
+    Ok(result)
 }
 
 #[async_trait]
 impl bookie_core::Transaction for MysqlTransaction {
     async fn query(&mut self, sql: &str) -> Result<QueryResult, DriverError> {
-        let connection = self.open()?;
-        let timestamp_is_utc = timezone_is_utc(&mut **connection).await?;
-        let mut result = params_into_result(connection, sql, &[], MAX_QUERY_ROWS).await?;
-        if !timestamp_is_utc {
-            refuse_non_utc_timestamps(&mut result);
-        }
-        Ok(result)
+        transaction_query(self.open()?, sql, &[]).await
+    }
+
+    async fn query_controlled(&mut self, sql: &str, control: &OperationControl) -> Result<QueryResult, DriverError> {
+        self.query_params_controlled(sql, &[], control).await
+    }
+
+    async fn query_params_controlled(
+        &mut self,
+        sql: &str,
+        params: &[Value],
+        control: &OperationControl,
+    ) -> Result<QueryResult, DriverError> {
+        let (cancellation_pool, connection_id) = (self.cancellation_pool.clone(), self.connection_id);
+        let result = run_server_cancellable(
+            transaction_query(self.open()?, sql, params),
+            request_cancellation(&cancellation_pool, connection_id),
+            confirms_cancellation,
+            control,
+        )
+        .await;
+        self.retire_if_uncertain(&result).await;
+        result
     }
 
     async fn execute(&mut self, sql: &str) -> Result<ExecResult, DriverError> {
-        let connection = self.open()?;
-        let res = sqlx::query(sqlx::AssertSqlSafe(sql))
-            .execute(&mut **connection)
-            .await
-            .map_err(map_sqlx_error)?;
-        Ok(ExecResult {
-            rows_affected: res.rows_affected(),
-        })
+        execute_on(&mut **self.open()?, sql, &[]).await
+    }
+
+    async fn execute_controlled(&mut self, sql: &str, control: &OperationControl) -> Result<ExecResult, DriverError> {
+        self.execute_params_controlled(sql, &[], control).await
+    }
+
+    async fn execute_params_controlled(
+        &mut self,
+        sql: &str,
+        params: &[Value],
+        control: &OperationControl,
+    ) -> Result<ExecResult, DriverError> {
+        let (cancellation_pool, connection_id) = (self.cancellation_pool.clone(), self.connection_id);
+        let result = run_server_cancellable(
+            execute_on(&mut **self.open()?, sql, params),
+            request_cancellation(&cancellation_pool, connection_id),
+            confirms_cancellation,
+            control,
+        )
+        .await;
+        self.retire_if_uncertain(&result).await;
+        result
     }
 
     async fn commit(mut self: Box<Self>) -> Result<(), DriverError> {
@@ -898,6 +954,21 @@ impl bookie_core::Transaction for MysqlTransaction {
 
     async fn rollback(mut self: Box<Self>) -> Result<(), DriverError> {
         self.end("ROLLBACK").await
+    }
+
+    async fn rollback_controlled(mut self: Box<Self>, control: &OperationControl) -> Result<(), DriverError> {
+        let (cancellation_pool, connection_id) = (self.cancellation_pool.clone(), self.connection_id);
+        let result = run_server_cancellable(
+            transaction::statement(self.open()?, "ROLLBACK"),
+            request_cancellation(&cancellation_pool, connection_id),
+            confirms_cancellation,
+            control,
+        )
+        .await;
+        if result.is_ok() {
+            self.connection = None;
+        }
+        result
     }
 }
 

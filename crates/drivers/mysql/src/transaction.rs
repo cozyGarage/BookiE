@@ -21,10 +21,7 @@ pub(super) async fn begin_and_run_checked(
 }
 
 pub(super) fn confirms_stopped_statement(error: &DriverError) -> bool {
-    match error {
-        DriverError::Transaction { source, .. } => confirms_cancellation(source),
-        other => confirms_cancellation(other),
-    }
+    matches!(error, DriverError::Transaction { source, .. } if confirms_cancellation(source))
 }
 
 pub(super) async fn run_checked(
