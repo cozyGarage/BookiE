@@ -1,4 +1,6 @@
-pub use drivers_redis::{MAX_SAMPLE_MESSAGES, PubSubMessage, PubSubSample, sample_pubsub};
+pub use drivers_redis::{
+    MAX_SAMPLE_MESSAGES, PubSubMessage, PubSubSample, check_request as validate_pubsub_request, sample_pubsub,
+};
 use std::sync::Arc;
 
 use bookie_core::DriverRegistry;

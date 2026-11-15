@@ -7,6 +7,7 @@ use bookie_app_services::command_bridge::{ChannelEventSink, Command, DispatchCon
 use bookie_app_services::database_service::DatabaseService;
 use bookie_app_services::driver_error_presentation::DriverFailurePresentation;
 use bookie_app_services::read_session::ReadSession;
+use bookie_app_services::read_session_store::{ReadSessionStore, SessionId};
 use bookie_core::{
     AuthMode, ConnectOptions, DatabaseDriver, DriverRegistry, Environment, OperationControl, TableInfo, Value,
 };
@@ -68,6 +69,15 @@ async fn session(path: &std::path::Path, id: Uuid, database: Arc<DatabaseService
     ReadSession::open(saved(path, id), Arc::new(registry), database)
         .await
         .expect("open")
+}
+
+async fn stored_session(path: &std::path::Path) -> (ReadSessionStore, SessionId) {
+    let mut registry = DriverRegistry::new();
+    registry.register(Arc::new(drivers_sqlite::SqliteDriver));
+    let sessions = ReadSessionStore::new(Arc::new(registry), Arc::new(DatabaseService::new_isolated()));
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(5));
+    let opened = sessions.open_file(path, &control).await.unwrap();
+    (sessions, opened.session_id)
 }
 
 #[tokio::test]
@@ -272,15 +282,16 @@ async fn a_read_command_returns_its_epoch_and_guarded_query_result() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("session.db");
     seeded(&path).await;
-    let session = session(&path, Uuid::new_v4(), Arc::new(DatabaseService::new_isolated())).await;
+    let (sessions, session_id) = stored_session(&path).await;
     let (sender, mut receiver) = tokio::sync::mpsc::channel(1);
     let sink = ChannelEventSink::new(sender);
     let control = OperationControl::with_timeout(std::time::Duration::from_secs(5));
 
     dispatch(
-        DispatchContext::Session(&session),
+        DispatchContext::Sessions(&sessions),
         Command::RunQuery {
             epoch: Epoch(42),
+            session_id,
             sql: "SELECT id FROM items ORDER BY id".into(),
         },
         &control,
@@ -299,25 +310,157 @@ async fn a_read_command_returns_its_epoch_and_guarded_query_result() {
 }
 
 #[tokio::test]
+async fn opening_a_file_returns_an_opaque_session_and_closing_it_retires_reads() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("session.db");
+    seeded(&path).await;
+    let mut registry = DriverRegistry::new();
+    registry.register(Arc::new(drivers_sqlite::SqliteDriver));
+    let database = Arc::new(DatabaseService::new_isolated());
+    let sessions = ReadSessionStore::new(Arc::new(registry), database.clone());
+    let (sender, mut receiver) = tokio::sync::mpsc::channel(4);
+    let sink = ChannelEventSink::new(sender);
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(5));
+
+    dispatch(
+        DispatchContext::Sessions(&sessions),
+        Command::OpenConnectionFile {
+            epoch: Epoch(70),
+            path: path.clone(),
+        },
+        &control,
+        &sink,
+    )
+    .await
+    .unwrap();
+    let Event::SessionOpened { epoch, outcome } = receiver.try_recv().unwrap() else {
+        panic!("open command returned a different event");
+    };
+    assert_eq!(epoch, Epoch(70));
+    let opened = outcome.unwrap();
+    assert_eq!(opened.label, "session.db");
+    assert_eq!(opened.driver_id, "sqlite");
+    assert_eq!(
+        opened
+            .tables
+            .iter()
+            .map(|table| table.name.as_str())
+            .collect::<Vec<_>>(),
+        ["items"]
+    );
+
+    dispatch(
+        DispatchContext::Sessions(&sessions),
+        Command::RunQuery {
+            epoch: Epoch(71),
+            session_id: opened.session_id,
+            sql: "SELECT count(*) FROM items".into(),
+        },
+        &control,
+        &sink,
+    )
+    .await
+    .unwrap();
+    let Event::QueryCompleted { outcome, .. } = receiver.try_recv().unwrap() else {
+        panic!("query command returned a different event");
+    };
+    assert_eq!(outcome.unwrap().rows.iter().next().unwrap()[0], Value::Int(3));
+
+    dispatch(
+        DispatchContext::Sessions(&sessions),
+        Command::CloseSession {
+            epoch: Epoch(72),
+            session_id: opened.session_id,
+        },
+        &control,
+        &sink,
+    )
+    .await
+    .unwrap();
+    assert!(matches!(
+        receiver.try_recv().unwrap(),
+        Event::SessionClosed {
+            epoch: Epoch(72),
+            closed: true
+        }
+    ));
+    assert!(database.connection_overview().is_empty());
+    dispatch(
+        DispatchContext::Sessions(&sessions),
+        Command::RunQuery {
+            epoch: Epoch(73),
+            session_id: opened.session_id,
+            sql: "SELECT 1".into(),
+        },
+        &control,
+        &sink,
+    )
+    .await
+    .unwrap();
+    assert!(matches!(
+        receiver.try_recv().unwrap(),
+        Event::QueryCompleted {
+            outcome: Err(DriverFailurePresentation::Disconnected),
+            ..
+        }
+    ));
+}
+
+#[tokio::test]
+async fn an_open_session_is_released_when_its_event_cannot_be_delivered() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("session.db");
+    seeded(&path).await;
+    let mut registry = DriverRegistry::new();
+    registry.register(Arc::new(drivers_sqlite::SqliteDriver));
+    let database = Arc::new(DatabaseService::new_isolated());
+    let sessions = ReadSessionStore::new(Arc::new(registry), database.clone());
+    let (sender, _receiver) = tokio::sync::mpsc::channel(1);
+    let sink = ChannelEventSink::new(sender.clone());
+    sender
+        .try_send(Event::SessionClosed {
+            epoch: Epoch(0),
+            closed: false,
+        })
+        .unwrap();
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(5));
+
+    let result = dispatch(
+        DispatchContext::Sessions(&sessions),
+        Command::OpenConnectionFile { epoch: Epoch(74), path },
+        &control,
+        &sink,
+    )
+    .await;
+
+    assert_eq!(
+        result,
+        Err(bookie_app_services::command_bridge::DispatchError::EventSink(
+            bookie_app_services::command_bridge::EventSinkError::Full
+        ))
+    );
+    assert!(database.connection_overview().is_empty());
+}
+
+#[tokio::test]
 async fn a_page_command_returns_the_requested_rows_with_its_epoch() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("session.db");
     seeded(&path).await;
-    let session = session(&path, Uuid::new_v4(), Arc::new(DatabaseService::new_isolated())).await;
-    let table = session
-        .tables
-        .iter()
-        .find(|table| table.name == "items")
-        .unwrap()
-        .clone();
+    let (sessions, session_id) = stored_session(&path).await;
+    let table = TableInfo {
+        schema: None,
+        name: "items".into(),
+    };
     let (sender, mut receiver) = tokio::sync::mpsc::channel(1);
     let sink = ChannelEventSink::new(sender);
     let control = OperationControl::with_timeout(std::time::Duration::from_secs(5));
 
     dispatch(
-        DispatchContext::Session(&session),
+        DispatchContext::Sessions(&sessions),
         Command::ReadPage {
             epoch: Epoch(44),
+            session_id,
             table,
             offset: 1,
             limit: 1,
@@ -340,14 +483,17 @@ async fn a_status_command_returns_the_active_connection_with_its_epoch() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("session.db");
     seeded(&path).await;
-    let session = session(&path, Uuid::new_v4(), Arc::new(DatabaseService::new_isolated())).await;
+    let (sessions, session_id) = stored_session(&path).await;
     let (sender, mut receiver) = tokio::sync::mpsc::channel(1);
     let sink = ChannelEventSink::new(sender);
     let control = OperationControl::with_timeout(std::time::Duration::from_secs(5));
 
     dispatch(
-        DispatchContext::Session(&session),
-        Command::ReadConnectionStatus { epoch: Epoch(45) },
+        DispatchContext::Sessions(&sessions),
+        Command::ReadConnectionStatus {
+            epoch: Epoch(45),
+            session_id,
+        },
         &control,
         &sink,
     )
@@ -359,7 +505,7 @@ async fn a_status_command_returns_the_active_connection_with_its_epoch() {
     };
     assert_eq!(epoch, Epoch(45));
     assert_eq!(outcome.len(), 1);
-    assert_eq!(outcome[0].name, "session");
+    assert_eq!(outcome[0].name, "session.db");
     assert_eq!(outcome[0].driver_id, "sqlite");
 }
 
@@ -392,15 +538,16 @@ async fn a_denied_write_command_does_not_change_the_database() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("session.db");
     seeded(&path).await;
-    let session = session(&path, Uuid::new_v4(), Arc::new(DatabaseService::new_isolated())).await;
+    let (sessions, session_id) = stored_session(&path).await;
     let (sender, mut receiver) = tokio::sync::mpsc::channel(1);
     let sink = ChannelEventSink::new(sender);
     let control = OperationControl::with_timeout(std::time::Duration::from_secs(5));
 
     dispatch(
-        DispatchContext::Session(&session),
+        DispatchContext::Sessions(&sessions),
         Command::RunQuery {
             epoch: Epoch(43),
+            session_id,
             sql: "DELETE FROM items".into(),
         },
         &control,
@@ -416,6 +563,20 @@ async fn a_denied_write_command_does_not_change_the_database() {
         outcome,
         Err(DriverFailurePresentation::ReadOnly | DriverFailurePresentation::PolicyDenied(_))
     ));
-    let rows = session.run_query("SELECT count(*) FROM items", &control).await.unwrap();
-    assert_eq!(rows.rows.iter().next().unwrap()[0], Value::Int(3));
+    dispatch(
+        DispatchContext::Sessions(&sessions),
+        Command::RunQuery {
+            epoch: Epoch(46),
+            session_id,
+            sql: "SELECT count(*) FROM items".into(),
+        },
+        &control,
+        &sink,
+    )
+    .await
+    .unwrap();
+    let Event::QueryCompleted { outcome, .. } = receiver.try_recv().unwrap() else {
+        panic!("query command returned a different event");
+    };
+    assert_eq!(outcome.unwrap().rows.iter().next().unwrap()[0], Value::Int(3));
 }
