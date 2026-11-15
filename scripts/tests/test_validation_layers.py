@@ -196,6 +196,17 @@ class LayerRunnerTests(unittest.TestCase):
 
     def test_timeout_and_missing_executable_fail_explicitly(self):
         self.assertEqual(self.execute(self.step("import time; time.sleep(60)", timeout=0.05))["status"], "timed_out")
+        code = (
+            "import time\n"
+            "deadline = time.monotonic() + 0.2\n"
+            "while time.monotonic() < deadline:\n"
+            " print('output', flush=True)\n"
+            " time.sleep(0.005)"
+        )
+        self.assertEqual(
+            self.execute(self.step(code, timeout=0.05))["status"],
+            "timed_out",
+        )
         step = {"argv": ["/missing/bookie-fixture"], "evidence": "exit", "timeout_seconds": 1}
         self.assertEqual(self.execute(step)["status"], "blocked")
         step = dict(self.step("pass"), required_tools=["bookie-missing-prerequisite"])

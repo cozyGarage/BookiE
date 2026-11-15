@@ -145,6 +145,8 @@ def stream_process_output(process, log, timeout):
     stream = process.stdout
     while True:
         remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise subprocess.TimeoutExpired(process.args, timeout)
         readable, _, _ = select.select([stream], [], [], max(remaining, 0))
         if not readable:
             raise subprocess.TimeoutExpired(process.args, timeout)
