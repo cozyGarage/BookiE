@@ -18,6 +18,7 @@ mod packed;
 mod pool_saturation;
 mod session;
 mod text_protocol;
+mod transaction;
 mod warnings;
 pub(crate) use text_protocol::{is_call_statement, text_protocol};
 use text_protocol::{mysql_row_payload_bytes, statement_columns};
@@ -169,6 +170,22 @@ impl DatabaseDriver for MysqlDriver {
     }
 }
 
+macro_rules! stoppable {
+    ($self:ident, $control:ident, |$connection:ident| $statement:expr) => {{
+        let mut $connection = acquire_controlled(&$self.pool, $control).await?;
+        let connection_id = connection_id_controlled(&mut $connection, $control).await?;
+        let result = run_server_cancellable(
+            $statement,
+            request_cancellation(&$self.cancellation_pool, connection_id),
+            confirms_cancellation,
+            $control,
+        )
+        .await;
+        release_connection($connection, &result).await;
+        result
+    }};
+}
+
 struct MysqlConnection {
     pool: Pool<MySql>,
     cancellation_pool: Pool<MySql>,
@@ -179,78 +196,96 @@ struct MysqlConnection {
 #[async_trait]
 impl Connection for MysqlConnection {
     async fn list_collations(&self) -> Result<Vec<bookie_core::CollationInfo>, DriverError> {
-        let rows = sqlx::query(
-            "SELECT CAST(collation_name AS CHAR), COALESCE(CAST(character_set_name AS CHAR), ''),
-                    COALESCE(is_default = 'Yes', 0)
-             FROM information_schema.collations
-             ORDER BY collation_name
-             LIMIT ?",
-        )
-        .bind(bookie_core::MAX_COLLATIONS as i64)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(map_sqlx_error)?;
-        Ok(rows
-            .into_iter()
-            .map(|row| bookie_core::CollationInfo {
-                name: row.get(0),
-                charset: row.get(1),
-                is_default: row.get(2),
-            })
-            .collect())
+        let mut connection = self.pool.acquire().await.map_err(map_sqlx_error)?;
+        read_list_collations(&mut connection).await
+    }
+
+    async fn list_collations_controlled(
+        &self,
+        control: &OperationControl,
+    ) -> Result<Vec<bookie_core::CollationInfo>, DriverError> {
+        stoppable!(self, control, |connection| read_list_collations(&mut connection))
     }
 
     async fn list_databases(&self) -> Result<Vec<String>, DriverError> {
-        let rows = sqlx::query(
-            "SELECT CAST(schema_name AS CHAR) FROM information_schema.schemata
-             WHERE schema_name NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
-             ORDER BY schema_name",
-        )
-        .fetch_all(&self.pool)
-        .await
-        .map_err(map_sqlx_error)?;
-        Ok(rows.into_iter().map(|row| row.get::<String, _>(0)).collect())
+        let mut connection = self.pool.acquire().await.map_err(map_sqlx_error)?;
+        read_list_databases(&mut connection).await
+    }
+
+    async fn list_databases_controlled(&self, control: &OperationControl) -> Result<Vec<String>, DriverError> {
+        stoppable!(self, control, |connection| read_list_databases(&mut connection))
     }
 
     async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
-        catalog::list_relations(&self.pool, None).await
+        let mut connection = self.pool.acquire().await.map_err(map_sqlx_error)?;
+        catalog::list_relations(&mut connection, None).await
+    }
+
+    async fn list_tables_controlled(&self, control: &OperationControl) -> Result<Vec<TableInfo>, DriverError> {
+        stoppable!(self, control, |connection| catalog::list_relations(
+            &mut connection,
+            None
+        ))
+    }
+
+    async fn list_tables_in(
+        &self,
+        schemas: &[String],
+        control: &OperationControl,
+    ) -> Result<Vec<TableInfo>, DriverError> {
+        let mut tables = self.list_tables_controlled(control).await?;
+        tables.retain(|table| table.schema.as_ref().is_none_or(|schema| schemas.contains(schema)));
+        Ok(tables)
+    }
+
+    async fn list_tables_excluding_controlled(
+        &self,
+        schemas: &[String],
+        control: &OperationControl,
+    ) -> Result<Vec<TableInfo>, DriverError> {
+        let mut tables = self.list_tables_controlled(control).await?;
+        tables.retain(|table| table.schema.as_ref().is_none_or(|schema| !schemas.contains(schema)));
+        Ok(tables)
     }
 
     async fn list_views(&self) -> Result<Vec<TableInfo>, DriverError> {
-        catalog::list_relations(&self.pool, Some("VIEW")).await
+        let mut connection = self.pool.acquire().await.map_err(map_sqlx_error)?;
+        catalog::list_relations(&mut connection, Some("VIEW")).await
+    }
+
+    async fn list_views_controlled(&self, control: &OperationControl) -> Result<Vec<TableInfo>, DriverError> {
+        stoppable!(self, control, |connection| catalog::list_relations(
+            &mut connection,
+            Some("VIEW")
+        ))
+    }
+
+    async fn list_views_excluding_controlled(
+        &self,
+        schemas: &[String],
+        control: &OperationControl,
+    ) -> Result<Vec<TableInfo>, DriverError> {
+        let mut views = self.list_views_controlled(control).await?;
+        views.retain(|view| view.schema.as_ref().is_none_or(|schema| !schemas.contains(schema)));
+        Ok(views)
     }
 
     async fn fetch_columns(&self, schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
-        // `column_type` is canonical: it carries the precision /
-        // length the user typed (`tinyint(1)`, `varchar(255)`,
-        // `decimal(10,2)`, `enum('a','b')`). `data_type` strips all
-        // that — returns `tinyint` for both `tinyint(1)` and
-        // `tinyint(4)`, which collapses MySQL's idiomatic boolean
-        // type into a generic int and breaks the bool-detection
-        // heuristic in `classify_type`. Prefer column_type for the
-        // displayed `data_type`.
-        let rows = sqlx::query(
-            "SELECT CAST(column_name AS CHAR), CAST(column_type AS CHAR),
-                    CAST(is_nullable AS CHAR), CAST(column_key AS CHAR),
-                    CAST(extra AS CHAR), CAST(column_default AS CHAR),
-                    CAST(generation_expression AS CHAR),
-                    CAST(column_comment AS CHAR),
-                    CAST(collation_name AS CHAR),
-                    CAST(VERSION() LIKE '%MariaDB%' AS SIGNED)
-             FROM information_schema.columns
-             WHERE table_schema = COALESCE(?, DATABASE()) AND table_name = ?
-             ORDER BY ordinal_position",
-        )
-        .bind(schema)
-        .bind(table)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(map_sqlx_error)?;
-        let mut columns: Vec<ColumnInfo> = rows.iter().map(row_to_column_info).collect();
-        if columns.iter().any(|column| spatial::is_spatial_type(&column.data_type)) {
-            self.name_spatial_srids(schema, table, &mut columns).await;
-        }
-        Ok(columns)
+        let mut connection = self.pool.acquire().await.map_err(map_sqlx_error)?;
+        read_fetch_columns(&mut connection, schema, table).await
+    }
+
+    async fn fetch_columns_controlled(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        control: &OperationControl,
+    ) -> Result<Vec<ColumnInfo>, DriverError> {
+        stoppable!(self, control, |connection| read_fetch_columns(
+            &mut connection,
+            schema,
+            table
+        ))
     }
 
     async fn fetch_rows(
@@ -260,12 +295,21 @@ impl Connection for MysqlConnection {
         offset: u64,
         limit: u64,
     ) -> Result<QueryResult, DriverError> {
-        let sql = format!(
-            "SELECT * FROM {} LIMIT {limit} OFFSET {offset}",
-            qualified(schema, table)
-        );
+        let sql = rows_page_sql(schema, table, offset, limit);
         let mut connection = self.pool.acquire().await.map_err(map_sqlx_error)?;
         params_into_result(&mut connection, &sql, &[], limit as usize).await
+    }
+
+    async fn fetch_rows_controlled(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        offset: u64,
+        limit: u64,
+        control: &OperationControl,
+    ) -> Result<QueryResult, DriverError> {
+        self.query_controlled(&rows_page_sql(schema, table, offset, limit), control)
+            .await
     }
 
     async fn query(&self, sql: &str) -> Result<QueryResult, DriverError> {
@@ -379,130 +423,73 @@ impl Connection for MysqlConnection {
         expect_one: &[usize],
     ) -> Result<Vec<u64>, DriverError> {
         validate_atomic_batch(statements)?;
-        let mut tx = self.pool.begin().await.map_err(map_sqlx_error)?;
-        let mut affected = Vec::with_capacity(statements.len());
-        for (idx, (sql, params)) in statements.iter().enumerate() {
-            let sql = sql.as_str();
-            let q = match bind_mysql_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params) {
-                Ok(query) => query,
-                Err(error) => {
-                    return Err(transaction_failure(tx, idx, error).await);
-                }
-            };
-            match q.execute(&mut *tx).await {
-                Ok(res) if expect_one.contains(&idx) && res.rows_affected() != 1 => {
-                    return Err(transaction_failure(tx, idx, DriverError::ConcurrentModification).await);
-                }
-                Ok(res) => affected.push(res.rows_affected()),
-                Err(e) => {
-                    return Err(transaction_failure(tx, idx, map_sqlx_error(e)).await);
-                }
-            }
-        }
-        tx.commit().await.map_err(map_sqlx_error)?;
-        Ok(affected)
+        let transaction = self.pool.begin().await.map_err(map_sqlx_error)?;
+        transaction::run_checked(transaction, statements, expect_one).await
+    }
+
+    async fn execute_in_transaction_controlled(
+        &self,
+        statements: &[(String, Vec<Value>)],
+        control: &OperationControl,
+    ) -> Result<Vec<u64>, DriverError> {
+        self.execute_in_transaction_checked_controlled(statements, &[], control)
+            .await
+    }
+
+    async fn execute_in_transaction_checked_controlled(
+        &self,
+        statements: &[(String, Vec<Value>)],
+        expect_one: &[usize],
+        control: &OperationControl,
+    ) -> Result<Vec<u64>, DriverError> {
+        validate_atomic_batch(statements)?;
+        let mut connection = acquire_controlled(&self.pool, control).await?;
+        let connection_id = connection_id_controlled(&mut connection, control).await?;
+        let result = run_server_cancellable(
+            transaction::begin_and_run_checked(&mut connection, statements, expect_one),
+            request_cancellation(&self.cancellation_pool, connection_id),
+            transaction::confirms_stopped_statement,
+            control,
+        )
+        .await;
+        release_connection(connection, &result).await;
+        result
     }
 
     async fn fetch_indexes(&self, schema: Option<&str>, table: &str) -> Result<Vec<IndexInfo>, DriverError> {
-        // information_schema.statistics returns one row per (index,
-        // column). Group rows by index_name in Rust because sqlx can't
-        // GROUP_CONCAT-then-split natively for ordered column lists.
-        // PRIMARY is the literal index name MySQL uses for the PK.
-        let rows = sqlx::query(
-            "SELECT
-                CAST(index_name AS CHAR) AS index_name,
-                non_unique,
-                CAST(column_name AS CHAR) AS column_name,
-                CAST(seq_in_index AS SIGNED) AS seq_in_index
-            FROM information_schema.statistics
-            WHERE table_schema = COALESCE(?, DATABASE())
-              AND table_name = ?
-            ORDER BY index_name, seq_in_index",
-        )
-        .bind(schema)
-        .bind(table)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(map_sqlx_error)?;
-        let mut by_name: std::collections::BTreeMap<String, IndexInfo> = std::collections::BTreeMap::new();
-        for r in rows {
-            let name: String = r.try_get(0).map_err(map_sqlx_error)?;
-            let non_unique: i64 = r.try_get(1).unwrap_or(0);
-            let column: Option<String> = r.try_get(2).map_err(map_sqlx_error)?;
-            let expression = column.is_none();
-            let key = match column {
-                Some(column) => column,
-                None => {
-                    index_key_expression(&self.pool, schema, table, &name, r.try_get(3).map_err(map_sqlx_error)?)
-                        .await?
-                }
-            };
-            let entry = by_name.entry(name.clone()).or_insert_with(|| IndexInfo {
-                constraint: None,
-                name: name.clone(),
-                columns: Vec::new(),
-                unique: non_unique == 0,
-                primary: name == "PRIMARY",
-                predicate: None,
-                has_expression_key: false,
-                using_clause: None,
-            });
-            entry.has_expression_key |= expression;
-            entry.columns.push(key);
-        }
-        Ok(by_name.into_values().collect())
+        let mut connection = self.pool.acquire().await.map_err(map_sqlx_error)?;
+        read_fetch_indexes(&mut connection, schema, table).await
+    }
+
+    async fn fetch_indexes_controlled(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        control: &OperationControl,
+    ) -> Result<Vec<IndexInfo>, DriverError> {
+        stoppable!(self, control, |connection| read_fetch_indexes(
+            &mut connection,
+            schema,
+            table
+        ))
     }
 
     async fn fetch_foreign_keys(&self, schema: Option<&str>, table: &str) -> Result<Vec<ForeignKeyInfo>, DriverError> {
-        // key_column_usage gives us the FK column ↔ referenced column
-        // pairs (one row per (constraint, ordinal)); referential_constraints
-        // adds the ON DELETE / ON UPDATE rules. Group by constraint_name
-        // in Rust to assemble the column lists.
-        let rows = sqlx::query(
-            "SELECT
-                CAST(kcu.constraint_name AS CHAR),
-                CAST(kcu.column_name AS CHAR),
-                CAST(kcu.referenced_table_name AS CHAR),
-                CAST(kcu.referenced_table_schema AS CHAR),
-                CAST(kcu.referenced_column_name AS CHAR),
-                CAST(rc.delete_rule AS CHAR),
-                CAST(rc.update_rule AS CHAR)
-            FROM information_schema.key_column_usage kcu
-            JOIN information_schema.referential_constraints rc
-                ON rc.constraint_name = kcu.constraint_name
-                AND rc.constraint_schema = kcu.constraint_schema
-            WHERE kcu.table_schema = COALESCE(?, DATABASE())
-              AND kcu.table_name = ?
-              AND kcu.referenced_table_name IS NOT NULL
-            ORDER BY kcu.constraint_name, kcu.ordinal_position",
-        )
-        .bind(schema)
-        .bind(table)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(map_sqlx_error)?;
-        let mut by_name: std::collections::BTreeMap<String, ForeignKeyInfo> = std::collections::BTreeMap::new();
-        for r in rows {
-            let name: String = r.get(0);
-            let column: String = r.get(1);
-            let ref_table: String = r.get(2);
-            let ref_schema: Option<String> = r.try_get(3).unwrap_or(None);
-            let ref_column: String = r.get(4);
-            let delete_rule: Option<String> = r.try_get(5).ok();
-            let update_rule: Option<String> = r.try_get(6).ok();
-            let entry = by_name.entry(name.clone()).or_insert_with(|| ForeignKeyInfo {
-                name: name.clone(),
-                columns: Vec::new(),
-                ref_schema,
-                ref_table,
-                ref_columns: Vec::new(),
-                on_delete: delete_rule.filter(|s| !s.is_empty() && s != "NO ACTION"),
-                on_update: update_rule.filter(|s| !s.is_empty() && s != "NO ACTION"),
-            });
-            entry.columns.push(column);
-            entry.ref_columns.push(ref_column);
-        }
-        Ok(by_name.into_values().collect())
+        let mut connection = self.pool.acquire().await.map_err(map_sqlx_error)?;
+        read_fetch_foreign_keys(&mut connection, schema, table).await
+    }
+
+    async fn fetch_foreign_keys_controlled(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        control: &OperationControl,
+    ) -> Result<Vec<ForeignKeyInfo>, DriverError> {
+        stoppable!(self, control, |connection| read_fetch_foreign_keys(
+            &mut connection,
+            schema,
+            table
+        ))
     }
 
     async fn fetch_inbound_foreign_keys(
@@ -510,41 +497,21 @@ impl Connection for MysqlConnection {
         schema: Option<&str>,
         table: &str,
     ) -> Result<Vec<InboundForeignKeyInfo>, DriverError> {
-        let rows = sqlx::query(
-            "SELECT
-                CAST(kcu.constraint_name AS CHAR),
-                CAST(kcu.table_schema AS CHAR),
-                CAST(kcu.table_name AS CHAR),
-                CAST(kcu.column_name AS CHAR),
-                CAST(kcu.referenced_column_name AS CHAR)
-            FROM information_schema.key_column_usage kcu
-            WHERE kcu.referenced_table_schema = COALESCE(?, DATABASE())
-              AND kcu.referenced_table_name = ?
-            ORDER BY kcu.constraint_name, kcu.ordinal_position",
-        )
-        .bind(schema)
-        .bind(table)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(map_sqlx_error)?;
-        let mut by_name: std::collections::BTreeMap<String, InboundForeignKeyInfo> = std::collections::BTreeMap::new();
-        for r in rows {
-            let name: String = r.get(0);
-            let source_schema: Option<String> = r.try_get(1).unwrap_or(None);
-            let source_table: String = r.get(2);
-            let source_column: String = r.get(3);
-            let target_column: String = r.get(4);
-            let entry = by_name.entry(name.clone()).or_insert_with(|| InboundForeignKeyInfo {
-                name,
-                source_schema,
-                source_table,
-                source_columns: Vec::new(),
-                target_columns: Vec::new(),
-            });
-            entry.source_columns.push(source_column);
-            entry.target_columns.push(target_column);
-        }
-        Ok(by_name.into_values().collect())
+        let mut connection = self.pool.acquire().await.map_err(map_sqlx_error)?;
+        read_fetch_inbound_foreign_keys(&mut connection, schema, table).await
+    }
+
+    async fn fetch_inbound_foreign_keys_controlled(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        control: &OperationControl,
+    ) -> Result<Vec<InboundForeignKeyInfo>, DriverError> {
+        stoppable!(self, control, |connection| read_fetch_inbound_foreign_keys(
+            &mut connection,
+            schema,
+            table
+        ))
     }
 
     async fn ping(&self) -> Result<(), DriverError> {
@@ -566,29 +533,284 @@ impl Connection for MysqlConnection {
         &self,
         control: &OperationControl,
     ) -> Result<Option<LexicalSettings>, DriverError> {
-        run_controlled_setup(session_lexical_settings(&self.pool), control)
-            .await?
-            .map(Some)
+        stoppable!(self, control, |connection| session_lexical_settings(&mut *connection)).map(Some)
     }
 
     async fn begin(&self) -> Result<Box<dyn bookie_core::Transaction>, DriverError> {
-        let tx = self.pool.begin().await.map_err(map_sqlx_error)?;
-        Ok(Box::new(MysqlTransaction { tx: Some(tx) }))
+        let mut connection = self.pool.acquire().await.map_err(map_sqlx_error)?;
+        transaction::statement(&mut connection, "BEGIN").await?;
+        Ok(Box::new(MysqlTransaction {
+            connection: Some(connection),
+        }))
+    }
+
+    async fn begin_controlled(
+        &self,
+        control: &OperationControl,
+    ) -> Result<Box<dyn bookie_core::Transaction>, DriverError> {
+        let mut connection = acquire_controlled(&self.pool, control).await?;
+        let connection_id = connection_id_controlled(&mut connection, control).await?;
+        let result = run_server_cancellable(
+            transaction::statement(&mut connection, "BEGIN"),
+            request_cancellation(&self.cancellation_pool, connection_id),
+            confirms_cancellation,
+            control,
+        )
+        .await;
+        match result {
+            Ok(()) => Ok(Box::new(MysqlTransaction {
+                connection: Some(connection),
+            })),
+            Err(error) => Err(retire_if_uncertain(connection, error).await),
+        }
     }
 
     async fn server_version(&self) -> Result<Option<String>, DriverError> {
-        let row = sqlx::query("SELECT VERSION()")
-            .fetch_one(&self.pool)
-            .await
-            .map_err(map_sqlx_error)?;
-        let v: String = row.try_get(0).unwrap_or_default();
-        Ok(Some(v))
+        let mut connection = self.pool.acquire().await.map_err(map_sqlx_error)?;
+        read_server_version(&mut connection).await
+    }
+
+    async fn server_version_controlled(&self, control: &OperationControl) -> Result<Option<String>, DriverError> {
+        stoppable!(self, control, |connection| read_server_version(&mut connection))
     }
 
     async fn close(self: Box<Self>) -> Result<(), DriverError> {
         self.pool.close().await;
         Ok(())
     }
+}
+
+async fn read_list_collations(
+    connection: &mut sqlx::MySqlConnection,
+) -> Result<Vec<bookie_core::CollationInfo>, DriverError> {
+    let rows = sqlx::query(
+        "SELECT CAST(collation_name AS CHAR), COALESCE(CAST(character_set_name AS CHAR), ''),
+                COALESCE(is_default = 'Yes', 0)
+         FROM information_schema.collations
+         ORDER BY collation_name
+         LIMIT ?",
+    )
+    .bind(bookie_core::MAX_COLLATIONS as i64)
+    .fetch_all(&mut *connection)
+    .await
+    .map_err(map_sqlx_error)?;
+    Ok(rows
+        .into_iter()
+        .map(|row| bookie_core::CollationInfo {
+            name: row.get(0),
+            charset: row.get(1),
+            is_default: row.get(2),
+        })
+        .collect())
+}
+
+async fn read_list_databases(connection: &mut sqlx::MySqlConnection) -> Result<Vec<String>, DriverError> {
+    let rows = sqlx::query(
+        "SELECT CAST(schema_name AS CHAR) FROM information_schema.schemata
+         WHERE schema_name NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
+         ORDER BY schema_name",
+    )
+    .fetch_all(&mut *connection)
+    .await
+    .map_err(map_sqlx_error)?;
+    Ok(rows.into_iter().map(|row| row.get::<String, _>(0)).collect())
+}
+
+async fn read_fetch_columns(
+    connection: &mut sqlx::MySqlConnection,
+    schema: Option<&str>,
+    table: &str,
+) -> Result<Vec<ColumnInfo>, DriverError> {
+    // `column_type` is canonical: it carries the precision /
+    // length the user typed (`tinyint(1)`, `varchar(255)`,
+    // `decimal(10,2)`, `enum('a','b')`). `data_type` strips all
+    // that — returns `tinyint` for both `tinyint(1)` and
+    // `tinyint(4)`, which collapses MySQL's idiomatic boolean
+    // type into a generic int and breaks the bool-detection
+    // heuristic in `classify_type`. Prefer column_type for the
+    // displayed `data_type`.
+    let rows = sqlx::query(
+        "SELECT CAST(column_name AS CHAR), CAST(column_type AS CHAR),
+                CAST(is_nullable AS CHAR), CAST(column_key AS CHAR),
+                CAST(extra AS CHAR), CAST(column_default AS CHAR),
+                CAST(generation_expression AS CHAR),
+                CAST(column_comment AS CHAR),
+                CAST(collation_name AS CHAR),
+                CAST(VERSION() LIKE '%MariaDB%' AS SIGNED)
+         FROM information_schema.columns
+         WHERE table_schema = COALESCE(?, DATABASE()) AND table_name = ?
+         ORDER BY ordinal_position",
+    )
+    .bind(schema)
+    .bind(table)
+    .fetch_all(&mut *connection)
+    .await
+    .map_err(map_sqlx_error)?;
+    let mut columns: Vec<ColumnInfo> = rows.iter().map(row_to_column_info).collect();
+    if columns.iter().any(|column| spatial::is_spatial_type(&column.data_type)) {
+        spatial::name_spatial_srids(connection, schema, table, &mut columns).await;
+    }
+    Ok(columns)
+}
+
+async fn read_fetch_indexes(
+    connection: &mut sqlx::MySqlConnection,
+    schema: Option<&str>,
+    table: &str,
+) -> Result<Vec<IndexInfo>, DriverError> {
+    // information_schema.statistics returns one row per (index,
+    // column). Group rows by index_name in Rust because sqlx can't
+    // GROUP_CONCAT-then-split natively for ordered column lists.
+    // PRIMARY is the literal index name MySQL uses for the PK.
+    let rows = sqlx::query(
+        "SELECT
+            CAST(index_name AS CHAR) AS index_name,
+            non_unique,
+            CAST(column_name AS CHAR) AS column_name,
+            CAST(seq_in_index AS SIGNED) AS seq_in_index
+        FROM information_schema.statistics
+        WHERE table_schema = COALESCE(?, DATABASE())
+          AND table_name = ?
+        ORDER BY index_name, seq_in_index",
+    )
+    .bind(schema)
+    .bind(table)
+    .fetch_all(&mut *connection)
+    .await
+    .map_err(map_sqlx_error)?;
+    let mut by_name: std::collections::BTreeMap<String, IndexInfo> = std::collections::BTreeMap::new();
+    for r in rows {
+        let name: String = r.try_get(0).map_err(map_sqlx_error)?;
+        let non_unique: i64 = r.try_get(1).unwrap_or(0);
+        let column: Option<String> = r.try_get(2).map_err(map_sqlx_error)?;
+        let expression = column.is_none();
+        let key = match column {
+            Some(column) => column,
+            None => {
+                index_key_expression(connection, schema, table, &name, r.try_get(3).map_err(map_sqlx_error)?).await?
+            }
+        };
+        let entry = by_name.entry(name.clone()).or_insert_with(|| IndexInfo {
+            constraint: None,
+            name: name.clone(),
+            columns: Vec::new(),
+            unique: non_unique == 0,
+            primary: name == "PRIMARY",
+            predicate: None,
+            has_expression_key: false,
+            using_clause: None,
+        });
+        entry.has_expression_key |= expression;
+        entry.columns.push(key);
+    }
+    Ok(by_name.into_values().collect())
+}
+
+async fn read_fetch_foreign_keys(
+    connection: &mut sqlx::MySqlConnection,
+    schema: Option<&str>,
+    table: &str,
+) -> Result<Vec<ForeignKeyInfo>, DriverError> {
+    // key_column_usage gives us the FK column ↔ referenced column
+    // pairs (one row per (constraint, ordinal)); referential_constraints
+    // adds the ON DELETE / ON UPDATE rules. Group by constraint_name
+    // in Rust to assemble the column lists.
+    let rows = sqlx::query(
+        "SELECT
+            CAST(kcu.constraint_name AS CHAR),
+            CAST(kcu.column_name AS CHAR),
+            CAST(kcu.referenced_table_name AS CHAR),
+            CAST(kcu.referenced_table_schema AS CHAR),
+            CAST(kcu.referenced_column_name AS CHAR),
+            CAST(rc.delete_rule AS CHAR),
+            CAST(rc.update_rule AS CHAR)
+        FROM information_schema.key_column_usage kcu
+        JOIN information_schema.referential_constraints rc
+            ON rc.constraint_name = kcu.constraint_name
+            AND rc.constraint_schema = kcu.constraint_schema
+        WHERE kcu.table_schema = COALESCE(?, DATABASE())
+          AND kcu.table_name = ?
+          AND kcu.referenced_table_name IS NOT NULL
+        ORDER BY kcu.constraint_name, kcu.ordinal_position",
+    )
+    .bind(schema)
+    .bind(table)
+    .fetch_all(&mut *connection)
+    .await
+    .map_err(map_sqlx_error)?;
+    let mut by_name: std::collections::BTreeMap<String, ForeignKeyInfo> = std::collections::BTreeMap::new();
+    for r in rows {
+        let name: String = r.get(0);
+        let column: String = r.get(1);
+        let ref_table: String = r.get(2);
+        let ref_schema: Option<String> = r.try_get(3).unwrap_or(None);
+        let ref_column: String = r.get(4);
+        let delete_rule: Option<String> = r.try_get(5).ok();
+        let update_rule: Option<String> = r.try_get(6).ok();
+        let entry = by_name.entry(name.clone()).or_insert_with(|| ForeignKeyInfo {
+            name: name.clone(),
+            columns: Vec::new(),
+            ref_schema,
+            ref_table,
+            ref_columns: Vec::new(),
+            on_delete: delete_rule.filter(|s| !s.is_empty() && s != "NO ACTION"),
+            on_update: update_rule.filter(|s| !s.is_empty() && s != "NO ACTION"),
+        });
+        entry.columns.push(column);
+        entry.ref_columns.push(ref_column);
+    }
+    Ok(by_name.into_values().collect())
+}
+
+async fn read_fetch_inbound_foreign_keys(
+    connection: &mut sqlx::MySqlConnection,
+    schema: Option<&str>,
+    table: &str,
+) -> Result<Vec<InboundForeignKeyInfo>, DriverError> {
+    let rows = sqlx::query(
+        "SELECT
+            CAST(kcu.constraint_name AS CHAR),
+            CAST(kcu.table_schema AS CHAR),
+            CAST(kcu.table_name AS CHAR),
+            CAST(kcu.column_name AS CHAR),
+            CAST(kcu.referenced_column_name AS CHAR)
+        FROM information_schema.key_column_usage kcu
+        WHERE kcu.referenced_table_schema = COALESCE(?, DATABASE())
+          AND kcu.referenced_table_name = ?
+        ORDER BY kcu.constraint_name, kcu.ordinal_position",
+    )
+    .bind(schema)
+    .bind(table)
+    .fetch_all(&mut *connection)
+    .await
+    .map_err(map_sqlx_error)?;
+    let mut by_name: std::collections::BTreeMap<String, InboundForeignKeyInfo> = std::collections::BTreeMap::new();
+    for r in rows {
+        let name: String = r.get(0);
+        let source_schema: Option<String> = r.try_get(1).unwrap_or(None);
+        let source_table: String = r.get(2);
+        let source_column: String = r.get(3);
+        let target_column: String = r.get(4);
+        let entry = by_name.entry(name.clone()).or_insert_with(|| InboundForeignKeyInfo {
+            name,
+            source_schema,
+            source_table,
+            source_columns: Vec::new(),
+            target_columns: Vec::new(),
+        });
+        entry.source_columns.push(source_column);
+        entry.target_columns.push(target_column);
+    }
+    Ok(by_name.into_values().collect())
+}
+
+async fn read_server_version(connection: &mut sqlx::MySqlConnection) -> Result<Option<String>, DriverError> {
+    let row = sqlx::query("SELECT VERSION()")
+        .fetch_one(&mut *connection)
+        .await
+        .map_err(map_sqlx_error)?;
+    let v: String = row.try_get(0).unwrap_or_default();
+    Ok(Some(v))
 }
 
 fn validate_atomic_batch(statements: &[(String, Vec<Value>)]) -> Result<(), DriverError> {
@@ -615,37 +837,44 @@ fn atomic_batch_refusal(statement_index: usize) -> DriverError {
     ))
 }
 
-async fn transaction_failure(
-    tx: sqlx::Transaction<'static, MySql>,
-    statement_index: usize,
-    source: DriverError,
-) -> DriverError {
-    match tx.rollback().await {
-        Ok(()) => DriverError::Transaction {
-            statement_index,
-            source: Box::new(source),
-        },
-        Err(error) => DriverError::TransactionRollbackFailed {
-            statement_index,
-            source: Box::new(source),
-            rollback_error: Box::new(map_sqlx_error(error)),
-        },
+struct MysqlTransaction {
+    connection: Option<PoolConnection<MySql>>,
+}
+
+impl Drop for MysqlTransaction {
+    fn drop(&mut self) {
+        if let Some(connection) = self.connection.as_mut() {
+            connection.close_on_drop();
+        }
     }
 }
 
-struct MysqlTransaction {
-    tx: Option<sqlx::Transaction<'static, MySql>>,
+impl MysqlTransaction {
+    fn open(&mut self) -> Result<&mut PoolConnection<MySql>, DriverError> {
+        self.connection
+            .as_mut()
+            .ok_or_else(|| DriverError::Internal("transaction closed".into()))
+    }
+
+    async fn end(&mut self, sql: &'static str) -> Result<(), DriverError> {
+        let mut connection = self
+            .connection
+            .take()
+            .ok_or_else(|| DriverError::Internal("transaction closed".into()))?;
+        let ended = transaction::statement(&mut connection, sql).await;
+        if ended.is_err() {
+            connection.close_on_drop();
+        }
+        ended
+    }
 }
 
 #[async_trait]
 impl bookie_core::Transaction for MysqlTransaction {
     async fn query(&mut self, sql: &str) -> Result<QueryResult, DriverError> {
-        let tx = self
-            .tx
-            .as_mut()
-            .ok_or_else(|| DriverError::Internal("transaction closed".into()))?;
-        let timestamp_is_utc = timezone_is_utc(&mut **tx).await?;
-        let mut result = params_into_result(tx, sql, &[], MAX_QUERY_ROWS).await?;
+        let connection = self.open()?;
+        let timestamp_is_utc = timezone_is_utc(&mut **connection).await?;
+        let mut result = params_into_result(connection, sql, &[], MAX_QUERY_ROWS).await?;
         if !timestamp_is_utc {
             refuse_non_utc_timestamps(&mut result);
         }
@@ -653,12 +882,9 @@ impl bookie_core::Transaction for MysqlTransaction {
     }
 
     async fn execute(&mut self, sql: &str) -> Result<ExecResult, DriverError> {
-        let tx = self
-            .tx
-            .as_mut()
-            .ok_or_else(|| DriverError::Internal("transaction closed".into()))?;
+        let connection = self.open()?;
         let res = sqlx::query(sqlx::AssertSqlSafe(sql))
-            .execute(&mut **tx)
+            .execute(&mut **connection)
             .await
             .map_err(map_sqlx_error)?;
         Ok(ExecResult {
@@ -667,19 +893,11 @@ impl bookie_core::Transaction for MysqlTransaction {
     }
 
     async fn commit(mut self: Box<Self>) -> Result<(), DriverError> {
-        let tx = self
-            .tx
-            .take()
-            .ok_or_else(|| DriverError::Internal("transaction closed".into()))?;
-        tx.commit().await.map_err(map_sqlx_error)
+        self.end("COMMIT").await
     }
 
     async fn rollback(mut self: Box<Self>) -> Result<(), DriverError> {
-        let tx = self
-            .tx
-            .take()
-            .ok_or_else(|| DriverError::Internal("transaction closed".into()))?;
-        tx.rollback().await.map_err(map_sqlx_error)
+        self.end("ROLLBACK").await
     }
 }
 
@@ -821,6 +1039,13 @@ where
     })
 }
 
+fn rows_page_sql(schema: Option<&str>, table: &str, offset: u64, limit: u64) -> String {
+    format!(
+        "SELECT * FROM {} LIMIT {limit} OFFSET {offset}",
+        qualified(schema, table)
+    )
+}
+
 async fn acquire_controlled(
     pool: &Pool<MySql>,
     control: &OperationControl,
@@ -886,6 +1111,13 @@ fn confirms_cancellation(error: &DriverError) -> bool {
             ..
         } if sqlstate == "70100"
     )
+}
+
+async fn retire_if_uncertain(connection: PoolConnection<MySql>, error: DriverError) -> DriverError {
+    if matches!(error, DriverError::OperationOutcomeUnknown { .. }) {
+        let _ = connection.detach().close_hard().await;
+    }
+    error
 }
 
 async fn release_connection<T>(connection: PoolConnection<MySql>, result: &Result<T, DriverError>) {
@@ -997,7 +1229,7 @@ const UNQUOTED_DEFAULT_TYPE_PREFIXES: [&str; 12] = [
 ];
 
 async fn index_key_expression(
-    pool: &Pool<MySql>,
+    connection: &mut sqlx::MySqlConnection,
     schema: Option<&str>,
     table: &str,
     index: &str,
@@ -1013,7 +1245,7 @@ async fn index_key_expression(
     .bind(table)
     .bind(index)
     .bind(seq_in_index)
-    .fetch_optional(pool)
+    .fetch_optional(&mut *connection)
     .await
     .map_err(map_sqlx_error)?
     .flatten();
