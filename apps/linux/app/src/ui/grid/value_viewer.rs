@@ -7,7 +7,7 @@ use std::io::{self, Write};
 use std::rc::Rc;
 
 use bookie_app_services::image_preview::previewable_image;
-use bookie_core::Value;
+use bookie_core::{ColumnInfo, Value};
 
 use super::display::{readonly_null_sentinel, value_to_copy_text, value_to_full_edit_text};
 
@@ -32,6 +32,10 @@ pub(super) fn body(value: &Value) -> String {
     } else {
         text
     }
+}
+
+pub(super) fn body_for_column(value: &Value, column: &ColumnInfo) -> String {
+    bookie_results::uuid_display::format_binary_uuid(value, column).unwrap_or_else(|| body(value))
 }
 
 fn hex_dump(bytes: &[u8]) -> String {
@@ -189,8 +193,13 @@ fn image_preview_picture(value: &Value, closed: &Rc<Cell<bool>>) -> Option<gtk::
     Some(picture)
 }
 
-pub(crate) fn present(parent: &impl IsA<gtk::Widget>, column: &str, value: Value, null_copy_text: Option<String>) {
-    let view = build_text_view(&body(&value));
+pub(crate) fn present(
+    parent: &impl IsA<gtk::Widget>,
+    column: &ColumnInfo,
+    value: Value,
+    null_copy_text: Option<String>,
+) {
+    let view = build_text_view(&body_for_column(&value, column));
     let scroller = gtk::ScrolledWindow::builder().child(&view).vexpand(true).build();
     let closed = Rc::new(Cell::new(false));
     let content = gtk::Box::new(gtk::Orientation::Vertical, 0);
@@ -218,14 +227,14 @@ pub(crate) fn present(parent: &impl IsA<gtk::Widget>, column: &str, value: Value
     toolbar.set_content(Some(&content));
 
     let dialog = adw::Dialog::builder()
-        .title(column)
+        .title(&column.name)
         .content_width(640)
         .content_height(480)
         .child(&toolbar)
         .build();
     dialog
         .upcast_ref::<gtk::Widget>()
-        .update_property(&[gtk::accessible::Property::Label(column)]);
+        .update_property(&[gtk::accessible::Property::Label(&column.name)]);
     dialog.connect_closed(move |_| closed.set(true));
     crate::ui::leak_probe::present_tracked("value_viewer", &dialog, parent);
 }
@@ -360,6 +369,30 @@ mod tests {
     }
 
     #[test]
+    fn binary16_uuid_viewer_shows_uuid_text_without_changing_the_value() {
+        let column = bookie_core::ColumnInfo {
+            name: "id".into(),
+            data_type: "VARBINARY".into(),
+            nullable: false,
+            primary_key: true,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: None,
+            domain_type: None,
+        };
+        let bytes = [
+            0x55, 0x0e, 0x84, 0x00, 0xe2, 0x9b, 0x41, 0xd4, 0xa7, 0x16, 0x44, 0x66, 0x55, 0x44, 0x00, 0x00,
+        ];
+        let value = Value::Bytes(bytes.to_vec());
+
+        assert_eq!(body_for_column(&value, &column), "550e8400-e29b-41d4-a716-446655440000");
+        assert_eq!(value, Value::Bytes(bytes.to_vec()));
+    }
+
+    #[test]
     fn a_long_hex_dump_says_how_much_it_shows() {
         let dump = body(&Value::Bytes(vec![0u8; MAX_VIEW_BYTES]));
         assert!(dump.contains(&format!("Showing the first {HEX_MAX_BYTES} of {MAX_VIEW_BYTES} bytes.")));
@@ -430,7 +463,20 @@ mod tests {
         let window = adw::Window::new();
         window.present();
         let value = "x".repeat(1_200_000);
-        present(&window, "payload", Value::Text(value.clone()), None);
+        let column = bookie_core::ColumnInfo {
+            name: "payload".into(),
+            data_type: "TEXT".into(),
+            nullable: true,
+            primary_key: false,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: None,
+            domain_type: None,
+        };
+        present(&window, &column, Value::Text(value.clone()), None);
         let dialogs = window.observe_children().n_items();
         assert!(dialogs >= 1);
         let copy = button_named(window.upcast_ref(), &bookie_app_services::tr!("Copy value")).unwrap();
