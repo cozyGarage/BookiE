@@ -18,7 +18,7 @@ The dial endpoint and authenticated service hostname are separate. SSH retains t
 
 Saved custom CA and client certificate/key paths are assembled through saved connections, bundles, GUI setup and agentd transport. PostgreSQL and MySQL drivers accept configured client identities; other drivers refuse them. TLS modes that can fall back to plaintext are rejected, and missing, partial, non-file or oversized identity material fails closed.
 
-MongoDB and Redis TLS backends have no CA-only mode, so `VerifyCa` also verifies the hostname. PostgreSQL and MySQL Verify CA and Verify Full use the operating system trust store when no custom authority is named. A named authority is added to those roots. Verify CA checks the certificate chain; Verify Full also checks the service hostname. Typed keyring failure propagates instead of becoming a missing password; see [storage](storage.md#secrets).
+MongoDB and Redis TLS backends have no CA-only mode, so `VerifyCa` also verifies the hostname. PostgreSQL and MySQL Verify CA and Verify Full use the operating system trust store when no custom authority is named; a named authority is added to those roots. MongoDB uses the operating system trust store when no CA file is configured; an explicit CA file defines its trust roots. Verify CA checks the certificate chain; Verify Full also checks the service hostname. Typed keyring failure propagates instead of becoming a missing password; see [storage](storage.md#secrets).
 
 ## SSH jump hosts
 
