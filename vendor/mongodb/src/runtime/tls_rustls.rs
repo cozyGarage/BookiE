@@ -86,7 +86,11 @@ fn make_rustls_config(cfg: TlsOptions) -> Result<rustls::ClientConfig> {
             .flatten();
         store.add_parsable_certificates(ders);
     } else {
-        store.extend(TLS_SERVER_ROOTS.iter().cloned());
+        let native = rustls_native_certs::load_native_certs();
+        let (added, _) = store.add_parsable_certificates(native.certs);
+        if added == 0 {
+            store.extend(TLS_SERVER_ROOTS.iter().cloned());
+        }
     }
 
     let config_builder = ClientConfig::builder_with_provider(provider::default_provider().into())

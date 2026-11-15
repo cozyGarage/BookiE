@@ -1049,6 +1049,7 @@ dependencies = [
  "bookie-transport",
  "chrono",
  "gettext-rs",
+ "quick-xml",
  "rust_decimal",
  "secrecy",
  "serde",
@@ -1174,6 +1175,8 @@ dependencies = [
  "csv",
  "futures",
  "mongodb",
+ "rustls",
+ "rustls-pki-types",
  "secrecy",
  "serde_json",
  "sqlparser",
@@ -1181,6 +1184,7 @@ dependencies = [
  "testcontainers",
  "testcontainers-modules",
  "tokio",
+ "tokio-rustls",
  "tokio-util",
  "zip",
 ]
@@ -1244,6 +1248,7 @@ dependencies = [
  "secrecy",
  "testcontainers",
  "tokio",
+ "tokio-util",
 ]
 
 [[package]]
@@ -4474,6 +4479,7 @@ dependencies = [
  "rand 0.9.5",
  "rustc_version_runtime",
  "rustls",
+ "rustls-native-certs",
  "serde",
  "serde_bytes",
  "serde_with",
