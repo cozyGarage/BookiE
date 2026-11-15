@@ -845,6 +845,7 @@ impl PolicyGuard {
             return batch;
         }
         let truncated = batch.truncated;
+        let rows_affected = batch.rows_affected;
         let result_sets = batch
             .result_sets
             .into_iter()
@@ -854,6 +855,7 @@ impl PolicyGuard {
             result_sets,
             truncated,
             messages: ServerMessages::default(),
+            rows_affected,
         }
     }
 

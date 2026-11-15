@@ -42,6 +42,7 @@ struct CatalogConn {
     calls: Arc<AtomicUsize>,
     fail: bool,
     exclusion_scopes: ExclusionScopes,
+    query_rows_affected: Option<u64>,
 }
 
 impl CatalogConn {
@@ -138,6 +139,19 @@ impl Connection for CatalogConn {
     async fn query_params(&self, _: &str, _: &[Value]) -> Result<QueryResult, DriverError> {
         self.answer(empty_result())
     }
+    async fn query_result_sets_controlled(
+        &self,
+        _: &str,
+        _: &[Value],
+        _: &OperationControl,
+    ) -> Result<bookie_core::QueryResultBatch, DriverError> {
+        let result = QueryResult {
+            columns: Vec::new(),
+            rows: vec![vec![Value::Int(1)]].into(),
+            truncated: false,
+        };
+        self.answer(bookie_core::QueryResultBatch::single(result).with_rows_affected(self.query_rows_affected))
+    }
     async fn execute(&self, _: &str) -> Result<ExecResult, DriverError> {
         self.answer(ExecResult { rows_affected: 0 })
     }
@@ -205,6 +219,14 @@ fn catalog_guard_with(
     fail: bool,
     audit_failures: Vec<AuditRecordPhase>,
 ) -> (PolicyGuard, Arc<AtomicUsize>, Arc<SequenceAuditSink>) {
+    catalog_guard_with_query_rows_affected(fail, audit_failures, None)
+}
+
+fn catalog_guard_with_query_rows_affected(
+    fail: bool,
+    audit_failures: Vec<AuditRecordPhase>,
+    query_rows_affected: Option<u64>,
+) -> (PolicyGuard, Arc<AtomicUsize>, Arc<SequenceAuditSink>) {
     let calls = Arc::new(AtomicUsize::new(0));
     let audit = Arc::new(SequenceAuditSink::new(audit_failures));
     let guard = PolicyGuard::new(
@@ -212,6 +234,7 @@ fn catalog_guard_with(
             calls: calls.clone(),
             fail,
             exclusion_scopes: Arc::new(std::sync::Mutex::new(Vec::new())),
+            query_rows_affected,
         }),
         context(
             Principal::human_gui(),
@@ -231,6 +254,7 @@ fn catalog_guard_with_scopes(exclusion_scopes: ExclusionScopes) -> PolicyGuard {
             calls: Arc::new(AtomicUsize::new(0)),
             fail: false,
             exclusion_scopes,
+            query_rows_affected: None,
         }),
         context(
             Principal::human_gui(),
@@ -539,6 +563,7 @@ async fn beginning_a_transaction_does_not_grant_write_authority() {
                 calls: calls.clone(),
                 fail: false,
                 exclusion_scopes: Arc::new(std::sync::Mutex::new(Vec::new())),
+                query_rows_affected: None,
             }),
             guard_context,
         );
@@ -608,6 +633,28 @@ async fn a_controlled_write_that_returns_rows_is_governed_like_a_plain_one() {
         })
         .count();
     assert_eq!(mutations, 3);
+}
+
+#[tokio::test]
+async fn a_write_audits_the_server_count_instead_of_the_retained_returning_rows() {
+    let (guard, _, audit) = catalog_guard_with_query_rows_affected(false, vec![], Some(5));
+    guard
+        .query_result_sets_controlled("INSERT INTO t VALUES (1) RETURNING id", &[], &control())
+        .await
+        .unwrap();
+    let events = audit.events.lock().expect("events");
+    assert_eq!(events.last().and_then(|event| event.rows_affected), Some(5));
+}
+
+#[tokio::test]
+async fn a_write_without_a_server_count_keeps_the_audit_count_unknown() {
+    let (guard, _, audit) = catalog_guard(false);
+    guard
+        .query_result_sets_controlled("INSERT INTO t VALUES (1) RETURNING id", &[], &control())
+        .await
+        .unwrap();
+    let events = audit.events.lock().expect("events");
+    assert_eq!(events.last().and_then(|event| event.rows_affected), None);
 }
 
 #[tokio::test]

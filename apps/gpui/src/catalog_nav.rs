@@ -223,11 +223,11 @@ mod tests {
     fn a_cancelled_connection_request_does_not_open_its_file() {
         let cancellation = tokio_util::sync::CancellationToken::new();
         cancellation.cancel();
-        let result = open_first_table(&Origin::File(PathBuf::from("/missing/bookie.db")), &cancellation);
-        assert!(
-            result.as_ref().is_err_and(|message| message.contains("Cancelled")),
-            "{:?}",
-            result.as_ref().map(|_| ())
-        );
+        let path = std::env::temp_dir().join(format!("bookie-cancelled-open-{}.sqlite", uuid::Uuid::new_v4()));
+        let result = open_first_table(&Origin::File(PathBuf::from(&path)), &cancellation);
+        let was_opened = path.exists();
+        let _ = std::fs::remove_file(path);
+        assert!(result.is_err(), "cancelled request succeeded");
+        assert!(!was_opened, "cancelled request created its database file");
     }
 }

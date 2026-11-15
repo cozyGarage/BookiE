@@ -206,6 +206,7 @@ fn first_result_keeps_truncation_from_either_batch_or_result_set() {
             }],
             truncated: batch_truncated,
             messages: Default::default(),
+            rows_affected: None,
         };
 
         assert_eq!(batch.into_first().truncated, expected);
@@ -322,6 +323,7 @@ fn retained_rows_sums_all_result_sets() {
         ],
         truncated: false,
         messages: Default::default(),
+        rows_affected: None,
     };
 
     assert_eq!(batch.retained_rows(), 3);
