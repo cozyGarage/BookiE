@@ -19,6 +19,7 @@ pub const TOOL_NAMES: &[&str] = &[
 use bookie_core::export::{
     CsvOptions, unique_csv_null_marker, write_csv_header_with_options, write_csv_row_with_columns_and_options,
 };
+use bookie_core::{ColumnInfo, OperationControl, Value};
 use serde_json::{Value as JsonValue, json};
 
 use uuid::Uuid;
@@ -43,7 +44,7 @@ pub(crate) async fn dispatch_structured(
 ) -> Result<JsonValue, McpToolError> {
     bridge.check_rate(token)?;
     bridge.ensure_tool_allowed(token, name)?;
-    match name {
+    let response = match name {
         "list_connections" => {
             let list = bridge.list_connections(token).await?;
             Ok(json!(
@@ -186,24 +187,8 @@ pub(crate) async fn dispatch_structured(
                     let null_marker = rows
                         .map(unique_csv_null_marker)
                         .unwrap_or_else(|| "__BOOKIE_NULL__".into());
-                    let options = CsvOptions {
-                        null_to_empty: false,
-                        null_marker: Some(null_marker.clone()),
-                        sanitize_formulas: false,
-                        ..CsvOptions::default()
-                    };
-                    let mut out: Vec<u8> = Vec::new();
-                    write_csv_header_with_options(&mut out, columns, &options).map_err(|error| error.to_string())?;
-                    for row in rows.into_iter().flat_map(|rows| rows.iter()) {
-                        bridge.ensure_operation_active(&control)?;
-                        write_csv_row_with_columns_and_options(&mut out, columns, row, &options)
-                            .map_err(|error| error.to_string())?;
-                    }
-                    bridge.ensure_operation_active(&control)?;
-                    let content = String::from_utf8(out).map_err(|error| error.to_string())?;
-                    Ok(
-                        json!({"format": "csv", "content": content, "null_marker": null_marker, "truncated": result.truncated}),
-                    )
+                    let rows = rows.into_iter().flat_map(|rows| rows.iter());
+                    csv_response(bridge, &control, columns, rows, null_marker, result.truncated).map_err(Into::into)
                 }
                 _ => {
                     let first = result.result_sets.first();
@@ -264,7 +249,64 @@ pub(crate) async fn dispatch_structured(
         "routine_source" => crate::discovery::routine_source(bridge, token, &args).await,
         "schema_context" => crate::discovery::schema_context(bridge, token, &args).await,
         other => Err(format!("unknown tool: {other}").into()),
+    }?;
+    crate::response_budget::enforce_response_budget(response, bridge.max_response_bytes).map_err(Into::into)
+}
+
+fn csv_response<'a>(
+    bridge: &McpBridge,
+    control: &OperationControl,
+    columns: &[ColumnInfo],
+    rows: impl Iterator<Item = &'a [Value]>,
+    null_marker: String,
+    mut truncated: bool,
+) -> Result<JsonValue, String> {
+    let mut response = json!({
+        "format": "csv",
+        "content": "",
+        "null_marker": null_marker.clone(),
+        "truncated": truncated,
+    });
+    let base_size = crate::response_budget::encoded_size(&response)?;
+    if base_size > bridge.max_response_bytes {
+        return Err("CSV export metadata exceeds the configured byte limit".into());
     }
+    let remaining = bridge.max_response_bytes - base_size;
+    let options = CsvOptions {
+        null_to_empty: false,
+        null_marker: Some(null_marker),
+        sanitize_formulas: false,
+        ..CsvOptions::default()
+    };
+    let mut header = Vec::new();
+    write_csv_header_with_options(&mut header, columns, &options).map_err(|error| error.to_string())?;
+    let mut content = String::from_utf8(header).map_err(|error| error.to_string())?;
+    let mut encoded_content_size = encoded_string_content_size(&content)?;
+    if encoded_content_size > remaining {
+        return Err("CSV header exceeds the configured byte limit".into());
+    }
+    for row in rows {
+        bridge.ensure_operation_active(control)?;
+        let mut encoded_row = Vec::new();
+        write_csv_row_with_columns_and_options(&mut encoded_row, columns, row, &options)
+            .map_err(|error| error.to_string())?;
+        let row = String::from_utf8(encoded_row).map_err(|error| error.to_string())?;
+        let row_size = encoded_string_content_size(&row)?;
+        if encoded_content_size.saturating_add(row_size) > remaining {
+            truncated = true;
+            break;
+        }
+        encoded_content_size = encoded_content_size.saturating_add(row_size);
+        content.push_str(&row);
+    }
+    bridge.ensure_operation_active(control)?;
+    response["content"] = JsonValue::String(content);
+    response["truncated"] = JsonValue::Bool(truncated);
+    Ok(response)
+}
+
+fn encoded_string_content_size(value: &str) -> Result<usize, String> {
+    crate::response_budget::encoded_size(value).map(|size| size.saturating_sub(2))
 }
 
 fn table_schema_json(schema: &TableSchema) -> JsonValue {

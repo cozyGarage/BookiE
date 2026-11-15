@@ -57,6 +57,7 @@ struct ExtraSets {
     collect: bool,
     sets: Vec<QueryResult>,
     messages: ServerMessages,
+    rows_affected: Option<u64>,
 }
 
 struct StatementInput<'a> {
@@ -79,10 +80,14 @@ async fn inner_statement(
         control,
     } = input;
     if !extra.collect {
+        extra.sets.clear();
+        extra.messages = ServerMessages::default();
+        extra.rows_affected = None;
         return inner.query_params_controlled(sql, params, control).await;
     }
     let batch = inner.query_result_sets_params_controlled(sql, params, control).await?;
     let truncated = batch.truncated;
+    extra.rows_affected = batch.rows_affected;
     extra.messages = guard.releasable_messages(batch.messages);
     let mut sets = batch.result_sets.into_iter();
     let mut first = sets.next().unwrap_or(QueryResult {
@@ -99,6 +104,14 @@ async fn inner_statement(
 
 fn rows_in(first: &QueryResult, extra_sets: &[QueryResult]) -> u64 {
     first.rows.len() as u64 + extra_sets.iter().map(|set| set.rows.len() as u64).sum::<u64>()
+}
+
+fn statement_rows_for_audit(result: &Result<QueryResult, DriverError>, writes: bool, extra: &ExtraSets) -> Option<u64> {
+    let result = result.as_ref().ok()?;
+    if writes {
+        return extra.rows_affected;
+    }
+    Some(rows_in(result, &extra.sets))
 }
 
 #[derive(Clone, Copy)]
@@ -225,6 +238,7 @@ impl Session for PolicySession {
         self.extra.collect = true;
         self.extra.sets.clear();
         self.extra.messages = ServerMessages::default();
+        self.extra.rows_affected = None;
         let first = self.query_params_controlled(sql, params, control).await;
         self.extra.collect = false;
         let extras = std::mem::take(&mut self.extra.sets);
@@ -236,6 +250,7 @@ impl Session for PolicySession {
             result_sets,
             truncated,
             messages,
+            rows_affected: self.extra.rows_affected,
         })
     }
 
@@ -286,6 +301,7 @@ impl Session for PolicySession {
             .guard
             .authorize_classified(sql, analysis, Some(control), None)
             .await?;
+        let control = &authorization.rearm(control);
         let audit = CursorAudit {
             operation_id: Uuid::new_v4(),
             batch_id: batch.id,
@@ -646,6 +662,7 @@ impl PolicySession {
             analysis,
             approval_outcome: AuditApprovalOutcome::NotRequired,
             preview_state: AuditPreviewState::NotRequested,
+            approval_wait: Duration::ZERO,
         };
         let operation = self.guard.operation(
             sql,
@@ -706,6 +723,7 @@ impl PolicySession {
                     .await?
             }
         };
+        let control = &authorization.rearm(control);
         let writes = authorization.analysis.facts.writes();
         let rolls_back_to_savepoint = authorization.analysis.rolls_back_to_savepoint;
         let result = match self.batch {
@@ -799,7 +817,7 @@ impl PolicySession {
             self.guard
                 .mask_result_for_analysis(Some(&authorization.analysis), value)
         });
-        let rows = result.as_ref().ok().map(|value| rows_in(value, &self.extra.sets));
+        let rows = statement_rows_for_audit(&result, writes, &self.extra);
         self.guard
             .audit_transaction_result(&operation, start, &result, rows, TransactionAuditMode::Interactive)
             .await?;
@@ -850,7 +868,7 @@ impl PolicySession {
                 self.guard
                     .mask_result_for_analysis(Some(&authorization.analysis), value)
             });
-        let rows = result.as_ref().ok().map(|value| rows_in(value, &self.extra.sets));
+        let rows = statement_rows_for_audit(&result, true, &self.extra);
         self.guard.audit_write_result(&operation, start, &result, rows).await?;
         pending_write.disarm();
         result

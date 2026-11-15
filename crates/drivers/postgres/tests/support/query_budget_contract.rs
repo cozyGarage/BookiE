@@ -126,6 +126,13 @@ async fn a_row_capped_query_aborts_its_transaction_until_rollback_then_preserves
     let (_container, opts) = super::start_pg().await;
     let observer = super::connect(opts.clone()).await;
     let connection = super::connect(opts).await;
+    let backend = connection
+        .query("SELECT pg_backend_pid()::bigint")
+        .await
+        .expect("read transaction backend identity");
+    let Some(Value::Int(backend_pid)) = backend.rows.first().and_then(|row| row.first()) else {
+        panic!("PostgreSQL returned no backend identity: {backend:?}");
+    };
     connection
         .query("CREATE TABLE bookie_row_cap_transaction (id integer PRIMARY KEY, value integer NOT NULL)")
         .await
@@ -154,7 +161,10 @@ async fn a_row_capped_query_aborts_its_transaction_until_rollback_then_preserves
         .query("SELECT 42")
         .await
         .expect_err("cancelled statement aborts the PostgreSQL transaction");
-    assert!(matches!(aborted, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "25P02"));
+    if !matches!(&aborted, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "25P02") {
+        let backend_state = backend_state(observer.as_ref(), *backend_pid).await;
+        panic!("unexpected post-cancellation transaction error: {aborted:?}; backend state: {backend_state}");
+    }
     transaction.rollback().await.expect("rollback aborted transaction");
 
     let stored = observer
@@ -167,4 +177,18 @@ async fn a_row_capped_query_aborts_its_transaction_until_rollback_then_preserves
         .await
         .expect("pooled connection recovers after rollback");
     assert_eq!(next.rows, vec![vec![Value::Int(42)]]);
+}
+
+async fn backend_state(observer: &dyn Connection, backend_pid: i64) -> String {
+    let result = observer
+        .query_params(
+            "SELECT COALESCE((SELECT state FROM pg_catalog.pg_stat_activity WHERE pid = $1), 'backend missing')::text",
+            &[Value::Int(backend_pid)],
+        )
+        .await
+        .expect("inspect transaction backend after unexpected cancellation error");
+    match result.rows.first().and_then(|row| row.first()) {
+        Some(Value::Text(state)) => state.clone(),
+        value => format!("unexpected backend state value: {value:?}"),
+    }
 }

@@ -46,6 +46,7 @@ pub(crate) async fn text_protocol(
         result_sets,
         truncated,
         messages: ServerMessages::default(),
+        rows_affected: None,
     })
 }
 

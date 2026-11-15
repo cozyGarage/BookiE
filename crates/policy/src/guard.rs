@@ -82,6 +82,16 @@ struct Authorization {
     analysis: StatementAnalysis,
     approval_outcome: AuditApprovalOutcome,
     preview_state: AuditPreviewState,
+    approval_wait: Duration,
+}
+
+impl Authorization {
+    fn rearm(&self, control: &OperationControl) -> OperationControl {
+        OperationControl::new(
+            control.cancellation_token().clone(),
+            control.deadline().map(|deadline| deadline + self.approval_wait),
+        )
+    }
 }
 
 struct AuditOperation<'a> {
@@ -168,12 +178,7 @@ impl PolicyGuard {
         analyze_parsed(parsed, &self.ctx.driver_id, self.mask_patterns.as_deref(), true)
     }
 
-    async fn authorize(
-        &self,
-        sql: &str,
-        _is_params_exec: bool,
-        control: Option<&OperationControl>,
-    ) -> Result<Authorization, DriverError> {
+    async fn authorize(&self, sql: &str, control: Option<&OperationControl>) -> Result<Authorization, DriverError> {
         self.authorize_analysis(sql, self.analyze_statement(sql), None, control)
             .await
     }
@@ -319,6 +324,7 @@ impl PolicyGuard {
                 analysis,
                 approval_outcome: AuditApprovalOutcome::NotRequired,
                 preview_state: AuditPreviewState::NotRequested,
+                approval_wait: Duration::ZERO,
             }),
             Decision::Deny { ref message, .. } => {
                 let operation = self.operation(
@@ -363,11 +369,12 @@ impl PolicyGuard {
                     cancellation: control.map(|control| control.cancellation_token().clone()),
                 });
                 tokio::pin!(approval);
+                let approval_started = tokio::time::Instant::now();
                 let outcome = match control {
                     Some(control) => tokio::select! {
                         biased;
                         _ = control.cancellation_token().cancelled() => Err(DriverError::Cancelled),
-                        _ = wait_for_control_deadline(control) => {
+                        _ = tokio::time::sleep(APPROVAL_WAIT_LIMIT) => {
                             control.cancellation_token().cancel();
                             Err(DriverError::TimedOut)
                         },
@@ -415,6 +422,7 @@ impl PolicyGuard {
                             analysis,
                             approval_outcome: approved_audit_outcome(outcome),
                             preview_state,
+                            approval_wait: approval_started.elapsed(),
                         })
                     }
                     ApprovalOutcome::Deny => {
@@ -832,6 +840,7 @@ impl PolicyGuard {
             return batch;
         }
         let truncated = batch.truncated;
+        let rows_affected = batch.rows_affected;
         let result_sets = batch
             .result_sets
             .into_iter()
@@ -841,6 +850,7 @@ impl PolicyGuard {
             result_sets,
             truncated,
             messages: ServerMessages::default(),
+            rows_affected,
         }
     }
 

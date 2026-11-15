@@ -131,7 +131,7 @@ impl<W> Clone for StdioSession<W> {
     }
 }
 
-async fn serve_json_rpc_lines<R, W>(bridge: Arc<McpBridge>, mut reader: R, stdout: W) -> Result<(), String>
+pub(crate) async fn serve_json_rpc_lines<R, W>(bridge: Arc<McpBridge>, mut reader: R, stdout: W) -> Result<(), String>
 where
     R: tokio::io::AsyncBufRead + Unpin,
     W: tokio::io::AsyncWrite + Unpin + Send + 'static,

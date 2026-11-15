@@ -27,7 +27,7 @@ case " $* " in
     [ -f "$dir/exit-fails" ] && exit 1
     kill "$(cat "$dir/master.pid")"
     exit 0 ;;
-  *" -O forward "*) [ -f "$dir/forward-fails" ] && { echo 'mux_client_forward: forwarding request failed: master forward request failed' >&2; exit 255; }; exit 0 ;;
+  *" -O forward "*) [ -f "$dir/forward-fails-once" ] && { rm -f "$dir/forward-fails-once"; echo 'mux_client_forward: forwarding request failed: master forward request failed' >&2; exit 255; }; [ -f "$dir/forward-fails" ] && { echo 'mux_client_forward: forwarding request failed: master forward request failed' >&2; exit 255; }; exit 0 ;;
   *" -O "*) exit 0 ;;
 esac
 echo "$$" > "$dir/master.pid"
@@ -376,6 +376,42 @@ async fn a_refused_forward_is_classified() {
         session.forward(target, ForwardRoute::UnixSocket).await,
         Err(OpenSshError::ForwardRejected { target, .. }) if target == "db.internal:5432"
     ));
+}
+
+fn forward_calls(fake: &Fake) -> usize {
+    fake.calls().iter().filter(|call| call.contains(" -O forward ")).count()
+}
+
+#[tokio::test]
+async fn a_lost_race_for_a_loopback_port_is_retried_once_on_a_fresh_port() {
+    let fake = Fake::new();
+    fake.flag("forward-fails-once");
+    let session = fake.connect(OpenSshAuth::Agent).await.unwrap();
+    let target = ForwardTarget::new("db.internal", 5432).unwrap();
+
+    let forward = session.forward(target, ForwardRoute::LoopbackTcp).await.unwrap();
+
+    assert!(matches!(forward.local_endpoint(), LocalEndpoint::Tcp(_)));
+    assert_eq!(forward_calls(&fake), 2);
+}
+
+#[tokio::test]
+async fn a_refused_loopback_forward_is_tried_twice_and_a_socket_forward_once() {
+    let fake = Fake::new();
+    fake.flag("forward-fails");
+    let session = fake.connect(OpenSshAuth::Agent).await.unwrap();
+    let target = ForwardTarget::new("db.internal", 5432).unwrap();
+
+    assert!(matches!(
+        session.forward(target.clone(), ForwardRoute::LoopbackTcp).await,
+        Err(OpenSshError::ForwardRejected { .. })
+    ));
+    assert_eq!(forward_calls(&fake), 2);
+    assert!(matches!(
+        session.forward(target, ForwardRoute::UnixSocket).await,
+        Err(OpenSshError::ForwardRejected { .. })
+    ));
+    assert_eq!(forward_calls(&fake), 3);
 }
 
 #[tokio::test]

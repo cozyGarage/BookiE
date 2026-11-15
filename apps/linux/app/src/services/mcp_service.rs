@@ -1,13 +1,17 @@
 //! In-process MCP server for the GTK app. Agents talk to the same
 //! policy-gated connections the UI uses.
 
-use std::{future::Future, sync::Arc};
+use std::{
+    future::Future,
+    sync::{Arc, Mutex},
+};
 
 use async_trait::async_trait;
 use bookie_core::Connection;
 use bookie_mcp::{ConnectionProvider, McpBridge, McpServerConfig, TokenPermissions, TokenStore};
 use bookie_policy::Principal;
 use bookie_storage::{SavedConnection, StorageError, load_connections, store_mcp_token};
+use chrono::{DateTime, Duration, Utc};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
@@ -86,11 +90,7 @@ pub fn start_background(database: Arc<DatabaseService>) -> Option<RunningMcpServ
                 return;
             }
         };
-        rt.block_on(async move {
-            if let Err(e) = bookie_mcp::serve_streamable_http_until(bridge_http, config, server_shutdown).await {
-                tracing::warn!(error = %e, "MCP HTTP server stopped");
-            }
-        });
+        rt.block_on(serve_http_and_socket(bridge_http, config, server_shutdown));
     }) {
         Ok(thread) => thread,
         Err(error) => {
@@ -103,6 +103,40 @@ pub fn start_background(database: Arc<DatabaseService>) -> Option<RunningMcpServ
         shutdown,
         thread: Some(thread),
     })
+}
+
+async fn serve_http_and_socket(bridge: Arc<McpBridge>, config: McpServerConfig, shutdown: CancellationToken) {
+    let port = config.bind_port;
+    let bridge_socket = bridge.clone();
+    let socket_shutdown = shutdown.clone();
+    let http = async {
+        if http_enabled(std::env::var("BOOKIE_MCP_HTTP").ok().as_deref()) {
+            if let Err(e) = bookie_mcp::serve_streamable_http_until(bridge, config, shutdown).await {
+                tracing::warn!(error = %e, "MCP HTTP server stopped");
+                record_server_failure(&e, port);
+            }
+        } else {
+            tracing::info!("MCP HTTP endpoint disabled by BOOKIE_MCP_HTTP; the socket stays available");
+            shutdown.cancelled().await;
+        }
+    };
+    let socket = async {
+        let Some(path) = bookie_mcp::default_socket_path() else {
+            tracing::warn!("XDG_RUNTIME_DIR is not set; the MCP socket is not started");
+            return;
+        };
+        if let Err(e) = bookie_mcp::serve_unix_socket_until(bridge_socket, path, socket_shutdown).await {
+            tracing::warn!(error = %e, "MCP socket stopped");
+        }
+    };
+    tokio::join!(http, socket);
+}
+
+pub fn http_enabled(setting: Option<&str>) -> bool {
+    !matches!(
+        setting.map(str::to_ascii_lowercase).as_deref(),
+        Some("off" | "0" | "false" | "no")
+    )
 }
 
 fn server_config(test_port: Option<&str>) -> McpServerConfig {
@@ -122,6 +156,7 @@ pub async fn issue_token(
     permissions: TokenPermissions,
     connection_allowlist: Vec<Uuid>,
     tool_allowlist: Option<Vec<String>>,
+    expires_at: Option<DateTime<Utc>>,
 ) -> Result<IssuedToken, String> {
     issue_token_with_store(
         bridge,
@@ -129,9 +164,40 @@ pub async fn issue_token(
         permissions,
         connection_allowlist,
         tool_allowlist,
+        expires_at,
         |id, plaintext, label| async move { store_mcp_token(id, &plaintext, &label).await },
     )
     .await
+}
+
+static SERVER_FAILURE: Mutex<Option<String>> = Mutex::new(None);
+
+fn record_server_failure(error: &str, port: u16) {
+    let message = if error.contains("in use") {
+        format!(
+            "Port {port} is already used by another program, so agents cannot reach BookiE. Close that program and restart BookiE."
+        )
+    } else {
+        format!("The MCP server stopped: {error}")
+    };
+    *SERVER_FAILURE.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(message);
+}
+
+pub fn server_failure() -> Option<String> {
+    SERVER_FAILURE
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone()
+}
+
+pub fn expiry_for_choice(choice: u32, now: DateTime<Utc>) -> Option<DateTime<Utc>> {
+    let days = match choice {
+        0 => 30,
+        2 => 365,
+        3 => return None,
+        _ => 90,
+    };
+    Some(now + Duration::days(days))
 }
 
 pub struct IssuedToken {
@@ -145,6 +211,7 @@ async fn issue_token_with_store<F, Fut>(
     permissions: TokenPermissions,
     connection_allowlist: Vec<Uuid>,
     tool_allowlist: Option<Vec<String>>,
+    expires_at: Option<DateTime<Utc>>,
     store: F,
 ) -> Result<IssuedToken, String>
 where
@@ -152,10 +219,13 @@ where
     Fut: Future<Output = Result<(), StorageError>>,
 {
     let bridge = bridge.ok_or_else(|| "MCP server is not running".to_string())?;
-    let (meta, plaintext) =
-        bridge
-            .tokens()
-            .issue_with_tools(name.clone(), permissions, connection_allowlist, tool_allowlist, None)?;
+    let (meta, plaintext) = bridge.tokens().issue_with_tools(
+        name.clone(),
+        permissions,
+        connection_allowlist,
+        tool_allowlist,
+        expires_at,
+    )?;
     let keyring_saved = match store(meta.id, plaintext.clone(), format!("BookiE MCP: {name}")).await {
         Ok(()) => true,
         Err(error) => {
@@ -186,7 +256,10 @@ pub fn list_tokens(bridge: Option<&Arc<McpBridge>>) -> Vec<bookie_mcp::McpToken>
 
 #[cfg(test)]
 mod tests {
-    use super::{issue_token_with_store, server_config};
+    use super::{
+        Duration, Utc, expiry_for_choice, http_enabled, issue_token_with_store, record_server_failure, server_config,
+        server_failure,
+    };
     use std::sync::Arc;
 
     use bookie_core::Connection;
@@ -227,6 +300,7 @@ mod tests {
             TokenPermissions::ReadOnly,
             vec![Uuid::new_v4()],
             None,
+            None,
             |_, _, _| async { Ok::<(), StorageError>(()) },
         )
         .await
@@ -247,6 +321,7 @@ mod tests {
             TokenPermissions::ReadOnly,
             vec![Uuid::new_v4()],
             None,
+            None,
             |_, _, _| async { Err(StorageError::Keyring(KeyringFailure::Unavailable)) },
         )
         .await
@@ -266,6 +341,7 @@ mod tests {
             TokenPermissions::ReadOnly,
             vec![Uuid::new_v4()],
             Some(vec!["list_tables".into()]),
+            None,
             |_, _, _| async { Ok::<(), StorageError>(()) },
         )
         .await
@@ -279,6 +355,54 @@ mod tests {
         );
         assert!(token.allows_tool("list_tables"));
         assert!(!token.allows_tool("execute_query"));
+    }
+
+    #[tokio::test]
+    async fn issue_token_applies_the_chosen_expiry() {
+        let (_directory, bridge) = bridge();
+        let expires = Utc::now() + Duration::days(90);
+        issue_token_with_store(
+            Some(&bridge),
+            "test client".into(),
+            TokenPermissions::ReadOnly,
+            vec![Uuid::new_v4()],
+            None,
+            Some(expires),
+            |_, _, _| async { Ok::<(), StorageError>(()) },
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(bridge.tokens().list()[0].expires_at, Some(expires));
+    }
+
+    #[test]
+    fn the_expiry_choices_default_to_ninety_days_and_never_is_explicit() {
+        let now = Utc::now();
+        assert_eq!(expiry_for_choice(0, now), Some(now + Duration::days(30)));
+        assert_eq!(expiry_for_choice(1, now), Some(now + Duration::days(90)));
+        assert_eq!(expiry_for_choice(2, now), Some(now + Duration::days(365)));
+        assert_eq!(expiry_for_choice(3, now), None);
+        assert_eq!(expiry_for_choice(99, now), Some(now + Duration::days(90)));
+    }
+
+    #[test]
+    fn the_http_endpoint_is_on_unless_explicitly_switched_off() {
+        assert!(http_enabled(None));
+        assert!(http_enabled(Some("on")));
+        for off in ["off", "OFF", "0", "false", "no"] {
+            assert!(!http_enabled(Some(off)), "{off}");
+        }
+    }
+
+    #[test]
+    fn a_taken_port_is_reported_in_plain_words() {
+        record_server_failure("Address already in use (os error 98)", 17432);
+        let message = server_failure().unwrap();
+        assert!(
+            message.contains("17432") && message.contains("already used"),
+            "{message}"
+        );
     }
 
     #[tokio::test]

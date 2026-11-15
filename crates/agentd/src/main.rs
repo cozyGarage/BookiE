@@ -19,9 +19,17 @@ mod tty_answer;
 #[derive(Parser, Debug)]
 #[command(name = "bookie-agentd", about = "Headless BookiE MCP agent daemon")]
 struct Args {
-    /// Path to policy.toml (required).
-    #[arg(long)]
-    policy: PathBuf,
+    /// Path to policy.toml (required unless --connect-socket is used).
+    #[arg(long, required_unless_present = "connect_socket")]
+    policy: Option<PathBuf>,
+
+    #[arg(
+        long,
+        num_args = 0..=1,
+        value_name = "PATH",
+        help = "Relay stdin and stdout to a running BookiE app's MCP socket, then exit (default: $XDG_RUNTIME_DIR/bookie/mcp.sock)"
+    )]
+    connect_socket: Option<Option<PathBuf>>,
 
     /// Approval strategy when policy requires approval.
     #[arg(long, default_value = "deny")]
@@ -377,11 +385,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let mut args = Args::parse();
-    if !args.policy.exists() {
-        tracing::error!(path = %args.policy.display(), "policy file not found");
+    if let Some(socket) = args.connect_socket.take() {
+        let path = socket
+            .or_else(bookie_mcp::default_socket_path)
+            .ok_or("XDG_RUNTIME_DIR is not set; pass the socket path to --connect-socket")?;
+        bookie_mcp::relay_to_socket(&path, tokio::io::stdin(), tokio::io::stdout()).await?;
+        return Ok(());
+    }
+    let Some(policy_path) = args.policy.take() else {
+        tracing::error!("--policy is required");
+        std::process::exit(2);
+    };
+    if !policy_path.exists() {
+        tracing::error!(path = %policy_path.display(), "policy file not found");
         std::process::exit(2);
     }
-    let policy = Arc::new(load_from_path(&args.policy).map_err(|e| e.to_string())?);
+    let policy = Arc::new(load_from_path(&policy_path).map_err(|e| e.to_string())?);
 
     let tokens = Arc::new(TokenStore::open_default().map_err(|e| e.to_string())?);
     if let Some(name) = args.issue_token.take() {

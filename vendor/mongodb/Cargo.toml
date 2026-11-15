@@ -131,6 +131,7 @@ rustls-tls = [
     "dep:tokio-rustls",
     "tokio-rustls/ring",
     "dep:webpki-roots",
+    "dep:rustls-native-certs",
 ]
 rustls-tls-aws-lc = [
     "dep:rustls",
@@ -138,6 +139,7 @@ rustls-tls-aws-lc = [
     "dep:tokio-rustls",
     "tokio-rustls/aws_lc_rs",
     "dep:webpki-roots",
+    "dep:rustls-native-certs",
 ]
 snappy-compression = ["dep:snap"]
 socks5-proxy = ["dep:fast-socks5"]
@@ -326,6 +328,11 @@ features = [
     "std",
     "tls12",
 ]
+optional = true
+default-features = false
+
+[dependencies.rustls-native-certs]
+version = "0.8"
 optional = true
 default-features = false
 

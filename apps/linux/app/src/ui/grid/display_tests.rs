@@ -146,6 +146,75 @@ fn grid_cell_view_bounds_json_when_serialization_exceeds_its_byte_budget() {
 }
 
 #[test]
+fn mongo_grid_paints_nested_numbers_and_dates_as_relaxed_extended_json() {
+    let canonical = serde_json::json!({
+        "int": {"$numberInt": "2"},
+        "long": {"$numberLong": "9007199254740993"},
+        "double": {"$numberDouble": "1.25"},
+        "date": {"$date": {"$numberLong": "1234"}},
+        "array": [{"$numberInt": "7"}, {"nested": {"$numberLong": "8"}}]
+    });
+    let value = Value::Json(Box::new(canonical.clone()));
+    let view = cell_view_with_column_editability(&value, &metadata("mixed"), false, true);
+
+    assert_eq!(
+        view.display_text,
+        r#"{"int":2,"long":9007199254740993,"double":1.25,"date":{"$date":"1970-01-01T00:00:01.234Z"},"array":[7,{"nested":8}]}"#
+    );
+    assert_eq!(
+        bookie_app_services::value_display::copy_text(&value).as_str(),
+        canonical.to_string()
+    );
+}
+
+#[test]
+fn mongodb_extended_json_grid_display_is_relaxed_while_copy_stays_canonical() {
+    let source = serde_json::json!({
+        "nested": {
+            "int32": {"$numberInt": "2"},
+            "int64": {"$numberLong": "3"},
+            "double": {"$numberDouble": "2.5"},
+            "date": {"$date": {"$numberLong": "0"}}
+        },
+        "items": [
+            {"$numberInt": "4"},
+            {"$date": {"$numberLong": "1000"}}
+        ]
+    });
+    let value = Value::Json(Box::new(source.clone()));
+
+    let expected = r#"{"nested":{"int32":2,"int64":3,"double":2.5,"date":{"$date":"1970-01-01T00:00:00Z"}},"items":[4,{"$date":"1970-01-01T00:00:01Z"}]}"#;
+    let grid_displayed = cell_view_with_column_editability(&value, &metadata("object"), false, true).display_text;
+    let array_displayed = cell_view_with_column_editability(&value, &metadata("array"), false, true).display_text;
+    let sql_json_displayed = cell_view(&value, &metadata("json")).display_text;
+
+    assert_eq!(grid_displayed, expected);
+    assert_eq!(array_displayed, expected);
+    assert_eq!(sql_json_displayed, source.to_string());
+    assert_eq!(value_to_display_text(&value), source.to_string());
+    assert_eq!(value_to_copy_text(&value), source.to_string());
+    assert_eq!(value, Value::Json(Box::new(source)));
+}
+
+#[test]
+fn oversized_mongodb_json_keeps_the_bounded_canonical_prefix() {
+    let source = serde_json::json!({
+        "nested": {"int32": {"$numberInt": "2"}},
+        "padding": "x".repeat(GRID_CELL_DISPLAY_MAX_BYTES)
+    });
+    let value = Value::Json(Box::new(source.clone()));
+    let view = cell_view_with_column_editability(&value, &metadata("object"), false, true);
+
+    assert!(view.truncated);
+    assert!(
+        view.display_text
+            .starts_with(r#"{"nested":{"int32":{"$numberInt":"2"}}"#)
+    );
+    assert!(view.display_text.chars().count() <= GRID_CELL_DISPLAY_MAX_CHARS + 1);
+    assert_eq!(value_to_copy_text(&value), source.to_string());
+}
+
+#[test]
 fn display_text_shows_valid_utf8_bytes_as_text() {
     assert_eq!(
         value_to_display_text(&Value::Bytes(b"hello world".to_vec())),
@@ -296,9 +365,24 @@ fn cell_view_keeps_server_generated_null_and_preview_display_semantics() {
         value: Value::Text("sample".into()),
         byte_count: PreviewByteCount::Exact(9000),
     };
-    let view = CellView::from_preview(&preview);
+    let view = CellView::from_preview(&preview, false);
     assert!(!view.inline_editable);
     assert_eq!(view.text_for_bind(true), "sample… (9000 bytes total)");
+}
+
+#[test]
+fn mongo_cell_preview_uses_relaxed_extended_json_for_paint() {
+    let value = serde_json::json!({"n": {"$numberInt": "2"}});
+    let byte_count = value.to_string().len();
+    let preview = crate::ui::row_object::CellPreview {
+        value: Value::Json(Box::new(value)),
+        byte_count: PreviewByteCount::Exact(byte_count),
+    };
+
+    assert_eq!(
+        CellView::from_preview(&preview, true).display_text,
+        format!("{{\"n\":2}}… ({byte_count} bytes total)")
+    );
 }
 
 #[test]
@@ -453,7 +537,7 @@ fn text_preview_shows_nul_without_cutting_the_sample_or_changing_its_value() {
         value: Value::Text("before\0after".into()),
         byte_count: PreviewByteCount::Exact(9000),
     };
-    let view = CellView::from_preview(&preview);
+    let view = CellView::from_preview(&preview, false);
     assert_eq!(view.text_for_bind(false), "before␀after… (9000 bytes total)");
     assert!(!view.inline_editable);
     assert_eq!(preview.value, Value::Text("before\0after".into()));
@@ -469,7 +553,7 @@ fn preview_matrix_bounds_layout_at_unicode_and_length_boundaries() {
                     value: value.clone(),
                     byte_count: PreviewByteCount::Exact(1_000_000),
                 };
-                let view = CellView::from_preview(&preview);
+                let view = CellView::from_preview(&preview, false);
                 let sample: String = text.chars().take(512).collect();
                 assert_eq!(
                     view.text_for_bind(false),
@@ -489,7 +573,7 @@ fn oversized_text_previews_bound_layout_without_shortening_the_stored_sample() {
             value: value.clone(),
             byte_count: PreviewByteCount::Exact(1_000_000),
         };
-        let view = CellView::from_preview(&preview);
+        let view = CellView::from_preview(&preview, false);
         assert_eq!(
             view.text_for_bind(false),
             format!("{}… (1000000 bytes total)", "x".repeat(512))
@@ -507,7 +591,7 @@ fn the_visible_preview_limit_counts_unicode_characters_and_preserves_nul_markers
         byte_count: PreviewByteCount::Exact(9000),
     };
     assert_eq!(
-        CellView::from_preview(&preview).display_text,
+        CellView::from_preview(&preview, false).display_text,
         format!("{}␀… (9000 bytes total)", "é".repeat(511))
     );
     assert_eq!(preview.value, Value::Text(text));
@@ -542,7 +626,7 @@ fn multiline_preview_collapses_line_breaks_without_changing_the_value() {
         byte_count: PreviewByteCount::Exact(text.len()),
     };
 
-    let view = CellView::from_preview(&preview);
+    let view = CellView::from_preview(&preview, false);
 
     assert_eq!(
         view.display_text,
