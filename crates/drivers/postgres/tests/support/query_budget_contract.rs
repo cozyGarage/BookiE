@@ -154,7 +154,10 @@ async fn a_row_capped_query_aborts_its_transaction_until_rollback_then_preserves
         .query("SELECT 42")
         .await
         .expect_err("cancelled statement aborts the PostgreSQL transaction");
-    assert!(matches!(aborted, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "25P02"));
+    assert!(
+        matches!(&aborted, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "25P02"),
+        "unexpected post-cancellation transaction error: {aborted:?}"
+    );
     transaction.rollback().await.expect("rollback aborted transaction");
 
     let stored = observer
