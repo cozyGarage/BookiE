@@ -37,21 +37,7 @@ pub fn driver_message(error: &DriverError) -> String {
 }
 
 pub fn open_failure_message(failure: &bookie_app_services::open_failure::OpenFailure) -> String {
-    use bookie_app_services::open_failure::OpenFailure;
-    match failure {
-        OpenFailure::Driver(presentation) => {
-            bookie_app_services::driver_failure_message::driver_failure_message(presentation)
-        }
-        OpenFailure::Keyring(failure) => keyring_message(failure),
-        OpenFailure::IntegratedAuthUnsupported(driver_name) => {
-            bookie_app_services::tr!("The {driver} driver does not support Windows (Kerberos) authentication.")
-                .replace("{driver}", driver_name)
-        }
-        OpenFailure::PolicyUnavailable => {
-            bookie_app_services::tr!("Policy unavailable. Fix policy.toml and reopen Preferences or restart BookiE.")
-        }
-        OpenFailure::Other(detail) => detail.clone(),
-    }
+    bookie_app_services::driver_failure_message::open_failure_message(failure)
 }
 
 pub fn create_database_file_message(
@@ -83,23 +69,7 @@ pub fn transport_message(error: bookie_transport::TransportError) -> String {
 }
 
 pub fn keyring_message(failure: &bookie_storage::KeyringFailure) -> String {
-    use bookie_storage::KeyringFailure;
-    match failure {
-        KeyringFailure::Unavailable => bookie_app_services::tr!(
-            "No keyring is running, so saved passwords can't be read. Start GNOME Keyring, KeePassXC with Secret Service, or another Secret Service provider, then try again."
-        ),
-        KeyringFailure::Locked => bookie_app_services::tr!(
-            "The keyring is locked. Unlock it, for example by signing in again or opening Passwords and Keys, then try again."
-        ),
-        KeyringFailure::UnlockCancelled => {
-            bookie_app_services::tr!(
-                "Unlocking the keyring was cancelled, so the saved password was not read. Try again and unlock it when asked."
-            )
-        }
-        KeyringFailure::Other(detail) => {
-            bookie_app_services::tr!("The keyring could not be used: {detail}").replace("{detail}", detail)
-        }
-    }
+    bookie_app_services::driver_failure_message::keyring_message(failure)
 }
 
 #[cfg(test)]

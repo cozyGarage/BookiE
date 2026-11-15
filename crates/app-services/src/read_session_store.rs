@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use crate::database_service::DatabaseService;
 use crate::driver_error_presentation::DriverFailurePresentation;
-use crate::driver_failure_message::driver_failure_message;
+use crate::driver_failure_message::open_failure_message;
 use crate::read_session::ReadSession;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -190,7 +190,7 @@ impl ReadSessionStore {
             control.cancellation_token().clone(),
         ))
         .await
-        .map_err(|failure| driver_failure_message(&failure))?;
+        .map_err(|failure| open_failure_message(&failure))?;
         let summary = OpenedSession {
             session_id: SessionId::new(),
             label,

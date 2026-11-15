@@ -1,4 +1,5 @@
 use crate::driver_error_presentation::{DriverFailurePresentation, SaveFailure, TlsFailureKind};
+use crate::open_failure::OpenFailure;
 use crate::tls_failure::redacted_tls_detail;
 
 pub fn driver_failure_message(presentation: &DriverFailurePresentation) -> String {
@@ -115,5 +116,41 @@ fn save_failure_message(failure: &SaveFailure) -> String {
             "{rollback_error}",
             driver_failure_message(rollback_error).trim_end_matches('.'),
         ),
+    }
+}
+
+pub fn open_failure_message(failure: &OpenFailure) -> String {
+    use crate::open_failure::OpenFailure;
+    match failure {
+        OpenFailure::Driver(presentation) => driver_failure_message(presentation),
+        OpenFailure::Keyring(failure) => keyring_message(failure),
+        OpenFailure::IntegratedAuthUnsupported(driver_name) => {
+            crate::tr!("The {driver} driver does not support Windows (Kerberos) authentication.")
+                .replace("{driver}", driver_name)
+        }
+        OpenFailure::PolicyUnavailable => {
+            crate::tr!("Policy unavailable. Fix policy.toml and reopen Preferences or restart BookiE.")
+        }
+        OpenFailure::Other(detail) => detail.clone(),
+    }
+}
+
+pub fn keyring_message(failure: &bookie_storage::KeyringFailure) -> String {
+    use bookie_storage::KeyringFailure;
+    match failure {
+        KeyringFailure::Unavailable => crate::tr!(
+            "No keyring is running, so saved passwords can't be read. Start GNOME Keyring, KeePassXC with Secret Service, or another Secret Service provider, then try again."
+        ),
+        KeyringFailure::Locked => crate::tr!(
+            "The keyring is locked. Unlock it, for example by signing in again or opening Passwords and Keys, then try again."
+        ),
+        KeyringFailure::UnlockCancelled => {
+            crate::tr!(
+                "Unlocking the keyring was cancelled, so the saved password was not read. Try again and unlock it when asked."
+            )
+        }
+        KeyringFailure::Other(detail) => {
+            crate::tr!("The keyring could not be used: {detail}").replace("{detail}", detail)
+        }
     }
 }
