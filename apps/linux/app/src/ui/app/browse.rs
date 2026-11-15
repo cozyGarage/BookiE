@@ -711,19 +711,22 @@ impl App {
         };
         let fetcher =
             crate::ui::export_dialog::spool_export_factory(spool, request.columns.clone(), request.total_rows);
+        let current_page = request.current_page;
         let result = QueryResult {
             columns: request.columns,
             rows: Vec::new().into(),
             truncated: false,
         };
-        let scope = if request.current_page.is_some() {
+        let scope = if current_page.is_some() {
             crate::ui::export_dialog::ExportScope::QueryPage {
                 filtered: request.filtered,
             }
         } else {
             crate::ui::export_dialog::ExportScope::QueryStored
         };
-        let result = request.current_page.unwrap_or_else(|| std::sync::Arc::new(result));
+        let result = current_page
+            .as_ref()
+            .map_or_else(|| std::sync::Arc::new(result), |page| page.result.clone());
         crate::ui::export_dialog::present_with_format(
             &self.window,
             &self.toast_overlay,
@@ -733,6 +736,7 @@ impl App {
                     mode: crate::ui::export_dialog::PagedExportMode::StoredQuery,
                     total_rows: Some(request.total_rows),
                     open: fetcher,
+                    retained_page: current_page,
                 }),
                 result,
                 suggested_name: request.query.suggested_name,
@@ -786,6 +790,7 @@ impl App {
             mode: crate::ui::export_dialog::PagedExportMode::SnapshotTable,
             total_rows,
             open: snapshot_fetcher_factory(guard, plan),
+            retained_page: None,
         })
     }
 
@@ -826,6 +831,7 @@ impl App {
                     mode: crate::ui::export_dialog::PagedExportMode::FullTable,
                     total_rows,
                     open: page_fetcher_factory(conn, plan),
+                    retained_page: None,
                 })),
                 result: std::sync::Arc::new(columns_only),
                 suggested_name: label,
