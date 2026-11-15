@@ -45,20 +45,26 @@ def old_enough(container, now):
     return now - container["created"] >= STALE_AFTER
 
 
-def reconcile(now=None):
+def reconcile(now=None, keep_run_id=""):
     now = datetime.datetime.now(datetime.timezone.utc) if now is None else now
+    if keep_run_id and not RUN_ID.fullmatch(keep_run_id):
+        raise ValueError("invalid current test-container run id")
     containers = [inspect(container_id) for container_id in sorted(container_ids())]
     stale_ids = []
     stale_projects = {}
     for container in containers:
         if container["project"]:
             stale_projects.setdefault(container["project"], []).append(container)
-        elif container["run_id"] and old_enough(container, now):
+        elif (
+            container["run_id"]
+            and container["run_id"] != keep_run_id
+            and (keep_run_id or old_enough(container, now))
+        ):
             stale_ids.append(container["id"])
     stale_projects = {
         project: members
         for project, members in stale_projects.items()
-        if all(old_enough(member, now) for member in members)
+        if project != keep_run_id and (keep_run_id or all(old_enough(member, now) for member in members))
     }
     stale_ids.extend(member["id"] for members in stale_projects.values() for member in members)
     if stale_ids:
@@ -79,4 +85,8 @@ def reconcile(now=None):
 
 
 if __name__ == "__main__":
-    reconcile()
+    import sys
+
+    if len(sys.argv) > 2:
+        raise SystemExit("usage: cleanup-stale-ci-fixtures.py [CURRENT_RUN_ID]")
+    reconcile(keep_run_id=sys.argv[1] if len(sys.argv) == 2 else "")
