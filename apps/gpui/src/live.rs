@@ -1,13 +1,15 @@
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
-use bookie_app_services::command_bridge::{
-    ChannelEventSink, Command, DispatchContext, Epoch, Event, dispatch,
-};
+use bookie_app_services::command_bridge::{ChannelEventSink, Command, DispatchContext, Epoch, Event, dispatch};
 use bookie_app_services::database_service::{ConnectionOverview, DatabaseService};
 use bookie_app_services::read_session::ConnectionSummary;
-use bookie_app_services::read_session_store::{OpenedSession, ReadSessionStore, SessionId};
+use bookie_app_services::read_session_store::{
+    OpenedSession, ReadSessionStore, SessionId, SubscriptionRequest, SubscriptionSample, SubscriptionSampler,
+};
 use bookie_core::{ColumnInfo, OperationControl, QueryResult, QueryResultBudget, QueryRows, TableInfo};
 use bookie_results::result_scan::ScanSource;
 use bookie_results::stream_result_spool::StreamResultSpoolManager;
@@ -86,9 +88,15 @@ impl LiveSession {
             return Err(format!("Row limit must be between 1 and {ROW_CAP}."));
         }
         let epoch = self.next_epoch();
-        let (columns, rows, scan, truncated) =
-            self.runtime
-                .block_on(query_pages(&self.sessions, self.session_id, sql, max_rows, cancellation, epoch, &self.epoch))?;
+        let (columns, rows, scan, truncated) = self.runtime.block_on(query_pages(
+            &self.sessions,
+            self.session_id,
+            sql,
+            max_rows,
+            cancellation,
+            epoch,
+            &self.epoch,
+        ))?;
         Ok(LiveTable {
             session: self.clone(),
             columns,
@@ -105,7 +113,10 @@ impl LiveSession {
         let control = OperationControl::with_timeout(Duration::from_secs(5));
         let event = self.runtime.block_on(dispatch_read(
             DispatchContext::Sessions(&self.sessions),
-            Command::ReadConnectionStatus { epoch, session_id: self.session_id },
+            Command::ReadConnectionStatus {
+                epoch,
+                session_id: self.session_id,
+            },
             &control,
             epoch,
             &self.epoch,
@@ -122,18 +133,29 @@ impl LiveSession {
         max_messages: usize,
         window: Duration,
         cancellation: &CancellationToken,
-    ) -> Result<drivers_registry::PubSubSample, String> {
-        let registry = drivers_registry::default_registry();
+    ) -> Result<SubscriptionSample, String> {
+        let epoch = self.next_epoch();
         let deadline = tokio::time::Instant::now() + window + Duration::from_secs(15);
         let control = OperationControl::new(cancellation.clone(), Some(deadline));
-        self.runtime
-            .block_on(self.sessions.with_subscription(
-                self.session_id,
-                &registry,
-                &control,
-                |options| drivers_registry::sample_pubsub(options, patterns, max_messages, window),
-            ))
-            .map_err(|failure| format!("{failure:?}"))
+        let event = self.runtime.block_on(dispatch_read(
+            DispatchContext::Sessions(&self.sessions),
+            Command::SampleSubscription {
+                epoch,
+                session_id: self.session_id,
+                request: SubscriptionRequest {
+                    patterns: patterns.to_vec(),
+                    max_messages,
+                    window,
+                },
+            },
+            &control,
+            epoch,
+            &self.epoch,
+        ))?;
+        let Event::SubscriptionSampled { outcome, .. } = event else {
+            return Err("The command bridge returned an unexpected event.".into());
+        };
+        outcome.map_err(|failure| format!("{failure:?}"))
     }
 
     pub fn load_table(self: &Arc<Self>, table: &TableInfo, max_rows: u64) -> Result<LiveTable, String> {
@@ -151,17 +173,15 @@ impl LiveSession {
         }
         let table = find_table(&self.tables, table)?.clone();
         let epoch = self.next_epoch();
-        let (columns, rows, scan, truncated) =
-            self.runtime
-                .block_on(read_pages(
-                    &self.sessions,
-                    self.session_id,
-                    &table,
-                    max_rows,
-                    cancellation,
-                    epoch,
-                    &self.epoch,
-                ))?;
+        let (columns, rows, scan, truncated) = self.runtime.block_on(read_pages(
+            &self.sessions,
+            self.session_id,
+            &table,
+            max_rows,
+            cancellation,
+            epoch,
+            &self.epoch,
+        ))?;
         Ok(LiveTable {
             session: self.clone(),
             columns,
@@ -214,7 +234,8 @@ async fn open_session(
     cancellation: CancellationToken,
 ) -> Result<(ReadSessionStore, OpenedSession), String> {
     let registry = Arc::new(drivers_registry::default_registry());
-    let sessions = ReadSessionStore::new(registry, Arc::new(DatabaseService::new()));
+    let sessions = ReadSessionStore::new(registry, Arc::new(DatabaseService::new()))
+        .with_subscription_sampler(Arc::new(RegistrySubscriptionSampler));
     let epoch = Epoch(1);
     let current_epoch = AtomicU64::new(epoch.0);
     let control = OperationControl::new(
@@ -231,7 +252,10 @@ async fn open_session(
                 .ok_or_else(|| format!("no saved connection named or numbered {connection}"))?;
             Command::OpenSavedConnection { epoch, connection_id }
         }
-        Origin::File(path) => Command::OpenConnectionFile { epoch, path: path.clone() },
+        Origin::File(path) => Command::OpenConnectionFile {
+            epoch,
+            path: path.clone(),
+        },
     };
     let event = dispatch_read(
         DispatchContext::Sessions(&sessions),
@@ -245,6 +269,39 @@ async fn open_session(
         return Err("The command bridge returned an unexpected event.".into());
     };
     Ok((sessions, outcome?))
+}
+
+struct RegistrySubscriptionSampler;
+
+impl SubscriptionSampler for RegistrySubscriptionSampler {
+    fn validate(&self, request: &SubscriptionRequest) -> Result<(), bookie_core::DriverError> {
+        drivers_registry::validate_pubsub_request(&request.patterns, request.max_messages, request.window)
+    }
+
+    fn sample(
+        &self,
+        options: bookie_core::ConnectOptions,
+        request: SubscriptionRequest,
+    ) -> Pin<Box<dyn Future<Output = Result<SubscriptionSample, bookie_core::DriverError>> + Send + '_>> {
+        Box::pin(async move {
+            let sample =
+                drivers_registry::sample_pubsub(options, &request.patterns, request.max_messages, request.window)
+                    .await?;
+            Ok(SubscriptionSample {
+                messages: sample
+                    .messages
+                    .into_iter()
+                    .map(|message| bookie_app_services::read_session_store::SubscriptionMessage {
+                        channel: message.channel,
+                        pattern: message.pattern,
+                        payload: message.payload,
+                        payload_bytes: message.payload_bytes,
+                    })
+                    .collect(),
+                reached_limit: sample.reached_limit,
+            })
+        })
+    }
 }
 
 type Pages = (Vec<ColumnMeta>, QueryRows, ScanSource, bool);
@@ -378,7 +435,17 @@ async fn next_result_page(
             Ok((page.result, page.has_next_page))
         }
         None => Ok((
-            bridge_read_page(sessions, session_id, table, offset, limit, &control, epoch, current_epoch).await?,
+            bridge_read_page(
+                sessions,
+                session_id,
+                table,
+                offset,
+                limit,
+                &control,
+                epoch,
+                current_epoch,
+            )
+            .await?,
             false,
         )),
     }
@@ -505,15 +572,17 @@ async fn dispatch_read(
     keep_current_event(context, event, Epoch(current_epoch.load(Ordering::Relaxed)))
 }
 
-fn keep_current_event(
-    context: DispatchContext<'_>,
-    event: Event,
-    current: Epoch,
-) -> Result<Event, String> {
+fn keep_current_event(context: DispatchContext<'_>, event: Event, current: Epoch) -> Result<Event, String> {
     if event.epoch() == current {
         return Ok(event);
     }
-    if let (DispatchContext::Sessions(sessions), Event::SessionOpened { outcome: Ok(opened), .. }) = (context, event) {
+    if let (
+        DispatchContext::Sessions(sessions),
+        Event::SessionOpened {
+            outcome: Ok(opened), ..
+        },
+    ) = (context, event)
+    {
         sessions.close(opened.session_id);
     }
     Err("The request was superseded.".into())

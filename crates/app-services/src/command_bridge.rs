@@ -7,7 +7,7 @@ use tokio::sync::mpsc;
 use crate::database_service::ConnectionOverview;
 use crate::driver_error_presentation::DriverFailurePresentation;
 use crate::read_session::{ConnectionSummary, list_saved_connections};
-use crate::read_session_store::{OpenedSession, ReadSessionStore, SessionId};
+use crate::read_session_store::{OpenedSession, ReadSessionStore, SessionId, SubscriptionRequest, SubscriptionSample};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Epoch(pub u64);
@@ -45,6 +45,11 @@ pub enum Command {
         epoch: Epoch,
         session_id: SessionId,
     },
+    SampleSubscription {
+        epoch: Epoch,
+        session_id: SessionId,
+        request: SubscriptionRequest,
+    },
 }
 
 #[derive(Debug)]
@@ -73,6 +78,10 @@ pub enum Event {
         epoch: Epoch,
         outcome: Vec<ConnectionOverview>,
     },
+    SubscriptionSampled {
+        epoch: Epoch,
+        outcome: Result<SubscriptionSample, DriverFailurePresentation>,
+    },
 }
 
 impl Event {
@@ -83,7 +92,8 @@ impl Event {
             | Self::SessionClosed { epoch, .. }
             | Self::QueryCompleted { epoch, .. }
             | Self::PageRead { epoch, .. }
-            | Self::ConnectionStatusRead { epoch, .. } => *epoch,
+            | Self::ConnectionStatusRead { epoch, .. }
+            | Self::SubscriptionSampled { epoch, .. } => *epoch,
         }
     }
 
@@ -155,7 +165,7 @@ pub fn dispatch<'a>(
                 sink.try_emit(Event::SavedConnectionsListed { epoch, outcome })?;
             }
             (DispatchContext::Sessions(sessions), command) => {
-                dispatch_session_command(sessions, command, control, sink).await?;
+                Box::pin(dispatch_session_command(sessions, command, control, sink)).await?;
             }
             _ => return Err(DispatchError::InvalidContext),
         }
@@ -203,6 +213,14 @@ async fn dispatch_session_command(
                 .get(session_id)
                 .map_or_else(Vec::new, |session| session.overview());
             sink.try_emit(Event::ConnectionStatusRead { epoch, outcome })?;
+        }
+        Command::SampleSubscription {
+            epoch,
+            session_id,
+            request,
+        } => {
+            let outcome = sessions.sample_subscription(session_id, request, control).await;
+            sink.try_emit(Event::SubscriptionSampled { epoch, outcome })?;
         }
         Command::ListSavedConnections { .. } => return Err(DispatchError::InvalidContext),
     }

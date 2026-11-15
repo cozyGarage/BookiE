@@ -1,11 +1,46 @@
 use std::collections::HashMap;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::{Arc, RwLock};
+use std::time::Duration;
 
 use bookie_core::{ConnectOptions, DriverError, DriverRegistry, OperationControl, TableInfo};
 use uuid::Uuid;
 
 use crate::database_service::DatabaseService;
+use crate::driver_error_presentation::DriverFailurePresentation;
 use crate::read_session::ReadSession;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SubscriptionRequest {
+    pub patterns: Vec<String>,
+    pub max_messages: usize,
+    pub window: Duration,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SubscriptionMessage {
+    pub channel: String,
+    pub pattern: Option<String>,
+    pub payload: String,
+    pub payload_bytes: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SubscriptionSample {
+    pub messages: Vec<SubscriptionMessage>,
+    pub reached_limit: bool,
+}
+
+pub trait SubscriptionSampler: Send + Sync {
+    fn validate(&self, request: &SubscriptionRequest) -> Result<(), DriverError>;
+
+    fn sample(
+        &self,
+        options: ConnectOptions,
+        request: SubscriptionRequest,
+    ) -> Pin<Box<dyn Future<Output = Result<SubscriptionSample, DriverError>> + Send + '_>>;
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SessionId(Uuid);
@@ -28,6 +63,7 @@ pub struct OpenedSession {
 pub struct ReadSessionStore {
     registry: Arc<DriverRegistry>,
     database: Arc<DatabaseService>,
+    subscription_sampler: Option<Arc<dyn SubscriptionSampler>>,
     sessions: RwLock<HashMap<SessionId, Arc<ReadSession>>>,
 }
 
@@ -36,8 +72,14 @@ impl ReadSessionStore {
         Self {
             registry,
             database,
+            subscription_sampler: None,
             sessions: RwLock::new(HashMap::new()),
         }
+    }
+
+    pub fn with_subscription_sampler(mut self, sampler: Arc<dyn SubscriptionSampler>) -> Self {
+        self.subscription_sampler = Some(sampler);
+        self
     }
 
     pub async fn open_saved(&self, id: Uuid, control: &OperationControl) -> Result<OpenedSession, String> {
@@ -104,6 +146,26 @@ impl ReadSessionStore {
             .get(id)
             .ok_or(crate::driver_error_presentation::DriverFailurePresentation::Disconnected)?;
         session.with_subscription(registry, control, work).await
+    }
+
+    pub async fn sample_subscription(
+        &self,
+        id: SessionId,
+        request: SubscriptionRequest,
+        control: &OperationControl,
+    ) -> Result<SubscriptionSample, DriverFailurePresentation> {
+        bookie_core::check_pre_dispatch(control).map_err(|error| crate::driver_error_presentation::classify(&error))?;
+        let session = self.get(id).ok_or(DriverFailurePresentation::Disconnected)?;
+        let sampler = self
+            .subscription_sampler
+            .as_ref()
+            .ok_or_else(|| DriverFailurePresentation::Unsupported("subscription sampling is unavailable".into()))?;
+        sampler
+            .validate(&request)
+            .map_err(|error| crate::driver_error_presentation::classify(&error))?;
+        session
+            .with_subscription(&self.registry, control, |options| sampler.sample(options, request))
+            .await
     }
 
     pub fn close(&self, id: SessionId) -> bool {
