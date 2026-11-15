@@ -126,13 +126,6 @@ async fn a_row_capped_query_aborts_its_transaction_until_rollback_then_preserves
     let (_container, opts) = super::start_pg().await;
     let observer = super::connect(opts.clone()).await;
     let connection = super::connect(opts).await;
-    let backend = connection
-        .query("SELECT pg_backend_pid()::bigint")
-        .await
-        .expect("read transaction backend identity");
-    let Some(Value::Int(backend_pid)) = backend.rows.first().and_then(|row| row.first()) else {
-        panic!("PostgreSQL returned no backend identity: {backend:?}");
-    };
     connection
         .query("CREATE TABLE bookie_row_cap_transaction (id integer PRIMARY KEY, value integer NOT NULL)")
         .await
@@ -143,6 +136,13 @@ async fn a_row_capped_query_aborts_its_transaction_until_rollback_then_preserves
         .expect("seed fixture row");
 
     let mut transaction = connection.begin().await.expect("begin transaction");
+    let backend = transaction
+        .query("SELECT pg_backend_pid()::bigint")
+        .await
+        .expect("read transaction backend identity");
+    let Some(Value::Int(backend_pid)) = backend.rows.first().and_then(|row| row.first()) else {
+        panic!("PostgreSQL returned no backend identity: {backend:?}");
+    };
     transaction
         .query("UPDATE bookie_row_cap_transaction SET value = 1 WHERE id = 1")
         .await
