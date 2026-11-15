@@ -1,13 +1,13 @@
-use std::{collections::HashMap, iter};
+use std::{collections::HashMap, iter, sync::Mutex};
 
 use bookie_core::{
     ColumnInfo, DriverError, ExecResult, MAX_QUERY_ROWS, QualifiedTypeName, QueryResult, QueryResultBudget, QueryRows,
     Value,
 };
-use futures::stream::StreamExt;
+use futures::{TryStreamExt, stream::StreamExt};
 use sqlx::pool::PoolConnection;
 use sqlx::postgres::{PgCancelToken, PgRow, PgTypeInfo, PgTypeKind};
-use sqlx::{Column, Connection, Executor, Pool, Postgres, Row, SqlSafeStr, Statement, TypeInfo, ValueRef};
+use sqlx::{Column, Connection, Either, Executor, Pool, Postgres, Row, SqlSafeStr, Statement, TypeInfo, ValueRef};
 
 use super::params::{bind_pg_params, describe_query_parameters, needs_text_type_inference, pg_parameter_type_infos};
 use super::{array, decode, map_sqlx_error, numeric, temporal};
@@ -37,10 +37,21 @@ pub(super) async fn query_connection(
     params: &[Value],
     stop: Option<QueryStop>,
 ) -> Result<QueryResult, DriverError> {
+    query_connection_with_rows_affected(connection, sql, params, stop)
+        .await
+        .map(|(result, _)| result)
+}
+
+pub(super) async fn query_connection_with_rows_affected(
+    connection: &mut PoolConnection<Postgres>,
+    sql: &str,
+    params: &[Value],
+    stop: Option<QueryStop>,
+) -> Result<(QueryResult, Option<u64>), DriverError> {
     let result = query_attempt(connection, sql, params, stop.clone()).await;
     if result.as_ref().is_err_and(is_stale_type_cache_error) {
         connection.clear_cached_statements().await.map_err(map_sqlx_error)?;
-        return query_connection_once(connection, sql, params, stop).await;
+        return query_connection_once_with_rows_affected(connection, sql, params, stop).await;
     }
     result.map_err(QueryFailure::into_driver)
 }
@@ -51,6 +62,17 @@ pub(super) async fn query_connection_once(
     params: &[Value],
     stop: Option<QueryStop>,
 ) -> Result<QueryResult, DriverError> {
+    query_connection_once_with_rows_affected(connection, sql, params, stop)
+        .await
+        .map(|(result, _)| result)
+}
+
+pub(super) async fn query_connection_once_with_rows_affected(
+    connection: &mut PoolConnection<Postgres>,
+    sql: &str,
+    params: &[Value],
+    stop: Option<QueryStop>,
+) -> Result<(QueryResult, Option<u64>), DriverError> {
     query_attempt(connection, sql, params, stop)
         .await
         .map_err(QueryFailure::into_driver)
@@ -61,7 +83,7 @@ async fn query_attempt(
     sql: &str,
     params: &[Value],
     stop: Option<QueryStop>,
-) -> Result<QueryResult, QueryFailure> {
+) -> Result<(QueryResult, Option<u64>), QueryFailure> {
     let description = if needs_text_type_inference(params) {
         Some(describe_query_parameters(connection, sql, params).await?)
     } else {
@@ -86,13 +108,8 @@ async fn query_attempt(
     if needs_text_results {
         connection.set_next_query_result_format(sql, sqlx::postgres::PgValueFormat::Text);
     }
-    let mut stream =
-        bind_pg_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params, inferred_text_types)?.fetch(&mut **connection);
-    let (mut result, mut type_infos, mut column_origins) = collect_query_rows(&mut stream, MAX_QUERY_ROWS).await?;
-    if result.truncated {
-        stop_server_query(stop, &mut stream).await;
-    }
-    drop(stream);
+    let (mut result, rows_affected, mut type_infos, mut column_origins) =
+        collect_query_rows_with_affected_count(connection, sql, params, inferred_text_types, stop).await?;
     if result.columns.is_empty() && result.rows.is_empty() {
         if let Some(description) = description {
             result.columns = description.columns;
@@ -111,7 +128,39 @@ async fn query_attempt(
     }
     refresh_enum_type_names(connection, &mut result.columns, &type_infos).await?;
     refresh_domain_column_names(connection, &mut result.columns, &column_origins).await?;
-    Ok(result)
+    Ok((result, rows_affected))
+}
+
+async fn collect_query_rows_with_affected_count(
+    connection: &mut PoolConnection<Postgres>,
+    sql: &str,
+    params: &[Value],
+    inferred_text_types: &[Option<PgTypeInfo>],
+    stop: Option<QueryStop>,
+) -> Result<(QueryResult, Option<u64>, Vec<PgTypeInfo>, Vec<Option<(i64, i16)>>), QueryFailure> {
+    let rows_affected = Mutex::new(None);
+    #[expect(deprecated, reason = "PostgreSQL command tags accompany RETURNING rows")]
+    let mut stream = Box::pin(
+        bind_pg_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params, inferred_text_types)?
+            .fetch_many(&mut **connection)
+            .try_filter_map(|item| match item {
+                Either::Left(result) => {
+                    *rows_affected.lock().unwrap_or_else(std::sync::PoisonError::into_inner) =
+                        Some(result.rows_affected());
+                    std::future::ready(Ok(None))
+                }
+                Either::Right(row) => std::future::ready(Ok(Some(row))),
+            }),
+    );
+    let (result, type_infos, column_origins) = collect_query_rows(&mut stream, MAX_QUERY_ROWS).await?;
+    if result.truncated {
+        stop_server_query(stop, &mut stream).await;
+    }
+    drop(stream);
+    let rows_affected = rows_affected
+        .into_inner()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    Ok((result, rows_affected, type_infos, column_origins))
 }
 
 pub(super) async fn execute_connection(
