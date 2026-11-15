@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use bookie_core::{DriverError, ViewEditability};
-use sqlx::{Pool, Postgres, Row};
+use sqlx::Row;
 
 use crate::map_sqlx_error;
 
@@ -94,20 +94,24 @@ pub(crate) fn target_origins(definition: &str) -> HashMap<i32, Origin> {
     origins
 }
 
-async fn relation(pool: &Pool<Postgres>, schema: Option<&str>, table: &str) -> Result<Option<Relation>, DriverError> {
+async fn relation(
+    connection: &mut sqlx::PgConnection,
+    schema: Option<&str>,
+    table: &str,
+) -> Result<Option<Relation>, DriverError> {
     let row = sqlx::query(RELATION_BY_NAME_SQL)
         .bind(table)
         .bind(schema)
-        .fetch_optional(pool)
+        .fetch_optional(&mut *connection)
         .await
         .map_err(map_sqlx_error)?;
     row.map(relation_from_row).transpose()
 }
 
-async fn relation_by_oid(pool: &Pool<Postgres>, oid: i64) -> Result<Option<Relation>, DriverError> {
+async fn relation_by_oid(connection: &mut sqlx::PgConnection, oid: i64) -> Result<Option<Relation>, DriverError> {
     let row = sqlx::query(RELATION_BY_OID_SQL)
         .bind(oid)
-        .fetch_optional(pool)
+        .fetch_optional(&mut *connection)
         .await
         .map_err(map_sqlx_error)?;
     row.map(relation_from_row).transpose()
@@ -130,10 +134,10 @@ struct ViewColumn {
     updatable: bool,
 }
 
-async fn view_columns(pool: &Pool<Postgres>, oid: i64) -> Result<Vec<ViewColumn>, DriverError> {
+async fn view_columns(connection: &mut sqlx::PgConnection, oid: i64) -> Result<Vec<ViewColumn>, DriverError> {
     let rows = sqlx::query(COLUMNS_SQL)
         .bind(oid)
-        .fetch_all(pool)
+        .fetch_all(&mut *connection)
         .await
         .map_err(map_sqlx_error)?;
     rows.iter()
@@ -147,10 +151,10 @@ async fn view_columns(pool: &Pool<Postgres>, oid: i64) -> Result<Vec<ViewColumn>
         .collect()
 }
 
-async fn primary_key(pool: &Pool<Postgres>, oid: i64) -> Result<Vec<i32>, DriverError> {
+async fn primary_key(connection: &mut sqlx::PgConnection, oid: i64) -> Result<Vec<i32>, DriverError> {
     let rows = sqlx::query(PRIMARY_KEY_SQL)
         .bind(oid)
-        .fetch_all(pool)
+        .fetch_all(&mut *connection)
         .await
         .map_err(map_sqlx_error)?;
     rows.iter().map(|row| row.try_get(0).map_err(map_sqlx_error)).collect()
@@ -176,11 +180,11 @@ fn key_columns(view: &[ViewColumn], mapping: &HashMap<i32, i32>, primary_key: &[
 }
 
 pub(crate) async fn fetch(
-    pool: &Pool<Postgres>,
+    connection: &mut sqlx::PgConnection,
     schema: Option<&str>,
     table: &str,
 ) -> Result<ViewEditability, DriverError> {
-    let Some(top) = relation(pool, schema, table).await? else {
+    let Some(top) = relation(connection, schema, table).await? else {
         return Ok(ViewEditability::NotApplicable);
     };
     if top.relkind != "v" {
@@ -189,7 +193,7 @@ pub(crate) async fn fetch(
     if !top.automatically_updatable() {
         return Ok(ViewEditability::NotUpdatable);
     }
-    let columns = view_columns(pool, top.oid).await?;
+    let columns = view_columns(connection, top.oid).await?;
     let mut mapping: HashMap<i32, i32> = columns.iter().map(|column| (column.attnum, column.attnum)).collect();
     let insertable = top.events & EVENT_INSERT != 0;
     let mut current = top;
@@ -202,14 +206,14 @@ pub(crate) async fn fetch(
             .into_iter()
             .filter_map(|(view, via)| origins.get(&via).map(|origin| (view, origin.column)))
             .collect();
-        let Some(base) = relation_by_oid(pool, base_oid).await? else {
+        let Some(base) = relation_by_oid(connection, base_oid).await? else {
             return Ok(ViewEditability::NotUpdatable);
         };
         match base.relkind.as_str() {
             "v" if base.automatically_updatable() => current = base,
             "v" => return Ok(ViewEditability::NotUpdatable),
             "r" | "p" => {
-                let keys = primary_key(pool, base.oid).await?;
+                let keys = primary_key(connection, base.oid).await?;
                 return Ok(match key_columns(&columns, &mapping, &keys) {
                     Some(key_columns) => ViewEditability::Editable {
                         key_columns,

@@ -35,6 +35,37 @@ fn confirmed_transaction_rollback_is_not_audited_as_an_unknown_outcome() {
 }
 
 #[test]
+fn confirmed_transaction_cancellation_is_audited_as_rolled_back() {
+    for (source, status) in [
+        (DriverError::Cancelled, AuditTerminalStatus::Cancelled),
+        (DriverError::TimedOut, AuditTerminalStatus::TimedOut),
+    ] {
+        let error = DriverError::Transaction {
+            statement_index: 0,
+            source: Box::new(source),
+        };
+
+        assert_eq!(
+            super::super::transaction_error_outcome(&error),
+            (status, AuditTransactionOutcome::RolledBack, false)
+        );
+    }
+}
+
+#[test]
+fn unconfirmed_transaction_cancellation_remains_pending() {
+    for (error, status) in [
+        (DriverError::Cancelled, AuditTerminalStatus::Cancelled),
+        (DriverError::TimedOut, AuditTerminalStatus::TimedOut),
+    ] {
+        assert_eq!(
+            super::super::transaction_error_outcome(&error),
+            (status, AuditTransactionOutcome::Pending, false)
+        );
+    }
+}
+
+#[test]
 fn a_partially_applied_batch_is_not_audited_as_rolled_back() {
     let error = DriverError::non_atomic_batch_failure(2, DriverError::query("statement failed"));
 

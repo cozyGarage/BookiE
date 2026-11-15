@@ -117,6 +117,29 @@ fn session_key_changes_when_saved_transport_changes() {
 }
 
 #[test]
+fn session_key_changes_when_a_connect_setting_changes() {
+    let original = saved_connection();
+    let key = SessionKey::from_saved(&original, [0; 32]);
+    let mut changed = original.clone();
+    changed.tls_strict_encryption = !original.tls_strict_encryption;
+    assert!(key != SessionKey::from_saved(&changed, [0; 32]), "strict encryption");
+
+    changed = original.clone();
+    changed.auth_source = Some("admin".into());
+    assert!(key != SessionKey::from_saved(&changed, [0; 32]), "auth source");
+
+    changed = original.clone();
+    changed.connect_timeout_secs = Some(3);
+    assert!(key != SessionKey::from_saved(&changed, [0; 32]), "connect timeout");
+
+    changed = original.clone();
+    changed
+        .attached_databases
+        .push(bookie_core::AttachedDatabase::new("extra", "/tmp/extra.db"));
+    assert!(key != SessionKey::from_saved(&changed, [0; 32]), "attached databases");
+}
+
+#[test]
 fn session_key_ignores_policy_only_changes() {
     let original = saved_connection();
     let original_key = SessionKey::from_saved(&original, [0; 32]);

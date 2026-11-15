@@ -44,7 +44,10 @@ async fn serve_for_owner(
             () = shutdown.cancelled() => break,
             accepted = listener.accept() => accepted,
         };
-        let (stream, _) = accepted.map_err(|error| error.to_string())?;
+        let Ok((stream, _)) = accepted else {
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            continue;
+        };
         if !stream.peer_cred().is_ok_and(|peer| peer.uid() == owner) {
             continue;
         }
@@ -135,16 +138,22 @@ fn with_token(line: &str, token: &str) -> String {
     let Some(object) = message.as_object_mut().filter(|object| object.contains_key("method")) else {
         return line.to_owned();
     };
-    if let Some(params) = object
-        .entry("params")
-        .or_insert_with(|| serde_json::json!({}))
-        .as_object_mut()
-        && let Some(meta) = params
-            .entry("_meta")
+    let carries_token = object
+        .get("params")
+        .is_some_and(|params| crate::server::extract_token_str(params).is_some());
+    if !carries_token
+        && let Some(meta) = object
+            .entry("params")
             .or_insert_with(|| serde_json::json!({}))
             .as_object_mut()
+            .and_then(|params| {
+                params
+                    .entry("_meta")
+                    .or_insert_with(|| serde_json::json!({}))
+                    .as_object_mut()
+            })
     {
-        meta.entry("authorization").or_insert_with(|| serde_json::json!(token));
+        meta.insert("authorization".into(), serde_json::json!(token));
     }
     format!("{message}\n")
 }
