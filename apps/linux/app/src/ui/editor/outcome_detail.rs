@@ -8,6 +8,8 @@ use super::StatementOutcome;
 pub struct OutcomeDetail {
     pub messages: ServerMessages,
     pub approval_wait_ms: u128,
+    pub rows_affected: Option<u64>,
+    pub is_write: bool,
 }
 
 pub(super) fn totals(outcomes: &[StatementOutcome]) -> (StatementTiming, MessagesView) {
@@ -45,6 +47,7 @@ mod tests {
             detail: OutcomeDetail {
                 messages,
                 approval_wait_ms,
+                ..OutcomeDetail::default()
             },
         }
     }

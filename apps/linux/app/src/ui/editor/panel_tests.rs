@@ -273,6 +273,7 @@ fn keyboard_shortcuts_move_focus_between_editor_and_result_grid() {
             result_sets: vec![result.clone(), result],
             truncated: false,
             messages: Default::default(),
+            rows_affected: None,
         }),
     );
     let dropdown = descendants(fixture.controller.widget().upcast_ref())
