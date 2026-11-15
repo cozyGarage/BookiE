@@ -6337,6 +6337,7 @@ dependencies = [
  "rand 0.9.5",
  "rustc_version_runtime",
  "rustls",
+ "rustls-native-certs",
  "serde",
  "serde_bytes",
  "serde_with",
