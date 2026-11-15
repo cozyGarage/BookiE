@@ -59,6 +59,12 @@ pub struct ApprovalRequest {
     pub cancellation: Option<CancellationToken>,
 }
 
+impl ApprovalRequest {
+    pub fn may_be_remembered(&self) -> bool {
+        self.environment != Environment::Prod && matches!(self.principal, Principal::Human { .. })
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ApprovalOutcome {
     AllowOnce,
@@ -161,7 +167,7 @@ impl<S: ApprovalSink> RememberingApprovalSink<S> {
 #[async_trait]
 impl<S: ApprovalSink> ApprovalSink for RememberingApprovalSink<S> {
     async fn request(&self, req: ApprovalRequest) -> ApprovalOutcome {
-        let may_remember = req.environment != Environment::Prod && matches!(req.principal, Principal::Human { .. });
+        let may_remember = req.may_be_remembered();
         let grant = grant_for(&req);
         if may_remember && self.grants.covers(&grant) {
             return ApprovalOutcome::UsedGrant;
@@ -174,5 +180,40 @@ impl<S: ApprovalSink> ApprovalSink for RememberingApprovalSink<S> {
             ApprovalOutcome::AllowAndRemember | ApprovalOutcome::UsedGrant => ApprovalOutcome::AllowOnce,
             other => other,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn request(principal: Principal, environment: Environment) -> ApprovalRequest {
+        ApprovalRequest {
+            principal,
+            environment,
+            connection_id: Uuid::nil(),
+            connection_name: "db".into(),
+            sql: "DELETE FROM t".into(),
+            facts: StatementFacts::unparseable("test"),
+            rule: "rule".into(),
+            reason: "reason".into(),
+            preview: None,
+            estimated_rows: None,
+            cancellation: None,
+        }
+    }
+
+    #[test]
+    fn only_a_person_outside_production_is_offered_remember() {
+        let agent = || Principal::Agent {
+            token: "token".into(),
+            client: None,
+            model: None,
+        };
+        assert!(request(Principal::human_gui(), Environment::Local).may_be_remembered());
+        assert!(request(Principal::human_gui(), Environment::Staging).may_be_remembered());
+        assert!(!request(Principal::human_gui(), Environment::Prod).may_be_remembered());
+        assert!(!request(agent(), Environment::Local).may_be_remembered());
+        assert!(!request(agent(), Environment::Prod).may_be_remembered());
     }
 }
