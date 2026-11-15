@@ -1466,6 +1466,8 @@ jobs:
         with:
           ref: ${{ needs.pin-revision.outputs.revision }}
           persist-credentials: false
+      - name: Mark checkout safe for Git in container
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
           name: floor-package-${{ github.run_id }}-${{ github.run_attempt }}

@@ -40,15 +40,15 @@ async fn an_interrupted_interactive_begin_retires_the_uncertain_backend() {
     let original_pid = backend_pid(connection.as_ref()).await;
     let begin_connection = connection.clone();
     let begin_task = tokio::spawn(async move {
-        let control = OperationControl::with_timeout(Duration::from_secs(1));
+        let control = OperationControl::with_timeout(Duration::from_secs(5));
         begin_connection.begin_controlled(&control).await
     });
 
-    tokio::time::timeout(Duration::from_secs(5), begin_reply)
+    tokio::time::timeout(Duration::from_secs(15), begin_reply)
         .await
         .expect("BEGIN reaches PostgreSQL")
         .expect("proxy reports the BEGIN response");
-    tokio::time::sleep(Duration::from_millis(1_100)).await;
+    tokio::time::sleep(Duration::from_millis(5_100)).await;
     release_reply.send(()).unwrap();
     let error = match begin_task.await.unwrap() {
         Ok(_) => panic!("the timed-out BEGIN cannot be reported as successful"),

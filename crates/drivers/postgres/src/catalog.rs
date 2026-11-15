@@ -2,8 +2,8 @@ use bookie_core::{
     CATALOG_OBJECT_LIMIT, CatalogObject, CatalogObjectKind, DriverError, ROUTINE_DEFINITION_LIMIT_BYTES,
     RoutineDefinition, RoutineLookup, RoutineRef, cap_definition,
 };
+use sqlx::Row;
 use sqlx::postgres::PgRow;
-use sqlx::{Pool, Postgres, Row};
 
 use crate::map_sqlx_error;
 
@@ -123,15 +123,15 @@ fn sql_for(kind: CatalogObjectKind) -> String {
 }
 
 pub(crate) async fn list_objects(
-    pool: &Pool<Postgres>,
+    connection: &mut sqlx::PgConnection,
     kind: CatalogObjectKind,
     schema: Option<&str>,
 ) -> Result<Vec<CatalogObject>, DriverError> {
-    list_objects_excluding(pool, kind, schema, &[]).await
+    list_objects_excluding(connection, kind, schema, &[]).await
 }
 
 pub(crate) async fn list_objects_excluding(
-    pool: &Pool<Postgres>,
+    connection: &mut sqlx::PgConnection,
     kind: CatalogObjectKind,
     schema: Option<&str>,
     excluded_schemas: &[String],
@@ -147,7 +147,7 @@ pub(crate) async fn list_objects_excluding(
         CatalogObjectKind::Extension => query.bind(excluded_schemas).bind(limit),
         CatalogObjectKind::Role => query.bind(limit),
     };
-    let rows = query.fetch_all(pool).await.map_err(map_sqlx_error)?;
+    let rows = query.fetch_all(&mut *connection).await.map_err(map_sqlx_error)?;
     rows.iter().map(|row| object_from_row(kind, row)).collect()
 }
 
@@ -189,7 +189,7 @@ fn routine_kind(prokind: &str) -> &'static str {
 }
 
 pub(crate) async fn routine_definition(
-    pool: &Pool<Postgres>,
+    connection: &mut sqlx::PgConnection,
     routine: &RoutineRef,
 ) -> Result<RoutineLookup, DriverError> {
     let cap = i64::try_from(ROUTINE_DEFINITION_LIMIT_BYTES).unwrap_or(i64::MAX);
@@ -201,7 +201,7 @@ pub(crate) async fn routine_definition(
         .bind(routine.name.as_str())
         .bind(routine.identity_arguments.as_deref())
         .bind(cap)
-        .fetch_all(pool)
+        .fetch_all(&mut *connection)
         .await
         .map_err(map_sqlx_error)?;
     match rows.as_slice() {
