@@ -40,6 +40,7 @@ import gtk_runner
 import gtk_shard
 import gtk_process
 import gtk_allocator_trim
+import gtk_server_messages
 
 _owned_application = None
 
@@ -3382,6 +3383,8 @@ def main():
     scenarios.extend(gtk_whole_result.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_active_edit.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_editor_panel.scenarios(sys.modules[__name__]))
+    if os.environ.get("BOOKIE_GTK_POSTGRES_PORT"):
+        scenarios.extend(gtk_server_messages.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_csv_refresh.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_copy_statements.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_catalog.scenarios(sys.modules[__name__]))
