@@ -7,6 +7,7 @@ use bookie_results::result_predicate::{ColumnScope, ResultPredicate};
 use bookie_results::result_scan::{ScanProgress, ScanSource, scan_pages};
 use bookie_results::stream_result_spool::StreamResultSpoolManager;
 use bookie_results::text_match::TextMatchOptions;
+use std::sync::OnceLock;
 use tokio_util::sync::CancellationToken;
 
 use crate::core_bridge::column_infos;
@@ -72,6 +73,11 @@ impl Synthetic {
     }
 }
 
+pub(crate) fn spool_manager() -> StreamResultSpoolManager {
+    static MANAGER: OnceLock<StreamResultSpoolManager> = OnceLock::new();
+    MANAGER.get_or_init(StreamResultSpoolManager::from_environment).clone()
+}
+
 fn spool_rows_from(
     rows: impl Iterator<Item = Vec<Value>>,
     cancel: &CancellationToken,
@@ -79,7 +85,7 @@ fn spool_rows_from(
     let runtime = tokio::runtime::Builder::new_current_thread()
         .build()
         .map_err(|_| "the result could not be prepared for scanning")?;
-    let spool = StreamResultSpoolManager::from_environment()
+    let spool = spool_manager()
         .create()
         .map_err(|_| "the result could not be prepared for scanning")?;
     let columns = column_infos();
@@ -357,6 +363,17 @@ mod tests {
             Ok(vec![999])
         );
         assert!(!source.compare(false, &CancellationToken::new()).unwrap().summary.keyed);
+    }
+
+    #[test]
+    fn every_result_spools_into_one_budget_for_the_whole_process() {
+        let first = Synthetic::new(500).scan(&CancellationToken::new()).unwrap();
+        let second = Synthetic::new(700).scan(&CancellationToken::new()).unwrap();
+        let reserved = spool_manager().reserved_bytes();
+        assert!(
+            reserved >= first.spool().stored_bytes() + second.spool().stored_bytes() && reserved > 0,
+            "two live results must count against one shared budget, saw {reserved}"
+        );
     }
 
     #[test]
