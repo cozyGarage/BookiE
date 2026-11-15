@@ -106,14 +106,21 @@ def main():
         directory = (ROOT / index['package_directories'][entry['package']]).resolve()
         if not directory.is_relative_to(ROOT.resolve()):
             raise ValueError('package directory is outside the source checkout')
-        result = subprocess.run(command, cwd=directory, env=execution_environment, text=True, stdout=subprocess.PIPE)
-        print(result.stdout, end='', flush=True)
-        if result.returncode:
-            return result.returncode
-        summaries = re.findall(r'^test result: ok\. (\d+) passed; 0 failed;', result.stdout, re.MULTILINE)
-        if not summaries:
+        process = subprocess.Popen(command, cwd=directory, env=execution_environment, text=True, stdout=subprocess.PIPE)
+        passed_tests = 0
+        has_summary = False
+        for line in process.stdout:
+            print(line, end='', flush=True)
+            match = re.match(r'^test result: ok\. (\d+) passed; 0 failed;', line)
+            if match:
+                passed_tests += int(match.group(1))
+                has_summary = True
+        returncode = process.wait()
+        if returncode:
+            return returncode
+        if not has_summary:
             raise ValueError('prebuilt test execution evidence missing')
-        passed += sum(map(int, summaries))
+        passed += passed_tests
     if not passed:
         raise ValueError('no prebuilt tests executed')
     return 0
