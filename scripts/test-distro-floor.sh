@@ -10,14 +10,16 @@ images=("$@")
 for base in "${images[@]}"; do
   tag="bookie-floor-${base//[:\/]/-}"
   echo "== $base"
-  package_mount=()
+  package_input=/dev/null
   package_env=()
+  package_interactive=()
   build_mounts=()
   build_environment=()
   if [ -n "${DISTRO_FLOOR_PACKAGE:-}" ]; then
     test -s "$DISTRO_FLOOR_PACKAGE"
-    package_mount=(-v "$(dirname "$(realpath "$DISTRO_FLOOR_PACKAGE")"):/package:ro")
+    package_input="$(realpath "$DISTRO_FLOOR_PACKAGE")"
     package_env=(-e "DISTRO_FLOOR_DEB_NAME=$(basename "$DISTRO_FLOOR_PACKAGE")")
+    package_interactive=(-i)
     dockerfile=scripts/distro-floor/Dockerfile.runtime
   else
     dockerfile=scripts/distro-floor/Dockerfile
@@ -39,11 +41,11 @@ for base in "${images[@]}"; do
     sleep "$((attempt * 20 + RANDOM % 15))"
   done
   rm -f "$build_log"
-  docker run --rm ${CARGO_BUILD_JOBS:+-e CARGO_BUILD_JOBS="$CARGO_BUILD_JOBS"} "${package_mount[@]}" "${package_env[@]}" -e BOOKIE_GTK_SHARD="${BOOKIE_GTK_SHARD:-}" -e DISTRO_FLOOR_INSTALLED="${DISTRO_FLOOR_INSTALLED:-0}" ${BOOKIE_GTK_Y_OFFSET:+-e BOOKIE_GTK_Y_OFFSET="$BOOKIE_GTK_Y_OFFSET"} ${BOOKIE_GTK_WAIT_SECONDS:+-e BOOKIE_GTK_WAIT_SECONDS="$BOOKIE_GTK_WAIT_SECONDS"} ${BOOKIE_GTK_SCENARIO_RETRIES:+-e BOOKIE_GTK_SCENARIO_RETRIES="$BOOKIE_GTK_SCENARIO_RETRIES"} -v "$PWD:/src:ro" "${build_mounts[@]}" "${build_environment[@]}" "$tag" bash -ceu -o pipefail '
+  docker run --rm "${package_interactive[@]}" ${CARGO_BUILD_JOBS:+-e CARGO_BUILD_JOBS="$CARGO_BUILD_JOBS"} "${package_env[@]}" -e BOOKIE_GTK_SHARD="${BOOKIE_GTK_SHARD:-}" -e DISTRO_FLOOR_INSTALLED="${DISTRO_FLOOR_INSTALLED:-0}" ${BOOKIE_GTK_Y_OFFSET:+-e BOOKIE_GTK_Y_OFFSET="$BOOKIE_GTK_Y_OFFSET"} ${BOOKIE_GTK_WAIT_SECONDS:+-e BOOKIE_GTK_WAIT_SECONDS="$BOOKIE_GTK_WAIT_SECONDS"} ${BOOKIE_GTK_SCENARIO_RETRIES:+-e BOOKIE_GTK_SCENARIO_RETRIES="$BOOKIE_GTK_SCENARIO_RETRIES"} -v "$PWD:/src:ro" "${build_mounts[@]}" "${build_environment[@]}" "$tag" bash -ceu -o pipefail '
     if [ -n "${DISTRO_FLOOR_DEB_NAME:-}" ]; then
+      cat > /tmp/bookie.deb
       apt-get update
-      cd /package
-      apt install -y "./$DISTRO_FLOOR_DEB_NAME"
+      apt install -y /tmp/bookie.deb
       status=0
       BOOKIE_GTK_BINARY=/usr/bin/bookie bash /src/scripts/test-gtk-safety.sh >/tmp/gtk-safety.log 2>&1 || status=$?
       if [ "$status" -ne 0 ]; then
@@ -68,5 +70,5 @@ for base in "${images[@]}"; do
         grep -aE "^passed:|^gtk: .*executed successfully" /tmp/gtk-safety.log
       fi
     fi
-  '
+  ' < "$package_input"
 done
