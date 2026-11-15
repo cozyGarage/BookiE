@@ -1143,6 +1143,7 @@ dependencies = [
  "bookie-transport",
  "chrono",
  "gettext-rs",
+ "quick-xml 0.42.0",
  "rust_decimal",
  "secrecy",
  "serde",
