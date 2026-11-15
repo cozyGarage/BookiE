@@ -137,8 +137,13 @@ pub(crate) fn text(value: &Value) -> Option<String> {
 
 impl CassandraConnection {
     pub(crate) async fn read(&self, cql: &str, _binds: &[Value], limit: usize) -> Result<QueryResult, DriverError> {
+        self.read_window(cql, 0, limit).await
+    }
+
+    pub(crate) async fn read_window(&self, cql: &str, skip: usize, limit: usize) -> Result<QueryResult, DriverError> {
         let mut statement = Statement::new(cql);
-        let page = i32::try_from(limit.saturating_add(1).min(MAX_QUERY_ROWS + 1)).unwrap_or(i32::MAX);
+        let wanted = skip.saturating_add(limit);
+        let page = i32::try_from(wanted.saturating_add(1).min(MAX_QUERY_ROWS + 1)).unwrap_or(i32::MAX);
         statement.set_page_size(page);
         let (result, paging) = self
             .session
@@ -175,10 +180,14 @@ impl CassandraConnection {
         let mut budget = QueryResultBudget::default();
         let mut cells = Vec::new();
         let mut truncated = !paging.finished();
-        for row in rows
+        for (index, row) in rows
             .rows::<scylla::value::Row>()
             .map_err(|error| DriverError::Internal(format!("cassandra rows: {error}")))?
+            .enumerate()
         {
+            if index < skip {
+                continue;
+            }
             let row = row.map_err(|error| DriverError::Internal(format!("cassandra row: {error}")))?;
             let values: Vec<Value> = row.columns.into_iter().map(value::cell).collect();
             if cells.len() >= limit || !budget.admit(&values) {
@@ -225,21 +234,11 @@ impl Connection for CassandraConnection {
                 "Cassandra has no row offset; pages are limited to the first {MAX_OFFSET} rows"
             )));
         }
-        let wanted = usize::try_from(offset.saturating_add(limit)).unwrap_or(MAX_QUERY_ROWS);
-        let target = guard::qualified(schema.or(self.keyspace.as_deref()), table);
-        let mut result = self
-            .read(&format!("SELECT * FROM {target} LIMIT {wanted}"), &[], wanted)
-            .await?;
         let skip = usize::try_from(offset).unwrap_or(usize::MAX);
-        let rows: Vec<Vec<Value>> = result
-            .rows
-            .iter()
-            .skip(skip)
-            .take(usize::try_from(limit).unwrap_or(MAX_QUERY_ROWS))
-            .map(|row| row.to_vec())
-            .collect();
-        result.rows = QueryRows::from_rows(rows);
-        Ok(result)
+        let take = usize::try_from(limit).unwrap_or(MAX_QUERY_ROWS);
+        let target = guard::qualified(schema.or(self.keyspace.as_deref()), table);
+        let cql = format!("SELECT * FROM {target} LIMIT {}", skip.saturating_add(take));
+        self.read_window(&cql, skip, take).await
     }
 
     async fn query(&self, cql: &str) -> Result<QueryResult, DriverError> {
