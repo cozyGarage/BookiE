@@ -815,15 +815,33 @@ impl Connection for PgConnection {
     }
 
     async fn begin(&self) -> Result<Box<dyn bookie_core::Transaction>, DriverError> {
-        let mut connection = tokio::time::timeout(CONTROL_SETUP_TIMEOUT, self.pool.acquire())
+        self.begin_controlled(&OperationControl::with_timeout(CONTROL_SETUP_TIMEOUT))
             .await
-            .map_err(|_| DriverError::TimedOut)?
-            .map_err(map_sqlx_error)?;
+    }
+
+    async fn begin_controlled(
+        &self,
+        control: &OperationControl,
+    ) -> Result<Box<dyn bookie_core::Transaction>, DriverError> {
+        let mut connection = acquire_controlled(&self.pool, control).await?;
         let cancel_token = connection.cancel_token();
-        sqlx::query("BEGIN")
-            .execute(&mut *connection)
-            .await
-            .map_err(map_sqlx_error)?;
+        let result = run_server_cancellable(
+            async {
+                sqlx::query("BEGIN")
+                    .execute(&mut *connection)
+                    .await
+                    .map(|_| ())
+                    .map_err(map_sqlx_error)
+            },
+            request_cancellation(cancel_token.clone()),
+            confirms_cancellation,
+            control,
+        )
+        .await;
+        let (connection, result) = finish_connection(connection, result).await;
+        result?;
+        let connection =
+            connection.ok_or_else(|| DriverError::Internal("PostgreSQL transaction connection was retired".into()))?;
         Ok(Box::new(PgTransaction {
             connection: Some(connection),
             cancel_token,

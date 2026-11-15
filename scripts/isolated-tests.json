@@ -1940,6 +1940,16 @@
     [
       "bookie-app",
       "--lib",
+      "ui::mcp_preferences::copy_tests::the_issue_form_offers_four_expiry_choices_and_defaults_to_ninety_days"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::mcp_preferences::copy_tests::the_status_group_shows_the_socket_and_a_server_that_could_not_start"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::plain_text::tests::a_banner_without_markup_shows_a_hostile_title_literally"
     ],
     [

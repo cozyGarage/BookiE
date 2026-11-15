@@ -377,6 +377,68 @@ mod copy_tests {
         assert_eq!(selected_tools(&issue.tool_checks), Some(vec![tool.clone()]));
     }
 
+    fn row_titles(widget: &gtk::Widget, titles: &mut Vec<String>) {
+        if let Some(row) = widget.downcast_ref::<adw::ActionRow>() {
+            titles.push(row.title().to_string());
+        }
+        let mut child = widget.first_child();
+        while let Some(current) = child {
+            row_titles(&current, titles);
+            child = current.next_sibling();
+        }
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn the_issue_form_offers_four_expiry_choices_and_defaults_to_ninety_days() {
+        adw::init().unwrap();
+        let issue = issue_group();
+
+        let model = issue
+            .expiry_combo
+            .model()
+            .unwrap()
+            .downcast::<gtk::StringList>()
+            .unwrap();
+        let choices: Vec<String> = (0..model.n_items())
+            .filter_map(|index| model.string(index))
+            .map(|choice| choice.to_string())
+            .collect();
+        assert_eq!(choices, ["After 30 days", "After 90 days", "After 1 year", "Never"]);
+        assert_eq!(issue.expiry_combo.selected(), 1);
+        assert!(mcp_service::expiry_for_choice(issue.expiry_combo.selected(), chrono::Utc::now()).is_some());
+        assert!(mcp_service::expiry_for_choice(3, chrono::Utc::now()).is_none());
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn the_status_group_shows_the_socket_and_a_server_that_could_not_start() {
+        adw::init().unwrap();
+        let database = crate::services::database_service::DatabaseService::new_isolated();
+        let titles = |database: &crate::services::database_service::DatabaseService| {
+            let mut titles = Vec::new();
+            row_titles(status_group(database).upcast_ref::<gtk::Widget>(), &mut titles);
+            titles
+        };
+
+        let before = titles(&database);
+        assert!(before.iter().any(|title| title == "Endpoint"), "{before:?}");
+        assert_eq!(
+            before.iter().any(|title| title == "Socket"),
+            bookie_mcp::default_socket_path().is_some(),
+            "{before:?}"
+        );
+        assert!(!before.iter().any(|title| title == "MCP server is not running"));
+
+        mcp_service::record_server_failure("Address already in use (os error 98)", 17432);
+
+        assert!(
+            titles(&database)
+                .iter()
+                .any(|title| title == "MCP server is not running")
+        );
+    }
+
     #[test]
     #[ignore = "requires an isolated GTK display"]
     fn the_copy_button_puts_the_token_on_the_clipboard_and_keeps_the_dialog_open() {

@@ -172,7 +172,7 @@ pub async fn issue_token(
 
 static SERVER_FAILURE: Mutex<Option<String>> = Mutex::new(None);
 
-fn record_server_failure(error: &str, port: u16) {
+pub(crate) fn record_server_failure(error: &str, port: u16) {
     let message = if error.contains("in use") {
         format!(
             "Port {port} is already used by another program, so agents cannot reach BookiE. Close that program and restart BookiE."
