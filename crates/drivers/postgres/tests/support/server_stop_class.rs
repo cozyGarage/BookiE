@@ -418,8 +418,12 @@ async fn a_save_stopped_while_it_waits_for_a_lock_is_rolled_back_on_the_server()
         .await
         .expect_err("a save behind a row lock cannot finish");
     assert!(
-        matches!(error, DriverError::TimedOut),
-        "PostgreSQL confirmed the stop, so the save is known not to have run: {error:?}"
+        matches!(
+            &error,
+            DriverError::Transaction { statement_index: 0, source }
+                if matches!(source.as_ref(), DriverError::TimedOut)
+        ),
+        "confirmed timeout keeps its transaction context: {error:?}"
     );
     assert_eq!(waiting_backends(observer.as_ref()).await, 0);
     assert_eq!(open_transactions(observer.as_ref()).await, 0);
@@ -435,7 +439,14 @@ async fn a_save_stopped_while_it_waits_for_a_lock_is_rolled_back_on_the_server()
         }
     );
     let error = error.expect_err("a save behind a row lock cannot finish");
-    assert!(matches!(error, DriverError::Cancelled), "{error:?}");
+    assert!(
+        matches!(
+            &error,
+            DriverError::Transaction { statement_index: 0, source }
+                if matches!(source.as_ref(), DriverError::Cancelled)
+        ),
+        "confirmed cancellation keeps its transaction context: {error:?}"
+    );
     assert_eq!(waiting_backends(observer.as_ref()).await, 0);
     assert_eq!(open_transactions(observer.as_ref()).await, 0);
 
