@@ -10,21 +10,36 @@ use tokio_util::sync::CancellationToken;
 pub const MAX_APPROVAL_SQL_CHARS: usize = 16_384;
 
 pub(crate) fn sql_is_reviewable(sql: &str) -> bool {
-    sql.chars().count() <= MAX_APPROVAL_SQL_CHARS
-        && !sql.chars().any(|c| {
-            (c.is_control() && !matches!(c, '\n' | '\r' | '\t'))
-                || matches!(
-                    c,
-                    '\u{061C}'
-                        | '\u{180E}'
-                        | '\u{200B}'..='\u{200F}'
-                        | '\u{2028}'..='\u{202E}'
-                        | '\u{2060}'..='\u{2064}'
-                        | '\u{2066}'..='\u{2069}'
-                        | '\u{FEFF}'
-                        | '\u{FFF9}'..='\u{FFFB}'
-                )
-        })
+    sql.chars().count() <= MAX_APPROVAL_SQL_CHARS && !sql.chars().any(is_unreviewable_character)
+}
+
+fn is_unreviewable_character(character: char) -> bool {
+    (character.is_control() && !matches!(character, '\n' | '\r' | '\t'))
+        || is_default_ignorable_code_point(character)
+        || matches!(character, '\u{2028}'..='\u{2029}' | '\u{FFF9}'..='\u{FFFB}')
+}
+
+fn is_default_ignorable_code_point(character: char) -> bool {
+    matches!(
+        character,
+        '\u{00AD}'
+            | '\u{034F}'
+            | '\u{061C}'
+            | '\u{115F}'..='\u{1160}'
+            | '\u{17B4}'..='\u{17B5}'
+            | '\u{180B}'..='\u{180F}'
+            | '\u{200B}'..='\u{200F}'
+            | '\u{202A}'..='\u{202E}'
+            | '\u{2060}'..='\u{206F}'
+            | '\u{3164}'
+            | '\u{FE00}'..='\u{FE0F}'
+            | '\u{FEFF}'
+            | '\u{FFA0}'
+            | '\u{FFF0}'..='\u{FFF8}'
+            | '\u{1BCA0}'..='\u{1BCA3}'
+            | '\u{1D173}'..='\u{1D17A}'
+            | '\u{E0000}'..='\u{E0FFF}'
+    )
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
