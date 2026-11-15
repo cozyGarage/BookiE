@@ -99,7 +99,7 @@ pub(super) fn cell_view_with_column_editability<'a>(
     let (display_text, truncated) = if is_null && auto_filled {
         (Cow::Owned(auto_filled_sentinel()), false)
     } else {
-        cell_display_text(value, relaxed_mongodb_json)
+        cell_display_text(value, column, relaxed_mongodb_json)
     };
     CellView {
         display_text,
@@ -120,7 +120,10 @@ pub(super) fn cell_view_with_column_editability<'a>(
     }
 }
 
-fn cell_display_text(value: &Value, relaxed_mongodb_json: bool) -> (Cow<'_, str>, bool) {
+fn cell_display_text<'a>(value: &'a Value, column: &ColumnInfo, relaxed_mongodb_json: bool) -> (Cow<'a, str>, bool) {
+    if let Some(uuid) = bookie_results::uuid_display::format_binary_uuid(value, column) {
+        return (Cow::Owned(uuid), false);
+    }
     match value {
         Value::Text(text) => text_to_display_text_cow(text, GRID_CELL_DISPLAY_MAX_CHARS, true, None),
         Value::Bytes(bytes) if bytes.len() > GRID_CELL_DISPLAY_MAX_BYTES => {

@@ -145,6 +145,21 @@ async fn exercise(container: &testcontainers::ContainerAsync<GenericImage>, opti
 
     let second = connection.fetch_rows(Some("conf"), "items", 2, 2).await.unwrap();
     assert_eq!(second.rows.iter().count(), 1, "offset 2 of 3 rows leaves one");
+    let mut ids: Vec<Value> = Vec::new();
+    for offset in 0..3 {
+        let page = connection.fetch_rows(Some("conf"), "items", offset, 1).await.unwrap();
+        ids.extend(page.rows.iter().map(|row| row[0].clone()));
+    }
+    let mut seen: Vec<Value> = ids;
+    seen.sort_by_key(|value| match value {
+        Value::Int(id) => *id,
+        _ => i64::MAX,
+    });
+    assert_eq!(
+        seen,
+        [Value::Int(1), Value::Int(2), Value::Int(3)],
+        "single-row pages cover each row once"
+    );
 
     let selected = connection
         .query("SELECT label FROM conf.items WHERE id = 1;")

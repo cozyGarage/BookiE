@@ -149,6 +149,13 @@ print(hosts[sys.argv[-1]], "STREAM", sys.argv[-1])
         self.assertIn('wait_for_ssh_host_key "$fixture_ssh_host" 2223', script)
         self.assertNotIn('wait_for_port "$fixture_ssh_host" 2223', script)
 
+    def test_ssh_readiness_timeout_reports_host_and_proxy_diagnostics(self):
+        script = (ROOT / "scripts/test-postgres-release.sh").read_text()
+        self.assertIn('getent ahostsv4 "$host" || true', script)
+        self.assertIn('ssh-keyscan -v -T 3 -p "$port" "$host" 2>&1 || true', script)
+        self.assertIn('compose ps --all || true', script)
+        self.assertIn('compose logs --no-color --tail 30 bastion toxiproxy || true', script)
+
 
 if __name__ == "__main__":
     unittest.main()

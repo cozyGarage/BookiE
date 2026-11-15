@@ -1159,7 +1159,7 @@ def run_sql(sql):
 
 
 def run_scenario(binary, scenario):
-    base = Path(tempfile.mkdtemp(prefix=f"bookie-{scenario.__name__}-"))
+    base = Path(tempfile.mkdtemp(prefix="bk-"))
     process = None
     failure = None
     stderr = ""

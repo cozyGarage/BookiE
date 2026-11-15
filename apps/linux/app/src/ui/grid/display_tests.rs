@@ -53,6 +53,36 @@ fn grid_cell_view_borrows_short_utf8_bytes_without_changing_display() {
 }
 
 #[test]
+fn mysql_binary_uuid_cells_show_uuid_text_and_keep_the_raw_bytes() {
+    let bytes = [
+        0x55, 0x0e, 0x84, 0x00, 0xe2, 0x9b, 0x41, 0xd4, 0xa7, 0x16, 0x44, 0x66, 0x55, 0x44, 0x00, 0x00,
+    ];
+    let value = Value::Bytes(bytes.to_vec());
+    let view = cell_view(&value, &metadata("binary(16)"));
+
+    assert_eq!(view.display_text, "550e8400-e29b-41d4-a716-446655440000");
+    assert_eq!(value, Value::Bytes(bytes.to_vec()));
+}
+
+#[test]
+fn mysql_binary_query_result_cells_show_uuid_text_from_driver_type_metadata() {
+    let bytes = [
+        0x55, 0x0e, 0x84, 0x00, 0xe2, 0x9b, 0x41, 0xd4, 0xa7, 0x16, 0x44, 0x66, 0x55, 0x44, 0x00, 0x00,
+    ];
+    let value = Value::Bytes(bytes.to_vec());
+    let view = cell_view(&value, &metadata("VARBINARY"));
+
+    assert_eq!(view.display_text, "550e8400-e29b-41d4-a716-446655440000");
+}
+
+#[test]
+fn mysql_binary_uuid_display_does_not_change_other_binary_cells() {
+    let value = Value::Bytes(vec![0; 16]);
+    assert_eq!(cell_view(&value, &metadata("blob")).display_text, "<16 bytes>");
+    assert_eq!(cell_view(&value, &metadata("binary(8)")).display_text, "<16 bytes>");
+}
+
+#[test]
 fn grid_cell_view_bounds_byte_classification_and_keeps_the_full_value_available() {
     let text = "large text bytes".repeat(GRID_CELL_DISPLAY_MAX_CHARS / 4 + 1);
     let value = Value::Bytes(text.as_bytes().to_vec());

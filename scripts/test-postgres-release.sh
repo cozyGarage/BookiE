@@ -69,6 +69,10 @@ wait_for_ssh_host_key() {
     sleep 1
   done
   echo "SSH service did not provide a host key on $host:$port" >&2
+  getent ahostsv4 "$host" || true
+  ssh-keyscan -v -T 3 -p "$port" "$host" 2>&1 || true
+  compose ps --all || true
+  compose logs --no-color --tail 30 bastion toxiproxy || true
   return 1
 }
 
