@@ -1,10 +1,13 @@
 import importlib.util
+import io
 import json
 from pathlib import Path
 import re
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 import unittest
 from unittest.mock import patch
 
@@ -197,6 +200,25 @@ class LayerRunnerTests(unittest.TestCase):
         self.assertEqual(self.execute(step)["status"], "blocked")
         step = dict(self.step("pass"), required_tools=["bookie-missing-prerequisite"])
         self.assertEqual(self.execute(step)["status"], "blocked")
+
+    def test_output_is_visible_before_the_child_exits(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output = io.StringIO()
+            result = {}
+            step = self.step("import time; print('early output', flush=True); time.sleep(0.5)")
+            with patch.object(runner.sys, "stdout", output):
+                thread = threading.Thread(
+                    target=lambda: result.update(runner.execute(step, Path(temporary) / "step.log"))
+                )
+                thread.start()
+                deadline = time.monotonic() + 0.3
+                while "early output" not in output.getvalue() and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                self.assertIn("early output", output.getvalue())
+                self.assertTrue(thread.is_alive())
+                thread.join(timeout=2)
+            self.assertFalse(thread.is_alive())
+            self.assertEqual(result["status"], "passed")
 
     def test_interruption_is_not_passed(self):
         with patch.object(runner.subprocess, "Popen", side_effect=KeyboardInterrupt):
