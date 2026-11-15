@@ -684,3 +684,9 @@ async fn the_saved_local_port_applies_to_the_last_hop_only() {
     assert_eq!(hops[0].local_port, None);
     assert_eq!(hops[1].local_port, Some(15432));
 }
+
+#[test]
+fn a_revoked_built_in_ssh_host_key_is_denied_like_the_openssh_backend() {
+    let error = bookie_ssh::SshError::HostKeyRevoked("the host key of db:22 is marked @revoked".into());
+    assert!(matches!(super::map_ssh_error(error), TransportError::HostKeyRevoked(_)));
+}

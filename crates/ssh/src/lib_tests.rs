@@ -82,7 +82,7 @@ async fn host_key_prompt_resumes_only_the_remaining_handshake_budget() {
 
 #[test]
 fn client_config_enables_keepalive_so_a_dead_bastion_is_eventually_detected() {
-    let config = client_config();
+    let config = client_config(&[]);
     assert_eq!(
         config.keepalive_interval,
         Some(KEEPALIVE_INTERVAL),
@@ -436,7 +436,7 @@ fn names<T: AsRef<str>>(items: &[T]) -> Vec<&str> {
 
 #[test]
 fn the_built_in_client_never_offers_a_weak_algorithm() {
-    let preferred = client_config().preferred;
+    let preferred = client_config(&[]).preferred;
     assert!(!preferred.key.contains(&Algorithm::Rsa { hash: None }));
     assert!(!preferred.key.iter().any(|key| matches!(key, Algorithm::Dsa)));
     for cipher in names(&preferred.cipher) {
@@ -457,7 +457,7 @@ fn the_built_in_client_never_offers_a_weak_algorithm() {
 
 #[test]
 fn the_built_in_client_still_offers_the_modern_algorithms() {
-    let preferred = client_config().preferred;
+    let preferred = client_config(&[]).preferred;
     for key in [
         Algorithm::Ed25519,
         Algorithm::Rsa {
@@ -538,4 +538,21 @@ fn a_fixed_bind_on_a_busy_port_names_the_port_in_a_bind_error() {
     };
     assert_eq!(error.kind(), std::io::ErrorKind::AddrInUse);
     assert!(error.to_string().contains(&busy.to_string()), "{error}");
+}
+
+#[test]
+fn the_built_in_client_asks_first_for_the_key_type_it_already_knows() {
+    let key_order = |recorded: &[Algorithm]| client_config(recorded).preferred.key.to_vec();
+    let ecdsa = Algorithm::Ecdsa {
+        curve: EcdsaCurve::NistP256,
+    };
+    assert_eq!(key_order(&[])[0], Algorithm::Ed25519);
+    let ecdsa_known = key_order(std::slice::from_ref(&ecdsa));
+    assert_eq!(ecdsa_known[0], ecdsa);
+    assert_eq!(ecdsa_known.len(), HOST_KEY_ALGORITHMS.len());
+    let rsa_known = key_order(&[Algorithm::Rsa { hash: None }]);
+    assert!(
+        rsa_known[..2].iter().all(|key| matches!(key, Algorithm::Rsa { .. })),
+        "{rsa_known:?}"
+    );
 }

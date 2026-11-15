@@ -467,6 +467,24 @@ index f68c928..c743320 100755
  pub use copy::{PgCopyIn, PgPoolCopyExt};
  pub use database::Postgres;
  pub use error::{PgDatabaseError, PgErrorPosition};
+diff --git a/src/transaction.rs b/src/transaction.rs
+index 3f4122e..b748ad7 100755
+--- a/src/transaction.rs
++++ b/src/transaction.rs
+@@ -27,11 +27,12 @@ impl TransactionManager for PgTransactionManager {
+ 
+         let rollback = Rollback::new(conn);
+         rollback.conn.queue_simple_query(statement.as_str())?;
++        rollback.conn.inner.transaction_depth += 1;
+         rollback.conn.wait_until_ready().await?;
+         if !rollback.conn.in_transaction() {
++            rollback.conn.inner.transaction_depth -= 1;
+             return Err(Error::BeginFailed);
+         }
+-        rollback.conn.inner.transaction_depth += 1;
+         rollback.defuse();
+ 
+         Ok(())
 diff --git a/src/types/array.rs b/src/types/array.rs
 index 692771c..3d44a7b 100755
 --- a/src/types/array.rs

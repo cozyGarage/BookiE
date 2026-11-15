@@ -420,6 +420,7 @@ fn map_ssh_error(error: bookie_ssh::SshError) -> TransportError {
     match error {
         error @ bookie_ssh::SshError::UnknownHostKey { .. } => TransportError::HostKeyRefused(error.to_string()),
         error @ bookie_ssh::SshError::HostKeyMismatch { .. } => TransportError::HostKeyChanged(error.to_string()),
+        error @ bookie_ssh::SshError::HostKeyRevoked(_) => TransportError::HostKeyRevoked(error.to_string()),
         error @ bookie_ssh::SshError::Timeout { .. } => TransportError::SshTimeout(error.to_string()),
         error => TransportError::Ssh(error.to_string()),
     }

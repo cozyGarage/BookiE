@@ -30,6 +30,33 @@ class PrebuiltTestRunnerTests(unittest.TestCase):
         ], "build_group": "default", "files": {"test-program": {"sha256": hashlib.sha256(self.binary.read_bytes()).hexdigest(), "size": self.binary.stat().st_size}}, "binaries": {}, "package_directories": {"sample": "crates/sample"}}
         (self.root / "index.json").write_text(json.dumps(self.index))
 
+    def test_source_revision_read_trusts_only_the_checkout(self):
+        with patch.object(runner, 'ROOT', self.root), \
+             patch.object(runner.subprocess, 'check_output', return_value='a' * 40) as check_output:
+            runner.load_index(self.root)
+
+        self.assertEqual(
+            check_output.call_args.args[0],
+            ['git', '-c', f'safe.directory={self.root.resolve()}', 'rev-parse', 'HEAD'],
+        )
+        self.assertEqual(check_output.call_args.kwargs['cwd'], self.root)
+
+    def test_source_revision_read_handles_a_different_owner_checkout(self):
+        repository = self.root / 'repository'
+        repository.mkdir()
+        subprocess.run(['git', 'init', '--quiet', str(repository)], check=True)
+        subprocess.run(['git', '-C', str(repository), 'config', 'user.name', 'Bookie Test'], check=True)
+        subprocess.run(['git', '-C', str(repository), 'config', 'user.email', 'bookie@example.test'], check=True)
+        tracked_file = repository / 'revision.txt'
+        tracked_file.write_text('revision\n')
+        subprocess.run(['git', '-C', str(repository), 'add', 'revision.txt'], check=True)
+        subprocess.run(['git', '-C', str(repository), 'commit', '--quiet', '-m', 'fixture'], check=True)
+        expected = subprocess.check_output(['git', '-C', str(repository), 'rev-parse', 'HEAD'], text=True).strip()
+
+        with patch.object(runner, 'ROOT', repository), \
+             patch.dict(os.environ, {'GIT_TEST_ASSUME_DIFFERENT_OWNER': '1'}):
+            self.assertEqual(runner.source_revision(), expected)
+
     def test_preserves_libtest_filters_and_single_process_fixture_lifetime(self):
         args = ["--locked", "-p", "sample", "--test", "integration", "rollback", "--", "--include-ignored", "--test-threads=1"]
         with patch.object(runner, "ROOT", self.root), patch.dict(os.environ, {"GITHUB_SHA": "a" * 40}, clear=True):
@@ -110,10 +137,28 @@ class PrebuiltTestRunnerTests(unittest.TestCase):
             self.assertEqual(len(runner.commands(self.root, ["-p", "sample", "--test", "integration"])), 1)
 
     def test_bundle_preparation_rejects_a_different_checkout(self):
-        result = subprocess.run(['bash', str(ROOT / 'scripts/prepare-test-bundle.sh'), '0' * 40, 'default'],
+        result = subprocess.run(['bash', str(ROOT / 'scripts/prepare-test-bundle.sh'), '0' * 40, 'default', str(self.root)],
                                 capture_output=True, text=True)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('differs from the checkout', result.stderr)
+
+    def test_bundle_preparation_verifies_the_download_and_exports_runner_environment(self):
+        revision = subprocess.run(['git', '-C', str(ROOT), 'rev-parse', 'HEAD'], check=True, capture_output=True, text=True).stdout.strip()
+        self.index['source_commit'] = revision
+        self.index['build_group'] = 'default'
+        (self.root / 'index.json').write_text(json.dumps(self.index))
+        environment = self.root / 'github-env'
+        result = subprocess.run(
+            ['bash', str(ROOT / 'scripts/prepare-test-bundle.sh'), revision, 'default', str(self.root)],
+            env={**os.environ, 'GITHUB_ENV': str(environment)}, capture_output=True, text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        values = environment.read_text()
+        self.assertIn(f'BOOKIE_TEST_BUNDLE={self.root}', values)
+        self.assertIn(f'BOOKIE_SOURCE_COMMIT={revision}', values)
+        self.assertIn(f'GSETTINGS_SCHEMA_DIR={self.root}/schemas', values)
+        self.assertIn('BOOKIE_REQUIRE_PREBUILT=1', values)
+        self.assertTrue(self.binary.stat().st_mode & 0o100)
 
     def test_bundle_builder_rejects_a_different_checkout(self):
         result = subprocess.run(['bash', str(ROOT / 'scripts/build-test-bundles.sh'), str(self.root / 'out')],

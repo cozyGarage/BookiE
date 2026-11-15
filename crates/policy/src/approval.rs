@@ -7,6 +7,41 @@ use crate::principal::Principal;
 use bookie_core::Environment;
 use tokio_util::sync::CancellationToken;
 
+pub const MAX_APPROVAL_SQL_CHARS: usize = 16_384;
+
+pub(crate) fn sql_is_reviewable(sql: &str) -> bool {
+    sql.chars().count() <= MAX_APPROVAL_SQL_CHARS && !sql.chars().any(is_unreviewable_character)
+}
+
+fn is_unreviewable_character(character: char) -> bool {
+    (character.is_control() && !matches!(character, '\n' | '\r' | '\t'))
+        || is_default_ignorable_code_point(character)
+        || matches!(character, '\u{2028}'..='\u{2029}' | '\u{FFF9}'..='\u{FFFB}')
+}
+
+fn is_default_ignorable_code_point(character: char) -> bool {
+    matches!(
+        character,
+        '\u{00AD}'
+            | '\u{034F}'
+            | '\u{061C}'
+            | '\u{115F}'..='\u{1160}'
+            | '\u{17B4}'..='\u{17B5}'
+            | '\u{180B}'..='\u{180F}'
+            | '\u{200B}'..='\u{200F}'
+            | '\u{202A}'..='\u{202E}'
+            | '\u{2060}'..='\u{206F}'
+            | '\u{3164}'
+            | '\u{FE00}'..='\u{FE0F}'
+            | '\u{FEFF}'
+            | '\u{FFA0}'
+            | '\u{FFF0}'..='\u{FFF8}'
+            | '\u{1BCA0}'..='\u{1BCA3}'
+            | '\u{1D173}'..='\u{1D17A}'
+            | '\u{E0000}'..='\u{E0FFF}'
+    )
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApprovalRequest {
     pub principal: Principal,
@@ -126,7 +161,7 @@ impl<S: ApprovalSink> RememberingApprovalSink<S> {
 #[async_trait]
 impl<S: ApprovalSink> ApprovalSink for RememberingApprovalSink<S> {
     async fn request(&self, req: ApprovalRequest) -> ApprovalOutcome {
-        let may_remember = req.environment != Environment::Prod;
+        let may_remember = req.environment != Environment::Prod && matches!(req.principal, Principal::Human { .. });
         let grant = grant_for(&req);
         if may_remember && self.grants.covers(&grant) {
             return ApprovalOutcome::UsedGrant;

@@ -440,6 +440,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::browse_tab::chrome_tests::a_loaded_page_keeps_its_total_unknown_when_row_count_fails"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::browse_tab::chrome_tests::active_save_completion_clears_submitted_edits"
     ],
     [
@@ -521,6 +526,11 @@
       "bookie-app",
       "--lib",
       "ui::browse_tab::save_in_flight_tests::a_foreign_key_that_arrives_after_the_rows_marks_its_header"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::browse_tab::save_in_flight_tests::blank_edit_on_not_null_default_does_not_stage_a_null"
     ],
     [
       "bookie-app",

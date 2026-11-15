@@ -127,6 +127,28 @@ async fn a_production_connection_keeps_asking_and_never_stores_a_grant() {
 }
 
 #[tokio::test]
+async fn an_agent_is_asked_every_time_and_never_gets_a_stored_grant() {
+    let grants = Arc::new(ApprovalGrants::default());
+    let rig = rig(
+        Principal::Agent {
+            token: "token".into(),
+            client: None,
+            model: None,
+        },
+        Environment::Local,
+        &grants,
+    );
+
+    rig.guard.execute(WRITE).await.expect("first write");
+    assert_eq!(last_approval(&rig), AuditApprovalOutcome::Approved);
+    rig.guard.execute(WRITE).await.expect("second write");
+
+    assert_eq!(rig.prompts.load(Ordering::SeqCst), 2);
+    assert_eq!(last_approval(&rig), AuditApprovalOutcome::Approved);
+    assert!(grants.list().is_empty());
+}
+
+#[tokio::test]
 async fn revoking_a_grant_restores_the_prompt() {
     let grants = Arc::new(ApprovalGrants::default());
     let rig = rig(Principal::human_gui(), Environment::Local, &grants);

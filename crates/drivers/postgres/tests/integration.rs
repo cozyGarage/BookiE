@@ -93,6 +93,8 @@ mod query_budget_contract;
 mod query_cursor;
 #[path = "support/reverse_keyset_paging.rs"]
 mod reverse_keyset_paging;
+#[path = "support/sqlx_begin_cancellation.rs"]
+mod sqlx_begin_cancellation;
 #[path = "support/value_contracts.rs"]
 mod value_contracts;
 
@@ -281,6 +283,31 @@ async fn a_bare_begin_does_not_leave_a_pooled_session_inside_a_transaction() {
         .await
         .unwrap();
     assert_eq!(idle_in_transaction.rows, vec![vec![Value::Int(0)]]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn an_idle_transaction_timeout_retires_its_dedicated_session() {
+    let (_c, opts) = start_pg().await;
+    let conn = connect(opts).await;
+    conn.execute("ALTER ROLE postgres SET idle_in_transaction_session_timeout = '2s'")
+        .await
+        .unwrap();
+    let mut session = conn.open_session().await.unwrap();
+    session
+        .query_params_controlled("BEGIN", &[], &no_timeout())
+        .await
+        .unwrap();
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+
+    let error = session
+        .query_params_controlled("SELECT 1", &[], &no_timeout())
+        .await
+        .unwrap_err();
+
+    assert!(matches!(error, DriverError::Disconnected), "{error:?}");
+    assert!(!session.is_usable());
+    session.close().await.unwrap();
 }
 
 #[tokio::test]

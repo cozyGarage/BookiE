@@ -108,6 +108,8 @@ pub enum SshError {
     },
     #[error("known_hosts: {0}")]
     KnownHosts(String),
+    #[error("{0}")]
+    HostKeyRevoked(String),
     #[error("ssh-agent: {0}")]
     Agent(String),
     #[error(
@@ -151,16 +153,26 @@ static HOST_KEY_ALGORITHMS: [Algorithm; 6] = [
     },
 ];
 
-fn client_config() -> Config {
+fn client_config(recorded: &[Algorithm]) -> Config {
+    let recorded_first = |known: bool| {
+        HOST_KEY_ALGORITHMS
+            .iter()
+            .filter(move |candidate| recorded.iter().any(|stored| same_key_family(candidate, stored)) == known)
+            .cloned()
+    };
     Config {
         nodelay: true,
         keepalive_interval: Some(KEEPALIVE_INTERVAL),
         preferred: Preferred {
-            key: std::borrow::Cow::Borrowed(&HOST_KEY_ALGORITHMS),
+            key: std::borrow::Cow::Owned(recorded_first(true).chain(recorded_first(false)).collect()),
             ..Preferred::DEFAULT
         },
         ..Default::default()
     }
+}
+
+fn same_key_family(candidate: &Algorithm, recorded: &Algorithm) -> bool {
+    matches!((candidate, recorded), (Algorithm::Rsa { .. }, Algorithm::Rsa { .. })) || candidate == recorded
 }
 
 fn timeout_error(stage: &'static str, cfg: &SshConfig, limit: Duration) -> SshError {
@@ -621,7 +633,11 @@ async fn connect_and_auth(
         outcome: outcome.clone(),
     };
 
-    let config = Arc::new(client_config());
+    let recorded: Vec<Algorithm> =
+        russh::keys::known_hosts::known_host_keys_path(&cfg.host, cfg.port, &known_hosts_path)
+            .map(|keys| keys.iter().map(|(_, key)| key.algorithm()).collect())
+            .unwrap_or_default();
+    let config = Arc::new(client_config(&recorded));
     let connecting = client::connect(config, (tcp_host, tcp_port), handler);
     let mut session = match wait_for_handshake(connecting, prompt_event_receiver, CONNECT_TIMEOUT).await {
         Ok(s) => s,
@@ -643,6 +659,7 @@ async fn connect_and_auth(
         ),
         Some(HostKeyOutcome::Trusted) => tracing::debug!(host = %cfg.host, "ssh: host key matches known_hosts"),
         Some(HostKeyOutcome::KnownHostsIo(e)) => return Err(SshError::KnownHosts(e)),
+        Some(HostKeyOutcome::Revoked(e)) => return Err(SshError::HostKeyRevoked(e)),
         Some(HostKeyOutcome::Unknown { fingerprint }) => {
             return Err(unknown_host_key(&cfg.host, cfg.port, fingerprint, &known_hosts_path));
         }
@@ -799,6 +816,7 @@ fn map_connect_error(
             known_hosts: known_hosts.to_path_buf(),
         },
         Some(HostKeyOutcome::KnownHostsIo(e)) => SshError::KnownHosts(e),
+        Some(HostKeyOutcome::Revoked(e)) => SshError::HostKeyRevoked(e),
         Some(HostKeyOutcome::Unknown { fingerprint }) => unknown_host_key(host, port, fingerprint, known_hosts),
         _ => algorithm_refusal(&err).unwrap_or_else(|| SshError::Connect(err.to_string())),
     }

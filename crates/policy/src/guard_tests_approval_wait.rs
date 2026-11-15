@@ -86,3 +86,106 @@ async fn an_approval_answered_before_the_limit_still_runs_the_write() {
 
     assert_eq!(executes.load(Ordering::SeqCst), 1);
 }
+
+struct CountingApproveSink {
+    prompts: Arc<AtomicUsize>,
+}
+
+#[async_trait]
+impl ApprovalSink for CountingApproveSink {
+    async fn request(&self, _request: ApprovalRequest) -> ApprovalOutcome {
+        self.prompts.fetch_add(1, Ordering::SeqCst);
+        ApprovalOutcome::AllowOnce
+    }
+}
+
+fn counting_rig(principal: Principal) -> (PolicyGuard, Arc<AtomicUsize>, Arc<AtomicUsize>) {
+    let executes = Arc::new(AtomicUsize::new(0));
+    let prompts = Arc::new(AtomicUsize::new(0));
+    let guard = PolicyGuard::new(
+        connection(executes.clone(), Arc::new(AtomicUsize::new(0))),
+        context(
+            principal,
+            Environment::Local,
+            approving_policy(),
+            Arc::new(CountingApproveSink {
+                prompts: prompts.clone(),
+            }),
+            Arc::new(SequenceAuditSink::new(vec![])),
+            Arc::new(AuditState::new()),
+        ),
+    );
+    (guard, prompts, executes)
+}
+
+fn agent() -> Principal {
+    Principal::Agent {
+        token: "token".into(),
+        client: None,
+        model: None,
+    }
+}
+
+#[tokio::test]
+async fn an_agent_write_the_approval_dialog_cannot_show_in_full_is_denied_without_asking() {
+    let long = format!(
+        "UPDATE items SET memo = '{}', balance = 0",
+        "x".repeat(crate::approval::MAX_APPROVAL_SQL_CHARS)
+    );
+    for sql in [
+        long.as_str(),
+        "UPDATE items SET memo = '\u{202E}reversed' WHERE id = 1",
+        "UPDATE items SET memo = 'zero\u{200B}width' WHERE id = 1",
+        "UPDATE items SET memo = 'soft\u{00AD}hyphen' WHERE id = 1",
+        "UPDATE items SET memo = 'join\u{034F}er' WHERE id = 1",
+        "UPDATE items SET memo = 'variation\u{FE0F}selector' WHERE id = 1",
+        "UPDATE items SET memo = 'tag\u{E0061}' WHERE id = 1",
+        "UPDATE items SET memo = 'reserved\u{2065}' WHERE id = 1",
+    ] {
+        let (guard, prompts, executes) = counting_rig(agent());
+
+        let error = guard
+            .execute(sql)
+            .await
+            .expect_err("an unreviewable statement is refused");
+
+        assert!(matches!(error, DriverError::PolicyDenied(_)), "{error:?}");
+        assert_eq!(
+            prompts.load(Ordering::SeqCst),
+            0,
+            "no one is asked to approve what they cannot read"
+        );
+        assert_eq!(executes.load(Ordering::SeqCst), 0);
+    }
+}
+
+#[tokio::test]
+async fn an_ordinary_agent_write_and_a_long_human_write_are_still_asked_and_run() {
+    let long = format!(
+        "UPDATE items SET memo = '{}' WHERE id = 1",
+        "x".repeat(crate::approval::MAX_APPROVAL_SQL_CHARS)
+    );
+    let (guard, prompts, executes) = counting_rig(agent());
+    guard
+        .execute("UPDATE items SET memo = 'line one\nline two' WHERE id = 1")
+        .await
+        .expect("a readable agent statement is approved normally");
+    guard
+        .execute("UPDATE items SET memo = 'cafe\u{0301} 東京' WHERE id = 1")
+        .await
+        .expect("combining marks and international text remain readable");
+    assert_eq!(
+        (prompts.load(Ordering::SeqCst), executes.load(Ordering::SeqCst)),
+        (2, 2)
+    );
+
+    let (guard, prompts, executes) = counting_rig(Principal::human_gui());
+    guard
+        .execute(&long)
+        .await
+        .expect("a person sees the dialog and can scroll it");
+    assert_eq!(
+        (prompts.load(Ordering::SeqCst), executes.load(Ordering::SeqCst)),
+        (1, 1)
+    );
+}

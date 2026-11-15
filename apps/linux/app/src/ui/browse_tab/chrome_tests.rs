@@ -121,6 +121,47 @@ fn a_row_count_queued_before_refresh_is_not_shown() {
 
 #[test]
 #[ignore = "requires isolated GTK display"]
+fn a_loaded_page_keeps_its_total_unknown_when_row_count_fails() {
+    let (controller, outputs) = launch_tab(false);
+    controller
+        .sender()
+        .send(BrowseTabInput::ColumnsLoaded(vec![column("id", true)]))
+        .unwrap();
+    pump(&outputs);
+    let request = controller.model().page_requests.begin(0);
+    controller
+        .sender()
+        .send(BrowseTabInput::RowsLoaded {
+            request,
+            result: bookie_core::QueryResult {
+                columns: Vec::new(),
+                rows: vec![vec![Value::Int(1)]].into(),
+                truncated: false,
+            },
+            projected_columns: None,
+            elapsed: std::time::Duration::ZERO,
+        })
+        .unwrap();
+    pump(&outputs);
+    let count_request = controller.model().row_count_requests.begin();
+    controller
+        .sender()
+        .send(BrowseTabInput::RowCountFailed(count_request))
+        .unwrap();
+    pump(&outputs);
+
+    assert_eq!(controller.model().current_total_rows, None);
+    assert_eq!(
+        controller.model().current_result.as_ref().map(|page| page.rows.len()),
+        Some(1)
+    );
+    let label = controller.model().paginator_label.label();
+    assert!(label.starts_with("Rows 1 – 1"));
+    assert!(!label.contains(" of "), "{label}");
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
 fn page_size_changes_apply_after_a_failed_first_load() {
     let (controller, outputs) = launch_tab(false);
     controller
