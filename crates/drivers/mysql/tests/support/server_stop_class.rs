@@ -499,8 +499,8 @@ async fn a_mysql_save_stopped_while_it_waits_for_a_lock_is_rolled_back_on_the_se
         .await
         .expect_err("a save behind a row lock cannot finish");
     assert!(
-        matches!(error, DriverError::TimedOut),
-        "MySQL confirmed the stop, so the save is known not to have run: {error:?}"
+        matches!(&error, DriverError::Transaction { source, .. } if matches!(source.as_ref(), DriverError::TimedOut)),
+        "MySQL confirmed the stop and the batch was rolled back, so the save is known not to have run: {error:?}"
     );
     assert_eq!(statements_still_running(observer.as_ref()).await, 0);
     assert_eq!(
@@ -519,7 +519,10 @@ async fn a_mysql_save_stopped_while_it_waits_for_a_lock_is_rolled_back_on_the_se
         }
     );
     let error = error.expect_err("a save behind a row lock cannot finish");
-    assert!(matches!(error, DriverError::Cancelled), "{error:?}");
+    assert!(
+        matches!(&error, DriverError::Transaction { source, .. } if matches!(source.as_ref(), DriverError::Cancelled)),
+        "{error:?}"
+    );
     assert_eq!(statements_still_running(observer.as_ref()).await, 0);
     assert_eq!(
         open_transactions(observer.as_ref()).await,

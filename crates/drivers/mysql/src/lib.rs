@@ -29,7 +29,7 @@ use bookie_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverValueInputCapabilities, EnumInputStyle,
     ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult,
     QueryResultBatch, QueryResultBudget, QueryRows, TableInfo, Transport, Value, check_pre_dispatch,
-    run_controlled_setup, run_server_cancellable,
+    run_controlled_setup, run_server_cancellable, run_server_cancellable_preserving_transaction_rollback,
 };
 
 /// Name of the SSH-forwarded rendezvous socket inside the private directory
@@ -455,7 +455,7 @@ impl Connection for MysqlConnection {
         validate_atomic_batch(statements)?;
         let mut connection = acquire_controlled(&self.pool, control).await?;
         let connection_id = connection_id_controlled(&mut connection, control).await?;
-        let result = run_server_cancellable(
+        let result = run_server_cancellable_preserving_transaction_rollback(
             transaction::begin_and_run_checked(&mut connection, statements, expect_one),
             request_cancellation(&self.cancellation_pool, connection_id),
             transaction::confirms_stopped_statement,
