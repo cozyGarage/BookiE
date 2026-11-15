@@ -19,6 +19,8 @@ use tokio_util::sync::CancellationToken;
 
 #[path = "catalog_exclusion_scale.rs"]
 mod catalog_exclusion_scale;
+#[path = "support/server_stop_class.rs"]
+mod server_stop_class;
 #[path = "support/session_time_zone.rs"]
 mod session_time_zone;
 #[path = "support/shared_container.rs"]
