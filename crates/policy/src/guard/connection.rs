@@ -209,7 +209,7 @@ impl Connection for PolicyGuard {
     }
 
     async fn query(&self, sql: &str) -> Result<QueryResult, DriverError> {
-        let authorization = self.authorize(sql, false, None).await?;
+        let authorization = self.authorize(sql, None).await?;
         if authorization.analysis.facts.writes() {
             return self
                 .execute_query_write(sql, None, authorization, |inner| inner.query(sql))
@@ -235,7 +235,7 @@ impl Connection for PolicyGuard {
     }
 
     async fn query_controlled(&self, sql: &str, control: &OperationControl) -> Result<QueryResult, DriverError> {
-        let authorization = self.authorize(sql, false, Some(control)).await?;
+        let authorization = self.authorize(sql, Some(control)).await?;
         let control = &authorization.rearm(control);
         if authorization.analysis.facts.writes() {
             return self
@@ -263,7 +263,7 @@ impl Connection for PolicyGuard {
     }
 
     async fn query_params(&self, sql: &str, params: &[Value]) -> Result<QueryResult, DriverError> {
-        let authorization = self.authorize(sql, true, None).await?;
+        let authorization = self.authorize(sql, None).await?;
         if authorization.analysis.facts.writes() {
             return self
                 .execute_query_write(sql, None, authorization, |inner| inner.query_params(sql, params))
@@ -294,7 +294,7 @@ impl Connection for PolicyGuard {
         params: &[Value],
         control: &OperationControl,
     ) -> Result<QueryResult, DriverError> {
-        let authorization = self.authorize(sql, true, Some(control)).await?;
+        let authorization = self.authorize(sql, Some(control)).await?;
         let control = &authorization.rearm(control);
         if authorization.analysis.facts.writes() {
             return self
@@ -329,7 +329,7 @@ impl Connection for PolicyGuard {
         params: &[Value],
         control: &OperationControl,
     ) -> Result<QueryResultBatch, DriverError> {
-        let authorization = self.authorize(sql, true, Some(control)).await?;
+        let authorization = self.authorize(sql, Some(control)).await?;
         let control = &authorization.rearm(control);
         let operation = self.operation(
             sql,
@@ -372,13 +372,13 @@ impl Connection for PolicyGuard {
     }
 
     async fn execute(&self, sql: &str) -> Result<ExecResult, DriverError> {
-        let authorization = self.authorize(sql, false, None).await?;
+        let authorization = self.authorize(sql, None).await?;
         self.execute_write(sql, None, authorization, |inner| inner.execute(sql))
             .await
     }
 
     async fn execute_controlled(&self, sql: &str, control: &OperationControl) -> Result<ExecResult, DriverError> {
-        let authorization = self.authorize(sql, false, Some(control)).await?;
+        let authorization = self.authorize(sql, Some(control)).await?;
         let control = &authorization.rearm(control);
         self.execute_write(sql, None, authorization, |inner| inner.execute_controlled(sql, control))
             .await
@@ -390,7 +390,7 @@ impl Connection for PolicyGuard {
         control: &OperationControl,
     ) -> Result<(ExecResult, Option<bookie_core::CommitToken>), (DriverError, Option<bookie_core::CommitToken>)> {
         let authorization = self
-            .authorize(sql, false, Some(control))
+            .authorize(sql, Some(control))
             .await
             .map_err(|error| (error, None))?;
         let token = std::sync::Arc::new(std::sync::Mutex::new(None));
@@ -417,7 +417,7 @@ impl Connection for PolicyGuard {
     }
 
     async fn execute_params(&self, sql: &str, params: &[Value]) -> Result<ExecResult, DriverError> {
-        let authorization = self.authorize(sql, true, None).await?;
+        let authorization = self.authorize(sql, None).await?;
         self.execute_write(sql, None, authorization, |inner| inner.execute_params(sql, params))
             .await
     }
@@ -428,7 +428,7 @@ impl Connection for PolicyGuard {
         params: &[Value],
         control: &OperationControl,
     ) -> Result<ExecResult, DriverError> {
-        let authorization = self.authorize(sql, true, Some(control)).await?;
+        let authorization = self.authorize(sql, Some(control)).await?;
         let control = &authorization.rearm(control);
         self.execute_write(sql, None, authorization, |inner| {
             inner.execute_params_controlled(sql, params, control)
@@ -438,7 +438,7 @@ impl Connection for PolicyGuard {
 
     async fn execute_in_transaction(&self, statements: &[(String, Vec<Value>)]) -> Result<Vec<u64>, DriverError> {
         let combined = batch_text(statements);
-        let authorization = self.authorize(&combined, true, None).await?;
+        let authorization = self.authorize(&combined, None).await?;
         self.require_governed_write_available()?;
         let batch_id = Uuid::new_v4();
         let operation = self.operation(
@@ -469,7 +469,7 @@ impl Connection for PolicyGuard {
     ) -> Result<Vec<u64>, DriverError> {
         check_pre_dispatch(control)?;
         let combined = batch_text(statements);
-        let authorization = self.authorize(&combined, true, Some(control)).await?;
+        let authorization = self.authorize(&combined, Some(control)).await?;
         let control = &authorization.rearm(control);
         self.require_governed_write_available()?;
         let batch_id = Uuid::new_v4();
