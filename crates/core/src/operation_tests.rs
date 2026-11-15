@@ -316,6 +316,27 @@ async fn server_confirmed_non_transaction_cancellation_remains_plain() {
 }
 
 #[tokio::test]
+async fn transaction_cancellation_before_dispatch_remains_plain() {
+    let token = CancellationToken::new();
+    token.cancel();
+    let control = OperationControl::new(token, None);
+    let error = DriverError::Transaction {
+        statement_index: 4,
+        source: Box::new(DriverError::query("server cancelled the statement")),
+    };
+
+    let result = run_server_cancellable_preserving_transaction_rollback(
+        async { Err::<(), _>(error) },
+        async { Ok(()) },
+        confirms_test_cancellation,
+        &control,
+    )
+    .await;
+
+    assert!(matches!(&result, Err(DriverError::Cancelled)), "{result:?}");
+}
+
+#[tokio::test]
 async fn unconfirmed_rollback_after_cancellation_remains_unknown() {
     let token = CancellationToken::new();
     let control = OperationControl::new(token.clone(), None);
