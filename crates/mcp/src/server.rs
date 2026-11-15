@@ -222,6 +222,7 @@ where
                 Some(refusal) => refusal,
                 None => return Ok(()),
             },
+            _ if request.get("id").is_none() => return Ok(()),
             other => immediate_response(&self.bridge, other, id, &params),
         };
         self.reply(response).await
@@ -665,6 +666,9 @@ async fn process_http_request(bridge: Arc<McpBridge>, headers: HeaderMap, body: 
     }
     let id = body.get("id").cloned().unwrap_or(JsonValue::Null);
     let method = body.get("method").and_then(|m| m.as_str()).unwrap_or("");
+    if body.get("id").is_none() && !method.is_empty() {
+        return StatusCode::ACCEPTED.into_response();
+    }
     let mut params = body.get("params").cloned().unwrap_or(json!({}));
     if let Some(token) = bearer_token(&headers) {
         add_token(&mut params, token);
@@ -678,6 +682,7 @@ async fn process_http_request(bridge: Arc<McpBridge>, headers: HeaderMap, body: 
             Err(error) => Ok(tool_error_result(&error)),
         },
         "tools/list" => handle_tools_list(&bridge, &params),
+        "ping" => Ok(json!({})),
         "initialize" => match initialize_result(&params) {
             Ok(result) => Ok(result),
             Err(message) => return Json(json_rpc_error(&id, -32602, message)).into_response(),
