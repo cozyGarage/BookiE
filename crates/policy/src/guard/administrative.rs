@@ -96,6 +96,7 @@ impl PolicyGuard {
     where
         F: Future<Output = Result<T, DriverError>>,
     {
+        let control = &authorization.rearm(control);
         let mut pending_restore = match (operation.replaces_data(), dispatched.clone()) {
             (true, Some(dispatched)) => Some(self.ctx.audit_state.pending_write_after_dispatch(dispatched)),
             _ => None,
