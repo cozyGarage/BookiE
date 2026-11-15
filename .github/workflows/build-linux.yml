@@ -1308,6 +1308,7 @@ jobs:
     needs: [pin-revision, ensure-ci-gtk-image, guards, clippy, test-build]
     container:
       image: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}
+      options: --add-host=host.docker.internal:host-gateway
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -1323,6 +1324,9 @@ jobs:
       BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
       BOOKIE_REQUIRE_PREBUILT: "1"
       BOOKIE_TEST_RUN_ID: github-${{ github.run_id }}-${{ github.run_attempt }}-driver-tls
+      BOOKIE_DRIVER_TLS_HOST: host.docker.internal
+      BOOKIE_DRIVER_TLS_HOSTNAME: host.docker.internal
+      BOOKIE_FIXTURE_BIND_ADDRESS: 0.0.0.0
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
@@ -1381,6 +1385,7 @@ jobs:
       options: --add-host=host.docker.internal:host-gateway
       volumes:
         - /var/run/docker.sock:/var/run/docker.sock
+        - /var/tmp/bookie-pg-release-fixtures:/var/tmp/bookie-pg-release-fixtures
       env:
         DEBIAN_FRONTEND: noninteractive
         DOCKER_CONFIG: /github/home/.docker
@@ -1413,6 +1418,7 @@ jobs:
       - name: PostgreSQL release fixture
         env:
           BOOKIE_FIXTURE_HOST: host.docker.internal
+          BOOKIE_FIXTURE_TOXIPROXY_CONFIG: /var/tmp/bookie-pg-release-fixtures/toxiproxy.json
           BOOKIE_TEST_BUNDLE: ${{ runner.temp }}/bookie-pg-release-bundle
           BOOKIE_REQUIRE_PREBUILT: "1"
           BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
@@ -1420,7 +1426,9 @@ jobs:
           CARGO_TARGET_DIR: ${{ runner.temp }}/bookie-pg-release-target
           TMPDIR: /tmp
         run: |
+          mkdir -p /var/tmp/bookie-pg-release-fixtures
           mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"
+          cp tests/fixtures/postgres-release/toxiproxy/toxiproxy.json "$BOOKIE_FIXTURE_TOXIPROXY_CONFIG"
           python3 scripts/run-test-layer.py postgres-release
       - name: Upload validation evidence
         if: always()
@@ -1429,6 +1437,9 @@ jobs:
           name: regression-pg-release-${{ github.run_id }}-${{ github.run_attempt }}
           path: target/quality/*-layers
           if-no-files-found: error
+      - name: Remove shared PostgreSQL fixture files
+        if: always()
+        run: rm -rf -- /var/tmp/bookie-pg-release-fixtures
 
   distro-floor-scenarios:
     name: Debian testing package GTK scenarios (${{ matrix.shard_group }})
