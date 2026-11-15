@@ -7,6 +7,20 @@ def git(*args):
     return subprocess.run(["git", *args], check=True, capture_output=True, text=True).stdout.strip()
 
 
+def resolve_requested_ref(requested_ref):
+    references = [requested_ref]
+    if requested_ref.startswith("refs/heads/"):
+        references.append(f"refs/remotes/origin/{requested_ref.removeprefix('refs/heads/')}")
+    elif not requested_ref.startswith("refs/"):
+        references.append(f"refs/remotes/origin/{requested_ref}")
+    for reference in references:
+        try:
+            return git("rev-parse", "--verify", "--end-of-options", f"{reference}^{{commit}}")
+        except subprocess.CalledProcessError:
+            continue
+    raise SystemExit(f"requested ref is not available: {requested_ref}")
+
+
 def main():
     event = os.environ["CI_EVENT_NAME"]
     requested_ref = os.environ.get("CI_REQUESTED_REF", "")
@@ -15,7 +29,7 @@ def main():
     if event == "workflow_dispatch" and requested_ref:
         if requested_ref.startswith(("refs/pull/", "pull/")):
             raise SystemExit("workflow_dispatch cannot pin a pull request ref")
-        revision = git("rev-parse", "--verify", "--end-of-options", f"{requested_ref}^{{commit}}")
+        revision = resolve_requested_ref(requested_ref)
         branches = git("branch", "-r", "--contains", revision)
         tags = git("tag", "--contains", revision)
         if not any(line.strip().startswith("origin/") for line in branches.splitlines()) and not tags:
