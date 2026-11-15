@@ -198,11 +198,11 @@ class PrepullTestImagesTests(unittest.TestCase):
         ci = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         driver = ci.split("  driver:\n", 1)[1].split("  b4-rollback:\n", 1)[0]
         group = (ROOT / "scripts/run-driver-group.sh").read_text()
-        self.assertIn("group: [driver-core, driver-analytics, driver-extended, socket-ssh]", driver)
-        self.assertIn("max-parallel: 2", driver)
+        self.assertIn("group: [driver-core, driver-analytics]", driver)
+        self.assertIn("group: [driver-extended, socket-ssh]", driver)
         self.assertIn('mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"', driver)
         self.assertIn("if: matrix.group == 'socket-ssh'", driver)
-        self.assertIn("needs: [pin-revision, guards, clippy, test-build]", driver)
+        self.assertIn("needs: [pin-revision, guards, clippy, test-build, driver]", driver)
         self.assertIn('python3 scripts/run-test-layer.py "$BOOKIE_TEST_LAYER"', driver)
         self.assertLess(driver.index("bash src/scripts/prepull-test-images.sh socket-ssh"),
                         driver.index('python3 scripts/run-test-layer.py "$BOOKIE_TEST_LAYER"'))

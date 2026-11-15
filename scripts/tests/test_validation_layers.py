@@ -291,8 +291,8 @@ class LayerRunnerTests(unittest.TestCase):
         for layer in ["sandbox", "change-contracts", "b4-rollback", "tls", "postgres-release", "ui", "widgets", "keyring", "security-policy"]:
             self.assertIn(f"run-test-layer.py {layer}", build)
         driver = build.split("  driver:\n", 1)[1].split("  b4-rollback:\n", 1)[0]
-        self.assertIn("group: [driver-core, driver-analytics, driver-extended, socket-ssh]", driver)
-        self.assertIn("max-parallel: 2", driver)
+        self.assertIn("group: [driver-core, driver-analytics]", driver)
+        self.assertIn("group: [driver-extended, socket-ssh]", driver)
         self.assertIn('python3 scripts/run-test-layer.py "$BOOKIE_TEST_LAYER"', driver)
         self.assertNotIn("if-no-files-found: ignore", build)
         contracts = (workflows / "linux-ci-contracts.yml").read_text()
