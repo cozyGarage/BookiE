@@ -325,7 +325,7 @@ fn call_response(id: JsonValue, result: Result<JsonValue, crate::errors::McpTool
 
 /// Shared lookup for every method that requires a token: `params.token`,
 /// `params._meta.authorization`, then (for `tools/call`) `arguments.token`.
-fn extract_token_str(params: &JsonValue) -> Option<&str> {
+pub(crate) fn extract_token_str(params: &JsonValue) -> Option<&str> {
     params
         .get("token")
         .and_then(|v| v.as_str())
