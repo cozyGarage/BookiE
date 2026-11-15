@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use crate::services::workspace_state;
 use crate::ui::browse_tab::{BrowseTab, BrowseTabInit, BrowseTabInput, BrowseTabOutput};
-use crate::ui::editor::{SqlEditor, SqlEditorInit, SqlEditorInput, SqlEditorOutput, derive_tab_label};
+use crate::ui::editor::{RunMessage, SqlEditor, SqlEditorInit, SqlEditorInput, SqlEditorOutput, derive_tab_label};
 
 use super::editor_files::initial_editor_query;
 use super::types::{CLOSED_TABS_CAPACITY, TableTabStart, read_workspace_tab_id, write_workspace_tab_id};
@@ -658,7 +658,7 @@ impl App {
         self.close_after_save.borrow_mut().cancel(&id);
         match &removed {
             WorkspaceTab::Editor(slot) => {
-                let _ = slot.controller.sender().send(SqlEditorInput::Cancel);
+                let _ = slot.controller.sender().send(SqlEditorInput::Run(RunMessage::Cancel));
                 self.change_trackers.close_tab(id);
             }
             WorkspaceTab::Structure(slot) => {
@@ -813,7 +813,7 @@ impl App {
     pub(super) fn cancel_all_editor_runs(&self) {
         for tab in self.workspace_tabs.borrow().values() {
             if let WorkspaceTab::Editor(s) = tab {
-                let _ = s.controller.sender().send(SqlEditorInput::Cancel);
+                let _ = s.controller.sender().send(SqlEditorInput::Run(RunMessage::Cancel));
             }
         }
     }
