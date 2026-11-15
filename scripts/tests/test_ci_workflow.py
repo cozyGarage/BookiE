@@ -345,6 +345,21 @@ class CiWorkflowTests(unittest.TestCase):
             ).stdout.strip()
             self.assertNotEqual(revision, tagged_revision)
             self.assertEqual(output.read_text(), f"revision={tagged_revision}\n")
+            subprocess.run(["git", "-C", str(clone), "switch", "--detach", "HEAD"], check=True, capture_output=True)
+            subprocess.run(["git", "-C", str(clone), "branch", "-D", "main"], check=True, capture_output=True)
+            environment["CI_REQUESTED_REF"] = "main"
+            branch_output = root / "branch-output"
+            environment["GITHUB_OUTPUT"] = str(branch_output)
+            subprocess.run(
+                [sys.executable, str(ROOT / "scripts/check-ci-revision.py")],
+                cwd=clone,
+                env=environment,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(branch_output.read_text(), f"revision={revision}\n")
+            environment["GITHUB_OUTPUT"] = str(output)
             environment["CI_REQUESTED_REF"] = "refs/pull/12/head"
             rejected = subprocess.run(
                 [sys.executable, str(ROOT / "scripts/check-ci-revision.py")],

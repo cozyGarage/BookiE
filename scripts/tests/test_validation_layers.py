@@ -22,7 +22,9 @@ class LayerRunnerTests(unittest.TestCase):
         return {"argv": [sys.executable, "-c", code], "evidence": evidence, "timeout_seconds": timeout}
 
     def execute(self, step):
-        with tempfile.TemporaryDirectory() as temporary, tempfile.TemporaryDirectory() as evidence:
+        with tempfile.TemporaryDirectory() as temporary, tempfile.TemporaryDirectory() as evidence, patch.object(
+            runner.sys, "stdout", io.StringIO()
+        ):
             return runner.execute(step, Path(temporary) / "step.log")
 
     def test_catalog_has_real_entrypoints_and_unique_steps(self):
