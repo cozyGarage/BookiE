@@ -187,11 +187,15 @@ async fn create_server(durable: bool) -> (ContainerAsync<Mysql>, Server) {
         .with_tag(crate::MYSQL_TEST_TAG)
         .with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test");
     let image = if durable {
-        image.with_cmd(["--mysql-native-password=ON"])
+        image.with_cmd([
+            "--mysql-native-password=ON",
+            "--authentication-policy=mysql_native_password",
+        ])
     } else {
         image
             .with_cmd([
                 "--mysql-native-password=ON",
+                "--authentication-policy=mysql_native_password",
                 "--innodb-flush-log-at-trx-commit=0",
                 "--innodb-doublewrite=0",
                 "--sync-binlog=0",

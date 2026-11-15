@@ -303,7 +303,10 @@ async fn a_restarted_mysql_server_restores_the_existing_pool() {
     let container = Mysql::default()
         .with_tag(crate::MYSQL_TEST_TAG)
         .with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test")
-        .with_cmd(["--mysql-native-password=ON"])
+        .with_cmd([
+            "--mysql-native-password=ON",
+            "--authentication-policy=mysql_native_password",
+        ])
         .with_mapped_port(host_port, 3306.tcp())
         .start()
         .await

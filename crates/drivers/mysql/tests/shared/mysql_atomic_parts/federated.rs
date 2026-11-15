@@ -14,6 +14,7 @@ async fn mysql_failed_batch_federated_write_survives_rollback() {
         .with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test")
         .with_cmd([
             "--mysql-native-password=ON",
+            "--authentication-policy=mysql_native_password",
             "--federated",
             "--innodb-flush-log-at-trx-commit=0",
             "--innodb-doublewrite=0",
@@ -265,6 +266,7 @@ async fn start_mysql_with_federated() -> (testcontainers::ContainerAsync<Mysql>,
         .with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test")
         .with_cmd([
             "--mysql-native-password=ON",
+            "--authentication-policy=mysql_native_password",
             "--federated",
             "--innodb-flush-log-at-trx-commit=0",
             "--innodb-doublewrite=0",
