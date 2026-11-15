@@ -180,3 +180,56 @@ async fn an_ordinary_agent_write_and_a_long_human_write_are_still_asked_and_run(
         (1, 1)
     );
 }
+
+#[tokio::test(start_paused = true)]
+async fn an_approval_slower_than_the_statement_timeout_does_not_use_up_the_statements_time() {
+    let executes = Arc::new(AtomicUsize::new(0));
+    let guard = PolicyGuard::new(
+        connection(executes.clone(), Arc::new(AtomicUsize::new(0))),
+        context(
+            agent(),
+            Environment::Local,
+            approving_policy(),
+            Arc::new(SlowApprovalSink {
+                delay: std::time::Duration::from_secs(31),
+            }),
+            Arc::new(SequenceAuditSink::new(vec![])),
+            Arc::new(AuditState::new()),
+        ),
+    );
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
+
+    guard
+        .execute_controlled("DELETE FROM items WHERE id = 1", &control)
+        .await
+        .expect("a person reading for 31 seconds must not make the write time out");
+
+    assert_eq!(executes.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test(start_paused = true)]
+async fn an_unanswered_approval_stops_at_the_approval_limit_even_with_a_shorter_statement_timeout() {
+    let executes = Arc::new(AtomicUsize::new(0));
+    let guard = PolicyGuard::new(
+        connection(executes.clone(), Arc::new(AtomicUsize::new(0))),
+        context(
+            agent(),
+            Environment::Local,
+            approving_policy(),
+            Arc::new(SilentApprovalSink),
+            Arc::new(SequenceAuditSink::new(vec![])),
+            Arc::new(AuditState::new()),
+        ),
+    );
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
+    let started = tokio::time::Instant::now();
+
+    let error = guard
+        .execute_controlled("DELETE FROM items WHERE id = 1", &control)
+        .await
+        .expect_err("nobody answers");
+
+    assert!(matches!(error, DriverError::TimedOut), "{error:?}");
+    assert_eq!(started.elapsed(), APPROVAL_WAIT_LIMIT);
+    assert_eq!(executes.load(Ordering::SeqCst), 0);
+}

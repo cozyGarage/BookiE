@@ -286,6 +286,7 @@ impl Session for PolicySession {
             .guard
             .authorize_classified(sql, analysis, Some(control), None)
             .await?;
+        let control = &authorization.rearm(control);
         let audit = CursorAudit {
             operation_id: Uuid::new_v4(),
             batch_id: batch.id,
@@ -646,6 +647,7 @@ impl PolicySession {
             analysis,
             approval_outcome: AuditApprovalOutcome::NotRequired,
             preview_state: AuditPreviewState::NotRequested,
+            approval_wait: Duration::ZERO,
         };
         let operation = self.guard.operation(
             sql,
@@ -706,6 +708,7 @@ impl PolicySession {
                     .await?
             }
         };
+        let control = &authorization.rearm(control);
         let writes = authorization.analysis.facts.writes();
         let rolls_back_to_savepoint = authorization.analysis.rolls_back_to_savepoint;
         let result = match self.batch {
