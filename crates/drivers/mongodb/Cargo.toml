@@ -23,8 +23,11 @@ tokio.workspace = true
 [dev-dependencies]
 chrono.workspace = true
 csv.workspace = true
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+rustls-pki-types = "1"
 tempfile.workspace = true
-tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+tokio = { workspace = true, features = ["io-util", "macros", "rt-multi-thread"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
 tokio-util.workspace = true
 testcontainers.workspace = true
 testcontainers-modules = { workspace = true, features = ["mongo"] }
