@@ -34,6 +34,36 @@ async fn use_on_a_pooled_connection_does_not_change_what_later_catalog_reads_see
     }
 }
 
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_session_keeps_user_variables_on_its_backend_across_use() {
+    let (_container, opts) = start_mysql().await;
+    let connection = connect(opts).await;
+    connection.execute("CREATE DATABASE other_db").await.unwrap();
+    let mut session = connection.open_session().await.unwrap();
+    let control = bookie_core::OperationControl::with_timeout(std::time::Duration::from_secs(5));
+
+    session
+        .query_params_controlled("SET @bookie_session_marker = 'session-owned'", &[], &control)
+        .await
+        .unwrap();
+    let before = session
+        .query_params_controlled("SELECT CONNECTION_ID(), @bookie_session_marker", &[], &control)
+        .await
+        .unwrap();
+    session
+        .query_params_controlled("USE other_db", &[], &control)
+        .await
+        .unwrap();
+    let after = session
+        .query_params_controlled("SELECT CONNECTION_ID(), @bookie_session_marker", &[], &control)
+        .await
+        .unwrap();
+
+    assert_eq!(before.rows[0][0], after.rows[0][0]);
+    assert!(matches!(&after.rows[0][1], bookie_core::Value::Text(value) if value == "session-owned"));
+}
+
 #[path = "../../../shared/pool_saturation.rs"]
 mod contract;
 
