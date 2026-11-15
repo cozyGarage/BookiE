@@ -38,12 +38,52 @@ fn job(path: std::path::PathBuf, source: JobSource) -> ExportJob {
     ExportJob {
         path,
         source,
+        retained_page: None,
         format: super::super::ExportFormat::Csv,
         options: CsvOptions::default(),
         driver_id: "postgres".into(),
         schema: None,
         table: "t".into(),
     }
+}
+
+#[test]
+fn current_page_export_keeps_its_budget_lease_until_the_write_finishes() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("result.csv");
+    let result = Arc::new(bookie_core::QueryResult {
+        columns: vec![bookie_core::ColumnInfo {
+            name: "value".into(),
+            data_type: "text".into(),
+            nullable: true,
+            primary_key: false,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: None,
+            domain_type: None,
+        }],
+        rows: vec![vec![bookie_core::Value::Text("retained".into())]].into(),
+        truncated: false,
+    });
+    let budget = bookie_results::stream_page_budget::StreamPageBudget::new(result.estimated_row_bytes());
+    let lease = budget.retain(&result).unwrap();
+    let job = ExportJob {
+        path: path.clone(),
+        source: JobSource::Loaded(result.clone()),
+        retained_page: Some(super::super::StreamExportPage { result, _lease: lease }),
+        format: super::super::ExportFormat::Csv,
+        options: CsvOptions::default(),
+        driver_id: "sqlite".into(),
+        schema: None,
+        table: "t".into(),
+    };
+
+    assert!(budget.used_bytes() > 0);
+    write_export(job, &CancellationToken::new(), &AtomicUsize::new(0)).unwrap();
+    assert_eq!(budget.used_bytes(), 0);
 }
 
 #[test]
