@@ -19,6 +19,7 @@ KEEP_UP="${BOOKIE_FIXTURE_KEEP_UP:-0}"
 fixture_host="${BOOKIE_FIXTURE_HOST:-localhost}"
 fixture_bind_address="${BOOKIE_FIXTURE_BIND_ADDRESS:-$fixture_host}"
 fixture_ssh_host="${BOOKIE_FIXTURE_SSH_HOST:-$fixture_host}"
+fixture_toxiproxy_config="${BOOKIE_FIXTURE_TOXIPROXY_CONFIG:-$FIXTURE/toxiproxy/toxiproxy.json}"
 
 if [[ -z "${BOOKIE_FIXTURE_SSH_HOST:-}" && "$fixture_ssh_host" == localhost ]]; then
   fixture_ssh_host=127.0.0.1
@@ -32,8 +33,13 @@ if [[ -z "$fixture_bind_address" ]]; then
   echo "could not resolve the Docker fixture host address: $fixture_host" >&2
   exit 1
 fi
+if [[ ! -f "$fixture_toxiproxy_config" ]]; then
+  echo "Toxiproxy config file is missing: $fixture_toxiproxy_config" >&2
+  exit 1
+fi
 export BOOKIE_FIXTURE_BIND_ADDRESS="$fixture_bind_address"
 export BOOKIE_FIXTURE_SSH_HOST="$fixture_ssh_host"
+export BOOKIE_FIXTURE_TOXIPROXY_CONFIG="$fixture_toxiproxy_config"
 
 compose() {
   docker compose --project-directory "$FIXTURE" -f "$FIXTURE/docker-compose.yml" "$@"
@@ -69,6 +75,10 @@ wait_for_ssh_host_key() {
     sleep 1
   done
   echo "SSH service did not provide a host key on $host:$port" >&2
+  getent ahostsv4 "$host" || true
+  ssh-keyscan -v -T 3 -p "$port" "$host" 2>&1 || true
+  compose ps --all || true
+  compose logs --no-color --tail 30 bastion toxiproxy || true
   return 1
 }
 

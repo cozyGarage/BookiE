@@ -44,7 +44,7 @@ services:
       timeout: 5s
       retries: 40
     ports:
-      - "127.0.0.1:27018:27017"
+      - "${BOOKIE_FIXTURE_BIND_ADDRESS:-127.0.0.1}:27018:27017"
     networks:
       fixture:
         aliases:
@@ -85,7 +85,7 @@ services:
       timeout: 5s
       retries: 40
     ports:
-      - "127.0.0.1:6380:6379"
+      - "${BOOKIE_FIXTURE_BIND_ADDRESS:-127.0.0.1}:6380:6379"
     networks:
       fixture:
         aliases:
@@ -120,7 +120,7 @@ services:
       timeout: 5s
       retries: 40
     ports:
-      - "127.0.0.1:27019:27017"
+      - "${BOOKIE_FIXTURE_BIND_ADDRESS:-127.0.0.1}:27019:27017"
     networks:
       - fixture
 
@@ -133,7 +133,7 @@ services:
       timeout: 5s
       retries: 40
     ports:
-      - "127.0.0.1:6381:6379"
+      - "${BOOKIE_FIXTURE_BIND_ADDRESS:-127.0.0.1}:6381:6379"
     networks:
       - fixture
 
@@ -170,7 +170,7 @@ services:
       timeout: 5s
       retries: 60
     ports:
-      - "127.0.0.1:3307:3306"
+      - "${BOOKIE_FIXTURE_BIND_ADDRESS:-127.0.0.1}:3307:3306"
     networks:
       fixture:
         aliases:
@@ -198,7 +198,7 @@ services:
       timeout: 5s
       retries: 40
     ports:
-      - "127.0.0.1:5436:5432"
+      - "${BOOKIE_FIXTURE_BIND_ADDRESS:-127.0.0.1}:5436:5432"
     networks:
       - fixture
 
@@ -264,7 +264,7 @@ services:
       timeout: 5s
       retries: 60
     ports:
-      - "127.0.0.1:3309:3306"
+      - "${BOOKIE_FIXTURE_BIND_ADDRESS:-127.0.0.1}:3309:3306"
     networks:
       fixture:
         aliases:
@@ -308,7 +308,7 @@ services:
       context: .
       dockerfile: ssh-bastion/Dockerfile
     ports:
-      - "127.0.0.1:2224:2222"
+      - "${BOOKIE_FIXTURE_BIND_ADDRESS:-127.0.0.1}:2224:2222"
     networks:
       - fixture
     healthcheck:
@@ -339,7 +339,7 @@ services:
       timeout: 5s
       retries: 40
     ports:
-      - "127.0.0.1:8444:8443"
+      - "${BOOKIE_FIXTURE_BIND_ADDRESS:-127.0.0.1}:8444:8443"
     networks:
       fixture:
         aliases:
@@ -368,7 +368,7 @@ services:
       retries: 60
       start_period: 240s
     ports:
-      - "127.0.0.1:3308:3306"
+      - "${BOOKIE_FIXTURE_BIND_ADDRESS:-127.0.0.1}:3308:3306"
     networks:
       - fixture
 
@@ -392,7 +392,7 @@ services:
       timeout: 5s
       retries: 40
     ports:
-      - "127.0.0.1:8445:8123"
+      - "${BOOKIE_FIXTURE_BIND_ADDRESS:-127.0.0.1}:8445:8123"
     networks:
       - fixture
 
@@ -414,7 +414,7 @@ services:
       timeout: 5s
       retries: 60
     ports:
-      - "127.0.0.1:1434:1433"
+      - "${BOOKIE_FIXTURE_BIND_ADDRESS:-127.0.0.1}:1434:1433"
     networks:
       fixture:
         aliases:
@@ -458,7 +458,7 @@ services:
       timeout: 5s
       retries: 60
     ports:
-      - "127.0.0.1:1435:1433"
+      - "${BOOKIE_FIXTURE_BIND_ADDRESS:-127.0.0.1}:1435:1433"
     networks:
       - fixture
 

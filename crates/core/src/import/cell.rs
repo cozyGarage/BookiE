@@ -342,6 +342,13 @@ fn value_for(text: &str, column: &ColumnInfo, options: &CsvImportOptions, driver
 }
 
 fn parse_non_null_cell(text: &str, column: &ColumnInfo, kind: ColumnKind, driver_id: &str) -> Result<Value, CellError> {
+    if crate::import::text_kind::is_unsigned_64(column, driver_id) {
+        return text
+            .trim()
+            .parse::<u64>()
+            .map(|_| Value::Text(text.trim().to_owned()))
+            .map_err(|_| CellError::NotAnInteger);
+    }
     if driver_id == "sqlite"
         && kind == ColumnKind::Text
         && crate::sqlite_declared_type_has_numeric_affinity(&column.data_type)

@@ -1080,6 +1080,16 @@ fn transaction_error_outcome(error: &DriverError) -> (AuditTerminalStatus, Audit
     match error {
         DriverError::Cancelled => (AuditTerminalStatus::Cancelled, AuditTransactionOutcome::Pending, false),
         DriverError::TimedOut => (AuditTerminalStatus::TimedOut, AuditTransactionOutcome::Pending, false),
+        DriverError::Transaction { source, .. } if matches!(source.as_ref(), DriverError::Cancelled) => (
+            AuditTerminalStatus::Cancelled,
+            AuditTransactionOutcome::RolledBack,
+            false,
+        ),
+        DriverError::Transaction { source, .. } if matches!(source.as_ref(), DriverError::TimedOut) => (
+            AuditTerminalStatus::TimedOut,
+            AuditTransactionOutcome::RolledBack,
+            false,
+        ),
         DriverError::Transaction { source, .. } if !is_ambiguous_post_dispatch(source) => {
             (AuditTerminalStatus::Failed, AuditTransactionOutcome::RolledBack, false)
         }

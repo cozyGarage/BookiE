@@ -8,9 +8,23 @@ use crate::services::database_service::{ConnectionHealth, ConnectionMetadata};
 use crate::ui::connect_dialog::{ConnectDialog, ConnectDialogInit, ConnectDialogOutput};
 
 use super::SessionTeardownAction;
-use super::{App, AppMsg, ConnectionTransition, SwitchDecision};
+use super::{App, AppMsg, ConnectionMessage, ConnectionTransition, SwitchDecision};
 
 impl App {
+    pub(super) fn on_connection_message(&mut self, message: ConnectionMessage, sender: ComponentSender<Self>) {
+        match message {
+            ConnectionMessage::Open => self.on_open_connect(sender),
+            ConnectionMessage::Cancel => self.on_cancel_connect(),
+            ConnectionMessage::Prepared(prepared) => self.on_connection_prepared(prepared, sender),
+            ConnectionMessage::PrepareFailed(message, saved) => {
+                self.on_connection_prepare_failed(message, *saved, sender)
+            }
+            ConnectionMessage::SwitchDecision(decision) => self.on_connection_switch_decision(decision, sender),
+            ConnectionMessage::Cancelled => self.on_connection_cancelled(),
+            ConnectionMessage::DialogClosed => self.on_connect_dialog_closed(),
+        }
+    }
+
     /// The policy-guarded connection this window owns, or `None` when the
     /// window is disconnected. Never resolves through the process-wide focus,
     /// so another window's connection can never answer for this one.
@@ -79,8 +93,8 @@ impl App {
                 guard_factory: self.database.candidate_guard_factory(),
             })
             .forward(sender.input_sender(), |out| match out {
-                ConnectDialogOutput::Prepared(prepared) => AppMsg::ConnectionPrepared(prepared),
-                ConnectDialogOutput::Closed => AppMsg::DialogClosed,
+                ConnectDialogOutput::Prepared(prepared) => AppMsg::Connection(ConnectionMessage::Prepared(prepared)),
+                ConnectDialogOutput::Closed => AppMsg::Connection(ConnectionMessage::DialogClosed),
             });
         crate::ui::leak_probe::track("connect", dialog.widget());
         dialog.widget().present(Some(&self.window));
@@ -401,12 +415,16 @@ impl App {
                     )
                     .await
                     {
-                        Ok(prepared) => sender_clone.input(AppMsg::ConnectionPrepared(Box::new(prepared))),
-                        Err(_) if cancel.is_cancelled() => sender_clone.input(AppMsg::ConnectionCancelled),
-                        Err(e) => sender_clone.input(AppMsg::ConnectionPrepareFailed(
+                        Ok(prepared) => {
+                            sender_clone.input(AppMsg::Connection(ConnectionMessage::Prepared(Box::new(prepared))))
+                        }
+                        Err(_) if cancel.is_cancelled() => {
+                            sender_clone.input(AppMsg::Connection(ConnectionMessage::Cancelled))
+                        }
+                        Err(e) => sender_clone.input(AppMsg::Connection(ConnectionMessage::PrepareFailed(
                             crate::services::error_text::open_failure_message(&e),
                             Box::new(attempted),
-                        )),
+                        ))),
                     }
                 })
                 .drop_on_shutdown()
@@ -553,11 +571,13 @@ impl App {
             dialog.set_close_response("stay");
             let response_sender = sender.clone();
             dialog.connect_response(None, move |_, response| {
-                response_sender.input(AppMsg::ConnectionSwitchDecision(if response == "cancel-runs" {
-                    SwitchDecision::CancelRuns
-                } else {
-                    SwitchDecision::Stay
-                }));
+                response_sender.input(AppMsg::Connection(ConnectionMessage::SwitchDecision(
+                    if response == "cancel-runs" {
+                        SwitchDecision::CancelRuns
+                    } else {
+                        SwitchDecision::Stay
+                    },
+                )));
             });
             dialog.present(Some(&self.window));
             return;
@@ -586,7 +606,7 @@ impl App {
                     "save" => SwitchDecision::SaveChanges,
                     _ => SwitchDecision::Stay,
                 };
-                response_sender.input(AppMsg::ConnectionSwitchDecision(decision));
+                response_sender.input(AppMsg::Connection(ConnectionMessage::SwitchDecision(decision)));
             });
             dialog.present(Some(&self.window));
             return;

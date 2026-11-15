@@ -163,7 +163,7 @@ async fn the_relay_carries_a_request_from_stdin_to_the_socket_and_the_answer_bac
     let (mut client_in, relay_in) = tokio::io::duplex(1 << 16);
     let (relay_out, mut client_out) = tokio::io::duplex(1 << 16);
     let path = server.path.clone();
-    let relay = tokio::spawn(async move { relay_to_socket(&path, relay_in, relay_out).await });
+    let relay = tokio::spawn(async move { relay_to_socket(&path, relay_in, relay_out, None).await });
 
     client_in.write_all(request.as_bytes()).await.unwrap();
     let mut answer = String::new();
@@ -183,4 +183,66 @@ async fn the_relay_carries_a_request_from_stdin_to_the_socket_and_the_answer_bac
     let _ = tokio::time::timeout(Duration::from_secs(5), relay).await;
     server.shutdown.cancel();
     server.task.await.unwrap().unwrap();
+}
+
+async fn relayed_answer(request: Value, token: Option<String>) -> Value {
+    let server = start().await;
+    let (mut client_in, relay_in) = tokio::io::duplex(1 << 16);
+    let (relay_out, mut client_out) = tokio::io::duplex(1 << 16);
+    let path = server.path.clone();
+    let token = token.map(|token| if token == "SERVER" { server.token.clone() } else { token });
+    let relay = tokio::spawn(async move { relay_to_socket(&path, relay_in, relay_out, token).await });
+    client_in.write_all(format!("{request}\n").as_bytes()).await.unwrap();
+    let mut answer = String::new();
+    tokio::time::timeout(
+        Duration::from_secs(5),
+        BufReader::new(&mut client_out).read_line(&mut answer),
+    )
+    .await
+    .expect("the relay returns the answer")
+    .unwrap();
+    drop(client_in);
+    let _ = tokio::time::timeout(Duration::from_secs(5), relay).await;
+    server.shutdown.cancel();
+    server.task.await.unwrap().unwrap();
+    serde_json::from_str(&answer).unwrap()
+}
+
+#[tokio::test]
+async fn a_client_that_sends_no_token_is_served_when_the_relay_holds_one() {
+    let listing = json!({"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}});
+
+    let without = relayed_answer(listing.clone(), None).await;
+    assert!(
+        without["error"]["message"].as_str().unwrap().contains("missing token"),
+        "{without}"
+    );
+
+    let with = relayed_answer(listing, Some("SERVER".into())).await;
+    assert!(
+        with["result"]["tools"]
+            .as_array()
+            .is_some_and(|tools| !tools.is_empty()),
+        "{with}"
+    );
+}
+
+#[tokio::test]
+async fn the_relay_keeps_a_token_the_client_sent() {
+    let own = json!({"jsonrpc":"2.0","id":1,"method":"tools/list","params":{"token":"nope"}});
+    let answer = relayed_answer(own, Some("SERVER".into())).await;
+    assert_eq!(
+        answer["error"]["message"], "authentication failed",
+        "the client's own token wins: {answer}"
+    );
+}
+
+#[tokio::test]
+async fn the_relay_keeps_a_token_the_client_put_in_the_tool_arguments() {
+    let call = json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"list_connections","arguments":{"token":"nope"}}});
+    let answer = relayed_answer(call, Some("SERVER".into())).await;
+    assert_eq!(
+        answer["result"]["isError"], true,
+        "the client's own bad token wins over the relay's good one: {answer}"
+    );
 }

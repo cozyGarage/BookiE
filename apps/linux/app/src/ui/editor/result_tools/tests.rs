@@ -263,6 +263,38 @@ fn a_derived_result_is_a_complete_spool_backed_result_with_its_own_counts() {
 }
 
 #[test]
+fn derived_result_pages_share_the_source_resident_budget() {
+    let (spool, counts) = spooled(&[vec![row(1, "apple")]]);
+    let source = source_result(spool, counts);
+    let budget = source
+        .resident_pages
+        .reserve(bookie_results::stream_page_budget::MAX_RETAINED_STREAM_PAGE_BYTES)
+        .expect("source reserves the shared budget");
+    let derived = derived_result(&source, filtered(&source, "apple"), 1 << 62);
+
+    assert!(derived.resident_pages.reserve(1).is_none());
+    drop(budget);
+    assert!(derived.resident_pages.reserve(1).is_some());
+}
+
+#[test]
+fn derived_result_has_an_independent_page_index() {
+    let (spool, counts) = spooled(&[vec![row(1, "apple")]]);
+    let source = source_result(spool, counts);
+    let page = std::sync::Arc::new(bookie_core::QueryResult {
+        columns: id_column(),
+        rows: vec![row(9, "source page")].into(),
+        truncated: false,
+    });
+    let lease = source.resident_pages.retain(&page).expect("source page fits");
+    source.resident_pages.insert(0, page.clone(), lease, true);
+    let derived = derived_result(&source, filtered(&source, "apple"), 1 << 62);
+
+    assert!(source.resident_pages.get(0).is_some());
+    assert!(derived.resident_pages.get(0).is_none());
+}
+
+#[test]
 fn a_derived_result_without_a_source_export_has_no_export() {
     let (spool, counts) = spooled(&[vec![row(1, "a")]]);
     let mut source = source_result(spool, counts);

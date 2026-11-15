@@ -59,7 +59,7 @@ async fn diff(connection: &dyn Connection) -> bookie_app_services::schema_compar
 
 #[tokio::test]
 #[ignore = "requires Docker; run cargo test -p bookie-app-services --test schema_compare_postgres -- --include-ignored"]
-async fn the_generated_script_makes_the_current_schema_match_the_desired_one_on_a_real_server() {
+async fn the_generated_script_applies_adds_and_alters_but_only_lists_drops() {
     let container = Postgres::default()
         .with_tag("18-alpine")
         .start()
@@ -82,6 +82,7 @@ async fn the_generated_script_makes_the_current_schema_match_the_desired_one_on_
     let before = diff(connection.as_ref()).await;
     assert_eq!(before.added, ["orders"]);
     assert_eq!(before.dropped, ["legacy"]);
+    assert!(before.script.contains("-- DROP TABLE \"current_side\".\"legacy\";"));
     assert_eq!(
         before
             .altered
@@ -102,8 +103,8 @@ async fn the_generated_script_makes_the_current_schema_match_the_desired_one_on_
 
     let after = diff(connection.as_ref()).await;
     assert!(
-        after.is_identical(),
-        "the script left differences: {after:?}\n--- script ---\n{}",
+        after.added.is_empty() && after.altered.is_empty() && after.dropped == ["legacy"],
+        "the script should apply adds and alters while leaving listed drops untouched: {after:?}\n--- script ---\n{}",
         before.script
     );
     connection.close().await.expect("close");

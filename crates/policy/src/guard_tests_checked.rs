@@ -265,6 +265,7 @@ fn assert_interruption_audit(audit: &SequenceAuditSink, timed_out: bool) {
             AuditApprovalOutcome::Cancelled
         }
     );
+    assert_eq!(event.transaction_outcome, AuditTransactionOutcome::NotApplicable);
 }
 
 #[tokio::test]
