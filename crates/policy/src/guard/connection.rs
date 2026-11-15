@@ -236,6 +236,7 @@ impl Connection for PolicyGuard {
 
     async fn query_controlled(&self, sql: &str, control: &OperationControl) -> Result<QueryResult, DriverError> {
         let authorization = self.authorize(sql, false, Some(control)).await?;
+        let control = &authorization.rearm(control);
         if authorization.analysis.facts.writes() {
             return self
                 .execute_query_write(sql, None, authorization, |inner| inner.query_controlled(sql, control))
@@ -294,6 +295,7 @@ impl Connection for PolicyGuard {
         control: &OperationControl,
     ) -> Result<QueryResult, DriverError> {
         let authorization = self.authorize(sql, true, Some(control)).await?;
+        let control = &authorization.rearm(control);
         if authorization.analysis.facts.writes() {
             return self
                 .execute_query_write(sql, None, authorization, |inner| {
@@ -328,6 +330,7 @@ impl Connection for PolicyGuard {
         control: &OperationControl,
     ) -> Result<QueryResultBatch, DriverError> {
         let authorization = self.authorize(sql, true, Some(control)).await?;
+        let control = &authorization.rearm(control);
         let operation = self.operation(
             sql,
             None,
@@ -376,6 +379,7 @@ impl Connection for PolicyGuard {
 
     async fn execute_controlled(&self, sql: &str, control: &OperationControl) -> Result<ExecResult, DriverError> {
         let authorization = self.authorize(sql, false, Some(control)).await?;
+        let control = &authorization.rearm(control);
         self.execute_write(sql, None, authorization, |inner| inner.execute_controlled(sql, control))
             .await
     }
@@ -425,6 +429,7 @@ impl Connection for PolicyGuard {
         control: &OperationControl,
     ) -> Result<ExecResult, DriverError> {
         let authorization = self.authorize(sql, true, Some(control)).await?;
+        let control = &authorization.rearm(control);
         self.execute_write(sql, None, authorization, |inner| {
             inner.execute_params_controlled(sql, params, control)
         })
@@ -465,6 +470,7 @@ impl Connection for PolicyGuard {
         check_pre_dispatch(control)?;
         let combined = batch_text(statements);
         let authorization = self.authorize(&combined, true, Some(control)).await?;
+        let control = &authorization.rearm(control);
         self.require_governed_write_available()?;
         let batch_id = Uuid::new_v4();
         let operation = self.operation(
@@ -546,6 +552,7 @@ impl Connection for PolicyGuard {
         let authorization = self
             .authorize_analysis(&combined, analysis, enforced_rows, Some(control))
             .await?;
+        let control = &authorization.rearm(control);
         self.require_governed_write_available()?;
         let operation = self.operation(
             &combined,
@@ -961,6 +968,7 @@ impl Transaction for PolicyTransaction {
             .guard
             .authorize_in_transaction(sql, Some(control), &mut *self.inner)
             .await?;
+        let control = &authorization.rearm(control);
         run_transaction_query(
             &self.guard,
             self.batch_id,
@@ -995,6 +1003,7 @@ impl Transaction for PolicyTransaction {
             .guard
             .authorize_in_transaction(sql, Some(control), &mut *self.inner)
             .await?;
+        let control = &authorization.rearm(control);
         run_transaction_query(
             &self.guard,
             self.batch_id,
@@ -1035,6 +1044,7 @@ impl Transaction for PolicyTransaction {
             .guard
             .authorize_in_transaction(sql, Some(control), &mut *self.inner)
             .await?;
+        let control = &authorization.rearm(control);
         self.guard.require_governed_write_available()?;
         let operation = self.guard.operation(
             sql,
@@ -1097,6 +1107,7 @@ impl Transaction for PolicyTransaction {
             .guard
             .authorize_in_transaction(sql, Some(control), &mut *self.inner)
             .await?;
+        let control = &authorization.rearm(control);
         self.guard.require_governed_write_available()?;
         let operation = self.guard.operation(
             sql,

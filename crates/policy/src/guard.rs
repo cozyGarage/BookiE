@@ -82,6 +82,16 @@ struct Authorization {
     analysis: StatementAnalysis,
     approval_outcome: AuditApprovalOutcome,
     preview_state: AuditPreviewState,
+    approval_wait: Duration,
+}
+
+impl Authorization {
+    fn rearm(&self, control: &OperationControl) -> OperationControl {
+        OperationControl::new(
+            control.cancellation_token().clone(),
+            control.deadline().map(|deadline| deadline + self.approval_wait),
+        )
+    }
 }
 
 struct AuditOperation<'a> {
@@ -319,6 +329,7 @@ impl PolicyGuard {
                 analysis,
                 approval_outcome: AuditApprovalOutcome::NotRequired,
                 preview_state: AuditPreviewState::NotRequested,
+                approval_wait: Duration::ZERO,
             }),
             Decision::Deny { ref message, .. } => {
                 let operation = self.operation(
@@ -363,11 +374,12 @@ impl PolicyGuard {
                     cancellation: control.map(|control| control.cancellation_token().clone()),
                 });
                 tokio::pin!(approval);
+                let approval_started = tokio::time::Instant::now();
                 let outcome = match control {
                     Some(control) => tokio::select! {
                         biased;
                         _ = control.cancellation_token().cancelled() => Err(DriverError::Cancelled),
-                        _ = wait_for_control_deadline(control) => {
+                        _ = tokio::time::sleep(APPROVAL_WAIT_LIMIT) => {
                             control.cancellation_token().cancel();
                             Err(DriverError::TimedOut)
                         },
@@ -415,6 +427,7 @@ impl PolicyGuard {
                             analysis,
                             approval_outcome: approved_audit_outcome(outcome),
                             preview_state,
+                            approval_wait: approval_started.elapsed(),
                         })
                     }
                     ApprovalOutcome::Deny => {

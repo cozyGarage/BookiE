@@ -87,6 +87,7 @@ pub mod workspace_state;
 pub mod browse_query;
 
 pub mod change_tracker;
+pub mod edit_preview;
 pub mod result_copy;
 pub mod result_editability;
 
