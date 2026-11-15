@@ -55,6 +55,7 @@ pub(crate) struct PagedExport {
     pub(crate) mode: PagedExportMode,
     pub(crate) total_rows: Option<usize>,
     pub(crate) open: PageFetcherFactory,
+    pub(crate) retained_page: Option<StreamExportPage>,
 }
 
 #[derive(Debug, Clone)]
@@ -69,8 +70,14 @@ pub(crate) struct StreamExportRequest {
     pub(crate) columns: Vec<bookie_core::ColumnInfo>,
     pub(crate) spool: Option<bookie_app_services::stream_result_spool::StreamResultSpool>,
     pub(crate) total_rows: usize,
-    pub(crate) current_page: Option<std::sync::Arc<QueryResult>>,
+    pub(crate) current_page: Option<StreamExportPage>,
     pub(crate) filtered: bool,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct StreamExportPage {
+    pub(crate) result: std::sync::Arc<QueryResult>,
+    pub(crate) _lease: bookie_results::stream_page_budget::StreamPageLease,
 }
 
 pub(crate) struct ExportRequest {
@@ -461,6 +468,11 @@ fn present_export(
                 driver_id: driver_id.clone(),
                 result: result.clone(),
                 paged: if all_rows { full_export.clone() } else { paged.clone() },
+                retained_page: if all_rows {
+                    None
+                } else {
+                    full_export.as_ref().and_then(|paged| paged.retained_page.clone())
+                },
                 include_header,
                 sanitize_formulas: safe_csv.is_active(),
                 spare_plain_numbers: spare_numbers.is_active(),
@@ -483,6 +495,7 @@ struct SaveRequest {
     driver_id: String,
     result: std::sync::Arc<QueryResult>,
     paged: Option<PagedExport>,
+    retained_page: Option<StreamExportPage>,
     include_header: bool,
     sanitize_formulas: bool,
     spare_plain_numbers: bool,
@@ -509,6 +522,7 @@ fn save_with_file_dialog(parent: &adw::ApplicationWindow, toast_overlay: &adw::T
         driver_id,
         result,
         paged,
+        retained_page,
         include_header,
         sanitize_formulas,
         spare_plain_numbers,
@@ -550,6 +564,7 @@ fn save_with_file_dialog(parent: &adw::ApplicationWindow, toast_overlay: &adw::T
             file::ExportJob {
                 path,
                 source: job_source(&paged, &result),
+                retained_page,
                 format,
                 options,
                 driver_id: driver_id.clone(),
