@@ -39,6 +39,10 @@ pub fn canonical_decimal128_text(text: &str) -> Result<String, DriverError> {
         .map_err(|error| DriverError::Unsupported(format!("invalid MongoDB Decimal128 value: {error}")))
 }
 
+pub fn relaxed_extended_json_for_display(value: &serde_json::Value) -> Option<serde_json::Value> {
+    codec::relaxed_extended_json_for_display(value)
+}
+
 #[async_trait]
 impl DatabaseDriver for MongodbDriver {
     fn value_input_capabilities(&self) -> DriverValueInputCapabilities {
