@@ -2,7 +2,7 @@ use std::os::unix::fs::{DirBuilderExt, FileTypeExt, MetadataExt, PermissionsExt}
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
 use tokio::net::{UnixListener, UnixStream};
 use tokio_util::sync::CancellationToken;
 
@@ -99,7 +99,7 @@ async fn bind_private_socket(path: &Path) -> Result<UnixListener, String> {
     Ok(listener)
 }
 
-pub async fn relay_to_socket<R, W>(path: &Path, input: R, output: W) -> Result<(), String>
+pub async fn relay_to_socket<R, W>(path: &Path, input: R, output: W, token: Option<String>) -> Result<(), String>
 where
     R: AsyncRead + Unpin + Send + 'static,
     W: AsyncWrite + Unpin,
@@ -109,14 +109,44 @@ where
         .map_err(|error| format!("cannot reach the BookiE MCP socket {}: {error}", path.display()))?;
     let (mut from_socket, mut to_socket) = stream.into_split();
     let upstream = tokio::spawn(async move {
-        let mut input = input;
-        let _ = tokio::io::copy(&mut input, &mut to_socket).await;
+        let mut input = BufReader::new(input);
+        let mut line = String::new();
+        while input.read_line(&mut line).await.is_ok_and(|read| read > 0) {
+            let outgoing = token
+                .as_deref()
+                .map_or_else(|| line.clone(), |token| with_token(&line, token));
+            if to_socket.write_all(outgoing.as_bytes()).await.is_err() {
+                break;
+            }
+            line.clear();
+        }
         let _ = to_socket.shutdown().await;
     });
     let mut output = output;
     let result = tokio::io::copy(&mut from_socket, &mut output).await;
     upstream.abort();
     result.map(|_| ()).map_err(|error| error.to_string())
+}
+
+fn with_token(line: &str, token: &str) -> String {
+    let Ok(mut message) = serde_json::from_str::<serde_json::Value>(line) else {
+        return line.to_owned();
+    };
+    let Some(object) = message.as_object_mut().filter(|object| object.contains_key("method")) else {
+        return line.to_owned();
+    };
+    if let Some(params) = object
+        .entry("params")
+        .or_insert_with(|| serde_json::json!({}))
+        .as_object_mut()
+        && let Some(meta) = params
+            .entry("_meta")
+            .or_insert_with(|| serde_json::json!({}))
+            .as_object_mut()
+    {
+        meta.entry("authorization").or_insert_with(|| serde_json::json!(token));
+    }
+    format!("{message}\n")
 }
 
 #[cfg(test)]

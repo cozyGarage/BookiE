@@ -389,7 +389,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let path = socket
             .or_else(bookie_mcp::default_socket_path)
             .ok_or("XDG_RUNTIME_DIR is not set; pass the socket path to --connect-socket")?;
-        bookie_mcp::relay_to_socket(&path, tokio::io::stdin(), tokio::io::stdout()).await?;
+        let token = std::env::var("BOOKIE_MCP_TOKEN").ok().filter(|token| !token.is_empty());
+        bookie_mcp::relay_to_socket(&path, tokio::io::stdin(), tokio::io::stdout(), token).await?;
         return Ok(());
     }
     let Some(policy_path) = args.policy.take() else {
