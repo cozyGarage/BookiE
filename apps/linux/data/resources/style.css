@@ -102,6 +102,17 @@ columnview > listview > row > cell:focus-within > .tp-cell-editor {
   animation: tp-flash-error 1.8s ease-out;
 }
 
+/* Align grid header buttons and cells flush with each other.
+   The cell's child carries the padding/margins, as in libadwaita's
+   file chooser and TablePro. */
+columnview.data-table > listview > row > cell {
+  padding: 0;
+}
+
+columnview.data-table > header > button {
+  padding: 0;
+}
+
 columnview.data-table > listview > row > cell > .row-number-cell {
   min-height: 16px;
   padding: 2px 6px;
@@ -168,4 +179,26 @@ columnview > header .tp-column-header-selected {
 
 .tp-paginator-bar button {
   min-width: 28px;
+}
+
+/* Compact SQL editor toolbar matching DBX and TablePro */
+.tp-editor-toolbar button {
+  padding-left: 6px;
+  padding-right: 6px;
+}
+
+/* Link Run button and Run Options dropdown in editor toolbar */
+.tp-editor-toolbar button.suggested-action {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  margin-right: 0;
+}
+
+.tp-editor-toolbar menubutton.suggested-action > button {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: 1px solid alpha(white, 0.25);
+  margin-left: 0;
+  padding-left: 4px;
+  padding-right: 4px;
 }

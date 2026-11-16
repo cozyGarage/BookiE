@@ -208,8 +208,7 @@ impl SimpleComponent for SqlEditor {
                         gtk::Label {
                             set_halign: gtk::Align::End,
                             add_css_class: "dim-label",
-                            add_css_class: "monospace",
-                            set_margin_end: 8,
+                            add_css_class: "caption",
                         },
 
                         #[name = "running_spinner"]
@@ -237,8 +236,9 @@ impl SimpleComponent for SqlEditor {
 
                     adw::WrapBox {
                         set_halign: gtk::Align::End,
-                        set_child_spacing: 8,
+                        set_child_spacing: 6,
                         set_line_spacing: 6,
+                        add_css_class: "tp-editor-toolbar",
 
                         #[name = "warnings_button"]
                         append = &gtk::MenuButton {
@@ -316,6 +316,7 @@ impl SimpleComponent for SqlEditor {
                         append = &gtk::MenuButton {
                             set_icon_name: "pan-down-symbolic",
                             set_tooltip_text: Some(bookie_app_services::tr!("Run options").as_str()),
+                            add_css_class: "suggested-action",
                         },
                     },
                 },

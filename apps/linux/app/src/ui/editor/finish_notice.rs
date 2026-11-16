@@ -29,7 +29,6 @@ pub(super) fn notify_if_unattended(widget: &impl IsA<gtk::Widget>, elapsed: Dura
 }
 
 pub(super) fn fit_status(status: &gtk::Label) {
-    status.set_width_chars(18);
     status.set_max_width_chars(18);
     status.set_xalign(1.0);
     status.set_ellipsize(gtk::pango::EllipsizeMode::End);
