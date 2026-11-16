@@ -47,9 +47,9 @@ pub fn present(
     toolbar.add_top_bar(&header);
 
     let box_ = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    let button_row = gtk::Box::builder()
-        .orientation(gtk::Orientation::Horizontal)
-        .spacing(8)
+    let button_row = adw::WrapBox::builder()
+        .child_spacing(8)
+        .line_spacing(8)
         .margin_start(12)
         .margin_end(12)
         .margin_top(8)
