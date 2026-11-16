@@ -39,6 +39,8 @@ import gtk_input
 import gtk_runner
 import gtk_shard
 import gtk_process
+import gtk_allocator_trim
+import gtk_server_messages
 
 _owned_application = None
 
@@ -135,6 +137,36 @@ def find_node(name=None, role=None):
     return None
 
 
+def sidebar_control_nodes(node):
+    yield node
+    if node_role(node) in (pyatspi.ROLE_LIST, pyatspi.ROLE_LIST_ITEM, pyatspi.ROLE_TABLE, pyatspi.ROLE_TREE):
+        return
+    try:
+        children = list(node)
+    except Exception:
+        return
+    for child in children:
+        yield from sidebar_control_nodes(child)
+
+
+def find_sidebar_control(name, role):
+    for application in desktop_applications():
+        for node in sidebar_control_nodes(application):
+            if node_name(node) == name and role_matches(node, role):
+                return node
+    return None
+
+
+def wait_for_sidebar_control(name, role):
+    deadline = time.monotonic() + WAIT_SECONDS
+    while time.monotonic() < deadline:
+        node = find_sidebar_control(name, role)
+        if node is not None:
+            return node
+        time.sleep(POLL_SECONDS)
+    raise AssertionError(f"expected sidebar control {name!r} to appear:\n{accessible_snapshot()}")
+
+
 def find_within(root, name=None, role=None):
     for node in descendants(root):
         if name is not None and node_name(node) != name:
@@ -156,6 +188,18 @@ def wait_within(root, name=None, role=None, present=True, timeout=WAIT_SECONDS):
     raise AssertionError(
         f"expected {name!r} to {expectation} inside {node_name(root)!r}:\n{accessible_snapshot()}"
     )
+
+
+def set_text_within(root, text):
+    for node in descendants(root):
+        if node_role(node) != pyatspi.ROLE_TEXT:
+            continue
+        try:
+            node.queryEditableText().setTextContents(text)
+            return
+        except Exception:
+            continue
+    raise AssertionError(f"no editable text field inside {node_name(root)!r}:\n{accessible_snapshot()}")
 
 
 def invoke_named_action(anchor_lookup, anchor_name, action_name):
@@ -289,6 +333,21 @@ def wait_for_node(name=None, role=None, present=True, timeout=WAIT_SECONDS):
         time.sleep(POLL_SECONDS)
     expectation = "appear" if present else "disappear"
     raise AssertionError(f"expected accessible node {name!r} to {expectation}:\n{accessible_snapshot()}")
+
+
+def dismiss_release_notes():
+    for application in desktop_applications():
+        alert = next(
+            (
+                node
+                for node in descendants(application)
+                if node_role(node) == pyatspi.ROLE_ALERT and node_name(node).startswith("What's new in BookiE")
+            ),
+            None,
+        )
+        if alert is not None:
+            invoke(wait_within(alert, name="Close", role=pyatspi.ROLE_PUSH_BUTTON))
+            return
 
 
 def wait_for_sensitive_node(name, role=None, timeout=WAIT_SECONDS):
@@ -524,18 +583,26 @@ def application_memory_kib():
     return values
 
 
-def application_sidebar_row_construction():
+def application_sidebar_model_metrics(minimum_nodes):
     process = owned_application().process
     stderr = process.stderr
-    position = stderr.tell()
-    stderr.seek(0)
-    output = stderr.read()
-    stderr.seek(position)
-    matches = re.findall(r"sidebar rows constructed sidebar_nodes=(\d+) row_construction_ms=([0-9.]+)", output)
-    if not matches:
-        raise AssertionError("the app did not report sidebar row construction timing")
-    count, elapsed = matches[-1]
-    return int(count), float(elapsed)
+    deadline = time.monotonic() + WAIT_SECONDS
+    while time.monotonic() < deadline:
+        position = stderr.tell()
+        stderr.seek(0)
+        output = stderr.read()
+        stderr.seek(position)
+        matches = re.findall(
+            r"sidebar tree model ready sidebar_nodes=(\d+) tree_model_build_ms=([0-9.]+) created_list_items=(\d+)",
+            output,
+        )
+        matches = [match for match in matches if int(match[0]) >= minimum_nodes]
+        if matches:
+            count, elapsed, created = matches[-1]
+            stalls = [int(value) for value in re.findall(r"UI thread stalled.*?stall_ms=(\d+)", output)]
+            return int(count), float(elapsed), int(created), len(stalls), max(stalls, default=0)
+        time.sleep(POLL_SECONDS)
+    raise AssertionError("the app did not publish sidebar tree model metrics")
 
 
 def wait_for_database_count(path, expected, timeout=WAIT_SECONDS):
@@ -563,7 +630,7 @@ def set_text_by_name(name, text, timeout=WAIT_SECONDS):
         for application in desktop_applications():
             for node in descendants(application):
                 if node_name(node) != name or node_role(node) not in {
-                    pyatspi.ROLE_TEXT, pyatspi.ROLE_PASSWORD_TEXT,
+                    pyatspi.ROLE_ENTRY, pyatspi.ROLE_TEXT, pyatspi.ROLE_PASSWORD_TEXT,
                 }:
                     continue
                 try:
@@ -643,6 +710,33 @@ def database_tables(path):
                 "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name"
             )
         }
+
+
+def seed_catalog_hidden_schemas(bookie_config):
+    encoded = os.environ.get("BOOKIE_GTK_CATALOG_HIDDEN_SCHEMAS_JSON")
+    if encoded is None:
+        return
+    if "BOOKIE_GTK_POSTGRES_PORT" not in os.environ:
+        raise ValueError("catalog hidden-schema profiles require a PostgreSQL connection")
+    hidden_schemas = json.loads(encoded)
+    if not isinstance(hidden_schemas, list) or any(not isinstance(schema, str) or not schema for schema in hidden_schemas):
+        raise ValueError("catalog hidden schemas must be a JSON array of non-empty strings")
+    path = bookie_config / "workspace_state.json"
+    path.write_text(
+        json.dumps(
+            {
+                "connections": {
+                    POSTGRES_CONNECTION_ID: {
+                        "tabs": [],
+                        "database": "bookie_test",
+                        "hidden_schemas": hidden_schemas,
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    path.chmod(0o600)
 
 
 def write_fixture(base, audit_available=True, environment="prod", mcp_token=False):
@@ -940,6 +1034,7 @@ def write_fixture(base, audit_available=True, environment="prod", mcp_token=Fals
                 capture_output=True,
             )
     (bookie_config / "connections.json").write_text(json.dumps(connections), encoding="utf-8")
+    seed_catalog_hidden_schemas(bookie_config)
     (bookie_config / "preferences.json").write_text(
         json.dumps(
             {
@@ -983,7 +1078,12 @@ def start_application(binary, environment, restored=False):
     heaptrack_output = os.environ.get("BOOKIE_GTK_APP_HEAPTRACK_OUTPUT")
     if (heaptrack_preload is None) != (heaptrack_output is None):
         raise AssertionError("Heaptrack requires both an app preload library and output pipe")
-    if heaptrack_preload is not None and heaptrack_output is not None:
+    trim_preload = gtk_allocator_trim.preload(environment)
+    if trim_preload is not None:
+        if heaptrack_preload is not None or environment.get("LD_PRELOAD"):
+            raise AssertionError("allocator trim profiling cannot be combined with another preload")
+        environment["LD_PRELOAD"] = trim_preload
+    elif heaptrack_preload is not None and heaptrack_output is not None:
         environment["LD_PRELOAD"] = heaptrack_preload
         environment["DUMP_HEAPTRACK_OUTPUT"] = heaptrack_output
     stderr_capture = tempfile.TemporaryFile(mode="w+", encoding="utf-8")
@@ -1060,7 +1160,7 @@ def run_sql(sql):
 
 
 def run_scenario(binary, scenario):
-    base = Path(tempfile.mkdtemp(prefix=f"bookie-{scenario.__name__}-"))
+    base = Path(tempfile.mkdtemp(prefix="bk-"))
     process = None
     failure = None
     stderr = ""
@@ -1073,11 +1173,12 @@ def run_scenario(binary, scenario):
         )
         environment.update(getattr(scenario, "environment_overrides", {}))
         process = start_application(binary, environment)
+        dismiss_release_notes()
         if getattr(scenario, "requires_editor", True):
             open_editor()
         def restart(before_start=None, empty=False, restored=None):
             nonlocal process, stderr
-            invoke_accessible_action("win.quit")
+            invoke(wait_for_node(name="Close", role=pyatspi.ROLE_PUSH_BUTTON))
             process.wait(timeout=WAIT_SECONDS)
             if process.returncode != 0:
                 raise RuntimeError("graceful quit failed")
@@ -1087,6 +1188,7 @@ def run_scenario(binary, scenario):
                 before_start(environment)
             restored = "empty" if empty else restored or ("welcome" if before_start else True)
             process = start_application(binary, environment, restored=restored)
+            dismiss_release_notes()
 
         if getattr(scenario, "needs_restart", False):
             scenario(database, base, restart)
@@ -1718,6 +1820,24 @@ def expanding_a_sidebar_table_loads_its_columns(database, _base):
 expanding_a_sidebar_table_loads_its_columns.environment = "local"
 
 
+def sidebar_table_opens_with_keyboard(_database, _base):
+    search_toggle = wait_for_node(name="Search tables", role=pyatspi.ROLE_TOGGLE_BUTTON)
+    if not search_toggle.getState().contains(pyatspi.STATE_CHECKED):
+        invoke(search_toggle)
+    for _ in range(40):
+        row = find_node(name="safety_items", role=pyatspi.ROLE_LIST_ITEM)
+        if row is not None and row.getState().contains(pyatspi.STATE_FOCUSED):
+            press_x11_key("Return")
+            wait_for_node(name="safety_items", role=pyatspi.ROLE_PAGE_TAB)
+            return
+        press_x11_key("Tab")
+        time.sleep(POLL_SECONDS)
+    raise AssertionError(f"the table row is not keyboard reachable:\n{accessible_snapshot()}")
+
+
+sidebar_table_opens_with_keyboard.environment = "local"
+
+
 def postgres_sidebar_catalog_profile(_database, base):
     target = os.environ["BOOKIE_GTK_CATALOG_TARGET"]
     before = application_memory_kib()
@@ -1725,28 +1845,36 @@ def postgres_sidebar_catalog_profile(_database, base):
     open_saved_connection(POSTGRES_CONNECTION_NAME)
     wait_for_frame_containing(f"{POSTGRES_CONNECTION_NAME} — BookiE", timeout=120)
     frame_ready = time.monotonic()
-    wait_for_node(name=target, role=pyatspi.ROLE_LIST_ITEM, timeout=120)
+    minimum_nodes = int(os.environ.get("BOOKIE_GTK_CATALOG_MINIMUM_NODES", os.environ["BOOKIE_GTK_CATALOG_TABLES"]))
+    sidebar_nodes, tree_model_build_ms, created_list_items, ui_stall_count, ui_stall_max_ms = (
+        application_sidebar_model_metrics(minimum_nodes)
+    )
+    hidden_schemas = json.loads(os.environ.get("BOOKIE_GTK_CATALOG_HIDDEN_SCHEMAS_JSON", "[]"))
+    if hidden_schemas:
+        wait_for_node(name=hidden_schemas[0], role=pyatspi.ROLE_LIST_ITEM, present=False)
     catalog_ready = time.monotonic()
-    search_toggle = wait_for_node(name="Search tables", role=pyatspi.ROLE_TOGGLE_BUTTON)
+    search_toggle = wait_for_sidebar_control("Search tables", pyatspi.ROLE_TOGGLE_BUTTON)
     if not search_toggle.getState().contains(pyatspi.STATE_CHECKED):
         invoke(search_toggle)
-    search = wait_for_node(name="Search tables", role=pyatspi.ROLE_ENTRY)
+    search = wait_for_sidebar_control("Search tables", pyatspi.ROLE_ENTRY)
     filter_started = time.monotonic()
     search.queryEditableText().setTextContents(target)
     wait_for_node_showing(target, True, timeout=120)
     filter_ready = time.monotonic()
     after = application_memory_kib()
-    sidebar_nodes, row_construction_ms = application_sidebar_row_construction()
     profile = {
         "scenario": "postgres_sidebar_catalog_profile",
         "source_commit": os.environ.get("BOOKIE_GTK_SOURCE_COMMIT"),
         "created_tables": int(os.environ["BOOKIE_GTK_CATALOG_TABLES"]),
         "target": target,
         "connect_and_catalog_frame_ms": (frame_ready - connect_started) * 1000,
-        "catalog_accessible_ms": (catalog_ready - connect_started) * 1000,
+        "sidebar_model_ready_ms": (catalog_ready - connect_started) * 1000,
         "search_filter_ms": (filter_ready - filter_started) * 1000,
         "sidebar_nodes": sidebar_nodes,
-        "row_construction_ms": row_construction_ms,
+        "tree_model_build_ms": tree_model_build_ms,
+        "created_list_items": created_list_items,
+        "ui_stall_count": ui_stall_count,
+        "ui_stall_max_ms": ui_stall_max_ms,
         "memory_before_kib": before,
         "memory_after_kib": after,
     }
@@ -1756,6 +1884,7 @@ def postgres_sidebar_catalog_profile(_database, base):
 
 
 postgres_sidebar_catalog_profile.environment = "local"
+postgres_sidebar_catalog_profile.environment_overrides = {"BOOKIE_UI_STALL_MS": "16"}
 
 
 def press_x11_text(text):
@@ -1783,6 +1912,120 @@ def wait_for_favorites(base, predicate, description, timeout=WAIT_SECONDS):
                 return last
         time.sleep(POLL_SECONDS)
     raise AssertionError(f"{description}; favorites file held {last!r}")
+
+
+def saved_query_document(base):
+    path = favorites_path(base)
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+
+
+def wait_for_saved_query_document(base, predicate, description, timeout=WAIT_SECONDS):
+    deadline = time.monotonic() + timeout
+    last = None
+    while time.monotonic() < deadline:
+        last = saved_query_document(base)
+        if last is not None and predicate(last):
+            return last
+        time.sleep(POLL_SECONDS)
+    raise AssertionError(f"{description}; saved query document held {last!r}")
+
+
+def choose_combo_option(combo, arrow_count):
+    button = next(
+        (node for node in descendants(combo) if node_role(node) == pyatspi.ROLE_TOGGLE_BUTTON),
+        combo,
+    )
+    invoke(button)
+    if arrow_count == 0:
+        press_x11_key("Home")
+    else:
+        press_x11_key("Down", presses=arrow_count + 1)
+    press_x11_key("Return")
+
+
+def choose_saved_query_folder(dialog):
+    combo = wait_within(dialog, name="Folder", role=pyatspi.ROLE_COMBO_BOX)
+    bounds = combo.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+    gtk_ux.x11_click(bounds.x + bounds.width - 24, bounds.y + bounds.height // 2, button=1)
+    press_x11_key("Down")
+    press_x11_key("Return")
+
+
+def saved_query_folders_keep_queries_and_keywords(base):
+    press_x11_key("b", modifiers=["Control_L", "Shift_L"])
+    wait_for_node(name="New folder", role=pyatspi.ROLE_PUSH_BUTTON)
+    invoke(wait_for_node(name="New folder", role=pyatspi.ROLE_PUSH_BUTTON))
+    wait_for_node(name="Folder name")
+    set_text_by_name("Folder name", "Reports")
+    invoke(wait_for_node(name="Create folder", role=pyatspi.ROLE_PUSH_BUTTON))
+    wait_for_saved_query_document(
+        base,
+        lambda document: any(folder["name"] == "Reports" for folder in document.get("folders", [])),
+        "creating a folder did not persist it",
+    )
+    invoke(wait_for_node(name="Organize", role=pyatspi.ROLE_PUSH_BUTTON))
+    organize_dialog = wait_for_node(name="Organize saved query", role=pyatspi.ROLE_ALERT)
+    choose_saved_query_folder(organize_dialog)
+    set_text_within(organize_dialog, "finance, daily")
+    invoke(wait_within(organize_dialog, name="Save", role=pyatspi.ROLE_PUSH_BUTTON))
+    assigned = wait_for_saved_query_document(
+        base,
+        lambda document: any(
+            item["name"] == "smoke favorite" and item.get("folder_id") and item.get("keywords") == ["finance", "daily"]
+            for item in document.get("favorites", [])
+        ),
+        "moving a query into a folder did not persist its folder and keywords",
+    )
+    folder_id = assigned["favorites"][0]["folder_id"]
+
+    invoke(wait_for_node(name="Organize", role=pyatspi.ROLE_PUSH_BUTTON))
+    invalid_organization = wait_for_node(name="Organize saved query", role=pyatspi.ROLE_ALERT)
+    set_text_within(invalid_organization, ", ".join(f"tag-{index}" for index in range(33)))
+    invoke(wait_within(invalid_organization, name="Save", role=pyatspi.ROLE_PUSH_BUTTON))
+    save_error = wait_for_node(name="Saved queries could not be saved", role=pyatspi.ROLE_ALERT)
+    invoke(wait_within(save_error, name="Close", role=pyatspi.ROLE_PUSH_BUTTON))
+    invoke(wait_for_node(name="Organize", role=pyatspi.ROLE_PUSH_BUTTON))
+    wait_for_node(name="Organize saved query", role=pyatspi.ROLE_ALERT)
+    press_x11_key("Escape")
+    wait_for_node(name="Organize saved query", role=pyatspi.ROLE_ALERT, present=False)
+
+    selector = wait_for_node(name="All queries", role=pyatspi.ROLE_COMBO_BOX)
+    choose_combo_option(selector, 2)
+    wait_for_node(name="Reports", role=pyatspi.ROLE_COMBO_BOX)
+    wait_for_node(name="smoke favorite")
+    invoke(wait_for_node(name="Rename folder", role=pyatspi.ROLE_PUSH_BUTTON))
+    wait_for_node(name="Folder name")
+    set_text_by_name("Folder name", "Reports renamed")
+    rename_dialog = wait_for_node(name="Rename folder", role=pyatspi.ROLE_ALERT)
+    invoke(wait_within(rename_dialog, name="Rename folder", role=pyatspi.ROLE_PUSH_BUTTON))
+    wait_for_saved_query_document(
+        base,
+        lambda document: any(folder["name"] == "Reports renamed" for folder in document.get("folders", [])),
+        "renaming a folder did not persist it",
+    )
+    wait_for_node(name="smoke favorite")
+
+    set_text_by_name("Search saved queries", "finance")
+    wait_for_node(name="smoke favorite")
+    set_text_by_name("Search saved queries", "missing keyword")
+    wait_for_node(name="No matches")
+    set_text_by_name("Search saved queries", "")
+    wait_for_node(name="smoke favorite")
+    invoke(wait_for_node(name="Delete folder", role=pyatspi.ROLE_PUSH_BUTTON))
+    delete_dialog = wait_for_node(name="Delete folder?")
+    invoke(wait_within(delete_dialog, name="Delete", role=pyatspi.ROLE_PUSH_BUTTON))
+    deleted = wait_for_saved_query_document(
+        base,
+        lambda document: not any(folder["id"] == folder_id for folder in document.get("folders", []))
+        and any(item["name"] == "smoke favorite" and item.get("folder_id") is None for item in document.get("favorites", [])),
+        "deleting a populated folder did not keep its query unfiled",
+    )
+    assert any(item.get("keywords") == ["finance", "daily"] for item in deleted["favorites"])
 
 
 def favorite_round_trips_through_open_quickly(_database, base):
@@ -1827,6 +2070,7 @@ def favorite_round_trips_through_open_quickly(_database, base):
         lambda favorites: any(item.get("last_used_at") for item in favorites),
         "opening the favorite did not record a use",
     )
+    saved_query_folders_keep_queries_and_keywords(base)
 
 
 favorite_round_trips_through_open_quickly.environment = "local"
@@ -2057,6 +2301,56 @@ def restart_restores_active_editor_and_connection(database, base, restart):
 
 restart_restores_active_editor_and_connection.environment = "local"
 restart_restores_active_editor_and_connection.needs_restart = True
+
+
+def first_keyboard_input_after_restore_targets_selected_editor(database, _base, restart):
+    queries = ["SELECT 1;", "SELECT 2;", "SELECT 3;"]
+
+    def seed_editor_tabs(environment):
+        path = Path(environment["XDG_CONFIG_HOME"]) / storage_dir_name() / "workspace_state.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "connections": {
+                        "d4f5e246-c40a-4a30-90f2-39e93e94d920": {
+                            "tabs": [
+                                {"kind": "editor", "query": query, "draft_id": None} for query in queries
+                            ],
+                            "active_idx": 1,
+                        }
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    restart(before_start=seed_editor_tabs, restored=True)
+    window = wait_for_frame_containing(" — BookiE")
+    wait_within(window, name="SELECT 2;", role=pyatspi.ROLE_PAGE_TAB)
+    wait_within(window, name="SELECT 3;", role=pyatspi.ROLE_PAGE_TAB)
+    wait_within(window, name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
+    press_x11_key("x")
+    deadline = time.monotonic() + WAIT_SECONDS
+    while time.monotonic() < deadline:
+        editor_values = [
+            node.queryText().getText(0, -1)
+            for node in descendants(window)
+            if node_role(node) == pyatspi.ROLE_TEXT
+        ]
+        if any("x" in value for value in editor_values):
+            break
+        time.sleep(POLL_SECONDS)
+    assert any("x" in value for value in editor_values), "keyboard input did not reach an editor"
+    assert any("x" in value and "SELECT 2;" in value for value in editor_values), (
+        f"first keyboard input after restore missed the selected editor: {editor_values}"
+    )
+    assert all("x" not in value for value in editor_values if "SELECT 1;" in value or "SELECT 3;" in value), (
+        f"first keyboard input after restore reached a background editor: {editor_values}"
+    )
+
+
+first_keyboard_input_after_restore_targets_selected_editor.environment = "local"
+first_keyboard_input_after_restore_targets_selected_editor.needs_restart = True
 
 
 def restart_with_a_deleted_connection_opens_the_welcome_list(database, base, restart):
@@ -2542,10 +2836,58 @@ def switched_connection_keeps_workspace_tabs_after_debounce(database, _base):
 
     open_saved_connection(CONNECTION_NAME)
     wait_for_frame_containing(f"{CONNECTION_NAME} — BookiE")
+    table_tab = wait_for_node(name="safety_items · Safety SQLite", role=pyatspi.ROLE_PAGE_TAB)
+    tab_bounds = table_tab.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+    gtk_ux.x11_click(tab_bounds.x + tab_bounds.width // 2, tab_bounds.y + tab_bounds.height // 2, button=1)
     wait_for_node_containing("Rows 1 – 5")
 
 
 switched_connection_keeps_workspace_tabs_after_debounce.environment = "local"
+
+
+def restart_restores_two_connections_in_the_same_window(database, base, restart):
+    invoke_accessible_action("win.open-editor")
+    set_editor_text("SELECT 174201 AS first_session_marker")
+    open_saved_connection(CONNECTION_B_NAME)
+    wait_for_frame_containing(f"{CONNECTION_B_NAME} — BookiE")
+    invoke_accessible_action("win.open-editor")
+    set_editor_text("SELECT 174202 AS second_session_marker")
+    open_saved_connection(CONNECTION_NAME)
+    wait_for_frame_containing(f"{CONNECTION_NAME} — BookiE")
+    open_saved_connection(CONNECTION_B_NAME)
+    wait_for_frame_containing(f"{CONNECTION_B_NAME} — BookiE")
+    state_path = base / "config" / storage_dir_name() / "window.json"
+    records = json.loads((base / "config" / storage_dir_name() / "connections.json").read_text())["connections"]
+    expected = next(record["id"] for record in records if record["name"] == CONNECTION_B_NAME)
+    deadline = time.monotonic() + WAIT_SECONDS
+    while time.monotonic() < deadline:
+        if state_path.exists() and json.loads(state_path.read_text()).get("last_connection_id") == expected:
+            break
+        time.sleep(POLL_SECONDS)
+    else:
+        raise AssertionError(f"front session was not persisted: {state_path.read_text()}")
+
+    restart()
+
+    window = wait_for_frame_containing(f"{CONNECTION_B_NAME} — BookiE")
+    first_tab = wait_for_node_containing("SELECT 174201 AS first_session", role=pyatspi.ROLE_PAGE_TAB)
+    second_tab = wait_for_node_containing("SELECT 174202 AS second_sessio", role=pyatspi.ROLE_PAGE_TAB)
+    frames = [node for node in descendants(application_node()) if node_role(node) == pyatspi.ROLE_FRAME]
+    assert len(frames) == 1, f"restored sessions opened {len(frames)} windows"
+    bounds = second_tab.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+    gtk_ux.x11_click(bounds.x + bounds.width // 2, bounds.y + bounds.height // 2, button=1)
+    run_sql_within(window, "INSERT INTO safety_items(id) VALUES (174204)")
+    wait_for_database_count(base / "safety-b.sqlite", 1)
+    bounds = first_tab.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+    gtk_ux.x11_click(bounds.x + bounds.width // 2, bounds.y + bounds.height // 2, button=1)
+    run_sql_within(window, "INSERT INTO safety_items(id) VALUES (174203)")
+    wait_for_database_count(database, 1)
+    assert database_ids(database) == [174203]
+    assert database_ids(base / "safety-b.sqlite") == [174204]
+
+
+restart_restores_two_connections_in_the_same_window.environment = "local"
+restart_restores_two_connections_in_the_same_window.needs_restart = True
 
 
 def switching_one_window_leaves_the_other_windows_edits(database, base):
@@ -3006,6 +3348,8 @@ def main():
         current_page_csv_export_is_pk_ordered,
         current_page_json_export_preserves_values,
         restart_restores_active_editor_and_connection,
+        restart_restores_two_connections_in_the_same_window,
+        first_keyboard_input_after_restore_targets_selected_editor,
         pending_edits_survive_opening_another_connection,
         preview_sql_shows_the_pending_statement_without_saving,
         browse_tabs_read_their_own_connections,
@@ -3022,6 +3366,7 @@ def main():
         sidebar_tables_group_collapses_and_expands,
         sidebar_search_reveals_groups_as_expanded,
         expanding_a_sidebar_table_loads_its_columns,
+        sidebar_table_opens_with_keyboard,
         restart_with_a_deleted_connection_opens_the_welcome_list,
         a_bundle_from_one_profile_imports_unchanged_into_an_empty_second_profile,
     ]
@@ -3038,6 +3383,8 @@ def main():
     scenarios.extend(gtk_whole_result.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_active_edit.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_editor_panel.scenarios(sys.modules[__name__]))
+    if os.environ.get("BOOKIE_GTK_POSTGRES_PORT"):
+        scenarios.extend(gtk_server_messages.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_csv_refresh.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_copy_statements.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_catalog.scenarios(sys.modules[__name__]))

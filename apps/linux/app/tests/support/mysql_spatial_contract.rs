@@ -46,8 +46,12 @@ async fn value_contract_mysql_spatial_grid_refusal_preserves_native_bytes() {
     use testcontainers_modules::mysql::Mysql;
 
     let container = Mysql::default()
+        .with_tag(crate::test_image_tags::MYSQL_TEST_TAG)
         .with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test")
-        .with_cmd(["--default-authentication-plugin=mysql_native_password"])
+        .with_cmd([
+            "--mysql-native-password=ON",
+            "--authentication-policy=mysql_native_password",
+        ])
         .with_startup_timeout(std::time::Duration::from_secs(180))
         .start()
         .await

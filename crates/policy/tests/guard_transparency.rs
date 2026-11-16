@@ -96,6 +96,8 @@ impl Connection for StubConnection {
         Ok(QueryResultBatch {
             result_sets,
             truncated: false,
+            messages: Default::default(),
+            rows_affected: None,
         })
     }
 

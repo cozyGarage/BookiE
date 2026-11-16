@@ -23,20 +23,6 @@ pub fn type_kind(cell: &Cell) -> Option<TypeKind> {
         Cell::Uuid(_) => Some(TypeKind::Identifier),
         Cell::Bytes(_) => Some(TypeKind::Binary),
         Cell::Null | Cell::Undecodable(_) => None,
-        Cell::Exact(value) => match value.as_ref() {
-            bookie_core::Value::Int(_) => Some(TypeKind::Integer),
-            bookie_core::Value::Float(_) | bookie_core::Value::Decimal(_) => Some(TypeKind::Numeric),
-            bookie_core::Value::Text(_) => Some(TypeKind::String),
-            bookie_core::Value::Bool(_) => Some(TypeKind::Boolean),
-            bookie_core::Value::Date(_)
-            | bookie_core::Value::Time(_)
-            | bookie_core::Value::DateTime(_)
-            | bookie_core::Value::TimestampTz(_) => Some(TypeKind::Temporal),
-            bookie_core::Value::Json(_) | bookie_core::Value::JsonText(_) => Some(TypeKind::Structured),
-            bookie_core::Value::Uuid(_) => Some(TypeKind::Identifier),
-            bookie_core::Value::Bytes(_) => Some(TypeKind::Binary),
-            bookie_core::Value::Null | bookie_core::Value::Undecodable(_) => None,
-        },
     }
 }
 
@@ -63,16 +49,22 @@ mod tests {
         let cases = [
             (Cell::Int(1), Some(TypeKind::Integer)),
             (Cell::Float(1.5), Some(TypeKind::Numeric)),
-            (Cell::Decimal("1.50".into()), Some(TypeKind::Numeric)),
+            (Cell::Decimal("1.50".parse().unwrap()), Some(TypeKind::Numeric)),
             (Cell::Text("a".into()), Some(TypeKind::String)),
             (Cell::Bool(true), Some(TypeKind::Boolean)),
-            (Cell::Date("2026-11-10".into()), Some(TypeKind::Temporal)),
+            (Cell::Date("2026-11-10".parse().unwrap()), Some(TypeKind::Temporal)),
             (
-                Cell::TimestampTz("2026-11-10T00:00:00Z".into()),
+                Cell::TimestampTz("2026-11-10T00:00:00Z".parse().unwrap()),
                 Some(TypeKind::Temporal),
             ),
-            (Cell::Json("{}".into()), Some(TypeKind::Structured)),
-            (Cell::Uuid("9f8e".into()), Some(TypeKind::Identifier)),
+            (
+                Cell::Json(Box::new(serde_json::from_str("{}").unwrap())),
+                Some(TypeKind::Structured),
+            ),
+            (
+                Cell::Uuid("9f8e0000-0000-0000-0000-000000000000".parse().unwrap()),
+                Some(TypeKind::Identifier),
+            ),
             (Cell::Bytes(vec![1]), Some(TypeKind::Binary)),
             (Cell::Null, None),
             (Cell::Undecodable("numeric".into()), None),
@@ -111,7 +103,7 @@ mod tests {
             (decimal, TypeKind::Numeric),
             (json, TypeKind::Structured),
         ] {
-            assert_eq!(type_kind(&crate::core_bridge::value_to_cell(value)), Some(expected));
+            assert_eq!(type_kind(&value), Some(expected));
         }
     }
 }

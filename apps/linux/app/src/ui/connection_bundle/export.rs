@@ -33,8 +33,8 @@ pub(crate) fn present_export_dialog(
     on_choice: impl Fn(ExportChoice) + 'static,
 ) {
     let dialog = adw::AlertDialog::new(
-        Some(&crate::tr!("Export connections")),
-        Some(&crate::tr!(
+        Some(&bookie_app_services::tr!("Export connections")),
+        Some(&bookie_app_services::tr!(
             "Choose the connections to put in the file. Without a passphrase the file carries no passwords. With one, saved database and SSH passwords are encrypted into it. MCP tokens are never exported."
         )),
     );
@@ -48,7 +48,7 @@ pub(crate) fn present_export_dialog(
     }
 
     let passphrase = adw::PasswordEntryRow::builder()
-        .title(crate::tr!("Passphrase (optional)"))
+        .title(bookie_app_services::tr!("Passphrase (optional)"))
         .build();
     let passphrase_list = boxed_list();
     passphrase_list.append(&passphrase);
@@ -67,8 +67,8 @@ pub(crate) fn present_export_dialog(
     body.append(&passphrase_list);
     dialog.set_extra_child(Some(&body));
 
-    dialog.add_response("cancel", &crate::tr!("Cancel"));
-    dialog.add_response("export", &crate::tr!("Choose File…"));
+    dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
+    dialog.add_response("export", &bookie_app_services::tr!("Choose File…"));
     dialog.set_response_appearance("export", adw::ResponseAppearance::Suggested);
     dialog.set_default_response(Some("export"));
     dialog.set_close_response("cancel");
@@ -101,7 +101,7 @@ fn choose_destination(
 ) {
     let filter = bundle_file_filter();
     let file_dialog = gtk::FileDialog::builder()
-        .title(crate::tr!("Export connections"))
+        .title(bookie_app_services::tr!("Export connections"))
         .modal(true)
         .initial_name(suggested_bundle_name(today))
         .default_filter(&filter)

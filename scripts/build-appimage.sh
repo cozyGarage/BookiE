@@ -3,7 +3,6 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT="$ROOT/target/appimage"
-VERSION="$(python3 "$ROOT/scripts/check-release-version.py" --print)"
 TOOLS="$OUT/tools"
 LINUXDEPLOY_URL=https://github.com/linuxdeploy/linuxdeploy/releases/download/1-alpha-20251107-1/linuxdeploy-x86_64.AppImage
 LINUXDEPLOY_SHA256=c20cd71e3a4e3b80c3483cef793cda3f4e990aca14014d23c544ca3ce1270b4d
@@ -19,16 +18,62 @@ fetch() {
   chmod +x "$target"
 }
 
+release_inputs_dir="${BOOKIE_RELEASE_INPUTS_DIR:-}"
+if [[ -n "$release_inputs_dir" ]]; then
+  output_path="$(realpath -m "$OUT")"
+  input_path="$(realpath -m "$release_inputs_dir")"
+  case "$input_path/" in
+    "$output_path/"*) echo "release inputs must be outside the AppImage output directory" >&2; exit 2 ;;
+  esac
+fi
 rm -rf "$OUT"
 mkdir -p "$TOOLS"
+SOURCE_ROOT="$ROOT"
+release_metadata=""
+if [[ -n "$release_inputs_dir" ]]; then
+  release_commit="${BOOKIE_RELEASE_COMMIT:?Set BOOKIE_RELEASE_COMMIT to the source commit}"
+  release_version="${BOOKIE_RELEASE_VERSION:?Set BOOKIE_RELEASE_VERSION to the release version}"
+  python3 "$ROOT/scripts/validate_release_inputs.py" \
+    "$release_inputs_dir" "$release_commit" "$release_version" >/dev/null
+  source_archive="$release_inputs_dir/bookie-$release_version-$release_commit.tar.gz"
+  vendor_archive="$release_inputs_dir/bookie-vendor-$release_version-$release_commit.tar.gz"
+  release_metadata="$release_inputs_dir/bookie-$release_version-$release_commit-inputs.json"
+  source_dir="$(mktemp -d "${TMPDIR:-/tmp}/bookie-appimage-source.XXXXXX")"
+  trap 'rm -rf -- "$source_dir"' EXIT
+  tar -xzf "$source_archive" -C "$source_dir"
+  tar -xzf "$vendor_archive" -C "$source_dir"
+  SOURCE_ROOT="$source_dir/BookiE-$release_commit"
+fi
+VERSION="$(python3 "$SOURCE_ROOT/scripts/check-release-version.py" --print)"
 fetch "$LINUXDEPLOY_URL" "$LINUXDEPLOY_SHA256" "$TOOLS/linuxdeploy-x86_64.AppImage"
 fetch "$APPIMAGE_PLUGIN_URL" "$APPIMAGE_PLUGIN_SHA256" "$TOOLS/linuxdeploy-plugin-appimage-x86_64.AppImage"
 fetch "$GTK_PLUGIN_URL" "$GTK_PLUGIN_SHA256" "$TOOLS/linuxdeploy-plugin-gtk.sh"
 
-DEB_OUT="$OUT/stage" "$ROOT/scripts/build-deb.sh"
+if [[ -n "$release_inputs_dir" ]]; then
+  DEB_OUT="$OUT/stage" CARGO_NET_OFFLINE=true "$SOURCE_ROOT/scripts/build-deb.sh"
+else
+  DEB_OUT="$OUT/stage" "$ROOT/scripts/build-deb.sh"
+fi
 APPDIR="$OUT/BookiE.AppDir"
 cp -a "$OUT/stage/bookie_${VERSION}-1_amd64" "$APPDIR"
 rm -rf "$APPDIR/DEBIAN"
+if [[ -n "$release_metadata" ]]; then
+  python3 - "$release_metadata" "$APPDIR/usr/share/doc/bookie/BUILD_INPUTS.json" <<'PY'
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+metadata = json.loads(Path(sys.argv[1]).read_text())
+metadata["appimage_build_toolchain"] = {
+    "cargo": subprocess.check_output(["cargo", "--version"], text=True).strip(),
+    "rustc": subprocess.check_output(["rustc", "--version"], text=True).strip(),
+    "profile": os.environ.get("BOOKIE_BUILD_PROFILE", "dist"),
+}
+Path(sys.argv[2]).write_text(json.dumps(metadata, indent=2, sort_keys=True) + "\n")
+PY
+fi
 GTK_SOURCE_DATA=/usr/share/gtksourceview-5
 GTK_SOURCE_SCHEMA="$GTK_SOURCE_DATA/language-specs/language.rng"
 if [[ ! -f "$GTK_SOURCE_SCHEMA" ]]; then
@@ -61,6 +106,8 @@ sed -i '/^export GTK_THEME=/d' "$APPDIR"/apprun-hooks/linuxdeploy-plugin-gtk.sh
 for module in "$APPDIR"/usr/lib/gtk-4.0/*/immodules/*.so; do
   patchelf --set-rpath '$ORIGIN/../../..' "$module"
 done
+APPIMAGE_GLIBC_FLOOR="$(tr -d '[:space:]' < "$SOURCE_ROOT/scripts/appimage-glibc-floor.txt")"
+python3 "$SOURCE_ROOT/scripts/check-appimage-glibc-floor.py" "$APPDIR" --max "$APPIMAGE_GLIBC_FLOOR"
 "$TOOLS/linuxdeploy-x86_64.AppImage" --appdir "$APPDIR" --output appimage
 sha256sum "$OUTPUT" > "$OUTPUT.sha256"
 echo "Wrote $OUT/$OUTPUT"

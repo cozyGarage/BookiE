@@ -1,5 +1,6 @@
 use relm4::{ComponentSender, adw, gtk};
 
+use bookie_app_services::preferences::{MAX_PAGE_SIZE, MIN_PAGE_SIZE};
 use bookie_core::{ColumnInfo, QueryResult};
 
 use crate::ui::count_format::format_thousands;
@@ -17,44 +18,47 @@ impl BrowseTab {
         // so a mis-aim toward Next doesn't land on Insert.
         let insert_button = gtk::Button::builder()
             .icon_name("list-add-symbolic")
-            .tooltip_text(crate::tr!("Insert row (Ctrl+N)"))
+            .tooltip_text(bookie_app_services::tr!("Insert row (Ctrl+N)"))
             .sensitive(false)
             .build();
         insert_button.add_css_class("flat");
-        insert_button.update_property(&[gtk::accessible::Property::Label(&crate::tr!("Insert row"))]);
+        insert_button.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!(
+            "Insert row"
+        ))]);
         let sender_for_insert = sender.clone();
         insert_button.connect_clicked(move |_| sender_for_insert.input(BrowseTabInput::InsertRow));
 
         let first_button = gtk::Button::builder()
             .icon_name("go-first-symbolic")
-            .tooltip_text(crate::tr!("First page"))
+            .tooltip_text(bookie_app_services::tr!("First page"))
             .sensitive(false)
             .build();
         let prev_button = gtk::Button::builder()
             .icon_name("go-previous-symbolic")
-            .tooltip_text(crate::tr!("Previous page (Page Up)"))
+            .tooltip_text(bookie_app_services::tr!("Previous page (Page Up)"))
             .sensitive(false)
             .build();
         let next_button = gtk::Button::builder()
             .icon_name("go-next-symbolic")
-            .tooltip_text(crate::tr!("Next page (Page Down)"))
+            .tooltip_text(bookie_app_services::tr!("Next page (Page Down)"))
             .sensitive(false)
             .build();
         let last_button = gtk::Button::builder()
             .icon_name("go-last-symbolic")
-            .tooltip_text(crate::tr!("Last page"))
+            .tooltip_text(bookie_app_services::tr!("Last page"))
             .sensitive(false)
             .build();
         for (button, label) in [
-            (&first_button, crate::tr!("First page")),
-            (&prev_button, crate::tr!("Previous page")),
-            (&next_button, crate::tr!("Next page")),
-            (&last_button, crate::tr!("Last page")),
+            (&first_button, bookie_app_services::tr!("First page")),
+            (&prev_button, bookie_app_services::tr!("Previous page")),
+            (&next_button, bookie_app_services::tr!("Next page")),
+            (&last_button, bookie_app_services::tr!("Last page")),
         ] {
             button.update_property(&[gtk::accessible::Property::Label(&label)]);
         }
-        let paginator_label = gtk::Label::builder().build();
+        let paginator_label = gtk::Label::builder().ellipsize(gtk::pango::EllipsizeMode::End).build();
         paginator_label.add_css_class("dim-label");
+        paginator_label.add_css_class("numeric");
 
         // Selection count badge — sits beside the paginator label.
         // Hidden when 0–1 rows selected; appears when the user
@@ -67,7 +71,7 @@ impl BrowseTab {
         selection_count_label.add_css_class("caption-heading");
         selection_count_label.set_accessible_role(gtk::AccessibleRole::Status);
         let selection_details_label = gtk::Label::builder().xalign(0.0).wrap(true).selectable(true).build();
-        let copy_label = crate::tr!("Copy summary");
+        let copy_label = bookie_app_services::tr!("Copy summary");
         let copy_selection_button = gtk::Button::with_label(&copy_label);
         let selection_details = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
@@ -79,6 +83,7 @@ impl BrowseTab {
             .build();
         selection_details.append(&selection_details_label);
         selection_details.append(&copy_selection_button);
+        selection_details.append(&column_selection::selection_buttons(sender.clone()));
         let selection_popover = gtk::Popover::new();
         selection_popover.set_child(Some(&selection_details));
         let selection_label = gtk::MenuButton::new();
@@ -93,37 +98,38 @@ impl BrowseTab {
             }
         });
 
-        // Use thousands-separated labels (100 / 500 / 1,000 / 5,000 /
-        // 10,000) instead of "1 K" abbreviations. With a visible
-        // "Rows:" label inline (below) the dropdown's purpose is
-        // obvious without needing a tooltip, matching how Evince
-        // labels its zoom dropdown.
-        let page_size_labels: Vec<String> = PAGE_SIZE_OPTIONS
-            .iter()
-            .map(|n| format_thousands(u128::from(*n)))
-            .collect();
-        let page_size_strs: Vec<&str> = page_size_labels.iter().map(String::as_str).collect();
-        let page_size_combo = gtk::DropDown::from_strings(&page_size_strs);
-        let initial_idx = PAGE_SIZE_OPTIONS
-            .iter()
-            .position(|n| *n == page_size)
-            .unwrap_or_else(|| {
-                PAGE_SIZE_OPTIONS
-                    .iter()
-                    .position(|n| *n == DEFAULT_PAGE_SIZE)
-                    .unwrap_or(2)
-            }) as u32;
-        page_size_combo.set_selected(initial_idx);
+        let page_size_spin = gtk::SpinButton::with_range(MIN_PAGE_SIZE as f64, MAX_PAGE_SIZE as f64, 1.0);
+        page_size_spin.set_numeric(true);
+        page_size_spin.set_digits(0);
+        page_size_spin.set_width_chars(5);
+        page_size_spin.set_value(page_size as f64);
         let sender_for_size = sender.clone();
-        page_size_combo.connect_selected_notify(move |dd| {
-            let idx = dd.selected() as usize;
-            if let Some(&size) = PAGE_SIZE_OPTIONS.get(idx) {
-                sender_for_size.input(BrowseTabInput::PageSizeChanged(size));
+        let timeout_id = std::rc::Rc::new(std::cell::Cell::new(None::<gtk::glib::SourceId>));
+        let timeout_id_clone = timeout_id.clone();
+        page_size_spin.connect_value_changed(move |spin| {
+            if let Some(source) = timeout_id_clone.take() {
+                source.remove();
             }
+            let sender = sender_for_size.clone();
+            let new_size = spin.value().round() as u64;
+            let timeout_id_inner = timeout_id_clone.clone();
+            let source = gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(300), move || {
+                timeout_id_inner.set(None);
+                sender.input(BrowseTabInput::PageSizeChanged(new_size));
+            });
+            timeout_id_clone.set(Some(source));
         });
-        let page_size_label = gtk::Label::builder().label(crate::tr!("Rows:")).build();
+        let sender_for_size_activate = sender.clone();
+        let timeout_id_activate = timeout_id;
+        page_size_spin.connect_activate(move |spin| {
+            if let Some(source) = timeout_id_activate.take() {
+                source.remove();
+            }
+            sender_for_size_activate.input(BrowseTabInput::PageSizeChanged(spin.value().round() as u64));
+        });
+        let page_size_label = gtk::Label::builder().label(bookie_app_services::tr!("Rows:")).build();
         page_size_label.add_css_class("dim-label");
-        page_size_combo.update_relation(&[gtk::accessible::Relation::LabelledBy(&[page_size_label.upcast_ref()])]);
+        page_size_spin.update_relation(&[gtk::accessible::Relation::LabelledBy(&[page_size_label.upcast_ref()])]);
 
         let sender_for_first = sender.clone();
         first_button.connect_clicked(move |_| sender_for_first.input(BrowseTabInput::FirstPage));
@@ -134,37 +140,38 @@ impl BrowseTab {
         let sender_for_last = sender.clone();
         last_button.connect_clicked(move |_| sender_for_last.input(BrowseTabInput::LastPage));
 
-        // Paginator lives in a native `gtk::ActionBar` to match the
-        // mutations bar and the Structure tab's bottom action bar.
-        // Prev/Next/label are start-packed; page-size + export are
-        // end-packed — which gives the same visual as before but
-        // through the toolkit's intended widget so spacing, dim-label
-        // background, and high-contrast theming come for free.
         let paginator_bar = gtk::ActionBar::new();
+        paginator_bar.add_css_class("tp-paginator-bar");
 
         let export_button = gtk::Button::builder()
             .icon_name("document-save-symbolic")
-            .tooltip_text(crate::tr!("Export results"))
+            .tooltip_text(bookie_app_services::tr!("Export results"))
             .action_name("win.export-csv")
             .build();
         export_button.add_css_class("flat");
-        export_button.update_property(&[gtk::accessible::Property::Label(&crate::tr!("Export results"))]);
+        export_button.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!(
+            "Export results"
+        ))]);
 
-        // Filter button — opens the rule editor for server-side WHERE.
-        // Action `win.open-filter` is registered in app/mod.rs and
-        // reads the active tab's controller, so the button implicitly
-        // targets this tab when this tab is active.
-        //
-        // Text-only label (no icon) because there is no canonical GNOME
-        // symbolic icon for "filter rows" in adwaita-icon-theme — the
-        // alternatives (system-search-symbolic, edit-find-symbolic)
-        // clash with Ctrl+F (now bound here). GNOME HIG accepts text-
-        // labeled toolbar buttons; the surrounding paginator strip is
-        // already text-heavy (`Rows 1–12 of 12`, `Rows: 100`) so a
-        // text label reads as native here. The `filter_badge` label
-        // shows the active rule count next to the word when ≥1 rule
-        // applies; hidden otherwise.
-        let filter_label = gtk::Label::new(Some(&crate::tr!("Filter")));
+        let auto_refresh_button = gtk::ToggleButton::builder()
+            .icon_name("view-refresh-symbolic")
+            .tooltip_text(bookie_app_services::tr!("Refresh this page every 15 seconds"))
+            .build();
+        auto_refresh_button.add_css_class("flat");
+        auto_refresh_button.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!(
+            "Auto-refresh this page every 15 seconds"
+        ))]);
+        let sender_for_auto_refresh = sender.clone();
+        auto_refresh_button.connect_toggled(move |button| {
+            sender_for_auto_refresh.input(BrowseTabInput::AutoRefreshToggled(button.is_active()));
+        });
+        let auto_refresh_status_label = gtk::Label::new(None);
+        auto_refresh_status_label.add_css_class("dim-label");
+        auto_refresh_status_label.add_css_class("caption");
+        auto_refresh_status_label.set_accessible_role(gtk::AccessibleRole::Status);
+
+        // Search icons conflict with Ctrl+F, so the filter control stays text-only.
+        let filter_label = gtk::Label::new(Some(&bookie_app_services::tr!("Filter")));
         let filter_badge = gtk::Label::builder().label("").visible(false).build();
         filter_badge.add_css_class("numeric");
         filter_badge.add_css_class("caption-heading");
@@ -178,16 +185,15 @@ impl BrowseTab {
         let filter_button = gtk::Button::builder().child(&filter_box).build();
         filter_button.add_css_class("flat");
         if browse_filters {
-            filter_button.set_tooltip_text(Some(&crate::tr!("Filter rows (Ctrl+F)")));
+            filter_button.set_tooltip_text(Some(&bookie_app_services::tr!("Filter rows (Ctrl+F)")));
             filter_button.set_action_name(Some("win.open-filter"));
         } else {
-            filter_button.set_tooltip_text(Some(&crate::tr!("This database cannot filter a table view")));
+            filter_button.set_tooltip_text(Some(&bookie_app_services::tr!(
+                "This database cannot filter a table view"
+            )));
             filter_button.set_sensitive(false);
         }
 
-        // First / Prev / Next / Last sit in a `linked` group so they
-        // read as one navigation control — same pattern GNOME Files
-        // uses on its back/forward toolbar buttons.
         let nav_box = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).build();
         nav_box.add_css_class("linked");
         nav_box.append(&first_button);
@@ -198,10 +204,10 @@ impl BrowseTab {
         let sort_status_label = gtk::Label::builder().visible(false).build();
         sort_status_label.add_css_class("dim-label");
         sort_status_label.add_css_class("caption");
-        let clear_sort_button = gtk::Button::with_label(&crate::tr!("Clear sort"));
+        let clear_sort_button = gtk::Button::with_label(&bookie_app_services::tr!("Clear sort"));
         clear_sort_button.add_css_class("flat");
         clear_sort_button.set_visible(false);
-        clear_sort_button.set_tooltip_text(Some(&crate::tr!("Clear column sort")));
+        clear_sort_button.set_tooltip_text(Some(&bookie_app_services::tr!("Clear column sort")));
         let sender_for_clear_sort = sender.clone();
         clear_sort_button.connect_clicked(move |_| sender_for_clear_sort.input(BrowseTabInput::ClearSort));
 
@@ -213,14 +219,18 @@ impl BrowseTab {
         paginator_bar.pack_start(&selection_label);
         let inspector_button = gtk::ToggleButton::builder()
             .icon_name("sidebar-show-right-symbolic")
-            .tooltip_text(crate::tr!("Row inspector"))
+            .tooltip_text(bookie_app_services::tr!("Row inspector"))
             .build();
         inspector_button.add_css_class("flat");
-        inspector_button.update_property(&[gtk::accessible::Property::Label(&crate::tr!("Row inspector"))]);
+        inspector_button.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!(
+            "Row inspector"
+        ))]);
         paginator_bar.pack_end(&inspector_button);
+        paginator_bar.pack_end(&auto_refresh_button);
+        paginator_bar.pack_end(&auto_refresh_status_label);
         paginator_bar.pack_end(&export_button);
         paginator_bar.pack_end(&filter_button);
-        paginator_bar.pack_end(&page_size_combo);
+        paginator_bar.pack_end(&page_size_spin);
         paginator_bar.pack_end(&page_size_label);
 
         Paginator {
@@ -239,41 +249,35 @@ impl BrowseTab {
             selection_count_label,
             selection_details_label,
             inspector_button,
+            auto_refresh_button,
+            auto_refresh_status_label,
         }
     }
 
-    /// Pending-changes footer: a `gtk::ActionBar` wrapped in a
-    /// `GtkRevealer` so the entire bar slides in only when there are
-    /// unsaved edits. Mirrors GNOME Text Editor / Builder's behaviour
-    /// of revealing a transient action footer rather than reserving a
-    /// permanent strip for occasionally-used controls.
-    ///
-    /// Layout: pending-count label on the left ("3 unsaved changes"),
-    /// Discard + Save on the right (Save is `.suggested-action`).
     pub(super) fn build_pending_revealer(sender: ComponentSender<Self>) -> PendingRevealer {
         let pending_label = gtk::Label::new(None);
         pending_label.add_css_class("dim-label");
         pending_label.add_css_class("caption");
 
         let discard_button = gtk::Button::builder()
-            .label(crate::tr!("Discard"))
-            .tooltip_text(crate::tr!("Discard all pending edits"))
+            .label(bookie_app_services::tr!("Discard"))
+            .tooltip_text(bookie_app_services::tr!("Discard all pending edits"))
             .build();
         let sender_for_discard = sender.clone();
         let sender_for_discard_preview = sender.clone();
         discard_button.connect_clicked(move |_| sender_for_discard.input(BrowseTabInput::DiscardAll));
 
         let save_button = gtk::Button::builder()
-            .label(crate::tr!("Save"))
-            .tooltip_text(crate::tr!("Save pending edits (Ctrl+S)"))
+            .label(bookie_app_services::tr!("Save"))
+            .tooltip_text(bookie_app_services::tr!("Save pending edits (Ctrl+S)"))
             .build();
         save_button.add_css_class("suggested-action");
         let sender_for_save = sender;
         save_button.connect_clicked(move |_| sender_for_save.input(BrowseTabInput::CommitSave));
 
         let preview_button = gtk::Button::builder()
-            .label(crate::tr!("Preview SQL"))
-            .tooltip_text(crate::tr!("Show the statements Save would run"))
+            .label(bookie_app_services::tr!("Preview SQL"))
+            .tooltip_text(bookie_app_services::tr!("Show the statements Save would run"))
             .build();
         let sender_for_preview = sender_for_discard_preview;
         preview_button.connect_clicked(move |_| sender_for_preview.input(BrowseTabInput::PreviewSql));
@@ -299,16 +303,11 @@ impl BrowseTab {
         }
     }
 
-    /// Toggle visibility / label of the pending-changeset cluster in
-    /// the mutation bar. Hidden when there are no pending edits; shows
-    /// "{n} unsaved change(s)" with Save (.suggested-action) + Discard.
-    /// The tab-title bullet (App-side) plus this footer cluster cover
-    /// the dirty-state communication — no banner.
     pub(super) fn refresh_pending_bar(&self, count: usize) {
         let visible = count > 0;
         if visible {
-            let label =
-                crate::trn!("{n} unsaved change", "{n} unsaved changes", count).replace("{n}", &count.to_string());
+            let label = bookie_app_services::trn!("{n} unsaved change", "{n} unsaved changes", count)
+                .replace("{n}", &count.to_string());
             self.pending_label.set_label(&label);
         }
         // Slide the whole footer in/out as one unit instead of
@@ -327,6 +326,9 @@ impl BrowseTab {
             && !self.current_columns.is_empty()
             && !self.current_columns.iter().any(|c| c.primary_key);
         self.read_only_banner.set_revealed(read_only);
+        if let Some(text) = self.view_restriction.and_then(|restriction| restriction.banner_text()) {
+            self.no_pk_banner.set_title(&text);
+        }
         self.no_pk_banner.set_revealed(!read_only && no_pk);
     }
 
@@ -346,14 +348,17 @@ impl BrowseTab {
         // formed without a PK and our materialise path would silently
         // no-op on UPDATE/DELETE. Disable instead of hide so the
         // affordance stays discoverable; tooltip explains the gate.
-        self.insert_button.set_sensitive(has_columns && has_pk);
-        if has_columns && !has_pk {
-            self.insert_button.set_tooltip_text(Some(&crate::tr!(
+        self.insert_button
+            .set_sensitive(has_columns && has_pk && self.view_restriction.is_none());
+        if let Some(restriction) = self.view_restriction {
+            self.insert_button.set_tooltip_text(Some(&restriction.insert_reason()));
+        } else if has_columns && !has_pk {
+            self.insert_button.set_tooltip_text(Some(&bookie_app_services::tr!(
                 "This table has no primary key. Inline editing is disabled."
             )));
         } else {
             self.insert_button
-                .set_tooltip_text(Some(&crate::tr!("Insert row (Ctrl+N)")));
+                .set_tooltip_text(Some(&bookie_app_services::tr!("Insert row (Ctrl+N)")));
         }
         self.refresh_banner_visibility();
     }
@@ -366,12 +371,6 @@ impl BrowseTab {
         self.allows_row_mutations() && self.current_columns.iter().any(|column| column.primary_key)
     }
 
-    /// Update the Filter button's count badge + tooltip based on the
-    /// current FilterSet. Active filters reveal a small numeric badge
-    /// next to the funnel icon and a count-aware tooltip; empty hides
-    /// the badge and falls back to the generic shortcut hint. Called
-    /// from FilterApplied + once on init so a restored filter shows
-    /// immediately.
     pub(super) fn apply_filter(&mut self, set: bookie_core::FilterSet, sender: &ComponentSender<Self>) {
         // No change to the rule list → don't churn the disk
         // or refetch. Re-fetch on identical filter would just
@@ -409,7 +408,7 @@ impl BrowseTab {
         match bookie_core::cell_filter_rule(column, value, exclude) {
             Some(rule) => sender.input(BrowseTabInput::FilterApplied(self.current_filter.narrowed_to(rule))),
             None => {
-                let _ = sender.output(BrowseTabOutput::ShowToast(crate::tr!(
+                let _ = sender.output(BrowseTabOutput::ShowToast(bookie_app_services::tr!(
                     "Values of this type can't be used as a filter"
                 )));
             }
@@ -422,12 +421,12 @@ impl BrowseTab {
             self.filter_badge.set_visible(false);
             self.filter_badge.set_label("");
             self.filter_button
-                .set_tooltip_text(Some(&crate::tr!("Filter rows (Ctrl+F)")));
+                .set_tooltip_text(Some(&bookie_app_services::tr!("Filter rows (Ctrl+F)")));
         } else {
             self.filter_badge.set_label(&n.to_string());
             self.filter_badge.set_visible(true);
             self.filter_button.set_tooltip_text(Some(
-                &crate::trn!(
+                &bookie_app_services::trn!(
                     "{n} filter rule active — click to edit",
                     "{n} filter rules active — click to edit",
                     n
@@ -461,7 +460,12 @@ impl BrowseTab {
             self.update_sort_status_label();
             return;
         };
-        self.set_paginator_text(&paginator_summary(result, self.current_offset, self.current_total_rows));
+        self.set_paginator_text(&paginator_summary(
+            result,
+            self.current_offset,
+            self.current_total_rows,
+            self.last_page_elapsed,
+        ));
         self.update_sort_status_label();
     }
 
@@ -525,7 +529,7 @@ impl BrowseTab {
         // guessing what failed.
         let page = adw::StatusPage::builder()
             .icon_name("dialog-error-symbolic")
-            .title(crate::tr!("Couldn't load rows"))
+            .title(bookie_app_services::tr!("Couldn't load rows"))
             .description(crate::ui::plain_text::escape_markup(message))
             .child(&retry_button(sender))
             .build();
@@ -547,16 +551,16 @@ fn sort_status_summary(keys: &[(usize, bool)], columns: &[ColumnInfo]) -> Option
         .collect::<Vec<_>>()
         .join(", ");
     let template = if keys.len() > 1 {
-        crate::tr!("Secondary sort applies only to the loaded page: {keys}")
+        bookie_app_services::tr!("Secondary sort applies only to the loaded page: {keys}")
     } else {
-        crate::tr!("Sorted by {keys}")
+        bookie_app_services::tr!("Sorted by {keys}")
     };
     Some(template.replace("{keys}", &parts))
 }
 
 fn retry_button(sender: &ComponentSender<BrowseTab>) -> gtk::Button {
     let button = gtk::Button::builder()
-        .label(crate::tr!("Retry"))
+        .label(bookie_app_services::tr!("Retry"))
         .halign(gtk::Align::Center)
         .build();
     button.add_css_class("pill");
@@ -565,30 +569,57 @@ fn retry_button(sender: &ComponentSender<BrowseTab>) -> gtk::Button {
     button
 }
 
-fn paginator_summary(result: &QueryResult, offset: u64, total: Option<u64>) -> String {
+fn paginator_summary(
+    result: &QueryResult,
+    offset: u64,
+    total: Option<u64>,
+    elapsed: Option<std::time::Duration>,
+) -> String {
     let n_rows = result.rows.len();
-    if n_rows == 0 {
-        return if result.truncated {
-            crate::tr!("No rows on this page (result truncated)")
+    let range = if n_rows == 0 {
+        if result.truncated {
+            bookie_app_services::tr!("No rows on this page (result truncated)")
         } else {
-            crate::tr!("No rows on this page")
+            bookie_app_services::tr!("No rows on this page")
+        }
+    } else {
+        let template = match (total.is_some(), result.truncated) {
+            (true, true) => bookie_app_services::tr!("Rows {start} – {end} of {total} (result truncated)"),
+            (true, false) => bookie_app_services::tr!("Rows {start} – {end} of {total}"),
+            (false, true) => bookie_app_services::tr!("Rows {start} – {end} (result truncated)"),
+            (false, false) => bookie_app_services::tr!("Rows {start} – {end}"),
         };
-    }
-    let template = match (total.is_some(), result.truncated) {
-        (true, true) => crate::tr!("Rows {start} – {end} of {total} (result truncated)"),
-        (true, false) => crate::tr!("Rows {start} – {end} of {total}"),
-        (false, true) => crate::tr!("Rows {start} – {end} (result truncated)"),
-        (false, false) => crate::tr!("Rows {start} – {end}"),
+        template
+            .replace("{start}", &format_thousands(u128::from(offset + 1)))
+            .replace("{end}", &format_thousands(u128::from(offset + n_rows as u64)))
+            .replace(
+                "{total}",
+                &total
+                    .map(|count| format_thousands(u128::from(count)))
+                    .unwrap_or_default(),
+            )
     };
-    template
-        .replace("{start}", &format_thousands(u128::from(offset + 1)))
-        .replace("{end}", &format_thousands(u128::from(offset + n_rows as u64)))
-        .replace(
-            "{total}",
-            &total
-                .map(|count| format_thousands(u128::from(count)))
-                .unwrap_or_default(),
-        )
+    match elapsed {
+        Some(elapsed) => bookie_app_services::tr!("{range} · {time}")
+            .replace("{range}", &range)
+            .replace("{time}", &page_elapsed_text(elapsed)),
+        None => range,
+    }
+}
+
+fn page_elapsed_text(elapsed: std::time::Duration) -> String {
+    if elapsed.as_millis() == 0 {
+        bookie_app_services::tr!("<1 ms")
+    } else if elapsed.as_secs() == 0 {
+        let millis = (elapsed.as_micros() + 500) / 1000;
+        bookie_app_services::tr!("{n} ms").replace("{n}", &millis.to_string())
+    } else if elapsed.as_secs() < 60 {
+        bookie_app_services::tr!("{n} s").replace("{n}", &format!("{:.2}", elapsed.as_secs_f64()))
+    } else {
+        bookie_app_services::tr!("{minutes}m {seconds}s")
+            .replace("{minutes}", &(elapsed.as_secs() / 60).to_string())
+            .replace("{seconds}", &(elapsed.as_secs() % 60).to_string())
+    }
 }
 
 pub(super) fn next_page_offset(
@@ -658,8 +689,6 @@ pub(super) fn clear_box(b: &gtk::Box) {
         b.remove(&child);
     }
 }
-/// Bundle of widgets returned by `build_paginator` so the builder
-/// signature stays narrow.
 pub(super) struct Paginator {
     pub(super) bar: gtk::ActionBar,
     pub(super) insert_button: gtk::Button,
@@ -676,9 +705,10 @@ pub(super) struct Paginator {
     pub(super) selection_count_label: gtk::Label,
     pub(super) selection_details_label: gtk::Label,
     pub(super) inspector_button: gtk::ToggleButton,
+    pub(super) auto_refresh_button: gtk::ToggleButton,
+    pub(super) auto_refresh_status_label: gtk::Label,
 }
 
-/// Bundle of widgets returned by `build_pending_revealer`.
 pub(super) struct PendingRevealer {
     pub(super) widget: gtk::Revealer,
     pub(super) save_button: gtk::Button,
@@ -701,9 +731,11 @@ pub(super) fn bind_inspector(
 #[cfg(test)]
 mod tests {
     use super::{
-        extract_first_keyset_cursor, extract_keyset_cursor, format_thousands, paginator_summary, sort_status_summary,
+        extract_first_keyset_cursor, extract_keyset_cursor, format_thousands, page_elapsed_text, paginator_summary,
+        sort_status_summary,
     };
     use bookie_core::{ColumnInfo, QueryResult, Value};
+    use std::time::Duration;
 
     #[test]
     fn projected_keyset_cursor_maps_primary_keys_to_result_positions() {
@@ -786,11 +818,11 @@ mod tests {
     #[test]
     fn truncated_browse_pages_disclose_the_result_limit() {
         assert_eq!(
-            paginator_summary(&page(37, true), 1_000, Some(5_000)),
+            paginator_summary(&page(37, true), 1_000, Some(5_000), None),
             "Rows 1,001 – 1,037 of 5,000 (result truncated)"
         );
         assert_eq!(
-            paginator_summary(&page(37, true), 0, None),
+            paginator_summary(&page(37, true), 0, None, None),
             "Rows 1 – 37 (result truncated)"
         );
     }
@@ -798,7 +830,7 @@ mod tests {
     #[test]
     fn a_truncated_browse_page_without_rows_still_discloses_the_result_limit() {
         assert_eq!(
-            paginator_summary(&page(0, true), 0, Some(5_000)),
+            paginator_summary(&page(0, true), 0, Some(5_000), None),
             "No rows on this page (result truncated)"
         );
     }
@@ -806,13 +838,33 @@ mod tests {
     #[test]
     fn untruncated_browse_pages_have_no_result_limit_suffix() {
         assert_eq!(
-            paginator_summary(&page(100, false), 1_000, Some(5_000)),
+            paginator_summary(&page(100, false), 1_000, Some(5_000), None),
             "Rows 1,001 – 1,100 of 5,000"
         );
-        assert_eq!(paginator_summary(&page(100, false), 0, None), "Rows 1 – 100");
+        assert_eq!(paginator_summary(&page(100, false), 0, None, None), "Rows 1 – 100");
         assert_eq!(
-            paginator_summary(&page(0, false), 0, Some(5_000)),
+            paginator_summary(&page(0, false), 0, Some(5_000), None),
             "No rows on this page"
+        );
+    }
+
+    #[test]
+    fn a_page_read_is_timed_after_the_row_range() {
+        assert_eq!(page_elapsed_text(Duration::from_micros(200)), "<1 ms");
+        assert_eq!(page_elapsed_text(Duration::ZERO), "<1 ms");
+        assert_eq!(page_elapsed_text(Duration::from_millis(1)), "1 ms");
+        assert_eq!(page_elapsed_text(Duration::from_micros(5_600)), "6 ms");
+        assert_eq!(page_elapsed_text(Duration::from_millis(999)), "999 ms");
+        assert_eq!(page_elapsed_text(Duration::from_millis(1_234)), "1.23 s");
+        assert_eq!(page_elapsed_text(Duration::from_secs(60)), "1m 0s");
+        assert_eq!(page_elapsed_text(Duration::from_secs(125)), "2m 5s");
+        assert_eq!(
+            paginator_summary(&page(2, false), 0, Some(2), Some(Duration::from_millis(5))),
+            "Rows 1 – 2 of 2 · 5 ms"
+        );
+        assert_eq!(
+            paginator_summary(&page(0, false), 0, Some(0), Some(Duration::from_millis(5))),
+            "No rows on this page · 5 ms"
         );
     }
 

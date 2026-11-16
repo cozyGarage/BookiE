@@ -333,3 +333,54 @@ fn resetting_a_workspace_releases_its_payloads_when_the_old_workspace_is_dropped
     drop(closed);
     assert_eq!(dropped.get(), 1);
 }
+
+fn scoped_request(name: &str) -> TableOpenRequest<'_> {
+    TableOpenRequest {
+        schema: Some("public"),
+        table: name,
+        selected: None,
+        mode: OpenMode::SwitchOrAppend,
+        preview_enabled: true,
+    }
+}
+
+#[test]
+fn a_table_with_the_same_name_in_another_session_is_not_selected() {
+    let other_session = Uuid::new_v4();
+    let mut tabs = WorkspaceTabs::default();
+    tabs.insert(other_session, Table("users"));
+    let plan = tabs.plan_table_open_scoped(scoped_request("users"), |_| false, |id| id != other_session);
+    assert_eq!(
+        plan,
+        TableOpenPlan::Append {
+            preview: true,
+            replace: None,
+            promote: None
+        }
+    );
+}
+
+#[test]
+fn a_table_in_the_same_session_is_still_selected() {
+    let own = Uuid::new_v4();
+    let mut tabs = WorkspaceTabs::default();
+    tabs.insert(own, Table("users"));
+    let plan = tabs.plan_table_open_scoped(scoped_request("users"), |_| false, |id| id == own);
+    assert_eq!(plan, TableOpenPlan::Select(own));
+}
+
+#[test]
+fn a_preview_tab_of_another_session_is_never_replaced() {
+    let other_session = Uuid::new_v4();
+    let mut tabs = WorkspaceTabs::default();
+    tabs.insert_with_preview(other_session, Table("old"), true);
+    let plan = tabs.plan_table_open_scoped(scoped_request("new"), |_| false, |id| id != other_session);
+    assert_eq!(
+        plan,
+        TableOpenPlan::Append {
+            preview: true,
+            replace: None,
+            promote: None
+        }
+    );
+}

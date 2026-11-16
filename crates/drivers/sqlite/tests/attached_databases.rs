@@ -166,6 +166,15 @@ async fn attached_schema_metadata() {
         .await
         .unwrap();
 
+    main_conn
+        .execute("CREATE TABLE parent (id INTEGER PRIMARY KEY)")
+        .await
+        .unwrap();
+    main_conn
+        .execute("CREATE TABLE child (id INTEGER PRIMARY KEY, parent_id INTEGER)")
+        .await
+        .unwrap();
+
     let columns = main_conn.fetch_columns(Some("aux"), "parent").await.unwrap();
     assert_eq!(columns.len(), 2);
     assert_eq!(columns[0].name, "id");
@@ -182,6 +191,24 @@ async fn attached_schema_metadata() {
     assert_eq!(foreign_keys[0].ref_schema.as_deref(), Some("aux"));
     assert_eq!(foreign_keys[0].columns, vec!["parent_id".to_string()]);
     assert_eq!(foreign_keys[0].ref_columns, vec!["id".to_string()]);
+
+    let inbound = main_conn
+        .fetch_inbound_foreign_keys(Some("aux"), "parent")
+        .await
+        .unwrap();
+    assert_eq!(inbound.len(), 1, "{inbound:?}");
+    assert_eq!(inbound[0].source_schema.as_deref(), Some("aux"));
+    assert_eq!(inbound[0].source_table, "child");
+    assert_eq!(inbound[0].source_columns, vec!["parent_id".to_string()]);
+    assert_eq!(inbound[0].target_columns, vec!["id".to_string()]);
+
+    assert!(
+        main_conn
+            .fetch_inbound_foreign_keys(None, "parent")
+            .await
+            .unwrap()
+            .is_empty()
+    );
 }
 
 #[tokio::test]
@@ -252,4 +279,23 @@ async fn missing_attached_database_skipped_without_error() {
 
     let res = conn.query("SELECT val FROM local_data").await.unwrap();
     assert_eq!(res.rows[0][0], Value::Text("ok".into()));
+}
+
+#[tokio::test]
+async fn invalid_existing_attached_database_fails_connection() {
+    let dir = TempDir::new().unwrap();
+    let main_path = dir.path().join("main.db").to_string_lossy().to_string();
+    let invalid_path = dir.path().join("invalid.db").to_string_lossy().to_string();
+    std::fs::File::create(&main_path).unwrap();
+    std::fs::write(&invalid_path, b"not a sqlite database").unwrap();
+
+    let result = SqliteDriver
+        .connect(ConnectOptions {
+            database: main_path,
+            attached_databases: vec![AttachedDatabase::new("invalid", invalid_path)],
+            ..Default::default()
+        })
+        .await;
+
+    assert!(result.is_err());
 }

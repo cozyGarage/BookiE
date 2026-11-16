@@ -11,6 +11,7 @@ use super::{App, AppMsg};
 
 mod busy_quit;
 
+#[cfg(test)]
 fn connect_close_confirmation_response(dialog: &adw::AlertDialog, on_response: impl Fn(&str) + 'static) {
     dialog.connect_response(None, move |_, response| on_response(response));
 }
@@ -18,11 +19,8 @@ fn connect_close_confirmation_response(dialog: &adw::AlertDialog, on_response: i
 #[cfg(test)]
 mod confirmation_tests;
 
-/// Owning handles the model needs from the window-close plumbing: the
-/// close-after-save counters, the "close the window once the map
-/// drains" flag, and the in-flight transaction counter the close
-/// guard polls.
 pub(super) struct WindowLifecycleHandles {
+    pub(super) force_close: Rc<Cell<bool>>,
     pub(super) grid_edits_ready: Rc<Cell<bool>>,
     pub(super) close_after_save: Rc<RefCell<CloseAfterSave>>,
     pub(super) close_window_after_save: Rc<Cell<bool>>,
@@ -48,11 +46,6 @@ pub(super) fn install_window_lifecycle(
     if restored.borrow().maximized {
         window.maximize();
     }
-    // Window-close handler. Three responsibilities: persist window
-    // size + maximize state, intercept close when any tab has
-    // unsaved edits with a Cancel | Discard | Save dialog, and
-    // route Save through the same SaveCompletedForTab plumbing as
-    // a per-tab close so failures abort cleanly.
     let force_close: Rc<Cell<bool>> = Rc::new(Cell::new(false));
     let force_close_for_close = force_close.clone();
     let busy_quit_confirmed = Rc::new(Cell::new(false));
@@ -69,6 +62,7 @@ pub(super) fn install_window_lifecycle(
     let window_close_state_saved = Rc::new(Cell::new(false));
     let window_close_state_pending = Rc::new(Cell::new(false));
     let handles = WindowLifecycleHandles {
+        force_close: force_close.clone(),
         close_after_save: close_after_save_for_close.clone(),
         close_window_after_save: close_window_after_save_for_close.clone(),
         in_flight_saves: in_flight_saves.clone(),
@@ -101,8 +95,8 @@ pub(super) fn install_window_lifecycle(
         // with no UI feedback.
         if !force_close_for_close.get() && in_flight_saves_for_close.get() > 0 {
             let dialog = adw::AlertDialog::new(
-                Some(&crate::tr!("Saving in progress")),
-                Some(&crate::tr!(
+                Some(&bookie_app_services::tr!("Saving in progress")),
+                Some(&bookie_app_services::tr!(
                     "Waiting for pending saves to finish before closing the window."
                 )),
             );
@@ -136,79 +130,7 @@ pub(super) fn install_window_lifecycle(
         let has_pending = !change_trackers.pending_tabs_for(&tab_ids).is_empty()
             || !structure_trackers.pending_tabs_for(&tab_ids).is_empty();
         if !force_close_for_close.get() && has_pending {
-            // Plural-form heading matches the per-tab dialog's
-            // tone — factual GNOME HIG language rather than the
-            // colloquial "throws them away" the body used to
-            // carry. Per-tab dialog stays specific ("Save changes
-            // to {name}"); window close groups across N tabs so
-            // it stays generic.
-            let dialog = adw::AlertDialog::new(None, None);
-            dialog.set_heading(Some(&crate::tr!("Save changes before closing?")));
-            dialog.set_body(&crate::tr!(
-                "One or more tabs have unsaved changes. They will be permanently lost if you discard them."
-            ));
-            dialog.add_response("cancel", &crate::tr!("Cancel"));
-            dialog.add_response("discard", &crate::tr!("Discard"));
-            dialog.add_response("save", &crate::tr!("Save"));
-            dialog.set_response_appearance("discard", adw::ResponseAppearance::Destructive);
-            dialog.set_response_appearance("save", adw::ResponseAppearance::Suggested);
-            dialog.set_default_response(Some("save"));
-            dialog.set_close_response("cancel");
-            let force_close_for_resp = force_close_for_close.clone();
-            let window_for_resp = w.clone();
-            let close_after_save_for_resp = close_after_save_for_close.clone();
-            let close_window_after_save_for_resp = close_window_after_save_for_close.clone();
-            let input_sender_for_resp = close_request_input_sender.clone();
-            let structure_trackers = structure_trackers.clone();
-            let change_trackers = change_trackers.clone();
-            connect_close_confirmation_response(&dialog, move |response| {
-                match response {
-                    "discard" => {
-                        for tab_id in change_trackers.pending_tabs_for(&tab_ids) {
-                            change_trackers.with_tab(tab_id, |t| t.clear());
-                        }
-                        for tab_id in structure_trackers.pending_tabs_for(&tab_ids) {
-                            structure_trackers.with_tab(tab_id, |t| t.clear());
-                        }
-                        force_close_for_resp.set(true);
-                        // Re-fire close_request — guard sees the flag,
-                        // saves window state, returns Proceed.
-                        window_for_resp.close();
-                    }
-                    "save" => {
-                        // Commit each dirty tab. Browse tabs go through
-                        // SaveActiveBrowseTabById; Structure tabs need
-                        // ExecuteStructureTransaction with materialized
-                        // statements. close_after_save tracks both kinds;
-                        // the SaveCompletedForTab / StructureSaveCompleted
-                        // handlers in App::update close the window once
-                        // the set drains. Any SaveFailed aborts.
-                        let browse_tabs = change_trackers.pending_tabs_for(&tab_ids);
-                        let structure_tabs = structure_trackers.pending_tabs_for(&tab_ids);
-                        // Counter increments — a Table tab listed in both
-                        // sets bumps to 2 so the window close waits for
-                        // BOTH the browse save and the structure save.
-                        {
-                            let mut map = close_after_save_for_resp.borrow_mut();
-                            for id in browse_tabs.iter().copied() {
-                                map.begin(id, 1);
-                            }
-                            for id in structure_tabs.iter().copied() {
-                                map.begin(id, 1);
-                            }
-                        }
-                        close_window_after_save_for_resp.set(true);
-                        for id in browse_tabs {
-                            let _ = input_sender_for_resp.send(AppMsg::SaveActiveBrowseTabById(id));
-                        }
-                        for id in structure_tabs {
-                            let _ = input_sender_for_resp.send(AppMsg::SaveActiveStructureTabById(id));
-                        }
-                    }
-                    _ => {} // Cancel: do nothing, stay open.
-                }
-            });
-            dialog.present(Some(w));
+            let _ = close_request_input_sender.send(AppMsg::PromptWindowClose);
             return glib::Propagation::Stop;
         }
         let close_state_was_saved = close_state_saved_for_close.replace(false);
@@ -259,12 +181,12 @@ pub(super) fn install_window_lifecycle(
                                 workspace_flush_in_progress_for_poll.set(false);
                                 window_for_flush.set_sensitive(true);
                                 let dialog = adw::AlertDialog::new(
-                                    Some(&crate::tr!("Could not save workspace")),
-                                    Some(&crate::tr!(
+                                    Some(&bookie_app_services::tr!("Could not save workspace")),
+                                    Some(&bookie_app_services::tr!(
                                         "The window will remain open so you can retry without losing your workspace."
                                     )),
                                 );
-                                dialog.add_response("close", &crate::tr!("Close"));
+                                dialog.add_response("close", &bookie_app_services::tr!("Close"));
                                 dialog.present(Some(&window_for_flush));
                                 glib::ControlFlow::Break
                             }

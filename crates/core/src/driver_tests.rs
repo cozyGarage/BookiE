@@ -37,6 +37,12 @@ fn a_driver_that_declares_nothing_claims_no_structure_metadata() {
     assert_eq!(capabilities.column_comment, ColumnCommentCapability::Unsupported);
     assert!(!capabilities.supports_explicit_auto_increment_values);
     assert!(capabilities.supports_browse_filters);
+    assert!(!capabilities.supports_table_default_collation);
+    assert!(!driver.supports_table_health_report());
+    assert!(!capabilities.supports_table_health_report);
+    assert_eq!(capabilities.import_upsert, ImportUpsertStyle::Unsupported);
+    assert!(!capabilities.supports_value_search);
+    assert!(!capabilities.supports_reverse_keyset);
     assert_eq!(driver.default_database(), "");
     assert_eq!(driver.default_username(), "");
 }
@@ -128,6 +134,12 @@ impl DatabaseDriver for DeclaredCapabilitiesDriver {
     async fn connect(&self, _opts: ConnectOptions) -> Result<Box<dyn Connection>, DriverError> {
         Err(DriverError::Unsupported("test driver".into()))
     }
+}
+
+#[test]
+fn reverse_keyset_defaults_off_until_a_driver_opts_in() {
+    assert!(!BareDriver.capabilities().supports_reverse_keyset);
+    assert!(!DeclaredCapabilitiesDriver.capabilities().supports_reverse_keyset);
 }
 
 #[test]

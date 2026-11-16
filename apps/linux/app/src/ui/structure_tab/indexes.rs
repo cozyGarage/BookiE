@@ -1,6 +1,3 @@
-//! Index-row builder + tag widgets used by the Indexes page of the
-//! Structure tab.
-
 use relm4::adw::prelude::*;
 use relm4::{ComponentSender, adw, gtk};
 
@@ -8,9 +5,6 @@ use bookie_core::IndexInfo;
 
 use super::{StructureTab, StructureTabInput};
 
-/// Tiny inline pill rendered as an AdwActionRow suffix — used by the
-/// indexes list to show UNIQUE / PRIMARY tags. `accent_class` is the
-/// CSS class controlling the colour (`dim-label`, `accent`, etc.).
 fn index_badge(label: &str, accent_class: &str) -> gtk::Label {
     let badge = gtk::Label::builder().label(label).valign(gtk::Align::Center).build();
     badge.add_css_class("caption");
@@ -18,10 +12,6 @@ fn index_badge(label: &str, accent_class: &str) -> gtk::Label {
     badge
 }
 
-/// Index row as a native `AdwActionRow` — title is the index name,
-/// subtitle is the comma-separated column list. UNIQUE / PRIMARY are
-/// small caption suffixes, the trash button is an end-suffix. The row
-/// participates in `boxed-list` styling for free; no manual margins.
 pub(super) fn build_index_row(index: usize, idx: &IndexInfo, sender: ComponentSender<StructureTab>) -> adw::ActionRow {
     // Empty columns array means the driver returned a malformed index
     // (corrupt catalog or driver bug). Render a dim "—" subtitle so
@@ -33,15 +23,15 @@ pub(super) fn build_index_row(index: usize, idx: &IndexInfo, sender: ComponentSe
         .build();
 
     if idx.unique {
-        row.add_suffix(&index_badge(&crate::tr!("UNIQUE"), "dim-label"));
+        row.add_suffix(&index_badge(&bookie_app_services::tr!("UNIQUE"), "dim-label"));
     }
     if idx.primary {
-        row.add_suffix(&index_badge(&crate::tr!("PRIMARY"), "accent"));
+        row.add_suffix(&index_badge(&bookie_app_services::tr!("PRIMARY"), "accent"));
     }
 
     let remove_button = gtk::Button::builder()
         .icon_name("user-trash-symbolic")
-        .tooltip_text(crate::tr!("Remove index"))
+        .tooltip_text(bookie_app_services::tr!("Remove index"))
         .valign(gtk::Align::Center)
         .build();
     remove_button.add_css_class("flat");
@@ -49,7 +39,7 @@ pub(super) fn build_index_row(index: usize, idx: &IndexInfo, sender: ComponentSe
     // column constraint and removing it breaks the table.
     if idx.primary {
         remove_button.set_sensitive(false);
-        remove_button.set_tooltip_text(Some(&crate::tr!(
+        remove_button.set_tooltip_text(Some(&bookie_app_services::tr!(
             "Primary-key index can't be dropped here; clear the PK on the column."
         )));
     }
@@ -86,6 +76,7 @@ mod tests {
             primary: false,
             predicate: Some("deleted_at IS NULL".into()),
             has_expression_key: false,
+            using_clause: None,
         };
         assert_eq!(index_subtitle(&index), "lower(email) WHERE deleted_at IS NULL");
     }

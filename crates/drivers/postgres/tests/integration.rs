@@ -19,6 +19,8 @@ use tokio_util::sync::CancellationToken;
 
 #[path = "catalog_exclusion_scale.rs"]
 mod catalog_exclusion_scale;
+#[path = "support/server_stop_class.rs"]
+mod server_stop_class;
 #[path = "support/session_time_zone.rs"]
 mod session_time_zone;
 #[path = "support/shared_container.rs"]
@@ -26,6 +28,8 @@ mod shared_container;
 #[path = "support/wire_round_trip.rs"]
 mod wire_round_trip;
 
+#[path = "support/affected_rows.rs"]
+mod affected_rows;
 #[path = "support/catalog_lookups.rs"]
 mod catalog_lookups;
 #[path = "support/connection_contracts.rs"]
@@ -38,7 +42,11 @@ mod pool_saturation;
 mod pool_session_reset;
 #[path = "support/read_only_session.rs"]
 mod read_only_session;
+#[path = "support/server_messages.rs"]
+mod server_messages;
 
+#[path = "support/extension_value_qualification.rs"]
+mod extension_value_qualification;
 #[path = "support/vector_contract.rs"]
 mod vector_contract;
 
@@ -83,6 +91,8 @@ mod interval_contract;
 
 #[path = "support/enum_contract.rs"]
 mod enum_contract;
+#[path = "support/interactive_begin_cancellation.rs"]
+mod interactive_begin_cancellation;
 #[path = "support/native_oracle_contract.rs"]
 mod native_oracle_contract;
 #[path = "support/query_budget_contract.rs"]
@@ -91,6 +101,8 @@ mod query_budget_contract;
 mod query_cursor;
 #[path = "support/reverse_keyset_paging.rs"]
 mod reverse_keyset_paging;
+#[path = "support/sqlx_begin_cancellation.rs"]
+mod sqlx_begin_cancellation;
 #[path = "support/value_contracts.rs"]
 mod value_contracts;
 
@@ -138,6 +150,8 @@ mod disconnection;
 
 #[path = "support/rollback_failure.rs"]
 mod rollback_failure;
+#[path = "support/server_activity.rs"]
+mod server_activity;
 
 #[path = "../../shared/server_restart.rs"]
 mod server_restart;
@@ -185,6 +199,28 @@ async fn a_session_keeps_settings_temp_tables_and_its_transaction_between_statem
     ] {
         session.query_params_controlled(sql, &[], &control).await.unwrap();
     }
+    let temporary = session.list_temporary_tables_controlled(&control).await.unwrap();
+    assert!(matches!(
+        temporary.as_slice(),
+        [bookie_core::TableInfo { schema: Some(schema), name }] if schema.starts_with("pg_temp_") && name == "scratch"
+    ));
+    assert!(
+        !conn
+            .list_tables()
+            .await
+            .unwrap()
+            .iter()
+            .any(|table| table.name == "scratch")
+    );
+    let mut isolated = conn.open_session().await.unwrap();
+    assert!(
+        isolated
+            .list_temporary_tables_controlled(&control)
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    isolated.close().await.unwrap();
     assert_eq!(
         session_value(&mut session, "SELECT current_setting('search_path')").await,
         Value::Text("pg_catalog, public".into())
@@ -192,6 +228,17 @@ async fn a_session_keeps_settings_temp_tables_and_its_transaction_between_statem
     assert_eq!(
         session_value(&mut session, "SELECT n FROM scratch").await,
         Value::Int(7)
+    );
+    session
+        .query_params_controlled("DROP TABLE scratch", &[], &control)
+        .await
+        .unwrap();
+    assert!(
+        session
+            .list_temporary_tables_controlled(&control)
+            .await
+            .unwrap()
+            .is_empty()
     );
 
     for sql in ["BEGIN", "INSERT INTO public.ledger VALUES (1)", "ROLLBACK"] {
@@ -283,6 +330,31 @@ async fn a_bare_begin_does_not_leave_a_pooled_session_inside_a_transaction() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn an_idle_transaction_timeout_retires_its_dedicated_session() {
+    let (_c, opts) = start_pg().await;
+    let conn = connect(opts).await;
+    conn.execute("ALTER ROLE postgres SET idle_in_transaction_session_timeout = '2s'")
+        .await
+        .unwrap();
+    let mut session = conn.open_session().await.unwrap();
+    session
+        .query_params_controlled("BEGIN", &[], &no_timeout())
+        .await
+        .unwrap();
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+
+    let error = session
+        .query_params_controlled("SELECT 1", &[], &no_timeout())
+        .await
+        .unwrap_err();
+
+    assert!(matches!(error, DriverError::Disconnected), "{error:?}");
+    assert!(!session.is_usable());
+    session.close().await.unwrap();
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn the_session_reports_the_application_name_it_was_given() {
     let (_c, mut opts) = start_pg().await;
     opts.application_name = Some("BookiE".into());
@@ -344,7 +416,9 @@ async fn catalog_objects_are_listed_per_kind_and_filtered_by_schema() {
     );
     let sequences = listed(Kind::Sequence).await;
     assert!(
-        sequences.contains(&("ticket_numbers".into(), "bigint".into())),
+        sequences
+            .iter()
+            .any(|(name, detail)| name == "ticket_numbers" && detail.starts_with("bigint")),
         "{sequences:?}"
     );
     assert!(sequences.iter().any(|(name, _)| name == "events_id_seq"));
@@ -612,6 +686,49 @@ async fn value_roundtrip_all_types() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn postgres_extended_temporal_filter_text_round_trips_through_the_server() {
+    let (_container, options) = start_pg().await;
+    let connection = connect(options).await;
+    let selected = connection
+        .query(
+            "SELECT DATE '0044-03-15 BC', TIME '24:00:00', TIMESTAMP '4713-01-01 00:00:00 BC', \
+             TIMESTAMPTZ '4713-01-01 00:00:00+00 BC'",
+        )
+        .await
+        .unwrap();
+    let values = &selected.rows[0];
+    let filters = values
+        .iter()
+        .map(|value| {
+            bookie_core::filter::cell_filter_rule("value", value, false)
+                .and_then(|rule| rule.value)
+                .and_then(|value| match value {
+                    bookie_core::filter::FilterValue::Single(text) => Some(Value::Text(text)),
+                    _ => None,
+                })
+                .unwrap()
+        })
+        .collect::<Vec<_>>();
+
+    assert_eq!(filters[0], Value::Text("0044-03-15 BC".into()));
+    assert_eq!(filters[1], Value::Text("24:00:00".into()));
+    assert_eq!(filters[2], Value::Text("4713-01-01 00:00:00 BC".into()));
+    assert_eq!(filters[3], Value::Text("4713-01-01 00:00:00+00:00 BC".into()));
+
+    let matched = connection
+        .query_params(
+            "SELECT $1::date = DATE '0044-03-15 BC', $2::time = TIME '24:00:00', \
+             $3::timestamp = TIMESTAMP '4713-01-01 00:00:00 BC', \
+             $4::timestamptz = TIMESTAMPTZ '4713-01-01 00:00:00+00 BC'",
+            &filters,
+        )
+        .await
+        .unwrap();
+    assert_eq!(matched.rows, vec![vec![Value::Bool(true); 4]]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn pagination_and_truncated_flag() {
     let (_c, opts) = start_pg().await;
     let conn = connect(opts).await;
@@ -649,11 +766,27 @@ async fn assert_capped_and_server_stopped(observer: &dyn Connection, result: Que
         rows,
         elapsed,
     } = result;
-    assert!(truncated, "{rows} rows in {elapsed:?}");
-    assert!(rows <= bookie_core::MAX_QUERY_ROWS);
+    let version_result = observer
+        .query("SHOW server_version")
+        .await
+        .expect("read PostgreSQL server version");
+    let server_version = version_result
+        .rows
+        .first()
+        .and_then(|row| row.first())
+        .and_then(|value| match value {
+            Value::Text(version) => Some(version.as_str()),
+            _ => None,
+        })
+        .expect("PostgreSQL reports its server version");
+    assert!(truncated, "PostgreSQL {server_version}: {rows} rows in {elapsed:?}");
+    assert!(
+        rows <= bookie_core::MAX_QUERY_ROWS,
+        "PostgreSQL {server_version}: {rows} rows"
+    );
     assert!(
         elapsed < std::time::Duration::from_secs(30),
-        "{rows} rows in {elapsed:?}"
+        "PostgreSQL {server_version}: {rows} rows in {elapsed:?}"
     );
     let still_running = format!(
         "SELECT count(*) FROM pg_stat_activity WHERE state = 'active' AND query LIKE '%{tag}%' AND pid <> pg_backend_pid()"
@@ -669,7 +802,10 @@ async fn assert_capped_and_server_stopped(observer: &dyn Connection, result: Que
         }
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     }
-    assert_eq!(running, 0, "the server kept producing rows after the cap");
+    assert_eq!(
+        running, 0,
+        "PostgreSQL {server_version} kept producing rows after the cap"
+    );
 }
 
 struct QueryResultProbe {

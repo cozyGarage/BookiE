@@ -18,6 +18,34 @@ fn value_contract_nonfinite_numbers_remain_distinct_from_sql_null() {
 }
 
 #[test]
+fn postgres_extended_temporals_keep_database_spelling_in_row_json() {
+    let date = chrono::NaiveDate::from_ymd_opt(-43, 3, 15).unwrap();
+    let stamp = chrono::NaiveDate::from_ymd_opt(-4712, 1, 1)
+        .unwrap()
+        .and_hms_opt(0, 0, 0)
+        .unwrap();
+    let columns = vec![column("d"), column("t"), column("ts"), column("tstz")];
+    let row = vec![
+        Value::Date(date),
+        Value::Text("24:00:00".into()),
+        Value::DateTime(stamp),
+        Value::TimestampTz(stamp.and_utc()),
+    ];
+    let expected = serde_json::json!({
+        "d": "0044-03-15 BC",
+        "t": "24:00:00",
+        "ts": "4713-01-01 00:00:00 BC",
+        "tstz": "4713-01-01 00:00:00+00:00 BC"
+    });
+
+    assert_eq!(row_to_json(&columns, &row), expected);
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&render_row_json(&columns, &row)).unwrap(),
+        expected
+    );
+}
+
+#[test]
 fn json_text_export_keeps_source_tokens_and_duplicate_keys() {
     let columns = vec![column("value")];
     let source = "{ \"z\": 1, \"z\": 2, \"n\": 1.0000000000000000000000000000000000000001 }";

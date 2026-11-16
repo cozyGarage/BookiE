@@ -166,9 +166,11 @@ fn force_dismissing_pending_connection_switch_preserves_workspace() {
         path,
         _directory,
     } = dirty_editor();
-    controller.emit(AppMsg::OpenConnect);
+    controller.emit(AppMsg::Connection(ConnectionMessage::Open));
     spin_until(|| controller.model().switch.transition == ConnectionTransition::Connecting);
-    controller.emit(AppMsg::ConnectionPrepared(Box::new(prepared_sqlite_connection())));
+    controller.emit(AppMsg::Connection(ConnectionMessage::Prepared(Box::new(
+        prepared_sqlite_connection(),
+    ))));
     spin_until(|| controller.widget().visible_dialog().is_some());
     let dialog = controller.widget().visible_dialog().unwrap();
     dialog.force_close();
@@ -192,6 +194,24 @@ fn force_dismissing_pending_connection_switch_preserves_workspace() {
 
 #[test]
 #[ignore = "requires an isolated GTK display"]
+fn deleting_a_connection_dismisses_the_saved_connections_popover() {
+    let DirtyEditor {
+        controller, _directory, ..
+    } = dirty_editor();
+    controller.model().connections_popover.popup();
+    spin_until(|| controller.model().connections_popover.is_visible());
+    controller.emit(AppMsg::DeleteConnection(uuid::Uuid::new_v4()));
+    spin_until(|| controller.widget().visible_dialog().is_some());
+    spin_until(|| !controller.model().connections_popover.is_visible());
+    assert!(
+        !controller.model().connections_popover.is_visible(),
+        "saved-connections popover must close before the delete dialog accepts clicks"
+    );
+    controller.widget().visible_dialog().unwrap().force_close();
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
 fn force_dismissing_running_query_switch_preserves_the_editor() {
     let DirtyEditor {
         controller,
@@ -205,9 +225,11 @@ fn force_dismissing_running_query_switch_preserves_the_editor() {
     {
         slot.running = true;
     }
-    controller.emit(AppMsg::OpenConnect);
+    controller.emit(AppMsg::Connection(ConnectionMessage::Open));
     spin_until(|| controller.model().switch.transition == ConnectionTransition::Connecting);
-    controller.emit(AppMsg::ConnectionPrepared(Box::new(prepared_sqlite_connection())));
+    controller.emit(AppMsg::Connection(ConnectionMessage::Prepared(Box::new(
+        prepared_sqlite_connection(),
+    ))));
     spin_until(|| controller.widget().visible_dialog().is_some());
     let dialog = controller.widget().visible_dialog().unwrap();
     dialog.force_close();

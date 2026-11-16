@@ -56,6 +56,7 @@ mod imp {
         }
 
         fn dispose(&self) {
+            // Unparent child widgets during custom-widget disposal.
             if let Some(entry) = self.entry.borrow().as_ref() {
                 entry.unparent();
             }
@@ -88,9 +89,7 @@ impl CellEditor {
         glib::Object::new()
     }
 
-    /// Current displayed text. In edit mode reads from the entry
-    /// (so a still-editing cell returns the user's in-progress
-    /// value); otherwise reads from the label.
+    /// Return the in-progress entry value while editing, otherwise the displayed label text.
     pub fn text(&self) -> glib::GString {
         if self.is_editing() {
             self.entry_widget().text()
@@ -106,6 +105,17 @@ impl CellEditor {
         }
     }
 
+    pub fn set_xalign(&self, xalign: f32) {
+        self.label_widget().set_xalign(xalign);
+        if let Some(entry) = self.imp().entry.borrow().as_ref() {
+            entry.set_property("xalign", xalign);
+        }
+    }
+
+    pub fn xalign(&self) -> f32 {
+        self.label_widget().xalign()
+    }
+
     pub fn set_inline_editable(&self, editable: bool) {
         self.imp().inline_editable.set(editable);
         if !editable && self.is_editing() {
@@ -117,9 +127,7 @@ impl CellEditor {
         self.imp().inline_editable.get()
     }
 
-    /// Apply or clear a Pango strikethrough attribute on the display
-    /// Label. Edit-mode `GtkText` is intentionally unaffected — a row
-    /// marked for deletion is read-only by definition.
+    /// Strike through the display label; deleted rows are not editable.
     pub fn set_strikethrough(&self, on: bool) {
         let label = self.label_widget();
         if on {
@@ -140,10 +148,7 @@ impl CellEditor {
         self.start_editing_with(&seed);
     }
 
-    /// Like `start_editing`, but seeds the entry from `seed` instead of
-    /// the label. The label can hold a truncated display string for a
-    /// long value, so a caller holding the untruncated text passes it
-    /// here to avoid editing (and saving) the truncated copy.
+    /// Seed from the full text when the label holds a truncated preview.
     pub fn start_editing_with(&self, seed: &str) {
         if !self.is_inline_editable() {
             return;
@@ -156,8 +161,6 @@ impl CellEditor {
             self.emit_by_name::<()>("editing-changed", &[]);
         }
         entry.grab_focus();
-        // Select all so the first keystroke replaces — matches the
-        // GTK Files rename flow and is what spreadsheet users expect.
         entry.select_region(0, -1);
     }
 
@@ -195,9 +198,7 @@ impl CellEditor {
         })
     }
 
-    /// The inner `GtkText` widget. Exposed so callers that need the
-    /// IME-aware delegate (preedit-changed, etc.) can hook directly
-    /// onto it.
+    /// Expose GtkText so callers can observe IME preedit changes.
     pub fn entry(&self) -> gtk4::Text {
         self.entry_widget()
     }
@@ -230,6 +231,7 @@ impl CellEditor {
             return entry.clone();
         }
         let entry = gtk4::Text::builder().hexpand(true).build();
+        entry.set_property("xalign", self.label_widget().xalign());
         entry.set_visible(false);
         entry.set_parent(self);
         self.install_entry_handlers(&entry);
@@ -246,6 +248,7 @@ impl CellEditor {
         });
 
         let key_ctrl = gtk4::EventControllerKey::new();
+        // Capture Escape before GtkText handles its own edit commands.
         key_ctrl.set_propagation_phase(gtk4::PropagationPhase::Capture);
         let weak_for_key = self.downgrade();
         key_ctrl.connect_key_pressed(move |_, keyval, _, _| {
@@ -372,7 +375,7 @@ mod tests {
 
     #[test]
     #[ignore = "requires an isolated GTK display"]
-    fn focus_leave_commits_pending_preedit_text() {
+    fn an_active_preedit_is_included_when_edit_commits() {
         gtk4::init().unwrap();
         let cell = CellEditor::new();
         cell.set_inline_editable(true);
@@ -401,5 +404,17 @@ mod tests {
         assert_eq!(committed_edit_text("Việt ", "nam"), "Việt nam");
         assert_eq!(committed_edit_text("Việt nam", "nam"), "Việt nam");
         assert_eq!(committed_edit_text("Việt ", ""), "Việt ");
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn editable_cell_tracks_xalign_for_numbers() {
+        gtk4::init().unwrap();
+        let cell = CellEditor::new();
+        assert_eq!(cell.xalign(), 0.0);
+        cell.set_xalign(1.0);
+        assert_eq!(cell.xalign(), 1.0);
+        cell.start_editing_with("12345");
+        assert_eq!(cell.entry().property::<f32>("xalign"), 1.0);
     }
 }

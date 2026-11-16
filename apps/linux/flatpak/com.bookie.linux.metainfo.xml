@@ -70,7 +70,7 @@
   </keywords>
   <content_rating type="oars-1.1" />
   <releases>
-    <release version="0.2.7" type="stable" date="2026-11-11">
+    <release version="0.2.7" type="stable" date="2026-11-12">
       <description><p>Release after 0.2.6: grid menus no longer act on a different row after the grid changes, large JSON cell previews no longer scan the whole value, result pages that finish late no longer stay in memory, and the AppImage uses libadwaita's own styling.</p></description>
     </release>
     <release version="0.2.6" type="stable" date="2026-11-10">

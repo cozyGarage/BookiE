@@ -94,6 +94,33 @@ where
     Op: Future<Output = Result<T, DriverError>>,
     Cancel: Future<Output = Result<(), DriverError>>,
 {
+    run_server_cancellable_inner(operation, cancellation, confirms_cancellation, false, control).await
+}
+
+pub async fn run_server_cancellable_preserving_transaction_rollback<T, Op, Cancel>(
+    operation: Op,
+    cancellation: Cancel,
+    confirms_cancellation: fn(&DriverError) -> bool,
+    control: &OperationControl,
+) -> Result<T, DriverError>
+where
+    Op: Future<Output = Result<T, DriverError>>,
+    Cancel: Future<Output = Result<(), DriverError>>,
+{
+    run_server_cancellable_inner(operation, cancellation, confirms_cancellation, true, control).await
+}
+
+async fn run_server_cancellable_inner<T, Op, Cancel>(
+    operation: Op,
+    cancellation: Cancel,
+    confirms_cancellation: fn(&DriverError) -> bool,
+    preserve_transaction_rollback: bool,
+    control: &OperationControl,
+) -> Result<T, DriverError>
+where
+    Op: Future<Output = Result<T, DriverError>>,
+    Cancel: Future<Output = Result<(), DriverError>>,
+{
     check_pre_dispatch(control)?;
     let mut operation = Box::pin(operation);
     let interruption = match tokio::select! {
@@ -102,7 +129,9 @@ where
         _ = control.cancellation_token.cancelled() => Err(Interruption::Cancelled),
         _ = wait_for_deadline(control.deadline) => Err(Interruption::TimedOut),
     } {
-        Ok(result) => return result,
+        Ok(result) => {
+            return settle_noticed_stop(result, control, confirms_cancellation, preserve_transaction_rollback);
+        }
         Err(interruption) => interruption,
     };
 
@@ -112,7 +141,7 @@ where
             if dispatch.await.is_err() {
                 return Err(unknown_outcome(interruption.into_error()));
             }
-            return classify_interrupted(result, interruption, confirms_cancellation);
+            return classify_interrupted(result, interruption, confirms_cancellation, preserve_transaction_rollback);
         },
         result = &mut dispatch => result,
     };
@@ -120,8 +149,27 @@ where
         return Err(unknown_outcome(interruption.into_error()));
     }
     match tokio::time::timeout(CANCELLATION_GRACE, &mut operation).await {
-        Ok(result) => classify_interrupted(result, interruption, confirms_cancellation),
+        Ok(result) => classify_interrupted(
+            result,
+            interruption,
+            confirms_cancellation,
+            preserve_transaction_rollback,
+        ),
         Err(_) => Err(unknown_outcome(interruption.into_error())),
+    }
+}
+
+fn settle_noticed_stop<T>(
+    result: Result<T, DriverError>,
+    control: &OperationControl,
+    confirms_cancellation: fn(&DriverError) -> bool,
+    preserve_transaction_rollback: bool,
+) -> Result<T, DriverError> {
+    match result {
+        Err(error) if control.cancellation_token.is_cancelled() && confirms_cancellation(&error) => Err(
+            confirmed_interruption(error, Interruption::Cancelled, preserve_transaction_rollback),
+        ),
+        other => other,
     }
 }
 
@@ -129,11 +177,30 @@ fn classify_interrupted<T>(
     result: Result<T, DriverError>,
     interruption: Interruption,
     confirms_cancellation: fn(&DriverError) -> bool,
+    preserve_transaction_rollback: bool,
 ) -> Result<T, DriverError> {
     match result {
         Ok(_) => Err(unknown_outcome(interruption.into_error())),
-        Err(error) if confirms_cancellation(&error) => Err(interruption.into_error()),
+        Err(error) if confirms_cancellation(&error) => Err(confirmed_interruption(
+            error,
+            interruption,
+            preserve_transaction_rollback,
+        )),
         Err(error) => Err(unknown_outcome(error)),
+    }
+}
+
+fn confirmed_interruption(
+    error: DriverError,
+    interruption: Interruption,
+    preserve_transaction_rollback: bool,
+) -> DriverError {
+    match (error, preserve_transaction_rollback) {
+        (DriverError::Transaction { statement_index, .. }, true) => DriverError::Transaction {
+            statement_index,
+            source: Box::new(interruption.into_error()),
+        },
+        _ => interruption.into_error(),
     }
 }
 

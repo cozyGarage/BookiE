@@ -216,3 +216,49 @@ fn set_to_null_needs_an_editable_nullable_cell() {
     column.data_type = "BYTEA".into();
     assert!(!cell_allows_set_null(&column, &value));
 }
+
+#[test]
+fn set_cells_accepts_large_text_values_but_keeps_boolean_representation_safe() {
+    let text = ColumnInfo {
+        name: "payload".into(),
+        data_type: "TEXT".into(),
+        nullable: true,
+        primary_key: false,
+        is_auto_increment: false,
+        is_generated: false,
+        comment: None,
+        default_value: None,
+        collation: None,
+        enum_type: None,
+        domain_type: None,
+    };
+    assert!(cell_allows_set_cells(&text, &Value::Text("x".repeat(16_384))));
+    let boolean = ColumnInfo {
+        data_type: "BOOLEAN".into(),
+        ..text
+    };
+    assert!(cell_allows_set_cells(&boolean, &Value::Null));
+    assert!(!cell_allows_set_cells(&boolean, &Value::Text("true".into())));
+}
+
+#[test]
+fn sql_server_udt_columns_reject_inline_and_bulk_edits() {
+    let udt = ColumnInfo {
+        name: "shape".into(),
+        data_type: "udt".into(),
+        nullable: true,
+        primary_key: false,
+        is_auto_increment: false,
+        is_generated: false,
+        default_value: None,
+        comment: None,
+        collation: None,
+        enum_type: None,
+        domain_type: None,
+    };
+    let raw_value = Value::Bytes(vec![0xE6, 0x10, 0x00, 0x00, 0x01]);
+
+    assert!(!cell_allows_inline_edit(&udt, &raw_value));
+    assert!(!cell_allows_set_cells(&udt, &Value::Text("replacement".into())));
+    assert!(!cell_allows_set_cells(&udt, &raw_value));
+}

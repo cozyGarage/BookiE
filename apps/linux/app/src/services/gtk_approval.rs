@@ -6,21 +6,23 @@ use std::{
 use async_trait::async_trait;
 use bookie_policy::{ApprovalOutcome, ApprovalRequest, ApprovalSink};
 
-/// GTK approval sink. Posts a modal `adw::AlertDialog` on the glib main
-/// context and parks the async caller until the user responds.
 pub struct GtkApprovalSink;
 
 const APPROVAL_TIMEOUT: Duration = Duration::from_secs(120);
 const MAX_SQL_PREVIEW_CHARS: usize = 16_384;
 static APPROVAL_DIALOG: OnceLock<Arc<tokio::sync::Semaphore>> = OnceLock::new();
 
+pub(crate) fn has_pending() -> bool {
+    APPROVAL_DIALOG.get().is_some_and(|gate| gate.available_permits() == 0)
+}
+
 const DENY_RESPONSE: &str = "deny";
 const APPROVE_ONCE_RESPONSE: &str = "once";
+const APPROVE_REMEMBER_RESPONSE: &str = "remember";
+const APPROVE_REMEMBER_LABEL: &str = "Approve and don't ask again";
 const CLOSE_RESPONSE: &str = DENY_RESPONSE;
 
-/// The window that actually owns the triggering connection wins over
-/// whichever window last had focus, which wins over any other visible
-/// window, which wins over anything still on screen at all.
+// Keep approval on the window that owns the connection, not another focused window.
 fn preferred_approval_window<T>(
     registered_and_visible: Option<T>,
     active: Option<T>,
@@ -31,16 +33,18 @@ fn preferred_approval_window<T>(
 }
 
 fn outcome_for_response(response: &str) -> ApprovalOutcome {
-    if response == APPROVE_ONCE_RESPONSE {
-        return ApprovalOutcome::AllowOnce;
+    match response {
+        APPROVE_ONCE_RESPONSE => ApprovalOutcome::AllowOnce,
+        APPROVE_REMEMBER_RESPONSE => ApprovalOutcome::AllowAndRemember,
+        _ => ApprovalOutcome::Deny,
     }
-    ApprovalOutcome::Deny
 }
 
 fn build_approval_dialog(
     heading: &str,
     body: &str,
     extra_child: &impl relm4::gtk::prelude::IsA<relm4::gtk::Widget>,
+    can_remember: bool,
 ) -> relm4::adw::AlertDialog {
     use relm4::adw::prelude::*;
     let dialog = relm4::adw::AlertDialog::builder()
@@ -50,6 +54,9 @@ fn build_approval_dialog(
         .build();
     dialog.add_response(DENY_RESPONSE, "Deny");
     dialog.add_response(APPROVE_ONCE_RESPONSE, "Approve once");
+    if can_remember {
+        dialog.add_response(APPROVE_REMEMBER_RESPONSE, APPROVE_REMEMBER_LABEL);
+    }
     dialog.set_response_appearance(DENY_RESPONSE, relm4::adw::ResponseAppearance::Destructive);
     dialog.set_response_appearance(APPROVE_ONCE_RESPONSE, relm4::adw::ResponseAppearance::Suggested);
     dialog.set_default_response(Some(DENY_RESPONSE));
@@ -114,8 +121,7 @@ async fn acquire_dialog_permit(
 #[async_trait]
 impl ApprovalSink for GtkApprovalSink {
     async fn request(&self, req: ApprovalRequest) -> ApprovalOutcome {
-        // The deadline includes time spent waiting behind another dialog, so
-        // a burst of agent writes cannot build an unbounded modal queue.
+        // Include dialog-queue wait in the deadline to bound queued approvals.
         let deadline = tokio::time::Instant::now() + APPROVAL_TIMEOUT;
         let gate = APPROVAL_DIALOG
             .get_or_init(|| Arc::new(tokio::sync::Semaphore::new(1)))
@@ -127,6 +133,7 @@ impl ApprovalSink for GtkApprovalSink {
         let tx = Arc::new(Mutex::new(Some(tx)));
         let permit = Arc::new(Mutex::new(Some(permit)));
 
+        let can_remember = req.may_be_remembered();
         let heading = format!("Approve write: {}", req.connection_name);
         let body = approval_body(&req);
 
@@ -167,7 +174,7 @@ impl ApprovalSink for GtkApprovalSink {
                 .max_content_height(360)
                 .child(&sql_view)
                 .build();
-            let dialog = build_approval_dialog(&heading_c, &body_c, &sql_scroll);
+            let dialog = build_approval_dialog(&heading_c, &body_c, &sql_scroll, can_remember);
 
             let timer = Arc::new(Mutex::new(None::<glib::SourceId>));
             let timer_response = timer.clone();
@@ -199,8 +206,7 @@ impl ApprovalSink for GtkApprovalSink {
                 if !cancelled && tokio::time::Instant::now() < deadline {
                     return glib::ControlFlow::Continue;
                 }
-                // This source is firing; clear its ID so force_close cannot
-                // try to remove the active source via the response callback.
+                // Clear the active source before force_close triggers its response callback.
                 if let Ok(mut timer) = timer_timeout.lock() {
                     timer.take();
                 }
@@ -219,10 +225,7 @@ impl ApprovalSink for GtkApprovalSink {
                 *timer = Some(source);
             }
 
-            // Prefer the window that actually owns the connection this
-            // statement runs on -- active_window() answers with whatever
-            // window last had focus, which in a multi-window session can
-            // be a different connection than the one being approved.
+            // Active window may belong to a different connection in a multi-window session.
             let application = gtk::Application::default();
             let window = preferred_approval_window(
                 crate::services::window_registry::window_for(connection_id).filter(|window| window.is_visible()),
@@ -292,12 +295,29 @@ mod tests {
         use relm4::adw::prelude::*;
         relm4::adw::init().unwrap();
         let scroll = relm4::gtk::ScrolledWindow::new();
-        let dialog = build_approval_dialog("Approve write: db", "body", &scroll);
+        let dialog = build_approval_dialog("Approve write: db", "body", &scroll, true);
         assert_eq!(dialog.default_response().as_deref(), Some(DENY_RESPONSE));
         assert_eq!(dialog.close_response().as_str(), DENY_RESPONSE);
         assert_ne!(DENY_RESPONSE, APPROVE_ONCE_RESPONSE);
         assert!(dialog.has_response(DENY_RESPONSE));
         assert!(dialog.has_response(APPROVE_ONCE_RESPONSE));
+        assert!(dialog.has_response(APPROVE_REMEMBER_RESPONSE));
+        let other = relm4::gtk::ScrolledWindow::new();
+        let without = build_approval_dialog("Approve write: db", "body", &other, false);
+        assert!(!without.has_response(APPROVE_REMEMBER_RESPONSE));
+    }
+
+    #[test]
+    fn the_remember_label_is_short_enough_not_to_be_ellipsized() {
+        assert!(APPROVE_REMEMBER_LABEL.chars().count() <= 30);
+    }
+
+    #[test]
+    fn remember_response_allows_and_remembers() {
+        assert_eq!(
+            outcome_for_response(APPROVE_REMEMBER_RESPONSE),
+            ApprovalOutcome::AllowAndRemember
+        );
     }
 
     #[test]

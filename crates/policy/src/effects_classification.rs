@@ -1,3 +1,6 @@
+use std::ops::ControlFlow;
+
+use sqlparser::ast::{CopySource, CopyTarget, Expr, Set, Statement, TableFactor, Visit, Visitor};
 use sqlparser::dialect::Dialect;
 use sqlparser::tokenizer::{Token, Tokenizer};
 
@@ -5,7 +8,6 @@ use crate::admin_functions::{is_administrative_function_exact_name, is_administr
 use crate::classify::{StatementClass, StatementDetails};
 use crate::effects::Effects;
 use crate::oracle_functions::is_known_pure_function;
-use sqlparser::ast::{CopySource, CopyTarget, Set, Statement};
 
 pub(crate) fn merge_script_class(current: StatementClass, next: StatementClass) -> StatementClass {
     if current == StatementClass::Administrative || next == StatementClass::Administrative {
@@ -157,7 +159,12 @@ fn statement_reads(stmt: &Statement, facts: &StatementDetails) -> bool {
     }
 }
 
-pub(crate) fn sql_effects_from_tokens(sql: &str, dialect: &dyn Dialect, driver_id: &str) -> (Effects, bool) {
+pub(crate) fn sql_effects_from_tokens(
+    sql: &str,
+    dialect: &dyn Dialect,
+    driver_id: &str,
+    statements: &[Statement],
+) -> (Effects, bool) {
     let Ok(tokens) = Tokenizer::new(dialect, sql).tokenize() else {
         return (Effects::EMPTY, false);
     };
@@ -202,7 +209,47 @@ pub(crate) fn sql_effects_from_tokens(sql: &str, dialect: &dyn Dialect, driver_i
             effects = effects.union(Effects::ADMIN);
         }
     }
+    if driver_id == "mysql"
+        && statements
+            .iter()
+            .any(|statement| statement.visit(&mut MysqlUnknownFunctionFinder).is_break())
+    {
+        effects = effects.union(Effects::ADMIN);
+        legacy_administrative_call = true;
+    }
     (effects, legacy_administrative_call)
+}
+
+struct MysqlUnknownFunctionFinder;
+
+impl Visitor for MysqlUnknownFunctionFinder {
+    type Break = ();
+
+    fn pre_visit_expr(&mut self, expression: &Expr) -> ControlFlow<Self::Break> {
+        match expression {
+            Expr::Function(function) if is_unknown_mysql_function(&function.name.to_string()) => ControlFlow::Break(()),
+            _ => ControlFlow::Continue(()),
+        }
+    }
+
+    fn pre_visit_table_factor(&mut self, factor: &TableFactor) -> ControlFlow<Self::Break> {
+        let name = match factor {
+            TableFactor::Function { name, .. }
+            | TableFactor::Table {
+                name, args: Some(_), ..
+            } => Some(name),
+            _ => None,
+        };
+        if name.is_some_and(|name| is_unknown_mysql_function(&name.to_string())) {
+            ControlFlow::Break(())
+        } else {
+            ControlFlow::Continue(())
+        }
+    }
+}
+
+fn is_unknown_mysql_function(name: &str) -> bool {
+    !crate::mysql_functions::is_known_pure_function(name)
 }
 
 fn oracle_function_requires_guard(tokens: &[Token], index: usize, name: &str) -> bool {

@@ -166,7 +166,7 @@ impl PgConnection {
                 // Eagerly bring the element type into cache for array types declared by-name
                 resolver.push_type(
                     format_args!("E'{}'", array_of.elem_name),
-                    format_args!("to_regtype(E'{}')", array_of.elem_name),
+                    format_args!("pg_catalog.to_regtype(E'{}')", array_of.elem_name),
                 );
             }
 
@@ -177,7 +177,7 @@ impl PgConnection {
                 format_args!("E'{}'", ty.name().escape_default()),
                 // `to_regtype()` evaluates to `NULL` if the type does not exist,
                 // instead of throwing an exception like `'<name>'::regtype` does.
-                format_args!("to_regtype(E'{}')::oid", ty.name().escape_default()),
+                format_args!("pg_catalog.to_regtype(E'{}')::pg_catalog.oid", ty.name().escape_default()),
             );
         }
 
@@ -366,22 +366,22 @@ impl TypeResolver {
                 &mut self.query,
                 // Postgres 13 would return `0` instead of `NULL` for `typelem`, `typbasetype`
                 "SELECT pg_type.oid,\n\
-                     pg_type.oid::regtype::text pretty_name,\n\
+                     pg_type.oid::pg_catalog.regtype::pg_catalog.text pretty_name,\n\
                      typname catalog_name,\n\
                      original_name,\n\
                      typtype,\n\
                      typcategory,\n\
-                     NULLIF(typelem, 0::oid) typelem,\n\
-                     NULLIF(typbasetype, 0::oid) typbasetype,\n\
+                     NULLIF(typelem, 0::pg_catalog.oid) typelem,\n\
+                     NULLIF(typbasetype, 0::pg_catalog.oid) typbasetype,\n\
                      rngsubtype,\n\
                      COALESCE(\
-                        (SELECT array_agg(enumlabel) FROM (SELECT *\n\
+                        (SELECT pg_catalog.array_agg(enumlabel) FROM (SELECT *\n\
                         FROM pg_catalog.pg_enum\n\
                         WHERE enumtypid = pg_type.oid\n\
                         ORDER BY enumsortorder) labels),\n\
                         '{{}}') enum_labels,\n\
                      COALESCE(\n\
-                        (SELECT array_agg((attname, atttypid)) FROM (SELECT *\n\
+                        (SELECT pg_catalog.array_agg((attname, atttypid)) FROM (SELECT *\n\
                         FROM pg_catalog.pg_attribute\n\
                         WHERE attrelid = pg_type.typrelid\n\
                             AND NOT attisdropped\n\
@@ -531,8 +531,8 @@ impl ColumnResolver {
                 // Postgres 13 does not accept `(attnum,attname)` without `ROW`
                 "SELECT\n\
                     attrelid table_oid,\n\
-                    attrelid::regclass::text table_name,\n\
-                    array_agg(ROW(attnum, attname)) AS columns\n\
+                    attrelid::pg_catalog.regclass::pg_catalog.text table_name,\n\
+                    pg_catalog.array_agg(ROW(attnum, attname)) AS columns\n\
                 FROM (VALUES ({}, {attribute_no})",
                 table_oid.0,
             )

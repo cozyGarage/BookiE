@@ -1,5 +1,3 @@
-use crate::model::Cell;
-
 pub const MAX_COPY_ROWS: u64 = 5_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -52,8 +50,4 @@ impl Selection {
         };
         format!("{count} {noun} selected{limit}")
     }
-}
-
-pub fn copy_tsv(rows: impl IntoIterator<Item = Vec<Cell>>, with_headers: bool) -> String {
-    crate::core_bridge::render_tsv(rows, with_headers)
 }

@@ -45,4 +45,22 @@ impl WindowSavePrompt {
         }
         connections
     }
+
+    pub fn connections_in_order(&self, order: &[Uuid]) -> Vec<Uuid> {
+        order
+            .iter()
+            .copied()
+            .filter(|connection| self.dirty_tabs.values().any(|dirty| dirty == connection))
+            .collect()
+    }
+
+    pub fn tabs_for_connection(&self, connection_id: Uuid) -> Vec<Uuid> {
+        let mut tabs: Vec<Uuid> = self
+            .dirty_tabs
+            .iter()
+            .filter_map(|(tab, connection)| (*connection == connection_id).then_some(*tab))
+            .collect();
+        tabs.sort();
+        tabs
+    }
 }

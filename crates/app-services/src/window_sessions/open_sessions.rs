@@ -84,3 +84,46 @@ pub fn restore_window_keys(keys: &[Uuid], available: &[Uuid]) -> Vec<Uuid> {
     let available = available.iter().copied().collect::<HashSet<_>>();
     keys.iter().copied().filter(|key| available.contains(key)).collect()
 }
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct StartupRestorePlan {
+    pub first: Vec<Uuid>,
+    pub others: Vec<Vec<Uuid>>,
+}
+
+pub fn startup_restore_plan(
+    stored: Option<&[u8]>,
+    last_connection_id: Option<Uuid>,
+    available: &[Uuid],
+) -> StartupRestorePlan {
+    let Some(front) = last_connection_id else {
+        return StartupRestorePlan::default();
+    };
+    let mut groups = match stored.map(parse_open_sessions) {
+        Some(OpenSessionsLoad::Restored(record)) => record.windows,
+        _ => Vec::new(),
+    };
+    let position = groups.iter().position(|keys| keys.contains(&front));
+    let first = position.map_or_else(|| vec![front], |index| groups.remove(index));
+    let others = groups
+        .iter()
+        .map(|keys| restore_window_keys(keys, available))
+        .filter(|keys| !keys.is_empty())
+        .collect();
+    StartupRestorePlan {
+        first: front_last(restore_window_keys(&first, available), front),
+        others,
+    }
+}
+
+pub fn startup_restore_keys(stored: Option<&[u8]>, last_connection_id: Option<Uuid>, available: &[Uuid]) -> Vec<Uuid> {
+    startup_restore_plan(stored, last_connection_id, available).first
+}
+
+fn front_last(mut keys: Vec<Uuid>, front: Uuid) -> Vec<Uuid> {
+    if let Some(position) = keys.iter().position(|key| *key == front) {
+        let front = keys.remove(position);
+        keys.push(front);
+    }
+    keys
+}

@@ -1,6 +1,6 @@
 # 0028: Isolate frontend experiments from the shipped application
 
-- **Status**: Accepted
+- **Status**: Superseded by 0052
 - **Date**: 2026-11-03
 
 ## Context

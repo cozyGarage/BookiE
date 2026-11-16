@@ -16,13 +16,27 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 - [ ] Saving a file that is a symlink updates its target and keeps the link.
 - [ ] Restart with a file tab open: the tab is titled by the file again, unsaved edits still show `•`, and Ctrl+S saves to the same file.
 - [ ] Restart with a saved connection, an active editor draft, a kept table tab and a preview table tab: restore the connection, draft and kept tab, omit the preview tab, and do not execute the draft until Run.
+- [ ] In a native Wayland session with a working preedit-capable input method, restore a workspace with at least three SQL editor tabs and the second tab selected. Focus its editor, compose and commit a multi-keystroke Unicode character, and confirm the committed text appears at the caret in that tab while both background tabs remain unchanged. Repeat immediately after another restart, cancel one composition before committing, and confirm cancellation inserts no text. Record the input method and package identity in the private verification record. The automated first-key restore test checks keyboard focus under Xvfb; it does not establish this IME behavior.
 - [ ] Delete that file, then restart: the tab keeps its text and a toast says it is no longer linked.
 - [ ] Ctrl+S on a browse or structure tab still saves pending edits there.
 - [ ] A `.sql` file above the size limit is refused with an explanation, not truncated.
 - [ ] A `.sql` file containing an excessively long line exceeding the per-line length ceiling is refused with an explanation before loading.
-- [ ] Ctrl+Shift+D lists saved queries; open, rename and delete all work.
+- [ ] Ctrl+Shift+B lists saved queries; open, rename, organize, keyword search and delete work.
+- [ ] Create, rename and delete a folder; deleting a populated folder leaves its queries unfiled.
+- [ ] After several successful editor runs on the current connection, Ctrl+P lists those past queries (at most 50, duplicates once). Choosing one opens a new editor tab with that SQL.
 - [ ] Saving a structure change or edited rows appears in history, and the history dialog can filter those out.
 - [ ] `BOOKIE_LOG_FORMAT=json ./target/debug/bookie` writes lines that parse as JSON; unset keeps the human format.
+
+## Server messages and timing
+
+- [ ] On PostgreSQL, run `DO $$ BEGIN RAISE NOTICE 'hello'; RAISE WARNING 'careful'; END $$`. A Messages section under the result lists both, with severity, code and text, and the status line ends with the message count. Copy messages puts one line per message on the clipboard.
+- [ ] On PostgreSQL, run `SELECT 1` straight after it. The Messages section is gone and the status line has no count.
+- [ ] On PostgreSQL, run a loop that raises 300 notices. The section shows 100 and says how many more were not shown; the window stays responsive.
+- [ ] On SQL Server, run `PRINT 'hello'; RAISERROR('low', 10, 1); SELECT 1`. Both messages appear next to the result set.
+- [ ] On MySQL or MariaDB, run `SELECT CAST('abc' AS SIGNED)`. A warning with code 1292 appears next to the result.
+- [ ] With the connection in an editor session, repeat the PostgreSQL steps. Messages come from the session's own statements only.
+- [ ] Hover the status line after a run. The tooltip shows the run time, and the approval wait when a write waited for approval, and says the server does not report its own time.
+- [ ] Use an MCP client against the same connection and run the PostgreSQL notice statement. The tool result carries no messages.
 
 ## SQL result editing
 

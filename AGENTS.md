@@ -9,9 +9,9 @@ These rules apply to every coding agent and every contributor. `CLAUDE.md` point
 The Forgejo mirror may retain a separate `linux` branch until that service is migrated. Specify the remote and branch explicitly for mirror operations; GitHub PRs and canonical development use `main`.
 
 - The rename is complete ([ADR 0027](docs/decisions/0027-complete-bookie-rename.md)): Cargo packages, binaries, crates, environment variables, application ID, paths and keyring schema are `bookie-*` / `BOOKIE_*` / `com.bookie.linux`. Legacy `tablepro` names appear only for upstream attribution and for reading old state. Do not reintroduce `tablepro` identifiers.
-- The UI uses GTK4, libadwaita, GtkSourceView and Relm4. Database drivers are static workspace crates registered at compile time. Isolated synthetic frontend experiments follow [ADR 0028](docs/decisions/0028-isolated-frontend-experiments.md).
+- The UI uses GTK4, libadwaita, GtkSourceView and Relm4. Database drivers are static workspace crates registered at compile time. The GPUI app in `apps/gpui` is the chosen cross-platform frontend and GTK is maintained in parallel ([ADR 0052](docs/decisions/0052-gpui-is-the-cross-platform-frontend.md)).
 - Every shipped feature works without an account, license key, subscription, paid tier or remote entitlement check.
-- The root [LICENSE](LICENSE) applies. User-facing changes carry a `Release-Note:` line ([changelog and commits](#changelog-and-commits)).
+- The root [LICENSE](LICENSE) applies. User-facing changes add a `changelog.d` fragment ([changelog and commits](#changelog-and-commits)).
 
 ## Where to start
 
@@ -87,8 +87,8 @@ The workspace manifest is `Cargo.toml`. [ARCHITECTURE.md](ARCHITECTURE.md) has t
 - `crates/storage`: saved connections, Secret Service access, query history and the audit journal.
 - `crates/ssh`: SSH tunnels through built-in `russh` or system OpenSSH.
 - `crates/transport`: connection assembly for the GUI and `agentd`: driver options, SSH chain, tunnel and the service endpoint used for certificate verification.
-- `crates/results`: pure result logic (compare, filter, find, predicate, scan, spool, exact values, sidebar tree) that depends only on `crates/core` ([ADR 0037](docs/decisions/0037-results-crate-split.md)); `crates/app-services` re-exports it.
-- `crates/app-services`: GTK-free application logic moved out of `apps/linux/app/src/services` in stages ([ADR 0018](docs/decisions/0018-headless-app-services-crate.md)); it must not depend on `gtk4`, `libadwaita`, `glib` or `relm4`.
+- `crates/results`: pure result logic (compare, filter, find, predicate, scan, spool, exact values, sidebar tree, paging window, grid cursor, stream page index and window) that depends only on `crates/core` ([ADR 0037](docs/decisions/0037-results-crate-split.md)); `crates/app-services` re-exports it.
+- `crates/app-services`: GTK-free application logic (result copy formats and TSV in `result_copy`, `tr!`/`trn!` in `i18n`) moved out of `apps/linux/app/src/services` in stages ([ADR 0018](docs/decisions/0018-headless-app-services-crate.md)); it must not depend on `gtk4`, `libadwaita`, `glib` or `relm4`.
 - `crates/mcp`: MCP authentication, scopes, connection allowlists, rate limits, tools and transport.
 - `crates/agentd`: headless MCP process and composition root without GTK.
 - `crates/drivers/*`: one static crate per engine, implementing `core` traits, never depending on the app.
@@ -194,7 +194,7 @@ Driver integration tests need Docker. If a prerequisite is missing, say which ch
 
 ## Changelog and commits
 
-- Release notes ([ADR 0022](docs/decisions/0022-release-notes-from-merge-commits.md)): do not edit `CHANGELOG.md`. Put one `Release-Note: <Category>: <text>` line per user-facing change (or `Release-Note: none`) in the PR body and the repository's squash-merge default uses the PR title and body, so the lines reach the commit; do not replace the body in the merge box. Categories follow [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Each line describes user impact, with no paths, type or function names. Test coverage, evidence runs and audits are not changelog entries; keep run-specific reports and research outside the public source tree. Do not add `Fixed` for a defect introduced and fixed before release. `Release-Note: none` is only for tests, CI, docs and refactors with no user-visible effect; a new feature, a changed behaviour or a user-visible fix, including one in the GPUI app, needs a real line, because the release notes are built from these lines and a `none` leaves the change out of the changelog.
+- Release notes ([ADR 0053](docs/decisions/0053-changelog-fragments.md)): do not edit `CHANGELOG.md` except in a `chore(release)` pull request. A user-facing change adds one file `changelog.d/<slug>.<category>.md` in the same commit. `<category>` is one of `added`, `changed`, `deprecated`, `removed`, `fixed`, `security` ([Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/)). The file holds one line of user impact, with no paths, type or function names. Test coverage, evidence runs and audits are not changelog entries; keep run-specific reports and research outside the public source tree. Do not add a `fixed` fragment for a defect introduced and fixed before release. A change with no user-visible effect adds no fragment. A change that only touches `apps/gpui` adds no fragment until GPUI ships ([ADR 0052](docs/decisions/0052-gpui-is-the-cross-platform-frontend.md)). Preflight runs `python3 scripts/release-notes.py fragments`. The release cut moves fragments into `CHANGELOG.md` with `python3 scripts/release-notes.py release X.Y.Z YYYY-MM-DD`.
 - Conventional Commits with a single-line subject and no body on branch commits (a squash commit's body is the PR description). Types: `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `build`, `ci`, `chore`, `style`, `revert`, `security`. Scopes such as `app`, `core`, `policy`, `mcp`, `agentd`, `storage`, `ssh`, `drivers`, `driver-postgres`.
 - A public API change updates every caller and test in the same commit.
 

@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use crate::services::workspace_state;
 use crate::ui::browse_tab::{BrowseTab, BrowseTabInit, BrowseTabInput, BrowseTabOutput};
-use crate::ui::editor::{SqlEditor, SqlEditorInit, SqlEditorInput, SqlEditorOutput, derive_tab_label};
+use crate::ui::editor::{RunMessage, SqlEditor, SqlEditorInit, SqlEditorInput, SqlEditorOutput, derive_tab_label};
 
 use super::editor_files::initial_editor_query;
 use super::types::{CLOSED_TABS_CAPACITY, TableTabStart, read_workspace_tab_id, write_workspace_tab_id};
@@ -19,6 +19,24 @@ mod bulk_close;
 use bulk_close::{add_bulk_close_actions, bulk_close_menu_model};
 mod closed_tab;
 use closed_tab::describe_closed_tab;
+
+fn focus_after_tab_close(tab_view: &adw::TabView, workspace_outer_stack: &gtk::Stack) {
+    let focused = tab_view
+        .selected_page()
+        .map(|page| page.child())
+        .is_some_and(|child| child.child_focus(gtk::DirectionType::TabForward));
+    if !focused {
+        let stack = workspace_outer_stack.downgrade();
+        glib::idle_add_local_once(move || {
+            if let Some(stack) = stack.upgrade()
+                && let Some(empty_page) = stack.child_by_name("empty")
+                && stack.visible_child_name().as_deref() == Some("empty")
+            {
+                empty_page.child_focus(gtk::DirectionType::TabForward);
+            }
+        });
+    }
+}
 
 impl App {
     /// Builds the unified AdwTabOverview tree once per connection.
@@ -50,7 +68,7 @@ impl App {
         let overview_button = adw::TabButton::builder()
             .view(&tab_view)
             .action_name("overview.open")
-            .tooltip_text(crate::tr!("View open tabs"))
+            .tooltip_text(bookie_app_services::tr!("View open tabs"))
             .valign(gtk::Align::Center)
             .build();
         // Hide the overview button until there are at least 2 tabs —
@@ -68,7 +86,7 @@ impl App {
         // Browse tabs come from sidebar clicks.
         let new_query_button = gtk::Button::builder()
             .icon_name("tab-new-symbolic")
-            .tooltip_text(crate::tr!("New query (Ctrl+E)"))
+            .tooltip_text(bookie_app_services::tr!("New query (Ctrl+E)"))
             .valign(gtk::Align::Center)
             .build();
         new_query_button.add_css_class("flat");
@@ -120,6 +138,10 @@ impl App {
         });
         let action_group = gio::SimpleActionGroup::new();
         action_group.add_action(&keep_tab_action);
+        let mark_sender = sender.clone();
+        super::tab_title::add_mark_actions(&action_group, menu_target.clone(), &tab_view, move || {
+            mark_sender.input(AppMsg::WorkspaceTabsChanged)
+        });
         let sender_for_bulk_close = sender.clone();
         add_bulk_close_actions(&action_group, menu_target, move |message| {
             sender_for_bulk_close.input(message);
@@ -145,6 +167,7 @@ impl App {
         let inner = gtk::Box::builder().orientation(gtk::Orientation::Vertical).build();
         inner.append(&tab_bar);
         inner.append(&tab_view);
+        inner.add_controller(rename_shortcut(&tab_view, &sender));
 
         let tab_overview = build_workspace_tab_overview(&tab_view, &inner);
         // Overview "+" button must return a real TabPage synchronously —
@@ -182,7 +205,7 @@ impl App {
                 .forward(sender_for_create.input_sender(), move |out| editor_output(tab_id, out));
             let page = tab_view_for_create.append(editor.widget());
             let label = first_free_editor_label(editor_titles(&workspace_tabs_for_create.borrow()));
-            page.set_title(&label);
+            super::tab_title::set_tab_title(&page, &label);
             // Empty query → no tooltip; tooltip will be set on first edit
             // via on_editor_tab_query_changed.
             write_workspace_tab_id(&page, tab_id);
@@ -197,6 +220,10 @@ impl App {
                 let mut tabs = workspace_tabs_for_create.borrow_mut();
                 tabs.insert(tab_id, WorkspaceTab::Editor(slot));
             }
+            sender_for_create.input(AppMsg::AttachWorkspaceTab {
+                tab_id,
+                connection_id: super::multi_session::overview_new_tab_connection(&front_connection_id_for_create),
+            });
             sender_for_create.input(AppMsg::WorkspaceTabsChanged);
             page
         });
@@ -219,19 +246,23 @@ impl App {
         let saved = self
             .connected_database
             .as_deref()
-            .and_then(|database| self.workspace.load_database(connection_id, database));
+            .and_then(|database| self.workspace.load_database(connection_id, database))
+            .filter(|saved| !saved.tabs.is_empty());
         let Some(saved) = saved else {
             self.workspace_outer_stack.set_visible_child_name("empty");
             return;
         };
-        if saved.tabs.is_empty() {
-            self.workspace_outer_stack.set_visible_child_name("empty");
-            return;
-        }
+        let first_page = self.workspace_tab_view.as_ref().map_or(0, |view| view.n_pages());
         for record in &saved.tabs {
             match workspace_state::restored_workspace_tab(record) {
-                Some(workspace_state::RestoredWorkspaceTab::Editor { query, draft_id, file }) => {
+                Some(workspace_state::RestoredWorkspaceTab::Editor {
+                    query,
+                    draft_id,
+                    file,
+                    mark,
+                }) => {
                     self.append_editor_draft(Some(query), draft_id, sender.clone());
+                    self.restore_tab_mark(mark);
                     if let (Some(path), Some(tab)) = (file, self.selected_editor_tab_id()) {
                         self.restore_editor_file(tab, path, sender.clone());
                     }
@@ -243,6 +274,7 @@ impl App {
                     page_size,
                     sort,
                     preview,
+                    mark,
                 }) => {
                     self.append_table_tab(
                         schema,
@@ -250,19 +282,19 @@ impl App {
                         TableTabStart::new(offset, page_size, sort, preview),
                         sender.clone(),
                     );
+                    self.restore_tab_mark(mark);
                 }
-                Some(workspace_state::RestoredWorkspaceTab::Structure { schema, table }) => {
+                Some(workspace_state::RestoredWorkspaceTab::Structure { schema, table, .. }) => {
                     self.append_existing_structure_tab(schema, table, sender.clone());
                 }
                 None => {}
             }
         }
-        if let Some(tab_view) = self.workspace_tab_view.as_ref()
-            && let Some(page) = tab_view.pages().item(saved.active_idx).and_downcast::<adw::TabPage>()
-        {
-            tab_view.set_selected_page(&page);
-        }
+        select_restored_page(self.workspace_tab_view.as_ref(), first_page as u32, saved.active_idx);
         self.workspace_outer_stack.set_visible_child_name("tabs");
+        if let Some(tab_id) = self.selected_editor_tab_id() {
+            self.dispatch_to_editor(tab_id, SqlEditorInput::FocusEditor);
+        }
         if let Some(notice) = omitted_tabs_notice(saved.omitted_tabs) {
             self.show_toast(&notice);
         }
@@ -291,30 +323,12 @@ impl App {
             // New mode has nothing to introspect (no real table yet).
             defer_initial_fetch: false,
         };
-        let controller =
-            crate::ui::structure_tab::StructureTab::builder()
-                .launch(init)
-                .forward(sender.input_sender(), move |out| match out {
-                    crate::ui::structure_tab::StructureTabOutput::DirtyChanged(dirty) => {
-                        AppMsg::StructureTabDirtyChanged(tab_id, dirty)
-                    }
-                    crate::ui::structure_tab::StructureTabOutput::FetchStructure => {
-                        AppMsg::FetchStructureData { tab_id }
-                    }
-                    crate::ui::structure_tab::StructureTabOutput::ExecuteTransaction { statements } => {
-                        AppMsg::ExecuteStructureTransaction { tab_id, statements }
-                    }
-                    crate::ui::structure_tab::StructureTabOutput::DropTableRequested { schema, table } => {
-                        AppMsg::DropTablePrompt { schema, table }
-                    }
-                    crate::ui::structure_tab::StructureTabOutput::ShowToast(msg) => AppMsg::ShowToast(msg),
-                    crate::ui::structure_tab::StructureTabOutput::ShowAlert { title, body } => {
-                        AppMsg::ShowAlert { title, body }
-                    }
-                });
+        let controller = crate::ui::structure_tab::StructureTab::builder()
+            .launch(init)
+            .forward(sender.input_sender(), move |out| structure_output_message(tab_id, out));
 
         let page = tab_view.append(controller.widget());
-        page.set_title(&crate::tr!("New Table"));
+        super::tab_title::set_tab_title(&page, &bookie_app_services::tr!("New Table"));
         write_workspace_tab_id(&page, tab_id);
 
         let slot = super::StructureTabSlot {
@@ -328,6 +342,7 @@ impl App {
         self.workspace_tabs
             .borrow_mut()
             .insert(tab_id, WorkspaceTab::Structure(slot));
+        self.attach_tab_to_front(tab_id);
         tab_view.set_selected_page(&page);
         self.workspace_outer_stack.set_visible_child_name("tabs");
         self.refresh_window_title();
@@ -357,12 +372,7 @@ impl App {
         };
         let tab_id = Uuid::new_v4();
         let driver_id = self.driver_id().to_string();
-        let enum_input_style = self
-            .registry
-            .get(&driver_id)
-            .map_or(bookie_core::EnumInputStyle::RawValue, |driver| {
-                driver.capabilities().enum_input_style
-            });
+        let parse_hooks = crate::ui::browse_tab::hooks_for(&driver_id);
         let browse_filters = self
             .registry
             .get(&driver_id)
@@ -376,7 +386,7 @@ impl App {
             schema: schema.clone(),
             table: table.clone(),
             driver_id,
-            enum_input_style,
+            parse_hooks,
             browse_filters,
             connection_id,
             read_only,
@@ -393,7 +403,8 @@ impl App {
                     AppMsg::OpenReferencedRow { schema, table, filter }
                 }
                 BrowseTabOutput::ChooseReferencedRow(targets) => AppMsg::ChooseReferencedRow(targets),
-                BrowseTabOutput::FetchPage => AppMsg::FetchBrowsePage(tab_id),
+                BrowseTabOutput::FetchPage => AppMsg::FetchBrowsePage(tab_id, false),
+                BrowseTabOutput::AutoRefreshPage => AppMsg::FetchBrowsePage(tab_id, true),
                 BrowseTabOutput::FetchColumns => AppMsg::FetchBrowseColumns(tab_id),
                 BrowseTabOutput::FetchRowCount => AppMsg::FetchBrowseRowCount(tab_id),
                 BrowseTabOutput::FetchCellValue {
@@ -413,7 +424,7 @@ impl App {
                 },
                 BrowseTabOutput::CopyToClipboard(text) => AppMsg::CopyToClipboard(text),
                 BrowseTabOutput::ShowRowAsJson(body) => AppMsg::ShowAlert {
-                    title: crate::tr!("Row as JSON"),
+                    title: bookie_app_services::tr!("Row as JSON"),
                     body,
                 },
                 BrowseTabOutput::ExportResults { result, name, filtered } => AppMsg::ExportResults {
@@ -440,13 +451,15 @@ impl App {
 
         let page = tab_view.append(browse.widget());
         let label = qualified_browse_tab_label(self.sidebar_schemas_distinct(), schema.as_deref(), &table);
-        page.set_title(&label);
+        super::tab_title::set_tab_title(&page, &label);
         if let Some(tip) = browse_tab_tooltip(schema.as_deref(), &table, &label) {
             page.set_tooltip(&tip);
         }
         if preview {
             page.set_indicator_icon(Some(&gio::ThemedIcon::new("document-open-recent-symbolic")));
-            page.set_indicator_tooltip(&crate::tr!("Preview tab. Use the tab menu to keep it open."));
+            page.set_indicator_tooltip(&bookie_app_services::tr!(
+                "Preview tab. Use the tab menu to keep it open."
+            ));
         }
         write_workspace_tab_id(&page, tab_id);
 
@@ -460,6 +473,7 @@ impl App {
         self.workspace_tabs
             .borrow_mut()
             .insert_with_preview(tab_id, WorkspaceTab::Table(slot), preview);
+        self.attach_tab_to_front(tab_id);
         tab_view.set_selected_page(&page);
         self.workspace_outer_stack.set_visible_child_name("tabs");
         self.refresh_window_title();
@@ -495,31 +509,13 @@ impl App {
             column_comment_capability,
             defer_initial_fetch: false,
         };
-        let controller =
-            crate::ui::structure_tab::StructureTab::builder()
-                .launch(init)
-                .forward(sender.input_sender(), move |out| match out {
-                    crate::ui::structure_tab::StructureTabOutput::DirtyChanged(dirty) => {
-                        AppMsg::StructureTabDirtyChanged(tab_id, dirty)
-                    }
-                    crate::ui::structure_tab::StructureTabOutput::FetchStructure => {
-                        AppMsg::FetchStructureData { tab_id }
-                    }
-                    crate::ui::structure_tab::StructureTabOutput::ExecuteTransaction { statements } => {
-                        AppMsg::ExecuteStructureTransaction { tab_id, statements }
-                    }
-                    crate::ui::structure_tab::StructureTabOutput::DropTableRequested { schema, table } => {
-                        AppMsg::DropTablePrompt { schema, table }
-                    }
-                    crate::ui::structure_tab::StructureTabOutput::ShowToast(msg) => AppMsg::ShowToast(msg),
-                    crate::ui::structure_tab::StructureTabOutput::ShowAlert { title, body } => {
-                        AppMsg::ShowAlert { title, body }
-                    }
-                });
+        let controller = crate::ui::structure_tab::StructureTab::builder()
+            .launch(init)
+            .forward(sender.input_sender(), move |out| structure_output_message(tab_id, out));
 
         let page = tab_view.append(controller.widget());
         let title = structure_tab_title(self.sidebar_schemas_distinct(), schema.as_deref(), &table);
-        page.set_title(&title);
+        super::tab_title::set_tab_title(&page, &title);
         write_workspace_tab_id(&page, tab_id);
 
         let slot = super::StructureTabSlot {
@@ -533,6 +529,7 @@ impl App {
         self.workspace_tabs
             .borrow_mut()
             .insert(tab_id, WorkspaceTab::Structure(slot));
+        self.attach_tab_to_front(tab_id);
         tab_view.set_selected_page(&page);
         self.workspace_outer_stack.set_visible_child_name("tabs");
         self.refresh_window_title();
@@ -577,7 +574,7 @@ impl App {
             })
             .forward(sender.input_sender(), move |out| editor_output(tab_id, out));
         let page = tab_view.append(editor.widget());
-        page.set_title(&label);
+        super::tab_title::set_tab_title(&page, &label);
         if let Some(tip) = editor_tab_tooltip(&query, &label) {
             page.set_tooltip(&tip);
         }
@@ -593,6 +590,7 @@ impl App {
         self.workspace_tabs
             .borrow_mut()
             .insert(tab_id, WorkspaceTab::Editor(slot));
+        self.attach_tab_to_front(tab_id);
         tab_view.set_selected_page(&page);
         self.workspace_outer_stack.set_visible_child_name("tabs");
         self.show_in_content_holder(&self.workspace_outer_stack);
@@ -641,14 +639,15 @@ impl App {
         let Some(mut removed) = removed else {
             return;
         };
+        let owner = self.detach_tab_session(id);
         // Snapshot the closed tab into the reopen stack BEFORE running
         // the per-kind teardown below — the BrowseModel still has its
         // pagination + sort state intact, and the EditorTabSlot still
         // owns the latest query buffer. New-mode Structure drafts are
         // skipped because the table they describe doesn't exist yet,
         // so reopening a draft would be useless.
-        if let Some(descriptor) = describe_closed_tab(&mut removed, preview) {
-            push_closed_tab(&self.closed_tabs_stack, descriptor);
+        if let (Some(owner), Some(descriptor)) = (owner, describe_closed_tab(&mut removed, preview)) {
+            push_closed_tab(&self.closed_tabs_stack, owner, descriptor);
         }
         // Drop any close-after-save / window-close-after-save intent
         // pinned to this tab. `close_tabs_for_table` (Drop Table)
@@ -659,7 +658,7 @@ impl App {
         self.close_after_save.borrow_mut().cancel(&id);
         match &removed {
             WorkspaceTab::Editor(slot) => {
-                let _ = slot.controller.sender().send(SqlEditorInput::Cancel);
+                let _ = slot.controller.sender().send(SqlEditorInput::Run(RunMessage::Cancel));
                 self.change_trackers.close_tab(id);
             }
             WorkspaceTab::Structure(slot) => {
@@ -692,16 +691,56 @@ impl App {
         if self.workspace_tabs.borrow().is_empty() {
             self.workspace_outer_stack.set_visible_child_name("empty");
         }
+        focus_after_tab_close(tab_view, &self.workspace_outer_stack);
         self.refresh_schema_index();
         self.refresh_window_title();
+    }
+
+    fn detach_tab_session(&mut self, id: Uuid) -> Option<Uuid> {
+        self.temporary_tables_by_tab.remove(&id);
+        self.multi.sessions.detach_tab(id)
+    }
+}
+
+fn select_restored_page(tab_view: Option<&adw::TabView>, first_page: u32, active_idx: u32) {
+    if let Some(view) = tab_view
+        && let Some(page) = view
+            .pages()
+            .item(first_page.saturating_add(active_idx))
+            .and_downcast::<adw::TabPage>()
+    {
+        view.set_selected_page(&page);
     }
 }
 
 impl App {
+    fn restore_tab_mark(&self, mark: bookie_app_services::tab_mark::TabMark) {
+        if let Some(page) = self.workspace_tab_view.as_ref().and_then(|view| view.selected_page()) {
+            super::tab_title::apply_tab_mark(&page, mark);
+        }
+    }
+
     pub(super) fn selected_workspace_tab_id(&self) -> Option<Uuid> {
         let tab_view = self.workspace_tab_view.as_ref()?;
         let page = tab_view.selected_page()?;
         read_workspace_tab_id(&page)
+    }
+
+    pub(super) fn show_temporary_table(&self, schema: Option<String>, name: String) {
+        let Some(id) = self.selected_workspace_tab_id() else {
+            return;
+        };
+        let tabs = self.workspace_tabs.borrow();
+        let Some(WorkspaceTab::Editor(slot)) = tabs.get(&id) else {
+            return;
+        };
+        let _ = slot
+            .controller
+            .sender()
+            .send(SqlEditorInput::Run(crate::ui::editor::RunMessage::ShowTemporaryTable {
+                schema,
+                name,
+            }));
     }
 
     pub(super) fn selected_browse_tab_id(&self) -> Option<Uuid> {
@@ -796,7 +835,7 @@ impl App {
     pub(super) fn cancel_all_editor_runs(&self) {
         for tab in self.workspace_tabs.borrow().values() {
             if let WorkspaceTab::Editor(s) = tab {
-                let _ = s.controller.sender().send(SqlEditorInput::Cancel);
+                let _ = s.controller.sender().send(SqlEditorInput::Run(RunMessage::Cancel));
             }
         }
     }
@@ -847,17 +886,17 @@ impl App {
             return;
         };
         if let Some((title, tooltip)) = file_details {
-            page.set_title(&title);
+            super::tab_title::set_tab_title(&page, &title);
             page.set_tooltip(&tooltip);
             return;
         }
         let label = if query.trim().is_empty() {
-            crate::tr!("Empty query")
+            bookie_app_services::tr!("Empty query")
         } else {
             derive_tab_label(&query)
         };
         let title = if rows_dirty { format!("• {label}") } else { label };
-        page.set_title(&title);
+        super::tab_title::set_tab_title(&page, &title);
         let is_selected = self
             .workspace_tab_view
             .as_ref()
@@ -870,12 +909,12 @@ impl App {
 
     pub(super) fn on_editor_tab_query_changed(&self, id: Uuid, query: String) {
         let label = if query.trim().is_empty() {
-            crate::tr!("Empty query")
+            bookie_app_services::tr!("Empty query")
         } else {
             derive_tab_label(&query)
         };
         if let Some(WorkspaceTab::Editor(slot)) = self.workspace_tabs.borrow_mut().get_mut(&id) {
-            slot.page.set_title(&label);
+            super::tab_title::set_tab_title(&slot.page, &label);
             // Pass empty when no extra info to clear any prior tooltip;
             // libadwaita treats empty-string as no tooltip.
             let tooltip = editor_tab_tooltip(&query, &label).unwrap_or_default();
@@ -928,16 +967,16 @@ pub(super) fn qualified_browse_tab_label(schemas_count: usize, schema: Option<&s
 
 pub(super) fn structure_tab_title(schemas_count: usize, schema: Option<&str>, table: &str) -> String {
     let title = qualified_browse_tab_label(schemas_count, schema, table);
-    format!("{title} · {}", crate::tr!("Structure"))
+    format!("{title} · {}", bookie_app_services::tr!("Structure"))
 }
 
 fn default_editor_tab_label(n: usize) -> String {
-    crate::tr!("Query {n}").replace("{n}", &n.to_string())
+    bookie_app_services::tr!("Query {n}").replace("{n}", &n.to_string())
 }
 
 fn omitted_tabs_notice(count: u32) -> Option<String> {
     (count > 0).then(|| {
-        crate::tr!("Table tabs not restored: {n}. At most 32 tabs per connection are kept.")
+        bookie_app_services::tr!("Table tabs not restored: {n}. At most 32 tabs per connection are kept.")
             .replace("{n}", &count.to_string())
     })
 }
@@ -970,28 +1009,30 @@ fn browse_tab_tooltip(schema: Option<&str>, table: &str, label: &str) -> Option<
 }
 
 fn push_closed_tab(
-    stack: &std::rc::Rc<std::cell::RefCell<std::collections::VecDeque<ClosedTabDescriptor>>>,
+    stack: &std::rc::Rc<std::cell::RefCell<std::collections::VecDeque<(Uuid, ClosedTabDescriptor)>>>,
+    owner: Uuid,
     descriptor: ClosedTabDescriptor,
 ) {
     let mut q = stack.borrow_mut();
     if q.len() == CLOSED_TABS_CAPACITY {
         q.pop_front();
     }
-    q.push_back(descriptor);
+    q.push_back((owner, descriptor));
 }
 
 impl App {
     pub(super) fn on_reopen_closed_tab(&mut self, sender: ComponentSender<Self>) {
-        if !self.connected {
+        let Some(front) = self.connection_id.filter(|_| self.connected) else {
             return;
-        }
-        let descriptor = self.closed_tabs_stack.borrow_mut().pop_back();
+        };
+        let descriptor =
+            bookie_app_services::window_sessions::take_latest_for(&mut self.closed_tabs_stack.borrow_mut(), front);
         let Some(descriptor) = descriptor else {
             // Stack empty — nothing to reopen. Toast keeps the
             // shortcut from feeling broken when the user hits it
             // before having closed anything (or after a reconnect
             // wiped the stack).
-            self.show_toast(&crate::tr!("No recently closed tab"));
+            self.show_toast(&bookie_app_services::tr!("No recently closed tab"));
             return;
         };
         match descriptor {
@@ -1070,12 +1111,13 @@ fn editor_output(tab_id: Uuid, output: SqlEditorOutput) -> AppMsg {
             schema: None,
             table: None,
         },
+        SqlEditorOutput::TemporaryTablesChanged(tables) => AppMsg::EditorTemporaryTablesChanged(tab_id, tables),
         SqlEditorOutput::RunStateChanged(running) => AppMsg::EditorTabRunStateChanged(tab_id, running),
         SqlEditorOutput::QueryChanged(text) => AppMsg::EditorTabQueryChanged(tab_id, text),
         SqlEditorOutput::CopyToClipboard(text) => AppMsg::CopyToClipboard(text),
         SqlEditorOutput::ShowToast(message) => AppMsg::ShowToast(message),
         SqlEditorOutput::ShowRowAsJson(body) => AppMsg::ShowAlert {
-            title: crate::tr!("Row as JSON"),
+            title: bookie_app_services::tr!("Row as JSON"),
             body,
         },
         SqlEditorOutput::ExportResults { result, name } => AppMsg::ExportResults {
@@ -1084,6 +1126,19 @@ fn editor_output(tab_id: Uuid, output: SqlEditorOutput) -> AppMsg {
             scope: crate::ui::export_dialog::ExportScope::QueryResult,
         },
         SqlEditorOutput::ExportStreamedResults(request) => AppMsg::ExportStreamedResults(request),
+    }
+}
+
+fn structure_output_message(tab_id: Uuid, output: crate::ui::structure_tab::StructureTabOutput) -> AppMsg {
+    use crate::ui::structure_tab::StructureTabOutput as Output;
+    match output {
+        Output::DirtyChanged(dirty) => AppMsg::StructureTabDirtyChanged(tab_id, dirty),
+        Output::FetchStructure => AppMsg::FetchStructureData { tab_id },
+        Output::FetchCollations => AppMsg::FetchCollations { tab_id },
+        Output::ExecuteTransaction { statements } => AppMsg::ExecuteStructureTransaction { tab_id, statements },
+        Output::DropTableRequested { schema, table } => AppMsg::DropTablePrompt { schema, table },
+        Output::ShowToast(message) => AppMsg::ShowToast(message),
+        Output::ShowAlert { title, body } => AppMsg::ShowAlert { title, body },
     }
 }
 
@@ -1125,4 +1180,28 @@ mod default_label_tests {
         with_named.push("SELECT orders".into());
         assert_eq!(first_free_editor_label(with_named), "Query 2");
     }
+}
+
+fn rename_workspace_tab(view: &adw::TabView, page: &adw::TabPage, sender: &ComponentSender<App>) {
+    let sender = sender.clone();
+    super::tab_title::present_rename_dialog(view, page, move |_| sender.input(AppMsg::WorkspaceTabsChanged));
+}
+
+fn rename_shortcut(view: &adw::TabView, sender: &ComponentSender<App>) -> gtk::ShortcutController {
+    let view = view.clone();
+    let sender = sender.clone();
+    let action = gtk::CallbackAction::new(move |_, _| {
+        let Some(page) = view.selected_page() else {
+            return glib::Propagation::Proceed;
+        };
+        rename_workspace_tab(&view, &page, &sender);
+        glib::Propagation::Stop
+    });
+    let controller = gtk::ShortcutController::new();
+    controller.set_propagation_phase(gtk::PropagationPhase::Bubble);
+    controller.add_shortcut(gtk::Shortcut::new(
+        gtk::ShortcutTrigger::parse_string("F2"),
+        Some(action),
+    ));
+    controller
 }

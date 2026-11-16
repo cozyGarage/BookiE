@@ -18,6 +18,7 @@ fn invalid_filter_refuses_both_page_and_count() {
         filter: &filter,
         hidden_columns: None,
         long_text_preview: false,
+        supports_reverse_keyset: true,
     };
     assert!(target.count().unwrap_err().contains("missing"));
     assert!(target.page(0, 100, None, None).unwrap_err().contains("missing"));
@@ -42,6 +43,7 @@ fn page_and_count_share_filter_and_keyset_parameters_follow_it() {
         filter: &filter,
         hidden_columns: None,
         long_text_preview: false,
+        supports_reverse_keyset: true,
     };
     let count = target.count().unwrap();
     let PageQuery::Sql(page) = target.page(10_000, 100, None, Some(&[Value::Int(50)])).unwrap() else {
@@ -76,6 +78,7 @@ fn previous_deep_page_uses_reverse_keyset_and_marks_rows_for_display_reversal() 
         filter: &filter,
         hidden_columns: None,
         long_text_preview: false,
+        supports_reverse_keyset: true,
     };
     let PageQuery::Sql(page) = target
         .page_before(10_000, 100, None, Some(&[Value::Int(2), Value::Int(5)]))
@@ -110,6 +113,7 @@ fn last_deep_page_uses_a_descending_key_window_without_offset() {
         filter: &FilterSet::default(),
         hidden_columns: None,
         long_text_preview: false,
+        supports_reverse_keyset: true,
     };
     let PageQuery::Sql(page) = target.page_last(1_000_000, 100, None).unwrap() else {
         panic!("expected SQL")
@@ -131,6 +135,7 @@ fn unsupported_native_pagers_keep_their_native_offset_path() {
         filter: &FilterSet::default(),
         hidden_columns: None,
         long_text_preview: false,
+        supports_reverse_keyset: false,
     };
 
     assert!(matches!(
@@ -156,6 +161,7 @@ fn explicit_sort_ignores_a_keyset_cursor_and_keeps_offset_pagination() {
         filter: &FilterSet::default(),
         hidden_columns: None,
         long_text_preview: false,
+        supports_reverse_keyset: true,
     };
     let PageQuery::Sql(page) = target
         .page(KEYSET_OFFSET_THRESHOLD, 25, Some((1, true)), Some(&[Value::Int(5)]))
@@ -183,6 +189,7 @@ fn incomplete_composite_cursor_is_ignored_and_keeps_offset_pagination() {
         filter: &FilterSet::default(),
         hidden_columns: None,
         long_text_preview: false,
+        supports_reverse_keyset: true,
     };
     let PageQuery::Sql(page) = target
         .page(KEYSET_OFFSET_THRESHOLD, 25, None, Some(&[Value::Int(5)]))
@@ -209,6 +216,7 @@ fn keyset_cursor_is_ignored_when_the_table_has_no_primary_key() {
         filter: &FilterSet::default(),
         hidden_columns: None,
         long_text_preview: false,
+        supports_reverse_keyset: true,
     };
     let PageQuery::Sql(page) = target
         .page_by_row_id(KEYSET_OFFSET_THRESHOLD, 25, None, Some(&[Value::Int(5)]))

@@ -4,7 +4,7 @@ use super::column::{build_add_column, build_alter_column, build_drop_column, bui
 use super::index_fk::{
     build_add_foreign_key, build_create_index, build_drop_constraint, build_drop_foreign_key, build_drop_index,
 };
-use super::table::{build_create_table, build_rename_table};
+use super::table::{build_create_table_with_default_collation, build_rename_table};
 use super::types::{BuildDdlError, DraftColumn, StructureOp, mssql_drop_default_constraint};
 
 /// Diff a loaded snapshot against the user's current edits and emit
@@ -176,7 +176,7 @@ pub fn diff_to_ops(
             ops.push(StructureOp::AddIndex {
                 schema: schema_owned.clone(),
                 table: table.clone(),
-                index: idx.clone(),
+                index: without_outdated_definition(idx, original_indexes),
             });
         }
     }
@@ -193,6 +193,18 @@ pub fn diff_to_ops(
     }
 
     ops
+}
+
+fn without_outdated_definition(edited: &IndexInfo, original_indexes: &[IndexInfo]) -> IndexInfo {
+    let definition_predates_the_edit = original_indexes.iter().any(|original| {
+        original.using_clause.is_some()
+            && original.using_clause == edited.using_clause
+            && (original.columns != edited.columns || original.predicate != edited.predicate)
+    });
+    IndexInfo {
+        using_clause: edited.using_clause.clone().filter(|_| !definition_predates_the_edit),
+        ..edited.clone()
+    }
 }
 
 pub(super) fn same_index(left: &IndexInfo, right: &IndexInfo) -> bool {
@@ -216,10 +228,19 @@ pub fn materialize_ops(ops: &[StructureOp], driver_id: &str) -> Result<Vec<Strin
         columns,
         indexes,
         fks,
+        default_collation,
     }) = ops.first()
         && ops.len() == 1
     {
-        return build_create_table(driver_id, schema.as_deref(), table, columns, indexes, fks);
+        return build_create_table_with_default_collation(
+            driver_id,
+            schema.as_deref(),
+            table,
+            columns,
+            indexes,
+            fks,
+            default_collation.as_deref(),
+        );
     }
 
     let mut out: Vec<String> = Vec::new();

@@ -13,6 +13,7 @@ IMAGES = ROOT / "ci/test-images.txt"
 TESTCONTAINERS_MODULES_0_15_IMAGES = {
     "Postgres": ("postgres", "11-alpine"),
     "Mysql": ("mysql", "8.1"),
+    "MysqlImage": ("mysql", "8.1"),
     "Mongo": ("mongo", "5.0.6"),
     "MssqlServer": ("mcr.microsoft.com/mssql/server", "2022-CU14-ubuntu-22.04"),
     "Redis": ("redis", "5.0"),
@@ -29,6 +30,12 @@ GROUP_SOURCES = {
     "cassandra": "crates/drivers/cassandra/tests",
     "app-server": "apps/linux/app",
 }
+GROUP_EXTRA_SOURCES = {"app-server": ("crates/policy/tests/session_mssql.rs",)}
+PINNED_TEST_SOURCES = tuple(GROUP_SOURCES.values()) + (
+    "crates/mcp/tests",
+    "crates/policy/tests",
+    "crates/app-services/tests",
+)
 DRIVER_TLS_FIXTURES = ROOT / "tests/fixtures/driver-tls"
 
 MODULE_START = re.compile(r"\b(" + "|".join(TESTCONTAINERS_MODULES_0_15_IMAGES) + r")::default\(\)")
@@ -67,7 +74,9 @@ def module_image(text, match, constants):
 
 
 def started_images(directory):
-    sources = {path: path.read_text(errors="replace") for path in (ROOT / directory).rglob("*.rs")}
+    source = ROOT / directory
+    paths = [source] if source.is_file() else source.rglob("*.rs")
+    sources = {path: path.read_text(errors="replace") for path in paths}
     constants = tag_constants(sources)
     images = set()
     for text in sources.values():
@@ -160,7 +169,9 @@ class PrepullTestImagesTests(unittest.TestCase):
         groups = listed_groups()
         for group, directory in GROUP_SOURCES.items():
             with self.subTest(group=group):
-                self.assertEqual(groups.get(group, set()), started_images(directory))
+                sources = (directory, *GROUP_EXTRA_SOURCES.get(group, ()))
+                expected = set().union(*(started_images(source) for source in sources))
+                self.assertEqual(groups.get(group, set()), expected)
 
     def test_the_tls_group_pulls_all_fixture_and_compose_images(self):
         self.assertEqual(listed_groups().get("driver-tls", set()), fixture_images())
@@ -169,11 +180,12 @@ class PrepullTestImagesTests(unittest.TestCase):
         ci = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         for job, group, command in (
             ("pg-release", "pg-release", "python3 scripts/run-test-layer.py postgres-release"),
-            ("pg-dump", "pg-dump", "python3 scripts/run-test-layer.py pg-dump"),
-            ("socket-ssh", "socket-ssh", "./scripts/test-postgres-socket.sh"),
+            ("driver", "pg-dump", "python3 scripts/run-test-layer.py pg-dump"),
+            ("driver", "socket-ssh", 'python3 scripts/run-test-layer.py "$BOOKIE_TEST_LAYER"'),
             ("driver-tls", "driver-tls", "python3 scripts/run-test-layer.py tls"),
         ):
-            body = re.search(rf"(?ms)^  {job}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", ci).group(1)
+            end_job = "b4-rollback" if job == "driver" else "[a-z][a-z0-9-]*"
+            body = re.search(rf"(?ms)^  {job}:\n(.*?)(?=^  {end_job}:\n|\Z)", ci).group(1)
             prepull = body.index(f"bash src/scripts/prepull-test-images.sh {group}")
             self.assertLess(prepull, body.index(command))
 
@@ -193,20 +205,41 @@ class PrepullTestImagesTests(unittest.TestCase):
         text = "let c = Mysql::default().with_env_var(\"A\", \"b\").start();"
         self.assertEqual(module_image(text, MODULE_START.search(text), {}), "mysql:8.1")
 
+    def test_mysql_mssql_and_redis_tests_pin_their_container_images(self):
+        unpinned = []
+        for directory in PINNED_TEST_SOURCES:
+            for path in (ROOT / directory).rglob("*.rs"):
+                text = path.read_text(errors="replace")
+                for match in MODULE_START.finditer(text):
+                    if match.group(1) not in {"Mysql", "MysqlImage", "MssqlServer", "Redis"}:
+                        continue
+                    chain = text[match.end() : match.end() + 600]
+                    start = chain.find(".start()")
+                    chain = chain[:start] if start >= 0 else chain
+                    if not TAG_ARGUMENT.search(chain):
+                        unpinned.append(path.relative_to(ROOT).as_posix())
+        self.assertEqual(unpinned, [])
+
     def test_the_driver_jobs_pre_pull_before_their_tests(self):
         ci = (ROOT / ".forgejo/workflows/ci.yml").read_text()
-        self.assertIn('bash src/scripts/prepull-test-images.sh "${{ matrix.driver }}"', ci)
+        driver = ci.split("  driver:\n", 1)[1].split("  b4-rollback:\n", 1)[0]
+        group = (ROOT / "scripts/run-driver-group.sh").read_text()
+        self.assertIn("group: [driver-core, driver-analytics]", driver)
+        self.assertIn("group: [driver-extended, socket-ssh]", driver)
+        self.assertIn('mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"', driver)
+        self.assertIn("if: matrix.group == 'socket-ssh'", driver)
+        self.assertIn("needs: [pin-revision, guards, clippy, test-build, driver]", driver)
+        self.assertIn('python3 scripts/run-test-layer.py "$BOOKIE_TEST_LAYER"', driver)
+        self.assertLess(driver.index("bash src/scripts/prepull-test-images.sh socket-ssh"),
+                        driver.index('python3 scripts/run-test-layer.py "$BOOKIE_TEST_LAYER"'))
+        self.assertIn('bash scripts/prepull-test-images.sh "$driver"', group)
+        self.assertLess(group.index('bash scripts/prepull-test-images.sh "$driver"'), group.index("bash scripts/run-rust-tests.sh"))
         self.assertIn("bash src/scripts/prepull-test-images.sh driver-tls", ci)
 
     def test_the_embedded_duckdb_driver_skips_container_image_setup(self):
-        ci = (ROOT / ".forgejo/workflows/ci.yml").read_text()
-        driver = ci.split("  driver:\n", 1)[1].split("  e2e:\n", 1)[0]
-        for step, condition in (
-            ("Docker Hub login", "if: matrix.driver != 'duckdb'"),
-            ("Pre-pull fixture images", "if: ${{ matrix.driver != 'duckdb' }}"),
-        ):
-            block = driver.split(f"- name: {step}\n", 1)[1].split("\n      - name:", 1)[0]
-            self.assertIn(condition, block)
+        group = (ROOT / "scripts/run-driver-group.sh").read_text()
+        self.assertIn('if [[ "$driver" != duckdb ]]; then\n    bash scripts/prepull-test-images.sh "$driver"', group)
+        self.assertIn('if [[ "$driver" == duckdb ]]; then', group)
 
     def test_distro_floor_package_builds_pre_pull_their_base_image(self):
         self.assertEqual(listed_groups().get("distro-floor"), {"debian:testing"})
@@ -218,11 +251,12 @@ class PrepullTestImagesTests(unittest.TestCase):
                 script = (ROOT / "scripts" / name).read_text()
                 self.assertLess(script.index(needle), script.index("docker build"))
 
-    def test_the_github_fast_job_pre_pulls_before_the_app_server_tests(self):
+    def test_the_github_consumers_job_pre_pulls_before_its_database_fixtures(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
-        fast = workflow.split("  fast:\n", 1)[1].split("  gtk-safety:\n", 1)[0]
-        prepull = fast.index("bash scripts/prepull-test-images.sh app-server")
-        self.assertLess(prepull, fast.index("run-test-layer.py app-server"))
+        consumers = workflow.split("  consumers:\n", 1)[1].split("  gtk-build:\n", 1)[0]
+        prepull = consumers.index("bash scripts/prepull-test-images.sh app-server")
+        self.assertLess(prepull, consumers.index("MCP and policy session fixtures"))
+        self.assertLess(prepull, consumers.index("run-test-layer.py app-server"))
 
     def test_the_fast_job_image_can_run_the_pre_pull_script(self):
         dockerfile = (ROOT / "ci/debian-testing-gtk/Dockerfile").read_text()

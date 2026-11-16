@@ -1,7 +1,7 @@
 use bookie_storage::KeyringFailure;
 use bookie_transport::TransportError;
 
-use crate::driver_error_presentation::{DriverFailurePresentation, classify};
+use crate::driver_error_presentation::{DriverFailurePresentation, TlsFailureKind, classify};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OpenFailure {
@@ -15,6 +15,15 @@ pub enum OpenFailure {
 impl OpenFailure {
     pub fn from_driver(error: &bookie_core::DriverError) -> Self {
         Self::Driver(classify(error))
+    }
+}
+
+impl OpenFailure {
+    pub fn tls_failure_kind(&self) -> Option<TlsFailureKind> {
+        match self {
+            Self::Driver(DriverFailurePresentation::Tls { kind, .. }) => Some(*kind),
+            _ => None,
+        }
     }
 }
 
@@ -33,6 +42,16 @@ impl From<TransportError> for OpenFailure {
 mod tests {
     use super::*;
     use bookie_core::DriverError;
+
+    #[test]
+    fn a_tls_failure_keeps_its_kind_and_other_failures_have_none() {
+        let tls = OpenFailure::from(TransportError::Driver(DriverError::Tls(
+            "invalid peer certificate: UnknownIssuer".into(),
+        )));
+        assert_eq!(tls.tls_failure_kind(), Some(TlsFailureKind::UnknownIssuer));
+        let refused = OpenFailure::from(TransportError::Driver(DriverError::ConnectionRefused));
+        assert_eq!(refused.tls_failure_kind(), None);
+    }
 
     #[test]
     fn transport_failures_keep_their_kind_for_the_frontend_to_word() {

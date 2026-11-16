@@ -274,7 +274,7 @@ fn browse_page_fetch_waits_until_the_new_columns_are_applied() {
             schema: Some("public".into()),
             table: "customers".into(),
             driver_id: "postgres".into(),
-            enum_input_style: EnumInputStyle::RawValue,
+            parse_hooks: bookie_app_services::value_input::ParseHooks::without_driver(EnumInputStyle::RawValue),
             browse_filters: true,
             connection_id: None,
             read_only: false,
@@ -343,7 +343,7 @@ fn deep_previous_page_uses_the_first_row_as_its_reverse_keyset_anchor() {
             schema: Some("public".into()),
             table: "items".into(),
             driver_id: "postgres".into(),
-            enum_input_style: EnumInputStyle::RawValue,
+            parse_hooks: bookie_app_services::value_input::ParseHooks::without_driver(EnumInputStyle::RawValue),
             browse_filters: true,
             connection_id: None,
             read_only: false,
@@ -371,6 +371,7 @@ fn deep_previous_page_uses_the_first_row_as_its_reverse_keyset_anchor() {
                 truncated: false,
             },
             projected_columns: None,
+            elapsed: std::time::Duration::ZERO,
         })
         .unwrap();
     spin_until(&context, || controller.model().current_result.is_some());
@@ -419,7 +420,7 @@ fn browse_next_page_is_disabled_when_known_total_matches_page_end() {
             schema: Some("main".into()),
             table: "items".into(),
             driver_id: "sqlite".into(),
-            enum_input_style: EnumInputStyle::RawValue,
+            parse_hooks: bookie_app_services::value_input::ParseHooks::without_driver(EnumInputStyle::RawValue),
             browse_filters: true,
             connection_id: None,
             read_only: false,
@@ -448,6 +449,7 @@ fn browse_next_page_is_disabled_when_known_total_matches_page_end() {
                 truncated: false,
             },
             projected_columns: None,
+            elapsed: std::time::Duration::ZERO,
         })
         .unwrap();
     spin_until(&context, || controller.model().current_result.is_some());
@@ -513,6 +515,15 @@ fn pasted_null_and_empty_text_stay_distinct() {
         parse_pasted_cell(Some("7"), Some(&count), "postgres", None),
         Ok(Value::Int(7))
     );
+}
+
+#[test]
+fn blank_grid_and_paste_inputs_refuse_a_not_null_defaulted_value() {
+    let mut timestamp = column("created_at", "timestamp", false);
+    timestamp.nullable = false;
+    timestamp.default_value = Some("CURRENT_TIMESTAMP".into());
+    assert!(parse_grid_cell_input("", Some(&timestamp), "postgres", None).is_err());
+    assert!(parse_pasted_cell(Some(""), Some(&timestamp), "postgres", None).is_err());
 }
 
 #[test]
@@ -1138,7 +1149,7 @@ fn a_closed_browse_tab_releases_its_root_widget() {
             schema: Some("public".into()),
             table: "customers".into(),
             driver_id: "postgres".into(),
-            enum_input_style: EnumInputStyle::RawValue,
+            parse_hooks: bookie_app_services::value_input::ParseHooks::without_driver(EnumInputStyle::RawValue),
             browse_filters: true,
             connection_id: None,
             read_only: true,

@@ -8,7 +8,23 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 
 
+def clean_test_environment(**values):
+    environment = os.environ.copy()
+    for key in ("BOOKIE_REQUIRE_PREBUILT", "BOOKIE_TEST_BUNDLE", "BOOKIE_SOURCE_COMMIT"):
+        environment.pop(key, None)
+    environment.update(values)
+    return environment
+
+
 class TlsStartupTests(unittest.TestCase):
+    def test_mongodb_healthcheck_uses_a_name_in_the_server_certificate(self):
+        compose = (ROOT / "tests/fixtures/driver-tls/docker-compose.yml").read_text()
+        mongo = compose.split("  redis:", 1)[0]
+        generator = (ROOT / "tests/fixtures/driver-tls/generate-materials.sh").read_text()
+
+        self.assertIn("        - --host\n        - mongo.bookie.test", mongo)
+        self.assertIn("DNS:mongo.bookie.test", generator)
+
     def prepare_fixture(self, root):
         (root / "scripts").mkdir()
         fixture = root / "tests/fixtures/driver-tls"
@@ -50,9 +66,12 @@ if any(action in args for action in ["ps", "inspect", "logs"]):
             log = root / "commands"
             result = subprocess.run(
                 ["bash", str(root / "scripts/test-driver-tls.sh")],
-                env=dict(os.environ, PATH=f"{binary}:{os.environ['PATH']}",
-                         TLS_COMMAND_LOG=str(log), TLS_DIAGNOSTIC_EXIT=str(diagnostic_exit),
-                         BOOKIE_FIXTURE_KEEP_UP="0"),
+                env=clean_test_environment(
+                    PATH=f"{binary}:{os.environ['PATH']}",
+                    TLS_COMMAND_LOG=str(log),
+                    TLS_DIAGNOSTIC_EXIT=str(diagnostic_exit),
+                    BOOKIE_FIXTURE_KEEP_UP="0",
+                ),
                 text=True, capture_output=True,
             )
             self.assertTrue(log.exists(), result.stderr)
@@ -101,8 +120,11 @@ if "up" in sys.argv:
                 command.chmod(0o755)
             result = subprocess.run(
                 ["bash", str(root / "scripts/test-driver-tls.sh")],
-                env=dict(os.environ, PATH=f"{binary}:{os.environ['PATH']}",
-                         TLS_FIXTURE_ROOT=str(fixture), BOOKIE_FIXTURE_KEEP_UP="0"),
+                env=clean_test_environment(
+                    PATH=f"{binary}:{os.environ['PATH']}",
+                    TLS_FIXTURE_ROOT=str(fixture),
+                    BOOKIE_FIXTURE_KEEP_UP="0",
+                ),
                 umask=0o077, text=True, capture_output=True, check=False,
             )
             self.assertEqual(result.returncode, 0, result.stderr)

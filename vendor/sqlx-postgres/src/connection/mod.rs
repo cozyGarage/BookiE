@@ -21,7 +21,7 @@ use crate::{PgConnectOptions, PgTypeInfo, PgValueFormat, Postgres};
 pub(crate) use sqlx_core::connection::*;
 use sqlx_core::sql_str::SqlSafeStr;
 
-pub use self::stream::PgStream;
+pub use self::stream::{PgServerNotice, PgStream};
 
 #[cfg(feature = "offline")]
 mod describe;
@@ -118,6 +118,12 @@ impl PgConnection {
     }
 
     /// the version number of the server in `libpq` format
+    pub fn take_server_notices(&mut self) -> (Vec<PgServerNotice>, u64) {
+        let notices = std::mem::take(&mut self.inner.stream.server_notices);
+        let dropped = std::mem::take(&mut self.inner.stream.dropped_server_notices);
+        (notices, dropped)
+    }
+
     pub fn server_version_num(&self) -> Option<u32> {
         self.inner.stream.server_version_num
     }

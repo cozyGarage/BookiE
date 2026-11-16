@@ -16,9 +16,9 @@ use sqlx::{
 use futures::stream::StreamExt;
 
 use bookie_core::{
-    ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, ExecResult, ForeignKeyInfo,
-    InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBudget, QueryRows,
-    TableInfo, Value, check_pre_dispatch, run_controlled_setup, run_server_cancellable,
+    ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverValueInputCapabilities, ExecResult,
+    ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBudget,
+    QueryRows, TableInfo, Value, check_pre_dispatch, run_controlled_setup, run_server_cancellable,
 };
 
 mod drop_guard;
@@ -32,8 +32,27 @@ pub struct SqliteDriver;
 
 #[async_trait]
 impl DatabaseDriver for SqliteDriver {
+    fn value_input_capabilities(&self) -> DriverValueInputCapabilities {
+        DriverValueInputCapabilities {
+            numeric_affinity_input: true,
+            heterogeneous_cell_values: true,
+            ..DriverValueInputCapabilities::default()
+        }
+    }
+
     fn id(&self) -> &'static str {
         "sqlite"
+    }
+
+    fn supports_value_search(&self) -> bool {
+        true
+    }
+    fn supports_reverse_keyset(&self) -> bool {
+        true
+    }
+
+    fn import_upsert(&self) -> bookie_core::ImportUpsertStyle {
+        bookie_core::ImportUpsertStyle::OnConflict
     }
 
     fn display_name(&self) -> &'static str {
@@ -79,10 +98,7 @@ impl DatabaseDriver for SqliteDriver {
         } else {
             let path = std::path::Path::new(&opts.database);
             if !path.exists() {
-                return Err(DriverError::Internal(format!(
-                    "database file does not exist: {}",
-                    opts.database
-                )));
+                return Err(DriverError::DatabaseFileNotFound(opts.database.clone()));
             }
             SqliteConnectOptions::new().filename(&opts.database)
         };
@@ -96,7 +112,7 @@ impl DatabaseDriver for SqliteDriver {
             .after_connect(move |conn, _| {
                 let attached = attached_for_pool.clone();
                 Box::pin(async move {
-                    attach_databases_to_connection(conn, &attached).await;
+                    attach_databases_to_connection(conn, &attached).await?;
                     Ok(())
                 })
             })
@@ -114,7 +130,7 @@ impl DatabaseDriver for SqliteDriver {
 pub(crate) async fn attach_databases_to_connection(
     conn: &mut SqlxSqliteConnection,
     attached: &[bookie_core::AttachedDatabase],
-) {
+) -> Result<(), sqlx::Error> {
     for db in attached {
         let expanded = expand_tilde(&db.path);
         if std::path::Path::new(&expanded).exists() {
@@ -123,9 +139,10 @@ pub(crate) async fn attach_databases_to_connection(
                 expanded.replace('\'', "''"),
                 quote_ident(&db.name)
             );
-            let _ = sqlx::query(sqlx::AssertSqlSafe(sql)).execute(&mut *conn).await;
+            sqlx::query(sqlx::AssertSqlSafe(sql)).execute(&mut *conn).await?;
         }
     }
+    Ok(())
 }
 
 fn expand_tilde(path: &str) -> String {
@@ -329,13 +346,21 @@ impl Connection for SqliteConnection {
         offset: u64,
         limit: u64,
     ) -> Result<QueryResult, DriverError> {
-        let table_ref = match schema {
-            Some(s) => format!("{}.{}", quote_ident(s), quote_ident(table)),
-            None => quote_ident(table),
-        };
-        let sql = format!("SELECT * FROM {table_ref} LIMIT {limit} OFFSET {offset}");
+        let sql = rows_page_sql(schema, table, offset, limit);
         let mut connection = self.pool.acquire().await.map_err(map_sqlx_error)?;
         stream_into_result(&mut connection, &sql, limit as usize).await
+    }
+
+    async fn fetch_rows_controlled(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        offset: u64,
+        limit: u64,
+        control: &OperationControl,
+    ) -> Result<QueryResult, DriverError> {
+        self.query_controlled(&rows_page_sql(schema, table, offset, limit), control)
+            .await
     }
 
     async fn query(&self, sql: &str) -> Result<QueryResult, DriverError> {
@@ -428,6 +453,38 @@ impl Connection for SqliteConnection {
         transaction::execute_in_transaction_checked(&self.pool, statements, expect_one).await
     }
 
+    async fn execute_in_transaction_controlled(
+        &self,
+        statements: &[(String, Vec<Value>)],
+        control: &OperationControl,
+    ) -> Result<Vec<u64>, DriverError> {
+        self.execute_in_transaction_checked_controlled(statements, &[], control)
+            .await
+    }
+
+    async fn execute_in_transaction_checked_controlled(
+        &self,
+        statements: &[(String, Vec<Value>)],
+        expect_one: &[usize],
+        control: &OperationControl,
+    ) -> Result<Vec<u64>, DriverError> {
+        let mut connection = acquire_controlled(&self.pool, control).await?;
+        let handle = InterruptHandle::of(&mut connection).await?;
+        let result = run_server_cancellable(
+            transaction::execute_in_transaction_on(&mut connection, statements, expect_one, &|| {
+                control.cancellation_token().is_cancelled()
+            }),
+            request_interrupt(&handle),
+            confirms_cancellation,
+            control,
+        )
+        .await;
+        drop(handle);
+        let result = settle_stopped_transaction(&mut connection, result).await;
+        release_connection(connection, &result).await;
+        result
+    }
+
     async fn fetch_indexes(&self, schema: Option<&str>, table: &str) -> Result<Vec<IndexInfo>, DriverError> {
         // SQLite catalog access is via PRAGMAs — they're scoped to the
         // current database file (no schema parameter needed). For each
@@ -454,14 +511,13 @@ impl Connection for SqliteConnection {
             let unique: i64 = r.try_get(2).unwrap_or(0);
             let origin: String = r.try_get(3).unwrap_or_default();
             let primary = origin == "pk";
-            if primary {
-                saw_primary = true;
-            }
+            saw_primary |= primary;
             let keys = index_keys(&mut connection, target_schema, &name).await?;
             out.push(IndexInfo {
                 constraint: None,
                 name,
                 has_expression_key: keys.iter().any(Option::is_none),
+                using_clause: None,
                 columns: keys
                     .into_iter()
                     .map(|key| key.unwrap_or_else(|| "(expression)".into()))
@@ -485,6 +541,7 @@ impl Connection for SqliteConnection {
                     primary: true,
                     predicate: None,
                     has_expression_key: false,
+                    using_clause: None,
                 });
             }
         }
@@ -540,18 +597,23 @@ impl Connection for SqliteConnection {
 
     async fn fetch_inbound_foreign_keys(
         &self,
-        _schema: Option<&str>,
+        schema: Option<&str>,
         table: &str,
     ) -> Result<Vec<InboundForeignKeyInfo>, DriverError> {
+        let target_schema = schema.unwrap_or("main");
         let tables = self.list_tables().await?;
         let mut inbound = Vec::new();
         for t in tables {
-            let fks = self.fetch_foreign_keys(None, &t.name).await?;
+            let source_schema = t.schema.as_deref().unwrap_or("main");
+            if !source_schema.eq_ignore_ascii_case(target_schema) {
+                continue;
+            }
+            let fks = self.fetch_foreign_keys(Some(source_schema), &t.name).await?;
             for fk in fks {
                 if fk.ref_table.eq_ignore_ascii_case(table) {
                     inbound.push(InboundForeignKeyInfo {
                         name: fk.name,
-                        source_schema: None,
+                        source_schema: t.schema.clone(),
                         source_table: t.name.clone(),
                         source_columns: fk.columns,
                         target_columns: fk.ref_columns,
@@ -594,29 +656,126 @@ struct SqliteTransaction {
     tx: Option<sqlx::Transaction<'static, Sqlite>>,
 }
 
+impl Drop for SqliteTransaction {
+    fn drop(&mut self) {
+        if let Some(tx) = self.tx.take()
+            && let Ok(runtime) = tokio::runtime::Handle::try_current()
+        {
+            runtime.spawn(transaction::rollback_transaction(tx));
+        }
+    }
+}
+
+impl SqliteTransaction {
+    fn open(&mut self) -> Result<&mut sqlx::Transaction<'static, Sqlite>, DriverError> {
+        self.tx
+            .as_mut()
+            .ok_or_else(|| DriverError::Internal("transaction closed".into()))
+    }
+
+    async fn settle_stop<T>(&mut self, result: &Result<T, DriverError>) {
+        let stopped = matches!(
+            result,
+            Err(DriverError::Cancelled | DriverError::TimedOut | DriverError::OperationOutcomeUnknown { .. })
+        );
+        if !stopped {
+            return;
+        }
+        let uncertain = matches!(result, Err(DriverError::OperationOutcomeUnknown { .. }));
+        let Some(tx) = self.tx.as_mut() else {
+            return;
+        };
+        if !uncertain && matches!(interrupt::in_autocommit_mode(tx).await, Ok(false)) {
+            return;
+        }
+        if let Some(tx) = self.tx.take() {
+            let rollback = tokio::spawn(transaction::rollback_transaction(tx));
+            if !uncertain {
+                let _ = rollback.await;
+            }
+        }
+    }
+}
+
 #[async_trait]
 impl bookie_core::Transaction for SqliteTransaction {
     async fn query(&mut self, sql: &str) -> Result<QueryResult, DriverError> {
-        let tx = self
-            .tx
-            .as_mut()
-            .ok_or_else(|| DriverError::Internal("transaction closed".into()))?;
-        stream_into_result(tx, sql, MAX_QUERY_ROWS).await
+        stream_into_result(self.open()?, sql, MAX_QUERY_ROWS).await
+    }
+
+    async fn query_controlled(&mut self, sql: &str, control: &OperationControl) -> Result<QueryResult, DriverError> {
+        let tx = self.open()?;
+        let handle = InterruptHandle::of(tx).await?;
+        let result = run_server_cancellable(
+            stream_into_result(tx, sql, MAX_QUERY_ROWS),
+            request_interrupt(&handle),
+            confirms_cancellation,
+            control,
+        )
+        .await;
+        drop(handle);
+        self.settle_stop(&result).await;
+        result
+    }
+
+    async fn query_params_controlled(
+        &mut self,
+        sql: &str,
+        params: &[Value],
+        control: &OperationControl,
+    ) -> Result<QueryResult, DriverError> {
+        if params.is_empty() {
+            return self.query_controlled(sql, control).await;
+        }
+        Err(DriverError::Unsupported(
+            "query_params is not implemented for this transaction".into(),
+        ))
     }
 
     async fn execute(&mut self, sql: &str) -> Result<ExecResult, DriverError> {
-        let tx = self
-            .tx
-            .as_mut()
-            .ok_or_else(|| DriverError::Internal("transaction closed".into()))?;
-        execute_on(tx, sql, &[]).await
+        execute_on(self.open()?, sql, &[]).await
+    }
+
+    async fn execute_params_controlled(
+        &mut self,
+        sql: &str,
+        params: &[Value],
+        control: &OperationControl,
+    ) -> Result<ExecResult, DriverError> {
+        if params.is_empty() {
+            return self.execute_controlled(sql, control).await;
+        }
+        Err(DriverError::Unsupported(
+            "execute_params is not implemented for this transaction".into(),
+        ))
+    }
+
+    async fn execute_controlled(&mut self, sql: &str, control: &OperationControl) -> Result<ExecResult, DriverError> {
+        let tx = self.open()?;
+        let handle = InterruptHandle::of(tx).await?;
+        let result = run_server_cancellable(
+            execute_on(tx, sql, &[]),
+            request_interrupt(&handle),
+            confirms_cancellation,
+            control,
+        )
+        .await;
+        drop(handle);
+        self.settle_stop(&result).await;
+        result
     }
 
     async fn commit(mut self: Box<Self>) -> Result<(), DriverError> {
-        let tx = self
+        let mut tx = self
             .tx
             .take()
             .ok_or_else(|| DriverError::Internal("transaction closed".into()))?;
+        if matches!(interrupt::in_autocommit_mode(&mut tx).await, Ok(true)) {
+            let _ = transaction::rollback_transaction(tx).await;
+            return Err(DriverError::Internal(
+                "the transaction ended before it was committed".into(),
+            ));
+        }
         tx.commit().await.map_err(map_sqlx_error)
     }
 
@@ -625,7 +784,34 @@ impl bookie_core::Transaction for SqliteTransaction {
             .tx
             .take()
             .ok_or_else(|| DriverError::Internal("transaction closed".into()))?;
-        tx.rollback().await.map_err(map_sqlx_error)
+        transaction::rollback_transaction(tx).await.map_err(map_sqlx_error)
+    }
+
+    async fn rollback_controlled(mut self: Box<Self>, control: &OperationControl) -> Result<(), DriverError> {
+        check_pre_dispatch(control)?;
+        let tx = self
+            .tx
+            .take()
+            .ok_or_else(|| DriverError::Internal("transaction closed".into()))?;
+        let mut rollback = tokio::spawn(transaction::rollback_transaction(tx));
+        let expiry = async {
+            match control.deadline() {
+                Some(deadline) => tokio::time::sleep_until(deadline).await,
+                None => std::future::pending::<()>().await,
+            }
+        };
+        tokio::select! {
+            biased;
+            () = control.cancellation_token().cancelled() => Err(DriverError::OperationOutcomeUnknown {
+                source: Box::new(DriverError::Cancelled),
+            }),
+            () = expiry => Err(DriverError::OperationOutcomeUnknown {
+                source: Box::new(DriverError::TimedOut),
+            }),
+            joined = &mut rollback => joined
+                .map_err(|error| DriverError::Internal(format!("sqlite rollback task failed: {error}")))?
+                .map_err(map_sqlx_error),
+        }
     }
 }
 
@@ -1067,6 +1253,14 @@ fn exact_real(decimal: &rust_decimal::Decimal) -> Option<f64> {
     digits.parse::<f64>().ok().filter(|real| real.to_string() == digits)
 }
 
+fn rows_page_sql(schema: Option<&str>, table: &str, offset: u64, limit: u64) -> String {
+    let table_ref = match schema {
+        Some(s) => format!("{}.{}", quote_ident(s), quote_ident(table)),
+        None => quote_ident(table),
+    };
+    format!("SELECT * FROM {table_ref} LIMIT {limit} OFFSET {offset}")
+}
+
 fn quote_ident(name: &str) -> String {
     format!("\"{}\"", name.replace('"', "\"\""))
 }
@@ -1148,13 +1342,40 @@ async fn request_interrupt(handle: &InterruptHandle) -> Result<(), DriverError> 
 /// reports the extended result code, so both the plain code and an
 /// extended code in the same family have to be accepted.
 fn confirms_cancellation(error: &DriverError) -> bool {
-    let DriverError::Query { message, sqlstate, .. } = error else {
-        return false;
-    };
-    if sqlstate.as_deref() == Some("9") {
-        return true;
+    match error {
+        DriverError::Transaction { source, .. } => confirms_cancellation(source),
+        DriverError::Cancelled => true,
+        DriverError::Query { message, sqlstate, .. } => {
+            sqlstate.as_deref() == Some("9") || message.to_lowercase().contains("interrupted")
+        }
+        _ => false,
     }
-    message.to_lowercase().contains("interrupted")
+}
+
+async fn settle_stopped_transaction<T>(
+    connection: &mut PoolConnection<Sqlite>,
+    result: Result<T, DriverError>,
+) -> Result<T, DriverError> {
+    let Err(error) = &result else {
+        return result;
+    };
+    let rollback_raced_the_stop = matches!(
+        error,
+        DriverError::OperationOutcomeUnknown { source }
+            if matches!(
+                source.as_ref(),
+                DriverError::TransactionRollbackFailed { source, .. }
+                    if matches!(source.as_ref(), DriverError::Cancelled)
+            )
+    );
+    if matches!(error, DriverError::OperationOutcomeUnknown { .. }) && !rollback_raced_the_stop {
+        return result;
+    }
+    let _ = sqlx::query("ROLLBACK").execute(&mut **connection).await;
+    if rollback_raced_the_stop && matches!(interrupt::in_autocommit_mode(connection).await, Ok(true)) {
+        return Err(DriverError::Cancelled);
+    }
+    result
 }
 
 async fn release_connection<T>(connection: PoolConnection<Sqlite>, result: &Result<T, DriverError>) {

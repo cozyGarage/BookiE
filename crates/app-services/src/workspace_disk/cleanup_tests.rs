@@ -5,6 +5,7 @@ fn workspace(ids: &[Uuid]) -> ConnectionWorkspaceState {
         tabs: ids
             .iter()
             .map(|id| WorkspaceTabRecord::Editor {
+                mark: Default::default(),
                 query: format!("SELECT '{id}'"),
                 draft_id: Some(*id),
                 file: None,
@@ -141,6 +142,7 @@ fn changed_bodies_survive_a_failed_metadata_publish_and_retry_without_orphan_gro
         std::os::unix::fs::symlink(&original, &path).unwrap();
         let mut changed = workspace(&[draft]);
         changed.tabs[0] = WorkspaceTabRecord::Editor {
+            mark: Default::default(),
             query: "SELECT 'changed body'".into(),
             draft_id: Some(draft),
             file: None,

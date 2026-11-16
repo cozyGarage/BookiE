@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 use bookie_app_services::window_sessions::{GuardedSessionMap, WindowSessions};
 use bookie_core::TableInfo;
@@ -22,6 +22,7 @@ pub(super) struct MultiSessionState {
     pub sessions: WindowSessions,
     pub guards: GuardedSessionMap,
     pub catalogs: HashMap<Uuid, SessionCatalog>,
+    pub restore_queue: VecDeque<Uuid>,
 }
 
 pub(super) fn opens_additional_session(connected: bool, front: Option<Uuid>, target: Uuid) -> bool {
@@ -61,23 +62,6 @@ impl App {
         );
     }
 
-    pub(super) fn claim_orphan_tabs(&mut self, connection_id: Uuid) {
-        let tab_ids: Vec<Uuid> = self.workspace_tabs.borrow().keys().copied().collect();
-        for tab_id in tab_ids {
-            if self.multi.sessions.connection_for_tab(tab_id).is_some() {
-                continue;
-            }
-            let _ = self.multi.sessions.attach_tab(tab_id, connection_id);
-        }
-    }
-
-    pub(super) fn sync_orphan_tabs_to_front(&mut self) {
-        let Some(front) = self.multi.sessions.front() else {
-            return;
-        };
-        self.claim_orphan_tabs(front);
-    }
-
     pub(super) fn focus_working_session(&mut self, connection_id: Uuid, sender: ComponentSender<Self>) {
         if !self.multi.sessions.is_working(connection_id) {
             return;
@@ -93,19 +77,23 @@ impl App {
         if !self.multi.sessions.focus_working(connection_id) {
             return;
         }
+        self.do_persist_workspace_state_now();
         self.connection_id = Some(connection_id);
+        self.set_last_connection_id(Some(connection_id), sender.clone());
         self.overview_front_connection_id.set(Some(connection_id));
         self.workspace_save_token = Some(self.workspace.connection_save_token(connection_id));
         let metadata = self.database.metadata(connection_id);
         self.current_driver_id = metadata.as_ref().map(|metadata| metadata.driver_id.clone());
+        self.sync_health_report_action();
         self.read_only = metadata.as_ref().map(|metadata| metadata.read_only).unwrap_or(false);
         self.read_only_badge.set_visible(self.read_only);
         let catalog = self.multi.catalogs.get(&connection_id).cloned();
         self.connected_database = catalog.as_ref().map(|catalog| catalog.database.clone());
+        self.restore_sidebar_state();
         if let Some(catalog) = catalog {
             self.sidebar_views = catalog.views;
             self.reset_sidebar_catalog();
-            self.repopulate_sidebar(&catalog.tables);
+            self.repopulate_sidebar(&catalog.tables, sender.clone());
             self.rebuild_schema_filter_popover(&sender);
             self.refresh_schema_index();
         }
@@ -118,7 +106,6 @@ impl App {
     }
 
     pub(super) fn follow_selected_tab_session(&mut self, sender: ComponentSender<Self>) {
-        self.sync_orphan_tabs_to_front();
         let Some(tab_id) = self.selected_workspace_tab_id() else {
             return;
         };
@@ -153,7 +140,7 @@ impl App {
                 .and_then(|id| self.database.metadata(id))
                 .map(|metadata| metadata.name);
             let title = connection_aware_tab_title(&base, connection_name.as_deref(), name_with_connection);
-            page.set_title(&title);
+            super::tab_title::set_tab_title(page, &title);
         }
     }
 
@@ -188,12 +175,22 @@ impl App {
         true
     }
 
-    pub(super) fn drop_working_session(&mut self, connection_id: Uuid, sender: ComponentSender<Self>) {
-        let closed_tabs = self.multi.sessions.disconnect(connection_id);
+    pub(super) fn release_connection_resources(&mut self, connection_id: Uuid) {
         self.multi.guards.remove(connection_id);
         self.multi.catalogs.remove(&connection_id);
         self.database.close(connection_id);
+        crate::services::approval_grants::shared().revoke_connection(connection_id);
         crate::services::window_registry::unregister(connection_id);
+    }
+
+    pub(super) fn drop_working_session(&mut self, connection_id: Uuid, sender: ComponentSender<Self>) {
+        self.do_persist_workspace_state_now();
+        self.closed_tabs_stack
+            .borrow_mut()
+            .retain(|(owner, _)| *owner != connection_id);
+        let closed_tabs = self.multi.sessions.disconnect(connection_id);
+        self.release_connection_resources(connection_id);
+        self.persist_open_sessions(sender.clone());
         for tab_id in closed_tabs {
             sender.input(AppMsg::FinishCloseWorkspaceTab(tab_id));
         }
@@ -209,6 +206,7 @@ impl App {
                 self.workspace_save_token = None;
                 self.connected_database = None;
                 self.current_driver_id = None;
+                self.sync_health_report_action();
                 self.read_only = false;
                 self.read_only_badge.set_visible(false);
                 self.databases_button.set_visible(false);
@@ -264,6 +262,10 @@ fn strip_connection_title_suffix(
 pub(super) fn overview_new_tab_connection(front: &std::cell::Cell<Option<Uuid>>) -> Option<Uuid> {
     front.get()
 }
+
+#[cfg(test)]
+#[path = "multi_session_gtk_tests.rs"]
+mod gtk_tests;
 
 #[cfg(test)]
 mod tests {

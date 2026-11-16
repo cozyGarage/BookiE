@@ -255,6 +255,7 @@ mod tests {
             elapsed_ms: 0,
             kind,
             pinned: false,
+            detail: Default::default(),
         };
         let outcomes = [
             outcome(StatementOutcomeKind::Rows(Vec::new())),

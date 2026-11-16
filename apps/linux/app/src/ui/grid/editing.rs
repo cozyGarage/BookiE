@@ -229,6 +229,15 @@ fn focused_cell_editor(view: &gtk::Widget) -> Option<CellEditor> {
     cell_editor_ancestor(&focused)
 }
 
+fn edit_focused_neighbour(cell: &CellEditor, triggers: &[Option<CellEditTrigger>]) {
+    let Some(next_cell) = focused_cell_editor(cell.upcast_ref()).filter(|next| next != cell) else {
+        return;
+    };
+    if let Some(trigger) = cell_edit_trigger(&next_cell, triggers) {
+        trigger(&next_cell);
+    }
+}
+
 fn handle_cell_key(
     cell: &CellEditor,
     keyval: gtk::gdk::Key,
@@ -244,11 +253,13 @@ fn handle_cell_key(
         gtk::gdk::Key::Tab if !shift => {
             cell.stop_editing(true);
             move_focus(cell, gtk::DirectionType::TabForward);
+            edit_focused_neighbour(cell, triggers);
             glib::Propagation::Stop
         }
         gtk::gdk::Key::Tab | gtk::gdk::Key::ISO_Left_Tab if shift => {
             cell.stop_editing(true);
             move_focus(cell, gtk::DirectionType::TabBackward);
+            edit_focused_neighbour(cell, triggers);
             glib::Propagation::Stop
         }
         _ => glib::Propagation::Proceed,
@@ -441,10 +452,10 @@ fn show_json_popover(label: &CellEditor, col_index: usize, sender: &relm4::Sende
         .has_frame(true)
         .build();
 
-    let save_button = gtk::Button::with_label(&crate::tr!("Save"));
+    let save_button = gtk::Button::with_label(&bookie_app_services::tr!("Save"));
     save_button.add_css_class("suggested-action");
 
-    let cancel_button = gtk::Button::with_label(&crate::tr!("Cancel"));
+    let cancel_button = gtk::Button::with_label(&bookie_app_services::tr!("Cancel"));
 
     let button_box = gtk::Box::builder()
         .orientation(gtk::Orientation::Horizontal)

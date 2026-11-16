@@ -17,6 +17,14 @@ if ! docker compose version >/dev/null 2>&1; then
 fi
 
 KEEP_UP="${BOOKIE_FIXTURE_KEEP_UP:-0}"
+if [[ "${BOOKIE_DRIVER_TLS_HOST:-}" == "host.docker.internal" && -z "${BOOKIE_DRIVER_TLS_WRONG_IDENTITY_HOST:-}" ]]; then
+  BOOKIE_DRIVER_TLS_WRONG_IDENTITY_HOST="$(getent ahostsv4 "$BOOKIE_DRIVER_TLS_HOST" | awk 'NR == 1 { print $1; exit}' || true)"
+  if [[ -z "$BOOKIE_DRIVER_TLS_WRONG_IDENTITY_HOST" ]]; then
+    echo "could not resolve the Docker fixture host address: $BOOKIE_DRIVER_TLS_HOST" >&2
+    exit 1
+  fi
+  export BOOKIE_DRIVER_TLS_WRONG_IDENTITY_HOST
+fi
 XDG_CONFIG_HOME="$(mktemp -d)"
 export XDG_CONFIG_HOME
 trap teardown EXIT

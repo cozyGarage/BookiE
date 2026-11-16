@@ -26,7 +26,7 @@ def source_identity():
 
 def digest(path):
     if path.is_symlink() or not path.is_file():
-        raise ValueError("Build artifact must contain a regular binary file")
+        raise ValueError("Build artifact must contain a regular file")
     if not 0 < path.stat().st_size <= 512 * 1024 * 1024:
         raise ValueError("Build artifact binary size is outside the supported limit")
     with path.open("rb") as binary:
@@ -79,7 +79,9 @@ def verify_toolkit_runtime(required, current):
             raise ValueError(f"Build artifact toolkit runtime is incompatible: {package}")
 
 
-def create(binary, output, expected_sha, *, package=False):
+def create(binary, output, expected_sha, *, package=False, profile="ci"):
+    if profile not in {"ci", "dist"}:
+        raise ValueError("Build artifact profile must be ci or dist")
     if source_identity() != expected_sha:
         raise ValueError("Build artifact source does not match the requested commit")
     binary_digest = digest(binary)
@@ -87,9 +89,28 @@ def create(binary, output, expected_sha, *, package=False):
         raise ValueError("Build artifact output must be a regular directory")
     output.mkdir(parents=True, exist_ok=True)
     filename = "bookie.deb" if package else "bookie"
+    schemas = output / "schemas"
+    if schemas.exists() or schemas.is_symlink():
+        schema_files = list(schemas.iterdir()) if schemas.is_dir() and not schemas.is_symlink() else []
+        if (schemas.is_symlink() or not schemas.is_dir() or len(schema_files) != 1
+                or schema_files[0].name != "gschemas.compiled" or schema_files[0].is_symlink()
+                or not schema_files[0].is_file()):
+            raise ValueError("Build artifact output contains an unexpected schema directory")
+        if package:
+            shutil.rmtree(schemas)
     for entry in output.iterdir():
+        if entry.name == "schemas" and not package:
+            continue
         if entry.name not in {filename, "manifest.json"} or entry.is_symlink() or not entry.is_file():
             raise ValueError("Build artifact output contains an unexpected file")
+    schema_digest = None
+    if not package:
+        schemas.mkdir(exist_ok=True)
+        subprocess.run(
+            ["glib-compile-schemas", "--strict", "--targetdir", str(schemas), str(ROOT / "apps/linux/data")],
+            check=True,
+        )
+        schema_digest = digest(schemas / "gschemas.compiled")
     destination = output / filename
     shutil.copyfile(binary, destination)
     destination.chmod(0o644)
@@ -98,16 +119,17 @@ def create(binary, output, expected_sha, *, package=False):
         "artifact_type": "debian-package" if package else "native-binary",
         "source_commit": expected_sha,
         "architecture": platform.machine(),
-        "profile": "release-package" if package else "ci",
+        "profile": "release-package" if package else profile,
         "features": feature_identity(),
         "toolkit_runtime": None if package else toolkit_identity(),
+        "gsettings_schema_sha256": schema_digest,
         "sha256": binary_digest,
     }
     (output / "manifest.json").write_text(json.dumps(manifest, sort_keys=True) + "\n")
     return output
 
 
-def verify(directory, expected_sha, *, package=False):
+def verify(directory, expected_sha, *, package=False, profile="ci"):
     manifest_path = directory / "manifest.json"
     if manifest_path.is_symlink() or not manifest_path.is_file() or manifest_path.stat().st_size > 4096:
         raise ValueError("Build artifact requires a small regular manifest")
@@ -121,16 +143,22 @@ def verify(directory, expected_sha, *, package=False):
         raise ValueError("Build artifact source does not match the requested commit")
     if manifest.get("architecture") != platform.machine():
         raise ValueError("Build artifact architecture does not match this worker")
-    profile = "release-package" if package else "ci"
-    if manifest.get("profile") != profile:
-        raise ValueError(f"Build artifact profile must be {profile}")
+    expected_profile = "release-package" if package else profile
+    if manifest.get("profile") != expected_profile:
+        raise ValueError(f"Build artifact profile must be {expected_profile}")
     if manifest.get("features") != feature_identity():
         raise ValueError("Build artifact feature set does not match this checkout")
     if package:
-        if manifest.get("toolkit_runtime") is not None:
+        if manifest.get("toolkit_runtime") is not None or manifest.get("gsettings_schema_sha256") is not None:
             raise ValueError("Package artifact cannot claim a native GTK runtime identity")
     else:
         verify_toolkit_runtime(manifest.get("toolkit_runtime"), toolkit_identity())
+        schemas = directory / "schemas"
+        if schemas.is_symlink() or not schemas.is_dir():
+            raise ValueError("Build artifact GSettings schema directory is unavailable")
+        schema_file = schemas / "gschemas.compiled"
+        if digest(schema_file) != manifest.get("gsettings_schema_sha256"):
+            raise ValueError("Build artifact schema digest does not match its manifest")
     binary = directory / ("bookie.deb" if package else "bookie")
     if digest(binary) != manifest.get("sha256"):
         raise ValueError("Build artifact digest does not match its manifest")
@@ -146,20 +174,22 @@ def main():
     publish.add_argument("directory", type=Path)
     publish.add_argument("source_commit")
     publish.add_argument("--package", action="store_true")
+    publish.add_argument("--profile", choices=("ci", "dist"), default="ci")
     consume = subcommands.add_parser("verify")
     consume.add_argument("directory", type=Path)
     consume.add_argument("source_commit")
     consume.add_argument("--package", action="store_true")
+    consume.add_argument("--profile", choices=("ci", "dist"), default="ci")
     args = parser.parse_args()
     try:
         if not re.fullmatch(r"[0-9a-f]{40}", args.source_commit):
             raise ValueError("Build artifact requires a full source commit")
         if args.command == "create":
-            result = create(args.binary, args.directory, args.source_commit, package=args.package)
+            result = create(args.binary, args.directory, args.source_commit, package=args.package, profile=args.profile)
         else:
             if source_identity() != args.source_commit:
                 raise ValueError("Build artifact source does not match this checkout")
-            result = verify(args.directory, args.source_commit, package=args.package)
+            result = verify(args.directory, args.source_commit, package=args.package, profile=args.profile)
         print(result)
         return 0
     except (OSError, ValueError, subprocess.CalledProcessError) as error:

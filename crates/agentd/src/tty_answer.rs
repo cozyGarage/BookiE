@@ -7,10 +7,15 @@ use bookie_policy::ApprovalOutcome;
 pub(crate) const MAX_ANSWER_BYTES: usize = 64;
 const POLL_SLICE_MILLIS: u128 = 250;
 
-pub(crate) fn read_answer<T: Read + AsRawFd>(source: &mut T, deadline: Instant) -> Option<ApprovalOutcome> {
+pub(crate) fn read_answer<T: Read + AsRawFd>(
+    source: &mut T,
+    deadline: Instant,
+    cancelled: &impl Fn() -> bool,
+    nonce: &str,
+) -> Option<ApprovalOutcome> {
     let mut answer = Vec::with_capacity(MAX_ANSWER_BYTES);
     while answer.len() < MAX_ANSWER_BYTES {
-        if !wait_readable(source.as_raw_fd(), deadline) {
+        if !wait_readable(source.as_raw_fd(), deadline, cancelled) || cancelled() {
             return None;
         }
         let mut byte = [0u8; 1];
@@ -18,7 +23,7 @@ pub(crate) fn read_answer<T: Read + AsRawFd>(source: &mut T, deadline: Instant) 
             return Some(ApprovalOutcome::Deny);
         }
         if byte[0] == b'\n' {
-            return Some(super::outcome_for_answer(&String::from_utf8_lossy(&answer)));
+            return Some(super::outcome_for_answer(&String::from_utf8_lossy(&answer), nonce));
         }
         answer.push(byte[0]);
     }
@@ -29,10 +34,10 @@ pub(crate) fn discard_pending_input(terminal: &impl AsRawFd) {
     let _ = flush_input(terminal.as_raw_fd());
 }
 
-fn wait_readable(descriptor: RawFd, deadline: Instant) -> bool {
+fn wait_readable(descriptor: RawFd, deadline: Instant, cancelled: &impl Fn() -> bool) -> bool {
     loop {
         let remaining = deadline.saturating_duration_since(Instant::now());
-        if remaining.is_zero() {
+        if remaining.is_zero() || cancelled() {
             return false;
         }
         let millis = i32::try_from(remaining.as_millis().min(POLL_SLICE_MILLIS))

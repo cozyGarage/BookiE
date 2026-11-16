@@ -1,3 +1,4 @@
+use super::super::ConnectionMessage;
 use super::*;
 use relm4::{Component, ComponentController};
 use std::sync::Arc;
@@ -184,7 +185,7 @@ fn browse_save_dispatch_executes_and_audits_a_guarded_transaction() {
     let directory = tempfile::tempdir().unwrap();
     let controller = launch(directory.path());
     controller.widget().present();
-    controller.emit(AppMsg::OpenConnect);
+    controller.emit(AppMsg::Connection(ConnectionMessage::Open));
     spin_until(|| controller.model().switch.transition == super::super::ConnectionTransition::Connecting);
     let prepared = prepared_sqlite_connection(false, None, bookie_core::Environment::Local);
     let runtime = tokio::runtime::Builder::new_multi_thread()
@@ -192,13 +193,13 @@ fn browse_save_dispatch_executes_and_audits_a_guarded_transaction() {
         .build()
         .unwrap();
     let _entered = runtime.enter();
-    controller.emit(AppMsg::ConnectionPrepared(Box::new(prepared)));
+    controller.emit(AppMsg::Connection(ConnectionMessage::Prepared(Box::new(prepared))));
     spin_until(|| controller.model().window_connection().is_some());
     let connection = controller.model().window_connection().unwrap();
     runtime
         .block_on(connection.execute("CREATE TABLE notes (id INTEGER PRIMARY KEY, title TEXT)"))
         .unwrap();
-    let tab_id = uuid::Uuid::new_v4();
+    let tab_id = attach_new_tab_to_front(&controller);
     let save_id = uuid::Uuid::new_v4();
     controller.emit(AppMsg::ExecuteBrowseTransaction {
         tab_id,
@@ -225,6 +226,16 @@ fn browse_save_dispatch_executes_and_audits_a_guarded_transaction() {
         let event = &record["event"];
         event["operation_class"] == "mutation" && event["phase"] == "outcome" && event["terminal_status"] == "succeeded"
     }));
+}
+
+fn attach_new_tab_to_front(controller: &relm4::Controller<App>) -> uuid::Uuid {
+    let tab_id = uuid::Uuid::new_v4();
+    controller.emit(AppMsg::AttachWorkspaceTab {
+        tab_id,
+        connection_id: controller.model().connection_id,
+    });
+    spin_until(|| controller.model().multi.sessions.connection_for_tab(tab_id).is_some());
+    tab_id
 }
 
 fn prepared_sqlite_connection(
@@ -289,7 +300,7 @@ fn browse_save_dispatch_on_read_only_connection_is_denied_and_audited() {
     let directory = tempfile::tempdir().unwrap();
     let controller = launch(directory.path());
     controller.widget().present();
-    controller.emit(AppMsg::OpenConnect);
+    controller.emit(AppMsg::Connection(ConnectionMessage::Open));
     spin_until(|| controller.model().switch.transition == super::super::ConnectionTransition::Connecting);
     std::fs::File::create(directory.path().join("notes.sqlite")).unwrap();
     let prepared = prepared_sqlite_connection(
@@ -302,10 +313,10 @@ fn browse_save_dispatch_on_read_only_connection_is_denied_and_audited() {
         .build()
         .unwrap();
     let _entered = runtime.enter();
-    controller.emit(AppMsg::ConnectionPrepared(Box::new(prepared)));
+    controller.emit(AppMsg::Connection(ConnectionMessage::Prepared(Box::new(prepared))));
     spin_until(|| controller.model().window_connection().is_some());
     let connection = controller.model().window_connection().unwrap();
-    let tab_id = uuid::Uuid::new_v4();
+    let tab_id = attach_new_tab_to_front(&controller);
     let save_id = uuid::Uuid::new_v4();
     controller.emit(AppMsg::ExecuteBrowseTransaction {
         tab_id,
@@ -360,7 +371,7 @@ fn browse_grid_edit_save_reaches_guarded_connection_and_audit() {
     let directory = tempfile::tempdir().unwrap();
     let controller = launch(directory.path());
     controller.widget().present();
-    controller.emit(AppMsg::OpenConnect);
+    controller.emit(AppMsg::Connection(ConnectionMessage::Open));
     spin_until(|| controller.model().switch.transition == super::super::ConnectionTransition::Connecting);
     let prepared = prepared_sqlite_connection(false, None, bookie_core::Environment::Local);
     let runtime = tokio::runtime::Builder::new_multi_thread()
@@ -368,7 +379,7 @@ fn browse_grid_edit_save_reaches_guarded_connection_and_audit() {
         .build()
         .unwrap();
     let _entered = runtime.enter();
-    controller.emit(AppMsg::ConnectionPrepared(Box::new(prepared)));
+    controller.emit(AppMsg::Connection(ConnectionMessage::Prepared(Box::new(prepared))));
     spin_until(|| controller.model().window_connection().is_some());
     let connection = controller.model().window_connection().unwrap();
     runtime
@@ -487,13 +498,14 @@ fn browse_save_waits_for_approval_before_writing() {
     });
     controller.model().database.set_approval_sink(approval.clone());
     controller.widget().present();
-    controller.emit(AppMsg::OpenConnect);
+    controller.emit(AppMsg::Connection(ConnectionMessage::Open));
     spin_until(|| controller.model().switch.transition == super::super::ConnectionTransition::Connecting);
-    controller.emit(AppMsg::ConnectionPrepared(Box::new(prepared)));
+    controller.emit(AppMsg::Connection(ConnectionMessage::Prepared(Box::new(prepared))));
     spin_until(|| controller.model().window_connection().is_some());
     let connection = controller.model().window_connection().unwrap();
+    let tab_id = attach_new_tab_to_front(&controller);
     controller.emit(AppMsg::ExecuteBrowseTransaction {
-        tab_id: uuid::Uuid::new_v4(),
+        tab_id,
         save_id: uuid::Uuid::new_v4(),
         statements: vec![(
             "INSERT INTO notes (id, title) VALUES (?, ?)".into(),
@@ -558,13 +570,14 @@ fn browse_save_denied_by_approval_preserves_data_and_audits() {
     });
     controller.model().database.set_approval_sink(approval.clone());
     controller.widget().present();
-    controller.emit(AppMsg::OpenConnect);
+    controller.emit(AppMsg::Connection(ConnectionMessage::Open));
     spin_until(|| controller.model().switch.transition == super::super::ConnectionTransition::Connecting);
-    controller.emit(AppMsg::ConnectionPrepared(Box::new(prepared)));
+    controller.emit(AppMsg::Connection(ConnectionMessage::Prepared(Box::new(prepared))));
     spin_until(|| controller.model().window_connection().is_some());
     let connection = controller.model().window_connection().unwrap();
+    let tab_id = attach_new_tab_to_front(&controller);
     controller.emit(AppMsg::ExecuteBrowseTransaction {
-        tab_id: uuid::Uuid::new_v4(),
+        tab_id,
         save_id: uuid::Uuid::new_v4(),
         statements: vec![(
             "INSERT INTO notes (id, title) VALUES (?, ?)".into(),

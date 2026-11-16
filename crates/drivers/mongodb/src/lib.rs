@@ -24,9 +24,9 @@ use shell::{
 use update::{parse_browse_page_select, parse_keyed_delete, parse_keyed_update, parse_keyed_value_select};
 
 use bookie_core::{
-    ColumnInfo, ConnectOptions, Connection, DataModel, DatabaseDriver, DriverError, DriverMaturity, ExecResult,
-    MAX_QUERY_RESULT_BYTES, MAX_QUERY_RESULT_CELLS, MAX_QUERY_ROWS, QueryResult, QueryResultBudget, QueryRows,
-    TableInfo, Value,
+    ColumnInfo, ConnectOptions, Connection, DataModel, DatabaseDriver, DriverError, DriverMaturity,
+    DriverValueInputCapabilities, ExecResult, MAX_QUERY_RESULT_BYTES, MAX_QUERY_RESULT_CELLS, MAX_QUERY_ROWS,
+    QueryResult, QueryResultBudget, QueryRows, TableInfo, Value,
 };
 
 pub struct MongodbDriver;
@@ -39,8 +39,21 @@ pub fn canonical_decimal128_text(text: &str) -> Result<String, DriverError> {
         .map_err(|error| DriverError::Unsupported(format!("invalid MongoDB Decimal128 value: {error}")))
 }
 
+pub fn relaxed_extended_json_for_display(value: &serde_json::Value) -> Option<serde_json::Value> {
+    codec::relaxed_extended_json_for_display(value)
+}
+
 #[async_trait]
 impl DatabaseDriver for MongodbDriver {
+    fn value_input_capabilities(&self) -> DriverValueInputCapabilities {
+        DriverValueInputCapabilities {
+            typed_integer_widths: true,
+            canonical_decimal_input: Some(|text| canonical_decimal128_text(text).ok()),
+            millisecond_date_precision: true,
+            ..DriverValueInputCapabilities::default()
+        }
+    }
+
     fn supports_database_listing(&self) -> bool {
         true
     }
@@ -93,6 +106,9 @@ impl DatabaseDriver for MongodbDriver {
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 const METADATA_SAMPLE_SIZE: i64 = 128;
+const METADATA_SAMPLE_BATCH_SIZE: u32 = 1;
+const METADATA_SAMPLE_MAX_FIELDS: usize = 4096;
+const METADATA_SAMPLE_MAX_FIELD_NAME_BYTES: usize = 1024 * 1024;
 
 async fn build_client_options(opts: &ConnectOptions) -> Result<ClientOptions, DriverError> {
     let host = uri_host(&opts.host)?;
@@ -192,17 +208,38 @@ fn bounded_document_rows(docs: &[Document], columns: &[ColumnInfo]) -> (QueryRow
     (rows, false)
 }
 
-async fn observe_sample<S>(mut sample: S) -> Result<BTreeMap<String, String>, mongodb::error::Error>
+async fn observe_sample<S>(mut sample: S) -> Result<BTreeMap<String, String>, DriverError>
 where
     S: futures::Stream<Item = Result<Document, mongodb::error::Error>> + Unpin,
 {
     let mut types = BTreeMap::new();
-    while let Some(doc) = sample.try_next().await? {
+    let mut field_name_bytes = 0;
+    while let Some(doc) = sample.try_next().await.map_err(map_mongo_error)? {
         for (key, value) in &doc {
-            observe_bson_type(&mut types, key, value);
+            observe_sample_field(&mut types, &mut field_name_bytes, key, value)?;
         }
     }
     Ok(types)
+}
+
+fn observe_sample_field(
+    types: &mut BTreeMap<String, String>,
+    field_name_bytes: &mut usize,
+    key: &str,
+    value: &mongodb::bson::Bson,
+) -> Result<(), DriverError> {
+    if !types.contains_key(key) {
+        let next_field_name_bytes = field_name_bytes.saturating_add(key.len());
+        if types.len() >= METADATA_SAMPLE_MAX_FIELDS || next_field_name_bytes > METADATA_SAMPLE_MAX_FIELD_NAME_BYTES {
+            return Err(DriverError::Unsupported(format!(
+                "MongoDB metadata sample exceeds the {}-field or {}-byte field-name limit",
+                METADATA_SAMPLE_MAX_FIELDS, METADATA_SAMPLE_MAX_FIELD_NAME_BYTES
+            )));
+        }
+        *field_name_bytes = next_field_name_bytes;
+    }
+    observe_bson_type(types, key, value);
+    Ok(())
 }
 
 impl MongodbConnection {
@@ -235,9 +272,10 @@ impl MongodbConnection {
             .find(doc! {})
             .sort(doc! { "_id": 1 })
             .limit(METADATA_SAMPLE_SIZE)
+            .batch_size(METADATA_SAMPLE_BATCH_SIZE)
             .await
             .map_err(map_mongo_error)?;
-        let mut types = observe_sample(cursor).await.map_err(map_mongo_error)?;
+        let mut types = observe_sample(cursor).await?;
         types.entry("_id".into()).or_insert_with(|| "ObjectId".into());
         let mut columns = columns_from_types(types);
         merge_page_types(&mut columns, &page_docs);

@@ -1,6 +1,11 @@
 use super::model::*;
 use super::selection::*;
 
+fn copy_tsv(rows: impl IntoIterator<Item = Vec<crate::model::Cell>>, with_headers: bool) -> String {
+    let columns = crate::core_bridge::column_infos_for(&crate::model::synthetic_columns());
+    bookie_app_services::result_copy::tsv(&columns, rows.into_iter().collect(), with_headers)
+}
+
 #[test]
 fn a_plain_click_selects_one_row_and_shift_extends_from_the_anchor() {
     let one = Selection::after_click(None, 10, false);
@@ -16,7 +21,7 @@ fn a_plain_click_selects_one_row_and_shift_extends_from_the_anchor() {
 }
 
 #[test]
-fn the_label_and_copy_limit_match_the_tauri_prototype() {
+fn the_label_and_copy_limit_are_fixed() {
     assert_eq!(Selection::after_click(None, 0, false).label(), "1 row selected");
     let wide = Selection {
         anchor: 0,

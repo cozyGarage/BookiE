@@ -3,7 +3,8 @@ use std::cell::Cell;
 use bookie_core::{QueryCursorId, QueryCursorPage, QueryResultBatch, Session, SessionCommitOutcome};
 
 use super::*;
-use crate::transaction_control::{TransactionControl, hides_transaction_control, transaction_control};
+use crate::parsed_sql::ParsedSql;
+use crate::transaction_control::{TransactionControl, hides_transaction_control, transaction_control_parsed};
 
 const CLOSE_ROLLBACK_TIMEOUT: Duration = Duration::from_secs(10);
 const CLOSE_CURSOR_TIMEOUT: Duration = Duration::from_secs(5);
@@ -55,6 +56,8 @@ impl CursorAudit {
 struct ExtraSets {
     collect: bool,
     sets: Vec<QueryResult>,
+    messages: ServerMessages,
+    rows_affected: Option<u64>,
 }
 
 struct StatementInput<'a> {
@@ -77,10 +80,15 @@ async fn inner_statement(
         control,
     } = input;
     if !extra.collect {
+        extra.sets.clear();
+        extra.messages = ServerMessages::default();
+        extra.rows_affected = None;
         return inner.query_params_controlled(sql, params, control).await;
     }
     let batch = inner.query_result_sets_params_controlled(sql, params, control).await?;
     let truncated = batch.truncated;
+    extra.rows_affected = batch.rows_affected;
+    extra.messages = guard.releasable_messages(batch.messages);
     let mut sets = batch.result_sets.into_iter();
     let mut first = sets.next().unwrap_or(QueryResult {
         columns: Vec::new(),
@@ -96,6 +104,14 @@ async fn inner_statement(
 
 fn rows_in(first: &QueryResult, extra_sets: &[QueryResult]) -> u64 {
     first.rows.len() as u64 + extra_sets.iter().map(|set| set.rows.len() as u64).sum::<u64>()
+}
+
+fn statement_rows_for_audit(result: &Result<QueryResult, DriverError>, writes: bool, extra: &ExtraSets) -> Option<u64> {
+    let result = result.as_ref().ok()?;
+    if writes {
+        return extra.rows_affected;
+    }
+    Some(rows_in(result, &extra.sets))
 }
 
 #[derive(Clone, Copy)]
@@ -140,6 +156,47 @@ impl PolicyGuard {
 
 #[async_trait]
 impl Session for PolicySession {
+    async fn list_temporary_tables_controlled(
+        &mut self,
+        control: &OperationControl,
+    ) -> Result<Vec<TableInfo>, DriverError> {
+        check_pre_dispatch(control)?;
+        if self.cursor.is_some() {
+            return self
+                .refuse_policy(
+                    "SESSION TEMPORARY TABLES",
+                    "query_cursor_active",
+                    "close the active query cursor before reading temporary table metadata",
+                )
+                .await;
+        }
+        if !self.is_usable() {
+            return self
+                .refuse_policy(
+                    "SESSION TEMPORARY TABLES",
+                    "retired_session",
+                    "the session was retired and cannot read temporary table metadata",
+                )
+                .await;
+        }
+        let operation = self.guard.metadata_operation("SESSION TEMPORARY TABLES", Vec::new());
+        self.guard.prepare_governed_read(&operation).await?;
+        let start = Instant::now();
+        let result = self
+            .guard
+            .caught_read(
+                "SESSION TEMPORARY TABLES",
+                self.inner.list_temporary_tables_controlled(control),
+            )
+            .await;
+        self.note_disconnect(&result);
+        let rows = result.as_ref().ok().map(|tables| tables.len() as u64);
+        self.guard
+            .audit_controlled_read_result(&operation, start, &result, rows)
+            .await?;
+        result
+    }
+
     async fn query_params_controlled(
         &mut self,
         sql: &str,
@@ -147,7 +204,22 @@ impl Session for PolicySession {
         control: &OperationControl,
     ) -> Result<QueryResult, DriverError> {
         self.require_query_ready(sql).await?;
-        match transaction_control(sql, &self.guard.ctx.driver_id) {
+        let lexical_settings = if ParsedSql::needs_lexical_settings(sql, &self.guard.ctx.driver_id) {
+            self.lexical_settings_controlled(control).await?
+        } else {
+            None
+        };
+        let parsed = ParsedSql::with_lexical_settings(sql, &self.guard.ctx.driver_id, lexical_settings);
+        if parsed.lexical_mode_ambiguous() {
+            return self
+                .refuse_policy(
+                    sql,
+                    "session_lexical_mode_ambiguous",
+                    "SQL token boundaries depend on the database session lexical mode",
+                )
+                .await;
+        }
+        match transaction_control_parsed(&parsed, &self.guard.ctx.driver_id) {
             Some(TransactionControl::BeginReadWrite) if self.guard.ctx.read_only => {
                 self.refuse_policy(
                     sql,
@@ -165,7 +237,7 @@ impl Session for PolicySession {
                 )
                 .await
             }
-            Some(TransactionControl::BeginReadOnlySnapshot) => self.begin_read_only(sql, control).await,
+            Some(TransactionControl::BeginReadOnlySnapshot) => self.begin_read_only(sql, control, &parsed).await,
             Some(TransactionControl::Commit { chain }) => self
                 .finish(sql, control, Finish::Commit, chain)
                 .await
@@ -174,7 +246,7 @@ impl Session for PolicySession {
                 .finish(sql, control, Finish::Rollback, chain)
                 .await
                 .map(|(result, _)| result),
-            None if hides_transaction_control(sql, &self.guard.ctx.driver_id) => {
+            None if hides_transaction_control(&parsed, &self.guard.ctx.driver_id) => {
                 self.refuse_policy(
                     sql,
                     "hidden_transaction_control",
@@ -182,7 +254,7 @@ impl Session for PolicySession {
                 )
                 .await
             }
-            None => self.statement(sql, params, control).await,
+            None => self.statement(sql, params, control, &parsed).await,
         }
     }
 
@@ -206,13 +278,21 @@ impl Session for PolicySession {
     ) -> Result<QueryResultBatch, DriverError> {
         self.extra.collect = true;
         self.extra.sets.clear();
+        self.extra.messages = ServerMessages::default();
+        self.extra.rows_affected = None;
         let first = self.query_params_controlled(sql, params, control).await;
         self.extra.collect = false;
         let extras = std::mem::take(&mut self.extra.sets);
+        let messages = std::mem::take(&mut self.extra.messages);
         let mut result_sets = vec![first?];
         result_sets.extend(extras);
         let truncated = result_sets.iter().any(|set| set.truncated);
-        Ok(QueryResultBatch { result_sets, truncated })
+        Ok(QueryResultBatch {
+            result_sets,
+            truncated,
+            messages,
+            rows_affected: self.extra.rows_affected,
+        })
     }
 
     async fn open_query_cursor_controlled(
@@ -262,6 +342,7 @@ impl Session for PolicySession {
             .guard
             .authorize_classified(sql, analysis, Some(control), None)
             .await?;
+        let control = &authorization.rearm(control);
         let audit = CursorAudit {
             operation_id: Uuid::new_v4(),
             batch_id: batch.id,
@@ -590,7 +671,12 @@ impl PolicySession {
         result
     }
 
-    async fn begin_read_only(&mut self, sql: &str, control: &OperationControl) -> Result<QueryResult, DriverError> {
+    async fn begin_read_only(
+        &mut self,
+        sql: &str,
+        control: &OperationControl,
+        parsed: &ParsedSql<'_>,
+    ) -> Result<QueryResult, DriverError> {
         if self.guard.ctx.driver_id != "postgres" {
             return self
                 .refuse_policy(
@@ -609,7 +695,7 @@ impl PolicySession {
                 )
                 .await;
         }
-        let analysis = self.guard.analyze_statement(sql);
+        let analysis = self.guard.analyze_parsed(parsed);
         let authorization = Authorization {
             decision: Decision::Allow {
                 rule: "read_only_snapshot".into(),
@@ -617,6 +703,7 @@ impl PolicySession {
             analysis,
             approval_outcome: AuditApprovalOutcome::NotRequired,
             preview_state: AuditPreviewState::NotRequested,
+            approval_wait: Duration::ZERO,
         };
         let operation = self.guard.operation(
             sql,
@@ -648,20 +735,36 @@ impl PolicySession {
         sql: &str,
         params: &[Value],
         control: &OperationControl,
+        parsed: &ParsedSql<'_>,
     ) -> Result<QueryResult, DriverError> {
-        let analysis = self.guard.analyze_statement(sql);
+        let analysis = self.guard.analyze_parsed(parsed);
         let external_effects = Effects::SESSION_STATE.union(Effects::HOST_OR_FILE_ACCESS);
         if self.batch.is_some_and(|batch| {
-            batch.read_only && (analysis.facts.effects.writes() || analysis.facts.effects.contains(external_effects))
+            batch.read_only
+                && (analysis.facts.writes()
+                    || analysis.facts.effects.writes()
+                    || analysis.facts.effects.contains(external_effects))
         }) {
             return self
                 .refuse(sql, "read_only_snapshot_refusal", DriverError::ReadOnly)
                 .await;
         }
-        let authorization = self
-            .guard
-            .authorize_classified(sql, analysis, Some(control), Some(Counter::Session(&mut *self.inner)))
-            .await?;
+        let commits_open_transaction = self
+            .batch
+            .and_then(|_| interactive_transaction_decision(&self.guard.ctx.driver_id, parsed, &analysis.facts));
+        let authorization = match commits_open_transaction {
+            Some(decision) => {
+                self.guard
+                    .resolve_authorization(sql, analysis, decision, None, Some(control))
+                    .await?
+            }
+            None => {
+                self.guard
+                    .authorize_classified(sql, analysis, Some(control), Some(Counter::Session(&mut *self.inner)))
+                    .await?
+            }
+        };
+        let control = &authorization.rearm(control);
         let writes = authorization.analysis.facts.writes();
         let rolls_back_to_savepoint = authorization.analysis.rolls_back_to_savepoint;
         let result = match self.batch {
@@ -755,7 +858,7 @@ impl PolicySession {
             self.guard
                 .mask_result_for_analysis(Some(&authorization.analysis), value)
         });
-        let rows = result.as_ref().ok().map(|value| rows_in(value, &self.extra.sets));
+        let rows = statement_rows_for_audit(&result, writes, &self.extra);
         self.guard
             .audit_transaction_result(&operation, start, &result, rows, TransactionAuditMode::Interactive)
             .await?;
@@ -806,7 +909,7 @@ impl PolicySession {
                 self.guard
                     .mask_result_for_analysis(Some(&authorization.analysis), value)
             });
-        let rows = result.as_ref().ok().map(|value| rows_in(value, &self.extra.sets));
+        let rows = statement_rows_for_audit(&result, true, &self.extra);
         self.guard.audit_write_result(&operation, start, &result, rows).await?;
         pending_write.disarm();
         result

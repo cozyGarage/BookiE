@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import argparse
-from collections import deque
+import codecs
 import datetime
 import fcntl
 import hashlib
@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import re
+import select
 import shutil
 import signal
 import subprocess
@@ -15,6 +16,11 @@ import sys
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
+CI_FIXTURE_LAYERS = {
+    "driver-core", "driver-analytics", "driver-extended", "drivers", "socket-ssh",
+    "tls", "b4-rollback", "postgres-release", "distro-floor",
+}
+CI_RUN_ID = re.compile(r"(?:forgejo|github)-\d+-\d+-[a-z0-9][a-z0-9_-]*|nightly-\d+-[a-z0-9][a-z0-9_-]*")
 
 
 def catalog():
@@ -101,6 +107,21 @@ def execution_evidence(kind, output):
     return bool(summaries) and sum(count for _, count in summaries) > 0 and all(ok for ok, _ in summaries)
 
 
+def failure_excerpt(output):
+    lines = output.splitlines()
+    markers = ("FAILED:", "Traceback (most recent call last):", "AssertionError:")
+    marker = next((index for index, line in enumerate(lines) if line.startswith(markers)), None)
+    if marker is None:
+        return "\n".join(lines[-40:])
+    start = max(0, marker - 2)
+    end = min(len(lines), marker + 28)
+    excerpt = lines[start:end]
+    tail = lines[-12:]
+    if end < len(lines) and tail[0] not in excerpt:
+        excerpt.extend(("... final log lines ...", *tail))
+    return "\n".join(excerpt)
+
+
 def stop_process(process, force=False):
     if force or process.poll() is None:
         try:
@@ -118,6 +139,28 @@ def stop_process(process, force=False):
         process.wait()
 
 
+def stream_process_output(process, log, timeout):
+    decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
+    deadline = time.monotonic() + timeout
+    stream = process.stdout
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise subprocess.TimeoutExpired(process.args, timeout)
+        readable, _, _ = select.select([stream], [], [], max(remaining, 0))
+        if not readable:
+            raise subprocess.TimeoutExpired(process.args, timeout)
+        chunk = os.read(stream.fileno(), 65536)
+        text = decoder.decode(chunk, final=not chunk)
+        if text:
+            log.write(text)
+            log.flush()
+            sys.stdout.write(text)
+            sys.stdout.flush()
+        if not chunk:
+            return process.wait(timeout=max(deadline - time.monotonic(), 0))
+
+
 def execute(step, log_path, cwd=ROOT):
     started = time.monotonic()
     result = dict(step, status="running", log=log_path.name)
@@ -131,11 +174,11 @@ def execute(step, log_path, cwd=ROOT):
                 step["argv"],
                 cwd=cwd,
                 env=dict(os.environ, BOOKIE_CI_REPORT_ACTIVE="1"),
-                stdout=log,
+                stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 start_new_session=True,
             )
-            result["exit_code"] = process.wait(timeout=step["timeout_seconds"])
+            result["exit_code"] = stream_process_output(process, log, step["timeout_seconds"])
         result["status"] = "passed" if result["exit_code"] == 0 else "failed"
         if result["status"] == "passed" and not execution_evidence(step["evidence"], log_path.read_text(errors="replace")):
             result.update(status="failed", reason="required test execution evidence missing")
@@ -148,6 +191,7 @@ def execute(step, log_path, cwd=ROOT):
     finally:
         if process is not None:
             stop_process(process, result["status"] in {"timed_out", "cancelled"})
+            process.stdout.close()
         result["seconds"] = round(time.monotonic() - started, 3)
     return result
 
@@ -180,9 +224,8 @@ def run_layers(names, layers, directory):
             write_report(report_path, report)
             print(f"  {result['status']}: {result.get('reason', result.get('log', 'not executed'))}", flush=True)
             if result["status"] != "passed" and (log_name := result.get("log")):
-                if (directory / log_name).exists():
-                    with (directory / log_name).open(errors="replace") as output:
-                        print("".join(deque(output, maxlen=40)), flush=True)
+                if (log_path := directory / log_name).exists():
+                    print(failure_excerpt(log_path.read_text(errors="replace")), flush=True)
         report["layers"][name]["status"] = "passed" if all(row["status"] == "passed" for row in results) else "failed"
     report["status"] = "passed" if all(row["status"] == "passed" for row in report["layers"].values()) else "failed"
     report["finished_utc"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
@@ -200,6 +243,15 @@ def interrupt(*_):
     raise KeyboardInterrupt
 
 
+def reconcile_ci_fixtures(names):
+    run_id = os.environ.get("BOOKIE_TEST_RUN_ID", "")
+    has_fixture_layer = any(name in CI_FIXTURE_LAYERS or name.startswith("gtk-") for name in names)
+    if has_fixture_layer and CI_RUN_ID.fullmatch(run_id):
+        subprocess.run(
+            [sys.executable, str(ROOT / "scripts/cleanup-stale-ci-fixtures.py"), run_id], cwd=ROOT, check=True
+        )
+
+
 def main():
     layers = catalog()
     parser = argparse.ArgumentParser(
@@ -214,6 +266,7 @@ def main():
         return 0
     if not args.layers or len(set(args.layers)) != len(args.layers) or any(name not in layers for name in args.layers):
         parser.error("select one or more distinct catalog layers; use --list")
+    reconcile_ci_fixtures(args.layers)
     base = ROOT / "target/quality"
     base.mkdir(parents=True, exist_ok=True)
     with (base / "test-layer.lock").open("w") as lock:

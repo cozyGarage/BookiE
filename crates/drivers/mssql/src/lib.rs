@@ -12,12 +12,14 @@ use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 use bookie_core::sql_dialect::build_order_and_pagination;
 use bookie_core::{
     AuthMode, CatalogObject, CatalogObjectKind, ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError,
-    ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult,
-    QueryResultBatch, QueryResultBudget, TableInfo, Value, check_pre_dispatch, run_server_cancellable,
+    DriverValueInputCapabilities, ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS,
+    OperationControl, QueryResult, QueryResultBatch, QueryResultBudget, ServerMessages, TableInfo, Value,
+    check_pre_dispatch, run_server_cancellable,
 };
 
 mod catalog;
 mod codec;
+mod info;
 mod session;
 mod variant_guard;
 mod zoned;
@@ -50,12 +52,26 @@ pub struct MssqlDriver;
 
 #[async_trait]
 impl DatabaseDriver for MssqlDriver {
+    fn value_input_capabilities(&self) -> DriverValueInputCapabilities {
+        DriverValueInputCapabilities {
+            datetimeoffset_input: true,
+            ..DriverValueInputCapabilities::default()
+        }
+    }
+
     fn supports_database_listing(&self) -> bool {
         true
     }
 
     fn id(&self) -> &'static str {
         "mssql"
+    }
+
+    fn supports_value_search(&self) -> bool {
+        true
+    }
+    fn supports_reverse_keyset(&self) -> bool {
+        true
     }
 
     fn display_name(&self) -> &'static str {
@@ -313,7 +329,7 @@ impl MssqlConnection {
     }
 
     async fn rollback_batch(&self, client: &mut MssqlClient, index: usize, source: DriverError) -> DriverError {
-        match exec_simple(client, "ROLLBACK").await {
+        match exec_simple(client, "IF @@TRANCOUNT > 0 ROLLBACK").await {
             Ok(()) => DriverError::Transaction {
                 statement_index: index,
                 source: Box::new(source),
@@ -327,6 +343,46 @@ impl MssqlConnection {
                 }
             }
         }
+    }
+
+    async fn run_transaction(
+        &self,
+        client: &mut MssqlClient,
+        statements: &[(String, Vec<Value>)],
+        expect_one: &[usize],
+    ) -> Result<Vec<u64>, DriverError> {
+        exec_simple(client, "BEGIN TRANSACTION").await?;
+        let mut affected = Vec::with_capacity(statements.len());
+        for (idx, (sql, params)) in statements.iter().enumerate() {
+            let boxes = match boxed_params(params) {
+                Ok(boxes) => boxes,
+                Err(error) => {
+                    return Err(self.rollback_batch(client, idx, error).await);
+                }
+            };
+            let refs: Vec<&dyn ToSql> = boxes.iter().map(|b| &**b as &dyn ToSql).collect();
+            match client.execute(sql.as_str(), &refs).await {
+                Ok(res) => {
+                    let total = res.total();
+                    if expect_one.contains(&idx) && total != 1 {
+                        return Err(self
+                            .rollback_batch(client, idx, DriverError::ConcurrentModification)
+                            .await);
+                    }
+                    affected.push(total);
+                }
+                Err(e) => {
+                    return Err(self.rollback_batch(client, idx, map_tiberius_error(e)).await);
+                }
+            }
+        }
+        if let Err(error) = exec_simple(client, "COMMIT").await {
+            self.retire().await?;
+            return Err(DriverError::OperationOutcomeUnknown {
+                source: Box::new(error),
+            });
+        }
+        Ok(affected)
     }
 
     async fn query_result(
@@ -433,6 +489,24 @@ impl Connection for MssqlConnection {
     ) -> Result<Vec<CatalogObject>, DriverError> {
         let mut client = bookie_core::run_controlled_setup(self.client(), control).await??;
         self.run_abandonable(catalog::list_objects(&mut client, kind, schema), control)
+            .await
+    }
+
+    async fn routine_definition(
+        &self,
+        routine: &bookie_core::RoutineRef,
+    ) -> Result<bookie_core::RoutineLookup, DriverError> {
+        let mut client = self.client().await?;
+        catalog::routine_definition(&mut client, routine).await
+    }
+
+    async fn routine_definition_controlled(
+        &self,
+        routine: &bookie_core::RoutineRef,
+        control: &OperationControl,
+    ) -> Result<bookie_core::RoutineLookup, DriverError> {
+        let mut client = bookie_core::run_controlled_setup(self.client(), control).await??;
+        self.run_abandonable(catalog::routine_definition(&mut client, routine), control)
             .await
     }
 
@@ -576,44 +650,33 @@ impl Connection for MssqlConnection {
         self.execute_in_transaction_checked(statements, &[]).await
     }
 
+    async fn execute_in_transaction_controlled(
+        &self,
+        statements: &[(String, Vec<Value>)],
+        control: &OperationControl,
+    ) -> Result<Vec<u64>, DriverError> {
+        self.execute_in_transaction_checked_controlled(statements, &[], control)
+            .await
+    }
+
+    async fn execute_in_transaction_checked_controlled(
+        &self,
+        statements: &[(String, Vec<Value>)],
+        expect_one: &[usize],
+        control: &OperationControl,
+    ) -> Result<Vec<u64>, DriverError> {
+        let mut client = self.client().await?;
+        self.run_abandonable(self.run_transaction(&mut client, statements, expect_one), control)
+            .await
+    }
+
     async fn execute_in_transaction_checked(
         &self,
         statements: &[(String, Vec<Value>)],
         expect_one: &[usize],
     ) -> Result<Vec<u64>, DriverError> {
         let mut client = self.client().await?;
-        exec_simple(&mut client, "BEGIN TRANSACTION").await?;
-        let mut affected = Vec::with_capacity(statements.len());
-        for (idx, (sql, params)) in statements.iter().enumerate() {
-            let boxes = match boxed_params(params) {
-                Ok(boxes) => boxes,
-                Err(error) => {
-                    return Err(self.rollback_batch(&mut client, idx, error).await);
-                }
-            };
-            let refs: Vec<&dyn ToSql> = boxes.iter().map(|b| &**b as &dyn ToSql).collect();
-            match client.execute(sql.as_str(), &refs).await {
-                Ok(res) => {
-                    let total = res.total();
-                    if expect_one.contains(&idx) && total != 1 {
-                        return Err(self
-                            .rollback_batch(&mut client, idx, DriverError::ConcurrentModification)
-                            .await);
-                    }
-                    affected.push(total);
-                }
-                Err(e) => {
-                    return Err(self.rollback_batch(&mut client, idx, map_tiberius_error(e)).await);
-                }
-            }
-        }
-        if let Err(error) = exec_simple(&mut client, "COMMIT").await {
-            self.retire().await?;
-            return Err(DriverError::OperationOutcomeUnknown {
-                source: Box::new(error),
-            });
-        }
-        Ok(affected)
+        self.run_transaction(&mut client, statements, expect_one).await
     }
 
     async fn fetch_indexes(&self, schema: Option<&str>, table: &str) -> Result<Vec<IndexInfo>, DriverError> {
@@ -659,6 +722,7 @@ impl Connection for MssqlConnection {
                     primary,
                     predicate: None,
                     has_expression_key: false,
+                    using_clause: None,
                 }),
             }
         }
@@ -814,8 +878,10 @@ async fn run_query_sets(
     variant_guard::catch_tiberius_variant_panic(async {
         let boxes = boxed_params(params)?;
         let refs: Vec<&dyn ToSql> = boxes.iter().map(|b| &**b as &dyn ToSql).collect();
+        info::discard(client);
         let stream = client.query(sql, &refs).await.map_err(map_tiberius_error)?;
-        collect_result_sets(stream, limit, retain_additional_sets).await
+        let batch = collect_result_sets(stream, limit, retain_additional_sets).await?;
+        Ok(batch.with_messages(info::drain(client)))
     })
     .await
 }
@@ -830,8 +896,10 @@ async fn run_batch_sets(
     retain_additional_sets: bool,
 ) -> Result<QueryResultBatch, DriverError> {
     variant_guard::catch_tiberius_variant_panic(async {
+        info::discard(client);
         let stream = client.simple_query(sql).await.map_err(map_tiberius_error)?;
-        collect_result_sets(stream, limit, retain_additional_sets).await
+        let batch = collect_result_sets(stream, limit, retain_additional_sets).await?;
+        Ok(batch.with_messages(info::drain(client)))
     })
     .await
 }
@@ -929,7 +997,12 @@ async fn collect_result_sets(
     if let Some(last) = current {
         result_sets.push(last);
     }
-    Ok(QueryResultBatch { result_sets, truncated })
+    Ok(QueryResultBatch {
+        result_sets,
+        truncated,
+        messages: ServerMessages::default(),
+        rows_affected: None,
+    })
 }
 
 async fn run_execute(client: &mut MssqlClient, sql: &str, params: &[Value]) -> Result<u64, DriverError> {

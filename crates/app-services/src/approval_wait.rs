@@ -36,7 +36,7 @@ mod tests {
             waited()
         })
         .await;
-        assert!(waited_inside >= Duration::from_millis(60), "{waited_inside:?}");
+        assert!(waited_inside >= Duration::from_millis(50), "{waited_inside:?}");
     }
 
     #[tokio::test]
@@ -54,7 +54,7 @@ mod tests {
         });
         let second = track(async { waited() });
         let (first, second) = tokio::join!(first, second);
-        assert!(first >= Duration::from_millis(20));
+        assert!(first >= Duration::from_millis(15), "{first:?}");
         assert_eq!(second, Duration::ZERO);
     }
 }

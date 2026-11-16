@@ -4,14 +4,16 @@ use sqlparser::ast::{
     GrantObjects, Insert, ObjectName, Query, SelectItem, SetExpr, Statement, TableFactor, TableObject, TableWithJoins,
     Update, UpdateTableFromKind, UtilityOption,
 };
-use sqlparser::dialect::{Dialect, GenericDialect, MsSqlDialect, MySqlDialect, PostgreSqlDialect, SQLiteDialect};
-use sqlparser::parser::Parser;
+use sqlparser::dialect::{
+    ClickHouseDialect, Dialect, GenericDialect, MsSqlDialect, MySqlDialect, PostgreSqlDialect, SQLiteDialect,
+};
 
 use crate::admin_functions::is_administrative_function_name;
 use crate::constant_predicate::is_constant_true;
 use crate::effects::Effects;
 use crate::effects_classification::{merge_script_class, sql_effects_from_tokens, statement_effects, truncate_facts};
 use crate::explain_options::analyze_option_enabled;
+use crate::parsed_sql::ParsedSql;
 use crate::select_writes::select_writes;
 use crate::{blast_radius, mask::SensitivePatterns, sensitive_projection};
 
@@ -59,6 +61,7 @@ pub(crate) struct StatementDetails {
 
 pub(crate) struct StatementAnalysis {
     pub(crate) facts: StatementFacts,
+    pub(crate) lexical_mode_ambiguous: bool,
     pub(crate) rolls_back_to_savepoint: bool,
     pub(crate) blast_radius: Option<blast_radius::BlastRadiusRewrite>,
     pub(crate) sensitive_positions: Option<Vec<bool>>,
@@ -100,30 +103,38 @@ pub fn statement_requires_write_capability(sql: &str, driver_id: &str) -> bool {
 }
 
 pub fn classify(sql: &str, driver_id: &str) -> StatementFacts {
-    analyze_statement_inner(sql, driver_id, None, false).facts
+    classify_parsed(&ParsedSql::new(sql, driver_id), driver_id)
+}
+
+pub(crate) fn classify_parsed(parsed: &ParsedSql, driver_id: &str) -> StatementFacts {
+    analyze_parsed(parsed, driver_id, None, false).facts
 }
 
 pub(crate) fn analyze_statement(sql: &str, driver_id: &str, masks: Option<&SensitivePatterns>) -> StatementAnalysis {
-    analyze_statement_inner(sql, driver_id, masks, true)
+    analyze_parsed(&ParsedSql::new(sql, driver_id), driver_id, masks, true)
 }
 
-fn analyze_statement_inner(
-    sql: &str,
+pub(crate) fn analyze_parsed(
+    parsed: &ParsedSql,
     driver_id: &str,
     mask_patterns: Option<&SensitivePatterns>,
     include_execution_plans: bool,
 ) -> StatementAnalysis {
-    let dialect = dialect_for(driver_id);
-    let trimmed = sql.trim();
+    if parsed.lexical_mode_ambiguous() {
+        return lexical_mode_ambiguous_analysis();
+    }
+    let dialect = parsed.dialect();
+    let dialect = dialect.as_ref();
+    let trimmed = parsed.trimmed();
     if trimmed.is_empty() {
         return failed_analysis("empty SQL");
     }
 
-    if let Some(reason) = crate::input_refusal::refusal(trimmed, driver_id, dialect.as_ref()) {
+    if let Some(reason) = crate::input_refusal::refusal(trimmed, driver_id, dialect) {
         return failed_analysis(reason);
     }
 
-    let statements = match Parser::parse_sql(dialect.as_ref(), trimmed) {
+    let statements = match parsed.statements() {
         Ok(s) => s,
         Err(e) => return failed_analysis(e.to_string()),
     };
@@ -132,22 +143,26 @@ fn analyze_statement_inner(
         return failed_analysis("no statements parsed");
     }
 
-    let (effects, contains_administrative_call) = sql_effects_from_tokens(trimmed, dialect.as_ref(), driver_id);
-    let effects = if driver_id == "duckdb" && crate::duckdb_paths::touches_foreign_source(&statements) {
+    let (effects, contains_administrative_call) = sql_effects_from_tokens(trimmed, dialect, driver_id, statements);
+    let effects = if driver_id == "duckdb" && crate::duckdb_paths::touches_foreign_source(statements) {
         effects.union(Effects::HOST_OR_FILE_ACCESS)
     } else {
         effects
     };
+    let effects = effects.union_if(
+        Effects::LINKED_SERVER,
+        crate::linked_server::names_a_linked_server_table(driver_id, statements),
+    );
     let facts = crate::select_writes::with_locking_backstop(
-        classify_statements(&statements, effects, contains_administrative_call),
+        classify_statements(statements, effects, contains_administrative_call),
         trimmed,
-        dialect.as_ref(),
+        dialect,
     );
     let (blast_radius, sensitive_positions, known_statement_rows) = if include_execution_plans {
-        let (blast_radius, known_statement_rows) = blast_radius::analyze_blast_radius(&statements, driver_id);
+        let (blast_radius, known_statement_rows) = blast_radius::analyze_blast_radius(statements, driver_id);
         (
             blast_radius,
-            mask_patterns.and_then(|patterns| sensitive_projection::projection_from_statements(&statements, patterns)),
+            mask_patterns.and_then(|patterns| sensitive_projection::projection_from_statements(statements, patterns)),
             known_statement_rows,
         )
     } else {
@@ -155,6 +170,7 @@ fn analyze_statement_inner(
     };
     StatementAnalysis {
         facts,
+        lexical_mode_ambiguous: false,
         rolls_back_to_savepoint: statements
             .iter()
             .any(|statement| matches!(statement, Statement::Rollback { savepoint: Some(_), .. })),
@@ -214,11 +230,18 @@ fn classify_statements(
 fn failed_analysis(message: impl Into<String>) -> StatementAnalysis {
     StatementAnalysis {
         facts: StatementFacts::unparseable(message),
+        lexical_mode_ambiguous: false,
         rolls_back_to_savepoint: false,
         blast_radius: None,
         sensitive_positions: None,
         known_statement_rows: Vec::new(),
     }
+}
+
+fn lexical_mode_ambiguous_analysis() -> StatementAnalysis {
+    let mut analysis = failed_analysis("SQL token boundaries differ across supported session lexical modes");
+    analysis.lexical_mode_ambiguous = true;
+    analysis
 }
 
 /// Detect administrative calls anywhere in a successfully parsed statement.
@@ -231,6 +254,7 @@ pub(crate) fn dialect_for(driver_id: &str) -> Box<dyn Dialect> {
     match driver_id {
         "postgres" => Box::new(PostgreSqlDialect {}),
         "mysql" => Box::new(MySqlDialect {}),
+        "clickhouse" => Box::new(ClickHouseDialect {}),
         "sqlite" => Box::new(SQLiteDialect {}),
         "mssql" => Box::new(MsSqlDialect {}),
         _ => Box::new(GenericDialect {}),

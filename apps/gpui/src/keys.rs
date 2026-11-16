@@ -1,5 +1,5 @@
-use bookie_gpui::cursor::{Cursor, move_cursor};
 use bookie_gpui::keymap::{Chord, Command};
+use bookie_results::grid_cursor::{Cursor, move_cursor};
 use gpui::{Context, Focusable, KeyDownEvent, KeystrokeEvent, Window};
 
 use crate::{GridView, Tab, palette_step};
@@ -7,18 +7,55 @@ use crate::{GridView, Tab, palette_step};
 impl GridView {
     pub(super) fn intercept_key(&mut self, event: &KeystrokeEvent, window: &mut Window, cx: &mut Context<Self>) {
         let modifiers = event.keystroke.modifiers;
+        if !self.grid_key_ready(window, modifiers.control || modifiers.alt) {
+            return;
+        }
+        let key = event.keystroke.key.as_str();
+        if modifiers.shift && matches!(key, "up" | "down") {
+            self.extend_selection_with_arrow(key);
+            cx.stop_propagation();
+            cx.notify();
+            return;
+        }
         let plain = !(modifiers.shift || modifiers.control || modifiers.alt);
-        let ready = self.focus.is_focused(window)
-            && plain
+        if plain && self.cross_page_edge(key) {
+            cx.stop_propagation();
+            cx.notify();
+        }
+    }
+
+    fn grid_key_ready(&self, window: &Window, blocked: bool) -> bool {
+        !blocked
+            && self.focus.is_focused(window)
             && self.editing.is_none()
             && self.compare.is_none()
             && !self.continuous
             && !self.palette_open
-            && self.tabs.shows_grid();
-        if ready && self.cross_page_edge(event.keystroke.key.as_str()) {
-            cx.stop_propagation();
-            cx.notify();
+            && self.tabs.shows_grid()
+    }
+
+    fn extend_selection_with_arrow(&mut self, key: &str) {
+        if let (None, Some(cursor)) = (self.selection, self.cell_cursor) {
+            self.click_row(self.base() + cursor.row as u64, false);
         }
+        if self.cross_page_edge(key) {
+            if let Some(cursor) = self.cell_cursor {
+                self.click_row(self.base() + cursor.row as u64, true);
+            }
+            return;
+        }
+        let Some(next) = move_cursor(
+            self.cell_cursor,
+            key,
+            self.visible_count(),
+            self.source.columns().len(),
+            self.viewport_rows,
+            false,
+        ) else {
+            return;
+        };
+        self.place_cursor(Some(next));
+        self.click_row(self.base() + next.row as u64, true);
     }
 
     pub(super) fn cross_page_edge(&mut self, key: &str) -> bool {
@@ -99,7 +136,11 @@ impl GridView {
             Command::NewQuery => {
                 self.tabs.open_query();
                 self.sync_grid_owner();
-                window.focus(&self.focus, cx);
+                if self.live.is_some() {
+                    self.focus_editor = true;
+                } else {
+                    window.focus(&self.focus, cx);
+                }
             }
             Command::RunQuery if matches!(self.tabs.current(), Tab::Query) => self.run_query(cx),
             Command::RunQuery => {}

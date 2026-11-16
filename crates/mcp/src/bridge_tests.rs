@@ -244,6 +244,27 @@ fn only_a_provable_read_skips_the_write_scope_check() {
 }
 
 #[test]
+fn external_source_functions_need_the_write_scope_on_clickhouse_and_sql_server() {
+    for sql in [
+        "SELECT * FROM file('/etc/passwd', 'CSV')",
+        "SELECT * FROM `url`('http://x', 'CSV')",
+        "SELECT * FROM s3('https://b/x.csv', 'CSV')",
+        "SELECT * FROM remote('h', db.t)",
+    ] {
+        assert!(sql_looks_like_write(sql, "clickhouse"), "{sql}");
+    }
+    for sql in [
+        "SELECT * FROM OPENROWSET('SQLNCLI', 'Server=o;', 'SELECT 1') AS d",
+        "SELECT * FROM [OPENQUERY](linked, 'SELECT 1')",
+        "SELECT * FROM OPENDATASOURCE('SQLNCLI', 'Data Source=o;').db.dbo.t",
+    ] {
+        assert!(sql_looks_like_write(sql, "mssql"), "{sql}");
+    }
+    assert!(!sql_looks_like_write("SELECT file FROM t", "clickhouse"));
+    assert!(!sql_looks_like_write("SELECT * FROM dbo.t", "mssql"));
+}
+
+#[test]
 fn a_mysql_preview_is_refused_for_statements_that_implicitly_commit() {
     for sql in [
         "DROP TABLE orders",

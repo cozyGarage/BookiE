@@ -34,3 +34,15 @@ An exported file is a data result users may save or share. Silently mixing multi
 ## Export file staging
 
 An export writes to an exclusive, unique, private temporary file in the destination's directory and replaces the destination only after a successful write, flush and sync. A shared `<destination>.tablepro-part` name let one writer rename another's file and let a symlink redirect writes. Concurrent successful exports use last-completed replacement, and the rule gives no directory-fsync durability after power loss and no database snapshot.
+
+## Amendment (2026-11-12): PostgreSQL graduates from refuse to ship
+
+Issue #2132 enables full-table export for PostgreSQL only. Database snapshots ([ADR 0015](0015-database-snapshots.md)) are a different mechanism and are not needed.
+
+- The driver declares `supports_snapshot_export`. Only PostgreSQL does. The scope choice, the dialog and the writer lift the refusal only for a driver that declares it. Every other engine keeps the refusal text.
+- Entire Table opens one audited, guarded session, runs `BEGIN READ ONLY ISOLATION LEVEL REPEATABLE READ`, and reads the table with one forward-only cursor over the browse `SELECT`. It respects the active filter and sort and uses no offset paging. The same cursor feeds the existing paged file writer.
+- The cursor and session close on success, failure and cancel. Cancellation and the timeout reach the cursor fetch through the operation control. A denied, failed, cancelled or timed-out read writes its terminal audit state.
+- A session that cannot be opened or held produces an error and no file; the writer's temporary-file rule discards partial output.
+- The proof is a PostgreSQL test that inserts, updates and deletes rows from a second connection between pages and asserts that the file holds the rows as they were when the export began.
+
+Other engines stay refused until each has an equivalent path and the same mutation-between-pages proof.

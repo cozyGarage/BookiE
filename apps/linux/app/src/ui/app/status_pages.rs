@@ -9,9 +9,7 @@ const ABOUT_DEVELOPERS: &[&str] = &["BookiE contributors https://github.com/cozy
 
 impl App {
     pub(super) fn show_welcome_page(&self, _sender: ComponentSender<Self>) {
-        // Welcome lives outside the ViewStack — it's the disconnected mode.
-        // The ViewSwitcherBar is hidden via on_disconnect so the welcome
-        // view occupies the full toolbar surface.
+        // Welcome stays outside the ViewStack; disconnect hides the ViewSwitcherBar.
         self.show_in_content_holder(self.welcome_view.widget());
     }
 
@@ -24,20 +22,11 @@ impl App {
         }
     }
 
-    /// Used during connect to convey "Connecting…". Persistent toast
-    /// (timeout 0) — held in `connect_progress_toast` until the connect
-    /// resolves, at which point `dismiss_loading_page` clears it. Replaces
-    /// the prior fire-and-forget toast which auto-dismissed at 2 s, well
-    /// before remote / SSH-tunnelled connections resolve.
+    /// Keep a persistent connect toast until remote and SSH connection attempts resolve.
     pub(super) fn set_loading_page(&mut self, title: &str, description: &str, sender: &ComponentSender<Self>) {
         if let Some(prev) = self.connect_progress_toast.take() {
             prev.dismiss();
         }
-        // GNOME inline-metadata separator (` · `) keeps the two
-        // strings reading as one phrase rather than two sentences
-        // colliding ("Connecting… Opening MyDB" → "Connecting… ·
-        // Opening MyDB"). Same convention used in the browse
-        // paginator label and the editor status line.
         let body = if description.is_empty() {
             title.to_string()
         } else {
@@ -45,9 +34,10 @@ impl App {
         };
         let toast = crate::ui::plain_text::toast(&body);
         toast.set_timeout(0);
-        toast.set_button_label(Some(&crate::tr!("Cancel")));
+        toast.set_button_label(Some(&bookie_app_services::tr!("Cancel")));
         let cancel_sender = sender.clone();
-        toast.connect_button_clicked(move |_| cancel_sender.input(AppMsg::CancelConnect));
+        toast
+            .connect_button_clicked(move |_| cancel_sender.input(AppMsg::Connection(super::ConnectionMessage::Cancel)));
         self.toast_overlay.add_toast(toast.clone());
         self.connect_progress_toast = Some(toast);
     }
@@ -58,10 +48,7 @@ impl App {
         }
     }
 
-    /// Convenience for `set_status_page(Error, ...)` and similar; in the
-    /// connected state, browse-tab errors flow through BrowseTabInput::ShowError.
-    /// Used here only for app-level (non-tab-scoped) failures — surfaces
-    /// as an alert dialog so the user actually notices.
+    /// Surface app-level failures in an alert; tab-scoped failures use BrowseTab.
     pub(super) fn set_status_page(&self, _kind: super::StatusKind, title: &str, description: &str) {
         self.show_error_alert(title, description);
     }
@@ -72,10 +59,8 @@ impl App {
 
     pub(super) fn show_error_alert(&self, title: &str, message: &str) {
         let dialog = adw::AlertDialog::new(Some(title), Some(message));
-        // GNOME HIG dismiss-only alert: "Close" reads cleaner than "OK"
-        // (which implies acknowledgement of an action the user took)
-        // and matches GNOME Settings' info-alert convention.
-        dialog.add_response("close", &crate::tr!("Close"));
+        // "Close" avoids implying acknowledgement of a completed action.
+        dialog.add_response("close", &bookie_app_services::tr!("Close"));
         dialog.set_default_response(Some("close"));
         dialog.set_close_response("close");
         dialog.present(Some(&self.window));
@@ -87,7 +72,7 @@ impl App {
             return;
         }
         let Some(history) = self.history.clone() else {
-            self.show_toast(&crate::tr!("Query history is unavailable"));
+            self.show_toast(&bookie_app_services::tr!("Query history is unavailable"));
             return;
         };
         let panel = HistoryDialog::builder()
@@ -118,41 +103,48 @@ impl App {
     }
 
     pub(super) fn on_show_about(&self) {
-        let dialog = adw::AboutDialog::builder()
-            .application_name(crate::tr!("BookiE"))
+        let mut builder = adw::AboutDialog::builder()
+            .application_name(bookie_app_services::tr!("BookiE"))
             .application_icon(crate::config::APP_ID)
-            .developer_name(crate::tr!("BookiE contributors"))
-            .version(env!("CARGO_PKG_VERSION"))
+            .developer_name(bookie_app_services::tr!("BookiE contributors"))
+            .version(crate::config::VERSION)
             .website("https://github.com/cozyGarage/BookiE")
             .issue_url("https://github.com/cozyGarage/BookiE/issues")
             .support_url("https://github.com/cozyGarage/BookiE/discussions")
-            .copyright(crate::tr!("© 2025–2026 BookiE contributors"))
+            .copyright(bookie_app_services::tr!("© 2025–2026 BookiE contributors"))
             .license_type(gtk::License::Agpl30)
-            .comments(crate::tr!(
+            .comments(bookie_app_services::tr!(
                 "A native Linux database client built with GTK4 + libadwaita."
-            ))
-            .build();
+            ));
+        if let Some((version, notes)) = super::whats_new::running_release_notes() {
+            builder = builder.release_notes_version(version).release_notes(notes);
+        }
+        let dialog = builder.build();
         dialog.set_developers(ABOUT_DEVELOPERS);
-        dialog.set_translator_credits(&crate::tr!("translator-credits"));
+        dialog.set_translator_credits(&bookie_app_services::tr!("translator-credits"));
+        dialog.add_link(
+            &bookie_app_services::tr!("Releases"),
+            "https://github.com/cozyGarage/BookiE/releases",
+        );
         crate::ui::leak_probe::track("about", &dialog);
         dialog.present(Some(&self.window));
     }
 
     pub(super) fn on_explain_active_query(&self) {
         let Some(id) = self.selected_workspace_tab_id() else {
-            self.show_toast(&crate::tr!("Open an SQL editor tab to explain a query."));
+            self.show_toast(&bookie_app_services::tr!("Open an SQL editor tab to explain a query."));
             return;
         };
         let tabs = self.workspace_tabs.borrow();
         let Some(super::WorkspaceTab::Editor(slot)) = tabs.get(&id) else {
-            self.show_toast(&crate::tr!("Open an SQL editor tab to explain a query."));
+            self.show_toast(&bookie_app_services::tr!("Open an SQL editor tab to explain a query."));
             return;
         };
         let sql = slot.query.clone();
         drop(tabs);
         crate::ui::explain_dialog::present(
             &self.window,
-            self.connection_id,
+            self.resolve_tab_connection(id).ok(),
             &sql,
             &self.database,
             &self.preferences,

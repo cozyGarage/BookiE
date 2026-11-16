@@ -1,3 +1,5 @@
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 #[cfg(target_os = "linux")]
 use std::os::{fd::AsRawFd, unix::fs::MetadataExt};
 use std::{
@@ -11,9 +13,9 @@ use duckdb::{
 };
 
 use bookie_core::{
-    ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverMaturity, EnumInputStyle, ExecResult,
-    MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBudget, QueryRows, TableInfo, Value,
-    run_server_cancellable,
+    ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverMaturity, DriverValueInputCapabilities,
+    EnumInputStyle, ExecResult, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBudget, QueryRows, TableInfo,
+    Value, run_server_cancellable,
 };
 use tempfile::TempDir;
 
@@ -24,12 +26,29 @@ pub struct DuckdbDriver;
 
 #[async_trait]
 impl DatabaseDriver for DuckdbDriver {
+    fn value_input_capabilities(&self) -> DriverValueInputCapabilities {
+        DriverValueInputCapabilities {
+            extended_calendar_dates: true,
+            timestamp_with_timezone: true,
+            temporal_fraction_precision: true,
+            ..DriverValueInputCapabilities::default()
+        }
+    }
+
     fn enum_input_style(&self) -> EnumInputStyle {
         EnumInputStyle::SqlQuotedLabel
     }
 
     fn id(&self) -> &'static str {
         "duckdb"
+    }
+
+    fn supports_value_search(&self) -> bool {
+        true
+    }
+
+    fn import_upsert(&self) -> bookie_core::ImportUpsertStyle {
+        bookie_core::ImportUpsertStyle::OnConflict
     }
 
     fn display_name(&self) -> &'static str {
@@ -60,6 +79,10 @@ impl DatabaseDriver for DuckdbDriver {
         true
     }
 
+    fn initialize_new_database_file(&self, path: &std::path::Path) -> Result<(), DriverError> {
+        initialize_database_file(path)
+    }
+
     async fn connect(&self, opts: ConnectOptions) -> Result<Box<dyn Connection>, DriverError> {
         let path = opts.database.clone();
         let read_only = opts.read_only;
@@ -88,6 +111,7 @@ fn open_path_with_access(
             "read-only DuckDB requires a database file or a selected flat file".into(),
         ));
     }
+    require_existing_file(path)?;
     if let Some(reader_fn) = flat_file_reader_fn(path) {
         let (conn, selected_file) = open_read_only_flat_file(path, reader_fn)?;
         return Ok((conn, Some(selected_file)));
@@ -250,9 +274,7 @@ fn open_path(path: &str) -> Result<DuckConnection, DriverError> {
     if path.is_empty() || path == ":memory:" {
         return DuckConnection::open_in_memory().map_err(map_duck_error);
     }
-    if !std::path::Path::new(path).exists() {
-        return Err(DriverError::Internal(format!("database file does not exist: {path}")));
-    }
+    require_existing_file(path)?;
     let Some(reader_fn) = flat_file_reader_fn(path) else {
         return DuckConnection::open(path).map_err(map_duck_error);
     };
@@ -265,6 +287,25 @@ fn open_path(path: &str) -> Result<DuckConnection, DriverError> {
     );
     conn.execute(&sql, []).map_err(map_duck_error)?;
     Ok(conn)
+}
+
+fn initialize_database_file(path: &std::path::Path) -> Result<(), DriverError> {
+    let directory = path.parent().filter(|parent| !parent.as_os_str().is_empty());
+    let staging = tempfile::Builder::new()
+        .prefix(".bookie-new-")
+        .tempdir_in(directory.unwrap_or_else(|| std::path::Path::new(".")))
+        .map_err(map_file_error)?;
+    let staged = staging.path().join("database");
+    DuckConnection::open(&staged).map_err(map_duck_error)?;
+    std::fs::set_permissions(&staged, std::fs::Permissions::from_mode(0o600)).map_err(map_file_error)?;
+    std::fs::rename(&staged, path).map_err(map_file_error)
+}
+
+fn require_existing_file(path: &str) -> Result<(), DriverError> {
+    if std::path::Path::new(path).exists() {
+        return Ok(());
+    }
+    Err(DriverError::DatabaseFileNotFound(path.to_string()))
 }
 
 fn flat_file_reader_fn(path: &str) -> Option<&'static str> {
@@ -339,7 +380,7 @@ impl DuckdbConnection {
                 handle.interrupt();
                 Ok(())
             },
-            |error| matches!(error, DriverError::Query { message, .. } if message.to_lowercase().contains("interrupt")),
+            confirms_interrupt,
             control,
         )
         .await
@@ -458,11 +499,19 @@ impl Connection for DuckdbConnection {
         offset: u64,
         limit: u64,
     ) -> Result<QueryResult, DriverError> {
-        let sql = format!(
-            "SELECT * FROM {} LIMIT {limit} OFFSET {offset}",
-            qualified(schema, table)
-        );
-        self.query(&sql).await
+        self.query(&rows_page_sql(schema, table, offset, limit)).await
+    }
+
+    async fn fetch_rows_controlled(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        offset: u64,
+        limit: u64,
+        control: &OperationControl,
+    ) -> Result<QueryResult, DriverError> {
+        self.query_controlled(&rows_page_sql(schema, table, offset, limit), control)
+            .await
     }
 
     fn supports_server_cancellation(&self) -> bool {
@@ -544,8 +593,36 @@ impl Connection for DuckdbConnection {
     }
 
     async fn execute_in_transaction(&self, statements: &[(String, Vec<Value>)]) -> Result<Vec<u64>, DriverError> {
+        self.execute_in_transaction_checked(statements, &[]).await
+    }
+
+    async fn execute_in_transaction_controlled(
+        &self,
+        statements: &[(String, Vec<Value>)],
+        control: &OperationControl,
+    ) -> Result<Vec<u64>, DriverError> {
+        self.execute_in_transaction_checked_controlled(statements, &[], control)
+            .await
+    }
+
+    async fn execute_in_transaction_checked_controlled(
+        &self,
+        statements: &[(String, Vec<Value>)],
+        expect_one: &[usize],
+        control: &OperationControl,
+    ) -> Result<Vec<u64>, DriverError> {
+        self.interruptible(self.execute_in_transaction_checked(statements, expect_one), control)
+            .await
+    }
+
+    async fn execute_in_transaction_checked(
+        &self,
+        statements: &[(String, Vec<Value>)],
+        expect_one: &[usize],
+    ) -> Result<Vec<u64>, DriverError> {
         let conn = Arc::clone(&self.session);
         let statements = statements.to_vec();
+        let expect_one = expect_one.to_vec();
         blocking(move || {
             let guard = conn
                 .conn
@@ -559,25 +636,16 @@ impl Connection for DuckdbConnection {
                 } else {
                     let bind = match values_to_duck_params(params) {
                         Ok(bind) => bind,
-                        Err(error) => {
-                            let _ = guard.execute_batch("ROLLBACK");
-                            return Err(DriverError::Transaction {
-                                statement_index: idx,
-                                source: Box::new(error),
-                            });
-                        }
+                        Err(error) => return Err(rolled_back(&guard, idx, error)),
                     };
                     guard.execute(sql, params_from_iter(bind.iter()))
                 };
                 match result {
-                    Ok(n) => affected.push(n as u64),
-                    Err(e) => {
-                        let _ = guard.execute_batch("ROLLBACK");
-                        return Err(DriverError::Transaction {
-                            statement_index: idx,
-                            source: Box::new(map_duck_error(e)),
-                        });
+                    Ok(n) if expect_one.contains(&idx) && n != 1 => {
+                        return Err(rolled_back(&guard, idx, DriverError::ConcurrentModification));
                     }
+                    Ok(n) => affected.push(n as u64),
+                    Err(e) => return Err(rolled_back(&guard, idx, map_duck_error(e))),
                 }
             }
             guard.execute_batch("COMMIT").map_err(map_duck_error)?;
@@ -601,6 +669,35 @@ impl Connection for DuckdbConnection {
 
     async fn close(self: Box<Self>) -> Result<(), DriverError> {
         Ok(())
+    }
+}
+
+fn rows_page_sql(schema: Option<&str>, table: &str, offset: u64, limit: u64) -> String {
+    format!(
+        "SELECT * FROM {} LIMIT {limit} OFFSET {offset}",
+        qualified(schema, table)
+    )
+}
+
+fn confirms_interrupt(error: &DriverError) -> bool {
+    match error {
+        DriverError::Transaction { source, .. } => confirms_interrupt(source),
+        DriverError::Query { message, .. } => message.to_lowercase().contains("interrupt"),
+        _ => false,
+    }
+}
+
+fn rolled_back(connection: &DuckConnection, statement_index: usize, source: DriverError) -> DriverError {
+    match connection.execute_batch("ROLLBACK") {
+        Ok(()) => DriverError::Transaction {
+            statement_index,
+            source: Box::new(source),
+        },
+        Err(error) => DriverError::TransactionRollbackFailed {
+            statement_index,
+            source: Box::new(source),
+            rollback_error: Box::new(map_duck_error(error)),
+        },
     }
 }
 

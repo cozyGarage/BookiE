@@ -28,7 +28,7 @@ impl App {
             return;
         }
         self.set_row_op_in_flight(false);
-        let msg = warning.unwrap_or_else(|| crate::tr!("Saved"));
+        let msg = warning.unwrap_or_else(|| bookie_app_services::tr!("Saved"));
         let toast = crate::ui::plain_text::toast(&msg);
         toast.set_timeout(4);
         self.toast_overlay.add_toast(toast);
@@ -54,6 +54,7 @@ impl App {
 
     pub(super) fn finish_browse_save_failure(&mut self, tab_id: Uuid, save_id: Uuid, message: String) {
         self.set_row_op_in_flight(false);
+        self.announce_save_failure(tab_id, &message);
         cancel_browse_save_intents(
             &mut self.close_after_save.borrow_mut(),
             &self.close_window_after_save,

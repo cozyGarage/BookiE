@@ -83,19 +83,36 @@ fn flat_toggle(label: &str, tooltip: &str) -> gtk::ToggleButton {
     toggle
 }
 
-fn build_widgets(names: &[String], can_replace: bool) -> FindWidgets {
-    let content = gtk::Box::new(gtk::Orientation::Vertical, 8);
-    content.append(&adw::HeaderBar::new());
+fn search_entry() -> gtk::SearchEntry {
     let search = gtk::SearchEntry::builder()
-        .placeholder_text(crate::tr!("Search the loaded rows"))
+        .placeholder_text(bookie_app_services::tr!("Search the loaded rows"))
         .margin_start(12)
         .margin_end(12)
         .hexpand(true)
         .build();
-    search.update_property(&[gtk::accessible::Property::Label(&crate::tr!("Search the loaded rows"))]);
-    let match_case = flat_toggle("Aa", &crate::tr!("Match case"));
-    let whole_words = flat_toggle("W", &crate::tr!("Whole words"));
-    let regex = flat_toggle(".*", &crate::tr!("Regular expression"));
+    search.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!(
+        "Search the loaded rows"
+    ))]);
+    search
+}
+
+fn dim_status_label() -> gtk::Label {
+    let status = gtk::Label::builder()
+        .xalign(0.0)
+        .margin_start(12)
+        .margin_end(12)
+        .build();
+    status.add_css_class("dim-label");
+    status
+}
+
+fn build_widgets(names: &[String], can_replace: bool) -> FindWidgets {
+    let content = gtk::Box::new(gtk::Orientation::Vertical, 8);
+    content.append(&adw::HeaderBar::new());
+    let search = search_entry();
+    let match_case = flat_toggle("Aa", &bookie_app_services::tr!("Match case"));
+    let whole_words = flat_toggle("W", &bookie_app_services::tr!("Whole words"));
+    let regex = flat_toggle(".*", &bookie_app_services::tr!("Regular expression"));
     let columns = column_dropdown(names);
     let find_row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
     find_row.set_margin_start(12);
@@ -108,12 +125,7 @@ fn build_widgets(names: &[String], can_replace: bool) -> FindWidgets {
     content.append(&find_row);
     let (replace_row, replace_entry, replace_one, replace_all, cancel_replace) = replace_controls(can_replace);
     content.append(&replace_row);
-    let status = gtk::Label::builder()
-        .xalign(0.0)
-        .margin_start(12)
-        .margin_end(12)
-        .build();
-    status.add_css_class("dim-label");
+    let status = dim_status_label();
     content.append(&status);
     let list = gtk::ListBox::builder()
         .selection_mode(gtk::SelectionMode::Single)
@@ -146,11 +158,11 @@ fn build_widgets(names: &[String], can_replace: bool) -> FindWidgets {
 }
 
 fn column_dropdown(names: &[String]) -> gtk::DropDown {
-    let mut labels = vec![crate::tr!("All columns")];
+    let mut labels = vec![bookie_app_services::tr!("All columns")];
     labels.extend(names.iter().cloned());
     let model = gtk::StringList::new(&labels.iter().map(String::as_str).collect::<Vec<_>>());
     let dropdown = gtk::DropDown::new(Some(model), gtk::Expression::NONE);
-    dropdown.set_tooltip_text(Some(&crate::tr!("Column scope")));
+    dropdown.set_tooltip_text(Some(&bookie_app_services::tr!("Column scope")));
     dropdown
 }
 
@@ -160,15 +172,15 @@ fn replace_controls(visible: bool) -> (gtk::Box, gtk::Entry, gtk::Button, gtk::B
     row.set_margin_end(12);
     row.set_visible(visible);
     let entry = gtk::Entry::builder()
-        .placeholder_text(crate::tr!("Replace"))
+        .placeholder_text(bookie_app_services::tr!("Replace"))
         .hexpand(true)
         .build();
-    entry.update_property(&[gtk::accessible::Property::Label(&crate::tr!("Replace"))]);
-    let replace_one = gtk::Button::with_label(&crate::tr!("Replace"));
+    entry.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!("Replace"))]);
+    let replace_one = gtk::Button::with_label(&bookie_app_services::tr!("Replace"));
     replace_one.add_css_class("flat");
-    let replace_all = gtk::Button::with_label(&crate::tr!("Replace all"));
+    let replace_all = gtk::Button::with_label(&bookie_app_services::tr!("Replace all"));
     replace_all.add_css_class("flat");
-    let cancel_replace = gtk::Button::with_label(&crate::tr!("Cancel"));
+    let cancel_replace = gtk::Button::with_label(&bookie_app_services::tr!("Cancel"));
     cancel_replace.add_css_class("flat");
     cancel_replace.set_visible(false);
     row.append(&entry);
@@ -195,12 +207,17 @@ fn result_row(label: &str) -> gtk::ListBoxRow {
 }
 
 pub(super) fn preview(text: &str) -> String {
-    let single_line: String = text.chars().map(|c| if c.is_control() { ' ' } else { c }).collect();
-    if single_line.chars().count() <= PREVIEW_CHARS {
-        return single_line;
+    preview_chars(text.chars())
+}
+
+pub(super) fn preview_chars(chars: impl Iterator<Item = char>) -> String {
+    let mut chars = chars.map(|character| if character.is_control() { ' ' } else { character });
+    let shown = chars.by_ref().take(PREVIEW_CHARS).collect::<String>();
+    if chars.next().is_some() {
+        format!("{shown}…")
+    } else {
+        shown
     }
-    let cut: String = single_line.chars().take(PREVIEW_CHARS).collect();
-    format!("{cut}…")
 }
 
 fn status_text(query: &str, shown: usize, problem: Option<&str>) -> String {
@@ -210,11 +227,11 @@ fn status_text(query: &str, shown: usize, problem: Option<&str>) -> String {
     if query.trim().is_empty() {
         String::new()
     } else if shown == 0 {
-        crate::tr!("No matching rows")
+        bookie_app_services::tr!("No matching rows")
     } else if shown >= MAX_MATCHES {
-        crate::tr!("The first {count} matches").replace("{count}", &MAX_MATCHES.to_string())
+        bookie_app_services::tr!("The first {count} matches").replace("{count}", &MAX_MATCHES.to_string())
     } else {
-        crate::tr!("{count} matching rows").replace("{count}", &shown.to_string())
+        bookie_app_services::tr!("{count} matching rows").replace("{count}", &shown.to_string())
     }
 }
 
@@ -255,7 +272,7 @@ fn show_matches(widgets: &FindWidgets, model: &gtk::SelectionModel, names: &[Str
     }
     let (hits, problem) = match found {
         Ok(hits) => (hits, None),
-        Err(_) => (Vec::new(), Some(crate::tr!("Invalid regular expression"))),
+        Err(_) => (Vec::new(), Some(bookie_app_services::tr!("Invalid regular expression"))),
     };
     for hit in &hits {
         let column = names.get(hit.column).map_or("", String::as_str);
@@ -280,7 +297,7 @@ fn close_on(dialog: &adw::Dialog) -> impl Fn() + 'static {
 
 pub(super) fn present(view: &gtk::ColumnView, target: Rc<FindTarget>) {
     let dialog = adw::Dialog::builder()
-        .title(crate::tr!("Find in Loaded Rows"))
+        .title(bookie_app_services::tr!("Find in Loaded Rows"))
         .content_width(560)
         .content_height(500)
         .build();
@@ -325,7 +342,9 @@ fn wire_search_controls(
         let (operation, widgets) = (operation, widgets.clone());
         move || {
             if cancel_replace_operation(&operation) {
-                widgets.status.set_text(&crate::tr!("Replacement cancelled"));
+                widgets
+                    .status
+                    .set_text(&bookie_app_services::tr!("Replacement cancelled"));
             }
             set_replace_running(&widgets, false);
         }
@@ -426,7 +445,9 @@ fn connect_replace(
         move |_| {
             cancel_replace_operation(&operation);
             set_replace_running(&widgets, false);
-            widgets.status.set_text(&crate::tr!("Replacement cancelled"));
+            widgets
+                .status
+                .set_text(&bookie_app_services::tr!("Replacement cancelled"));
         }
     });
     let operation = operation.clone();
@@ -460,6 +481,14 @@ fn replace_every(view: &gtk::ColumnView, widgets: &FindWidgets, target: &FindTar
     start_replace(view, widgets, target, None, operation);
 }
 
+fn replace_query(widgets: &FindWidgets, only: Option<(u32, usize)>) -> FindQuery {
+    let mut query = current_query(widgets);
+    if let Some((_, column)) = only {
+        query.column = Some(column);
+    }
+    query
+}
+
 fn start_replace(
     view: &gtk::ColumnView,
     widgets: &FindWidgets,
@@ -470,13 +499,7 @@ fn start_replace(
     let Some(model) = view.model() else {
         return;
     };
-    let query = {
-        let mut query = current_query(widgets);
-        if let Some((_, column)) = only {
-            query.column = Some(column);
-        }
-        query
-    };
+    let query = replace_query(widgets, only);
     let replacement = widgets.replace_entry.text().to_string();
     let row_store = model
         .downcast_ref::<gtk::MultiSelection>()
@@ -485,13 +508,13 @@ fn start_replace(
     let Some(row_store) = row_store else {
         widgets
             .status
-            .set_text(&crate::tr!("These rows are no longer available"));
+            .set_text(&bookie_app_services::tr!("These rows are no longer available"));
         return;
     };
     if row_store.generation() != target.generation {
         widgets
             .status
-            .set_text(&crate::tr!("These rows changed; run the search again"));
+            .set_text(&bookie_app_services::tr!("These rows changed; run the search again"));
         return;
     }
     let Some(sender) = target.edit.clone() else { return };
@@ -503,7 +526,9 @@ fn start_replace(
         .map(|(_, cancel)| cancel.clone())
         .unwrap_or_default();
     set_replace_running(widgets, true);
-    widgets.status.set_text(&crate::tr!("Preparing replacement…"));
+    widgets
+        .status
+        .set_text(&bookie_app_services::tr!("Preparing replacement…"));
     let total = only.map_or(model.n_items(), |(position, _)| position.saturating_add(1));
     let start_position = only.map_or(0, |(position, _)| position);
     let capture = ReplaceCapture {
@@ -543,7 +568,7 @@ fn collect_snapshot_chunk(capture: &ReplaceCapture) -> glib::ControlFlow {
             &capture.widgets,
             &capture.operation,
             capture.id,
-            crate::tr!("These rows changed; run the search again"),
+            bookie_app_services::tr!("These rows changed; run the search again"),
         );
         return glib::ControlFlow::Break;
     }
@@ -630,7 +655,7 @@ fn plan_and_apply_replacements(plan: ReplacePlan) {
                     &widgets,
                     &operation,
                     id,
-                    crate::tr!("Replacement could not be completed"),
+                    bookie_app_services::tr!("Replacement could not be completed"),
                 );
                 return;
             }
@@ -648,7 +673,12 @@ fn plan_and_apply_replacements(plan: ReplacePlan) {
             })
             .is_err()
         {
-            finish_replace_ui(&widgets, &operation, id, crate::tr!("Replacement could not be applied"));
+            finish_replace_ui(
+                &widgets,
+                &operation,
+                id,
+                bookie_app_services::tr!("Replacement could not be applied"),
+            );
             return;
         }
         finish_replace_apply(&widgets, &operation, id, result.await);
@@ -675,7 +705,12 @@ fn finish_replace_apply(
             finish_replace_ui(widgets, operation, id, replace_status(ack.replacements, ack.skipped));
         }
         Ok(Err(error)) => finish_replace_ui(widgets, operation, id, replace_apply_error_text(error)),
-        Err(_) => finish_replace_ui(widgets, operation, id, crate::tr!("Replacement could not be applied")),
+        Err(_) => finish_replace_ui(
+            widgets,
+            operation,
+            id,
+            bookie_app_services::tr!("Replacement could not be applied"),
+        ),
     }
 }
 
@@ -725,33 +760,33 @@ fn finish_replace_ui(widgets: &FindWidgets, operation: &ReplaceOperation, id: u6
 
 fn replace_error_text(error: super::replace::ReplaceError) -> String {
     match error {
-        super::replace::ReplaceError::Cancelled => crate::tr!("Replacement cancelled"),
+        super::replace::ReplaceError::Cancelled => bookie_app_services::tr!("Replacement cancelled"),
         super::replace::ReplaceError::Budget => {
-            crate::tr!("Replacement is too large; narrow the selection or use a shorter replacement")
+            bookie_app_services::tr!("Replacement is too large; narrow the selection or use a shorter replacement")
         }
-        super::replace::ReplaceError::Match(_) => crate::tr!("Invalid regular expression"),
-        super::replace::ReplaceError::Stale => crate::tr!("These rows changed; run the search again"),
+        super::replace::ReplaceError::Match(_) => bookie_app_services::tr!("Invalid regular expression"),
+        super::replace::ReplaceError::Stale => bookie_app_services::tr!("These rows changed; run the search again"),
     }
 }
 
 fn replace_apply_error_text(error: bookie_app_services::grid_replace::ReplaceApplyError) -> String {
     use bookie_app_services::grid_replace::ReplaceApplyError;
     match error {
-        ReplaceApplyError::Cancelled => crate::tr!("Replacement cancelled"),
-        ReplaceApplyError::Stale => crate::tr!("These rows changed; run the search again"),
-        ReplaceApplyError::NotEditable => crate::tr!("One or more cells can no longer be edited"),
-        ReplaceApplyError::Saving => crate::tr!("Finish saving changes before replacing values"),
-        ReplaceApplyError::InvalidValue => crate::tr!("One or more replacement values are invalid"),
+        ReplaceApplyError::Cancelled => bookie_app_services::tr!("Replacement cancelled"),
+        ReplaceApplyError::Stale => bookie_app_services::tr!("These rows changed; run the search again"),
+        ReplaceApplyError::NotEditable => bookie_app_services::tr!("One or more cells can no longer be edited"),
+        ReplaceApplyError::Saving => bookie_app_services::tr!("Finish saving changes before replacing values"),
+        ReplaceApplyError::InvalidValue => bookie_app_services::tr!("One or more replacement values are invalid"),
     }
 }
 
 fn replace_status(replacements: usize, skipped: usize) -> String {
     if replacements == 0 && skipped == 0 {
-        crate::tr!("No replacements")
+        bookie_app_services::tr!("No replacements")
     } else if skipped == 0 {
-        crate::tr!("Replaced {count} matches").replace("{count}", &replacements.to_string())
+        bookie_app_services::tr!("Replaced {count} matches").replace("{count}", &replacements.to_string())
     } else {
-        crate::tr!("Replaced {count} matches · skipped {skipped} cells")
+        bookie_app_services::tr!("Replaced {count} matches · skipped {skipped} cells")
             .replace("{count}", &replacements.to_string())
             .replace("{skipped}", &skipped.to_string())
     }

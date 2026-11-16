@@ -58,7 +58,7 @@ impl Picker {
 
 fn shown(label: &str) -> String {
     if label.is_empty() {
-        crate::tr!("(empty)")
+        bookie_app_services::tr!("(empty)")
     } else {
         label.to_owned()
     }
@@ -121,7 +121,7 @@ fn set_content(picker: Picker, labels: Vec<String>, current: &str) -> gtk::Widge
             check.set_active(!check.is_active());
         }
     });
-    let apply = gtk::Button::builder().label(crate::tr!("Apply")).build();
+    let apply = gtk::Button::builder().label(bookie_app_services::tr!("Apply")).build();
     apply.add_css_class("suggested-action");
     apply.connect_clicked(move |_| {
         let checked: Vec<bool> = boxes.iter().map(|check| check.is_active()).collect();

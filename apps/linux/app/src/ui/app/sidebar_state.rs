@@ -1,11 +1,12 @@
 use bookie_core::TableInfo;
 use relm4::adw;
 use relm4::gtk::prelude::*;
+use relm4::{ComponentSender, gtk};
+use std::time::{Duration, Instant};
 
 use super::App;
-use super::init_sidebar::refresh_visible;
-use crate::services::sidebar_tree::{CollapseState, NodeKind, Reveal, build_nodes, reveal_target};
-use crate::ui::sidebar_row::{GroupInit, SchemaCatalogActions, SidebarObjectKind, SidebarRowInit, SidebarRowMsg};
+use crate::services::sidebar_tree::{CollapseState, NodeKind, Reveal, build_nodes_with_temporary, reveal_target};
+use crate::ui::sidebar_row::{GroupInit, SchemaCatalogActions, SidebarObjectKind, SidebarRowInit};
 
 fn reveal_sidebar_unless_overlay(split_view: &adw::OverlaySplitView, generation: &std::rc::Rc<std::cell::Cell<u32>>) {
     reveal_with(split_view, generation, show_unless_overlay);
@@ -76,9 +77,9 @@ impl App {
         sidebar_follows_connection(&self.split_view, &self.sidebar_toggle, connected);
     }
 
-    pub(super) fn repopulate_sidebar(&mut self, tables: &[TableInfo]) {
+    pub(super) fn repopulate_sidebar(&mut self, tables: &[TableInfo], _sender: ComponentSender<App>) {
         self.sidebar_tables = tables.to_vec();
-        let mut nodes = build_nodes(tables, &self.sidebar_views);
+        let mut nodes = build_nodes_with_temporary(tables, &self.sidebar_views, &self.sidebar_temporary_tables);
         let catalog_kinds = self
             .current_driver_id
             .as_deref()
@@ -86,76 +87,73 @@ impl App {
             .map_or(&[][..], |driver| driver.capabilities().catalog_object_kinds);
         crate::services::sidebar_tree::append_catalog_entries_with(&mut nodes, catalog_kinds, &self.sidebar_catalog);
         let schema_filter_enabled = self.current_driver_id.as_deref() == Some("postgres");
-        let driver_id = self.current_driver_id.as_deref().unwrap_or_default();
         let timeout =
             crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
-        let source =
+        let column_source =
             crate::ui::sidebar_columns::ColumnSource::capture(self.connection_id, self.database.clone(), timeout);
-        let row_construction_started = std::time::Instant::now();
-        let mut guard = self.sidebar_factory.guard();
-        guard.clear();
-        for node in &nodes {
-            guard.push_back(row_for(
-                node,
-                &self.sidebar_collapsed.borrow(),
-                !self.table_search.text().trim().is_empty(),
-                schema_filter_enabled,
-                driver_id,
-                source.clone(),
-            ));
-        }
-        drop(guard);
-        tracing::debug!(
-            sidebar_nodes = nodes.len(),
-            row_construction_ms = row_construction_started.elapsed().as_secs_f64() * 1000.0,
-            "sidebar rows constructed"
-        );
         *self.sidebar_nodes.borrow_mut() = nodes;
-        refresh_visible(
-            &self.sidebar_nodes,
-            &self.sidebar_collapsed,
-            &self.sidebar_visible,
-            &self.table_search.text(),
-            &self.sidebar_hidden_schemas,
-        );
-        self.sidebar_factory.widget().invalidate_filter();
+        let mut render_context = self.sidebar_render_context.borrow_mut();
+        render_context.driver_id = self.current_driver_id.clone().unwrap_or_default();
+        render_context.schema_filter_enabled = schema_filter_enabled;
+        render_context.column_source = column_source;
+        drop(render_context);
         self.schema_filter_button.set_visible(schema_filter_enabled);
+        self.refresh_sidebar_model();
         self.sync_sidebar_fold_button();
         self.sync_sidebar_selection();
     }
 
-    pub(super) fn sync_sidebar_expansion(&self) {
-        use crate::services::sidebar_tree::NodeKind;
-        let searching = !self.table_search.text().trim().is_empty();
-        let collapsed = self.sidebar_collapsed.borrow();
-        for (index, node) in self.sidebar_nodes.borrow().iter().enumerate() {
-            if matches!(node.kind, NodeKind::Schema | NodeKind::Group(_)) {
-                self.sidebar_factory.send(
-                    index,
-                    SidebarRowMsg::SetCollapsed(!searching && collapsed.is_collapsed(&node.key)),
-                );
-            }
+    pub(super) fn sync_sidebar_temporary_tables(&mut self, sender: ComponentSender<App>) {
+        let selected = self.selected_workspace_tab_id().filter(|id| {
+            matches!(
+                self.workspace_tabs.borrow().get(id),
+                Some(super::WorkspaceTab::Editor(_))
+            )
+        });
+        let tables = selected
+            .and_then(|id| self.temporary_tables_by_tab.get(&id).cloned())
+            .unwrap_or_default();
+        if self.sidebar_temporary_tables == tables {
+            return;
         }
+        self.sidebar_temporary_tables = tables;
+        let current = self.sidebar_tables.clone();
+        self.repopulate_sidebar(&current, sender);
     }
 
-    pub(super) fn toggle_sidebar_group(&mut self, key: &str) {
+    pub(super) fn refresh_sidebar_model(&self) {
+        let started = Instant::now();
+        let nodes = self.sidebar_nodes.borrow();
+        let sidebar_nodes = nodes.len();
+        let included = crate::services::sidebar_tree::visible_nodes_with_hidden_schemas(
+            &nodes,
+            &CollapseState::default(),
+            &self.table_search.text(),
+            &self.sidebar_hidden_schemas.borrow(),
+        );
+        super::init_sidebar::disconnect_expansion_handlers(&self.sidebar_expansion_handlers);
+        self.sidebar_model.replace_nodes(&nodes, &included);
+        let model_build_ms = started.elapsed().as_secs_f64() * 1000.0;
+        let row_factories = self.sidebar_row_factories.clone();
+        gtk::glib::timeout_add_local_once(Duration::from_millis(250), move || {
+            tracing::debug!(
+                sidebar_nodes,
+                tree_model_build_ms = model_build_ms,
+                created_list_items = row_factories.borrow().len(),
+                "sidebar tree model ready"
+            );
+        });
+        self.sync_sidebar_selection();
+    }
+
+    pub(super) fn sidebar_group_expansion_changed(&mut self, key: &str, expanded: bool) {
         if !self.table_search.text().trim().is_empty() {
             return;
         }
-        self.sidebar_collapsed.borrow_mut().toggle(key);
-        let collapsed = self.sidebar_collapsed.borrow().is_collapsed(key);
-        let row = self.sidebar_nodes.borrow().iter().position(|node| node.key == key);
-        if let Some(row) = row {
-            self.sidebar_factory.send(row, SidebarRowMsg::SetCollapsed(collapsed));
+        let is_collapsed = self.sidebar_collapsed.borrow().is_collapsed(key);
+        if is_collapsed == expanded {
+            self.sidebar_collapsed.borrow_mut().toggle(key);
         }
-        refresh_visible(
-            &self.sidebar_nodes,
-            &self.sidebar_collapsed,
-            &self.sidebar_visible,
-            &self.table_search.text(),
-            &self.sidebar_hidden_schemas,
-        );
-        self.sidebar_factory.widget().invalidate_filter();
         self.sync_sidebar_fold_button();
         self.persist_workspace_state();
     }
@@ -164,36 +162,29 @@ impl App {
         if !self.table_search.text().is_empty() {
             return;
         }
-        {
+        let collapse = {
             let nodes = self.sidebar_nodes.borrow();
             let mut collapsed = self.sidebar_collapsed.borrow_mut();
             if collapsed.is_all_collapsed(&nodes) {
                 collapsed.expand_all();
+                false
             } else {
                 collapsed.collapse_all(&nodes);
+                true
             }
-        }
-        let states: Vec<(usize, bool)> = {
-            let collapsed = self.sidebar_collapsed.borrow();
-            self.sidebar_nodes
-                .borrow()
-                .iter()
-                .enumerate()
-                .filter(|(_, node)| matches!(node.kind, NodeKind::Schema | NodeKind::Group(_)))
-                .map(|(index, node)| (index, collapsed.is_collapsed(&node.key)))
-                .collect()
         };
-        for (index, collapsed) in states {
-            self.sidebar_factory.send(index, SidebarRowMsg::SetCollapsed(collapsed));
+        let mut position = 0;
+        while position < self.sidebar_model.tree().n_items() {
+            let Some(row) = self.sidebar_model.tree().row(position) else {
+                break;
+            };
+            let node = crate::ui::sidebar_tree_model::SidebarTreeModel::node_index(&row)
+                .and_then(|index| self.sidebar_nodes.borrow().get(index).cloned());
+            if node.is_some_and(|node| crate::ui::app::init_sidebar::is_expandable(&node)) {
+                row.set_expanded(!collapse);
+            }
+            position += 1;
         }
-        refresh_visible(
-            &self.sidebar_nodes,
-            &self.sidebar_collapsed,
-            &self.sidebar_visible,
-            &self.table_search.text(),
-            &self.sidebar_hidden_schemas,
-        );
-        self.sidebar_factory.widget().invalidate_filter();
         self.sync_sidebar_fold_button();
         self.persist_workspace_state();
     }
@@ -204,9 +195,9 @@ impl App {
             .borrow()
             .is_all_collapsed(&self.sidebar_nodes.borrow());
         let (icon, label) = if all_collapsed {
-            ("go-down-symbolic", crate::tr!("Expand all"))
+            ("go-down-symbolic", bookie_app_services::tr!("Expand all"))
         } else {
-            ("go-up-symbolic", crate::tr!("Collapse all"))
+            ("go-up-symbolic", bookie_app_services::tr!("Collapse all"))
         };
         self.sidebar_fold_button.set_icon_name(icon);
         self.sidebar_fold_button.set_tooltip_text(Some(&label));
@@ -237,7 +228,7 @@ impl App {
 
     pub(super) fn on_reveal_in_sidebar(&mut self) {
         let Some((schema, table)) = self.selected_browse_slot_table() else {
-            self.show_toast(&crate::tr!("Open a table to reveal it in the sidebar."));
+            self.show_toast(&bookie_app_services::tr!("Open a table to reveal it in the sidebar."));
             return;
         };
         let plan = reveal_target(
@@ -250,11 +241,11 @@ impl App {
         );
         match plan {
             Reveal::Missing => self.show_toast(
-                &crate::tr!("{table} is not in the sidebar. Refresh the connection if it is new.")
+                &bookie_app_services::tr!("{table} is not in the sidebar. Refresh the connection if it is new.")
                     .replace("{table}", &table),
             ),
             Reveal::HiddenBySchemaFilter => self.show_toast(
-                &crate::tr!("The schema of {table} is hidden. Show it from the schema filter.")
+                &bookie_app_services::tr!("The schema of {table} is hidden. Show it from the schema filter.")
                     .replace("{table}", &table),
             ),
             Reveal::Show {
@@ -267,33 +258,34 @@ impl App {
                     self.table_search.set_text("");
                 }
                 for key in &uncollapse {
-                    self.toggle_sidebar_group(key);
+                    if self.sidebar_collapsed.borrow().is_collapsed(key) {
+                        self.sidebar_collapsed.borrow_mut().toggle(key);
+                    }
                 }
-                refresh_visible(
-                    &self.sidebar_nodes,
-                    &self.sidebar_collapsed,
-                    &self.sidebar_visible,
-                    &self.table_search.text(),
-                    &self.sidebar_hidden_schemas,
-                );
-                self.sidebar_factory.widget().invalidate_filter();
+                self.refresh_sidebar_model();
                 self.focus_sidebar_row(index);
             }
         }
     }
 
-    fn focus_sidebar_row(&self, index: usize) {
-        let listbox = self.sidebar_factory.widget();
-        if let Some(row) = listbox.row_at_index(index as i32) {
-            listbox.select_row(Some(&row));
-            row.grab_focus();
+    fn focus_sidebar_row(&mut self, index: usize) {
+        for position in 0..self.sidebar_model.tree().n_items() {
+            let Some(row) = self.sidebar_model.tree().row(position) else {
+                continue;
+            };
+            if crate::ui::sidebar_tree_model::SidebarTreeModel::node_index(&row) == Some(index) {
+                self.sidebar_selection.set_selected(position);
+                self.sidebar_list.grab_focus();
+                return;
+            }
         }
     }
 
     pub(super) fn restore_sidebar_state(&self) {
         let state = self
-            .workspace_target()
-            .and_then(|(id, database, _)| self.workspace.load_database(id, &database));
+            .connection_id
+            .zip(self.connected_database.as_deref())
+            .and_then(|(id, database)| self.workspace.load_database(id, database));
         *self.sidebar_collapsed.borrow_mut() = CollapseState::from_keys(
             state
                 .as_ref()
@@ -345,7 +337,7 @@ impl App {
             self.schema_filter_list.remove(&child);
         }
         let heading = relm4::gtk::Label::builder()
-            .label(crate::tr!("Hidden schemas"))
+            .label(bookie_app_services::tr!("Hidden schemas"))
             .xalign(0.0)
             .build();
         self.schema_filter_list.append(&heading);
@@ -353,18 +345,18 @@ impl App {
         hidden.sort();
         if hidden.is_empty() {
             let empty = relm4::gtk::Label::builder()
-                .label(crate::tr!("No schemas are hidden"))
+                .label(bookie_app_services::tr!("No schemas are hidden"))
                 .xalign(0.0)
                 .build();
             self.schema_filter_list.append(&empty);
             return;
         }
         let sender_for_all = sender.clone();
-        let show_all = relm4::gtk::Button::with_label(&crate::tr!("Show all schemas"));
+        let show_all = relm4::gtk::Button::with_label(&bookie_app_services::tr!("Show all schemas"));
         show_all.connect_clicked(move |_| sender_for_all.input(super::AppMsg::ShowAllSidebarSchemas));
         self.schema_filter_list.append(&show_all);
         for schema in hidden {
-            let label = crate::tr!("Show {schema}").replace("{schema}", &schema);
+            let label = bookie_app_services::tr!("Show {schema}").replace("{schema}", &schema);
             let button = relm4::gtk::Button::with_label(&label);
             let sender_for_schema = sender.clone();
             button.connect_clicked(move |_| sender_for_schema.input(super::AppMsg::ShowSidebarSchema(schema.clone())));
@@ -373,14 +365,7 @@ impl App {
     }
 
     fn refresh_schema_filter(&self, sender: &relm4::ComponentSender<App>) {
-        refresh_visible(
-            &self.sidebar_nodes,
-            &self.sidebar_collapsed,
-            &self.sidebar_visible,
-            &self.table_search.text(),
-            &self.sidebar_hidden_schemas,
-        );
-        self.sidebar_factory.widget().invalidate_filter();
+        self.refresh_sidebar_model();
         self.rebuild_schema_filter_popover(sender);
     }
 }
@@ -389,19 +374,22 @@ fn sidebar_group_label(node: &crate::services::sidebar_tree::TreeNode) -> String
     use crate::services::sidebar_tree::{GroupKind, NodeKind};
     match &node.kind {
         NodeKind::Schema => node.schema.clone().unwrap_or_default(),
-        NodeKind::Group(GroupKind::Tables) => crate::tr!("Tables").to_string(),
-        NodeKind::Group(GroupKind::Views) => crate::tr!("Views").to_string(),
-        NodeKind::Group(GroupKind::Catalog) => crate::tr!("Catalog").to_string(),
+        NodeKind::Group(GroupKind::Tables) => bookie_app_services::tr!("Tables").to_string(),
+        NodeKind::Group(GroupKind::Views) => bookie_app_services::tr!("Views").to_string(),
+        NodeKind::Group(GroupKind::Catalog) => bookie_app_services::tr!("Catalog").to_string(),
+        NodeKind::Group(GroupKind::TemporaryTables) => bookie_app_services::tr!("Temporary tables").to_string(),
         NodeKind::Catalog(kind) | NodeKind::CatalogLoaded(kind) => crate::ui::catalog_dialog::kind_label(*kind),
         NodeKind::CatalogObject { schema, name, .. } => schema
             .as_deref()
             .map_or_else(|| name.clone(), |schema| format!("{schema}.{name}")),
-        NodeKind::CatalogMore(_) => crate::tr!("Show all in Catalog…").to_string(),
-        NodeKind::Table { name, .. } | NodeKind::View { name, .. } => name.clone(),
+        NodeKind::CatalogMore(_) => bookie_app_services::tr!("Show all in Catalog…").to_string(),
+        NodeKind::Table { name, .. } | NodeKind::TemporaryTable { name, .. } | NodeKind::View { name, .. } => {
+            name.clone()
+        }
     }
 }
 
-fn row_for(
+pub(super) fn row_for(
     node: &crate::services::sidebar_tree::TreeNode,
     collapsed: &crate::services::sidebar_tree::CollapseState,
     searching: bool,
@@ -413,7 +401,9 @@ fn row_for(
     let create_schema = bookie_core::sql_ddl::supports_create_schema(driver_id);
     let (kind, group) = row_kind_and_group(node, collapsed, searching, create_schema);
     let name = match &node.kind {
-        NodeKind::Table { name, .. } | NodeKind::View { name, .. } => name.clone(),
+        NodeKind::Table { name, .. } | NodeKind::TemporaryTable { name, .. } | NodeKind::View { name, .. } => {
+            name.clone()
+        }
         _ => node.key.clone(),
     };
     let schema_name = node.schema.as_deref().unwrap_or_default();
@@ -445,6 +435,7 @@ fn row_kind_and_group(
     use crate::services::sidebar_tree::{GroupKind, NodeKind};
     match &node.kind {
         NodeKind::Table { .. } => (SidebarObjectKind::Table, None),
+        NodeKind::TemporaryTable { .. } => (SidebarObjectKind::TemporaryTable, None),
         NodeKind::View { .. } => (SidebarObjectKind::View, None),
         NodeKind::Catalog(_) | NodeKind::CatalogObject { .. } | NodeKind::CatalogMore(_) => (
             SidebarObjectKind::Catalog,
@@ -579,8 +570,14 @@ mod sidebar_label_tests {
             .find(|node| node.kind == NodeKind::Group(GroupKind::Views))
             .expect("view group exists");
 
-        assert_eq!(sidebar_group_label(table_group), crate::tr!("Tables").to_string());
-        assert_eq!(sidebar_group_label(view_group), crate::tr!("Views").to_string());
+        assert_eq!(
+            sidebar_group_label(table_group),
+            bookie_app_services::tr!("Tables").to_string()
+        );
+        assert_eq!(
+            sidebar_group_label(view_group),
+            bookie_app_services::tr!("Views").to_string()
+        );
     }
 
     #[test]
@@ -597,12 +594,15 @@ mod sidebar_label_tests {
             .find(|node| node.kind == NodeKind::Catalog(bookie_core::CatalogObjectKind::Role))
             .unwrap();
 
-        assert_eq!(sidebar_group_label(group), crate::tr!("Catalog").to_string());
+        assert_eq!(
+            sidebar_group_label(group),
+            bookie_app_services::tr!("Catalog").to_string()
+        );
         let init = row_for(entry, &Default::default(), false, false, "postgres", None);
         assert_eq!(init.kind, SidebarObjectKind::Catalog);
         let group_init = init.group.unwrap();
         assert!(group_init.entry);
-        assert_eq!(group_init.label, crate::tr!("Roles").to_string());
+        assert_eq!(group_init.label, bookie_app_services::tr!("Roles").to_string());
     }
 
     #[test]

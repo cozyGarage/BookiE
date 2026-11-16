@@ -89,12 +89,9 @@ run_integration() {
   trap 'cleanup_testcontainers; exit 143' TERM
   trap 'cleanup_testcontainers; exit 130' INT
   echo "==> SQL and document/key-value driver integration"
-  bash scripts/run-rust-tests.sh --locked --test integration \
-    -p bookie-driver-postgres -p bookie-driver-mysql -p bookie-driver-mssql \
-    -p bookie-driver-clickhouse -p bookie-driver-redis -p bookie-driver-mongodb -p bookie-driver-oracle -p bookie-driver-cassandra \
-    -- --include-ignored --test-threads=1
-  bash scripts/run-rust-tests.sh --locked -p bookie-driver-duckdb \
-    --test integration --test read_only --test missing_file -- --include-ignored --test-threads=1
+  for group in core analytics extended; do
+    bash scripts/run-driver-group.sh "$group"
+  done
   bash scripts/run-rust-tests.sh --locked -p bookie-mcp --test mongodb_extended_json -- --include-ignored --test-threads=1
   bash scripts/run-rust-tests.sh --locked -p bookie-mcp --test postgres_custom_enum -- --include-ignored --test-threads=1
   bash scripts/run-rust-tests.sh --locked -p bookie-policy --test session_postgres -- --include-ignored --test-threads=1

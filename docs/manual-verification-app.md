@@ -11,7 +11,7 @@ Run the core grid/editor/connection screens in light, dark, high-contrast light 
 - [ ] Show ordinary, selected, focused, edited, inserted, deleted and failed cells, including Boolean, NULL, empty text and long values. Pending state remains distinguishable without hue and is announced by Orca; recycling a row clears its previous state. Keep the existing production badge and window-title marker readable.
 - [ ] Toggle light/dark and high contrast while both SQL panes are open. Check syntax text, selection, caret, gutter marks, statement band, completion and error highlights; compare with the native controls beside them.
 - [ ] Measure custom text against its actual composited background, including selected rows and translucent state tints. Record foreground/background colors, ratio and screenshot. Use 4.5:1 as the target for normal text and 3:1 for meaningful non-text indicators; class names and uncomposited palette values alone do not prove a pass.
-- [ ] Resize connection forms/popovers, editor toolbars, the browse pager, import mapping controls and result panes. Use long translated labels and large fonts. Run, Stop, transaction state, primary dialog actions and secondary menu actions remain reachable without overlap or clipped labels. Refresh row counts and change page size while narrow, then widen again.
+- [ ] Resize connection forms/popovers, editor toolbars, the browse pager, import mapping controls and result panes. Use long translated labels and large fonts. Run, Stop, transaction state, primary dialog actions and secondary menu actions remain reachable without overlap or clipped labels. Refresh row counts and change page size (including a custom size from 1 to 5,000) while narrow, then widen again. After a page load, the status line shows the load duration beside the row count.
 - [ ] Navigate with keyboard only through text, Boolean and editable cells, menus and dialogs. Focus stays visible on selected rows and returns to its origin after dismissal. With animations disabled, a failed edit retains an understandable error indication.
 - [ ] Scroll to the final grid row and rightmost column with wrapped/multiline values. Inspect text baselines, descenders, focus borders, bottom bars and popover edges at each tested scale. Copy and full-value editing preserve the underlying value; a display preview never becomes the saved value.
 
@@ -45,12 +45,15 @@ Main menu, then Catalog, on a PostgreSQL connection with a few objects of each k
 - [ ] Type in the sidebar search: groups holding a match open even if collapsed; clearing the search restores your collapsed groups. Quit and reopen the connection: the groups you collapsed are still collapsed.
 - [ ] New Table and Table from CSV on a Tables group still open their dialogs for that schema. Light and dark look right.
 - [ ] With a table tab open on a connection with many tables, collapse its group, type something that does not match it in the sidebar search, and scroll the list away. Press Ctrl+Shift+L: the search clears, the group opens, and the table's row is selected, in view and focused. From a SQL editor tab it says to open a table first. For a table in a hidden schema it says the schema is hidden.
+- [ ] On a table that other tables reference, choose **Drop Table…**. The confirmation names the referencing tables before you confirm. Cancel leaves the table; confirm runs through the usual approval and audit path.
 
 ## Preferences, About and application icons
 
 - [ ] Open Preferences and confirm the page navigation separates General, Appearance, Editor and MCP.
 - [ ] Change Appearance between System, Light and Dark; confirm the active application style changes and the choice survives a restart.
 - [ ] Confirm the Data browser, Query history and SQL editor controls retain their current values and live-save behavior.
+- [ ] Leave typography overrides at their defaults, then set font family, size and weight independently for Application interface, SQL editor, Result grid and Error and output text. Each change applies to already-open windows and grids and survives restart. Blank family, size 0 and System weight restore the default for that property.
+- [ ] Test size minimum and maximum for each surface. Repeat with desktop text scaling at 1 and enlarged, high-contrast light/dark themes, and at 2x display scale. Text remains readable and controls do not clip; grid size remains within its keyboard zoom range.
 - [ ] Open About and confirm project credits and third-party attribution are presented separately, and the copyright attribution remains visible.
 - [ ] Check the BookiE launcher icon at small and large sizes in the application menu and task switcher; confirm the same artwork is used by the installed package.
 
@@ -72,7 +75,7 @@ Main menu, then Catalog, on a PostgreSQL connection with a few objects of each k
 
 - [ ] With an open owned-session transaction, check the separate active badge and commit/rollback-and-close buttons at narrow width and enlarged text. While a query runs they cannot dispatch; Commit on an aborted PostgreSQL transaction reports rollback. Session closure and connection replacement do not accept an old queued action.
 - [ ] Run All and Run Current through the menu match their shortcuts in both split panes. File output names the statement/result set; exporting loaded rows never reruns SQL. A stream rerun is clearly labeled.
-- [ ] Table toolbar and grid-menu export both show Scope before Format. All matching rows explains its snapshot refusal and cannot proceed; returning to Current page restores the action. A joined query exports its result columns and cannot be mistaken for a full source-table export.
+- [ ] Table toolbar and grid-menu export both show Scope before Format. On PostgreSQL, All matching rows exports every row (with the active filter and sort) as they were when the export started, even while another session changes the table, and Cancel leaves no file. On other engines All matching rows explains its snapshot refusal and cannot proceed; returning to Current page restores the action. A joined query exports its result columns and cannot be mistaken for a full source-table export.
 - [ ] Header names and types retain their case; Column details exposes complete null/key metadata and a bounded column comment without making every header taller. Test keyboard menus and light/dark/high-contrast themes.
 
 ## Schema ER diagram
@@ -88,4 +91,28 @@ Main menu, then Catalog, on a PostgreSQL connection with a few objects of each k
 - [ ] On a SQL Server database containing objects in non-dbo schemas (such as `sales`, `analytics`, or custom user schemas), the sidebar lists tables, views, triggers, routines, sequences, custom types, and roles partitioned under their respective schemas.
 - [ ] Disabled triggers display a `(disabled)` status indicator in their sidebar listing.
 - [ ] Multi-statement scripts creating and using session `#temp` tables execute sequentially and return results without syntax or scoping errors.
+
+## PostgreSQL table and index health report
+
+Use a PostgreSQL database with a table that has had many rows deleted, an index never used, two indexes on the same leading column and a table of more than 10,000 rows read by full scans. Run BookiE with isolated `XDG_*` and `HOME`.
+
+- [ ] On a PostgreSQL connection the main menu shows **Table and Index Health** under **Server Activity**. On a MySQL, SQLite or SQL Server connection the item is absent.
+- [ ] Open it and choose **Dead rows and vacuum**. The table with deleted rows is listed with its size, dead row count and last vacuum and analyze. The window stays responsive.
+- [ ] Choose **Unused indexes**. The unused index is listed, and primary key and unique indexes are not.
+- [ ] Choose **Duplicate indexes**. The index whose columns are covered by a longer index on the same table is listed with the covering index named.
+- [ ] Choose **Estimated bloat** and **Sequential scans**. The hint under the list says the bloat figure is an estimate.
+- [ ] Hide a schema in the sidebar and reopen the dialog. Its objects are not listed. Connect as a role without table privileges: those tables are not listed.
+- [ ] On a row, choose **Copy diagnostic SQL** and paste elsewhere: a `VACUUM (ANALYZE)` or `DROP INDEX CONCURRENTLY IF EXISTS` statement with quoted names. Choose **Open diagnostic SQL in an editor tab**: a new tab holds the statement and nothing runs.
+- [ ] Start a report on a large catalog and close the dialog. The server query is cancelled.
+
+## Check for updates and What's new
+
+Use an installed Arch package or AppImage build whose version matches `config::VERSION`. Clear `last-launched-version` in GSettings when testing the first-launch dialog (`gsettings reset com.bookie.linux last-launched-version` or the Devel schema). Reset `dismissed-update-version` the same way when re-testing the update banner.
+
+- [ ] Primary menu → **Check for Updates** while online against the current published release: a toast says BookiE is up to date.
+- [ ] Primary menu → **Check for Updates** while offline or with DNS blocked: a toast reports the network failure; the main window stays usable.
+- [ ] After clearing `last-launched-version`, launch the app once: a What's new dialog shows the AppStream notes for the running version. Close it, quit, and launch again: the dialog does not appear.
+- [ ] About BookiE shows the running version and release notes for that version, and a Releases link opens the GitHub releases page.
+- [ ] With a build whose version is older than the published latest release, and `dismissed-update-version` cleared: launch online. A banner reports the newer version without a blocking toast. **Review** opens the update dialog; **Not now** hides the banner and stores the dismissed version so the next launch stays quiet for that release.
+- [ ] Launch offline after resetting `dismissed-update-version`: no toast, no banner, and the main window stays usable.
 

@@ -87,6 +87,7 @@ impl McpToolError {
             DriverError::OperationOutcomeUnknown { .. }
             | DriverError::CommitUnconfirmed(_)
             | DriverError::ConnectionRefused
+            | DriverError::DatabaseFileNotFound(_)
             | DriverError::AuthFailed
             | DriverError::Disconnected
             | DriverError::Internal(_)

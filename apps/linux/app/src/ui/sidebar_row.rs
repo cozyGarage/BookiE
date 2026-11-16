@@ -1,9 +1,10 @@
+use relm4::adw;
+use relm4::adw::prelude::*;
 use relm4::factory::{DynamicIndex, FactoryComponent, FactorySender};
 use relm4::gtk;
 use relm4::gtk::gdk;
 use relm4::gtk::glib;
 use relm4::gtk::pango;
-use relm4::gtk::prelude::*;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -12,6 +13,7 @@ use bookie_core::TableInfo;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SidebarObjectKind {
     Table,
+    TemporaryTable,
     View,
     Group,
     Schema,
@@ -56,6 +58,7 @@ fn chevron_icon(collapsed: bool) -> &'static str {
 fn sidebar_icon(kind: SidebarObjectKind) -> &'static str {
     match kind {
         SidebarObjectKind::Table => "view-list-symbolic",
+        SidebarObjectKind::TemporaryTable => "view-list-symbolic",
         SidebarObjectKind::View => "view-paged-symbolic",
         SidebarObjectKind::Group => "folder-symbolic",
         SidebarObjectKind::Schema => "folder-symbolic",
@@ -66,10 +69,12 @@ fn sidebar_icon(kind: SidebarObjectKind) -> &'static str {
 fn context_menu_model(kind: SidebarObjectKind) -> gtk::gio::Menu {
     let menu = gtk::gio::Menu::new();
     let open_section = gtk::gio::Menu::new();
-    open_section.append(
-        Some(&crate::tr!("Open in new tab")),
-        Some("sidebar-row.open-in-new-tab"),
-    );
+    let open_label = if kind == SidebarObjectKind::TemporaryTable {
+        bookie_app_services::tr!("Show in Session Results")
+    } else {
+        bookie_app_services::tr!("Open in new tab")
+    };
+    open_section.append(Some(&open_label), Some("sidebar-row.open-in-new-tab"));
     menu.append_section(None, &open_section);
     if kind == SidebarObjectKind::Table {
         append_table_context_sections(&menu);
@@ -79,28 +84,40 @@ fn context_menu_model(kind: SidebarObjectKind) -> gtk::gio::Menu {
 
 fn append_table_context_sections(menu: &gtk::gio::Menu) {
     let structure_section = gtk::gio::Menu::new();
-    structure_section.append(Some(&crate::tr!("Edit Structure")), Some("sidebar-row.edit-structure"));
     structure_section.append(
-        Some(&crate::tr!("Show CREATE TABLE")),
+        Some(&bookie_app_services::tr!("Edit Structure")),
+        Some("sidebar-row.edit-structure"),
+    );
+    structure_section.append(
+        Some(&bookie_app_services::tr!("Show CREATE TABLE")),
         Some("sidebar-row.show-create-table"),
     );
     structure_section.append(
-        Some(&crate::tr!("Join Referenced Tables")),
+        Some(&bookie_app_services::tr!("Join Referenced Tables")),
         Some("sidebar-row.join-referenced"),
     );
-    structure_section.append(Some(&crate::tr!("Show ER Diagram")), Some("sidebar-row.show-diagram"));
+    structure_section.append(
+        Some(&bookie_app_services::tr!("Show ER Diagram")),
+        Some("sidebar-row.show-diagram"),
+    );
     menu.append_section(None, &structure_section);
     let mutate_section = gtk::gio::Menu::new();
-    mutate_section.append(Some(&crate::tr!("Import CSV\u{2026}")), Some("sidebar-row.import-csv"));
     mutate_section.append(
-        Some(&crate::tr!("Rename Table\u{2026}")),
+        Some(&bookie_app_services::tr!("Import CSV\u{2026}")),
+        Some("sidebar-row.import-csv"),
+    );
+    mutate_section.append(
+        Some(&bookie_app_services::tr!("Rename Table\u{2026}")),
         Some("sidebar-row.rename-table"),
     );
     mutate_section.append(
-        Some(&crate::tr!("Truncate Table\u{2026}")),
+        Some(&bookie_app_services::tr!("Truncate Table\u{2026}")),
         Some("sidebar-row.truncate-table"),
     );
-    mutate_section.append(Some(&crate::tr!("Drop Table\u{2026}")), Some("sidebar-row.drop-table"));
+    mutate_section.append(
+        Some(&bookie_app_services::tr!("Drop Table\u{2026}")),
+        Some("sidebar-row.drop-table"),
+    );
     menu.append_section(None, &mutate_section);
 }
 
@@ -112,8 +129,7 @@ fn context_popover(
     if let Some(popover) = state.borrow().as_ref() {
         return popover.clone();
     }
-    let popover = gtk::PopoverMenu::from_model(Some(&context_menu_model(kind)));
-    popover.set_has_arrow(true);
+    let popover = crate::ui::context_menu::from_model(Some(&context_menu_model(kind)));
     popover.set_parent(root);
     *state.borrow_mut() = Some(popover.clone());
     popover
@@ -132,11 +148,7 @@ pub struct SidebarRow {
     new_schema_button: Option<gtk::Button>,
     open_button: Option<gtk::Button>,
     schema_actions: SchemaCatalogActions,
-    /// The eagerly-parented context-menu popover. Held on the model
-    /// so `shutdown` can `unparent()` it before the row's root widget
-    /// is finalized — without this, GTK warns
-    /// "Finalizing widget, but it still has children left" whenever
-    /// the sidebar rebuilds.
+    // Keep the parented popover so shutdown can unparent it before GTK finalizes the row.
     popover: Rc<RefCell<Option<gtk::PopoverMenu>>>,
     columns: super::sidebar_columns::SidebarColumns,
 }
@@ -181,25 +193,20 @@ pub enum SidebarRowOutput {
         schema: Option<String>,
         name: String,
     },
-    /// Ctrl+click or right-click "Open in new tab" — App always appends a
-    /// new tab even if the same table is already open. Plain click /
-    /// Enter activation does NOT flow through here; it's handled at the
-    /// parent ListBox via the `row-activated` signal, which is the only
-    /// GTK signal that fires for both mouse and keyboard activation.
+    ShowTemporaryTable {
+        schema: Option<String>,
+        name: String,
+    },
+    /// Ctrl+click and the context menu always append a tab, even when the table is already open.
+    /// Plain click and Enter use the parent ListBox activation.
     OpenInNewTab {
         schema: Option<String>,
         name: String,
     },
-    /// Right-click "Edit Structure" → opens an Edit-mode Structure tab
-    /// for this table.
     EditStructure {
         schema: Option<String>,
         name: String,
     },
-    /// Right-click "Show CREATE TABLE" → App synthesises the full
-    /// CREATE statement (columns + indexes + foreign keys) and opens
-    /// it in a fresh editor tab. Useful for schema export, sharing,
-    /// or just reading the canonical DDL without going through pg_dump.
     ShowCreateTable {
         schema: Option<String>,
         name: String,
@@ -208,11 +215,6 @@ pub enum SidebarRowOutput {
         schema: Option<String>,
         name: String,
     },
-    /// Right-click "Drop Table…" → App presents the AdwAlertDialog
-    /// confirmation; on confirm runs DROP TABLE and closes any open
-    /// tabs for the dropped table.
-    /// Right-click "Import CSV…" → App reads the file, asks the user how
-    /// to map its fields, and loads it into this table.
     ImportCsv {
         schema: Option<String>,
         name: String,
@@ -236,6 +238,17 @@ pub enum SidebarRowOutput {
     },
 }
 
+fn group_button(icon: &str, tooltip: String) -> gtk::Button {
+    let button = gtk::Button::builder()
+        .icon_name(icon)
+        .tooltip_text(&tooltip)
+        .valign(gtk::Align::Center)
+        .css_classes(["flat"])
+        .build();
+    button.update_property(&[gtk::accessible::Property::Label(&tooltip)]);
+    button
+}
+
 #[relm4::factory(pub)]
 impl FactoryComponent for SidebarRow {
     type Init = SidebarRowInit;
@@ -245,66 +258,74 @@ impl FactoryComponent for SidebarRow {
     type ParentWidget = gtk::ListBox;
 
     view! {
-        // Compact navigation row matching GNOME Files / Builder density
-        // (~36-40px). AdwActionRow was the wrong widget here — it's for
-        // settings entries (title + subtitle + suffix) and forces
-        // ~50px height even with single-line content. The parent
-        // ListBox carries the `.navigation-sidebar` style class which
-        // does the rest of the visual work.
+        // Avoid AdwActionRow's settings-row height; the parent ListBox supplies sidebar styling.
         gtk::ListBoxRow {
             set_activatable: true,
-            // No connect_activate here: gtk::ListBoxRow::activate is a
-            // keybinding signal that fires only on Enter, not on mouse
-            // click. The unified handler lives on the parent ListBox
-            // (`row-activated`), which fires for both keyboard and mouse.
-            //
-            // Stash the table name for filter_func / sync_sidebar_selection
-            // / row-activated lookup. widget-name is unused for CSS in
-            // this app, so no styling collision risk.
+            // The parent row-activated handler covers mouse and Enter; retain the name for its selection lookup.
             set_widget_name: &self.info.name,
 
             #[name = "row_content"]
             #[wrap(Some)]
             set_child = &gtk::Box {
+                set_orientation: gtk::Orientation::Vertical,
+
+                #[name = "row_layout"]
+                adw::BreakpointBin {
+                    set_width_request: 180,
+                    set_height_request: 36,
+                    #[wrap(Some)]
+                    set_child = &gtk::Box {
                 set_orientation: gtk::Orientation::Horizontal,
-                // Icon-to-label spacing matches GtkPlacesSidebar's
-                // ~8px standard. 12 was loose enough to read as two
-                // separate columns rather than one labelled icon.
                 set_spacing: 8,
                 set_margin_start: 12 + 14 * i32::from(self.depth),
                 set_margin_end: 12,
                 set_margin_top: 6,
                 set_margin_bottom: 6,
 
-                append: &self.chevron,
+                        #[name = "title_row"]
+                        gtk::Box {
+                            set_orientation: gtk::Orientation::Horizontal,
+                            set_spacing: 8,
+                            set_hexpand: true,
 
-                gtk::Image {
-                    set_icon_name: Some(sidebar_icon(self.kind)),
-                    set_pixel_size: 16,
-                    set_visible: self.group.as_ref().is_none_or(|group| group.entry),
+                            append: &self.chevron,
+
+                            gtk::Image {
+                                set_icon_name: Some(sidebar_icon(self.kind)),
+                                set_pixel_size: 16,
+                                set_visible: self.group.as_ref().is_none_or(|group| group.entry),
+                            },
+
+                            gtk::Label {
+                                set_label: &self.title(),
+                                set_xalign: 0.0,
+                                set_hexpand: true,
+                                set_ellipsize: pango::EllipsizeMode::End,
+                                set_css_classes: if self.group.as_ref().is_some_and(|group| !group.entry) { &["caption-heading"] } else { &[] },
+                            },
+
+                            gtk::Label {
+                                set_label: &self.group.as_ref().map(|group| group.count.to_string()).unwrap_or_default(),
+                                set_visible: self.group.as_ref().is_some_and(|group| !group.entry),
+                                set_css_classes: &["dim-label", "caption"],
+                            },
+                        },
+
+                        #[name = "actions_row"]
+                        gtk::Box {
+                            set_orientation: gtk::Orientation::Horizontal,
+                            set_spacing: 4,
+                            set_halign: gtk::Align::End,
+                        },
                 },
-
-                gtk::Label {
-                    set_label: &self.title(),
-                    set_xalign: 0.0,
-                    set_hexpand: true,
-                    set_ellipsize: pango::EllipsizeMode::End,
-                    set_css_classes: if self.group.as_ref().is_some_and(|group| !group.entry) { &["caption-heading"] } else { &[] },
-                },
-
-                gtk::Label {
-                    set_label: &self.group.as_ref().map(|group| group.count.to_string()).unwrap_or_default(),
-                    set_visible: self.group.as_ref().is_some_and(|group| !group.entry),
-                    set_css_classes: &["dim-label", "caption"],
-                },
-
+                    },
             },
         }
     }
 
     fn init_model(init: Self::Init, _index: &DynamicIndex, _sender: FactorySender<Self>) -> Self {
         let open_button = init.group.is_none().then(|| {
-            let open_label = crate::tr!("Open {name}").replace("{name}", &init.info.name);
+            let open_label = bookie_app_services::tr!("Open {name}").replace("{name}", &init.info.name);
             let button = gtk::Button::builder()
                 .icon_name("go-next-symbolic")
                 .tooltip_text(&open_label)
@@ -314,23 +335,16 @@ impl FactoryComponent for SidebarRow {
             button.update_property(&[gtk::accessible::Property::Label(&open_label)]);
             button
         });
-        let group_button = |icon: &str, tooltip: String| {
-            let button = gtk::Button::builder()
-                .icon_name(icon)
-                .tooltip_text(&tooltip)
-                .valign(gtk::Align::Center)
-                .css_classes(["flat"])
-                .build();
-            button.update_property(&[gtk::accessible::Property::Label(&tooltip)]);
-            button
-        };
         let (new_table_button, csv_button) = if init.group.as_ref().is_some_and(|group| group.actions) {
             let labels = match init.info.schema.as_deref() {
                 Some(schema) => (
-                    crate::tr!("New Table in {schema}\u{2026}").replace("{schema}", schema),
-                    crate::tr!("Table from CSV in {schema}\u{2026}").replace("{schema}", schema),
+                    bookie_app_services::tr!("New Table in {schema}\u{2026}").replace("{schema}", schema),
+                    bookie_app_services::tr!("Table from CSV in {schema}\u{2026}").replace("{schema}", schema),
                 ),
-                None => (crate::tr!("New Table\u{2026}"), crate::tr!("Table from CSV\u{2026}")),
+                None => (
+                    bookie_app_services::tr!("New Table\u{2026}"),
+                    bookie_app_services::tr!("Table from CSV\u{2026}"),
+                ),
             };
             (
                 Some(group_button("list-add-symbolic", labels.0)),
@@ -339,11 +353,12 @@ impl FactoryComponent for SidebarRow {
         } else {
             (None, None)
         };
-        let new_schema_button = init
-            .group
-            .as_ref()
-            .is_some_and(|group| group.new_schema)
-            .then(|| group_button("folder-new-symbolic", crate::tr!("New Schema\u{2026}").to_string()));
+        let new_schema_button = init.group.as_ref().is_some_and(|group| group.new_schema).then(|| {
+            group_button(
+                "folder-new-symbolic",
+                bookie_app_services::tr!("New Schema\u{2026}").to_string(),
+            )
+        });
         let collapsed = init.group.as_ref().is_some_and(|group| group.collapsed);
         let chevron = gtk::Image::from_icon_name(chevron_icon(collapsed));
         chevron.set_visible(init.group.as_ref().is_some_and(|group| !group.entry));
@@ -365,10 +380,7 @@ impl FactoryComponent for SidebarRow {
     }
 
     fn shutdown(&mut self, _widgets: &mut Self::Widgets, _output: relm4::Sender<Self::Output>) {
-        // Eagerly-parented popovers must be unparented before the
-        // row is finalized — GTK warns about leftover children
-        // otherwise. shutdown() runs on factory removal (sidebar
-        // rebuild, disconnect, search filter), the natural hook.
+        // GTK requires unparenting a factory row's popover before finalizing the row.
         self.columns.close();
         if let Some(popover) = self.popover.borrow_mut().take() {
             popover.popdown();
@@ -384,17 +396,29 @@ impl FactoryComponent for SidebarRow {
         sender: FactorySender<Self>,
     ) -> Self::Widgets {
         let widgets = view_output!();
+        let narrow = adw::Breakpoint::new(adw::BreakpointCondition::new_length(
+            adw::BreakpointConditionLengthType::MaxWidth,
+            260.0,
+            adw::LengthUnit::Px,
+        ));
+        if let Some(row_layout) = widgets.row_layout.child().and_downcast::<gtk::Box>() {
+            narrow.add_setter(&row_layout, "orientation", Some(&gtk::Orientation::Vertical.into()));
+        }
+        widgets.row_layout.add_breakpoint(narrow);
+        if self.group.is_none() && self.kind != SidebarObjectKind::TemporaryTable {
+            self.columns.install(&root, &widgets.actions_row, &sender);
+        }
         if let Some(button) = &self.new_table_button {
-            widgets.row_content.append(button);
+            widgets.actions_row.append(button);
         }
         if let Some(button) = &self.csv_button {
-            widgets.row_content.append(button);
+            widgets.actions_row.append(button);
         }
         if let Some(button) = &self.new_schema_button {
-            widgets.row_content.append(button);
+            widgets.actions_row.append(button);
         }
         if let Some(button) = &self.open_button {
-            widgets.row_content.append(button);
+            widgets.actions_row.append(button);
         }
         if self.group.is_some() {
             self.describe_group(&root);
@@ -404,27 +428,19 @@ impl FactoryComponent for SidebarRow {
             }
             return widgets;
         }
-        self.columns.install(&root, &sender);
         if let Some(button) = &self.open_button {
             let sender_for_open_button = sender.clone();
             button.connect_clicked(move |_| sender_for_open_button.input(SidebarRowMsg::Open));
         }
 
-        // Tooltip surfaces the fully-qualified name (`schema.table`)
-        // for multi-schema connections so the user can disambiguate
-        // sibling tables without a tab open. Single-schema connections
-        // get a plain table-name tooltip — redundant with the visible
-        // label, but harmless and keeps screen-reader output uniform.
+        // Qualified tooltips disambiguate schemas; plain-name tooltips keep single-schema accessibility consistent.
         let tooltip = match self.info.schema.as_deref().filter(|s| !s.is_empty()) {
             Some(schema) => format!("{schema}.{}", self.info.name),
             None => self.info.name.clone(),
         };
         root.set_tooltip_text(Some(&tooltip));
 
-        // Ctrl+click → "Open in new tab". A button=1 GestureClick fires
-        // before the ListBoxRow's own activate signal, so we can intercept
-        // and short-circuit when CONTROL is held; without claiming the
-        // gesture, normal clicks fall through to connect_activate.
+        // Claim Ctrl+click before row activation so the parent opens a new tab.
         let click_gesture = gtk::GestureClick::builder().button(1).build();
         let sender_for_ctrl = sender.clone();
         click_gesture.connect_pressed(move |gesture, _, _, _| {
@@ -436,10 +452,7 @@ impl FactoryComponent for SidebarRow {
         });
         root.add_controller(click_gesture);
 
-        // Action group on the row (same widget the popover is
-        // parented to). The muxer walks up from the popover surface
-        // through its set_parent anchor; the row is the first widget
-        // in that chain that holds an action group.
+        // The popover resolves actions through its row parent.
         let group = gtk::gio::SimpleActionGroup::new();
         let sender_open = sender.clone();
         let open_action = gtk::gio::ActionEntry::builder("open-in-new-tab")
@@ -490,10 +503,7 @@ impl FactoryComponent for SidebarRow {
         ]);
         root.insert_action_group("sidebar-row", Some(&group));
 
-        // Defence against the factory-clears-row-while-menu-is-open
-        // race: if the row is being removed from the view, the menu
-        // pops down before disposal so the popover doesn't get
-        // finalised mid-display.
+        // Pop down before row removal so GTK cannot finalize an open popover.
         let popover_for_unmap = self.popover.clone();
         root.connect_unmap(move |_| {
             if let Some(popover) = popover_for_unmap.borrow().as_ref() {
@@ -511,13 +521,11 @@ impl FactoryComponent for SidebarRow {
                 return;
             };
             let popover = context_popover(&popover_for_right, &root, kind_for_right);
-            popover.set_pointing_to(Some(&gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
-            popover.popup();
+            crate::ui::context_menu::popup_at(&popover, Some(gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
         });
         root.add_controller(right_click);
 
-        // Keyboard Menu key opens the same context menu, anchored to
-        // the row centre (no pointer position).
+        // The Menu key anchors to the row center because no pointer position exists.
         let popover_for_menu = self.popover.clone();
         let root_for_menu = root.downgrade();
         let kind_for_menu = self.kind;
@@ -525,7 +533,11 @@ impl FactoryComponent for SidebarRow {
             .trigger(&crate::ui::shortcut::parse("Menu"))
             .action(&gtk::CallbackAction::new(move |_, _| {
                 if let Some(root) = root_for_menu.upgrade() {
-                    context_popover(&popover_for_menu, &root, kind_for_menu).popup();
+                    let popover = context_popover(&popover_for_menu, &root, kind_for_menu);
+                    let pointing = root.compute_bounds(&root).map(|bounds| {
+                        gdk::Rectangle::new((bounds.width() / 2.0) as i32, (bounds.height() / 2.0) as i32, 1, 1)
+                    });
+                    crate::ui::context_menu::popup_at(&popover, pointing);
                 }
                 glib::Propagation::Stop
             }))
@@ -552,7 +564,13 @@ impl FactoryComponent for SidebarRow {
         let output = match msg {
             SidebarRowMsg::ToggleColumns(active) => return self.columns.toggle(active, &self.info, sender),
             SidebarRowMsg::SetCollapsed(collapsed) => return self.apply_collapse(collapsed),
+            SidebarRowMsg::Open if self.kind == SidebarObjectKind::TemporaryTable => {
+                SidebarRowOutput::ShowTemporaryTable { schema, name }
+            }
             SidebarRowMsg::Open => SidebarRowOutput::Open { schema, name },
+            SidebarRowMsg::OpenInNewTab if self.kind == SidebarObjectKind::TemporaryTable => {
+                SidebarRowOutput::ShowTemporaryTable { schema, name }
+            }
             SidebarRowMsg::OpenInNewTab => SidebarRowOutput::OpenInNewTab { schema, name },
             SidebarRowMsg::EditStructure => SidebarRowOutput::EditStructure { schema, name },
             SidebarRowMsg::ShowCreateTable => SidebarRowOutput::ShowCreateTable { schema, name },
@@ -620,7 +638,7 @@ impl SidebarRow {
     fn wire_schema_menu(&mut self, root: &gtk::ListBoxRow, sender: &FactorySender<Self>) {
         let compare_enabled = std::env::var_os("BOOKIE_SCHEMA_COMPARE").is_some();
         let menu = schema_menu(compare_enabled, self.schema_actions);
-        let popover = gtk::PopoverMenu::from_model(Some(&menu));
+        let popover = crate::ui::context_menu::from_model(Some(&menu));
         popover.set_parent(root);
         root.insert_action_group(
             "sidebar-row",
@@ -671,15 +689,20 @@ fn attach_schema_popover(root: &gtk::ListBoxRow, popover: &gtk::PopoverMenu) {
     let popover_for_right = popover.clone();
     right_click.connect_pressed(move |gesture, _, x, y| {
         gesture.set_state(gtk::EventSequenceState::Claimed);
-        popover_for_right.set_pointing_to(Some(&gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
-        popover_for_right.popup();
+        crate::ui::context_menu::popup_at(&popover_for_right, Some(gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
     });
     root.add_controller(right_click);
     let popover_for_shortcut = popover.clone();
+    let root_for_shortcut = root.downgrade();
     let menu_shortcut = gtk::Shortcut::builder()
         .trigger(&crate::ui::shortcut::parse("Menu"))
         .action(&gtk::CallbackAction::new(move |_, _| {
-            popover_for_shortcut.popup();
+            let pointing = root_for_shortcut.upgrade().and_then(|root| {
+                root.compute_bounds(&root).map(|bounds| {
+                    gdk::Rectangle::new((bounds.width() / 2.0) as i32, (bounds.height() / 2.0) as i32, 1, 1)
+                })
+            });
+            crate::ui::context_menu::popup_at(&popover_for_shortcut, pointing);
             glib::Propagation::Stop
         }))
         .build();
@@ -690,24 +713,33 @@ fn attach_schema_popover(root: &gtk::ListBoxRow, popover: &gtk::PopoverMenu) {
 
 fn schema_menu(compare_enabled: bool, actions: SchemaCatalogActions) -> gtk::gio::Menu {
     let menu = gtk::gio::Menu::new();
-    menu.append(Some(&crate::tr!("Show ER Diagram")), Some("sidebar-row.show-diagram"));
+    menu.append(
+        Some(&bookie_app_services::tr!("Show ER Diagram")),
+        Some("sidebar-row.show-diagram"),
+    );
     if actions.create {
-        menu.append(Some(&crate::tr!("New Schema\u{2026}")), Some("sidebar-row.new-schema"));
+        menu.append(
+            Some(&bookie_app_services::tr!("New Schema\u{2026}")),
+            Some("sidebar-row.new-schema"),
+        );
     }
     if actions.drop {
         menu.append(
-            Some(&crate::tr!("Drop Schema\u{2026}")),
+            Some(&bookie_app_services::tr!("Drop Schema\u{2026}")),
             Some("sidebar-row.drop-schema"),
         );
     }
     if compare_enabled {
         menu.append(
-            Some(&crate::tr!("Compare with another schema…")),
+            Some(&bookie_app_services::tr!("Compare with another schema…")),
             Some("sidebar-row.compare-schema"),
         );
     }
     if actions.hide {
-        menu.append(Some(&crate::tr!("Hide schema")), Some("sidebar-row.hide-schema"));
+        menu.append(
+            Some(&bookie_app_services::tr!("Hide schema")),
+            Some("sidebar-row.hide-schema"),
+        );
     }
     menu
 }
@@ -845,6 +877,84 @@ mod catalog_entry_tests {
 }
 
 #[cfg(test)]
+mod responsive_layout_tests {
+    use super::*;
+    use relm4::factory::FactoryVecDeque;
+
+    fn row_at_width(width: i32) -> (gtk::Window, FactoryVecDeque<SidebarRow>, gtk::ListBoxRow) {
+        relm4::adw::init().unwrap();
+        let list = gtk::ListBox::new();
+        let mut factory = FactoryVecDeque::<SidebarRow>::builder().launch(list.clone()).detach();
+        factory.guard().push_back(SidebarRowInit {
+            info: TableInfo {
+                schema: Some("public".into()),
+                name: "a_very_long_table_name_for_narrow_sidebar_testing".into(),
+            },
+            kind: SidebarObjectKind::Table,
+            depth: 1,
+            group: None,
+            column_source: None,
+            schema_actions: SchemaCatalogActions::default(),
+        });
+        let window = gtk::Window::builder()
+            .default_width(width)
+            .default_height(180)
+            .child(&list)
+            .build();
+        window.present();
+        let context = glib::MainContext::default();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+        while factory.get(0).is_none_or(|_| list.row_at_index(0).is_none()) && std::time::Instant::now() < deadline {
+            context.iteration(false);
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+        while context.iteration(false) {}
+        (window, factory, list.row_at_index(0).unwrap())
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn row_actions_reflow_at_supported_sidebar_widths_with_names_and_focus_order() {
+        for (width, orientation) in [(220, gtk::Orientation::Vertical), (280, gtk::Orientation::Horizontal)] {
+            let (window, _factory, row) = row_at_width(width);
+            let body = row.child().and_downcast::<gtk::Box>().unwrap();
+            let breakpoint = body.first_child().and_downcast::<relm4::adw::BreakpointBin>().unwrap();
+            let row_content = breakpoint.child().and_downcast::<gtk::Box>().unwrap();
+            assert_eq!(
+                row_content.orientation(),
+                orientation,
+                "requested={width}, window={}, row={}, breakpoint={}, active={}",
+                window.width(),
+                row.width(),
+                breakpoint.width(),
+                breakpoint.current_breakpoint().is_some()
+            );
+            let title = row_content.first_child().and_downcast::<gtk::Box>().unwrap();
+            let actions = title.next_sibling().and_downcast::<gtk::Box>().unwrap();
+            let title_y = title.compute_bounds(&row_content).unwrap().y();
+            let actions_y = actions.compute_bounds(&row_content).unwrap().y();
+            assert_eq!(
+                actions_y > title_y,
+                width <= 260,
+                "requested={width}, title_y={title_y}, actions_y={actions_y}"
+            );
+            let columns = actions.first_child().and_downcast::<gtk::ToggleButton>().unwrap();
+            let open = columns.next_sibling().and_downcast::<gtk::Button>().unwrap();
+            assert!(columns.is_focusable());
+            assert!(open.is_focusable());
+            assert!(columns.grab_focus());
+            assert!(actions.child_focus(gtk::DirectionType::TabForward));
+            assert_eq!(gtk::prelude::GtkWindowExt::focus(&window), Some(open.clone().upcast()));
+            assert_eq!(
+                open.tooltip_text().as_deref(),
+                Some("Open a_very_long_table_name_for_narrow_sidebar_testing")
+            );
+            assert!(gtk::test_accessible_has_property(&open, gtk::AccessibleProperty::Label));
+        }
+    }
+}
+
+#[cfg(test)]
 mod columns_affordance_tests {
     use super::*;
     use relm4::factory::FactoryVecDeque;
@@ -898,6 +1008,16 @@ mod columns_affordance_tests {
             expansion_button(row.upcast_ref()).expect("table columns can be expanded without opening the table");
         assert!(expander.is_focusable());
         assert!(!expander.is_active());
+        let body = row.child().and_downcast::<gtk::Box>().unwrap();
+        let reveal = body.last_child().and_downcast::<gtk::Revealer>().unwrap();
+        assert!(reveal.child().is_none());
+        expander.set_active(true);
+        while glib::MainContext::default().iteration(false) {}
+        assert!(reveal.child().is_some());
+        assert!(reveal.reveals_child());
+        expander.set_active(false);
+        while glib::MainContext::default().iteration(false) {}
+        assert!(!reveal.reveals_child());
 
         factory.guard().push_back(SidebarRowInit {
             info: TableInfo {

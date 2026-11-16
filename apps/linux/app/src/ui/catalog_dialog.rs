@@ -10,7 +10,7 @@ use bookie_core::{CATALOG_OBJECT_LIMIT, CatalogObject, CatalogObjectKind, Driver
 use crate::services::database_service::DatabaseService;
 use crate::services::preferences::PreferencesStore;
 use crate::services::request_generation::replace_scoped_in_flight;
-use crate::tr;
+use bookie_app_services::tr;
 
 struct CatalogSource {
     connection: uuid::Uuid,

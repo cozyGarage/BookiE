@@ -11,6 +11,7 @@ fn rows(sql: &str) -> StatementOutcome {
         elapsed_ms: 1,
         kind: StatementOutcomeKind::Rows(Vec::new()),
         pinned: false,
+        detail: Default::default(),
     }
 }
 
@@ -118,6 +119,21 @@ fn pinned_results_stay_ahead_of_the_next_run() {
     assert!(shown[0].pinned);
     assert_eq!(shown[0].sql_preview, "SELECT 1");
     assert!(!shown[1].pinned);
+}
+
+#[test]
+fn a_pinned_resident_page_survives_result_replacement_until_unpinned() {
+    let (outcome, page) = wide_streamed("SELECT payload FROM items", 9);
+    let mut pins = PinnedResults::default();
+    drop(pins.show(vec![outcome]));
+    assert!(page.upgrade().is_some());
+
+    assert_eq!(pins.pin_last(), 1);
+    drop(pins.show(vec![rows("SELECT 2")]));
+    assert!(page.upgrade().is_some());
+
+    drop(pins.unpin_all());
+    assert!(page.upgrade().is_none());
 }
 
 #[test]

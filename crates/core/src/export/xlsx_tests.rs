@@ -84,16 +84,28 @@ fn value_contract_workbook_keeps_text_null_labels_as_strings_and_sql_null_blank(
     assert!(strings.contains("<t>東京</t>"), "{strings}");
     assert!(strings.contains("<t>&lt;tag&gt;&amp;amp;</t>"), "{strings}");
     assert!(strings.contains("<t>=1+1</t>"), "{strings}");
-    assert!(!sheet.contains("r=\"A6\""), "{sheet}");
+    assert!(sheet.contains("<c r=\"A6\" s=\""), "{sheet}");
     assert!(!sheet.contains("<f>"), "{sheet}");
+}
+
+#[test]
+fn xlsx_round_trip_preserves_trailing_all_null_rows() {
+    let mut writer = XlsxWriter::new(2).unwrap();
+    let mut output = Vec::new();
+    writer.begin(&mut output, &[column("id"), column("note")]).unwrap();
+    writer.write_row(&mut output, 0, &[Value::Int(1), Value::Null]).unwrap();
+    writer.write_row(&mut output, 1, &[Value::Null, Value::Null]).unwrap();
+    writer.finish(&mut output).unwrap();
+
+    assert_eq!(crate::import::xlsx_to_csv(&output).unwrap(), b"id,note\n1,\n,\n");
 }
 
 #[test]
 fn value_contract_workbook_preserves_temporal_precision_and_timezone_as_text() {
     let cases = [
         (Value::Date("1899-12-31".parse().unwrap()), "1899-12-31"),
-        (Value::Date("0000-01-01".parse().unwrap()), "0000-01-01"),
-        (Value::Date("+10000-01-01".parse().unwrap()), "+10000-01-01"),
+        (Value::Date("0000-01-01".parse().unwrap()), "0001-01-01 BC"),
+        (Value::Date("+10000-01-01".parse().unwrap()), "10000-01-01"),
         (Value::Time("12:34:56.123456789".parse().unwrap()), "12:34:56.123456789"),
         (
             Value::DateTime("2026-09-27T12:34:56.123456789".parse().unwrap()),
@@ -101,7 +113,7 @@ fn value_contract_workbook_preserves_temporal_precision_and_timezone_as_text() {
         ),
         (
             Value::DateTime("0000-01-01T00:00:00".parse().unwrap()),
-            "0000-01-01 00:00:00",
+            "0001-01-01 00:00:00 BC",
         ),
         (
             Value::TimestampTz("2024-11-03T05:30:00Z".parse().unwrap()),
@@ -154,7 +166,7 @@ fn value_contract_workbook_float_specials_stay_distinct_from_null() {
     for row in [3, 4, 5] {
         assert!(sheet.contains(&format!("<c r=\"A{row}\" t=\"s\">")), "{sheet}");
     }
-    assert!(!sheet.contains("r=\"A6\""), "{sheet}");
+    assert!(sheet.contains("<c r=\"A6\" s=\""), "{sheet}");
 }
 
 #[test]

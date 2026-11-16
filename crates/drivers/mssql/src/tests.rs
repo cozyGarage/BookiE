@@ -415,3 +415,10 @@ fn strict_encryption_is_refused_with_modes_that_allow_plaintext() {
         assert!(matches!(error, DriverError::Tls(_)), "{mode:?}: {error:?}");
     }
 }
+
+#[test]
+fn the_driver_declares_value_search_but_not_import_updates() {
+    let capabilities = MssqlDriver.capabilities();
+    assert!(capabilities.supports_value_search);
+    assert_eq!(capabilities.import_upsert, bookie_core::ImportUpsertStyle::Unsupported);
+}

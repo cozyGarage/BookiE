@@ -265,6 +265,7 @@ fn assert_interruption_audit(audit: &SequenceAuditSink, timed_out: bool) {
             AuditApprovalOutcome::Cancelled
         }
     );
+    assert_eq!(event.transaction_outcome, AuditTransactionOutcome::NotApplicable);
 }
 
 #[tokio::test]
@@ -273,7 +274,7 @@ async fn controlled_transaction_approval_cancellation_is_audited() {
     verify_controlled_approval_interruption(true, false).await;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn controlled_transaction_approval_timeout_is_audited() {
     verify_controlled_approval_interruption(false, true).await;
     verify_controlled_approval_interruption(true, true).await;

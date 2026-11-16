@@ -7,7 +7,7 @@ use relm4::gtk::glib;
 use relm4::{adw, gtk};
 
 use crate::services::quick_switcher::{QuickItem, QuickTarget, filter};
-use crate::tr;
+use bookie_app_services::tr;
 
 pub fn present<F>(parent: &impl IsA<gtk::Window>, items: Vec<QuickItem>, on_choice: F)
 where
@@ -104,6 +104,7 @@ where
                     QuickTarget::Connection(_) => "network-server-symbolic",
                     QuickTarget::Relation { .. } => "view-list-symbolic",
                     QuickTarget::Command(_) => "system-run-symbolic",
+                    QuickTarget::History(_) => "document-open-recent-symbolic",
                 };
                 row.add_prefix(&gtk::Image::from_icon_name(icon));
                 let open_label = tr!("Open {name}").replace("{name}", &item.title);

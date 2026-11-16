@@ -9,6 +9,7 @@ pub enum QuickTarget {
     Connection(Uuid),
     Relation { schema: Option<String>, name: String },
     Command(&'static str),
+    History(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -25,6 +26,19 @@ pub fn favorite_items(favorites: &[SavedQuery]) -> Vec<QuickItem> {
             target: QuickTarget::Favorite(favorite.id),
             title: favorite.name.clone(),
             subtitle: one_line(&favorite.sql),
+        })
+        .collect()
+}
+
+pub fn history_items(newest_first: &[bookie_storage::query_history::Entry], label: &str) -> Vec<QuickItem> {
+    let mut seen = std::collections::HashSet::new();
+    newest_first
+        .iter()
+        .filter(|entry| seen.insert(entry.query.trim()))
+        .map(|entry| QuickItem {
+            target: QuickTarget::History(entry.query.clone()),
+            title: one_line(&entry.query),
+            subtitle: label.to_owned(),
         })
         .collect()
 }
@@ -269,5 +283,36 @@ mod tests {
         let items = favorite_items(&[favorite]);
         assert!(items[0].subtitle.ends_with('…'));
         assert!(items[0].subtitle.chars().count() <= 81);
+    }
+
+    fn ran(query: &str) -> bookie_storage::query_history::Entry {
+        bookie_storage::query_history::Entry {
+            id: 1,
+            query: query.to_string(),
+            driver_id: "postgres".into(),
+            connection_id: Uuid::nil(),
+            connection_name: "dev".into(),
+            executed_at: std::time::SystemTime::UNIX_EPOCH,
+            duration_ms: None,
+            rows_affected: None,
+            success: true,
+            cancelled: false,
+            pinned: false,
+            error: None,
+            source: bookie_storage::query_history::Source::Editor,
+        }
+    }
+
+    #[test]
+    fn past_queries_are_found_by_their_text_and_open_the_full_statement_once() {
+        let long = format!("SELECT {} FROM orders", "total, ".repeat(40));
+        let entries = [ran("SELECT 1 FROM orders"), ran(&long), ran(" SELECT 1 FROM orders ")];
+        let items = history_items(&entries, "History");
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[1].target, QuickTarget::History(long));
+
+        let found = filter(&items, "orders");
+        assert_eq!(found[0].target, QuickTarget::History("SELECT 1 FROM orders".into()));
+        assert!(filter(&items, "customers").is_empty());
     }
 }

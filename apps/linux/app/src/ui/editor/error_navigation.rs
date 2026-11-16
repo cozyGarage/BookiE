@@ -115,7 +115,7 @@ impl SqlEditor {
             || target.offset < 0
             || target.offset > buffer.char_count()
         {
-            self.status.set_label(&crate::tr!(
+            self.status.set_label(&bookie_app_services::tr!(
                 "The query or connection changed. Run it again to locate the error."
             ));
             return;

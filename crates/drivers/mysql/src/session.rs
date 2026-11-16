@@ -10,7 +10,7 @@ use sqlx::{Connection as SqlxConnection, Pool};
 
 use crate::{
     confirms_cancellation, connection_id, map_sqlx_error, params_into_result, prepare_session,
-    refuse_non_utc_timestamps, request_cancellation, session_lexical_settings, timezone_is_utc,
+    refuse_non_utc_timestamps, report_read_only_setup, request_cancellation, session_lexical_settings, timezone_is_utc,
 };
 
 const SESSION_SETUP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
@@ -36,10 +36,11 @@ pub(crate) async fn open(
         .map_err(|_| DriverError::TimedOut)?
         .map_err(map_sqlx_error)?;
     connection.close_on_drop();
-    tokio::time::timeout(SESSION_SETUP_TIMEOUT, prepare_session(&mut connection, read_only))
+    let server_read_only = tokio::time::timeout(SESSION_SETUP_TIMEOUT, prepare_session(&mut connection, read_only))
         .await
         .map_err(|_| DriverError::TimedOut)?
         .map_err(map_sqlx_error)?;
+    report_read_only_setup(read_only, server_read_only);
     let connection_id = tokio::time::timeout(SESSION_SETUP_TIMEOUT, connection_id(&mut connection))
         .await
         .map_err(|_| DriverError::TimedOut)??;
@@ -52,6 +53,20 @@ pub(crate) async fn open(
 }
 
 pub(crate) async fn query_with_text_fallback(
+    connection: &mut PoolConnection<MySql>,
+    cancellation_pool: &Pool<MySql>,
+    connection_id: u64,
+    sql: &str,
+    params: &[Value],
+    control: &OperationControl,
+) -> Result<QueryResultBatch, DriverError> {
+    crate::warnings::discard(connection);
+    let batch = run_statement(connection, cancellation_pool, connection_id, sql, params, control).await?;
+    let messages = crate::warnings::collect(connection).await;
+    Ok(batch.with_messages(messages))
+}
+
+async fn run_statement(
     connection: &mut PoolConnection<MySql>,
     cancellation_pool: &Pool<MySql>,
     connection_id: u64,

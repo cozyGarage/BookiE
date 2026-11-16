@@ -14,7 +14,7 @@ use super::canvas::DiagramCanvas;
 use super::describe::{diagram_label, table_description};
 use crate::services::database_service::DatabaseService;
 use crate::services::preferences::PreferencesStore;
-use crate::tr;
+use bookie_app_services::tr;
 
 struct Ui {
     dialog: adw::Dialog,

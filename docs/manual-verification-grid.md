@@ -2,10 +2,21 @@
 
 Part of the [manual verification checklist](manual-verification-0.2-features.md), which holds the setup and private recording rules for every item here.
 
+## Editing PostgreSQL views
+
+Create `items(id int primary key, name text)`, `v_items` as `SELECT id, name FROM items`, `v_names` as `SELECT name FROM items`, and `v_counts` as `SELECT name, count(*) FROM items GROUP BY name`.
+
+- [ ] Open `v_items`. Edit a name and save. The change appears in `items`, and the audit journal shows the write against `v_items`. Delete a row and save; it disappears from `items`.
+- [ ] Open `v_names`. The banner says the view does not expose the table's primary key; nothing is editable.
+- [ ] Open `v_counts`. The banner says the view is not automatically updatable, which differs from the previous banner.
+- [ ] Add an INSTEAD OF trigger to `v_items` and reopen it. It becomes read-only with the not-updatable banner.
+- [ ] On a read-only connection `v_items` stays read-only. On a MySQL or SQL Server connection views stay read-only.
+
 ## Export dialog
 
 Open a result, then Export Results.
 
+- [ ] Scope appears before Format. For a browse tab it offers the current table page; for a completed SQL result it offers the visible page and the complete saved result.
 - [ ] The Format list offers CSV, JSON, Markdown, HTML, XML, SQL and Excel.
 - [ ] SQL is absent for a MongoDB or Redis connection, present for the others.
 - [ ] The CSV options group shows for CSV and hides for every other format.
@@ -21,6 +32,8 @@ Right-click a table in the sidebar, then Import CSV. Separately, use the second 
 
 - [ ] Separator and header-row detection are right for a comma file, a semicolon file, and a file with no header.
 - [ ] The preview grid matches the file.
+- [ ] On a large CSV, changing encoding or delimiter leaves the dialog responsive while the preview refreshes; Import stays disabled until the current settings finish previewing.
+- [ ] An unreadable encoding shows a preview error and keeps Import disabled; choosing a valid encoding refreshes the preview and enables Import again.
 - [ ] Column mapping is prefilled sensibly and can be changed.
 - [ ] For an existing table, remember a mapping, reorder the CSV headers, restore it, and confirm values still target the named columns; added destination columns remain on Skip.
 - [ ] Duplicate CSV headers are distinguishable, and a saved mapping refuses to restore if its selected header or destination column is missing or ambiguous.
@@ -33,6 +46,14 @@ Right-click a table in the sidebar, then Import CSV. Separately, use the second 
 - [ ] Progress advances and Cancel stops it.
 - [ ] A file with a bad row partway through stops the import and the message says how many rows were written.
 - [ ] Import refuses to start on a read-only connection.
+- [ ] On PostgreSQL, SQLite, MySQL or MariaDB, an existing-table import shows **Existing rows**. With **Update the existing row** and the primary key chosen, a CSV that repeats one existing id and adds a new id changes the existing row and adds the new one; typed values (numbers, dates, decimals) are unchanged by the round trip.
+- [ ] The approval text for an update import says that existing rows may change, and the audit entry for the import names the table with the upsert note. A plain insert import shows neither.
+- [ ] A table with no primary key or unique index shows the update mode greyed out with the reason. SQL Server and Oracle tables do not show the section.
+- [ ] Choosing a key whose column is left on Skip refuses to start the import and names the column.
+- [ ] Select three CSV files with the same columns in the file chooser: the dialog says the choices apply to two more files, each file asks for approval, the progress dialog names the file and its rows, and the final message counts all rows.
+- [ ] Select a second file with different headers: the run stops at that file, the message names it, and the third file is reported as not started. Rows from the first file stay written.
+- [ ] Press Cancel during the second of three files: that file ends cancelled, the third is cancelled without any approval prompt, and the audit journal has a cancelled entry for the second file and none for the third.
+- [ ] Select 21 files: the import refuses to start and says the limit is 20 files.
 
 ## Structure tab, column comments
 
@@ -113,9 +134,9 @@ Use a stable collection with enough documents to browse multiple pages. Pages ou
 
 In browse and SQL result grids, text and JSON cells display at most 512 Unicode characters. Text and JSON text show their exact byte count. Parsed JSON larger than 8 KiB shows `More than 8192 bytes total`; the preview stops counting once it proves the serialized value exceeds the sample budget. This bounds GTK/Pango work for long values in wide grids. Text, JSON text and binary previews over 8 KiB show their exact original byte count. SQL result grids are editable when a single SELECT reads one base table and includes that table's full primary key; otherwise they stay read-only and show why. In an editable browse or SQL result grid, confirm that a long text cell opens for inline editing with the full value, not the displayed preview. **View Value** shows a bounded rendering. **Copy Value** copies complete text and JSON values; binary values copy only a byte-count placeholder. Text and JSON cells over 8 KiB and up to 1 MiB can be edited in the bounded full-value dialog. Use values just below and just above the 512-character and 8 KiB thresholds, plus a value over 1 MiB for the read-only view.
 
-- [ ] Values up to 512 Unicode characters display in full; longer text shows a byte-count suffix, while oversized parsed JSON shows a `More than 8192 bytes total` suffix. Copy Value and View Value retain the complete source value.
+- [ ] Values up to 512 Unicode characters display in full; longer text shows a byte-count suffix, while oversized parsed JSON shows a `More than 8192 bytes total` suffix. Copy Value retains the complete source value; View Value applies its display cap.
 - [ ] Values over the threshold show a prefix and an accurate size notice (`N bytes total` for known lengths and `More than 8192 bytes total` for parsed JSON when size counting stops); SQL result cells and binary/unsupported browse values do not offer inline editing. Editable browse text opens with the full value.
-- [ ] View Value shows up to 1 MiB of rendered text or JSON and indicates when longer content is truncated.
+- [ ] View Value shows up to 64 KiB of rendered text or JSON and indicates when longer content is truncated.
 - [ ] Short values wrap without display-only hyphens. Long values use horizontal scrolling so GTK does not spend excessive time laying out one unbroken line.
 - [ ] Copy Value copies the complete text or JSON rather than the displayed preview.
 - [ ] Repeat with a binary value over the threshold; the preview reports the original byte count and View Value shows at most the first 16 KiB of source bytes as hex with the total byte count.
@@ -140,6 +161,7 @@ Use a keyed table with a nullable text column and values above 8 KiB. Include CR
 ## Result headers, selection statistics, error copy and connection strip
 
 - [ ] Browse a table: each column header shows its name, a key marker for primary and foreign keys, and the exact engine type spelling beneath it, in light and dark.
+- [ ] In Browse and SQL result grids, text headers align left with their cells and numeric headers align right with numeric values; verify this with active sort indicators and after moving or hiding a column.
 - [ ] Select several rows of a numeric column: the selection badge popover lists the column's count, sum, average, min and max, and Copy summary copies them. A text column is not listed.
 - [ ] Run a failing statement in the editor: Copy error places the exact error text on the clipboard.
 
@@ -155,3 +177,40 @@ Use a keyed table with a nullable text column and values above 8 KiB. Include CR
 - [ ] In a table browse tab, right-click a foreign key cell and choose **Go to Referenced Row**: opens a tab for the referenced parent table filtered to `parent_pk = <fk_value>`.
 - [ ] On a table referenced by inbound foreign keys (e.g. `customers` referenced by `orders.customer_id`), right-click any persisted row and choose **Show Referencing Rows**: a sub-menu lists referencing child tables. Selecting a target opens that table in a new tab filtered to matching child rows (`customer_id = <id>`).
 - [ ] On an unpersisted newly inserted row or a table with no inbound foreign keys, **Show Referencing Rows** is absent or greyed out.
+
+## Column selection, selection copy and Set Cells to Value
+
+Use a keyed, editable table with at least four columns and some rows. Run BookiE with isolated `XDG_*` and `HOME`.
+
+1. Open the header menu of a column and choose **Select Column**. The column cells are shaded with side bars, the header is bold with an underline, and the status bar reads `1 column selected` with loaded-row statistics.
+2. Choose **Add Column to Selection** on another header, then **Extend Selection to Column** on a third. The count and shading follow.
+3. Press Esc. The shading and the count disappear. Select a column again and click a cell. The selection clears. Select again and go to the next page. The selection clears.
+4. Click a cell and press Ctrl+Space. That cell's column is selected. While a cell is open for editing, Ctrl+Space and Esc must still act on the editor.
+5. With a column selected, press Ctrl+C and paste into a text editor. Only the selected columns and the loaded rows appear. Repeat with **Copy as** in the cell menu for CSV, JSON and IN Clause.
+6. Open the status bar selection button. **Copy TSV**, **Copy CSV**, **Copy JSON** and **Copy IN list** copy the selection. With row selection and no column selection the same buttons copy the selected rows.
+7. Select a text column and choose **Set Column to Value…**, type a value, and confirm. Every loaded row shows a pending edit and the pending bar counts the cells. **Preview SQL** lists one UPDATE per row. Save runs the normal approval and audit path.
+8. Try the same on a primary key column, a NOT NULL column with **Set to NULL** ticked, and an integer column with `abc`. Each shows a message and stages nothing.
+9. Select two rows, right-click a cell and choose **Set Cells to Value…**. Only the selected rows change. In a query result grid the item is not offered.
+10. On a page of 10,000 rows, set a column to a value. The window stays responsive.
+
+## Decoded preview in View Value
+
+Use a table with a `bytea` or `blob` column. Run BookiE with isolated `XDG_*` and `HOME`.
+
+1. Store the MessagePack bytes `82 a1 61 01 a1 62 c3` in a row and open **View Value** on the cell. The hex dump shows, and a **Decoded as MessagePack** section below it shows `"a": 1` and `"b": true`. The section cannot be edited.
+2. Click **Copy Value** and paste. The clipboard holds the original bytes, not the decoded text.
+3. Store the bytes `08 96 01 12 07` followed by `testing`. The section reads **Decoded as Protobuf without a schema** and lists field `1` as 150 and field `2` as `testing`.
+4. Store `de ad be ef`, plain text and an image. No **Decoded** section appears.
+5. Store a MessagePack array over 64 KiB. No **Decoded** section appears and the hex dump still shows.
+
+## Search database values
+
+Open the main menu on a connection with several tables and choose Search Database Values.
+
+- [ ] Searching for a name that appears in one text column of two tables lists both tables with the matching rows and columns; **Open filtered** opens the table narrowed to that column.
+- [ ] A term with `%` or `_` matches those characters literally.
+- [ ] **Equals** with a number finds nothing until **Also match numbers and ids** is on, then finds the matching integer column.
+- [ ] Cancel during a search on a database with many tables stops it quickly; the result says how many tables were not searched.
+- [ ] A hidden schema is not searched. A connection with more than 200 tables says some tables were left out.
+- [ ] A Redis, MongoDB or ClickHouse connection says the search is not available.
+- [ ] After a search, the audit log shows one read per table searched with the bound value not shown in the SQL.

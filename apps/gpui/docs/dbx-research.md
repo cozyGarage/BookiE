@@ -96,3 +96,7 @@ TablePro (`TableProApp/TablePro`, AGPL-3.0) is the project BookiE's Linux client
 The lessons: keep query and result logic in the shared core, keep per-type cell editors as their own components, and treat the SQL editor as its own subproject rather than a widget.
 
 Update 2026-11-05: the prototype now builds on `gpui-pre =0.3.11` with `gpui-kit =0.9.0` (ADR 0039); the `gpui =0.2.2` pin mentioned above is gone.
+
+## Current state (2026-11-11)
+
+The steps above are superseded. The GPUI prototype now uses the core `Value` as its cell type (`Cell` is an alias), with no bridge; equality is typed through `bookie-results` where the column type is known; the pager and grid cursor live in `bookie-results`; result copy (formats and TSV) lives in `bookie-app-services::result_copy`; and the copied TSV headers come from the result's own columns. The old `edit.rs`, `selection::copy_tsv` and `core_bridge::render_tsv` are gone. See `apps/gpui/README.md` for the current behaviour.

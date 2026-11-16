@@ -1,6 +1,6 @@
 # 0042: dbx is the visual reference for the GPUI experiment
 
-- **Status**: Proposed
+- **Status**: Accepted (2026-11-11)
 - **Date**: 2026-11-09
 
 ## Context

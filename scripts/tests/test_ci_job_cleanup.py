@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import socket
 import subprocess
 import tempfile
 import unittest
@@ -8,8 +9,14 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-WORKFLOWS = (ROOT / ".forgejo/workflows/ci.yml", ROOT / ".forgejo/workflows/nightly.yml")
+WORKFLOWS = (
+    ROOT / ".forgejo/workflows/ci.yml",
+    ROOT / ".forgejo/workflows/ci-contracts.yml",
+    ROOT / ".forgejo/workflows/nightly.yml",
+    ROOT / ".forgejo/workflows/pr-title.yml",
+)
 CLEANUP = ROOT / "scripts/cleanup-ci-job.sh"
+NIGHTLY = ROOT / ".forgejo/workflows/nightly.yml"
 
 
 def runner_jobs(path):
@@ -38,14 +45,34 @@ def runner_jobs(path):
 
 
 class CiJobCleanupTests(unittest.TestCase):
+    def test_linux_builder_cache_cleanup_uses_the_source_checkout_path(self):
+        job = runner_jobs(WORKFLOWS[0])["linux-build"]
+        self.assertIn("if [[ -f src/scripts/ci-cache.py ]]", job)
+        cleanup = (
+            "python3 src/scripts/ci-cache.py --root /target --lock /target/.bookie-build-cache.lock "
+            "cleanup --min-free-gib 30"
+        )
+        self.assertIn(
+            cleanup, job
+        )
+
     def test_gtk_server_fixtures_have_job_scoped_cleanup_labels(self):
         jobs = runner_jobs(WORKFLOWS[0])
-        for job in ("e2e", "gtk-server"):
-            self.assertIn("BOOKIE_TEST_RUN_ID:", jobs[job])
-            self.assertIn("${{ matrix.server }}", jobs[job])
+        self.assertIn("BOOKIE_TEST_RUN_ID:", jobs["gtk-server"])
+        self.assertIn("${{ matrix.server }}", jobs["gtk-server"])
         for server in ("postgres", "mysql", "mysql-approval", "mongodb", "clickhouse"):
             script = (ROOT / f"scripts/test-gtk-{server}.sh").read_text(encoding="utf-8")
             self.assertIn('com.bookie.test-run=${BOOKIE_TEST_RUN_ID:-local-$$}', script)
+
+    def test_clickhouse_driver_fixtures_have_job_scoped_cleanup_labels(self):
+        for relative in (
+            "crates/drivers/clickhouse/tests/support/clickhouse.rs",
+            "crates/drivers/clickhouse/tests/conformance.rs",
+        ):
+            with self.subTest(file=relative):
+                source = (ROOT / relative).read_text(encoding="utf-8")
+                self.assertIn('"com.bookie.test-run"', source)
+                self.assertIn('"BOOKIE_TEST_RUN_ID"', source)
 
     def test_every_runner_job_finishes_with_the_finalizer(self):
         for workflow in WORKFLOWS:
@@ -137,7 +164,6 @@ class CiJobCleanupTests(unittest.TestCase):
             job_tmp = Path(temporary) / "job-tmp"
             job_tmp.mkdir()
             (scripts / "cleanup-testcontainers.py").touch()
-            (scripts / "ci-cache.py").touch()
             bin_dir = Path(temporary) / "bin"
             bin_dir.mkdir()
             calls = Path(temporary) / "calls"
@@ -147,6 +173,14 @@ class CiJobCleanupTests(unittest.TestCase):
                 encoding="utf-8",
             )
             python.chmod(0o755)
+            cache_helper = bin_dir / "bookie-ci-cache"
+            cache_helper.write_text(
+                "#!/usr/bin/env bash\nset -e\n"
+                "test ! -e \"$GITHUB_WORKSPACE/src\"\n"
+                "printf '%s\\n' \"$*\" >> \"$CLEANUP_CALLS\"\n",
+                encoding="utf-8",
+            )
+            cache_helper.chmod(0o755)
             result = subprocess.run(
                 ["bash", str(CLEANUP)],
                 cwd=workspace,
@@ -158,6 +192,7 @@ class CiJobCleanupTests(unittest.TestCase):
                     "CARGO_TARGET_DIR": "/var/cache/ci/target/unit",
                     "TMPDIR": str(job_tmp),
                     "BOOKIE_TEST_RUN_ID": "forgejo-123-1-postgres",
+                    "BOOKIE_CI_CACHE_HELPER": str(cache_helper),
                     "CLEANUP_CALLS": str(calls),
                 },
                 capture_output=True,
@@ -169,7 +204,7 @@ class CiJobCleanupTests(unittest.TestCase):
                 calls.read_text(encoding="utf-8").splitlines(),
                 [
                     f"{scripts / 'cleanup-testcontainers.py'} forgejo-123-1-postgres",
-                    f"{scripts / 'ci-cache.py'} cleanup --min-free-gib 30",
+                    "cleanup --min-free-gib 30",
                 ],
             )
 
@@ -231,31 +266,213 @@ class CiJobCleanupTests(unittest.TestCase):
             self.assertFalse((workspace / "src").exists())
 
     def test_pg_dump_uses_and_removes_a_run_scoped_temp_directory(self):
-        job = runner_jobs(WORKFLOWS[0])["pg-dump"]
-        self.assertIn("TMPDIR: ${{ github.workspace }}/.tmp-pg-dump-${{ github.run_id }}-${{ github.run_attempt }}", job)
+        job = runner_jobs(WORKFLOWS[0])["driver"]
+        self.assertIn("TMPDIR: /var/cache/ci/tmp/b-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}", job)
+        self.assertNotIn(".tmp-pg-dump-${{ github.run_id }}-${{ github.run_attempt }}", job)
         with tempfile.TemporaryDirectory() as temporary:
             workspace = Path(temporary) / "workspace"
             workspace.mkdir()
             job_tmp = workspace / ".tmp-pg-dump-123-2"
             job_tmp.mkdir()
             (job_tmp / "temporary-data").touch()
+            bin_dir = Path(temporary) / "bin"
+            bin_dir.mkdir()
+            calls = Path(temporary) / "calls"
+            rm = bin_dir / "rm"
+            rm.write_text(
+                "#!/usr/bin/env python3\n"
+                "import json, os, subprocess, sys\n"
+                "with open(os.environ['RM_CALLS'], 'a', encoding='utf-8') as stream:\n"
+                "    stream.write(json.dumps(sys.argv[1:]) + '\\n')\n"
+                "target = sys.argv[-1]\n"
+                "if target != '/var/cache/ci/tmp/bookie-driver-123-2-core':\n"
+                "    subprocess.run(['/usr/bin/rm', *sys.argv[1:]], check=True)\n",
+                encoding="utf-8",
+            )
+            rm.chmod(0o755)
+            child_env = {
+                **os.environ,
+                "PATH": f"{bin_dir}:{os.environ['PATH']}",
+                "GITHUB_RUN_ID": "123",
+                "GITHUB_RUN_ATTEMPT": "2",
+                "GITHUB_JOB": "driver",
+                "GITHUB_WORKSPACE": str(workspace),
+                "CARGO_TARGET_DIR": str(Path(temporary) / "target"),
+                "TMPDIR": "/var/cache/ci/tmp/b-123-2-core",
+                "RM_CALLS": str(calls),
+            }
+            child_env.pop("BASH_ENV", None)
             result = subprocess.run(
                 ["bash", str(CLEANUP)],
                 cwd=workspace,
+                env=child_env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse(
+                job_tmp.exists(),
+                f"cleanup output: {result.stdout}\ncleanup errors: {result.stderr}\nrm calls: {calls.read_text(encoding='utf-8')}",
+            )
+            rm_calls = [json.loads(line) for line in calls.read_text(encoding="utf-8").splitlines()]
+            self.assertIn(["-rf", "--", "/var/cache/ci/tmp/b-123-2-core"], rm_calls)
+
+    def test_b4_rollback_finalizer_removes_only_its_run_scoped_temp_path(self):
+        job = runner_jobs(WORKFLOWS[0])["b4-rollback"]
+        self.assertIn("TMPDIR: /var/cache/ci/tmp/bookie-b4-rollback-${{ github.run_id }}-${{ github.run_attempt }}", job)
+        self.assertIn(
+            "SCCACHE_SERVER_UDS: /var/cache/ci/tmp/bookie-b4-rollback-${{ github.run_id }}-${{ github.run_attempt }}/sccache.sock",
+            job,
+        )
+        self.assertIn("sccache --start-server", job)
+        with tempfile.TemporaryDirectory() as temporary:
+            bin_dir = Path(temporary) / "bin"
+            bin_dir.mkdir()
+            calls = Path(temporary) / "calls"
+            rm = bin_dir / "rm"
+            rm.write_text(
+                "#!/usr/bin/env python3\n"
+                "import json, os, sys\n"
+                "with open(os.environ['RM_CALLS'], 'a', encoding='utf-8') as stream:\n"
+                "    stream.write(json.dumps(sys.argv[1:]) + '\\n')\n",
+                encoding="utf-8",
+            )
+            rm.chmod(0o755)
+            result = subprocess.run(
+                ["bash", str(CLEANUP)],
                 env={
                     **os.environ,
+                    "PATH": f"{bin_dir}:{os.environ['PATH']}",
                     "GITHUB_RUN_ID": "123",
                     "GITHUB_RUN_ATTEMPT": "2",
-                    "GITHUB_WORKSPACE": str(workspace),
-                    "CARGO_TARGET_DIR": str(Path(temporary) / "target"),
-                    "TMPDIR": str(job_tmp),
+                    "GITHUB_JOB": "b4-rollback",
+                    "TMPDIR": "/var/cache/ci/tmp/bookie-b4-rollback-123-2",
+                    "RM_CALLS": str(calls),
                 },
                 capture_output=True,
                 text=True,
                 check=False,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertFalse(job_tmp.exists())
+            self.assertIn(
+                ["-rf", "--", "/var/cache/ci/tmp/bookie-b4-rollback-123-2"],
+                [json.loads(line) for line in calls.read_text(encoding="utf-8").splitlines()],
+            )
+
+    def test_finalizer_stops_job_scoped_sccache_before_removing_its_temp_path(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            events = root / "events"
+            socket_path = root / "sccache.sock"
+            sock = socket.socket(socket.AF_UNIX)
+            sock.bind(str(socket_path))
+            sccache = bin_dir / "sccache"
+            sccache.write_text(
+                "#!/usr/bin/env python3\n"
+                "import os, sys\n"
+                "with open(os.environ['EVENTS'], 'a', encoding='utf-8') as stream:\n"
+                "    stream.write('sccache ' + ' '.join(sys.argv[1:]) + '\\n')\n",
+                encoding="utf-8",
+            )
+            sccache.chmod(0o755)
+            rm = bin_dir / "rm"
+            rm.write_text(
+                "#!/usr/bin/env python3\n"
+                "import os, sys\n"
+                "with open(os.environ['EVENTS'], 'a', encoding='utf-8') as stream:\n"
+                "    stream.write('rm ' + ' '.join(sys.argv[1:]) + '\\n')\n",
+                encoding="utf-8",
+            )
+            rm.chmod(0o755)
+            result = subprocess.run(
+                ["bash", str(CLEANUP)],
+                env={
+                    **os.environ,
+                    "PATH": f"{bin_dir}:{os.environ['PATH']}",
+                    "GITHUB_JOB": "b4-rollback",
+                    "GITHUB_RUN_ID": "123",
+                    "GITHUB_RUN_ATTEMPT": "2",
+                    "TMPDIR": "/var/cache/ci/tmp/bookie-b4-rollback-123-2",
+                    "SCCACHE_SERVER_UDS": str(socket_path),
+                    "EVENTS": str(events),
+                },
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            sock.close()
+            self.assertEqual(result.returncode, 0, result.stderr)
+            lines = events.read_text(encoding="utf-8").splitlines()
+            stop = lines.index("sccache --stop-server")
+            remove = lines.index("rm -rf -- /var/cache/ci/tmp/bookie-b4-rollback-123-2")
+            self.assertLess(stop, remove)
+
+    def test_another_job_cannot_remove_the_b4_rollback_temp_path(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            bin_dir = Path(temporary) / "bin"
+            bin_dir.mkdir()
+            calls = Path(temporary) / "calls"
+            rm = bin_dir / "rm"
+            rm.write_text(
+                "#!/usr/bin/env python3\n"
+                "import json, os, sys\n"
+                "with open(os.environ['RM_CALLS'], 'a', encoding='utf-8') as stream:\n"
+                "    stream.write(json.dumps(sys.argv[1:]) + '\\n')\n",
+                encoding="utf-8",
+            )
+            rm.chmod(0o755)
+            result = subprocess.run(
+                ["bash", str(CLEANUP)],
+                env={
+                    **os.environ,
+                    "PATH": f"{bin_dir}:{os.environ['PATH']}",
+                    "GITHUB_JOB": "driver",
+                    "TMPDIR": "/var/cache/ci/tmp/bookie-b4-rollback-123-2",
+                    "RM_CALLS": str(calls),
+                },
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            rm_calls = [json.loads(line) for line in calls.read_text(encoding="utf-8").splitlines()]
+            self.assertNotIn(["-rf", "--", "/var/cache/ci/tmp/bookie-b4-rollback-123-2"], rm_calls)
+
+    def test_b4_rollback_finalizer_cannot_remove_another_run_temp_path(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            bin_dir = Path(temporary) / "bin"
+            bin_dir.mkdir()
+            calls = Path(temporary) / "calls"
+            rm = bin_dir / "rm"
+            rm.write_text(
+                "#!/usr/bin/env python3\n"
+                "import json, os, sys\n"
+                "with open(os.environ['RM_CALLS'], 'a', encoding='utf-8') as stream:\n"
+                "    stream.write(json.dumps(sys.argv[1:]) + '\\n')\n",
+                encoding="utf-8",
+            )
+            rm.chmod(0o755)
+            result = subprocess.run(
+                ["bash", str(CLEANUP)],
+                env={
+                    **os.environ,
+                    "PATH": f"{bin_dir}:{os.environ['PATH']}",
+                    "GITHUB_JOB": "b4-rollback",
+                    "GITHUB_RUN_ID": "123",
+                    "GITHUB_RUN_ATTEMPT": "2",
+                    "TMPDIR": "/var/cache/ci/tmp/bookie-b4-rollback-456-2",
+                    "RM_CALLS": str(calls),
+                },
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            rm_calls = [json.loads(line) for line in calls.read_text(encoding="utf-8").splitlines()]
+            self.assertNotIn(["-rf", "--", "/var/cache/ci/tmp/bookie-b4-rollback-456-2"], rm_calls)
 
     def test_driver_finalizer_removes_only_its_scoped_scratch_path(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -271,26 +488,27 @@ class CiJobCleanupTests(unittest.TestCase):
                 encoding="utf-8",
             )
             rm.chmod(0o755)
-            scratch = "/var/cache/ci/tmp/bookie-driver-123-2-mysql"
-            result = subprocess.run(
-                ["bash", str(CLEANUP)],
-                env={
-                    **os.environ,
-                    "PATH": f"{bin_dir}:{os.environ['PATH']}",
-                    "GITHUB_RUN_ID": "123",
-                    "GITHUB_JOB": "driver",
-                    "TMPDIR": scratch,
-                    "RM_CALLS": str(calls),
-                },
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            self.assertEqual(result.returncode, 0, result.stderr)
-            rm_calls = [json.loads(line) for line in calls.read_text(encoding="utf-8").splitlines()]
-            self.assertIn(["-rf", "--", scratch], rm_calls)
-
-            calls.unlink()
+            for group in ("core", "driver-core", "driver-analytics", "driver-extended", "socket-ssh"):
+                with self.subTest(group=group):
+                    scratch = f"/var/cache/ci/tmp/b-123-2-{group}"
+                    result = subprocess.run(
+                        ["bash", str(CLEANUP)],
+                        env={
+                            **os.environ,
+                            "PATH": f"{bin_dir}:{os.environ['PATH']}",
+                            "GITHUB_RUN_ID": "123",
+                            "GITHUB_JOB": "driver",
+                            "TMPDIR": scratch,
+                            "RM_CALLS": str(calls),
+                        },
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    rm_calls = [json.loads(line) for line in calls.read_text(encoding="utf-8").splitlines()]
+                    self.assertIn(["-rf", "--", scratch], rm_calls)
+                    calls.unlink(missing_ok=True)
             result = subprocess.run(
                 ["bash", str(CLEANUP)],
                 env={
@@ -317,7 +535,7 @@ class CiJobCleanupTests(unittest.TestCase):
         self.assertIn('--project-name "${BOOKIE_TEST_RUN_ID:-driver-tls}"', script)
 
     def test_nightly_outputs_do_not_use_tmp(self):
-        self.assertNotIn("/tmp/", WORKFLOWS[1].read_text(encoding="utf-8"))
+        self.assertNotIn("/tmp/", NIGHTLY.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

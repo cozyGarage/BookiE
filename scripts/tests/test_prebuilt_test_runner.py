@@ -1,9 +1,12 @@
+from contextlib import redirect_stdout
 import hashlib
 import importlib.util
+import io
 import json
 import os
 import platform
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -15,9 +18,21 @@ runner = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(runner)
 
 
+class FakeProcess:
+    def __init__(self, output, returncode=0, before_wait=None):
+        self.stdout = iter(output.splitlines(keepends=True))
+        self.returncode = returncode
+        self.before_wait = before_wait
+
+    def wait(self):
+        if self.before_wait:
+            self.before_wait()
+        return self.returncode
+
+
 class PrebuiltTestRunnerTests(unittest.TestCase):
     def setUp(self):
-        self.enterContext(patch.dict(os.environ, {"GITHUB_SHA": "a" * 40}))
+        self.enterContext(patch.dict(os.environ, {"GITHUB_SHA": "a" * 40, "BOOKIE_SOURCE_COMMIT": "a" * 40}))
         self.enterContext(patch.object(runner.subprocess, 'check_output', return_value='a' * 40))
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
@@ -29,6 +44,33 @@ class PrebuiltTestRunnerTests(unittest.TestCase):
             {"package": "sample", "kind": "test", "name": "integration", "path": "test-program"}
         ], "build_group": "default", "files": {"test-program": {"sha256": hashlib.sha256(self.binary.read_bytes()).hexdigest(), "size": self.binary.stat().st_size}}, "binaries": {}, "package_directories": {"sample": "crates/sample"}}
         (self.root / "index.json").write_text(json.dumps(self.index))
+
+    def test_source_revision_read_trusts_only_the_checkout(self):
+        with patch.object(runner, 'ROOT', self.root), \
+             patch.object(runner.subprocess, 'check_output', return_value='a' * 40) as check_output:
+            runner.load_index(self.root)
+
+        self.assertEqual(
+            check_output.call_args.args[0],
+            ['git', '-c', f'safe.directory={self.root.resolve()}', 'rev-parse', 'HEAD'],
+        )
+        self.assertEqual(check_output.call_args.kwargs['cwd'], self.root)
+
+    def test_source_revision_read_handles_a_different_owner_checkout(self):
+        repository = self.root / 'repository'
+        repository.mkdir()
+        subprocess.run(['git', 'init', '--quiet', str(repository)], check=True)
+        subprocess.run(['git', '-C', str(repository), 'config', 'user.name', 'Bookie Test'], check=True)
+        subprocess.run(['git', '-C', str(repository), 'config', 'user.email', 'bookie@example.test'], check=True)
+        tracked_file = repository / 'revision.txt'
+        tracked_file.write_text('revision\n')
+        subprocess.run(['git', '-C', str(repository), 'add', 'revision.txt'], check=True)
+        subprocess.run(['git', '-C', str(repository), 'commit', '--quiet', '-m', 'fixture'], check=True)
+        expected = subprocess.check_output(['git', '-C', str(repository), 'rev-parse', 'HEAD'], text=True).strip()
+
+        with patch.object(runner, 'ROOT', repository), \
+             patch.dict(os.environ, {'GIT_TEST_ASSUME_DIFFERENT_OWNER': '1'}):
+            self.assertEqual(runner.source_revision(), expected)
 
     def test_preserves_libtest_filters_and_single_process_fixture_lifetime(self):
         args = ["--locked", "-p", "sample", "--test", "integration", "rollback", "--", "--include-ignored", "--test-threads=1"]
@@ -42,17 +84,29 @@ class PrebuiltTestRunnerTests(unittest.TestCase):
         self.index['package_directories']['sample'] = '.'
         (self.root / 'index.json').write_text(json.dumps(self.index))
         command = [str(self.binary)]
-        empty = subprocess.CompletedProcess(command, 0, 'test result: ok. 0 passed; 0 failed;\n')
-        passed = subprocess.CompletedProcess(command, 0, 'test result: ok. 1 passed; 0 failed;\n')
+        empty = FakeProcess('test result: ok. 0 passed; 0 failed;\n')
+        passed = FakeProcess('test result: ok. 1 passed; 0 failed;\n')
         with patch.object(runner, 'ROOT', self.root), patch.object(runner, 'commands', return_value=[command, command]), \
-             patch.object(runner.subprocess, 'run', side_effect=[empty, passed]), \
+             patch.object(runner.subprocess, 'Popen', side_effect=[empty, passed]), \
              patch.dict(os.environ, {'BOOKIE_TEST_BUNDLE': str(self.root)}):
             self.assertEqual(runner.main(), 0)
         with patch.object(runner, 'ROOT', self.root), patch.object(runner, 'commands', return_value=[command]), \
-             patch.object(runner.subprocess, 'run', return_value=empty), \
+             patch.object(runner.subprocess, 'Popen', return_value=FakeProcess('test result: ok. 0 passed; 0 failed;\n')), \
              patch.dict(os.environ, {'BOOKIE_TEST_BUNDLE': str(self.root)}), \
              self.assertRaisesRegex(ValueError, 'no prebuilt tests executed'):
             runner.main()
+
+    def test_invocation_matches_executable_paths_through_symlinked_temp_directories(self):
+        self.index['package_directories']['sample'] = '.'
+        (self.root / 'index.json').write_text(json.dumps(self.index))
+        alias = self.root.with_name(f'{self.root.name}-alias')
+        alias.symlink_to(self.root, target_is_directory=True)
+        command = [str(alias / self.binary.name)]
+        result = FakeProcess('test result: ok. 1 passed; 0 failed;\n')
+        with patch.object(runner, 'ROOT', self.root), patch.object(runner, 'commands', return_value=[command]), \
+             patch.object(runner.subprocess, 'Popen', return_value=result), \
+             patch.dict(os.environ, {'BOOKIE_TEST_BUNDLE': str(self.root)}):
+            self.assertEqual(runner.main(), 0)
 
     def test_nested_libtest_output_keeps_the_outer_test_run_valid(self):
         self.index['package_directories']['sample'] = '.'
@@ -62,8 +116,9 @@ class PrebuiltTestRunnerTests(unittest.TestCase):
             'test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 86 filtered out\n'
             'test result: ok. 86 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out\n'
         )
+        process = FakeProcess(output)
         with patch.object(runner, 'ROOT', self.root), patch.object(runner, 'commands', return_value=[command]), \
-             patch.object(runner.subprocess, 'run', return_value=subprocess.CompletedProcess(command, 0, output)), \
+             patch.object(runner.subprocess, 'Popen', return_value=process), \
              patch.dict(os.environ, {'BOOKIE_TEST_BUNDLE': str(self.root)}):
             self.assertEqual(runner.main(), 0)
 
@@ -73,11 +128,28 @@ class PrebuiltTestRunnerTests(unittest.TestCase):
         command = [str(self.binary)]
         with patch.object(runner, 'ROOT', self.root), patch.object(runner, 'commands', return_value=[command]), \
              patch.dict(os.environ, {'BOOKIE_TEST_BUNDLE': str(self.root)}):
-            with patch.object(runner.subprocess, 'run', return_value=subprocess.CompletedProcess(command, 101, '')):
+            failed = FakeProcess('', returncode=101)
+            with patch.object(runner.subprocess, 'Popen', return_value=failed):
                 self.assertEqual(runner.main(), 101)
-            with patch.object(runner.subprocess, 'run', return_value=subprocess.CompletedProcess(command, 0, '')), \
+            completed = FakeProcess('')
+            with patch.object(runner.subprocess, 'Popen', return_value=completed), \
                  self.assertRaisesRegex(ValueError, 'execution evidence missing'):
                 runner.main()
+
+    def test_test_output_is_forwarded_before_the_process_exits(self):
+        self.index['package_directories']['sample'] = '.'
+        (self.root / 'index.json').write_text(json.dumps(self.index))
+        command = [str(self.binary)]
+        output = io.StringIO()
+        process = FakeProcess(
+            'test sample::slow_case ... ok\n'
+            'test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n',
+            before_wait=lambda: self.assertIn('test sample::slow_case ... ok\n', output.getvalue()),
+        )
+        with patch.object(runner, 'ROOT', self.root), patch.object(runner, 'commands', return_value=[command]), \
+             patch.object(runner.subprocess, 'Popen', return_value=process), \
+             patch.dict(os.environ, {'BOOKIE_TEST_BUNDLE': str(self.root)}), redirect_stdout(output):
+            self.assertEqual(runner.main(), 0)
 
     def test_missing_target_fails_instead_of_building_or_running_zero_tests(self):
         with self.assertRaises(ValueError):
@@ -102,6 +174,31 @@ class PrebuiltTestRunnerTests(unittest.TestCase):
                                 capture_output=True, text=True)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('differs from the checkout', result.stderr)
+
+    def test_bundle_preparation_verifies_the_download_and_exports_runner_environment(self):
+        revision = subprocess.run(['git', '-C', str(ROOT), 'rev-parse', 'HEAD'], check=True, capture_output=True, text=True).stdout.strip()
+        self.index['source_commit'] = revision
+        self.index['build_group'] = 'default'
+        (self.root / 'index.json').write_text(json.dumps(self.index))
+        environment = self.root / 'github-env'
+        cache = self.root / 'bundle-cache'
+        bundle_directory = cache / f'{revision}-default'
+        bundle_directory.mkdir(parents=True)
+        for path in list(self.root.iterdir()):
+            if path.is_file() and path != environment:
+                shutil.copy2(path, bundle_directory / path.name)
+        result = subprocess.run(
+            ['bash', str(ROOT / 'scripts/prepare-test-bundle.sh'), revision, 'default'],
+            env={**os.environ, 'GITHUB_ENV': str(environment), 'BOOKIE_BUNDLE_CACHE': str(cache),
+                 'BOOKIE_REGISTRY_URL': 'https://registry.example/packages'}, capture_output=True, text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        values = environment.read_text()
+        self.assertIn(f'BOOKIE_TEST_BUNDLE={bundle_directory}', values)
+        self.assertIn(f'BOOKIE_SOURCE_COMMIT={revision}', values)
+        self.assertIn(f'GSETTINGS_SCHEMA_DIR={bundle_directory}/schemas', values)
+        self.assertIn('BOOKIE_REQUIRE_PREBUILT=1', values)
+        self.assertTrue((bundle_directory / self.binary.name).stat().st_mode & 0o100)
 
     def test_bundle_builder_rejects_a_different_checkout(self):
         result = subprocess.run(['bash', str(ROOT / 'scripts/build-test-bundles.sh'), str(self.root / 'out')],
@@ -130,6 +227,14 @@ class PrebuiltTestRunnerTests(unittest.TestCase):
     def test_unverified_nextest_archive_is_rejected(self):
         (self.root / 'nextest.tar.zst').write_bytes(b'unverified')
         with self.assertRaisesRegex(ValueError, 'unverified nextest archive'):
+            runner.load_index(self.root)
+
+    def test_archive_only_bundle_cannot_be_used_for_direct_test_execution(self):
+        self.index['archive_only'] = True
+        self.index['files']['nextest.tar.zst'] = {'sha256': hashlib.sha256(b'archive').hexdigest(), 'size': 7}
+        (self.root / 'nextest.tar.zst').write_bytes(b'archive')
+        (self.root / 'index.json').write_text(json.dumps(self.index))
+        with self.assertRaisesRegex(ValueError, 'not direct test executables'):
             runner.load_index(self.root)
 
     def test_missing_package_cannot_be_silently_skipped(self):

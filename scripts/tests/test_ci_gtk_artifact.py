@@ -2,6 +2,7 @@ import importlib.util
 import json
 from pathlib import Path
 import re
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -22,6 +23,53 @@ TOOLKIT = {
 
 
 class GtkArtifactWorkflowTests(unittest.TestCase):
+    def test_github_package_output_does_not_dirty_the_artifact_source_checkout(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        build = workflow.split("  linux-build:\n", 1)[1].split("  gtk:\n", 1)[0]
+        self.assertIn("DEB_OUT: ${{ github.workspace }}/.floor-package", build)
+
+        generated_package = ROOT / ".floor-package/bookie.deb"
+        ignored = subprocess.run(
+            ["git", "check-ignore", "--quiet", str(generated_package)], cwd=ROOT, check=False
+        )
+        self.assertEqual(ignored.returncode, 0)
+
+    def test_linux_release_artifacts_feed_gtk_and_package_scenarios(self):
+        github = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+
+        for workflow, gtk_needs, floor_needs in (
+            (
+                github,
+                "needs: [pin-revision, ensure-ci-gtk-image, guards, linux-build]",
+                "needs: [pin-revision, ensure-ci-gtk-image, linux-build]",
+            ),
+            (forgejo, "needs: [pin-revision, guards, linux-build]", "needs: [pin-revision, linux-build]"),
+        ):
+            build = workflow.split("  linux-build:\n", 1)[1].split("  clippy:\n", 1)[0]
+            gtk = workflow.split("  gtk:\n", 1)[1].split("  keyring:\n", 1)[0]
+            floor = workflow.split("  distro-floor-scenarios:\n", 1)[1].split("  driver:\n", 1)[0]
+            self.assertIn("bash scripts/build-deb.sh", build)
+            self.assertIn("ci-gtk-artifact.py create --profile dist", build)
+            self.assertIn("ci-gtk-artifact.py create --package", build)
+            self.assertIn(gtk_needs, gtk)
+            self.assertIn(floor_needs, floor)
+            self.assertIn("ci-gtk-artifact.py verify", gtk)
+            self.assertIn("ci-gtk-artifact.py verify --package", floor)
+            self.assertNotIn("gtk-build:", workflow)
+            self.assertNotIn("floor-build:", workflow)
+
+    def test_github_gtk_jobs_consume_the_verified_binary_and_schema_artifact(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        build = workflow.split("  linux-build:\n", 1)[1].split("  gtk:\n", 1)[0]
+        for name, end in (("gtk", "gtk-server"), ("gtk-server", "current-stable-clippy")):
+            job = workflow.split(f"  {name}:\n", 1)[1].split(f"  {end}:\n", 1)[0]
+            self.assertIn("ci-gtk-artifact.py verify", job)
+            self.assertIn("BOOKIE_GTK_BINARY=", job)
+            self.assertIn("GSETTINGS_SCHEMA_DIR=", job)
+        self.assertIn("ci-gtk-artifact.py create --profile dist target/dist/bookie-app target/gtk-safety", build)
+        self.assertIn("path: target/gtk-safety/", build)
+
     def test_native_scenario_jobs_consume_the_single_verified_build(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         headings = list(re.finditer(r"(?m)^  ([a-z0-9-]+):\n", workflow.split("jobs:\n", 1)[1]))
@@ -30,22 +78,28 @@ class GtkArtifactWorkflowTests(unittest.TestCase):
             heading[1]: content[heading.start():headings[index + 1].start() if index + 1 < len(headings) else len(content)]
             for index, heading in enumerate(headings)
         }
-        self.assertIn("gtk-build", list(jobs))
-        build_job = jobs["gtk-build"]
-        self.assertIn("cargo build --profile ci --locked -p bookie-app --bin bookie-app", build_job)
+        self.assertIn("linux-build", list(jobs))
+        build_job = jobs["linux-build"]
+        self.assertIn("bash scripts/build-deb.sh", build_job)
+        self.assertIn("BOOKIE_BUILD_PROFILE: dist", build_job)
+        self.assertIn("ci-gtk-artifact.py create --profile dist", build_job)
         self.assertNotIn("--no-default-features", build_job)
         self.assertNotRegex(build_job, r"cargo build[^\n]*--features")
         self.assertEqual(len(re.findall(r"ci-gtk-artifact\.py create (?!--package)", workflow)), 1)
-        for name in ("e2e", "gtk", "gtk-server"):
+        for name in ("gtk", "gtk-server"):
             job = jobs[name]
-            self.assertRegex(job, r"needs: \[[^\]]*gtk-build[^\]]*\]")
+            self.assertRegex(job, r"needs: \[[^\]]*linux-build[^\]]*\]")
+            self.assertNotIn("test-build", job)
+            self.assertNotIn("prepare-test-bundle.sh", job)
             self.assertIn("ci-gtk-artifact.py verify", job)
             self.assertIn("BOOKIE_GTK_BINARY=", job)
-            self.assertIn("CARGO_TARGET_DIR: /var/cache/ci/target/gtk-build\n", job)
-            self.assertIn('"${{ github.sha }}"', job)
-            self.assertIn("name: gtk-ci-${{ github.run_id }}-${{ github.sha }}", job)
+            self.assertIn("GSETTINGS_SCHEMA_DIR=", job)
             self.assertNotIn("cargo build", job)
-            self.assertLess(job.index("ensure-node.sh"), job.index("uses:"))
+            self.assertIn('"${{ needs.pin-revision.outputs.revision }}"', job)
+            self.assertIn("name: gtk-ci-${{ github.run_id }}-${{ needs.pin-revision.outputs.revision }}", job)
+            self.assertNotIn("cargo build", job)
+            self.assertLess(job.index("uses: actions/checkout@"), job.index("ensure-node.sh"))
+            self.assertLess(job.index("ensure-node.sh"), job.index("uses: https://code.forgejo.org/actions/"))
 
     def test_distro_floor_package_uses_the_default_app_feature_set(self):
         package_workflow = (ROOT / "scripts/distro-floor-package.sh").read_text()
@@ -72,15 +126,21 @@ class GtkArtifactTests(unittest.TestCase):
             patch.object(artifact, "source_identity", return_value=SHA),
             patch.object(artifact, "feature_identity", return_value=FEATURES),
             patch.object(artifact, "toolkit_identity", return_value=TOOLKIT),
+            patch.object(artifact.subprocess, "run", side_effect=self.compile_schemas),
         ):
             artifact.create(self.binary, self.output, SHA)
 
-    def verify(self, expected_sha=SHA, *, package=False, features=FEATURES, toolkit=TOOLKIT):
+    def compile_schemas(self, command, check):
+        destination = Path(command[command.index("--targetdir") + 1])
+        self.assertTrue(destination.is_dir())
+        (destination / "gschemas.compiled").write_bytes(b"compiled schemas")
+
+    def verify(self, expected_sha=SHA, *, package=False, profile="ci", features=FEATURES, toolkit=TOOLKIT):
         with (
             patch.object(artifact, "feature_identity", return_value=features),
             patch.object(artifact, "toolkit_identity", return_value=toolkit),
         ):
-            return artifact.verify(self.output, expected_sha, package=package)
+            return artifact.verify(self.output, expected_sha, package=package, profile=profile)
 
     def test_manifest_records_default_features_and_toolkit_runtime(self):
         self.create()
@@ -88,6 +148,45 @@ class GtkArtifactTests(unittest.TestCase):
         manifest = json.loads((self.output / "manifest.json").read_text())
         self.assertEqual(manifest["features"], FEATURES)
         self.assertEqual(manifest["toolkit_runtime"], TOOLKIT)
+        self.assertEqual(
+            manifest["gsettings_schema_sha256"],
+            artifact.digest(self.output / "schemas" / "gschemas.compiled"),
+        )
+
+    def test_release_profile_is_recorded_and_required_by_native_artifact_consumers(self):
+        with (
+            patch.object(artifact, "source_identity", return_value=SHA),
+            patch.object(artifact, "feature_identity", return_value=FEATURES),
+            patch.object(artifact, "toolkit_identity", return_value=TOOLKIT),
+            patch.object(artifact.subprocess, "run", side_effect=self.compile_schemas),
+        ):
+            artifact.create(self.binary, self.output, SHA, profile="dist")
+
+        manifest = json.loads((self.output / "manifest.json").read_text())
+        self.assertEqual(manifest["profile"], "dist")
+        self.assertEqual(self.verify(profile="dist"), (self.output / "bookie").resolve())
+        with self.assertRaisesRegex(ValueError, "profile must be ci"):
+            self.verify()
+
+    def test_native_artifact_compiles_schemas_from_the_source_tree(self):
+        with patch.object(artifact, "source_identity", return_value=SHA), \
+                patch.object(artifact, "feature_identity", return_value=FEATURES), \
+                patch.object(artifact, "toolkit_identity", return_value=TOOLKIT), \
+                patch.object(artifact.subprocess, "run", side_effect=self.compile_schemas) as compile_schemas:
+            artifact.create(self.binary, self.output, SHA)
+
+        compile_schemas.assert_called_once_with(
+            ["glib-compile-schemas", "--strict", "--targetdir", str(self.output / "schemas"),
+             str(artifact.ROOT / "apps/linux/data")],
+            check=True,
+        )
+
+    def test_a_tampered_schema_bundle_is_refused(self):
+        self.create()
+        (self.output / "schemas" / "gschemas.compiled").write_bytes(b"changed")
+
+        with self.assertRaisesRegex(ValueError, "schema digest"):
+            self.verify()
 
     def test_feature_identity_reads_default_features_from_the_app_manifest(self):
         self.assertEqual(artifact.feature_identity(), FEATURES)

@@ -70,6 +70,13 @@ def scenarios(ui):
         ui.wait_for_node(name="1 unsaved change")
         save_and_assert_notes(database)
 
+    def active_cell_edit_escape_cancels_uncommitted_text(database, _base):
+        begin_edit(database)
+        ui.press_x11_key("Escape")
+        ui.wait_for_node(name="alpha", role=ui.pyatspi.ROLE_LABEL)
+        assert ui.find_node(name="1 unsaved change") is None, "Escape staged the cell edit"
+        assert notes(database) == [(1, "alpha"), (2, "beta")], "Escape committed the cell edit"
+
     def active_cell_edit_f2_after_click_saves_only_the_selected_cell(database, _base):
         with sqlite3.connect(database) as connection:
             connection.executemany(
@@ -145,6 +152,53 @@ def scenarios(ui):
 
     def active_cell_edit_survives_cancelled_close_button(database, base):
         cancel_close_and_save(database, "button", "Save changes to “safety_items”?")
+
+    def active_cell_edit_close_focus_moves_to_a_live_widget(database, _base):
+        begin_edit(database)
+        ui.invoke_accessible_action("win.open-editor")
+        ui.wait_for_node(name="Run", role=ui.pyatspi.ROLE_PUSH_BUTTON)
+        page = ui.wait_for_node_containing("safety_items", role=ui.pyatspi.ROLE_PAGE_TAB)
+        close_button = ui.wait_within(page, name="Close Tab", role=ui.pyatspi.ROLE_PUSH_BUTTON)
+        ui.invoke(close_button)
+        prompt = wait_for_prompt(name="Save changes to “safety_items”?")
+        ui.invoke(ui.wait_within(prompt, name="Save", role=ui.pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node_containing("safety_items", role=ui.pyatspi.ROLE_PAGE_TAB, present=False)
+        ui.wait_for_node(name="Run", role=ui.pyatspi.ROLE_PUSH_BUTTON)
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        while time.monotonic() < deadline:
+            focused = [
+                node
+                for node in ui.descendants(ui.application_node())
+                if node.getState().contains(ui.pyatspi.STATE_FOCUSED)
+                and node.getState().contains(ui.pyatspi.STATE_SHOWING)
+            ]
+            if focused:
+                return
+            time.sleep(ui.POLL_SECONDS)
+        raise AssertionError(f"closing the edited tab left no visible focused widget:\n{ui.accessible_snapshot()}")
+
+    def active_cell_edit_last_tab_close_focuses_the_empty_workspace(database, _base):
+        editor = ui.wait_for_node_containing("Query 1", role=ui.pyatspi.ROLE_PAGE_TAB)
+        ui.invoke(ui.wait_within(editor, name="Close Tab", role=ui.pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node_containing("Query 1", role=ui.pyatspi.ROLE_PAGE_TAB, present=False)
+        begin_edit(database)
+        ui.invoke_accessible_action("win.close-current")
+        prompt = wait_for_prompt(name="Save changes to “safety_items”?")
+        ui.invoke(ui.wait_within(prompt, name="Save", role=ui.pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node_containing("safety_items", role=ui.pyatspi.ROLE_PAGE_TAB, present=False)
+        ui.wait_for_node(name="Open SQL editor", role=ui.pyatspi.ROLE_PUSH_BUTTON)
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        while time.monotonic() < deadline:
+            focused = [
+                node
+                for node in ui.descendants(ui.application_node())
+                if node.getState().contains(ui.pyatspi.STATE_FOCUSED)
+                and node.getState().contains(ui.pyatspi.STATE_SHOWING)
+            ]
+            if focused:
+                return
+            time.sleep(ui.POLL_SECONDS)
+        raise AssertionError(f"closing the last edited tab left no visible focused widget:\n{ui.accessible_snapshot()}")
 
     def active_cell_edit_save_then_close_persists_the_value(database, base):
         begin_edit(database)
@@ -318,6 +372,7 @@ def scenarios(ui):
 
     result = [
         active_cell_edit_enter_control,
+        active_cell_edit_escape_cancels_uncommitted_text,
         active_cell_edit_click_inside_the_open_editor_keeps_editing,
         active_cell_edit_f2_after_click_saves_only_the_selected_cell,
         active_cell_edit_enter_after_grid_navigation_saves_only_the_selected_cell,
@@ -326,6 +381,8 @@ def scenarios(ui):
         active_cell_edit_survives_cancelled_tab_close,
         active_cell_edit_survives_cancelled_keyboard_close,
         active_cell_edit_survives_cancelled_close_button,
+        active_cell_edit_close_focus_moves_to_a_live_widget,
+        active_cell_edit_last_tab_close_focuses_the_empty_workspace,
         active_cell_edit_save_then_close_persists_the_value,
         active_cell_edit_discard_then_close_leaves_the_database_unchanged,
         active_cell_edit_survives_cancelled_window_quit,

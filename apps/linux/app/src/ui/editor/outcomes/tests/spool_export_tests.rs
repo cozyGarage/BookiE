@@ -2,6 +2,38 @@ use super::*;
 use std::sync::{Arc, Mutex, atomic::Ordering};
 
 #[test]
+fn a_full_shared_page_budget_stops_the_cursor_without_fetching() {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let manager = bookie_app_services::stream_result_spool::StreamResultSpoolManager::default();
+    let spool = manager.create().unwrap();
+    let budget = spool.page_budget();
+    let reservation = budget.reserve(budget.limit_bytes()).unwrap();
+    let counters = Arc::new(CursorCounters::default());
+    let result = runtime.block_on(super::super::run_statements_with_spool_manager(
+        StatementRun {
+            target: cursor_target(vec![Ok(cursor_page(&[1], false))], counters.clone()),
+            statements: vec!["SELECT id FROM items".into()],
+            driver_id: "postgres",
+            parameter_values: &Default::default(),
+            control: &crate::services::operation_control::bounded(30),
+            error_policy: BatchErrorPolicy::StopScript,
+            settings_check: None,
+            succeeded: |_: &str| {},
+        },
+        manager,
+        |_update| std::future::ready(true),
+    ));
+    assert!(matches!(result, ScriptRunResult::Streamed(StreamTerminal::Failed(_))));
+    assert_eq!(counters.fetched.load(Ordering::SeqCst), 0);
+    assert_eq!(counters.rolled_back.load(Ordering::SeqCst), 1);
+    drop(reservation);
+    assert_eq!(budget.used_bytes(), 0);
+}
+
+#[test]
 fn exporting_a_completed_stream_reuses_pages_without_executing_sql_again() {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()

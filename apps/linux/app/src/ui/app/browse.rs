@@ -10,6 +10,20 @@ use crate::ui::browse_tab::{BrowseLoadFailure, BrowsePageRequest, BrowseRowCount
 use super::{App, AppMsg, ExportFormat, OpenMode};
 use crate::services::read_scopes::ReadScope;
 
+struct PreparedBrowsePage {
+    schema: Option<String>,
+    table: String,
+    request: BrowsePageRequest,
+    limit: u64,
+    sort: Option<(usize, bool)>,
+    filter: bookie_core::FilterSet,
+    columns: Vec<ColumnInfo>,
+    driver_id: String,
+    keyset_cursor: Option<Vec<bookie_core::Value>>,
+    reverse_page: bool,
+    last_page: bool,
+}
+
 impl App {
     fn browse_cell_value_context(&self, tab_id: Uuid) -> Option<(Option<String>, String, Vec<ColumnInfo>, String)> {
         let tabs = self.workspace_tabs.borrow();
@@ -50,19 +64,18 @@ impl App {
                 return;
             }
         };
-        let Some(conn) = self.window_connection() else {
+        let Some(conn) = self.tab_connection(tab_id) else {
             self.fail_browse_cell_value(
                 &sender,
                 tab_id,
                 request,
                 col_index,
                 column_name,
-                crate::tr!("No active connection.").to_string(),
+                bookie_app_services::tr!("No active connection.").to_string(),
             );
             return;
         };
-        let timeout_secs =
-            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
+        let timeout_secs = self.tab_timeout_secs(tab_id);
         let token = self.read_scopes.borrow_mut().start(tab_id, ReadScope::CellValue);
         let reply = sender.clone();
         sender.command(move |_, shutdown| {
@@ -112,6 +125,9 @@ impl App {
         open_mode: OpenMode,
         sender: ComponentSender<Self>,
     ) {
+        if self.split_view.is_collapsed() {
+            self.split_view.set_show_sidebar(false);
+        }
         self.dispatch_select_table(schema, name, open_mode, sender);
     }
 
@@ -122,43 +138,72 @@ impl App {
     /// `sql_dialect::build_order_and_pagination` because the syntax is
     /// dialect-specific. Past `KEYSET_OFFSET_THRESHOLD`, sequential Next
     /// uses a primary-key seek when PKs and a cursor are available.
-    pub(super) fn fetch_browse_page(&self, tab_id: Uuid, sender: ComponentSender<Self>) {
-        let (schema, table, request, limit, sort, filter, columns, driver_id, keyset_cursor, reverse_page, last_page) = {
-            let tabs = self.workspace_tabs.borrow();
-            let Some(controller) = tabs.get(&tab_id).and_then(|t| t.browse_controller()) else {
-                return;
-            };
-            let model = controller.model();
-            (
-                model.schema().map(str::to_owned),
-                model.table().to_string(),
-                model.begin_page_request(),
-                model.page_size(),
-                model.current_sort(),
-                model.current_filter().clone(),
-                model.columns().to_vec(),
-                model.driver_id().to_string(),
-                if model.reverse_page() {
-                    model.keyset_before_cursor().map(|v| v.to_vec())
-                } else {
-                    model.keyset_cursor().map(|v| v.to_vec())
-                },
-                model.reverse_page(),
-                model.last_page(),
-            )
+    pub(super) fn fetch_browse_page(&self, tab_id: Uuid, auto_refresh: bool, sender: ComponentSender<Self>) {
+        let Some(page) = self.browse_page_request(tab_id) else {
+            return;
         };
-
-        let offset = request.offset;
-        let Some(conn) = self.window_connection() else {
+        let Some(conn) = self.tab_connection(tab_id) else {
+            if auto_refresh {
+                sender.input(AppMsg::AutoRefreshFailed(
+                    tab_id,
+                    page.request,
+                    bookie_app_services::tr!("No active connection").to_string(),
+                ));
+                return;
+            }
             sender.input(AppMsg::LoadFailed(
                 Some(tab_id),
                 BrowseLoadFailure {
-                    request: Some(request),
+                    request: Some(page.request),
                     message: "no active connection".into(),
                 },
             ));
             return;
         };
+        let query = match self.plan_browse_page_query(tab_id, &page) {
+            Ok(query) => query,
+            Err(message) => {
+                if auto_refresh {
+                    sender.input(AppMsg::AutoRefreshFailed(tab_id, page.request, message));
+                    return;
+                }
+                sender.input(AppMsg::LoadFailed(
+                    Some(tab_id),
+                    BrowseLoadFailure {
+                        request: Some(page.request),
+                        message,
+                    },
+                ));
+                return;
+            }
+        };
+        self.spawn_browse_page_load(tab_id, sender, conn, page, query, auto_refresh);
+    }
+
+    fn browse_page_request(&self, tab_id: Uuid) -> Option<PreparedBrowsePage> {
+        let tabs = self.workspace_tabs.borrow();
+        let controller = tabs.get(&tab_id).and_then(|t| t.browse_controller())?;
+        let model = controller.model();
+        Some(PreparedBrowsePage {
+            schema: model.schema().map(str::to_owned),
+            table: model.table().to_string(),
+            request: model.begin_page_request(),
+            limit: model.page_size(),
+            sort: model.current_sort(),
+            filter: model.current_filter().clone(),
+            columns: model.columns().to_vec(),
+            driver_id: model.driver_id().to_string(),
+            keyset_cursor: if model.reverse_page() {
+                model.keyset_before_cursor().map(|v| v.to_vec())
+            } else {
+                model.keyset_cursor().map(|v| v.to_vec())
+            },
+            reverse_page: model.reverse_page(),
+            last_page: model.last_page(),
+        })
+    }
+
+    fn plan_browse_page_query(&self, tab_id: Uuid, page: &PreparedBrowsePage) -> Result<PageQuery, String> {
         let pending = self
             .change_trackers
             .with_tab_ref(tab_id, |tracker| tracker.has_pending())
@@ -166,52 +211,61 @@ impl App {
         let hidden_columns = if pending {
             std::collections::HashSet::new()
         } else {
-            self.connection_id
+            self.resolve_tab_connection(tab_id)
+                .ok()
                 .zip(self.persistence.column_widths.as_ref())
-                .map(|(connection_id, store)| store.hidden_columns(connection_id, &table))
+                .map(|(connection_id, store)| store.hidden_columns(connection_id, &page.table))
                 .unwrap_or_default()
         };
+        let supports_reverse_keyset = self
+            .registry
+            .get(&page.driver_id)
+            .is_some_and(|driver| driver.capabilities().supports_reverse_keyset);
         let target = BrowseTarget {
-            driver_id: &driver_id,
-            schema: schema.as_deref(),
-            table: &table,
-            columns: &columns,
-            filter: &filter,
+            driver_id: &page.driver_id,
+            schema: page.schema.as_deref(),
+            table: &page.table,
+            columns: &page.columns,
+            filter: &page.filter,
             hidden_columns: Some(&hidden_columns),
-            long_text_preview: columns.iter().any(|column| column.primary_key),
+            long_text_preview: page.columns.iter().any(|column| column.primary_key),
+            supports_reverse_keyset,
         };
-        let row_id_order = self.relation_is_ordinary_table(schema.as_deref(), &table);
-        let page = if reverse_page {
-            target.page_before(offset, limit, sort, keyset_cursor.as_deref())
-        } else if last_page {
-            target.page_last(offset, limit, sort)
+        let row_id_order = self.relation_is_ordinary_table(page.schema.as_deref(), &page.table);
+        let offset = page.request.offset;
+        if page.reverse_page {
+            target.page_before(offset, page.limit, page.sort, page.keyset_cursor.as_deref())
+        } else if page.last_page {
+            target.page_last(offset, page.limit, page.sort)
         } else if row_id_order {
-            target.page_by_row_id(offset, limit, sort, keyset_cursor.as_deref())
+            target.page_by_row_id(offset, page.limit, page.sort, page.keyset_cursor.as_deref())
         } else {
-            target.page(offset, limit, sort, keyset_cursor.as_deref())
-        };
-        let query = match page {
-            Ok(query) => query,
-            Err(message) => {
-                sender.input(AppMsg::LoadFailed(
-                    Some(tab_id),
-                    BrowseLoadFailure {
-                        request: Some(request),
-                        message,
-                    },
-                ));
-                return;
-            }
-        };
+            target.page(offset, page.limit, page.sort, page.keyset_cursor.as_deref())
+        }
+    }
 
-        let timeout_secs =
-            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
+    fn spawn_browse_page_load(
+        &self,
+        tab_id: Uuid,
+        sender: ComponentSender<Self>,
+        conn: std::sync::Arc<dyn bookie_core::Connection>,
+        page: PreparedBrowsePage,
+        query: PageQuery,
+        auto_refresh: bool,
+    ) {
+        let timeout_secs = self.tab_timeout_secs(tab_id);
         let token = self.read_scopes.borrow_mut().start(tab_id, ReadScope::Page);
         let sender_clone = sender.clone();
         let reverse_rows = matches!(&query, PageQuery::Sql(bound) if bound.reverse_rows);
+        let offset = page.request.offset;
+        let limit = page.limit;
+        let schema = page.schema;
+        let table = page.table;
+        let request = page.request;
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
+                    let started = std::time::Instant::now();
                     let control = crate::services::operation_control::bounded_with(timeout_secs, token);
                     let (result, projected_columns) = match query {
                         PageQuery::Native => (
@@ -228,21 +282,28 @@ impl App {
                             (page, projected_columns)
                         }
                     };
+                    let elapsed = started.elapsed();
                     match result {
                         Ok(mut query_result) => {
                             if reverse_rows {
                                 query_result.rows.reverse();
                             }
-                            sender_clone.input(AppMsg::RowsLoaded(tab_id, request, query_result, projected_columns))
+                            sender_clone.input(AppMsg::RowsLoaded(
+                                tab_id,
+                                request,
+                                query_result,
+                                projected_columns,
+                                elapsed,
+                            ))
                         }
                         Err(_) if control.cancellation_token().is_cancelled() => {}
-                        Err(e) => sender_clone.input(AppMsg::LoadFailed(
-                            Some(tab_id),
-                            BrowseLoadFailure {
-                                request: Some(request),
-                                message: crate::services::error_text::driver_message(&e),
-                            },
-                        )),
+                        Err(e) => dispatch_page_load_failure(
+                            &sender_clone,
+                            tab_id,
+                            request,
+                            crate::services::error_text::driver_message(&e),
+                            auto_refresh,
+                        ),
                     }
                 })
                 .drop_on_shutdown()
@@ -259,11 +320,15 @@ impl App {
             (model.schema().map(str::to_owned), model.table().to_string())
         };
 
-        let Some(conn) = self.window_connection() else {
+        let Some(conn) = self.tab_connection(tab_id) else {
             return;
         };
-        let timeout_secs =
-            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
+        let timeout_secs = self.tab_timeout_secs(tab_id);
+        let check_view = self
+            .tab_driver_id(tab_id)
+            .and_then(|driver_id| self.registry.get(&driver_id))
+            .is_some_and(|driver| driver.capabilities().supports_updatable_views)
+            && !self.relation_is_ordinary_table(schema.as_deref(), &table);
         let token = self.read_scopes.borrow_mut().start(tab_id, ReadScope::Columns);
         let sender_clone = sender.clone();
         sender.command(move |_, shutdown| {
@@ -272,11 +337,26 @@ impl App {
                     let control = crate::services::operation_control::bounded_with(timeout_secs, token);
                     match conn.fetch_columns_controlled(schema.as_deref(), &table, &control).await {
                         Ok(_) | Err(_) if control.cancellation_token().is_cancelled() => {}
-                        Ok(columns) => sender_clone.input(AppMsg::ColumnsLoaded(
-                            tab_id,
-                            columns,
-                            control.cancellation_token().clone(),
-                        )),
+                        Ok(columns) => {
+                            let plan = bookie_app_services::view_edit::resolve_view_columns(
+                                &*conn,
+                                schema.as_deref(),
+                                &table,
+                                columns,
+                                check_view,
+                                &control,
+                            )
+                            .await;
+                            if control.cancellation_token().is_cancelled() {
+                                return;
+                            }
+                            sender_clone.input(AppMsg::BrowseViewRestriction(tab_id, plan.restriction));
+                            sender_clone.input(AppMsg::ColumnsLoaded(
+                                tab_id,
+                                plan.columns,
+                                control.cancellation_token().clone(),
+                            ));
+                        }
                         Err(error) => sender_clone.input(AppMsg::LoadFailed(
                             Some(tab_id),
                             BrowseLoadFailure {
@@ -300,11 +380,10 @@ impl App {
             (model.schema().map(str::to_owned), model.table().to_string())
         };
 
-        let Some(conn) = self.window_connection() else {
+        let Some(conn) = self.tab_connection(tab_id) else {
             return;
         };
-        let timeout_secs =
-            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
+        let timeout_secs = self.tab_timeout_secs(tab_id);
         let token = self.read_scopes.borrow_mut().start(tab_id, ReadScope::ForeignKeys);
         let sender_clone = sender.clone();
         sender.command(move |_, shutdown| {
@@ -350,7 +429,7 @@ impl App {
             )
         };
 
-        let Some(conn) = self.window_connection() else {
+        let Some(conn) = self.tab_connection(tab_id) else {
             return;
         };
 
@@ -362,6 +441,7 @@ impl App {
             filter: &filter,
             hidden_columns: None,
             long_text_preview: false,
+            supports_reverse_keyset: false,
         };
         let query = match target.count() {
             Ok(query) => query,
@@ -372,8 +452,7 @@ impl App {
             }
         };
 
-        let timeout_secs =
-            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
+        let timeout_secs = self.tab_timeout_secs(tab_id);
         let token = self.read_scopes.borrow_mut().start(tab_id, ReadScope::Count);
         let sender_clone = sender.clone();
         sender.command(move |_, shutdown| {
@@ -420,11 +499,10 @@ impl App {
         targets: Vec<(String, bookie_core::QualifiedTypeName)>,
         sender: ComponentSender<Self>,
     ) {
-        let Some(conn) = self.window_connection() else {
+        let Some(conn) = self.tab_connection(tab_id) else {
             return;
         };
-        let timeout_secs =
-            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
+        let timeout_secs = self.tab_timeout_secs(tab_id);
         let token = self.read_scopes.borrow_mut().start(tab_id, ReadScope::EnumLabels);
         let sender_clone = sender.clone();
         sender.command(move |_, shutdown| {
@@ -466,6 +544,7 @@ impl App {
         request: BrowsePageRequest,
         result: QueryResult,
         projected_columns: Option<Vec<usize>>,
+        elapsed: std::time::Duration,
     ) {
         self.dispatch_to_tab(
             tab_id,
@@ -473,6 +552,7 @@ impl App {
                 request,
                 result,
                 projected_columns,
+                elapsed,
             },
         );
     }
@@ -504,7 +584,11 @@ impl App {
             None => {
                 tracing::warn!(error = %failure.message, "app-level load failed");
                 self.dismiss_loading_page();
-                self.set_status_page(super::StatusKind::Error, &crate::tr!("Failed"), &failure.message);
+                self.set_status_page(
+                    super::StatusKind::Error,
+                    &bookie_app_services::tr!("Failed"),
+                    &failure.message,
+                );
             }
         }
     }
@@ -524,7 +608,7 @@ impl App {
 
     pub(super) fn on_export_front_results(&self) {
         let Some(id) = self.selected_workspace_tab_id() else {
-            self.show_toast(&crate::tr!("Nothing to export"));
+            self.show_toast(&bookie_app_services::tr!("Nothing to export"));
             return;
         };
         let export = {
@@ -545,29 +629,39 @@ impl App {
                 };
                 crate::ui::export_dialog::present(&self.window, &self.toast_overlay, request, &self.preferences);
             }
-            FrontExport::Editor { result, name } => crate::ui::export_dialog::present(
-                &self.window,
-                &self.toast_overlay,
-                crate::ui::export_dialog::ExportRequest {
-                    scope: crate::ui::export_dialog::ExportScope::QueryResult,
-                    paged: None,
-                    result,
-                    suggested_name: name,
-                    driver_id: self.driver_id().to_string(),
-                },
-                &self.preferences,
-            ),
-            FrontExport::Empty => self.show_toast(&crate::tr!("Nothing to export")),
+            FrontExport::Editor { result, name } => {
+                let Some(driver_id) = self.tab_driver_id(id) else {
+                    self.show_toast(&bookie_app_services::tr!("Nothing to export"));
+                    return;
+                };
+                crate::ui::export_dialog::present(
+                    &self.window,
+                    &self.toast_overlay,
+                    crate::ui::export_dialog::ExportRequest {
+                        scope: crate::ui::export_dialog::ExportScope::QueryResult,
+                        paged: None,
+                        result,
+                        suggested_name: name,
+                        driver_id,
+                    },
+                    &self.preferences,
+                )
+            }
+            FrontExport::Empty => self.show_toast(&bookie_app_services::tr!("Nothing to export")),
         }
     }
 
     fn browse_export_request(&self) -> Option<crate::ui::export_dialog::ExportRequest> {
         let Some((schema, table)) = self.selected_browse_slot_table() else {
-            self.show_toast(&crate::tr!("Nothing to export"));
+            self.show_toast(&bookie_app_services::tr!("Nothing to export"));
             return None;
         };
         let Some(active_id) = self.selected_browse_tab_id() else {
-            self.show_toast(&crate::tr!("Nothing to export"));
+            self.show_toast(&bookie_app_services::tr!("Nothing to export"));
+            return None;
+        };
+        let Some(driver_id) = self.tab_driver_id(active_id) else {
+            self.show_toast(&bookie_app_services::tr!("Nothing to export"));
             return None;
         };
         let (result, has_unfetched_columns, filtered) = {
@@ -577,7 +671,7 @@ impl App {
                 .and_then(|tab| tab.browse_controller())
                 .map(|controller| controller.model())
             else {
-                self.show_toast(&crate::tr!("Nothing to export"));
+                self.show_toast(&bookie_app_services::tr!("Nothing to export"));
                 return None;
             };
             (
@@ -588,9 +682,9 @@ impl App {
         };
         let Some(result) = result else {
             let message = if has_unfetched_columns {
-                crate::tr!("Show hidden columns and reload before exporting this page.")
+                bookie_app_services::tr!("Show hidden columns and reload before exporting this page.")
             } else {
-                crate::tr!("Nothing to export")
+                bookie_app_services::tr!("Nothing to export")
             };
             self.show_toast(&message);
             return None;
@@ -601,36 +695,50 @@ impl App {
         };
         Some(crate::ui::export_dialog::ExportRequest {
             scope: crate::ui::export_dialog::ExportScope::TablePage { filtered },
-            paged: None,
+            paged: self.snapshot_export(active_id),
             result: std::sync::Arc::new(result),
             suggested_name: table_label,
-            driver_id: self.driver_id().to_string(),
+            driver_id,
         })
     }
 
     pub(super) fn on_export_streamed_results(&self, request: crate::ui::export_dialog::StreamExportRequest) {
         let Some(spool) = request.spool else {
-            self.show_toast(&crate::tr!("The complete query result is no longer available."));
+            self.show_toast(&bookie_app_services::tr!(
+                "The complete query result is no longer available."
+            ));
             return;
         };
         let fetcher =
             crate::ui::export_dialog::spool_export_factory(spool, request.columns.clone(), request.total_rows);
+        let current_page = request.current_page;
         let result = QueryResult {
             columns: request.columns,
             rows: Vec::new().into(),
             truncated: false,
         };
+        let scope = if current_page.is_some() {
+            crate::ui::export_dialog::ExportScope::QueryPage {
+                filtered: request.filtered,
+            }
+        } else {
+            crate::ui::export_dialog::ExportScope::QueryStored
+        };
+        let result = current_page
+            .as_ref()
+            .map_or_else(|| std::sync::Arc::new(result), |page| page.result.clone());
         crate::ui::export_dialog::present_with_format(
             &self.window,
             &self.toast_overlay,
             crate::ui::export_dialog::ExportRequest {
-                scope: crate::ui::export_dialog::ExportScope::QueryStored,
+                scope,
                 paged: Some(crate::ui::export_dialog::PagedExport {
                     mode: crate::ui::export_dialog::PagedExportMode::StoredQuery,
                     total_rows: Some(request.total_rows),
                     open: fetcher,
+                    retained_page: current_page,
                 }),
-                result: std::sync::Arc::new(result),
+                result,
                 suggested_name: request.query.suggested_name,
                 driver_id: request.query.driver_id,
             },
@@ -658,29 +766,49 @@ impl App {
             filter: model.current_filter().clone(),
             sort: model.current_sort(),
             row_id_order: self.relation_is_ordinary_table(model.schema(), model.table()),
-            timeout_secs: crate::services::operation_control::timeout_for(
-                &self.preferences,
-                &self.database,
-                self.connection_id,
-            ),
+            timeout_secs: self.tab_timeout_secs(tab_id),
         };
         let total = model.total_rows().and_then(|total| usize::try_from(total).ok());
         Some((plan, total))
     }
 
+    fn snapshot_export(&self, tab_id: Uuid) -> Option<crate::ui::export_dialog::PagedExport> {
+        let driver_id = self.tab_driver_id(tab_id)?;
+        let supported = self
+            .registry
+            .get(&driver_id)
+            .is_some_and(|driver| driver.capabilities().supports_snapshot_export);
+        if !supported {
+            return None;
+        }
+        let guard = self
+            .resolve_tab_connection(tab_id)
+            .ok()
+            .and_then(|id| self.database.guard(id, bookie_policy::Principal::human_gui()))?;
+        let (plan, total_rows) = self.export_page_plan(tab_id)?;
+        Some(crate::ui::export_dialog::PagedExport {
+            mode: crate::ui::export_dialog::PagedExportMode::SnapshotTable,
+            total_rows,
+            open: snapshot_fetcher_factory(guard, plan),
+            retained_page: None,
+        })
+    }
+
     pub(super) fn on_export_all(&self, format: ExportFormat) {
-        let planned = self
-            .selected_browse_tab_id()
+        let selected = self.selected_browse_tab_id();
+        let planned = selected
             .and_then(|id| self.export_page_plan(id))
-            .zip(self.window_connection());
-        let Some(((plan, total_rows), conn)) = planned else {
-            self.show_toast(&crate::tr!("Nothing to export"));
+            .zip(selected.and_then(|id| self.tab_connection(id)));
+        let (Some(selected), Some(((plan, total_rows), conn))) = (selected, planned) else {
+            self.show_toast(&bookie_app_services::tr!("Nothing to export"));
             return;
         };
         let label = match &plan.schema {
             Some(schema) => format!("{schema}.{}", plan.table),
             None => plan.table.clone(),
         };
+        let snapshot = self.snapshot_export(selected);
+        let driver_id = plan.driver_id.clone();
         let columns_only = QueryResult {
             columns: plan.columns.clone(),
             rows: Vec::new().into(),
@@ -690,17 +818,24 @@ impl App {
             &self.window,
             &self.toast_overlay,
             crate::ui::export_dialog::ExportRequest {
-                scope: crate::ui::export_dialog::ExportScope::TablePage {
-                    filtered: !plan.filter.is_empty(),
+                scope: if snapshot.is_some() {
+                    crate::ui::export_dialog::ExportScope::TableSnapshot {
+                        filtered: !plan.filter.is_empty(),
+                    }
+                } else {
+                    crate::ui::export_dialog::ExportScope::TablePage {
+                        filtered: !plan.filter.is_empty(),
+                    }
                 },
-                paged: Some(crate::ui::export_dialog::PagedExport {
+                paged: Some(snapshot.unwrap_or_else(|| crate::ui::export_dialog::PagedExport {
                     mode: crate::ui::export_dialog::PagedExportMode::FullTable,
                     total_rows,
                     open: page_fetcher_factory(conn, plan),
-                }),
+                    retained_page: None,
+                })),
                 result: std::sync::Arc::new(columns_only),
                 suggested_name: label,
-                driver_id: self.driver_id().to_string(),
+                driver_id,
             },
             matches!(format, ExportFormat::Json),
             &self.preferences,
@@ -716,7 +851,7 @@ impl App {
             return;
         }
         let Some(id) = self.selected_browse_tab_id() else {
-            self.show_toast(&crate::tr!("Open a table to filter rows."));
+            self.show_toast(&bookie_app_services::tr!("Open a table to filter rows."));
             return;
         };
         self.dispatch_to_tab(id, BrowseTabInput::ToggleFilterStrip);
@@ -743,18 +878,20 @@ impl App {
             }
             RefreshDecision::ConfirmDiscard => {}
             RefreshDecision::SaveInFlight => {
-                self.show_toast(&crate::tr!("Saving changes. Refresh after the save finishes."));
+                self.show_toast(&bookie_app_services::tr!(
+                    "Saving changes. Refresh after the save finishes."
+                ));
                 return;
             }
         }
         let dialog = adw::AlertDialog::new(
-            Some(&crate::tr!("Discard pending changes?")),
-            Some(&crate::tr!(
+            Some(&bookie_app_services::tr!("Discard pending changes?")),
+            Some(&bookie_app_services::tr!(
                 "Refreshing reloads the table from the database and drops every unsaved edit on this tab."
             )),
         );
-        dialog.add_response("cancel", &crate::tr!("Cancel"));
-        dialog.add_response("discard", &crate::tr!("Discard and refresh"));
+        dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
+        dialog.add_response("discard", &bookie_app_services::tr!("Discard and refresh"));
         dialog.set_response_appearance("discard", adw::ResponseAppearance::Destructive);
         dialog.set_default_response(Some("cancel"));
         dialog.set_close_response("cancel");
@@ -767,6 +904,38 @@ impl App {
             }
         });
         dialog.present(Some(&self.window));
+    }
+
+    pub(super) fn on_auto_refresh_failed(&self, tab_id: Uuid, request: BrowsePageRequest, message: String) {
+        let current = self
+            .workspace_tabs
+            .borrow()
+            .get(&tab_id)
+            .and_then(|tab| tab.browse_controller())
+            .is_some_and(|controller| controller.model().accepts_page_request(request));
+        if current {
+            self.dispatch_to_tab(tab_id, BrowseTabInput::AutoRefreshFailed(message));
+        }
+    }
+}
+
+fn dispatch_page_load_failure(
+    sender: &ComponentSender<App>,
+    tab_id: Uuid,
+    request: BrowsePageRequest,
+    message: String,
+    auto_refresh: bool,
+) {
+    if auto_refresh {
+        sender.input(AppMsg::AutoRefreshFailed(tab_id, request, message));
+    } else {
+        sender.input(AppMsg::LoadFailed(
+            Some(tab_id),
+            BrowseLoadFailure {
+                request: Some(request),
+                message,
+            },
+        ));
     }
 }
 
@@ -819,7 +988,9 @@ fn browse_cell_value_query(
     row_key: &[bookie_core::Value],
 ) -> Result<crate::services::browse_query::BoundQuery, String> {
     if columns.get(col_index).is_none_or(|column| column.name != column_name) {
-        return Err(crate::tr!("The table columns changed before the value could be fetched.").to_string());
+        return Err(
+            bookie_app_services::tr!("The table columns changed before the value could be fetched.").to_string(),
+        );
     }
     BrowseTarget {
         driver_id,
@@ -829,22 +1000,23 @@ fn browse_cell_value_query(
         filter: &bookie_core::FilterSet::default(),
         hidden_columns: None,
         long_text_preview: false,
+        supports_reverse_keyset: false,
     }
     .value_query(col_index, row_key)
 }
 
 fn single_cell_value(result: QueryResult) -> Result<bookie_core::Value, String> {
     if result.columns.len() != 1 || result.truncated {
-        return Err(crate::tr!("The row key did not identify exactly one cell.").to_string());
+        return Err(bookie_app_services::tr!("The row key did not identify exactly one cell.").to_string());
     }
     let Some(row) = result.rows.first() else {
-        return Err(crate::tr!("The row key did not identify exactly one cell.").to_string());
+        return Err(bookie_app_services::tr!("The row key did not identify exactly one cell.").to_string());
     };
     if result.rows.len() != 1 {
-        return Err(crate::tr!("The row key did not identify exactly one cell.").to_string());
+        return Err(bookie_app_services::tr!("The row key did not identify exactly one cell.").to_string());
     }
     let [value] = row else {
-        return Err(crate::tr!("The row key did not identify exactly one cell.").to_string());
+        return Err(bookie_app_services::tr!("The row key did not identify exactly one cell.").to_string());
     };
     Ok(value.clone())
 }
@@ -873,11 +1045,34 @@ async fn run_browse_count(
     }
 }
 
-fn page_fetcher_factory(
-    conn: std::sync::Arc<dyn bookie_core::Connection>,
+fn snapshot_fetcher_factory(
+    guard: std::sync::Arc<bookie_policy::PolicyGuard>,
     plan: crate::services::export_pages::PagePlan,
 ) -> crate::ui::export_dialog::PageFetcherFactory {
-    let run: crate::services::export_pages::PageRunner = std::sync::Arc::new(|future| {
+    let run = page_runner();
+    std::sync::Arc::new(move |cancel| {
+        let pages =
+            bookie_app_services::snapshot_export::SnapshotPages::new(guard.clone(), plan.clone(), run.clone(), cancel);
+        let shared = std::sync::Arc::new(std::sync::Mutex::new(Some(pages)));
+        let reader = shared.clone();
+        crate::ui::export_dialog::PageFetcher::new(
+            move || {
+                let mut slot = reader.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+                match slot.as_mut() {
+                    Some(pages) => pages.next_page(),
+                    None => Ok(None),
+                }
+            },
+            move || {
+                let taken = shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner).take();
+                taken.map_or(Ok(()), |pages| pages.finish())
+            },
+        )
+    })
+}
+
+fn page_runner() -> crate::services::export_pages::PageRunner {
+    std::sync::Arc::new(|future| {
         let (reply, answer) = async_channel::bounded(1);
         relm4::spawn(async move {
             let _ = reply.send(future.await).await;
@@ -887,7 +1082,14 @@ fn page_fetcher_factory(
                 "the export was interrupted".into(),
             ))
         })
-    });
+    })
+}
+
+fn page_fetcher_factory(
+    conn: std::sync::Arc<dyn bookie_core::Connection>,
+    plan: crate::services::export_pages::PagePlan,
+) -> crate::ui::export_dialog::PageFetcherFactory {
+    let run = page_runner();
     std::sync::Arc::new(move |cancel| {
         let fetcher = crate::services::export_pages::page_fetcher(conn.clone(), plan.clone(), run.clone(), cancel);
         crate::ui::export_dialog::PageFetcher::new(fetcher, || Ok(()))

@@ -4,12 +4,11 @@ use relm4::prelude::*;
 use relm4::{adw, gtk};
 use uuid::Uuid;
 
-use bookie_core::{ColumnInfo, EnumInputStyle, ForeignKeyInfo, QueryResult, Value};
+use bookie_app_services::preferences::bounded_page_size;
+use bookie_core::{ColumnInfo, ForeignKeyInfo, QueryResult, Value};
 
 use crate::ui::grid::{GridMsg, TabGridContext, build_column_view};
 
-const PAGE_SIZE_OPTIONS: &[u64] = &[100, 500, 1_000, 5_000, 10_000];
-const DEFAULT_PAGE_SIZE: u64 = 1_000;
 /// Bulk-delete safety net: when the user marks at least this many
 /// rows pending-delete in one shot, surface a confirmation dialog
 /// before tracking. The marker is reversible via Discard / Ctrl+Z,
@@ -66,7 +65,7 @@ pub struct BrowseTabInit {
     pub schema: Option<String>,
     pub table: String,
     pub driver_id: String,
-    pub enum_input_style: EnumInputStyle,
+    pub parse_hooks: ParseHooks,
     pub browse_filters: bool,
     pub connection_id: Option<Uuid>,
     pub read_only: bool,
@@ -83,7 +82,7 @@ pub struct BrowseTab {
     schema: Option<String>,
     table: String,
     driver_id: String,
-    enum_input_style: EnumInputStyle,
+    parse_hooks: ParseHooks,
     browse_filters: bool,
     connection_id: Option<Uuid>,
     read_only: bool,
@@ -108,6 +107,7 @@ pub struct BrowseTab {
     choice_labels: crate::ui::grid::ChoiceMap,
     ambiguous_keys: crate::ui::grid::AmbiguousKeys,
     current_result: Option<std::sync::Arc<QueryResult>>,
+    last_page_elapsed: Option<std::time::Duration>,
     current_projection: Option<Vec<usize>>,
     /// Last row's primary-key values from the most recent page. Used
     /// for keyset seek when offset exceeds `KEYSET_OFFSET_THRESHOLD`.
@@ -140,6 +140,7 @@ pub struct BrowseTab {
     /// can't dismiss by saving.
     read_only_banner: adw::Banner,
     no_pk_banner: adw::Banner,
+    view_restriction: Option<bookie_app_services::view_edit::ViewEditRestriction>,
     /// Last-emitted dirty state. PendingCountChanged fires on every
     /// tracker mutation including count-only changes (2 → 3) where the
     /// dirty flag hasn't actually flipped. Tracking the previous flag
@@ -169,6 +170,10 @@ pub struct BrowseTab {
     prev_button: gtk::Button,
     next_button: gtk::Button,
     last_button: gtk::Button,
+    auto_refresh_button: gtk::ToggleButton,
+    auto_refresh_status_label: gtk::Label,
+    auto_refresh_source: Option<glib::SourceId>,
+    auto_refresh_in_flight: std::cell::Cell<bool>,
     /// Toolbar button that toggles the filter strip. Text-only
     /// ("Filter") because adwaita-icon-theme has no canonical
     /// symbolic icon for filtering and reusing a search/find icon
@@ -198,14 +203,17 @@ pub struct BrowseTab {
     discard_button: gtk::Button,
     pending_label: gtk::Label,
     grid_sender: relm4::Sender<GridMsg>,
+    column_selection: crate::ui::grid::ColumnSelectionHandle,
     rejected_edit_revision: std::cell::Cell<u64>,
 }
 
 mod accessors;
+mod auto_refresh;
 mod choices;
 mod chrome;
 #[cfg(test)]
 mod chrome_tests;
+mod column_selection;
 #[cfg(test)]
 mod filter_support_tests;
 mod grid_messages;
@@ -215,6 +223,7 @@ mod paste;
 mod preview;
 pub(crate) mod reference;
 mod requests;
+mod reset_cell;
 mod row_ops;
 mod save_completion;
 #[cfg(test)]
@@ -222,18 +231,21 @@ mod save_completion_tests;
 #[cfg(test)]
 mod save_in_flight_tests;
 mod selection;
+mod set_cells;
 #[cfg(test)]
 mod tests;
 mod value_parse;
 mod value_view;
 
+use bookie_app_services::value_input::ParseHooks;
+pub(crate) use bookie_app_services::value_input::mysql_enum_set_labels;
 pub(crate) use choices::scalar_enum_columns;
 use chrome::*;
 pub use messages::{BrowseTabInput, BrowseTabOutput};
 pub use requests::{BrowseCellValueRequest, BrowseLoadFailure, BrowsePageRequest, BrowseRowCountRequest};
 use requests::{CellValueRequestTracker, PageRequestTracker, RowCountRequestTracker};
 use selection::*;
-pub(crate) use value_parse::mysql_enum_set_labels;
+pub(crate) use value_parse::hooks_for;
 pub(in crate::ui) use value_parse::parse_grid_cell_input;
 use value_parse::*;
 
@@ -359,8 +371,8 @@ impl SimpleComponent for BrowseTab {
         inner_stack.add_named(&grid_holder, Some("grid"));
         // Initial state: loading. The first RowsLoaded swaps to "grid".
         let initial_loading = adw::StatusPage::builder()
-            .title(crate::tr!("Loading…"))
-            .description(crate::tr!("Fetching rows from {table}").replace(
+            .title(bookie_app_services::tr!("Loading…"))
+            .description(bookie_app_services::tr!("Fetching rows from {table}").replace(
                 "{table}",
                 &match init.schema.as_deref() {
                     Some(s) => format!("{s}.{}", init.table),
@@ -379,7 +391,8 @@ impl SimpleComponent for BrowseTab {
         inner_stack.add_named(&initial_loading, Some("loading"));
         inner_stack.set_visible_child_name("loading");
 
-        let paginator = Self::build_paginator(sender.clone(), init.page_size, init.browse_filters);
+        let page_size = bounded_page_size(init.page_size);
+        let paginator = Self::build_paginator(sender.clone(), page_size, init.browse_filters);
         let pending = Self::build_pending_revealer(sender.clone());
 
         // Per-HIG banner rule: banners persist hard constraints the
@@ -393,12 +406,12 @@ impl SimpleComponent for BrowseTab {
         // an additional banner would just duplicate that signal.
         let read_only_banner = adw::Banner::builder()
             .use_markup(false)
-            .title(crate::tr!("Read-only connection. Editing disabled."))
+            .title(bookie_app_services::tr!("Read-only connection. Editing disabled."))
             .revealed(init.read_only)
             .build();
         let no_pk_banner = adw::Banner::builder()
             .use_markup(false)
-            .title(crate::tr!(
+            .title(bookie_app_services::tr!(
                 "This table has no primary key. Row order is not stable; use the SQL editor to modify rows."
             ))
             .revealed(false)
@@ -650,14 +663,14 @@ impl SimpleComponent for BrowseTab {
             schema: init.schema,
             table: init.table,
             driver_id: init.driver_id,
-            enum_input_style: init.enum_input_style,
+            parse_hooks: init.parse_hooks,
             browse_filters: init.browse_filters,
             connection_id: init.connection_id,
             read_only: init.read_only,
             persistence: init.persistence,
             database: init.database,
             current_offset: init.initial_offset,
-            page_size: init.page_size,
+            page_size,
             current_sort: init.initial_sort,
             current_sort_keys: init.initial_sort.into_iter().collect(),
             current_filter: initial_filter,
@@ -667,6 +680,7 @@ impl SimpleComponent for BrowseTab {
             choice_labels: Default::default(),
             ambiguous_keys: Default::default(),
             current_result: None,
+            last_page_elapsed: None,
             current_projection: None,
             keyset_cursor: None,
             keyset_first_cursor: None,
@@ -685,6 +699,7 @@ impl SimpleComponent for BrowseTab {
             rendered_columns: Vec::new(),
             read_only_banner,
             no_pk_banner,
+            view_restriction: None,
             was_dirty: std::cell::Cell::new(false),
             save_in_flight: std::cell::Cell::new(None),
             pending_focus_restore: std::cell::RefCell::new(None),
@@ -699,6 +714,10 @@ impl SimpleComponent for BrowseTab {
             prev_button: paginator.prev_button,
             next_button: paginator.next_button,
             last_button: paginator.last_button,
+            auto_refresh_button: paginator.auto_refresh_button,
+            auto_refresh_status_label: paginator.auto_refresh_status_label,
+            auto_refresh_source: None,
+            auto_refresh_in_flight: std::cell::Cell::new(false),
             filter_button: paginator.filter_button,
             filter_badge: paginator.filter_badge,
             filter_strip: Some(filter_strip),
@@ -708,10 +727,12 @@ impl SimpleComponent for BrowseTab {
             discard_button: pending.discard_button,
             pending_label: pending.pending_label,
             grid_sender,
+            column_selection: Default::default(),
             rejected_edit_revision: Default::default(),
         };
         model.refresh_crud_buttons();
         model.refresh_pending_bar(0);
+        model.refresh_auto_refresh_availability();
         // If the user has a saved filter on this (connection, schema,
         // table), the button picks up the .accent badge before the
         // first fetch returns so the filter state is visible from
@@ -756,7 +777,9 @@ impl SimpleComponent for BrowseTab {
                 let result = if self.rejected_edit_revision.get() == revision {
                     Ok(())
                 } else {
-                    Err(crate::tr!("Finish or cancel the current cell edit and try again."))
+                    Err(bookie_app_services::tr!(
+                        "Finish or cancel the current cell edit and try again."
+                    ))
                 };
                 let _ = reply.send(result);
             }
@@ -764,10 +787,15 @@ impl SimpleComponent for BrowseTab {
                 request,
                 result,
                 projected_columns,
+                elapsed,
             } => {
                 if !self.page_requests.accepts(request, self.current_offset) {
                     return;
                 }
+                self.auto_refresh_status_label.set_text("");
+                self.auto_refresh_status_label.set_tooltip_text(None);
+                self.auto_refresh_in_flight.set(false);
+                self.last_page_elapsed = Some(elapsed);
                 // Driver fallback: every shipping driver derives the
                 // `QueryResult.columns` list from the FIRST returned
                 // row, so a zero-row page comes back with an empty
@@ -798,6 +826,9 @@ impl SimpleComponent for BrowseTab {
                 // save. Waiting also avoids a wasted full rebuild when
                 // ColumnsLoaded fires next and triggers a re-render.
                 self.render_grid_if_ready(sender);
+            }
+            BrowseTabInput::ViewRestriction(restriction) => {
+                self.view_restriction = restriction;
             }
             BrowseTabInput::ColumnsLoaded(columns) => {
                 let columns = columns_for_browse_page(&self.driver_id, &columns, self.current_result.as_deref());
@@ -875,6 +906,7 @@ impl SimpleComponent for BrowseTab {
                 // RowsLoaded arrives. Paginator label is left empty
                 // until next RowCountLoaded.
                 self.current_result = None;
+                self.last_page_elapsed = None;
                 self.current_total_rows = None;
                 self.set_paginator_text("");
                 self.first_button.set_sensitive(false);
@@ -885,13 +917,32 @@ impl SimpleComponent for BrowseTab {
                 self.inner_stack.set_visible_child_name("error");
             }
             BrowseTabInput::Refresh => {
+                self.auto_refresh_status_label.set_text("");
+                self.auto_refresh_status_label.set_tooltip_text(None);
                 self.capture_focus_for_restore();
                 self.show_loading_inner(
-                    &crate::tr!("Loading…"),
-                    &crate::tr!("Fetching rows from {table}").replace("{table}", &self.table_label()),
+                    &bookie_app_services::tr!("Loading…"),
+                    &bookie_app_services::tr!("Fetching rows from {table}").replace("{table}", &self.table_label()),
                 );
                 self.emit_fetch_page_and_count(&sender);
             }
+            BrowseTabInput::AutoRefreshToggled(enabled) => self.set_auto_refresh(enabled, sender),
+            BrowseTabInput::AutoRefreshTick => self.auto_refresh_tick(&sender),
+            BrowseTabInput::AutoRefreshFlushFinished(flushed) => self.auto_refresh_after_flush(flushed, &sender),
+            BrowseTabInput::AutoRefreshDisconnected => self.stop_auto_refresh_for_disconnect(),
+            BrowseTabInput::AutoRefreshFailed(message) => {
+                self.stop_auto_refresh_after_failure();
+                self.auto_refresh_status_label
+                    .set_text(&bookie_app_services::tr!("Refresh failed"));
+                self.auto_refresh_status_label.set_tooltip_text(Some(&message));
+            }
+            BrowseTabInput::ColumnSelectionChanged => self.refresh_selection_chrome(),
+            BrowseTabInput::CopySelectionAs(format) => self.handle_copy_selection_as(format, sender),
+            BrowseTabInput::GridSetCells(request) => self.handle_grid_set_cells(request, sender),
+            BrowseTabInput::SetCellsConfirmed { request, value } => {
+                self.handle_set_cells_confirmed(request, value, sender)
+            }
+            BrowseTabInput::SetCellsPlanned(planned) => self.handle_set_cells_planned(planned, sender),
             BrowseTabInput::ClearSelection => {
                 let Some(sel) = self.current_selection.as_ref() else {
                     return;
@@ -1021,6 +1072,7 @@ impl SimpleComponent for BrowseTab {
                 let _ = sender.output(BrowseTabOutput::StateChanged);
             }
             BrowseTabInput::PageSizeChanged(size) => {
+                let size = bounded_page_size(size);
                 if self.page_size == size {
                     return;
                 }
@@ -1074,6 +1126,10 @@ impl SimpleComponent for BrowseTab {
                 row_key,
                 draft_id,
             } => self.handle_grid_delete_row(row_position, row_key, draft_id, sender),
+            BrowseTabInput::GridResetCell(request) => self.handle_grid_reset_cell(request, sender),
+            BrowseTabInput::GridResetConfirmed { row_key, statement } => {
+                self.handle_grid_reset_confirmed(row_key, statement, sender)
+            }
             BrowseTabInput::GridCopyRowAsStatement(row_positions, statement) => {
                 self.handle_grid_copy_row_as_statement(row_positions, statement, sender)
             }
@@ -1096,7 +1152,7 @@ impl SimpleComponent for BrowseTab {
                 }
             }
             BrowseTabInput::IncompleteRowData => {
-                let _ = sender.output(BrowseTabOutput::ShowToast(crate::tr!(
+                let _ = sender.output(BrowseTabOutput::ShowToast(bookie_app_services::tr!(
                     "Some row values were not fetched. Show hidden columns and reload before copying or exporting."
                 )));
             }
@@ -1138,5 +1194,9 @@ impl SimpleComponent for BrowseTab {
             BrowseTabInput::Undo => self.handle_undo(),
             BrowseTabInput::Redo => self.handle_redo(),
         }
+    }
+
+    fn shutdown(&mut self, _widgets: &mut Self::Widgets, _output: relm4::Sender<Self::Output>) {
+        self.shutdown_auto_refresh();
     }
 }

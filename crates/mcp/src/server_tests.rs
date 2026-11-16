@@ -402,6 +402,146 @@ async fn disconnecting_during_agent_approval_records_cancellation_and_never_exec
     assert!(server.await.expect("server task").is_ok());
 }
 
+#[tokio::test]
+async fn the_http_transport_refuses_calls_beyond_the_in_flight_limit() {
+    use tokio::io::AsyncReadExt;
+
+    let ApprovalFixture {
+        _directory,
+        bridge,
+        connection_id,
+        plaintext,
+        ..
+    } = approval_fixture();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let server = tokio::spawn(async move { axum::serve(listener, http_router(bridge)).await });
+    let body = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/call",
+        "params": {
+            "name": "execute_write",
+            "arguments": {
+                "connection_id": connection_id,
+                "sql": "INSERT INTO jobs(id) VALUES (1)",
+                "preview": false,
+                "token": plaintext,
+            }
+        }
+    })
+    .to_string();
+    let request = format!(
+        "POST /mcp HTTP/1.1\r\nHost: {address}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        body.len()
+    );
+
+    let mut waiting = Vec::new();
+    for _ in 0..MAX_IN_FLIGHT_CALLS {
+        let mut stream = TcpStream::connect(address).await.unwrap();
+        stream.write_all(request.as_bytes()).await.unwrap();
+        waiting.push(stream);
+    }
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
+    let mut extra = TcpStream::connect(address).await.unwrap();
+    extra.write_all(request.as_bytes()).await.unwrap();
+    let mut head = [0u8; 12];
+    let read = tokio::time::timeout(std::time::Duration::from_secs(3), extra.read_exact(&mut head)).await;
+    server.abort();
+
+    assert!(
+        read.is_ok(),
+        "the call over the limit must be refused at once, not held open"
+    );
+    assert_eq!(&head, b"HTTP/1.1 429", "{}", String::from_utf8_lossy(&head));
+    drop(waiting);
+}
+
+#[tokio::test]
+async fn an_http_request_may_carry_its_token_in_a_bearer_header() {
+    use tokio::io::AsyncReadExt;
+
+    let (_dir, bridge, token) = bridge_with_token();
+    let router = http_router(Arc::new(bridge));
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let server = tokio::spawn(async move { axum::serve(listener, router).await });
+
+    let mut answers = Vec::new();
+    for authorization in [Some(format!("Bearer {token}")), Some("Bearer nope".to_string()), None] {
+        let body = json!({"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}).to_string();
+        let header = authorization
+            .map(|value| format!("Authorization: {value}\r\n"))
+            .unwrap_or_default();
+        let request = format!(
+            "POST /mcp HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\n{header}Content-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        );
+        let mut stream = TcpStream::connect(address).await.unwrap();
+        stream.write_all(request.as_bytes()).await.unwrap();
+        let mut response = Vec::new();
+        let _ = stream.read_to_end(&mut response).await;
+        let text = String::from_utf8_lossy(&response).into_owned();
+        let json_body = text.split("\r\n\r\n").nth(1).unwrap_or_default().to_string();
+        answers.push(serde_json::from_str::<JsonValue>(&json_body).unwrap_or(JsonValue::Null));
+    }
+    server.abort();
+
+    assert!(
+        answers[0]["result"]["tools"]
+            .as_array()
+            .is_some_and(|tools| !tools.is_empty()),
+        "{}",
+        answers[0]
+    );
+    assert_eq!(
+        answers[1]["error"]["message"], "authentication failed",
+        "{}",
+        answers[1]
+    );
+    assert!(
+        answers[2]["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("missing token"),
+        "{}",
+        answers[2]
+    );
+}
+
+#[tokio::test]
+async fn a_stdio_session_uses_the_default_token_for_requests_that_carry_none() {
+    let (_dir, bridge, token) = bridge_with_token();
+    let mut client = start_stdio_session(Arc::new(bridge.with_default_token(Some(token))));
+    client
+        .send(json!({"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}))
+        .await;
+    let listed = client
+        .next_message(std::time::Duration::from_secs(5))
+        .await
+        .expect("an answer");
+    assert!(
+        listed["result"]["tools"]
+            .as_array()
+            .is_some_and(|tools| !tools.is_empty()),
+        "{listed}"
+    );
+
+    client
+        .send(json!({"jsonrpc":"2.0","id":2,"method":"tools/list","params":{"token":"nope"}}))
+        .await;
+    let refused = client
+        .next_message(std::time::Duration::from_secs(5))
+        .await
+        .expect("an answer");
+    assert_eq!(
+        refused["error"]["message"], "authentication failed",
+        "the client's own token wins: {refused}"
+    );
+    client.finish().await;
+}
+
 struct StdioClient {
     input: tokio::io::WriteHalf<tokio::io::DuplexStream>,
     output: BufReader<tokio::io::ReadHalf<tokio::io::DuplexStream>>,
@@ -587,11 +727,66 @@ fn tools_list_is_refused_with_a_bad_token() {
 }
 
 #[test]
+fn tools_list_gives_one_static_message_for_every_authentication_failure() {
+    let (dir, bridge, token) = bridge_with_token();
+    let bad_token = handle_tools_list(&bridge, &json!({"token": "not-a-real-token"})).unwrap_err();
+    assert_eq!(bad_token, "authentication failed");
+
+    std::fs::write(dir.path().join("tokens.json"), "{ not a token store").unwrap();
+    let unreadable_store = handle_tools_list(&bridge, &json!({"token": token})).unwrap_err();
+    assert_eq!(unreadable_store, "authentication failed");
+    assert!(!unreadable_store.contains(&dir.path().display().to_string()));
+}
+
+#[test]
 fn tools_list_succeeds_with_a_valid_token() {
     let (_dir, bridge, token) = bridge_with_token();
     let result = handle_tools_list(&bridge, &json!({"token": token})).unwrap();
     let tools = result["tools"].as_array().unwrap();
     assert_eq!(tools.len(), TOOL_NAMES.len());
+}
+
+#[test]
+fn tools_list_omits_the_tools_a_token_allowlist_excludes() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = Arc::new(crate::tokens::TokenStore::open(dir.path().join("tokens.json")).unwrap());
+    let (_metadata, plaintext) = store
+        .issue_with_tools(
+            "narrow".into(),
+            crate::TokenPermissions::ReadOnly,
+            vec![],
+            Some(vec!["routine_source".into(), "list_tables".into()]),
+            None,
+        )
+        .unwrap();
+    let bridge = McpBridge::new(Arc::new(NoProvider), store);
+
+    let result = handle_tools_list(&bridge, &json!({"token": plaintext})).unwrap();
+
+    let names: Vec<&str> = result["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|tool| tool["name"].as_str())
+        .collect();
+    assert_eq!(names, ["list_tables", "routine_source"]);
+}
+
+#[test]
+fn the_discovery_tools_are_advertised_as_read_only_with_object_schemas() {
+    let (_dir, bridge, token) = bridge_with_token();
+    let result = handle_tools_list(&bridge, &json!({"token": token})).unwrap();
+    for name in ["routine_source", "schema_context"] {
+        let tool = result["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|tool| tool["name"] == name)
+            .unwrap();
+        assert_eq!(tool["annotations"]["readOnlyHint"], true, "{name}");
+        assert_eq!(tool["inputSchema"]["type"], "object", "{name}");
+        assert!(!tool["description"].as_str().unwrap().is_empty(), "{name}");
+    }
 }
 
 #[test]
@@ -780,4 +975,55 @@ fn untrusted_browser_origins_are_rejected() {
     ] {
         assert!(!origin_is_allowed(&headers_with_origin(origin)), "{origin}");
     }
+}
+
+async fn http_post(address: std::net::SocketAddr, body: &JsonValue) -> (String, JsonValue) {
+    use tokio::io::AsyncReadExt;
+
+    let body = body.to_string();
+    let request = format!(
+        "POST /mcp HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        body.len()
+    );
+    let mut stream = TcpStream::connect(address).await.unwrap();
+    stream.write_all(request.as_bytes()).await.unwrap();
+    let mut response = Vec::new();
+    let _ = stream.read_to_end(&mut response).await;
+    let text = String::from_utf8_lossy(&response).into_owned();
+    let status = text.lines().next().unwrap_or_default().to_string();
+    let json_body = text.split("\r\n\r\n").nth(1).unwrap_or_default();
+    (status, serde_json::from_str(json_body).unwrap_or(JsonValue::Null))
+}
+
+#[tokio::test]
+async fn http_accepts_notifications_without_a_reply_and_answers_ping() {
+    let (_dir, bridge, _) = bridge_with_token();
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let router = http_router(Arc::new(bridge));
+    let server = tokio::spawn(async move { axum::serve(listener, router).await });
+
+    let (status, body) = http_post(address, &json!({"jsonrpc":"2.0","method":"notifications/initialized"})).await;
+    assert!(status.contains("202"), "a notification is accepted: {status}");
+    assert_eq!(body, JsonValue::Null, "and has no body");
+
+    let (_, ping) = http_post(address, &json!({"jsonrpc":"2.0","id":7,"method":"ping"})).await;
+    server.abort();
+    assert_eq!(ping["result"], json!({}), "{ping}");
+}
+
+#[tokio::test]
+async fn a_stdio_session_does_not_answer_an_unknown_notification() {
+    let (_dir, bridge, _) = bridge_with_token();
+    let mut client = start_stdio_session(Arc::new(bridge));
+    client
+        .send(json!({"jsonrpc":"2.0","method":"notifications/roots/list_changed"}))
+        .await;
+    client.send(json!({"jsonrpc":"2.0","id":2,"method":"ping"})).await;
+    let first = client
+        .next_message(std::time::Duration::from_secs(5))
+        .await
+        .expect("an answer");
+    assert_eq!(first["id"], 2, "the first reply is the ping's, not an error: {first}");
+    client.finish().await;
 }

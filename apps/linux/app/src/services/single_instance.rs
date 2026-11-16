@@ -1,25 +1,12 @@
-//! Process-level single-instance gate.
-//!
-//! `gtk::Application::register()` already handles single-instance via
-//! the DBus session bus on a healthy GNOME session: a second launch
-//! sends `activate` to the primary and exits. That mechanism breaks
-//! when DBus is unavailable (sandboxed / headless / minimal session)
-//! and silently lets two processes through. Two BookiE processes
-//! racing on `workspace_state.json` corrupt each other's tab state.
-//!
-//! This module adds a belt-and-suspenders `flock(2)` exclusive lock on
-//! `$XDG_RUNTIME_DIR/bookie.lock` (fallback `$XDG_CACHE_HOME` or
-//! `$HOME/.cache`). Held for the lifetime of the returned `Lock`
-//! guard. The kernel auto-releases the flock on process exit, so
-//! crashes don't leak the lock.
+// D-Bus registration cannot enforce uniqueness without a session bus.
+// Keep flock held across shared state access; closing the file releases it.
 
 use std::fs::{File, OpenOptions};
 use std::os::fd::AsRawFd;
 use std::path::PathBuf;
 
 pub struct Lock {
-    // Held only for its drop-side effect (closing the fd, which the
-    // kernel turns into a flock release).
+    // Keeping this file open keeps the flock held.
     _file: File,
 }
 
@@ -53,14 +40,8 @@ fn lock_path() -> Option<PathBuf> {
     Some(dir.join(lock_file))
 }
 
-/// Try to acquire the process-wide single-instance lock. Returns
-/// `Err(AlreadyRunning)` if another process holds it. The returned
-/// guard must outlive every codepath that touches user-state JSON.
 pub fn acquire() -> Result<Lock, LockError> {
     let Some(path) = lock_path() else {
-        // No XDG_RUNTIME_DIR / XDG_CACHE_HOME / HOME: we can't even
-        // place the lock file, so we can't enforce. Fall through —
-        // the caller will treat this as a soft failure.
         return Err(LockError::Io(std::io::Error::new(
             std::io::ErrorKind::NotFound,
             "no XDG runtime / cache / HOME directory",
@@ -73,8 +54,7 @@ pub fn acquire() -> Result<Lock, LockError> {
         .truncate(false)
         .open(&path)
         .map_err(LockError::Io)?;
-    // SAFETY: `file` owns the fd for the duration of this call;
-    // flock(2) is a thin syscall wrapper.
+    // SAFETY: `file` keeps a valid descriptor open during the syscall.
     let rc = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) };
     if rc == 0 {
         return Ok(Lock { _file: file });

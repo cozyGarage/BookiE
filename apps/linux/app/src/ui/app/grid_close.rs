@@ -68,13 +68,13 @@ async fn wait_for_edits(replies: Vec<tokio::sync::oneshot::Receiver<Result<(), S
         for reply in replies {
             reply
                 .await
-                .map_err(|_| crate::tr!("The table closed before its edit was finished."))??;
+                .map_err(|_| bookie_app_services::tr!("The table closed before its edit was finished."))??;
         }
         Ok(())
     };
     tokio::time::timeout(Duration::from_secs(20), finished)
         .await
-        .map_err(|_| crate::tr!("Finishing the cell edit timed out. Try again."))?
+        .map_err(|_| bookie_app_services::tr!("Finishing the cell edit timed out. Try again."))?
 }
 
 fn pending_grid_close_owner_is_current(expected: &glib::WeakRef<adw::TabPage>, current: Option<&adw::TabPage>) -> bool {
@@ -138,7 +138,7 @@ impl App {
             return true;
         }
         if !self.finish_grid_inputs(&intent) {
-            let message = crate::tr!("Finish or cancel the current cell edit and try again.");
+            let message = bookie_app_services::tr!("Finish or cancel the current cell edit and try again.");
             self.grid_edits_prepared(intent, ticket, Err(message), sender.clone());
             return true;
         }
@@ -204,7 +204,7 @@ impl App {
                     view.close_page_finish(&page, false);
                 }
             }
-            self.show_error_alert(&crate::tr!("Could not finish the cell edit"), &message);
+            self.show_error_alert(&bookie_app_services::tr!("Could not finish the cell edit"), &message);
             return;
         }
         sender.input(intent.message());

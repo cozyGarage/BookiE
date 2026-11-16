@@ -4,40 +4,26 @@ import os
 from pathlib import Path
 import sys
 
-REQUIRED = {
-    "pin-revision",
-    "reusable-test-builds",
-    "gpui-tests",
-    "preflight",
-    "fast",
-    "gtk-safety",
-    "gtk-server",
-    "distro-floor-scenarios",
-    "integration",
-    "b4-rollback",
-    "driver-tls",
-    "postgres-release",
-}
-SCHEDULED = "current-stable-clippy"
-MERGE_ONLY = set()
-OPTIONAL_ON_PULL_REQUEST = {"distro-floor-scenarios"}
+TEST_LAYERS = json.loads((Path(__file__).with_name("test-layers.json")).read_text())
+REQUIRED = set(TEST_LAYERS["gate_jobs"]) - {"regression-gate"}
+PUSH_REQUIRED = set(TEST_LAYERS["push_required_jobs"])
+OPTIONAL_ON_PUSH = REQUIRED - PUSH_REQUIRED
 
 
 def assess(results, event):
-    expected = REQUIRED | {SCHEDULED}
+    required = PUSH_REQUIRED if event == "push" else REQUIRED
+    expected = REQUIRED | results.keys()
     failures = []
     rows = []
     for name in sorted(expected | results.keys()):
         status = results.get(name, {}).get("result", "missing")
-        allowed_skip = status == "skipped" and (
-            (name == SCHEDULED and event in {"push", "pull_request"})
-            or (name in OPTIONAL_ON_PULL_REQUEST and event == "pull_request")
-        )
-        accepted = name in expected and (status == "success" or allowed_skip)
+        allowed_skip = status == "skipped" and name in OPTIONAL_ON_PUSH and event == "push"
+        allowed_success = status == "success" and (name in required or event == "push")
+        accepted = name in REQUIRED and (allowed_success or allowed_skip)
         if not accepted:
             failures.append(name)
         if allowed_skip:
-            detail = "not a pull-request gate" if name in OPTIONAL_ON_PULL_REQUEST else "scheduled/manual only"
+            detail = "full gate runs on pull requests, schedules and dispatch"
         else:
             detail = status
         rows.append(f"| {name} | {detail} | {'accepted' if accepted else 'FAILED'} |")
@@ -47,7 +33,7 @@ def assess(results, event):
 def main():
     results = json.loads(os.environ["CI_JOB_RESULTS"])
     failures, rows = assess(results, os.environ["GITHUB_EVENT_NAME"])
-    report = "## Linux regression jobs\n\n| Job | Result | Gate |\n| --- | --- | --- |\n" + "\n".join(rows) + "\n"
+    report = "## BookiE regression jobs\n\n| Job | Result | Gate |\n| --- | --- | --- |\n" + "\n".join(rows) + "\n"
     report += "\nMutation/coverage and installed Wayland acceptance are separate checks.\n"
     print(report)
     if summary := os.environ.get("GITHUB_STEP_SUMMARY"):

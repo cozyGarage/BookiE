@@ -46,7 +46,7 @@ impl StatementFailure {
         let target = self.target?;
         Some(
             gtk::Button::builder()
-                .label(crate::tr!("Go to error"))
+                .label(bookie_app_services::tr!("Go to error"))
                 .action_name("editor-error.jump")
                 .action_target(&target.variant())
                 .halign(gtk::Align::Center)

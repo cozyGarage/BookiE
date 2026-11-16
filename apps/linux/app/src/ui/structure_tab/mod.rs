@@ -1,35 +1,3 @@
-//! Structure workspace tab — full schema-management UI for CREATE /
-//! DROP / ALTER TABLE, indexes, and foreign keys.
-//!
-//! Layout (adw::ToolbarView, no internal HeaderBar — the wrapper's
-//! Data/Structure HeaderBar already provides one toolbar strip):
-//!
-//!   ┌─ Content ────────────────────────────────────────────────┐
-//!   │   (New mode) AdwPreferencesGroup { name entry }          │
-//!   │   Centred AdwViewSwitcher: Columns | Indexes | FKs | SQL │
-//!   │ ┌─ ViewStack ─────────────────────────────────────────┐  │
-//!   │ │ Columns: boxed-list of AdwExpanderRow (per column,  │  │
-//!   │ │   header = Name + summary, body = Name/Type/Null/   │  │
-//!   │ │   Default/PK/AutoInc rows) + AdwButtonRow add row   │  │
-//!   │ │ Indexes: boxed-list (Name, Cols, Unique, trash)     │  │
-//!   │ │ FKs: boxed-list (Name, Cols, Refs, RefCols, trash)  │  │
-//!   │ │ SQL Preview: SourceView5 (read-only, sql highlight) │  │
-//!   │ └─────────────────────────────────────────────────────┘  │
-//!   ├─ ActionBar { pending count | Discard | Save | Drop } ────┤
-//!   └──────────────────────────────────────────────────────────┘
-//!
-//! Editing flow (snapshot + diff). On load we capture the canonical
-//! schema into `original_*` snapshots. Every cell mutation updates
-//! the live model and calls `recompute_dirty_state`, which runs
-//! `sql_ddl::diff_to_ops` against the snapshot, regenerates the SQL
-//! preview from the resulting `Vec<StructureOp>`, and stores those
-//! ops in a passive per-tab `StructureChangeTracker` so out-of-band
-//! callers (close-with-pending dialog, save dispatcher) can read the
-//! current dirty state without touching the UI. There is no per-op
-//! undo / redo — the snapshot is the only restore point, exposed via
-//! the Discard button. Save calls `materialize_ops` against the same
-//! diff and dispatches `ExecuteTransaction` to App.
-
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
@@ -57,8 +25,6 @@ use indexes::build_index_row;
 use metadata::{MetadataAvailability, metadata_availability, metadata_notice_row};
 use validate::{SaveDraft, validate_save};
 
-/// Whether the Structure tab is editing an existing table or
-/// drafting a brand-new one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StructureMode {
     New,
@@ -112,6 +78,9 @@ pub struct StructureTab {
     supports_index_metadata: bool,
     supports_foreign_key_metadata: bool,
     collations: Rc<[String]>,
+    default_collation: Rc<RefCell<Option<String>>>,
+    table_collation_choices: Rc<RefCell<Vec<String>>>,
+    table_collation_row: adw::ComboRow,
     columns: Rc<RefCell<Vec<DraftColumn>>>,
     indexes: Rc<RefCell<Vec<IndexInfo>>>,
     foreign_keys: Rc<RefCell<Vec<ForeignKeyInfo>>>,
@@ -126,7 +95,6 @@ pub struct StructureTab {
     original_indexes: Rc<RefCell<Vec<IndexInfo>>>,
     original_fks: Rc<RefCell<Vec<ForeignKeyInfo>>>,
 
-    // Widget refs we touch from `update`.
     inner_stack: gtk::Stack,
     /// `AdwStatusPage` shown when initial structure fetch fails.
     /// Holding a reference so `LoadFailed` can set its description
@@ -192,6 +160,11 @@ pub enum StructureTabInput {
         metadata: StructureMetadata,
     },
     LoadFailed(String),
+    CollationsLoaded {
+        collations: Vec<String>,
+        table_default_supported: bool,
+    },
+    TableCollationEdited(Option<String>),
     Save,
     Discard,
     DropTableRequested,
@@ -199,26 +172,17 @@ pub enum StructureTabInput {
         new_table_name: Option<String>,
     },
     SaveFailed(String),
-    /// Re-render the columns / indexes / FKs lists + SQL preview from
-    /// the current model state. Fired after every UI mutation so the
-    /// rendered grid matches what materialize() will produce.
     Refresh,
-    /// User edited a column's field; push the matching StructureOp.
     ColumnEdited {
         index: usize,
         field: ColumnField,
     },
-    /// User clicked "Add Column" — append a placeholder draft column,
-    /// push AddColumn op, focus the new row's name entry.
     AddColumn,
-    /// User clicked the trash icon on a column row.
     RemoveColumn(usize),
-    /// User clicked "Add Index…" → AlertDialog returned with values.
     AddIndex(IndexInfo),
     RemoveIndex(usize),
     AddForeignKey(ForeignKeyInfo),
     RemoveForeignKey(usize),
-    /// User edited the table-name entry.
     TableNameEdited(String),
 }
 
@@ -238,6 +202,7 @@ pub enum ColumnField {
 pub enum StructureTabOutput {
     DirtyChanged(bool),
     FetchStructure,
+    FetchCollations,
     ExecuteTransaction { statements: Vec<String> },
     DropTableRequested { schema: Option<String>, table: String },
     ShowToast(String),
@@ -245,6 +210,23 @@ pub enum StructureTabOutput {
 }
 
 impl StructureTab {
+    fn show_table_default_collation(&self, collations: &[String], supported: bool) {
+        let visible = supported && !collations.is_empty() && matches!(*self.mode.borrow(), StructureMode::New);
+        self.table_collation_row.set_visible(visible);
+        if !visible {
+            return;
+        }
+        let default_label = bookie_app_services::tr!("Server default");
+        let labels: Vec<&str> = std::iter::once(default_label.as_str())
+            .chain(collations.iter().map(String::as_str))
+            .collect();
+        *self.table_collation_choices.borrow_mut() = collations.to_vec();
+        self.suppress_emit.set(true);
+        self.table_collation_row.set_model(Some(&gtk::StringList::new(&labels)));
+        self.table_collation_row.set_selected(0);
+        self.suppress_emit.set(false);
+    }
+
     /// Compute the pending-op list from the diff between original
     /// snapshot and current model state. The single source of truth
     /// for "what will Save emit?". Pure function on the live state.
@@ -263,6 +245,7 @@ impl StructureTab {
                 columns,
                 indexes: self.indexes.borrow().clone(),
                 fks: self.foreign_keys.borrow().clone(),
+                default_collation: self.default_collation.borrow().clone(),
             }];
         }
         diff_to_ops(
@@ -321,9 +304,9 @@ impl StructureTab {
         self.discard_button.set_sensitive(has_pending);
         if has_pending {
             let label = if pending_count == 1 {
-                crate::tr!("1 pending change")
+                bookie_app_services::tr!("1 pending change")
             } else {
-                crate::tr!("{n} pending changes").replace("{n}", &pending_count.to_string())
+                bookie_app_services::tr!("{n} pending changes").replace("{n}", &pending_count.to_string())
             };
             self.pending_label.set_label(&label);
             self.pending_label.set_visible(true);
@@ -335,7 +318,7 @@ impl StructureTab {
     fn regenerate_sql_preview_from(&self, ops: &[StructureOp]) {
         let text = match materialize_ops(ops, &self.driver_id) {
             Ok(stmts) if !stmts.is_empty() => stmts.join(";\n\n") + ";",
-            Ok(_) => crate::tr!("-- No pending changes."),
+            Ok(_) => bookie_app_services::tr!("-- No pending changes."),
             Err(e) => format!("-- {e}"),
         };
         self.sql_buffer.set_text(&text);
@@ -386,18 +369,10 @@ impl StructureTab {
         }
         clear_box(&self.columns_box);
 
-        // Native column editor: boxed-list `gtk::ListBox` of one
-        // `adw::ExpanderRow` per column. Each expander's collapsed
-        // header reads as a row in a Settings-style list (column
-        // name + summary subtitle); expanding reveals AdwEntryRow /
-        // AdwSwitchRow children for the editable attributes. Add
-        // Column appears as the trailing AdwButtonRow inside the
-        // same boxed-list — the GNOME pattern matching Settings's
-        // "Add Network" or Builder's run-config list.
         let list = boxed_list();
         self.append_column_rows(&list, &sender);
         let sender_for_add = sender.clone();
-        append_add_button(&list, &crate::tr!("Add Column"), move || {
+        append_add_button(&list, &bookie_app_services::tr!("Add Column"), move || {
             sender_for_add.input(StructureTabInput::AddColumn);
         });
         self.columns_box.append(&list);
@@ -414,8 +389,8 @@ impl StructureTab {
         if metadata_availability(*self.mode.borrow(), self.supports_index_metadata) == MetadataAvailability::Unsupported
         {
             list.append(&metadata_notice_row(
-                &crate::tr!("Index metadata unavailable"),
-                &crate::tr!("This driver doesn't expose index metadata for existing tables."),
+                &bookie_app_services::tr!("Index metadata unavailable"),
+                &bookie_app_services::tr!("This driver doesn't expose index metadata for existing tables."),
             ));
         }
         for (i, idx) in self.indexes.borrow().iter().enumerate() {
@@ -424,7 +399,7 @@ impl StructureTab {
         let columns_for_dialog = self.columns.clone();
         let sender_for_add = sender.clone();
         let parent_box = self.indexes_box.downgrade();
-        append_add_button(&list, &crate::tr!("Add Index…"), move || {
+        append_add_button(&list, &bookie_app_services::tr!("Add Index…"), move || {
             let Some(parent_box) = parent_box.upgrade() else {
                 return;
             };
@@ -445,8 +420,8 @@ impl StructureTab {
             == MetadataAvailability::Unsupported
         {
             list.append(&metadata_notice_row(
-                &crate::tr!("Foreign-key metadata unavailable"),
-                &crate::tr!("This driver doesn't expose foreign-key metadata for existing tables."),
+                &bookie_app_services::tr!("Foreign-key metadata unavailable"),
+                &bookie_app_services::tr!("This driver doesn't expose foreign-key metadata for existing tables."),
             ));
         }
         for (i, fk) in self.foreign_keys.borrow().iter().enumerate() {
@@ -456,7 +431,7 @@ impl StructureTab {
         let sender_for_add = sender.clone();
         let parent_box = self.fks_box.downgrade();
         let driver_id_for_dialog = driver_id.clone();
-        let add_row = append_add_button(&list, &crate::tr!("Add Foreign Key…"), move || {
+        let add_row = append_add_button(&list, &bookie_app_services::tr!("Add Foreign Key…"), move || {
             let Some(parent_box) = parent_box.upgrade() else {
                 return;
             };
@@ -468,7 +443,8 @@ impl StructureTab {
             );
         });
         if !fks::can_add_foreign_key(&driver_id, &self.mode.borrow()) {
-            let reason = crate::tr!("Adding a foreign key to an existing table isn't supported by SQLite.");
+            let reason =
+                bookie_app_services::tr!("Adding a foreign key to an existing table isn't supported by SQLite.");
             add_row.set_sensitive(false);
             add_row.set_subtitle(&reason);
             add_row.set_tooltip_text(Some(&reason));
@@ -477,10 +453,6 @@ impl StructureTab {
     }
 }
 
-/// Build a `gtk::ListBox` with the `.boxed-list` HIG style class. Used
-/// for the columns / indexes / FKs sections of the Structure tab so
-/// rows pick up the standard Adwaita rounded-corner + row-separator
-/// treatment used in GNOME Settings, Files, etc.
 fn boxed_list() -> gtk::ListBox {
     let list = gtk::ListBox::builder()
         .selection_mode(gtk::SelectionMode::None)
@@ -499,12 +471,6 @@ fn clear_box(b: &gtk::Box) {
     }
 }
 
-/// Append a trailing `adw::ButtonRow` to a boxed-list — the GNOME
-/// pattern for "Add another item" rows in Settings / Builder. The
-/// caller's closure runs on activation; what it dispatches (a model
-/// mutation for Add Column, a dialog launcher for Add Index / Add
-/// Foreign Key) is the only thing that varies between the columns,
-/// indexes, and FKs views.
 fn append_add_button(list: &gtk::ListBox, label: &str, on_activate: impl Fn() + 'static) -> adw::ActionRow {
     let row = adw::ActionRow::builder()
         .use_markup(false)
@@ -541,7 +507,7 @@ impl SimpleComponent for StructureTab {
         let columns_page = view_stack.add_titled_with_icon(
             &columns_scroll,
             Some("columns"),
-            &crate::tr!("Columns"),
+            &bookie_app_services::tr!("Columns"),
             "view-list-symbolic",
         );
         let _ = columns_page;
@@ -554,7 +520,7 @@ impl SimpleComponent for StructureTab {
         let indexes_page = view_stack.add_titled_with_icon(
             &indexes_scroll,
             Some("indexes"),
-            &crate::tr!("Indexes"),
+            &bookie_app_services::tr!("Indexes"),
             "view-sort-ascending-symbolic",
         );
         let _ = indexes_page;
@@ -567,7 +533,7 @@ impl SimpleComponent for StructureTab {
         let fks_page = view_stack.add_titled_with_icon(
             &fks_scroll,
             Some("fks"),
-            &crate::tr!("Foreign Keys"),
+            &bookie_app_services::tr!("Foreign Keys"),
             "emblem-shared-symbolic",
         );
         let _ = fks_page;
@@ -581,12 +547,9 @@ impl SimpleComponent for StructureTab {
         };
         let sql_view = build_sql_preview_view(&sql_buffer);
         let sql_scroll = gtk::ScrolledWindow::builder().child(&sql_view).vexpand(true).build();
-        // Copy SQL toolbar — saves the user from clicking into the
-        // sourceview, Ctrl+A, Ctrl+C every time they want to paste
-        // the generated DDL into a different tool.
         let copy_sql_btn = gtk::Button::builder()
             .icon_name("edit-copy-symbolic")
-            .tooltip_text(crate::tr!("Copy SQL to clipboard"))
+            .tooltip_text(bookie_app_services::tr!("Copy SQL to clipboard"))
             .valign(gtk::Align::Center)
             .build();
         copy_sql_btn.add_css_class("flat");
@@ -595,10 +558,7 @@ impl SimpleComponent for StructureTab {
             let text = buffer_for_copy.text(&buffer_for_copy.start_iter(), &buffer_for_copy.end_iter(), false);
             btn.clipboard().set_text(text.as_str());
         });
-        // CenterBox is the native idiom for "leading / centred /
-        // trailing" toolbar layouts. The earlier hexpand label-spacer
-        // worked but was a CSS-flexbox-era pattern that fights GTK's
-        // layout system.
+        // CenterBox avoids the spacer allocation conflict in GTK's toolbar layout.
         let sql_toolbar = gtk::CenterBox::builder()
             .margin_top(6)
             .margin_start(6)
@@ -611,16 +571,11 @@ impl SimpleComponent for StructureTab {
         let sql_page = view_stack.add_titled_with_icon(
             &sql_page_box,
             Some("sql"),
-            &crate::tr!("SQL Preview"),
+            &bookie_app_services::tr!("SQL Preview"),
             "text-x-generic-symbolic",
         );
         let _ = sql_page;
 
-        // Inline switcher centred above the form. We can't add a
-        // second AdwHeaderBar to the tab — the wrapper's "Data /
-        // Structure" header already takes that role. A centred
-        // ViewSwitcher with margins reads as a section navigation
-        // without spawning a second toolbar strip.
         let view_switcher = adw::ViewSwitcher::builder()
             .stack(&view_stack)
             .policy(adw::ViewSwitcherPolicy::Wide)
@@ -629,28 +584,21 @@ impl SimpleComponent for StructureTab {
             .margin_bottom(6)
             .build();
 
-        // Inner stack swaps between "loading" / "editor" / "error" so
-        // Edit-mode tabs show a spinner until fetch_structure_data
-        // resolves.
         let inner_stack = gtk::Stack::new();
         inner_stack.set_transition_type(gtk::StackTransitionType::Crossfade);
 
-        // AdwSpinner (libadwaita 1.6+) is the native animated spinner
-        // — pulses while the introspection round-trip is in flight.
-        // The earlier `emblem-synchronizing-symbolic` rendered as a
-        // static sync icon that read as "this could be idle". A
-        // centred vertical box with spinner + title + dim subtitle
-        // is the same pattern GNOME Software / Console use for
-        // in-flight load states.
+        // Use an animated spinner so an in-flight load cannot look idle.
         let loading_spinner = gtk::Spinner::builder()
             .spinning(true)
             .width_request(48)
             .height_request(48)
             .build();
-        let loading_title = gtk::Label::builder().label(crate::tr!("Loading structure…")).build();
+        let loading_title = gtk::Label::builder()
+            .label(bookie_app_services::tr!("Loading structure…"))
+            .build();
         loading_title.add_css_class("title-2");
         let loading_subtitle = gtk::Label::builder()
-            .label(crate::tr!("Reading columns, indexes, and foreign keys…"))
+            .label(bookie_app_services::tr!("Reading columns, indexes, and foreign keys…"))
             .build();
         loading_subtitle.add_css_class("dim-label");
         let loading_box = gtk::Box::builder()
@@ -669,42 +617,27 @@ impl SimpleComponent for StructureTab {
             .orientation(gtk::Orientation::Vertical)
             .spacing(0)
             .build();
-        // New-mode only: name row at the top of the editor. Edit mode
-        // hides this — the tab title already shows the name and rename
-        // is a separate (sidebar context-menu) action that we don't
-        // want users triggering accidentally by clicking a floating
-        // text field. The name_entry widget itself is still built and
-        // stored in the model so update()'s SaveCompleted path can
-        // `set_text` it when New mode promotes to Edit.
-        //
-        // Native pattern: a single AdwEntryRow with title "Name". The
-        // title floats large when empty (acts as the placeholder) and
-        // shrinks to a small label above the typed value — matching
-        // GNOME Settings's text input pattern. The PreferencesGroup
-        // around it carries only the helper description; no redundant
-        // "New table" title since the tab title already says so.
-        let name_entry = adw::EntryRow::builder().title(crate::tr!("Name")).build();
+        let name_entry = adw::EntryRow::builder().title(bookie_app_services::tr!("Name")).build();
         name_entry.set_text(&init.table);
         let name_row = adw::PreferencesGroup::builder()
-            .description(crate::tr!("Add a name and at least one column to save."))
+            .description(bookie_app_services::tr!("Add a name and at least one column to save."))
             .margin_top(12)
             .margin_bottom(6)
             .margin_start(12)
             .margin_end(12)
             .build();
         name_row.add(&name_entry);
+        let table_collation_row = adw::ComboRow::builder()
+            .title(bookie_app_services::tr!("Default collation"))
+            .enable_search(true)
+            .visible(false)
+            .build();
+        name_row.add(&table_collation_row);
         name_row.set_visible(matches!(init.mode, StructureMode::New));
         editor_box.append(&name_row);
         editor_box.append(&view_switcher);
         editor_box.append(&view_stack);
-        // Constrain content width on wide windows so forms don't
-        // stretch to ridiculous proportions (without this a single
-        // "Add Column" row spans the entire monitor on a wide screen).
-        // AdwClamp matches the GNOME Settings / Builder pattern;
-        // 900sp gives room for the column-row attributes (Name, Type,
-        // Default…) without overflowing on small screens. No outer
-        // ScrolledWindow because each view in `view_stack` already has
-        // its own scroller — wrapping again would double-scroll.
+        // An outer scroller would nest the scrollers inside each view.
         let editor_clamp = adw::Clamp::builder()
             .maximum_size(900)
             .tightening_threshold(700)
@@ -714,7 +647,7 @@ impl SimpleComponent for StructureTab {
 
         let error_status = adw::StatusPage::builder()
             .icon_name("dialog-error-symbolic")
-            .title(crate::tr!("Couldn't load structure"))
+            .title(bookie_app_services::tr!("Couldn't load structure"))
             .build();
         // "Try again" — fires another FetchStructure round-trip via
         // the existing output channel. Without this, a transient
@@ -723,7 +656,7 @@ impl SimpleComponent for StructureTab {
         // GNOME Software's "Try Again" affordance on its own
         // load-failure page.
         let retry_button = gtk::Button::builder()
-            .label(crate::tr!("Try Again"))
+            .label(bookie_app_services::tr!("Try Again"))
             .halign(gtk::Align::Center)
             .build();
         retry_button.add_css_class("suggested-action");
@@ -756,23 +689,19 @@ impl SimpleComponent for StructureTab {
         action_bar.pack_start(&pending_label);
 
         let discard_button = gtk::Button::builder()
-            .label(crate::tr!("Discard"))
+            .label(bookie_app_services::tr!("Discard"))
             .sensitive(false)
             .build();
         let save_button = gtk::Button::builder()
-            .label(crate::tr!("Save"))
+            .label(bookie_app_services::tr!("Save"))
             .sensitive(false)
             .build();
         save_button.add_css_class("suggested-action");
         let drop_button = gtk::Button::builder()
-            .label(crate::tr!("Drop Table…"))
+            .label(bookie_app_services::tr!("Drop Table…"))
             .visible(matches!(init.mode, StructureMode::Edit))
             .build();
         drop_button.add_css_class("destructive-action");
-        // Drop sits at the start of the action bar, spatially
-        // separated from the Discard / Save pair on the end. Mixing
-        // a destructive action with the primary action invites
-        // misclicks; HIG groups them by intent.
         action_bar.pack_start(&drop_button);
         action_bar.pack_end(&save_button);
         action_bar.pack_end(&discard_button);
@@ -784,15 +713,23 @@ impl SimpleComponent for StructureTab {
         let sender_for_drop = sender.clone();
         drop_button.connect_clicked(move |_| sender_for_drop.input(StructureTabInput::DropTableRequested));
 
-        // Content + bottom bar. The Data/Structure outer header
-        // already supplies the toolbar strip — Structure's own
-        // sub-navigation lives inline inside `editor_box`.
         root.set_content(Some(&inner_stack));
         root.add_bottom_bar(&action_bar);
 
-        // Wire the table-name entry to push RenameTable / propagate to
-        // the model.
         let suppress_emit = Rc::new(Cell::new(false));
+        let table_collation_choices = Rc::new(RefCell::new(Vec::<String>::new()));
+        {
+            let sender_for_collation = sender.clone();
+            let suppress_for_collation = suppress_emit.clone();
+            let choices = table_collation_choices.clone();
+            table_collation_row.connect_selected_notify(move |row| {
+                if suppress_for_collation.get() {
+                    return;
+                }
+                let choice = columns::collation_selection(&choices.borrow(), row.selected());
+                sender_for_collation.input(StructureTabInput::TableCollationEdited(choice));
+            });
+        }
         let sender_for_name = sender.clone();
         let suppress_for_name = suppress_emit.clone();
         name_entry.connect_changed(move |e| {
@@ -802,14 +739,12 @@ impl SimpleComponent for StructureTab {
             sender_for_name.input(StructureTabInput::TableNameEdited(e.text().to_string()));
         });
 
-        // No tracker subscription — dirty state is computed from the
-        // diff between snapshot + current model on every mutation.
-
-        // Edit mode: kick the App for fetch_structure_data — unless
-        // the parent (Table tab in Data mode) explicitly deferred us
-        // to avoid an N-tabs-N-bursts startup stampede.
+        // Tab restoration can defer reads to avoid an N-tabs-N-queries startup burst.
         if matches!(init.mode, StructureMode::Edit) && !init.defer_initial_fetch {
             let _ = sender.output(StructureTabOutput::FetchStructure);
+        }
+        if matches!(init.mode, StructureMode::New) {
+            let _ = sender.output(StructureTabOutput::FetchCollations);
         }
 
         let model = StructureTab {
@@ -824,6 +759,9 @@ impl SimpleComponent for StructureTab {
             supports_index_metadata: false,
             supports_foreign_key_metadata: false,
             collations: Rc::from(Vec::new()),
+            default_collation: Rc::new(RefCell::new(None)),
+            table_collation_choices,
+            table_collation_row,
             columns: Rc::new(RefCell::new(Vec::new())),
             indexes: Rc::new(RefCell::new(Vec::new())),
             foreign_keys: Rc::new(RefCell::new(Vec::new())),
@@ -849,7 +787,6 @@ impl SimpleComponent for StructureTab {
             refetching: Rc::new(Cell::new(false)),
         };
 
-        // Initial render so New-mode tabs aren't blank.
         sender.input(StructureTabInput::Refresh);
 
         ComponentParts { model, widgets: () }
@@ -882,6 +819,21 @@ impl SimpleComponent for StructureTab {
                 self.refetching.set(false);
                 self.recompute_dirty_state(&sender);
                 sender.input(StructureTabInput::Refresh);
+            }
+            StructureTabInput::CollationsLoaded {
+                collations,
+                table_default_supported,
+            } => {
+                self.show_table_default_collation(&collations, table_default_supported);
+                self.collations = Rc::from(collations);
+                sender.input(StructureTabInput::Refresh);
+            }
+            StructureTabInput::TableCollationEdited(collation) => {
+                if *self.default_collation.borrow() == collation {
+                    return;
+                }
+                *self.default_collation.borrow_mut() = collation;
+                self.recompute_dirty_state(&sender);
             }
             StructureTabInput::LoadFailed(message) => {
                 // Surface the driver error inline on the StatusPage —
@@ -1038,17 +990,20 @@ impl SimpleComponent for StructureTab {
                         let _ = sender.output(StructureTabOutput::ExecuteTransaction { statements });
                     }
                     Ok(_) => {
-                        let _ = sender.output(StructureTabOutput::ShowToast(crate::tr!("Nothing to save.")));
+                        let _ = sender.output(StructureTabOutput::ShowToast(bookie_app_services::tr!(
+                            "Nothing to save."
+                        )));
                     }
                     Err(BuildDdlError::SqliteNotSupported(detail)) => {
                         let _ = sender.output(StructureTabOutput::ShowAlert {
-                            title: crate::tr!("Cannot save"),
-                            body: crate::tr!("SQLite doesn't support: {detail}").replace("{detail}", detail),
+                            title: bookie_app_services::tr!("Cannot save"),
+                            body: bookie_app_services::tr!("SQLite doesn't support: {detail}")
+                                .replace("{detail}", detail),
                         });
                     }
                     Err(e) => {
                         let _ = sender.output(StructureTabOutput::ShowAlert {
-                            title: crate::tr!("Cannot save"),
+                            title: bookie_app_services::tr!("Cannot save"),
                             body: format!("{e}"),
                         });
                     }
@@ -1121,7 +1076,7 @@ impl SimpleComponent for StructureTab {
             StructureTabInput::SaveFailed(message) => {
                 self.recompute_dirty_state(&sender);
                 let _ = sender.output(StructureTabOutput::ShowAlert {
-                    title: crate::tr!("Save failed"),
+                    title: bookie_app_services::tr!("Save failed"),
                     body: message,
                 });
             }
@@ -1161,5 +1116,7 @@ mod tests {
     }
 }
 
+#[cfg(test)]
+mod default_collation_tests;
 #[cfg(test)]
 mod lifetime_tests;

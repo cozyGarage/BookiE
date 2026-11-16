@@ -2,6 +2,13 @@ use std::collections::HashSet;
 
 use bookie_core::TableInfo;
 use bookie_results::sidebar_tree::{CollapseState, NodeKind, build_nodes, visible_nodes_with_hidden_schemas};
+use regex::RegexBuilder;
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SidebarFilter {
+    pub regex: bool,
+    pub active_only: bool,
+}
 
 pub const CONNECTION: &str = "PostgreSQL · sample";
 pub const DATABASE: &str = "sample";
@@ -12,8 +19,8 @@ pub const TABLES: [&str; 4] = [DATA_TABLE, "customers", "orders", "audit_log"];
 pub struct Catalog {
     pub connection: String,
     pub database: String,
-    pub tables: Vec<String>,
-    pub grid_table: String,
+    pub tables: Vec<TableInfo>,
+    pub grid_table: TableInfo,
 }
 
 impl Catalog {
@@ -21,8 +28,8 @@ impl Catalog {
         Catalog {
             connection: CONNECTION.into(),
             database: DATABASE.into(),
-            tables: TABLES.iter().map(|name| (*name).to_string()).collect(),
-            grid_table: DATA_TABLE.into(),
+            tables: TABLES.iter().map(|name| table_info(name)).collect(),
+            grid_table: table_info(DATA_TABLE),
         }
     }
 }
@@ -31,11 +38,17 @@ impl Catalog {
 pub enum TreeRow {
     Connection { open: bool },
     Database { open: bool },
-    Table(String),
+    Table(TableInfo),
 }
 
 pub fn tree_rows(search: &str, connection_open: bool, database_open: bool) -> Vec<(usize, TreeRow)> {
-    tree_rows_in(&Catalog::synthetic(), search, connection_open, database_open)
+    tree_rows_in(
+        &Catalog::synthetic(),
+        search,
+        connection_open,
+        database_open,
+        SidebarFilter::default(),
+    )
 }
 
 pub fn tree_rows_in(
@@ -43,25 +56,10 @@ pub fn tree_rows_in(
     search: &str,
     connection_open: bool,
     database_open: bool,
+    filter: SidebarFilter,
 ) -> Vec<(usize, TreeRow)> {
-    let searching = !search.trim().is_empty();
-    let infos: Vec<TableInfo> = catalog
-        .tables
-        .iter()
-        .map(|name| TableInfo {
-            schema: None,
-            name: name.clone(),
-        })
-        .collect();
-    let nodes = build_nodes(&infos, &[]);
-    let shown = visible_nodes_with_hidden_schemas(&nodes, &CollapseState::default(), search, &HashSet::new());
-    let tables: Vec<String> = shown
-        .into_iter()
-        .filter_map(|index| match &nodes[index].kind {
-            NodeKind::Table { name, .. } => catalog.tables.iter().find(|table| *table == name).cloned(),
-            _ => None,
-        })
-        .collect();
+    let tables = filtered_tables(catalog, search, filter);
+    let searching = filter.active_only || !search.trim().is_empty();
     if searching && tables.is_empty() {
         return Vec::new();
     }
@@ -76,10 +74,51 @@ pub fn tree_rows_in(
     rows
 }
 
+fn filtered_tables(catalog: &Catalog, search: &str, filter: SidebarFilter) -> Vec<TableInfo> {
+    let mut tables: Vec<TableInfo> = if filter.active_only {
+        catalog
+            .tables
+            .iter()
+            .filter(|table| *table == &catalog.grid_table)
+            .cloned()
+            .collect()
+    } else {
+        catalog.tables.clone()
+    };
+    let needle = search.trim();
+    if needle.is_empty() {
+        return tables;
+    }
+    if filter.regex {
+        let Ok(pattern) = RegexBuilder::new(needle).case_insensitive(true).build() else {
+            return Vec::new();
+        };
+        tables.retain(|table| pattern.is_match(&table.name) || pattern.is_match(&table_label(table)));
+        return tables;
+    }
+    let nodes = build_nodes(&tables, &[]);
+    let shown = visible_nodes_with_hidden_schemas(&nodes, &CollapseState::default(), needle, &HashSet::new());
+    shown
+        .into_iter()
+        .filter_map(|index| match &nodes[index].kind {
+            NodeKind::Table { schema, name } => Some(TableInfo {
+                schema: schema.clone(),
+                name: name.clone(),
+            }),
+            _ => None,
+        })
+        .collect()
+}
+
+pub fn sidebar_regex_ok(search: &str) -> bool {
+    let needle = search.trim();
+    needle.is_empty() || RegexBuilder::new(needle).case_insensitive(true).build().is_ok()
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Tab {
     Home,
-    Table(String),
+    Table(TableInfo),
     Query,
     Settings,
 }
@@ -88,7 +127,7 @@ impl Tab {
     pub fn title(&self) -> String {
         match self {
             Tab::Home => "Home".into(),
-            Tab::Table(name) => name.clone(),
+            Tab::Table(table) => table_label(table),
             Tab::Query => "Query 1".into(),
             Tab::Settings => "Settings".into(),
         }
@@ -104,7 +143,7 @@ pub struct Tabs {
 impl Default for Tabs {
     fn default() -> Self {
         Tabs {
-            items: vec![Tab::Home, Tab::Table(DATA_TABLE.into())],
+            items: vec![Tab::Home, Tab::Table(table_info(DATA_TABLE))],
             active: 1,
         }
     }
@@ -115,8 +154,8 @@ impl Tabs {
         &self.items[self.active]
     }
 
-    pub fn open_table(&mut self, name: &str) {
-        let tab = Tab::Table(name.to_string());
+    pub fn open_table(&mut self, table: &TableInfo) {
+        let tab = Tab::Table(table.clone());
         self.active = match self.items.iter().position(|item| *item == tab) {
             Some(index) => index,
             None => {
@@ -161,12 +200,37 @@ impl Tabs {
     }
 
     pub fn shows_grid(&self) -> bool {
-        self.shows_grid_for(DATA_TABLE)
+        self.shows_grid_for(&table_info(DATA_TABLE))
     }
 
-    pub fn shows_grid_for(&self, grid_table: &str) -> bool {
-        matches!(self.current(), Tab::Query) || *self.current() == Tab::Table(grid_table.into())
+    pub fn shows_grid_for(&self, grid_table: &TableInfo) -> bool {
+        matches!(self.current(), Tab::Query) || *self.current() == Tab::Table(grid_table.clone())
     }
+}
+
+pub fn table_info(name: &str) -> TableInfo {
+    TableInfo {
+        schema: None,
+        name: name.into(),
+    }
+}
+
+pub fn table_label(table: &TableInfo) -> String {
+    let name = display_identifier(&table.name);
+    table.schema.as_deref().map_or(name.clone(), |schema| {
+        format!("{}.{}", display_identifier(schema), name)
+    })
+}
+
+fn display_identifier(identifier: &str) -> String {
+    if !identifier.is_empty()
+        && identifier
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || matches!(character, '_' | '$'))
+    {
+        return identifier.into();
+    }
+    format!("\"{}\"", identifier.replace('"', "\"\""))
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -233,7 +297,7 @@ mod tests {
                 let name = match row {
                     TreeRow::Connection { .. } => "conn".to_string(),
                     TreeRow::Database { .. } => "db".to_string(),
-                    TreeRow::Table(name) => (*name).to_string(),
+                    TreeRow::Table(table) => table_label(table),
                 };
                 format!("{depth}:{name}")
             })
@@ -245,13 +309,112 @@ mod tests {
         let catalog = Catalog {
             connection: "sqlite · shop.db".into(),
             database: "shop.db".into(),
-            tables: vec!["customers".into(), "main.orders".into()],
-            grid_table: "orders".into(),
+            tables: vec![
+                table_info("customers"),
+                TableInfo {
+                    schema: Some("main".into()),
+                    name: "orders".into(),
+                },
+            ],
+            grid_table: table_info("orders"),
         };
-        let rows = tree_rows_in(&catalog, "", true, true);
+        let rows = tree_rows_in(&catalog, "", true, true, SidebarFilter::default());
         assert_eq!(rows.len(), 4);
-        assert_eq!(rows[3].1, TreeRow::Table("main.orders".into()));
-        assert_eq!(tree_rows_in(&catalog, "cust", false, false).len(), 3);
+        assert_eq!(
+            rows[3].1,
+            TreeRow::Table(TableInfo {
+                schema: Some("main".into()),
+                name: "orders".into(),
+            })
+        );
+        assert_eq!(
+            tree_rows_in(&catalog, "cust", false, false, SidebarFilter::default()).len(),
+            3
+        );
+    }
+
+    #[test]
+    fn active_only_keeps_the_grid_table_and_regex_matches_names() {
+        let catalog = Catalog::synthetic();
+        let active = tree_rows_in(
+            &catalog,
+            "",
+            true,
+            true,
+            SidebarFilter {
+                active_only: true,
+                ..SidebarFilter::default()
+            },
+        );
+        assert_eq!(
+            active
+                .iter()
+                .filter_map(|(_, row)| match row {
+                    TreeRow::Table(table) => Some(table.name.as_str()),
+                    _ => None,
+                })
+                .collect::<Vec<_>>(),
+            ["synthetic_rows"]
+        );
+        let regex = tree_rows_in(
+            &catalog,
+            r"^aud",
+            true,
+            true,
+            SidebarFilter {
+                regex: true,
+                ..SidebarFilter::default()
+            },
+        );
+        assert_eq!(
+            regex
+                .iter()
+                .filter_map(|(_, row)| match row {
+                    TreeRow::Table(table) => Some(table.name.as_str()),
+                    _ => None,
+                })
+                .collect::<Vec<_>>(),
+            ["audit_log"]
+        );
+        assert!(!sidebar_regex_ok("("));
+        assert!(sidebar_regex_ok(r"^aud"));
+    }
+
+    #[test]
+    fn duplicate_table_names_keep_their_schema_identity_in_tree_and_tabs() {
+        let first = TableInfo {
+            schema: Some("sales".into()),
+            name: "orders".into(),
+        };
+        let second = TableInfo {
+            schema: Some("archive".into()),
+            name: "orders".into(),
+        };
+        let catalog = Catalog {
+            connection: "postgres · shop".into(),
+            database: "shop".into(),
+            tables: vec![first.clone(), second.clone()],
+            grid_table: first.clone(),
+        };
+        let rows = tree_rows_in(&catalog, "orders", true, true, SidebarFilter::default());
+        assert!(rows.iter().any(|(_, row)| *row == TreeRow::Table(first.clone())));
+        assert!(rows.iter().any(|(_, row)| *row == TreeRow::Table(second.clone())));
+        let mut tabs = Tabs::default();
+        tabs.open_table(&first);
+        tabs.open_table(&second);
+        assert_eq!(tabs.items.len(), 4);
+        assert_eq!(tabs.current(), &Tab::Table(second));
+    }
+
+    #[test]
+    fn table_labels_quote_dots_and_quotes_without_flattening_identity() {
+        let table = TableInfo {
+            schema: Some("schema.with\"quote".into()),
+            name: "table.name".into(),
+        };
+        assert_eq!(table_label(&table), "\"schema.with\"\"quote\".\"table.name\"");
+        assert_eq!(table.schema.as_deref(), Some("schema.with\"quote"));
+        assert_eq!(table.name, "table.name");
     }
 
     #[test]
@@ -289,12 +452,13 @@ mod tests {
     fn opening_a_table_adds_one_tab_and_reopening_reuses_it() {
         let mut tabs = Tabs::default();
         assert!(tabs.shows_grid());
-        tabs.open_table("orders");
+        let orders = table_info("orders");
+        tabs.open_table(&orders);
         assert_eq!(tabs.items.len(), 3);
-        assert_eq!(tabs.current(), &Tab::Table("orders".into()));
-        tabs.open_table("orders");
+        assert_eq!(tabs.current(), &Tab::Table(orders.clone()));
+        tabs.open_table(&orders);
         assert_eq!(tabs.items.len(), 3, "the same table is not opened twice");
-        tabs.open_table(DATA_TABLE);
+        tabs.open_table(&table_info(DATA_TABLE));
         assert!(tabs.shows_grid());
         assert_eq!(tabs.items.len(), 3);
     }
@@ -302,7 +466,7 @@ mod tests {
     #[test]
     fn closing_a_tab_keeps_a_valid_active_tab_and_never_closes_home() {
         let mut tabs = Tabs::default();
-        tabs.open_table("orders");
+        tabs.open_table(&table_info("orders"));
         tabs.close(0);
         assert_eq!(tabs.items.len(), 3, "Home cannot be closed");
         tabs.close(2);
@@ -322,10 +486,11 @@ mod tests {
         assert!(tabs.shows_grid());
         tabs.open_query();
         assert_eq!(tabs.items.len(), 3, "the query tab is reused");
-        tabs.open_table("orders");
+        let orders = table_info("orders");
+        tabs.open_table(&orders);
         assert!(!tabs.shows_grid());
         tabs.close(2);
-        assert_eq!(tabs.current(), &Tab::Table("orders".into()));
+        assert_eq!(tabs.current(), &Tab::Table(orders));
     }
 
     #[test]
@@ -355,7 +520,10 @@ mod tests {
         assert_eq!(runs[0].label(), "Run 1");
         assert_eq!(runs[1].millis(), 1_003);
         assert_eq!(runs[1].measured(), None, "a synthetic run has no measured time");
-        let measured = Run { elapsed_ms: Some(12), ..runs[1] };
+        let measured = Run {
+            elapsed_ms: Some(12),
+            ..runs[1]
+        };
         assert_eq!((measured.millis(), measured.measured().as_deref()), (12, Some("12 ms")));
     }
 }

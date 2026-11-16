@@ -197,6 +197,13 @@ impl AuditedSession {
 
 #[async_trait]
 impl Session for AuditedSession {
+    async fn list_temporary_tables_controlled(
+        &mut self,
+        control: &OperationControl,
+    ) -> Result<Vec<bookie_core::TableInfo>, DriverError> {
+        self.inner.list_temporary_tables_controlled(control).await
+    }
+
     async fn query_params_controlled(
         &mut self,
         sql: &str,

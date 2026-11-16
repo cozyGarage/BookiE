@@ -14,6 +14,7 @@ impl Effects {
     pub(crate) const SESSION_STATE: Self = Self(1 << 5);
     pub(crate) const HOST_OR_FILE_ACCESS: Self = Self(1 << 6);
     pub(crate) const UNKNOWN: Self = Self(1 << 7);
+    pub(crate) const LINKED_SERVER: Self = Self(1 << 8);
 
     pub(crate) const fn union(self, other: Self) -> Self {
         Self(self.0 | other.0)

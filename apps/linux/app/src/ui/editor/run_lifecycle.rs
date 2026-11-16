@@ -101,17 +101,18 @@ impl SqlEditor {
             .root()
             .and_then(|root| root.downcast::<gtk::Window>().ok())
         else {
-            self.status
-                .set_label(&crate::tr!("Cannot ask for parameter values without a window"));
+            self.status.set_label(&bookie_app_services::tr!(
+                "Cannot ask for parameter values without a window"
+            ));
             return;
         };
         crate::ui::parameters_dialog::present(&window, &names, move |values| {
-            sender.input(SqlEditorInput::RunWithParameters {
+            sender.input(SqlEditorInput::Run(super::RunMessage::RunWithParameters {
                 sql: sql.clone(),
                 anchor,
                 planned: planned.clone(),
                 values,
-            });
+            }));
         });
     }
 
@@ -191,7 +192,13 @@ impl SqlEditor {
             return;
         }
 
-        self.status.set_label(&totals.summary());
+        let (timing, messages) = super::outcome_detail::totals(&outcomes);
+        self.status
+            .set_label(&bookie_app_services::server_messages_view::status_with_messages(
+                &totals.summary(),
+                &messages,
+            ));
+        self.status.set_tooltip_text(Some(&timing.tooltip()));
         let shown = self.pinned.show(outcomes);
         self.refresh_pin_button();
         self.clear_result_surface();

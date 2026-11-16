@@ -8,19 +8,69 @@ use std::sync::Arc;
 use bookie_mcp::{McpBridge, TokenPermissions};
 
 use crate::services::mcp_service;
-use crate::tr;
+use bookie_app_services::tr;
 
 pub fn build_page(
     database: &crate::services::database_service::DatabaseService,
     mcp_bridge: Option<Arc<McpBridge>>,
 ) -> adw::PreferencesPage {
-    let policy_reload = database.reload_policy();
-
     let page = adw::PreferencesPage::builder()
         .title(tr!("MCP"))
         .icon_name("network-server-symbolic")
         .build();
 
+    let status_group = status_group(database);
+    let issue = issue_group();
+    let tokens_group = adw::PreferencesGroup::builder().title(tr!("Active tokens")).build();
+    refresh_token_list(&tokens_group, mcp_bridge.clone());
+
+    let name_for_issue = issue.name_row.clone();
+    let scope_for_issue = issue.scope_combo.clone();
+    let expiry_for_issue = issue.expiry_combo.clone();
+    let tools_for_issue = issue.tool_checks.clone();
+    let tokens_for_issue = tokens_group.clone();
+    let page_for_dialog = page.clone();
+    issue.button.connect_clicked(move |_| {
+        let name = name_for_issue.text().to_string();
+        if name.trim().is_empty() {
+            return;
+        }
+        let permissions = match scope_for_issue.selected() {
+            1 => TokenPermissions::ReadWrite,
+            _ => TokenPermissions::ReadOnly,
+        };
+        let tool_allowlist = selected_tools(&tools_for_issue);
+        let expires_at = mcp_service::expiry_for_choice(expiry_for_issue.selected(), chrono::Utc::now());
+        glib::spawn_future_local(issue_token_flow(
+            page_for_dialog.clone(),
+            tokens_for_issue.clone(),
+            mcp_bridge.clone(),
+            name,
+            permissions,
+            tool_allowlist,
+            expires_at,
+        ));
+    });
+
+    page.add(&status_group);
+    page.add(&issue.group);
+    page.add(&issue.tools_group);
+    page.add(&tokens_group);
+    page
+}
+
+struct IssueGroup {
+    group: adw::PreferencesGroup,
+    tools_group: adw::PreferencesGroup,
+    name_row: adw::EntryRow,
+    scope_combo: adw::ComboRow,
+    expiry_combo: adw::ComboRow,
+    tool_checks: Vec<(String, gtk::CheckButton)>,
+    button: gtk::Button,
+}
+
+fn status_group(database: &crate::services::database_service::DatabaseService) -> adw::PreferencesGroup {
+    let policy_reload = database.reload_policy();
     let status_group = adw::PreferencesGroup::builder()
         .title(tr!("Agent access"))
         .description(tr!(
@@ -43,13 +93,33 @@ pub fn build_page(
         status_group.add(&row);
     }
 
+    if let Some(message) = mcp_service::server_failure() {
+        let row = adw::ActionRow::builder()
+            .use_markup(false)
+            .title(tr!("MCP server is not running"))
+            .subtitle(message)
+            .build();
+        status_group.add(&row);
+    }
+
     let endpoint_row = adw::ActionRow::builder()
         .title(tr!("Endpoint"))
         .subtitle("http://127.0.0.1:17432/mcp")
         .build();
     status_group.add(&endpoint_row);
+    if let Some(path) = bookie_mcp::default_socket_path() {
+        let socket_row = adw::ActionRow::builder()
+            .use_markup(false)
+            .title(tr!("Socket"))
+            .subtitle(tr!("{path}. Run bookie-agentd --connect-socket as the client command; set BOOKIE_MCP_HTTP=off to close the TCP port.").replace("{path}", &path.display().to_string()))
+            .build();
+        status_group.add(&socket_row);
+    }
+    status_group
+}
 
-    let issue_group = adw::PreferencesGroup::builder()
+fn issue_group() -> IssueGroup {
+    let group = adw::PreferencesGroup::builder()
         .title(tr!("Issue token"))
         .description(tr!(
             "Plaintext is shown once. Keyring storage is best-effort; the confirmation states whether it was saved."
@@ -64,88 +134,104 @@ pub fn build_page(
     scope_combo.set_model(Some(&scope_model));
     scope_combo.set_selected(0);
 
-    let issue_button = gtk::Button::builder()
+    let expiry_combo = adw::ComboRow::builder().title(tr!("Expires")).build();
+    let expiry_model = gtk::StringList::new(&["After 30 days", "After 90 days", "After 1 year", "Never"]);
+    expiry_combo.set_model(Some(&expiry_model));
+    expiry_combo.set_selected(1);
+
+    let tool_group = adw::PreferencesGroup::builder()
+        .title(tr!("Tool access"))
+        .description(tr!(
+            "Select tools to restrict this token. Leave all unchecked to allow tools permitted by its scope."
+        ))
+        .build();
+    let tool_checks = bookie_mcp::TOOL_NAMES
+        .iter()
+        .map(|tool| {
+            let row = adw::ActionRow::builder().use_markup(false).title(*tool).build();
+            let check = gtk::CheckButton::new();
+            check.set_valign(gtk::Align::Center);
+            row.add_suffix(&check);
+            row.set_activatable_widget(Some(&check));
+            tool_group.add(&row);
+            ((*tool).to_string(), check)
+        })
+        .collect();
+
+    let button = gtk::Button::builder()
         .label(tr!("Issue token"))
         .valign(gtk::Align::Center)
         .build();
-    issue_button.add_css_class("suggested-action");
+    button.add_css_class("suggested-action");
     let issue_row = adw::ActionRow::builder().title(tr!("Create pairing token")).build();
-    issue_row.add_suffix(&issue_button);
+    issue_row.add_suffix(&button);
 
-    issue_group.add(&name_row);
-    issue_group.add(&scope_combo);
-    issue_group.add(&issue_row);
+    group.add(&name_row);
+    group.add(&scope_combo);
+    group.add(&expiry_combo);
+    group.add(&issue_row);
+    IssueGroup {
+        group,
+        tools_group: tool_group,
+        name_row,
+        scope_combo,
+        expiry_combo,
+        tool_checks,
+        button,
+    }
+}
 
-    let tokens_group = adw::PreferencesGroup::builder().title(tr!("Active tokens")).build();
-    refresh_token_list(&tokens_group, mcp_bridge.clone());
+fn present_issue_error(parent: &impl IsA<gtk::Widget>, message: &str) {
+    let alert = adw::AlertDialog::new(Some(&tr!("Could not issue token")), Some(message));
+    alert.add_response("ok", &tr!("OK"));
+    alert.set_default_response(Some("ok"));
+    alert.present(Some(parent));
+}
 
-    let name_for_issue = name_row.clone();
-    let scope_for_issue = scope_combo.clone();
-    let tokens_for_issue = tokens_group.clone();
-    let page_for_dialog = page.clone();
-    let bridge_for_issue = mcp_bridge.clone();
-    issue_button.connect_clicked(move |_| {
-        let name = name_for_issue.text().to_string();
-        if name.trim().is_empty() {
+async fn issue_token_flow(
+    parent: adw::PreferencesPage,
+    tokens_group: adw::PreferencesGroup,
+    bridge: Option<Arc<McpBridge>>,
+    name: String,
+    permissions: TokenPermissions,
+    tool_allowlist: Option<Vec<String>>,
+    expires_at: Option<chrono::DateTime<chrono::Utc>>,
+) {
+    let allowlist = match bookie_storage::load_connections().await {
+        Ok(list) => list.into_iter().map(|c| c.id).collect::<Vec<_>>(),
+        Err(e) => {
+            present_issue_error(&parent, &format!("could not load connections: {e}"));
             return;
         }
-        let permissions = match scope_for_issue.selected() {
-            1 => TokenPermissions::ReadWrite,
-            _ => TokenPermissions::ReadOnly,
-        };
-        let tokens_group = tokens_for_issue.clone();
-        let parent = page_for_dialog.clone();
-        let bridge = bridge_for_issue.clone();
-        glib::spawn_future_local(async move {
-            let allowlist = match bookie_storage::load_connections().await {
-                Ok(list) => list.into_iter().map(|c| c.id).collect::<Vec<_>>(),
-                Err(e) => {
-                    let msg = format!("could not load connections: {e}");
-                    let alert = adw::AlertDialog::new(
-                        Some(&tr!("Could not issue token")),
-                        Some(&msg),
-                    );
-                    alert.add_response("ok", &tr!("OK"));
-                    alert.set_default_response(Some("ok"));
-                    alert.present(Some(&parent));
-                    return;
-                }
-            };
-            if allowlist.is_empty() {
-                let alert = adw::AlertDialog::new(
-                    Some(&tr!("Could not issue token")),
-                    Some(&tr!(
-                        "Save at least one connection before issuing an MCP token. Tokens are scoped to the connections that exist at issue time."
-                    )),
-                );
-                alert.add_response("ok", &tr!("OK"));
-                alert.set_default_response(Some("ok"));
-                alert.present(Some(&parent));
-                return;
-            }
-            match mcp_service::issue_token(bridge.as_ref(), name, permissions, allowlist).await {
-                Ok(issued) => {
-                    show_issued_token(&parent, &issued.plaintext, issued.keyring_saved);
-                    clear_and_refresh(&tokens_group, bridge.clone());
-                }
-                Err(e) => {
-                    tracing::warn!(error = %e, "MCP token issue failed");
-                    let alert = adw::AlertDialog::new(
-                        Some(&tr!("Could not issue token")),
-                        Some(&e),
-                    );
-                    alert.add_response("ok", &tr!("OK"));
-                    alert.set_default_response(Some("ok"));
-                    alert.present(Some(&parent));
-                }
-            }
-        });
-    });
-
-    page.add(&status_group);
-    page.add(&issue_group);
-    page.add(&tokens_group);
-    page
+    };
+    if allowlist.is_empty() {
+        present_issue_error(
+            &parent,
+            &tr!(
+                "Save at least one connection before issuing an MCP token. Tokens are scoped to the connections that exist at issue time."
+            ),
+        );
+        return;
+    }
+    match mcp_service::issue_token(
+        bridge.as_ref(),
+        name,
+        permissions,
+        allowlist,
+        tool_allowlist,
+        expires_at,
+    )
+    .await
+    {
+        Ok(issued) => {
+            show_issued_token(&parent, &issued.plaintext, issued.keyring_saved);
+            clear_and_refresh(&tokens_group, bridge.clone());
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "MCP token issue failed");
+            present_issue_error(&parent, &e);
+        }
+    }
 }
 
 fn clear_and_refresh(group: &adw::PreferencesGroup, mcp_bridge: Option<Arc<McpBridge>>) {
@@ -173,9 +259,10 @@ fn refresh_token_list(group: &adw::PreferencesGroup, mcp_bridge: Option<Arc<McpB
             .use_markup(false)
             .title(&token.name)
             .subtitle(format!(
-                "{} · {}",
+                "{} · {} · {}",
                 permissions_label(token.permissions),
-                token.created_at.format("%Y-%m-%d")
+                token.created_at.format("%Y-%m-%d"),
+                token_tools_label(token.tool_allowlist.as_deref())
             ))
             .build();
         let revoke = gtk::Button::builder()
@@ -198,6 +285,23 @@ fn refresh_token_list(group: &adw::PreferencesGroup, mcp_bridge: Option<Arc<McpB
         });
         row.add_suffix(&revoke);
         group.add(&row);
+    }
+}
+
+fn selected_tools(checks: &[(String, gtk::CheckButton)]) -> Option<Vec<String>> {
+    let selected = checks
+        .iter()
+        .filter(|(_, check)| check.is_active())
+        .map(|(name, _)| name.clone())
+        .collect::<Vec<_>>();
+    (!selected.is_empty()).then_some(selected)
+}
+
+fn token_tools_label(allowlist: Option<&[String]>) -> String {
+    match allowlist {
+        Some([]) => tr!("No tools allowed"),
+        Some(tools) => format!("{}: {}", tr!("Selected tools"), tools.join(", ")),
+        None => tr!("All tools allowed by scope"),
     }
 }
 
@@ -258,6 +362,82 @@ fn issued_token_message(plaintext: &str, keyring_saved: bool) -> String {
 #[cfg(test)]
 mod copy_tests {
     use super::*;
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn tool_restriction_is_optional_and_uses_only_selected_tools() {
+        adw::init().unwrap();
+        let issue = issue_group();
+
+        assert_eq!(issue.tool_checks.len(), bookie_mcp::TOOL_NAMES.len());
+        assert_eq!(selected_tools(&issue.tool_checks), None);
+
+        let (tool, check) = &issue.tool_checks[0];
+        check.set_active(true);
+        assert_eq!(selected_tools(&issue.tool_checks), Some(vec![tool.clone()]));
+    }
+
+    fn row_titles(widget: &gtk::Widget, titles: &mut Vec<String>) {
+        if let Some(row) = widget.downcast_ref::<adw::ActionRow>() {
+            titles.push(row.title().to_string());
+        }
+        let mut child = widget.first_child();
+        while let Some(current) = child {
+            row_titles(&current, titles);
+            child = current.next_sibling();
+        }
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn the_issue_form_offers_four_expiry_choices_and_defaults_to_ninety_days() {
+        adw::init().unwrap();
+        let issue = issue_group();
+
+        let model = issue
+            .expiry_combo
+            .model()
+            .unwrap()
+            .downcast::<gtk::StringList>()
+            .unwrap();
+        let choices: Vec<String> = (0..model.n_items())
+            .filter_map(|index| model.string(index))
+            .map(|choice| choice.to_string())
+            .collect();
+        assert_eq!(choices, ["After 30 days", "After 90 days", "After 1 year", "Never"]);
+        assert_eq!(issue.expiry_combo.selected(), 1);
+        assert!(mcp_service::expiry_for_choice(issue.expiry_combo.selected(), chrono::Utc::now()).is_some());
+        assert!(mcp_service::expiry_for_choice(3, chrono::Utc::now()).is_none());
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn the_status_group_shows_the_socket_and_a_server_that_could_not_start() {
+        adw::init().unwrap();
+        let database = crate::services::database_service::DatabaseService::new_isolated();
+        let titles = |database: &crate::services::database_service::DatabaseService| {
+            let mut titles = Vec::new();
+            row_titles(status_group(database).upcast_ref::<gtk::Widget>(), &mut titles);
+            titles
+        };
+
+        let before = titles(&database);
+        assert!(before.iter().any(|title| title == "Endpoint"), "{before:?}");
+        assert_eq!(
+            before.iter().any(|title| title == "Socket"),
+            bookie_mcp::default_socket_path().is_some(),
+            "{before:?}"
+        );
+        assert!(!before.iter().any(|title| title == "MCP server is not running"));
+
+        mcp_service::record_server_failure("Address already in use (os error 98)", 17432);
+
+        assert!(
+            titles(&database)
+                .iter()
+                .any(|title| title == "MCP server is not running")
+        );
+    }
 
     #[test]
     #[ignore = "requires an isolated GTK display"]

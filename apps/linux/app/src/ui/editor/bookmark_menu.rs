@@ -15,14 +15,14 @@ pub(super) fn build(sender: &ComponentSender<SqlEditor>) -> gtk::MenuButton {
         .build();
     content.append(&action(
         sender,
-        crate::tr!("Toggle bookmark"),
-        crate::tr!("Bookmark or clear the current line"),
+        bookie_app_services::tr!("Toggle bookmark"),
+        bookie_app_services::tr!("Bookmark or clear the current line"),
         || SqlEditorInput::ToggleBookmark,
     ));
     content.append(&action(
         sender,
-        crate::tr!("Next bookmark"),
-        crate::tr!("Jump to the next bookmarked line"),
+        bookie_app_services::tr!("Next bookmark"),
+        bookie_app_services::tr!("Jump to the next bookmarked line"),
         || SqlEditorInput::JumpBookmark {
             forward: true,
             pane: EditorPane::Primary,
@@ -30,8 +30,8 @@ pub(super) fn build(sender: &ComponentSender<SqlEditor>) -> gtk::MenuButton {
     ));
     content.append(&action(
         sender,
-        crate::tr!("Previous bookmark"),
-        crate::tr!("Jump to the previous bookmarked line"),
+        bookie_app_services::tr!("Previous bookmark"),
+        bookie_app_services::tr!("Jump to the previous bookmarked line"),
         || SqlEditorInput::JumpBookmark {
             forward: false,
             pane: EditorPane::Primary,
@@ -39,17 +39,19 @@ pub(super) fn build(sender: &ComponentSender<SqlEditor>) -> gtk::MenuButton {
     ));
     content.append(&action(
         sender,
-        crate::tr!("Clear bookmarks"),
-        crate::tr!("Remove every bookmark in this editor"),
+        bookie_app_services::tr!("Clear bookmarks"),
+        bookie_app_services::tr!("Remove every bookmark in this editor"),
         || SqlEditorInput::ClearBookmarks,
     ));
     let menu = gtk::MenuButton::builder()
         .icon_name("bookmark-new-symbolic")
-        .tooltip_text(crate::tr!("SQL line bookmarks"))
+        .tooltip_text(bookie_app_services::tr!("SQL line bookmarks"))
         .popover(&gtk::Popover::builder().child(&content).build())
         .build();
     menu.add_css_class("flat");
-    menu.update_property(&[gtk::accessible::Property::Label(&crate::tr!("SQL line bookmarks"))]);
+    menu.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!(
+        "SQL line bookmarks"
+    ))]);
     menu
 }
 

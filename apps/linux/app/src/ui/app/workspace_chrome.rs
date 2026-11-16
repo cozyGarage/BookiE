@@ -33,21 +33,15 @@ impl App {
         {
             self.recent_pages.borrow_mut().touch(&page);
         }
-        self.follow_selected_tab_session(sender);
+        self.follow_selected_tab_session(sender.clone());
+        self.sync_sidebar_temporary_tables(sender);
         self.persist_workspace_state();
         self.refresh_window_title();
         self.sync_sidebar_selection();
     }
 
     pub(super) fn refresh_window_title(&self) {
-        // Subtitle: "<connection> · <driver>" when connected, empty
-        // otherwise. The active table goes in the tab title (where it
-        // already lives) — duplicating it in the WindowTitle subtitle
-        // both overruns the slot's intended ~7-word capacity and
-        // pretends the subtitle is the canonical "where am I?" widget
-        // when the tab strip already serves that role. Matches GNOME
-        // Builder (subtitle = branch name only) and Text Editor
-        // (subtitle = filename only) — short, single-purpose.
+        // The tab title identifies the table; keep the subtitle for connection context.
         let metadata = self.window_metadata();
         let connection_name = metadata.as_ref().map(|m| m.name.as_str());
         let active = self.selected_browse_slot_table();
@@ -71,39 +65,28 @@ impl App {
             (None, Some(driver), _) => (format!("{driver} — BookiE"), driver.to_string()),
             _ => ("BookiE".to_string(), String::new()),
         };
-        // GNOME Text Editor convention: prefix the OS-level window
-        // title with "• " when any open document has unsaved changes,
-        // so the dirty state is visible from the Activities overview /
-        // Alt-Tab without needing the tab to be focused.
+        // Keep unsaved state visible in the Activities overview and Alt-Tab.
         let environment = metadata.as_ref().map(|metadata| metadata.environment);
         os_title = super::environment_marker::os_window_title(os_title, environment, self.window_has_pending());
         super::environment_marker::apply(&self.environment_badge, &self.header_bar, environment);
         self.window.set_title(Some(&os_title));
         self.window_title.set_subtitle(&subtitle);
 
-        // Sidebar header acts as a breadcrumb: the title shows the
-        // active connection name when connected, falling back to the
-        // generic "Tables" label on the welcome screen. Subtitle stays
-        // empty — the driver / host already lives in the main header.
+        // The main header already identifies the driver and host.
         match connection_name {
             Some(name) => {
                 self.sidebar_title.set_title(name);
             }
             None => {
-                self.sidebar_title.set_title(&crate::tr!("Tables"));
+                self.sidebar_title.set_title(&bookie_app_services::tr!("Tables"));
             }
         }
     }
 
-    /// Highlight the sidebar row matching the active Browse tab's
-    /// `(schema, table)`. When the active tab is an Editor (or there
-    /// are no tabs), clear the sidebar selection — leaving a stale
-    /// row highlighted while the user is in the editor would imply
-    /// the editor is showing that table's data, which it isn't.
+    /// Clear selection outside Browse tabs so it cannot imply the editor shows that table.
     pub(crate) fn sync_sidebar_selection(&self) {
-        let listbox = self.sidebar_factory.widget();
         let Some((schema, table)) = self.selected_browse_slot_table() else {
-            listbox.unselect_all();
+            self.sidebar_selection.set_selected(relm4::gtk::INVALID_LIST_POSITION);
             return;
         };
         let nodes = self.sidebar_nodes.borrow();
@@ -118,9 +101,20 @@ impl App {
             } => name.as_str() == table && node_schema.as_deref() == schema.as_deref(),
             _ => false,
         });
-        if let Some(row) = found.and_then(|index| listbox.row_at_index(index as i32)) {
-            listbox.select_row(Some(&row));
+        let Some(found) = found else {
+            self.sidebar_selection.set_selected(relm4::gtk::INVALID_LIST_POSITION);
+            return;
+        };
+        for position in 0..self.sidebar_model.tree().n_items() {
+            let Some(row) = self.sidebar_model.tree().row(position) else {
+                continue;
+            };
+            if crate::ui::sidebar_tree_model::SidebarTreeModel::node_index(&row) == Some(found) {
+                self.sidebar_selection.set_selected(position);
+                return;
+            }
         }
+        self.sidebar_selection.set_selected(relm4::gtk::INVALID_LIST_POSITION);
     }
 }
 

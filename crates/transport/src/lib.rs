@@ -20,9 +20,11 @@ const DATABASE_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 
 mod audit;
 mod local_socket;
+mod tls_ca_file;
 mod tool_endpoint;
 
 use audit::{audit_client, record_transport_attempt};
+use tls_ca_file::validate_tls_ca_file;
 
 pub use tool_endpoint::open_tool_endpoint;
 
@@ -259,6 +261,7 @@ async fn establish_inner(
     check_auth_mode(opts.auth_mode, driver.supports_integrated_auth(), driver.display_name())?;
     validate_client_tls_auth(driver, &opts)?;
     validate_strict_encryption(driver, &opts)?;
+    validate_tls_ca_file(&opts.tls).map_err(|error| DriverError::Tls(error.to_string()))?;
     validate_local_socket(&opts, driver, ssh.is_some())?;
     opts.forwarded_socket_dir = None;
     let tunnel = match ssh {
@@ -420,6 +423,7 @@ fn map_ssh_error(error: bookie_ssh::SshError) -> TransportError {
     match error {
         error @ bookie_ssh::SshError::UnknownHostKey { .. } => TransportError::HostKeyRefused(error.to_string()),
         error @ bookie_ssh::SshError::HostKeyMismatch { .. } => TransportError::HostKeyChanged(error.to_string()),
+        error @ bookie_ssh::SshError::HostKeyRevoked(_) => TransportError::HostKeyRevoked(error.to_string()),
         error @ bookie_ssh::SshError::Timeout { .. } => TransportError::SshTimeout(error.to_string()),
         error => TransportError::Ssh(error.to_string()),
     }

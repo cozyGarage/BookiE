@@ -30,14 +30,14 @@ impl SkipLog {
             .iter()
             .take(SHOWN_ROWS)
             .map(|(row, reason)| {
-                crate::tr!("Row {row}: {reason}")
+                bookie_app_services::tr!("Row {row}: {reason}")
                     .replace("{row}", &row.to_string())
                     .replace("{reason}", reason)
             })
             .collect();
         let hidden = self.total.saturating_sub(lines.len() as u64);
         if hidden > 0 {
-            lines.push(crate::tr!("…and {n} more skipped rows.").replace("{n}", &hidden.to_string()));
+            lines.push(bookie_app_services::tr!("…and {n} more skipped rows.").replace("{n}", &hidden.to_string()));
         }
         lines.join("\n")
     }

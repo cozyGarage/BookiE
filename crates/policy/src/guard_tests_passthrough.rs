@@ -42,6 +42,8 @@ struct CatalogConn {
     calls: Arc<AtomicUsize>,
     fail: bool,
     exclusion_scopes: ExclusionScopes,
+    query_rows_affected: Option<u64>,
+    transaction_error: Arc<std::sync::Mutex<Option<DriverError>>>,
 }
 
 impl CatalogConn {
@@ -52,6 +54,17 @@ impl CatalogConn {
         } else {
             Ok(value)
         }
+    }
+
+    fn transaction_answer<T>(&self, value: T) -> Result<T, DriverError> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        if let Some(error) = self.transaction_error.lock().expect("transaction error").take() {
+            return Err(error);
+        }
+        if self.fail {
+            return Err(DriverError::Disconnected);
+        }
+        Ok(value)
     }
 }
 
@@ -96,6 +109,20 @@ impl Connection for CatalogConn {
         self.record_exclusion("objects", schemas);
         self.answer(Vec::new())
     }
+    async fn routine_definition(
+        &self,
+        routine: &bookie_core::RoutineRef,
+    ) -> Result<bookie_core::RoutineLookup, DriverError> {
+        self.answer(bookie_core::RoutineLookup::Found(bookie_core::RoutineDefinition {
+            schema: routine.schema.clone(),
+            name: routine.name.clone(),
+            kind: "function".into(),
+            identity_arguments: String::new(),
+            definition: ROUTINE_BODY.into(),
+            total_bytes: None,
+            truncated: false,
+        }))
+    }
     async fn fetch_columns(&self, _: Option<&str>, _: &str) -> Result<Vec<ColumnInfo>, DriverError> {
         self.answer(Vec::new())
     }
@@ -124,6 +151,19 @@ impl Connection for CatalogConn {
     async fn query_params(&self, _: &str, _: &[Value]) -> Result<QueryResult, DriverError> {
         self.answer(empty_result())
     }
+    async fn query_result_sets_controlled(
+        &self,
+        _: &str,
+        _: &[Value],
+        _: &OperationControl,
+    ) -> Result<bookie_core::QueryResultBatch, DriverError> {
+        let result = QueryResult {
+            columns: Vec::new(),
+            rows: vec![vec![Value::Int(1)]].into(),
+            truncated: false,
+        };
+        self.answer(bookie_core::QueryResultBatch::single(result).with_rows_affected(self.query_rows_affected))
+    }
     async fn execute(&self, _: &str) -> Result<ExecResult, DriverError> {
         self.answer(ExecResult { rows_affected: 0 })
     }
@@ -132,7 +172,7 @@ impl Connection for CatalogConn {
         _: &[(String, Vec<Value>)],
         _: &[usize],
     ) -> Result<Vec<u64>, DriverError> {
-        self.answer(Vec::new())
+        self.transaction_answer(Vec::new())
     }
     async fn execute_in_transaction_checked_controlled(
         &self,
@@ -140,13 +180,13 @@ impl Connection for CatalogConn {
         _: &[usize],
         _: &OperationControl,
     ) -> Result<Vec<u64>, DriverError> {
-        self.answer(Vec::new())
+        self.transaction_answer(Vec::new())
     }
     async fn execute_params(&self, _: &str, _: &[Value]) -> Result<ExecResult, DriverError> {
         self.answer(ExecResult { rows_affected: 0 })
     }
     async fn execute_in_transaction(&self, _: &[(String, Vec<Value>)]) -> Result<Vec<u64>, DriverError> {
-        self.answer(Vec::new())
+        self.transaction_answer(Vec::new())
     }
     async fn server_version(&self) -> Result<Option<String>, DriverError> {
         self.answer(Some("18.0".into()))
@@ -161,6 +201,16 @@ impl Connection for CatalogConn {
     }
     async fn close(self: Box<Self>) -> Result<(), DriverError> {
         Ok(())
+    }
+}
+
+const ROUTINE_BODY: &str = "CREATE FUNCTION f() AS 'SELECT secret_marker'";
+
+fn routine_ref() -> bookie_core::RoutineRef {
+    bookie_core::RoutineRef {
+        schema: "public".into(),
+        name: "f".into(),
+        identity_arguments: Some("a integer".into()),
     }
 }
 
@@ -181,6 +231,23 @@ fn catalog_guard_with(
     fail: bool,
     audit_failures: Vec<AuditRecordPhase>,
 ) -> (PolicyGuard, Arc<AtomicUsize>, Arc<SequenceAuditSink>) {
+    catalog_guard_with_query_rows_affected(fail, audit_failures, None)
+}
+
+fn catalog_guard_with_query_rows_affected(
+    fail: bool,
+    audit_failures: Vec<AuditRecordPhase>,
+    query_rows_affected: Option<u64>,
+) -> (PolicyGuard, Arc<AtomicUsize>, Arc<SequenceAuditSink>) {
+    catalog_guard_with_transaction_error(fail, audit_failures, query_rows_affected, None)
+}
+
+fn catalog_guard_with_transaction_error(
+    fail: bool,
+    audit_failures: Vec<AuditRecordPhase>,
+    query_rows_affected: Option<u64>,
+    transaction_error: Option<DriverError>,
+) -> (PolicyGuard, Arc<AtomicUsize>, Arc<SequenceAuditSink>) {
     let calls = Arc::new(AtomicUsize::new(0));
     let audit = Arc::new(SequenceAuditSink::new(audit_failures));
     let guard = PolicyGuard::new(
@@ -188,6 +255,8 @@ fn catalog_guard_with(
             calls: calls.clone(),
             fail,
             exclusion_scopes: Arc::new(std::sync::Mutex::new(Vec::new())),
+            query_rows_affected,
+            transaction_error: Arc::new(std::sync::Mutex::new(transaction_error)),
         }),
         context(
             Principal::human_gui(),
@@ -207,6 +276,8 @@ fn catalog_guard_with_scopes(exclusion_scopes: ExclusionScopes) -> PolicyGuard {
             calls: Arc::new(AtomicUsize::new(0)),
             fail: false,
             exclusion_scopes,
+            query_rows_affected: None,
+            transaction_error: Arc::new(std::sync::Mutex::new(None)),
         }),
         context(
             Principal::human_gui(),
@@ -222,6 +293,7 @@ fn catalog_guard_with_scopes(exclusion_scopes: ExclusionScopes) -> PolicyGuard {
 async fn run_every_read(guard: &PolicyGuard, control: Option<&OperationControl>) -> Vec<Result<(), DriverError>> {
     let schema = Some("public");
     let kind = CatalogObjectKind::ALL[0];
+    let routine = routine_ref();
     macro_rules! read {
         ($plain:expr, $controlled:expr) => {
             match control {
@@ -243,6 +315,8 @@ async fn run_every_read(guard: &PolicyGuard, control: Option<&OperationControl>)
             .list_objects_controlled(kind, schema, c)),
         read!(guard.list_objects_excluding(kind, schema, &[]), |c| guard
             .list_objects_excluding_controlled(kind, schema, &[], c)),
+        read!(guard.routine_definition(&routine), |c| guard
+            .routine_definition_controlled(&routine, c)),
         read!(guard.fetch_columns(schema, "t"), |c| guard
             .fetch_columns_controlled(schema, "t", c)),
         read!(guard.fetch_rows(schema, "t", 0, 10), |c| guard
@@ -253,6 +327,7 @@ async fn run_every_read(guard: &PolicyGuard, control: Option<&OperationControl>)
             .fetch_foreign_keys_controlled(schema, "t", c)),
         read!(guard.fetch_inbound_foreign_keys(schema, "t"), |c| guard
             .fetch_inbound_foreign_keys_controlled(schema, "t", c)),
+        read!(guard.server_version(), |c| guard.server_version_controlled(c)),
         read!(guard.fetch_enum_labels("public", "mood"), |c| guard
             .fetch_enum_labels_controlled("public", "mood", c)),
         guard.server_version().await.map(|_| ()),
@@ -443,6 +518,44 @@ async fn transaction_batches_run_through_the_guard_in_every_form() {
 }
 
 #[tokio::test]
+async fn atomic_batch_audit_distinguishes_confirmed_from_ambiguous_cancellation() {
+    let cases = [
+        (
+            DriverError::Transaction {
+                statement_index: 0,
+                source: Box::new(DriverError::Cancelled),
+            },
+            AuditTerminalStatus::Cancelled,
+            AuditTransactionOutcome::RolledBack,
+        ),
+        (
+            DriverError::TransactionRollbackFailed {
+                statement_index: 0,
+                source: Box::new(DriverError::Cancelled),
+                rollback_error: Box::new(DriverError::Disconnected),
+            },
+            AuditTerminalStatus::Unknown,
+            AuditTransactionOutcome::Unknown,
+        ),
+    ];
+    let batch = vec![("UPDATE t SET value = 1".to_string(), Vec::new())];
+
+    for (error, status, transaction_outcome) in cases {
+        let (guard, _, audit) = catalog_guard_with_transaction_error(false, vec![], None, Some(error));
+        guard
+            .execute_in_transaction_checked(&batch, &[0])
+            .await
+            .expect_err("the driver reports an interrupted transaction");
+
+        let events = audit.events.lock().expect("events");
+        let outcome = events.last().expect("terminal audit outcome");
+        assert_eq!(outcome.phase, AuditRecordPhase::Outcome);
+        assert_eq!(outcome.terminal_status, status);
+        assert_eq!(outcome.transaction_outcome, transaction_outcome);
+    }
+}
+
+#[tokio::test]
 async fn a_guarded_transaction_audits_each_statement_and_its_outcome() {
     let (guard, calls, audit) = catalog_guard(false);
     let control = control();
@@ -511,6 +624,8 @@ async fn beginning_a_transaction_does_not_grant_write_authority() {
                 calls: calls.clone(),
                 fail: false,
                 exclusion_scopes: Arc::new(std::sync::Mutex::new(Vec::new())),
+                query_rows_affected: None,
+                transaction_error: Arc::new(std::sync::Mutex::new(None)),
             }),
             guard_context,
         );
@@ -580,6 +695,28 @@ async fn a_controlled_write_that_returns_rows_is_governed_like_a_plain_one() {
         })
         .count();
     assert_eq!(mutations, 3);
+}
+
+#[tokio::test]
+async fn a_write_audits_the_server_count_instead_of_the_retained_returning_rows() {
+    let (guard, _, audit) = catalog_guard_with_query_rows_affected(false, vec![], Some(5));
+    guard
+        .query_result_sets_controlled("INSERT INTO t VALUES (1) RETURNING id", &[], &control())
+        .await
+        .unwrap();
+    let events = audit.events.lock().expect("events");
+    assert_eq!(events.last().and_then(|event| event.rows_affected), Some(5));
+}
+
+#[tokio::test]
+async fn a_write_without_a_server_count_keeps_the_audit_count_unknown() {
+    let (guard, _, audit) = catalog_guard(false);
+    guard
+        .query_result_sets_controlled("INSERT INTO t VALUES (1) RETURNING id", &[], &control())
+        .await
+        .unwrap();
+    let events = audit.events.lock().expect("events");
+    assert_eq!(events.last().and_then(|event| event.rows_affected), None);
 }
 
 #[tokio::test]
@@ -698,4 +835,38 @@ async fn no_read_under_a_cancelled_control_writes_two_outcomes() {
     for (operation, statuses) in outcomes {
         assert_eq!(statuses.len(), 1, "{operation}: {statuses:?}");
     }
+}
+
+#[tokio::test]
+async fn a_routine_definition_read_is_audited_with_its_identity_and_never_its_text() {
+    for controlled in [false, true] {
+        let (guard, _calls, audit) = catalog_guard(false);
+        let lookup = if controlled {
+            guard.routine_definition_controlled(&routine_ref(), &control()).await
+        } else {
+            guard.routine_definition(&routine_ref()).await
+        };
+        assert!(matches!(lookup, Ok(bookie_core::RoutineLookup::Found(_))));
+        let events = audit.events.lock().expect("events");
+        assert_eq!(events.len(), 2, "an intent and a terminal outcome");
+        assert_eq!(events[1].terminal_status, AuditTerminalStatus::Succeeded);
+        assert_eq!(events[1].rows_affected, Some(1));
+        assert_eq!(events[0].targets, ["routine:public.f(a integer)"]);
+        assert!(
+            !format!("{events:?}").contains("secret_marker"),
+            "the audit journal holds no definition text"
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_failed_routine_definition_read_records_a_failed_terminal_outcome() {
+    let (guard, _calls, audit) = catalog_guard(true);
+    let outcome = guard.routine_definition(&routine_ref()).await;
+    assert!(matches!(outcome, Err(DriverError::Disconnected)));
+    let events = audit.events.lock().expect("events");
+    assert_eq!(
+        events.last().map(|event| event.terminal_status),
+        Some(AuditTerminalStatus::Failed)
+    );
 }

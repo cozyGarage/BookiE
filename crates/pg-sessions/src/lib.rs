@@ -1,12 +1,12 @@
 use bookie_core::{Connection, DriverError, Value};
 
-pub const SESSIONS_SQL: &str = "SELECT pid::bigint, usename::text, datname::text, state::text, \
-wait_event_type::text, wait_event::text, \
-COALESCE(EXTRACT(EPOCH FROM (now() - query_start)), 0)::bigint, \
-array_to_string(pg_blocking_pids(pid), ','), left(query, 2000) \
-FROM pg_stat_activity \
-WHERE backend_type = 'client backend' AND pid <> pg_backend_pid() \
-ORDER BY pid";
+pub const SESSIONS_SQL: &str = "SELECT activity.pid::pg_catalog.int8, activity.usename::pg_catalog.text, activity.datname::pg_catalog.text, activity.state::pg_catalog.text, \
+activity.wait_event_type::pg_catalog.text, activity.wait_event::pg_catalog.text, \
+COALESCE(EXTRACT(EPOCH FROM (pg_catalog.now() - activity.query_start)), 0)::pg_catalog.int8, \
+pg_catalog.array_to_string(pg_catalog.pg_blocking_pids(activity.pid), ','), pg_catalog.left(activity.query, 2000) \
+FROM pg_catalog.pg_stat_activity AS activity \
+WHERE activity.backend_type = 'client backend' AND activity.pid <> pg_catalog.pg_backend_pid() \
+ORDER BY activity.pid";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Session {

@@ -7,11 +7,11 @@ use std::io::{self, Write};
 use std::rc::Rc;
 
 use bookie_app_services::image_preview::previewable_image;
-use bookie_core::Value;
+use bookie_core::{ColumnInfo, Value};
 
 use super::display::{readonly_null_sentinel, value_to_copy_text, value_to_full_edit_text};
 
-const MAX_VIEW_BYTES: usize = 1 << 20;
+const MAX_VIEW_BYTES: usize = 64 * 1024;
 const MAX_WORD_WRAP_BYTES: usize = 4 * 1024;
 const HEX_ROW_BYTES: usize = 16;
 const HEX_MAX_BYTES: usize = 16 * 1024;
@@ -22,7 +22,7 @@ pub(super) fn body(value: &Value) -> String {
         Value::Null => readonly_null_sentinel(),
         Value::Bytes(bytes) => match std::str::from_utf8(bytes) {
             Ok(text) if !text.contains('\0') => return capped(text),
-            _ => hex_dump(bytes),
+            _ => return hex_dump(bytes),
         },
         Value::Json(json) => return json_preview(json),
         other => value_to_full_edit_text(other),
@@ -32,6 +32,10 @@ pub(super) fn body(value: &Value) -> String {
     } else {
         text
     }
+}
+
+pub(super) fn body_for_column(value: &Value, column: &ColumnInfo) -> String {
+    bookie_results::uuid_display::format_binary_uuid(value, column).unwrap_or_else(|| body(value))
 }
 
 fn hex_dump(bytes: &[u8]) -> String {
@@ -59,7 +63,7 @@ fn hex_dump(bytes: &[u8]) -> String {
     }
     if shown.len() < bytes.len() {
         out.push_str(
-            &crate::tr!("Showing the first {shown} of {total} bytes.")
+            &bookie_app_services::tr!("Showing the first {shown} of {total} bytes.")
                 .replace("{shown}", &shown.len().to_string())
                 .replace("{total}", &bytes.len().to_string()),
         );
@@ -82,7 +86,7 @@ fn json_preview(value: &serde_json::Value) -> String {
     let mut preview = PreviewWriter::default();
     let serialized = serde_json::to_writer_pretty(&mut preview, value);
     if serialized.is_err() && !preview.truncated {
-        return crate::tr!("This JSON value could not be previewed.");
+        return bookie_app_services::tr!("This JSON value could not be previewed.");
     }
     let end = std::str::from_utf8(&preview.bytes).map_or_else(|error| error.valid_up_to(), |_| preview.bytes.len());
     let text = String::from_utf8_lossy(&preview.bytes[..end]).into_owned();
@@ -93,13 +97,13 @@ fn json_preview(value: &serde_json::Value) -> String {
 }
 
 fn truncation_note(shown: usize, total: usize) -> String {
-    crate::tr!("Showing the first {shown} of {total} bytes. Copy value copies the whole value.")
+    bookie_app_services::tr!("Showing the first {shown} of {total} bytes. Copy value copies the whole value.")
         .replace("{shown}", &shown.to_string())
         .replace("{total}", &total.to_string())
 }
 
 fn json_truncation_note(shown: usize) -> String {
-    crate::tr!("Showing the first {shown} bytes. Copy value copies the whole value.")
+    bookie_app_services::tr!("Showing the first {shown} bytes. Copy value copies the whole value.")
         .replace("{shown}", &shown.to_string())
 }
 
@@ -189,8 +193,13 @@ fn image_preview_picture(value: &Value, closed: &Rc<Cell<bool>>) -> Option<gtk::
     Some(picture)
 }
 
-pub(crate) fn present(parent: &impl IsA<gtk::Widget>, column: &str, value: Value, null_copy_text: Option<String>) {
-    let view = build_text_view(&body(&value));
+pub(crate) fn present(
+    parent: &impl IsA<gtk::Widget>,
+    column: &ColumnInfo,
+    value: Value,
+    null_copy_text: Option<String>,
+) {
+    let view = build_text_view(&body_for_column(&value, column));
     let scroller = gtk::ScrolledWindow::builder().child(&view).vexpand(true).build();
     let closed = Rc::new(Cell::new(false));
     let content = gtk::Box::new(gtk::Orientation::Vertical, 0);
@@ -198,8 +207,14 @@ pub(crate) fn present(parent: &impl IsA<gtk::Widget>, column: &str, value: Value
         content.append(&picture);
     }
     content.append(&scroller);
+    if let Some(decoded) = super::value_decoded::section(&value) {
+        content.append(&decoded);
+    }
+    if let Some(forms) = super::value_decoded::display_as_section(&value) {
+        content.append(&forms);
+    }
 
-    let copy = gtk::Button::with_label(&crate::tr!("Copy value"));
+    let copy = gtk::Button::with_label(&bookie_app_services::tr!("Copy value"));
     copy.add_css_class("suggested-action");
     copy.connect_clicked(move |button| {
         let text = null_copy_text
@@ -215,14 +230,14 @@ pub(crate) fn present(parent: &impl IsA<gtk::Widget>, column: &str, value: Value
     toolbar.set_content(Some(&content));
 
     let dialog = adw::Dialog::builder()
-        .title(column)
+        .title(&column.name)
         .content_width(640)
         .content_height(480)
         .child(&toolbar)
         .build();
     dialog
         .upcast_ref::<gtk::Widget>()
-        .update_property(&[gtk::accessible::Property::Label(column)]);
+        .update_property(&[gtk::accessible::Property::Label(&column.name)]);
     dialog.connect_closed(move |_| closed.set(true));
     crate::ui::leak_probe::present_tracked("value_viewer", &dialog, parent);
 }
@@ -357,9 +372,33 @@ mod tests {
     }
 
     #[test]
+    fn binary16_uuid_viewer_shows_uuid_text_without_changing_the_value() {
+        let column = bookie_core::ColumnInfo {
+            name: "id".into(),
+            data_type: "VARBINARY".into(),
+            nullable: false,
+            primary_key: true,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: None,
+            domain_type: None,
+        };
+        let bytes = [
+            0x55, 0x0e, 0x84, 0x00, 0xe2, 0x9b, 0x41, 0xd4, 0xa7, 0x16, 0x44, 0x66, 0x55, 0x44, 0x00, 0x00,
+        ];
+        let value = Value::Bytes(bytes.to_vec());
+
+        assert_eq!(body_for_column(&value, &column), "550e8400-e29b-41d4-a716-446655440000");
+        assert_eq!(value, Value::Bytes(bytes.to_vec()));
+    }
+
+    #[test]
     fn a_long_hex_dump_says_how_much_it_shows() {
         let dump = body(&Value::Bytes(vec![0u8; MAX_VIEW_BYTES]));
-        assert!(dump.contains("Showing the first 16384 of 1048576 bytes."));
+        assert!(dump.contains(&format!("Showing the first {HEX_MAX_BYTES} of {MAX_VIEW_BYTES} bytes.")));
     }
 
     #[test]
@@ -368,6 +407,20 @@ mod tests {
         let shown = body(&Value::Text(text));
         assert!(shown.contains("Showing the first"));
         assert!(shown.len() < MAX_VIEW_BYTES + 200);
+    }
+
+    #[test]
+    fn a_large_text_viewer_keeps_the_gtk_preview_within_64_kib() {
+        let shown = body(&Value::Text("x".repeat(1_200_000)));
+        let (preview, note) = shown.split_once("\n\n").expect("truncation note");
+        assert!(preview.len() <= 64 * 1024);
+        assert_eq!(
+            note,
+            format!(
+                "Showing the first {} of 1200000 bytes. Copy value copies the whole value.",
+                preview.len()
+            )
+        );
     }
 
     #[test]
@@ -413,10 +466,23 @@ mod tests {
         let window = adw::Window::new();
         window.present();
         let value = "x".repeat(1_200_000);
-        present(&window, "payload", Value::Text(value.clone()), None);
+        let column = bookie_core::ColumnInfo {
+            name: "payload".into(),
+            data_type: "TEXT".into(),
+            nullable: true,
+            primary_key: false,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: None,
+            domain_type: None,
+        };
+        present(&window, &column, Value::Text(value.clone()), None);
         let dialogs = window.observe_children().n_items();
         assert!(dialogs >= 1);
-        let copy = button_named(window.upcast_ref(), &crate::tr!("Copy value")).unwrap();
+        let copy = button_named(window.upcast_ref(), &bookie_app_services::tr!("Copy value")).unwrap();
         copy.emit_clicked();
         let received = gtk::glib::MainContext::default()
             .block_on(window.clipboard().read_text_future())

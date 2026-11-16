@@ -10,11 +10,13 @@ mod editor_files;
 mod environment_marker;
 mod favorites;
 mod grid_close;
+mod health_report;
 pub(crate) mod import;
 mod init_css;
 mod init_sidebar;
 mod init_window;
 mod init_workspace;
+mod lifecycle_messages;
 mod msg;
 mod multi_session;
 mod open_request;
@@ -24,6 +26,7 @@ mod referenced_row;
 mod render;
 mod row_ops;
 mod schema_index;
+mod session_restore;
 mod session_teardown;
 mod shortcuts;
 mod sidebar_catalog;
@@ -31,9 +34,15 @@ mod sidebar_layout;
 mod sidebar_state;
 mod status_pages;
 mod structure;
+mod tab_session;
+mod tab_title;
 mod types;
+mod value_search;
+mod whats_new;
+mod window_close_prompt;
 mod workspace_chrome;
 mod workspace_close;
+mod workspace_editing_messages;
 mod workspace_overview;
 mod workspace_persist;
 mod workspace_preview;
@@ -56,11 +65,10 @@ use super::connect_dialog::ConnectDialog;
 use super::connection_row::ConnectionRow;
 use super::editor::SqlEditorInput;
 use super::history_dialog::HistoryDialog;
-use super::sidebar_row::SidebarRow;
 use super::welcome_view::{WelcomeView, WelcomeViewInit, WelcomeViewOutput};
 use crate::services::database_service::ConnectionHealth;
 
-pub use msg::AppMsg;
+pub use msg::{AppMsg, ConnectionMessage};
 use render::qualified_label;
 use types::{CLOSED_TABS_CAPACITY, ConnectionSwitch, ConnectionTransition, ExportFormat, StatusKind, SwitchDecision};
 pub use types::{ClosedTabDescriptor, EditorTabSlot, OpenMode, StructureTabSlot, TableTabSlot, WorkspaceTab};
@@ -71,6 +79,12 @@ pub(crate) enum SessionTeardownAction {
     Disconnect,
     ConnectionSwitch,
     WindowClose,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum UpdateCheckSource {
+    Manual,
+    Quiet,
 }
 
 #[derive(Clone)]
@@ -108,16 +122,22 @@ pub struct App {
     environment_badge: gtk::Label,
     sidebar_title: adw::WindowTitle,
     disconnect_action: gio::SimpleAction,
-    sidebar_factory: FactoryVecDeque<SidebarRow>,
+    sidebar_model: crate::ui::sidebar_tree_model::SidebarTreeModel,
+    sidebar_selection: gtk::SingleSelection,
+    sidebar_list: gtk::ListView,
+    sidebar_row_factories: init_sidebar::RowFactories,
+    sidebar_expansion_handlers: init_sidebar::ExpansionHandlers,
+    sidebar_render_context: std::rc::Rc<std::cell::RefCell<init_sidebar::SidebarRenderContext>>,
     sidebar_nodes: std::rc::Rc<std::cell::RefCell<Vec<crate::services::sidebar_tree::TreeNode>>>,
     sidebar_collapsed: std::rc::Rc<std::cell::RefCell<crate::services::sidebar_tree::CollapseState>>,
-    sidebar_visible: std::rc::Rc<std::cell::RefCell<std::collections::HashSet<usize>>>,
     sidebar_hidden_schemas: std::rc::Rc<std::cell::RefCell<std::collections::HashSet<String>>>,
     schema_filter_button: gtk::MenuButton,
     sidebar_fold_button: gtk::Button,
     schema_filter_list: gtk::Box,
     sidebar_views: Vec<bookie_core::TableInfo>,
     sidebar_tables: Vec<bookie_core::TableInfo>,
+    sidebar_temporary_tables: Vec<bookie_core::TableInfo>,
+    temporary_tables_by_tab: std::collections::HashMap<Uuid, Vec<bookie_core::TableInfo>>,
     sidebar_catalog: std::collections::HashMap<bookie_core::CatalogObjectKind, Vec<bookie_core::CatalogObject>>,
     sidebar_catalog_cancel: std::cell::RefCell<tokio_util::sync::CancellationToken>,
     catalog_generation: std::cell::Cell<u64>,
@@ -134,6 +154,8 @@ pub struct App {
     connect_progress_toast: Option<adw::Toast>,
     connect_cancel: Option<tokio_util::sync::CancellationToken>,
     reconnect_banner: adw::Banner,
+    update_banner: adw::Banner,
+    available_update: Option<bookie_app_services::release_updates::LatestRelease>,
     connections_factory: FactoryVecDeque<ConnectionRow>,
     connections_popover: gtk::Popover,
     databases_button: gtk::MenuButton,
@@ -207,6 +229,7 @@ pub struct App {
     /// so the close-request handler closure can mutate it from outside
     /// `App::update`.
     close_window_after_save: std::rc::Rc<std::cell::Cell<bool>>,
+    force_close: std::rc::Rc<std::cell::Cell<bool>>,
     /// Count of in-flight transaction commits (a tab clicked Save
     /// and is awaiting `execute_in_transaction`). Incremented by
     /// `on_execute_browse_transaction` at dispatch, decremented by
@@ -240,7 +263,7 @@ pub struct App {
     /// schema. Editor descriptors round-trip the buffer text;
     /// dirty tabs lose their pending row/DDL edits because the
     /// trackers have already been cleared by the close path.
-    closed_tabs_stack: std::rc::Rc<std::cell::RefCell<std::collections::VecDeque<ClosedTabDescriptor>>>,
+    closed_tabs_stack: std::rc::Rc<std::cell::RefCell<std::collections::VecDeque<(Uuid, ClosedTabDescriptor)>>>,
     /// Extra ApplicationWindows spawned via New Window. Kept alive so
     /// closing the primary window does not drop them mid-use. Removing an
     /// entry (see `AppMsg::ExtraWindowClosed`) drops its `Controller`,
@@ -286,14 +309,14 @@ impl SimpleComponent for App {
                     #[name = "new_connection_button"]
                     pack_start = &gtk::Button {
                         set_icon_name: "list-add-symbolic",
-                        set_tooltip_text: Some(crate::tr!("New connection").as_str()),
-                        connect_clicked => AppMsg::OpenConnect,
+                        set_tooltip_text: Some(bookie_app_services::tr!("New connection").as_str()),
+                        connect_clicked => AppMsg::Connection(ConnectionMessage::Open),
                     },
 
                     #[name = "saved_connections_button"]
                     pack_start = &gtk::MenuButton {
                         set_icon_name: "document-open-symbolic",
-                        set_tooltip_text: Some(crate::tr!("Open saved connection").as_str()),
+                        set_tooltip_text: Some(bookie_app_services::tr!("Open saved connection").as_str()),
 
                         #[wrap(Some)]
                         #[name = "connections_popover"]
@@ -303,13 +326,13 @@ impl SimpleComponent for App {
                     #[name = "sidebar_toggle"]
                     pack_start = &gtk::ToggleButton {
                         set_icon_name: "sidebar-show-symbolic",
-                        set_tooltip_text: Some(crate::tr!("Tables sidebar").as_str()),
+                        set_tooltip_text: Some(bookie_app_services::tr!("Tables sidebar").as_str()),
                     },
 
                     #[name = "databases_button"]
                     pack_start = &gtk::MenuButton {
                         set_icon_name: "network-server-symbolic",
-                        set_tooltip_text: Some(crate::tr!("Switch database").as_str()),
+                        set_tooltip_text: Some(bookie_app_services::tr!("Switch database").as_str()),
                         set_visible: false,
 
                         #[wrap(Some)]
@@ -320,8 +343,8 @@ impl SimpleComponent for App {
                     #[name = "environment_badge"]
                     pack_end = &gtk::Label {
                         set_visible: false,
-                        set_label: &crate::tr!("Production"),
-                        set_tooltip_text: Some(crate::tr!("This is a production connection. Changes can affect live data.").as_str()),
+                        set_label: &bookie_app_services::tr!("Production"),
+                        set_tooltip_text: Some(bookie_app_services::tr!("This is a production connection. Changes can affect live data.").as_str()),
                         set_margin_end: 6,
                         add_css_class: "error",
                         add_css_class: "caption-heading",
@@ -330,7 +353,7 @@ impl SimpleComponent for App {
                     #[name = "read_only_badge"]
                     pack_end = &gtk::Label {
                         set_visible: false,
-                        set_label: &crate::tr!("Read-only"),
+                        set_label: &bookie_app_services::tr!("Read-only"),
                         set_margin_end: 6,
                         add_css_class: "warning",
                         add_css_class: "caption-heading",
@@ -340,13 +363,13 @@ impl SimpleComponent for App {
                     pack_end = &gtk::Spinner {
                         set_visible: false,
                         set_margin_end: 6,
-                        set_tooltip_text: Some(crate::tr!("Saving…").as_str()),
+                        set_tooltip_text: Some(bookie_app_services::tr!("Saving…").as_str()),
                     },
 
                     #[name = "primary_menu_button"]
                     pack_end = &gtk::MenuButton {
                         set_icon_name: "open-menu-symbolic",
-                        set_tooltip_text: Some(crate::tr!("Main menu").as_str()),
+                        set_tooltip_text: Some(bookie_app_services::tr!("Main menu").as_str()),
                         set_primary: true,
                     },
                 },
@@ -375,25 +398,25 @@ impl SimpleComponent for App {
                             #[wrap(Some)]
                             #[name = "sidebar_title"]
                             set_title_widget = &adw::WindowTitle {
-                                set_title: &crate::tr!("Tables"),
+                                set_title: &bookie_app_services::tr!("Tables"),
                             },
 
                             pack_end = &gtk::Button {
                                 set_icon_name: "view-refresh-symbolic",
-                                set_tooltip_text: Some(crate::tr!("Refresh tables").as_str()),
+                                set_tooltip_text: Some(bookie_app_services::tr!("Refresh tables").as_str()),
                                 set_action_name: Some("win.refresh-sidebar"),
                             },
 
                             #[name = "table_search_toggle"]
                             pack_end = &gtk::ToggleButton {
                                 set_icon_name: "system-search-symbolic",
-                                set_tooltip_text: Some(crate::tr!("Search tables").as_str()),
+                                set_tooltip_text: Some(bookie_app_services::tr!("Search tables").as_str()),
                             },
 
                             #[name = "sidebar_fold_button"]
                             pack_end = &gtk::Button {
                                 set_icon_name: "go-up-symbolic",
-                                set_tooltip_text: Some(crate::tr!("Collapse all").as_str()),
+                                set_tooltip_text: Some(bookie_app_services::tr!("Collapse all").as_str()),
                                 set_visible: false,
                                 connect_clicked => AppMsg::ToggleAllSidebarGroups,
                             },
@@ -401,7 +424,7 @@ impl SimpleComponent for App {
                             #[name = "schema_filter_button"]
                             pack_end = &gtk::MenuButton {
                                 set_icon_name: crate::ui::icons::SCHEMA_FILTER_ICON_NAME,
-                                set_tooltip_text: Some(crate::tr!("Filter schemas").as_str()),
+                                set_tooltip_text: Some(bookie_app_services::tr!("Filter schemas").as_str()),
                                 set_visible: false,
 
                                 #[wrap(Some)]
@@ -422,7 +445,7 @@ impl SimpleComponent for App {
                                 #[wrap(Some)]
                                 #[name = "table_search"]
                                 set_child = &gtk::SearchEntry {
-                                    set_placeholder_text: Some(crate::tr!("Filter tables…").as_str()),
+                                    set_placeholder_text: Some(bookie_app_services::tr!("Filter tables…").as_str()),
                                     set_hexpand: true,
                                 },
                             },
@@ -441,20 +464,18 @@ impl SimpleComponent for App {
                         #[wrap(Some)]
                         #[name = "content_holder"]
                         set_child = &adw::ToolbarView {
+                            #[name = "update_banner"]
+                            add_top_bar = &adw::Banner {
+                                set_revealed: false,
+                                set_use_markup: false,
+                                set_button_label: Some(bookie_app_services::tr!("Review").as_str()),
+                            },
                             #[name = "reconnect_banner"]
                             add_top_bar = &adw::Banner {
                                 set_revealed: false,
                                 set_use_markup: false,
-                                set_button_label: Some(crate::tr!("Retry").as_str()),
+                                set_button_label: Some(bookie_app_services::tr!("Retry").as_str()),
                             },
-                            // Content is set imperatively at the end of
-                            // init() — show_welcome_page swaps in the
-                            // WelcomeView for the disconnected state,
-                            // and on_connected swaps in the workspace
-                            // tab strip on connect. The previously-
-                            // inlined "Connect to a database" StatusPage
-                            // here was dead UI: built once, replaced
-                            // immediately, never seen.
                         },
                     },
                 },
@@ -476,10 +497,14 @@ impl SimpleComponent for App {
         sidebar_layout::install(&widgets.split_view);
         widgets
             .table_search
-            .update_property(&[gtk::accessible::Property::Label(&crate::tr!("Search tables"))]);
+            .update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!(
+                "Search tables"
+            ))]);
         widgets
             .sidebar_fold_button
-            .update_property(&[gtk::accessible::Property::Label(&crate::tr!("Collapse all"))]);
+            .update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!(
+                "Collapse all"
+            ))]);
         let schema_filter_list = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
             .spacing(6)
@@ -515,7 +540,7 @@ impl SimpleComponent for App {
                 registry: registry.clone(),
             })
             .forward(sender.input_sender(), |out| match out {
-                WelcomeViewOutput::OpenConnect => AppMsg::OpenConnect,
+                WelcomeViewOutput::OpenConnect => AppMsg::Connection(ConnectionMessage::Open),
                 WelcomeViewOutput::ImportUrl => AppMsg::ImportConnectionUrl,
                 WelcomeViewOutput::OpenSaved(saved) => AppMsg::OpenSaved(*saved),
                 WelcomeViewOutput::ToggleFavorite(id) => AppMsg::ToggleConnectionFavorite(id),
@@ -527,14 +552,20 @@ impl SimpleComponent for App {
                 WelcomeViewOutput::Delete(id) => AppMsg::DeleteConnection(id),
             });
 
+        let current_preferences = preferences.load();
         adw::StyleManager::default().set_color_scheme(crate::services::preferences::color_scheme_style(
-            preferences.load().color_scheme,
+            current_preferences.color_scheme,
         ));
-        crate::ui::theme::apply(preferences.load().theme);
-        crate::ui::grid::set_null_display(preferences.load().null_display);
-        crate::ui::grid::set_date_format(preferences.load().date_format);
-        crate::ui::grid::full_value_editor::set_show_invisible_characters(preferences.load().show_invisible_characters);
-        let default_page_size = preferences.load().default_page_size;
+        crate::ui::theme::apply(current_preferences.theme);
+        crate::ui::typography::apply(&current_preferences);
+        crate::ui::editor::apply_font_preferences(&current_preferences);
+        crate::ui::grid::apply_typography(&current_preferences.grid_typography);
+        crate::ui::grid::set_null_display(current_preferences.null_display);
+        crate::ui::grid::set_date_format(current_preferences.date_format);
+        crate::ui::grid::full_value_editor::set_show_invisible_characters(
+            current_preferences.show_invisible_characters,
+        );
+        let default_page_size = current_preferences.default_page_size;
         let mut model = App {
             change_trackers,
             structure_trackers,
@@ -557,16 +588,22 @@ impl SimpleComponent for App {
             environment_badge: widgets.environment_badge.clone(),
             sidebar_title: widgets.sidebar_title.clone(),
             disconnect_action,
-            sidebar_factory: sidebar.factory,
+            sidebar_model: sidebar.model,
+            sidebar_selection: sidebar.selection,
+            sidebar_list: sidebar.list,
+            sidebar_row_factories: sidebar.row_factories,
+            sidebar_expansion_handlers: sidebar.expansion_handlers,
+            sidebar_render_context: sidebar.render_context,
             sidebar_nodes: sidebar.nodes,
             sidebar_collapsed: sidebar.collapsed,
-            sidebar_visible: sidebar.visible,
             sidebar_hidden_schemas: sidebar.hidden_schemas,
             schema_filter_button: widgets.schema_filter_button.clone(),
             sidebar_fold_button: widgets.sidebar_fold_button.clone(),
             schema_filter_list,
             sidebar_views: Vec::new(),
             sidebar_tables: Vec::new(),
+            sidebar_temporary_tables: Vec::new(),
+            temporary_tables_by_tab: std::collections::HashMap::new(),
             sidebar_catalog: Default::default(),
             sidebar_catalog_cancel: Default::default(),
             catalog_generation: std::cell::Cell::new(0),
@@ -583,6 +620,8 @@ impl SimpleComponent for App {
             connect_progress_toast: None,
             connect_cancel: None,
             reconnect_banner: widgets.reconnect_banner.clone(),
+            update_banner: widgets.update_banner.clone(),
+            available_update: None,
             connections_factory: workspace_chrome.connections_factory,
             connections_popover: widgets.connections_popover.clone(),
             databases_button: widgets.databases_button.clone(),
@@ -633,6 +672,7 @@ impl SimpleComponent for App {
             grid_close: grid_close::GridCloseState::new(window_handles.grid_edits_ready),
             close_after_save: window_handles.close_after_save,
             close_window_after_save: window_handles.close_window_after_save,
+            force_close: window_handles.force_close,
             in_flight_saves: window_handles.in_flight_saves,
             active_browse_saves: std::collections::HashMap::new(),
             session_teardown_ready: window_handles.session_teardown_ready,
@@ -650,6 +690,8 @@ impl SimpleComponent for App {
         };
         open_request::forward_open_signal(sender.input_sender());
         sender.input(AppMsg::ReloadConnections);
+        sender.input(AppMsg::MaybeShowWhatsNew);
+        sender.input(AppMsg::QuietCheckForUpdates);
         model.content_holder.set_content(Some(&model.history_paned));
         model.set_sidebar_connected(false);
         model.show_welcome_page(sender.clone());
@@ -667,6 +709,10 @@ impl SimpleComponent for App {
         let banner_sender = sender.clone();
         widgets.reconnect_banner.connect_button_clicked(move |_| {
             banner_sender.input(AppMsg::RefreshPage);
+        });
+        let update_banner_sender = sender.clone();
+        widgets.update_banner.connect_button_clicked(move |_| {
+            update_banner_sender.input(AppMsg::ReviewAvailableUpdate);
         });
 
         let poll_sender = sender.clone();
@@ -701,72 +747,43 @@ impl SimpleComponent for App {
             return;
         }
         match msg {
-            AppMsg::FlushWindowEdits => {
-                self.grid_close.window_ready.set(true);
-                self.window.close();
-            }
+            AppMsg::FlushWindowEdits => lifecycle_messages::flush_window_edits(self),
             AppMsg::GridEditsPrepared { intent, ticket, result } => {
                 self.grid_edits_prepared(intent, ticket, result, sender)
             }
-            AppMsg::OpenConnect => self.on_open_connect(sender),
-            AppMsg::ConnectionPrepared(prepared) => self.on_connection_prepared(prepared, sender),
-            AppMsg::ConnectionPrepareFailed(message, saved) => {
-                self.on_connection_prepare_failed(message, *saved, sender)
-            }
-            AppMsg::ConnectionSwitchDecision(decision) => self.on_connection_switch_decision(decision, sender),
+            AppMsg::Connection(message) => self.on_connection_message(message, sender),
             AppMsg::Disconnect => self.on_disconnect(sender),
             AppMsg::ForceDisconnect => self.request_disconnect(sender),
             AppMsg::PrepareWindowClose => self.prepare_window_close(sender),
+            AppMsg::PromptWindowClose => self.prompt_window_close_with_pending(sender),
             AppMsg::PersistWindowStateForClose {
                 width,
                 height,
                 maximized,
-            } => {
-                let mut state = self.window_state.borrow_mut();
-                state.width = width;
-                state.height = height;
-                state.maximized = maximized;
-                drop(state);
-                self.persist_window_state(sender, true);
-            }
-            AppMsg::WindowStatePersisted(result) => {
-                if let Err(error) = result {
-                    tracing::warn!(error = %error, "window state write failed");
-                }
-            }
+            } => lifecycle_messages::persist_window_state_for_close(self, width, height, maximized, sender),
+            AppMsg::WindowStatePersisted(result) => lifecycle_messages::window_state_persisted(result),
             AppMsg::WindowStatePersistedForClose(result) => {
-                self.window_close_state_pending.set(false);
-                if let Err(error) = result {
-                    tracing::warn!(error = %error, "window state write failed before close");
-                }
-                self.window_close_state_saved.set(true);
-                self.window.close();
+                lifecycle_messages::window_state_persisted_for_close(self, result)
             }
             AppMsg::ConnectionDeleted(id) => self.on_connection_deleted(id, sender),
             AppMsg::ConfirmSessionTeardown(action) => self.prepare_editor_sessions(action, sender),
-            AppMsg::CancelSessionTeardown(action) => match action {
-                SessionTeardownAction::WindowClose => self.session_teardown_pending.set(false),
-                SessionTeardownAction::ConnectionSwitch => {
-                    self.switch.transition = ConnectionTransition::Idle;
-                    self.switch.prepared = None;
-                    self.switch.saves_pending.clear();
-                    self.switch.cancel_audit_was_disabled = None;
-                }
-                SessionTeardownAction::CloseTab(_) | SessionTeardownAction::Disconnect => {}
-            },
+            AppMsg::CancelSessionTeardown(action) => lifecycle_messages::cancel_session_teardown(self, action),
             AppMsg::SessionTeardownCompleted { action, result } => {
                 self.on_session_teardown_completed(action, result, sender);
             }
-            AppMsg::DialogClosed => self.on_connect_dialog_closed(),
             AppMsg::SelectTable {
                 schema,
                 name,
                 open_mode,
             } => self.on_select_table(schema, name, open_mode, sender),
+            AppMsg::ShowTemporaryTable { schema, name } => self.show_temporary_table(schema, name),
             AppMsg::OpenReferencedRow { schema, table, filter } => {
                 self.on_open_referenced_row(schema, table, filter, sender)
             }
             AppMsg::ChooseReferencedRow(targets) => self.on_choose_referenced_row(targets, sender),
+            AppMsg::BrowseViewRestriction(tab_id, restriction) => {
+                self.dispatch_to_tab(tab_id, BrowseTabInput::ViewRestriction(restriction));
+            }
             AppMsg::ColumnsLoaded(tab_id, columns, request) => {
                 self.on_browse_columns_loaded(tab_id, columns, request, sender)
             }
@@ -779,13 +796,16 @@ impl SimpleComponent for App {
             AppMsg::InboundForeignKeysLoaded(tab_id, inbound) => {
                 self.on_browse_inbound_foreign_keys_loaded(tab_id, inbound)
             }
-            AppMsg::RowsLoaded(tab_id, request, result, projected_columns) => {
-                self.on_browse_rows_loaded(tab_id, request, result, projected_columns)
+            AppMsg::RowsLoaded(tab_id, request, result, projected_columns, elapsed) => {
+                self.on_browse_rows_loaded(tab_id, request, result, projected_columns, elapsed)
             }
             AppMsg::LoadFailed(tab_id, msg) => self.on_browse_load_failed(tab_id, msg),
             AppMsg::RowCountLoaded(tab_id, request, count) => self.on_browse_row_count_loaded(tab_id, request, count),
             AppMsg::RowCountFailed(tab_id, request) => self.on_browse_row_count_failed(tab_id, request),
-            AppMsg::FetchBrowsePage(tab_id) => self.fetch_browse_page(tab_id, sender),
+            AppMsg::FetchBrowsePage(tab_id, auto_refresh) => self.fetch_browse_page(tab_id, auto_refresh, sender),
+            AppMsg::AutoRefreshFailed(tab_id, request, message) => {
+                self.on_auto_refresh_failed(tab_id, request, message)
+            }
             AppMsg::FetchBrowseCellValue(tab_id, request, col_index, column_name, row_key) => {
                 self.fetch_browse_cell_value(tab_id, request, col_index, column_name, row_key, sender)
             }
@@ -806,6 +826,14 @@ impl SimpleComponent for App {
             AppMsg::FetchBrowseColumns(tab_id) => self.fetch_browse_columns(tab_id, sender),
             AppMsg::FetchBrowseRowCount(tab_id) => self.fetch_browse_row_count(tab_id, sender),
             AppMsg::WorkspaceTabsChanged => self.on_workspace_tabs_changed(sender),
+            AppMsg::EditorTemporaryTablesChanged(tab_id, tables) => {
+                if tables.is_empty() {
+                    self.temporary_tables_by_tab.remove(&tab_id);
+                } else {
+                    self.temporary_tables_by_tab.insert(tab_id, tables);
+                }
+                self.sync_sidebar_temporary_tables(sender);
+            }
             AppMsg::FocusWorkingSession(id) => self.focus_working_session(id, sender),
             AppMsg::SwitchToRecentTab => self.on_switch_to_recent_tab(),
             AppMsg::EndRecentTabWalk => self.on_end_recent_tab_walk(),
@@ -828,47 +856,19 @@ impl SimpleComponent for App {
                 self.dispatch_to_tab(tab_id, BrowseTabInput::FlashErrorRow(source.clone()));
                 self.dispatch_to_editor(tab_id, SqlEditorInput::ResultFlashError(source));
             }
-            AppMsg::FocusActiveGrid => {
-                if let Some(id) = self.selected_editor_tab_id() {
-                    self.dispatch_to_editor(id, crate::ui::editor::SqlEditorInput::FocusResultGrid);
-                } else if let Some(id) = self.selected_browse_tab_id() {
-                    self.dispatch_to_tab(id, BrowseTabInput::FocusGrid);
-                }
-            }
-            AppMsg::FocusActiveEditor => {
-                if let Some(id) = self.selected_editor_tab_id() {
-                    self.dispatch_to_editor(id, crate::ui::editor::SqlEditorInput::FocusEditor);
-                }
-            }
-            AppMsg::SaveActiveBrowseTab => {
-                if let Some(id) = self.selected_editor_tab_id() {
-                    if self.change_trackers.with_tab_ref(id, |tracker| tracker.has_pending()) == Some(true) {
-                        self.dispatch_to_editor(id, SqlEditorInput::CommitResultEdits);
-                    } else {
-                        self.save_editor_file(id, false, sender);
-                    }
-                } else if let Some(id) = self.selected_browse_tab_id() {
-                    self.dispatch_to_tab(id, BrowseTabInput::CommitSave);
-                }
-            }
-            AppMsg::SaveActiveBrowseTabById(id) => {
-                self.dispatch_to_tab(id, BrowseTabInput::CommitSave);
-            }
+            AppMsg::FocusActiveGrid => workspace_editing_messages::focus_active_grid(self),
+            AppMsg::FocusActiveEditor => workspace_editing_messages::focus_active_editor(self),
+            AppMsg::SaveActiveBrowseTab => workspace_editing_messages::save_active_browse_tab(self, sender),
+            AppMsg::SaveActiveBrowseTabById(id) => workspace_editing_messages::save_browse_tab_by_id(self, id),
             AppMsg::UndoActiveBrowseTab => {
                 // Ctrl+Z routes to BrowseTab undo only. Structure
                 // editing follows the snapshot+diff model — DDL undo
                 // is a session-level Discard, not a per-keystroke
                 // history. Inside a Structure-mode Entry, the native
                 // `gtk::Text` undo handles per-field text revert.
-                if let Some(id) = self.selected_browse_tab_id() {
-                    self.dispatch_to_tab(id, BrowseTabInput::Undo);
-                }
+                workspace_editing_messages::undo_active_browse_tab(self)
             }
-            AppMsg::RedoActiveBrowseTab => {
-                if let Some(id) = self.selected_browse_tab_id() {
-                    self.dispatch_to_tab(id, BrowseTabInput::Redo);
-                }
-            }
+            AppMsg::RedoActiveBrowseTab => workspace_editing_messages::redo_active_browse_tab(self),
             AppMsg::WorkspaceTabClosed(id) => self.close_workspace_tab_by_id(id, sender),
             AppMsg::FinishCloseWorkspaceTab(id) => {
                 if let Some(tab_view) = self.workspace_tab_view.clone() {
@@ -900,8 +900,10 @@ impl SimpleComponent for App {
             AppMsg::ShowToast(msg) => self.show_toast(&msg),
             AppMsg::BrowseTabDirtyChanged(tab_id, dirty) => self.refresh_browse_tab_dirty(tab_id, dirty),
             AppMsg::EditorResultDirtyChanged(tab_id, dirty) => self.refresh_editor_result_dirty(tab_id, dirty),
-            AppMsg::ToggleSidebarGroup(key) => self.toggle_sidebar_group(&key),
-            AppMsg::SidebarSearchChanged => self.sync_sidebar_expansion(),
+            AppMsg::SidebarGroupExpansionChanged { key, expanded } => {
+                self.sidebar_group_expansion_changed(&key, expanded);
+            }
+            AppMsg::SidebarSearchChanged => self.refresh_sidebar_model(),
             AppMsg::RefreshSidebar => self.refresh_sidebar(sender),
             AppMsg::RevealInSidebar => self.on_reveal_in_sidebar(),
             AppMsg::HideSidebarSchema(schema) => self.hide_sidebar_schema(&schema, &sender),
@@ -923,6 +925,12 @@ impl SimpleComponent for App {
                 self.on_truncate_table_confirmed(origin, schema, table, sender)
             }
             AppMsg::DropTablePrompt { schema, table } => self.on_drop_table_prompt(schema, table, sender),
+            AppMsg::DropTablePromptReady {
+                origin,
+                schema,
+                table,
+                referencing,
+            } => self.present_drop_table_prompt(origin, schema, table, &referencing, sender),
             AppMsg::DropTableConfirmed { origin, schema, table } => {
                 self.on_drop_table_confirmed(origin, schema, table, sender)
             }
@@ -933,6 +941,7 @@ impl SimpleComponent for App {
             AppMsg::ExecuteStructureTransaction { tab_id, statements } => {
                 self.on_execute_structure_transaction(tab_id, statements, sender)
             }
+            AppMsg::AttachWorkspaceTab { tab_id, connection_id } => self.attach_tab_to(tab_id, connection_id),
             AppMsg::SaveActiveStructureTabById(id) => self.save_structure_tab_by_id(id, sender),
             AppMsg::StructureSaveCompleted {
                 origin,
@@ -953,13 +962,19 @@ impl SimpleComponent for App {
                 metadata,
             } => self.on_structure_data_loaded(tab_id, columns, metadata),
             AppMsg::StructureLoadFailed { tab_id, message } => self.on_structure_load_failed(tab_id, message),
+            AppMsg::FetchCollations { tab_id } => self.on_fetch_collations(tab_id, sender),
+            AppMsg::CollationsLoaded {
+                tab_id,
+                collations,
+                table_default_supported,
+            } => self.on_collations_loaded(tab_id, collations, table_default_supported),
             AppMsg::StructureTabDirtyChanged(tab_id, dirty) => self.refresh_structure_tab_dirty(tab_id, dirty),
             AppMsg::SchemaChanged { origin, schema, table } => self.on_schema_changed(origin, schema, table, sender),
             AppMsg::CatalogReloaded {
                 origin,
                 generation,
                 result,
-            } => self.on_catalog_reloaded(origin, generation, result),
+            } => self.on_catalog_reloaded(origin, generation, result, sender.clone()),
             AppMsg::RowOpStarted => self.set_row_op_in_flight(true),
             AppMsg::ReloadConnections => self.on_reload_connections(sender),
             AppMsg::ConnectionsLoaded(connections) => {
@@ -989,7 +1004,7 @@ impl SimpleComponent for App {
             AppMsg::EditorTabQueryChanged(id, text) => self.on_editor_tab_query_changed(id, text),
             AppMsg::FavoritesLoaded(ticket, favorites) => self.on_favorites_loaded(ticket, favorites),
             AppMsg::PersistFavorite(favorite) => self.on_persist_favorite(favorite, sender),
-            AppMsg::FavoriteSaved => self.show_toast(&crate::tr!("Saved as favorite")),
+            AppMsg::FavoriteSaved => self.show_toast(&bookie_app_services::tr!("Saved as favorite")),
             AppMsg::FavoriteSaveFailed(reason) => self.show_toast(&reason),
             AppMsg::SaveQueryAsFavorite => self.on_save_query_as_favorite(sender),
             AppMsg::ShowSavedQueries => self.on_show_saved_queries(sender),
@@ -999,6 +1014,7 @@ impl SimpleComponent for App {
                 self.on_favorites_loaded(ticket, saved);
             }
             AppMsg::ShowQuickSwitcher => self.on_show_quick_switcher(sender),
+            AppMsg::QuickSwitcherHistoryLoaded(history) => self.present_quick_switcher(history, sender),
             AppMsg::QuickSwitcherChose(target) => self.on_quick_switcher_chose(target, sender),
             AppMsg::ShowHistory => self.on_show_history(sender),
             AppMsg::CloseHistory => self.hide_history_panel(),
@@ -1006,20 +1022,31 @@ impl SimpleComponent for App {
                 if self.connected {
                     self.append_editor_tab(Some(text), sender);
                 } else {
-                    self.show_toast(&crate::tr!("Connect to a database first to run SQL."));
+                    self.show_toast(&bookie_app_services::tr!("Connect to a database first to run SQL."));
                 }
             }
             AppMsg::ReplaceActiveTabQuery(text) => {
                 if self.connected {
                     self.on_replace_active_tab_query(text, sender);
                 } else {
-                    self.show_toast(&crate::tr!("Connect to a database first to run SQL."));
+                    self.show_toast(&bookie_app_services::tr!("Connect to a database first to run SQL."));
                 }
             }
             AppMsg::PollHealth => self.on_poll_health(),
             AppMsg::RefreshPage => self.on_refresh_active_tab(),
             AppMsg::ShowShortcuts => self.on_show_shortcuts(),
             AppMsg::ShowAbout => self.on_show_about(),
+            AppMsg::CheckForUpdates => whats_new::start_update_check(self, UpdateCheckSource::Manual, sender.clone()),
+            AppMsg::QuietCheckForUpdates => {
+                whats_new::start_update_check(self, UpdateCheckSource::Quiet, sender.clone())
+            }
+            AppMsg::UpdateCheckFinished { source, result } => {
+                whats_new::present_update_check_result(self, source, result, sender.clone())
+            }
+            AppMsg::ReviewAvailableUpdate => whats_new::review_available_update(self, sender.clone()),
+            AppMsg::DismissAvailableUpdate => whats_new::dismiss_available_update(self),
+            AppMsg::MaybeShowWhatsNew => whats_new::maybe_show_whats_new(self, sender.clone()),
+            AppMsg::WhatsNewDismissed => {}
             AppMsg::ShowAuditLog => {
                 crate::ui::audit_dialog::present(self.window.upcast_ref::<gtk::Window>(), &self.database)
             }
@@ -1036,11 +1063,13 @@ impl SimpleComponent for App {
                     &self.preferences,
                 );
             }
+            AppMsg::ShowHealthReport => self.show_health_report(&sender),
+            AppMsg::OpenSqlInEditor(sql) => self.append_editor_tab(Some(sql), sender),
             AppMsg::ShowCatalog => self.show_catalog(None),
             AppMsg::ShowCatalogKind(kind) => self.show_catalog(Some(kind)),
             AppMsg::LoadSidebarCatalog(kind) => self.on_load_sidebar_catalog(kind, &sender),
             AppMsg::SidebarCatalogLoaded { origin, kind, result } => {
-                self.on_sidebar_catalog_loaded(&origin, kind, result);
+                self.on_sidebar_catalog_loaded(&origin, kind, result, sender.clone());
             }
             AppMsg::ToggleAllSidebarGroups => self.toggle_all_sidebar_groups(),
             AppMsg::ShowErDiagram { schema } => self.on_show_er_diagram(schema),
@@ -1054,24 +1083,9 @@ impl SimpleComponent for App {
                 self.mcp_bridge.clone(),
             ),
             AppMsg::NewWindow => {
-                let ctrl = App::builder()
-                    .launch(AppInit {
-                        registry: self.registry.clone(),
-                        persistence: self.persistence.clone(),
-                        workspace: self.workspace.clone(),
-                        history: self.history.clone(),
-                        database: self.database.clone(),
-                        preferences: self.preferences.clone(),
-                        mcp_bridge: self.mcp_bridge.clone(),
-                    })
-                    .detach();
                 // Only the window relm4 starts the application with is
                 // presented for us. A window spawned here stays unmapped
                 // unless it joins the application and is presented.
-                if let Some(application) = self.window.application() {
-                    ctrl.widget().set_application(Some(&application));
-                }
-                ctrl.widget().present();
                 // Dropping a Controller is what actually runs the child's
                 // Component::shutdown (which closes its connection and
                 // cancels its timers), but nothing does that when the user
@@ -1079,16 +1093,12 @@ impl SimpleComponent for App {
                 // while this Vec keeps the Controller alive forever. Watch
                 // for that destruction and remove our own entry so the
                 // Controller drops.
-                let key = ctrl.widget().as_ptr() as usize;
-                let destroy_sender = sender.clone();
-                ctrl.widget().connect_destroy(move |_| {
-                    destroy_sender.input(AppMsg::ExtraWindowClosed(key));
-                });
-                self.extra_windows.push((key, ctrl));
+                session_restore::open_extra_window(self, sender)
             }
             AppMsg::ExtraWindowClosed(key) => {
                 self.extra_windows.retain(|(k, _)| *k != key);
             }
+            AppMsg::ExtraWindowDismissed(key) => self.forget_open_sessions_window(key, sender),
             AppMsg::JumpToColumn => {
                 let opened = self
                     .workspace_tab_view
@@ -1096,7 +1106,7 @@ impl SimpleComponent for App {
                     .and_then(|view| view.selected_page())
                     .is_some_and(|page| crate::ui::grid::jump_to_column(&page.child()));
                 if !opened {
-                    self.show_toast(&crate::tr!("Open a result grid to jump to a column."));
+                    self.show_toast(&bookie_app_services::tr!("Open a result grid to jump to a column."));
                 }
             }
             AppMsg::ExportCsv => self.on_export(ExportFormat::Csv),
@@ -1111,8 +1121,7 @@ impl SimpleComponent for App {
                 statement,
             } => self.on_copy_row_as_statement(tab_id, &row_positions, statement),
             AppMsg::DeleteConnection(id) => self.on_delete_connection(id, sender),
-            AppMsg::CancelConnect => self.on_cancel_connect(),
-            AppMsg::ConnectionCancelled => self.on_connection_cancelled(),
+            AppMsg::ContinueSessionRestore => self.continue_session_restore(sender),
             AppMsg::EditConnection(saved) => self.on_edit_connection(saved, sender),
             AppMsg::EditConnectionLoaded(prefill) => self.open_connect_dialog(Some(*prefill), sender),
             AppMsg::DuplicateConnection(id) => self.on_duplicate_connection(id, sender),
@@ -1151,14 +1160,22 @@ impl SimpleComponent for App {
             AppMsg::ReopenClosedTab => self.on_reopen_closed_tab(sender),
             AppMsg::ImportCsvIntoTable { schema, table } => self.on_import_csv_into_table(schema, table, sender),
             AppMsg::CreateTableFromCsv { schema } => self.on_create_table_from_csv(schema, sender),
-            AppMsg::CsvFileChosen { schema, table, path } => self.on_csv_file_chosen(schema, table, path, sender),
+            AppMsg::CsvFileChosen {
+                schema,
+                table,
+                path,
+                more_files,
+            } => self.on_csv_file_chosen(schema, table, path, more_files, sender),
             AppMsg::CsvImportPrepared(preparation) => self.on_csv_import_prepared(*preparation, sender),
             AppMsg::CsvImportPreparationFailed(failure) => self.on_csv_import_preparation_failed(*failure),
             AppMsg::StartCsvImport(choice) => self.on_start_csv_import(*choice, sender),
             AppMsg::CsvImportPlanPrepared(preparation) => self.on_csv_import_plan_prepared(*preparation, sender),
             AppMsg::CsvImportProgress(committed) => self.on_csv_import_progress(committed),
             AppMsg::CsvImportFinished(report) => self.on_csv_import_finished(*report, sender),
+            AppMsg::ImportQueueFileStarted(started) => self.on_import_queue_file_started(*started),
+            AppMsg::ImportQueueFinished(finished) => self.on_import_queue_finished(*finished),
             AppMsg::BackUpDatabase => self.on_back_up_database(sender),
+            AppMsg::SearchDatabaseValues => self.on_search_database_values(&sender),
             AppMsg::RestoreDatabase => self.on_restore_database(sender),
             AppMsg::StartBackupJob(job) => self.on_start_backup_job(job, sender),
             AppMsg::BackupJobFinished(report) => self.on_backup_job_finished(*report, sender),

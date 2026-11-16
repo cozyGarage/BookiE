@@ -35,6 +35,37 @@ fn confirmed_transaction_rollback_is_not_audited_as_an_unknown_outcome() {
 }
 
 #[test]
+fn confirmed_transaction_cancellation_is_audited_as_rolled_back() {
+    for (source, status) in [
+        (DriverError::Cancelled, AuditTerminalStatus::Cancelled),
+        (DriverError::TimedOut, AuditTerminalStatus::TimedOut),
+    ] {
+        let error = DriverError::Transaction {
+            statement_index: 0,
+            source: Box::new(source),
+        };
+
+        assert_eq!(
+            super::super::transaction_error_outcome(&error),
+            (status, AuditTransactionOutcome::RolledBack, false)
+        );
+    }
+}
+
+#[test]
+fn unconfirmed_transaction_cancellation_remains_pending() {
+    for (error, status) in [
+        (DriverError::Cancelled, AuditTerminalStatus::Cancelled),
+        (DriverError::TimedOut, AuditTerminalStatus::TimedOut),
+    ] {
+        assert_eq!(
+            super::super::transaction_error_outcome(&error),
+            (status, AuditTransactionOutcome::Pending, false)
+        );
+    }
+}
+
+#[test]
 fn a_partially_applied_batch_is_not_audited_as_rolled_back() {
     let error = DriverError::non_atomic_batch_failure(2, DriverError::query("statement failed"));
 
@@ -86,4 +117,28 @@ fn read_only_transaction_error_is_a_known_failure_without_disabling_writes() {
         super::super::interactive_transaction_error_outcome(&DriverError::ReadOnly),
         (AuditTerminalStatus::Failed, AuditTransactionOutcome::Failed, false)
     );
+}
+
+#[test]
+fn errors_raised_before_a_statement_is_sent_are_known_failures() {
+    for error in [
+        DriverError::ConnectionRefused,
+        DriverError::DatabaseFileNotFound("/tmp/gone.db".into()),
+        DriverError::AuthFailed,
+        DriverError::IntegratedAuth("no ticket".into()),
+        DriverError::Tls("certificate rejected".into()),
+    ] {
+        assert!(!super::super::is_ambiguous_post_dispatch(&error), "{error:?}");
+        assert_eq!(
+            super::super::write_error_outcome(&error),
+            (AuditTerminalStatus::Failed, false),
+            "{error:?}"
+        );
+        assert_eq!(
+            super::super::transaction_error_outcome(&error),
+            (AuditTerminalStatus::Failed, AuditTransactionOutcome::RolledBack, false),
+            "{error:?}"
+        );
+    }
+    assert!(super::super::is_ambiguous_post_dispatch(&DriverError::Disconnected));
 }

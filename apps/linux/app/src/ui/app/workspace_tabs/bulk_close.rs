@@ -32,10 +32,16 @@ pub(super) fn add_bulk_close_actions(
 
 pub(super) fn bulk_close_menu_model() -> gtk::gio::Menu {
     let menu = gtk::gio::Menu::new();
-    menu.append(Some(&crate::tr!("Keep Tab")), Some("tab.keep"));
-    menu.append_section(None, &gtk::gio::Menu::new());
-    menu.append(Some(&crate::tr!("Close Other Tabs")), Some("tab.close-others"));
-    menu.append(Some(&crate::tr!("Close Tabs to the Right")), Some("tab.close-right"));
+    menu.append(Some(&bookie_app_services::tr!("Keep Tab")), Some("tab.keep"));
+    menu.append_section(None, &super::super::tab_title::mark_menu());
+    menu.append(
+        Some(&bookie_app_services::tr!("Close Other Tabs")),
+        Some("tab.close-others"),
+    );
+    menu.append(
+        Some(&bookie_app_services::tr!("Close Tabs to the Right")),
+        Some("tab.close-right"),
+    );
     menu
 }
 

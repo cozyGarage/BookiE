@@ -27,6 +27,10 @@ mod result_budget;
 mod result_column_types;
 #[path = "support/rust_decimal_boundaries.rs"]
 mod rust_decimal_boundaries;
+#[path = "support/server_stop_class.rs"]
+mod server_stop_class;
+#[path = "support/single_precision_filter.rs"]
+mod single_precision_filter;
 #[path = "support/submicro_parameter_expression.rs"]
 mod submicro_parameter_expression;
 #[path = "support/uhugeint_union.rs"]
@@ -1180,4 +1184,46 @@ async fn value_contract_timestamptz_filter_preserves_offset_origin_instant() {
             Value::Int(expected_epoch)
         ]]
     );
+}
+
+#[tokio::test]
+async fn a_keyed_write_that_matches_no_row_rolls_the_whole_batch_back() {
+    let connection = native_connection().await;
+    connection
+        .execute("CREATE TABLE guarded (id INTEGER PRIMARY KEY, note VARCHAR)")
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO guarded VALUES (1, 'one'), (2, 'two')")
+        .await
+        .unwrap();
+    let statements = vec![
+        (
+            "UPDATE guarded SET note = 'changed' WHERE id = 1".to_string(),
+            Vec::new(),
+        ),
+        ("UPDATE guarded SET note = 'lost' WHERE id = 99".to_string(), Vec::new()),
+    ];
+
+    let error = connection
+        .execute_in_transaction_checked(&statements, &[0, 1])
+        .await
+        .unwrap_err();
+
+    assert!(
+        matches!(&error, bookie_core::DriverError::Transaction { statement_index: 1, source }
+            if matches!(source.as_ref(), bookie_core::DriverError::ConcurrentModification)),
+        "{error:?}"
+    );
+    let rows = connection.query("SELECT note FROM guarded WHERE id = 1").await.unwrap();
+    assert_eq!(
+        rows.rows.first().and_then(|row| row.first()),
+        Some(&Value::Text("one".into()))
+    );
+
+    let counts = connection
+        .execute_in_transaction_checked(&statements[..1], &[0])
+        .await
+        .unwrap();
+    assert_eq!(counts, vec![1]);
 }

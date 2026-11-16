@@ -14,7 +14,7 @@ BOOKIE_RC_VERSION="$(python3 scripts/check-release-version.py --print)" \
 BOOKIE_RC_DATE="$(date -u +%F)" bash scripts/build-arch-rc.sh
 ```
 
-The example builds the workspace release version from the committed tree. The helper refuses a dirty tree or a candidate SHA other than `HEAD`. It archives that exact local commit, computes the checksum, builds with `makepkg`, and runs `namcap` and package-content validation. Set `BOOKIE_RC_TAG=linux-v…` instead of `BOOKIE_RC_COMMIT` to verify an already published tag against the remote. The Arch package replaces/conflicts with `bookie`; it retains production paths, application ID, gettext domain, keyring records, and legacy commands. Publication remains a separate decision.
+The example builds the workspace release version from the committed tree. The helper refuses a dirty tree or a candidate SHA other than `HEAD`. It archives that exact local commit, computes the checksum, builds with `makepkg`, and runs `namcap` and package-content validation. Set `BOOKIE_RC_TAG=linux-v…` instead of `BOOKIE_RC_COMMIT` to verify an already published tag against the remote. The Arch package is named `bookie` and replaces/conflicts with the legacy `tablepro` package. It installs `bookie`, `bookie-agentd`, and `bookie-askpass`; it does not install legacy command aliases. Publication remains a separate decision.
 
 The standalone build, upgrade and removal wrapper runs in an isolated Arch container:
 
@@ -48,8 +48,16 @@ sudo apt install ./apps/linux/packaging/out/bookie_0.2.5-1_amd64.deb
 
 The package name is `bookie`. It installs `/usr/bin/bookie`, `/usr/bin/bookie-agentd`, and `/usr/bin/bookie-askpass`. It replaces and conflicts with the legacy `tablepro` package. It does not install or enable a user service.
 
+## Release build inputs
+
+The release workflow creates source and Cargo vendor archives for one immutable commit in the Arch job. Its metadata records checksums, Rust toolchain versions, workspace roots and native build inputs. The AppImage job validates those inputs and builds the Rust binaries with Cargo offline from the same archives. The AppImage carries `BUILD_INPUTS.json` with the source provenance and the AppImage build toolchain.
+
+This does not make the whole release build hermetic. The workflow installs native build tools from Debian testing and downloads pinned linuxdeploy components with SHA-256 verification. These inputs remain separate from Cargo's offline build.
+
 ## Release versions
 
 `[workspace.package].version` in the root `Cargo.toml` is the BookiE release version. Every workspace crate inherits it. For a release or hotfix, update that value, the Meson version and the newest AppStream entry together, then regenerate `Cargo.lock`. Keep older AppStream entries and published upgrade fixtures intact. The published 0.2.0 entry is marked `type="stable"` with release date 2026-10-23.
 
 Run `python3 scripts/check-release-version.py` to check consistency; the script harness also runs it. `--print` returns the source version for packaging. Translation generation resolves the inherited version, and MCP advertises its compiled crate version. These version declarations do not change compatibility identifiers, create a tag or publish artifacts.
+
+Run `python3 scripts/check-packaging-metadata.py` to check that the application and schema IDs, desktop icon, license, Debian homepage, native dependency floors and Rust version agree across `Cargo.toml`, `meson.build`, the AppStream metadata, the desktop file, the GSettings schema, the PKGBUILD and `scripts/build-deb.sh`; the script harness also runs it.

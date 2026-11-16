@@ -43,3 +43,25 @@ fn the_update_a_grid_edit_generates_is_a_plain_update_on_every_sql_engine() {
         }
     }
 }
+
+#[test]
+fn a_default_reset_is_a_plain_update_and_a_dangerous_expression_is_not() {
+    use bookie_core::sql_dialect::{ColumnReset, build_keyed_column_reset};
+    let columns = [column("id", true), column("note", false)];
+    let build = |driver: &str, reset: ColumnReset| {
+        build_keyed_column_reset(driver, None, "items", &columns, 1, &reset, &[Value::Int(1)])
+            .unwrap()
+            .0
+    };
+    for driver in ["postgres", "mysql", "mssql"] {
+        let facts = classify(&build(driver, ColumnReset::Default), driver);
+        assert_eq!(facts.class, StatementClass::Update, "{driver}");
+    }
+    let file_read = build(
+        "postgres",
+        ColumnReset::Expression("pg_read_file('/etc/passwd')".into()),
+    );
+    assert_eq!(classify(&file_read, "postgres").class, StatementClass::Administrative);
+    let injected = build("postgres", ColumnReset::Expression("1); DROP TABLE items; --".into()));
+    assert_ne!(classify(&injected, "postgres").class, StatementClass::Update);
+}

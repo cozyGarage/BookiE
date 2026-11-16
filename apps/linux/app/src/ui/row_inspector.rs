@@ -28,9 +28,9 @@ fn inspector_field(column: &ColumnInfo, value: Option<&Value>) -> InspectorField
         name: column.name.clone(),
         data_type: column.data_type.clone(),
         text: match value {
-            None => crate::tr!("Not fetched"),
-            Some(Value::Undecodable(kind)) if kind == "not fetched" => crate::tr!("Not fetched"),
-            Some(value) if value.is_missing_field() => crate::tr!("Absent from this document"),
+            None => bookie_app_services::tr!("Not fetched"),
+            Some(Value::Undecodable(kind)) if kind == "not fetched" => bookie_app_services::tr!("Not fetched"),
+            Some(value) if value.is_missing_field() => bookie_app_services::tr!("Absent from this document"),
             Some(value) => value_to_display_text(value),
         },
         is_null: matches!(value, Some(Value::Null)),
@@ -77,8 +77,8 @@ impl RowInspector {
             .margin_end(12)
             .build();
         let placeholder = adw::StatusPage::builder()
-            .title(crate::tr!("No row selected"))
-            .description(crate::tr!("Select one row to see every column."))
+            .title(bookie_app_services::tr!("No row selected"))
+            .description(bookie_app_services::tr!("Select one row to see every column."))
             .icon_name("view-list-symbolic")
             .build();
         let stack = gtk::Stack::new();
@@ -233,6 +233,40 @@ mod tests {
     }
 
     #[test]
+    fn the_inspector_uses_postgres_era_spelling_for_temporal_values() {
+        let date = chrono::NaiveDate::from_ymd_opt(-43, 3, 15).unwrap();
+        let stamp = chrono::NaiveDate::from_ymd_opt(-4712, 1, 1)
+            .unwrap()
+            .and_hms_opt(0, 0, 0)
+            .unwrap();
+        let columns = [
+            column("d", "date"),
+            column("t", "time"),
+            column("ts", "timestamp"),
+            column("tstz", "timestamptz"),
+        ];
+        let fields = inspector_fields(
+            &columns,
+            &[
+                Value::Date(date),
+                Value::Text("24:00:00".into()),
+                Value::DateTime(stamp),
+                Value::TimestampTz(stamp.and_utc()),
+            ],
+        );
+
+        assert_eq!(
+            fields.iter().map(|field| field.text.as_str()).collect::<Vec<_>>(),
+            [
+                "0044-03-15 BC",
+                "24:00:00",
+                "4713-01-01 00:00:00 BC",
+                "4713-01-01 00:00:00+00:00 BC",
+            ]
+        );
+    }
+
+    #[test]
     fn every_column_distinguishes_sql_null_from_a_missing_value() {
         let columns = [column("id", "int"), column("name", "text"), column("extra", "text")];
         let fields = inspector_fields(&columns, &[Value::Int(7), Value::Null]);
@@ -287,7 +321,7 @@ mod tests {
             }
             assert!(fields[3].is_null);
             assert!(!fields[4].is_null);
-            assert_eq!(fields[4].text, crate::tr!("Not fetched"));
+            assert_eq!(fields[4].text, bookie_app_services::tr!("Not fetched"));
         }
         assert_eq!(
             row.with_cell_value(1, |value| match value {

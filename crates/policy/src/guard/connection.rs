@@ -115,6 +115,21 @@ impl Connection for PolicyGuard {
             .await
     }
 
+    async fn routine_definition(
+        &self,
+        routine: &bookie_core::RoutineRef,
+    ) -> Result<bookie_core::RoutineLookup, DriverError> {
+        self.governed_routine_definition(routine).await
+    }
+
+    async fn routine_definition_controlled(
+        &self,
+        routine: &bookie_core::RoutineRef,
+        control: &OperationControl,
+    ) -> Result<bookie_core::RoutineLookup, DriverError> {
+        self.governed_routine_definition_controlled(routine, control).await
+    }
+
     async fn fetch_columns(&self, schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
         let operation = self.table_metadata_operation("FETCH COLUMNS", schema, table);
         self.prepare_governed_read(&operation).await?;
@@ -194,7 +209,7 @@ impl Connection for PolicyGuard {
     }
 
     async fn query(&self, sql: &str) -> Result<QueryResult, DriverError> {
-        let authorization = self.authorize(sql, false, None).await?;
+        let authorization = self.authorize(sql, None).await?;
         if authorization.analysis.facts.writes() {
             return self
                 .execute_query_write(sql, None, authorization, |inner| inner.query(sql))
@@ -220,7 +235,8 @@ impl Connection for PolicyGuard {
     }
 
     async fn query_controlled(&self, sql: &str, control: &OperationControl) -> Result<QueryResult, DriverError> {
-        let authorization = self.authorize(sql, false, Some(control)).await?;
+        let authorization = self.authorize(sql, Some(control)).await?;
+        let control = &authorization.rearm(control);
         if authorization.analysis.facts.writes() {
             return self
                 .execute_query_write(sql, None, authorization, |inner| inner.query_controlled(sql, control))
@@ -247,7 +263,7 @@ impl Connection for PolicyGuard {
     }
 
     async fn query_params(&self, sql: &str, params: &[Value]) -> Result<QueryResult, DriverError> {
-        let authorization = self.authorize(sql, true, None).await?;
+        let authorization = self.authorize(sql, None).await?;
         if authorization.analysis.facts.writes() {
             return self
                 .execute_query_write(sql, None, authorization, |inner| inner.query_params(sql, params))
@@ -278,7 +294,8 @@ impl Connection for PolicyGuard {
         params: &[Value],
         control: &OperationControl,
     ) -> Result<QueryResult, DriverError> {
-        let authorization = self.authorize(sql, true, Some(control)).await?;
+        let authorization = self.authorize(sql, Some(control)).await?;
+        let control = &authorization.rearm(control);
         if authorization.analysis.facts.writes() {
             return self
                 .execute_query_write(sql, None, authorization, |inner| {
@@ -312,7 +329,8 @@ impl Connection for PolicyGuard {
         params: &[Value],
         control: &OperationControl,
     ) -> Result<QueryResultBatch, DriverError> {
-        let authorization = self.authorize(sql, true, Some(control)).await?;
+        let authorization = self.authorize(sql, Some(control)).await?;
+        let control = &authorization.rearm(control);
         let operation = self.operation(
             sql,
             None,
@@ -333,7 +351,7 @@ impl Connection for PolicyGuard {
                 )
                 .await
                 .map(|batch| self.mask_result_batch_for_analysis(&authorization.analysis, batch));
-            let rows = result.as_ref().ok().map(QueryResultBatch::retained_rows);
+            let rows = result.as_ref().ok().and_then(|batch| batch.rows_affected);
             self.audit_write_result(&operation, start, &result, rows).await?;
             pending_write.disarm();
             return result;
@@ -354,13 +372,14 @@ impl Connection for PolicyGuard {
     }
 
     async fn execute(&self, sql: &str) -> Result<ExecResult, DriverError> {
-        let authorization = self.authorize(sql, false, None).await?;
+        let authorization = self.authorize(sql, None).await?;
         self.execute_write(sql, None, authorization, |inner| inner.execute(sql))
             .await
     }
 
     async fn execute_controlled(&self, sql: &str, control: &OperationControl) -> Result<ExecResult, DriverError> {
-        let authorization = self.authorize(sql, false, Some(control)).await?;
+        let authorization = self.authorize(sql, Some(control)).await?;
+        let control = &authorization.rearm(control);
         self.execute_write(sql, None, authorization, |inner| inner.execute_controlled(sql, control))
             .await
     }
@@ -371,7 +390,7 @@ impl Connection for PolicyGuard {
         control: &OperationControl,
     ) -> Result<(ExecResult, Option<bookie_core::CommitToken>), (DriverError, Option<bookie_core::CommitToken>)> {
         let authorization = self
-            .authorize(sql, false, Some(control))
+            .authorize(sql, Some(control))
             .await
             .map_err(|error| (error, None))?;
         let token = std::sync::Arc::new(std::sync::Mutex::new(None));
@@ -398,7 +417,7 @@ impl Connection for PolicyGuard {
     }
 
     async fn execute_params(&self, sql: &str, params: &[Value]) -> Result<ExecResult, DriverError> {
-        let authorization = self.authorize(sql, true, None).await?;
+        let authorization = self.authorize(sql, None).await?;
         self.execute_write(sql, None, authorization, |inner| inner.execute_params(sql, params))
             .await
     }
@@ -409,7 +428,8 @@ impl Connection for PolicyGuard {
         params: &[Value],
         control: &OperationControl,
     ) -> Result<ExecResult, DriverError> {
-        let authorization = self.authorize(sql, true, Some(control)).await?;
+        let authorization = self.authorize(sql, Some(control)).await?;
+        let control = &authorization.rearm(control);
         self.execute_write(sql, None, authorization, |inner| {
             inner.execute_params_controlled(sql, params, control)
         })
@@ -418,7 +438,7 @@ impl Connection for PolicyGuard {
 
     async fn execute_in_transaction(&self, statements: &[(String, Vec<Value>)]) -> Result<Vec<u64>, DriverError> {
         let combined = batch_text(statements);
-        let authorization = self.authorize(&combined, true, None).await?;
+        let authorization = self.authorize(&combined, None).await?;
         self.require_governed_write_available()?;
         let batch_id = Uuid::new_v4();
         let operation = self.operation(
@@ -449,7 +469,8 @@ impl Connection for PolicyGuard {
     ) -> Result<Vec<u64>, DriverError> {
         check_pre_dispatch(control)?;
         let combined = batch_text(statements);
-        let authorization = self.authorize(&combined, true, Some(control)).await?;
+        let authorization = self.authorize(&combined, Some(control)).await?;
+        let control = &authorization.rearm(control);
         self.require_governed_write_available()?;
         let batch_id = Uuid::new_v4();
         let operation = self.operation(
@@ -531,6 +552,7 @@ impl Connection for PolicyGuard {
         let authorization = self
             .authorize_analysis(&combined, analysis, enforced_rows, Some(control))
             .await?;
+        let control = &authorization.rearm(control);
         self.require_governed_write_available()?;
         let operation = self.operation(
             &combined,
@@ -619,6 +641,45 @@ impl Connection for PolicyGuard {
             .await;
         let rows = result.as_ref().ok().map(|keys| keys.len() as u64);
         self.audit_read_result(&operation, start, &result, rows).await?;
+        result
+    }
+
+    async fn fetch_view_editability(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+    ) -> Result<bookie_core::ViewEditability, DriverError> {
+        let operation = self.table_metadata_operation("FETCH VIEW EDITABILITY", schema, table);
+        self.prepare_governed_read(&operation).await?;
+        let start = Instant::now();
+        let result = self
+            .caught_read(
+                "FETCH VIEW EDITABILITY",
+                self.inner.fetch_view_editability(schema, table),
+            )
+            .await;
+        self.audit_read_result(&operation, start, &result, None).await?;
+        result
+    }
+
+    async fn fetch_view_editability_controlled(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        control: &OperationControl,
+    ) -> Result<bookie_core::ViewEditability, DriverError> {
+        check_pre_dispatch(control)?;
+        let operation = self.table_metadata_operation("FETCH VIEW EDITABILITY", schema, table);
+        self.prepare_governed_read(&operation).await?;
+        let start = Instant::now();
+        let result = self
+            .caught_read(
+                "FETCH VIEW EDITABILITY",
+                self.inner.fetch_view_editability_controlled(schema, table, control),
+            )
+            .await;
+        self.audit_controlled_read_result(&operation, start, &result, None)
+            .await?;
         result
     }
 
@@ -724,6 +785,19 @@ impl Connection for PolicyGuard {
         result
     }
 
+    async fn server_version_controlled(&self, control: &OperationControl) -> Result<Option<String>, DriverError> {
+        check_pre_dispatch(control)?;
+        let operation = self.metadata_operation("SERVER VERSION", Vec::new());
+        self.prepare_governed_read(&operation).await?;
+        let start = Instant::now();
+        let result = self
+            .caught_read("SERVER VERSION", self.inner.server_version_controlled(control))
+            .await;
+        self.audit_controlled_read_result(&operation, start, &result, None)
+            .await?;
+        result
+    }
+
     async fn resolve_commit(
         &self,
         token: &bookie_core::CommitToken,
@@ -821,8 +895,7 @@ impl PolicyGuard {
             .caught_write("a write statement", execute(&self.inner))
             .await
             .map(|value| self.mask_result_for_analysis(Some(&authorization.analysis), value));
-        let rows = result.as_ref().ok().map(|value| value.rows.len() as u64);
-        self.audit_write_result(&operation, start, &result, rows).await?;
+        self.audit_write_result(&operation, start, &result, None).await?;
         pending_write.disarm();
         result
     }
@@ -856,9 +929,8 @@ where
             .caught_write(operation_name, execution)
             .await
             .map(|value| guard.mask_result_for_analysis(Some(&authorization.analysis), value));
-        let rows = result.as_ref().ok().map(|value| value.rows.len() as u64);
         guard
-            .audit_transaction_result(&operation, start, &result, rows, TransactionAuditMode::Interactive)
+            .audit_transaction_result(&operation, start, &result, None, TransactionAuditMode::Interactive)
             .await?;
         pending_write.disarm();
         return result;
@@ -896,6 +968,7 @@ impl Transaction for PolicyTransaction {
             .guard
             .authorize_in_transaction(sql, Some(control), &mut *self.inner)
             .await?;
+        let control = &authorization.rearm(control);
         run_transaction_query(
             &self.guard,
             self.batch_id,
@@ -930,6 +1003,7 @@ impl Transaction for PolicyTransaction {
             .guard
             .authorize_in_transaction(sql, Some(control), &mut *self.inner)
             .await?;
+        let control = &authorization.rearm(control);
         run_transaction_query(
             &self.guard,
             self.batch_id,
@@ -970,6 +1044,7 @@ impl Transaction for PolicyTransaction {
             .guard
             .authorize_in_transaction(sql, Some(control), &mut *self.inner)
             .await?;
+        let control = &authorization.rearm(control);
         self.guard.require_governed_write_available()?;
         let operation = self.guard.operation(
             sql,
@@ -1032,6 +1107,7 @@ impl Transaction for PolicyTransaction {
             .guard
             .authorize_in_transaction(sql, Some(control), &mut *self.inner)
             .await?;
+        let control = &authorization.rearm(control);
         self.guard.require_governed_write_available()?;
         let operation = self.guard.operation(
             sql,

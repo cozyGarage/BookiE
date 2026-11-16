@@ -5,6 +5,9 @@ pub enum DriverError {
     #[error("connection refused")]
     ConnectionRefused,
 
+    #[error("database file does not exist: {0}")]
+    DatabaseFileNotFound(String),
+
     #[error("authentication failed")]
     AuthFailed,
 

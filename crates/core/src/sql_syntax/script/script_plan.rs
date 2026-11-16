@@ -149,7 +149,7 @@ impl<'a> Builder<'a> {
         if !kind.is_trivia() {
             let terminates = kind == ScriptTokenKind::Semicolon
                 && self.rules.boundary != Boundary::GoBatch
-                && self.tracker.semicolon_ends_statement();
+                && (self.delimiter != ";" || self.tracker.semicolon_ends_statement());
             if terminates {
                 self.finish_statement(Some(range.end), NonZeroU32::MIN);
             } else {

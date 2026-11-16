@@ -192,3 +192,168 @@ async fn completed_operation_waits_for_an_in_flight_server_cancel_dispatch() {
     ));
     assert!(cancellation_dispatched.load(Ordering::SeqCst));
 }
+
+#[tokio::test]
+async fn a_stop_the_operation_noticed_itself_is_reported_as_a_plain_cancellation() {
+    let token = CancellationToken::new();
+    let control = OperationControl::new(token.clone(), None);
+    let stopper = token.clone();
+    let operation = async move {
+        stopper.cancel();
+        Err::<(), _>(DriverError::Transaction {
+            statement_index: 3,
+            source: Box::new(DriverError::Cancelled),
+        })
+    };
+    let confirms = |error: &DriverError| matches!(error, DriverError::Transaction { source, .. } if matches!(source.as_ref(), DriverError::Cancelled));
+
+    let result = run_server_cancellable(operation, async { Ok(()) }, confirms, &control).await;
+
+    assert!(matches!(result, Err(DriverError::Cancelled)), "{result:?}");
+}
+
+fn confirms_test_cancellation(error: &DriverError) -> bool {
+    match error {
+        DriverError::Query { .. } => true,
+        DriverError::Transaction { source, .. } => matches!(source.as_ref(), DriverError::Query { .. }),
+        _ => false,
+    }
+}
+
+async fn run_after_server_cancel(
+    control: OperationControl,
+    cancel_token: Option<CancellationToken>,
+    operation_error: DriverError,
+) -> Result<(), DriverError> {
+    use tokio::sync::oneshot;
+
+    let (started_tx, started_rx) = oneshot::channel();
+    let (stopped_tx, stopped_rx) = oneshot::channel();
+    let operation = async move {
+        let _ = started_tx.send(());
+        stopped_rx
+            .await
+            .map_err(|_| DriverError::Internal("server stop signal was dropped".into()))?;
+        Err(operation_error)
+    };
+    let cancellation = async move {
+        stopped_tx
+            .send(())
+            .map_err(|_| DriverError::Internal("operation stop receiver was dropped".into()))
+    };
+    let task = tokio::spawn(async move {
+        run_server_cancellable_preserving_transaction_rollback(
+            operation,
+            cancellation,
+            confirms_test_cancellation,
+            &control,
+        )
+        .await
+    });
+
+    started_rx.await.expect("operation should start");
+    if let Some(token) = cancel_token {
+        token.cancel();
+    }
+    task.await.expect("operation task should finish")
+}
+
+#[tokio::test]
+async fn server_confirmed_transaction_cancellation_preserves_rollback_and_cancelled_status() {
+    let token = CancellationToken::new();
+    let control = OperationControl::new(token.clone(), None);
+    let error = DriverError::Transaction {
+        statement_index: 4,
+        source: Box::new(DriverError::query("server cancelled the statement")),
+    };
+
+    let result = run_after_server_cancel(control, Some(token), error).await;
+
+    assert!(
+        matches!(
+            &result,
+            Err(DriverError::Transaction {
+                statement_index: 4,
+                source
+            }) if matches!(source.as_ref(), DriverError::Cancelled)
+        ),
+        "{result:?}"
+    );
+}
+
+#[tokio::test]
+async fn server_confirmed_transaction_timeout_preserves_rollback_and_timeout_status() {
+    let deadline = Instant::now() + Duration::from_millis(10);
+    let control = OperationControl::new(CancellationToken::new(), Some(deadline));
+    let error = DriverError::Transaction {
+        statement_index: 4,
+        source: Box::new(DriverError::query("server cancelled the statement")),
+    };
+
+    let result = run_after_server_cancel(control, None, error).await;
+
+    assert!(
+        matches!(
+            &result,
+            Err(DriverError::Transaction {
+                statement_index: 4,
+                source
+            }) if matches!(source.as_ref(), DriverError::TimedOut)
+        ),
+        "{result:?}"
+    );
+}
+
+#[tokio::test]
+async fn server_confirmed_non_transaction_cancellation_remains_plain() {
+    let token = CancellationToken::new();
+    let control = OperationControl::new(token.clone(), None);
+    let error = DriverError::query("server cancelled the statement");
+
+    let result = run_after_server_cancel(control, Some(token), error).await;
+
+    assert!(matches!(&result, Err(DriverError::Cancelled)), "{result:?}");
+}
+
+#[tokio::test]
+async fn transaction_cancellation_before_dispatch_remains_plain() {
+    let token = CancellationToken::new();
+    token.cancel();
+    let control = OperationControl::new(token, None);
+    let error = DriverError::Transaction {
+        statement_index: 4,
+        source: Box::new(DriverError::query("server cancelled the statement")),
+    };
+
+    let result = run_server_cancellable_preserving_transaction_rollback(
+        async { Err::<(), _>(error) },
+        async { Ok(()) },
+        confirms_test_cancellation,
+        &control,
+    )
+    .await;
+
+    assert!(matches!(&result, Err(DriverError::Cancelled)), "{result:?}");
+}
+
+#[tokio::test]
+async fn unconfirmed_rollback_after_cancellation_remains_unknown() {
+    let token = CancellationToken::new();
+    let control = OperationControl::new(token.clone(), None);
+    let error = DriverError::TransactionRollbackFailed {
+        statement_index: 4,
+        source: Box::new(DriverError::query("server cancelled the statement")),
+        rollback_error: Box::new(DriverError::Disconnected),
+    };
+
+    let result = run_after_server_cancel(control, Some(token), error).await;
+
+    assert!(
+        matches!(
+            &result,
+            Err(DriverError::OperationOutcomeUnknown { source })
+                if matches!(source.as_ref(), DriverError::TransactionRollbackFailed { .. })
+        ),
+        "{result:?}"
+    );
+}

@@ -55,6 +55,21 @@ One typed handle covers every consumer. A new surface inherits classify, approva
 - An MCP request deadline bounds driver work, authorization and rollback, but not the durable audit append: abandoning it could leave an unconfirmed terminal state, so policy stays fail-closed while the request waits.
 - Trusted production mutations, unattended MCP writes and a public package are not approved. Do not build them without amending this record.
 
+## Amendment (2026-11-11): remembered approvals
+
+Issue #2858 asks for an approval that stops asking again. The maintainer chose to record it here, in the ADR that owns the approval contract, rather than in a new one. This amendment lets a build add it; nothing is built yet.
+
+1. **Scope.** A remembered approval covers one rule, on one connection, for one principal (the person at the GUI, or one named MCP token). It never covers another rule, connection or principal, and there is no "everything" option.
+2. **Duration.** Until the connection closes. It is held in memory only: it is not written to the policy file, not exported with a profile, and gone after a restart.
+3. **Never remembered.** Hard denials (`agent_admin_denied`, `agent_host_access_denied`, blast-radius limits) are denials, not approvals, and stay denials. A connection marked production keeps asking every time.
+4. **Agents.** A person at the GUI may grant a remembered approval for a named MCP token; an agent cannot grant one for itself or for another token, and a grant for a token does not cover the person.
+5. **Outcome.** `ApprovalOutcome` gains a remembered variant. The dialog offers it only where rules 1 to 3 allow.
+6. **Audit.** Creating a grant is an audit event. Every use of a grant is audited with the rule and the grant that allowed it, and a use never skips the terminal audit state.
+7. **Revocation.** The connection's settings list active grants and remove each one; closing the connection removes all of them.
+8. **Tests** cover: a grant skips the prompt for the same rule, connection and principal only; a hard denial and a production connection are never skipped; revocation restores the prompt; an agent grant does not cover a person and the reverse.
+
+A grant that lasts across restarts, or covers more than one rule, needs a further amendment.
+
 ## Alternatives considered
 
 - **Safety as preferences on a normal connection.** Rejected. A new path can forget a preference. The type boundary cannot.

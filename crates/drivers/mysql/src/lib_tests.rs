@@ -106,6 +106,15 @@ fn a_pool_startup_timeout_is_not_mapped_as_an_established_disconnect() {
 }
 
 #[test]
+fn only_unsupported_read_only_transaction_errors_use_the_policy_fallback() {
+    assert!(unsupported_read_only_transaction_error_number(1064));
+    assert!(unsupported_read_only_transaction_error_number(1193));
+    assert!(!unsupported_read_only_transaction_error_number(1044));
+    assert!(!unsupported_read_only_transaction_error_number(1227));
+    assert!(!unsupported_read_only_transaction_error_number(1231));
+}
+
+#[test]
 fn quote_ident_doubles_embedded_backticks() {
     assert_eq!(quote_ident("users"), "`users`");
     assert_eq!(quote_ident("My Table"), "`My Table`");
@@ -190,4 +199,17 @@ fn a_refused_plaintext_password_exchange_is_a_policy_refusal_naming_the_fix() {
     );
     let other = map_sqlx_error(sqlx::Error::Configuration("unrelated option".into()));
     assert!(matches!(other, DriverError::Internal(_)), "{other:?}");
+}
+
+#[test]
+fn the_driver_declares_how_an_import_updates_existing_rows() {
+    assert_eq!(
+        MysqlDriver.capabilities().import_upsert,
+        bookie_core::ImportUpsertStyle::OnDuplicateKey
+    );
+}
+
+#[test]
+fn the_driver_declares_value_search() {
+    assert!(MysqlDriver.capabilities().supports_value_search);
 }

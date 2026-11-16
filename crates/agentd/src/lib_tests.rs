@@ -117,6 +117,29 @@ fn session_key_changes_when_saved_transport_changes() {
 }
 
 #[test]
+fn session_key_changes_when_a_connect_setting_changes() {
+    let original = saved_connection();
+    let key = SessionKey::from_saved(&original, [0; 32]);
+    let mut changed = original.clone();
+    changed.tls_strict_encryption = !original.tls_strict_encryption;
+    assert!(key != SessionKey::from_saved(&changed, [0; 32]), "strict encryption");
+
+    changed = original.clone();
+    changed.auth_source = Some("admin".into());
+    assert!(key != SessionKey::from_saved(&changed, [0; 32]), "auth source");
+
+    changed = original.clone();
+    changed.connect_timeout_secs = Some(3);
+    assert!(key != SessionKey::from_saved(&changed, [0; 32]), "connect timeout");
+
+    changed = original.clone();
+    changed
+        .attached_databases
+        .push(bookie_core::AttachedDatabase::new("extra", "/tmp/extra.db"));
+    assert!(key != SessionKey::from_saved(&changed, [0; 32]), "attached databases");
+}
+
+#[test]
 fn session_key_ignores_policy_only_changes() {
     let original = saved_connection();
     let original_key = SessionKey::from_saved(&original, [0; 32]);
@@ -171,6 +194,7 @@ async fn retired_session_drops_after_final_issued_reference() {
             connection: connection.clone(),
             audit_state: Arc::new(AuditState::new()),
             retired: Default::default(),
+            last_used: std::time::Instant::now(),
         },
     );
     let issued = connection.clone();
@@ -212,6 +236,7 @@ async fn cached_session_is_dropped_when_material_changes() {
             connection: connection.clone(),
             audit_state: Arc::new(AuditState::new()),
             retired: Default::default(),
+            last_used: std::time::Instant::now(),
         },
     );
 
@@ -260,6 +285,7 @@ async fn a_key_material_rotation_during_connect_is_not_cached_under_the_stale_di
     let mut saved = saved_connection();
     saved.driver_id = "sqlite".into();
     saved.database = ":memory:".into();
+    saved.tls_mode = Some(bookie_core::TlsMode::Disabled);
     saved.tls_root_cert = Some(ca_path.clone());
     saved.ssh = None;
 
@@ -335,6 +361,7 @@ async fn a_material_lookup_failure_does_not_reuse_a_healthy_cached_connection() 
             connection: connection.clone(),
             audit_state: Arc::new(AuditState::new()),
             retired: Default::default(),
+            last_used: std::time::Instant::now(),
         },
     );
 
@@ -389,6 +416,7 @@ async fn a_material_lookup_failure_after_connect_discards_the_new_connection() {
     let mut saved = saved_connection();
     saved.driver_id = "sqlite".into();
     saved.database = ":memory:".into();
+    saved.tls_mode = Some(bookie_core::TlsMode::Disabled);
     saved.tls_root_cert = Some(ca_path.clone());
     saved.ssh = None;
 
@@ -445,6 +473,7 @@ async fn a_healthy_cached_connection_is_reused_when_material_is_verified() {
             connection: connection.clone(),
             audit_state: Arc::new(AuditState::new()),
             retired: Default::default(),
+            last_used: std::time::Instant::now(),
         },
     );
 
@@ -453,4 +482,47 @@ async fn a_healthy_cached_connection_is_reused_when_material_is_verified() {
         .await
         .expect("verified healthy connection is reusable");
     assert!(Arc::ptr_eq(&reused, &connection));
+}
+
+#[tokio::test]
+async fn a_session_unused_past_the_limit_is_closed_and_a_recent_one_is_kept() {
+    let saved = saved_connection();
+    let key = SessionKey::from_saved(&saved, [1; 32]);
+    let mut opts = ConnectOptions {
+        database: ":memory:".into(),
+        ..Default::default()
+    };
+    opts.tls.mode = TlsMode::Disabled;
+    let connection: Arc<dyn Connection> = Arc::from(SqliteDriver.connect(opts).await.expect("open test database"));
+    let lifetime = Arc::downgrade(&connection);
+    let provider = DaemonProvider::new(
+        Arc::new(DriverRegistry::new()),
+        Arc::new(PolicyConfig::default()),
+        Arc::new(NullAuditSink),
+        Arc::new(AuditState::new()),
+        Arc::new(DenyApprovalSink),
+    );
+    provider.sessions.lock().expect("sessions").insert(
+        saved.id,
+        OpenSession {
+            key,
+            connection,
+            audit_state: Arc::new(AuditState::new()),
+            retired: Default::default(),
+            last_used: Instant::now(),
+        },
+    );
+
+    provider.evict_sessions_idle_longer_than(Duration::from_secs(60));
+    assert_eq!(provider.sessions.lock().expect("sessions").len(), 1);
+    assert!(lifetime.upgrade().is_some());
+
+    tokio::time::sleep(Duration::from_millis(20)).await;
+    provider.evict_sessions_idle_longer_than(Duration::from_millis(5));
+
+    assert!(provider.sessions.lock().expect("sessions").is_empty());
+    assert!(
+        lifetime.upgrade().is_none(),
+        "an idle session must release its database connection"
+    );
 }

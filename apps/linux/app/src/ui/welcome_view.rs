@@ -80,10 +80,6 @@ impl SimpleComponent for WelcomeView {
         let empty_page = empty_page(&sender);
         root.add_named(&empty_page, Some("empty"));
 
-        // Populated page — saved connections list. AdwClamp is the
-        // GNOME pattern for "constrain reading width to a sensible
-        // max in a scrollable area"; it centres + caps width without
-        // the manual `gtk::Box` halign/margin gymnastics.
         let scroller = gtk::ScrolledWindow::builder()
             .hexpand(true)
             .vexpand(true)
@@ -100,13 +96,13 @@ impl SimpleComponent for WelcomeView {
             .build();
 
         let heading = gtk::Label::builder()
-            .label(crate::tr!("Welcome to BookiE"))
+            .label(bookie_app_services::tr!("Welcome to BookiE"))
             .xalign(0.0)
             .wrap(true)
             .css_classes(["title-1"])
             .build();
         let introduction = gtk::Label::builder()
-            .label(crate::tr!(
+            .label(bookie_app_services::tr!(
                 "Choose a saved connection or add a database to get started."
             ))
             .xalign(0.0)
@@ -123,36 +119,26 @@ impl SimpleComponent for WelcomeView {
             .column_spacing(8)
             .build();
         let recent_group = adw::PreferencesGroup::builder()
-            .title(crate::tr!("Recently opened"))
+            .title(bookie_app_services::tr!("Recently opened"))
             .visible(false)
             .build();
         recent_group.add(&recent_items);
         outer.append(&recent_group);
 
-        // Single CTA on the populated page: the "+" button in the
-        // group header. Previously we also rendered a bottom pill
-        // labelled "New connection", which duplicated the affordance —
-        // ambiguity at different visual weights. Empty-page pill
-        // stays (it's the only CTA there); on this page the header
-        // suffix is sufficient.
         let group = adw::PreferencesGroup::builder()
-            .title(crate::tr!("Saved connections"))
+            .title(bookie_app_services::tr!("Saved connections"))
             .build();
         let header_btn = gtk::Button::builder()
             .icon_name("list-add-symbolic")
-            .tooltip_text(crate::tr!("Add Connection"))
+            .tooltip_text(bookie_app_services::tr!("Add Connection"))
             .valign(gtk::Align::Center)
             .build();
         header_btn.add_css_class("flat");
         let s_header = sender.clone();
         header_btn.connect_clicked(move |_| s_header.input(WelcomeViewInput::OpenConnect));
-        // Import sits beside Add rather than inside a menu: pasting a
-        // connection URL is the fastest path in from another tool, and
-        // GNOME puts sibling create-actions side by side in the group
-        // header (Software's "Add" / "Install File…" pattern).
         let import_btn = gtk::Button::builder()
             .icon_name("insert-link-symbolic")
-            .tooltip_text(crate::tr!("Import from URL"))
+            .tooltip_text(bookie_app_services::tr!("Import from URL"))
             .valign(gtk::Align::Center)
             .build();
         import_btn.add_css_class("flat");
@@ -164,13 +150,19 @@ impl SimpleComponent for WelcomeView {
             .build();
         let bundle_btn = gtk::MenuButton::builder()
             .icon_name("document-send-symbolic")
-            .tooltip_text(crate::tr!("Export or import connections"))
+            .tooltip_text(bookie_app_services::tr!("Export or import connections"))
             .valign(gtk::Align::Center)
             .build();
         bundle_btn.add_css_class("flat");
         let bundle_menu = gtk::gio::Menu::new();
-        bundle_menu.append(Some(&crate::tr!("Export connections…")), Some("welcome.export-bundle"));
-        bundle_menu.append(Some(&crate::tr!("Import connections…")), Some("welcome.import-bundle"));
+        bundle_menu.append(
+            Some(&bookie_app_services::tr!("Export connections…")),
+            Some("welcome.export-bundle"),
+        );
+        bundle_menu.append(
+            Some(&bookie_app_services::tr!("Import connections…")),
+            Some("welcome.import-bundle"),
+        );
         bundle_btn.set_menu_model(Some(&bundle_menu));
 
         let actions = gtk::gio::SimpleActionGroup::new();
@@ -189,12 +181,8 @@ impl SimpleComponent for WelcomeView {
         header_actions.append(&header_btn);
         group.set_header_suffix(Some(&header_actions));
 
-        // Filter box above the list. Hidden until there are enough
-        // connections to be worth filtering — a search field over three
-        // rows is noise, and GNOME only reveals search once a list can
-        // outgrow the viewport.
         let search = gtk::SearchEntry::builder()
-            .placeholder_text(crate::tr!("Filter by name, group, tag or driver"))
+            .placeholder_text(bookie_app_services::tr!("Filter by name, group, tag or driver"))
             .hexpand(true)
             .visible(false)
             .build();
@@ -210,13 +198,10 @@ impl SimpleComponent for WelcomeView {
             .build();
         outer.append(&sections_box);
 
-        // Shown in place of the list when every connection is filtered
-        // out. Distinct from the "no connections yet" page: the fix is
-        // to clear the filter, not to add a connection.
         let empty_filter_page = adw::StatusPage::builder()
             .icon_name("system-search-symbolic")
-            .title(crate::tr!("No matches"))
-            .description(crate::tr!("No saved connection matches this filter."))
+            .title(bookie_app_services::tr!("No matches"))
+            .description(bookie_app_services::tr!("No saved connection matches this filter."))
             .visible(false)
             .build();
         empty_filter_page.add_css_class("compact");
@@ -298,9 +283,6 @@ impl SimpleComponent for WelcomeView {
     }
 }
 
-/// Connections a filter cannot outgrow. Below this the filter box stays
-/// hidden, so the field only appears once scanning the list by eye stops
-/// being the faster option.
 const FILTER_REVEAL_THRESHOLD: usize = 6;
 
 fn recent_connections(connections: &[SavedConnection]) -> Vec<&SavedConnection> {
@@ -321,7 +303,7 @@ fn recent_connections(connections: &[SavedConnection]) -> Vec<&SavedConnection> 
 
 fn recent_connection_detail(driver: &str, environment: bookie_core::Environment) -> String {
     let label = if environment == bookie_core::Environment::Prod {
-        crate::tr!("Production")
+        bookie_app_services::tr!("Production")
     } else {
         environment.display_name().to_owned()
     };
@@ -417,7 +399,7 @@ impl WelcomeView {
             content.append(&detail);
             let button = gtk::Button::builder().child(&content).hexpand(true).build();
             button.add_css_class("card");
-            let label = crate::tr!("Open recent connection: {name}, {details}")
+            let label = bookie_app_services::tr!("Open recent connection: {name}, {details}")
                 .replace("{name}", &saved.name)
                 .replace("{details}", &recent_connection_detail(&driver, saved.environment));
             button.update_property(&[gtk::accessible::Property::Label(&label)]);
@@ -487,9 +469,9 @@ fn collapse_button(expanded: bool) -> gtk::Button {
         "pan-end-symbolic"
     };
     let label = if expanded {
-        crate::tr!("Collapse group")
+        bookie_app_services::tr!("Collapse group")
     } else {
-        crate::tr!("Expand group")
+        bookie_app_services::tr!("Expand group")
     };
     gtk::Button::builder()
         .icon_name(icon)
@@ -501,21 +483,25 @@ fn collapse_button(expanded: bool) -> gtk::Button {
 fn empty_page(sender: &ComponentSender<WelcomeView>) -> adw::StatusPage {
     let page = adw::StatusPage::builder()
         .icon_name("network-server-symbolic")
-        .title(crate::tr!("No connections yet"))
-        .description(crate::tr!("Add a database connection to get started."))
+        .title(bookie_app_services::tr!("No connections yet"))
+        .description(bookie_app_services::tr!("Add a database connection to get started."))
         .build();
     let add = gtk::Button::builder()
-        .label(crate::tr!("Add Connection"))
+        .label(bookie_app_services::tr!("Add Connection"))
         .halign(gtk::Align::Center)
         .build();
     add.add_css_class("suggested-action");
     add.add_css_class("pill");
     let s_add = sender.clone();
     add.connect_clicked(move |_| s_add.input(WelcomeViewInput::OpenConnect));
-    let import_bundle = gtk::Button::builder().label(crate::tr!("Import connections…")).build();
+    let import_bundle = gtk::Button::builder()
+        .label(bookie_app_services::tr!("Import connections…"))
+        .build();
     let s_bundle = sender.clone();
     import_bundle.connect_clicked(move |_| s_bundle.input(WelcomeViewInput::ImportBundle));
-    let import_url = gtk::Button::builder().label(crate::tr!("Import from URL…")).build();
+    let import_url = gtk::Button::builder()
+        .label(bookie_app_services::tr!("Import from URL…"))
+        .build();
     let s_url = sender.clone();
     import_url.connect_clicked(move |_| s_url.input(WelcomeViewInput::ImportUrl));
     let imports = gtk::Box::builder()
@@ -538,7 +524,7 @@ fn empty_page(sender: &ComponentSender<WelcomeView>) -> adw::StatusPage {
 }
 
 pub(crate) fn section_group(group: Option<&str>, depth: u32) -> adw::PreferencesGroup {
-    let title = group.map_or_else(|| crate::tr!("Ungrouped"), str::to_owned);
+    let title = group.map_or_else(|| bookie_app_services::tr!("Ungrouped"), str::to_owned);
     let section = adw::PreferencesGroup::builder()
         .title(crate::ui::plain_text::escape_markup(&title))
         .build();

@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use bookie_core::QueryResult;
 use bookie_core::{
     Connection, DriverError, OperationControl, QueryCursorId, QueryCursorPage, QueryResultBatch, Session,
-    SessionCommitOutcome, Value,
+    SessionCommitOutcome, TableInfo, Value,
 };
 use relm4::ComponentSender;
 use relm4::adw::prelude::*;
@@ -110,6 +110,16 @@ impl SessionHandle {
 
 #[async_trait]
 impl Session for SessionHandle {
+    async fn list_temporary_tables_controlled(
+        &mut self,
+        control: &OperationControl,
+    ) -> Result<Vec<TableInfo>, DriverError> {
+        match self {
+            Self::Audited(session) => session.list_temporary_tables_controlled(control).await,
+            Self::Plain(session) => session.list_temporary_tables_controlled(control).await,
+        }
+    }
+
     async fn query_params_controlled(
         &mut self,
         sql: &str,
@@ -555,14 +565,14 @@ fn can_start_session_close(
 
 fn session_end_dialog(button: &gtk::ToggleButton, on_end: impl Fn(bool) + 'static) -> adw::AlertDialog {
     let dialog = adw::AlertDialog::new(
-        Some(&crate::tr!("End the session with an open transaction?")),
-        Some(&crate::tr!(
+        Some(&bookie_app_services::tr!("End the session with an open transaction?")),
+        Some(&bookie_app_services::tr!(
             "Changes made since BEGIN are kept only if you commit them."
         )),
     );
-    dialog.add_response("cancel", &crate::tr!("Cancel"));
-    dialog.add_response("rollback", &crate::tr!("Roll Back"));
-    dialog.add_response("commit", &crate::tr!("Commit"));
+    dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
+    dialog.add_response("rollback", &bookie_app_services::tr!("Roll Back"));
+    dialog.add_response("commit", &bookie_app_services::tr!("Commit"));
     dialog.set_response_appearance("rollback", adw::ResponseAppearance::Destructive);
     dialog.set_default_response(Some("cancel"));
     dialog.set_close_response("cancel");
@@ -637,7 +647,7 @@ impl SqlEditor {
         ) else {
             self.opening_session_id = None;
             self.session_button.set_active(false);
-            self.status.set_label(&crate::tr!("no active connection"));
+            self.status.set_label(&bookie_app_services::tr!("no active connection"));
             return;
         };
         let session_id = Uuid::new_v4();
@@ -717,7 +727,8 @@ impl SqlEditor {
             self.opening_session_id = None;
             self.session_button.set_sensitive(false);
             self.run_button.set_sensitive(false);
-            self.status.set_label(&crate::tr!("Rolling back and closing session…"));
+            self.status
+                .set_label(&bookie_app_services::tr!("Rolling back and closing session…"));
             if let Some(token) = self.cancel_token.take() {
                 token.cancel();
             }
@@ -747,7 +758,7 @@ impl SqlEditor {
         self.session_teardown_running = true;
         self.session_button.set_sensitive(false);
         self.run_button.set_sensitive(false);
-        self.status.set_label(&crate::tr!("Closing session…"));
+        self.status.set_label(&bookie_app_services::tr!("Closing session…"));
         self.transaction_clock.reset(&self.session_button);
         self.session_button.remove_css_class("warning");
         if self.session_button.is_active() {
@@ -771,7 +782,8 @@ impl SqlEditor {
             Err(message) => self.status.set_label(message),
             Ok(()) => {
                 let status = self.status.label();
-                if status == crate::tr!("Closing session…") || status == crate::tr!("Rolling back and closing session…")
+                if status == bookie_app_services::tr!("Closing session…")
+                    || status == bookie_app_services::tr!("Rolling back and closing session…")
                 {
                     self.status.set_label("");
                 }
@@ -822,7 +834,7 @@ impl SqlEditor {
             self.retired_session_connection_id = Some((session.connection_id, session.id));
             self.clear_catalog_changes();
             self.close_session_for_teardown(session.shared, sender);
-            self.status.set_label(&crate::tr!(
+            self.status.set_label(&bookie_app_services::tr!(
                 "This editor session was retired after a connection failure. Reopen Session before running more SQL."
             ));
             return;
@@ -838,6 +850,9 @@ impl SqlEditor {
     }
 
     pub(super) fn end_session(&mut self, sender: &ComponentSender<Self>) {
+        if self.session.is_some() {
+            let _ = sender.output(super::SqlEditorOutput::TemporaryTablesChanged(Vec::new()));
+        }
         self.clear_catalog_changes();
         self.opening_session_id = None;
         self.transaction_clock.reset(&self.session_button);
@@ -870,7 +885,8 @@ impl SqlEditor {
         self.session_teardown_running = true;
         self.session_button.set_sensitive(false);
         self.run_button.set_sensitive(false);
-        self.status.set_label(&crate::tr!("Rolling back and closing session…"));
+        self.status
+            .set_label(&bookie_app_services::tr!("Rolling back and closing session…"));
         let shared = session.shared.clone();
         let sender = sender.clone();
         relm4::spawn(async move {
@@ -903,7 +919,7 @@ impl SqlEditor {
         }
         if result.is_ok() {
             self.clear_run_marks();
-            self.status.set_label(&crate::tr!("Session rolled back"));
+            self.status.set_label(&bookie_app_services::tr!("Session rolled back"));
         }
         self.finish_session_teardown(result);
     }
@@ -927,7 +943,7 @@ impl SqlEditor {
         }
         self.ending_session_id = Some(session_id);
         self.session_button.set_sensitive(false);
-        self.status.set_label(&crate::tr!("Committing session…"));
+        self.status.set_label(&bookie_app_services::tr!("Committing session…"));
         let shared = session.shared.clone();
         let sender = sender.clone();
         relm4::spawn(async move {
@@ -960,10 +976,10 @@ impl SqlEditor {
             Ok(outcome) => {
                 self.end_session(sender);
                 let message = match outcome {
-                    SessionCommitOutcome::Committed => crate::tr!("Session committed"),
+                    SessionCommitOutcome::Committed => bookie_app_services::tr!("Session committed"),
                     SessionCommitOutcome::RolledBack => {
                         self.clear_run_marks();
-                        crate::tr!("Session rolled back")
+                        bookie_app_services::tr!("Session rolled back")
                     }
                 };
                 self.status.set_label(&message);
@@ -981,11 +997,57 @@ impl SqlEditor {
     }
 
     fn publish_catalog_change(&self, sender: &ComponentSender<Self>) {
-        let Some(origin) = self.catalog_origin.as_ref() else {
+        if let Some(origin) = self.catalog_origin.as_ref()
+            && origin.owns_window(self.connection_id, &self.database)
+        {
+            let _ = sender.output(super::SqlEditorOutput::CatalogChanged(origin.clone()));
+        }
+        self.refresh_temporary_tables(sender);
+    }
+
+    pub(super) fn refresh_temporary_tables(&self, sender: &ComponentSender<Self>) {
+        let Some(session) = self.session.as_ref() else {
             return;
         };
-        if origin.owns_window(self.connection_id, &self.database) {
-            let _ = sender.output(super::SqlEditorOutput::CatalogChanged(origin.clone()));
+        let session_id = session.id;
+        let shared = session.shared.clone();
+        let sender = sender.clone();
+        relm4::spawn(async move {
+            let control = OperationControl::with_timeout(std::time::Duration::from_secs(10));
+            let result = {
+                let mut session = shared.lock().await;
+                match session.as_mut() {
+                    Some(session) => session
+                        .list_temporary_tables_controlled(&control)
+                        .await
+                        .map_err(|error| crate::services::error_text::driver_message(&error)),
+                    None => Ok(Vec::new()),
+                }
+            };
+            sender.input(super::SqlEditorInput::TemporaryTablesLoaded { session_id, result });
+        });
+    }
+
+    pub(super) fn on_temporary_tables_loaded(
+        &self,
+        session_id: Uuid,
+        result: Result<Vec<TableInfo>, String>,
+        sender: &ComponentSender<Self>,
+    ) {
+        if !session_callback_matches(session_id, self.session.as_ref().map(|session| session.id)) {
+            return;
+        }
+        match result {
+            Ok(tables) => {
+                let _ = sender.output(super::SqlEditorOutput::TemporaryTablesChanged(tables));
+            }
+            Err(body) => {
+                let _ = sender.output(super::SqlEditorOutput::TemporaryTablesChanged(Vec::new()));
+                let _ = sender.output(super::SqlEditorOutput::ShowAlert {
+                    title: bookie_app_services::tr!("Temporary table refresh failed").to_string(),
+                    body,
+                });
+            }
         }
     }
 
@@ -1043,7 +1105,7 @@ async fn close_detached_session(shared: SharedSession) {
 
 fn session_open_message(error: &DriverError) -> String {
     match error {
-        DriverError::Unsupported(_) => crate::tr!("This engine does not offer dedicated sessions yet"),
+        DriverError::Unsupported(_) => bookie_app_services::tr!("This engine does not offer dedicated sessions yet"),
         other => crate::services::error_text::driver_message(other),
     }
 }

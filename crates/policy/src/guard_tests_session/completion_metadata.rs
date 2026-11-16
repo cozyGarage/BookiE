@@ -47,6 +47,56 @@ async fn session_completion_metadata_is_a_governed_and_audited_read() {
 }
 
 #[tokio::test]
+async fn session_temporary_table_listing_is_a_governed_and_audited_read() {
+    let h = harness(SessionScript::default(), true);
+    let mut session = h.guard.open_session().await.expect("open session");
+    let tables = session
+        .list_temporary_tables_controlled(&OperationControl::with_timeout(Duration::from_secs(1)))
+        .await
+        .expect("temporary table metadata is available through the guarded session");
+
+    assert!(tables.is_empty());
+    let events = h.audit.events.lock().expect("events");
+    let outcome = events
+        .iter()
+        .find(|event| event.phase == AuditRecordPhase::Outcome)
+        .expect("metadata outcome is audited");
+    assert_eq!(outcome.operation_class, AuditOperationClass::Read);
+    assert_eq!(outcome.decision_rule, "metadata_read");
+    assert_eq!(outcome.terminal_status, AuditTerminalStatus::Succeeded);
+    assert_eq!(outcome.rows_affected, Some(0));
+}
+
+#[tokio::test]
+async fn a_retired_session_refuses_and_audits_temporary_table_listing() {
+    let h = harness(
+        SessionScript {
+            lose_on: Some("SELECT 1"),
+            ..SessionScript::default()
+        },
+        false,
+    );
+    let mut session = h.guard.open_session().await.expect("open session");
+    run(&mut session, "SELECT 1")
+        .await
+        .expect_err("the session connection is lost");
+    let error = session
+        .list_temporary_tables_controlled(&OperationControl::with_timeout(Duration::from_secs(1)))
+        .await
+        .expect_err("a retired session cannot serve temporary table metadata");
+
+    assert!(matches!(error, DriverError::PolicyDenied(_)), "{error:?}");
+    let events = h.audit.events.lock().expect("events");
+    let outcome = events
+        .iter()
+        .rev()
+        .find(|event| event.phase == AuditRecordPhase::Outcome)
+        .expect("refusal outcome is audited");
+    assert_eq!(outcome.terminal_status, AuditTerminalStatus::Denied);
+    assert_eq!(outcome.decision_rule, "retired_session");
+}
+
+#[tokio::test]
 async fn audited_session_forwards_completion_metadata_and_records_the_outcome() {
     let h = harness(SessionScript::default(), true);
     let mut session = h.guard.open_session_with_audit().await.expect("open audited session");

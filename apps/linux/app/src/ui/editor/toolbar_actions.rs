@@ -5,7 +5,8 @@ use relm4::adw::prelude::*;
 use relm4::{ComponentSender, adw, gtk};
 use uuid::Uuid;
 
-use super::{SqlEditor, SqlEditorInput, StatementOutcomeKind};
+use super::sql_text::text_to_run;
+use super::{RunMessage, SqlEditor, SqlEditorInput, StatementOutcomeKind};
 
 pub(super) struct TransactionActions {
     pub(super) row: gtk::FlowBox,
@@ -25,20 +26,20 @@ impl TransactionActions {
             .visible(false)
             .build();
         row.set_widget_name("editor-transaction-actions");
-        let label = gtk::Label::new(Some(&crate::tr!("Transaction active")));
+        let label = gtk::Label::new(Some(&bookie_app_services::tr!("Transaction active")));
         label.add_css_class("warning");
         row.insert(&label, -1);
         let id = Rc::new(Cell::new(None));
         for (label, commit) in [
-            (crate::tr!("Commit & close session"), true),
-            (crate::tr!("Roll back & close session"), false),
+            (bookie_app_services::tr!("Commit & close session"), true),
+            (bookie_app_services::tr!("Roll back & close session"), false),
         ] {
             let button = gtk::Button::with_label(&label);
             let active = id.clone();
             let sender = sender.clone();
             button.connect_clicked(move |_| {
                 if let Some(session_id) = active.get() {
-                    sender.input(SqlEditorInput::SessionAction { session_id, commit });
+                    sender.input(SqlEditorInput::Run(RunMessage::SessionAction { session_id, commit }));
                 }
             });
             row.insert(&button, -1);
@@ -49,6 +50,87 @@ impl TransactionActions {
 }
 
 impl SqlEditor {
+    pub(super) fn on_run_message(&mut self, message: RunMessage, sender: ComponentSender<Self>) {
+        match message {
+            RunMessage::Run => self.run_all(sender),
+            RunMessage::SessionAction { session_id, commit } => {
+                self.on_session_toolbar_action(session_id, commit, &sender);
+            }
+            RunMessage::RunWithParameters {
+                sql,
+                anchor,
+                planned,
+                values,
+            } => {
+                self.execute_sql(sql, anchor, planned, values, sender);
+            }
+            RunMessage::Cancel => self.cancel_run(),
+            RunMessage::RunWithLongerTimeout => self.retry_with_longer_timeout(sender),
+            RunMessage::RunAtCursor => self.run_scope(true, sender),
+            RunMessage::Explain => self.explain_at_cursor(),
+            RunMessage::ShowTemporaryTable { schema, name } => {
+                self.begin_run(temporary_table_query(schema.as_deref(), &name), None, true, sender);
+            }
+        }
+    }
+
+    fn run_all(&mut self, sender: ComponentSender<Self>) {
+        self.timeout_retry.clear_override();
+        let sql = text_to_run(&self.source_view.buffer());
+        let trimmed = sql.trim().to_string();
+        if trimmed.is_empty() {
+            self.status.set_label(&bookie_app_services::tr!("empty query"));
+            return;
+        }
+        let buffer = self.source_view.buffer();
+        let start = buffer
+            .selection_bounds()
+            .filter(|(start, end)| !buffer.text(start, end, true).trim().is_empty())
+            .map_or(0, |(start, _)| start.offset() as usize);
+        let anchor = super::SourceAnchor {
+            revision: self.drop_generation.revision(),
+            start: start + sql.chars().take_while(|character| character.is_whitespace()).count(),
+        };
+        self.begin_run(trimmed, Some(anchor), false, sender);
+    }
+
+    fn cancel_run(&mut self) {
+        if self.cancel_button.is_visible()
+            && let Some(token) = self.cancel_token.take()
+        {
+            token.cancel();
+        }
+    }
+
+    fn retry_with_longer_timeout(&mut self, sender: ComponentSender<Self>) {
+        let Some(sql) = self.timeout_retry.accept() else {
+            return;
+        };
+        self.longer_timeout_button.set_visible(false);
+        self.begin_run(sql, None, false, sender);
+    }
+
+    fn explain_at_cursor(&self) {
+        let buffer = self.source_view.buffer();
+        let text = if let Some((a, b)) = buffer.selection_bounds() {
+            buffer.text(&a, &b, true).to_string()
+        } else {
+            let (start, end) = buffer.bounds();
+            let all = buffer.text(&start, &end, true).to_string();
+            let cursor_chars = buffer.iter_at_mark(&buffer.get_insert()).offset() as usize;
+            let driver_id = self.metadata().map(|metadata| metadata.driver_id).unwrap_or_default();
+            let cursor = super::cursor_byte_offset(&all, cursor_chars);
+            super::statement_at_cursor(&all, self.lexing(&driver_id), cursor).unwrap_or(all)
+        };
+        if let Some(window) = self
+            .source_view
+            .root()
+            .and_then(|root| root.downcast::<gtk::Window>().ok())
+        {
+            crate::ui::explain_dialog::present(&window, self.connection_id, &text, &self.database, &self.preferences);
+        }
+    }
+
     pub(super) fn run_scope(&mut self, current: bool, sender: ComponentSender<Self>) {
         self.timeout_retry.clear_override();
         let buffer = self.source_view.buffer();
@@ -64,7 +146,7 @@ impl SqlEditor {
             if let Some(text) = super::statement_at_cursor(&sql, self.lexing(&driver), cursor) {
                 self.begin_run(text, None, true, sender);
             } else {
-                self.status.set_label(&crate::tr!("No statement to run"));
+                self.status.set_label(&bookie_app_services::tr!("No statement to run"));
             }
             return;
         }
@@ -77,7 +159,7 @@ impl SqlEditor {
             (!sql.trim().is_empty()).then_some(start..start + sql.trim().len())
         };
         let Some(range) = range else {
-            self.status.set_label(&crate::tr!("No statement to run"));
+            self.status.set_label(&bookie_app_services::tr!("No statement to run"));
             return;
         };
         let anchor = super::SourceAnchor {
@@ -114,9 +196,9 @@ impl SqlEditor {
             let sender = sender.clone();
             action.connect_activate(move |_, _| {
                 sender.input(if current {
-                    SqlEditorInput::RunAtCursor
+                    SqlEditorInput::Run(RunMessage::RunAtCursor)
                 } else {
-                    SqlEditorInput::Run
+                    SqlEditorInput::Run(RunMessage::Run)
                 })
             });
             group.add_action(&action);
@@ -148,9 +230,10 @@ impl SqlEditor {
                             continue;
                         }
                         let name = format!("result-{statement}-{result_set}");
-                        let label = crate::tr!("Export loaded rows: statement {statement}, result {result}")
-                            .replace("{statement}", &(statement + 1).to_string())
-                            .replace("{result}", &(result_set + 1).to_string());
+                        let label =
+                            bookie_app_services::tr!("Export loaded rows: statement {statement}, result {result}")
+                                .replace("{statement}", &(statement + 1).to_string())
+                                .replace("{result}", &(result_set + 1).to_string());
                         let action = gtk::gio::SimpleAction::new(&name, None);
                         let result = result.clone();
                         let sender = self.grid_sender.clone();
@@ -172,7 +255,7 @@ impl SqlEditor {
                         });
                         actions.add_action(&action);
                         exports.append(
-                            Some(&crate::tr!("Export all rows from this result…")),
+                            Some(&bookie_app_services::tr!("Export all rows from this result…")),
                             Some("editor-export.all-query-rows"),
                         );
                     }
@@ -182,7 +265,7 @@ impl SqlEditor {
         }
         self.run_options.insert_action_group("editor-export", Some(&actions));
         if exports.n_items() > 0 {
-            menu.append_section(Some(&crate::tr!("File output")), &exports);
+            menu.append_section(Some(&bookie_app_services::tr!("File output")), &exports);
         }
         self.run_options.set_menu_model(Some(&menu));
     }
@@ -191,14 +274,39 @@ impl SqlEditor {
 pub(super) fn run_menu_items() -> [(String, &'static str, &'static str); 2] {
     [
         (
-            crate::tr!("Run selection or all statements"),
+            bookie_app_services::tr!("Run selection or all statements"),
             "editor-run.all",
             "<Primary>Return",
         ),
         (
-            crate::tr!("Run current statement"),
+            bookie_app_services::tr!("Run current statement"),
             "editor-run.current",
             "<Primary><Shift>Return",
         ),
     ]
+}
+
+fn temporary_table_query(schema: Option<&str>, name: &str) -> String {
+    let table = bookie_core::sql_dialect::quote_ident("postgres", name);
+    let relation = schema.map_or(table.clone(), |schema| {
+        format!(
+            "{}.{}",
+            bookie_core::sql_dialect::quote_ident("postgres", schema),
+            table
+        )
+    });
+    format!("SELECT * FROM {relation}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::temporary_table_query;
+
+    #[test]
+    fn a_temporary_table_query_quotes_each_identifier() {
+        assert_eq!(
+            temporary_table_query(Some("pg_temp_4"), "x\"; DROP TABLE users;--"),
+            "SELECT * FROM \"pg_temp_4\".\"x\"\"; DROP TABLE users;--\""
+        );
+    }
 }

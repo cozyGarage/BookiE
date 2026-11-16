@@ -8,7 +8,7 @@ use crate::ui::grid::local_filter::{LocalResultSettingsStore, ResultViewKey};
 use crate::ui::grid::{GridMsg, TabGridContext, build_column_view};
 use bookie_app_services::stream_result_spool::{StreamResultSpool, StreamResultSpoolManager};
 use bookie_core::sql_syntax::script::{BatchErrorPolicy, LexicalSettings};
-use bookie_core::{DriverError, OperationControl, QueryResult};
+use bookie_core::{DriverError, OperationControl, QueryResult, ServerMessages};
 use bookie_policy::AuditReceipt;
 use std::future::Future;
 use stream_result_view::build_streamed_result_widget;
@@ -70,7 +70,7 @@ impl RunTotals {
                 StatementOutcomeKind::Error(message) => Some(message.to_string()),
                 StatementOutcomeKind::Streamed(result) => match &result.terminal {
                     StreamTerminal::Failed(message) => Some(message.to_string()),
-                    StreamTerminal::TimedOut => Some(crate::tr!("Query timed out")),
+                    StreamTerminal::TimedOut => Some(bookie_app_services::tr!("Query timed out")),
                     StreamTerminal::Loading | StreamTerminal::Complete | StreamTerminal::Cancelled => None,
                 },
                 StatementOutcomeKind::NotRun | StatementOutcomeKind::Rows(_) => None,
@@ -98,6 +98,7 @@ pub(crate) enum StreamUpdate {
         sequence: u64,
         page: std::sync::Arc<QueryResult>,
         spooled: bool,
+        lease: bookie_results::stream_page_budget::StreamPageLease,
     },
 }
 
@@ -161,6 +162,8 @@ where
     crate::services::approval_wait::track(run_tracked_statements(run, stream_spool_manager, stream_update)).await
 }
 
+#[path = "outcomes/messages_panel.rs"]
+mod messages_panel;
 #[path = "outcomes/run_loop.rs"]
 mod run_loop;
 use run_loop::run_tracked_statements;
@@ -191,17 +194,25 @@ enum Halt {
     Failed(Box<StatementOutcome>),
 }
 
+struct StatementResult {
+    kind: StatementOutcomeKind,
+    messages: ServerMessages,
+    rows_affected: Option<u64>,
+    is_write: bool,
+}
+
 async fn run_statement<F, Fut>(
     attempt: StreamAttempt<'_>,
     stream_update: &mut F,
     succeeded: &impl Fn(&str),
-) -> Result<StatementOutcomeKind, Halt>
+) -> Result<StatementResult, Halt>
 where
     F: FnMut(StreamUpdate) -> Fut,
     Fut: Future<Output = bool>,
 {
-    let (target, bound_sql, bound_params, sql, control) = (
+    let (target, driver_id, bound_sql, bound_params, sql, control) = (
         attempt.target,
+        attempt.driver_id,
         attempt.bound_sql,
         attempt.bound_params,
         attempt.sql,
@@ -212,7 +223,7 @@ where
         Ok(None) => {}
         Err(outcome) => return Err(Halt::Failed(outcome)),
     }
-    query_statement(target, bound_sql, bound_params, sql, control, succeeded)
+    query_statement(target, driver_id, bound_sql, bound_params, sql, control, succeeded)
         .await
         .map_err(Halt::Finished)
 }
@@ -227,14 +238,14 @@ async fn lexical_settings_change(
     };
     match target.lexical_settings(control).await {
         Ok(current) if current.is_none_or(|current| current == expected) => Ok(None),
-        Ok(_) => Ok(Some(crate::tr!(
+        Ok(_) => Ok(Some(bookie_app_services::tr!(
             "Not run: the previous statement changed how this session reads strings, so the rest of the script \
              would split differently. Run the remaining statements again."
         ))),
         Err(DriverError::Cancelled) => Err(ScriptRunResult::Cancelled),
         Err(DriverError::TimedOut) => Err(ScriptRunResult::TimedOut),
         Err(error) => Ok(Some(
-            crate::tr!("Not run: could not confirm how this session reads strings: {error}")
+            bookie_app_services::tr!("Not run: could not confirm how this session reads strings: {error}")
                 .replace("{error}", &crate::services::error_text::driver_message(&error)),
         )),
     }
@@ -248,6 +259,7 @@ fn not_run_outcome(identity: StatementIdentity, preview: String, sql: String) ->
         elapsed_ms: 0,
         kind: StatementOutcomeKind::NotRun,
         pinned: false,
+        detail: Default::default(),
     }
 }
 
@@ -257,16 +269,28 @@ fn statement_outcome(
     sql: String,
     started: std::time::Instant,
     waited_before: std::time::Duration,
-    kind: StatementOutcomeKind,
+    result: StatementResult,
 ) -> StatementOutcome {
     StatementOutcome {
         identity,
         sql_preview: preview,
         sql,
         elapsed_ms: elapsed_without_approval_wait(started, waited_before),
-        kind,
+        kind: result.kind,
         pinned: false,
+        detail: super::outcome_detail::OutcomeDetail {
+            messages: result.messages,
+            approval_wait_ms: approval_wait_since(waited_before),
+            rows_affected: result.rows_affected,
+            is_write: result.is_write,
+        },
     }
+}
+
+fn approval_wait_since(waited_before: std::time::Duration) -> u128 {
+    crate::services::approval_wait::waited()
+        .saturating_sub(waited_before)
+        .as_millis()
 }
 
 fn elapsed_without_approval_wait(started: std::time::Instant, waited_before: std::time::Duration) -> u128 {
@@ -292,31 +316,44 @@ fn bind_statement_for_run(
             elapsed_ms: 0,
             kind: StatementOutcomeKind::Error(crate::ui::parameters_dialog::error_message(error).into()),
             pinned: false,
+            detail: Default::default(),
         })
     })
 }
 
 async fn query_statement(
     target: &super::session_mode::StatementTarget,
+    driver_id: &str,
     bound_sql: &str,
     bound_params: &[bookie_core::Value],
     sql: &str,
     control: &OperationControl,
     succeeded: &impl Fn(&str),
-) -> Result<StatementOutcomeKind, ScriptRunResult> {
+) -> Result<StatementResult, ScriptRunResult> {
     let audited = target.query_with_audit(bound_sql, bound_params, control).await;
     match audited.result {
         Ok(result) => {
             succeeded(sql);
-            Ok(StatementOutcomeKind::Rows(
-                result.result_sets.into_iter().map(std::sync::Arc::new).collect(),
-            ))
+            let is_write = bookie_policy::classify(bound_sql, driver_id).writes();
+            let affected_rows = if is_write { result.rows_affected } else { None };
+            let rows = StatementOutcomeKind::Rows(result.result_sets.into_iter().map(std::sync::Arc::new).collect());
+            Ok(StatementResult {
+                kind: rows,
+                messages: result.messages,
+                rows_affected: affected_rows,
+                is_write,
+            })
         }
         Err(DriverError::Cancelled) => Err(ScriptRunResult::Cancelled),
         Err(DriverError::TimedOut) => Err(ScriptRunResult::TimedOut),
-        Err(error) => Ok(StatementOutcomeKind::Error(
-            failure_message(&error, sql, bound_sql).with_audit_receipts(audited.audit_receipts),
-        )),
+        Err(error) => Ok(StatementResult {
+            kind: StatementOutcomeKind::Error(
+                failure_message(&error, sql, bound_sql).with_audit_receipts(audited.audit_receipts),
+            ),
+            messages: ServerMessages::default(),
+            rows_affected: None,
+            is_write: false,
+        }),
     }
 }
 
@@ -352,8 +389,11 @@ where
             sql_preview: attempt.preview.clone(),
             sql: attempt.sql.to_owned(),
             elapsed_ms: attempt.started.elapsed().as_millis(),
-            kind: StatementOutcomeKind::Error(crate::tr!("Temporary result storage is unavailable.").into()),
+            kind: StatementOutcomeKind::Error(
+                bookie_app_services::tr!("Temporary result storage is unavailable.").into(),
+            ),
             pinned: false,
+            detail: Default::default(),
         })
     })?;
     let opened = attempt
@@ -391,6 +431,7 @@ where
                 failure_message(&error, attempt.sql, attempt.bound_sql).with_audit_receipts(audit_receipts),
             ),
             pinned: false,
+            detail: Default::default(),
         })),
     }
 }
@@ -472,32 +513,21 @@ where
 {
     let mut sequence = 0;
     loop {
-        let fetched = cursor.fetch_page_with_audit(control).await;
-        merge_audit_receipts(&mut audit_receipts, fetched.audit_receipts);
-        let page = match fetched.result {
-            Ok(page) => page,
-            Err(DriverError::Cancelled) => {
-                finish_stream_cursor(cursor, false).await;
-                return ScriptRunResult::Streamed(StreamTerminal::Cancelled);
-            }
-            Err(DriverError::TimedOut) => {
-                finish_stream_cursor(cursor, false).await;
-                return ScriptRunResult::Streamed(StreamTerminal::TimedOut);
-            }
-            Err(error) => {
-                let message = failure_message(&error, sql, sent).with_audit_receipts(audit_receipts);
-                finish_stream_cursor(cursor, false).await;
-                return ScriptRunResult::Streamed(StreamTerminal::Failed(message));
-            }
-        };
-        let has_next_page = page.has_next_page;
-        let page = std::sync::Arc::new(page.result);
+        let (page, has_next_page, lease) =
+            match fetch_stream_page(&cursor, &spool, &mut audit_receipts, (sql, sent), control).await {
+                Ok(page) => page,
+                Err(terminal) => {
+                    finish_stream_cursor(cursor, false).await;
+                    return ScriptRunResult::Streamed(terminal);
+                }
+            };
         let truncated = page.truncated;
         let spooled = spool.append_page(sequence, page.clone()).await.is_ok();
         if !stream_update(StreamUpdate::Page {
             sequence,
             page,
             spooled,
+            lease,
         })
         .await
         {
@@ -508,14 +538,15 @@ where
         if !spooled {
             finish_stream_cursor(cursor, true).await;
             return ScriptRunResult::Streamed(StreamTerminal::Failed(
-                crate::tr!("BookiE could not keep the complete result in temporary storage. The received rows remain available.")
+                bookie_app_services::tr!("BookiE could not keep the complete result in temporary storage. The received rows remain available.")
                     .into(),
             ));
         }
         if truncated {
             finish_stream_cursor(cursor, true).await;
             return ScriptRunResult::Streamed(StreamTerminal::Failed(
-                crate::tr!("A result page exceeded the query result limit. The result is incomplete.").into(),
+                bookie_app_services::tr!("A result page exceeded the query result limit. The result is incomplete.")
+                    .into(),
             ));
         }
         if !has_next_page {
@@ -530,6 +561,48 @@ where
             return ScriptRunResult::Streamed(StreamTerminal::Complete);
         }
     }
+}
+
+async fn fetch_stream_page(
+    cursor: &super::session_mode::StatementCursor,
+    spool: &StreamResultSpool,
+    audit_receipts: &mut Vec<AuditReceipt>,
+    (sql, sent): (&str, &str),
+    control: &OperationControl,
+) -> Result<
+    (
+        std::sync::Arc<QueryResult>,
+        bool,
+        bookie_results::stream_page_budget::StreamPageLease,
+    ),
+    StreamTerminal,
+> {
+    let Some(mut lease) = spool.page_budget().reserve(bookie_core::MAX_QUERY_RESULT_BYTES) else {
+        return Err(StreamTerminal::Failed(
+            bookie_app_services::tr!("The result memory budget is full. Close or release other large results before running this query again.")
+                .into(),
+        ));
+    };
+    let fetched = cursor.fetch_page_with_audit(control).await;
+    merge_audit_receipts(audit_receipts, fetched.audit_receipts);
+    let page = match fetched.result {
+        Ok(page) => page,
+        Err(DriverError::Cancelled) => return Err(StreamTerminal::Cancelled),
+        Err(DriverError::TimedOut) => return Err(StreamTerminal::TimedOut),
+        Err(error) => {
+            let receipts = std::mem::take(audit_receipts);
+            let message = failure_message(&error, sql, sent).with_audit_receipts(receipts);
+            return Err(StreamTerminal::Failed(message));
+        }
+    };
+    let has_next_page = page.has_next_page;
+    let page = std::sync::Arc::new(page.result);
+    if !lease.resize_page(&page) {
+        return Err(StreamTerminal::Failed(
+            bookie_app_services::tr!("This result page exceeds the available memory budget.").into(),
+        ));
+    }
+    Ok((page, has_next_page, lease))
 }
 
 async fn finish_stream_cursor(cursor: super::session_mode::StatementCursor, close_cursor: bool) {
@@ -558,20 +631,20 @@ pub(crate) fn summary_label(n_total: usize, n_ok: usize, total_ms: u128, has_err
     if n_total == 1 {
         let ms = total_ms.to_string();
         if has_error {
-            crate::tr!("error in {ms} ms").replace("{ms}", &ms)
+            bookie_app_services::tr!("error in {ms} ms").replace("{ms}", &ms)
         } else {
-            crate::tr!("done in {ms} ms").replace("{ms}", &ms)
+            bookie_app_services::tr!("done in {ms} ms").replace("{ms}", &ms)
         }
     } else {
         let ok_s = n_ok.to_string();
         let total_s = n_total.to_string();
         let ms = total_ms.to_string();
-        let base = crate::tr!("{ok}/{total} statements · {ms} ms")
+        let base = bookie_app_services::tr!("{ok}/{total} statements · {ms} ms")
             .replace("{ok}", &ok_s)
             .replace("{total}", &total_s)
             .replace("{ms}", &ms);
         if has_error {
-            format!("{base} · {}", crate::tr!("error"))
+            format!("{base} · {}", bookie_app_services::tr!("error"))
         } else {
             base
         }
@@ -579,6 +652,18 @@ pub(crate) fn summary_label(n_total: usize, n_ok: usize, total_ms: u128, has_err
 }
 
 fn build_outcome_widget(
+    o: &StatementOutcome,
+    grid_sender: &relm4::Sender<GridMsg>,
+    connection_id: Option<uuid::Uuid>,
+    database: std::sync::Arc<crate::services::database_service::DatabaseService>,
+    settings_store: LocalResultSettingsStore,
+    sender: Option<&relm4::ComponentSender<super::SqlEditor>>,
+) -> gtk::Widget {
+    let content = build_outcome_content(o, grid_sender, connection_id, database, settings_store, sender);
+    messages_panel::attach(content, &o.detail.messages)
+}
+
+fn build_outcome_content(
     o: &StatementOutcome,
     grid_sender: &relm4::Sender<GridMsg>,
     connection_id: Option<uuid::Uuid>,
@@ -600,11 +685,10 @@ fn build_outcome_widget(
             false,
         ),
         StatementOutcomeKind::Rows(_) => {
-            let ms = o.elapsed_ms.to_string();
             let number = (o.identity.statement_index + 1).to_string();
             adw::StatusPage::builder()
-                .title(crate::tr!("Statement {n} executed").replace("{n}", &number))
-                .description(crate::tr!("No rows returned · {ms} ms").replace("{ms}", &ms))
+                .title(bookie_app_services::tr!("Statement {n} executed").replace("{n}", &number))
+                .description(crate::ui::plain_text::escape_markup(&no_result_description(o)))
                 .icon_name("emblem-default-symbolic")
                 .vexpand(true)
                 .build()
@@ -615,12 +699,28 @@ fn build_outcome_widget(
         }
         StatementOutcomeKind::Error(msg) => error_page(o.identity.statement_index, msg).upcast(),
         StatementOutcomeKind::NotRun => adw::StatusPage::builder()
-            .title(crate::tr!("Statement {n} not run").replace("{n}", &(o.identity.statement_index + 1).to_string()))
-            .description(crate::tr!("Skipped because an earlier statement failed."))
+            .title(
+                bookie_app_services::tr!("Statement {n} not run")
+                    .replace("{n}", &(o.identity.statement_index + 1).to_string()),
+            )
+            .description(bookie_app_services::tr!("Skipped because an earlier statement failed."))
             .icon_name("media-playback-stop-symbolic")
             .vexpand(true)
             .build()
             .upcast(),
+    }
+}
+
+fn no_result_description(outcome: &StatementOutcome) -> String {
+    let ms = outcome.elapsed_ms.to_string();
+    match (outcome.detail.is_write, outcome.detail.rows_affected) {
+        (true, Some(1)) => bookie_app_services::tr!("1 row affected · {ms} ms").replace("{ms}", &ms),
+        (true, Some(rows)) => bookie_app_services::tr!("{rows} rows affected · {ms} ms")
+            .replace("{rows}", &rows.to_string())
+            .replace("{ms}", &ms),
+        (true, None) => bookie_app_services::tr!("Statement completed; affected row count unavailable · {ms} ms")
+            .replace("{ms}", &ms),
+        (false, _) => bookie_app_services::tr!("No rows returned · {ms} ms").replace("{ms}", &ms),
     }
 }
 
@@ -637,7 +737,7 @@ fn build_multi_result_widget(
         .iter()
         .enumerate()
         .map(|(index, result)| {
-            crate::tr!("Result set {n} ({rows})")
+            bookie_app_services::tr!("Result set {n} ({rows})")
                 .replace("{n}", &(index + 1).to_string())
                 .replace("{rows}", &result.rows.len().to_string())
         })
@@ -655,7 +755,9 @@ fn build_multi_result_widget(
         stack.add_titled(&widget, Some(&format!("set{index}")), &labels[index]);
     }
     let dropdown = gtk::DropDown::from_strings(&labels.iter().map(String::as_str).collect::<Vec<_>>());
-    dropdown.update_property(&[gtk::accessible::Property::Label(&crate::tr!("Result set"))]);
+    dropdown.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!(
+        "Result set"
+    ))]);
     dropdown.connect_selected_notify({
         let stack = stack.downgrade();
         move |dropdown| {
@@ -681,8 +783,8 @@ fn error_page(idx: usize, message: &super::StatementFailure) -> gtk::Box {
         .vexpand(true)
         .build();
     let title = gtk::Label::builder()
-        .label(crate::tr!("Statement {n} failed").replace("{n}", &(idx + 1).to_string()))
-        .css_classes(["title-3"])
+        .label(bookie_app_services::tr!("Statement {n} failed").replace("{n}", &(idx + 1).to_string()))
+        .css_classes(["title-3", "bookie-output-font"])
         .xalign(0.0)
         .wrap(true)
         .build();
@@ -694,7 +796,7 @@ fn error_page(idx: usize, message: &super::StatementFailure) -> gtk::Box {
         .column_spacing(6)
         .row_spacing(4)
         .build();
-    let copy = gtk::Button::with_label(&crate::tr!("Copy error"));
+    let copy = gtk::Button::with_label(&bookie_app_services::tr!("Copy error"));
     let text = message.to_string();
     copy.connect_clicked(move |button| button.clipboard().set_text(&text));
     actions.insert(&copy, -1);
@@ -703,6 +805,7 @@ fn error_page(idx: usize, message: &super::StatementFailure) -> gtk::Box {
     }
     let description = gtk::Label::builder()
         .label(message.as_ref())
+        .css_classes(["bookie-output-font"])
         .selectable(true)
         .wrap(true)
         .wrap_mode(gtk::pango::WrapMode::WordChar)
@@ -730,7 +833,8 @@ fn append_audit_actions(holder: &gtk::Box, actions: &gtk::FlowBox, message: &sup
             .collect::<Vec<_>>()
             .join(", ");
         let label = gtk::Label::builder()
-            .label(crate::tr!("Audit operation: {id}").replace("{id}", &audit_ids))
+            .label(bookie_app_services::tr!("Audit operation: {id}").replace("{id}", &audit_ids))
+            .css_classes(["bookie-output-font"])
             .xalign(0.0)
             .selectable(true)
             .wrap(true)
@@ -740,7 +844,7 @@ fn append_audit_actions(holder: &gtk::Box, actions: &gtk::FlowBox, message: &sup
     for operation_id in message.audit_operation_ids() {
         let action_target = operation_id.to_string().to_variant();
         let audit = gtk::Button::builder()
-            .label(crate::tr!("View in Audit Log"))
+            .label(bookie_app_services::tr!("View in Audit Log"))
             .action_name("win.show-audit-for")
             .action_target(&action_target)
             .css_classes(["pill", "flat"])
@@ -806,7 +910,7 @@ pub(super) fn build_result_set_widget(
 ) -> gtk::Widget {
     if result.columns.is_empty() {
         return adw::StatusPage::builder()
-            .title(crate::tr!("No rows returned"))
+            .title(bookie_app_services::tr!("No rows returned"))
             .icon_name("emblem-default-symbolic")
             .vexpand(true)
             .build()
@@ -815,6 +919,8 @@ pub(super) fn build_result_set_widget(
     let changed_cells = settings_store.changed_cells(settings_key);
     let local_result_view =
         super::super::grid::local_filter::LocalResultView::new(result.clone(), settings_store, settings_key);
+    let column_selection = Default::default();
+    let column_selection_chrome = super::super::grid::selection_chrome();
     let (column_view, _selection) = build_column_view(
         result,
         &result.columns,
@@ -834,6 +940,8 @@ pub(super) fn build_result_set_widget(
                 whole_result_filter,
                 changed_cells,
                 sortable_result_columns: crate::ui::grid::sortable_result_columns(result),
+                column_selection,
+                column_selection_chrome: Some(column_selection_chrome.clone()),
                 ..Default::default()
             },
             column_widths: None,
@@ -844,6 +952,7 @@ pub(super) fn build_result_set_widget(
     local_result_view.bind_column_view(&column_view);
     let holder = gtk::Box::new(gtk::Orientation::Vertical, 0);
     holder.append(&local_result_view.controls());
+    holder.append(&column_selection_chrome);
     holder.append(&crate::ui::grid::wrap_grid_scrolled(&column_view));
     holder.upcast()
 }
@@ -893,29 +1002,29 @@ fn outcome_tab_label(o: &StatementOutcome) -> String {
     let n = (o.identity.statement_index + 1).to_string();
     let Some(statement) = statement_subject(&o.sql_preview) else {
         return match &o.kind {
-            StatementOutcomeKind::Rows(sets) => crate::tr!("Result {n} ({rows})")
+            StatementOutcomeKind::Rows(sets) => bookie_app_services::tr!("Result {n} ({rows})")
                 .replace("{n}", &n)
                 .replace("{rows}", &format_result_rows(result_rows(sets))),
-            StatementOutcomeKind::Streamed(result) => crate::tr!("Result {n} ({rows})")
+            StatementOutcomeKind::Streamed(result) => bookie_app_services::tr!("Result {n} ({rows})")
                 .replace("{n}", &n)
                 .replace("{rows}", &format_result_rows(result.total_rows)),
-            StatementOutcomeKind::Error(_) => crate::tr!("Result {n} (error)").replace("{n}", &n),
-            StatementOutcomeKind::NotRun => crate::tr!("Result {n} (skipped)").replace("{n}", &n),
+            StatementOutcomeKind::Error(_) => bookie_app_services::tr!("Result {n} (error)").replace("{n}", &n),
+            StatementOutcomeKind::NotRun => bookie_app_services::tr!("Result {n} (skipped)").replace("{n}", &n),
         };
     };
     match &o.kind {
-        StatementOutcomeKind::Rows(sets) => crate::tr!("{n} · {statement} ({rows})")
+        StatementOutcomeKind::Rows(sets) => bookie_app_services::tr!("{n} · {statement} ({rows})")
             .replace("{n}", &n)
             .replace("{statement}", &statement)
             .replace("{rows}", &format_result_rows(result_rows(sets))),
-        StatementOutcomeKind::Streamed(result) => crate::tr!("{n} · {statement} ({rows})")
+        StatementOutcomeKind::Streamed(result) => bookie_app_services::tr!("{n} · {statement} ({rows})")
             .replace("{n}", &n)
             .replace("{statement}", &statement)
             .replace("{rows}", &format_result_rows(result.total_rows)),
-        StatementOutcomeKind::Error(_) => crate::tr!("{n} · {statement} (error)")
+        StatementOutcomeKind::Error(_) => bookie_app_services::tr!("{n} · {statement} (error)")
             .replace("{n}", &n)
             .replace("{statement}", &statement),
-        StatementOutcomeKind::NotRun => crate::tr!("{n} · {statement} (skipped)")
+        StatementOutcomeKind::NotRun => bookie_app_services::tr!("{n} · {statement} (skipped)")
             .replace("{n}", &n)
             .replace("{statement}", &statement),
     }
@@ -927,8 +1036,8 @@ fn pinned_tab_label(o: &StatementOutcome) -> String {
         StatementOutcomeKind::Streamed(result) => format_result_rows(result.total_rows),
         StatementOutcomeKind::Error(_) | StatementOutcomeKind::NotRun => String::new(),
     };
-    let subject = statement_subject(&o.sql_preview).unwrap_or_else(|| crate::tr!("Result"));
-    crate::tr!("📌 {statement} ({rows})")
+    let subject = statement_subject(&o.sql_preview).unwrap_or_else(|| bookie_app_services::tr!("Result"));
+    bookie_app_services::tr!("📌 {statement} ({rows})")
         .replace("{statement}", &subject)
         .replace("{rows}", &rows)
 }
@@ -980,7 +1089,9 @@ fn build_result_drop_down(stack: &adw::ViewStack, outcomes: &[StatementOutcome])
     let labels: Vec<String> = outcomes.iter().map(outcome_tab_label).collect();
     let label_refs: Vec<&str> = labels.iter().map(String::as_str).collect();
     let drop_down = gtk::DropDown::from_strings(&label_refs);
-    drop_down.update_property(&[gtk::accessible::Property::Label(&crate::tr!("Statement result"))]);
+    drop_down.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!(
+        "Statement result"
+    ))]);
     let first_error = first_failure(outcomes).unwrap_or(0);
     drop_down.set_selected(first_error as u32);
     drop_down.connect_selected_notify({
@@ -1014,8 +1125,8 @@ pub(crate) fn render_outcomes(
     settings_store.retain(&result_view_keys(outcomes));
     if outcomes.is_empty() {
         let placeholder = adw::StatusPage::builder()
-            .title(crate::tr!("Empty query"))
-            .description(crate::tr!("Type a SQL statement and press Run."))
+            .title(bookie_app_services::tr!("Empty query"))
+            .description(bookie_app_services::tr!("Type a SQL statement and press Run."))
             .icon_name("text-x-generic-symbolic")
             .vexpand(true)
             .build();
@@ -1095,11 +1206,17 @@ fn result_view_keys(outcomes: &[StatementOutcome]) -> std::collections::HashSet<
 }
 
 #[cfg(test)]
+#[path = "outcomes/affected_rows_tests.rs"]
+mod affected_rows_tests;
+#[cfg(test)]
 #[path = "outcomes/lexing_tests.rs"]
 mod lexing_tests;
 #[cfg(test)]
 #[path = "outcomes/lifetime_tests.rs"]
 mod lifetime_tests;
+#[cfg(test)]
+#[path = "outcomes/messages_tests.rs"]
+mod messages_tests;
 #[cfg(test)]
 #[path = "outcomes/result_tab_icon_tests.rs"]
 mod result_tab_icon_tests;

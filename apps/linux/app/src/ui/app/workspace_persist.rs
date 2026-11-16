@@ -25,7 +25,7 @@ impl App {
         let current_generation = self.persist_generation.clone();
         let workspace_tabs = self.workspace_tabs.clone();
         let tab_view = self.workspace_tab_view.clone();
-        let target = self.workspace_target();
+        let targets = self.workspace_targets();
         let workspace = self.workspace.clone();
         let collapsed = self.sidebar_collapsed.clone();
         let hidden_schemas = self.sidebar_hidden_schemas.clone();
@@ -37,7 +37,7 @@ impl App {
             }
             do_persist_workspace_state(
                 &workspace,
-                target,
+                &targets,
                 &workspace_tabs,
                 tab_view.as_ref(),
                 collapsed.borrow().keys(),
@@ -56,7 +56,7 @@ impl App {
         self.cancel_persist_timer();
         do_persist_workspace_state(
             &self.workspace,
-            self.workspace_target(),
+            &self.workspace_targets(),
             &self.workspace_tabs,
             self.workspace_tab_view.as_ref(),
             self.sidebar_collapsed.borrow().keys(),
@@ -64,14 +64,31 @@ impl App {
         );
     }
 
-    pub(super) fn workspace_target(
-        &self,
-    ) -> Option<(Uuid, String, crate::services::workspace_state::WorkspaceSaveToken)> {
-        Some((
-            self.connection_id?,
-            self.connected_database.clone()?,
-            self.workspace_save_token.clone()?,
-        ))
+    pub(super) fn workspace_targets(&self) -> Vec<PersistTarget> {
+        let front = self.connection_id;
+        self.multi
+            .sessions
+            .working_order()
+            .iter()
+            .filter_map(|id| {
+                let is_front = Some(*id) == front;
+                let (database, token) = if is_front {
+                    (self.connected_database.clone()?, self.workspace_save_token.clone()?)
+                } else {
+                    (
+                        self.multi.catalogs.get(id)?.database.clone(),
+                        self.workspace.connection_save_token(*id),
+                    )
+                };
+                Some(PersistTarget {
+                    connection_id: *id,
+                    database,
+                    token,
+                    tabs: self.multi.sessions.tabs_for_connection(*id).into_iter().collect(),
+                    is_front,
+                })
+            })
+            .collect()
     }
 
     fn replace_persist_timer(&self) {
@@ -83,17 +100,43 @@ impl App {
     }
 }
 
+pub(super) struct PersistTarget {
+    connection_id: Uuid,
+    database: String,
+    token: workspace_state::WorkspaceSaveToken,
+    tabs: std::collections::HashSet<Uuid>,
+    is_front: bool,
+}
+
 fn do_persist_workspace_state(
     workspace: &workspace_state::WorkspaceStore,
-    target: Option<(Uuid, String, workspace_state::WorkspaceSaveToken)>,
+    targets: &[PersistTarget],
     workspace_tabs: &std::rc::Rc<std::cell::RefCell<WorkspaceTabs<WorkspaceTab>>>,
     tab_view: Option<&relm4::adw::TabView>,
     collapsed_groups: Vec<String>,
     hidden_schemas: Vec<String>,
 ) {
-    let Some((connection_id, database, save_token)) = target else {
-        return;
-    };
+    for target in targets {
+        let (collapsed, hidden) = if target.is_front {
+            (collapsed_groups.clone(), hidden_schemas.clone())
+        } else {
+            workspace
+                .load_database(target.connection_id, &target.database)
+                .map(|stored| (stored.collapsed_groups, stored.hidden_schemas))
+                .unwrap_or_default()
+        };
+        persist_session_tabs(workspace, target, workspace_tabs, tab_view, collapsed, hidden);
+    }
+}
+
+fn persist_session_tabs(
+    workspace: &workspace_state::WorkspaceStore,
+    target: &PersistTarget,
+    workspace_tabs: &std::rc::Rc<std::cell::RefCell<WorkspaceTabs<WorkspaceTab>>>,
+    tab_view: Option<&relm4::adw::TabView>,
+    collapsed_groups: Vec<String>,
+    hidden_schemas: Vec<String>,
+) {
     let tabs = workspace_tabs.borrow();
     let Some(tab_view) = tab_view else {
         return;
@@ -109,16 +152,22 @@ fn do_persist_workspace_state(
             kept.push(false);
             continue;
         };
+        let owned = read_workspace_tab_id(&page).filter(|id| target.tabs.contains(id));
+        if owned.is_none() {
+            kept.push(false);
+            continue;
+        }
         if active_page.as_ref() == Some(&page) {
             active_raw_index = Some(i as usize);
         }
-        let record = read_workspace_tab_id(&page)
+        let record = owned
             .and_then(|id| tabs.get(&id).map(|slot| (id, slot)))
             .and_then(|(id, slot)| match slot {
                 WorkspaceTab::Editor(s) => Some(WorkspaceTabRecord::Editor {
                     query: s.query.clone(),
                     draft_id: Some(id),
                     file: s.file.as_ref().map(|file| file.path.clone()),
+                    mark: super::tab_title::read_tab_mark(&s.page),
                 }),
                 WorkspaceTab::Structure(_) => None,
                 WorkspaceTab::Table(s) if s.table.is_empty() => None,
@@ -131,9 +180,9 @@ fn do_persist_workspace_state(
     }
     let active_idx = active_idx_among_kept(&kept, active_raw_index);
     workspace.save_database_for_session(
-        connection_id,
-        &database,
-        &save_token,
+        target.connection_id,
+        &target.database,
+        &target.token,
         ConnectionWorkspaceState {
             tabs: tab_records,
             active_idx,
@@ -156,6 +205,7 @@ fn table_record(slot: &super::TableTabSlot, preview: bool) -> WorkspaceTabRecord
         sort_col: sort.map(|(column, _)| column),
         sort_asc: sort.map(|(_, ascending)| ascending),
         preview,
+        mark: super::tab_title::read_tab_mark(&slot.page),
     }
 }
 
@@ -165,13 +215,6 @@ fn sorted_hidden_schemas(hidden_schemas: &std::collections::HashSet<String>) -> 
     schemas
 }
 
-/// `kept[i]` says whether the tab strip's raw position `i` produced a
-/// persisted record -- a Structure tab or an empty-table draft never
-/// does. Returns the active tab's position within the persisted list,
-/// which drifts from its raw position as soon as a skipped tab appears
-/// before it. Falls back to 0 when the active tab itself is one of the
-/// kinds that's never persisted, since there is nothing truthful to
-/// restore it to.
 fn active_idx_among_kept(kept: &[bool], active_raw_index: Option<usize>) -> u32 {
     let Some(active_raw_index) = active_raw_index else {
         return 0;
@@ -193,8 +236,6 @@ mod tests {
 
     #[test]
     fn a_skipped_tab_before_the_active_one_shifts_its_index_down() {
-        // Structure tab at 0, active Editor tab at raw index 2 -- only
-        // one tab (at raw index 1) was actually persisted before it.
         assert_eq!(active_idx_among_kept(&[false, true, true], Some(2)), 1);
     }
 

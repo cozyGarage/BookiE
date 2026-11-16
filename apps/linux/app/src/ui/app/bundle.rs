@@ -36,7 +36,7 @@ impl std::fmt::Debug for PendingImport {
 impl App {
     pub(super) fn on_export_connections(&self, sender: ComponentSender<Self>) {
         if self.saved_connections.is_empty() {
-            self.show_toast(&crate::tr!("There are no saved connections to export."));
+            self.show_toast(&bookie_app_services::tr!("There are no saved connections to export."));
             return;
         }
         let input = sender.input_sender().clone();
@@ -75,7 +75,7 @@ impl App {
                         .await
                         .is_err()
                     {
-                        sender_clone.input(AppMsg::BundleFailed(crate::tr!(
+                        sender_clone.input(AppMsg::BundleFailed(bookie_app_services::tr!(
                             "The export was cancelled because its audit record could not be saved."
                         )));
                         return;
@@ -99,7 +99,7 @@ impl App {
                         .await
                         .is_err()
                     {
-                        sender_clone.input(AppMsg::BundleFailed(crate::tr!(
+                        sender_clone.input(AppMsg::BundleFailed(bookie_app_services::tr!(
                             "The export finished, but its audit outcome could not be saved."
                         )));
                         return;
@@ -114,7 +114,7 @@ impl App {
     }
 
     pub(super) fn on_export_connections_succeeded(&self, count: usize) {
-        self.show_toast(&crate::tr!("Exported {n} connections.").replace("{n}", &count.to_string()));
+        self.show_toast(&bookie_app_services::tr!("Exported {n} connections.").replace("{n}", &count.to_string()));
     }
 
     pub(super) fn on_bundle_failed(&self, message: &str) {
@@ -125,28 +125,34 @@ impl App {
         let filter = crate::ui::connection_bundle::bundle_file_filter();
         let filters = crate::ui::connection_bundle::bundle_file_filters(&filter);
         let dbeaver = relm4::gtk::FileFilter::new();
-        dbeaver.set_name(Some(&crate::tr!("DBeaver data-sources.json")));
+        dbeaver.set_name(Some(&bookie_app_services::tr!("DBeaver data-sources.json")));
         dbeaver.add_suffix("json");
         filters.append(&dbeaver);
+        let dbx = relm4::gtk::FileFilter::new();
+        dbx.set_name(Some(&bookie_app_services::tr!(
+            "DBX connection database (connections only)"
+        )));
+        dbx.add_suffix("db");
+        filters.append(&dbx);
         let another_redis = relm4::gtk::FileFilter::new();
-        another_redis.set_name(Some(&crate::tr!("Another Redis Desktop Manager export")));
+        another_redis.set_name(Some(&bookie_app_services::tr!("Another Redis Desktop Manager export")));
         another_redis.add_suffix("ano");
         another_redis.add_suffix("json");
         filters.append(&another_redis);
         let datagrip = relm4::gtk::FileFilter::new();
-        datagrip.set_name(Some(&crate::tr!("DataGrip dataSources.xml")));
+        datagrip.set_name(Some(&bookie_app_services::tr!("DataGrip dataSources.xml")));
         datagrip.add_suffix("xml");
         filters.append(&datagrip);
         let navicat = relm4::gtk::FileFilter::new();
-        navicat.set_name(Some(&crate::tr!("Navicat connections.ncx")));
+        navicat.set_name(Some(&bookie_app_services::tr!("Navicat connections.ncx")));
         navicat.add_suffix("ncx");
         filters.append(&navicat);
         let resp = relm4::gtk::FileFilter::new();
-        resp.set_name(Some(&crate::tr!("RESP.app connections.json")));
+        resp.set_name(Some(&bookie_app_services::tr!("RESP.app connections.json")));
         resp.add_suffix("json");
         filters.append(&resp);
         let dialog = relm4::gtk::FileDialog::builder()
-            .title(crate::tr!("Import connections"))
+            .title(bookie_app_services::tr!("Import connections"))
             .modal(true)
             .default_filter(&filter)
             .filters(&filters)
@@ -242,7 +248,7 @@ impl App {
 
     pub(super) fn on_import_bundle_planned(&mut self, pending: PendingImport, sender: ComponentSender<Self>) {
         if pending.plan.items.is_empty() {
-            self.show_toast(&crate::tr!("That file holds no connections."));
+            self.show_toast(&bookie_app_services::tr!("That file holds no connections."));
             return;
         }
         let carries_secrets = !pending.secrets.is_empty();
@@ -267,7 +273,7 @@ impl App {
             items: accepted_items(&pending.plan, &choice.accepted),
         };
         if plan.items.is_empty() {
-            self.show_toast(&crate::tr!("No connections were selected for import."));
+            self.show_toast(&bookie_app_services::tr!("No connections were selected for import."));
             return;
         }
         let operation_id = Uuid::new_v4();
@@ -321,7 +327,8 @@ async fn apply_import_with_audit(
         .is_err()
     {
         return Err(ImportFailure {
-            message: crate::tr!("The import was cancelled because its audit record could not be saved.").to_string(),
+            message: bookie_app_services::tr!("The import was cancelled because its audit record could not be saved.")
+                .to_string(),
             affected_count: 0,
         });
     }
@@ -346,7 +353,8 @@ async fn apply_import_with_audit(
         .is_err()
     {
         return Err(ImportFailure {
-            message: crate::tr!("The import finished, but its audit outcome could not be saved.").to_string(),
+            message: bookie_app_services::tr!("The import finished, but its audit outcome could not be saved.")
+                .to_string(),
             affected_count,
         });
     }
@@ -401,18 +409,27 @@ pub(super) fn read_bundle_file(bytes: &[u8]) -> Result<ParsedBundle, BundleError
 }
 
 async fn read_bundle_at(path: &std::path::Path) -> Result<ParsedBundle, BundleError> {
+    if is_sqlite_file(path).await? {
+        return Err(BundleError::NotABundle);
+    }
     let bytes = read_bounded(path, bookie_storage::MAX_BUNDLE_BYTES).await?;
     read_bundle_file(&bytes)
 }
 
 async fn read_peer_connections_at(path: &std::path::Path) -> Result<bookie_storage::PeerImport, String> {
+    if is_sqlite_file(path).await.map_err(|error| error.to_string())? {
+        return bookie_storage::parse_dbx_connection_database(path)
+            .await
+            .map_err(|error| error.to_string());
+    }
     let limit = bookie_storage::MAX_DBEAVER_BYTES
         .max(bookie_storage::MAX_ANOTHER_REDIS_BYTES)
         .max(bookie_storage::MAX_DATAGRIP_BYTES)
         .max(bookie_storage::MAX_NAVICAT_BYTES)
         .max(bookie_storage::MAX_RESP_BYTES);
     let bytes = read_bounded(path, limit).await.map_err(|error| error.to_string())?;
-    let text = String::from_utf8(bytes).map_err(|_| crate::tr!("The connection file is not valid UTF-8."))?;
+    let text =
+        String::from_utf8(bytes).map_err(|_| bookie_app_services::tr!("The connection file is not valid UTF-8."))?;
     let import = if text.contains("<Connections") {
         bookie_storage::parse_navicat_connections(&text)
     } else if text.trim_start().starts_with('<') {
@@ -428,6 +445,17 @@ async fn read_peer_connections_at(path: &std::path::Path) -> Result<bookie_stora
             .or_else(|error| bookie_storage::parse_another_redis_connections(&text).map_err(|_| error))
     };
     import.map_err(|error| error.to_string())
+}
+
+async fn is_sqlite_file(path: &std::path::Path) -> Result<bool, BundleError> {
+    use tokio::io::AsyncReadExt;
+    let file = tokio::fs::File::open(path).await.map_err(|_| BundleError::NotABundle)?;
+    let mut header = Vec::with_capacity(16);
+    file.take(16)
+        .read_to_end(&mut header)
+        .await
+        .map_err(|_| BundleError::NotABundle)?;
+    Ok(header.starts_with(b"SQLite format 3\0"))
 }
 
 async fn read_bounded(path: &std::path::Path, limit: usize) -> Result<Vec<u8>, BundleError> {
@@ -458,7 +486,7 @@ async fn read_bounded(path: &std::path::Path, limit: usize) -> Result<Vec<u8>, B
 async fn plan_from_body(body: &bookie_storage::BundleBody) -> Result<PendingImport, String> {
     let local = bookie_storage::load_connections()
         .await
-        .map_err(|_| crate::tr!("The saved connections could not be read."))?;
+        .map_err(|_| bookie_app_services::tr!("The saved connections could not be read."))?;
     let plan = bookie_storage::plan_import(&local, body).map_err(|error| error.to_string())?;
     Ok(PendingImport {
         plan,
@@ -505,13 +533,13 @@ async fn apply_plan(
     .await;
     if imported == 0 && failure == Some(ItemApplyFailure::ConnectionSave) {
         return Err(ImportFailure {
-            message: crate::tr!("The connections could not be saved."),
+            message: bookie_app_services::tr!("The connections could not be saved."),
             affected_count: 0,
         });
     }
     if failure == Some(ItemApplyFailure::WorkspaceSaveRecovery) {
         return Err(ImportFailure {
-            message: crate::tr!(
+            message: bookie_app_services::tr!(
                 "Some connections may have been imported, but workspace saves could not be re-enabled. Resolve the workspace storage problem and restart BookiE before relying on saved tabs."
             ),
             affected_count: imported,

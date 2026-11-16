@@ -169,6 +169,88 @@ class CiCacheTests(unittest.TestCase):
         self.assertTrue((unrelated / 'payload').is_file())
         self.assertTrue((target / 'debug/deps/artifact').exists())
 
+    def test_pressure_cleanup_evicts_orphaned_bundle_download_directories(self):
+        target = self.target('current-build', 0.1)
+        bundle_root = self.directory / 'shared-bundles'
+        bundle_root.mkdir()
+        old_temp = Path(tempfile.mkdtemp(dir=bundle_root))
+        new_temp = Path(tempfile.mkdtemp(prefix='bookie-bundle-', dir=bundle_root))
+        current = bundle_root / ('c' * 40 + '-direct')
+        unrelated = bundle_root / 'tmp-unrelated'
+        for path in (current, unrelated):
+            path.mkdir()
+            (path / 'payload').write_text('keep')
+        (old_temp / 'partial').write_text('interrupted download')
+        (new_temp / 'partial').write_text('interrupted download')
+        os.utime(old_temp, (1, 1))
+        spec = importlib.util.spec_from_file_location('ci_cache', SCRIPT)
+        helper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(helper)
+
+        def disk_usage(_):
+            recovered = not old_temp.exists()
+            return SimpleNamespace(free=100 if recovered else 0)
+
+        with patch.object(helper.shutil, 'disk_usage', side_effect=disk_usage), patch.dict(
+            os.environ, {'GITHUB_SHA': 'c' * 40, 'BOOKIE_BUNDLE_CACHE': str(bundle_root)}
+        ):
+            result = helper.cleanup(self.cache, 50)
+
+        self.assertEqual(result, 0)
+        self.assertFalse(old_temp.exists())
+        self.assertTrue((new_temp / 'partial').exists())
+        self.assertTrue((current / 'payload').exists())
+        self.assertTrue((unrelated / 'payload').exists())
+        self.assertTrue((target / 'debug/deps/artifact').exists())
+
+    def test_pressure_cleanup_preserves_recent_bundle_downloads_if_reserve_is_still_low(self):
+        bundle_root = self.directory / 'shared-bundles'
+        bundle_root.mkdir()
+        old_temp = Path(tempfile.mkdtemp(prefix='bookie-bundle-', dir=bundle_root))
+        active_temp = Path(tempfile.mkdtemp(prefix='bookie-bundle-', dir=bundle_root))
+        (old_temp / 'partial').write_text('interrupted download')
+        (active_temp / 'partial').write_text('active download')
+        os.utime(old_temp, (1, 1))
+        spec = importlib.util.spec_from_file_location('ci_cache', SCRIPT)
+        helper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(helper)
+
+        with patch.object(helper.shutil, 'disk_usage', return_value=SimpleNamespace(free=0)), patch.dict(
+            os.environ, {'BOOKIE_BUNDLE_CACHE': str(bundle_root)}
+        ):
+            helper.prune_bundles(self.cache, 50, '')
+
+        self.assertFalse(old_temp.exists())
+        self.assertTrue((active_temp / 'partial').exists())
+
+    def test_pressure_cleanup_evicts_each_supported_test_bundle_group(self):
+        spec = importlib.util.spec_from_file_location('ci_cache', SCRIPT)
+        helper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(helper)
+
+        self.assertIn('workspace', helper.BUNDLE_GROUPS)
+        for group in helper.BUNDLE_GROUPS:
+            with self.subTest(group=group), tempfile.TemporaryDirectory() as temporary:
+                bundle_root = Path(temporary) / 'bundles'
+                bundle_root.mkdir()
+                stale = bundle_root / ('a' * 40 + '-' + group)
+                current = bundle_root / ('c' * 40 + '-' + group)
+                stale.mkdir()
+                current.mkdir()
+                os.utime(stale, (1, 1))
+                os.utime(current, (2, 2))
+
+                with patch.object(
+                    helper.shutil,
+                    'disk_usage',
+                    side_effect=lambda _: SimpleNamespace(free=100 if not stale.exists() else 0),
+                ), patch.dict(os.environ, {'GITHUB_SHA': 'c' * 40, 'BOOKIE_BUNDLE_CACHE': str(bundle_root)}):
+                    result = helper.cleanup(self.cache, 50)
+
+                self.assertEqual(result, 0)
+                self.assertFalse(stale.exists())
+                self.assertTrue(current.exists())
+
     def test_checkout_refuses_to_run_when_cleanup_cannot_restore_the_reserve(self):
         self.target('unit', 0)
         shell = self.directory / 'checkout.sh'
@@ -316,11 +398,17 @@ class CiCacheTests(unittest.TestCase):
             with self.lock.open('r+') as lock:
                 fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             status = Path(f'/proc/{int(child_pid.read_text())}/stat')
-            try:
-                process_state = status.read_text().split()[2]
-            except FileNotFoundError:
-                process_state = 'Z'
-            self.assertEqual(process_state, 'Z')
+            deadline = time.monotonic() + 2
+            process_state = None
+            while time.monotonic() < deadline:
+                try:
+                    process_state = status.read_text().split()[2]
+                except (FileNotFoundError, ProcessLookupError):
+                    process_state = 'Z'
+                if process_state in {'Z', 'X'}:
+                    break
+                time.sleep(0.01)
+            self.assertIn(process_state, {'Z', 'X'})
         finally:
             for pid_file in (child_pid, shell_pid):
                 if pid_file.exists():
@@ -378,8 +466,8 @@ class CiCacheTests(unittest.TestCase):
             self.assertIn('defaults:\n  run:\n    shell: /usr/local/libexec/bookie-ci-cache run {0}\n', workflow)
             self.assertEqual(workflow.count('shell: /usr/local/libexec/bookie-ci-cache run {0}'), 1)
             for step in workflow.split('      - name: ')[1:]:
-                if 'uses:' in step:
-                    self.assertRegex(step, r'(?m)^          path: (gtk|floor)-artifact/$')
+                if 'uses: https://code.forgejo.org/actions/' in step:
+                    self.assertRegex(step, r'(?m)^          path: ((gtk|floor)-artifact/|src/target/quality/\*-layers|test-bundles/[a-z-]+/|\$\{\{ runner\.temp \}\}/bookie-.+-bundle)$')
                     self.assertNotIn('path: /var/cache/', step)
                     self.assertNotIn('path: ${{ env.CARGO_TARGET_DIR }}', step)
 
@@ -395,20 +483,18 @@ class CiCacheTests(unittest.TestCase):
             )
             self.assertTrue(jobs, filename)
             for name, block in jobs:
-                if '      - name: Check out\n' not in block:
+                if '      - name: Check out source revision\n' not in block:
                     continue
-                step = block.split('      - name: Check out\n', 1)[1].split('\n      - name:', 1)[0]
-                if 'shell: bash' in step:
-                    if name == 'guards':
-                        self.assertIn(f'CARGO_TARGET_DIR: {pilot_target}', block, filename)
-                        self.assertIn(f'TMPDIR: {pilot_tmp}', block, filename)
-                        self.assertIn('mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"', step, filename)
-                    else:
-                        self.assertIn('runs-on: build-host', block, name)
-                else:
+                self.assertIn('uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683', block, name)
+                self.assertIn('path: src', block, name)
+                if '      - name: Check runner space before checkout\n' in block:
+                    step = block.split('      - name: Check runner space before checkout\n', 1)[1].split('\n      - name:', 1)[0]
                     self.assertIn('shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}', step, filename)
-                if 'shell:' in step:
-                    self.assertLess(step.index('shell:'), step.index('run:'), filename)
+                    self.assertIn('run: true', step, filename)
+                if name == 'guards':
+                    self.assertIn(f'CARGO_TARGET_DIR: {pilot_target}', block, filename)
+                    self.assertIn(f'TMPDIR: {pilot_tmp}', block, filename)
+                    self.assertIn('mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"', block, filename)
 
     def test_missing_or_symlink_lock_fails_closed(self):
         self.lock.unlink()

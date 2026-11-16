@@ -37,7 +37,8 @@ impl App {
         match outcome {
             Ok(file) => self.bind_editor_file(tab, EditorFile::from_disk(file)),
             Err(message) => self.show_toast(
-                &crate::tr!("A reopened tab is no longer linked to its file: {reason}").replace("{reason}", &message),
+                &bookie_app_services::tr!("A reopened tab is no longer linked to its file: {reason}")
+                    .replace("{reason}", &message),
             ),
         }
     }
@@ -77,7 +78,7 @@ impl App {
 
     pub(super) fn on_editor_file_saved(&mut self, tab: Uuid, file: TextFile) {
         self.bind_editor_file(tab, EditorFile::from_disk(file));
-        self.show_toast(&crate::tr!("Saved"));
+        self.show_toast(&bookie_app_services::tr!("Saved"));
         if matches!(
             self.workspace_tabs.borrow().get(&tab),
             Some(WorkspaceTab::Editor(slot)) if slot.has_unsaved_file_changes()
@@ -101,14 +102,14 @@ impl App {
 
     pub(super) fn on_editor_file_changed_on_disk(&self, tab: Uuid, sender: ComponentSender<Self>) {
         let dialog = adw::AlertDialog::new(
-            Some(&crate::tr!("The file changed on disk")),
-            Some(&crate::tr!(
+            Some(&bookie_app_services::tr!("The file changed on disk")),
+            Some(&bookie_app_services::tr!(
                 "Another program changed or removed this file after it was opened. Overwriting replaces its changes with yours."
             )),
         );
-        dialog.add_response("cancel", &crate::tr!("Cancel"));
-        dialog.add_response("save-as", &crate::tr!("Save As…"));
-        dialog.add_response("overwrite", &crate::tr!("Overwrite"));
+        dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
+        dialog.add_response("save-as", &bookie_app_services::tr!("Save As…"));
+        dialog.add_response("overwrite", &bookie_app_services::tr!("Overwrite"));
         dialog.set_response_appearance("overwrite", adw::ResponseAppearance::Destructive);
         dialog.set_default_response(Some("cancel"));
         dialog.set_close_response("cancel");
@@ -124,7 +125,7 @@ impl App {
         let Some(file) = slot.file.as_ref() else {
             return;
         };
-        slot.page.set_title(&file.title(&slot.query));
+        super::tab_title::set_tab_title(&slot.page, &file.title(&slot.query));
         slot.page.set_tooltip(&file.path.display().to_string());
     }
 

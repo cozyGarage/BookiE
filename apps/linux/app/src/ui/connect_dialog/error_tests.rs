@@ -53,7 +53,10 @@ async fn connecting_with_a_bad_certificate_keeps_the_certificate_recovery_guidan
     .await
     .err()
     .expect("the test driver refuses the certificate");
-    assert!(failure.contains("unknown certificate authority"));
-    assert!(failure.contains("certificate authority file"));
-    assert!(failure.contains("Do not turn TLS off"));
+    assert!(failure.message.contains("certificate authority file"));
+    assert!(failure.message.contains("Do not turn TLS off"));
+    assert_eq!(
+        failure.tls_remedy,
+        Some(bookie_app_services::tls_failure::TlsRemedy::ChooseCertificateAuthority)
+    );
 }

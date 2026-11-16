@@ -28,34 +28,20 @@ fn locale_dir() -> String {
     "/usr/share/locale".into()
 }
 
-#[macro_export]
-macro_rules! tr {
-    ($s:expr $(,)?) => {
-        ::gettextrs::gettext($s)
-    };
-}
-
-#[macro_export]
-macro_rules! trn {
-    ($one:expr, $many:expr, $n:expr $(,)?) => {
-        ::gettextrs::ngettext($one, $many, u32::try_from($n).unwrap_or(u32::MAX))
-    };
-}
-
 #[cfg(test)]
 mod tests {
     #[test]
     fn plural_messages_choose_the_form_for_the_count() {
         assert_eq!(
-            crate::trn!("Delete {n} row?", "Delete {n} rows?", 1usize),
+            bookie_app_services::trn!("Delete {n} row?", "Delete {n} rows?", 1usize),
             "Delete {n} row?"
         );
         assert_eq!(
-            crate::trn!("Delete {n} row?", "Delete {n} rows?", 2usize),
+            bookie_app_services::trn!("Delete {n} row?", "Delete {n} rows?", 2usize),
             "Delete {n} rows?"
         );
         assert_eq!(
-            crate::trn!("Delete {n} row?", "Delete {n} rows?", usize::MAX),
+            bookie_app_services::trn!("Delete {n} row?", "Delete {n} rows?", usize::MAX),
             "Delete {n} rows?"
         );
     }

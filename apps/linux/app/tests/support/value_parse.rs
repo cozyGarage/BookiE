@@ -569,8 +569,12 @@ async fn value_contract_mysql_bit_parser_edits_preserve_native_values() {
     use testcontainers_modules::mysql::Mysql;
 
     let container = Mysql::default()
+        .with_tag(crate::test_image_tags::MYSQL_TEST_TAG)
         .with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test")
-        .with_cmd(["--default-authentication-plugin=mysql_native_password"])
+        .with_cmd([
+            "--mysql-native-password=ON",
+            "--authentication-policy=mysql_native_password",
+        ])
         .with_startup_timeout(std::time::Duration::from_secs(180))
         .start()
         .await
@@ -919,9 +923,9 @@ fn empty_on_nullable_yields_null() {
 }
 
 #[test]
-fn empty_on_not_null_with_default_yields_null() {
-    let r = parse_input_for_column("", Some(&col_with_default("timestamp", "now()"))).unwrap();
-    assert!(matches!(r, Value::Null));
+fn empty_on_not_null_with_default_is_rejected() {
+    let error = parse_input_for_column("", Some(&col_with_default("timestamp", "now()"))).unwrap_err();
+    assert!(error.contains("required"));
 }
 
 #[test]
@@ -951,10 +955,7 @@ fn empty_driver_input_obeys_shared_nullable_and_required_rules() {
             parse_input_for_driver("", Some(&col(data_type, true)), driver).unwrap(),
             Value::Null
         ));
-        assert!(matches!(
-            parse_input_for_driver("", Some(&col_with_default(data_type, "default")), driver).unwrap(),
-            Value::Null
-        ));
+        assert!(parse_input_for_driver("", Some(&col_with_default(data_type, "default")), driver).is_err());
         assert!(
             parse_input_for_driver("", Some(&col(data_type, false)), driver)
                 .unwrap_err()

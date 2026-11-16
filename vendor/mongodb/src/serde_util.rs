@@ -3,11 +3,24 @@ use std::time::Duration;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::{
-    bson::{doc, Bson, Document},
+    bson::{doc, Bson, Document, RawDocumentBuf},
     bson_util::get_u64,
     error::{Error, Result},
     serde_util,
 };
+
+/// Deserializes from a value into a optional `Document` without parsing extended JSON values. This
+/// is useful when representing invalid extended JSON, e.g. `{ "$numberLong": "string" }`.
+pub(crate) fn deserialize_document_bypass_extjson<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Option<Document>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let raw = Option::<RawDocumentBuf>::deserialize(deserializer)?;
+    raw.map(|doc| Document::try_from(doc).map_err(serde::de::Error::custom))
+        .transpose()
+}
 
 pub(crate) mod duration_option_as_int_seconds {
     use super::*;
@@ -73,7 +86,7 @@ pub(crate) fn serialize_u32_option_as_i32<S: Serializer>(
     serializer: S,
 ) -> std::result::Result<S::Ok, S::Error> {
     match val {
-        Some(ref val) => serde_util::serialize_u32_as_i32(val, serializer),
+        Some(val) => serde_util::serialize_u32_as_i32(val, serializer),
         None => serializer.serialize_none(),
     }
 }
@@ -101,7 +114,7 @@ pub(crate) fn serialize_u64_option_as_i64<S: Serializer>(
     serializer: S,
 ) -> std::result::Result<S::Ok, S::Error> {
     match val {
-        Some(ref v) => serde_util::serialize_u64_as_i64(v, serializer),
+        Some(v) => serde_util::serialize_u64_as_i64(v, serializer),
         None => serializer.serialize_none(),
     }
 }

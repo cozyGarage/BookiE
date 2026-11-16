@@ -41,7 +41,9 @@ for command_name in docker dbus-run-session gnome-keyring-daemon secret-tool; do
   fi
 done
 
-container="$(docker run --rm --detach --label "com.bookie.test-run=${BOOKIE_TEST_RUN_ID:-local-$$}" --publish 127.0.0.1::5432 \
+source "$ROOT/scripts/gtk-fixture-host.sh"
+
+container="$(docker run --rm --detach --label "com.bookie.test-run=${BOOKIE_TEST_RUN_ID:-local-$$}" --publish "$fixture_bind_address::5432" \
   --env POSTGRES_PASSWORD=bookie_test --env POSTGRES_DB=bookie_test \
   postgres:17-alpine)"
 cleanup() {
@@ -76,6 +78,23 @@ CREATE TABLE public.enum_grid (id integer PRIMARY KEY, state public.gtk_enum_sta
 INSERT INTO public.enum_grid VALUES
   (1, 'ready', 'target'), (2, 'NULL', 'literal NULL'),
   (3, NULL, 'SQL NULL'), (4, '', 'empty'), (5, 'ready', 'sibling');
+CREATE FUNCTION public.bookie_gtk_notice() RETURNS integer LANGUAGE plpgsql AS $$
+BEGIN
+  RAISE NOTICE 'bookie GTK server message';
+  RETURN 42;
+END;
+$$;
+CREATE FUNCTION public.bookie_gtk_notice_flood() RETURNS integer LANGUAGE plpgsql AS $$
+DECLARE
+  notice_index integer;
+BEGIN
+  FOR notice_index IN 1..5000 LOOP
+    RAISE NOTICE 'bookie GTK notice flood %', notice_index;
+    PERFORM pg_sleep(0.002);
+  END LOOP;
+  RETURN notice_index;
+END;
+$$;
 SQL
 
 eval "$(printf 'bookie-test' | gnome-keyring-daemon --daemonize --unlock --components=secrets)"
@@ -87,7 +106,7 @@ printf 'bookie_test' | secret-tool store --label='BookiE GTK PostgreSQL fixture'
 BOOKIE_GTK_POSTGRES_CONTAINER="$container" \
   BOOKIE_GTK_KEYRING_READY=1 \
   BOOKIE_GTK_DBUS_ACTIVE=1 \
-  BOOKIE_GTK_POSTGRES_HOST=127.0.0.1 \
+  BOOKIE_GTK_POSTGRES_HOST="$fixture_host" \
   BOOKIE_GTK_POSTGRES_PORT="$port" \
-  BOOKIE_GTK_SCENARIO="${BOOKIE_GTK_SCENARIO:-postgres_saved_connection_browses_rows_and_values,postgres_sidebar_catalog_lists_routines_inline,postgres_hidden_projection_refresh_and_edit_preserve_hidden_value,postgres_grid_edit_and_delete_commit_to_the_server,postgres_enum_grid_edit_preserves_native_label_and_siblings,postgres_database_switcher_reconnects_to_the_chosen_database,postgres_session_commit_distinguishes_aborted_rollback_from_recovered_commit,postgres_large_stream_pages_round_trip_from_spool,postgres_visible_evicted_page_can_be_revisited,postgres_whole_result_find_filter_and_compare,postgres_structure_preserves_empty_and_populated_metadata,postgres_schema_compare_opens_a_script_and_runs_nothing}" \
+  BOOKIE_GTK_SCENARIO="${BOOKIE_GTK_SCENARIO:-postgres_saved_connection_browses_rows_and_values,postgres_sidebar_catalog_lists_routines_inline,postgres_hidden_projection_refresh_and_edit_preserve_hidden_value,postgres_grid_edit_and_delete_commit_to_the_server,postgres_enum_grid_edit_preserves_native_label_and_siblings,postgres_database_switcher_reconnects_to_the_chosen_database,postgres_session_commit_distinguishes_aborted_rollback_from_recovered_commit,postgres_large_stream_pages_round_trip_from_spool,postgres_visible_evicted_page_can_be_revisited,postgres_whole_result_find_filter_and_compare,postgres_structure_preserves_empty_and_populated_metadata,postgres_schema_compare_opens_a_script_and_runs_nothing,postgres_server_notice_output_keeps_rows_and_clears_on_rerun,postgres_server_notice_flood_can_be_cancelled_and_reused}" \
   bash "$ROOT/scripts/test-gtk-safety.sh"

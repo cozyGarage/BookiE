@@ -24,7 +24,10 @@ impl App {
         let tabs = self.workspace_tabs.borrow();
         let mut index = self.schema_index.borrow_mut();
         index.set_tables(self.table_names.clone());
-        for tab in tabs.values() {
+        for (id, tab) in tabs.iter() {
+            if !self.tab_belongs_to(*id, self.connection_id) {
+                continue;
+            }
             if let Some(editor) = tab.editor_controller() {
                 let snapshot = index.editor_snapshot();
                 let _ = editor

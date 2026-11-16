@@ -21,7 +21,7 @@ pub(super) fn apply(badge: &gtk::Label, header_bar: &adw::HeaderBar, environment
 
 pub(super) fn os_window_title(title: String, environment: Option<Environment>, unsaved: bool) -> String {
     let marked = if is_production(environment) {
-        format!("{} {title}", crate::tr!("[Production]"))
+        format!("{} {title}", bookie_app_services::tr!("[Production]"))
     } else {
         title
     };

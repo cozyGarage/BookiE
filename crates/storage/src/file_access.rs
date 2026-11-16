@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::ffi::OsString;
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
-use std::os::fd::AsRawFd;
+use std::os::fd::{AsRawFd, RawFd};
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock, Weak};
@@ -70,14 +70,25 @@ fn open_and_lock(path: &Path) -> Result<File, StorageError> {
         .mode(0o600)
         .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW)
         .open(path)?;
-    loop {
-        let result = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX) };
-        if result == 0 {
-            return Ok(file);
+    flock_retrying(file.as_raw_fd(), libc::LOCK_EX)?;
+    Ok(file)
+}
+
+pub(crate) fn flock_retrying(descriptor: RawFd, operation: libc::c_int) -> std::io::Result<()> {
+    retry_interrupted(|| {
+        if unsafe { libc::flock(descriptor, operation) } == 0 {
+            Ok(())
+        } else {
+            Err(std::io::Error::last_os_error())
         }
-        let error = std::io::Error::last_os_error();
-        if error.kind() != std::io::ErrorKind::Interrupted {
-            return Err(error.into());
+    })
+}
+
+pub(crate) fn retry_interrupted<T>(mut attempt: impl FnMut() -> std::io::Result<T>) -> std::io::Result<T> {
+    loop {
+        match attempt() {
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
+            outcome => return outcome,
         }
     }
 }
@@ -174,12 +185,13 @@ mod tests {
         let path = dir.path().join("connections.json");
         let first_marker = dir.path().join("first-acquired");
         let second_marker = dir.path().join("second-acquired");
+        let release = dir.path().join("release-first");
         let executable = std::env::current_exe().unwrap();
         let mut first = Command::new(&executable)
             .args(["--exact", "file_access::tests::subprocess_holds_path_lock", "--ignored"])
             .env("BOOKIE_LOCK_TEST_PATH", &path)
             .env("BOOKIE_LOCK_TEST_MARKER", &first_marker)
-            .env("BOOKIE_LOCK_TEST_HOLD_MS", "500")
+            .env("BOOKIE_LOCK_TEST_RELEASE", &release)
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()
@@ -189,7 +201,6 @@ mod tests {
             .args(["--exact", "file_access::tests::subprocess_holds_path_lock", "--ignored"])
             .env("BOOKIE_LOCK_TEST_PATH", &path)
             .env("BOOKIE_LOCK_TEST_MARKER", &second_marker)
-            .env("BOOKIE_LOCK_TEST_HOLD_MS", "0")
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()
@@ -197,9 +208,45 @@ mod tests {
 
         std::thread::sleep(Duration::from_millis(100));
         assert!(!second_marker.exists());
+        std::fs::write(&release, b"go").unwrap();
         assert!(first.wait().unwrap().success());
         assert!(second.wait().unwrap().success());
         assert!(second_marker.exists());
+    }
+
+    #[test]
+    fn an_interrupted_attempt_is_retried_until_it_finishes() {
+        let mut calls = 0;
+        let outcome = retry_interrupted(|| {
+            calls += 1;
+            if calls < 4 {
+                Err(std::io::Error::from(std::io::ErrorKind::Interrupted))
+            } else {
+                Ok(calls)
+            }
+        });
+        assert_eq!(outcome.unwrap(), 4);
+    }
+
+    #[test]
+    fn any_other_error_is_returned_at_once_and_never_retried() {
+        let mut calls = 0;
+        let outcome: std::io::Result<()> = retry_interrupted(|| {
+            calls += 1;
+            Err(std::io::Error::from(std::io::ErrorKind::PermissionDenied))
+        });
+        assert_eq!(outcome.unwrap_err().kind(), std::io::ErrorKind::PermissionDenied);
+        assert_eq!(calls, 1);
+    }
+
+    #[test]
+    fn a_free_file_locks_and_a_conflicting_non_blocking_lock_is_reported_and_not_retried() {
+        let directory = TempDir::new().unwrap();
+        let first = File::create(directory.path().join("lock")).unwrap();
+        let second = File::open(directory.path().join("lock")).unwrap();
+        flock_retrying(first.as_raw_fd(), libc::LOCK_EX).unwrap();
+        let error = flock_retrying(second.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB).unwrap_err();
+        assert_eq!(error.kind(), std::io::ErrorKind::WouldBlock);
     }
 
     fn wait_for_path(path: &Path) {
@@ -215,9 +262,10 @@ mod tests {
     async fn subprocess_holds_path_lock() {
         let path = PathBuf::from(std::env::var_os("BOOKIE_LOCK_TEST_PATH").unwrap());
         let marker = PathBuf::from(std::env::var_os("BOOKIE_LOCK_TEST_MARKER").unwrap());
-        let hold_ms: u64 = std::env::var("BOOKIE_LOCK_TEST_HOLD_MS").unwrap().parse().unwrap();
         let _guard = lock_path(&path).await.unwrap();
         std::fs::write(marker, b"acquired").unwrap();
-        std::thread::sleep(Duration::from_millis(hold_ms));
+        if let Some(release) = std::env::var_os("BOOKIE_LOCK_TEST_RELEASE") {
+            wait_for_path(Path::new(&release));
+        }
     }
 }

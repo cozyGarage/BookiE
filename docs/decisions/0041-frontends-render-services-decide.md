@@ -1,6 +1,6 @@
 # 0041: Frontends render; app-services decides
 
-- **Status**: Proposed
+- **Status**: Accepted (2026-11-11)
 - **Date**: 2026-11-09
 
 ## Context

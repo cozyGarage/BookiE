@@ -19,10 +19,13 @@ mod numeric_input;
 mod operation;
 mod pagination;
 mod params;
+mod pg_health;
 mod protobuf_wire;
 mod query;
 mod query_rows;
 mod registry;
+mod routine;
+mod server_message;
 mod session;
 pub mod sql_credentials;
 pub mod sql_ddl;
@@ -36,6 +39,8 @@ mod sqlite_any_csv;
 pub mod text_file;
 mod tls;
 mod transaction;
+mod value_search;
+mod view_editability;
 
 pub use activity::{ActivityQuery, ActivityUnsupported, activity_kinds, activity_sql, parse_session_id};
 pub use catalog::{CATALOG_OBJECT_LIMIT, CatalogObject, CatalogObjectKind};
@@ -45,8 +50,9 @@ pub use connection::{
     uri_host,
 };
 pub use driver::{
-    ConnectionFormDefaults, DataModel, DatabaseDriver, DriverCapabilities, DriverMaturity, EnumInputStyle,
-    connection_form_defaults, initial_connection_form_defaults,
+    ConnectionFormDefaults, DataModel, DatabaseDriver, DriverCapabilities, DriverMaturity,
+    DriverValueInputCapabilities, EnumInputStyle, ImportUpsertStyle, connection_form_defaults,
+    initial_connection_form_defaults,
 };
 pub use error::DriverError;
 pub use filter::{
@@ -62,20 +68,30 @@ pub use numeric_input::{
 pub use operation::{
     CANCELLATION_DISPATCH_TIMEOUT, CANCELLATION_GRACE, CONTROL_SETUP_TIMEOUT, Interruption, OperationControl,
     check_pre_dispatch, run_controlled_setup, run_server_cancellable,
+    run_server_cancellable_preserving_transaction_rollback,
 };
 pub use pagination::{
     KEYSET_OFFSET_THRESHOLD, KeysetError, keyset_before_where_clause, keyset_order_by, keyset_order_by_before,
     keyset_where_clause,
 };
 pub use params::{NamedParameters, ParameterKind, extract_named_parameters, parse_parameter_value};
+pub use pg_health::{HEALTH_ROW_LIMIT, HealthReport, hidden_schemas_param};
 pub use protobuf_wire::{MAX_PAYLOAD_BYTES as MAX_PROTOBUF_BYTES, ProtobufWireError, decode_protobuf_wire};
 pub use query::{
     ColumnInfo, ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, MAX_QUERY_CURSOR_PAGE_ROWS,
     MAX_QUERY_RESULT_BYTES, MAX_QUERY_RESULT_CELLS, MAX_QUERY_ROWS, QualifiedTypeName, QueryCursorId, QueryCursorPage,
-    QueryResult, QueryResultBatch, QueryResultBudget, TableInfo, Value, parse_partial, partial_value,
+    QueryResult, QueryResultBatch, QueryResultBudget, TableInfo, Value, estimated_row_size, parse_partial,
+    partial_value,
 };
 pub use query_rows::{QueryRowSet, QueryRows};
 pub use registry::DriverRegistry;
+pub use routine::{ROUTINE_DEFINITION_LIMIT_BYTES, RoutineDefinition, RoutineLookup, RoutineRef, cap_definition};
+pub use server_message::{
+    MAX_SERVER_MESSAGE_CODE_BYTES, MAX_SERVER_MESSAGE_TEXT_BYTES, MAX_SERVER_MESSAGES, MAX_SERVER_MESSAGES_TOTAL_BYTES,
+    MessageSeverity, ServerMessage, ServerMessages,
+};
 pub use session::{Session, SessionCommitOutcome};
 pub use tls::{Environment, TlsConfig, TlsMode, error_chain_text, looks_like_tls_failure};
 pub use transaction::Transaction;
+pub use value_search::{SearchClause, SearchMode, search_clause};
+pub use view_editability::ViewEditability;

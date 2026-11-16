@@ -49,12 +49,12 @@ fn present(
     persist: Rc<Option<Persist>>,
 ) {
     let dialog = adw::Dialog::builder()
-        .title(crate::tr!("Columns"))
+        .title(bookie_app_services::tr!("Columns"))
         .content_width(380)
         .content_height(460)
         .build();
     let group = adw::PreferencesGroup::builder()
-        .description(crate::tr!("At least one column stays visible."))
+        .description(bookie_app_services::tr!("At least one column stays visible."))
         .build();
     let rows: Rc<Vec<adw::SwitchRow>> = Rc::new(
         names
@@ -76,11 +76,11 @@ fn present(
     }
     let widths = adw::PreferencesGroup::new();
     let reset = adw::ActionRow::builder()
-        .title(crate::tr!("Column widths"))
-        .subtitle(crate::tr!("Forget the widths you set by dragging"))
+        .title(bookie_app_services::tr!("Column widths"))
+        .subtitle(bookie_app_services::tr!("Forget the widths you set by dragging"))
         .build();
     let reset_button = gtk::Button::builder()
-        .label(crate::tr!("Reset"))
+        .label(bookie_app_services::tr!("Reset"))
         .valign(gtk::Align::Center)
         .build();
     {

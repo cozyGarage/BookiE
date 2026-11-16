@@ -1,13 +1,3 @@
-//! App-side handlers for the Structure (DDL) workspace tab.
-//!
-//! Each `on_*` method mirrors the equivalent Browse-tab path in
-//! `browse.rs` / `row_ops.rs`: dispatch by tab id, take a slot
-//! reference, run async work via `sender.command`, route results
-//! back through `AppMsg::Structure*Loaded` / `Structure*Completed`
-//! variants. Window-close is gated by the shared `in_flight_saves`
-//! counter so a Structure DDL transaction can't commit after the
-//! window has been torn down.
-
 use relm4::adw::prelude::*;
 use relm4::{ComponentController, ComponentSender, adw};
 use uuid::Uuid;
@@ -73,21 +63,14 @@ impl App {
         );
     }
 
-    /// Sidebar right-click → "New Table…" or schema-header "+" button.
     pub(super) fn on_new_table_tab(&mut self, schema: Option<String>, sender: ComponentSender<Self>) {
         if !self.connected {
-            self.show_toast(&crate::tr!("Connect to a database first."));
+            self.show_toast(&bookie_app_services::tr!("Connect to a database first."));
             return;
         }
         self.append_new_structure_tab(schema, sender);
     }
 
-    /// Sidebar right-click → "Edit Structure". Opens a dedicated
-    /// Structure tab (separate AdwTabPage). If one already exists for
-    /// this `(schema, table)` it's just re-selected; otherwise a new
-    /// `WorkspaceTab::Structure` is appended via
-    /// `append_existing_structure_tab`. The Data-side Browse tab (if
-    /// any) is independent — both can stay open side by side.
     pub(super) fn on_edit_structure_tab(
         &mut self,
         schema: Option<String>,
@@ -95,12 +78,16 @@ impl App {
         sender: ComponentSender<Self>,
     ) {
         if !self.connected {
-            self.show_toast(&crate::tr!("Connect to a database first."));
+            self.show_toast(&bookie_app_services::tr!("Connect to a database first."));
             return;
         }
-        let existing_structure = self.workspace_tabs.borrow().iter().find_map(|(_, tab)| match tab {
+        let front = self.connection_id;
+        let existing_structure = self.workspace_tabs.borrow().iter().find_map(|(id, tab)| match tab {
             WorkspaceTab::Structure(slot)
-                if slot.mode == StructureMode::Edit && slot.schema == schema && slot.table == table =>
+                if slot.mode == StructureMode::Edit
+                    && slot.schema == schema
+                    && slot.table == table
+                    && self.tab_belongs_to(*id, front) =>
             {
                 Some(slot.page.clone())
             }
@@ -115,11 +102,16 @@ impl App {
         self.append_existing_structure_tab(schema, table, sender);
     }
 
-    fn has_open_tabs_for_table(&self, schema: Option<&str>, table: &str) -> bool {
-        self.workspace_tabs.borrow().values().any(|tab| match tab {
-            WorkspaceTab::Structure(s) => s.schema.as_deref() == schema && s.table == table,
-            WorkspaceTab::Table(s) => s.schema.as_deref() == schema && s.table == table,
-            _ => false,
+    fn has_open_tabs_for_table(&self, connection_id: Uuid, schema: Option<&str>, table: &str) -> bool {
+        self.workspace_tabs.borrow().iter().any(|(id, tab)| {
+            if !self.tab_belongs_to(*id, Some(connection_id)) {
+                return false;
+            }
+            match tab {
+                WorkspaceTab::Structure(s) => s.schema.as_deref() == schema && s.table == table,
+                WorkspaceTab::Table(s) => s.schema.as_deref() == schema && s.table == table,
+                _ => false,
+            }
         })
     }
 
@@ -134,16 +126,16 @@ impl App {
         };
         let driver_id = self.driver_id().to_string();
         if let Err(e) = bookie_core::sql_ddl::build_truncate_table(&driver_id, schema.as_deref(), &table) {
-            self.show_error_alert(&crate::tr!("Cannot truncate table"), &format!("{e}"));
+            self.show_error_alert(&bookie_app_services::tr!("Cannot truncate table"), &format!("{e}"));
             return;
         }
-        let title = crate::tr!("Truncate {table}?").replace("{table}", &table);
-        let body = crate::tr!(
+        let title = bookie_app_services::tr!("Truncate {table}?").replace("{table}", &table);
+        let body = bookie_app_services::tr!(
             "All rows will be removed and the table definition kept. This can't be undone from inside BookiE."
         );
         let dialog = adw::AlertDialog::new(Some(&title), Some(&body));
-        dialog.add_response("cancel", &crate::tr!("Cancel"));
-        dialog.add_response("truncate", &crate::tr!("Truncate"));
+        dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
+        dialog.add_response("truncate", &bookie_app_services::tr!("Truncate"));
         dialog.set_response_appearance("truncate", adw::ResponseAppearance::Destructive);
         dialog.set_default_response(Some("cancel"));
         dialog.set_close_response("cancel");
@@ -175,7 +167,7 @@ impl App {
         let sql = match bookie_core::sql_ddl::build_truncate_table(&driver_id, schema.as_deref(), &table) {
             Ok(sql) => sql,
             Err(e) => {
-                self.show_error_alert(&crate::tr!("Cannot truncate table"), &format!("{e}"));
+                self.show_error_alert(&bookie_app_services::tr!("Cannot truncate table"), &format!("{e}"));
                 return;
             }
         };
@@ -188,8 +180,8 @@ impl App {
                 .register(async move {
                     let Some(conn) = connection else {
                         sender_for_cmd.input(AppMsg::ShowAlert {
-                            title: crate::tr!("Cannot truncate table"),
-                            body: crate::tr!("No active connection."),
+                            title: bookie_app_services::tr!("Cannot truncate table"),
+                            body: bookie_app_services::tr!("No active connection."),
                         });
                         return;
                     };
@@ -201,7 +193,7 @@ impl App {
                             table: Some(table),
                         }),
                         Err(e) => sender_for_cmd.input(AppMsg::ShowAlert {
-                            title: crate::tr!("Truncate failed"),
+                            title: bookie_app_services::tr!("Truncate failed"),
                             body: format!("{e}"),
                         }),
                     }
@@ -219,20 +211,20 @@ impl App {
         let Some(origin) = CatalogOrigin::capture(self.connection_id, &self.database) else {
             return;
         };
-        if self.has_open_tabs_for_table(schema.as_deref(), &table) {
+        if self.has_open_tabs_for_table(origin.id, schema.as_deref(), &table) {
             self.show_error_alert(
-                &crate::tr!("Cannot rename table"),
-                &crate::tr!("Close the open tabs for {table} first, so no pending changes are lost.")
+                &bookie_app_services::tr!("Cannot rename table"),
+                &bookie_app_services::tr!("Close the open tabs for {table} first, so no pending changes are lost.")
                     .replace("{table}", &table),
             );
             return;
         }
-        let title = crate::tr!("Rename {table}").replace("{table}", &table);
+        let title = bookie_app_services::tr!("Rename {table}").replace("{table}", &table);
         let dialog = adw::AlertDialog::new(Some(&title), None);
         let entry = gtk4::Entry::builder().text(&table).activates_default(true).build();
         dialog.set_extra_child(Some(&entry));
-        dialog.add_response("cancel", &crate::tr!("Cancel"));
-        dialog.add_response("rename", &crate::tr!("Rename"));
+        dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
+        dialog.add_response("rename", &bookie_app_services::tr!("Rename"));
         dialog.set_response_appearance("rename", adw::ResponseAppearance::Suggested);
         dialog.set_default_response(Some("rename"));
         dialog.set_close_response("cancel");
@@ -267,7 +259,7 @@ impl App {
         let sql = match bookie_core::sql_ddl::build_rename_table(&driver_id, schema.as_deref(), &table, &new_name) {
             Ok(sql) => sql,
             Err(e) => {
-                self.show_error_alert(&crate::tr!("Cannot rename table"), &format!("{e}"));
+                self.show_error_alert(&bookie_app_services::tr!("Cannot rename table"), &format!("{e}"));
                 return;
             }
         };
@@ -280,8 +272,8 @@ impl App {
                 .register(async move {
                     let Some(conn) = connection else {
                         sender_for_cmd.input(AppMsg::ShowAlert {
-                            title: crate::tr!("Cannot rename table"),
-                            body: crate::tr!("No active connection."),
+                            title: bookie_app_services::tr!("Cannot rename table"),
+                            body: bookie_app_services::tr!("No active connection."),
                         });
                         return;
                     };
@@ -293,7 +285,7 @@ impl App {
                             table: None,
                         }),
                         Err(e) => sender_for_cmd.input(AppMsg::ShowAlert {
-                            title: crate::tr!("Rename failed"),
+                            title: bookie_app_services::tr!("Rename failed"),
                             body: format!("{e}"),
                         }),
                     }
@@ -302,7 +294,6 @@ impl App {
         });
     }
 
-    /// Right-click → "Drop Table…", or in-tab destructive button.
     pub(super) fn on_drop_table_prompt(
         &mut self,
         schema: Option<String>,
@@ -312,12 +303,53 @@ impl App {
         let Some(origin) = CatalogOrigin::capture(self.connection_id, &self.database) else {
             return;
         };
-        let title = crate::tr!("Drop {table}?").replace("{table}", &table);
-        let body =
-            crate::tr!("All rows and the table definition will be removed. This can't be undone from inside BookiE.");
+        let connection = origin.connection(&self.database);
+        let timeout_secs =
+            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
+        let sender_for_cmd = sender.clone();
+        sender.command(move |_, shutdown| {
+            shutdown
+                .register(async move {
+                    let control = crate::services::operation_control::bounded(timeout_secs);
+                    let inbound = match connection {
+                        Some(conn) => conn
+                            .fetch_inbound_foreign_keys_controlled(schema.as_deref(), &table, &control)
+                            .await
+                            .unwrap_or_default(),
+                        None => Vec::new(),
+                    };
+                    let referencing = bookie_app_services::referencing_tables::referencing_tables(
+                        &inbound,
+                        schema.as_deref(),
+                        &table,
+                    );
+                    sender_for_cmd.input(AppMsg::DropTablePromptReady {
+                        origin,
+                        schema,
+                        table,
+                        referencing,
+                    });
+                })
+                .drop_on_shutdown()
+        });
+    }
+
+    pub(super) fn present_drop_table_prompt(
+        &mut self,
+        origin: CatalogOrigin,
+        schema: Option<String>,
+        table: String,
+        referencing: &[String],
+        sender: ComponentSender<Self>,
+    ) {
+        if !origin.owns_window(self.connection_id, &self.database) {
+            return;
+        }
+        let title = bookie_app_services::tr!("Drop {table}?").replace("{table}", &table);
+        let body = drop_table_body(referencing);
         let dialog = adw::AlertDialog::new(Some(&title), Some(&body));
-        dialog.add_response("cancel", &crate::tr!("Cancel"));
-        dialog.add_response("drop", &crate::tr!("Drop"));
+        dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
+        dialog.add_response("drop", &bookie_app_services::tr!("Drop"));
         dialog.set_response_appearance("drop", adw::ResponseAppearance::Destructive);
         dialog.set_default_response(Some("cancel"));
         dialog.set_close_response("cancel");
@@ -336,11 +368,7 @@ impl App {
         dialog.present(Some(&self.window));
     }
 
-    /// User confirmed the drop. Run DROP TABLE async; only close any
-    /// open Browse / Structure tabs for the table after the DROP
-    /// returns Ok. Tabs stay open if DROP fails (FK violation,
-    /// privileges) so the user doesn't lose their state on a failed
-    /// destructive action.
+    /// Close tabs for the table only after DROP succeeds.
     pub(super) fn on_drop_table_confirmed(
         &mut self,
         origin: CatalogOrigin,
@@ -357,7 +385,7 @@ impl App {
         let sql = match bookie_core::sql_ddl::build_drop_table(&driver_id, schema.as_deref(), &table, true, false) {
             Ok(s) => s,
             Err(e) => {
-                self.show_error_alert(&crate::tr!("Cannot drop table"), &format!("{e}"));
+                self.show_error_alert(&bookie_app_services::tr!("Cannot drop table"), &format!("{e}"));
                 return;
             }
         };
@@ -372,8 +400,8 @@ impl App {
                 .register(async move {
                     let Some(conn) = connection else {
                         sender_for_cmd.input(AppMsg::ShowAlert {
-                            title: crate::tr!("Cannot drop table"),
-                            body: crate::tr!("No active connection."),
+                            title: bookie_app_services::tr!("Cannot drop table"),
+                            body: bookie_app_services::tr!("No active connection."),
                         });
                         return;
                     };
@@ -388,7 +416,7 @@ impl App {
                         }
                         Err(e) => {
                             sender_for_cmd.input(AppMsg::ShowAlert {
-                                title: crate::tr!("Drop failed"),
+                                title: bookie_app_services::tr!("Drop failed"),
                                 body: format!("{e}"),
                             });
                         }
@@ -398,17 +426,9 @@ impl App {
         });
     }
 
-    /// Targeted save: commit a specific Structure tab's pending DDL
-    /// without requiring it to be the active tab. Used by the
-    /// close-with-pending dialog's "Save" branch — the user might be
-    /// closing a background tab via its X button.
+    /// Save a background Structure tab selected for close-with-pending.
     pub(super) fn save_structure_tab_by_id(&mut self, tab_id: Uuid, sender: ComponentSender<Self>) {
-        // If a save is already in flight for this tab, do nothing —
-        // calling `on_execute_structure_transaction` would silently
-        // early-return on the duplicate insert, never firing a
-        // completion. The in-flight save's `on_structure_save_completed`
-        // (or _failed) drains `close_after_save` for `tab_id`, so the
-        // close-with-pending flow still resolves through that path.
+        // Let the active save resolve close-after-save instead of re-dispatching.
         if self.structure_saves_in_flight.borrow().contains(&tab_id) {
             tracing::debug!(
                 ?tab_id,
@@ -416,7 +436,10 @@ impl App {
             );
             return;
         }
-        let driver_id = self.driver_id().to_string();
+        let Some(driver_id) = self.tab_driver_id(tab_id) else {
+            self.report_refused_tab_save(tab_id, &sender);
+            return;
+        };
         let result = self
             .structure_trackers
             .with_tab_ref(tab_id, |t| t.materialize(&driver_id));
@@ -425,10 +448,9 @@ impl App {
                 self.on_execute_structure_transaction(tab_id, statements, sender);
             }
             Some(Ok(_)) => {
-                // Nothing to save — short-circuit so close-after-save
-                // can proceed.
+                // Continue close-after-save when there is nothing to commit.
                 sender.input(AppMsg::StructureSaveCompleted {
-                    origin: CatalogOrigin::capture(self.connection_id, &self.database),
+                    origin: self.tab_origin(tab_id),
                     tab_id,
                     new_table_name: None,
                 });
@@ -440,10 +462,7 @@ impl App {
         }
     }
 
-    /// Drop succeeded on the driver — now close any open tabs for
-    /// the dropped table and refresh sidebar. Run synchronously on
-    /// the GTK main thread so the close + sidebar refresh appear
-    /// atomic to the user.
+    /// Close matching tabs before refreshing the sidebar after a successful drop.
     pub(super) fn on_drop_table_succeeded(
         &mut self,
         origin: CatalogOrigin,
@@ -454,7 +473,7 @@ impl App {
         if !origin.owns_window(self.connection_id, &self.database) {
             return;
         }
-        self.close_tabs_for_table(schema.as_deref(), &table);
+        self.close_tabs_for_table(origin.id, schema.as_deref(), &table);
         sender.input(AppMsg::SchemaChanged {
             origin: origin.clone(),
             schema,
@@ -462,15 +481,16 @@ impl App {
         });
     }
 
-    /// Walk the tab map and force-close any Browse / Structure tabs
-    /// pointing at `(schema, table)`. Skips the per-tab pending-changes
-    /// dialog because the underlying table is gone.
-    pub(super) fn close_tabs_for_table(&mut self, schema: Option<&str>, table: &str) {
+    /// Skip pending-change prompts because the dropped table no longer exists.
+    pub(super) fn close_tabs_for_table(&mut self, connection_id: Uuid, schema: Option<&str>, table: &str) {
         let Some(tab_view) = self.workspace_tab_view.clone() else {
             return;
         };
         let mut targets: Vec<Uuid> = Vec::new();
         for (id, tab) in self.workspace_tabs.borrow().iter() {
+            if !self.tab_belongs_to(*id, Some(connection_id)) {
+                continue;
+            }
             match tab {
                 WorkspaceTab::Structure(s) if s.schema.as_deref() == schema && s.table == table => targets.push(*id),
                 WorkspaceTab::Table(s) if s.schema.as_deref() == schema && s.table == table => targets.push(*id),
@@ -482,29 +502,21 @@ impl App {
         }
     }
 
-    /// Structure tab Save → run ordered DDL statements. Engines whose
-    /// DDL is transactional go through `execute_in_transaction` so a
-    /// mid-batch failure rolls the whole save back; the driver owns the
-    /// transaction-control statements because their spelling and their
-    /// wire encoding are engine-specific. The rest execute
-    /// sequentially.
+    /// Run transactional DDL as one batch; run non-transactional DDL sequentially.
     pub(super) fn on_execute_structure_transaction(
         &mut self,
         tab_id: Uuid,
         statements: Vec<String>,
         sender: ComponentSender<Self>,
     ) {
-        // Reject re-entry: a second Ctrl+S (or rapid double-click on
-        // Save) while the first DDL transaction is still mid-flight
-        // would dispatch a parallel async command and potentially
-        // commit the same statements twice. Mark the tab and bail.
+        // Prevent concurrent saves from committing the same DDL twice.
         if !self.structure_saves_in_flight.borrow_mut().insert(tab_id) {
             tracing::debug!(?tab_id, "structure save already in flight; ignoring duplicate");
             return;
         }
-        let Some(driver_id) = self.current_driver_id.clone() else {
+        let Some(driver_id) = self.tab_driver_id(tab_id) else {
             self.structure_saves_in_flight.borrow_mut().remove(&tab_id);
-            sender.input(AppMsg::StructureSaveFailed(tab_id, crate::tr!("No active connection.")));
+            self.report_refused_tab_save(tab_id, &sender);
             return;
         };
         let ddl_is_transactional = self
@@ -519,20 +531,14 @@ impl App {
             };
             match slot {
                 WorkspaceTab::Structure(s) => s.mode,
-                // Table tabs no longer host the DDL editor — structure
-                // lives in its own WorkspaceTab::Structure. A structure
-                // Save dispatched against a Table-tab id can only be a
-                // stale queued message from before the split; clear the
-                // in-flight gate and bail.
+                // A table-tab save is stale because DDL now uses Structure tabs.
                 _ => {
                     self.structure_saves_in_flight.borrow_mut().remove(&tab_id);
                     return;
                 }
             }
         };
-        // For New mode we need the user-typed table name. Today the
-        // stub UI doesn't expose a name field yet, so pull it from
-        // the first CreateTable op in the tracker.
+        // The first CreateTable op carries the name for a new-table draft.
         let new_table_name = if matches!(mode, StructureMode::New) {
             self.structure_trackers
                 .with_tab_ref(tab_id, |t| {
@@ -549,22 +555,27 @@ impl App {
             None
         };
 
-        let Some(origin) = CatalogOrigin::capture(self.connection_id, &self.database) else {
+        let Some(origin) = self.tab_origin(tab_id) else {
             self.structure_saves_in_flight.borrow_mut().remove(&tab_id);
-            sender.input(AppMsg::StructureSaveFailed(tab_id, crate::tr!("No active connection.")));
+            sender.input(AppMsg::StructureSaveFailed(
+                tab_id,
+                bookie_app_services::tr!("No active connection."),
+            ));
             return;
         };
         self.in_flight_saves.set(self.in_flight_saves.get() + 1);
         let sender_for_cmd = sender.clone();
-        let mut recorded = self.ran_statements(Source::Structure, &statements);
+        let mut recorded = self.ran_statements(tab_id, Source::Structure, &statements);
         let connection = origin.connection(&self.database);
-        let timeout_secs =
-            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
+        let timeout_secs = self.tab_timeout_secs(tab_id);
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
                     let Some(conn) = connection else {
-                        sender_for_cmd.input(AppMsg::StructureSaveFailed(tab_id, crate::tr!("No active connection.")));
+                        sender_for_cmd.input(AppMsg::StructureSaveFailed(
+                            tab_id,
+                            bookie_app_services::tr!("No active connection."),
+                        ));
                         return;
                     };
                     let control = crate::services::operation_control::bounded(timeout_secs);
@@ -598,16 +609,6 @@ impl App {
         });
     }
 
-    /// Save resolved successfully. Two cases:
-    ///
-    /// 1. **New-Table draft (`Structure` slot)**: CreateTable
-    ///    succeeded so the table now exists. Close the draft and
-    ///    append a fresh `Table` tab pointed at the new name in
-    ///    Structure mode so the user keeps editing in the canonical
-    ///    UI.
-    /// 2. **Table tab Save**: the slot stays put; just forward
-    ///    `SaveCompleted` to the structure controller so it clears
-    ///    the tracker + refetches introspection.
     pub(super) fn on_structure_save_completed(
         &mut self,
         origin: Option<CatalogOrigin>,
@@ -620,19 +621,15 @@ impl App {
         }
         self.structure_saves_in_flight.borrow_mut().remove(&tab_id);
 
-        let Some(origin) = origin.filter(|origin| origin.owns_window(self.connection_id, &self.database)) else {
+        let Some(origin) = origin.filter(|origin| self.tab_owns_origin(tab_id, origin)) else {
             return;
         };
 
-        // Inspect slot kind first so we can branch — promote-and-close
-        // vs. in-place clear — without borrowing across mutation.
         enum SaveKind {
             PromoteNewToTable(Option<String>, String),
             UpdateInPlace(Option<String>, String),
             Skip,
         }
-        // `WorkspaceTab::Structure` only exists for New-Table drafts;
-        // Edit-mode DDL flows through Table tabs exclusively.
         let kind = {
             let tabs = self.workspace_tabs.borrow();
             match tabs.get(&tab_id) {
@@ -651,12 +648,6 @@ impl App {
                 if let Some(tab_view) = self.workspace_tab_view.clone() {
                     self.finish_close_workspace_tab_now(tab_id, &tab_view);
                 }
-                // After the CREATE TABLE lands, drop the user into a
-                // Browse tab on the freshly-created table — they just
-                // designed it, so showing Data (empty grid) is the
-                // natural next step. If they want to keep editing the
-                // schema, sidebar right-click → "Edit Structure"
-                // reopens a Structure tab.
                 super::App::append_table_tab(
                     self,
                     schema.clone(),
@@ -690,16 +681,7 @@ impl App {
             SaveKind::Skip => {}
         }
 
-        // Mirror the browse `SaveCompletedForTab` cleanup. Without this,
-        // a close-with-pending dialog that picked "Save" leaves the tab
-        // open after a successful structure save (the dialog inserted
-        // tab_id into close_after_save, expecting completion to drain
-        // it). For PromoteNewToTable the original Structure tab was
-        // already closed by `finish_close_workspace_tab`; the
-        // `WorkspaceTabClosed` here is therefore dispatched only for
-        // UpdateInPlace and Skip paths where the tab is still alive.
-        // The window-close-after-save check runs unconditionally since
-        // the counter membership was consumed either way.
+        // Consume close-after-save state even when a new-table draft was already closed.
         let drained = self.close_after_save.borrow_mut().complete(&tab_id);
         if drained && !kind_promoted {
             self.request_workspace_tab_close(tab_id);
@@ -715,14 +697,10 @@ impl App {
             self.in_flight_saves.set(self.in_flight_saves.get() - 1);
         }
         self.structure_saves_in_flight.borrow_mut().remove(&tab_id);
-        // Match the Browse-side `SaveFailedForTab` handler: a save
-        // that started from the close-with-pending dialog left this
-        // tab in `close_after_save`, and the window-close-after-save
-        // intent in `close_window_after_save`. Both must be cleared
-        // on failure or the next unrelated SaveCompleted on another
-        // tab will spuriously close the window.
+        // A failed save must not let a later tab completion close this window.
         self.close_after_save.borrow_mut().cancel(&tab_id);
         self.close_window_after_save.set(false);
+        self.announce_save_failure(tab_id, &message);
         if let Some(controller) = self
             .workspace_tabs
             .borrow()
@@ -733,11 +711,6 @@ impl App {
         }
     }
 
-    /// Sidebar "Show CREATE TABLE" — synthesise the canonical
-    /// CREATE statement for an existing table by fetching columns,
-    /// indexes, and FKs and feeding them through
-    /// `sql_ddl::materialize_ops`. Result lands in a fresh editor
-    /// tab. No Structure tab is touched; the user just sees the SQL.
     pub(super) fn on_structure_text(
         &self,
         schema: Option<String>,
@@ -762,7 +735,7 @@ impl App {
             shutdown
                 .register(async move {
                     let Some(conn) = connection_id.and_then(|id| database.get(id)) else {
-                        sender_for_cmd.input(AppMsg::ShowToast(crate::tr!("No active connection.")));
+                        sender_for_cmd.input(AppMsg::ShowToast(bookie_app_services::tr!("No active connection.")));
                         return;
                     };
                     let control = crate::services::operation_control::bounded(timeout_secs);
@@ -773,7 +746,7 @@ impl App {
                         Ok(keys) => keys,
                         Err(error) => {
                             sender_for_cmd.input(AppMsg::ShowAlert {
-                                title: crate::tr!("Couldn't read foreign keys"),
+                                title: bookie_app_services::tr!("Couldn't read foreign keys"),
                                 body: crate::services::error_text::driver_message(&error),
                             });
                             return;
@@ -782,7 +755,7 @@ impl App {
                     match bookie_core::join_skeleton(&driver_id, schema.as_deref(), &table, &keys) {
                         Ok(sql) => sender_for_cmd.input(AppMsg::ShowCreateTableLoaded { sql }),
                         Err(refusal) => sender_for_cmd.input(AppMsg::ShowAlert {
-                            title: crate::tr!("No join was built"),
+                            title: bookie_app_services::tr!("No join was built"),
                             body: refusal.to_string(),
                         }),
                     }
@@ -804,7 +777,7 @@ impl App {
             shutdown
                 .register(async move {
                     let Some(conn) = connection_id.and_then(|id| database.get(id)) else {
-                        sender_for_cmd.input(AppMsg::ShowToast(crate::tr!("No active connection.")));
+                        sender_for_cmd.input(AppMsg::ShowToast(bookie_app_services::tr!("No active connection.")));
                         return;
                     };
                     let control = crate::services::operation_control::bounded(timeout_secs);
@@ -815,20 +788,23 @@ impl App {
                         Ok(c) => c,
                         Err(e) => {
                             sender_for_cmd.input(AppMsg::ShowToast(
-                                crate::tr!("Couldn't read columns: {error}").replace("{error}", &format!("{e}")),
+                                bookie_app_services::tr!("Couldn't read columns: {error}")
+                                    .replace("{error}", &format!("{e}")),
                             ));
                             return;
                         }
                     };
                     if columns.is_empty() {
                         sender_for_cmd.input(AppMsg::ShowToast(
-                            crate::tr!("Table {table} has no columns.").replace("{table}", &table_for_cmd),
+                            bookie_app_services::tr!("Table {table} has no columns.")
+                                .replace("{table}", &table_for_cmd),
                         ));
                         return;
                     }
                     if let Err(e) = bookie_core::check_pre_dispatch(&control) {
                         sender_for_cmd.input(AppMsg::ShowToast(
-                            crate::tr!("Couldn't read indexes: {error}").replace("{error}", &format!("{e}")),
+                            bookie_app_services::tr!("Couldn't read indexes: {error}")
+                                .replace("{error}", &format!("{e}")),
                         ));
                         return;
                     }
@@ -839,14 +815,16 @@ impl App {
                         Ok(indexes) => indexes,
                         Err(e) => {
                             sender_for_cmd.input(AppMsg::ShowToast(
-                                crate::tr!("Couldn't read indexes: {error}").replace("{error}", &format!("{e}")),
+                                bookie_app_services::tr!("Couldn't read indexes: {error}")
+                                    .replace("{error}", &format!("{e}")),
                             ));
                             return;
                         }
                     };
                     if let Err(e) = bookie_core::check_pre_dispatch(&control) {
                         sender_for_cmd.input(AppMsg::ShowToast(
-                            crate::tr!("Couldn't read foreign keys: {error}").replace("{error}", &format!("{e}")),
+                            bookie_app_services::tr!("Couldn't read foreign keys: {error}")
+                                .replace("{error}", &format!("{e}")),
                         ));
                         return;
                     }
@@ -857,16 +835,13 @@ impl App {
                         Ok(fks) => fks,
                         Err(e) => {
                             sender_for_cmd.input(AppMsg::ShowToast(
-                                crate::tr!("Couldn't read foreign keys: {error}").replace("{error}", &format!("{e}")),
+                                bookie_app_services::tr!("Couldn't read foreign keys: {error}")
+                                    .replace("{error}", &format!("{e}")),
                             ));
                             return;
                         }
                     };
-                    // Synthesise the CreateTable op directly from the
-                    // fetched schema. DraftColumn::from_info preserves
-                    // the original ColumnInfo so materialise emits the
-                    // right type / nullability / default per driver
-                    // dialect.
+                    // Preserve fetched metadata so generated SQL retains driver-specific types and defaults.
                     let op = bookie_core::sql_ddl::StructureOp::CreateTable {
                         schema: schema_for_cmd.clone(),
                         table: table_for_cmd.clone(),
@@ -876,22 +851,20 @@ impl App {
                             .collect(),
                         indexes,
                         fks,
+                        default_collation: None,
                     };
                     match bookie_core::sql_ddl::materialize_ops(&[op], &driver_id) {
                         Ok(stmts) if !stmts.is_empty() => {
-                            // Multi-statement output (CreateTable + N
-                            // CREATE INDEX + N ALTER ... ADD FK) joins
-                            // with semicolons + blank lines so the
-                            // editor renders each statement on its own.
                             let sql = stmts.join(";\n\n") + ";";
                             sender_for_cmd.input(AppMsg::ShowCreateTableLoaded { sql });
                         }
                         Ok(_) => {
-                            sender_for_cmd.input(AppMsg::ShowToast(crate::tr!("Nothing to show.")));
+                            sender_for_cmd.input(AppMsg::ShowToast(bookie_app_services::tr!("Nothing to show.")));
                         }
                         Err(e) => {
                             sender_for_cmd.input(AppMsg::ShowToast(
-                                crate::tr!("Couldn't build SQL: {error}").replace("{error}", &format!("{e}")),
+                                bookie_app_services::tr!("Couldn't build SQL: {error}")
+                                    .replace("{error}", &format!("{e}")),
                             ));
                         }
                     }
@@ -900,11 +873,7 @@ impl App {
         });
     }
 
-    /// Edit-mode init asks for introspection. Fetch columns / indexes /
-    /// FKs in one async block and dispatch a single StructureLoaded
-    /// carrying all three so the tab only rebuilds its UI once. The
-    /// previous fan-out (3 messages, 3 rebuilds) was visible as
-    /// flicker on Edit-mode tab open.
+    /// Fetch all structure metadata together to avoid rebuilding the tab three times.
     pub(super) fn on_fetch_structure_data(&self, tab_id: Uuid, sender: ComponentSender<Self>) {
         let (schema, table) = {
             let tabs = self.workspace_tabs.borrow();
@@ -918,18 +887,24 @@ impl App {
         };
         let token = self.read_scopes.borrow_mut().start(tab_id, ReadScope::Structure);
         let sender_for_cmd = sender.clone();
-        let capabilities = crate::ui::structure_tab::driver_capabilities_for(&self.registry, self.driver_id());
-        let connection_id = self.connection_id;
+        let Some(tab_driver_id) = self.tab_driver_id(tab_id) else {
+            sender.input(AppMsg::StructureLoadFailed {
+                tab_id,
+                message: bookie_app_services::tr!("No active connection."),
+            });
+            return;
+        };
+        let capabilities = crate::ui::structure_tab::driver_capabilities_for(&self.registry, &tab_driver_id);
+        let connection_id = self.resolve_tab_connection(tab_id).ok();
         let database = self.database.clone();
-        let timeout_secs =
-            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
+        let timeout_secs = self.tab_timeout_secs(tab_id);
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
                     let Some(conn) = connection_id.and_then(|id| database.get(id)) else {
                         sender_for_cmd.input(AppMsg::StructureLoadFailed {
                             tab_id,
-                            message: crate::tr!("No active connection."),
+                            message: bookie_app_services::tr!("No active connection."),
                         });
                         return;
                     };
@@ -996,6 +971,55 @@ impl App {
         }
     }
 
+    pub(super) fn on_fetch_collations(&self, tab_id: Uuid, sender: ComponentSender<Self>) {
+        let token = self.read_scopes.borrow_mut().start(tab_id, ReadScope::Structure);
+        let sender_for_cmd = sender.clone();
+        let connection_id = self.resolve_tab_connection(tab_id).ok();
+        let database = self.database.clone();
+        let table_default_supported = self.tab_driver_id(tab_id).is_some_and(|driver_id| {
+            crate::ui::structure_tab::driver_capabilities_for(&self.registry, &driver_id)
+                .supports_table_default_collation
+        });
+        let timeout_secs = self.tab_timeout_secs(tab_id);
+        sender.command(move |_, shutdown| {
+            shutdown
+                .register(async move {
+                    let Some(conn) = connection_id.and_then(|id| database.get(id)) else {
+                        return;
+                    };
+                    let control = crate::services::operation_control::bounded_with(timeout_secs, token);
+                    let Ok(collations) =
+                        bookie_app_services::structure_metadata::load_collations(conn.as_ref(), &control).await
+                    else {
+                        return;
+                    };
+                    if control.cancellation_token().is_cancelled() {
+                        return;
+                    }
+                    sender_for_cmd.input(AppMsg::CollationsLoaded {
+                        tab_id,
+                        collations: collations.into_iter().map(|collation| collation.name).collect(),
+                        table_default_supported,
+                    });
+                })
+                .drop_on_shutdown()
+        });
+    }
+
+    pub(super) fn on_collations_loaded(&self, tab_id: Uuid, collations: Vec<String>, table_default_supported: bool) {
+        if let Some(controller) = self
+            .workspace_tabs
+            .borrow()
+            .get(&tab_id)
+            .and_then(|t| t.structure_controller())
+        {
+            let _ = controller.sender().send(StructureTabInput::CollationsLoaded {
+                collations,
+                table_default_supported,
+            });
+        }
+    }
+
     pub(super) fn on_structure_load_failed(&self, tab_id: Uuid, message: String) {
         if let Some(controller) = self
             .workspace_tabs
@@ -1007,8 +1031,7 @@ impl App {
         }
     }
 
-    /// A workspace is rebuilt on connection switch: check its origin before
-    /// touching any tabs, then reject reordered catalog completions as well.
+    /// Reject stale schema and catalog work after a connection or request change.
     pub(super) fn on_schema_changed(
         &self,
         origin: CatalogOrigin,
@@ -1078,6 +1101,7 @@ impl App {
         origin: CatalogOrigin,
         generation: u64,
         result: Result<crate::services::catalog::Catalog, String>,
+        sender: relm4::ComponentSender<App>,
     ) {
         if !origin.owns_window(self.connection_id, &self.database) || self.catalog_generation.get() != generation {
             return;
@@ -1086,10 +1110,10 @@ impl App {
             Ok((tables, views)) => {
                 self.set_completion_tables(&tables, &views);
                 self.sidebar_views = views;
-                self.repopulate_sidebar(&tables);
+                self.repopulate_sidebar(&tables, sender);
                 self.refresh_schema_index();
             }
-            Err(error) => self.show_error_alert(&crate::tr!("Catalog refresh failed"), &error),
+            Err(error) => self.show_error_alert(&bookie_app_services::tr!("Catalog refresh failed"), &error),
         }
     }
 
@@ -1102,9 +1126,7 @@ impl App {
         let (page, schema, table_name, combined_dirty) = match slot {
             WorkspaceTab::Structure(s) => (&s.page, s.schema.as_deref(), s.table.clone(), dirty),
             WorkspaceTab::Table(s) => {
-                // Combine with the data-side dirty state — either
-                // mode contributing pending changes prefixes the tab
-                // with the "•" GNOME convention.
+                // Either data or structure edits mark the shared tab dirty.
                 let data = self
                     .change_trackers
                     .with_tab_ref(s.id, |tr| tr.has_pending())
@@ -1114,14 +1136,14 @@ impl App {
             _ => return,
         };
         let base = if table_name.is_empty() {
-            crate::tr!("New Table")
+            bookie_app_services::tr!("New Table")
         } else if matches!(slot, WorkspaceTab::Structure(_)) {
             super::workspace_tabs::structure_tab_title(schemas_count, schema, &table_name)
         } else {
             super::workspace_tabs::qualified_browse_tab_label(schemas_count, schema, &table_name)
         };
         let title = if combined_dirty { format!("• {base}") } else { base };
-        page.set_title(&title);
+        super::tab_title::set_tab_title(page, &title);
         let is_selected = self
             .workspace_tab_view
             .as_ref()
@@ -1130,5 +1152,33 @@ impl App {
             .unwrap_or(false);
         page.set_needs_attention(combined_dirty && !is_selected);
         self.refresh_window_title();
+    }
+}
+
+fn drop_table_body(referencing: &[String]) -> String {
+    let warning = bookie_app_services::tr!(
+        "All rows and the table definition will be removed. This can't be undone from inside BookiE."
+    );
+    if referencing.is_empty() {
+        return warning;
+    }
+    let referenced = bookie_app_services::tr!(
+        "These tables reference it: {tables}. The database may refuse the drop or change their rows."
+    )
+    .replace("{tables}", &referencing.join(", "));
+    format!("{warning}\n\n{referenced}")
+}
+
+#[cfg(test)]
+mod drop_prompt_tests {
+    use super::drop_table_body;
+
+    #[test]
+    fn the_drop_confirmation_names_the_tables_that_reference_the_table() {
+        let plain = drop_table_body(&[]);
+        let warned = drop_table_body(&["orders".into(), "billing.invoices".into()]);
+        assert!(warned.starts_with(&plain));
+        assert!(warned.contains("orders, billing.invoices"));
+        assert!(!plain.contains("reference"));
     }
 }

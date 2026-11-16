@@ -3,6 +3,7 @@ use apache_avro::types::Value;
 
 pub const MAX_RECORDS: usize = 1000;
 pub const MAX_BYTES: usize = 16 * 1024 * 1024;
+pub const MAX_DECODED_BLOCK_BYTES: usize = 64 * 1024 * 1024;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum AvroError {
@@ -14,6 +15,7 @@ pub fn decode_container(bytes: &[u8]) -> Result<(Vec<serde_json::Value>, bool), 
     if bytes.len() > MAX_BYTES {
         return Err(AvroError::TooLarge);
     }
+    apache_avro::util::max_allocation_bytes(MAX_DECODED_BLOCK_BYTES);
     let reader = Reader::new(bytes).map_err(|error| AvroError::Invalid(error.to_string()))?;
     let mut records = Vec::new();
     for record in reader {
@@ -54,7 +56,7 @@ mod tests {
             r#"{"type":"record","name":"Order","fields":[{"name":"id","type":"long"},{"name":"note","type":["null","string"]}]}"#,
         )
         .unwrap();
-        let mut writer = Writer::new(&schema, Vec::new());
+        let mut writer = Writer::new(&schema, Vec::new()).unwrap();
         for n in 0..records {
             let mut record = apache_avro::types::Record::new(&schema).unwrap();
             record.put("id", n as i64);
@@ -66,7 +68,7 @@ mod tests {
                     Value::Union(0, Box::new(Value::Null))
                 },
             );
-            writer.append(record).unwrap();
+            writer.append_value(record).unwrap();
         }
         writer.into_inner().unwrap()
     }
@@ -84,6 +86,25 @@ mod tests {
         let (records, more) = decode_container(&container(MAX_RECORDS + 1)).unwrap();
         assert_eq!(records.len(), MAX_RECORDS);
         assert!(more);
+    }
+
+    #[test]
+    fn a_small_compressed_block_that_inflates_far_past_the_limit_is_refused() {
+        use apache_avro::{Codec, DeflateSettings};
+        let schema =
+            Schema::parse_str(r#"{"type":"record","name":"Blob","fields":[{"name":"text","type":"string"}]}"#).unwrap();
+        let mut writer = Writer::with_codec(&schema, Vec::new(), Codec::Deflate(DeflateSettings::default())).unwrap();
+        let mut record = apache_avro::types::Record::new(&schema).unwrap();
+        record.put("text", "a".repeat(MAX_DECODED_BLOCK_BYTES + 16 * 1024 * 1024));
+        writer.append_value(record).unwrap();
+        let bomb = writer.into_inner().unwrap();
+
+        assert!(
+            bomb.len() < MAX_BYTES / 100,
+            "the test file must stay small: {}",
+            bomb.len()
+        );
+        assert!(matches!(decode_container(&bomb), Err(AvroError::Invalid(_))));
     }
 
     #[test]

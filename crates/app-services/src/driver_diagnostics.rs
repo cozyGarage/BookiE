@@ -23,6 +23,7 @@ pub fn warn_export_cleanup(error: &bookie_core::export::ExportError, operation: 
         ExportError::XmlCharacter { .. } => "xml_character",
         ExportError::HtmlCharacter { .. } => "html_character",
         ExportError::NullMarkerCollision { .. } => "null_marker_collision",
+        ExportError::RowWidthMismatch { .. } => "row_width_mismatch",
         ExportError::Source(_) => "source",
         ExportError::Workbook(_) => "workbook",
     };
@@ -32,6 +33,7 @@ pub fn warn_export_cleanup(error: &bookie_core::export::ExportError, operation: 
 fn driver_code(error: &DriverError) -> &'static str {
     match error {
         DriverError::ConnectionRefused => "connection_refused",
+        DriverError::DatabaseFileNotFound(_) => "database_file_not_found",
         DriverError::AuthFailed => "authentication_failed",
         DriverError::Tls(_) => "tls",
         DriverError::Query { .. } => "query",
@@ -106,5 +108,29 @@ mod tests {
         for code in ["query", "internal", "outcome_unknown", "rollback_failed"] {
             assert!(output.contains(code));
         }
+    }
+
+    #[test]
+    fn export_row_width_errors_log_a_stable_code() {
+        let capture = Capture::default();
+        let writer = capture.clone();
+        let subscriber = tracing_subscriber::fmt()
+            .without_time()
+            .with_ansi(false)
+            .with_writer(move || writer.clone())
+            .finish();
+        let _guard = tracing::subscriber::set_default(subscriber);
+        warn_export_cleanup(
+            &bookie_core::export::ExportError::RowWidthMismatch {
+                row: 1,
+                expected: 2,
+                actual: 3,
+            },
+            "write",
+        );
+        let output = String::from_utf8(capture.0.lock().unwrap().clone()).unwrap();
+
+        assert!(output.contains("row_width_mismatch"));
+        assert!(output.contains("write"));
     }
 }

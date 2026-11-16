@@ -1,0 +1,1 @@
+Create a new database file in the connection form creates the SQLite or DuckDB file without replacing an existing one, and a missing database file is reported as not found instead of as an internal driver error.

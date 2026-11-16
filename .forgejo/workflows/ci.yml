@@ -2,14 +2,36 @@ name: lab-ci
 
 on:
   push:
-    branches: ["**"]
+    branches: [main]
+    paths:
+      - "**"
+      - "!docs/**"
+      - "!**.md"
+      - ".github/workflows/build-linux.yml"
+      - ".github/actions/dockerhub-login/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "**"
+      - "!docs/**"
+      - "!**.md"
+      - ".github/workflows/build-linux.yml"
+      - ".github/actions/dockerhub-login/**"
   schedule:
-    - cron: "0 22 * * *"
+    - cron: "13 14 * * 1"
   workflow_dispatch:
+    inputs:
+      ref:
+        description: >-
+          Commit SHA, tag or branch to build. Pin a release candidate so
+          every job in the run tests the same tree.
+        required: false
+        default: ""
+        type: string
 
 concurrency:
-  group: bookie-ci-${{ github.ref }}
-  cancel-in-progress: false
+  group: build-linux-${{ github.event_name }}-${{ github.ref }}-${{ inputs.ref || 'auto' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 defaults:
   run:
@@ -30,7 +52,43 @@ env:
   TMPDIR: /var/cache/ci/target
 
 jobs:
+  pin-revision:
+    name: Pin tested revision
+    runs-on: any-host
+    outputs:
+      revision: ${{ steps.pin.outputs.revision }}
+    timeout-minutes: 5
+    steps:
+      - name: Prepare runner workspace
+        run: |
+          mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: src
+      - name: Record the source revision
+        id: pin
+        shell: bash
+        env:
+          CI_REQUESTED_REF: ${{ inputs.ref }}
+          CI_EVENT_NAME: ${{ github.event_name }}
+        run: cd src && python3 scripts/check-ci-revision.py
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src
+          fi
+
   guards:
+    needs: [pin-revision]
     runs-on: any-host
     timeout-minutes: 90
     defaults:
@@ -42,21 +100,18 @@ jobs:
       TMPDIR: /var/cache/ci/tmp/bookie-guards-${{ github.run_id }}
       RUSTC_WRAPPER: ""
     steps:
-      - name: Check out
-        shell: bash
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"
           rm -rf src
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
       - name: Script harness and guards
         run: |
           mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"
@@ -66,8 +121,11 @@ jobs:
           bash scripts/check-file-size.sh
           bash scripts/check-bounded-operations.sh
           bash scripts/check-panic-sites.sh
+          python3 scripts/check-crate-boundaries.py
+          python3 scripts/check-driver-id-branches.py
           python3 scripts/check-function-size.py
           python3 scripts/check-comment-lines.py
+          python3 scripts/release-notes.py fragments
           cargo fmt --all -- --check
       - name: Clean pilot scratch
         if: always()
@@ -83,33 +141,35 @@ jobs:
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
   gpui-tests:
+    if: github.event_name != 'push'
     runs-on: any-host
-    needs: [test-build]
+    needs: [pin-revision, gpui-build]
     timeout-minutes: 45
     env:
       CARGO_BUILD_JOBS: 4
       RUSTC_WRAPPER: ""
     steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           rm -rf src
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ github.sha }}"
-      - name: Obtain the source-pinned GPUI test bundle
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
+      - name: Prepare artifact runtime
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Prepare source-pinned gpui test bundle
         env:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" gpui
+        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" gpui
       - name: GPUI model and simulated interaction tests
         run: |
           cd src
@@ -130,11 +190,11 @@ jobs:
           else
             rm -rf -- src
           fi
-  gtk-build:
+  linux-build:
+    if: github.event_name != 'push'
     runs-on: build-host
-    needs: [guards]
-    if: github.event_name != 'pull_request'
-    timeout-minutes: 20
+    needs: [pin-revision, guards]
+    timeout-minutes: 60
     defaults:
       run:
         shell: bash
@@ -151,41 +211,55 @@ jobs:
       CARGO_TARGET_DIR: /target/bookie-${{ github.job }}
       TMPDIR: /target/tmp-${{ github.run_id }}-${{ github.job }}
       BOOKIE_TOOL_DIR: /tools
-      CARGO_PROFILE_CI_STRIP: symbols
+      CARGO_BUILD_JOBS: "8"
+      BOOKIE_BUILD_PROFILE: dist
     steps:
-      - name: Check out
-        shell: bash
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
           touch "$CARGO_TARGET_DIR/.bookie-last-used" /target/.bookie-build-cache.lock
           sccache --start-server
           rm -rf src
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ github.sha }}"
-      - name: Prepare artifact runtime
-        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
-      - name: Build the shared GTK binary
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
+      - name: Mark checkout safe for Git in container
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE/src"
+      - name: Install package validation tools
+        run: |
+          apt-get update -qq
+          apt-get install -y --no-install-recommends desktop-file-utils
+      - name: Build native application and package artifacts once
         env:
-          CARGO_BUILD_JOBS: "8"
+          BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
+          DEB_OUT: ${{ github.workspace }}/floor-package
         run: |
           exec 9>>/target/.bookie-build-cache.lock
           flock --exclusive 9
           cd src
-          cargo build --profile ci --locked -p bookie-app --bin bookie-app
-          python3 scripts/ci-gtk-artifact.py create "$CARGO_TARGET_DIR/ci/bookie-app" "$GITHUB_WORKSPACE/gtk-artifact" "${{ github.sha }}"
+          DEB_OUT="$DEB_OUT" bash scripts/build-deb.sh
+          python3 scripts/ci-gtk-artifact.py create --profile dist "$CARGO_TARGET_DIR/dist/bookie-app" "$GITHUB_WORKSPACE/gtk-artifact" "$BOOKIE_SOURCE_COMMIT"
+          package=$(find "$DEB_OUT" -maxdepth 1 -name '*.deb' -print -quit)
+          python3 scripts/ci-gtk-artifact.py create --package "$package" "$GITHUB_WORKSPACE/floor-artifact" "$BOOKIE_SOURCE_COMMIT"
+      - name: Prepare artifact runtime
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
       - name: Upload the source-pinned GTK binary
         uses: https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
         with:
-          name: gtk-ci-${{ github.run_id }}-${{ github.sha }}
+          name: gtk-ci-${{ github.run_id }}-${{ needs.pin-revision.outputs.revision }}
           path: gtk-artifact/
+          if-no-files-found: error
+          retention-days: 2
+      - name: Upload the source-pinned Debian package
+        uses: https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
+        with:
+          name: floor-package-${{ github.run_id }}-${{ needs.pin-revision.outputs.revision }}
+          path: floor-artifact/
           if-no-files-found: error
           retention-days: 2
       - name: Clean builder scratch
@@ -199,8 +273,6 @@ jobs:
           if [[ -f src/scripts/ci-cache.py ]]; then
             python3 src/scripts/ci-cache.py --root /target --lock /target/.bookie-build-cache.lock cleanup --min-free-gib 30
           fi
-
-
       - name: Finalize runner job
         if: always()
         shell: bash
@@ -208,9 +280,11 @@ jobs:
           if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
             bash src/scripts/cleanup-ci-job.sh
           else
-            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+            rm -rf -- src gtk-artifact floor-artifact floor-package floor-package-path
           fi
+
   clippy:
+    needs: [pin-revision]
     runs-on: build-host
     timeout-minutes: 90
     defaults:
@@ -230,23 +304,20 @@ jobs:
       CARGO_TARGET_DIR: /target/bookie-${{ github.job }}
       TMPDIR: /target/tmp-${{ github.run_id }}-${{ github.job }}
     steps:
-      - name: Check out
-        shell: bash
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
           touch "$CARGO_TARGET_DIR/.bookie-last-used" /target/.bookie-build-cache.lock
           sccache --start-server
           rm -rf src
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
       - name: Clippy
         run: |
           exec 9>>/target/.bookie-build-cache.lock
@@ -276,7 +347,7 @@ jobs:
           fi
   test-build:
     runs-on: build-host
-    needs: [guards, clippy]
+    needs: [pin-revision]
     timeout-minutes: 45
     defaults:
       run:
@@ -297,23 +368,20 @@ jobs:
       PATH: /tools:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
       BOOKIE_BUILD_IMAGE: sha256:f21a3d99fb08a940f7fbf775ad6878d52a3fc957876970ae7d0f607b89696ec4
     steps:
-      - name: Check out
-        shell: bash
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
           touch "$CARGO_TARGET_DIR/.bookie-last-used" /target/.bookie-build-cache.lock
           sccache --start-server
           rm -rf src
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
       - name: Install the GPUI linker dependency
         run: |
           apt-get update -qq
@@ -323,18 +391,27 @@ jobs:
           exec 9>>/target/.bookie-build-cache.lock
           flock --exclusive 9
           cd src && bash scripts/build-test-bundles.sh "$GITHUB_WORKSPACE/test-bundles" all
-      - name: Publish the default test bundle
+      - name: Prepare artifact runtime
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Publish source-pinned test bundles
         env:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: cd src && python3 scripts/ci-bundle-registry.py publish "$GITHUB_WORKSPACE/test-bundles/default" "${{ github.sha }}" default
-      - name: Publish the GPUI test bundle
+        run: |
+          mapfile -t groups < <(python3 -c 'import json; print("\n".join(json.load(open("src/scripts/ci-test-bundle-groups.json"))["publish_groups"] + ["workspace"]))')
+          for group in "${groups[@]}"; do
+            python3 src/scripts/ci-bundle-registry.py publish "test-bundles/$group" "${{ needs.pin-revision.outputs.revision }}" "$group"
+          done
+      - name: Remove expired test bundles with reference protection
+        if: github.event_name == 'push' || github.event_name == 'schedule'
         env:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
-          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: cd src && python3 scripts/ci-bundle-registry.py publish "$GITHUB_WORKSPACE/test-bundles/gpui" "${{ github.sha }}" gpui
+          BOOKIE_REGISTRY_API_URL: ${{ github.server_url }}/api/v1/packages/trung
+          BOOKIE_FORGEJO_API_URL: ${{ github.server_url }}/api/v1/repos/${{ github.repository }}
+          BOOKIE_FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
+        run: |
+          cd src
+          python3 scripts/ci-bundle-registry.py prune "${{ needs.pin-revision.outputs.revision }}" --retention-days 14 --delete --discover-references
       - name: Check the no-default-features layer
         run: |
           exec 9>>/target/.bookie-build-cache.lock
@@ -362,141 +439,10 @@ jobs:
           else
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
-  unit:
-    runs-on: any-host
-    needs: [test-build]
-    timeout-minutes: 90
-    steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
-        run: |
-          rm -rf src
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ github.sha }}"
-      - name: Obtain the source-pinned test bundle
-        env:
-          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
-          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
-      - name: Unit tests
-        env:
-          BOOKIE_TOOL_DIR: /var/cache/ci/tools
-        run: |
-          cd src
-          NEXTEST="$(bash scripts/ensure-nextest.sh)"
-          mkdir -p "$CARGO_TARGET_DIR"
-          export TMPDIR="$CARGO_TARGET_DIR"
-          "$NEXTEST" nextest run --archive-file "$BOOKIE_TEST_BUNDLE/nextest.tar.zst" --workspace-remap "$PWD" --profile ci --no-tests=fail -E 'kind(lib) | kind(bin)'
-      - name: Focused Data-lane change contracts
-        run: |
-          cd src
-          if [[ "${{ github.ref }}" == "refs/heads/main" || "${{ github.event_name }}" != "push" ]]; then
-            export BOOKIE_CHANGE_BASE="${{ github.event.before || 'HEAD^' }}"
-          else
-            export BOOKIE_CHANGE_BASE="$(git merge-base HEAD origin/main)"
-          fi
-          python3 scripts/run-test-layer.py change-contracts
-
-      - name: Finalize runner job
-        if: always()
-        shell: bash
-        run: |
-          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
-            bash src/scripts/cleanup-ci-job.sh
-          else
-            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
-          fi
-  sandbox:
-    runs-on: any-host
-    needs: [test-build]
-    timeout-minutes: 90
-    steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
-        run: |
-          rm -rf src
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ github.sha }}"
-      - name: Obtain the source-pinned test bundle
-        env:
-          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
-          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
-      - name: Sandbox tier
-        env:
-          BOOKIE_TOOL_DIR: /var/cache/ci/tools
-          BOOKIE_NEXTEST_PROFILE: ci
-        run: |
-          cd src && python3 scripts/run-test-layer.py sandbox
-
-      - name: Finalize runner job
-        if: always()
-        shell: bash
-        run: |
-          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
-            bash src/scripts/cleanup-ci-job.sh
-          else
-            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
-          fi
-  widgets:
-    runs-on: any-host
-    needs: [test-build]
-    timeout-minutes: 90
-    steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
-        run: |
-          rm -rf src
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ github.sha }}"
-      - name: Obtain the source-pinned test bundle
-        env:
-          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
-          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
-      - name: GTK widget tests
-        run: cd src && python3 scripts/run-test-layer.py widgets
-
-      - name: Finalize runner job
-        if: always()
-        shell: bash
-        run: |
-          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
-            bash src/scripts/cleanup-ci-job.sh
-          else
-            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
-          fi
-  floor-build:
+  gpui-build:
+    if: github.event_name != 'push'
     runs-on: build-host
-    needs: [guards, clippy]
-    if: github.ref == 'refs/heads/main' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    needs: [pin-revision]
     timeout-minutes: 45
     defaults:
       run:
@@ -515,45 +461,38 @@ jobs:
       SCCACHE_BASEDIRS: /target/bookie-${{ github.job }}
       SCCACHE_SERVER_UDS: /target/tmp-${{ github.run_id }}-${{ github.job }}/sccache.sock
       PATH: /tools:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
+      BOOKIE_BUILD_IMAGE: sha256:f21a3d99fb08a940f7fbf775ad6878d52a3fc957876970ae7d0f607b89696ec4
     steps:
-      - name: Check out
-        shell: bash
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
           touch "$CARGO_TARGET_DIR/.bookie-last-used" /target/.bookie-build-cache.lock
           sccache --start-server
           rm -rf src
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ github.sha }}"
-      - name: Install package validation tools
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
+      - name: Install the GPUI linker dependency
         run: |
           apt-get update -qq
-          apt-get install -y --no-install-recommends desktop-file-utils
-      - name: Build the shared release package
+          apt-get install -y --no-install-recommends libxkbcommon-x11-dev
+      - name: Build the GPUI test bundle
         run: |
           exec 9>>/target/.bookie-build-cache.lock
           flock --exclusive 9
-          cd src
-          DEB_OUT="$GITHUB_WORKSPACE/floor-package" bash scripts/build-deb.sh
-          package=$(find "$GITHUB_WORKSPACE/floor-package" -maxdepth 1 -name '*.deb' -print -quit)
-          python3 scripts/ci-gtk-artifact.py create --package "$package" "$GITHUB_WORKSPACE/floor-artifact" "${{ github.sha }}"
+          cd src && bash scripts/build-test-bundles.sh "$GITHUB_WORKSPACE/test-bundles" gpui
       - name: Prepare artifact runtime
         run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
-      - name: Upload the shared release package
-        uses: https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
-        with:
-          name: floor-package-${{ github.run_id }}-${{ github.sha }}
-          path: floor-artifact/
-          if-no-files-found: error
-          retention-days: 2
+      - name: Publish source-pinned GPUI test bundle
+        env:
+          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
+          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
+        run: python3 src/scripts/ci-bundle-registry.py publish test-bundles/gpui "${{ needs.pin-revision.outputs.revision }}" gpui
       - name: Clean builder scratch
         if: always()
         run: |
@@ -566,6 +505,68 @@ jobs:
             python3 src/scripts/ci-cache.py --root /target --lock /target/.bookie-build-cache.lock cleanup --min-free-gib 30
           fi
 
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
+  unit:
+    runs-on: any-host
+    needs: [pin-revision, test-build]
+    timeout-minutes: 90
+    steps:
+      - name: Prepare runner workspace
+        run: |
+          rm -rf src
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: src
+      - name: Prepare artifact runtime
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Prepare source-pinned workspace test bundle
+        env:
+          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
+          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
+        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" workspace
+      - name: Unit tests
+        env:
+          BOOKIE_TOOL_DIR: /var/cache/ci/tools
+        run: |
+          cd src
+          NEXTEST="$(bash scripts/ensure-nextest.sh)"
+          mkdir -p "$CARGO_TARGET_DIR"
+          export TMPDIR="$CARGO_TARGET_DIR"
+          "$NEXTEST" nextest run --archive-file "$BOOKIE_TEST_BUNDLE/nextest.tar.zst" --workspace-remap "$PWD" --profile ci --no-tests=fail -E 'kind(lib) | kind(bin)'
+      - name: Prepare source-pinned direct test bundle
+        env:
+          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
+          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
+        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" direct
+      - name: Focused Data-lane change contracts
+        env:
+          BOOKIE_CI_REF: ${{ github.ref }}
+          BOOKIE_CI_EVENT_NAME: ${{ github.event_name }}
+          BOOKIE_CI_EVENT_BEFORE: ${{ github.event.before || 'HEAD^' }}
+        run: |
+          cd src
+          if [[ "$BOOKIE_CI_REF" == "refs/heads/main" || "$BOOKIE_CI_EVENT_NAME" != "push" ]]; then
+            export BOOKIE_CHANGE_BASE="$BOOKIE_CI_EVENT_BEFORE"
+          else
+            export BOOKIE_CHANGE_BASE="$(git merge-base HEAD origin/main)"
+          fi
+          python3 scripts/run-test-layer.py change-contracts
 
       - name: Finalize runner job
         if: always()
@@ -576,33 +577,119 @@ jobs:
           else
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
+  sandbox:
+    runs-on: any-host
+    needs: [pin-revision, test-build]
+    timeout-minutes: 90
+    steps:
+      - name: Prepare runner workspace
+        run: |
+          rm -rf src
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
+      - name: Prepare artifact runtime
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Prepare source-pinned workspace test bundle
+        env:
+          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
+          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
+        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" workspace
+      - name: Sandbox tier
+        env:
+          BOOKIE_TOOL_DIR: /var/cache/ci/tools
+          BOOKIE_NEXTEST_PROFILE: ci
+        run: |
+          cd src && python3 scripts/run-test-layer.py sandbox
+
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
+  widgets:
+    runs-on: any-host
+    needs: [pin-revision, test-build]
+    timeout-minutes: 90
+    steps:
+      - name: Prepare runner workspace
+        run: |
+          rm -rf src
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
+      - name: Prepare artifact runtime
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Prepare source-pinned direct test bundle
+        env:
+          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
+          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
+        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" direct
+      - name: GTK widget tests
+        run: cd src && python3 scripts/run-test-layer.py widgets
+      - name: Retain GTK widget diagnostics
+        if: always()
+        uses: https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
+        with:
+          name: widgets-${{ github.run_id }}-${{ github.run_attempt }}
+          path: src/target/quality/*-layers
+          if-no-files-found: error
+          retention-days: 2
+
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
+
   distro-floor-scenarios:
     runs-on: any-host
-    needs: [floor-build]
-    if: github.ref == 'refs/heads/main' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    needs: [pin-revision, linux-build]
+    if: github.event_name != 'push'
     timeout-minutes: 90
-    env:
-      CARGO_TARGET_DIR: /var/cache/ci/target/floor-debian:testing
     strategy:
       fail-fast: false
-      max-parallel: 2
       matrix:
         shard_group: [1, 2]
     steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           rm -rf src
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
       - name: Prepare artifact runtime
         env:
           BOOKIE_TOOL_DIR: /var/cache/ci/tools
@@ -610,11 +697,11 @@ jobs:
       - name: Download the shared release package
         uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
         with:
-          name: floor-package-${{ github.run_id }}-${{ github.sha }}
+          name: floor-package-${{ github.run_id }}-${{ needs.pin-revision.outputs.revision }}
           path: floor-artifact/
       - name: Verify the shared release package
         run: |
-          package=$(python3 src/scripts/ci-gtk-artifact.py verify --package "$GITHUB_WORKSPACE/floor-artifact" "${{ github.sha }}")
+          package=$(python3 src/scripts/ci-gtk-artifact.py verify --package "$GITHUB_WORKSPACE/floor-artifact" "${{ needs.pin-revision.outputs.revision }}")
           printf 'DISTRO_FLOOR_PACKAGE=%s\n' "$package" >> "$GITHUB_ENV"
       - name: Docker Hub login
         env:
@@ -641,62 +728,69 @@ jobs:
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
   driver:
+    if: github.event_name != 'push'
     runs-on: any-host
-    needs: [guards, clippy, test-build]
-    if: github.event_name != 'pull_request'
-    timeout-minutes: 45
+    needs: [pin-revision, guards, clippy, test-build]
+    timeout-minutes: 90
     env:
-      CARGO_TARGET_DIR: /var/cache/ci/target/driver-${{ matrix.driver }}
-      TMPDIR: /var/cache/ci/tmp/bookie-driver-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.driver }}
-      BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.driver }}
+      CARGO_TARGET_DIR: /var/cache/ci/target/${{ matrix.group }}
+      TMPDIR: /var/cache/ci/tmp/b-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}
+      BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}
     strategy:
       fail-fast: false
       matrix:
-        driver: [postgres, mysql, mssql, clickhouse, redis, mongodb, oracle, cassandra, duckdb]
-        include:
-          - driver: duckdb
-            tests: --test integration --test read_only --test missing_file
+        group: [driver-core, driver-analytics]
     steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
+          mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"
           rm -rf src
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ github.sha }}"
-      - name: Obtain the source-pinned test bundle
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
+      - name: Prepare artifact runtime
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Prepare source-pinned ${{ matrix.group }} test bundle
         env:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
+        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" "${{ matrix.group }}"
       - name: Docker Hub login
-        if: matrix.driver != 'duckdb'
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: bash src/scripts/docker-hub-login.sh
-      - name: Pre-pull fixture images
-        if: ${{ matrix.driver != 'duckdb' }}
-        run: bash src/scripts/prepull-test-images.sh "${{ matrix.driver }}"
+      - name: Pre-pull PostgreSQL socket fixture image
+        if: matrix.group == 'socket-ssh'
+        run: bash src/scripts/prepull-test-images.sh socket-ssh
       - name: Driver integration
+        env:
+          BOOKIE_TEST_LAYER: ${{ matrix.group }}
         run: |
           cd src
-          cleanup_testcontainers() {
-            python3 scripts/cleanup-testcontainers.py "$BOOKIE_TEST_RUN_ID"
-          }
-          trap cleanup_testcontainers EXIT
-          trap 'cleanup_testcontainers; exit 143' TERM
-          trap 'cleanup_testcontainers; exit 130' INT
-          mkdir -p "$TMPDIR"
-          bash scripts/run-rust-tests.sh --locked -p bookie-driver-${{ matrix.driver }} ${{ matrix.tests || '--test integration' }} -- --include-ignored --test-threads=1
+          if [[ "$BOOKIE_TEST_LAYER" == socket-ssh ]]; then
+            cleanup_testcontainers() {
+              python3 scripts/cleanup-testcontainers.py "$BOOKIE_TEST_RUN_ID"
+            }
+            trap cleanup_testcontainers EXIT
+            trap 'cleanup_testcontainers; exit 143' TERM
+            trap 'cleanup_testcontainers; exit 130' INT
+          fi
+          python3 scripts/run-test-layer.py "$BOOKIE_TEST_LAYER"
+      - name: Pre-pull pg_dump image
+        if: matrix.group == 'driver-core'
+        run: bash src/scripts/prepull-test-images.sh pg-dump
+      - name: PostgreSQL dump and restore
+        if: matrix.group == 'driver-core'
+        run: cd src && python3 scripts/run-test-layer.py pg-dump
 
       - name: Finalize runner job
         if: always()
@@ -707,66 +801,119 @@ jobs:
           else
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
-  e2e:
+  driver-followup:
+    if: always() && !cancelled() && github.event_name != 'push' && needs.pin-revision.result == 'success' && needs.guards.result == 'success' && needs.clippy.result == 'success' && needs.test-build.result == 'success'
     runs-on: any-host
-    needs: [guards, clippy, gtk-build, test-build]
-    if: github.event_name != 'pull_request'
-    timeout-minutes: 45
+    needs: [pin-revision, guards, clippy, test-build, driver]
+    timeout-minutes: 90
     env:
-      CARGO_TARGET_DIR: /var/cache/ci/target/gtk-build
-      BOOKIE_GTK_SCENARIO_RETRIES: "0"
-      BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-e2e-${{ matrix.server }}
+      CARGO_TARGET_DIR: /var/cache/ci/target/${{ matrix.group }}
+      TMPDIR: /var/cache/ci/tmp/bookie-driver-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}
+      BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - server: postgres
-            mcp_port_slot: 5
-          - server: mysql
-            mcp_port_slot: 6
+        group: [driver-extended, socket-ssh]
     steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
+          mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"
           rm -rf src
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ github.sha }}"
-      - name: Obtain the source-pinned test bundle
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
+      - name: Prepare artifact runtime
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Prepare source-pinned ${{ matrix.group }} test bundle
         env:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
-      - name: Prepare artifact runtime
-        env:
-          BOOKIE_TOOL_DIR: /var/cache/ci/tools
-        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
-      - name: Download the shared GTK binary
-        uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
-        with:
-          name: gtk-ci-${{ github.run_id }}-${{ github.sha }}
-          path: gtk-artifact/
-      - name: Verify the shared GTK binary
-        run: |
-          binary=$(python3 src/scripts/ci-gtk-artifact.py verify "$GITHUB_WORKSPACE/gtk-artifact" "${{ github.sha }}")
-          printf 'BOOKIE_GTK_BINARY=%s\n' "$binary" >> "$GITHUB_ENV"
+        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" "${{ matrix.group }}"
       - name: Docker Hub login
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: bash src/scripts/docker-hub-login.sh
-      - name: Select isolated MCP HTTP port
-        run: cd src && python3 scripts/ci-mcp-port.py "${{ matrix.mcp_port_slot }}"
-      - name: Real server end to end
-        run: cd src && python3 scripts/run-test-layer.py "gtk-${{ matrix.server }}"
+      - name: Pre-pull PostgreSQL socket fixture image
+        if: matrix.group == 'socket-ssh'
+        run: bash src/scripts/prepull-test-images.sh socket-ssh
+      - name: Driver integration
+        env:
+          BOOKIE_TEST_LAYER: ${{ matrix.group }}
+        run: |
+          cd src
+          if [[ "$BOOKIE_TEST_LAYER" == socket-ssh ]]; then
+            cleanup_testcontainers() {
+              python3 scripts/cleanup-testcontainers.py "$BOOKIE_TEST_RUN_ID"
+            }
+            trap cleanup_testcontainers EXIT
+            trap 'cleanup_testcontainers; exit 143' TERM
+            trap 'cleanup_testcontainers; exit 130' INT
+          fi
+          python3 scripts/run-test-layer.py "$BOOKIE_TEST_LAYER"
+      - name: Pre-pull pg_dump image
+        if: matrix.group == 'driver-core'
+        run: bash src/scripts/prepull-test-images.sh pg-dump
+      - name: PostgreSQL dump and restore
+        if: matrix.group == 'driver-core'
+        run: cd src && python3 scripts/run-test-layer.py pg-dump
+
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
+  b4-rollback:
+    if: github.event_name != 'push'
+    needs: [pin-revision]
+    runs-on: any-host
+    timeout-minutes: 45
+    env:
+      TMPDIR: /var/cache/ci/tmp/bookie-b4-rollback-${{ github.run_id }}-${{ github.run_attempt }}
+      SCCACHE_SERVER_UDS: /var/cache/ci/tmp/bookie-b4-rollback-${{ github.run_id }}-${{ github.run_attempt }}/sccache.sock
+      BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-b4-rollback
+    steps:
+      - name: Prepare runner workspace
+        run: |
+          rm -rf src
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
+      - name: Start job-scoped compiler cache
+        run: |
+          mkdir -p "$TMPDIR"
+          sccache --start-server
+      - name: Docker Hub login
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: bash src/scripts/docker-hub-login.sh
+      - name: Pre-pull MySQL and PostgreSQL fixtures
+        run: |
+          bash src/scripts/prepull-test-images.sh mysql
+          bash src/scripts/prepull-test-images.sh postgres
+      - name: Focused MySQL and PostgreSQL rollback cases
+        run: cd src && python3 scripts/run-test-layer.py b4-rollback
 
       - name: Finalize runner job
         if: always()
@@ -778,30 +925,32 @@ jobs:
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
   security-policy:
+    if: github.event_name != 'push'
     runs-on: any-host
-    needs: [test-build]
+    needs: [pin-revision, test-build]
     timeout-minutes: 45
     steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           rm -rf src
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ github.sha }}"
-      - name: Obtain the source-pinned test bundle
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
+      - name: Prepare artifact runtime
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Prepare source-pinned consumers test bundle
         env:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
+        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" consumers
       - name: Security policy tests
         run: cd src && python3 scripts/run-test-layer.py security-policy
 
@@ -815,33 +964,34 @@ jobs:
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
   consumers:
+    if: github.event_name != 'push'
     runs-on: any-host
-    needs: [guards, clippy, test-build]
-    if: github.event_name != 'pull_request'
+    needs: [pin-revision, guards, clippy, test-build]
     timeout-minutes: 45
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/consumers
     steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           rm -rf src
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ github.sha }}"
-      - name: Obtain the source-pinned test bundle
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
+      - name: Prepare artifact runtime
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Prepare source-pinned consumers test bundle
         env:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
+        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" consumers
       - name: Docker Hub login
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -867,37 +1017,29 @@ jobs:
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
   gtk:
+    if: github.event_name != 'push'
     runs-on: any-host
-    needs: [guards, clippy, gtk-build, test-build]
-    if: github.event_name != 'pull_request'
+    needs: [pin-revision, guards, linux-build]
     timeout-minutes: 60
-    env:
-      CARGO_TARGET_DIR: /var/cache/ci/target/gtk-build
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2]
     steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           rm -rf src
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ github.sha }}"
-      - name: Obtain the source-pinned test bundle
-        env:
-          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
-          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
       - name: Prepare artifact runtime
         env:
           BOOKIE_TOOL_DIR: /var/cache/ci/tools
@@ -905,12 +1047,69 @@ jobs:
       - name: Download the shared GTK binary
         uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
         with:
-          name: gtk-ci-${{ github.run_id }}-${{ github.sha }}
+          name: gtk-ci-${{ github.run_id }}-${{ needs.pin-revision.outputs.revision }}
           path: gtk-artifact/
       - name: Verify the shared GTK binary
         run: |
-          binary=$(python3 src/scripts/ci-gtk-artifact.py verify "$GITHUB_WORKSPACE/gtk-artifact" "${{ github.sha }}")
-          printf 'BOOKIE_GTK_BINARY=%s\n' "$binary" >> "$GITHUB_ENV"
+          binary=$(python3 src/scripts/ci-gtk-artifact.py verify --profile dist "$GITHUB_WORKSPACE/gtk-artifact" "${{ needs.pin-revision.outputs.revision }}")
+          printf 'BOOKIE_GTK_BINARY=%s\nGSETTINGS_SCHEMA_DIR=%s/schemas\n' "$binary" "$GITHUB_WORKSPACE/gtk-artifact" >> "$GITHUB_ENV"
+      - name: Docker Hub login
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: bash src/scripts/docker-hub-login.sh
+      - name: Select isolated MCP HTTP port
+        run: cd src && python3 scripts/ci-mcp-port.py "${{ matrix.shard }}"
+      - name: Installed GTK end-to-end suite, one third
+        run: |
+          cd src && BOOKIE_GTK_SHARD="${{ matrix.shard }}/3" python3 scripts/run-test-layer.py ui
+
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
+  gtk-followup:
+    if: always() && !cancelled() && github.event_name != 'push' && needs.pin-revision.result == 'success' && needs.guards.result == 'success' && needs.linux-build.result == 'success'
+    runs-on: any-host
+    needs: [pin-revision, guards, linux-build, gtk]
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [3]
+    steps:
+      - name: Prepare runner workspace
+        run: |
+          rm -rf src
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
+      - name: Prepare artifact runtime
+        env:
+          BOOKIE_TOOL_DIR: /var/cache/ci/tools
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Download the shared GTK binary
+        uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
+        with:
+          name: gtk-ci-${{ github.run_id }}-${{ needs.pin-revision.outputs.revision }}
+          path: gtk-artifact/
+      - name: Verify the shared GTK binary
+        run: |
+          binary=$(python3 src/scripts/ci-gtk-artifact.py verify --profile dist "$GITHUB_WORKSPACE/gtk-artifact" "${{ needs.pin-revision.outputs.revision }}")
+          printf 'BOOKIE_GTK_BINARY=%s\nGSETTINGS_SCHEMA_DIR=%s/schemas\n' "$binary" "$GITHUB_WORKSPACE/gtk-artifact" >> "$GITHUB_ENV"
       - name: Docker Hub login
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -932,34 +1131,35 @@ jobs:
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
   pg-release:
+    if: github.event_name != 'push'
     runs-on: any-host
-    needs: [guards, clippy, test-build]
-    if: github.event_name != 'pull_request'
+    needs: [pin-revision, guards, clippy, test-build]
     timeout-minutes: 45
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/pg-release
       TMPDIR: /var/cache/ci/tmp
     steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           rm -rf src
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ github.sha }}"
-      - name: Obtain the source-pinned test bundle
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
+      - name: Prepare artifact runtime
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Prepare source-pinned pg-release test bundle
         env:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
+        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" pg-release
       - name: Docker Hub login
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -983,152 +1183,39 @@ jobs:
           else
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
-  pg-dump:
+  gtk-server:
+    if: github.event_name != 'push'
     runs-on: any-host
-    needs: [guards, clippy, test-build]
-    if: github.event_name != 'pull_request'
-    timeout-minutes: 30
-    env:
-      CARGO_TARGET_DIR: /var/cache/ci/target/pg-dump
-      TMPDIR: ${{ github.workspace }}/.tmp-pg-dump-${{ github.run_id }}-${{ github.run_attempt }}
-    steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
-        run: |
-          mkdir -p "$TMPDIR"
-          rm -rf src
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ github.sha }}"
-      - name: Obtain the source-pinned test bundle
-        env:
-          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
-          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
-      - name: Docker Hub login
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-        run: bash src/scripts/docker-hub-login.sh
-      - name: Pre-pull pg_dump image
-        run: bash src/scripts/prepull-test-images.sh pg-dump
-      - name: pg_dump against PostgreSQL
-        run: cd src && python3 scripts/run-test-layer.py pg-dump
-
-      - name: Finalize runner job
-        if: always()
-        shell: bash
-        run: |
-          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
-            bash src/scripts/cleanup-ci-job.sh
-          else
-            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
-          fi
-  socket-ssh:
-    runs-on: any-host
-    needs: [guards, clippy, test-build]
-    if: github.event_name != 'pull_request'
+    needs: [pin-revision, guards, linux-build]
     timeout-minutes: 45
     env:
-      CARGO_TARGET_DIR: /var/cache/ci/target/socket-ssh
-      BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-socket-ssh
-    steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
-        run: |
-          rm -rf src
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ github.sha }}"
-      - name: Obtain the source-pinned test bundle
-        env:
-          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
-          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
-      - name: Docker Hub login
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-        run: bash src/scripts/docker-hub-login.sh
-      - name: Pre-pull PostgreSQL socket fixture image
-        run: bash src/scripts/prepull-test-images.sh socket-ssh
-      - name: PostgreSQL socket and SSH fixtures
-        run: |
-          cd src
-          cleanup_testcontainers() {
-            python3 scripts/cleanup-testcontainers.py "$BOOKIE_TEST_RUN_ID"
-          }
-          trap cleanup_testcontainers EXIT
-          trap 'cleanup_testcontainers; exit 143' TERM
-          trap 'cleanup_testcontainers; exit 130' INT
-          ./scripts/test-postgres-socket.sh
-          bash ./scripts/test-ssh.sh
-
-      - name: Finalize runner job
-        if: always()
-        shell: bash
-        run: |
-          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
-            bash src/scripts/cleanup-ci-job.sh
-          else
-            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
-          fi
-  gtk-server:
-    runs-on: any-host
-    needs: [guards, clippy, gtk-build, test-build]
-    if: github.event_name != 'pull_request'
-    timeout-minutes: 60
-    env:
-      CARGO_TARGET_DIR: /var/cache/ci/target/gtk-build
       BOOKIE_GTK_SCENARIO_RETRIES: "0"
       BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-gtk-server-${{ matrix.server }}
+      BOOKIE_GTK_SERVER_IMAGE_GROUP: ${{ matrix.server == 'mysql-approval' && 'mysql' || matrix.server }}
+      TMPDIR: /var/cache/ci/tmp
     strategy:
       fail-fast: false
       matrix:
         include:
           - server: clickhouse
-            mcp_port_slot: 7
-          - server: mysql-approval
-            mcp_port_slot: 8
+            mcp_port_slot: 5
           - server: mongodb
-            mcp_port_slot: 9
+            mcp_port_slot: 6
     steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           rm -rf src
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ github.sha }}"
-      - name: Obtain the source-pinned test bundle
-        env:
-          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
-          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
       - name: Prepare artifact runtime
         env:
           BOOKIE_TOOL_DIR: /var/cache/ci/tools
@@ -1136,17 +1223,149 @@ jobs:
       - name: Download the shared GTK binary
         uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
         with:
-          name: gtk-ci-${{ github.run_id }}-${{ github.sha }}
+          name: gtk-ci-${{ github.run_id }}-${{ needs.pin-revision.outputs.revision }}
           path: gtk-artifact/
       - name: Verify the shared GTK binary
         run: |
-          binary=$(python3 src/scripts/ci-gtk-artifact.py verify "$GITHUB_WORKSPACE/gtk-artifact" "${{ github.sha }}")
-          printf 'BOOKIE_GTK_BINARY=%s\n' "$binary" >> "$GITHUB_ENV"
+          binary=$(python3 src/scripts/ci-gtk-artifact.py verify --profile dist "$GITHUB_WORKSPACE/gtk-artifact" "${{ needs.pin-revision.outputs.revision }}")
+          printf 'BOOKIE_GTK_BINARY=%s\nGSETTINGS_SCHEMA_DIR=%s/schemas\n' "$binary" "$GITHUB_WORKSPACE/gtk-artifact" >> "$GITHUB_ENV"
       - name: Docker Hub login
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: bash src/scripts/docker-hub-login.sh
+      - name: Pre-pull GTK fixture image with retries
+        run: bash src/scripts/prepull-test-images.sh "$BOOKIE_GTK_SERVER_IMAGE_GROUP"
+      - name: Select isolated MCP HTTP port
+        run: cd src && python3 scripts/ci-mcp-port.py "${{ matrix.mcp_port_slot }}"
+      - name: Installed GTK scenarios against a real server
+        run: cd src && python3 scripts/run-test-layer.py "gtk-${{ matrix.server }}"
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
+  gtk-server-followup:
+    if: always() && !cancelled() && github.event_name != 'push' && needs.pin-revision.result == 'success' && needs.guards.result == 'success' && needs.linux-build.result == 'success'
+    runs-on: any-host
+    needs: [pin-revision, guards, linux-build, gtk-server]
+    timeout-minutes: 45
+    env:
+      BOOKIE_GTK_SCENARIO_RETRIES: "0"
+      BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-gtk-server-${{ matrix.server }}
+      BOOKIE_GTK_SERVER_IMAGE_GROUP: ${{ matrix.server == 'mysql-approval' && 'mysql' || matrix.server }}
+      TMPDIR: /var/cache/ci/tmp
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - server: postgres
+            mcp_port_slot: 7
+          - server: mysql
+            mcp_port_slot: 8
+    steps:
+      - name: Prepare runner workspace
+        run: |
+          rm -rf src
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
+      - name: Prepare artifact runtime
+        env:
+          BOOKIE_TOOL_DIR: /var/cache/ci/tools
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Download the shared GTK binary
+        uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
+        with:
+          name: gtk-ci-${{ github.run_id }}-${{ needs.pin-revision.outputs.revision }}
+          path: gtk-artifact/
+      - name: Verify the shared GTK binary
+        run: |
+          binary=$(python3 src/scripts/ci-gtk-artifact.py verify --profile dist "$GITHUB_WORKSPACE/gtk-artifact" "${{ needs.pin-revision.outputs.revision }}")
+          printf 'BOOKIE_GTK_BINARY=%s\nGSETTINGS_SCHEMA_DIR=%s/schemas\n' "$binary" "$GITHUB_WORKSPACE/gtk-artifact" >> "$GITHUB_ENV"
+      - name: Docker Hub login
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: bash src/scripts/docker-hub-login.sh
+      - name: Pre-pull GTK fixture image with retries
+        run: bash src/scripts/prepull-test-images.sh "$BOOKIE_GTK_SERVER_IMAGE_GROUP"
+      - name: Select isolated MCP HTTP port
+        run: cd src && python3 scripts/ci-mcp-port.py "${{ matrix.mcp_port_slot }}"
+      - name: Installed GTK scenarios against a real server
+        run: cd src && python3 scripts/run-test-layer.py "gtk-${{ matrix.server }}"
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
+  gtk-server-final:
+    if: always() && !cancelled() && github.event_name != 'push' && needs.pin-revision.result == 'success' && needs.guards.result == 'success' && needs.linux-build.result == 'success' && needs.gtk-server-followup.result != 'skipped'
+    runs-on: any-host
+    needs: [pin-revision, guards, linux-build, gtk-server-followup]
+    timeout-minutes: 45
+    env:
+      BOOKIE_GTK_SCENARIO_RETRIES: "0"
+      BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-gtk-server-${{ matrix.server }}
+      BOOKIE_GTK_SERVER_IMAGE_GROUP: ${{ matrix.server == 'mysql-approval' && 'mysql' || matrix.server }}
+      TMPDIR: /var/cache/ci/tmp
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - server: mysql-approval
+            mcp_port_slot: 9
+    steps:
+      - name: Prepare runner workspace
+        run: |
+          rm -rf src
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
+      - name: Prepare artifact runtime
+        env:
+          BOOKIE_TOOL_DIR: /var/cache/ci/tools
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Download the shared GTK binary
+        uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
+        with:
+          name: gtk-ci-${{ github.run_id }}-${{ needs.pin-revision.outputs.revision }}
+          path: gtk-artifact/
+      - name: Verify the shared GTK binary
+        run: |
+          binary=$(python3 src/scripts/ci-gtk-artifact.py verify --profile dist "$GITHUB_WORKSPACE/gtk-artifact" "${{ needs.pin-revision.outputs.revision }}")
+          printf 'BOOKIE_GTK_BINARY=%s\nGSETTINGS_SCHEMA_DIR=%s/schemas\n' "$binary" "$GITHUB_WORKSPACE/gtk-artifact" >> "$GITHUB_ENV"
+      - name: Docker Hub login
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: bash src/scripts/docker-hub-login.sh
+      - name: Pre-pull GTK fixture image with retries
+        run: bash src/scripts/prepull-test-images.sh "$BOOKIE_GTK_SERVER_IMAGE_GROUP"
       - name: Select isolated MCP HTTP port
         run: cd src && python3 scripts/ci-mcp-port.py "${{ matrix.mcp_port_slot }}"
       - name: Installed GTK scenarios against a real server
@@ -1161,34 +1380,35 @@ jobs:
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
   driver-tls:
+    if: github.event_name != 'push'
     runs-on: any-host
-    needs: [guards, clippy, test-build]
-    if: github.event_name != 'pull_request'
+    needs: [pin-revision, guards, clippy, test-build]
     timeout-minutes: 45
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/driver-tls
       BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-driver-tls
     steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           rm -rf src
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ github.sha }}"
-      - name: Obtain the source-pinned test bundle
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
+      - name: Prepare artifact runtime
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Prepare source-pinned driver-tls test bundle
         env:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
+        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" driver-tls
       - name: Docker Hub login
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -1198,6 +1418,14 @@ jobs:
         run: bash src/scripts/prepull-test-images.sh driver-tls
       - name: Driver TLS fixtures
         run: cd src && python3 scripts/run-test-layer.py tls
+      - name: Retain driver TLS diagnostics
+        if: always()
+        uses: https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
+        with:
+          name: driver-tls-${{ github.run_id }}-${{ github.run_attempt }}
+          path: src/target/quality/*-layers
+          if-no-files-found: error
+          retention-days: 2
 
       - name: Finalize runner job
         if: always()
@@ -1209,33 +1437,34 @@ jobs:
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
   keyring:
+    if: github.event_name != 'push'
     runs-on: any-host
-    needs: [guards, clippy, test-build]
-    if: github.event_name != 'pull_request'
+    needs: [pin-revision, guards, clippy, test-build]
     timeout-minutes: 30
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/keyring
     steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           rm -rf src
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ github.sha }}"
-      - name: Obtain the source-pinned test bundle
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
+      - name: Prepare artifact runtime
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Prepare source-pinned keyring test bundle
         env:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
+        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" keyring
       - name: Secret Service tier
         run: cd src && python3 scripts/run-test-layer.py keyring
 
@@ -1249,9 +1478,9 @@ jobs:
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
   supply-chain:
+    if: github.event_name != 'push'
     runs-on: build-host
-    needs: [guards, clippy]
-    if: github.event_name != 'pull_request'
+    needs: [pin-revision, guards, clippy]
     timeout-minutes: 45
     defaults:
       run:
@@ -1259,32 +1488,33 @@ jobs:
     env:
       CARGO_HOME: /cargo
       RUSTC_WRAPPER: ""
-      PATH: /opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
+      PATH: /cargo/bin:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
       CARGO_TARGET_DIR: /target/${{ github.run_id }}/${{ github.job }}
       TMPDIR: /target/${{ github.run_id }}/${{ github.job }}
     steps:
-      - name: Check out
-        shell: bash
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
           rm -rf src
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
       - name: Supply-chain tools
         run: |
           command -v cargo-deny >/dev/null || cargo install --locked cargo-deny --version 0.20.2
           command -v cargo-audit >/dev/null || cargo install --locked cargo-audit --version 0.22.2
+          command -v cargo-shear >/dev/null || cargo install --locked cargo-shear --version 1.13.4
       - name: Advisories, licenses and sources
         run: |
           cd src && python3 scripts/run-test-layer.py supply-chain
+      - name: Unused dependency check
+        run: |
+          cd src && python3 scripts/run-test-layer.py unused-dependencies
       - name: Vendored crates equal upstream plus their patches
         run: |
           cd src && python3 scripts/vendor-patches.py check
@@ -1303,50 +1533,51 @@ jobs:
           fi
   regression-gate:
     name: Forgejo regression gate
-    if: always()
+    if: always() && !cancelled()
     needs:
+      - pin-revision
       - guards
       - gpui-tests
-      - gtk-build
+      - gpui-build
+      - linux-build
       - clippy
       - test-build
+      - b4-rollback
       - unit
       - sandbox
       - widgets
-      - floor-build
       - distro-floor-scenarios
       - driver
-      - e2e
+      - driver-followup
       - security-policy
       - consumers
       - gtk
+      - gtk-followup
       - pg-release
-      - pg-dump
-      - socket-ssh
       - gtk-server
+      - gtk-server-followup
+      - gtk-server-final
       - driver-tls
       - keyring
       - supply-chain
     runs-on: any-host
     timeout-minutes: 5
     steps:
-      - name: Check out
+      - name: Check runner space before checkout
         shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
-        run: |
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ github.sha }}"
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
       - name: Evaluate finalized job results
         env:
           CI_JOB_RESULTS: ${{ toJSON(needs) }}
-        run: python3 src/scripts/check-forgejo-ci-jobs.py
+        run: python3 src/scripts/check-ci-jobs.py
       - name: Finalize runner job
         if: always()
         shell: bash

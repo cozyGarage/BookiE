@@ -28,7 +28,16 @@ def call_arguments(source, call):
 def is_plain_or_protected(argument):
     return (
         argument.startswith('"')
-        or argument.startswith(("crate::tr!", "tr!", "&crate::tr!", "&tr!"))
+        or argument.startswith(
+            (
+                "crate::tr!",
+                "tr!",
+                "&crate::tr!",
+                "&tr!",
+                "bookie_app_services::tr!",
+                "&bookie_app_services::tr!",
+            )
+        )
         or any(
             marker in argument
             for marker in ("escape_markup(", "markup_escape_text(", "glib_escaped(")

@@ -11,17 +11,20 @@ mod render;
 mod text_input;
 mod ui_theme;
 
-use bookie_gpui::copy_format::{self, CopyContext, CopyFormat};
-use bookie_gpui::cursor::Cursor;
+use bookie_app_services::result_copy::{self, CopyContext, CopyFormat};
+use bookie_gpui::core_bridge::column_infos_for;
 use bookie_gpui::font_settings;
 use bookie_gpui::keymap::Keymap;
 use bookie_gpui::messages::{MessageKind, MessageLog};
 use bookie_gpui::model::*;
 use bookie_gpui::palette::{Action, matches as palette_matches, step as palette_step};
-use bookie_gpui::selection::{Selection, copy_tsv};
-use bookie_gpui::shell::{Catalog, DEFAULT_RESULT_RATIO, ResultView, Run, Tab, Tabs, next_run, result_ratio_from_drag};
+use bookie_gpui::selection::Selection;
+use bookie_gpui::shell::{
+    Catalog, DEFAULT_RESULT_RATIO, ResultView, Run, Tab, Tabs, next_run, result_ratio_from_drag, table_label,
+};
 use bookie_gpui::source::{Source, Synthetic};
 use bookie_gpui::theme::{Style, Theme};
+use bookie_results::grid_cursor::Cursor;
 use gpui::{
     App, Bounds, ClipboardItem, Context, Div, Entity, FocusHandle, Focusable, MouseButton, ScrollHandle,
     ScrollStrategy, Stateful, UniformListScrollHandle, Window, WindowBounds, WindowOptions, div, prelude::*, px, rgb,
@@ -43,10 +46,36 @@ enum Mode {
     },
 }
 
+#[derive(Clone, Copy)]
+enum Work {
+    Load,
+    Scan,
+}
+
+struct Ticket {
+    generation: u64,
+    cancel: CancellationToken,
+}
+
+impl Ticket {
+    fn new() -> Self {
+        Self {
+            generation: 0,
+            cancel: CancellationToken::new(),
+        }
+    }
+
+    fn invalidate(&mut self) {
+        self.generation += 1;
+        self.cancel.cancel();
+    }
+}
+
 struct GridView {
     table: gpui::Entity<gpui_kit::component::table::TableState<grid_table::GridDelegate>>,
     _table_events: gpui::Subscription,
     keystroke_hook: Option<gpui::Subscription>,
+    focus_editor: bool,
     source: Source,
     table_source: Source,
     mode: Mode,
@@ -95,6 +124,8 @@ struct GridView {
     check_histories: Vec<(String, bookie_app_services::checks::History)>,
     sidebar_open: bool,
     import_menu_open: bool,
+    sidebar_regex: bool,
+    sidebar_active_only: bool,
     sidebar_width: f32,
     resizing_sidebar: bool,
     connection_open: bool,
@@ -102,11 +133,11 @@ struct GridView {
     sidebar_search: Entity<TextInput>,
     cursor: MatchCursor,
     find_capped: bool,
-    operation_cancel: CancellationToken,
+    loads: Ticket,
+    scans: Ticket,
     compare: Option<std::sync::Arc<Diff>>,
     status: String,
     selection: Option<Selection>,
-    generation: u64,
     scroll: UniformListScrollHandle,
     focus: FocusHandle,
     started: Instant,
@@ -167,7 +198,7 @@ impl GridView {
         let filter = cx.new(|cx| TextInput::new("label contains 7", cx));
         cx.subscribe(&find, |this, _, event: &InputEvent, cx| match event {
             InputEvent::Changed => {
-                this.invalidate_background();
+                this.invalidate_scans();
                 this.cursor = MatchCursor::default();
                 this.status.clear();
                 cx.notify();
@@ -178,7 +209,7 @@ impl GridView {
         .detach();
         cx.subscribe(&filter, |this, _, event: &InputEvent, cx| match event {
             InputEvent::Changed => {
-                this.invalidate_background();
+                this.invalidate_scans();
                 if this.status == "Filtering…" {
                     this.status.clear();
                 }
@@ -247,13 +278,16 @@ impl GridView {
             window,
             |this: &mut Self, _, event: &gpui_kit::component::table::TableEvent, window, cx| match event {
                 gpui_kit::component::table::TableEvent::SelectCell(row, column) => {
-                    let cursor = bookie_gpui::cursor::Cursor {
+                    let cursor = bookie_results::grid_cursor::Cursor {
                         row: *row,
                         column: *column,
                     };
                     this.cell_cursor = Some(cursor);
-                    let names = this.column_names();
-                    this.status = cursor.label(&names);
+                    let dataset = this.base() + *row as u64;
+                    this.status = match this.selection {
+                        Some(selection) if selection.focus == dataset => selection.label(),
+                        _ => cursor.label(&this.column_names()),
+                    };
                     cx.notify();
                 }
                 gpui_kit::component::table::TableEvent::DoubleClickedRow(row) => {
@@ -267,6 +301,7 @@ impl GridView {
             table,
             _table_events: table_events,
             keystroke_hook: None,
+            focus_editor: false,
             table_source: source.clone(),
             source,
             mode: Mode::All,
@@ -318,6 +353,8 @@ impl GridView {
             check_histories: Vec::new(),
             sidebar_open: true,
             import_menu_open: false,
+            sidebar_regex: false,
+            sidebar_active_only: false,
             sidebar_width: 340.0,
             resizing_sidebar: false,
             connection_open: true,
@@ -325,11 +362,11 @@ impl GridView {
             sidebar_search,
             cursor: MatchCursor::default(),
             find_capped: false,
-            operation_cancel: CancellationToken::new(),
+            loads: Ticket::new(),
+            scans: Ticket::new(),
             compare: None,
             status: String::new(),
             selection: None,
-            generation: 0,
             scroll: UniformListScrollHandle::new(),
             focus: table_focus,
             started,
@@ -411,7 +448,8 @@ impl GridView {
             self.status = selection.label();
             return;
         }
-        let text = copy_tsv(self.selected_rows(selection), with_headers);
+        let columns = column_infos_for(self.source.columns());
+        let text = result_copy::tsv(&columns, self.selected_rows(selection), with_headers);
         cx.write_to_clipboard(ClipboardItem::new_string(text));
         let noun = if selection.count() == 1 { "row" } else { "rows" };
         self.status = format!(
@@ -436,13 +474,14 @@ impl GridView {
             .live
             .as_ref()
             .map_or_else(|| "postgres".to_string(), |session| session.driver_id.clone());
+        let columns = column_infos_for(self.source.columns());
         let context = CopyContext {
-            columns: self.source.columns(),
+            columns: &columns,
             driver_id: &driver_id,
-            table: &self.catalog.grid_table,
+            target: (!self.grid_is_query).then(|| self.catalog.grid_table.clone()),
             column: self.cell_cursor.map_or(0, |cursor| cursor.column),
         };
-        match copy_format::render(format, &context, &rows) {
+        match result_copy::render(format, &context, &rows) {
             Ok(copied) => {
                 cx.write_to_clipboard(ClipboardItem::new_string(copied.text));
                 let noun = if selection.count() == 1 { "row" } else { "rows" };
@@ -465,6 +504,7 @@ impl GridView {
         );
         let target = pattern.clone();
         self.begin_background(
+            Work::Load,
             cx,
             move |cancel| {
                 live.sample_pubsub(
@@ -489,6 +529,7 @@ impl GridView {
     fn kafka_topics(&mut self, broker: String, cx: &mut Context<Self>) {
         self.status = format!("Listing topics at {broker}…");
         self.begin_background(
+            Work::Load,
             cx,
             move |_| bookie_gpui::net_check::kafka_topics(&broker),
             |this, outcome| {
@@ -506,6 +547,7 @@ impl GridView {
         self.status = format!("Checking {address}…");
         let target = address.clone();
         self.begin_background(
+            Work::Load,
             cx,
             move |_| bookie_gpui::net_check::run_check(&target),
             move |this, outcome| {
@@ -521,7 +563,16 @@ impl GridView {
         let Some(live) = self.live.clone() else {
             return;
         };
-        let lines = bookie_gpui::status_view::describe(&live.overview());
+        let overview = match live.overview() {
+            Ok(overview) => overview,
+            Err(error) => {
+                let message = format!("Could not read connection status: {error}");
+                self.status = message.clone();
+                self.messages.push(MessageKind::Error, message);
+                return;
+            }
+        };
+        let lines = bookie_gpui::status_view::describe(&overview);
         if let Some((_, headline)) = lines.first() {
             self.status = headline.clone();
         }
@@ -548,6 +599,7 @@ impl GridView {
             }
             self.status = "Running…".into();
             self.begin_background(
+                Work::Load,
                 cx,
                 {
                     let statement = sql.clone();
@@ -765,18 +817,30 @@ impl GridView {
 
     fn begin_background<T: Send + 'static>(
         &mut self,
+        work_kind: Work,
         cx: &mut Context<Self>,
         work: impl FnOnce(CancellationToken) -> T + Send + 'static,
         apply: impl FnOnce(&mut Self, T) + 'static,
     ) {
-        self.invalidate_background();
-        let generation = self.generation;
+        match work_kind {
+            Work::Load => self.invalidate_background(),
+            Work::Scan => self.invalidate_scans(),
+        }
+        let ticket = match work_kind {
+            Work::Load => &mut self.loads,
+            Work::Scan => &mut self.scans,
+        };
+        let generation = ticket.generation;
         let cancel = CancellationToken::new();
-        self.operation_cancel = cancel.clone();
+        ticket.cancel = cancel.clone();
         cx.spawn(async move |this, cx| {
             let result = cx.background_executor().spawn(async move { work(cancel) }).await;
             this.update(cx, |this, cx| {
-                if this.generation == generation {
+                let current = match work_kind {
+                    Work::Load => this.loads.generation,
+                    Work::Scan => this.scans.generation,
+                };
+                if current == generation {
                     apply(this, result);
                     cx.notify();
                 }
@@ -797,6 +861,7 @@ impl GridView {
         let (source, query) = (self.source.clone(), self.find_text(cx));
         self.status = "Searching…".into();
         self.begin_background(
+            Work::Scan,
             cx,
             move |cancel| source.find(&query, MAX_FIND_MATCHES, &cancel),
             move |this, found| match found {
@@ -858,6 +923,7 @@ impl GridView {
         let label = format!("WHERE {}", self.filter.read(cx).content());
         self.status = "Filtering…".into();
         self.begin_background(
+            Work::Scan,
             cx,
             move |cancel| source.filter(&predicate, &cancel),
             move |this, kept| {
@@ -878,7 +944,7 @@ impl GridView {
     }
 
     fn clear_filter(&mut self) {
-        self.invalidate_background();
+        self.invalidate_scans();
         self.cursor = MatchCursor::default();
         self.set_mode(Mode::All);
         self.status.clear();
@@ -891,6 +957,7 @@ impl GridView {
         let source = self.source.clone();
         self.status = "Comparing…".into();
         self.begin_background(
+            Work::Scan,
             cx,
             move |cancel| source.compare(keyed, &cancel),
             |this, result| match result {
@@ -906,8 +973,12 @@ impl GridView {
     }
 
     fn invalidate_background(&mut self) {
-        self.generation += 1;
-        self.operation_cancel.cancel();
+        self.loads.invalidate();
+        self.invalidate_scans();
+    }
+
+    fn invalidate_scans(&mut self) {
+        self.scans.invalidate();
     }
 
     fn next_page(&mut self) -> bool {
@@ -1079,7 +1150,7 @@ impl GridView {
                 action("settings", "Open settings", true),
                 action(
                     "table",
-                    &format!("Open {}", self.catalog.grid_table),
+                    &format!("Open {}", table_label(&self.catalog.grid_table)),
                     !self.catalog.tables.is_empty(),
                 ),
                 action(
@@ -1377,10 +1448,8 @@ mod tests {
     fn only_numeric_cells_use_right_alignment() {
         assert!(numeric_cell(&Cell::Int(7)));
         assert!(numeric_cell(&Cell::Float(7.5)));
-        assert!(numeric_cell(&Cell::Decimal("7.50".into())));
-        assert!(numeric_cell(&bookie_gpui::core_bridge::value_to_cell(
-            bookie_core::Value::Decimal("7.50".parse().unwrap())
-        )));
+        assert!(numeric_cell(&Cell::Decimal("7.50".parse().unwrap())));
+        assert!(numeric_cell(&bookie_core::Value::Decimal("7.50".parse().unwrap())));
         assert!(!numeric_cell(&Cell::Text("7".into())));
         assert!(!numeric_cell(&Cell::Null));
     }
@@ -1465,6 +1534,8 @@ fn main() {
 #[cfg(test)]
 mod live_ui_tests;
 #[cfg(test)]
+mod typed_value_ui_tests;
+#[cfg(test)]
 mod ui_tests;
 
 fn load_keymap() -> Keymap {
@@ -1481,7 +1552,7 @@ fn load_keymap() -> Keymap {
 }
 
 fn live_source() -> Option<std::sync::Arc<bookie_gpui::live::LiveTable>> {
-    use bookie_gpui::live::{LiveTable, Origin};
+    use bookie_gpui::live::{LiveSession, Origin};
     let table = std::env::var("BOOKIE_PROTOTYPE_TABLE").ok()?;
     let origin = match (
         std::env::var("BOOKIE_PROTOTYPE_FILE").ok(),
@@ -1491,7 +1562,22 @@ fn live_source() -> Option<std::sync::Arc<bookie_gpui::live::LiveTable>> {
         (None, Some(connection)) => Origin::Saved(connection),
         (None, None) => return None,
     };
-    match LiveTable::load(&origin, &table, bookie_gpui::live::ROW_CAP) {
+    let session = match LiveSession::open(&origin) {
+        Ok(session) => session,
+        Err(error) => {
+            eprintln!("could not open live source: {error}");
+            std::process::exit(2);
+        }
+    };
+    let Some(target) = session
+        .tables
+        .iter()
+        .find(|candidate| candidate.name == table || table_label(candidate) == table)
+    else {
+        eprintln!("could not find table {table}");
+        std::process::exit(2);
+    };
+    match session.load_table(target, bookie_gpui::live::ROW_CAP) {
         Ok(live) => Some(std::sync::Arc::new(live)),
         Err(error) => {
             eprintln!("could not read {table}: {error}");

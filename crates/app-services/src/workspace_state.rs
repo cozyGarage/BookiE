@@ -1,3 +1,4 @@
+use crate::tab_mark::TabMark;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, Weak, mpsc};
@@ -6,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::workspace_disk;
+use crate::preferences::{DEFAULT_PAGE_SIZE, bounded_page_size};
 
 #[derive(Clone)]
 pub struct WorkspaceStore {
@@ -140,9 +142,6 @@ const MAX_COLLAPSED_KEY_BYTES: usize = 600;
 const MAX_SCHEMA_NAME_BYTES: usize = 256;
 const MAX_HIDDEN_SCHEMAS: usize = 256;
 
-const PAGE_SIZE_OPTIONS: &[u64] = &[100, 500, 1_000, 5_000, 10_000];
-const DEFAULT_PAGE_SIZE: u64 = 1_000;
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct WorkspaceState {
     #[serde(default)]
@@ -226,10 +225,14 @@ pub enum WorkspaceTabRecord {
         draft_id: Option<Uuid>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         file: Option<std::path::PathBuf>,
+        #[serde(default, skip_serializing_if = "TabMark::is_empty")]
+        mark: TabMark,
     },
     Structure {
         schema: Option<String>,
         table: String,
+        #[serde(default, skip_serializing_if = "TabMark::is_empty")]
+        mark: TabMark,
     },
     Table {
         schema: Option<String>,
@@ -246,6 +249,8 @@ pub enum WorkspaceTabRecord {
         sort_asc: Option<bool>,
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         preview: bool,
+        #[serde(default, skip_serializing_if = "TabMark::is_empty")]
+        mark: TabMark,
     },
     #[serde(other)]
     Unknown,
@@ -269,6 +274,7 @@ pub enum RestoredWorkspaceTab {
         query: String,
         draft_id: Option<Uuid>,
         file: Option<std::path::PathBuf>,
+        mark: TabMark,
     },
     Table {
         schema: Option<String>,
@@ -277,19 +283,27 @@ pub enum RestoredWorkspaceTab {
         page_size: u64,
         sort: Option<(usize, bool)>,
         preview: bool,
+        mark: TabMark,
     },
     Structure {
         schema: Option<String>,
         table: String,
+        mark: TabMark,
     },
 }
 
 pub fn restored_workspace_tab(record: &WorkspaceTabRecord) -> Option<RestoredWorkspaceTab> {
     match record {
-        WorkspaceTabRecord::Editor { query, draft_id, file } => Some(RestoredWorkspaceTab::Editor {
+        WorkspaceTabRecord::Editor {
+            query,
+            draft_id,
+            file,
+            mark,
+        } => Some(RestoredWorkspaceTab::Editor {
             query: query.clone(),
             draft_id: *draft_id,
             file: file.clone(),
+            mark: mark.clone(),
         }),
         WorkspaceTabRecord::Table {
             schema,
@@ -300,6 +314,7 @@ pub fn restored_workspace_tab(record: &WorkspaceTabRecord) -> Option<RestoredWor
             sort_col,
             sort_asc,
             preview,
+            mark,
         } => Some(RestoredWorkspaceTab::Table {
             schema: schema.clone(),
             table: table.clone(),
@@ -310,20 +325,23 @@ pub fn restored_workspace_tab(record: &WorkspaceTabRecord) -> Option<RestoredWor
                 _ => None,
             },
             preview: *preview,
+            mark: mark.clone(),
         }),
         WorkspaceTabRecord::Table {
             schema,
             table,
             mode: PersistedTableMode::Structure,
+            mark,
             ..
         }
-        | WorkspaceTabRecord::Structure { schema, table } => {
+        | WorkspaceTabRecord::Structure { schema, table, mark } => {
             if table.is_empty() {
                 None
             } else {
                 Some(RestoredWorkspaceTab::Structure {
                     schema: schema.clone(),
                     table: table.clone(),
+                    mark: mark.clone(),
                 })
             }
         }
@@ -855,8 +873,9 @@ fn migrate_legacy_tabs(conn: &mut ConnectionWorkspaceState) {
                 sort_col,
                 sort_asc,
                 preview: false,
+                mark: TabMark::default(),
             },
-            WorkspaceTabRecord::Structure { schema, table } => WorkspaceTabRecord::Table {
+            WorkspaceTabRecord::Structure { schema, table, mark } => WorkspaceTabRecord::Table {
                 schema,
                 table,
                 mode: PersistedTableMode::Structure,
@@ -865,6 +884,7 @@ fn migrate_legacy_tabs(conn: &mut ConnectionWorkspaceState) {
                 sort_col: None,
                 sort_asc: None,
                 preview: false,
+                mark,
             },
             other => other,
         };
@@ -895,9 +915,7 @@ fn normalize_tab(tab: &mut WorkspaceTabRecord) {
                 let boundary = floor_char_boundary(s, MAX_SCHEMA_NAME_BYTES);
                 s.truncate(boundary);
             }
-            if !PAGE_SIZE_OPTIONS.contains(page_size) {
-                *page_size = DEFAULT_PAGE_SIZE;
-            }
+            *page_size = bounded_page_size(*page_size);
         }
         WorkspaceTabRecord::Browse { .. } | WorkspaceTabRecord::Structure { .. } => {}
         WorkspaceTabRecord::Unknown => {}

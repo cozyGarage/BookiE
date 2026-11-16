@@ -1,5 +1,8 @@
 //! Successful-statement catalog notifications. This does not authorize execution.
-use sqlparser::{ast::Statement, parser::Parser};
+use sqlparser::ast::Statement;
+
+use crate::classify::classify_parsed;
+use crate::parsed_sql::ParsedSql;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CatalogEffect {
@@ -11,15 +14,15 @@ pub enum CatalogEffect {
 }
 
 pub fn catalog_effect(sql: &str, driver_id: &str) -> CatalogEffect {
-    let dialect = super::classify::dialect_for(driver_id);
-    let Ok(statements) = Parser::parse_sql(dialect.as_ref(), sql) else {
+    let parsed = ParsedSql::new(sql, driver_id);
+    let Ok(statements) = parsed.statements() else {
         return CatalogEffect::None;
     };
-    match statements.as_slice() {
+    match statements {
         [Statement::StartTransaction { .. }] => CatalogEffect::Begin,
         [Statement::Commit { chain, .. }] => CatalogEffect::Commit { chain: *chain },
         [Statement::Rollback { chain, savepoint: None }] => CatalogEffect::Rollback { chain: *chain },
-        [_] if super::classify(sql, driver_id).contains_ddl() => CatalogEffect::Ddl,
+        [_] if classify_parsed(&parsed, driver_id).contains_ddl() => CatalogEffect::Ddl,
         _ => CatalogEffect::None,
     }
 }

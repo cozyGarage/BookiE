@@ -27,7 +27,7 @@ jobs:
         env:
           TITLE: ${{ github.event.pull_request.title }}
         run: python3 scripts/check-pr-title.py "$TITLE"
-      # Release notes come from Release-Note lines, so only a release pull request edits the frozen CHANGELOG.md.
+      # Release notes come from changelog.d fragments (ADR 0053), so only a release pull request edits CHANGELOG.md.
       - name: Only a release pull request edits CHANGELOG.md
         env:
           TITLE: ${{ github.event.pull_request.title }}
@@ -35,6 +35,6 @@ jobs:
           set -euo pipefail
           case "$TITLE" in 'chore(release)'*) exit 0 ;; esac
           if [ -n "$(git diff --no-renames --name-only HEAD^1 HEAD -- CHANGELOG.md)" ]; then
-            echo "::error title=Changelog::Only a chore(release) pull request edits CHANGELOG.md. Put a Release-Note line in the pull request body instead (ADR 0022)."
+            echo "::error title=Changelog::Only a chore(release) pull request edits CHANGELOG.md. Add a changelog.d fragment for the user-facing change instead (ADR 0053)."
             exit 1
           fi

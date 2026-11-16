@@ -30,10 +30,13 @@ bookie-pg-sessions = { path = "../pg-sessions" }
 bookie-checks = { path = "../checks" }
 bookie-kafka-browser = { path = "../kafka-browser" }
 chrono.workspace = true
+quick-xml = "0.42"
+gettext-rs = { version = "0.8", features = ["gettext-system"] }
 thiserror.workspace = true
 serde.workspace = true
 tracing.workspace = true
 serde_json.workspace = true
+secrecy.workspace = true
 tempfile.workspace = true
 rust_decimal.workspace = true
 tokio.workspace = true
@@ -43,7 +46,6 @@ sqlparser.workspace = true
 unicode-width.workspace = true
 
 [dev-dependencies]
-secrecy.workspace = true
 tracing-subscriber.workspace = true
 async-trait.workspace = true
 bookie-driver-postgres = { path = "../drivers/postgres" }

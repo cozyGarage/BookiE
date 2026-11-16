@@ -1,5 +1,6 @@
 mod explanation;
 mod mutations;
+mod set_cells;
 
 use std::sync::Arc;
 
@@ -51,6 +52,7 @@ pub(super) struct ResultEditing {
     pending: PendingBar,
     selection: Option<gtk::MultiSelection>,
     column_view: Option<gtk::ColumnView>,
+    column_selection: crate::ui::grid::ColumnSelectionHandle,
     save_in_flight: Option<Uuid>,
     rereading: bool,
     quiet_run: bool,
@@ -93,6 +95,7 @@ impl ResultEditing {
             pending,
             selection: None,
             column_view: None,
+            column_selection: Default::default(),
             save_in_flight: None,
             rereading: false,
             quiet_run: false,
@@ -123,17 +126,17 @@ fn build_pending_bar() -> PendingBar {
     pending_label.add_css_class("dim-label");
     pending_label.add_css_class("caption");
     let discard_button = gtk::Button::builder()
-        .label(crate::tr!("Discard"))
-        .tooltip_text(crate::tr!("Discard all pending edits"))
+        .label(bookie_app_services::tr!("Discard"))
+        .tooltip_text(bookie_app_services::tr!("Discard all pending edits"))
         .build();
     let save_button = gtk::Button::builder()
-        .label(crate::tr!("Save"))
-        .tooltip_text(crate::tr!("Save pending edits (Ctrl+S)"))
+        .label(bookie_app_services::tr!("Save"))
+        .tooltip_text(bookie_app_services::tr!("Save pending edits (Ctrl+S)"))
         .build();
     save_button.add_css_class("suggested-action");
     let preview_button = gtk::Button::builder()
-        .label(crate::tr!("Preview SQL"))
-        .tooltip_text(crate::tr!("Show the statements Save would run"))
+        .label(bookie_app_services::tr!("Preview SQL"))
+        .tooltip_text(bookie_app_services::tr!("Show the statements Save would run"))
         .build();
     let bar = gtk::ActionBar::new();
     bar.pack_start(&pending_label);
@@ -186,6 +189,7 @@ impl SqlEditor {
         editing.sql.clear();
         editing.selection = None;
         editing.column_view = None;
+        editing.column_selection.borrow_mut().clear();
         editing.save_in_flight = None;
         editing
             .change_trackers
@@ -234,6 +238,7 @@ impl SqlEditor {
         editing.table = None;
         editing.selection = None;
         editing.column_view = None;
+        editing.column_selection.borrow_mut().clear();
         editing.identity = outcomes.first().map(|outcome| outcome.identity).unwrap_or_default();
         editing
             .change_trackers
@@ -403,7 +408,7 @@ impl SqlEditor {
         clear_box(&editing.results_content);
         if result.columns.is_empty() {
             let empty = adw::StatusPage::builder()
-                .title(crate::tr!("No rows returned"))
+                .title(bookie_app_services::tr!("No rows returned"))
                 .icon_name("emblem-default-symbolic")
                 .vexpand(true)
                 .build();
@@ -438,6 +443,7 @@ impl SqlEditor {
             self.result_view_settings.clone(),
             settings_key,
         );
+        let column_selection_chrome = crate::ui::grid::selection_chrome();
         let (column_view, selection) = build_column_view(
             result,
             &editing.columns,
@@ -461,6 +467,9 @@ impl SqlEditor {
                     changed_cells: self.result_view_settings.changed_cells(settings_key),
                     sortable_result_columns: crate::ui::grid::sortable_result_columns(result),
                     row_mutations_allowed: true,
+                    column_selection: editing.column_selection.clone(),
+                    set_cells_enabled: true,
+                    column_selection_chrome: Some(column_selection_chrome.clone()),
                     ..Default::default()
                 },
                 column_widths: None,
@@ -471,6 +480,7 @@ impl SqlEditor {
         local_result_view.bind_column_view(&column_view);
         let holder = gtk::Box::new(gtk::Orientation::Vertical, 0);
         holder.append(&local_result_view.controls());
+        holder.append(&column_selection_chrome);
         holder.append(&crate::ui::grid::wrap_grid_scrolled(&column_view));
         (column_view, selection, holder)
     }
@@ -481,8 +491,8 @@ impl SqlEditor {
         };
         let visible = count > 0;
         if visible {
-            let label =
-                crate::trn!("{n} unsaved change", "{n} unsaved changes", count).replace("{n}", &count.to_string());
+            let label = bookie_app_services::trn!("{n} unsaved change", "{n} unsaved changes", count)
+                .replace("{n}", &count.to_string());
             editing.pending.pending_label.set_label(&label);
         }
         editing.pending.revealer.set_reveal_child(visible);
@@ -498,7 +508,7 @@ impl SqlEditor {
     pub(super) fn gate_run_for_pending_edits(&mut self, deferred: DeferredRun, sender: &ComponentSender<Self>) -> bool {
         if self.result_save_in_flight() {
             self.status
-                .set_label(&crate::tr!("Wait for the changes to finish saving"));
+                .set_label(&bookie_app_services::tr!("Wait for the changes to finish saving"));
             return false;
         }
         if !self.has_pending_result_edits() {
@@ -511,13 +521,13 @@ impl SqlEditor {
             editing.deferred_run = Some(deferred);
         }
         let dialog = adw::AlertDialog::new(
-            Some(&crate::tr!("Discard pending changes?")),
-            Some(&crate::tr!(
+            Some(&bookie_app_services::tr!("Discard pending changes?")),
+            Some(&bookie_app_services::tr!(
                 "Running again replaces these results and drops every unsaved edit on this tab."
             )),
         );
-        dialog.add_response("cancel", &crate::tr!("Cancel"));
-        dialog.add_response("discard", &crate::tr!("Discard and run"));
+        dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
+        dialog.add_response("discard", &bookie_app_services::tr!("Discard and run"));
         dialog.set_response_appearance("discard", adw::ResponseAppearance::Destructive);
         dialog.set_default_response(Some("cancel"));
         dialog.set_close_response("cancel");

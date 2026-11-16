@@ -1,8 +1,6 @@
 use sqlparser::ast::{
     Delete, Expr, FromTable, Insert, SetExpr, Statement, TableFactor, TableObject, TableWithJoins, UpdateTableFromKind,
 };
-use sqlparser::dialect::{Dialect, GenericDialect, MsSqlDialect, MySqlDialect, PostgreSqlDialect, SQLiteDialect};
-use sqlparser::parser::Parser;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BlastRadiusResult {
@@ -18,16 +16,6 @@ pub enum BlastRadiusRewrite {
     Known(u64),
     /// Run `count_sql` against the database to learn the row count.
     CountQuery(BlastRadiusResult),
-}
-
-/// Rewrite an UPDATE, DELETE, or INSERT into something the guard can use to
-/// measure blast radius before executing. Returns `None` when the statement
-/// is not a single one of those or cannot be rewritten safely; callers must
-/// treat `None` as "unknown", not "zero rows".
-pub fn count_sql_for_mutation(sql: &str, driver_id: &str) -> Option<BlastRadiusRewrite> {
-    let dialect = dialect_for(driver_id);
-    let statements = Parser::parse_sql(dialect.as_ref(), sql.trim()).ok()?;
-    analyze_blast_radius(&statements, driver_id).0
 }
 
 pub(crate) fn analyze_blast_radius(
@@ -166,19 +154,15 @@ fn table_names_from_factor(factor: &TableFactor) -> Vec<String> {
     }
 }
 
-fn dialect_for(driver_id: &str) -> Box<dyn Dialect> {
-    match driver_id {
-        "postgres" => Box::new(PostgreSqlDialect {}),
-        "mysql" => Box::new(MySqlDialect {}),
-        "sqlite" => Box::new(SQLiteDialect {}),
-        "mssql" => Box::new(MsSqlDialect {}),
-        _ => Box::new(GenericDialect {}),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parsed_sql::ParsedSql;
+
+    fn count_sql_for_mutation(sql: &str, driver_id: &str) -> Option<BlastRadiusRewrite> {
+        let parsed = ParsedSql::new(sql, driver_id);
+        analyze_blast_radius(parsed.statements().ok()?, driver_id).0
+    }
 
     fn count_query(sql: &str, driver_id: &str) -> BlastRadiusResult {
         match count_sql_for_mutation(sql, driver_id).unwrap() {

@@ -22,7 +22,7 @@ impl BrowseTab {
         if self.allows_keyed_row_mutations() || !requires_row_key(input) {
             return false;
         }
-        let _ = sender.output(BrowseTabOutput::ShowToast(crate::tr!(
+        let _ = sender.output(BrowseTabOutput::ShowToast(bookie_app_services::tr!(
             "This table has no primary key. Inline editing is disabled."
         )));
         true
@@ -32,7 +32,9 @@ impl BrowseTab {
         if self.allows_row_mutations() || !is_row_mutation_input(input) {
             return false;
         }
-        let _ = sender.output(BrowseTabOutput::ShowToast(crate::tr!("This connection is read-only.")));
+        let _ = sender.output(BrowseTabOutput::ShowToast(bookie_app_services::tr!(
+            "This connection is read-only."
+        )));
         true
     }
 
@@ -53,16 +55,18 @@ impl BrowseTab {
         let values = match duplicate_row_values(&self.current_columns, &source_cells) {
             Ok(values) => values,
             Err(DuplicateRowError::Undecodable { column }) => {
-                let message = crate::tr!("Cannot duplicate this row because column {name} is undecodable.")
-                    .replace("{name}", &column);
+                let message =
+                    bookie_app_services::tr!("Cannot duplicate this row because column {name} is undecodable.")
+                        .replace("{name}", &column);
                 let _ = sender.output(BrowseTabOutput::ShowToast(message));
                 return;
             }
             Err(DuplicateRowError::CellCountMismatch { expected, actual }) => {
-                let message =
-                    crate::tr!("Cannot duplicate this row because it has {actual} values for {expected} columns.")
-                        .replace("{actual}", &actual.to_string())
-                        .replace("{expected}", &expected.to_string());
+                let message = bookie_app_services::tr!(
+                    "Cannot duplicate this row because it has {actual} values for {expected} columns."
+                )
+                .replace("{actual}", &actual.to_string())
+                .replace("{expected}", &expected.to_string());
                 let _ = sender.output(BrowseTabOutput::ShowToast(message));
                 return;
             }
@@ -191,8 +195,8 @@ impl BrowseTab {
         // deleting part of it without saying so.
         if unreadable_key_rows > 0 {
             let _ = sender.output(BrowseTabOutput::ShowSelectionAlert {
-                title: crate::tr!("Cannot delete"),
-                body: crate::tr!(
+                title: bookie_app_services::tr!("Cannot delete"),
+                body: bookie_app_services::tr!(
                     "Some selected rows have a key value this driver could not read, so they cannot be identified. Reload the table, or delete those rows from a SQL editor."
                 ),
             });
@@ -200,8 +204,8 @@ impl BrowseTab {
         }
         if self.read_only && had_persisted_row {
             let _ = sender.output(BrowseTabOutput::ShowSelectionAlert {
-                title: crate::tr!("Cannot delete"),
-                body: crate::tr!("This connection is read-only."),
+                title: bookie_app_services::tr!("Cannot delete"),
+                body: bookie_app_services::tr!("This connection is read-only."),
             });
             return;
         }
@@ -209,8 +213,8 @@ impl BrowseTab {
         // Pure-draft selections sail through to discard.
         if had_persisted_row && pk_indices.is_empty() {
             let _ = sender.output(BrowseTabOutput::ShowSelectionAlert {
-                title: crate::tr!("Cannot delete"),
-                body: crate::tr!("This table has no primary key — editing is disabled."),
+                title: bookie_app_services::tr!("Cannot delete"),
+                body: bookie_app_services::tr!("This table has no primary key — editing is disabled."),
             });
             return;
         }
@@ -248,11 +252,14 @@ impl BrowseTab {
             // window. The inner_stack is always parented to
             // the BrowseTab's root toolbar, so it resolves
             // correctly while the tab is visible.
-            let title = crate::trn!("Delete {n} row?", "Delete {n} rows?", count).replace("{n}", &count.to_string());
-            let body = crate::tr!("These rows will be marked for deletion. They aren't removed until you click Save.");
+            let title = bookie_app_services::trn!("Delete {n} row?", "Delete {n} rows?", count)
+                .replace("{n}", &count.to_string());
+            let body = bookie_app_services::tr!(
+                "These rows will be marked for deletion. They aren't removed until you click Save."
+            );
             let dialog = adw::AlertDialog::new(Some(&title), Some(&body));
-            dialog.add_response("cancel", &crate::tr!("Cancel"));
-            dialog.add_response("delete", &crate::tr!("Delete"));
+            dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
+            dialog.add_response("delete", &bookie_app_services::tr!("Delete"));
             dialog.set_response_appearance("delete", adw::ResponseAppearance::Destructive);
             dialog.set_default_response(Some("cancel"));
             dialog.set_close_response("cancel");
@@ -316,13 +323,7 @@ impl BrowseTab {
         let col = self.current_columns.get(col_index);
         let row_obj = self.row_object_at(row_position);
         let current_value = row_obj.as_ref().map(|row| row.cell_value(col_index));
-        let new = match parse_grid_cell_input_with_style(
-            &new_value,
-            col,
-            &self.driver_id,
-            self.enum_input_style,
-            current_value.as_ref(),
-        ) {
+        let new = match parse_grid_cell_input_with_style(&new_value, col, &self.parse_hooks, current_value.as_ref()) {
             Ok(v) => v,
             Err(message) => {
                 let _ = sender.output(BrowseTabOutput::ShowToast(message));
@@ -497,14 +498,8 @@ impl BrowseTab {
                 if !crate::ui::grid::cell_allows_inline_edit(column, original) {
                     return Err(ReplaceApplyError::NotEditable);
                 }
-                parse_grid_cell_input_with_style(
-                    new_value,
-                    Some(column),
-                    &self.driver_id,
-                    self.enum_input_style,
-                    Some(original),
-                )
-                .map_err(|_| ReplaceApplyError::InvalidValue)
+                parse_grid_cell_input_with_style(new_value, Some(column), &self.parse_hooks, Some(original))
+                    .map_err(|_| ReplaceApplyError::InvalidValue)
             },
         )
     }
@@ -525,7 +520,7 @@ impl BrowseTab {
         if !row_key_is_unreadable(&row_obj.cells_clone(), &pk_indices) {
             return;
         }
-        let _ = sender.output(BrowseTabOutput::ShowToast(crate::tr!(
+        let _ = sender.output(BrowseTabOutput::ShowToast(bookie_app_services::tr!(
             "This row's key could not be read from the database, so the row cannot be changed."
         )));
         self.refresh_row(row_position);
@@ -545,11 +540,16 @@ impl BrowseTab {
         row_key_matches(&self.current_columns, &row_obj, expected_key)
     }
 
-    fn reject_stale_row_edit(&mut self, row_position: u32, row_key: &[Value], sender: &ComponentSender<Self>) -> bool {
+    pub(super) fn reject_stale_row_edit(
+        &mut self,
+        row_position: u32,
+        row_key: &[Value],
+        sender: &ComponentSender<Self>,
+    ) -> bool {
         if self.row_position_still_holds(row_position, row_key) {
             return false;
         }
-        let _ = sender.output(BrowseTabOutput::ShowToast(crate::tr!(
+        let _ = sender.output(BrowseTabOutput::ShowToast(bookie_app_services::tr!(
             "That row moved while you were editing. The change was not applied."
         )));
         self.refresh_row(row_position);
@@ -576,7 +576,7 @@ impl BrowseTab {
             .zip(self.row_object_at(row_position))
             .is_some_and(|(column, row)| crate::ui::grid::cell_allows_set_null(column, &row.cell_value(col_index)));
         if !allowed {
-            let _ = sender.output(BrowseTabOutput::ShowToast(crate::tr!(
+            let _ = sender.output(BrowseTabOutput::ShowToast(bookie_app_services::tr!(
                 "This cell can't be set to NULL because it is read-only or does not accept NULL."
             )));
             return;
@@ -646,6 +646,10 @@ impl BrowseTab {
     }
 
     pub(super) fn handle_copy_selected_rows_as_tsv(&mut self, sender: ComponentSender<Self>) {
+        if !self.column_selection.borrow().is_empty() {
+            self.handle_copy_selection_as(bookie_app_services::column_selection::SelectionCopyFormat::Tsv, sender);
+            return;
+        }
         let Some(selection) = self.current_selection.as_ref() else {
             return;
         };
@@ -664,7 +668,7 @@ impl BrowseTab {
                 continue;
             };
             let Some(cells) = row.complete_cells() else {
-                let _ = sender.output(BrowseTabOutput::ShowToast(crate::tr!(
+                let _ = sender.output(BrowseTabOutput::ShowToast(bookie_app_services::tr!(
                     "Some row values were not fetched. Show hidden columns and reload before copying or exporting."
                 )));
                 return;
@@ -679,7 +683,7 @@ impl BrowseTab {
     }
 
     pub(super) fn handle_paste_not_supported(&mut self, sender: ComponentSender<Self>) {
-        let _ = sender.output(BrowseTabOutput::ShowToast(crate::tr!(
+        let _ = sender.output(BrowseTabOutput::ShowToast(bookie_app_services::tr!(
             "Click a cell first, then paste to fill cells from that one"
         )));
     }
@@ -726,6 +730,9 @@ impl BrowseTab {
     }
 
     pub(super) fn emit_fetch_page(&self, sender: &ComponentSender<Self>) {
+        self.auto_refresh_status_label.set_text("");
+        self.auto_refresh_status_label.set_tooltip_text(None);
+        self.auto_refresh_in_flight.set(false);
         self.page_requests.invalidate();
         self.cell_value_requests.invalidate();
         self.pending_cell_edit.borrow_mut().take();
@@ -734,6 +741,16 @@ impl BrowseTab {
 
     pub(super) fn emit_fetch_page_and_count(&self, sender: &ComponentSender<Self>) {
         self.emit_fetch_page(sender);
+        self.row_count_requests.invalidate();
+        let _ = sender.output(BrowseTabOutput::FetchRowCount);
+    }
+
+    pub(super) fn emit_auto_fetch_page_and_count(&self, sender: &ComponentSender<Self>) {
+        self.auto_refresh_in_flight.set(true);
+        self.page_requests.invalidate();
+        self.cell_value_requests.invalidate();
+        self.pending_cell_edit.borrow_mut().take();
+        let _ = sender.output(BrowseTabOutput::AutoRefreshPage);
         self.row_count_requests.invalidate();
         let _ = sender.output(BrowseTabOutput::FetchRowCount);
     }
@@ -751,6 +768,10 @@ impl BrowseTab {
                 | BrowseTabInput::GridCellEdited { .. }
                 | BrowseTabInput::GridReplaceBatch { .. }
                 | BrowseTabInput::GridSetCellNull { .. }
+                | BrowseTabInput::GridSetCells(_)
+                | BrowseTabInput::SetCellsConfirmed { .. }
+                | BrowseTabInput::SetCellsPlanned(_)
+                | BrowseTabInput::GridResetCell(_)
                 | BrowseTabInput::GridDeleteRowAt { .. }
                 | BrowseTabInput::Undo
                 | BrowseTabInput::Redo
@@ -763,7 +784,7 @@ impl BrowseTab {
         }
         self.rejected_edit_revision
             .set(self.rejected_edit_revision.get().wrapping_add(1));
-        let _ = sender.output(BrowseTabOutput::ShowToast(crate::tr!(
+        let _ = sender.output(BrowseTabOutput::ShowToast(bookie_app_services::tr!(
             "Saving changes. Edit again when the save finishes."
         )));
         None
@@ -808,7 +829,7 @@ impl BrowseTab {
             }
             Some(Err(e)) => {
                 let _ = sender.output(BrowseTabOutput::ShowSelectionAlert {
-                    title: crate::tr!("Cannot save"),
+                    title: bookie_app_services::tr!("Cannot save"),
                     body: format!("{e}"),
                 });
             }
@@ -832,7 +853,7 @@ impl BrowseTab {
             ),
             Some(Err(e)) => {
                 let _ = sender.output(BrowseTabOutput::ShowSelectionAlert {
-                    title: crate::tr!("Cannot preview"),
+                    title: bookie_app_services::tr!("Cannot preview"),
                     body: format!("{e}"),
                 });
             }
@@ -979,6 +1000,10 @@ fn is_row_mutation_input(input: &BrowseTabInput) -> bool {
             | BrowseTabInput::GridCellEdited { .. }
             | BrowseTabInput::GridReplaceBatch { .. }
             | BrowseTabInput::GridSetCellNull { .. }
+            | BrowseTabInput::GridSetCells(_)
+            | BrowseTabInput::SetCellsConfirmed { .. }
+            | BrowseTabInput::SetCellsPlanned(_)
+            | BrowseTabInput::GridResetCell(_)
             | BrowseTabInput::GridDeleteRowAt { .. }
             | BrowseTabInput::CommitSave
             | BrowseTabInput::Paste(_)
@@ -1011,6 +1036,9 @@ fn requires_row_key(input: &BrowseTabInput) -> bool {
             | BrowseTabInput::GridCellEdited { .. }
             | BrowseTabInput::GridReplaceBatch { .. }
             | BrowseTabInput::GridSetCellNull { .. }
+            | BrowseTabInput::GridSetCells(_)
+            | BrowseTabInput::SetCellsConfirmed { .. }
+            | BrowseTabInput::SetCellsPlanned(_)
             | BrowseTabInput::GridDeleteRowAt { .. }
             | BrowseTabInput::CommitSave
             | BrowseTabInput::Paste(_)

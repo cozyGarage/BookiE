@@ -1,7 +1,3 @@
-//! Activity / monitoring dialog. Runs driver-specific activity SQL through
-//! the policy-gated connection owned by the calling window and shows the
-//! result grid.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -15,7 +11,7 @@ use bookie_core::{
 
 use crate::services::database_service::DatabaseService;
 use crate::services::preferences::PreferencesStore;
-use crate::tr;
+use bookie_app_services::tr;
 
 pub fn present(
     parent: &gtk::Window,
@@ -84,6 +80,8 @@ pub fn present(
         ("Blocking locks", ActivityQuery::BlockingLocks),
         ("Long-running", ActivityQuery::LongRunning),
         ("Replication lag", ActivityQuery::ReplicationLag),
+        ("Server variables", ActivityQuery::ServerVariables),
+        ("Server status", ActivityQuery::ServerStatus),
     ];
     let supported = activity_kinds(&driver_id);
     for (label, kind) in actions {

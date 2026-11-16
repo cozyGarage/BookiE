@@ -60,7 +60,8 @@ fn visible_stack_index(root: &gtk::Widget, prefix: &str) -> Option<usize> {
 }
 
 fn streamed_page_for(holder: &gtk::Box, result: &StreamedResult) -> Option<Arc<QueryResult>> {
-    let page_index = visible_page_index(holder, result.generation).or_else(|| result.page_indices.first().copied())?;
+    let root = holder.clone().upcast::<gtk::Widget>();
+    let page_index = visible_page_index(&root, result.generation).or_else(|| result.page_indices.first().copied())?;
     result
         .resident_pages
         .get(page_index)
@@ -106,6 +107,7 @@ mod tests {
             elapsed_ms: 0,
             kind: StatementOutcomeKind::Rows(sets.into_iter().map(Arc::new).collect()),
             pinned: false,
+            detail: Default::default(),
         }
     }
 
@@ -162,6 +164,7 @@ mod tests {
                 resident_pages: Default::default(),
             })),
             pinned: false,
+            detail: Default::default(),
         }
     }
 
@@ -174,6 +177,7 @@ mod tests {
             elapsed_ms: 0,
             kind: StatementOutcomeKind::Error("boom".into()),
             pinned: false,
+            detail: Default::default(),
         };
         assert!(pick_shown_export(&[], None, None, None).is_none());
         assert!(pick_shown_export(&[error], None, None, None).is_none());

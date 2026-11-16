@@ -1,5 +1,28 @@
 use super::*;
 
+#[derive(Debug)]
+pub enum RunMessage {
+    Run,
+    SessionAction {
+        session_id: Uuid,
+        commit: bool,
+    },
+    RunWithParameters {
+        sql: String,
+        anchor: Option<SourceAnchor>,
+        planned: PlannedStatements,
+        values: std::collections::HashMap<String, bookie_core::Value>,
+    },
+    Cancel,
+    RunWithLongerTimeout,
+    RunAtCursor,
+    Explain,
+    ShowTemporaryTable {
+        schema: Option<String>,
+        name: String,
+    },
+}
+
 #[derive(Debug, Clone)]
 pub struct StatementOutcome {
     pub identity: StatementIdentity,
@@ -8,6 +31,7 @@ pub struct StatementOutcome {
     pub elapsed_ms: u128,
     pub kind: StatementOutcomeKind,
     pub pinned: bool,
+    pub detail: super::outcome_detail::OutcomeDetail,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
@@ -31,17 +55,7 @@ pub enum SqlEditorInput {
         driver: String,
         sql: String,
     },
-    Run,
-    SessionAction {
-        session_id: Uuid,
-        commit: bool,
-    },
-    RunWithParameters {
-        sql: String,
-        anchor: Option<SourceAnchor>,
-        planned: PlannedStatements,
-        values: std::collections::HashMap<String, bookie_core::Value>,
-    },
+    Run(RunMessage),
     LexingRead {
         source: session_lexing::LexingSource,
         sql: String,
@@ -52,7 +66,6 @@ pub enum SqlEditorInput {
         source: session_lexing::LexingSource,
         settings: Option<bookie_core::sql_syntax::script::LexicalSettings>,
     },
-    Cancel,
     FocusResultGrid,
     FocusEditor,
     TogglePin,
@@ -66,10 +79,14 @@ pub enum SqlEditorInput {
     Stream(streaming::Input),
     FilterResults(Box<result_tools::FilterRequest>),
     FilterFinished(Box<result_tools::FilterDone>),
+    SetCellsPlanned {
+        result: Result<bookie_app_services::set_cells::SetCellsPlan, bookie_app_services::set_cells::SetCellsError>,
+        generation: u64,
+        run: u64,
+    },
     OpenCompare,
     CompareResults(Box<result_compare::CompareRequest>),
     CompareFinished(Box<result_compare::CompareDone>),
-    RunWithLongerTimeout,
     ShowCancelled(u64),
     ShowTimedOut {
         generation: u64,
@@ -85,7 +102,6 @@ pub enum SqlEditorInput {
     },
     ReplaceQuery(String),
     Format,
-    RunAtCursor,
     JumpStatement {
         forward: bool,
     },
@@ -100,7 +116,6 @@ pub enum SqlEditorInput {
     InsertSnippet(String),
     UnfoldAll,
     ShowFind,
-    Explain,
     Grid(GridMsg),
     SessionToggled(bool),
     SessionOpened {
@@ -134,6 +149,10 @@ pub enum SqlEditorInput {
         session_id: Uuid,
         result: Result<(), String>,
     },
+    TemporaryTablesLoaded {
+        session_id: Uuid,
+        result: Result<Vec<bookie_core::TableInfo>, String>,
+    },
     PrepareForTeardown(tokio::sync::oneshot::Sender<Result<(), String>>),
     SessionTeardownFinished(Result<(), String>),
     EditColumnsFetched {
@@ -155,6 +174,7 @@ pub enum SqlEditorInput {
 #[derive(Debug)]
 pub enum SqlEditorOutput {
     CatalogChanged(crate::services::catalog::CatalogOrigin),
+    TemporaryTablesChanged(Vec<bookie_core::TableInfo>),
     RunStateChanged(bool),
     QueryChanged(String),
     CopyToClipboard(String),

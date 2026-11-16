@@ -23,6 +23,7 @@ use crate::{
     cmap::{PoolGeneration, StreamDescription},
     error::{Error, Result},
     event::cmap::{
+        CmapEvent,
         ConnectionCheckedInEvent,
         ConnectionCheckedOutEvent,
         ConnectionClosedEvent,
@@ -233,9 +234,7 @@ impl PooledConnection {
                 "cannot pin a checked-in connection (id = {})",
                 self.id
             ))),
-            PooledConnectionState::CheckedOut {
-                ref pool_manager, ..
-            } => {
+            PooledConnectionState::CheckedOut { pool_manager, .. } => {
                 let (tx, rx) = mpsc::channel(1);
                 self.state = PooledConnectionState::Pinned {
                     // Mark the connection as in-use while the operation currently using the
@@ -277,7 +276,7 @@ impl PooledConnection {
     /// Emit a [`ConnectionClosedEvent`] for this connection with the supplied reason.
     pub(crate) fn emit_closed_event(&self, reason: ConnectionClosedReason) {
         self.event_emitter
-            .emit_event(|| self.closed_event(reason).into());
+            .emit_event(|| CmapEvent::ConnectionClosed(self.closed_event(reason)));
     }
 
     pub(crate) fn stream_description(&self) -> Result<&StreamDescription> {

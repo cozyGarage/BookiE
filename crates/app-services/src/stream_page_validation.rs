@@ -5,6 +5,7 @@ pub enum PageAppendError {
     OutOfOrder,
     SchemaChanged,
     InvalidRowWidth,
+    RetentionLimit,
 }
 
 pub fn validate_page(

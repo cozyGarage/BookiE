@@ -17,7 +17,7 @@ use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
-use super::{SqlEditor, SqlEditorInit, SqlEditorInput, bookmarks};
+use super::{RunMessage, SqlEditor, SqlEditorInit, SqlEditorInput, bookmarks};
 use crate::services::database_service::{ConnectionMetadata, DatabaseService, ReconnectParams};
 
 struct PendingQuery {
@@ -200,7 +200,10 @@ impl EditorFixture {
         spin_until(|| self.controller.model().session.is_some());
         let session_id = self.controller.model().session.as_ref().unwrap().id;
         self.controller.model().source_view.buffer().set_text("BEGIN;");
-        self.controller.sender().send(SqlEditorInput::Run).unwrap();
+        self.controller
+            .sender()
+            .send(SqlEditorInput::Run(RunMessage::Run))
+            .unwrap();
         spin_until(|| {
             self.controller.model().session_transaction_open() && self.controller.model().run_button.is_sensitive()
         });
@@ -319,7 +322,11 @@ fn stale_set_null_does_not_modify_a_replacement_query_result_draft() {
         .source_view
         .buffer()
         .set_text("SELECT id, name FROM edit_fixture");
-    fixture.controller.sender().send(SqlEditorInput::Run).unwrap();
+    fixture
+        .controller
+        .sender()
+        .send(SqlEditorInput::Run(RunMessage::Run))
+        .unwrap();
     let query = fixture.next_query();
     fixture.finish(
         query,
@@ -413,7 +420,7 @@ fn stale_set_null_does_not_modify_a_replacement_query_result_draft() {
 }
 
 fn parameter_response() -> SqlEditorInput {
-    SqlEditorInput::RunWithParameters {
+    SqlEditorInput::Run(RunMessage::RunWithParameters {
         sql: "SELECT :value;".into(),
         anchor: None,
         planned: super::PlannedStatements {
@@ -423,7 +430,7 @@ fn parameter_response() -> SqlEditorInput {
             settings_check: None,
         },
         values: [("value".into(), Value::Int(2))].into(),
-    }
+    })
 }
 
 #[test]
@@ -542,7 +549,11 @@ fn editor_dispatch_resumes_after_success_cancel_and_timeout() {
         let running = fixture.next_query();
         assert_eq!(fixture.calls.load(Ordering::SeqCst), count + 1);
         if matches!(&result, Err(DriverError::Cancelled)) {
-            fixture.controller.sender().send(SqlEditorInput::Cancel).unwrap();
+            fixture
+                .controller
+                .sender()
+                .send(SqlEditorInput::Run(RunMessage::Cancel))
+                .unwrap();
             fixture.process_inputs();
             assert!(running.token.is_cancelled());
             fixture.shortcut("<Primary><Shift>Return", false);
@@ -766,6 +777,72 @@ fn assert_editor_toolbar_fits(width: i32, style: &str) {
 
 #[test]
 #[ignore = "requires an isolated GTK display"]
+fn completing_a_query_does_not_shift_the_editor_when_status_text_changes() {
+    let fixture = EditorFixture::new();
+    let (source_view, run_button, run_options, status) = {
+        let model = fixture.controller.model();
+        (
+            model.source_view.clone(),
+            model.run_button.clone(),
+            model.run_options.clone(),
+            model.status.clone(),
+        )
+    };
+    let root = fixture.controller.widget();
+    let window = gtk::Window::builder()
+        .default_width(917)
+        .default_height(700)
+        .child(root)
+        .build();
+    window.present();
+    let frames = std::rc::Rc::new(std::cell::Cell::new(0));
+    let observed = frames.clone();
+    window.add_tick_callback(move |_, _| {
+        let count = observed.get() + 1;
+        observed.set(count);
+        if count < 2 {
+            gtk::glib::ControlFlow::Continue
+        } else {
+            gtk::glib::ControlFlow::Break
+        }
+    });
+    spin_until(|| frames.get() >= 2 && root.width() > 0 && run_button.width() > 0);
+    assert_eq!(root.width(), 917);
+    assert!(source_view.height() > 0);
+    let editor_y_before = source_view.compute_bounds(root).unwrap().y();
+    let run_y_before = run_button.compute_bounds(root).unwrap().y();
+    let run_options_y_before = run_options.compute_bounds(root).unwrap().y();
+    fixture
+        .controller
+        .sender()
+        .send(SqlEditorInput::Run(RunMessage::Run))
+        .unwrap();
+    let query = fixture.next_query();
+    fixture.finish(query, success());
+    spin_until(|| status.label().starts_with("done in"));
+    frames.set(0);
+    let observed = frames.clone();
+    window.add_tick_callback(move |_, _| {
+        let count = observed.get() + 1;
+        observed.set(count);
+        if count < 2 {
+            gtk::glib::ControlFlow::Continue
+        } else {
+            gtk::glib::ControlFlow::Break
+        }
+    });
+    spin_until(|| frames.get() >= 2);
+    let editor_y_after = source_view.compute_bounds(root).unwrap().y();
+    let run_y_after = run_button.compute_bounds(root).unwrap().y();
+    let run_options_y_after = run_options.compute_bounds(root).unwrap().y();
+    assert_eq!(editor_y_after, editor_y_before);
+    assert_eq!(run_y_after, run_y_before);
+    assert_eq!(run_options_y_after, run_options_y_before);
+    window.close();
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
 fn run_scope_menu_executes_the_current_statement_and_blocks_overlap() {
     let fixture = EditorFixture::new();
     fixture
@@ -879,10 +956,10 @@ fn transaction_buttons_close_only_the_idle_owned_session() {
     fixture
         .controller
         .sender()
-        .send(SqlEditorInput::SessionAction {
+        .send(SqlEditorInput::Run(RunMessage::SessionAction {
             session_id: id,
             commit: true,
-        })
+        }))
         .unwrap();
     fixture.process_inputs();
     assert_eq!(fixture.sessions.commits.load(Ordering::SeqCst), 0);
@@ -916,17 +993,17 @@ fn transaction_buttons_close_only_the_idle_owned_session() {
     assert_eq!(fixture.sessions.commits.load(Ordering::SeqCst), 1);
     assert_eq!(
         fixture.controller.model().status.label().as_str(),
-        crate::tr!("Session committed")
+        bookie_app_services::tr!("Session committed")
     );
     let replacement = fixture.open_transaction();
     assert_ne!(replacement, id);
     fixture
         .controller
         .sender()
-        .send(SqlEditorInput::SessionAction {
+        .send(SqlEditorInput::Run(RunMessage::SessionAction {
             session_id: id,
             commit: false,
-        })
+        }))
         .unwrap();
     fixture.process_inputs();
     assert_eq!(fixture.sessions.rollbacks.load(Ordering::SeqCst), 0);
@@ -942,7 +1019,7 @@ fn transaction_buttons_close_only_the_idle_owned_session() {
     assert_eq!(fixture.sessions.rollbacks.load(Ordering::SeqCst), 1);
     assert_eq!(
         fixture.controller.model().status.label().as_str(),
-        crate::tr!("Session rolled back")
+        bookie_app_services::tr!("Session rolled back")
     );
 }
 
@@ -959,7 +1036,7 @@ fn closing_an_idle_session_clears_its_status() {
 
     assert_ne!(
         fixture.controller.model().status.label().as_str(),
-        crate::tr!("Closing session…")
+        bookie_app_services::tr!("Closing session…")
     );
 }
 
@@ -972,10 +1049,10 @@ fn a_transaction_action_refuses_a_changed_connection_identity() {
     fixture
         .controller
         .sender()
-        .send(SqlEditorInput::SessionAction {
+        .send(SqlEditorInput::Run(RunMessage::SessionAction {
             session_id: id,
             commit: true,
-        })
+        }))
         .unwrap();
     fixture.process_inputs();
     assert_eq!(fixture.sessions.commits.load(Ordering::SeqCst), 0);
@@ -1041,6 +1118,45 @@ mod toolbar_operability_tests;
 
 #[path = "error_navigation_tests.rs"]
 mod error_navigation_tests;
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn large_sql_buffers_pause_syntax_highlighting_and_resume_after_shrinking() {
+    let fixture = EditorFixture::new();
+    let buffer = fixture
+        .controller
+        .model()
+        .source_view
+        .buffer()
+        .downcast::<sourceview5::Buffer>()
+        .unwrap();
+    let view = fixture.controller.model().source_view.clone();
+    let large = "SELECT 1;\n".repeat(super::query_changes::MAX_SYNTAX_HIGHLIGHT_BYTES / 10 + 1);
+    assert!(large.len() > super::query_changes::MAX_SYNTAX_HIGHLIGHT_BYTES);
+    let language = sourceview5::LanguageManager::default().language("sql").unwrap();
+    let initial_buffer = sourceview5::Buffer::with_language(&language);
+    let highlight_during_initial_load = Arc::new(AtomicUsize::new(usize::MAX));
+    let observed_highlight = highlight_during_initial_load.clone();
+    let language_detached_during_initial_load = Arc::new(AtomicUsize::new(0));
+    let observed_language = language_detached_during_initial_load.clone();
+    initial_buffer.connect_changed(move |buffer| {
+        observed_highlight.store(usize::from(buffer.is_highlight_syntax()), Ordering::SeqCst);
+        observed_language.store(usize::from(buffer.language().is_none()), Ordering::SeqCst);
+    });
+    super::set_initial_sql_buffer_text(&initial_buffer, &large);
+    assert_eq!(highlight_during_initial_load.load(Ordering::SeqCst), 0);
+    assert_eq!(language_detached_during_initial_load.load(Ordering::SeqCst), 1);
+
+    buffer.set_text(&large);
+
+    assert!(!buffer.is_highlight_syntax());
+    assert!(buffer.language().is_none());
+    assert!(view.tooltip_text().is_some());
+    buffer.set_text("SELECT 1;");
+    assert!(buffer.is_highlight_syntax());
+    assert!(buffer.language().is_some());
+    assert!(view.tooltip_text().is_none());
+}
 
 #[test]
 #[ignore = "requires an isolated GTK display"]
@@ -1218,7 +1334,11 @@ fn running_a_query_dismisses_the_visible_completion_popup() {
             .find(|w| w.is::<gtk::Popover>() && w.has_css_class("completion"))
     };
     spin_until(|| popup().is_some_and(|p| p.is_visible()));
-    fixture.controller.sender().send(SqlEditorInput::Run).unwrap();
+    fixture
+        .controller
+        .sender()
+        .send(SqlEditorInput::Run(RunMessage::Run))
+        .unwrap();
     let query = fixture.next_query();
     fixture.finish(query, success());
     spin_until(|| popup().is_none_or(|p| !p.is_visible()));

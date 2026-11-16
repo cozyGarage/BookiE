@@ -9,6 +9,52 @@ use std::os::fd::AsRawFd;
 use std::str::FromStr;
 use std::sync::Arc;
 
+#[tokio::test]
+async fn cancelled_page_load_keeps_its_reservation_until_the_blocking_worker_finishes() {
+    use std::future::Future;
+    use std::task::Poll;
+
+    let spool = StreamResultSpoolManager::default().create().unwrap();
+    let budget = spool.page_budget();
+    let lease = budget.reserve(64).unwrap();
+    let spool_inner = Arc::clone(&spool.inner);
+    let (locked_tx, locked_rx) = tokio::sync::oneshot::channel();
+    let (release_tx, release_rx) = std::sync::mpsc::channel();
+    let blocker = std::thread::spawn(move || {
+        let _file = spool_inner.file.lock().unwrap();
+        let _ = locked_tx.send(());
+        let _ = release_rx.recv();
+    });
+    tokio::time::timeout(std::time::Duration::from_secs(5), locked_rx)
+        .await
+        .unwrap()
+        .unwrap();
+    let mut load = Box::pin(spool.load_page_retained(0, Vec::new(), lease));
+    std::future::poll_fn(|context| {
+        assert!(load.as_mut().poll(context).is_pending());
+        Poll::Ready(())
+    })
+    .await;
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        while !spool.inner.load_worker_started.load(Ordering::Acquire) {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    drop(load);
+    assert_eq!(budget.used_bytes(), 64);
+    let _ = release_tx.send(());
+    blocker.join().unwrap();
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        while budget.used_bytes() != 0 {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+}
+
 struct CountingSequence {
     items: usize,
     serialized: Arc<std::sync::atomic::AtomicUsize>,

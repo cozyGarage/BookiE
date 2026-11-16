@@ -43,6 +43,16 @@ pub async fn load_structure_metadata(
     })
 }
 
+pub async fn load_collations(
+    connection: &dyn Connection,
+    control: &OperationControl,
+) -> Result<Vec<CollationInfo>, DriverError> {
+    check_pre_dispatch(control)?;
+    let collations = connection.list_collations_controlled(control).await.unwrap_or_default();
+    check_pre_dispatch(control)?;
+    Ok(collations)
+}
+
 #[cfg(test)]
 #[path = "structure_metadata_tests.rs"]
 mod tests;

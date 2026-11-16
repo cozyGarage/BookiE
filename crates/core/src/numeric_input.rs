@@ -21,6 +21,7 @@ pub(crate) fn widened_single_precision(
     let single = match driver_id {
         "mysql" => data_type.starts_with("float"),
         "mssql" => data_type == "real",
+        "duckdb" => matches!(data_type.as_str(), "float" | "float4" | "real"),
         _ => false,
     };
     match value {

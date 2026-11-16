@@ -10,7 +10,7 @@ use bookie_core::{DriverCapabilities, DriverError, TableInfo};
 
 use crate::services::database_service::DatabaseService;
 use crate::services::preferences::PreferencesStore;
-use crate::tr;
+use bookie_app_services::tr;
 
 pub struct CompareRequest {
     pub schema: Option<String>,

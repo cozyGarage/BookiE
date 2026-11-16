@@ -51,7 +51,7 @@ graph TD
 | Query history | SQLite with FTS5 | `$XDG_CONFIG_HOME/bookie/history.db` |
 | Policy | TOML | `$XDG_CONFIG_HOME/bookie/policy.toml` |
 | Audit journal | Hash-chained JSONL | `$XDG_DATA_HOME/bookie/audit.jsonl` |
-| MCP token registry (token hashes only) | JSON | `$XDG_CONFIG_HOME/bookie/mcp-tokens.json` |
+| MCP token registry (token hashes, scope, connection allowlist and optional tool allowlist; no secrets) | JSON | `$XDG_CONFIG_HOME/bookie/mcp-tokens.json` |
 | Built-in SSH known hosts | OpenSSH `known_hosts` format | `$XDG_CONFIG_HOME/bookie/known_hosts` |
 | Database passwords, SSH passwords, SSH key passphrases | Secret Service through `oo7` | Desktop keyring |
 | GUI-issued MCP token plaintext | Returned once; storage is attempted through Secret Service | Desktop keyring, when the save succeeds |
@@ -75,7 +75,7 @@ Application services own preferences, window state, workspace state, column widt
 
 Window state stores size, maximize flag, and the last connection id. Closing a window keeps that id so the next launch can reopen the same connection. An explicit disconnect or deleting that saved connection clears it. Geometry writes do not drop the last connection id.
 
-ADR 0040 defines an open-session record with saved connection keys grouped by window, and `bookie-app-services::window_sessions` provides its headless model and parser. Runtime persistence and multi-session startup restoration are not wired yet: the app still saves one `last_connection_id` in `window.json` and restores only that connection. This remains open in [#2499](https://github.com/cozyGarage/BookiE/issues/2499). Per-connection workspace tab records remain keyed by saved connection id below; ADR 0040 does not rewrite that format.
+`open-sessions.json` follows the ADR 0040 record: saved connection keys grouped by window, parsed by `bookie-app-services::window_sessions`. Each window rewrites its group when a session opens or closes. At startup the first window reopens, one after another, the saved connections of the group that holds `last_connection_id` from `window.json`, and opens that connection last so that it is in front. Every other group in the record opens in a new window, each reopening its own connections in order. A connection that is no longer saved is skipped, and a window left with nothing to open is not created. A connection appears in one window only: the first group that lists it wins. A window that is closed while others stay open drops its group from the record. Without a usable record (missing, unreadable or a version this build does not know), only `last_connection_id` is restored, which keeps older single-key state readable. When the record does not hold `last_connection_id`, that connection opens alone in the first window and the recorded groups still open in their own windows. Per-connection workspace tab records remain keyed by saved connection id below; ADR 0040 does not rewrite that format.
 
 Workspace state is keyed by connection UUID and limited before it is written. Unknown tab variants deserialize as `Unknown` and are dropped during restore. This lets an older build ignore a newer tab kind without rejecting the whole workspace file. Editor bodies are separate private draft files. Individual file replacements are atomic, but a workspace save is not atomic across all draft files and metadata: a later failure can leave an earlier draft updated ([#1821](https://github.com/cozyGarage/BookiE/issues/1821)). Prefetch currently loads all saved connections, so one unreadable draft can prevent restoring an unrelated requested workspace ([#1822](https://github.com/cozyGarage/BookiE/issues/1822)).
 
@@ -137,7 +137,7 @@ When changing storage behavior:
 
 ## Query favorites
 
-`$XDG_CONFIG_HOME/bookie/favorites.json` holds saved queries as `{version, favorites[]}`, written through a temporary file and a rename. Each entry keeps an id, name, statement, optional driver and connection ids, a creation time, and a last-used time. Saving a name that already exists replaces that entry's statement and keeps its id. The file is capped at 500 entries, and a name or statement that is only whitespace is rejected.
+`$XDG_CONFIG_HOME/bookie/favorites.json` holds saved queries as `{version, favorites[], folders[]}`, written through a temporary file and a rename. Each query keeps an id, name, statement, optional driver and connection ids, a creation time, and a last-used time. Folder assignment and keywords are optional query fields, so older flat files load as unfiled queries. Saving a name that already exists replaces its statement and keeps its id, folder and keywords. Deleting a folder keeps its queries and keywords and removes only their folder assignment. Folder and query mutations reread the file while holding its lock. Unknown fields are carried forward when records are rewritten. The file is capped at 500 queries and 200 folders; names, statements and keywords are bounded, and invalid folder references are rejected without replacing the file.
 
 ## Connection bundles
 

@@ -7,15 +7,19 @@ pub enum ActivityQuery {
     BlockingLocks,
     LongRunning,
     ReplicationLag,
+    ServerVariables,
+    ServerStatus,
     KillSession,
 }
 
 impl ActivityQuery {
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 7] = [
         Self::Sessions,
         Self::BlockingLocks,
         Self::LongRunning,
         Self::ReplicationLag,
+        Self::ServerVariables,
+        Self::ServerStatus,
         Self::KillSession,
     ];
 }
@@ -41,11 +45,15 @@ pub fn activity_kinds(driver_id: &str) -> &'static [ActivityQuery] {
             ActivityQuery::BlockingLocks,
             ActivityQuery::LongRunning,
             ActivityQuery::ReplicationLag,
+            ActivityQuery::ServerVariables,
+            ActivityQuery::ServerStatus,
             ActivityQuery::KillSession,
         ],
         "mysql" => &[
             ActivityQuery::Sessions,
             ActivityQuery::LongRunning,
+            ActivityQuery::ServerVariables,
+            ActivityQuery::ServerStatus,
             ActivityQuery::KillSession,
         ],
         "mssql" => &[ActivityQuery::Sessions, ActivityQuery::KillSession],
@@ -79,7 +87,7 @@ fn activity_template(driver_id: &str, kind: ActivityQuery, session_id: Option<u6
     match (driver_id, kind) {
         ("postgres", ActivityQuery::Sessions) => Some(
             "SELECT pid, usename, datname, state, wait_event_type, wait_event, \
-             (now() - query_start)::text AS duration, left(query, 200) AS query \
+             (clock_timestamp() - query_start)::text AS duration, left(query, 200) AS query \
              FROM pg_stat_activity \
              WHERE backend_type = 'client backend' \
              ORDER BY query_start NULLS LAST"
@@ -108,10 +116,10 @@ fn activity_template(driver_id: &str, kind: ActivityQuery, session_id: Option<u6
                 .into(),
         ),
         ("postgres", ActivityQuery::LongRunning) => Some(
-            "SELECT pid, usename, datname, (now() - query_start)::text AS duration, \
+            "SELECT pid, usename, datname, (clock_timestamp() - query_start)::text AS duration, \
              left(query, 200) AS query \
              FROM pg_stat_activity \
-             WHERE state = 'active' AND query_start < now() - interval '30 seconds' \
+             WHERE state = 'active' AND query_start < clock_timestamp() - interval '30 seconds' \
              ORDER BY query_start"
                 .into(),
         ),
@@ -119,6 +127,18 @@ fn activity_template(driver_id: &str, kind: ActivityQuery, session_id: Option<u6
             "SELECT client_addr, state, sent_lsn, write_lsn, flush_lsn, replay_lsn, \
              write_lag, flush_lag, replay_lag \
              FROM pg_stat_replication"
+                .into(),
+        ),
+        ("postgres", ActivityQuery::ServerVariables) => Some(
+            "SELECT name, setting, unit, category, source, pending_restart \
+             FROM pg_settings ORDER BY category, name"
+                .into(),
+        ),
+        ("postgres", ActivityQuery::ServerStatus) => Some(
+            "SELECT datname, numbackends, xact_commit, xact_rollback, blks_read, blks_hit, \
+             tup_returned, tup_fetched, tup_inserted, tup_updated, tup_deleted, conflicts, \
+             temp_files, temp_bytes, deadlocks \
+             FROM pg_stat_database WHERE datname IS NOT NULL ORDER BY datname"
                 .into(),
         ),
         ("postgres", ActivityQuery::KillSession) => {
@@ -133,6 +153,8 @@ fn activity_template(driver_id: &str, kind: ActivityQuery, session_id: Option<u6
              ORDER BY time DESC"
                 .into(),
         ),
+        ("mysql", ActivityQuery::ServerVariables) => Some("SHOW GLOBAL VARIABLES".into()),
+        ("mysql", ActivityQuery::ServerStatus) => Some("SHOW GLOBAL STATUS".into()),
         ("mysql", ActivityQuery::KillSession) => {
             let id = session_id.filter(|id| *id > 0)?;
             Some(format!("KILL {id}"))
@@ -159,6 +181,38 @@ mod tests {
     fn postgres_sessions_sql() {
         let sql = activity_sql("postgres", ActivityQuery::Sessions, None).unwrap();
         assert!(sql.contains("pg_stat_activity"));
+    }
+
+    #[test]
+    fn postgres_activity_durations_use_wall_clock_time() {
+        for kind in [ActivityQuery::Sessions, ActivityQuery::LongRunning] {
+            let sql = activity_sql("postgres", kind, None).unwrap();
+            assert!(sql.contains("clock_timestamp()"), "{kind:?}: {sql}");
+            assert!(!sql.contains("now()"), "{kind:?}: {sql}");
+        }
+    }
+
+    #[test]
+    fn server_variables_and_status_are_fixed_read_only_statements() {
+        for driver in ["postgres", "mysql"] {
+            for kind in [ActivityQuery::ServerVariables, ActivityQuery::ServerStatus] {
+                let sql = activity_sql(driver, kind, Some(42)).unwrap();
+                let upper = sql.to_ascii_uppercase();
+                assert!(
+                    upper.starts_with("SELECT ") || upper.starts_with("SHOW "),
+                    "{driver} {kind:?}: {sql}"
+                );
+                assert!(!sql.contains("42"), "{driver} {kind:?} must not take caller input");
+            }
+        }
+        assert_eq!(
+            activity_sql("mssql", ActivityQuery::ServerVariables, None),
+            Err(ActivityUnsupported::Query)
+        );
+        assert_eq!(
+            activity_sql("sqlite", ActivityQuery::ServerStatus, None),
+            Err(ActivityUnsupported::Engine)
+        );
     }
 
     #[test]

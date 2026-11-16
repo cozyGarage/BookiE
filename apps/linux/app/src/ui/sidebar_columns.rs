@@ -50,11 +50,11 @@ impl ColumnSource {
             .loading
             .clone()
             .try_acquire_owned()
-            .map_err(|_| crate::tr!("Other fields are loading. Collapse and expand to retry."))?;
+            .map_err(|_| bookie_app_services::tr!("Other fields are loading. Collapse and expand to retry."))?;
         let connection = self
             .origin
             .connection(&self.database)
-            .ok_or_else(|| crate::tr!("The connection changed. Reopen the tables sidebar."))?;
+            .ok_or_else(|| bookie_app_services::tr!("The connection changed. Reopen the tables sidebar."))?;
         let control = crate::services::operation_control::bounded_with(self.timeout_secs, cancel);
         let columns = connection
             .fetch_columns_controlled(info.schema.as_deref(), &info.name, &control)
@@ -110,7 +110,7 @@ impl LoadedColumns {
         let retained = visible
             .clone()
             .try_acquire_many_owned(columns.len() as u32)
-            .map_err(|_| crate::tr!("Close another expanded table to show more fields."))?;
+            .map_err(|_| bookie_app_services::tr!("Close another expanded table to show more fields."))?;
         Ok(Self {
             columns,
             truncated,
@@ -123,8 +123,6 @@ pub(super) struct SidebarColumns {
     source: Option<ColumnSource>,
     toggle: gtk::ToggleButton,
     reveal: gtk::Revealer,
-    content: gtk::Box,
-    structure: gtk::Button,
     cancel: CancellationToken,
     serial: u64,
     retained: Option<OwnedSemaphorePermit>,
@@ -138,42 +136,26 @@ impl std::fmt::Debug for SidebarColumns {
 
 impl SidebarColumns {
     pub(super) fn new(source: Option<ColumnSource>) -> Self {
-        let content = gtk::Box::builder()
-            .orientation(gtk::Orientation::Vertical)
-            .spacing(4)
-            .margin_start(26)
-            .margin_bottom(8)
-            .build();
         Self {
             source,
-            structure: gtk::Button::builder()
-                .label(crate::tr!("Structure…"))
-                .action_name("sidebar-row.edit-structure")
-                .css_classes(["flat"])
-                .build(),
             toggle: gtk::ToggleButton::builder()
                 .icon_name("pan-end-symbolic")
-                .tooltip_text(crate::tr!("Show columns"))
+                .tooltip_text(bookie_app_services::tr!("Show columns"))
                 .css_classes(["flat"])
                 .build(),
-            reveal: gtk::Revealer::builder().child(&content).build(),
-            content,
+            reveal: gtk::Revealer::new(),
             cancel: CancellationToken::new(),
             serial: 0,
             retained: None,
         }
     }
 
-    pub(super) fn install(&self, row: &gtk::ListBoxRow, sender: &FactorySender<SidebarRow>) {
-        let Some(header) = row.child().and_downcast::<gtk::Box>() else {
+    pub(super) fn install(&self, row: &gtk::ListBoxRow, actions: &gtk::Box, sender: &FactorySender<SidebarRow>) {
+        let Some(body) = row.child().and_downcast::<gtk::Box>() else {
             return;
         };
-        row.set_child(gtk::Widget::NONE);
-        let body = gtk::Box::new(gtk::Orientation::Vertical, 0);
-        header.prepend(&self.toggle);
-        body.append(&header);
+        actions.append(&self.toggle);
         body.append(&self.reveal);
-        row.set_child(Some(&body));
         let sender = sender.clone();
         self.toggle
             .connect_toggled(move |button| sender.input(SidebarRowMsg::ToggleColumns(button.is_active())));
@@ -184,7 +166,9 @@ impl SidebarColumns {
         self.cancel = CancellationToken::new();
         self.serial = self.serial.wrapping_add(1);
         self.retained = None;
-        clear(&self.content);
+        if let Some(content) = self.content() {
+            clear(&content);
+        }
         self.reveal.set_reveal_child(active);
         self.toggle.set_icon_name(if active {
             "pan-down-symbolic"
@@ -192,17 +176,18 @@ impl SidebarColumns {
             "pan-end-symbolic"
         });
         self.toggle.set_tooltip_text(Some(&if active {
-            crate::tr!("Hide columns")
+            bookie_app_services::tr!("Hide columns")
         } else {
-            crate::tr!("Show columns")
+            bookie_app_services::tr!("Show columns")
         }));
         if !active {
             return;
         }
+        self.ensure_content();
         let Some(source) = self.source.clone() else {
-            return self.message(&crate::tr!("Connect to load the fields of this table."));
+            return self.message(&bookie_app_services::tr!("Connect to load the fields of this table."));
         };
-        self.message(&crate::tr!("Loading fields…"));
+        self.message(&bookie_app_services::tr!("Loading fields…"));
         let (info, serial, cancel) = (info.clone(), self.serial, self.cancel.clone());
         sender.oneshot_command(async move { source.fetch(info, serial, cancel).await });
     }
@@ -211,13 +196,18 @@ impl SidebarColumns {
         if !self.accepts(reply.serial) {
             return;
         }
-        clear(&self.content);
+        let Some(content) = self.content() else {
+            return;
+        };
+        clear(&content);
         if self
             .source
             .as_ref()
             .is_none_or(|source| source.origin.connection(&source.database).is_none())
         {
-            return self.message(&crate::tr!("The connection changed. Reopen the tables sidebar."));
+            return self.message(&bookie_app_services::tr!(
+                "The connection changed. Reopen the tables sidebar."
+            ));
         }
         let loaded = match reply.result {
             Ok(loaded) => loaded,
@@ -225,15 +215,17 @@ impl SidebarColumns {
         };
         self.retained = Some(loaded.retained);
         if loaded.columns.is_empty() {
-            self.message(&crate::tr!("No fields were returned."));
+            self.message(&bookie_app_services::tr!("No fields were returned."));
         }
         for column in &loaded.columns {
-            self.content.append(&field_row(column));
+            content.append(&field_row(column));
         }
         if loaded.truncated {
-            self.message(&crate::tr!("Showing the first 256 fields. Open Structure for more."));
+            self.message(&bookie_app_services::tr!(
+                "Showing the first 256 fields. Open Structure for more."
+            ));
         }
-        self.content.append(&self.structure);
+        content.append(&structure_button());
     }
 
     fn accepts(&self, serial: u64) -> bool {
@@ -244,6 +236,23 @@ impl SidebarColumns {
         self.cancel.cancel();
     }
 
+    fn content(&self) -> Option<gtk::Box> {
+        self.reveal.child().and_downcast::<gtk::Box>()
+    }
+
+    fn ensure_content(&self) {
+        if self.reveal.child().is_some() {
+            return;
+        }
+        let content = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .spacing(4)
+            .margin_start(26)
+            .margin_bottom(8)
+            .build();
+        self.reveal.set_child(Some(&content));
+    }
+
     fn message(&self, text: &str) {
         let label = gtk::Label::builder()
             .label(bounded(text, 512))
@@ -251,8 +260,18 @@ impl SidebarColumns {
             .xalign(0.0)
             .css_classes(["dim-label", "caption"])
             .build();
-        self.content.append(&label);
+        if let Some(content) = self.content() {
+            content.append(&label);
+        }
     }
+}
+
+fn structure_button() -> gtk::Button {
+    gtk::Button::builder()
+        .label(bookie_app_services::tr!("Structure…"))
+        .action_name("sidebar-row.edit-structure")
+        .css_classes(["flat"])
+        .build()
 }
 
 fn bounded(text: &str, limit: usize) -> String {
@@ -339,6 +358,8 @@ mod tests {
     fn a_stale_column_reply_cannot_replace_newer_fields_or_retain_its_budget() {
         gtk::init().unwrap();
         let mut columns = SidebarColumns::new(None);
+        assert!(columns.reveal.child().is_none());
+        columns.ensure_content();
         columns.serial = 2;
         columns.toggle.set_active(true);
         columns.message("newer request");
@@ -352,7 +373,8 @@ mod tests {
         assert_eq!(budget.available_permits(), VISIBLE_FIELDS);
         assert_eq!(
             columns
-                .content
+                .content()
+                .unwrap()
                 .first_child()
                 .and_downcast::<gtk::Label>()
                 .unwrap()
@@ -374,7 +396,7 @@ mod structure_action_tests {
     #[ignore = "requires an isolated GTK display"]
     fn the_structure_shortcut_activates_the_owning_row_action() {
         gtk::init().unwrap();
-        let columns = SidebarColumns::new(None);
+        let structure = structure_button();
         let root = gtk::Box::new(gtk::Orientation::Vertical, 0);
         let actions = gtk::gio::SimpleActionGroup::new();
         let action = gtk::gio::SimpleAction::new("edit-structure", None);
@@ -383,8 +405,8 @@ mod structure_action_tests {
         action.connect_activate(move |_, _| observed.set(observed.get() + 1));
         actions.add_action(&action);
         root.insert_action_group("sidebar-row", Some(&actions));
-        root.append(&columns.structure);
-        columns.structure.emit_clicked();
+        root.append(&structure);
+        structure.emit_clicked();
         assert_eq!(calls.get(), 1);
     }
 }

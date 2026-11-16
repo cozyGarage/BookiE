@@ -1,10 +1,32 @@
 use bookie_core::{DriverError, TableInfo};
-use sqlx::{Pool, Postgres, Row};
+use sqlx::Row;
 
 use crate::map_sqlx_error;
 
-pub(crate) async fn list_relations(
-    pool: &Pool<Postgres>,
+pub(crate) const TEMPORARY_TABLES_SQL: &str = "SELECT n.nspname, c.relname
+    FROM pg_catalog.pg_class c
+    JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+    WHERE c.relnamespace = pg_catalog.pg_my_temp_schema()
+      AND c.relkind IN ('r', 'p')
+      AND pg_catalog.has_any_column_privilege(c.oid, 'SELECT,INSERT,UPDATE,REFERENCES')
+    ORDER BY c.relname";
+
+pub(crate) async fn list_tables(
+    connection: &mut sqlx::PgConnection,
+    excluded_schemas: &[String],
+) -> Result<Vec<TableInfo>, DriverError> {
+    list_relations(connection, &["r", "p"], excluded_schemas).await
+}
+
+pub(crate) async fn list_views(
+    connection: &mut sqlx::PgConnection,
+    excluded_schemas: &[String],
+) -> Result<Vec<TableInfo>, DriverError> {
+    list_relations(connection, &["v", "m"], excluded_schemas).await
+}
+
+async fn list_relations(
+    connection: &mut sqlx::PgConnection,
     relation_kinds: &[&str],
     excluded_schemas: &[String],
 ) -> Result<Vec<TableInfo>, DriverError> {
@@ -18,6 +40,7 @@ pub(crate) async fn list_relations(
          JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
          WHERE c.relkind::text = ANY($1)
            AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+           AND n.nspname !~ '^pg_(toast_)?temp_[0-9]+$'
            AND NOT EXISTS (
              SELECT 1 FROM pg_catalog.unnest($2::text[]) AS hidden_schema(schema_name)
              WHERE hidden_schema.schema_name = n.nspname
@@ -28,7 +51,7 @@ pub(crate) async fn list_relations(
     )
     .bind(relation_kinds)
     .bind(excluded_schemas)
-    .fetch_all(pool)
+    .fetch_all(&mut *connection)
     .await
     .map_err(map_sqlx_error)?;
     Ok(rows

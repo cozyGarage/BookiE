@@ -1,10 +1,13 @@
 import importlib.util
+import io
 import json
 from pathlib import Path
 import re
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 import unittest
 from unittest.mock import patch
 
@@ -19,7 +22,9 @@ class LayerRunnerTests(unittest.TestCase):
         return {"argv": [sys.executable, "-c", code], "evidence": evidence, "timeout_seconds": timeout}
 
     def execute(self, step):
-        with tempfile.TemporaryDirectory() as temporary, tempfile.TemporaryDirectory() as evidence:
+        with tempfile.TemporaryDirectory() as temporary, tempfile.TemporaryDirectory() as evidence, patch.object(
+            runner.sys, "stdout", io.StringIO()
+        ):
             return runner.execute(step, Path(temporary) / "step.log")
 
     def test_catalog_has_real_entrypoints_and_unique_steps(self):
@@ -29,6 +34,25 @@ class LayerRunnerTests(unittest.TestCase):
                 for arg in step["argv"]:
                     if arg.startswith("scripts/"):
                         self.assertTrue((ROOT / arg).exists(), arg)
+
+    def test_only_ci_fixture_layers_reconcile_abandoned_resources(self):
+        with patch.dict("os.environ", {"BOOKIE_TEST_RUN_ID": "forgejo-123-1-driver-core"}), patch.object(
+            runner.subprocess, "run"
+        ) as run:
+            runner.reconcile_ci_fixtures(["sandbox"])
+            run.assert_not_called()
+            runner.reconcile_ci_fixtures(["driver-core"])
+            run.assert_called_once_with(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/cleanup-stale-ci-fixtures.py"),
+                    "forgejo-123-1-driver-core",
+                ],
+                cwd=ROOT,
+                check=True,
+            )
+            runner.reconcile_ci_fixtures(["postgres-release"])
+            self.assertEqual(run.call_count, 2)
 
     def test_untracked_source_contents_change_evidence_identity_but_ignored_outputs_do_not(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -141,7 +165,8 @@ class LayerRunnerTests(unittest.TestCase):
         ):
             for output in (other + success, success + other):
                 with self.subTest(output=output):
-                    result = self.execute(self.step(f"print({output!r})", "python-tests"))
+                    with patch.object(runner.sys, "stdout", io.StringIO()):
+                        result = self.execute(self.step(f"print({output!r})", "python-tests"))
                     self.assertEqual(result["exit_code"], 0)
                     self.assertEqual(result["status"], "failed")
 
@@ -155,7 +180,8 @@ class LayerRunnerTests(unittest.TestCase):
                 "    unittest.TextTestRunner().run(Contract())\n"
             )
             with self.subTest(outcomes=outcomes):
-                result = self.execute(self.step(code, "python-tests"))
+                with patch.object(runner.sys, "stdout", io.StringIO()):
+                    result = self.execute(self.step(code, "python-tests"))
                 self.assertEqual(result["exit_code"], 0)
                 self.assertEqual(result["status"], expected)
 
@@ -174,10 +200,44 @@ class LayerRunnerTests(unittest.TestCase):
 
     def test_timeout_and_missing_executable_fail_explicitly(self):
         self.assertEqual(self.execute(self.step("import time; time.sleep(60)", timeout=0.05))["status"], "timed_out")
+        self.assertEqual(
+            self.execute(self.step("import os,time; os.close(1); os.close(2); time.sleep(60)", timeout=0.05))["status"],
+            "timed_out",
+        )
+        code = (
+            "import time\n"
+            "deadline = time.monotonic() + 0.2\n"
+            "while time.monotonic() < deadline:\n"
+            " print('output', flush=True)\n"
+            " time.sleep(0.005)"
+        )
+        self.assertEqual(
+            self.execute(self.step(code, timeout=0.05))["status"],
+            "timed_out",
+        )
         step = {"argv": ["/missing/bookie-fixture"], "evidence": "exit", "timeout_seconds": 1}
         self.assertEqual(self.execute(step)["status"], "blocked")
         step = dict(self.step("pass"), required_tools=["bookie-missing-prerequisite"])
         self.assertEqual(self.execute(step)["status"], "blocked")
+
+    def test_output_is_visible_before_the_child_exits(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output = io.StringIO()
+            result = {}
+            step = self.step("import time; print('early output', flush=True); time.sleep(0.5)")
+            with patch.object(runner.sys, "stdout", output):
+                thread = threading.Thread(
+                    target=lambda: result.update(runner.execute(step, Path(temporary) / "step.log"))
+                )
+                thread.start()
+                deadline = time.monotonic() + 0.3
+                while "early output" not in output.getvalue() and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                self.assertIn("early output", output.getvalue())
+                self.assertTrue(thread.is_alive())
+                thread.join(timeout=2)
+            self.assertFalse(thread.is_alive())
+            self.assertEqual(result["status"], "passed")
 
     def test_interruption_is_not_passed(self):
         with patch.object(runner.subprocess, "Popen", side_effect=KeyboardInterrupt):
@@ -192,6 +252,23 @@ class LayerRunnerTests(unittest.TestCase):
             self.assertEqual(report["status"], "failed")
             self.assertEqual(report["layers"]["good"]["status"], "passed")
             self.assertEqual((directory / "good-1.log").read_text().strip(), "done")
+
+    def test_failure_excerpt_keeps_traceback_before_a_long_accessibility_snapshot(self):
+        output = "\n".join((
+            "passed: first_scenario (duration: 1.0s)",
+            "FAILED: enum_edit (duration: 2.0s)",
+            "Traceback (most recent call last):",
+            "  File \"gtk_safety.py\", line 10, in run_scenario",
+            "    scenario()",
+            "AssertionError: expected saved enum value 'high'",
+            *(f"accessible node {index}" for index in range(80)),
+            "Job 'gtk-server' failed",
+        ))
+        excerpt = runner.failure_excerpt(output)
+
+        self.assertIn("AssertionError: expected saved enum value 'high'", excerpt)
+        self.assertIn("... final log lines ...", excerpt)
+        self.assertIn("Job 'gtk-server' failed", excerpt)
 
     def test_unknown_duplicate_and_empty_selection_fail(self):
         for args in [[], ["missing"], ["harness", "harness"]]:
@@ -229,7 +306,11 @@ class LayerRunnerTests(unittest.TestCase):
         github = ROOT / ".github/workflows"
         forgejo = ROOT / ".forgejo/workflows"
         expected = {f".github/workflows/{path.name}" for path in github.glob("*linux*.yml")}
-        expected.update({".github/workflows/gtk-soak.yml", ".github/workflows/release.yml"})
+        expected.update({
+            ".github/workflows/gtk-soak.yml",
+            ".github/workflows/gpui-macos.yml",
+            ".github/workflows/release.yml",
+        })
         expected.update(f".forgejo/workflows/{path.name}" for path in forgejo.glob("*.yml"))
         selected = set(runner.catalog()["workflow-lint"]["steps"][0]["argv"][1:])
         self.assertEqual(selected, expected)
@@ -246,12 +327,20 @@ class LayerRunnerTests(unittest.TestCase):
     def test_security_and_contract_workflows_use_shared_runner(self):
         workflows = ROOT / ".github/workflows"
         security = (workflows / "linux-security.yml").read_text()
-        for text in ["security-policy", "supply-chain", "fail-fast: false", "if: always()", "if-no-files-found: error", "run-test-layer.py"]:
+        for text in ["supply-chain", "fail-fast: false", "if: always()", "if-no-files-found: error", "run-test-layer.py"]:
             self.assertIn(text, security)
+        self.assertNotIn("security-policy", security)
+        self.assertIn("schedule:", security)
+        self.assertNotIn("pull_request:", security)
+        self.assertNotIn("push:", security)
         self.assertNotIn("continue-on-error:", security)
         build = (workflows / "build-linux.yml").read_text()
-        for layer in ["quick", "gtk-app", "drivers", "b4-rollback", "tls", "postgres-release", "ui", "widgets", "keyring"]:
+        for layer in ["sandbox", "change-contracts", "b4-rollback", "tls", "postgres-release", "ui", "widgets", "keyring", "security-policy"]:
             self.assertIn(f"run-test-layer.py {layer}", build)
+        driver = build.split("  driver:\n", 1)[1].split("  b4-rollback:\n", 1)[0]
+        self.assertIn("group: [driver-core, driver-analytics]", driver)
+        self.assertIn("group: [driver-extended, socket-ssh]", driver)
+        self.assertIn('python3 scripts/run-test-layer.py "$BOOKIE_TEST_LAYER"', driver)
         self.assertNotIn("if-no-files-found: ignore", build)
         contracts = (workflows / "linux-ci-contracts.yml").read_text()
         self.assertIn("run-test-layer.py harness", contracts)
@@ -279,7 +368,7 @@ class LayerRunnerTests(unittest.TestCase):
     def test_no_default_features_layer_is_in_both_hosted_gates(self):
         layer = runner.catalog()["no-default-features"]
 
-        self.assertIn("Build Linux / reusable-test-builds", layer["hosted_gate"])
+        self.assertIn("Build Linux / test-build", layer["hosted_gate"])
         self.assertIn("lab-ci / test-build", layer["hosted_gate"])
         self.assertEqual(
             layer["steps"][0]["argv"],
@@ -305,10 +394,15 @@ class LayerRunnerTests(unittest.TestCase):
 
     def test_driver_layer_timeout_fits_hosted_integration_job(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
-        integration = re.search(r"(?ms)^  integration:\n(.*?)(?=^  [a-z][a-z-]*:\n)", workflow)
-        self.assertIsNotNone(integration)
-        job_timeout = re.search(r"(?m)^    timeout-minutes:\s+(\d+)$", integration.group(1))
+        driver = re.search(r"(?ms)^  driver:\n(.*?)(?=^  [a-z][a-z-]*:\n)", workflow)
+        self.assertIsNotNone(driver)
+        job_timeout = re.search(r"(?m)^    timeout-minutes:\s+(\d+)$", driver.group(1))
         self.assertIsNotNone(job_timeout)
+        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        forgejo_driver = re.search(r"(?ms)^  driver:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n)", forgejo)
+        forgejo_timeout = re.search(r"(?m)^    timeout-minutes:\s+(\d+)$", forgejo_driver.group(1))
+        self.assertIsNotNone(forgejo_timeout)
+        self.assertEqual(job_timeout.group(1), forgejo_timeout.group(1))
         layer_timeout = runner.catalog()["drivers"]["steps"][0]["timeout_seconds"]
         self.assertGreaterEqual(int(job_timeout.group(1)) * 60, layer_timeout + 300)
 

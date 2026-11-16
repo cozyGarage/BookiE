@@ -206,9 +206,9 @@ impl BottomPanel {
             "view-fullscreen-symbolic"
         });
         let tooltip = if state.mode() == PanelMode::Maximized {
-            crate::tr!("Restore editor")
+            bookie_app_services::tr!("Restore editor")
         } else {
-            crate::tr!("Maximize results")
+            bookie_app_services::tr!("Maximize results")
         };
         self.maximize.set_tooltip_text(Some(&tooltip));
         if state.mode() == PanelMode::Docked && self.paned.height() > 0 {
@@ -238,7 +238,7 @@ impl BottomPanel {
                 let label = gtk::Label::builder()
                     .label(format!(
                         "{} {}: {message}",
-                        crate::tr!("Statement"),
+                        bookie_app_services::tr!("Statement"),
                         outcome.identity.statement_index + 1
                     ))
                     .selectable(true)
@@ -253,17 +253,18 @@ impl BottomPanel {
         }
         self.error_button.set_label(&errors_label(count));
         if count == 0 {
-            self.errors
-                .append(&gtk::Label::new(Some(&crate::tr!("No errors in the latest query run"))));
+            self.errors.append(&gtk::Label::new(Some(&bookie_app_services::tr!(
+                "No errors in the latest query run"
+            ))));
         }
     }
 }
 
 fn errors_label(count: usize) -> String {
     if count == 0 {
-        crate::tr!("Errors")
+        bookie_app_services::tr!("Errors")
     } else {
-        crate::tr!("Errors ({n})").replace("{n}", &count.to_string())
+        bookie_app_services::tr!("Errors ({n})").replace("{n}", &count.to_string())
     }
 }
 
@@ -271,15 +272,15 @@ fn controls(sender: &ComponentSender<SqlEditor>) -> (gtk::Box, gtk::ToggleButton
     let bar = gtk::Box::new(gtk::Orientation::Horizontal, 6);
     bar.add_css_class("toolbar");
     let results = gtk::ToggleButton::builder()
-        .label(crate::tr!("Results"))
+        .label(bookie_app_services::tr!("Results"))
         .active(true)
-        .tooltip_text(crate::tr!("Show or hide query results (Ctrl+J)"))
+        .tooltip_text(bookie_app_services::tr!("Show or hide query results (Ctrl+J)"))
         .build();
     let sender_results = sender.clone();
     results.connect_clicked(move |_| sender_results.input(SqlEditorInput::Panel(PanelAction::ResultsButton)));
     let errors = gtk::ToggleButton::builder()
         .label(errors_label(0))
-        .tooltip_text(crate::tr!("Show the errors of the latest run"))
+        .tooltip_text(bookie_app_services::tr!("Show the errors of the latest run"))
         .build();
     let sender_errors = sender.clone();
     errors.connect_clicked(move |_| sender_errors.input(SqlEditorInput::Panel(PanelAction::Errors)));
@@ -291,7 +292,7 @@ fn controls(sender: &ComponentSender<SqlEditor>) -> (gtk::Box, gtk::ToggleButton
     spacer.set_hexpand(true);
     let maximize = gtk::Button::builder()
         .icon_name("view-fullscreen-symbolic")
-        .tooltip_text(crate::tr!("Maximize results"))
+        .tooltip_text(bookie_app_services::tr!("Maximize results"))
         .build();
     let sender_max = sender.clone();
     maximize.connect_clicked(move |_| sender_max.input(SqlEditorInput::Panel(PanelAction::Maximize)));
@@ -328,7 +329,7 @@ fn outcome_error(outcome: &StatementOutcome) -> Option<super::StatementFailure> 
         StatementOutcomeKind::Error(message) => Some(message.clone()),
         StatementOutcomeKind::Streamed(result) => match &result.terminal {
             super::StreamTerminal::Failed(message) => Some(message.clone()),
-            super::StreamTerminal::TimedOut => Some(crate::tr!("Query timed out").into()),
+            super::StreamTerminal::TimedOut => Some(bookie_app_services::tr!("Query timed out").into()),
             _ => None,
         },
         _ => None,

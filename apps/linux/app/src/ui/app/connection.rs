@@ -8,9 +8,23 @@ use crate::services::database_service::{ConnectionHealth, ConnectionMetadata};
 use crate::ui::connect_dialog::{ConnectDialog, ConnectDialogInit, ConnectDialogOutput};
 
 use super::SessionTeardownAction;
-use super::{App, AppMsg, ConnectionTransition, SwitchDecision};
+use super::{App, AppMsg, ConnectionMessage, ConnectionTransition, SwitchDecision};
 
 impl App {
+    pub(super) fn on_connection_message(&mut self, message: ConnectionMessage, sender: ComponentSender<Self>) {
+        match message {
+            ConnectionMessage::Open => self.on_open_connect(sender),
+            ConnectionMessage::Cancel => self.on_cancel_connect(),
+            ConnectionMessage::Prepared(prepared) => self.on_connection_prepared(prepared, sender),
+            ConnectionMessage::PrepareFailed(message, saved) => {
+                self.on_connection_prepare_failed(message, *saved, sender)
+            }
+            ConnectionMessage::SwitchDecision(decision) => self.on_connection_switch_decision(decision, sender),
+            ConnectionMessage::Cancelled => self.on_connection_cancelled(),
+            ConnectionMessage::DialogClosed => self.on_connect_dialog_closed(),
+        }
+    }
+
     /// The policy-guarded connection this window owns, or `None` when the
     /// window is disconnected. Never resolves through the process-wide focus,
     /// so another window's connection can never answer for this one.
@@ -38,12 +52,6 @@ impl App {
         prompt_for_password: bool,
         sender: ComponentSender<Self>,
     ) {
-        if crate::ui::connect_dialog::has_jump_chain(&saved) {
-            self.show_toast(&crate::tr!(
-                "This connection uses an SSH jump chain, which the form cannot edit yet. Edit ssh.jump in the saved connection file."
-            ));
-            return;
-        }
         let reply = sender.clone();
         sender.command(move |_, shutdown| {
             shutdown
@@ -62,9 +70,10 @@ impl App {
         sender: ComponentSender<Self>,
     ) {
         if self.switch.transition != ConnectionTransition::Idle || self.dialog.is_some() {
-            self.show_toast(&crate::tr!("A connection change is already in progress."));
+            self.show_toast(&bookie_app_services::tr!("A connection change is already in progress."));
             return;
         }
+        self.dismiss_saved_connections_popover();
         self.switch.transition = ConnectionTransition::Connecting;
         let hidden_schemas = prefill
             .as_ref()
@@ -84,8 +93,8 @@ impl App {
                 guard_factory: self.database.candidate_guard_factory(),
             })
             .forward(sender.input_sender(), |out| match out {
-                ConnectDialogOutput::Prepared(prepared) => AppMsg::ConnectionPrepared(prepared),
-                ConnectDialogOutput::Closed => AppMsg::DialogClosed,
+                ConnectDialogOutput::Prepared(prepared) => AppMsg::Connection(ConnectionMessage::Prepared(prepared)),
+                ConnectDialogOutput::Closed => AppMsg::Connection(ConnectionMessage::DialogClosed),
             });
         crate::ui::leak_probe::track("connect", dialog.widget());
         dialog.widget().present(Some(&self.window));
@@ -120,6 +129,7 @@ impl App {
         self.show_database_switcher(&driver_id, id, &sender);
         self.show_sidebar_for_new_connection();
         self.disconnect_action.set_enabled(true);
+        self.sync_health_report_action();
         self.table_search.set_text("");
         self.ensure_workspace_root(sender.clone());
         self.show_in_content_holder(&self.workspace_outer_stack);
@@ -133,21 +143,21 @@ impl App {
         self.sidebar_views = views;
         self.reset_sidebar_catalog();
         self.restore_sidebar_state();
-        self.repopulate_sidebar(&tables);
+        self.repopulate_sidebar(&tables, sender.clone());
         self.rebuild_schema_filter_popover(&sender);
         self.refresh_schema_index();
         self.refresh_window_title();
         if let Some(connection_id) = self.connection_id {
             self.set_last_connection_id(Some(connection_id), sender.clone());
             self.restore_workspace_tabs(connection_id, sender.clone());
-            self.claim_orphan_tabs(connection_id);
             if self.multi.sessions.names_tabs_with_connection()
                 && self.multi.sessions.tabs_for_connection(connection_id).is_empty()
             {
                 self.append_editor_tab(None, sender.clone());
-                self.claim_orphan_tabs(connection_id);
             }
             self.refresh_multi_session_tab_titles();
+            self.persist_open_sessions(sender.clone());
+            sender.input(AppMsg::ContinueSessionRestore);
             touch_last_opened(connection_id, sender);
             return;
         }
@@ -156,7 +166,7 @@ impl App {
 
     pub(super) fn on_disconnect(&mut self, sender: ComponentSender<Self>) {
         if self.switch.transition != ConnectionTransition::Idle {
-            self.show_toast(&crate::tr!(
+            self.show_toast(&bookie_app_services::tr!(
                 "Finish or cancel the connection change before disconnecting."
             ));
             return;
@@ -166,16 +176,14 @@ impl App {
         // the connection mid-edit silently destroys the user's work.
         // Confirm via an AlertDialog mirroring the window-close-with-
         // pending and F5-with-pending paths.
-        let has_pending = self.window_has_pending();
+        let has_pending = self.disconnect_has_pending();
         if has_pending {
             let dialog = adw::AlertDialog::new(
-                Some(&crate::tr!("Discard pending changes?")),
-                Some(&crate::tr!(
-                    "Disconnecting will close every tab and drop every unsaved row edit and DDL change."
-                )),
+                Some(&bookie_app_services::tr!("Discard pending changes?")),
+                Some(&self.disconnect_discard_body()),
             );
-            dialog.add_response("cancel", &crate::tr!("Cancel"));
-            dialog.add_response("discard", &crate::tr!("Discard and disconnect"));
+            dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
+            dialog.add_response("discard", &bookie_app_services::tr!("Discard and disconnect"));
             dialog.set_response_appearance("discard", adw::ResponseAppearance::Destructive);
             dialog.set_default_response(Some("cancel"));
             dialog.set_close_response("cancel");
@@ -195,9 +203,9 @@ impl App {
         if !self.confirm_session_teardown(
             sender.clone(),
             SessionTeardownAction::Disconnect,
-            &crate::tr!("Disconnect with an open session transaction?"),
-            &crate::tr!("The open transaction will be rolled back before disconnecting."),
-            &crate::tr!("Roll Back and Disconnect"),
+            &bookie_app_services::tr!("Disconnect with an open session transaction?"),
+            &bookie_app_services::tr!("The open transaction will be rolled back before disconnecting."),
+            &bookie_app_services::tr!("Roll Back and Disconnect"),
         ) {
             self.do_disconnect(sender);
         }
@@ -232,7 +240,9 @@ impl App {
             self.set_last_connection_id(None, sender.clone());
         }
         self.clear_multi_session_state();
+        self.persist_open_sessions(sender.clone());
         self.current_driver_id = None;
+        self.sync_health_report_action();
         self.read_only = false;
         self.read_only_badge.set_visible(false);
         self.databases_button.set_visible(false);
@@ -243,10 +253,14 @@ impl App {
         self.refresh_window_title();
         self.table_search.set_text("");
         self.sidebar_nodes.borrow_mut().clear();
-        self.sidebar_visible.borrow_mut().clear();
         self.sidebar_views.clear();
         self.reset_sidebar_catalog();
-        self.sidebar_factory.guard().clear();
+        super::init_sidebar::disconnect_expansion_handlers(&self.sidebar_expansion_handlers);
+        for factory in self.sidebar_row_factories.borrow_mut().values_mut() {
+            factory.guard().clear();
+        }
+        self.sidebar_model.replace_nodes(&[], &[]);
+        self.sidebar_selection.set_selected(relm4::gtk::INVALID_LIST_POSITION);
         self.show_welcome_page(sender);
         tracing::info!("disconnected");
     }
@@ -260,7 +274,7 @@ impl App {
                     if let Ok(connections) = bookie_storage::load_connections().await {
                         let ids = connections.iter().map(|connection| connection.id).collect::<Vec<_>>();
                         if workspace.prefetch_connections(&ids).is_err() {
-                            sender_clone.input(AppMsg::ShowToast(crate::tr!(
+                            sender_clone.input(AppMsg::ShowToast(bookie_app_services::tr!(
                                 "Could not restore the workspace. Existing files have been preserved."
                             )));
                         }
@@ -292,23 +306,8 @@ impl App {
         self.prune_connection_organization(sender.clone());
         if !self.connected {
             self.show_welcome_page(sender.clone());
-            self.restore_last_connection(connections, sender);
+            self.begin_session_restore(connections, sender);
         }
-    }
-
-    fn restore_last_connection(&mut self, connections: &[SavedConnection], sender: ComponentSender<Self>) {
-        if !crate::services::window_state::take_session_restore_turn() {
-            return;
-        }
-        let last = self.window_state.borrow().last_connection_id;
-        let available: Vec<Uuid> = connections.iter().map(|saved| saved.id).collect();
-        let Some(id) = bookie_app_services::window_state::connection_id_to_restore(last, &available) else {
-            return;
-        };
-        let Some(saved) = connections.iter().find(|saved| saved.id == id).cloned() else {
-            return;
-        };
-        self.on_open_saved(saved, sender);
     }
 
     pub(super) fn on_poll_health(&mut self) {
@@ -327,6 +326,10 @@ impl App {
         }
     }
 
+    pub(super) fn dismiss_saved_connections_popover(&self) {
+        self.connections_popover.popdown();
+    }
+
     pub(super) fn on_delete_connection(&self, id: Uuid, sender: ComponentSender<Self>) {
         // Connection deletion wipes the saved entry and ALL associated
         // keyring credentials (db password, SSH password, SSH passphrase).
@@ -335,19 +338,20 @@ impl App {
         // preference gate let users skip it, but per HIG (and GNOME
         // Files' bookmark-delete behaviour) destructive keyring writes
         // need confirmation regardless of preferences.
+        self.dismiss_saved_connections_popover();
         let connection_name = self
             .saved_connections
             .iter()
             .find(|s| s.id == id)
             .map(|s| s.name.clone())
-            .unwrap_or_else(|| crate::tr!("this connection"));
-        let title = crate::tr!("Delete {name}?").replace("{name}", &connection_name);
-        let body = crate::tr!(
+            .unwrap_or_else(|| bookie_app_services::tr!("this connection"));
+        let title = bookie_app_services::tr!("Delete {name}?").replace("{name}", &connection_name);
+        let body = bookie_app_services::tr!(
             "The saved entry and any stored passwords will be removed from your keyring. This cannot be undone."
         );
         let dialog = adw::AlertDialog::new(Some(&title), Some(&body));
-        dialog.add_response("cancel", &crate::tr!("Cancel"));
-        dialog.add_response("delete", &crate::tr!("Delete"));
+        dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
+        dialog.add_response("delete", &bookie_app_services::tr!("Delete"));
         dialog.set_response_appearance("delete", adw::ResponseAppearance::Destructive);
         dialog.set_default_response(Some("cancel"));
         dialog.set_close_response("cancel");
@@ -371,14 +375,14 @@ impl App {
 
     pub(super) fn on_open_saved(&mut self, saved: SavedConnection, sender: ComponentSender<Self>) {
         if self.switch.transition != ConnectionTransition::Idle {
-            self.show_toast(&crate::tr!("A connection change is already in progress."));
+            self.show_toast(&bookie_app_services::tr!("A connection change is already in progress."));
             return;
         }
         self.connections_popover.popdown();
         self.switch.transition = ConnectionTransition::Connecting;
         self.set_loading_page(
-            &crate::tr!("Connecting…"),
-            &crate::tr!("Opening {name}").replace("{name}", &saved.name),
+            &bookie_app_services::tr!("Connecting…"),
+            &bookie_app_services::tr!("Opening {name}").replace("{name}", &saved.name),
             &sender,
         );
         let cancel = tokio_util::sync::CancellationToken::new();
@@ -411,12 +415,16 @@ impl App {
                     )
                     .await
                     {
-                        Ok(prepared) => sender_clone.input(AppMsg::ConnectionPrepared(Box::new(prepared))),
-                        Err(_) if cancel.is_cancelled() => sender_clone.input(AppMsg::ConnectionCancelled),
-                        Err(e) => sender_clone.input(AppMsg::ConnectionPrepareFailed(
+                        Ok(prepared) => {
+                            sender_clone.input(AppMsg::Connection(ConnectionMessage::Prepared(Box::new(prepared))))
+                        }
+                        Err(_) if cancel.is_cancelled() => {
+                            sender_clone.input(AppMsg::Connection(ConnectionMessage::Cancelled))
+                        }
+                        Err(e) => sender_clone.input(AppMsg::Connection(ConnectionMessage::PrepareFailed(
                             crate::services::error_text::open_failure_message(&e),
                             Box::new(attempted),
-                        )),
+                        ))),
                     }
                 })
                 .drop_on_shutdown()
@@ -430,6 +438,7 @@ impl App {
     }
 
     pub(super) fn on_connection_cancelled(&mut self) {
+        self.stop_session_restore();
         self.connect_cancel = None;
         self.pending_database_switch = None;
         if self.switch.transition != ConnectionTransition::Connecting || self.switch.prepared.is_some() {
@@ -438,7 +447,7 @@ impl App {
         self.switch.transition = ConnectionTransition::Idle;
         self.switch.cancel_audit_was_disabled = None;
         self.dismiss_loading_page();
-        self.show_toast(&crate::tr!("Connection cancelled."));
+        self.show_toast(&bookie_app_services::tr!("Connection cancelled."));
     }
 
     pub(super) fn on_connection_prepared(
@@ -483,14 +492,15 @@ impl App {
         self.switch.cancel_audit_was_disabled = None;
         self.dismiss_loading_page();
         tracing::warn!(error = %message, "candidate connection failed");
+        sender.input(AppMsg::ContinueSessionRestore);
         self.show_connection_failed_alert(&message, saved, sender);
     }
 
     fn show_connection_failed_alert(&self, message: &str, saved: SavedConnection, sender: ComponentSender<Self>) {
-        let dialog = adw::AlertDialog::new(Some(&crate::tr!("Connection failed")), Some(message));
-        dialog.add_response("close", &crate::tr!("Close"));
-        dialog.add_response("edit", &crate::tr!("Edit Connection"));
-        dialog.add_response("retry", &crate::tr!("Try Again"));
+        let dialog = adw::AlertDialog::new(Some(&bookie_app_services::tr!("Connection failed")), Some(message));
+        dialog.add_response("close", &bookie_app_services::tr!("Close"));
+        dialog.add_response("edit", &bookie_app_services::tr!("Edit Connection"));
+        dialog.add_response("retry", &bookie_app_services::tr!("Try Again"));
         dialog.set_response_appearance("retry", adw::ResponseAppearance::Suggested);
         dialog.set_default_response(Some("retry"));
         dialog.set_close_response("close");
@@ -539,7 +549,7 @@ impl App {
                 self.switch.prepared = None;
                 self.switch.saves_pending.clear();
                 self.switch.transition = ConnectionTransition::Idle;
-                self.show_toast(&crate::tr!(
+                self.show_toast(&bookie_app_services::tr!(
                     "Connection switch stopped because a running operation has an unknown outcome."
                 ));
                 return;
@@ -549,23 +559,25 @@ impl App {
         if self.any_editor_running() {
             self.switch.transition = ConnectionTransition::AwaitingDecision;
             let dialog = adw::AlertDialog::new(
-                Some(&crate::tr!("Cancel running queries and switch?")),
-                Some(&crate::tr!(
+                Some(&bookie_app_services::tr!("Cancel running queries and switch?")),
+                Some(&bookie_app_services::tr!(
                     "BookiE will wait for every running query to report cancellation before changing connections."
                 )),
             );
-            dialog.add_response("stay", &crate::tr!("Stay"));
-            dialog.add_response("cancel-runs", &crate::tr!("Cancel queries and switch"));
+            dialog.add_response("stay", &bookie_app_services::tr!("Stay"));
+            dialog.add_response("cancel-runs", &bookie_app_services::tr!("Cancel queries and switch"));
             dialog.set_response_appearance("cancel-runs", adw::ResponseAppearance::Destructive);
             dialog.set_default_response(Some("stay"));
             dialog.set_close_response("stay");
             let response_sender = sender.clone();
             dialog.connect_response(None, move |_, response| {
-                response_sender.input(AppMsg::ConnectionSwitchDecision(if response == "cancel-runs" {
-                    SwitchDecision::CancelRuns
-                } else {
-                    SwitchDecision::Stay
-                }));
+                response_sender.input(AppMsg::Connection(ConnectionMessage::SwitchDecision(
+                    if response == "cancel-runs" {
+                        SwitchDecision::CancelRuns
+                    } else {
+                        SwitchDecision::Stay
+                    },
+                )));
             });
             dialog.present(Some(&self.window));
             return;
@@ -575,14 +587,14 @@ impl App {
         if has_pending {
             self.switch.transition = ConnectionTransition::AwaitingDecision;
             let dialog = adw::AlertDialog::new(
-                Some(&crate::tr!("Save changes before switching?")),
-                Some(&crate::tr!(
+                Some(&bookie_app_services::tr!("Save changes before switching?")),
+                Some(&bookie_app_services::tr!(
                     "Pending row and structure changes belong to the current connection."
                 )),
             );
-            dialog.add_response("stay", &crate::tr!("Stay"));
-            dialog.add_response("discard", &crate::tr!("Discard and switch"));
-            dialog.add_response("save", &crate::tr!("Save and switch"));
+            dialog.add_response("stay", &bookie_app_services::tr!("Stay"));
+            dialog.add_response("discard", &bookie_app_services::tr!("Discard and switch"));
+            dialog.add_response("save", &bookie_app_services::tr!("Save and switch"));
             dialog.set_response_appearance("discard", adw::ResponseAppearance::Destructive);
             dialog.set_response_appearance("save", adw::ResponseAppearance::Suggested);
             dialog.set_default_response(Some("save"));
@@ -594,7 +606,7 @@ impl App {
                     "save" => SwitchDecision::SaveChanges,
                     _ => SwitchDecision::Stay,
                 };
-                response_sender.input(AppMsg::ConnectionSwitchDecision(decision));
+                response_sender.input(AppMsg::Connection(ConnectionMessage::SwitchDecision(decision)));
             });
             dialog.present(Some(&self.window));
             return;
@@ -610,7 +622,7 @@ impl App {
                 self.switch.saves_pending.clear();
                 self.switch.cancel_audit_was_disabled = None;
                 self.switch.transition = ConnectionTransition::Idle;
-                self.show_toast(&crate::tr!("Connection switch cancelled."));
+                self.show_toast(&bookie_app_services::tr!("Connection switch cancelled."));
             }
             SwitchDecision::CancelRuns => {
                 self.switch.cancel_audit_was_disabled = Some(
@@ -660,9 +672,9 @@ impl App {
             if !self.confirm_session_teardown(
                 sender.clone(),
                 SessionTeardownAction::ConnectionSwitch,
-                &crate::tr!("Switch with an open session transaction?"),
-                &crate::tr!("The open transaction will be rolled back before switching connections."),
-                &crate::tr!("Roll Back and Switch"),
+                &bookie_app_services::tr!("Switch with an open session transaction?"),
+                &bookie_app_services::tr!("The open transaction will be rolled back before switching connections."),
+                &bookie_app_services::tr!("Roll Back and Switch"),
             ) {
                 self.prepare_editor_sessions(SessionTeardownAction::ConnectionSwitch, sender);
             }
@@ -688,15 +700,13 @@ impl App {
             self.switch.transition = ConnectionTransition::Idle;
             self.switch.saves_pending.clear();
             self.switch.cancel_audit_was_disabled = None;
-            self.show_toast(&crate::tr!("This connection is already open in another window."));
+            self.show_toast(&bookie_app_services::tr!(
+                "This connection is already open in another window."
+            ));
             return;
         }
         crate::services::request_generation::replace_in_flight(&self.catalog_dialog_cancel);
-        if additive {
-            if let Some(previous) = self.connection_id {
-                self.claim_orphan_tabs(previous);
-            }
-        } else if self.connected {
+        if !additive && self.connected {
             self.teardown_workspace_tabs();
             self.clear_closed_tabs_stack();
             self.connected_database = None;
@@ -704,10 +714,7 @@ impl App {
             if let Some(previous) = self.connection_id.take() {
                 self.overview_front_connection_id.set(None);
                 self.multi.sessions.disconnect(previous);
-                self.multi.guards.remove(previous);
-                self.multi.catalogs.remove(&previous);
-                self.database.close(previous);
-                crate::services::window_registry::unregister(previous);
+                self.release_connection_resources(previous);
             }
         }
         let Some(activated) = prepared.activate(&self.database) else {
@@ -721,7 +728,9 @@ impl App {
                 self.disconnect_action.set_enabled(false);
                 self.refresh_window_title();
             }
-            self.show_toast(&crate::tr!("This connection is already open in another window."));
+            self.show_toast(&bookie_app_services::tr!(
+                "This connection is already open in another window."
+            ));
             return;
         };
         self.switch.transition = ConnectionTransition::Idle;
@@ -751,7 +760,7 @@ impl App {
         self.switch.prepared = None;
         self.switch.cancel_audit_was_disabled = None;
         self.switch.transition = ConnectionTransition::Idle;
-        self.show_toast(&crate::tr!(
+        self.show_toast(&bookie_app_services::tr!(
             "Connection switch stopped because changes could not be saved."
         ));
     }
@@ -764,15 +773,17 @@ impl App {
         match health {
             Some(ConnectionHealth::Reconnecting { attempt }) => {
                 self.reconnect_banner.set_title(
-                    &crate::tr!("Connection lost — reconnecting (attempt {n}, will keep retrying)")
+                    &bookie_app_services::tr!("Connection lost — reconnecting (attempt {n}, will keep retrying)")
                         .replace("{n}", &attempt.to_string()),
                 );
                 self.reconnect_banner.set_revealed(true);
             }
             Some(ConnectionHealth::Failed { reason }) => {
                 self.reconnect_banner.set_title(
-                    &crate::tr!("Connection lost and cannot be restored: {reason}. Reopen the connection to retry.")
-                        .replace("{reason}", &crate::services::error_text::open_failure_message(&reason)),
+                    &bookie_app_services::tr!(
+                        "Connection lost and cannot be restored: {reason}. Reopen the connection to retry."
+                    )
+                    .replace("{reason}", &crate::services::error_text::open_failure_message(&reason)),
                 );
                 self.reconnect_banner.set_revealed(true);
             }
@@ -798,11 +809,7 @@ impl App {
                             let file_based = registry
                                 .get(&source.driver_id)
                                 .is_some_and(|driver| driver.capabilities().is_file_based);
-                            let eligible = duplicate_connection_prompt_eligible(
-                                source.auth_mode,
-                                file_based,
-                                crate::ui::connect_dialog::has_jump_chain(&source),
-                            );
+                            let eligible = duplicate_connection_prompt_eligible(source.auth_mode, file_based);
                             if !eligible {
                                 false
                             } else {
@@ -842,7 +849,7 @@ impl App {
     }
 
     pub(super) fn on_duplicate_connection_failed(&self) {
-        self.show_toast(&crate::tr!("The connection could not be duplicated."));
+        self.show_toast(&bookie_app_services::tr!("The connection could not be duplicated."));
     }
 }
 
@@ -850,7 +857,7 @@ impl App {
 /// shared the original's password would look ready to open and then
 /// fail at connect time.
 fn duplicate_connection_message(name: &str) -> String {
-    crate::tr!("Created “{name}”. Enter its password the first time you connect.").replace("{name}", name)
+    bookie_app_services::tr!("Created “{name}”. Enter its password the first time you connect.").replace("{name}", name)
 }
 
 fn prompt_for_stored_password(stored: Result<Option<secrecy::SecretString>, bookie_storage::StorageError>) -> bool {
@@ -865,12 +872,8 @@ fn prompt_for_stored_password(stored: Result<Option<secrecy::SecretString>, book
     }
 }
 
-fn duplicate_connection_prompt_eligible(
-    auth_mode: bookie_core::AuthMode,
-    file_based: bool,
-    has_jump_chain: bool,
-) -> bool {
-    auth_mode == bookie_core::AuthMode::Password && !file_based && !has_jump_chain
+fn duplicate_connection_prompt_eligible(auth_mode: bookie_core::AuthMode, file_based: bool) -> bool {
+    auth_mode == bookie_core::AuthMode::Password && !file_based
 }
 
 /// Performs the actual disk + keyring teardown for a saved connection.
@@ -887,10 +890,17 @@ fn execute_delete_connection(
         shutdown
             .register(async move {
                 let _save_turn = crate::services::connection_save_turn::take().await;
+                let chain = bookie_storage::load_connections()
+                    .await
+                    .ok()
+                    .and_then(|all| all.into_iter().find(|saved| saved.id == id))
+                    .and_then(|saved| saved.ssh);
                 let result = bookie_storage::delete_connection(id).await;
                 if let Err(error) = result {
                     tracing::warn!(error = %error, "deleting the connection file entry failed");
-                    sender_clone.input(AppMsg::ShowToast(crate::tr!("The connection could not be deleted.")));
+                    sender_clone.input(AppMsg::ShowToast(bookie_app_services::tr!(
+                        "The connection could not be deleted."
+                    )));
                     return;
                 }
                 workspace.forget_connection(id);
@@ -902,6 +912,13 @@ fn execute_delete_connection(
                 let ssh_password = bookie_storage::delete_ssh_password(id).await;
                 let ssh_passphrase = bookie_storage::delete_ssh_passphrase(id).await;
                 let mut credential_failure = false;
+                if let Some(Err(error)) = match &chain {
+                    Some(chain) => Some(bookie_app_services::ssh_chain_secrets::delete_chain_secrets(id, chain).await),
+                    None => None,
+                } {
+                    credential_failure = true;
+                    tracing::warn!(error = %error, "deleting jump host credentials failed");
+                }
                 for error in [password.err(), ssh_password.err(), ssh_passphrase.err()]
                     .into_iter()
                     .flatten()
@@ -910,7 +927,7 @@ fn execute_delete_connection(
                     tracing::warn!(error = %error, "deleting connection credentials failed");
                 }
                 if credential_failure {
-                    sender_clone.input(AppMsg::ShowToast(crate::tr!(
+                    sender_clone.input(AppMsg::ShowToast(bookie_app_services::tr!(
                         "The connection was deleted, but some stored credentials could not be removed."
                     )));
                 }
@@ -926,7 +943,7 @@ fn touch_last_opened(connection_id: Uuid, sender: ComponentSender<App>) {
         let result = bookie_storage::touch_last_opened(connection_id).await;
         if let Err(error) = result {
             tracing::warn!(error = %error, "touch_last_opened failed");
-            sender.input(AppMsg::ShowToast(crate::tr!(
+            sender.input(AppMsg::ShowToast(bookie_app_services::tr!(
                 "The connection opened, but its recent-use time could not be saved."
             )));
         }
@@ -950,22 +967,14 @@ mod tests {
     fn duplicate_prompts_only_for_editable_password_authenticated_connections() {
         assert!(duplicate_connection_prompt_eligible(
             bookie_core::AuthMode::Password,
-            false,
             false
         ));
         assert!(!duplicate_connection_prompt_eligible(
             bookie_core::AuthMode::Kerberos,
-            false,
             false
         ));
         assert!(!duplicate_connection_prompt_eligible(
             bookie_core::AuthMode::Password,
-            true,
-            false
-        ));
-        assert!(!duplicate_connection_prompt_eligible(
-            bookie_core::AuthMode::Password,
-            false,
             true
         ));
     }

@@ -11,6 +11,7 @@ fn index(name: &str, columns: &[&str], unique: bool) -> IndexInfo {
         predicate: None,
         constraint: None,
         has_expression_key: false,
+        using_clause: None,
     }
 }
 
@@ -119,6 +120,7 @@ fn create_index_refuses_an_expression_key_instead_of_quoting_it_as_a_column() {
         primary: false,
         predicate: None,
         has_expression_key: true,
+        using_clause: None,
     };
     let err = super::build_create_index("mysql", None, "users", &idx).unwrap_err();
     assert!(matches!(err, super::BuildDdlError::ExpressionIndex));

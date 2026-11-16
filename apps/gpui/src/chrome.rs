@@ -1,6 +1,6 @@
 use bookie_gpui::font_settings;
 use bookie_gpui::messages::MessageKind;
-use bookie_gpui::shell::{ResultView, Tab, TreeRow, tree_rows_in};
+use bookie_gpui::shell::{ResultView, SidebarFilter, Tab, TreeRow, table_label, tree_rows_in};
 const SQL: [&str; 3] = [
     "SELECT value, label, state, typed",
     "FROM synthetic_rows",
@@ -48,8 +48,22 @@ fn expand_sidebar_button(theme: Theme, cx: &mut Context<GridView>) -> Stateful<D
         }))
 }
 
-fn import_menu(theme: Theme) -> Div {
-    let item = |label: &'static str| div().px_3().py_1().text_color(rgb(theme.foreground)).child(label);
+fn import_menu(theme: Theme, cx: &mut Context<GridView>) -> Div {
+    let item = |id: &'static str, label: &'static str, cx: &mut Context<GridView>| {
+        div()
+            .id(id)
+            .px_3()
+            .py_1()
+            .cursor_pointer()
+            .text_color(rgb(theme.foreground))
+            .hover(move |style| style.bg(rgb(theme.accent)))
+            .child(label)
+            .on_click(cx.listener(move |this, _, _, cx| {
+                this.import_menu_open = false;
+                this.status = format!("{label} is not available in this prototype yet.");
+                cx.notify();
+            }))
+    };
     div()
         .absolute()
         .top(px(40.0))
@@ -64,13 +78,28 @@ fn import_menu(theme: Theme) -> Div {
         .bg(rgb(theme.background))
         .shadow_lg()
         .occlude()
-        .child(item("Import DBX Config"))
-        .child(item("Import Navicat NCX"))
-        .child(item("Import DBeaver"))
-        .child(item("Import DataGrip"))
-        .child(item("Import RDM"))
-        .child(item("Import AnotherRDM"))
-        .child(item("Export Connections"))
+        .child(item("import-dbx", "Import DBX Config", cx))
+        .child(item("import-navicat", "Import Navicat NCX", cx))
+        .child(item("import-dbeaver", "Import DBeaver", cx))
+        .child(item("import-datagrip", "Import DataGrip", cx))
+        .child(item("import-rdm", "Import RDM", cx))
+        .child(item("import-anotherrdm", "Import AnotherRDM", cx))
+        .child(item("export-connections", "Export Connections", cx))
+}
+
+fn toggle_icon(
+    id: &'static str,
+    name: &'static str,
+    on: bool,
+    theme: Theme,
+    cx: &mut Context<GridView>,
+    on_click: impl Fn(&mut GridView, &mut Context<GridView>) + 'static,
+) -> Stateful<Div> {
+    let button = header_icon(id, name, theme).on_click(cx.listener(move |this, _, _, cx| {
+        on_click(this, cx);
+        cx.notify();
+    }));
+    if on { button.bg(rgb(theme.accent)) } else { button }
 }
 
 fn header_icon(id: &'static str, name: &'static str, theme: Theme) -> Stateful<Div> {
@@ -158,12 +187,6 @@ fn card_title(text: &str, theme: Theme) -> Div {
 
 impl GridView {
     pub fn toolbar(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
-        let inert = |id: &'static str, name: &'static str, cx: &mut Context<Self>| {
-            toolbar_icon(id, name, theme).on_click(cx.listener(|this, _, _, cx| {
-                this.status = "Synthetic prototype: nothing to open here.".into();
-                cx.notify();
-            }))
-        };
         div()
             .flex()
             .items_center()
@@ -180,12 +203,25 @@ impl GridView {
                     .items_center()
                     .gap_1()
                     .children((!self.sidebar_open).then(|| expand_sidebar_button(theme, cx)))
-                    .child(inert("new-connection", "database", cx))
-                    .child(inert("new-query", "file-plus", cx))
-                    .child(inert("data-transfer", "arrow-left-right", cx))
-                    .child(inert("driver-manager", "package", cx))
-                    .child(inert("plugin-center", "puzzle", cx))
-                    .child(inert("more", "chevron-down", cx)),
+                    .child(
+                        toolbar_icon("new-connection", "database", theme).on_click(cx.listener(|this, _, _, cx| {
+                            this.tabs.open_home();
+                            this.sync_grid_owner();
+                            cx.notify();
+                        })),
+                    )
+                    .child(
+                        toolbar_icon("new-query", "file-plus", theme).on_click(cx.listener(|this, _, window, cx| {
+                            this.tabs.open_query();
+                            this.sync_grid_owner();
+                            if this.live.is_some() {
+                                this.focus_editor = true;
+                            } else {
+                                window.focus(&this.focus, cx);
+                            }
+                            cx.notify();
+                        })),
+                    ),
             )
             .child(self.toolbar_right(theme, cx))
     }
@@ -227,61 +263,69 @@ impl GridView {
 
     pub fn sidebar(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
         let search = self.sidebar_search.read(cx).content().to_string();
-        let rows = tree_rows_in(&self.catalog, &search, self.connection_open, self.database_open);
+        let filter = SidebarFilter {
+            regex: self.sidebar_regex,
+            active_only: self.sidebar_active_only,
+        };
+        let rows = tree_rows_in(&self.catalog, &search, self.connection_open, self.database_open, filter);
         let open_table = self.tabs.current().clone();
-        let tree = rows.into_iter().enumerate().map(|(index, (depth, row))| {
-            let (label, chevron) = match &row {
-                TreeRow::Connection { open } => (self.catalog.connection.clone(), Some(*open)),
-                TreeRow::Database { open } => (self.catalog.database.clone(), Some(*open)),
-                TreeRow::Table(name) => (name.clone(), None),
-            };
-            let current = matches!(&row, TreeRow::Table(name) if open_table == Tab::Table(name.clone()));
-            let line = div()
-                .id(("tree", index))
-                .flex()
-                .items_center()
-                .h(px(26.0))
-                .pl(px(8.0 + 14.0 * depth as f32))
-                .gap_1()
-                .rounded(px(theme.radius))
-                .cursor_pointer()
-                .child(div().w(px(15.0)).flex_none().children(chevron.map(|open| {
-                    icon(
-                        if open { "chevron-down" } else { "chevron-right" },
+        let tree: Vec<_> = rows
+            .into_iter()
+            .enumerate()
+            .map(|(index, (depth, row))| {
+                let (label, chevron) = match &row {
+                    TreeRow::Connection { open } => (self.catalog.connection.clone(), Some(*open)),
+                    TreeRow::Database { open } => (self.catalog.database.clone(), Some(*open)),
+                    TreeRow::Table(table) => (table_label(table), None),
+                };
+                let current = matches!(&row, TreeRow::Table(table) if open_table == Tab::Table(table.clone()));
+                let line = div()
+                    .id(("tree", index))
+                    .flex()
+                    .items_center()
+                    .h(px(26.0))
+                    .pl(px(8.0 + 14.0 * depth as f32))
+                    .gap_1()
+                    .rounded(px(theme.radius))
+                    .cursor_pointer()
+                    .child(div().w(px(15.0)).flex_none().children(chevron.map(|open| {
+                        icon(
+                            if open { "chevron-down" } else { "chevron-right" },
+                            theme.muted_foreground,
+                        )
+                    })))
+                    .child(icon(
+                        match &row {
+                            TreeRow::Connection { .. } => "database",
+                            TreeRow::Database { .. } => "folder",
+                            TreeRow::Table(_) => "table",
+                        },
                         theme.muted_foreground,
-                    )
-                })))
-                .child(icon(
+                    ))
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .overflow_hidden()
+                            .whitespace_nowrap()
+                            .text_ellipsis()
+                            .child(label),
+                    );
+                let line = if current {
+                    line.bg(rgb(theme.accent)).font_weight(gpui::FontWeight::MEDIUM)
+                } else {
+                    line.hover(move |style| style.bg(rgb(theme.accent)))
+                };
+                line.on_click(cx.listener(move |this, _, window, cx| {
                     match &row {
-                        TreeRow::Connection { .. } => "database",
-                        TreeRow::Database { .. } => "folder",
-                        TreeRow::Table(_) => "table",
-                    },
-                    theme.muted_foreground,
-                ))
-                .child(
-                    div()
-                        .flex_1()
-                        .min_w_0()
-                        .overflow_hidden()
-                        .whitespace_nowrap()
-                        .text_ellipsis()
-                        .child(label),
-                );
-            let line = if current {
-                line.bg(rgb(theme.accent)).font_weight(gpui::FontWeight::MEDIUM)
-            } else {
-                line.hover(move |style| style.bg(rgb(theme.accent)))
-            };
-            line.on_click(cx.listener(move |this, _, window, cx| {
-                match &row {
-                    TreeRow::Connection { .. } => this.connection_open = !this.connection_open,
-                    TreeRow::Database { .. } => this.database_open = !this.database_open,
-                    TreeRow::Table(name) => this.open_table_named(name, window, cx),
-                }
-                cx.notify();
-            }))
-        });
+                        TreeRow::Connection { .. } => this.connection_open = !this.connection_open,
+                        TreeRow::Database { .. } => this.database_open = !this.database_open,
+                        TreeRow::Table(table) => this.open_table_named(table, window, cx),
+                    }
+                    cx.notify();
+                }))
+            })
+            .collect();
         let empty = (!search.trim().is_empty() && self.sidebar_matches(&search) == 0).then(|| {
             div()
                 .p_3()
@@ -348,7 +392,7 @@ impl GridView {
                             ),
                     ),
             )
-            .children(self.import_menu_open.then(|| import_menu(theme)))
+            .children(self.import_menu_open.then(|| import_menu(theme, cx)))
             .child(
                 div()
                     .p_2()
@@ -356,9 +400,37 @@ impl GridView {
                     .items_center()
                     .gap_1()
                     .child(div().flex_1().min_w_0().child(self.sidebar_search.clone()))
-                    .child(header_icon("sidebar-locate", "crosshair", theme))
-                    .child(header_icon("sidebar-filter", "sliders-horizontal", theme))
-                    .child(header_icon("sidebar-active-only", "circle", theme)),
+                    .child(toggle_icon(
+                        "sidebar-locate",
+                        "crosshair",
+                        false,
+                        theme,
+                        cx,
+                        |this, cx| this.locate_active_table(cx),
+                    ))
+                    .child(toggle_icon(
+                        "sidebar-filter",
+                        "sliders-horizontal",
+                        self.sidebar_regex,
+                        theme,
+                        cx,
+                        |this, cx| this.toggle_sidebar_regex(cx),
+                    ))
+                    .child(toggle_icon(
+                        "sidebar-active-only",
+                        "circle",
+                        self.sidebar_active_only,
+                        theme,
+                        cx,
+                        |this, _| {
+                            this.sidebar_active_only = !this.sidebar_active_only;
+                            this.status = if this.sidebar_active_only {
+                                "Showing only the active table.".into()
+                            } else {
+                                "Showing every table.".into()
+                            };
+                        },
+                    )),
             )
             .child(div().flex().flex_col().px_2().children(tree).children(empty))
             .child(
@@ -383,10 +455,45 @@ impl GridView {
     }
 
     fn sidebar_matches(&self, search: &str) -> usize {
-        tree_rows_in(&self.catalog, search, true, true)
-            .iter()
-            .filter(|(_, row)| matches!(row, TreeRow::Table(_)))
-            .count()
+        tree_rows_in(
+            &self.catalog,
+            search,
+            true,
+            true,
+            SidebarFilter {
+                regex: self.sidebar_regex,
+                active_only: self.sidebar_active_only,
+            },
+        )
+        .iter()
+        .filter(|(_, row)| matches!(row, TreeRow::Table(_)))
+        .count()
+    }
+
+    pub(crate) fn toggle_sidebar_regex(&mut self, cx: &mut Context<Self>) {
+        let search = self.sidebar_search.read(cx).content().to_string();
+        if !self.sidebar_regex && !bookie_gpui::shell::sidebar_regex_ok(&search) {
+            self.status = "That search is not a valid regular expression.".into();
+            return;
+        }
+        self.sidebar_regex = !self.sidebar_regex;
+        self.status = if self.sidebar_regex {
+            "Sidebar search uses a regular expression.".into()
+        } else {
+            "Sidebar search matches plain text.".into()
+        };
+    }
+
+    pub(crate) fn locate_active_table(&mut self, cx: &mut Context<Self>) {
+        self.sidebar_open = true;
+        self.connection_open = true;
+        self.database_open = true;
+        self.sidebar_active_only = false;
+        self.sidebar_regex = false;
+        let name = self.catalog.grid_table.name.clone();
+        let label = table_label(&self.catalog.grid_table);
+        self.sidebar_search.update(cx, |input, cx| input.set_content(&name, cx));
+        self.status = format!("Located {label}");
     }
 
     pub fn tab_bar(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
@@ -647,7 +754,8 @@ impl GridView {
                                                     "quick-open",
                                                     format!(
                                                         "{} → {}",
-                                                        self.catalog.connection, self.catalog.grid_table
+                                                        self.catalog.connection,
+                                                        table_label(&self.catalog.grid_table)
                                                     ),
                                                     theme,
                                                 )
@@ -971,7 +1079,11 @@ impl GridView {
                     Some(took) => format!("Elapsed: {took}"),
                     None => format!("Elapsed: {} ms (synthetic)", run.millis()),
                 })
-                .children(self.live.is_none().then_some("Source: synthetic generator, no database"))
+                .children(
+                    self.live
+                        .is_none()
+                        .then_some("Source: synthetic generator, no database"),
+                )
         } else if self.runs.is_empty() {
             div().flex_1().p_4().child("No results")
         } else {

@@ -206,6 +206,8 @@ fn source_result(spool: StreamResultSpool, counts: Vec<usize>) -> StreamedResult
             columns: id_column(),
             spool: Some(spool.clone()),
             total_rows: total,
+            current_page: None,
+            filtered: false,
         }),
         generation: 7,
         spool: Some(spool),
@@ -258,6 +260,38 @@ fn a_derived_result_is_a_complete_spool_backed_result_with_its_own_counts() {
     let page = runtime.block_on(spool.load_page(0, derived.columns.clone())).unwrap();
     let ids: Vec<&Value> = page.rows.iter().map(|row| &row[0]).collect();
     assert_eq!(ids, vec![&Value::Int(1), &Value::Int(3), &Value::Int(5)]);
+}
+
+#[test]
+fn derived_result_pages_share_the_source_resident_budget() {
+    let (spool, counts) = spooled(&[vec![row(1, "apple")]]);
+    let source = source_result(spool, counts);
+    let budget = source
+        .resident_pages
+        .reserve(bookie_results::stream_page_budget::MAX_RETAINED_STREAM_PAGE_BYTES)
+        .expect("source reserves the shared budget");
+    let derived = derived_result(&source, filtered(&source, "apple"), 1 << 62);
+
+    assert!(derived.resident_pages.reserve(1).is_none());
+    drop(budget);
+    assert!(derived.resident_pages.reserve(1).is_some());
+}
+
+#[test]
+fn derived_result_has_an_independent_page_index() {
+    let (spool, counts) = spooled(&[vec![row(1, "apple")]]);
+    let source = source_result(spool, counts);
+    let page = std::sync::Arc::new(bookie_core::QueryResult {
+        columns: id_column(),
+        rows: vec![row(9, "source page")].into(),
+        truncated: false,
+    });
+    let lease = source.resident_pages.retain(&page).expect("source page fits");
+    source.resident_pages.insert(0, page.clone(), lease, true);
+    let derived = derived_result(&source, filtered(&source, "apple"), 1 << 62);
+
+    assert!(source.resident_pages.get(0).is_some());
+    assert!(derived.resident_pages.get(0).is_none());
 }
 
 #[test]
@@ -330,6 +364,7 @@ fn filter_messages_name_the_quota_and_count_rows() {
         failure_message(&FilterError::Scan(ScanError::Cancelled)),
         "Filter cancelled"
     );
+    assert!(failure_message(&FilterError::Scan(ScanError::PageBudget)).contains("page memory"));
     assert_eq!(success_message(1, 0, true), "Showing 1 matching row in a new result");
     assert_eq!(
         success_message(3, 0, false),
@@ -482,6 +517,7 @@ fn a_cell_filter_picks_the_result_it_was_started_from_when_the_same_sql_is_pinne
             elapsed_ms: 0,
             kind: StatementOutcomeKind::Streamed(Box::new(result)),
             pinned: false,
+            detail: Default::default(),
         }
     };
     let pinned = make(7);

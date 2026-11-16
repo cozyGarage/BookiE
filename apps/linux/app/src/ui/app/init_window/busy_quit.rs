@@ -50,13 +50,13 @@ pub(super) fn confirm(window: &adw::ApplicationWindow, confirmed: Rc<Cell<bool>>
 
 fn alert() -> adw::AlertDialog {
     let dialog = adw::AlertDialog::new(
-        Some(&crate::tr!("Work is still running")),
-        Some(&crate::tr!(
+        Some(&bookie_app_services::tr!("Work is still running")),
+        Some(&bookie_app_services::tr!(
             "An import, export or backup has not finished. Quitting cancels it and waits for it to stop."
         )),
     );
-    dialog.add_response("keep", &crate::tr!("Keep Working"));
-    dialog.add_response("quit", &crate::tr!("Cancel Work and Quit"));
+    dialog.add_response("keep", &bookie_app_services::tr!("Keep Working"));
+    dialog.add_response("quit", &bookie_app_services::tr!("Cancel Work and Quit"));
     dialog.set_response_appearance("quit", adw::ResponseAppearance::Destructive);
     dialog.set_default_response(Some("keep"));
     dialog.set_close_response("keep");

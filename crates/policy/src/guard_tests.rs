@@ -393,7 +393,7 @@ impl Connection for AmbiguousWriteConn {
     }
 
     async fn execute(&self, _: &str) -> Result<ExecResult, DriverError> {
-        Err(DriverError::Tls("Bearer raw-driver-secret".into()))
+        Err(DriverError::Internal("Bearer raw-driver-secret".into()))
     }
 
     async fn execute_params(&self, sql: &str, _: &[Value]) -> Result<ExecResult, DriverError> {
@@ -401,7 +401,7 @@ impl Connection for AmbiguousWriteConn {
     }
 
     async fn execute_in_transaction(&self, _: &[(String, Vec<Value>)]) -> Result<Vec<u64>, DriverError> {
-        Err(DriverError::Tls("Bearer raw-driver-secret".into()))
+        Err(DriverError::Internal("Bearer raw-driver-secret".into()))
     }
 
     async fn begin(&self) -> Result<Box<dyn Transaction>, DriverError> {
@@ -638,5 +638,7 @@ mod masking;
 mod operation_receipt;
 #[path = "guard_tests_outcomes.rs"]
 mod outcomes;
+#[path = "guard_tests_remembered.rs"]
+mod remembered_tests;
 #[path = "guard_tests_session.rs"]
 mod session;

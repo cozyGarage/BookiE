@@ -1,15 +1,69 @@
+const NEVER_TURN_OFF: &str = "Do not turn TLS off or lower verification to get past this.";
+
+fn verification_messages() -> Vec<(&'static str, String)> {
+    [
+        "invalid peer certificate: UnknownIssuer",
+        "certificate verify failed: self-signed certificate",
+        "invalid peer certificate: certificate not valid for name \"db.example\"; certificate is only valid for x.example",
+        "certificate verify failed: hostname mismatch",
+        "invalid peer certificate: certificate expired: verification time 2 (UNIX)",
+        "certificate verify failed: certificate has expired",
+        "invalid peer certificate: NotValidYet",
+        "invalid peer certificate: Revoked",
+        "certificate verify failed: certificate signature failure",
+    ]
+    .into_iter()
+    .map(|detail| (detail, driver_message(&DriverError::Tls(detail.into()))))
+    .collect()
+}
+
 #[test]
 fn a_certificate_failure_never_advises_turning_tls_off() {
-    for detail in [
-        "certificate verify failed",
-        "unknown issuer",
-        "certificate hostname mismatch",
-    ] {
-        let message = driver_message(&DriverError::Tls(detail.into()));
-        assert!(message.contains(detail));
-        assert!(!message.contains("set TLS to Disabled"), "{detail}: {message}");
-        assert!(message.contains("certificate authority file"));
+    for (detail, message) in verification_messages() {
+        let advice = message.replace(NEVER_TURN_OFF, "").to_ascii_lowercase();
+        assert!(message.contains(NEVER_TURN_OFF), "{detail}: {message}");
+        for forbidden in [
+            "disable",
+            "turn off",
+            "turn tls off",
+            "lower",
+            "skip",
+            "ignore",
+            "insecure",
+        ] {
+            assert!(!advice.contains(forbidden), "{detail}: {message}");
+        }
     }
+}
+
+#[test]
+fn each_certificate_failure_names_its_own_next_step() {
+    let expect = [
+        (
+            "invalid peer certificate: UnknownIssuer",
+            "Choose the certificate authority file",
+        ),
+        ("certificate verify failed: hostname mismatch", "different host name"),
+        ("certificate verify failed: certificate has expired", "has expired"),
+        ("invalid peer certificate: NotValidYet", "clock"),
+        ("invalid peer certificate: Revoked", "was revoked"),
+    ];
+    for (detail, phrase) in expect {
+        let message = driver_message(&DriverError::Tls(detail.into()));
+        assert!(message.contains(phrase), "{detail}: {message}");
+    }
+}
+
+#[test]
+fn certificate_messages_do_not_repeat_library_text_or_paths() {
+    let message = driver_message(&DriverError::Tls(
+        "invalid peer certificate: UnknownIssuer in /home/me/.secret/ca.pem".into(),
+    ));
+    assert!(!message.contains("/home/me"));
+    assert!(!message.contains("UnknownIssuer"));
+    let other = driver_message(&DriverError::Tls("cannot read /home/me/.secret/ca.pem: denied".into()));
+    assert!(!other.contains("/home/me"));
+    assert!(other.contains("denied"));
 }
 
 #[test]
@@ -28,7 +82,7 @@ fn each_keyring_failure_says_what_to_do_next() {
         KeyringFailure::Other("boom".into()),
     ]
     .iter()
-    .map(keyring_message)
+    .map(bookie_app_services::driver_failure_message::keyring_message)
     .collect();
     assert!(texts[0].contains("Start"));
     assert!(texts[1].contains("Unlock"));
@@ -92,6 +146,8 @@ fn build_sql_messages_have_actionable_advice() {
     let mismatch = build_sql_message(&BuildSqlError::LengthMismatch { expected: 3, got: 2 });
     assert!(mismatch.contains("expected 3"));
     assert!(mismatch.contains("got 2"));
+    assert!(build_sql_message(&BuildSqlError::DefaultUnsupported("sqlite".into())).contains("sqlite"));
+    assert!(build_sql_message(&BuildSqlError::EmptyExpression).contains("expression"));
 }
 
 #[test]
@@ -168,4 +224,27 @@ fn integrated_auth_names_the_remedy_and_keeps_the_detail() {
     assert!(message.contains("No Kerberos credentials available"));
     assert!(message.contains("kinit"));
     assert!(message.contains("SPN"));
+}
+
+#[test]
+fn a_missing_database_file_names_the_path_and_is_not_an_internal_error() {
+    let message = driver_message(&DriverError::DatabaseFileNotFound("/data/moved.db".into()));
+    assert!(message.contains("/data/moved.db"), "{message}");
+    assert!(message.contains("does not exist"), "{message}");
+    assert!(!message.contains("Internal"), "{message}");
+}
+
+#[test]
+fn each_database_file_creation_failure_says_the_file_was_not_replaced_or_why_it_failed() {
+    use bookie_app_services::database_file::CreateDatabaseFileError;
+    let path = std::path::Path::new("/data/new.db");
+    let existing = create_database_file_message(&CreateDatabaseFileError::AlreadyExists, path);
+    assert!(existing.contains("/data/new.db"), "{existing}");
+    assert!(existing.contains("not replaced"), "{existing}");
+    let denied = create_database_file_message(
+        &CreateDatabaseFileError::Io(std::io::Error::from(std::io::ErrorKind::PermissionDenied)),
+        path,
+    );
+    assert!(denied.contains("/data/new.db"), "{denied}");
+    assert!(denied.contains("permission denied"), "{denied}");
 }

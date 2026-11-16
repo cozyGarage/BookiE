@@ -248,6 +248,15 @@ fn a_long_cell_is_shown_as_one_short_line() {
 }
 
 #[test]
+fn a_preview_reads_only_the_visible_prefix_and_one_character() {
+    let visited = std::cell::Cell::new(0);
+    let chars = std::iter::repeat_n('x', 1_000_000).inspect(|_| visited.set(visited.get() + 1));
+    let shown = super::dialog::preview_chars(chars);
+    assert_eq!(shown.chars().count(), PREVIEW_CHARS + 1);
+    assert_eq!(visited.get(), PREVIEW_CHARS + 1);
+}
+
+#[test]
 fn replace_edits_keyed_text_and_skips_read_only_or_undecodable_cells() {
     let rows = [
         vec![Value::Int(1), Value::Text("alpha".into()), Value::Text("keep".into())],

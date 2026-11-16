@@ -117,7 +117,9 @@ fn is_cancellation(failure: &CompareFailure) -> bool {
 
 fn failure_text(failure: &CompareFailure) -> String {
     match failure {
-        CompareFailure::Audit => crate::tr!("The comparison needs the audit journal, which is unavailable"),
+        CompareFailure::Audit => {
+            bookie_app_services::tr!("The comparison needs the audit journal, which is unavailable")
+        }
         CompareFailure::Compare(error) => failure_message(error),
     }
 }
@@ -142,6 +144,7 @@ fn diff_outcome(request: &CompareRequest, diff: Arc<QueryResult>) -> StatementOu
         elapsed_ms: 0,
         kind: StatementOutcomeKind::Rows(vec![diff]),
         pinned: true,
+        detail: Default::default(),
     }
 }
 
@@ -150,7 +153,7 @@ impl SqlEditor {
         let found = super::selection::candidates(&self.pinned.displayed());
         if found.len() < 2 {
             self.status
-                .set_label(&crate::tr!("Pin or run a second result to compare"));
+                .set_label(&bookie_app_services::tr!("Pin or run a second result to compare"));
             return;
         }
         super::dialog::present(&self.results_holder, found, sender.input_sender().clone());
@@ -162,7 +165,7 @@ impl SqlEditor {
         sender: &ComponentSender<Self>,
     ) {
         let Some(context) = self.audit_context() else {
-            let message = crate::tr!("Open a connection before comparing results");
+            let message = bookie_app_services::tr!("Open a connection before comparing results");
             self.status.set_label(&message);
             request.ticket.fail(message);
             return;

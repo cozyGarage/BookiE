@@ -112,7 +112,7 @@ impl MatchCursor {
         if self.unsearchable == 0 {
             return base;
         }
-        let skipped = crate::trn!(
+        let skipped = bookie_app_services::trn!(
             "{n} cell could not be searched",
             "{n} cells could not be searched",
             self.unsearchable as usize
@@ -127,15 +127,15 @@ impl MatchCursor {
     fn base_status(&self) -> String {
         let total = crate::ui::count_format::format_thousands(self.matches.len() as u128);
         if self.matches.is_empty() {
-            return crate::tr!("No match");
+            return bookie_app_services::tr!("No match");
         }
         let total = if self.capped { format!("{total}+") } else { total };
         match self.current {
-            Some(index) => crate::tr!("Match {n} of {total}")
+            Some(index) => bookie_app_services::tr!("Match {n} of {total}")
                 .replace("{n}", &crate::ui::count_format::format_thousands(index as u128 + 1))
                 .replace("{total}", &total),
-            None if self.capped => crate::tr!("{total} matches (list capped)").replace("{total}", &total),
-            None => crate::tr!("{total} matches").replace("{total}", &total),
+            None if self.capped => bookie_app_services::tr!("{total} matches (list capped)").replace("{total}", &total),
+            None => bookie_app_services::tr!("{total} matches").replace("{total}", &total),
         }
     }
 }

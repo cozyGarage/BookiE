@@ -2,6 +2,7 @@
 
 - **Status**: Accepted
 - **Date**: 2026-10-07
+- **Implementation**: PostgreSQL editor streaming through a server cursor and spool is shipped; other engines keep the capped path until each has a tested cursor. A read-only “snapshot session” wording in older notes means this cursor session, not ADR 0014 or 0015.
 
 ## Context
 
@@ -27,7 +28,11 @@ Add an optional driver capability that opens a forward-only cursor over a single
 
 ## Consequences
 
-- The stream cache bounds estimated retained row storage, except for the newest-page allowance. This is not a process-memory ceiling: pins, overlapping results, widgets, incoming buffers, metadata and allocator retention remain outside the estimate.
+- Each stream cache targets a 64 MiB estimated retained-row window. The GTK application also shares a 256 MiB estimated page budget across streamed result owners. This is not a process-memory ceiling: widgets, incoming buffers, metadata and allocator retention remain outside the estimate.
 - Every page is a guarded, audited call. The audit journal grows with the number of pages, so the page size is fixed and a long scroll writes bounded events.
 - A forward-only cursor cannot show earlier pages without keeping them. The retained-page budget decides what the user can scroll back to.
 - Engines without a cursor keep the current caps and the truncated banner.
+
+## Amendment (2026-11-15): Shared GTK page budget
+
+The GTK application shares a 256 MiB estimated page budget across streamed-result pages, including pages retained by snapshots, streamed-result pins, derived results, visible page loads and exports. Page decode and reload reserve up to 64 MiB before work and resize the lease to the decoded page, so in-flight reservations count against the cap. Per-cache eviction still targets 64 MiB. The shared estimate does not cover materialized non-streaming results or process RSS; it counts estimated row payloads and cells, not GTK allocations, driver buffers or allocator retention.

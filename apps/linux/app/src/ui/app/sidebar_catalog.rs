@@ -47,17 +47,18 @@ impl App {
         origin: &CatalogOrigin,
         kind: CatalogObjectKind,
         result: Result<Vec<CatalogObject>, String>,
+        sender: ComponentSender<Self>,
     ) {
         if !origin.owns_window(self.connection_id, &self.database) {
             return;
         }
         match result {
             Ok(objects) if objects.is_empty() => {
-                self.show_toast(&crate::tr!("Nothing of this kind was found."));
+                self.show_toast(&bookie_app_services::tr!("Nothing of this kind was found."));
             }
             Ok(objects) => {
                 self.sidebar_catalog.insert(kind, objects);
-                self.repopulate_sidebar(&self.sidebar_tables.clone());
+                self.repopulate_sidebar(&self.sidebar_tables.clone(), sender);
             }
             Err(message) => self.show_toast(&message),
         }

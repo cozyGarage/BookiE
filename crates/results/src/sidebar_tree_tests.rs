@@ -23,15 +23,33 @@ fn label(node: &TreeNode) -> String {
         NodeKind::Group(GroupKind::Tables) => "Tables".into(),
         NodeKind::Group(GroupKind::Views) => "Views".into(),
         NodeKind::Group(GroupKind::Catalog) => "Catalog".into(),
+        NodeKind::Group(GroupKind::TemporaryTables) => "Temporary tables".into(),
         NodeKind::Catalog(kind) | NodeKind::CatalogLoaded(kind) => kind.as_str().into(),
         NodeKind::CatalogObject { schema, name, .. } => format!("{}.{name}", schema.as_deref().unwrap_or("-")),
         NodeKind::CatalogMore(_) => "more".into(),
-        NodeKind::Table { name, .. } | NodeKind::View { name, .. } => name.clone(),
+        NodeKind::Table { name, .. } | NodeKind::TemporaryTable { name, .. } | NodeKind::View { name, .. } => {
+            name.clone()
+        }
     }
 }
 
 fn all(nodes: &[TreeNode]) -> Vec<usize> {
     (0..nodes.len()).collect()
+}
+
+#[test]
+fn temporary_tables_have_a_separate_group_and_keep_their_session_schema() {
+    let temporary = [info(Some("pg_temp_4"), "scratch")];
+    let nodes = build_nodes_with_temporary(&[info(Some("public"), "users")], &[], &temporary);
+
+    assert_eq!(
+        labels(&nodes, &all(&nodes)),
+        ["Tables", "  users", "Temporary tables", "  scratch"]
+    );
+    assert!(matches!(
+        &nodes[3].kind,
+        NodeKind::TemporaryTable { schema: Some(schema), name } if schema == "pg_temp_4" && name == "scratch"
+    ));
 }
 
 #[test]
@@ -186,6 +204,69 @@ fn a_view_also_returned_as_a_table_appears_only_in_views() {
         &[info(Some("db"), "recent")],
     );
     assert_eq!(labels(&nodes, &all(&nodes)), ["Tables", "  items", "Views", "  recent"]);
+}
+
+#[test]
+fn repeated_table_and_view_entries_are_deduplicated_by_schema_and_name() {
+    let nodes = build_nodes(
+        &[
+            info(Some("public"), "users"),
+            info(Some("public"), "users"),
+            info(Some("archive"), "users"),
+        ],
+        &[
+            info(Some("public"), "users"),
+            info(Some("public"), "users"),
+            info(Some("public"), "recent_users"),
+            info(Some("public"), "recent_users"),
+        ],
+    );
+
+    assert_eq!(nodes.len(), 7);
+    assert_eq!(
+        nodes
+            .iter()
+            .find(|node| node.key == "schema:archive")
+            .map(|node| node.count),
+        Some(1)
+    );
+    assert_eq!(
+        nodes
+            .iter()
+            .find(|node| node.key == "schema:public")
+            .map(|node| node.count),
+        Some(2)
+    );
+    assert_eq!(
+        labels(&nodes, &visible_nodes(&nodes, &CollapseState::default(), "users")),
+        [
+            "archive",
+            "  Tables",
+            "    users",
+            "public",
+            "  Views",
+            "    users",
+            "    recent_users"
+        ]
+    );
+}
+
+#[test]
+fn filtering_after_a_progressive_duplicate_load_does_not_add_rows() {
+    let initial = build_nodes(&[info(Some("public"), "users")], &[]);
+    let progressively_loaded = build_nodes(
+        &[
+            info(Some("public"), "users"),
+            info(Some("public"), "users"),
+            info(Some("public"), "orders"),
+        ],
+        &[],
+    );
+    let initial_matches = visible_nodes(&initial, &CollapseState::default(), "users");
+    let loaded_matches = visible_nodes(&progressively_loaded, &CollapseState::default(), "users");
+
+    assert_eq!(labels(&initial, &initial_matches), ["Tables", "  users"]);
+    assert_eq!(labels(&progressively_loaded, &loaded_matches), ["Tables", "  users"]);
 }
 
 #[test]

@@ -81,7 +81,7 @@ pub fn render_sql_literal(driver_id: &str, value: &Value) -> Result<String, Lite
         return Err(LiteralError::Unsupported);
     }
     if driver_id == "postgres"
-        && let Some(text) = postgres_extended_date(value)
+        && let Some(text) = postgres_extended_temporal_text(value)
     {
         return Ok(string_literal(driver_id, &text));
     }
@@ -131,7 +131,7 @@ pub fn render_sql_literal(driver_id: &str, value: &Value) -> Result<String, Lite
     })
 }
 
-fn postgres_extended_date(value: &Value) -> Option<String> {
+pub fn postgres_extended_temporal_text(value: &Value) -> Option<String> {
     let date = match value {
         Value::Date(date) => *date,
         Value::DateTime(stamp) => stamp.date(),

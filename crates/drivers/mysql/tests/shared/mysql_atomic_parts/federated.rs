@@ -10,9 +10,11 @@ use testcontainers_modules::testcontainers::runners::AsyncRunner;
 #[ignore = "requires docker"]
 async fn mysql_failed_batch_federated_write_survives_rollback() {
     let container = Mysql::default()
+        .with_tag(crate::MYSQL_TEST_TAG)
         .with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test")
         .with_cmd([
-            "--default-authentication-plugin=mysql_native_password",
+            "--mysql-native-password=ON",
+            "--authentication-policy=mysql_native_password",
             "--federated",
             "--innodb-flush-log-at-trx-commit=0",
             "--innodb-doublewrite=0",
@@ -260,9 +262,11 @@ async fn create_federated_trigger(opts: &ConnectOptions, trigger: &'static str) 
 
 async fn start_mysql_with_federated() -> (testcontainers::ContainerAsync<Mysql>, ConnectOptions) {
     let container = Mysql::default()
+        .with_tag(crate::MYSQL_TEST_TAG)
         .with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test")
         .with_cmd([
-            "--default-authentication-plugin=mysql_native_password",
+            "--mysql-native-password=ON",
+            "--authentication-policy=mysql_native_password",
             "--federated",
             "--innodb-flush-log-at-trx-commit=0",
             "--innodb-doublewrite=0",

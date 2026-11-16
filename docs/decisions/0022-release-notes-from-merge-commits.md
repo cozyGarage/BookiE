@@ -1,6 +1,6 @@
 # 0022: Release notes come from merge commits, not a tracked changelog
 
-- **Status**: Accepted
+- **Status**: Superseded by 0053
 - **Date**: 2026-10-24
 - **Supersedes**: the shared `CHANGELOG.md` release-note workflow.
 

@@ -14,6 +14,10 @@ impl Render for GridView {
         if std::mem::take(&mut self.find_reset) {
             self.find.update(cx, |find, cx| find.set_content("", cx));
         }
+        if std::mem::take(&mut self.focus_editor) {
+            let editor = self.sql_input.read(cx).focus_handle(cx);
+            window.focus(&editor, cx);
+        }
         self.note_frame();
         self.pace_frame(window);
         let theme = Theme::current(cx);
@@ -23,7 +27,12 @@ impl Render for GridView {
             Mode::Filtered { label, .. } => format!("{label} · "),
             Mode::All => String::new(),
         };
-        let progress = progress_text(&title, self.dataset_count(), self.source.is_partial(), self.pager.pages());
+        let progress = progress_text(
+            &title,
+            self.dataset_count(),
+            self.source.is_partial(),
+            self.pager.pages(),
+        );
         let range_label = if self.dataset_count() == 0 {
             "Rows 0".to_string()
         } else if self.continuous {
@@ -33,6 +42,7 @@ impl Render for GridView {
         };
         let strip = div()
             .flex()
+            .flex_wrap()
             .items_center()
             .gap_1()
             .px_2()
@@ -150,6 +160,11 @@ impl Render for GridView {
                     thousands(s.removed)
                 )
             };
+            let summary = if s.unknown > 0 {
+                format!("{summary} · Unknown {}", thousands(s.unknown))
+            } else {
+                summary
+            };
             let capped = if diff.capped {
                 format!(" · first {MAX_DIFF_ROWS} differences shown")
             } else {
@@ -176,7 +191,9 @@ impl Render for GridView {
                 )
         });
         let palette = self.palette_open.then(|| self.palette_overlay(cx));
-        self.sync_table(cx);
+        let sidebar_width = if self.sidebar_open { self.sidebar_width } else { 0.0 };
+        let grid_width = (f32::from(window.viewport_size().width) - sidebar_width).max(0.0);
+        self.sync_table(grid_width, cx);
         let grid = div()
             .flex_1()
             .flex()
@@ -192,7 +209,7 @@ impl Render for GridView {
             Tab::Settings => self.settings_page(theme, cx),
             Tab::Query => self.query_page(theme, grid, cx),
             Tab::Table(name) if name == self.catalog.grid_table => grid,
-            Tab::Table(name) => self.placeholder_page(&name, theme),
+            Tab::Table(table) => self.placeholder_page(&table_label(&table), theme),
         };
         let sidebar = self.sidebar_open.then(|| self.sidebar(theme, cx));
         let toolbar = self.toolbar(theme, cx);

@@ -2,14 +2,9 @@
 
 Describe the user-visible behavior or the issue this change addresses. Link the owning issue.
 
-## Release note
+## Changelog fragment
 
-One line per user-facing change, written as user impact, or `none`. The PR body becomes the squash commit body, so these lines reach history unchanged.
-
-```
-Release-Note: <Added|Changed|Deprecated|Removed|Fixed|Security>: <what the user sees>
-Release-Note: none
-```
+For a user-facing change, add `changelog.d/<slug>.<category>.md` in the same commit (`added`, `changed`, `deprecated`, `removed`, `fixed` or `security`). One line of user impact; no paths, type or function names. Changes with no user-visible effect add no file ([ADR 0053](../docs/decisions/0053-changelog-fragments.md)).
 
 ## Reproduction and regression proof
 

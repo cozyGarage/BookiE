@@ -159,15 +159,15 @@ fn header_title_omits_an_unknown_type() {
 fn pending_cell_description_names_each_edit_state() {
     assert_eq!(
         pending_description(&["tp-cell-modified"]),
-        Some(crate::tr!("Modified").to_string())
+        Some(bookie_app_services::tr!("Modified").to_string())
     );
     assert_eq!(
         pending_description(&["tp-row-pending-insert"]),
-        Some(crate::tr!("New row").to_string())
+        Some(bookie_app_services::tr!("New row").to_string())
     );
     assert_eq!(
         pending_description(&["tp-row-pending-delete"]),
-        Some(crate::tr!("Pending deletion").to_string())
+        Some(bookie_app_services::tr!("Pending deletion").to_string())
     );
     assert_eq!(pending_description(&[]), None);
 }

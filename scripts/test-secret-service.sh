@@ -16,12 +16,16 @@ if [[ "${BOOKIE_SECRET_DBUS_ACTIVE:-0}" != "1" ]]; then
     "$secret_root/runtime"
   chmod 0700 "$secret_root/runtime"
   trap 'rm -rf -- "$secret_root"' EXIT
+  git_config="$secret_root/gitconfig"
+  git -C "$ROOT" config --file "$git_config" --add safe.directory "$ROOT"
   cargo_home="${CARGO_HOME:-$HOME/.cargo}"
   rustup_home="${RUSTUP_HOME:-$HOME/.rustup}"
   BOOKIE_SECRET_DBUS_ACTIVE=1 \
     CARGO_HOME="$cargo_home" \
     RUSTUP_HOME="$rustup_home" \
     HOME="$secret_root/home" \
+    GIT_CONFIG_GLOBAL="$git_config" \
+    GIT_CONFIG_NOSYSTEM=1 \
     XDG_CONFIG_HOME="$secret_root/config" \
     XDG_DATA_HOME="$secret_root/data" \
     XDG_CACHE_HOME="$secret_root/cache" \

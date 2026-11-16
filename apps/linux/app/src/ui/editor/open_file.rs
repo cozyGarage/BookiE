@@ -104,14 +104,14 @@ pub(super) fn validate_sql_line_lengths(text: &str) -> Result<(), String> {
 fn sql_text_error_message(error: SqlTextError) -> String {
     match error {
         SqlTextError::DocumentTooLarge | SqlTextError::InsertionTooLarge => {
-            crate::tr!("The SQL text exceeds the editor's 8 MiB limit.")
+            bookie_app_services::tr!("The SQL text exceeds the editor's 8 MiB limit.")
         }
-        SqlTextError::LineTooLong { line } => crate::tr!(
+        SqlTextError::LineTooLong { line } => bookie_app_services::tr!(
             "The SQL text contains a line over {limit} KiB (line {line}). Split long lines before opening. The text has not been changed."
         )
         .replace("{limit}", &(EDITOR_MAX_SQL_LINE_BYTES / 1024).to_string())
         .replace("{line}", &line.to_string()),
-        SqlTextError::InvalidCursor => crate::tr!("The insertion position changed. Drop the SQL file again."),
+        SqlTextError::InvalidCursor => bookie_app_services::tr!("The insertion position changed. Drop the SQL file again."),
     }
 }
 
@@ -120,7 +120,9 @@ pub(super) fn validate_dropped_sql(current: &str, cursor: usize, text: &str) -> 
         .validate_drop(current, cursor, text)
         .map_err(|error| match error {
             SqlTextError::InsertionTooLarge => {
-                crate::tr!("Adding this SQL file would exceed the editor's 8 MiB limit. Open it in a separate tab.")
+                bookie_app_services::tr!(
+                    "Adding this SQL file would exceed the editor's 8 MiB limit. Open it in a separate tab."
+                )
             }
             other => sql_text_error_message(other),
         })
@@ -139,19 +141,19 @@ pub(crate) fn save_sql_file(
 
 pub(crate) fn file_error_message(error: &TextFileError) -> String {
     match error {
-        TextFileError::Changed => crate::tr!("The file changed on disk"),
-        TextFileError::TooLarge(_) => crate::tr!("The SQL file is too large"),
-        TextFileError::NotText => crate::tr!("The SQL file is not valid UTF-8"),
+        TextFileError::Changed => bookie_app_services::tr!("The file changed on disk"),
+        TextFileError::TooLarge(_) => bookie_app_services::tr!("The SQL file is too large"),
+        TextFileError::NotText => bookie_app_services::tr!("The SQL file is not valid UTF-8"),
         TextFileError::Io(error) if error.kind() == std::io::ErrorKind::PermissionDenied => {
-            crate::tr!("You don't have permission to use that file")
+            bookie_app_services::tr!("You don't have permission to use that file")
         }
-        TextFileError::Io(_) => crate::tr!("Couldn't read or write the SQL file"),
+        TextFileError::Io(_) => bookie_app_services::tr!("Couldn't read or write the SQL file"),
     }
 }
 
 fn sql_filters() -> gtk::gio::ListStore {
     let filter = gtk::FileFilter::new();
-    filter.set_name(Some(&crate::tr!("SQL files")));
+    filter.set_name(Some(&bookie_app_services::tr!("SQL files")));
     filter.add_pattern("*.sql");
     filter.add_mime_type("application/sql");
     filter.add_mime_type("text/x-sql");
@@ -173,13 +175,13 @@ pub(crate) fn choose_sql_file<F>(parent: Option<gtk::Window>, done: F)
 where
     F: FnOnce(Result<TextFile, String>) + 'static,
 {
-    let dialog = sql_file_dialog(&crate::tr!("Open SQL file"));
+    let dialog = sql_file_dialog(&bookie_app_services::tr!("Open SQL file"));
     dialog.open(parent.as_ref(), gtk::gio::Cancellable::NONE, move |result| {
         let Ok(file) = result else {
             return;
         };
         let Some(path) = file.path() else {
-            done(Err(crate::tr!("That file is not on this computer")));
+            done(Err(bookie_app_services::tr!("That file is not on this computer")));
             return;
         };
         let (tx, rx) = async_channel::bounded(1);
@@ -198,7 +200,7 @@ pub(crate) fn choose_save_path<F>(parent: Option<gtk::Window>, suggested_name: &
 where
     F: FnOnce(Option<Result<std::path::PathBuf, String>>) + 'static,
 {
-    let dialog = sql_file_dialog(&crate::tr!("Save SQL file"));
+    let dialog = sql_file_dialog(&bookie_app_services::tr!("Save SQL file"));
     dialog.set_initial_name(Some(suggested_name));
     dialog.save(parent.as_ref(), gtk::gio::Cancellable::NONE, move |result| {
         let Ok(file) = result else {
@@ -207,7 +209,7 @@ where
         };
         match file.path() {
             Some(path) => done(Some(Ok(path))),
-            None => done(Some(Err(crate::tr!("That file is not on this computer")))),
+            None => done(Some(Err(bookie_app_services::tr!("That file is not on this computer")))),
         }
     });
 }

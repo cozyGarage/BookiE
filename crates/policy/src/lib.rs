@@ -17,7 +17,10 @@ mod effects_classification;
 mod explain_options;
 mod guard;
 mod input_refusal;
+mod linked_server;
 mod mask;
+mod mysql_functions;
+mod parsed_sql;
 mod principal;
 mod rules;
 mod script_statements;
@@ -29,14 +32,17 @@ mod transaction_control;
 mod tsql_transaction;
 mod verdict;
 
-pub use approval::{ApprovalOutcome, ApprovalRequest, ApprovalSink, AutoApproveSink, DenyApprovalSink};
+pub use approval::{
+    ApprovalGrant, ApprovalGrants, ApprovalOutcome, ApprovalRequest, ApprovalSink, AutoApproveSink, DenyApprovalSink,
+    RememberingApprovalSink,
+};
 pub use audit::{
     AuditAdministrativeAction, AuditAdministrativeMetadata, AuditApprovalOutcome, AuditConnectionContext,
     AuditConnectionIdentity, AuditError, AuditErrorCategory, AuditEvent, AuditOperationClass, AuditPreviewState,
     AuditRecordPhase, AuditSink, AuditState, AuditTerminalStatus, AuditTransactionOutcome, AuditTransportClient,
     AuditTransportMetadata, AuditTransportOutcome, NullAuditSink,
 };
-pub use blast_radius::{BlastRadiusResult, BlastRadiusRewrite, count_sql_for_mutation};
+pub use blast_radius::{BlastRadiusResult, BlastRadiusRewrite};
 pub use classify::{StatementClass, StatementFacts, classify, statement_requires_write_capability};
 pub use config::{EnvPolicy, MaskRule, PolicyConfig, WritePolicy, load_from_path};
 pub use guard::{

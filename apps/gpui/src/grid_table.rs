@@ -82,7 +82,16 @@ impl TableDelegate for GridDelegate {
             Some((row, column, view)) if *row == row_ix && *column == col_ix => div().flex_1().child(view.clone()),
             _ => {
                 let (text, right) = self.label_of(row_ix, col_ix);
-                div().w_full().flex().when(right, |cell| cell.justify_end()).child(text)
+                div().w_full().flex().child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .overflow_hidden()
+                        .whitespace_nowrap()
+                        .text_ellipsis()
+                        .when(right, |cell| cell.text_right())
+                        .child(text),
+                )
             }
         }
     }
@@ -114,15 +123,7 @@ impl GridDelegate {
             let labels = match (&self.map.compare, &self.source) {
                 (Some(diff), _) => compare_labels(diff, row_ix, numeric),
                 (None, Some(source)) => match self.map.source_row(row_ix) {
-                    Some(index) => {
-                        let mut cells = source.row(index);
-                        for (column, cell) in cells.iter_mut().enumerate() {
-                            if let Some(edit) = self.edits.get(&(index, column)) {
-                                *cell = edit.clone();
-                            }
-                        }
-                        labels(&cells, numeric)
-                    }
+                    Some(index) => source_labels(source, index, numeric, &self.edits),
                     None => Vec::new(),
                 },
                 (None, None) => Vec::new(),
@@ -158,7 +159,7 @@ impl GridView {
         }
     }
 
-    pub(crate) fn sync_table(&self, cx: &mut Context<Self>) {
+    pub(crate) fn sync_table(&self, available_width: f32, cx: &mut Context<Self>) {
         let columns: Vec<(String, f32)> = self
             .source
             .columns()
@@ -171,13 +172,14 @@ impl GridView {
         } else {
             numeric
         };
-        let columns = if self.compare.is_some() {
+        let mut columns = if self.compare.is_some() {
             std::iter::once(("Change".to_string(), COMPARE_CHANGE_WIDTH))
                 .chain(columns)
                 .collect()
         } else {
             columns
         };
+        fill_last_column(&mut columns, available_width);
         let map = self.row_map();
         let editor = self.editing.as_ref().and_then(|editing| {
             let dataset = self.dataset_index_of(editing.row)?.checked_sub(map.base)?;
@@ -219,11 +221,41 @@ impl GridView {
 
 const COMPARE_CHANGE_WIDTH: f32 = 70.0;
 
+fn fill_last_column(columns: &mut [(String, f32)], available_width: f32) {
+    let Some(last) = columns.len().checked_sub(1) else {
+        return;
+    };
+    if !available_width.is_finite() || available_width <= 0.0 {
+        return;
+    }
+    let preceding_width: f32 = columns[..last].iter().map(|(_, width)| width).sum();
+    columns[last].1 = columns[last].1.max((available_width - preceding_width).max(0.0));
+}
+
 fn labels(cells: &[Cell], numeric: &[bool]) -> Vec<(String, bool)> {
     cells
         .iter()
         .enumerate()
         .map(|(column, cell)| {
+            let right = crate::right_aligned(numeric.get(column).copied().unwrap_or(false), cell);
+            (cell_preview(cell), right)
+        })
+        .collect()
+}
+
+fn source_labels(source: &Source, index: u64, numeric: &[bool], edits: &Edits) -> Vec<(String, bool)> {
+    match source.row_ref(index) {
+        Some(cells) => labels_with_edits(cells, numeric, index, edits),
+        None => labels_with_edits(&source.row(index), numeric, index, edits),
+    }
+}
+
+fn labels_with_edits(cells: &[Cell], numeric: &[bool], row: u64, edits: &Edits) -> Vec<(String, bool)> {
+    cells
+        .iter()
+        .enumerate()
+        .map(|(column, cell)| {
+            let cell = edits.get(&(row, column)).unwrap_or(cell);
             let right = crate::right_aligned(numeric.get(column).copied().unwrap_or(false), cell);
             (cell_preview(cell), right)
         })
@@ -239,21 +271,23 @@ fn compare_labels(diff: &Diff, row: usize, numeric: &[bool]) -> Vec<(String, boo
         .collect()
 }
 
-pub fn table_cell(cursor: Option<bookie_gpui::cursor::Cursor>) -> Option<(usize, usize)> {
+pub fn table_cell(cursor: Option<bookie_results::grid_cursor::Cursor>) -> Option<(usize, usize)> {
     cursor.map(|cursor| (cursor.row, cursor.column))
 }
 
 #[cfg(test)]
-pub fn cursor_at(cell: Option<(usize, usize)>) -> Option<bookie_gpui::cursor::Cursor> {
-    cell.map(|(row, column)| bookie_gpui::cursor::Cursor { row, column })
+pub fn cursor_at(cell: Option<(usize, usize)>) -> Option<bookie_results::grid_cursor::Cursor> {
+    cell.map(|(row, column)| bookie_results::grid_cursor::Cursor { row, column })
 }
 
 #[cfg(test)]
 mod tests {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
     use super::*;
-    use bookie_gpui::cursor::Cursor;
     use bookie_gpui::model::Cell;
     use bookie_gpui::source::{ResultSource, Synthetic};
+    use bookie_results::grid_cursor::Cursor;
 
     #[test]
     fn a_cell_reads_the_source_row_it_maps_to_and_keeps_that_row_cached() {
@@ -273,6 +307,81 @@ mod tests {
         assert_eq!(delegate.cached.as_ref().map(|(row, _)| *row), Some(1));
         assert_eq!(delegate.label_of(1, 1).0, expected);
         assert_eq!(delegate.label_of(9, 0).0, "");
+    }
+
+    struct BorrowedRowSource {
+        cells: Vec<Cell>,
+        row_copies: AtomicUsize,
+    }
+
+    impl ResultSource for BorrowedRowSource {
+        fn columns(&self) -> &[bookie_gpui::model::ColumnMeta] {
+            &[]
+        }
+
+        fn total(&self) -> u64 {
+            1
+        }
+
+        fn row(&self, _index: u64) -> Vec<Cell> {
+            self.row_copies.fetch_add(1, Ordering::Relaxed);
+            self.cells.clone()
+        }
+
+        fn row_ref(&self, index: u64) -> Option<&[Cell]> {
+            (index == 0).then_some(&self.cells)
+        }
+
+        fn find(
+            &self,
+            _query: &str,
+            _cap: usize,
+            _cancel: &tokio_util::sync::CancellationToken,
+        ) -> Result<bookie_gpui::model::FindResult, &'static str> {
+            Err("not available")
+        }
+
+        fn filter(
+            &self,
+            _predicate: &bookie_gpui::model::Predicate,
+            _cancel: &tokio_util::sync::CancellationToken,
+        ) -> Result<Vec<u32>, &'static str> {
+            Err("not available")
+        }
+
+        fn compare(
+            &self,
+            _keyed: bool,
+            _cancel: &tokio_util::sync::CancellationToken,
+        ) -> Result<bookie_gpui::model::Diff, &'static str> {
+            Err("not available")
+        }
+    }
+
+    #[test]
+    fn live_grid_previews_borrow_large_cells_instead_of_cloning_the_row() {
+        let source = Arc::new(BorrowedRowSource {
+            cells: vec![Cell::Text("x".repeat(1024 * 1024))],
+            row_copies: AtomicUsize::new(0),
+        });
+        let source_dyn: Source = source.clone();
+        let mut delegate = GridDelegate {
+            columns: vec![("value".into(), 100.0)],
+            numeric: vec![false],
+            source: Some(source_dyn),
+            map: RowMap {
+                count: 1,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let preview = delegate.label_of(0, 0).0;
+
+        assert!(preview.starts_with(&"x".repeat(512)));
+        assert!(preview.len() < 600);
+        assert_eq!(source.row_copies.load(Ordering::Relaxed), 0);
+        assert!(matches!(&source.cells[0], Cell::Text(value) if value.len() == 1024 * 1024));
     }
 
     #[test]
@@ -317,6 +426,7 @@ mod tests {
                 added: 0,
                 removed: 0,
                 changed: 1,
+                unknown: 0,
             },
             rows: vec![DiffRow {
                 change: "changed",
@@ -347,5 +457,20 @@ mod tests {
         .map(|(_, right)| right)
         .collect();
         assert_eq!(flags, vec![true, true, false]);
+    }
+
+    #[test]
+    fn the_last_column_fills_only_unused_viewport_space() {
+        let mut columns = vec![("id".into(), 200.0), ("label".into(), 100.0)];
+        fill_last_column(&mut columns, 520.0);
+        assert_eq!(columns, vec![("id".into(), 200.0), ("label".into(), 320.0)]);
+
+        fill_last_column(&mut columns, 250.0);
+        assert_eq!(columns, vec![("id".into(), 200.0), ("label".into(), 320.0)]);
+    }
+
+    #[test]
+    fn an_empty_result_has_no_column_to_expand() {
+        fill_last_column(&mut [], 520.0);
     }
 }

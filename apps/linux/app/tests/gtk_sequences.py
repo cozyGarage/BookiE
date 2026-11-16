@@ -109,7 +109,7 @@ def scenarios(ui):
 
     def focus_grid_cell():
         ui.run_sql("SELECT 'leak-probe' AS payload")
-        ui.wait_for_node_containing("payload\n", role=ui.pyatspi.ROLE_LABEL)
+        ui.wait_for_node(name="payload", role=ui.pyatspi.ROLE_LABEL)
         ui.press_x11_key("j", ("Control_L", "Shift_L"))
         search = ui.wait_for_node(name="Search columns")
         search.queryEditableText().setTextContents("payload")

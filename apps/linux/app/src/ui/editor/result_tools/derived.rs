@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use bookie_app_services::result_filter::FilteredResult;
 use sha2::{Digest, Sha256};
 
-use super::super::stream_pages::{ResidentPageStore, StreamTerminal, StreamedResult};
+use super::super::stream_pages::{StreamTerminal, StreamedResult};
 use super::super::{StatementIdentity, StatementOutcome, StatementOutcomeKind};
 use crate::ui::export_dialog::{StreamExportQuery, StreamExportRequest};
 
@@ -59,6 +59,8 @@ fn export_request(
         columns: columns.to_vec(),
         spool: Some(filtered.spool.clone()),
         total_rows: filtered.total_rows as usize,
+        current_page: None,
+        filtered: true,
     })
 }
 
@@ -75,7 +77,7 @@ pub(super) fn derived_result(source: &StreamedResult, filtered: FilteredResult, 
         export: export_request(source, &filtered, &source.columns),
         generation,
         spool: Some(filtered.spool),
-        resident_pages: ResidentPageStore::default(),
+        resident_pages: source.resident_pages.with_shared_budget(),
         page_row_counts: filtered.page_row_counts,
     }
 }
@@ -95,5 +97,6 @@ pub(in crate::ui::editor) fn derived_outcome(
         elapsed_ms: 0,
         kind: StatementOutcomeKind::Streamed(Box::new(derived_result(source, filtered, generation))),
         pinned: true,
+        detail: Default::default(),
     }
 }

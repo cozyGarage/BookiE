@@ -28,6 +28,7 @@ impl MySqlConnection {
                 stream,
                 transaction_depth: 0,
                 status_flags: Default::default(),
+                warning_count: 0,
                 cache_statement: StatementCache::new(options.statement_cache_capacity),
                 log_settings: options.log_settings.clone(),
             }),

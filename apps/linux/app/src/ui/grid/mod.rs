@@ -3,6 +3,9 @@ mod choice_editor;
 mod close_edits;
 pub(crate) use close_edits::finish_active_edits;
 mod column;
+mod column_select;
+pub use column_select::ColumnSelectionHandle;
+pub(crate) use column_select::{project_rows, refresh as refresh_column_selection, selection_chrome};
 mod column_jump;
 mod column_order;
 mod column_visibility;
@@ -16,6 +19,7 @@ mod editing;
 mod export;
 mod font_zoom;
 pub(crate) mod full_value_editor;
+mod header_alignment;
 mod highlight_paint;
 mod highlight_rules;
 pub(crate) use highlight_rules::HighlightPersist;
@@ -30,9 +34,12 @@ mod row_number_column;
 #[cfg(test)]
 mod row_number_tests;
 mod types;
+mod value_decoded;
 mod value_viewer;
+#[cfg(test)]
+mod wide_scroll_tests;
 pub(crate) use column_order::displayed_column_order;
-pub(crate) use presentation::{cell_allows_inline_edit, cell_allows_set_null};
+pub(crate) use presentation::{cell_allows_inline_edit, cell_allows_set_cells, cell_allows_set_null};
 
 use std::cell::Cell;
 use std::rc::Rc;
@@ -52,12 +59,36 @@ pub(crate) use display::focused_cell_draft_id;
 pub(crate) use display::focused_row_position;
 pub(crate) use display::preview_to_display_text;
 pub use display::{focused_cell_identity, last_clicked_cell, set_date_format, set_null_display, value_to_display_text};
+
+pub(crate) fn apply_typography(typography: &bookie_app_services::preferences::TypographyOverride) {
+    font_zoom::apply_typography(typography);
+}
 pub use display_refresh::refresh_date_displays_under;
 pub use pinned_numbers::wrap_in_scrolled as wrap_grid_scrolled;
 pub(crate) use value_viewer::present as present_value_viewer;
 
 pub(crate) fn enter_cell_edit_mode(label: &crate::ui::cell_editor::CellEditor) {
     editing::enter_edit_mode(label);
+}
+
+#[derive(Debug, Clone)]
+pub enum SetCellsRows {
+    AllLoaded,
+    Positions(Vec<u32>),
+}
+
+#[derive(Debug, Clone)]
+pub struct SetCellsRequest {
+    pub columns: Vec<usize>,
+    pub rows: SetCellsRows,
+}
+
+#[derive(Debug, Clone)]
+pub struct ResetCellRequest {
+    pub row_position: u32,
+    pub col_index: usize,
+    pub row_key: Vec<bookie_core::Value>,
+    pub reset: Option<bookie_core::sql_dialect::ColumnReset>,
 }
 
 #[derive(Debug)]
@@ -94,6 +125,14 @@ pub enum GridMsg {
             >,
         >,
     },
+    ColumnSelectionChanged,
+    SetCells(SetCellsRequest),
+    SetCellsConfirmed {
+        request: SetCellsRequest,
+        value: bookie_app_services::set_cells::SetCellsValue,
+        generation: u64,
+        run: u64,
+    },
     CopyToClipboard(String),
     FetchCellValue {
         col_index: usize,
@@ -113,6 +152,7 @@ pub enum GridMsg {
         row_key: Vec<bookie_core::Value>,
         draft_id: Option<u64>,
     },
+    ResetCell(ResetCellRequest),
     DeleteRowAt {
         row_position: u32,
         row_key: Vec<bookie_core::Value>,
@@ -173,6 +213,9 @@ pub struct TabGridContext {
     pub choices: ChoiceMap,
     pub ambiguous_keys: AmbiguousKeys,
     pub row_number_base: u64,
+    pub column_selection: ColumnSelectionHandle,
+    pub set_cells_enabled: bool,
+    pub column_selection_chrome: Option<gtk4::Box>,
 }
 
 pub type AmbiguousKeys =
@@ -217,6 +260,11 @@ pub fn build_column_view(
         highlight_settings,
         database,
     } = env;
+    let driver_id = connection_id
+        .and_then(|id| database.metadata(id))
+        .map(|metadata| metadata.driver_id)
+        .unwrap_or_default();
+    let relaxed_mongodb_json = driver_id == "mongodb";
     let result: &QueryResult = shared;
     let store = match &tab_ctx.projected_columns {
         Some(indices) => match if tab_ctx.preview_redis_strings && !tab_ctx.pk_col_indices.is_empty() {
@@ -282,16 +330,12 @@ pub fn build_column_view(
     column_view.append_column(&numbers);
 
     if let Some(sender) = menu_sender.as_ref() {
-        let driver_id = connection_id
-            .and_then(|id| database.metadata(id))
-            .map(|metadata| metadata.driver_id)
-            .unwrap_or_default();
         install_grid_context_menus(
             &column_view,
             sender.clone(),
             columns,
             result.truncated,
-            driver_id,
+            driver_id.clone(),
             context_menu::GridMenuOptions {
                 filterable: tab_ctx.tab_id.is_some() && !tab_ctx.filters_unavailable,
                 row_mutations_allowed: tab_ctx.row_mutations_allowed,
@@ -300,6 +344,8 @@ pub fn build_column_view(
                 local_result_view: tab_ctx.local_result_view.clone(),
                 whole_result_filter: tab_ctx.whole_result_filter,
                 snapshot_export: tab_ctx.result_model.is_none(),
+                column_selection: tab_ctx.column_selection.clone(),
+                set_cells_enabled: tab_ctx.set_cells_enabled,
             },
         );
     }
@@ -319,6 +365,7 @@ pub fn build_column_view(
             table: table.to_string(),
             sender: edit_sender.clone(),
             connection_id,
+            relaxed_mongodb_json,
             tab_ctx: tab_ctx.clone(),
             sort_enabled: sort_sender.is_some()
                 || (tab_ctx.local_result_sort && tab_ctx.sortable_result_columns.contains(&i)),
@@ -352,6 +399,7 @@ pub fn build_column_view(
             .zip(column_widths.clone())
             .map(|(id, store)| (id, table.to_string(), store)),
     );
+    header_alignment::install(&column_view, &display_columns);
     column_jump::install(
         &column_view,
         &grid_actions,
@@ -388,6 +436,18 @@ pub fn build_column_view(
         menu_sender.clone(),
     );
     font_zoom::install(&column_view, &grid_actions);
+    column_select::install(
+        &column_view,
+        &grid_actions,
+        &tab_ctx.column_selection,
+        menu_sender.clone(),
+        tab_ctx.set_cells_enabled,
+        column_select::CopySource {
+            columns: schema_columns,
+            driver_id: &driver_id,
+        },
+        tab_ctx.column_selection_chrome.as_ref(),
+    );
     column_view.insert_action_group("grid", Some(&grid_actions));
     row_number_column::fit(&column_view, tab_ctx.row_number_base);
     {

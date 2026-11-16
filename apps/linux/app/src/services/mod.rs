@@ -5,6 +5,7 @@ pub use bookie_app_services::{
 
 #[cfg(test)]
 pub use bookie_app_services::filter_settings;
+pub mod approval_grants;
 pub mod approval_router;
 pub mod audit_view;
 pub mod change_tracker;
@@ -13,9 +14,11 @@ pub(crate) mod driver_diagnostics;
 pub(crate) mod error_text;
 pub mod export_pages;
 pub mod gtk_approval;
+pub mod launch_version;
 pub mod mcp_service;
 pub mod named_filter_presets;
 pub mod open_request;
+pub mod open_sessions;
 pub mod operation_control;
 pub mod persistence_stores;
 pub mod preferences;
@@ -25,6 +28,7 @@ pub mod sidebar_tree;
 pub mod single_instance;
 pub mod structure_tracker;
 pub mod ui_stall;
+pub mod update_check;
 
 pub mod window_registry;
 pub mod window_state;

@@ -20,6 +20,7 @@ pub(super) enum JobSource {
 pub(super) struct ExportJob {
     pub(super) path: std::path::PathBuf,
     pub(super) source: JobSource,
+    pub(super) retained_page: Option<super::StreamExportPage>,
     pub(super) format: super::ExportFormat,
     pub(super) options: CsvOptions,
     pub(super) driver_id: String,
@@ -28,6 +29,7 @@ pub(super) struct ExportJob {
 }
 
 fn write_export(job: ExportJob, cancel: &CancellationToken, completed: &AtomicUsize) -> Result<(), ExportError> {
+    let _retained_page = job.retained_page;
     if matches!(
         &job.source,
         JobSource::Paged {
@@ -53,7 +55,7 @@ fn write_export(job: ExportJob, cancel: &CancellationToken, completed: &AtomicUs
             bookie_core::export::write_result_file(&job.path, &result, &export, cancelled, progress)
         }
         JobSource::Paged {
-            mode: super::PagedExportMode::StoredQuery,
+            mode: super::PagedExportMode::StoredQuery | super::PagedExportMode::SnapshotTable,
             columns,
             total,
             open,
@@ -89,7 +91,9 @@ fn finish_pages(result: Result<(), ExportError>, finish: Result<(), ExportError>
 }
 
 pub(super) fn snapshot_refusal_message() -> String {
-    crate::tr!("Full-table export requires a consistent snapshot. Export the current page or a query result instead.")
+    bookie_app_services::tr!(
+        "Full-table export requires a consistent snapshot. Export the current page or a query result instead."
+    )
 }
 
 fn result_format(format: super::ExportFormat) -> ResultFormat {
@@ -113,12 +117,12 @@ pub(super) fn start(parent: &adw::ApplicationWindow, toast: &adw::ToastOverlay, 
     };
     let path = job.path.clone();
     let label = gtk::Label::new(Some(&if paged {
-        crate::tr!("Exporting all rows…")
+        bookie_app_services::tr!("Exporting all rows…")
     } else {
-        crate::tr!("Exporting loaded rows…")
+        bookie_app_services::tr!("Exporting loaded rows…")
     }));
     let progress = gtk::ProgressBar::new();
-    let stop = gtk::Button::with_label(&crate::tr!("Cancel"));
+    let stop = gtk::Button::with_label(&bookie_app_services::tr!("Cancel"));
     let content = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
         .spacing(12)
@@ -131,7 +135,7 @@ pub(super) fn start(parent: &adw::ApplicationWindow, toast: &adw::ToastOverlay, 
     content.append(&progress);
     content.append(&stop);
     let dialog = adw::Dialog::builder()
-        .title(crate::tr!("Export Results"))
+        .title(bookie_app_services::tr!("Export Results"))
         .child(&content)
         .content_width(400)
         .build();
@@ -166,14 +170,14 @@ pub(super) fn start(parent: &adw::ApplicationWindow, toast: &adw::ToastOverlay, 
             Some(total) => {
                 progress.set_fraction(if total == 0 { 0.0 } else { done as f64 / total as f64 });
                 label.set_label(
-                    &crate::tr!("{done} / {total} rows")
+                    &bookie_app_services::tr!("{done} / {total} rows")
                         .replace("{done}", &done.to_string())
                         .replace("{total}", &total.to_string()),
                 );
             }
             None => {
                 progress.pulse();
-                label.set_label(&crate::tr!("{done} rows written").replace("{done}", &done.to_string()));
+                label.set_label(&bookie_app_services::tr!("{done} rows written").replace("{done}", &done.to_string()));
             }
         }
         glib::ControlFlow::Continue
@@ -189,7 +193,7 @@ pub(super) fn start(parent: &adw::ApplicationWindow, toast: &adw::ToastOverlay, 
             Ok(Ok(())) => {
                 if let Some(toast) = toast.upgrade() {
                     toast.add_toast(crate::ui::plain_text::toast(
-                        &crate::tr!("Exported {n} rows to {path}")
+                        &bookie_app_services::tr!("Exported {n} rows to {path}")
                             .replace("{n}", &final_count.load(Ordering::Relaxed).to_string())
                             .replace("{path}", &path.display().to_string()),
                     ));

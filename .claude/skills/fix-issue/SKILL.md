@@ -11,7 +11,7 @@ description: >-
 
 # Fix issue
 
-One run ends in one pull request against `linux` that fixes the reported problem at its cause and passes its required checks.
+One run ends in one pull request against `main` that fixes the reported problem at its cause and passes its required checks.
 
 This skill is the order of steps. Every rule it relies on lives in [AGENTS.md](../../../AGENTS.md) and the documents it links. When this file and `AGENTS.md` disagree, `AGENTS.md` wins and this file is wrong.
 
@@ -39,8 +39,8 @@ Never, even in an authorized run: force-push, rebase a shared branch, merge a pu
 2. **Confirm the lane.** If your lane does not own the files, stop and record a handoff, or hand the issue back.
 3. **Make a worktree** beside the main checkout, never inside another agent's. Inspect `git remote -v` and identify the remote whose fetch and push URLs name `cozyGarage/BookiE` on GitHub. Replace `<bookie-remote>` below with that remote name; do not assume `origin` points to BookiE. If no matching remote exists, add one with an unused name and the BookiE GitHub URL.
    ```bash
-   git fetch <bookie-remote> linux
-   git worktree add ../bookie-<lane>-<slug> -b <lane>/<topic> <bookie-remote>/linux
+   git fetch <bookie-remote> main
+   git worktree add ../bookie-<lane>-<slug> -b <lane>/<topic> <bookie-remote>/main
    ```
    From here on every command runs in that tree (`git -C <tree>`, `cd <tree> &&`).
 4. **Write the problem statement** to `<tree>/.analysis/<slug>/problem.md` (ignored by git): what happens, what should happen, the smallest reproduction, engine and version. It survives a compaction or a usage limit.
@@ -96,9 +96,9 @@ Use an available, authorized independent reviewer for the full diff. Check that 
 
 1. Stage explicit paths only, never `git add -A` or `.`, and compare `git diff --cached --stat` with the plan.
 2. Commit with a single-line Conventional Commit subject (`AGENTS.md`, Changelog and commits).
-3. Merge the latest GitHub `linux` into the branch; never rebase. Regenerate `Cargo.lock` on conflict.
+3. Merge the latest GitHub `main` into the branch; never rebase. Regenerate `Cargo.lock` on conflict.
 4. Push the branch to GitHub and verify all required checks for the exact pull request head. Missing, skipped, cancelled or failed checks are not passes.
-5. Open the pull request against `linux` with `.github/pull_request_template.md`. State the lane that owns its review and merge.
+5. Open the pull request against `main` with `.github/pull_request_template.md`. State the lane that owns its review and merge.
 
 ## Phase 7: Report
 

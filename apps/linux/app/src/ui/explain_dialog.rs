@@ -1,14 +1,10 @@
-//! EXPLAIN plan dialog. Runs the engine's plan statement through the
-//! policy-gated connection owned by the calling window and shows the
-//! textual plan.
-
 use gtk::prelude::IsA;
 use relm4::adw::prelude::*;
 use relm4::{adw, gtk};
 
 use crate::services::database_service::DatabaseService;
 use crate::services::preferences::PreferencesStore;
-use crate::tr;
+use bookie_app_services::tr;
 
 pub fn present(
     parent: &impl IsA<gtk::Window>,

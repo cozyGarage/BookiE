@@ -199,6 +199,11 @@
       "bookie-app",
       "--lib",
       "ui::editor::pinned::tests::evicting_old_stream_pins_releases_their_pages_and_unpin_releases_the_rest"
+    ],
+    [
+      "bookie-app",
+      "postgres_mcp_catalog",
+      "mcp_catalog_tools_follow_restricted_postgres_role_visibility"
     ]
   ],
   "gtk": [
@@ -251,6 +256,31 @@
       "bookie-app",
       "--lib",
       "ui::app::init_workspace::tests::saved_connections_popover_stays_inside_narrow_windows"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::multi_session::gtk_tests::a_failed_connect_keeps_both_sessions_in_the_same_window"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::multi_session::gtk_tests::a_save_from_a_background_tab_reaches_its_own_connection_and_not_the_front_one"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::multi_session::gtk_tests::a_save_from_a_tab_without_a_recorded_connection_writes_nowhere"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::multi_session::gtk_tests::closing_a_secondary_window_forgets_only_its_own_group"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::multi_session::gtk_tests::destroying_windows_without_a_close_request_keeps_every_group"
     ],
     [
       "bookie-app",
@@ -310,6 +340,21 @@
     [
       "bookie-app",
       "--lib",
+      "ui::sidebar_tree_model::tests::large_catalog_domain_nodes_do_not_become_list_rows_until_their_groups_expand"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::sidebar_tree_model::tests::gtk_list_view_realizes_a_bounded_fraction_of_a_large_expanded_table_group"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::sidebar_tree_model::tests::tree_model_keeps_catalog_nodes_under_their_schema_without_flattening_children"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::app::structure::confirmation_tests::force_dismissing_a_table_confirmation_does_not_run_its_action"
     ],
     [
@@ -360,6 +405,21 @@
     [
       "bookie-app",
       "--lib",
+      "ui::app::tab_title::tests::renaming_survives_later_automatic_titles_and_an_empty_name_restores_them"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::workspace_overview::tests::overview_titles_show_current_tags_and_restore_titles_when_closed"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::tab_title::tests::the_colour_mark_shows_as_the_tab_icon_and_clears_with_no_colour"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::browse_tab::chrome_tests::focus_grid_targets_the_current_browse_view"
     ],
     [
@@ -370,7 +430,17 @@
     [
       "bookie-app",
       "--lib",
+      "ui::browse_tab::chrome_tests::custom_page_size_changes_the_exact_fetch_limit"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::browse_tab::chrome_tests::a_row_count_queued_before_refresh_is_not_shown"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::browse_tab::chrome_tests::a_loaded_page_keeps_its_total_unknown_when_row_count_fails"
     ],
     [
       "bookie-app",
@@ -456,6 +526,16 @@
       "bookie-app",
       "--lib",
       "ui::browse_tab::save_in_flight_tests::a_foreign_key_that_arrives_after_the_rows_marks_its_header"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::browse_tab::save_in_flight_tests::blank_edit_on_not_null_default_does_not_stage_a_null"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::browse_tab::save_in_flight_tests::invalid_cell_in_multi_cell_paste_leaves_every_target_unchanged"
     ],
     [
       "bookie-app",
@@ -610,7 +690,12 @@
     [
       "bookie-app",
       "--lib",
-      "ui::cell_editor::tests::focus_leave_commits_pending_preedit_text"
+      "ui::cell_editor::tests::editable_cell_tracks_xalign_for_numbers"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::cell_editor::tests::an_active_preedit_is_included_when_edit_commits"
     ],
     [
       "bookie-app",
@@ -800,6 +885,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::editor::dispatch_tests::completing_a_query_does_not_shift_the_editor_when_status_text_changes"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::editor::dispatch_tests::editor_dispatch_resumes_after_success_cancel_and_timeout"
     ],
     [
@@ -811,6 +901,11 @@
       "bookie-app",
       "--lib",
       "ui::editor::dispatch_tests::editor_waits_for_its_session_before_accepting_any_run_input"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::dispatch_tests::large_sql_buffers_pause_syntax_highlighting_and_resume_after_shrinking"
     ],
     [
       "bookie-app",
@@ -955,7 +1050,12 @@
     [
       "bookie-app",
       "--lib",
-      "ui::editor::outcomes::lifetime_tests::streamed_widgets_keep_small_pages_and_release_cancelled_results_on_close"
+      "ui::editor::outcomes::lifetime_tests::streamed_widgets_keep_wide_pages_charged_until_close"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::outcomes::messages_panel::tests::the_panel_is_added_only_when_the_statement_produced_messages"
     ],
     [
       "bookie-app",
@@ -986,6 +1086,11 @@
       "bookie-app",
       "--lib",
       "ui::editor::outcomes::tests::export_partial_view::an_incomplete_stream_does_not_offer_full_result_export"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::export_dialog::scope::tests::query_scope_names_the_page_and_saved_filtered_result"
     ],
     [
       "bookie-app",
@@ -1245,6 +1350,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::editor::stream_view::tests::hiding_a_streamed_result_releases_its_grid_and_reloads_from_the_spool"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::editor::stream_view::tests::navigating_away_releases_a_cached_page_grid_and_keeps_its_rows_reusable"
     ],
     [
@@ -1411,6 +1521,11 @@
       "bookie-app",
       "--lib",
       "ui::grid::column_width_tests::unsaved_result_grid_width_stays_fixed_when_the_window_grows"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::column_width_tests::column_header_text_aligns_with_numeric_and_text_cells"
     ],
     [
       "bookie-app",
@@ -1590,6 +1705,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::grid::lifetime_tests::a_wide_result_realizes_a_bounded_row_window"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::grid::lifetime_tests::alternating_editable_and_readonly_grids_release_every_retired_page"
     ],
     [
@@ -1670,6 +1790,16 @@
     [
       "bookie-app",
       "--lib",
+      "ui::grid::column_select::tests::selected_column_cells_get_the_selection_style_and_lose_it_on_clear"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::column_select::tests::the_header_menu_offers_column_selection_and_only_offers_set_cells_when_enabled"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::grid::local_sort_tests::sorting_a_fully_selected_result_restores_the_selection_in_one_signal"
     ],
     [
@@ -1685,6 +1815,16 @@
     [
       "bookie-app",
       "--lib",
+      "ui::grid::wide_scroll_tests::keyboard_focus_moving_right_brings_every_column_into_view_to_the_last"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::wide_scroll_tests::the_last_column_of_a_wide_result_is_reachable_by_scrolling"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::grid::highlight_rules::tests::a_new_over_limit_pattern_is_refused_without_saving_or_closing"
     ],
     [
@@ -1696,6 +1836,16 @@
       "bookie-app",
       "--lib",
       "ui::grid::value_viewer::tests::the_viewer_dialog_shows_a_preview_and_copies_the_full_value"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::value_decoded::tests::the_decoded_section_is_read_only_and_absent_for_unrecognised_bytes"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::health_report_dialog::tests::a_row_with_a_diagnostic_offers_copy_and_open_and_a_row_without_offers_neither"
     ],
     [
       "bookie-app",
@@ -1750,7 +1900,32 @@
     [
       "bookie-app",
       "--lib",
+      "ui::import_dialog::lifetime_tests::changing_encoding_does_not_block_the_dialog_and_close_discards_its_preview"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::import_dialog::lifetime_tests::malformed_preview_displays_an_error_and_keeps_import_disabled"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::import_dialog::lifetime_tests::the_skip_switch_is_off_by_default_and_its_state_reaches_the_import"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::import_dialog::write_mode::tests::a_table_without_a_key_refuses_the_update_mode"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::import_dialog::write_mode::tests::an_engine_without_upsert_does_not_offer_the_mode"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::import_dialog::write_mode::tests::insert_is_the_default_and_update_uses_the_chosen_key"
     ],
     [
       "bookie-app",
@@ -1766,6 +1941,21 @@
       "bookie-app",
       "--lib",
       "ui::mcp_preferences::copy_tests::the_copy_button_puts_the_token_on_the_clipboard_and_keeps_the_dialog_open"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::mcp_preferences::copy_tests::tool_restriction_is_optional_and_uses_only_selected_tools"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::mcp_preferences::copy_tests::the_issue_form_offers_four_expiry_choices_and_defaults_to_ninety_days"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::mcp_preferences::copy_tests::the_status_group_shows_the_socket_and_a_server_that_could_not_start"
     ],
     [
       "bookie-app",
@@ -1860,6 +2050,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::sidebar_row::responsive_layout_tests::row_actions_reflow_at_supported_sidebar_widths_with_names_and_focus_order"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::sidebar_row::columns_affordance_tests::a_table_has_a_separate_keyboard_reachable_columns_expander"
     ],
     [
@@ -1871,6 +2066,31 @@
       "bookie-app",
       "--lib",
       "ui::sidebar_row::tests::a_group_row_shows_a_chevron_that_follows_its_collapse_state"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::ssh_jumps::tests::a_saved_chain_loads_into_the_editor_and_saves_back_unchanged_without_showing_secrets"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::ssh_jumps::tests::a_typed_secret_is_collected_for_storage_and_an_untouched_row_collects_none"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::ssh_jumps::tests::adding_stops_at_the_chain_limit"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::ssh_jumps::tests::hosts_can_be_added_reordered_and_removed_and_the_order_is_the_chain_order"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::ssh_jumps::tests::the_system_openssh_client_disables_editing_with_a_reason_and_restores_it"
     ],
     [
       "bookie-app",
@@ -1891,6 +2111,21 @@
       "bookie-app",
       "--lib",
       "ui::structure_tab::columns::tests::column_comment_editor_enabled_state_follows_typed_capability"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::structure_tab::default_collation_tests::a_driver_without_table_level_collations_never_shows_the_default_collation_row"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::structure_tab::default_collation_tests::a_new_table_tab_offers_a_default_collation_when_the_driver_supports_one"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::structure_tab::default_collation_tests::choosing_a_default_collation_puts_it_in_the_create_table_statement"
     ],
     [
       "bookie-app",
@@ -1951,6 +2186,11 @@
       "bookie-app",
       "--lib",
       "ui::app::connection::dismiss_tests::force_dismissing_running_query_switch_preserves_the_editor"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::connection::dismiss_tests::deleting_a_connection_dismisses_the_saved_connections_popover"
     ]
   ],
   "keyring": [
@@ -1958,6 +2198,11 @@
       "bookie-agentd",
       "saved_transport",
       "a_saved_ssh_hop_is_used_instead_of_dialling_the_database_directly"
+    ],
+    [
+      "bookie-app-services",
+      "--lib",
+      "ssh_chain_secrets::tests::jump_host_secrets_round_trip_through_the_secret_service_and_clear_on_obsolescence"
     ],
     [
       "bookie-storage",

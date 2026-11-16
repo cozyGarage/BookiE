@@ -19,9 +19,17 @@ mod tty_answer;
 #[derive(Parser, Debug)]
 #[command(name = "bookie-agentd", about = "Headless BookiE MCP agent daemon")]
 struct Args {
-    /// Path to policy.toml (required).
-    #[arg(long)]
-    policy: PathBuf,
+    /// Path to policy.toml (required unless --connect-socket is used).
+    #[arg(long, required_unless_present = "connect_socket")]
+    policy: Option<PathBuf>,
+
+    #[arg(
+        long,
+        num_args = 0..=1,
+        value_name = "PATH",
+        help = "Relay stdin and stdout to a running BookiE app's MCP socket, then exit (default: $XDG_RUNTIME_DIR/bookie/mcp.sock)"
+    )]
+    connect_socket: Option<Option<PathBuf>>,
 
     /// Approval strategy when policy requires approval.
     #[arg(long, default_value = "deny")]
@@ -33,6 +41,9 @@ struct Args {
 
     #[arg(long, requires = "issue_token")]
     connection: Vec<Uuid>,
+
+    #[arg(long = "tool", requires = "issue_token")]
+    tools: Vec<String>,
 
     /// Scope for --issue-token. Defaults to the least privilege that is useful.
     #[arg(long, requires = "issue_token", default_value = "read-only")]
@@ -70,6 +81,14 @@ enum ApprovalMode {
 
 struct TtyApprovalSink;
 
+struct CancelApprovalReader(std::sync::Arc<std::sync::atomic::AtomicBool>);
+
+impl Drop for CancelApprovalReader {
+    fn drop(&mut self) {
+        self.0.store(true, std::sync::atomic::Ordering::Release);
+    }
+}
+
 /// How long a human has to answer one prompt before it is treated as a
 /// denial. Without this, one unanswered prompt would block every later
 /// tool call forever, since the stdio server processes requests serially.
@@ -79,19 +98,75 @@ const APPROVAL_GRACE: std::time::Duration = std::time::Duration::from_secs(5);
 #[async_trait]
 impl ApprovalSink for TtyApprovalSink {
     async fn request(&self, req: ApprovalRequest) -> ApprovalOutcome {
+        let cancellation = req.cancellation.clone();
+        let nonce = Uuid::new_v4().to_string();
         let prompt = format!(
-            "\n[bookie-agentd] approval required\n  connection: {}\n  rule: {}\n  reason: {}\n  sql: {}\nApprove? [y/N] ",
+            "\n[bookie-agentd] approval required\n  connection: {}\n  rule: {}\n  reason: {}\n  sql: {}\nType 'approve {}' to approve, or press Enter to deny: ",
             sanitize_for_terminal(&req.connection_name),
             sanitize_for_terminal(&req.rule),
             sanitize_for_terminal(&req.reason),
             sanitize_for_terminal(&req.sql),
+            nonce,
         );
-        let deadline = std::time::Instant::now() + APPROVAL_TIMEOUT;
-        approval_with_timeout(APPROVAL_TIMEOUT + APPROVAL_GRACE, move || {
-            ask_on_controlling_terminal(&prompt, deadline)
-        })
+        let queued_cancel = cancellation.clone();
+        let approval = terminal_approval(move |cancelled| {
+            ask_on_controlling_terminal(&prompt, &nonce, std::time::Instant::now() + APPROVAL_TIMEOUT, || {
+                cancelled.load(std::sync::atomic::Ordering::Acquire)
+                    || cancellation.as_ref().is_some_and(|token| token.is_cancelled())
+            })
+        });
+        deny_when_cancelled(
+            async move {
+                match queued_cancel {
+                    Some(token) => token.cancelled().await,
+                    None => std::future::pending().await,
+                }
+            },
+            approval,
+        )
         .await
     }
+}
+
+async fn deny_when_cancelled<F>(cancelled: impl std::future::Future<Output = ()>, approval: F) -> ApprovalOutcome
+where
+    F: std::future::Future<Output = ApprovalOutcome>,
+{
+    tokio::select! {
+        outcome = approval => outcome,
+        () = cancelled => ApprovalOutcome::Deny,
+    }
+}
+
+async fn terminal_approval<F>(work: F) -> ApprovalOutcome
+where
+    F: FnOnce(std::sync::Arc<std::sync::atomic::AtomicBool>) -> ApprovalOutcome + Send + 'static,
+{
+    terminal_approval_within(APPROVAL_TIMEOUT, work).await
+}
+
+async fn terminal_approval_within<F>(queue_wait: std::time::Duration, work: F) -> ApprovalOutcome
+where
+    F: FnOnce(std::sync::Arc<std::sync::atomic::AtomicBool>) -> ApprovalOutcome + Send + 'static,
+{
+    static TERMINAL: std::sync::OnceLock<std::sync::Arc<tokio::sync::Mutex<()>>> = std::sync::OnceLock::new();
+    let terminal = TERMINAL
+        .get_or_init(|| std::sync::Arc::new(tokio::sync::Mutex::new(())))
+        .clone();
+    let Ok(lease) = tokio::time::timeout(queue_wait, terminal.lock_owned()).await else {
+        tracing::warn!(
+            seconds = queue_wait.as_secs(),
+            "another approval prompt held the terminal; denying"
+        );
+        return ApprovalOutcome::Deny;
+    };
+    let cancelled = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let _cancel_reader = CancelApprovalReader(cancelled.clone());
+    approval_with_timeout(APPROVAL_TIMEOUT + APPROVAL_GRACE, move || {
+        let _lease = lease;
+        work(cancelled)
+    })
+    .await
 }
 
 async fn approval_with_timeout<F>(timeout: std::time::Duration, work: F) -> ApprovalOutcome
@@ -141,7 +216,12 @@ fn is_invisible_format(c: char) -> bool {
     )
 }
 
-fn ask_on_controlling_terminal(prompt: &str, deadline: std::time::Instant) -> ApprovalOutcome {
+fn ask_on_controlling_terminal(
+    prompt: &str,
+    nonce: &str,
+    deadline: std::time::Instant,
+    cancelled: impl Fn() -> bool,
+) -> ApprovalOutcome {
     use std::io::Write;
 
     let terminal = match std::fs::OpenOptions::new().read(true).write(true).open("/dev/tty") {
@@ -151,6 +231,9 @@ fn ask_on_controlling_terminal(prompt: &str, deadline: std::time::Instant) -> Ap
             return ApprovalOutcome::Deny;
         }
     };
+    if cancelled() {
+        return ApprovalOutcome::Deny;
+    }
     tty_answer::discard_pending_input(&terminal);
     let mut writer = match terminal.try_clone() {
         Ok(writer) => writer,
@@ -164,18 +247,23 @@ fn ask_on_controlling_terminal(prompt: &str, deadline: std::time::Instant) -> Ap
     }
 
     let mut terminal = terminal;
-    match tty_answer::read_answer(&mut terminal, deadline) {
+    match tty_answer::read_answer(&mut terminal, deadline, &cancelled, nonce) {
         Some(outcome) => outcome,
         None => {
+            let message: &[u8] = if cancelled() {
+                b"\n[bookie-agentd] approval cancelled; denied\n"
+            } else {
+                b"\n[bookie-agentd] approval timed out; denied\n"
+            };
             tracing::warn!("approval prompt unanswered; denying");
-            let _ = writer.write_all(b"\n[bookie-agentd] approval timed out; denied\n");
+            let _ = writer.write_all(message);
             ApprovalOutcome::Deny
         }
     }
 }
 
-fn outcome_for_answer(answer: &str) -> ApprovalOutcome {
-    if answer.trim().eq_ignore_ascii_case("y") {
+fn outcome_for_answer(answer: &str, nonce: &str) -> ApprovalOutcome {
+    if answer.trim() == format!("approve {nonce}") {
         ApprovalOutcome::AllowOnce
     } else {
         ApprovalOutcome::Deny
@@ -257,6 +345,32 @@ async fn daemon_provider(
     }
 }
 
+async fn issue_token_command(name: String, args: Args, tokens: &TokenStore) -> Result<(), Box<dyn std::error::Error>> {
+    let saved = load_connections().await?;
+    validate_token_connections(&args.connection, &saved)?;
+    let expires_at = match args.expires_days {
+        Some(days) => Some(
+            chrono::Utc::now()
+                .checked_add_signed(chrono::TimeDelta::days(i64::from(days)))
+                .ok_or("--expires-days is too large")?,
+        ),
+        None => None,
+    };
+    let tool_allowlist = (!args.tools.is_empty()).then_some(args.tools);
+    let (_meta, plain) = tokens.issue_with_tools(
+        name,
+        args.permissions.into(),
+        args.connection,
+        tool_allowlist,
+        expires_at,
+    )?;
+    match args.token_file {
+        Some(path) => write_token_file(&path, &plain)?,
+        None => emit_token(&plain)?,
+    }
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     bookie_transport::install_crypto_provider();
@@ -270,31 +384,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tracing::error!(%error, "legacy tablepro state could not be copied; it was left untouched");
     }
 
-    let args = Args::parse();
-    if !args.policy.exists() {
-        tracing::error!(path = %args.policy.display(), "policy file not found");
+    let mut args = Args::parse();
+    if let Some(socket) = args.connect_socket.take() {
+        let path = socket
+            .or_else(bookie_mcp::default_socket_path)
+            .ok_or("XDG_RUNTIME_DIR is not set; pass the socket path to --connect-socket")?;
+        let token = std::env::var("BOOKIE_MCP_TOKEN").ok().filter(|token| !token.is_empty());
+        bookie_mcp::relay_to_socket(&path, tokio::io::stdin(), tokio::io::stdout(), token).await?;
+        return Ok(());
+    }
+    let Some(policy_path) = args.policy.take() else {
+        tracing::error!("--policy is required");
+        std::process::exit(2);
+    };
+    if !policy_path.exists() {
+        tracing::error!(path = %policy_path.display(), "policy file not found");
         std::process::exit(2);
     }
-    let policy = Arc::new(load_from_path(&args.policy).map_err(|e| e.to_string())?);
+    let policy = Arc::new(load_from_path(&policy_path).map_err(|e| e.to_string())?);
 
     let tokens = Arc::new(TokenStore::open_default().map_err(|e| e.to_string())?);
-    if let Some(name) = args.issue_token {
-        let saved = load_connections().await?;
-        validate_token_connections(&args.connection, &saved)?;
-        let expires_at = match args.expires_days {
-            Some(days) => Some(
-                chrono::Utc::now()
-                    .checked_add_signed(chrono::TimeDelta::days(i64::from(days)))
-                    .ok_or("--expires-days is too large")?,
-            ),
-            None => None,
-        };
-        let (_meta, plain) = tokens.issue(name, args.permissions.into(), args.connection, expires_at)?;
-        match args.token_file {
-            Some(path) => write_token_file(&path, &plain)?,
-            None => emit_token(&plain)?,
-        }
-        return Ok(());
+    if let Some(name) = args.issue_token.take() {
+        return issue_token_command(name, args, &tokens).await;
     }
 
     let approval: Arc<dyn bookie_policy::ApprovalSink> = match args.approval {
@@ -313,7 +424,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let audit: Arc<dyn bookie_policy::AuditSink> = Arc::new(journal);
 
     let provider = Arc::new(daemon_provider(policy, audit, approval).await);
-    let bridge = Arc::new(McpBridge::new(provider, tokens));
+    let default_token = std::env::var("BOOKIE_MCP_TOKEN").ok().filter(|token| !token.is_empty());
+    let bridge = Arc::new(McpBridge::new(provider, tokens).with_default_token(default_token));
 
     serve_stdio(bridge).await?;
     Ok(())

@@ -14,13 +14,13 @@ impl ConnectDialog {
 
     pub(super) fn configure_socket_field(&self, kind: Option<LocalSocketPathKind>) {
         if kind == Some(LocalSocketPathKind::File) {
-            self.socket_dir.set_title(&crate::tr!("Socket path"));
+            self.socket_dir.set_title(&bookie_app_services::tr!("Socket path"));
             if self.socket_dir.text() == "/run/postgresql" {
                 self.socket_dir.set_text("/run/mysqld/mysqld.sock");
             }
             return;
         }
-        self.socket_dir.set_title(&crate::tr!("Socket directory"));
+        self.socket_dir.set_title(&bookie_app_services::tr!("Socket directory"));
         if self.socket_dir.text() == "/run/mysqld/mysqld.sock" {
             self.socket_dir.set_text("/run/postgresql");
         }

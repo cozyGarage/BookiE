@@ -91,11 +91,12 @@ def experiment_problems(experiments, gpui_app=None):
         manifests.append(Path(gpui_app) / "Cargo.toml")
     for manifest in manifests:
         data = tomllib.loads(manifest.read_text())
-        for table in ("dependencies", "dev-dependencies", "build-dependencies"):
-            for name, spec in data.get(table, {}).items():
-                package = spec.get("package", name) if isinstance(spec, dict) else name
-                if package.startswith("bookie-") and package not in EXPERIMENT_ALLOWED:
-                    problems.append(f"{manifest.parent.name} may not depend on {package} (ADR 0041)")
+        for section in (data, *data.get("target", {}).values()):
+            for table in ("dependencies", "dev-dependencies", "build-dependencies"):
+                for name, spec in section.get(table, {}).items():
+                    package = spec.get("package", name) if isinstance(spec, dict) else name
+                    if package.startswith("bookie-") and package not in EXPERIMENT_ALLOWED:
+                        problems.append(f"{manifest.parent.name} may not depend on {package} (ADR 0041)")
     return problems
 
 

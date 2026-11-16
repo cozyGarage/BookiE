@@ -1,21 +1,32 @@
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
-use bookie_app_services::read_session::{ReadSession, list_saved_connections};
-use bookie_core::{ColumnInfo, OperationControl, QueryResult, QueryResultBudget, TableInfo};
+use bookie_app_services::command_bridge::{ChannelEventSink, Command, DispatchContext, Epoch, Event, dispatch};
+use bookie_app_services::database_service::{ConnectionOverview, DatabaseService};
+use bookie_app_services::driver_failure_message::driver_failure_message;
+use bookie_app_services::read_session::ConnectionSummary;
+use bookie_app_services::read_session_store::{
+    OpenedSession, ReadSessionStore, SessionId, SubscriptionRequest, SubscriptionSample, SubscriptionSampler,
+};
+use bookie_core::{ColumnInfo, OperationControl, QueryResult, QueryResultBudget, QueryRows, TableInfo};
 use bookie_results::result_scan::ScanSource;
-use bookie_results::stream_result_spool::StreamResultSpoolManager;
 use tokio_util::sync::CancellationToken;
 
-use crate::core_bridge::value_to_cell;
 use crate::model::{Cell, ColumnMeta, Diff, FindResult, PAGE_ROWS, Predicate};
+use crate::shell::table_label;
 use crate::source::{ResultSource, filter_in, find_in};
 
-pub fn saved_connections() -> Result<Vec<bookie_app_services::read_session::ConnectionSummary>, String> {
+pub fn saved_connections() -> Result<Vec<ConnectionSummary>, String> {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .build()
         .map_err(|error| error.to_string())?;
-    runtime.block_on(list_saved_connections())
+    let epoch = Epoch(1);
+    let current_epoch = AtomicU64::new(epoch.0);
+    let control = OperationControl::with_timeout(Duration::from_secs(5));
+    runtime.block_on(bridge_saved_connections(&control, epoch, &current_epoch))
 }
 
 #[derive(Clone, Debug)]
@@ -30,10 +41,13 @@ const PAGE_TIMEOUT: Duration = Duration::from_secs(30);
 
 pub struct LiveSession {
     runtime: tokio::runtime::Runtime,
-    session: Option<ReadSession>,
+    sessions: ReadSessionStore,
+    session_id: SessionId,
+    epoch: AtomicU64,
     pub driver_id: String,
     pub label: String,
-    pub tables: Vec<String>,
+    pub tables: Vec<TableInfo>,
+    supports_snapshot_cursor: bool,
 }
 
 impl LiveSession {
@@ -47,14 +61,16 @@ impl LiveSession {
             .enable_all()
             .build()
             .map_err(|error| error.to_string())?;
-        let (session, label) = runtime.block_on(open_session(origin, cancellation.clone()))?;
-        let tables = session.tables.iter().map(table_label).collect();
+        let (sessions, opened) = runtime.block_on(open_session(origin, cancellation.clone()))?;
         Ok(Arc::new(LiveSession {
-            driver_id: session.driver_id.clone(),
+            driver_id: opened.driver_id.clone(),
             runtime,
-            session: Some(session),
-            label,
-            tables,
+            sessions,
+            session_id: opened.session_id,
+            epoch: AtomicU64::new(0),
+            label: opened.label,
+            tables: opened.tables,
+            supports_snapshot_cursor: opened.supports_snapshot_cursor,
         }))
     }
 
@@ -71,22 +87,44 @@ impl LiveSession {
         if max_rows == 0 || max_rows > ROW_CAP {
             return Err(format!("Row limit must be between 1 and {ROW_CAP}."));
         }
-        let session = self.session.as_ref().ok_or("the session is closed")?;
-        let (columns, rows, scan, truncated) =
-            self.runtime
-                .block_on(query_pages(session, sql, max_rows, cancellation))?;
+        let epoch = self.next_epoch();
+        let (columns, rows, scan, truncated) = self.runtime.block_on(query_pages(
+            &self.sessions,
+            self.session_id,
+            sql,
+            max_rows,
+            cancellation,
+            epoch,
+            &self.epoch,
+        ))?;
         Ok(LiveTable {
             session: self.clone(),
             columns,
             rows,
             scan,
             truncated,
-            table: "query".into(),
+            snapshot_consistent: false,
+            table: None,
         })
     }
 
-    pub fn overview(&self) -> Vec<bookie_app_services::database_service::ConnectionOverview> {
-        self.session.as_ref().map(ReadSession::overview).unwrap_or_default()
+    pub fn overview(&self) -> Result<Vec<ConnectionOverview>, String> {
+        let epoch = Epoch(self.epoch.load(Ordering::Relaxed));
+        let control = OperationControl::with_timeout(Duration::from_secs(5));
+        let event = self.runtime.block_on(dispatch_read(
+            DispatchContext::Sessions(&self.sessions),
+            Command::ReadConnectionStatus {
+                epoch,
+                session_id: self.session_id,
+            },
+            &control,
+            epoch,
+            &self.epoch,
+        ))?;
+        let Event::ConnectionStatusRead { outcome, .. } = event else {
+            return Err("The command bridge returned an unexpected event.".into());
+        };
+        Ok(outcome)
     }
 
     pub fn sample_pubsub(
@@ -95,67 +133,86 @@ impl LiveSession {
         max_messages: usize,
         window: Duration,
         cancellation: &CancellationToken,
-    ) -> Result<drivers_registry::PubSubSample, String> {
-        let session = self.session.as_ref().ok_or("the session is closed")?;
-        let registry = drivers_registry::default_registry();
+    ) -> Result<SubscriptionSample, String> {
+        let epoch = self.next_epoch();
         let deadline = tokio::time::Instant::now() + window + Duration::from_secs(15);
         let control = OperationControl::new(cancellation.clone(), Some(deadline));
-        self.runtime
-            .block_on(session.with_subscription(&registry, &control, |options| {
-                drivers_registry::sample_pubsub(options, patterns, max_messages, window)
-            }))
-            .map_err(|failure| format!("{failure:?}"))
+        let event = self.runtime.block_on(dispatch_read(
+            DispatchContext::Sessions(&self.sessions),
+            Command::SampleSubscription {
+                epoch,
+                session_id: self.session_id,
+                request: SubscriptionRequest {
+                    patterns: patterns.to_vec(),
+                    max_messages,
+                    window,
+                },
+            },
+            &control,
+            epoch,
+            &self.epoch,
+        ))?;
+        let Event::SubscriptionSampled { outcome, .. } = event else {
+            return Err("The command bridge returned an unexpected event.".into());
+        };
+        outcome.map_err(|failure| driver_failure_message(&failure))
     }
 
-    pub fn load_table(self: &Arc<Self>, table: &str, max_rows: u64) -> Result<LiveTable, String> {
+    pub fn load_table(self: &Arc<Self>, table: &TableInfo, max_rows: u64) -> Result<LiveTable, String> {
         self.load_table_controlled(table, max_rows, &CancellationToken::new())
     }
 
     pub fn load_table_controlled(
         self: &Arc<Self>,
-        table: &str,
+        table: &TableInfo,
         max_rows: u64,
         cancellation: &CancellationToken,
     ) -> Result<LiveTable, String> {
         if max_rows == 0 || max_rows > ROW_CAP {
             return Err(format!("Row limit must be between 1 and {ROW_CAP}."));
         }
-        let session = self.session.as_ref().ok_or("the session is closed")?;
-        let (columns, rows, scan, truncated) =
-            self.runtime
-                .block_on(read_pages(session, table, max_rows, cancellation))?;
+        let table = find_table(&self.tables, table)?.clone();
+        let epoch = self.next_epoch();
+        let (columns, rows, scan, truncated) = self.runtime.block_on(read_pages(
+            &self.sessions,
+            self.session_id,
+            &table,
+            max_rows,
+            cancellation,
+            epoch,
+            &self.epoch,
+        ))?;
         Ok(LiveTable {
             session: self.clone(),
             columns,
             rows,
             scan,
             truncated,
-            table: table.to_string(),
+            snapshot_consistent: self.supports_snapshot_cursor,
+            table: Some(table.clone()),
         })
+    }
+
+    fn next_epoch(&self) -> Epoch {
+        Epoch(self.epoch.fetch_add(1, Ordering::Relaxed) + 1)
     }
 }
 
 impl Drop for LiveSession {
     fn drop(&mut self) {
         let _inside = self.runtime.enter();
-        drop(self.session.take());
-    }
-}
-
-fn table_label(table: &TableInfo) -> String {
-    match &table.schema {
-        Some(schema) => format!("{schema}.{}", table.name),
-        None => table.name.clone(),
+        self.sessions.close(self.session_id);
     }
 }
 
 pub struct LiveTable {
     session: Arc<LiveSession>,
     columns: Vec<ColumnMeta>,
-    rows: Vec<Vec<Cell>>,
+    rows: QueryRows,
     scan: ScanSource,
     pub truncated: bool,
-    table: String,
+    snapshot_consistent: bool,
+    table: Option<TableInfo>,
 }
 
 impl LiveTable {
@@ -163,64 +220,167 @@ impl LiveTable {
         &self.session
     }
 
-    pub fn table_name(&self) -> &str {
-        &self.table
+    pub fn table_info(&self) -> Option<&TableInfo> {
+        self.table.as_ref()
     }
 
-    pub fn load(origin: &Origin, table: &str, max_rows: u64) -> Result<Self, String> {
+    pub fn load(origin: &Origin, table: &TableInfo, max_rows: u64) -> Result<Self, String> {
         LiveSession::open(origin)?.load_table(table, max_rows)
     }
 }
 
-async fn open_session(origin: &Origin, cancellation: CancellationToken) -> Result<(ReadSession, String), String> {
+async fn open_session(
+    origin: &Origin,
+    cancellation: CancellationToken,
+) -> Result<(ReadSessionStore, OpenedSession), String> {
     let registry = Arc::new(drivers_registry::default_registry());
-    let (opened, label) = match origin {
+    let sessions = ReadSessionStore::new(registry, Arc::new(DatabaseService::new()))
+        .with_subscription_sampler(Arc::new(RegistrySubscriptionSampler));
+    let epoch = Epoch(1);
+    let current_epoch = AtomicU64::new(epoch.0);
+    let control = OperationControl::new(
+        cancellation,
+        Some(tokio::time::Instant::now() + Duration::from_secs(30)),
+    );
+    let command = match origin {
         Origin::Saved(connection) => {
-            let saved = list_saved_connections().await?;
-            let summary = saved
+            let saved = bridge_saved_connections(&control, epoch, &current_epoch).await?;
+            let connection_id = saved
                 .iter()
                 .find(|saved| saved.id.to_string() == *connection || saved.name == *connection)
+                .map(|saved| saved.id)
                 .ok_or_else(|| format!("no saved connection named or numbered {connection}"))?;
-            (
-                ReadSession::open_saved_controlled(summary.id, registry, cancellation).await,
-                summary.name.clone(),
-            )
+            Command::OpenSavedConnection { epoch, connection_id }
         }
-        Origin::File(path) => (
-            ReadSession::open_file_controlled(path, registry, cancellation).await,
-            path.file_name().map_or_else(
-                || path.display().to_string(),
-                |name| name.to_string_lossy().into_owned(),
-            ),
-        ),
+        Origin::File(path) => Command::OpenConnectionFile {
+            epoch,
+            path: path.clone(),
+        },
     };
-    Ok((opened.map_err(|failure| format!("{failure:?}"))?, label))
+    let event = dispatch_read(
+        DispatchContext::Sessions(&sessions),
+        command,
+        &control,
+        epoch,
+        &current_epoch,
+    )
+    .await?;
+    let Event::SessionOpened { outcome, .. } = event else {
+        return Err("The command bridge returned an unexpected event.".into());
+    };
+    Ok((sessions, outcome?))
 }
 
-type Pages = (Vec<ColumnMeta>, Vec<Vec<Cell>>, ScanSource, bool);
+struct RegistrySubscriptionSampler;
+
+impl SubscriptionSampler for RegistrySubscriptionSampler {
+    fn validate(&self, request: &SubscriptionRequest) -> Result<(), bookie_core::DriverError> {
+        drivers_registry::validate_pubsub_request(&request.patterns, request.max_messages, request.window)
+    }
+
+    fn sample(
+        &self,
+        options: bookie_core::ConnectOptions,
+        request: SubscriptionRequest,
+    ) -> Pin<Box<dyn Future<Output = Result<SubscriptionSample, bookie_core::DriverError>> + Send + '_>> {
+        Box::pin(async move {
+            let sample =
+                drivers_registry::sample_pubsub(options, &request.patterns, request.max_messages, request.window)
+                    .await?;
+            Ok(SubscriptionSample {
+                messages: sample
+                    .messages
+                    .into_iter()
+                    .map(|message| bookie_app_services::read_session_store::SubscriptionMessage {
+                        channel: message.channel,
+                        pattern: message.pattern,
+                        payload: message.payload,
+                        payload_bytes: message.payload_bytes,
+                    })
+                    .collect(),
+                reached_limit: sample.reached_limit,
+            })
+        })
+    }
+}
+
+type Pages = (Vec<ColumnMeta>, QueryRows, ScanSource, bool);
 
 async fn read_pages(
-    session: &ReadSession,
-    table: &str,
+    sessions: &ReadSessionStore,
+    session_id: SessionId,
+    table: &TableInfo,
     max_rows: u64,
     cancellation: &CancellationToken,
+    epoch: Epoch,
+    current_epoch: &AtomicU64,
 ) -> Result<Pages, String> {
-    let table = find_table(&session.tables, table)?;
-    let spool = StreamResultSpoolManager::from_environment()
+    let open_control = OperationControl::new(cancellation.clone(), Some(tokio::time::Instant::now() + PAGE_TIMEOUT));
+    let mut cursor = sessions
+        .open_table_cursor(session_id, table, &open_control)
+        .await
+        .map_err(|failure| driver_failure_message(&failure))?;
+    let result = collect_pages(
+        sessions,
+        session_id,
+        table,
+        max_rows,
+        cancellation,
+        &mut cursor,
+        epoch,
+        current_epoch,
+    )
+    .await;
+    let close_result = if let Some(cursor) = cursor {
+        cursor.close().await.map_err(|failure| driver_failure_message(&failure))
+    } else {
+        Ok(())
+    };
+    match result {
+        Ok(pages) => {
+            close_result?;
+            Ok(pages)
+        }
+        Err(error) => {
+            let _ = close_result;
+            Err(error)
+        }
+    }
+}
+
+async fn collect_pages(
+    sessions: &ReadSessionStore,
+    session_id: SessionId,
+    table: &TableInfo,
+    max_rows: u64,
+    cancellation: &CancellationToken,
+    cursor: &mut Option<bookie_app_services::read_session::PostgresTableCursor>,
+    epoch: Epoch,
+    current_epoch: &AtomicU64,
+) -> Result<Pages, String> {
+    let spool = crate::source::spool_manager()
         .create()
         .map_err(|error| error.to_string())?;
     let mut infos: Vec<ColumnInfo> = Vec::new();
-    let mut rows: Vec<Vec<Cell>> = Vec::new();
+    let mut rows = QueryRows::new();
     let mut truncated = false;
     let mut page_index = 0;
     let mut budget = QueryResultBudget::default();
     while (rows.len() as u64) < max_rows {
         let limit = PAGE_ROWS.min(max_rows - rows.len() as u64);
-        let control = OperationControl::new(cancellation.clone(), Some(tokio::time::Instant::now() + PAGE_TIMEOUT));
-        let mut page = session
-            .read_page(&table, rows.len() as u64, limit, &control)
-            .await
-            .map_err(|failure| format!("{failure:?}"))?;
+        let (mut page, has_next_page) = next_result_page(
+            sessions,
+            session_id,
+            table,
+            rows.len() as u64,
+            limit,
+            cancellation,
+            cursor,
+            epoch,
+            current_epoch,
+        )
+        .await?;
+        cap_page_rows(&mut page, limit);
         if infos.is_empty() {
             infos.clone_from(&page.columns);
         }
@@ -229,11 +389,9 @@ async fn read_pages(
         }
         let incomplete = bound_page(&mut page, &mut budget);
         let count = page.rows.len() as u64;
-        rows.extend(
-            page.rows
-                .iter()
-                .map(|row| row.iter().cloned().map(value_to_cell).collect()),
-        );
+        for row in page.rows.iter() {
+            rows.push(row.to_vec());
+        }
         spool
             .append_page(page_index, Arc::new(page))
             .await
@@ -246,7 +404,7 @@ async fn read_pages(
             truncated = true;
             break;
         }
-        if count < limit {
+        if count == 0 || (cursor.is_some() && !has_next_page) || (cursor.is_none() && count < limit) {
             break;
         }
         truncated = (rows.len() as u64) >= max_rows;
@@ -256,52 +414,217 @@ async fn read_pages(
     Ok((columns, rows, ScanSource::new(spool, infos, total), truncated))
 }
 
+async fn next_result_page(
+    sessions: &ReadSessionStore,
+    session_id: SessionId,
+    table: &TableInfo,
+    offset: u64,
+    limit: u64,
+    cancellation: &CancellationToken,
+    cursor: &mut Option<bookie_app_services::read_session::PostgresTableCursor>,
+    epoch: Epoch,
+    current_epoch: &AtomicU64,
+) -> Result<(QueryResult, bool), String> {
+    let control = OperationControl::new(cancellation.clone(), Some(tokio::time::Instant::now() + PAGE_TIMEOUT));
+    match cursor {
+        Some(cursor) => {
+            let page = cursor
+                .next_page(&control)
+                .await
+                .map_err(|failure| driver_failure_message(&failure))?;
+            Ok((page.result, page.has_next_page))
+        }
+        None => Ok((
+            bridge_read_page(
+                sessions,
+                session_id,
+                table,
+                offset,
+                limit,
+                &control,
+                epoch,
+                current_epoch,
+            )
+            .await?,
+            false,
+        )),
+    }
+}
+
 async fn query_pages(
-    session: &ReadSession,
+    sessions: &ReadSessionStore,
+    session_id: SessionId,
     sql: &str,
     max_rows: u64,
     cancellation: &CancellationToken,
+    epoch: Epoch,
+    current_epoch: &AtomicU64,
 ) -> Result<Pages, String> {
     let control = OperationControl::new(cancellation.clone(), Some(tokio::time::Instant::now() + PAGE_TIMEOUT));
-    let mut result = session
-        .run_query(sql, &control)
-        .await
-        .map_err(|failure| format!("{failure:?}"))?;
+    let mut result = bridge_query(sessions, session_id, sql, &control, epoch, current_epoch).await?;
     if cancellation.is_cancelled() {
         return Err("The operation was cancelled.".into());
     }
-    let spool = StreamResultSpoolManager::from_environment()
+    let spool = crate::source::spool_manager()
         .create()
         .map_err(|error| error.to_string())?;
     let infos: Vec<ColumnInfo> = result.columns.clone();
     let cap = usize::try_from(max_rows).unwrap_or(usize::MAX);
-    let mut truncated = result.truncated || result.rows.len() > cap;
-    let mut all: Vec<Vec<bookie_core::Value>> = result.rows.iter().take(cap).map(|row| row.to_vec()).collect();
-    result.rows = bookie_core::QueryRows::from_rows(Vec::new());
     let mut budget = QueryResultBudget::default();
-    let admitted = all.iter().take_while(|row| budget.admit(row)).count();
-    if admitted < all.len() {
-        all.truncate(admitted);
-        truncated = true;
-    }
-    let rows: Vec<Vec<Cell>> = all
-        .iter()
-        .map(|row| row.iter().cloned().map(value_to_cell).collect())
-        .collect();
-    for (index, chunk) in all.chunks(PAGE_ROWS as usize).enumerate() {
+    let truncated = bound_query_result(&mut result, cap, &mut budget);
+    let page_size = PAGE_ROWS as usize;
+    for page_index in 0..result.rows.len().div_ceil(page_size) {
+        let start = page_index * page_size;
+        let page_rows = result
+            .rows
+            .iter()
+            .skip(start)
+            .take(page_size)
+            .map(|row| row.to_vec())
+            .collect();
         let page = QueryResult {
             columns: infos.clone(),
-            rows: bookie_core::QueryRows::from_rows(chunk.to_vec()),
+            rows: QueryRows::from_rows(page_rows),
             truncated: false,
         };
         spool
-            .append_page(index as u64, Arc::new(page))
+            .append_page(page_index as u64, Arc::new(page))
             .await
             .map_err(|error| error.to_string())?;
     }
-    let total = all.len() as u64;
+    let total = result.rows.len() as u64;
     let columns = infos.iter().map(column_meta).collect();
-    Ok((columns, rows, ScanSource::new(spool, infos, total), truncated))
+    Ok((columns, result.rows, ScanSource::new(spool, infos, total), truncated))
+}
+
+async fn bridge_query(
+    sessions: &ReadSessionStore,
+    session_id: SessionId,
+    sql: &str,
+    control: &OperationControl,
+    epoch: Epoch,
+    current_epoch: &AtomicU64,
+) -> Result<QueryResult, String> {
+    let event = dispatch_read(
+        DispatchContext::Sessions(sessions),
+        Command::RunQuery {
+            epoch,
+            session_id,
+            sql: sql.to_owned(),
+        },
+        control,
+        epoch,
+        current_epoch,
+    )
+    .await?;
+    let Event::QueryCompleted { outcome, .. } = event else {
+        return Err("The command bridge returned an unexpected event.".into());
+    };
+    outcome.map_err(|failure| driver_failure_message(&failure))
+}
+
+async fn bridge_read_page(
+    sessions: &ReadSessionStore,
+    session_id: SessionId,
+    table: &TableInfo,
+    offset: u64,
+    limit: u64,
+    control: &OperationControl,
+    epoch: Epoch,
+    current_epoch: &AtomicU64,
+) -> Result<QueryResult, String> {
+    let event = dispatch_read(
+        DispatchContext::Sessions(sessions),
+        Command::ReadPage {
+            epoch,
+            session_id,
+            table: table.clone(),
+            offset,
+            limit,
+        },
+        control,
+        epoch,
+        current_epoch,
+    )
+    .await?;
+    let Event::PageRead { outcome, .. } = event else {
+        return Err("The command bridge returned an unexpected event.".into());
+    };
+    outcome.map_err(|failure| driver_failure_message(&failure))
+}
+
+async fn dispatch_read(
+    context: DispatchContext<'_>,
+    command: Command,
+    control: &OperationControl,
+    epoch: Epoch,
+    current_epoch: &AtomicU64,
+) -> Result<Event, String> {
+    if current_epoch.load(Ordering::Relaxed) != epoch.0 {
+        return Err("The request was superseded.".into());
+    }
+    let (sender, mut receiver) = tokio::sync::mpsc::channel(1);
+    let sink = ChannelEventSink::new(sender);
+    dispatch(context, command, control, &sink)
+        .await
+        .map_err(|error| format!("{error:?}"))?;
+    let event = receiver.try_recv().map_err(|error| format!("{error:?}"))?;
+    keep_current_event(context, event, Epoch(current_epoch.load(Ordering::Relaxed)))
+}
+
+fn keep_current_event(context: DispatchContext<'_>, event: Event, current: Epoch) -> Result<Event, String> {
+    if event.epoch() == current {
+        return Ok(event);
+    }
+    if let (
+        DispatchContext::Sessions(sessions),
+        Event::SessionOpened {
+            outcome: Ok(opened), ..
+        },
+    ) = (context, event)
+    {
+        sessions.close(opened.session_id);
+    }
+    Err("The request was superseded.".into())
+}
+
+async fn bridge_saved_connections(
+    control: &OperationControl,
+    epoch: Epoch,
+    current_epoch: &AtomicU64,
+) -> Result<Vec<ConnectionSummary>, String> {
+    let event = dispatch_read(
+        DispatchContext::SavedConnections,
+        Command::ListSavedConnections { epoch },
+        control,
+        epoch,
+        current_epoch,
+    )
+    .await?;
+    let Event::SavedConnectionsListed { outcome, .. } = event else {
+        return Err("The command bridge returned an unexpected event.".into());
+    };
+    outcome
+}
+
+fn bound_query_result(result: &mut QueryResult, cap: usize, budget: &mut QueryResultBudget) -> bool {
+    let mut truncated = result.truncated || result.rows.len() > cap;
+    result.rows.truncate(cap);
+    let admitted = result.rows.iter().take_while(|row| budget.admit(row)).count();
+    if admitted < result.rows.len() {
+        result.rows.truncate(admitted);
+        truncated = true;
+    }
+    truncated
+}
+
+fn cap_page_rows(page: &mut QueryResult, cap: u64) -> bool {
+    if page.rows.len() as u64 <= cap {
+        return false;
+    }
+    page.rows.truncate(usize::try_from(cap).unwrap_or(usize::MAX));
+    page.truncated = true;
+    true
 }
 
 fn bound_page(page: &mut QueryResult, budget: &mut QueryResultBudget) -> bool {
@@ -312,26 +635,49 @@ fn bound_page(page: &mut QueryResult, budget: &mut QueryResultBudget) -> bool {
     incomplete
 }
 
-fn find_table(tables: &[TableInfo], wanted: &str) -> Result<TableInfo, String> {
+fn find_table(tables: &[TableInfo], wanted: &TableInfo) -> Result<TableInfo, String> {
     tables
         .iter()
-        .find(|table| {
-            table.name == wanted
-                || table
-                    .schema
-                    .as_ref()
-                    .is_some_and(|schema| format!("{schema}.{}", table.name) == wanted)
-        })
+        .find(|table| *table == wanted)
         .cloned()
-        .ok_or_else(|| format!("no table named {wanted}"))
+        .ok_or_else(|| format!("no table named {}", table_label(wanted)))
 }
 
 fn column_meta(info: &ColumnInfo) -> ColumnMeta {
-    let width = (info.name.chars().count() as f32 * 9.0 + 48.0).clamp(110.0, 320.0);
+    let measured = (info.name.chars().count() as f32 * 9.0 + 48.0).clamp(110.0, 320.0);
+    let width = if numeric_type(&info.data_type) {
+        measured.max(200.0)
+    } else {
+        measured
+    };
     ColumnMeta {
         name: info.name.clone(),
         width,
         numeric: numeric_type(&info.data_type),
+    }
+}
+
+#[cfg(test)]
+mod column_meta_tests {
+    use super::*;
+
+    #[test]
+    fn numeric_columns_have_room_for_exact_integer_values() {
+        let column = column_meta(&ColumnInfo {
+            name: "value".into(),
+            data_type: "BIGINT".into(),
+            nullable: false,
+            primary_key: false,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: None,
+            domain_type: None,
+        });
+
+        assert!(column.width >= 200.0, "{}", column.width);
     }
 }
 
@@ -359,7 +705,19 @@ impl ResultSource for LiveTable {
         } else {
             String::new()
         };
-        format!("{} · {} · read-only{cap}", self.session.driver_id, self.table)
+        let table = self
+            .table
+            .as_ref()
+            .map(table_label)
+            .unwrap_or_else(|| "query result".into());
+        let consistency = self.table.as_ref().map_or("", |_| {
+            if self.snapshot_consistent {
+                " · snapshot for this load"
+            } else {
+                " · concurrent changes may skip or repeat rows"
+            }
+        });
+        format!("{} · {} · read-only{consistency}{cap}", self.session.driver_id, table)
     }
 
     fn total(&self) -> u64 {
@@ -370,8 +728,12 @@ impl ResultSource for LiveTable {
         usize::try_from(index)
             .ok()
             .and_then(|index| self.rows.get(index))
-            .cloned()
+            .map(<[Cell]>::to_vec)
             .unwrap_or_default()
+    }
+
+    fn row_ref(&self, index: u64) -> Option<&[Cell]> {
+        usize::try_from(index).ok().and_then(|index| self.rows.get(index))
     }
 
     fn find(&self, query: &str, cap: usize, cancel: &CancellationToken) -> Result<FindResult, &'static str> {
@@ -390,6 +752,32 @@ impl ResultSource for LiveTable {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_stale_open_event_closes_its_session() {
+        let Origin::File(source) = fixture() else {
+            unreachable!()
+        };
+        let file = FixtureFile(std::env::temp_dir().join(format!("bookie-gpui-stale-{}.sqlite", uuid::Uuid::new_v4())));
+        std::fs::copy(source, &file.0).unwrap();
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let database = Arc::new(DatabaseService::new_isolated());
+        let sessions = ReadSessionStore::new(Arc::new(drivers_registry::default_registry()), database.clone());
+        let control = OperationControl::with_timeout(Duration::from_secs(5));
+        let opened = runtime.block_on(sessions.open_file(&file.0, &control)).unwrap();
+
+        let result = keep_current_event(
+            DispatchContext::Sessions(&sessions),
+            Event::SessionOpened {
+                epoch: Epoch(1),
+                outcome: Ok(opened),
+            },
+            Epoch(2),
+        );
+
+        assert!(result.is_err());
+        assert!(database.connection_overview().is_empty());
+    }
 
     #[test]
     fn declared_number_types_are_numeric_and_text_types_are_not() {
@@ -445,7 +833,15 @@ mod tests {
     #[test]
     fn a_driver_truncated_page_is_reported_as_incomplete() {
         let file = oversized_fixture();
-        let table = LiveTable::load(&Origin::File(file.0.clone()), "wide", 100).unwrap();
+        let table = LiveTable::load(
+            &Origin::File(file.0.clone()),
+            &TableInfo {
+                schema: None,
+                name: "wide".into(),
+            },
+            100,
+        )
+        .unwrap();
         assert_eq!(table.total(), 0);
         assert!(table.truncated);
     }
@@ -453,8 +849,28 @@ mod tests {
     #[test]
     fn an_empty_or_oversized_row_cap_is_refused() {
         let session = LiveSession::open(&fixture()).unwrap();
-        assert!(session.load_table("orders", 0).is_err());
-        assert!(session.load_table("orders", ROW_CAP + 1).is_err());
+        assert!(
+            session
+                .load_table(
+                    &TableInfo {
+                        schema: None,
+                        name: "orders".into()
+                    },
+                    0
+                )
+                .is_err()
+        );
+        assert!(
+            session
+                .load_table(
+                    &TableInfo {
+                        schema: None,
+                        name: "orders".into()
+                    },
+                    ROW_CAP + 1
+                )
+                .is_err()
+        );
     }
 
     #[test]
@@ -462,7 +878,18 @@ mod tests {
         let session = LiveSession::open(&fixture()).unwrap();
         let cancellation = CancellationToken::new();
         cancellation.cancel();
-        assert!(session.load_table_controlled("orders", 100, &cancellation).is_err());
+        assert!(
+            session
+                .load_table_controlled(
+                    &TableInfo {
+                        schema: None,
+                        name: "orders".into()
+                    },
+                    100,
+                    &cancellation
+                )
+                .is_err()
+        );
     }
 
     #[test]
@@ -496,14 +923,81 @@ mod tests {
         }
     }
 
+    #[test]
+    fn a_cursor_page_larger_than_the_remaining_row_cap_is_truncated() {
+        let mut page = QueryResult {
+            columns: Vec::new(),
+            rows: QueryRows::from_rows((0..3).map(|id| vec![bookie_core::Value::Int(id)]).collect()),
+            truncated: false,
+        };
+        assert!(cap_page_rows(&mut page, 2));
+        assert!(page.truncated);
+        assert_eq!(page.rows.len(), 2);
+        assert_eq!(page.rows[1][0], bookie_core::Value::Int(1));
+    }
+
+    #[test]
+    fn a_query_result_is_bounded_in_place_and_keeps_its_typed_prefix() {
+        let row = |index| {
+            vec![
+                bookie_core::Value::Int(index),
+                bookie_core::Value::Text("x".repeat(1024 * 1024)),
+            ]
+        };
+        let mut result = QueryResult {
+            columns: Vec::new(),
+            rows: QueryRows::from_rows((0..70).map(row).collect()),
+            truncated: false,
+        };
+        let mut budget = QueryResultBudget::default();
+        assert!(bound_query_result(&mut result, 100, &mut budget));
+        assert!((1..70).contains(&result.rows.len()));
+        for (index, retained) in result.rows.iter().enumerate() {
+            assert_eq!(retained[0], bookie_core::Value::Int(index as i64));
+        }
+    }
+
+    #[test]
+    fn a_query_result_row_cap_keeps_only_the_prefix_and_marks_it_incomplete() {
+        let mut result = QueryResult {
+            columns: Vec::new(),
+            rows: QueryRows::from_rows((0..3).map(|index| vec![bookie_core::Value::Int(index)]).collect()),
+            truncated: false,
+        };
+        assert!(bound_query_result(&mut result, 2, &mut QueryResultBudget::default()));
+        assert_eq!(result.rows.len(), 2);
+        assert_eq!(result.rows.last(), Some([bookie_core::Value::Int(1)].as_slice()));
+    }
+
     fn fixture() -> Origin {
         let manifest_dir = std::env::var_os("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR");
         Origin::File(std::path::PathBuf::from(manifest_dir).join("tests/fixtures/orders.sqlite"))
     }
 
     #[test]
+    fn a_database_file_cannot_write_from_the_query_editor() {
+        let Origin::File(source) = fixture() else {
+            unreachable!()
+        };
+        let path = std::env::temp_dir().join(format!("bookie-gpui-read-only-{}.sqlite", uuid::Uuid::new_v4()));
+        std::fs::copy(source, &path).unwrap();
+        let file = FixtureFile(path);
+        let live = LiveSession::open(&Origin::File(file.0.clone())).unwrap();
+        assert!(live.run_query("DELETE FROM orders", 100).is_err());
+        assert_eq!(live.run_query("SELECT id FROM orders", 100).unwrap().total(), 6);
+    }
+
+    #[test]
     fn a_database_file_loads_as_a_live_table_with_real_columns_and_nulls() {
-        let table = LiveTable::load(&fixture(), "orders", 100).expect("load");
+        let table = LiveTable::load(
+            &fixture(),
+            &TableInfo {
+                schema: None,
+                name: "orders".into(),
+            },
+            100,
+        )
+        .expect("load");
         let names: Vec<&str> = table.columns().iter().map(|column| column.name.as_str()).collect();
         assert_eq!(names, ["id", "customer", "total", "paid", "note"]);
         assert_eq!(table.total(), 6);
@@ -514,8 +1008,34 @@ mod tests {
     }
 
     #[test]
+    fn connection_status_uses_the_read_command_bridge() {
+        let session = LiveSession::open(&fixture()).expect("open fixture");
+
+        let overview = session.overview().expect("connection status");
+
+        assert_eq!(overview.len(), 1);
+        assert_eq!(overview[0].driver_id, "sqlite");
+        assert_eq!(
+            overview[0].health,
+            bookie_app_services::database_service::ConnectionHealth::Healthy
+        );
+        assert_eq!(
+            overview[0].tunnel,
+            bookie_app_services::database_service::TunnelState::Direct
+        );
+    }
+
+    #[test]
     fn find_and_filter_answer_from_the_loaded_rows() {
-        let table = LiveTable::load(&fixture(), "orders", 100).expect("load");
+        let table = LiveTable::load(
+            &fixture(),
+            &TableInfo {
+                schema: None,
+                name: "orders".into(),
+            },
+            100,
+        )
+        .expect("load");
         let cancel = CancellationToken::new();
         let found = table.find("ada", 10, &cancel).expect("find");
         assert_eq!(found.matches, vec![0, 3]);
@@ -527,10 +1047,38 @@ mod tests {
     #[test]
     fn one_session_loads_each_of_its_tables() {
         let session = LiveSession::open(&fixture()).expect("open");
-        assert_eq!(session.tables, ["customers", "orders"]);
+        assert_eq!(
+            session.tables,
+            [
+                TableInfo {
+                    schema: None,
+                    name: "customers".into()
+                },
+                TableInfo {
+                    schema: None,
+                    name: "orders".into()
+                }
+            ]
+        );
         assert_eq!(session.label, "orders.sqlite");
-        let customers = session.load_table("customers", 100).expect("customers");
-        let orders = session.load_table("orders", 100).expect("orders");
+        let customers = session
+            .load_table(
+                &TableInfo {
+                    schema: None,
+                    name: "customers".into(),
+                },
+                100,
+            )
+            .expect("customers");
+        let orders = session
+            .load_table(
+                &TableInfo {
+                    schema: None,
+                    name: "orders".into(),
+                },
+                100,
+            )
+            .expect("orders");
         assert_eq!((customers.total(), orders.total()), (2, 6));
         assert_eq!(customers.columns().len(), 2);
         assert_eq!(orders.columns().len(), 5);
@@ -556,21 +1104,61 @@ mod tests {
 
     #[test]
     fn the_row_cap_truncates_and_says_so() {
-        let table = LiveTable::load(&fixture(), "orders", 4).expect("load");
+        let table = LiveTable::load(
+            &fixture(),
+            &TableInfo {
+                schema: None,
+                name: "orders".into(),
+            },
+            4,
+        )
+        .expect("load");
         assert_eq!(table.total(), 4);
         assert!(table.truncated);
         assert_eq!(
             table.origin(),
-            "sqlite · orders · read-only · 4 rows loaded; result may be incomplete"
+            "sqlite · orders · read-only · concurrent changes may skip or repeat rows · 4 rows loaded; result may be incomplete"
         );
-        let whole = LiveTable::load(&fixture(), "orders", 100).expect("load");
-        assert_eq!(whole.origin(), "sqlite · orders · read-only");
+        let whole = LiveTable::load(
+            &fixture(),
+            &TableInfo {
+                schema: None,
+                name: "orders".into(),
+            },
+            100,
+        )
+        .expect("load");
+        assert_eq!(
+            whole.origin(),
+            "sqlite · orders · read-only · concurrent changes may skip or repeat rows"
+        );
+        assert!(whole.origin().contains("concurrent changes may skip or repeat rows"));
     }
 
     #[test]
     fn a_missing_table_or_file_is_an_error_not_a_panic() {
-        assert!(LiveTable::load(&fixture(), "nope", 10).is_err());
+        assert!(
+            LiveTable::load(
+                &fixture(),
+                &TableInfo {
+                    schema: None,
+                    name: "nope".into()
+                },
+                10
+            )
+            .is_err()
+        );
         let missing = Origin::File("/nonexistent/none.sqlite".into());
-        assert!(LiveTable::load(&missing, "orders", 10).is_err());
+        assert!(
+            LiveTable::load(
+                &missing,
+                &TableInfo {
+                    schema: None,
+                    name: "orders".into()
+                },
+                10
+            )
+            .is_err()
+        );
     }
 }

@@ -10,6 +10,20 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 
 
+def clean_test_environment(**values):
+    environment = os.environ.copy()
+    for key in (
+        "BOOKIE_REQUIRE_PREBUILT",
+        "BOOKIE_SANDBOX_BUNDLE",
+        "BOOKIE_TEST_BUNDLE",
+        "BOOKIE_SOURCE_COMMIT",
+        "BOOKIE_NEXTEST_PROFILE",
+    ):
+        environment.pop(key, None)
+    environment.update(values)
+    return environment
+
+
 class SandboxSelectionTests(unittest.TestCase):
     def test_empty_sandbox_selection_is_not_reported_as_success(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -28,7 +42,7 @@ class SandboxSelectionTests(unittest.TestCase):
             ensure.chmod(0o755)
             result = subprocess.run(
                 ["bash", str(scripts / "test-sandbox.sh")],
-                text=True, capture_output=True, check=False,
+                env=clean_test_environment(), text=True, capture_output=True, check=False,
             )
             self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
 
@@ -47,8 +61,8 @@ class SandboxSelectionTests(unittest.TestCase):
 
     def test_preflight_requires_and_verifies_a_source_pinned_bundle_when_requested(self):
         script = (ROOT / "scripts/preflight.sh").read_text()
-        self.assertIn('if [[ -n "${BOOKIE_TEST_BUNDLE:-}" ]]; then', script)
-        self.assertIn('ci-test-bundle.py" verify "$BOOKIE_TEST_BUNDLE"', script)
+        self.assertIn('unit_bundle="${BOOKIE_UNIT_BUNDLE:-${BOOKIE_TEST_BUNDLE:-}}"', script)
+        self.assertIn('ci-test-bundle.py" verify "$unit_bundle"', script)
         self.assertIn('elif [[ "${BOOKIE_REQUIRE_PREBUILT:-0}" == 1 ]]; then', script)
         self.assertIn('package(=$crate)', script)
 
@@ -70,7 +84,7 @@ class SandboxSelectionTests(unittest.TestCase):
             log = root / "commands.jsonl"
             result = subprocess.run(
                 ["bash", str(scripts / "test-sandbox.sh")],
-                env={**os.environ, "NEXTEST_LOG": str(log)}, text=True, capture_output=True,
+                env=clean_test_environment(NEXTEST_LOG=str(log)), text=True, capture_output=True,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             commands = [json.loads(line) for line in log.read_text().splitlines()]

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import argparse
-import importlib.util
 import json
 from pathlib import Path
 import re
@@ -8,11 +7,6 @@ import subprocess
 import sys
 import urllib.request
 
-
-ROOT = Path(__file__).resolve().parents[1]
-_SPEC = importlib.util.spec_from_file_location('release_notes', ROOT / 'scripts/release-notes.py')
-release_notes = importlib.util.module_from_spec(_SPEC)
-_SPEC.loader.exec_module(release_notes)
 
 REPOSITORY = 'cozyGarage/BookiE'
 MANIFEST = 'ci/forgejo-train.json'
@@ -48,22 +42,6 @@ def manifest_members(manifest):
     require(len({m['number'] for m in members}) == len(members), 'duplicate constituent PR')
     require(len({m['sha'] for m in members}) == len(members), 'duplicate constituent head')
     return members
-
-
-def check_release_notes(aggregate_body, member_bodies):
-    """The aggregate squash commit must carry every constituent's Release-Note lines (ADR 0022)."""
-    carried = set()
-    for number, body in member_bodies.items():
-        _, errors = release_notes.parse_notes(body or '')
-        require(not errors, f'constituent #{number} Release-Note: ' + '; '.join(errors))
-        carried.update(f'Release-Note: {v}' for v in release_notes.note_values(body) if v.lower() != 'none')
-    _, errors = release_notes.parse_notes(aggregate_body or '')
-    require(not errors, 'aggregate PR Release-Note: ' + '; '.join(errors))
-    present = {f'Release-Note: {v}' for v in release_notes.note_values(aggregate_body)}
-    missing = sorted(carried - present)
-    require(not missing, 'aggregate PR body is missing constituent release notes: ' + '; '.join(missing))
-    require(carried or present == {'Release-Note: none'} or all(v.lower() == 'none' for v in release_notes.note_values(aggregate_body)),
-            'no constituent has a release note, so the aggregate PR must say `Release-Note: none`')
 
 
 def check_results(checks, required_checks=REQUIRED_CHECKS):
@@ -185,13 +163,10 @@ def main():
         return
     require(main_head() == manifest['base'], 'main moved; rebuild and gate a new train')
     check_open(aggregate, is_aggregate=True)
-    member_bodies = {}
     for member in members:
         pr = pull_request(member['number'])
         require(pr['headRefOid'] == member['sha'], f"constituent #{member['number']} moved")
         check_open(pr, is_aggregate=False)
-        member_bodies[member['number']] = pr.get('body', '')
-    check_release_notes(aggregate.get('body', ''), member_bodies)
     for member in members:
         current = pull_request(member['number'])
         require(current['headRefOid'] == member['sha'] and current['state'] == 'OPEN'

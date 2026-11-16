@@ -38,6 +38,51 @@ pub struct PgStream {
     pub(crate) parameter_statuses: BTreeMap<String, String>,
 
     pub(crate) server_version_num: Option<u32>,
+
+    pub(crate) server_notices: Vec<PgServerNotice>,
+
+    pub(crate) dropped_server_notices: u64,
+}
+
+pub const MAX_BUFFERED_SERVER_NOTICES: usize = 256;
+pub const MAX_SERVER_NOTICE_BYTES: usize = 8192;
+pub const MAX_SERVER_NOTICE_CODE_BYTES: usize = 32;
+
+#[derive(Debug, Clone)]
+pub struct PgServerNotice {
+    pub severity: PgSeverity,
+    pub code: String,
+    pub message: String,
+}
+
+impl PgStream {
+    pub(crate) fn buffer_server_notice(&mut self, notice: &Notice) {
+        if self.server_notices.len() >= MAX_BUFFERED_SERVER_NOTICES {
+            self.dropped_server_notices = self.dropped_server_notices.saturating_add(1);
+            return;
+        }
+        let message = bounded_notice_text(notice.message());
+        self.server_notices.push(PgServerNotice {
+            severity: notice.severity(),
+            code: bounded_notice_code(notice.code()),
+            message,
+        });
+    }
+}
+
+fn bounded_notice_text(text: &str) -> String {
+    let mut end = text.len().min(MAX_SERVER_NOTICE_BYTES);
+    while !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    text[..end].to_owned()
+}
+
+fn bounded_notice_code(code: &str) -> String {
+    if code.len() <= MAX_SERVER_NOTICE_CODE_BYTES {
+        return code.to_owned();
+    }
+    String::new()
 }
 
 impl PgStream {
@@ -54,6 +99,8 @@ impl PgStream {
             notifications: None,
             parameter_statuses: BTreeMap::default(),
             server_version_num: None,
+            server_notices: Vec::new(),
+            dropped_server_notices: 0,
         })
     }
 
@@ -174,6 +221,7 @@ impl PgStream {
                     // if you are reading this comment and think so, open an issue
 
                     let notice: Notice = message.decode()?;
+                    self.buffer_server_notice(&notice);
 
                     let (log_level, tracing_level) = match notice.severity() {
                         PgSeverity::Fatal | PgSeverity::Panic | PgSeverity::Error => {
@@ -274,7 +322,10 @@ fn parse_server_version(s: &str) -> Option<u32> {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_server_version;
+    use super::{
+        MAX_SERVER_NOTICE_BYTES, MAX_SERVER_NOTICE_CODE_BYTES, bounded_notice_code, bounded_notice_text,
+        parse_server_version,
+    };
 
     #[test]
     fn test_parse_server_version_num() {
@@ -289,5 +340,16 @@ mod tests {
         assert_eq!(parse_server_version("13devel87"), Some(130000));
         // unknown
         assert_eq!(parse_server_version("unknown"), None);
+    }
+
+    #[test]
+    fn retained_notice_fields_are_bounded_before_copying() {
+        let code = "x".repeat(MAX_SERVER_NOTICE_CODE_BYTES + 1);
+        let text = "é".repeat(MAX_SERVER_NOTICE_BYTES);
+        assert_eq!(bounded_notice_code("01000"), "01000");
+        assert!(bounded_notice_code(&code).is_empty());
+        let retained_text = bounded_notice_text(&text);
+        assert!(retained_text.len() <= MAX_SERVER_NOTICE_BYTES);
+        assert!(retained_text.is_char_boundary(retained_text.len()));
     }
 }

@@ -2,10 +2,41 @@
 
 ## [Unreleased]
 
-## [0.2.7] - 2026-11-11
+## [0.2.7] - 2026-11-12
+
+### Added
+
+- The New Table tab now lets you pick each column's collation from the server's list, on engines that provide one. (#2862)
+- The New Table tab on MySQL and MariaDB can now set the table's default collation from the server's list. (#2865)
+- A workspace tab can be renamed from its menu or with F2, given a colour and tags, and these are saved with the workspace. Tags are found in Open Quickly and the tab overview. (#2887, #2889, #2890, #2892)
+- Query results can select columns, copy loaded values and stage bulk cell edits. (#2953, #2966)
+- View Value shows a read-only decoded preview of MessagePack and schema-less Protobuf bytes below the hex dump. (#2953)
+- PostgreSQL connections can open a read-only table and index health report and copy maintenance statements without running them. (#2953)
+- PostgreSQL can export a whole table, or its active filter and sort, from one consistent snapshot. (#2956)
+- PostgreSQL rows in updatable views can be edited when the view exposes its table's primary key. (#2956)
+- The SQL editor shows PostgreSQL notices and warnings, SQL Server PRINT output, and MySQL or MariaDB warnings next to results. (#2956)
+- MCP agents can read bounded schema context and routine definitions, and tokens can be limited to selected tools. (#2956, #2967)
+- Search Database Values searches a connection's tables and opens matching tables filtered to the matching columns. (#2970)
+- CSV, TSV and XLSX imports can update matching rows on supported engines and process up to 20 files in one run. (#2970)
+- The connection form can add, reorder and remove SSH jump hosts, with each hop's secrets stored in the keyring. (#2969)
+
+### Changed
+
+- On SQL Server, a query that reaches another server through a linked server name (four-part names) now asks for approval first. (#2859)
+- GTK grid: columns start at widths that suit their type, and the last column fills the view. (#2848)
+- The result grid right-aligns numeric columns, with their NULLs. (#2846)
+- GPUI retains live query results in a compact row store to reduce duplicate decoded-result memory. (#2844)
+- Large database sidebars remain responsive while the full catalog loads in batches. (#2871)
+- The AppImage requires glibc 2.43 or newer. (#2875)
+- Grid column headers align with their cell values. (#2874)
+- A terminal approval in bookie-agentd now asks you to type `approve` and a code shown in the prompt instead of `y`, so a late answer to an older prompt cannot approve a new one. (#2938)
+- Large database catalogs create sidebar rows on demand, reducing initial sidebar work. (#2944)
+- Windows restore all saved connections at startup, and each tab's work and edits use its own connection. (#2951, #2969)
+- Connection errors identify common server certificate failures and point to the field to correct. (#2953)
 
 ### Fixed
 
+- A cancelled or timed-out terminal approval in bookie-agentd no longer lets a second prompt start while the first is still reading, and a request waiting for the terminal is denied when it is cancelled or has waited two minutes. (#2938, #2941)
 - Result pages finishing after their rows disappear no longer remain unnecessarily loaded. (#2751)
 - A delayed row delete no longer discards a different unsaved draft after the grid changes. (#2755)
 - A grid menu no longer redirects a row delete to another row if the cell changes while the menu is open. (#2756)
@@ -18,6 +49,25 @@
 - Cell menu actions no longer use a different row after the grid changes. (#2786)
 - Large JSON cell previews avoid scanning the full value. (#2798)
 - The AppImage now uses libadwaita's own styling, with proper spacing and text hierarchy in dialogs and Preferences. (#2807)
+- Closing an edited table keeps keyboard focus in the workspace. (#2851)
+- Confirming an edit on a cell that holds an empty string or empty binary value no longer turns it into NULL. (#2843)
+- Contains, Starts with and Ends with filters on Oracle now treat percent signs, underscores and backslashes as literal text. (#2847)
+- Cancelling a CSV import into SQLite while a batch is running now records a cancelled import with the rows already written and no longer blocks later writes on the connection. (#2853)
+- In a narrow window, picking a table closes the sidebar. (#2854)
+- The result grid and query results show NULL the same way, and expression columns no longer show a type label. (#2842)
+- The SQL editor's status text keeps a fixed width, so the Run button no longer moves when a statement finishes. (#2857)
+- The Arch package now declares the OpenSSL 4 libraries it links against. (#2855)
+- A server that never answers the version request no longer holds a connection attempt open in the connect dialog. (#2860)
+- The column collation picker now works on MariaDB servers that list a collation without a character set. (#2864)
+- Inactive streamed result views release loaded pages and restore them from the saved result when shown again. (#2867)
+- CSV preview updates no longer block the import dialog on large files. (#2878)
+- Connection names render as plain text in history filters. (#2880)
+- Creating a new SQLite or DuckDB database file from the connection form now creates it without replacing an existing file. (#2952)
+- Restore the selected connection and its tab when reopening a window with multiple connections. (#2982)
+- PostgreSQL metadata and session queries ignore user-schema objects that shadow built-in catalog names. (#2985)
+- Bulk cell edits now refuse SQL Server CLR UDT columns whose values are exposed as opaque bytes. (#2987)
+- SQL Server grid edits preserve empty values and SQL NULL independently. (#2993)
+- Large value previews show a bounded prefix while Copy value keeps the full value. (#2998)
 
 ## [0.2.6] - 2026-11-10
 
@@ -937,7 +987,7 @@ Source version **0.2.0** (`Cargo.toml`, inherited by every workspace crate). Thi
 - Agentd session reuse after Secret Service or SSH/CA file rotation.
 - Unbounded PostgreSQL and MongoDB SCRAM iteration counts.
 
-[Unreleased]: https://github.com/cozyGarage/BookiE/compare/linux-v0.2.5...linux
+[Unreleased]: https://github.com/cozyGarage/BookiE/compare/linux-v0.2.5...main
 [0.1.5]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.1.5
 [0.2.0]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.0
 [0.2.2]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.2

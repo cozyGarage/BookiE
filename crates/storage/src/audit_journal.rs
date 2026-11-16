@@ -312,10 +312,7 @@ fn try_exclusive_lock(file: &File) -> Result<bool, StorageError> {
 }
 
 fn acquire_shared_lock(file: &File) -> Result<(), StorageError> {
-    let result = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_SH) };
-    if result != 0 {
-        return Err(std::io::Error::last_os_error().into());
-    }
+    crate::file_access::flock_retrying(file.as_raw_fd(), libc::LOCK_SH)?;
     Ok(())
 }
 
@@ -835,10 +832,7 @@ struct FileLock {
 impl FileLock {
     fn exclusive(file: &File) -> Result<Self, StorageError> {
         let descriptor = file.as_raw_fd();
-        let result = unsafe { libc::flock(descriptor, libc::LOCK_EX) };
-        if result != 0 {
-            return Err(std::io::Error::last_os_error().into());
-        }
+        crate::file_access::flock_retrying(descriptor, libc::LOCK_EX)?;
         Ok(Self { descriptor })
     }
 }

@@ -97,19 +97,33 @@ impl<T: TabContent> WorkspaceTabs<T> {
         request: TableOpenRequest<'_>,
         has_pending_changes: impl Fn(Uuid) -> bool,
     ) -> TableOpenPlan {
+        self.plan_table_open_scoped(request, has_pending_changes, |_| true)
+    }
+
+    pub fn plan_table_open_scoped(
+        &self,
+        request: TableOpenRequest<'_>,
+        has_pending_changes: impl Fn(Uuid) -> bool,
+        in_scope: impl Fn(Uuid) -> bool,
+    ) -> TableOpenPlan {
         if request.mode == OpenMode::SwitchOrAppend {
             let matches = |tab: &T| tab.table_target() == Some((request.schema, request.table));
             let existing = request
                 .selected
-                .filter(|id| self.get(id).is_some_and(matches))
-                .or_else(|| self.iter().find_map(|(id, tab)| matches(tab).then_some(*id)));
+                .filter(|id| in_scope(*id) && self.get(id).is_some_and(matches))
+                .or_else(|| {
+                    self.iter()
+                        .find_map(|(id, tab)| (in_scope(*id) && matches(tab)).then_some(*id))
+                });
             if let Some(id) = existing {
                 return TableOpenPlan::Select(id);
             }
         }
         let preview = opens_as_preview(request.mode == OpenMode::SwitchOrAppend, request.preview_enabled);
         let previous = if preview {
-            self.tabs.iter().find_map(|(id, tab)| tab.preview.then_some(*id))
+            self.tabs
+                .iter()
+                .find_map(|(id, tab)| (tab.preview && in_scope(*id)).then_some(*id))
         } else {
             None
         };

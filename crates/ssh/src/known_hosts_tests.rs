@@ -404,7 +404,7 @@ fn a_revoked_line_for_another_host_or_key_does_not_block_a_good_one() {
     let good = learn_then(&path, "bastion.example.com", 22, KEY_A_BASE64, UnknownHostKey::Refuse);
     assert!(matches!(good, HostKeyOutcome::Trusted), "{good:?}");
     let revoked = learn_then(&path, "bastion.example.com", 22, KEY_B_BASE64, UnknownHostKey::Refuse);
-    assert!(matches!(revoked, HostKeyOutcome::KnownHostsIo(_)), "{revoked:?}");
+    assert!(matches!(revoked, HostKeyOutcome::Revoked(_)), "{revoked:?}");
 }
 
 #[test]
@@ -414,7 +414,7 @@ fn a_revoked_hashed_entry_is_matched_too() {
     std::fs::write(&path, format!("@revoked {HASHED_BASTION} ssh-ed25519 {KEY_A_BASE64}\n")).unwrap();
 
     let outcome = learn_then(&path, "bastion.example.com", 22, KEY_A_BASE64, UnknownHostKey::Learn);
-    assert!(matches!(outcome, HostKeyOutcome::KnownHostsIo(message) if message.contains("@revoked")));
+    assert!(matches!(outcome, HostKeyOutcome::Revoked(message) if message.contains("@revoked")));
 }
 
 #[test]
@@ -432,7 +432,7 @@ fn a_revoked_wildcard_entry_is_matched() {
 
         let outcome = learn_then(&path, host, port, KEY_A_BASE64, UnknownHostKey::Learn);
         assert!(
-            matches!(&outcome, HostKeyOutcome::KnownHostsIo(message) if message.contains("@revoked")),
+            matches!(&outcome, HostKeyOutcome::Revoked(message) if message.contains("@revoked")),
             "{pattern} for {host}:{port}: {outcome:?}"
         );
     }

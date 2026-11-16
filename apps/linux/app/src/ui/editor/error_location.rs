@@ -14,7 +14,7 @@ pub(super) fn located_message(message: &str, sql: &str, position: Option<usize>)
     };
     let line = line.to_string();
     let column = column.to_string();
-    let place = crate::tr!("Line {line}, column {column} of this statement")
+    let place = bookie_app_services::tr!("Line {line}, column {column} of this statement")
         .replace("{line}", &line)
         .replace("{column}", &column);
     format!("{message}\n{place}")

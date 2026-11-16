@@ -45,6 +45,8 @@ pub(crate) struct MySqlConnectionInner {
     pub(crate) transaction_depth: usize,
     status_flags: Status,
 
+    pub(crate) warning_count: u32,
+
     // cache by query string to the statement id and metadata
     cache_statement: StatementCache<(u32, MySqlStatementMetadata)>,
 
@@ -52,6 +54,10 @@ pub(crate) struct MySqlConnectionInner {
 }
 
 impl MySqlConnection {
+    pub fn take_warning_count(&mut self) -> u32 {
+        std::mem::take(&mut self.inner.warning_count)
+    }
+
     pub(crate) fn in_transaction(&self) -> bool {
         self.inner
             .status_flags

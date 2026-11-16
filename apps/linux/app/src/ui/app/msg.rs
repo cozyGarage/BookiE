@@ -33,18 +33,27 @@ pub enum CatalogDdlMsg {
 }
 
 #[derive(Debug)]
-pub enum AppMsg {
-    OpenConnect,
-    ConnectionPrepared(Box<crate::services::connection_service::PreparedConnection>),
-    ConnectionPrepareFailed(String, Box<SavedConnection>),
-    CancelConnect,
-    ConnectionCancelled,
-    ConnectionSwitchDecision(super::types::SwitchDecision),
+pub enum ConnectionMessage {
+    Open,
+    Cancel,
+    Prepared(Box<crate::services::connection_service::PreparedConnection>),
+    PrepareFailed(String, Box<SavedConnection>),
+    SwitchDecision(super::types::SwitchDecision),
+    Cancelled,
     DialogClosed,
+}
+
+#[derive(Debug)]
+pub enum AppMsg {
+    Connection(ConnectionMessage),
     SelectTable {
         schema: Option<String>,
         name: String,
         open_mode: OpenMode,
+    },
+    ShowTemporaryTable {
+        schema: Option<String>,
+        name: String,
     },
     OpenReferencedRow {
         schema: Option<String>,
@@ -53,6 +62,7 @@ pub enum AppMsg {
     },
     ChooseReferencedRow(Vec<crate::ui::browse_tab::reference::ReferencedRowTarget>),
     ColumnsLoaded(Uuid, Vec<ColumnInfo>, tokio_util::sync::CancellationToken),
+    BrowseViewRestriction(Uuid, Option<bookie_app_services::view_edit::ViewEditRestriction>),
     FetchBrowseForeignKeys(Uuid),
     FetchBrowseEnumLabels(Uuid, Vec<(String, bookie_core::QualifiedTypeName)>),
     EnumLabelsLoaded(Uuid, Vec<(String, Vec<String>)>),
@@ -63,6 +73,7 @@ pub enum AppMsg {
         crate::ui::browse_tab::BrowsePageRequest,
         QueryResult,
         Option<Vec<usize>>,
+        std::time::Duration,
     ),
     LoadFailed(Option<Uuid>, crate::ui::browse_tab::BrowseLoadFailure),
     RowOpStarted,
@@ -133,6 +144,7 @@ pub enum AppMsg {
     SavedQueriesChanged(Vec<bookie_storage::SavedQuery>),
     SavedQueriesDialogClosed,
     ShowQuickSwitcher,
+    QuickSwitcherHistoryLoaded(Vec<crate::services::quick_switcher::QuickItem>),
     QuickSwitcherChose(crate::services::quick_switcher::QuickTarget),
     ShowHistory,
     CloseHistory,
@@ -141,6 +153,7 @@ pub enum AppMsg {
     Disconnect,
     ForceDisconnect,
     PrepareWindowClose,
+    PromptWindowClose,
     FlushWindowEdits,
     GridEditsPrepared {
         intent: super::grid_close::GridCloseIntent,
@@ -152,6 +165,7 @@ pub enum AppMsg {
         height: i32,
         maximized: bool,
     },
+    ContinueSessionRestore,
     WindowStatePersisted(Result<(), String>),
     WindowStatePersistedForClose(Result<(), String>),
     ConnectionDeleted(Uuid),
@@ -165,7 +179,19 @@ pub enum AppMsg {
     RefreshPage,
     ShowShortcuts,
     ShowAbout,
+    CheckForUpdates,
+    QuietCheckForUpdates,
+    UpdateCheckFinished {
+        source: super::UpdateCheckSource,
+        result: crate::services::update_check::UpdateCheckResult,
+    },
+    ReviewAvailableUpdate,
+    DismissAvailableUpdate,
+    MaybeShowWhatsNew,
+    WhatsNewDismissed,
     ShowActivity,
+    ShowHealthReport,
+    OpenSqlInEditor(String),
     ShowAuditLog,
     ShowAuditOperation(Uuid),
     ShowCatalog,
@@ -190,6 +216,7 @@ pub enum AppMsg {
     /// destroyed GTK widget's pointer, cast to `usize`, so the entry in
     /// `extra_windows` can be found and dropped.
     ExtraWindowClosed(usize),
+    ExtraWindowDismissed(usize),
     RowCountLoaded(Uuid, crate::ui::browse_tab::BrowseRowCountRequest, u64),
     RowCountFailed(Uuid, crate::ui::browse_tab::BrowseRowCountRequest),
     JumpToColumn,
@@ -210,7 +237,12 @@ pub enum AppMsg {
         row_positions: Vec<u32>,
         statement: bookie_core::sql_literal::RowStatement,
     },
-    FetchBrowsePage(Uuid),
+    FetchBrowsePage(Uuid, bool),
+    AutoRefreshFailed(Uuid, crate::ui::browse_tab::BrowsePageRequest, String),
+    AttachWorkspaceTab {
+        tab_id: Uuid,
+        connection_id: Option<Uuid>,
+    },
     FetchBrowseCellValue(
         Uuid,
         crate::ui::browse_tab::BrowseCellValueRequest,
@@ -234,6 +266,7 @@ pub enum AppMsg {
     CloseOtherWorkspaceTabs(Uuid),
     CloseWorkspaceTabsToRight(Uuid),
     WorkspaceTabsChanged,
+    EditorTemporaryTablesChanged(Uuid, Vec<bookie_core::TableInfo>),
     SwitchToRecentTab,
     EndRecentTabWalk,
     ExecuteBrowseTransaction {
@@ -258,7 +291,10 @@ pub enum AppMsg {
     ShowToast(String),
     BrowseTabDirtyChanged(Uuid, bool),
     EditorResultDirtyChanged(Uuid, bool),
-    ToggleSidebarGroup(String),
+    SidebarGroupExpansionChanged {
+        key: String,
+        expanded: bool,
+    },
     SidebarSearchChanged,
     RefreshSidebar,
     RevealInSidebar,
@@ -303,6 +339,12 @@ pub enum AppMsg {
         schema: Option<String>,
         table: String,
     },
+    DropTablePromptReady {
+        origin: crate::services::catalog::CatalogOrigin,
+        schema: Option<String>,
+        table: String,
+        referencing: Vec<String>,
+    },
     DropTableConfirmed {
         origin: crate::services::catalog::CatalogOrigin,
         schema: Option<String>,
@@ -337,6 +379,14 @@ pub enum AppMsg {
         tab_id: Uuid,
         message: String,
     },
+    FetchCollations {
+        tab_id: Uuid,
+    },
+    CollationsLoaded {
+        tab_id: Uuid,
+        collations: Vec<String>,
+        table_default_supported: bool,
+    },
     StructureTabDirtyChanged(Uuid, bool),
     SchemaChanged {
         origin: crate::services::catalog::CatalogOrigin,
@@ -361,6 +411,7 @@ pub enum AppMsg {
         schema: Option<String>,
         table: Option<String>,
         path: std::path::PathBuf,
+        more_files: Vec<std::path::PathBuf>,
     },
     CsvImportPrepared(Box<super::import::CsvImportPreparation>),
     CsvImportPreparationFailed(Box<super::import::CsvImportPreparationFailure>),
@@ -368,7 +419,10 @@ pub enum AppMsg {
     CsvImportPlanPrepared(Box<super::import::CsvImportPlanPreparation>),
     CsvImportProgress(u64),
     CsvImportFinished(Box<super::import::CsvImportReport>),
+    ImportQueueFileStarted(Box<super::import::ImportQueueFileStarted>),
+    ImportQueueFinished(Box<super::import::ImportQueueFinished>),
     BackUpDatabase,
+    SearchDatabaseValues,
     RestoreDatabase,
     StartBackupJob(bookie_app_services::database_backup::BackupJob),
     BackupJobFinished(Box<super::backup::BackupReport>),

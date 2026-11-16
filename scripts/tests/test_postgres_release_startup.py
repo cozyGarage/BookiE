@@ -10,6 +10,30 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class PostgresReleaseStartupTests(unittest.TestCase):
+    def test_database_readiness_waits_for_the_release_seed(self):
+        compose = (ROOT / "tests/fixtures/postgres-release/docker-compose.yml").read_text()
+
+        self.assertIn("pg_isready -U bookie -d bookie", compose)
+        self.assertIn("to_regclass('public.release_items')", compose)
+        self.assertIn("grep -qx t", compose)
+
+    def test_server_certificate_covers_local_and_container_hostnames(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = Path(temporary) / "postgres-release"
+            fixture.mkdir()
+            generator = fixture / "generate-materials.sh"
+            shutil.copy(ROOT / "tests/fixtures/postgres-release/generate-materials.sh", generator)
+            subprocess.run(["bash", str(generator)], check=True, capture_output=True, text=True)
+            certificate = subprocess.run(
+                ["openssl", "x509", "-in", str(fixture / "materials/server.crt"), "-noout", "-ext", "subjectAltName"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            self.assertIn("DNS:localhost", certificate.stdout)
+            self.assertIn("DNS:host.docker.internal", certificate.stdout)
+            self.assertNotIn("IP Address:127.0.0.1", certificate.stdout)
+
     def test_private_umask_keeps_seed_readable_without_exposing_keys(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -26,6 +50,9 @@ class PostgresReleaseStartupTests(unittest.TestCase):
             key = materials / "server.key"
             key.write_text("fixture-private-material")
             key.chmod(0o600)
+            toxiproxy = fixture / "toxiproxy"
+            toxiproxy.mkdir()
+            (toxiproxy / "toxiproxy.json").write_text("[]\n")
             (fixture / "generate-materials.sh").write_text("exit 0\n")
             binary = root / "bin"
             binary.mkdir()
@@ -49,6 +76,123 @@ if "up" in sys.argv:
             self.assertEqual(sql.stat().st_mode & 0o777, 0o644)
             self.assertEqual(materials.stat().st_mode & 0o777, 0o700)
             self.assertEqual(key.stat().st_mode & 0o777, 0o600)
+
+    def test_fixture_hosts_route_container_and_local_ssh(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "scripts").mkdir()
+            shutil.copy(ROOT / "scripts/test-postgres-release.sh", root / "scripts")
+            fixture = root / "tests/fixtures/postgres-release"
+            seed = fixture / "seed"
+            seed.mkdir(parents=True)
+            (seed / "01-seed.sql").write_text("SELECT 1;\n")
+            (fixture / "materials").mkdir()
+            toxiproxy = fixture / "toxiproxy"
+            toxiproxy.mkdir()
+            (toxiproxy / "toxiproxy.json").write_text("[]\n")
+            (fixture / "generate-materials.sh").write_text("exit 0\n")
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            docker = bin_dir / "docker"
+            docker.write_text('''#!/usr/bin/env python3
+import os, sys
+from pathlib import Path
+if "up" in sys.argv:
+    Path(os.environ["CAPTURE_BIND_ADDRESS"]).write_text(os.environ["BOOKIE_FIXTURE_BIND_ADDRESS"])
+    Path(os.environ["CAPTURE_SSH_HOST"]).write_text(os.environ["BOOKIE_FIXTURE_SSH_HOST"])
+    sys.exit(42)
+''')
+            docker.chmod(0o755)
+            getent = bin_dir / "getent"
+            getent.write_text('''#!/usr/bin/env python3
+import sys
+hosts = {"localhost": "127.0.0.1", "host.docker.internal": "172.17.0.1"}
+print(hosts[sys.argv[-1]], "STREAM", sys.argv[-1])
+''')
+            getent.chmod(0o755)
+            captured = root / "bind-address"
+            captured_ssh = root / "ssh-host"
+            cases = (
+                ("host.docker.internal", "172.17.0.1", "host.docker.internal"),
+                (None, "127.0.0.1", "127.0.0.1"),
+            )
+
+            for fixture_host, expected_bind, expected_ssh in cases:
+                with self.subTest(fixture_host=fixture_host):
+                    env = dict(
+                        os.environ,
+                        PATH=f"{bin_dir}:{os.environ['PATH']}",
+                        CAPTURE_BIND_ADDRESS=str(captured),
+                        CAPTURE_SSH_HOST=str(captured_ssh),
+                        PG_FIXTURE_ROOT=str(fixture),
+                    )
+                    env.pop("BOOKIE_FIXTURE_HOST", None)
+                    env.pop("BOOKIE_FIXTURE_SSH_HOST", None)
+                    env.pop("BOOKIE_FIXTURE_BIND_ADDRESS", None)
+                    if fixture_host is not None:
+                        env["BOOKIE_FIXTURE_HOST"] = fixture_host
+                    result = subprocess.run(
+                        ["bash", str(root / "scripts/test-postgres-release.sh")],
+                        env=env,
+                        text=True,
+                        capture_output=True,
+                    )
+
+                    self.assertEqual(result.returncode, 42, result.stderr)
+                    self.assertEqual(captured.read_text(), expected_bind)
+                    self.assertEqual(captured_ssh.read_text(), expected_ssh)
+
+    def test_missing_toxiproxy_config_fails_before_starting_compose(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "scripts").mkdir()
+            shutil.copy(ROOT / "scripts/test-postgres-release.sh", root / "scripts")
+            binary = root / "bin"
+            binary.mkdir()
+            docker = binary / "docker"
+            docker.write_text('''#!/usr/bin/env bash
+if [[ "$1" == "compose" && "$2" == "version" ]]; then
+    exit 0
+fi
+exit 99
+''')
+            docker.chmod(0o755)
+            result = subprocess.run(
+                ["bash", str(root / "scripts/test-postgres-release.sh")],
+                env=dict(os.environ, PATH=f"{binary}:{os.environ['PATH']}"),
+                text=True,
+                capture_output=True,
+            )
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("Toxiproxy config file is missing", result.stderr)
+
+    def test_container_fixture_ports_are_bound_to_the_configured_address(self):
+        compose = (ROOT / "tests/fixtures/postgres-release/docker-compose.yml").read_text()
+        self.assertEqual(compose.count('${BOOKIE_FIXTURE_BIND_ADDRESS:-127.0.0.1}:'), 3)
+
+        script = (ROOT / "scripts/test-postgres-release.sh").read_text()
+        self.assertIn('fixture_host="${BOOKIE_FIXTURE_HOST:-localhost}"', script)
+        self.assertIn('BOOKIE_GTK_POSTGRES_MTLS_HOST="$BOOKIE_FIXTURE_PROXY_HOST"', script)
+        self.assertIn('BOOKIE_GTK_POSTGRES_SSH_AUDIT_HOST="$BOOKIE_FIXTURE_SSH_HOST"', script)
+
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        job = workflow.split("  pg-release:\n", 1)[1].split("  distro-floor-scenarios:\n", 1)[0]
+        self.assertIn("options: --add-host=host.docker.internal:host-gateway", job)
+        self.assertIn("BOOKIE_FIXTURE_HOST: host.docker.internal", job)
+
+    def test_release_waits_for_the_bastion_ssh_service(self):
+        script = (ROOT / "scripts/test-postgres-release.sh").read_text()
+        self.assertIn('ssh-keyscan -T 1 -p "$port" "$host"', script)
+        self.assertIn('wait_for_ssh_host_key "$fixture_ssh_host" 2223', script)
+        self.assertNotIn('wait_for_port "$fixture_ssh_host" 2223', script)
+
+    def test_ssh_readiness_timeout_reports_host_and_proxy_diagnostics(self):
+        script = (ROOT / "scripts/test-postgres-release.sh").read_text()
+        self.assertIn('getent ahostsv4 "$host" || true', script)
+        self.assertIn('ssh-keyscan -v -T 3 -p "$port" "$host" 2>&1 || true', script)
+        self.assertIn('compose ps --all || true', script)
+        self.assertIn('compose logs --no-color --tail 30 bastion toxiproxy || true', script)
 
 
 if __name__ == "__main__":

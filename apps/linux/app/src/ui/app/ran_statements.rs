@@ -69,9 +69,17 @@ impl RanStatements {
 }
 
 impl App {
-    pub(super) fn ran_statements(&self, source: Source, statements: &[String]) -> Option<RanStatements> {
+    pub(super) fn ran_statements(
+        &self,
+        tab_id: uuid::Uuid,
+        source: Source,
+        statements: &[String],
+    ) -> Option<RanStatements> {
         let store = self.history.clone()?;
-        let metadata = self.window_metadata()?;
+        let metadata = self
+            .resolve_tab_connection(tab_id)
+            .ok()
+            .and_then(|id| self.database.metadata(id))?;
         let sql = combined_sql(statements)?;
         Some(RanStatements {
             store,

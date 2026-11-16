@@ -302,6 +302,7 @@ fn a_pinned_result_is_named_by_its_statement_without_a_run_number() {
         elapsed_ms: 3,
         kind: StatementOutcomeKind::Rows(Vec::new()),
         pinned: true,
+        detail: Default::default(),
     };
     assert_eq!(super::outcome_tab_label(&outcome), "📌 SELECT public.users (0)");
 }
@@ -318,6 +319,7 @@ fn a_fresh_result_keeps_its_script_number_after_pinned_results_precede_it() {
         elapsed_ms: 0,
         kind: StatementOutcomeKind::Error("missing table".into()),
         pinned: false,
+        detail: Default::default(),
     };
     assert_eq!(super::outcome_tab_label(&outcome), "2 · SELECT missing_table (error)");
 }
@@ -586,9 +588,27 @@ fn stream_export_button(widget: &gtk::Widget) -> Option<gtk::Button> {
     let mut pending = std::collections::VecDeque::from([widget.clone()]);
     while let Some(current) = pending.pop_front() {
         if let Ok(button) = current.clone().downcast::<gtk::Button>()
-            && button.label().as_deref() == Some("Export all rows…")
+            && button.label().as_deref() == Some("Export rows…")
         {
             return Some(button);
+        }
+        let mut child = current.first_child();
+        while let Some(node) = child {
+            child = node.next_sibling();
+            pending.push_back(node);
+        }
+    }
+    None
+}
+
+fn completed_pages_stack(widget: &gtk::Widget, generation: u64) -> Option<gtk::Stack> {
+    let name = super::super::stream_view::completed_page_stack_name(generation);
+    let mut pending = std::collections::VecDeque::from([widget.clone()]);
+    while let Some(current) = pending.pop_front() {
+        if current.widget_name() == name
+            && let Ok(stack) = current.clone().downcast::<gtk::Stack>()
+        {
+            return Some(stack);
         }
         let mut child = current.first_child();
         while let Some(node) = child {
@@ -640,6 +660,7 @@ fn streamed_result_pages(
         elapsed_ms: 0,
         kind: StatementOutcomeKind::Streamed(Box::new(streamed.clone())),
         pinned: false,
+        detail: Default::default(),
     };
     let (grid_sender, _) = relm4::channel::<crate::ui::grid::GridMsg>();
     let widget = super::build_streamed_result_widget(
@@ -944,6 +965,7 @@ fn outcome_with(kind: StatementOutcomeKind, pinned: bool) -> super::StatementOut
         elapsed_ms: 0,
         kind,
         pinned,
+        detail: Default::default(),
     }
 }
 
@@ -999,6 +1021,7 @@ fn skipped_empty_stream_page_does_not_shift_retained_result_identity() {
         elapsed_ms: 0,
         kind: StatementOutcomeKind::Streamed(Box::new(cache.snapshot(StreamTerminal::Complete, None))),
         pinned: false,
+        detail: Default::default(),
     };
 
     assert!(matches!(&outcome.kind, StatementOutcomeKind::Streamed(_)));

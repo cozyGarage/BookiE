@@ -1,12 +1,16 @@
 use bookie_core::DriverError;
 
+pub use crate::tls_failure::TlsFailureKind;
+use crate::tls_failure::classify_tls_failure;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DriverFailurePresentation {
     ConnectionRefused,
+    DatabaseFileNotFound(String),
     AuthFailed,
     Tls {
         detail: String,
-        advice: TlsAdvice,
+        kind: TlsFailureKind,
     },
     Query {
         message: String,
@@ -24,12 +28,6 @@ pub enum DriverFailurePresentation {
     OperationOutcomeUnknown(Box<Self>),
     IntegratedAuth(String),
     Save(SaveFailure),
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TlsAdvice {
-    ServerDoesNotSupportTls,
-    VerifyCertificate,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -52,10 +50,11 @@ pub enum SaveFailure {
 pub fn classify(error: &DriverError) -> DriverFailurePresentation {
     match error {
         DriverError::ConnectionRefused => DriverFailurePresentation::ConnectionRefused,
+        DriverError::DatabaseFileNotFound(path) => DriverFailurePresentation::DatabaseFileNotFound(path.clone()),
         DriverError::AuthFailed => DriverFailurePresentation::AuthFailed,
         DriverError::Tls(detail) => DriverFailurePresentation::Tls {
             detail: detail.clone(),
-            advice: tls_advice(detail),
+            kind: classify_tls_failure(detail),
         },
         DriverError::Query {
             message,
@@ -106,23 +105,6 @@ pub fn classify(error: &DriverError) -> DriverFailurePresentation {
             rollback_error: Box::new(classify(rollback_error)),
         }),
     }
-}
-
-fn tls_advice(detail: &str) -> TlsAdvice {
-    let detail = detail.to_ascii_lowercase();
-    let server_lacks_tls = [
-        "does not support tls",
-        "does not support ssl",
-        "tls is not enabled",
-        "ssl is not enabled",
-        "server does not use tls",
-    ]
-    .iter()
-    .any(|marker| detail.contains(marker));
-    if server_lacks_tls {
-        return TlsAdvice::ServerDoesNotSupportTls;
-    }
-    TlsAdvice::VerifyCertificate
 }
 
 #[cfg(test)]

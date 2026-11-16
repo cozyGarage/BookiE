@@ -1,7 +1,63 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use bookie_app_services::tab_mark::{TabColor, TabMark};
 use bookie_app_services::workspace_state::{ConnectionWorkspaceState, WorkspaceStore, WorkspaceTabRecord};
+use bookie_app_services::workspace_state::{RestoredWorkspaceTab, restored_workspace_tab};
 use uuid::Uuid;
+
+#[test]
+fn tab_names_colours_and_tags_survive_a_fresh_store_and_old_files_still_load() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("workspace_state.json");
+    let drafts = dir.path().join("drafts");
+    let id = Uuid::new_v4();
+    let mark = TabMark::new("Orders audit", Some(TabColor::Teal), ["audit", "q4"]);
+    let store = WorkspaceStore::new(Some(path.clone()), drafts.clone());
+    store.save_connection(
+        id,
+        ConnectionWorkspaceState {
+            tabs: vec![
+                WorkspaceTabRecord::Editor {
+                    query: "SELECT 1".into(),
+                    draft_id: None,
+                    file: None,
+                    mark: mark.clone(),
+                },
+                WorkspaceTabRecord::Structure {
+                    schema: None,
+                    table: "orders".into(),
+                    mark: TabMark::default().with_color(Some(TabColor::Pink)),
+                },
+            ],
+            ..Default::default()
+        },
+    );
+    assert_eq!(flush(&store), Ok(()));
+
+    let restored = WorkspaceStore::new(Some(path.clone()), drafts.clone());
+    restored.prefetch_connections(&[id]).unwrap();
+    let tabs = restored.load_connection(id).unwrap().tabs;
+    let editor = restored_workspace_tab(&tabs[0]).unwrap();
+    assert!(matches!(&editor, RestoredWorkspaceTab::Editor { mark: saved, .. } if *saved == mark));
+    let structure = restored_workspace_tab(&tabs[1]).unwrap();
+    assert!(matches!(&structure, RestoredWorkspaceTab::Structure { mark: saved, .. }
+        if saved.color() == Some(TabColor::Pink) && saved.name().is_none()));
+
+    let text = std::fs::read_to_string(&path).unwrap();
+    let mut old: serde_json::Value = serde_json::from_str(&text).unwrap();
+    for connection in old["connections"].as_object_mut().unwrap().values_mut() {
+        for tab in connection["tabs"].as_array_mut().unwrap() {
+            tab.as_object_mut().unwrap().remove("mark");
+        }
+    }
+    std::fs::write(&path, old.to_string()).unwrap();
+    let older = WorkspaceStore::new(Some(path), drafts);
+    older.prefetch_connections(&[id]).unwrap();
+    let tabs = older.load_connection(id).unwrap().tabs;
+    assert!(
+        matches!(restored_workspace_tab(&tabs[0]), Some(RestoredWorkspaceTab::Editor { mark, .. }) if mark.is_empty())
+    );
+}
 
 #[test]
 fn an_explicit_workspace_path_survives_flush_and_a_fresh_store() {
@@ -14,6 +70,7 @@ fn an_explicit_workspace_path_survives_flush_and_a_fresh_store() {
         id,
         ConnectionWorkspaceState {
             tabs: vec![WorkspaceTabRecord::Editor {
+                mark: Default::default(),
                 query: "SELECT 'é';".into(),
                 draft_id: None,
                 file: Some("/tmp/report.sql".into()),
@@ -26,7 +83,7 @@ fn an_explicit_workspace_path_survives_flush_and_a_fresh_store() {
     restored.prefetch_connections(&[id]).unwrap();
     let state = restored.load_connection(id).unwrap();
     assert!(
-        matches!(&state.tabs[0], WorkspaceTabRecord::Editor { query, draft_id: Some(_), file: Some(file) }
+        matches!(&state.tabs[0], WorkspaceTabRecord::Editor { query, draft_id: Some(_), file: Some(file), .. }
         if query == "SELECT 'é';" && file == std::path::Path::new("/tmp/report.sql"))
     );
     let json: serde_json::Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
@@ -122,6 +179,7 @@ fn forgetting_a_connection_only_removes_its_own_workspace_and_drafts() {
             id,
             ConnectionWorkspaceState {
                 tabs: vec![WorkspaceTabRecord::Editor {
+                    mark: Default::default(),
                     query: id.to_string(),
                     draft_id: None,
                     file: None,
@@ -154,6 +212,7 @@ async fn reimporting_a_deleted_connection_rejects_its_old_session_and_allows_a_n
         id,
         ConnectionWorkspaceState {
             tabs: vec![WorkspaceTabRecord::Editor {
+                mark: Default::default(),
                 query: "SELECT before_delete".into(),
                 draft_id: None,
                 file: None,
@@ -171,6 +230,7 @@ async fn reimporting_a_deleted_connection_rejects_its_old_session_and_allows_a_n
         &old_session,
         ConnectionWorkspaceState {
             tabs: vec![WorkspaceTabRecord::Editor {
+                mark: Default::default(),
                 query: "SELECT stale_session".into(),
                 draft_id: None,
                 file: None,
@@ -187,6 +247,7 @@ async fn reimporting_a_deleted_connection_rejects_its_old_session_and_allows_a_n
         &new_session,
         ConnectionWorkspaceState {
             tabs: vec![WorkspaceTabRecord::Editor {
+                mark: Default::default(),
                 query: "SELECT after_reimport".into(),
                 draft_id: None,
                 file: None,
@@ -211,6 +272,7 @@ fn startup_preview_cleanup_preserves_the_selected_kept_tab_on_disk() {
     let tabs = [true, false]
         .into_iter()
         .map(|preview| WorkspaceTabRecord::Table {
+            mark: Default::default(),
             schema: None,
             table: if preview { "preview" } else { "kept" }.into(),
             mode: Default::default(),
@@ -248,6 +310,7 @@ fn repeated_large_draft_saves(connection_count: usize) {
     let original = "SELECT '東京é';\n".repeat(65_536);
     let record = |query: String| ConnectionWorkspaceState {
         tabs: vec![WorkspaceTabRecord::Editor {
+            mark: Default::default(),
             query,
             draft_id: None,
             file: None,
@@ -296,6 +359,7 @@ fn saving_one_connection_preserves_an_external_change_to_an_unrelated_draft() {
     let untouched = Uuid::new_v4();
     let record = |query: &str| ConnectionWorkspaceState {
         tabs: vec![WorkspaceTabRecord::Editor {
+            mark: Default::default(),
             query: query.into(),
             draft_id: None,
             file: None,
@@ -349,6 +413,7 @@ fn assert_unrelated_workspace_restores(unreadable_path: bool) {
         broken,
         ConnectionWorkspaceState {
             tabs: vec![WorkspaceTabRecord::Editor {
+                mark: Default::default(),
                 query: "SELECT 'preserve'".into(),
                 draft_id: Some(draft),
                 file: None,
@@ -410,11 +475,13 @@ fn two_drafts(first: Uuid, second: Uuid, first_text: &str, second_text: &str) ->
     ConnectionWorkspaceState {
         tabs: vec![
             WorkspaceTabRecord::Editor {
+                mark: Default::default(),
                 query: first_text.into(),
                 draft_id: Some(first),
                 file: None,
             },
             WorkspaceTabRecord::Editor {
+                mark: Default::default(),
                 query: second_text.into(),
                 draft_id: Some(second),
                 file: None,

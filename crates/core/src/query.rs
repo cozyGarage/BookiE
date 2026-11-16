@@ -3,7 +3,7 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::QueryRows;
+use crate::{QueryRows, ServerMessages};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TableInfo {
@@ -33,6 +33,8 @@ pub struct IndexInfo {
     pub constraint: Option<String>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub has_expression_key: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub using_clause: Option<String>,
 }
 
 /// Foreign-key constraint metadata. `on_delete` / `on_update` carry
@@ -239,6 +241,10 @@ fn value_size(value: &Value) -> usize {
     }
 }
 
+pub fn estimated_row_size(row: &[Value]) -> usize {
+    row_size(row)
+}
+
 fn row_size(row: &[Value]) -> usize {
     let payload_bytes = row
         .iter()
@@ -295,6 +301,8 @@ impl QueryResult {
 pub struct QueryResultBatch {
     pub result_sets: Vec<QueryResult>,
     pub truncated: bool,
+    pub messages: ServerMessages,
+    pub rows_affected: Option<u64>,
 }
 
 impl QueryResultBatch {
@@ -303,7 +311,19 @@ impl QueryResultBatch {
         Self {
             result_sets: vec![result],
             truncated,
+            messages: ServerMessages::default(),
+            rows_affected: None,
         }
+    }
+
+    pub fn with_rows_affected(mut self, rows_affected: Option<u64>) -> Self {
+        self.rows_affected = rows_affected;
+        self
+    }
+
+    pub fn with_messages(mut self, messages: ServerMessages) -> Self {
+        self.messages = messages;
+        self
     }
 
     pub fn into_first(self) -> QueryResult {

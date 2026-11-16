@@ -6,6 +6,9 @@ use secrecy::SecretString;
 use testcontainers::ImageExt;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
 
+const MYSQL_TEST_TAG: &str = "8.4.13";
+const MSSQL_TEST_TAG: &str = "2022-CU23-ubuntu-22.04";
+
 fn column(name: &str, data_type: &str, primary_key: bool) -> ColumnInfo {
     ColumnInfo {
         name: name.into(),
@@ -42,6 +45,7 @@ async fn assert_preview_column(
         filter: &filter,
         hidden_columns: None,
         long_text_preview: true,
+        supports_reverse_keyset: false,
     };
     let PageQuery::Sql(query) = target.page(0, 10, None, None).unwrap() else {
         panic!("{driver_id}: a preview page must run as SQL")
@@ -112,6 +116,7 @@ async fn sqlite_previews_a_huge_text_cell() {
         filter: &filter,
         hidden_columns: None,
         long_text_preview: true,
+        supports_reverse_keyset: true,
     };
     let PageQuery::Sql(query) = target.page(0, 10, None, None).unwrap() else {
         panic!("SQL preview")
@@ -127,8 +132,12 @@ async fn sqlite_previews_a_huge_text_cell() {
 #[ignore = "requires docker"]
 async fn mysql_previews_a_huge_longtext_cell() {
     let container = testcontainers_modules::mysql::Mysql::default()
-        .with_tag("8.4")
+        .with_tag(MYSQL_TEST_TAG)
         .with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test")
+        .with_cmd([
+            "--mysql-native-password=ON",
+            "--authentication-policy=mysql_native_password",
+        ])
         .start()
         .await
         .unwrap();
@@ -167,6 +176,7 @@ async fn mysql_previews_a_huge_longtext_cell() {
 async fn sql_server_previews_a_huge_varchar_max_cell() {
     let container = testcontainers_modules::mssql_server::MssqlServer::default()
         .with_accept_eula()
+        .with_tag(MSSQL_TEST_TAG)
         .with_startup_timeout(std::time::Duration::from_secs(180))
         .start()
         .await
@@ -254,6 +264,7 @@ async fn postgres_previews_huge_json_and_jsonb_cells() {
         filter: &filter,
         hidden_columns: None,
         long_text_preview: true,
+        supports_reverse_keyset: true,
     };
     let PageQuery::Sql(query) = target.page(0, 10, None, None).unwrap() else {
         panic!("a preview page must run as SQL")
@@ -297,6 +308,7 @@ async fn postgres_previews_huge_json_and_jsonb_cells() {
 async fn sql_server_previews_huge_legacy_text_and_ntext_cells() {
     let container = testcontainers_modules::mssql_server::MssqlServer::default()
         .with_accept_eula()
+        .with_tag(MSSQL_TEST_TAG)
         .with_startup_timeout(std::time::Duration::from_secs(180))
         .start()
         .await
@@ -351,6 +363,7 @@ async fn sql_server_previews_huge_legacy_text_and_ntext_cells() {
         filter: &filter,
         hidden_columns: None,
         long_text_preview: true,
+        supports_reverse_keyset: true,
     };
     let PageQuery::Sql(query) = target.page(0, 10, None, None).unwrap() else {
         panic!("a preview page must run as SQL")

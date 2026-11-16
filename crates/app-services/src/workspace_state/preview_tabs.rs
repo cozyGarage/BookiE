@@ -50,6 +50,7 @@ mod tests {
 
     fn table(name: &str, preview: bool) -> WorkspaceTabRecord {
         WorkspaceTabRecord::Table {
+            mark: Default::default(),
             schema: None,
             table: name.into(),
             mode: PersistedTableMode::Data,

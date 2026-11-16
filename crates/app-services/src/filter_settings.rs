@@ -108,9 +108,6 @@ mod tests {
 
     #[test]
     fn schema_none_distinct_from_some() {
-        // An empty-string schema slot lives next to a "public" slot;
-        // they don't collide. Verified by writing two sets with
-        // different schema keys to the cache directly.
         let mut connections: Connections = HashMap::new();
         let id = Uuid::new_v4();
         connections
@@ -133,9 +130,6 @@ mod tests {
 
     #[test]
     fn round_trip_serialises_and_deserialises() {
-        // Ensure the on-disk representation round-trips a non-trivial
-        // FilterSet — schemes / Combinator default behaviour / nested
-        // FilterValue tagged-content serde.
         let original = sample_set();
         let json = serde_json::to_string(&original).unwrap();
         let parsed: FilterSet = serde_json::from_str(&json).unwrap();

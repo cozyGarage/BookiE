@@ -1,5 +1,6 @@
 use super::*;
 use bookie_core::{ConnectOptions, Connection, DatabaseDriver, Value};
+use testcontainers::ImageExt;
 use testcontainers::runners::AsyncRunner;
 use testcontainers_modules::redis::Redis;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -8,7 +9,11 @@ use tokio::net::TcpStream;
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn redis_guarded_refetch_preserves_binary_key_and_value() {
-    let container = Redis::default().start().await.unwrap();
+    let container = Redis::default()
+        .with_tag(crate::test_image_tags::REDIS_TEST_TAG)
+        .start()
+        .await
+        .unwrap();
     let host = container.get_host().await.unwrap().to_string();
     let port = container.get_host_port_ipv4(6379).await.unwrap();
     let key = vec![0xff, b'?', b'\n'];
@@ -40,9 +45,13 @@ async fn redis_guarded_refetch_preserves_binary_key_and_value() {
         filter: &bookie_core::FilterSet::default(),
         hidden_columns: None,
         long_text_preview: false,
+        supports_reverse_keyset: false,
     };
     let key_value = Value::Bytes(key.clone());
-    let query = target.value_query(3, std::slice::from_ref(&key_value)).unwrap();
+    let value_column = columns.iter().position(|column| column.name == "Value").unwrap();
+    let query = target
+        .value_query(value_column, std::slice::from_ref(&key_value))
+        .unwrap();
     let result = guarded_value_refetch(connection, "redis", &query, &control).await;
     assert_eq!(result.rows, vec![vec![Value::Bytes(bytes.clone())]]);
     assert_eq!(redis_command(&mut native, &[b"GET", &key]).await, bytes);
