@@ -132,7 +132,10 @@ async fn assert_nonempty_enum_set_xlsx(connection: &dyn Connection, suffix: usiz
         "literal ENUM/SET strings must be string cells: {sheet}"
     );
     assert!(!sheet.contains("r=\"B5\""), "SQL NULL enum must remain blank: {sheet}");
-    assert!(!sheet.contains("r=\"C5\""), "SQL NULL set must remain blank: {sheet}");
+    assert!(
+        is_blank_styled_cell(&sheet, "C5"),
+        "SQL NULL set must remain blank: {sheet}"
+    );
     assert!(
         !sheet.contains("<f>"),
         "enum/set labels must not become formulas: {sheet}"
@@ -1072,4 +1075,13 @@ async fn session_string_settings_follow_sql_mode() {
         "the pool keeps the server default"
     );
     session.close().await.unwrap();
+}
+
+fn is_blank_styled_cell(sheet: &str, cell: &str) -> bool {
+    let marker = format!("<c r=\"{cell}\" s=\"");
+    sheet.find(&marker).is_some_and(|start| {
+        let tag = &sheet[start..];
+        let tag = &tag[..tag.find('>').map_or(tag.len(), |end| end + 1)];
+        tag.ends_with("/>") && !tag.contains(" t=")
+    })
 }
