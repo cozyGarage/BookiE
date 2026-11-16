@@ -76,7 +76,7 @@ def scenarios(ui):
         seed_workbook(database)
         before = database_rows(database)
         ui.invoke_named_action_within("safety_items", "Open safety_items")
-        ui.wait_for_node(name="Rows 1 – 100 of 150")
+        ui.wait_for_paginator("Rows 1 – 100 of 150")
         choose_workbook(ui)
         export = base / "home" / "typed-page.xlsx"
         ui.set_visible_editable_within("Export Results", ui.FILE_CHOOSER_ROLES, str(export))
@@ -92,7 +92,7 @@ def scenarios(ui):
         seed_workbook(database)
         before = database_rows(database)
         ui.invoke_named_action_within("safety_items", "Open safety_items")
-        ui.wait_for_node(name="Rows 1 – 100 of 150")
+        ui.wait_for_paginator("Rows 1 – 100 of 150")
         export = base / "home" / "keep.xlsx"
         export.write_bytes(b"existing file must survive")
         choose_workbook(ui)
@@ -111,7 +111,7 @@ def scenarios(ui):
             connection.execute("UPDATE safety_items SET note='' WHERE id=4")
         before = database_rows(database)
         ui.invoke_named_action_within("safety_items", "Open safety_items")
-        ui.wait_for_node(name="Rows 1 – 100 of 150")
+        ui.wait_for_paginator("Rows 1 – 100 of 150")
         choose_workbook(ui)
         export = base / "home" / "refused.xlsx"
         ui.set_visible_editable_within("Export Results", ui.FILE_CHOOSER_ROLES, str(export))
