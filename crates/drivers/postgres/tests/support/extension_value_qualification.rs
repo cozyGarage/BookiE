@@ -11,6 +11,9 @@ use testcontainers::{ContainerAsync, GenericImage, ImageExt};
 async fn start_extension_postgres(image: &str, tag: &str) -> (ContainerAsync<GenericImage>, ConnectOptions) {
     let image = GenericImage::new(image.to_owned(), tag.to_owned())
         .with_exposed_port(5432.tcp())
+        .with_wait_for(WaitFor::message_on_stderr(
+            "database system is ready to accept connections",
+        ))
         .with_wait_for(WaitFor::message_on_stdout(
             "database system is ready to accept connections",
         ));
