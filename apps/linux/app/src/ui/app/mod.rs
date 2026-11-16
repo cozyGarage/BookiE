@@ -136,6 +136,8 @@ pub struct App {
     schema_filter_list: gtk::Box,
     sidebar_views: Vec<bookie_core::TableInfo>,
     sidebar_tables: Vec<bookie_core::TableInfo>,
+    sidebar_temporary_tables: Vec<bookie_core::TableInfo>,
+    temporary_tables_by_tab: std::collections::HashMap<Uuid, Vec<bookie_core::TableInfo>>,
     sidebar_catalog: std::collections::HashMap<bookie_core::CatalogObjectKind, Vec<bookie_core::CatalogObject>>,
     sidebar_catalog_cancel: std::cell::RefCell<tokio_util::sync::CancellationToken>,
     catalog_generation: std::cell::Cell<u64>,
@@ -600,6 +602,8 @@ impl SimpleComponent for App {
             schema_filter_list,
             sidebar_views: Vec::new(),
             sidebar_tables: Vec::new(),
+            sidebar_temporary_tables: Vec::new(),
+            temporary_tables_by_tab: std::collections::HashMap::new(),
             sidebar_catalog: Default::default(),
             sidebar_catalog_cancel: Default::default(),
             catalog_generation: std::cell::Cell::new(0),
@@ -772,6 +776,7 @@ impl SimpleComponent for App {
                 name,
                 open_mode,
             } => self.on_select_table(schema, name, open_mode, sender),
+            AppMsg::ShowTemporaryTable { schema, name } => self.show_temporary_table(schema, name),
             AppMsg::OpenReferencedRow { schema, table, filter } => {
                 self.on_open_referenced_row(schema, table, filter, sender)
             }
@@ -821,6 +826,14 @@ impl SimpleComponent for App {
             AppMsg::FetchBrowseColumns(tab_id) => self.fetch_browse_columns(tab_id, sender),
             AppMsg::FetchBrowseRowCount(tab_id) => self.fetch_browse_row_count(tab_id, sender),
             AppMsg::WorkspaceTabsChanged => self.on_workspace_tabs_changed(sender),
+            AppMsg::EditorTemporaryTablesChanged(tab_id, tables) => {
+                if tables.is_empty() {
+                    self.temporary_tables_by_tab.remove(&tab_id);
+                } else {
+                    self.temporary_tables_by_tab.insert(tab_id, tables);
+                }
+                self.sync_sidebar_temporary_tables(sender);
+            }
             AppMsg::FocusWorkingSession(id) => self.focus_working_session(id, sender),
             AppMsg::SwitchToRecentTab => self.on_switch_to_recent_tab(),
             AppMsg::EndRecentTabWalk => self.on_end_recent_tab_walk(),

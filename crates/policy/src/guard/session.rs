@@ -156,6 +156,47 @@ impl PolicyGuard {
 
 #[async_trait]
 impl Session for PolicySession {
+    async fn list_temporary_tables_controlled(
+        &mut self,
+        control: &OperationControl,
+    ) -> Result<Vec<TableInfo>, DriverError> {
+        check_pre_dispatch(control)?;
+        if self.cursor.is_some() {
+            return self
+                .refuse_policy(
+                    "SESSION TEMPORARY TABLES",
+                    "query_cursor_active",
+                    "close the active query cursor before reading temporary table metadata",
+                )
+                .await;
+        }
+        if !self.is_usable() {
+            return self
+                .refuse_policy(
+                    "SESSION TEMPORARY TABLES",
+                    "retired_session",
+                    "the session was retired and cannot read temporary table metadata",
+                )
+                .await;
+        }
+        let operation = self.guard.metadata_operation("SESSION TEMPORARY TABLES", Vec::new());
+        self.guard.prepare_governed_read(&operation).await?;
+        let start = Instant::now();
+        let result = self
+            .guard
+            .caught_read(
+                "SESSION TEMPORARY TABLES",
+                self.inner.list_temporary_tables_controlled(control),
+            )
+            .await;
+        self.note_disconnect(&result);
+        let rows = result.as_ref().ok().map(|tables| tables.len() as u64);
+        self.guard
+            .audit_controlled_read_result(&operation, start, &result, rows)
+            .await?;
+        result
+    }
+
     async fn query_params_controlled(
         &mut self,
         sql: &str,

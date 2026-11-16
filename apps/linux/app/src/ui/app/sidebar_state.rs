@@ -5,7 +5,7 @@ use relm4::{ComponentSender, gtk};
 use std::time::{Duration, Instant};
 
 use super::App;
-use crate::services::sidebar_tree::{CollapseState, NodeKind, Reveal, build_nodes, reveal_target};
+use crate::services::sidebar_tree::{CollapseState, NodeKind, Reveal, build_nodes_with_temporary, reveal_target};
 use crate::ui::sidebar_row::{GroupInit, SchemaCatalogActions, SidebarObjectKind, SidebarRowInit};
 
 fn reveal_sidebar_unless_overlay(split_view: &adw::OverlaySplitView, generation: &std::rc::Rc<std::cell::Cell<u32>>) {
@@ -79,7 +79,7 @@ impl App {
 
     pub(super) fn repopulate_sidebar(&mut self, tables: &[TableInfo], _sender: ComponentSender<App>) {
         self.sidebar_tables = tables.to_vec();
-        let mut nodes = build_nodes(tables, &self.sidebar_views);
+        let mut nodes = build_nodes_with_temporary(tables, &self.sidebar_views, &self.sidebar_temporary_tables);
         let catalog_kinds = self
             .current_driver_id
             .as_deref()
@@ -101,6 +101,24 @@ impl App {
         self.refresh_sidebar_model();
         self.sync_sidebar_fold_button();
         self.sync_sidebar_selection();
+    }
+
+    pub(super) fn sync_sidebar_temporary_tables(&mut self, sender: ComponentSender<App>) {
+        let selected = self.selected_workspace_tab_id().filter(|id| {
+            matches!(
+                self.workspace_tabs.borrow().get(id),
+                Some(super::WorkspaceTab::Editor(_))
+            )
+        });
+        let tables = selected
+            .and_then(|id| self.temporary_tables_by_tab.get(&id).cloned())
+            .unwrap_or_default();
+        if self.sidebar_temporary_tables == tables {
+            return;
+        }
+        self.sidebar_temporary_tables = tables;
+        let current = self.sidebar_tables.clone();
+        self.repopulate_sidebar(&current, sender);
     }
 
     pub(super) fn refresh_sidebar_model(&self) {
@@ -359,12 +377,15 @@ fn sidebar_group_label(node: &crate::services::sidebar_tree::TreeNode) -> String
         NodeKind::Group(GroupKind::Tables) => bookie_app_services::tr!("Tables").to_string(),
         NodeKind::Group(GroupKind::Views) => bookie_app_services::tr!("Views").to_string(),
         NodeKind::Group(GroupKind::Catalog) => bookie_app_services::tr!("Catalog").to_string(),
+        NodeKind::Group(GroupKind::TemporaryTables) => bookie_app_services::tr!("Temporary tables").to_string(),
         NodeKind::Catalog(kind) | NodeKind::CatalogLoaded(kind) => crate::ui::catalog_dialog::kind_label(*kind),
         NodeKind::CatalogObject { schema, name, .. } => schema
             .as_deref()
             .map_or_else(|| name.clone(), |schema| format!("{schema}.{name}")),
         NodeKind::CatalogMore(_) => bookie_app_services::tr!("Show all in Catalog…").to_string(),
-        NodeKind::Table { name, .. } | NodeKind::View { name, .. } => name.clone(),
+        NodeKind::Table { name, .. } | NodeKind::TemporaryTable { name, .. } | NodeKind::View { name, .. } => {
+            name.clone()
+        }
     }
 }
 
@@ -380,7 +401,9 @@ pub(super) fn row_for(
     let create_schema = bookie_core::sql_ddl::supports_create_schema(driver_id);
     let (kind, group) = row_kind_and_group(node, collapsed, searching, create_schema);
     let name = match &node.kind {
-        NodeKind::Table { name, .. } | NodeKind::View { name, .. } => name.clone(),
+        NodeKind::Table { name, .. } | NodeKind::TemporaryTable { name, .. } | NodeKind::View { name, .. } => {
+            name.clone()
+        }
         _ => node.key.clone(),
     };
     let schema_name = node.schema.as_deref().unwrap_or_default();
@@ -412,6 +435,7 @@ fn row_kind_and_group(
     use crate::services::sidebar_tree::{GroupKind, NodeKind};
     match &node.kind {
         NodeKind::Table { .. } => (SidebarObjectKind::Table, None),
+        NodeKind::TemporaryTable { .. } => (SidebarObjectKind::TemporaryTable, None),
         NodeKind::View { .. } => (SidebarObjectKind::View, None),
         NodeKind::Catalog(_) | NodeKind::CatalogObject { .. } | NodeKind::CatalogMore(_) => (
             SidebarObjectKind::Catalog,

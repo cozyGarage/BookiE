@@ -9,6 +9,7 @@ pub(super) fn blocks_execution(input: &SqlEditorInput) -> bool {
                 | RunMessage::RunWithLongerTimeout
                 | RunMessage::RunAtCursor
                 | RunMessage::Explain
+                | RunMessage::ShowTemporaryTable { .. }
         )
     )
 }

@@ -17,6 +17,10 @@ pub enum RunMessage {
     RunWithLongerTimeout,
     RunAtCursor,
     Explain,
+    ShowTemporaryTable {
+        schema: Option<String>,
+        name: String,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -145,6 +149,10 @@ pub enum SqlEditorInput {
         session_id: Uuid,
         result: Result<(), String>,
     },
+    TemporaryTablesLoaded {
+        session_id: Uuid,
+        result: Result<Vec<bookie_core::TableInfo>, String>,
+    },
     PrepareForTeardown(tokio::sync::oneshot::Sender<Result<(), String>>),
     SessionTeardownFinished(Result<(), String>),
     EditColumnsFetched {
@@ -166,6 +174,7 @@ pub enum SqlEditorInput {
 #[derive(Debug)]
 pub enum SqlEditorOutput {
     CatalogChanged(crate::services::catalog::CatalogOrigin),
+    TemporaryTablesChanged(Vec<bookie_core::TableInfo>),
     RunStateChanged(bool),
     QueryChanged(String),
     CopyToClipboard(String),

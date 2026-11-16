@@ -23,15 +23,33 @@ fn label(node: &TreeNode) -> String {
         NodeKind::Group(GroupKind::Tables) => "Tables".into(),
         NodeKind::Group(GroupKind::Views) => "Views".into(),
         NodeKind::Group(GroupKind::Catalog) => "Catalog".into(),
+        NodeKind::Group(GroupKind::TemporaryTables) => "Temporary tables".into(),
         NodeKind::Catalog(kind) | NodeKind::CatalogLoaded(kind) => kind.as_str().into(),
         NodeKind::CatalogObject { schema, name, .. } => format!("{}.{name}", schema.as_deref().unwrap_or("-")),
         NodeKind::CatalogMore(_) => "more".into(),
-        NodeKind::Table { name, .. } | NodeKind::View { name, .. } => name.clone(),
+        NodeKind::Table { name, .. } | NodeKind::TemporaryTable { name, .. } | NodeKind::View { name, .. } => {
+            name.clone()
+        }
     }
 }
 
 fn all(nodes: &[TreeNode]) -> Vec<usize> {
     (0..nodes.len()).collect()
+}
+
+#[test]
+fn temporary_tables_have_a_separate_group_and_keep_their_session_schema() {
+    let temporary = [info(Some("pg_temp_4"), "scratch")];
+    let nodes = build_nodes_with_temporary(&[info(Some("public"), "users")], &[], &temporary);
+
+    assert_eq!(
+        labels(&nodes, &all(&nodes)),
+        ["Tables", "  users", "Temporary tables", "  scratch"]
+    );
+    assert!(matches!(
+        &nodes[3].kind,
+        NodeKind::TemporaryTable { schema: Some(schema), name } if schema == "pg_temp_4" && name == "scratch"
+    ));
 }
 
 #[test]

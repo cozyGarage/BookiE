@@ -640,6 +640,7 @@ impl App {
             return;
         };
         let owner = self.multi.sessions.detach_tab(id);
+        self.temporary_tables_by_tab.remove(&id);
         // Snapshot the closed tab into the reopen stack BEFORE running
         // the per-kind teardown below — the BrowseModel still has its
         // pagination + sort state intact, and the EditorTabSlot still
@@ -719,6 +720,23 @@ impl App {
         let tab_view = self.workspace_tab_view.as_ref()?;
         let page = tab_view.selected_page()?;
         read_workspace_tab_id(&page)
+    }
+
+    pub(super) fn show_temporary_table(&self, schema: Option<String>, name: String) {
+        let Some(id) = self.selected_workspace_tab_id() else {
+            return;
+        };
+        let tabs = self.workspace_tabs.borrow();
+        let Some(WorkspaceTab::Editor(slot)) = tabs.get(&id) else {
+            return;
+        };
+        let _ = slot
+            .controller
+            .sender()
+            .send(SqlEditorInput::Run(crate::ui::editor::RunMessage::ShowTemporaryTable {
+                schema,
+                name,
+            }));
     }
 
     pub(super) fn selected_browse_tab_id(&self) -> Option<Uuid> {
@@ -1089,6 +1107,7 @@ fn editor_output(tab_id: Uuid, output: SqlEditorOutput) -> AppMsg {
             schema: None,
             table: None,
         },
+        SqlEditorOutput::TemporaryTablesChanged(tables) => AppMsg::EditorTemporaryTablesChanged(tab_id, tables),
         SqlEditorOutput::RunStateChanged(running) => AppMsg::EditorTabRunStateChanged(tab_id, running),
         SqlEditorOutput::QueryChanged(text) => AppMsg::EditorTabQueryChanged(tab_id, text),
         SqlEditorOutput::CopyToClipboard(text) => AppMsg::CopyToClipboard(text),
