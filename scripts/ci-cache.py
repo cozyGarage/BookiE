@@ -14,7 +14,7 @@ import time
 
 
 DIRECTORY_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
-BUNDLE_GROUPS = {'default', 'duckdb', 'unit', 'sandbox', 'gpui'}
+BUNDLE_GROUPS = {'default', 'duckdb', 'unit', 'sandbox', 'gpui', 'workspace'}
 BUNDLE_GROUPS.update(json.loads(Path(__file__).with_name('ci-test-bundle-groups.json').read_text())['groups'])
 BUNDLE_DIRECTORY = re.compile(r'[0-9a-f]{40}-(?:' + '|'.join(map(re.escape, sorted(BUNDLE_GROUPS))) + r')\Z')
 TEMP_BUNDLE_DIRECTORY = re.compile(r'(?:tmp|bookie-bundle-)[A-Za-z0-9_]{8}\Z')

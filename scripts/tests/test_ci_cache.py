@@ -228,6 +228,7 @@ class CiCacheTests(unittest.TestCase):
         helper = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(helper)
 
+        self.assertIn('workspace', helper.BUNDLE_GROUPS)
         for group in helper.BUNDLE_GROUPS:
             with self.subTest(group=group), tempfile.TemporaryDirectory() as temporary:
                 bundle_root = Path(temporary) / 'bundles'
