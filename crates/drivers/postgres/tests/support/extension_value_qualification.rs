@@ -85,7 +85,7 @@ async fn assert_postgis_type_identity(connection: &dyn Connection) {
         .await
         .expect("create same-named user type");
     connection
-        .execute("CREATE EXTENSION postgis")
+        .execute("CREATE EXTENSION IF NOT EXISTS postgis")
         .await
         .expect("enable PostGIS");
 
@@ -133,11 +133,11 @@ async fn pgvector_values_are_refused_without_losing_null_or_type_identity() {
         )
         .await
         .expect("read vector values");
-    assert_eq!(result.columns[0].data_type, "vector");
+    assert_eq!(result.columns[0].data_type, "extension_types.vector");
     assert_eq!(
         result.rows,
         vec![vec![
-            Value::Undecodable("VECTOR".into()),
+            Value::Undecodable("EXTENSION_TYPES.VECTOR".into()),
             Value::Int(3),
             Value::Bytes(vec![
                 0, 3, 0, 0, 0x3f, 0x80, 0, 0, 0x3d, 0xcc, 0xcc, 0xcd, 0x40, 0x49, 0x0f, 0xdb,
@@ -198,7 +198,7 @@ async fn postgis_values_are_refused_without_losing_empty_null_or_spatial_metadat
                 Value::Int(3857),
                 Value::Int(3),
                 Value::Bool(false),
-                Value::Undecodable("GEOMETRY".into())
+                Value::Undecodable("LOOKALIKE.GEOMETRY".into())
             ],
             vec![
                 Value::Undecodable("GEOMETRY".into()),
@@ -208,7 +208,7 @@ async fn postgis_values_are_refused_without_losing_empty_null_or_spatial_metadat
                 Value::Int(0),
                 Value::Int(2),
                 Value::Bool(true),
-                Value::Undecodable("GEOMETRY".into())
+                Value::Undecodable("LOOKALIKE.GEOMETRY".into())
             ],
             vec![
                 Value::Null,
@@ -216,9 +216,9 @@ async fn postgis_values_are_refused_without_losing_empty_null_or_spatial_metadat
                 Value::Null,
                 Value::Null,
                 Value::Null,
-                Value::Undecodable("GEOMETRY".into())
+                Value::Undecodable("LOOKALIKE.GEOMETRY".into())
             ],
         ]
     );
-    assert_eq!(result.columns[5].data_type, "geometry");
+    assert_eq!(result.columns[5].data_type, "lookalike.geometry");
 }
