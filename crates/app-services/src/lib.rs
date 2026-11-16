@@ -47,6 +47,7 @@ pub mod highlight_settings;
 pub mod i18n;
 pub mod image_preview;
 pub mod import_queue;
+pub mod json_format;
 pub mod open_failure;
 pub mod ordered_refresh;
 pub mod preparation;

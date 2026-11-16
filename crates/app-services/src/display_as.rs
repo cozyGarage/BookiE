@@ -58,6 +58,9 @@ fn unix_time_form(number: i64) -> Option<DisplayForm> {
 }
 
 fn text_forms(text: &str) -> Vec<DisplayForm> {
+    if text.len() > MAX_JSON_TEXT_BYTES {
+        return Vec::new();
+    }
     if let Ok(uuid) = Uuid::parse_str(text.trim()) {
         return uuid_forms(&uuid, Some(text));
     }
@@ -81,11 +84,10 @@ fn uuid_forms(uuid: &Uuid, original: Option<&str>) -> Vec<DisplayForm> {
 
 fn json_form(text: &str) -> Option<DisplayForm> {
     let trimmed = text.trim();
-    if trimmed.len() > MAX_JSON_TEXT_BYTES || !matches!(trimmed.as_bytes().first(), Some(b'{' | b'[')) {
+    if !matches!(trimmed.as_bytes().first(), Some(b'{' | b'[')) {
         return None;
     }
-    let parsed: serde_json::Value = serde_json::from_str(trimmed).ok()?;
-    let pretty = serde_json::to_string_pretty(&parsed).ok()?;
+    let pretty = crate::json_format::pretty_json(text, MAX_JSON_TEXT_BYTES).ok()?;
     if pretty == text {
         return None;
     }
@@ -172,6 +174,31 @@ mod tests {
         assert_eq!(form.kind, DisplayKind::JsonInText);
         assert!(form.text.contains("\"a\": 1"));
         assert!(display_forms(&Value::Text(form.text)).is_empty());
+    }
+
+    #[test]
+    fn json_display_preserves_duplicate_entries_and_number_spellings() {
+        let source = r#"{"a":1,"a":2,"n":900719925474099312345.000,"e":1e+004,"s":"\u0041"}"#;
+        let form = json_form(source).unwrap();
+        assert_eq!(
+            form.text,
+            r#"{
+  "a": 1,
+  "a": 2,
+  "n": 900719925474099312345.000,
+  "e": 1e+004,
+  "s": "\u0041"
+}"#
+        );
+    }
+
+    #[test]
+    fn json_display_refuses_oversized_expansion_and_whitespace() {
+        let nested = format!("{}[{}0]{}", "[".repeat(100), "0,".repeat(10_000), "]".repeat(100));
+        assert!(nested.len() < MAX_JSON_TEXT_BYTES);
+        assert!(json_form(&nested).is_none());
+        let padded = format!("{}{{\"a\":1}}", " ".repeat(MAX_JSON_TEXT_BYTES));
+        assert!(json_form(&padded).is_none());
     }
 
     #[test]
