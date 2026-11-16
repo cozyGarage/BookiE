@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import difflib
+import hashlib
 import json
 import os
 from itertools import islice
@@ -87,10 +88,51 @@ def generate() -> str:
     return "\n".join(sections) + "\n"
 
 
+def cache_directory() -> Path:
+    base = os.environ.get("XDG_CACHE_HOME") or str(Path.home() / ".cache")
+    return Path(base) / "bookie-tools"
+
+
+def input_digest() -> str:
+    digest = hashlib.sha256()
+    listing = subprocess.run(
+        ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", "Cargo.lock", "*Cargo.toml"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+    ).stdout
+    inputs = sorted(path for path in listing.split(b"\0") if path)
+    inputs += [os.fsencode(str(path.relative_to(ROOT))) for path in (CONFIG, ROOT / "deny.toml", OUTPUT, Path(__file__).resolve())]
+    for raw in inputs:
+        path = ROOT / os.fsdecode(raw)
+        digest.update(len(raw).to_bytes(8, "big") + raw)
+        content = path.read_bytes() if path.exists() else b""
+        digest.update(len(content).to_bytes(8, "big") + content)
+    version = subprocess.run(
+        [os.environ.get("CARGO_ABOUT", "cargo-about"), "--version"], cwd=ROOT, check=False, capture_output=True
+    ).stdout
+    digest.update(version)
+    return digest.hexdigest()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="fail when the checked-in notice bundle is stale")
+    parser.add_argument(
+        "--cached",
+        action="store_true",
+        help="with --check, skip the check when its inputs match a run that already passed on this machine",
+    )
     args = parser.parse_args()
+    marker = None
+    if args.check and args.cached:
+        try:
+            marker = cache_directory() / f"notices-check-{input_digest()}.ok"
+        except (OSError, ValueError, subprocess.CalledProcessError):
+            marker = None
+        if marker is not None and marker.exists():
+            print("third-party notices: inputs unchanged since a passing check, skipped")
+            return 0
     try:
         generated = generate()
     except (OSError, RuntimeError, json.JSONDecodeError) as error:
@@ -113,6 +155,12 @@ def main() -> int:
                 )
                 print("".join(islice(diff, 80)), file=sys.stderr, end="")
             return 1
+        if marker is not None:
+            try:
+                marker.parent.mkdir(parents=True, exist_ok=True)
+                marker.write_text("ok\n")
+            except OSError:
+                pass
         return 0
     OUTPUT.write_text(generated)
     return 0

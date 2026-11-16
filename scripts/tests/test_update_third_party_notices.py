@@ -127,6 +127,79 @@ class ThirdPartyNoticeTests(unittest.TestCase):
             ):
                 self.assertEqual(NOTICES.main(), 0)
 
+    def check_with_cache(self, argv, generated, marker_exists=False, digest="inputs-1"):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = root / "notices.md"
+            output.write_text("current\n", encoding="utf-8")
+            cache = root / "cache"
+            cache.mkdir()
+            marker = cache / f"notices-check-{digest}.ok"
+            if marker_exists:
+                marker.write_text("ok\n")
+            with (
+                patch.object(NOTICES, "ROOT", root),
+                patch.object(NOTICES, "OUTPUT", output),
+                patch.object(NOTICES, "cache_directory", return_value=cache),
+                patch.object(NOTICES, "input_digest", return_value=digest),
+                patch.object(NOTICES, "generate", side_effect=generated) as generate,
+                patch.object(sys, "argv", [str(SCRIPT), *argv]),
+                contextlib.redirect_stdout(io.StringIO()),
+                contextlib.redirect_stderr(io.StringIO()),
+            ):
+                result = NOTICES.main()
+            return result, generate.call_count, marker.exists()
+
+    def test_cached_check_skips_generation_when_the_inputs_already_passed(self):
+        result, generated, _ = self.check_with_cache(
+            ["--check", "--cached"], AssertionError("must not generate"), marker_exists=True
+        )
+        self.assertEqual((result, generated), (0, 0))
+
+    def test_cached_check_records_a_pass_and_never_a_failure(self):
+        result, generated, recorded = self.check_with_cache(["--check", "--cached"], ["current\n"])
+        self.assertEqual((result, generated, recorded), (0, 1, True))
+        result, generated, recorded = self.check_with_cache(["--check", "--cached"], ["stale\n"])
+        self.assertEqual((result, generated, recorded), (1, 1, False))
+
+    def test_a_check_without_the_cache_flag_ignores_a_recorded_pass(self):
+        result, generated, _ = self.check_with_cache(["--check"], ["stale\n"], marker_exists=True)
+        self.assertEqual((result, generated), (1, 1))
+
+    def test_the_input_digest_follows_every_file_the_notices_depend_on(self):
+        import os
+        import subprocess
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+            for name, text in {
+                "Cargo.lock": "lock 1",
+                "Cargo.toml": "manifest 1",
+                "about.toml": "about 1",
+                "deny.toml": "deny 1",
+                "notices.md": "notices 1",
+            }.items():
+                (root / name).write_text(text)
+            (root / "crates").mkdir()
+            (root / "crates" / "Cargo.toml").write_text("member 1")
+            with (
+                patch.object(NOTICES, "ROOT", root),
+                patch.object(NOTICES, "CONFIG", root / "about.toml"),
+                patch.object(NOTICES, "OUTPUT", root / "notices.md"),
+                patch.object(NOTICES, "__file__", str(root / "script.py"), create=True),
+                patch.dict(os.environ, {"CARGO_ABOUT": "true"}),
+            ):
+                (root / "script.py").write_text("script 1")
+                baseline = NOTICES.input_digest()
+                self.assertEqual(NOTICES.input_digest(), baseline)
+                for name in ["Cargo.lock", "crates/Cargo.toml", "about.toml", "deny.toml", "notices.md"]:
+                    original = (root / name).read_text()
+                    (root / name).write_text(original + " changed")
+                    self.assertNotEqual(NOTICES.input_digest(), baseline, name)
+                    (root / name).write_text(original)
+                self.assertEqual(NOTICES.input_digest(), baseline)
+
     def test_check_mode_reports_stale_notice_file(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
