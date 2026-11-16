@@ -528,3 +528,20 @@ fn a_read_only_subquery_inside_any_all_or_some_stays_a_read() {
         assert_eq!(facts.class, StatementClass::Select, "{sql}");
     }
 }
+
+#[test]
+fn a_write_nested_in_any_subquery_clauses_that_classification_does_not_scan_is_still_a_write() {
+    let write = "(WITH d AS (DELETE FROM x RETURNING 1) SELECT * FROM d)";
+    for clause in [
+        format!("SELECT 1 ORDER BY (SELECT 1 FROM {write} z)"),
+        format!("SELECT 1 LIMIT (SELECT 1 FROM {write} z)"),
+        format!("SELECT 1 GROUP BY (SELECT 1 FROM {write} z)"),
+        format!("SELECT 1 OFFSET (SELECT 1 FROM {write} z)"),
+        format!("SELECT 1 FROM generate_series(1, (SELECT 1 FROM {write} z))"),
+        format!("SELECT 1 WHERE 1 = ANY (SELECT 1 FROM {write} z)"),
+    ] {
+        let sql = format!("SELECT * FROM t WHERE a = ANY ({clause})");
+        let facts = classify(&sql, "postgres");
+        assert!(facts.writes(), "{sql}: {facts:?}");
+    }
+}

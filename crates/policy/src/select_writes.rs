@@ -2,7 +2,7 @@ use std::ops::ControlFlow;
 
 use sqlparser::ast::{
     Expr, Function, FunctionArg, FunctionArgExpr, FunctionArguments, JoinConstraint, JoinOperator, Query, Select,
-    SelectItem, TableFactor, Visit, Visitor,
+    SelectItem, SetExpr, TableFactor, Visit, Visitor,
 };
 
 use sqlparser::dialect::Dialect;
@@ -127,30 +127,31 @@ pub(crate) fn expr_writes(expr: &Expr) -> bool {
     }
 }
 
-#[derive(Default)]
-struct NestedQueryWrite {
-    depth: usize,
-}
+struct NestedQueryWrite;
 
 impl Visitor for NestedQueryWrite {
     type Break = ();
 
     fn pre_visit_query(&mut self, query: &Query) -> ControlFlow<()> {
-        if self.depth == 0 && classify_query(query).class.is_write() {
+        if set_expr_is_write_node(&query.body) {
             return ControlFlow::Break(());
         }
-        self.depth += 1;
-        ControlFlow::Continue(())
-    }
-
-    fn post_visit_query(&mut self, _query: &Query) -> ControlFlow<()> {
-        self.depth -= 1;
         ControlFlow::Continue(())
     }
 }
 
+fn set_expr_is_write_node(body: &SetExpr) -> bool {
+    match body {
+        SetExpr::Insert(_) | SetExpr::Update(_) | SetExpr::Delete(_) | SetExpr::Merge(_) => true,
+        SetExpr::Select(select) => select.into.is_some(),
+        SetExpr::SetOperation { left, right, .. } => set_expr_is_write_node(left) || set_expr_is_write_node(right),
+        SetExpr::Query(query) => set_expr_is_write_node(&query.body),
+        SetExpr::Values(_) | SetExpr::Table(_) => false,
+    }
+}
+
 fn nested_query_writes(expr: &Expr) -> bool {
-    expr.visit(&mut NestedQueryWrite::default()).is_break()
+    expr.visit(&mut NestedQueryWrite).is_break()
 }
 
 fn function_writes(function: &Function) -> bool {
