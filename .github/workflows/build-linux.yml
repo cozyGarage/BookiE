@@ -1325,6 +1325,7 @@ jobs:
       BOOKIE_REQUIRE_PREBUILT: "1"
       BOOKIE_TEST_RUN_ID: github-${{ github.run_id }}-${{ github.run_attempt }}-driver-tls
       BOOKIE_DRIVER_TLS_HOST: host.docker.internal
+      BOOKIE_DRIVER_TLS_SSH_HOST: host.docker.internal
       BOOKIE_DRIVER_TLS_HOSTNAME: host.docker.internal
       BOOKIE_FIXTURE_BIND_ADDRESS: 0.0.0.0
     steps:
