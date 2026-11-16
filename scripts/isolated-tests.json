@@ -690,6 +690,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::cell_editor::tests::editable_cell_tracks_xalign_for_numbers"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::cell_editor::tests::an_active_preedit_is_included_when_edit_commits"
     ],
     [
