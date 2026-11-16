@@ -1,12 +1,14 @@
-use super::SqlEditorInput;
+use super::{RunMessage, SqlEditorInput};
 
 pub(super) fn blocks_execution(input: &SqlEditorInput) -> bool {
     matches!(
         input,
-        SqlEditorInput::Run
-            | SqlEditorInput::RunWithParameters { .. }
-            | SqlEditorInput::RunWithLongerTimeout
-            | SqlEditorInput::RunAtCursor
-            | SqlEditorInput::Explain
+        SqlEditorInput::Run(
+            RunMessage::Run
+                | RunMessage::RunWithParameters { .. }
+                | RunMessage::RunWithLongerTimeout
+                | RunMessage::RunAtCursor
+                | RunMessage::Explain
+        )
     )
 }

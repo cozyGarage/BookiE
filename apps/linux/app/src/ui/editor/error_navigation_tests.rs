@@ -78,7 +78,11 @@ fn run_current_locates_the_second_identical_statement_and_restores_the_editor() 
     let sql = "SELECT broken;\nSELECT broken;";
     buffer.set_text(sql);
     buffer.place_cursor(&buffer.end_iter());
-    fixture.controller.sender().send(SqlEditorInput::RunAtCursor).unwrap();
+    fixture
+        .controller
+        .sender()
+        .send(SqlEditorInput::Run(super::RunMessage::RunAtCursor))
+        .unwrap();
     let query = fixture.next_query();
     assert_eq!(query.sql, "SELECT broken");
     fixture.finish(query, error());
