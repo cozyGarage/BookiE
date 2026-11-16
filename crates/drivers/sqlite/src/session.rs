@@ -51,6 +51,11 @@ impl bookie_core::Session for SqliteSession {
                 control,
             )
             .await?;
+        if result.truncated {
+            return Err(DriverError::Internal(
+                "SQLite temporary table catalog exceeded the result limit".into(),
+            ));
+        }
         result
             .rows
             .iter()
