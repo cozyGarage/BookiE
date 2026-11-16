@@ -129,9 +129,22 @@ Storage tests use temporary directories and explicit file paths for JSON and aud
 
 Tests that change XDG environment variables must avoid racing with other tests. Prefer internal functions that accept a path when the module already provides them.
 
-Certificate rejection tests open and ping a trusted control before testing the rejected configuration, then require a TLS error or explicit certificate-verification reason. MySQL unwraps rustls verification details from SQLx I/O errors so rejected certificates retain the TLS classification. Wrong-authority cases exercise both verifying modes across all five TLS fixture drivers; fixture outages and authentication errors cannot stand in for certificate rejection.
+Certificate rejection tests open and ping a trusted control before testing the rejected configuration, then require a TLS error or explicit certificate-verification reason. MySQL unwraps rustls verification details from SQLx I/O errors so rejected certificates retain the TLS classification. Wrong-authority cases exercise both verifying modes across all six TLS fixture drivers; fixture outages and authentication errors cannot stand in for certificate rejection.
 
-Run the driver TLS fixtures with `bash scripts/test-driver-tls.sh`. The MySQL and SQL Server fixtures also expose TLS-only servers behind the built-in SSH tunnel, so the same tier checks service identity through forwarding and refuses invalid certificates without plaintext fallback.
+The `VerifyCa` hostname matrix records current behavior when the server presents a certificate signed by the configured CA but the connection uses an IP address or an SSH tunnel with a mismatched service identity:
+
+| Engine | `VerifyCa` checks the hostname | Wrong identity by IP and through SSH |
+| --- | --- | --- |
+| PostgreSQL | No; CA chain only | Accepted |
+| MySQL / MariaDB | No; CA chain only | Accepted |
+| MongoDB | Yes; the TLS client has no CA-only mode | Rejected |
+| Redis | Yes; the TLS client has no CA-only mode | Rejected |
+| ClickHouse | Yes; rustls verifies the server name | Rejected |
+| SQL Server | Yes; Tiberius verifies the configured server name | Rejected |
+
+`verify_ca_hostname_behavior_by_ip_matches_each_tls_engine` and `verify_ca_hostname_behavior_through_ssh_matches_each_tls_engine` in `tests/driver-tls/tests/verify_ca_hostname.rs` pin this table with real servers. SQLite and DuckDB use local files, and Cassandra and Oracle do not currently implement TLS, so they have no hostname result in this matrix.
+
+Run the driver TLS fixtures with `bash scripts/test-driver-tls.sh`. The tier checks service identity through the built-in SSH tunnel for every TLS fixture driver and refuses invalid certificates without plaintext fallback.
 
 SQL Server Kerberos is an opt-in local fixture because its Samba AD domain controller needs privileged Docker execution. Run `bash scripts/test-mssql-kerberos.sh` to verify a real Kerberos ticket, SQL Server service keytab, SPN refusal, and `VerifyFull` TLS through the BookiE driver. The fixture uses Samba AD DC and does not replace a Windows AD lab.
 

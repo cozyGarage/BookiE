@@ -251,6 +251,44 @@ impl DriverTlsFixture {
         .expect("open SSH TCP forward to the unpublished SQL Server fixture")
     }
 
+    pub async fn open_service_tunnel(&self, host: &str, port: u16, socket_name: Option<&str>) -> SshTunnel {
+        let config = self.ssh_config();
+        let result = match socket_name {
+            Some(name) => {
+                SshTunnel::open_chain_socket(&[config], host.to_string(), port, name, UnknownHostKey::Learn).await
+            }
+            None => SshTunnel::open(config, host.to_string(), port, UnknownHostKey::Learn).await,
+        };
+        result.expect("open SSH forward to the TLS fixture")
+    }
+
+    pub fn tunnel_options(
+        mut options: ConnectOptions,
+        host: &str,
+        port: u16,
+        tunnel: &SshTunnel,
+        socket_name: Option<&str>,
+    ) -> ConnectOptions {
+        options.service_endpoint = Some((host.to_string(), port));
+        match socket_name {
+            Some(_) => {
+                options.host = host.to_string();
+                options.port = port;
+                options.forwarded_socket_dir = Some(
+                    tunnel
+                        .socket_dir()
+                        .expect("TLS fixture socket forward exposes its local directory")
+                        .to_path_buf(),
+                );
+            }
+            None => {
+                options.host = tunnel.local_host().to_string();
+                options.port = tunnel.local_port();
+            }
+        }
+        options
+    }
+
     fn ssh_config(&self) -> SshConfig {
         SshConfig {
             host: self.ssh_host.clone(),
@@ -315,6 +353,31 @@ impl DriverTlsFixture {
 
     pub fn mssql_plaintext(&self) -> ConnectOptions {
         self.options(self.mssql_plaintext_port, TlsMode::Disabled, None)
+    }
+}
+
+pub async fn assert_verify_ca_hostname_behavior(
+    driver: &dyn bookie_core::DatabaseDriver,
+    accepted: ConnectOptions,
+    hostname_mismatch: ConnectOptions,
+    checks_hostname: bool,
+) {
+    if checks_hostname {
+        assert_certificate_rejected(driver, accepted, hostname_mismatch).await;
+        return;
+    }
+    for options in [accepted, hostname_mismatch] {
+        let connection = driver.connect(options).await.unwrap_or_else(|error| {
+            panic!(
+                "{} VerifyCa accepts the trusted CA chain: {error}",
+                driver.display_name()
+            )
+        });
+        connection
+            .ping()
+            .await
+            .unwrap_or_else(|error| panic!("{} verified TLS ping failed: {error}", driver.display_name()));
+        connection.close().await.expect("close TLS connection");
     }
 }
 
