@@ -17,6 +17,10 @@ A release is a tag named `linux-vX.Y.Z` on the protected `main` branch. The GitH
 
 The Arch and AppImage artifact names (0.2.4 also has Debian and Flatpak) and installation notes are in the [platform guide](platforms.md).
 
+## After publishing
+
+Update `apps/linux/packaging/aur/PKGBUILD` (`pkgver`, `pkgrel=1` and `_commit`, the commit the tag points at), build it with `makepkg` and push the same file to the AUR repository. The in-tree copy lags until its own pull request merges.
+
 ## Recovering publication after successful package builds
 
 The release workflow supports recovery when package builds succeed but draft creation fails. Dispatch `release.yml` with `artifact_run_id` and `release_tag` set to the original tag run. The recovery path validates the run and tagged commit, reuses only that run's artifacts, regenerates checksums and provenance, and does not move the tag or rebuild packages. Verify the original build identity and the workflow revision that finalized the assets.
