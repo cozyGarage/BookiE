@@ -16,6 +16,7 @@ bookie-policy = { path = "../policy" }
 bookie-ssh = { path = "../ssh" }
 bookie-storage = { path = "../storage" }
 rustls = { version = "0.23", default-features = false, features = ["aws-lc-rs", "std"] }
+rustls-pki-types = "1"
 secrecy.workspace = true
 libc.workspace = true
 sha2.workspace = true
