@@ -192,8 +192,12 @@ async fn a_row_capped_read_only_driver_transaction_stops_server_work_and_require
         .expect("make transaction read only");
 
     let started = std::time::Instant::now();
+    let sql = "WITH RECURSIVE generated(value) AS ( \
+               SELECT 1::bigint UNION ALL \
+               SELECT value + 1 FROM generated WHERE value < 4000000000 \
+               ) SELECT value FROM generated /* bookie_owned_read_row_cap */";
     let result = transaction
-        .query("SELECT value FROM generate_series(1, 4000000000) AS generated(value) /* bookie_owned_read_row_cap */")
+        .query(sql)
         .await
         .expect("row-capped read returns admitted rows");
     assert!(result.truncated);
@@ -242,12 +246,12 @@ async fn a_row_capped_user_read_transaction_stops_server_work_and_requires_rollb
         .expect("begin the user's read-only transaction");
 
     let started = std::time::Instant::now();
+    let sql = "WITH RECURSIVE generated(value) AS ( \
+               SELECT 1::bigint UNION ALL \
+               SELECT value + 1 FROM generated WHERE value < 4000000000 \
+               ) SELECT value FROM generated /* user_read_row_cap */";
     let result = session
-        .query_params_controlled(
-            "SELECT value FROM generate_series(1, 4000000000) AS generated(value) /* user_read_row_cap */",
-            &[],
-            &super::no_timeout(),
-        )
+        .query_params_controlled(sql, &[], &super::no_timeout())
         .await
         .expect("row-capped read returns admitted rows");
     assert!(result.truncated);
