@@ -12,7 +12,7 @@
     "consumers": {
       "bin": ["bookie-app"],
       "lib": ["bookie-app", "bookie-mcp", "bookie-policy"],
-      "test": ["bookie-app", "bookie-mcp", "bookie-policy"]
+      "test": ["bookie-app", "bookie-app-services", "bookie-mcp", "bookie-policy"]
     },
     "driver-core": {
       "test": ["bookie-app-services", "bookie-dump", "bookie-driver-mssql", "bookie-driver-mysql", "bookie-driver-postgres"]

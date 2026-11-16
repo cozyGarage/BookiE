@@ -52,6 +52,16 @@ class ClassifyCiFailureTests(unittest.TestCase):
                 text = message + "\nerror: could not compile `bookie-app`\nJob failed"
                 self.assertEqual(self.tag(text), "infra")
 
+    def test_runner_below_the_free_space_reserve_is_infrastructure(self):
+        line = "free after cleanup: 31297191936 bytes; required reserve: 32212254720 bytes"
+        tag, _, evidence = classifier.classify_log(line + "\ncache cleanup could not recover the required reserve\nJob failed")
+        self.assertEqual(tag, "infra")
+        self.assertEqual(evidence, line)
+
+    def test_runner_recovering_the_free_space_reserve_is_not_infrastructure(self):
+        text = "free after cleanup: 47399645184 bytes; required reserve: 32212254720 bytes\nJob failed"
+        self.assertEqual(self.tag(text), "unknown")
+
     def test_an_unrelated_git_checkout_failure_stays_unknown(self):
         self.assertEqual(self.tag("fatal: reference is not a tree: missing-revision\nJob failed"), "unknown")
 

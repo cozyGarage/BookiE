@@ -1368,7 +1368,7 @@ class CiWorkflowTests(unittest.TestCase):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         driver = workflow.split("  driver:\n", 1)[1].split("  consumers:\n", 1)[0]
         script = (ROOT / "scripts/run-driver-group.sh").read_text()
-        self.assertIn("TMPDIR: /var/cache/ci/tmp/bookie-driver-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}", driver)
+        self.assertIn("TMPDIR: /var/cache/ci/tmp/b-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}", driver)
         self.assertIn("BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}", driver)
         self.assertIn('python3 scripts/run-test-layer.py "$BOOKIE_TEST_LAYER"', driver)
         self.assertIn("timeout-minutes: 90", driver)
@@ -1376,6 +1376,11 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("cleanup-testcontainers.py", script)
         self.assertIn("trap finish EXIT", script)
         self.assertIn("--test-threads=1", script)
+
+    def test_socket_ssh_control_path_fits_the_unix_socket_limit(self):
+        temporary = "/var/cache/ci/tmp/b-" + "9" * 12 + "-99-socket-ssh"
+        control_path = f"{temporary}/.tmpABCDEF/run/ssh/{'a' * 16}/{'b' * 8}/control.askpass"
+        self.assertLessEqual(len(control_path.encode()), 107)
 
     def test_socket_ssh_job_cleans_run_scoped_containers_on_cancel(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
@@ -1478,6 +1483,36 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("scripts/run-test-layer.py app-server", ledger)
         self.assertNotIn("bookie-driver-tests", ledger)
         self.assertNotIn("bookie-driver-src", ledger)
+
+    def test_mysql_preview_tests_are_in_the_source_pinned_consumer_gate(self):
+        bundle_groups = json.loads((ROOT / "scripts/ci-test-bundle-groups.json").read_text())["groups"]
+        self.assertTrue({"bookie-app-services", "bookie-mcp"} <= set(bundle_groups["consumers"]["test"]))
+        layer = json.loads((ROOT / "scripts/test-layers.json").read_text())["layers"]["app-server"]
+        commands = [step["argv"] for step in layer["steps"]]
+        self.assertEqual(commands[1:], [
+            [
+                "bash", "scripts/run-rust-tests.sh", "--locked", "-p", "bookie-mcp", "--test",
+                "mysql_preview_engines", "--", "--include-ignored", "--test-threads=1",
+            ],
+            [
+                "bash", "scripts/run-rust-tests.sh", "--locked", "-p", "bookie-app-services", "--test",
+                "browse_long_text_preview_engines", "mysql_previews_a_huge_longtext_cell", "--",
+                "--include-ignored", "--test-threads=1",
+            ],
+        ])
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        consumers = workflow.split("  consumers:\n", 1)[1].split("  linux-build:\n", 1)[0]
+        self.assertIn("python3 scripts/run-test-layer.py app-server", consumers)
+        ledger = subprocess.check_output(["python3", str(ROOT / "scripts/inventory-ignored-tests.py")], text=True)
+        for name in [
+            "a_preview_is_refused_for_a_myisam_table_and_still_runs_for_innodb",
+            "a_preview_is_refused_for_a_myisam_table_in_another_database",
+            "a_preview_is_refused_for_statements_that_commit_on_their_own_and_nothing_runs",
+            "mysql_previews_a_huge_longtext_cell",
+        ]:
+            row = next(line for line in ledger.splitlines() if f"[{name}]" in line)
+            self.assertIn("App server", row)
+            self.assertIn("scripts/run-test-layer.py app-server", row)
 
     def test_ignored_arch_source_does_not_hide_new_nonignored_inventory_tests(self):
         with tempfile.TemporaryDirectory() as temporary:

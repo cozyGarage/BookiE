@@ -1,5 +1,6 @@
 pub const MAX_SERVER_MESSAGES: usize = 100;
 pub const MAX_SERVER_MESSAGE_TEXT_BYTES: usize = 4096;
+pub const MAX_SERVER_MESSAGE_CODE_BYTES: usize = 32;
 pub const MAX_SERVER_MESSAGES_TOTAL_BYTES: usize = 64 * 1024;
 
 const TRUNCATION_MARK: char = '…';
@@ -24,7 +25,7 @@ impl ServerMessage {
     pub fn new(severity: MessageSeverity, code: Option<String>, text: &str) -> Self {
         Self {
             severity,
-            code,
+            code: code.filter(|code| code.len() <= MAX_SERVER_MESSAGE_CODE_BYTES),
             text: cap_text(text),
         }
     }
@@ -52,8 +53,18 @@ pub struct ServerMessages {
 }
 
 impl ServerMessages {
-    pub fn push(&mut self, message: ServerMessage) {
-        let size = message.text.len();
+    pub fn push(&mut self, mut message: ServerMessage) {
+        if message
+            .code
+            .as_ref()
+            .is_some_and(|code| code.len() > MAX_SERVER_MESSAGE_CODE_BYTES)
+        {
+            message.code = None;
+        }
+        let size = message
+            .text
+            .len()
+            .saturating_add(message.code.as_ref().map_or(0, String::len));
         let fits = self.items.len() < MAX_SERVER_MESSAGES
             && self.bytes.saturating_add(size) <= MAX_SERVER_MESSAGES_TOTAL_BYTES;
         if !fits {

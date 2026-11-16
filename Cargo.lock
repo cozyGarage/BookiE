@@ -1165,6 +1165,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tokio",
+ "tokio-util",
 ]
 
 [[package]]
@@ -1549,6 +1550,7 @@ dependencies = [
  "bookie-storage",
  "libc",
  "rustls",
+ "rustls-pki-types",
  "secrecy",
  "sha2 0.11.1",
  "tempfile",

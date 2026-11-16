@@ -574,6 +574,73 @@ fn blank_edit_on_not_null_default_does_not_stage_a_null() {
 
 #[test]
 #[ignore = "requires isolated GTK display"]
+fn invalid_cell_in_multi_cell_paste_leaves_every_target_unchanged() {
+    relm4::gtk::init().unwrap();
+    let (mut controller, observed) = launch(Uuid::new_v4());
+    let mut created_at = column("created_at", false);
+    created_at.data_type = "timestamp".into();
+    created_at.nullable = false;
+    created_at.default_value = Some("CURRENT_TIMESTAMP".into());
+    let columns = vec![column("id", true), created_at, column("note", false)];
+    let original_time = Value::Text("2026-11-16 12:00:00".into());
+    let original_note = Value::Text("before".into());
+    controller
+        .sender()
+        .send(BrowseTabInput::ColumnsLoaded(columns.clone()))
+        .unwrap();
+    pump(&observed);
+    let request = BrowsePageRequest {
+        id: controller
+            .model()
+            .page_requests
+            .current_id()
+            .expect("a page was requested"),
+        offset: 0,
+    };
+    controller
+        .sender()
+        .send(BrowseTabInput::RowsLoaded {
+            request,
+            result: QueryResult {
+                columns,
+                rows: vec![vec![Value::Int(1), original_time.clone(), original_note.clone()]].into(),
+                truncated: false,
+            },
+            projected_columns: None,
+            elapsed: std::time::Duration::ZERO,
+        })
+        .unwrap();
+    pump(&observed);
+    let snapshot = controller.model().capture_paste_snapshot();
+    controller
+        .sender()
+        .send(BrowseTabInput::PasteText(super::paste::PasteTextInput {
+            row: 0,
+            col: 1,
+            row_key: vec![Value::Int(1)],
+            text: "\tchanged".into(),
+            displayed: None,
+            snapshot,
+        }))
+        .unwrap();
+    let outputs = pump(&observed);
+    let row = controller.model().row_object_at(0).unwrap();
+    assert_eq!(pending(&controller), 0, "invalid paste must not stage any target cell");
+    assert_eq!(transactions(&outputs), 0, "invalid paste must not dispatch a save");
+    assert_eq!(row.cell_value(1), original_time);
+    assert_eq!(row.cell_value(2), original_note);
+    assert_eq!(
+        outputs
+            .iter()
+            .filter(|output| matches!(output, BrowseTabOutput::ShowToast(_)))
+            .count(),
+        1
+    );
+    controller.detach_runtime();
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
 fn stale_row_edit_null_delete_and_paste_messages_do_not_mutate_the_rebound_row() {
     relm4::gtk::init().unwrap();
     let tab_id = Uuid::new_v4();

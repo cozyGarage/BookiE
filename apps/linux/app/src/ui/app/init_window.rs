@@ -19,10 +19,6 @@ fn connect_close_confirmation_response(dialog: &adw::AlertDialog, on_response: i
 #[cfg(test)]
 mod confirmation_tests;
 
-/// Owning handles the model needs from the window-close plumbing: the
-/// close-after-save counters, the "close the window once the map
-/// drains" flag, and the in-flight transaction counter the close
-/// guard polls.
 pub(super) struct WindowLifecycleHandles {
     pub(super) force_close: Rc<Cell<bool>>,
     pub(super) grid_edits_ready: Rc<Cell<bool>>,
@@ -50,11 +46,6 @@ pub(super) fn install_window_lifecycle(
     if restored.borrow().maximized {
         window.maximize();
     }
-    // Window-close handler. Three responsibilities: persist window
-    // size + maximize state, intercept close when any tab has
-    // unsaved edits with a Cancel | Discard | Save dialog, and
-    // route Save through the same SaveCompletedForTab plumbing as
-    // a per-tab close so failures abort cleanly.
     let force_close: Rc<Cell<bool>> = Rc::new(Cell::new(false));
     let force_close_for_close = force_close.clone();
     let busy_quit_confirmed = Rc::new(Cell::new(false));

@@ -351,8 +351,8 @@
       ]
     },
     "app-server": {
-      "purpose": "App parser and grid edit contracts against PostgreSQL, MongoDB, MySQL, and SQL Server",
-      "prerequisites": "Rust 1.98; GTK 4.24 development stack; Docker",
+      "purpose": "App parser, grid edit, MCP preview, and large MySQL text contracts",
+      "prerequisites": "Rust 1.98; GTK 4.24 development stack; Docker; source-pinned consumers test bundle",
       "hosted_gate": "Build Linux / consumers; lab-ci / consumers",
       "steps": [
         {
@@ -363,6 +363,39 @@
           ],
           "timeout_seconds": 900,
           "evidence": "exit"
+        },
+        {
+          "argv": [
+            "bash",
+            "scripts/run-rust-tests.sh",
+            "--locked",
+            "-p",
+            "bookie-mcp",
+            "--test",
+            "mysql_preview_engines",
+            "--",
+            "--include-ignored",
+            "--test-threads=1"
+          ],
+          "timeout_seconds": 900,
+          "evidence": "rust-tests"
+        },
+        {
+          "argv": [
+            "bash",
+            "scripts/run-rust-tests.sh",
+            "--locked",
+            "-p",
+            "bookie-app-services",
+            "--test",
+            "browse_long_text_preview_engines",
+            "mysql_previews_a_huge_longtext_cell",
+            "--",
+            "--include-ignored",
+            "--test-threads=1"
+          ],
+          "timeout_seconds": 900,
+          "evidence": "rust-tests"
         }
       ]
     },

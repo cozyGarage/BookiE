@@ -17,6 +17,14 @@ def clean_test_environment(**values):
 
 
 class TlsStartupTests(unittest.TestCase):
+    def test_mongodb_healthcheck_uses_a_name_in_the_server_certificate(self):
+        compose = (ROOT / "tests/fixtures/driver-tls/docker-compose.yml").read_text()
+        mongo = compose.split("  redis:", 1)[0]
+        generator = (ROOT / "tests/fixtures/driver-tls/generate-materials.sh").read_text()
+
+        self.assertIn("        - --host\n        - mongo.bookie.test", mongo)
+        self.assertIn("DNS:mongo.bookie.test", generator)
+
     def prepare_fixture(self, root):
         (root / "scripts").mkdir()
         fixture = root / "tests/fixtures/driver-tls"

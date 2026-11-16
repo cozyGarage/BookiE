@@ -89,7 +89,13 @@ fn append_tls_ca(hasher: &mut MaterialHasher, saved: &SavedConnection) -> Result
     let Some(path) = saved.tls_root_cert.as_deref() else {
         return Ok(());
     };
-    hasher.tag(b"tls_ca", &read_material_file(path)?);
+    let bytes = if saved.effective_tls_mode().verifies_cert() {
+        super::tls_ca_file::read_tls_ca_file(path, true)
+            .map_err(|error| bookie_core::DriverError::Tls(error.to_string()))?
+    } else {
+        read_material_file(path)?
+    };
+    hasher.tag(b"tls_ca", &bytes);
     Ok(())
 }
 
