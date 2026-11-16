@@ -28,6 +28,8 @@ mod pooled_database;
 mod read_only_session;
 #[path = "support/server_messages.rs"]
 mod server_messages;
+#[path = "support/server_stop_class.rs"]
+mod server_stop_class;
 #[path = "support/shared_container.rs"]
 mod shared_container;
 
