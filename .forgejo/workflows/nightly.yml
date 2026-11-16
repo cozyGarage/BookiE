@@ -1,12 +1,19 @@
 name: nightly
 on:
-  schedule:
-    - cron: "0 23 * * *"
   workflow_dispatch:
+    inputs:
+      full:
+        description: Run every driver and every mutation shard instead of tonight's rotation
+        type: boolean
+        default: false
+      plan_only:
+        description: Run only the plan job and print the plan to its log
+        type: boolean
+        default: false
 
 concurrency:
-  group: build-linux-${{ github.event_name }}-${{ github.ref }}-auto
-  cancel-in-progress: false
+  group: nightly-${{ github.ref }}-${{ inputs.plan_only && 'plan' || 'run' }}
+  cancel-in-progress: true
 
 defaults:
   run:
@@ -22,8 +29,59 @@ env:
   SCCACHE_CACHE_SIZE: 40G
 
 jobs:
+  plan:
+    runs-on: any-host
+    timeout-minutes: 15
+    outputs:
+      skip: ${{ steps.plan.outputs.skip }}
+      reason: ${{ steps.plan.outputs.reason }}
+      drivers: ${{ steps.plan.outputs.drivers }}
+      mutation: ${{ steps.plan.outputs.mutation }}
+      values: ${{ steps.plan.outputs.values }}
+      gtk_soak: ${{ steps.plan.outputs.gtk_soak }}
+      arch_package: ${{ steps.plan.outputs.arch_package }}
+    steps:
+      - name: Prepare runner workspace
+        run: |
+          rm -rf src
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: src
+      - name: Plan the shards for today
+        id: plan
+        shell: bash
+        env:
+          FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
+          FORGEJO_API: ${{ github.server_url }}/api/v1/repos/${{ github.repository }}
+          FULL_RUN: ${{ inputs.full }}
+          PLAN_ONLY: ${{ inputs.plan_only }}
+        run: |
+          cd src
+          args=(--commit "${{ github.sha }}" --lookup --changed-from-git --github-output "$GITHUB_OUTPUT")
+          if [ "$FULL_RUN" = true ]; then args+=(--force); fi
+          if [ "$PLAN_ONLY" = true ]; then args+=(--plan-only); fi
+          python3 scripts/ci-nightly-plan.py "${args[@]}"
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
   coverage:
     runs-on: any-host
+    needs: plan
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.skip != 'true' }}
     timeout-minutes: 90
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/nightly-coverage
@@ -64,8 +122,8 @@ jobs:
           fi
   docker-coverage:
     runs-on: any-host
-    needs: coverage
-    if: ${{ !cancelled() }}
+    needs: [plan, coverage]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.skip != 'true' && needs.plan.outputs.drivers != '[]' }}
     timeout-minutes: 120
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/nightly-docker-cov-${{ matrix.driver }}
@@ -73,9 +131,9 @@ jobs:
       BOOKIE_TEST_RUN_ID: nightly-${{ github.run_id }}-${{ matrix.driver }}
     strategy:
       fail-fast: false
-      max-parallel: 2
+      max-parallel: 3
       matrix:
-        driver: [postgres, mysql, sqlite, mongodb, redis, clickhouse]
+        driver: ${{ fromJSON(needs.plan.outputs.drivers) }}
     steps:
       - name: Prepare runner workspace
         run: |
@@ -123,29 +181,17 @@ jobs:
           fi
   mutation:
     runs-on: any-host
-    needs: coverage
-    if: ${{ !cancelled() }}
-    timeout-minutes: 150
+    needs: [plan, docker-coverage]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.skip != 'true' && needs.plan.outputs.mutation != '[]' }}
+    timeout-minutes: 120
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/nightly-mutants-${{ matrix.label }}
       RUSTC_WRAPPER: ""
     strategy:
       fail-fast: false
-      max-parallel: 2
+      max-parallel: 3
       matrix:
-        include:
-          - {label: core-1, package: bookie-core, shard: 0/4}
-          - {label: core-2, package: bookie-core, shard: 1/4}
-          - {label: core-3, package: bookie-core, shard: 2/4}
-          - {label: core-4, package: bookie-core, shard: 3/4}
-          - {label: policy-1, package: bookie-policy, shard: 0/2}
-          - {label: policy-2, package: bookie-policy, shard: 1/2}
-          - {label: ssh, package: bookie-ssh, shard: 0/1}
-          - {label: redis, package: bookie-driver-redis, shard: 0/1}
-          - {label: postgres, package: bookie-driver-postgres, shard: 0/1}
-          - {label: agentd, package: bookie-agentd, shard: 0/1}
-          - {label: transport, package: bookie-transport, shard: 0/1}
-          - {label: app-services, package: bookie-app-services, shard: 0/1}
+        include: ${{ fromJSON(needs.plan.outputs.mutation) }}
     steps:
       - name: Prepare runner workspace
         run: |
@@ -165,20 +211,19 @@ jobs:
         run: |
           command -v cargo-mutants >/dev/null || cargo install --locked cargo-mutants --version ^27
       - name: Mutants that no test notices
+        env:
+          MUTANT_FILES: ${{ matrix.files }}
         run: |
           cd src
           args=(--package "${{ matrix.package }}" --test-tool cargo --shard "${{ matrix.shard }}"
                 --output "$GITHUB_WORKSPACE/mutants-${{ matrix.label }}" --timeout 60 --build-timeout 900 --no-shuffle)
-          if [ "${{ matrix.package }}" = bookie-driver-postgres ]; then
-            args+=(--file crates/drivers/postgres/src/array.rs --file crates/drivers/postgres/src/numeric.rs
-                   --file crates/drivers/postgres/src/temporal.rs --file crates/drivers/postgres/src/decode.rs)
-          fi
+          for file in $MUTANT_FILES; do args+=(--file "$file"); done
           status=0
           test_args=(--lib)
           [ "${{ matrix.package }}" = bookie-agentd ] && test_args+=(--bins --tests)
           cargo mutants "${args[@]}" -- "${test_args[@]}" || status=$?
           partial=()
-          [ "${{ matrix.shard }}" = 0/1 ] || partial=(--partial)
+          if [ "${{ matrix.partial }}" = true ]; then partial=(--partial); fi
           python3 scripts/check-mutants-baseline.py "${{ matrix.package }}" "$GITHUB_WORKSPACE/mutants-${{ matrix.label }}" "$status" "${partial[@]}"
 
       - name: Finalize runner job
@@ -192,16 +237,16 @@ jobs:
           fi
   gtk-soak:
     runs-on: any-host
-    needs: [docker-coverage, mutation]
-    if: ${{ !cancelled() }}
-    timeout-minutes: 120
+    needs: [plan, mutation]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.skip != 'true' && needs.plan.outputs.gtk_soak != '[]' }}
+    timeout-minutes: 90
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/nightly-soak
     strategy:
       fail-fast: false
-      max-parallel: 2
+      max-parallel: 3
       matrix:
-        run: [1, 2, 3]
+        run: ${{ fromJSON(needs.plan.outputs.gtk_soak) }}
     steps:
       - name: Prepare runner workspace
         run: |
@@ -244,9 +289,9 @@ jobs:
           fi
   arch-package:
     runs-on: any-host
-    needs: [docker-coverage, mutation]
-    if: ${{ !cancelled() }}
-    timeout-minutes: 120
+    needs: [plan, mutation]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.skip != 'true' && needs.plan.outputs.arch_package == 'true' }}
+    timeout-minutes: 60
     steps:
       - name: Prepare runner workspace
         run: |
@@ -276,9 +321,9 @@ jobs:
           fi
   values:
     runs-on: any-host
-    needs: [docker-coverage, mutation]
-    if: ${{ !cancelled() }}
-    timeout-minutes: 120
+    needs: [plan, mutation]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.skip != 'true' && needs.plan.outputs.values == 'true' }}
+    timeout-minutes: 60
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/nightly-values
     steps:
