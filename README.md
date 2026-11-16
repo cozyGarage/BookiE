@@ -32,19 +32,34 @@ BookiE is a free, open-source database client for Linux, built for data analysts
   <img src="docs/brand/badges/duckdb.svg" alt="DuckDB">
   <img src="docs/brand/badges/redis.svg" alt="Redis">
   <img src="docs/brand/badges/mongodb.svg" alt="MongoDB">
+  <img src="docs/brand/badges/cassandra.svg" alt="Cassandra / ScyllaDB">
+  <img src="docs/brand/badges/oracle.svg" alt="Oracle Database">
 </p>
 
 ## At a glance
 
 | | |
 |---|---|
-| Platform | Linux, with a native GTK4 and libadwaita interface. |
-| Databases | PostgreSQL, MySQL and MariaDB, SQLite, SQL Server and ClickHouse. DuckDB, MongoDB, Redis and a read-only Oracle Database driver and a read-only Cassandra and ScyllaDB driver are experimental and built in. See the [driver maturity table](docs/adding-drivers.md#driver-maturity). |
-| Cost | Every shipped feature is free, with no account, license key, subscription, paid tier or remote entitlement check. |
-| Credentials | Kept in the desktop keyring (Secret Service). |
-| Safety | Database operations pass local policy checks. Audit-intent failures block writes by default; explicit Local/Dev policy can allow a human write without an audit record. |
-| AI agents | Optional Model Context Protocol access through the same checks. |
-| License | [GNU Affero General Public License v3.0 or later](LICENSE). |
+| Platform | Linux, with a native GTK4 and libadwaita interface. Cross-platform GPUI frontend in active parallel development ([ADR 0052](docs/decisions/0052-gpui-is-the-cross-platform-frontend.md)). |
+| Databases | **11 engines**: PostgreSQL, MySQL, MariaDB, SQLite, SQL Server, and ClickHouse (Stable). DuckDB (built in), MongoDB, and Redis (Experimental). Read-only Oracle Database and Cassandra / ScyllaDB drivers (Experimental). See the [driver maturity table](docs/adding-drivers.md#driver-maturity). |
+| Cost | Free and open source under [AGPL-3.0-or-later](LICENSE). No accounts, subscriptions, license keys, paid tiers, or remote entitlement checks. |
+| Credentials | Securely stored in the system keyring (Secret Service via `oo7`). Plaintext files never hold passwords or passphrases. |
+| Safety & Governance | Every operation passes local `PolicyGuard` checks and writes to an encrypted audit journal. Destructive actions require explicit confirmation or terminal code approval (`approve <code>`). |
+| Interoperability | Native connection draft import from **DBX** (`dbx.db`), DBeaver, DataGrip, Navicat, RESP.app, and Another Redis Desktop Manager. |
+| AI agents | Built-in headless `bookie-agentd` server implementing the Model Context Protocol (MCP) over Unix sockets or stdio, guarded by the same safety policy. |
+| Performance | Progressive streaming for large results with disk spooling (1 GiB quota, 4,096 pages) and continuous scrolling; fast keyset seeks for table browsing. |
+
+## Highlights and capabilities
+
+- **Spreadsheet-grade data grid**: Fast keyset pagination, customizable page sizes (1–5,000 rows), browse auto-refresh (15s toggle), and page load duration display. Select columns (`Ctrl+Space`), stage multi-cell values (`Set Cells to Value`), enjoy right-aligned numeric data and sticky row-number gutters.
+- **Deep value inspection & editing**: Decoded previews in **View Value** for MessagePack, schema-less Protobuf, and binary image formats (PNG, JPEG, GIF, WebP) alongside full hex dumps and semantic JSON editing up to 1 MiB.
+- **Governed SQL editor**: Side-by-side split view, syntax folding, line bookmarks (`Ctrl+F2`), query history in Open Quickly (`Ctrl+P`), and saved queries organized by folders and search keywords.
+- **Server messages & notices**: Real-time display for PostgreSQL notices/warnings (`RAISE`), SQL Server `PRINT` messages, and MySQL/MariaDB warnings right next to statement results with copyable details.
+- **Progressive streaming & comparison**: Progressive streaming within an estimated 64 MiB row window and 256 MiB shared page budget, spooled to encrypted local cache. Background search across all rows, and side-by-side result diffing (**Compare…**) with cell change highlighting.
+- **Multi-connection workspace**: Open and switch between multiple database connections in a single window with independent per-tab connection routing, environment ribbons (Local, Dev, Staging, Prod), and automatic session restoration.
+- **Enterprise SSH tunneling**: Multi-hop SSH bastion chains with up to 8 jump hosts, individual keyring secrets per hop, custom local port binding, and strict TLS verification.
+- **Multi-file import with upsert**: Process up to 20 CSV, TSV, or Excel `.xlsx` files in one run, with row updating for existing primary keys on supported engines.
+- **Visual schema diagrams & health reports**: Interactive ER diagrams with foreign key links, PostgreSQL table and index bloat/health reports, and one-consistent-snapshot full table exports.
 
 ## Install
 

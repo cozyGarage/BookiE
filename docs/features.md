@@ -47,7 +47,9 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
 
 - Click a table or view in the sidebar to open it in a preview tab. Edit or keep the tab to make it permanent.
 - Tables are read in bounded pages. The pager accepts a custom page size from 1 to 5,000 rows (Preferences sets the default). The status line shows how long the current page took to load beside its row count. Deep forward navigation uses primary-key seeks where supported; previous-page, last-page and explicitly sorted paths may use offsets on some engines. See [known limitations](known-limitations.md#data-and-values).
+- Toggle **Auto-refresh** in the bottom pager bar to automatically refresh the current page every 15 seconds while monitoring live data changes.
 - Edit a cell with a double-click, F2 or Enter. Edits stay pending, with a dot on the tab, until Ctrl+S. Undo and redo apply to pending edits.
+- Sticky row-number gutter keeps row numbers visible as columns scroll horizontally.
 - On PostgreSQL, a view that is automatically updatable, maps to one table and exposes every primary-key column of that table opens editable, through the same staged edits, approval and audit as a table. Insert is offered only when the view accepts inserts. A view with an INSTEAD OF trigger or rule, an aggregate, a join or a missing key column stays read-only and says which of these applies. MySQL, MariaDB and SQL Server views stay read-only ([#2203](https://github.com/cozyGarage/BookiE/issues/2203)).
 - Insert rows, delete rows and set a cell to NULL. Changes are saved in one transaction where the engine supports it.
 - NULL, empty text and unsupported values look different. Booleans show a check box with a third state for NULL. Sparse document fields that an object lacks show as (missing) and remain distinct from NULL.
