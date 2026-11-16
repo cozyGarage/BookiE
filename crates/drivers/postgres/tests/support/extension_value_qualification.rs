@@ -85,7 +85,7 @@ async fn assert_postgis_type_identity(connection: &dyn Connection) {
         .await
         .expect("create same-named user type");
     connection
-        .execute("CREATE EXTENSION postgis")
+        .execute("CREATE EXTENSION IF NOT EXISTS postgis")
         .await
         .expect("enable PostGIS");
 
@@ -133,7 +133,7 @@ async fn pgvector_values_are_refused_without_losing_null_or_type_identity() {
         )
         .await
         .expect("read vector values");
-    assert_eq!(result.columns[0].data_type, "vector");
+    assert_eq!(result.columns[0].data_type, "extension_types.vector");
     assert_eq!(
         result.rows,
         vec![vec![
