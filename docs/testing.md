@@ -120,6 +120,7 @@ A guardrail test pins a contract that other code relies on but that no feature t
 | Every audited read ends in exactly one terminal outcome, on success and failure, controlled or not | `every_audited_read_ends_in_exactly_one_terminal_outcome`, `no_read_under_a_cancelled_control_writes_two_outcomes` | `crates/policy/src/guard_tests_passthrough.rs` |
 | An undecodable value stays visible and distinct from NULL in every export format and in copy; SQL export refuses it | `value_contract_every_export_keeps_undecodable_distinct_from_null` | `crates/core/src/export/stream_tests.rs` |
 | Every driver that joins the shared suite refuses writes on a read-only connection and keeps its rows, and returns NULL, empty text and integers beyond 2^53 unchanged | `conformance_*` | `crates/drivers/shared/tests/conformance.rs`, run by `crates/drivers/sqlite/tests/conformance.rs` and `crates/drivers/duckdb/tests/conformance.rs`, and on real PostgreSQL 16, MySQL, ClickHouse and SQL Server containers by `crates/drivers/{postgres,mysql,clickhouse,mssql}/tests/conformance.rs` (docker) |
+| A key-value driver reports exact values, key types, TTL and complete browse pages, and a read-only connection keeps its keys (the Redis driver does not refuse writes itself, so that case checks reads only) | `keyspace_conformance_*` | `crates/drivers/shared/tests/keyspace_conformance.rs`, run on a real Redis 7.4 container by `crates/drivers/redis/tests/conformance.rs` (docker) |
 
 Add a row here when you add a guardrail.
 
