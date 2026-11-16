@@ -160,3 +160,12 @@ columnview > header .tp-column-header-selected {
   font-weight: bold;
   box-shadow: inset 0 -3px 0 @accent_bg_color;
 }
+
+.tp-paginator-bar {
+  padding-left: 6px;
+  padding-right: 6px;
+}
+
+.tp-paginator-bar button {
+  min-width: 28px;
+}

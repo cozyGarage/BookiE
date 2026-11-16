@@ -244,11 +244,25 @@ fn handle_cell_key(
         gtk::gdk::Key::Tab if !shift => {
             cell.stop_editing(true);
             move_focus(cell, gtk::DirectionType::TabForward);
+            if let Some(next_cell) = focused_cell_editor(cell.upcast_ref()) {
+                if next_cell != *cell {
+                    if let Some(trigger) = cell_edit_trigger(&next_cell, triggers) {
+                        trigger(&next_cell);
+                    }
+                }
+            }
             glib::Propagation::Stop
         }
         gtk::gdk::Key::Tab | gtk::gdk::Key::ISO_Left_Tab if shift => {
             cell.stop_editing(true);
             move_focus(cell, gtk::DirectionType::TabBackward);
+            if let Some(next_cell) = focused_cell_editor(cell.upcast_ref()) {
+                if next_cell != *cell {
+                    if let Some(trigger) = cell_edit_trigger(&next_cell, triggers) {
+                        trigger(&next_cell);
+                    }
+                }
+            }
             glib::Propagation::Stop
         }
         _ => glib::Propagation::Proceed,

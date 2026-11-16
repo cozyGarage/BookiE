@@ -187,12 +187,6 @@ fn card_title(text: &str, theme: Theme) -> Div {
 
 impl GridView {
     pub fn toolbar(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
-        let inert = |id: &'static str, name: &'static str, cx: &mut Context<Self>| {
-            toolbar_icon(id, name, theme).on_click(cx.listener(|this, _, _, cx| {
-                this.status = "Synthetic prototype: nothing to open here.".into();
-                cx.notify();
-            }))
-        };
         div()
             .flex()
             .items_center()
@@ -209,12 +203,25 @@ impl GridView {
                     .items_center()
                     .gap_1()
                     .children((!self.sidebar_open).then(|| expand_sidebar_button(theme, cx)))
-                    .child(inert("new-connection", "database", cx))
-                    .child(inert("new-query", "file-plus", cx))
-                    .child(inert("data-transfer", "arrow-left-right", cx))
-                    .child(inert("driver-manager", "package", cx))
-                    .child(inert("plugin-center", "puzzle", cx))
-                    .child(inert("more", "chevron-down", cx)),
+                    .child(
+                        toolbar_icon("new-connection", "database", theme).on_click(cx.listener(|this, _, _, cx| {
+                            this.tabs.open_home();
+                            this.sync_grid_owner();
+                            cx.notify();
+                        })),
+                    )
+                    .child(
+                        toolbar_icon("new-query", "file-plus", theme).on_click(cx.listener(|this, _, window, cx| {
+                            this.tabs.open_query();
+                            this.sync_grid_owner();
+                            if this.live.is_some() {
+                                this.focus_editor = true;
+                            } else {
+                                window.focus(&this.focus, cx);
+                            }
+                            cx.notify();
+                        })),
+                    ),
             )
             .child(self.toolbar_right(theme, cx))
     }
