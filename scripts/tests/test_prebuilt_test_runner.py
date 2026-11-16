@@ -6,6 +6,7 @@ import json
 import os
 import platform
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -169,7 +170,7 @@ class PrebuiltTestRunnerTests(unittest.TestCase):
             self.assertEqual(len(runner.commands(self.root, ["-p", "sample", "--test", "integration"])), 1)
 
     def test_bundle_preparation_rejects_a_different_checkout(self):
-        result = subprocess.run(['bash', str(ROOT / 'scripts/prepare-test-bundle.sh'), '0' * 40, 'default', str(self.root)],
+        result = subprocess.run(['bash', str(ROOT / 'scripts/prepare-test-bundle.sh'), '0' * 40, 'default'],
                                 capture_output=True, text=True)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('differs from the checkout', result.stderr)
@@ -180,17 +181,24 @@ class PrebuiltTestRunnerTests(unittest.TestCase):
         self.index['build_group'] = 'default'
         (self.root / 'index.json').write_text(json.dumps(self.index))
         environment = self.root / 'github-env'
+        cache = self.root / 'bundle-cache'
+        bundle_directory = cache / f'{revision}-default'
+        bundle_directory.mkdir(parents=True)
+        for path in list(self.root.iterdir()):
+            if path.is_file() and path != environment:
+                shutil.copy2(path, bundle_directory / path.name)
         result = subprocess.run(
-            ['bash', str(ROOT / 'scripts/prepare-test-bundle.sh'), revision, 'default', str(self.root)],
-            env={**os.environ, 'GITHUB_ENV': str(environment)}, capture_output=True, text=True,
+            ['bash', str(ROOT / 'scripts/prepare-test-bundle.sh'), revision, 'default'],
+            env={**os.environ, 'GITHUB_ENV': str(environment), 'BOOKIE_BUNDLE_CACHE': str(cache),
+                 'BOOKIE_REGISTRY_URL': 'https://registry.example/packages'}, capture_output=True, text=True,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         values = environment.read_text()
-        self.assertIn(f'BOOKIE_TEST_BUNDLE={self.root}', values)
+        self.assertIn(f'BOOKIE_TEST_BUNDLE={bundle_directory}', values)
         self.assertIn(f'BOOKIE_SOURCE_COMMIT={revision}', values)
-        self.assertIn(f'GSETTINGS_SCHEMA_DIR={self.root}/schemas', values)
+        self.assertIn(f'GSETTINGS_SCHEMA_DIR={bundle_directory}/schemas', values)
         self.assertIn('BOOKIE_REQUIRE_PREBUILT=1', values)
-        self.assertTrue(self.binary.stat().st_mode & 0o100)
+        self.assertTrue((bundle_directory / self.binary.name).stat().st_mode & 0o100)
 
     def test_bundle_builder_rejects_a_different_checkout(self):
         result = subprocess.run(['bash', str(ROOT / 'scripts/build-test-bundles.sh'), str(self.root / 'out')],

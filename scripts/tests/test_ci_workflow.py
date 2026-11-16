@@ -289,7 +289,7 @@ class CiWorkflowTests(unittest.TestCase):
                     self.assertRegex(block, r"(?m)(^    needs:.*pin-revision|^      - pin-revision$)")
                     self.assertNotIn("${{ github.sha }}", block)
         self.assertIn("${{ needs.pin-revision.outputs.revision }}", workflows[".forgejo/workflows/ci.yml"])
-        self.assertNotIn("ci-bundle-registry.py", workflows[".forgejo/workflows/ci.yml"])
+        self.assertIn("ci-bundle-registry.py publish", workflows[".forgejo/workflows/ci.yml"])
 
     def test_ci_revision_validator_records_a_tag_and_refuses_pull_refs(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -796,7 +796,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn('git merge-base HEAD origin/main', unit)
         self.assertIn("github.event.before", unit)
         self.assertIn('"$BOOKIE_CI_EVENT_NAME" != "push"', unit)
-        direct_bundle = 'prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" direct "${{ runner.temp }}/bookie-direct-bundle"'
+        direct_bundle = 'prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" direct'
         self.assertIn(direct_bundle, unit)
         self.assertLess(unit.index(direct_bundle), unit.index("Focused Data-lane change contracts"))
 
@@ -805,8 +805,7 @@ class CiWorkflowTests(unittest.TestCase):
         job = re.search(r"(?ms)^  gpui-tests:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
         self.assertIn("timeout-minutes:", job)
         self.assertIn("needs: [pin-revision, gpui-build]", job)
-        self.assertIn('prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" gpui "${{ runner.temp }}/bookie-gpui-bundle"', job)
-        self.assertIn('bookie-tests-${{ needs.pin-revision.outputs.revision }}-gpui', job)
+        self.assertIn('prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" gpui', job)
         self.assertIn('nextest run --archive-file "$BOOKIE_TEST_BUNDLE/nextest.tar.zst"', job)
         self.assertIn('mkdir -p "$TMPDIR/bookie-gpui-${GITHUB_RUN_ID}"', job)
         self.assertIn('workspace_root="$(cd apps/gpui && pwd -P)"', job)
@@ -821,30 +820,50 @@ class CiWorkflowTests(unittest.TestCase):
         for name, group in (("unit", "workspace"), ("sandbox", "workspace"), ("gpui-tests", "gpui"),
                             ("widgets", "direct"), ("security-policy", "consumers"),
                             ("consumers", "consumers"), ("pg-release", "pg-release"),
-                            ("driver-tls", "driver-tls"),
-                            ("keyring", "keyring")):
+                            ("driver-tls", "driver-tls"), ("keyring", "keyring")):
             with self.subTest(job=name):
                 job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
-                self.assertIn("actions/download-artifact@", job)
-                self.assertIn(f'bookie-tests-${{{{ needs.pin-revision.outputs.revision }}}}-{group}', job)
-                self.assertRegex(job, rf'prepare-test-bundle\.sh "\$\{{\{{ needs\.pin-revision\.outputs\.revision \}}\}}" {group} "\$\{{\{{ runner\.temp \}}\}}/bookie-[a-z$\{{}}.-]+-bundle"')
+                self.assertIn(f'prepare-test-bundle.sh "${{{{ needs.pin-revision.outputs.revision }}}}" {group}', job)
+                self.assertIn("BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}", job)
+                self.assertIn("/api/packages/trung/generic/bookie-test-bundles", job)
+                self.assertNotIn("actions/download-artifact", job)
         driver = "".join(
             re.findall(r"(?ms)^  driver(?:-followup)?:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow)
         )
-        self.assertIn('bookie-tests-${{ needs.pin-revision.outputs.revision }}-${{ matrix.group }}', driver)
-        self.assertIn('prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" "${{ matrix.group }}" "${{ runner.temp }}/bookie-${{ matrix.group }}-bundle"', driver)
+        self.assertIn('prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" "${{ matrix.group }}"', driver)
+        self.assertIn("BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}", driver)
+        self.assertNotIn("actions/download-artifact", driver)
 
-    def test_forgejo_uploads_short_lived_artifacts_for_every_bundle_group(self):
+    def test_forgejo_bundle_transfer_uses_registry_and_github_keeps_actions_artifacts(self):
+        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        github = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        builder = re.search(r"(?ms)^  test-build:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
+
+        self.assertIn("ci-bundle-registry.py publish", builder)
+        self.assertIn("BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}", builder)
+        self.assertIn("/api/packages/trung/generic/bookie-test-bundles", builder)
+        self.assertNotRegex(builder, r"bookie-tests-.*upload-artifact")
+        self.assertIn("BOOKIE_BUNDLE_CACHE", (ROOT / "scripts/prepare-test-bundle.sh").read_text())
+        self.assertIn("actions/upload-artifact@", github)
+        self.assertIn("actions/download-artifact@", github)
+
+    def test_forgejo_publishes_only_provider_consumed_bundle_groups(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         builder = re.search(r"(?ms)^  test-build:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
         groups = json.loads((ROOT / "scripts/ci-test-bundle-groups.json").read_text())["publish_groups"] + ["workspace"]
-        for group in groups:
-            with self.subTest(group=group):
-                self.assertIn(f'name: bookie-tests-${{{{ needs.pin-revision.outputs.revision }}}}-{group}', builder)
-                self.assertIn(f'path: test-bundles/{group}/', builder)
-        self.assertEqual(builder.count("retention-days: 1"), len(groups))
-        self.assertNotIn("BOOKIE_REGISTRY", builder)
-        self.assertNotIn("ci-bundle-registry.py", builder)
+        self.assertIn('"publish_groups"', builder)
+        self.assertIn('"workspace"', builder)
+        self.assertIn('ci-bundle-registry.py publish "test-bundles/$group"', builder)
+        self.assertIn("BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}", builder)
+        self.assertEqual(builder.count("ci-bundle-registry.py publish"), 1)
+        self.assertIn('print("\\n".join(json.load(open("src/scripts/ci-test-bundle-groups.json"))["publish_groups"] + ["workspace"]))', builder)
+        self.assertNotIn("actions/upload-artifact", builder)
+        self.assertIn("prune", builder)
+        self.assertIn("--discover-references", builder)
+        self.assertIn("BOOKIE_FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}", builder)
+        gpui_builder = re.search(r"(?ms)^  gpui-build:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+        self.assertIn("src/scripts/ci-bundle-registry.py publish test-bundles/gpui", gpui_builder)
+        self.assertNotIn("actions/upload-artifact", gpui_builder)
 
     def test_github_runs_the_same_gpui_tests_in_the_shared_linux_image(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
@@ -892,11 +911,9 @@ class CiWorkflowTests(unittest.TestCase):
         gpui_builder = re.search(r"(?ms)^  gpui-build:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", github).group(1)
         self.assertIn("bookie-tests-${{ needs.pin-revision.outputs.revision }}-gpui", gpui_builder)
         self.assertIn("retention-days: 1", gpui_builder)
-        forgejo_groups = re.findall(
-            r"name: bookie-tests-\$\{\{ needs\.pin-revision\.outputs\.revision \}\}-([a-z-]+)",
-            forgejo_builder,
-        )
-        self.assertEqual(set(forgejo_groups), groups)
+        self.assertIn('ci-bundle-registry.py publish "test-bundles/$group"', forgejo_builder)
+        self.assertIn('"publish_groups"', forgejo_builder)
+        self.assertNotIn('actions/upload-artifact', forgejo_builder)
 
     def test_driver_tls_uses_the_source_pinned_prebuilt_bundle_on_both_providers(self):
         github = (ROOT / ".github/workflows/build-linux.yml").read_text()
@@ -905,8 +922,7 @@ class CiWorkflowTests(unittest.TestCase):
         forgejo_job = re.search(r"(?ms)^  driver-tls:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
 
         self.assertIn("bookie-tests-${{ needs.pin-revision.outputs.revision }}-driver-tls", github_job)
-        self.assertIn('bookie-tests-${{ needs.pin-revision.outputs.revision }}-driver-tls', forgejo_job)
-        self.assertIn('prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" driver-tls "${{ runner.temp }}/bookie-driver-tls-bundle"', forgejo_job)
+        self.assertIn('prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" driver-tls', forgejo_job)
         for provider, job in (("github", github_job), ("forgejo", forgejo_job)):
             with self.subTest(provider=provider):
                 self.assertIn('python3 scripts/run-test-layer.py tls', job)
@@ -1087,8 +1103,8 @@ class CiWorkflowTests(unittest.TestCase):
                           "pg-release", "socket-ssh", "driver-tls", "keyring", "workspace"})
         gpui_build = re.search(r"(?ms)^  gpui-build:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
         self.assertIn('build-test-bundles.sh "$GITHUB_WORKSPACE/test-bundles" gpui', gpui_build)
-        self.assertIn('name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-gpui', gpui_build)
-        self.assertIn('path: test-bundles/gpui/', gpui_build)
+        self.assertIn('src/scripts/ci-bundle-registry.py publish test-bundles/gpui', gpui_build)
+        self.assertIn('BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}', gpui_build)
         self.assertNotIn("duckdb-build", workflow)
         self.assertNotRegex(workflow, r"(?m)^  duckdb:\n")
         for name in ("unit", "sandbox", "widgets", "driver", "consumers"):
@@ -1275,7 +1291,10 @@ class CiWorkflowTests(unittest.TestCase):
                 self.assertRegex(block, r"(?m)^    timeout-minutes: [1-9][0-9]*$", heading.group(1))
 
             self.assertNotIn("git clone --quiet", workflow)
-            self.assertEqual(workflow.count("BOOKIE_FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}"), 0)
+            self.assertEqual(
+                workflow.count("BOOKIE_FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}"),
+                1 if name == "ci" else 0,
+            )
             self.assertEqual(workflow.count("uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683"), expected_checkouts)
             self.assertEqual(workflow.count("token: ${{ secrets.FORGEJO_TOKEN }}"), expected_checkouts)
             self.assertEqual(workflow.count("persist-credentials: false"), expected_checkouts)
