@@ -37,7 +37,7 @@ async fn run_statements(
         {
             Ok(query) => query,
             Err(error) => {
-                let _ = tx.rollback().await;
+                let _ = rollback_transaction(tx).await;
                 return Err(DriverError::Transaction {
                     statement_index: idx,
                     source: Box::new(error),
@@ -49,7 +49,7 @@ async fn run_statements(
                 let total = result.rows_affected();
                 if expect_one.contains(&idx) && total != 1 {
                     let source = DriverError::ConcurrentModification;
-                    return Err(match tx.rollback().await {
+                    return Err(match rollback_transaction(tx).await {
                         Ok(()) => DriverError::Transaction {
                             statement_index: idx,
                             source: Box::new(source),
@@ -64,7 +64,7 @@ async fn run_statements(
                 affected.push(total);
             }
             Err(error) => {
-                let _ = tx.rollback().await;
+                let _ = rollback_transaction(tx).await;
                 return Err(DriverError::Transaction {
                     statement_index: idx,
                     source: Box::new(map_sqlx_error(error)),
@@ -80,7 +80,7 @@ async fn run_statements(
 }
 
 async fn stopped(tx: sqlx::Transaction<'_, Sqlite>, statement_index: usize) -> DriverError {
-    match tx.rollback().await {
+    match rollback_transaction(tx).await {
         Ok(()) => DriverError::Transaction {
             statement_index,
             source: Box::new(DriverError::Cancelled),
@@ -91,4 +91,11 @@ async fn stopped(tx: sqlx::Transaction<'_, Sqlite>, statement_index: usize) -> D
             rollback_error: Box::new(map_sqlx_error(error)),
         },
     }
+}
+
+pub(super) async fn rollback_transaction(mut tx: sqlx::Transaction<'_, Sqlite>) -> Result<(), sqlx::Error> {
+    if matches!(interrupt::in_autocommit_mode(&mut tx).await, Ok(true)) {
+        sqlx::raw_sql("BEGIN").execute(&mut *tx).await?;
+    }
+    tx.rollback().await
 }

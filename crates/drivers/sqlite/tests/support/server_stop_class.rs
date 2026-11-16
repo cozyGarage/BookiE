@@ -405,3 +405,89 @@ async fn a_sqlite_transaction_refuses_bound_parameters_without_running_anything(
     transaction.commit().await.unwrap();
     assert_eq!(row_count(connection.as_ref()).await, 1);
 }
+
+async fn second_connection(directory: &TempDir) -> Arc<dyn Connection> {
+    SqliteDriver
+        .connect(ConnectOptions {
+            database: directory.path().join("stop.db").to_string_lossy().to_string(),
+            ..Default::default()
+        })
+        .await
+        .expect("a second connection to the same file")
+        .into()
+}
+
+async fn the_pool_stays_clean_for_later_transactions(connection: &dyn Connection, other: &dyn Connection) {
+    assert_eq!(row_count(other).await, 1);
+    for round in 0..8_i64 {
+        let id = 100 + round;
+        let mut transaction = connection.begin().await.unwrap();
+        transaction
+            .execute(&format!("INSERT INTO stop_class_rows (id) VALUES ({id})"))
+            .await
+            .unwrap();
+        transaction.rollback().await.unwrap();
+        assert_eq!(
+            row_count(other).await,
+            1,
+            "a rolled back transaction left rows behind in round {round}"
+        );
+    }
+    for round in 0..8_i64 {
+        let id = 200 + round;
+        connection
+            .execute(&format!("INSERT INTO stop_class_rows (id) VALUES ({id})"))
+            .await
+            .unwrap();
+        assert_eq!(
+            row_count(other).await,
+            2 + round,
+            "an acknowledged write is not visible to another connection in round {round}"
+        );
+    }
+    let mut transaction = connection.begin().await.unwrap();
+    transaction
+        .execute("INSERT INTO stop_class_rows (id) VALUES (300)")
+        .await
+        .unwrap();
+    transaction.commit().await.unwrap();
+    assert_eq!(row_count(other).await, 10);
+}
+
+#[tokio::test]
+async fn a_stopped_write_in_a_sqlite_transaction_leaves_the_pool_clean_for_later_transactions() {
+    let (directory, connection) = open().await;
+    let other = second_connection(&directory).await;
+    let mut transaction = connection.begin().await.unwrap();
+    transaction
+        .execute_controlled(ENDLESS_INSERT, &OperationControl::with_timeout(STOP_AFTER))
+        .await
+        .expect_err("the endless write is stopped");
+    drop(transaction);
+
+    the_pool_stays_clean_for_later_transactions(connection.as_ref(), other.as_ref()).await;
+}
+
+#[tokio::test]
+async fn a_stopped_batch_leaves_the_pool_clean_for_later_transactions() {
+    let (directory, connection) = open().await;
+    let other = second_connection(&directory).await;
+    let result = connection
+        .execute_in_transaction_checked_controlled(&endless_batch(), &[0], &OperationControl::with_timeout(STOP_AFTER))
+        .await;
+    assert!(matches!(result, Err(DriverError::TimedOut)), "{result:?}");
+
+    the_pool_stays_clean_for_later_transactions(connection.as_ref(), other.as_ref()).await;
+}
+
+#[tokio::test]
+async fn a_stopped_unchecked_batch_leaves_the_pool_clean_for_later_transactions() {
+    let (directory, connection) = open().await;
+    let other = second_connection(&directory).await;
+    let result = connection
+        .execute_in_transaction_controlled(&endless_batch(), &OperationControl::with_timeout(STOP_AFTER))
+        .await;
+    assert!(matches!(result, Err(DriverError::TimedOut)), "{result:?}");
+
+    the_pool_stays_clean_for_later_transactions(connection.as_ref(), other.as_ref()).await;
+}

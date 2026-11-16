@@ -16,9 +16,10 @@ use sqlx::{
 use futures::stream::StreamExt;
 
 use bookie_core::{
-    ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverValueInputCapabilities, ExecResult,
-    ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBudget,
-    QueryRows, TableInfo, Value, check_pre_dispatch, run_controlled_setup, run_server_cancellable,
+    CANCELLATION_GRACE, ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError,
+    DriverValueInputCapabilities, ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS,
+    OperationControl, QueryResult, QueryResultBudget, QueryRows, TableInfo, Value, check_pre_dispatch,
+    run_controlled_setup, run_server_cancellable,
 };
 
 mod drop_guard;
@@ -675,9 +676,11 @@ impl SqliteTransaction {
         let Some(tx) = self.tx.as_mut() else {
             return;
         };
-        let still_open = matches!(interrupt::in_autocommit_mode(tx).await, Ok(false));
-        if uncertain || !still_open {
-            self.tx = None;
+        if !uncertain && matches!(interrupt::in_autocommit_mode(tx).await, Ok(false)) {
+            return;
+        }
+        if let Some(tx) = self.tx.take() {
+            let _ = tokio::time::timeout(CANCELLATION_GRACE, transaction::rollback_transaction(tx)).await;
         }
     }
 }
