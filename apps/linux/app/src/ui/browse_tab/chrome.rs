@@ -9,13 +9,6 @@ use super::*;
 
 impl BrowseTab {
     pub(super) fn build_paginator(sender: ComponentSender<Self>, page_size: u64, browse_filters: bool) -> Paginator {
-        // First / Last bracket the Prev / Next pair. Tables of millions
-        // of rows make Last especially valuable; it stays disabled until
-        // the row count loads.
-        // Insert row sits at the very start of the paginator's
-        // pack_start group — clearly separated from the nav arrows by
-        // its position and by the GtkActionBar's start group spacing,
-        // so a mis-aim toward Next doesn't land on Insert.
         let insert_button = gtk::Button::builder()
             .icon_name("list-add-symbolic")
             .tooltip_text(bookie_app_services::tr!("Insert row (Ctrl+N)"))
@@ -60,12 +53,6 @@ impl BrowseTab {
         paginator_label.add_css_class("dim-label");
         paginator_label.add_css_class("numeric");
 
-        // Selection count badge — sits beside the paginator label.
-        // Hidden when 0–1 rows selected; appears when the user
-        // shift-clicks a range or ctrl-clicks to multi-select.
-        // `accent` class draws the user's eye to it; AccessibleRole
-        // Status is the same role we use for the paginator label so
-        // a screen reader announces both as live regions.
         let selection_count_label = gtk::Label::new(None);
         selection_count_label.add_css_class("accent");
         selection_count_label.add_css_class("caption-heading");
@@ -310,10 +297,6 @@ impl BrowseTab {
                 .replace("{n}", &count.to_string());
             self.pending_label.set_label(&label);
         }
-        // Slide the whole footer in/out as one unit instead of
-        // toggling each child's visibility. GtkRevealer animates the
-        // reveal so the bar doesn't pop into existence; the bar's
-        // own children stay always-visible inside it.
         self.pending_revealer.set_reveal_child(visible);
         self.refresh_banner_visibility();
     }
@@ -524,9 +507,6 @@ impl BrowseTab {
     }
 
     pub(super) fn show_error_inner(&self, message: &str, sender: &ComponentSender<Self>) {
-        // Title pattern matches the structure tab ("Couldn't load
-        // structure"). The previous terse "Failed" left the user
-        // guessing what failed.
         let page = adw::StatusPage::builder()
             .icon_name("dialog-error-symbolic")
             .title(bookie_app_services::tr!("Couldn't load rows"))
