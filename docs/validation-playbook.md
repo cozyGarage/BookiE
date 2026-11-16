@@ -97,7 +97,7 @@ Missing tools, nonzero exits, timeouts, cancellations and absent required test s
 | `security-policy` | Policy/MCP permissions, allowlists, bounds and audit behavior | Non-GTK dependencies; does not prove every server authorization mode |
 | `supply-chain` | Advisory, license and dependency-source policy | `cargo-deny`, `cargo-audit`, network; repository exceptions remain explicit |
 | `widgets` | Named GTK widget regressions in isolated processes | GTK 4.24, Xvfb and private D-Bus |
-| `app-server` | App parser and grid-edit contracts against PostgreSQL, MySQL, MongoDB and SQL Server | GTK 4.24 build libraries and Docker; `consumers` on both providers |
+| `app-server` | App parser, grid-edit, MCP preview safety and large MySQL text preview contracts | GTK 4.24 build libraries, Docker and source-pinned consumers bundle; `consumers` on both providers |
 | `keyring` | Registered Secret Service contracts | Private D-Bus, gnome-keyring and libsecret tools |
 | `ui` | Real application actions and database postconditions via AT-SPI | GTK 4.24, Xvfb, PyAT-SPI; X11 automation, not Wayland acceptance |
 | `mssql-kerberos` | SQL Server integrated authentication, SPN refusal and verified TLS against an isolated test domain | Docker Compose with privileged-container support; opt-in local fixture |

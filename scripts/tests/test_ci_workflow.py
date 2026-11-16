@@ -1460,6 +1460,36 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertNotIn("bookie-driver-tests", ledger)
         self.assertNotIn("bookie-driver-src", ledger)
 
+    def test_mysql_preview_tests_are_in_the_source_pinned_consumer_gate(self):
+        bundle_groups = json.loads((ROOT / "scripts/ci-test-bundle-groups.json").read_text())["groups"]
+        self.assertTrue({"bookie-app-services", "bookie-mcp"} <= set(bundle_groups["consumers"]["test"]))
+        layer = json.loads((ROOT / "scripts/test-layers.json").read_text())["layers"]["app-server"]
+        commands = [step["argv"] for step in layer["steps"]]
+        self.assertEqual(commands[1:], [
+            [
+                "bash", "scripts/run-rust-tests.sh", "--locked", "-p", "bookie-mcp", "--test",
+                "mysql_preview_engines", "--", "--include-ignored", "--test-threads=1",
+            ],
+            [
+                "bash", "scripts/run-rust-tests.sh", "--locked", "-p", "bookie-app-services", "--test",
+                "browse_long_text_preview_engines", "mysql_previews_a_huge_longtext_cell", "--",
+                "--include-ignored", "--test-threads=1",
+            ],
+        ])
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        consumers = workflow.split("  consumers:\n", 1)[1].split("  linux-build:\n", 1)[0]
+        self.assertIn("python3 scripts/run-test-layer.py app-server", consumers)
+        ledger = subprocess.check_output(["python3", str(ROOT / "scripts/inventory-ignored-tests.py")], text=True)
+        for name in [
+            "a_preview_is_refused_for_a_myisam_table_and_still_runs_for_innodb",
+            "a_preview_is_refused_for_a_myisam_table_in_another_database",
+            "a_preview_is_refused_for_statements_that_commit_on_their_own_and_nothing_runs",
+            "mysql_previews_a_huge_longtext_cell",
+        ]:
+            row = next(line for line in ledger.splitlines() if f"[{name}]" in line)
+            self.assertIn("App server", row)
+            self.assertIn("scripts/run-test-layer.py app-server", row)
+
     def test_ignored_arch_source_does_not_hide_new_nonignored_inventory_tests(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

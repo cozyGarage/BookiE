@@ -43,6 +43,10 @@ async fn fixture() -> Fixture {
     let container = Mysql::default()
         .with_tag(MYSQL_TEST_TAG)
         .with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test")
+        .with_cmd([
+            "--mysql-native-password=ON",
+            "--authentication-policy=mysql_native_password",
+        ])
         .start()
         .await
         .unwrap();
