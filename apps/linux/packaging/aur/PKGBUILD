@@ -1,0 +1,101 @@
+# Community recipe for the AUR. Builds the released BookiE source for the tag below.
+# The internal release-candidate recipe is apps/linux/packaging/arch/PKGBUILD.
+# shellcheck shell=bash disable=SC2034,SC2154,SC2164
+
+pkgname=bookie
+pkgver=0.2.7
+pkgrel=1
+pkgdesc="Native Linux database client"
+arch=('x86_64')
+url="https://github.com/cozyGarage/BookiE"
+license=('AGPL-3.0-or-later')
+conflicts=('tablepro')
+replaces=('tablepro')
+depends=('gtk4>=1:4.24' 'glib2>=2.88' 'libadwaita>=1:1.10' 'gtksourceview5>=5.22' 'libsecret' 'openssl' 'krb5' 'sqlite')
+makedepends=('git' 'rust>=1:1.98' 'pkgconf' 'clang' 'gettext')
+checkdepends=('desktop-file-utils' 'appstream')
+options=('!lto')
+
+# The tag is followed and the commit it must resolve to is pinned, so a moved tag fails the build.
+_tag="linux-v${pkgver}"
+_commit=e293de78f947931d34d5ceac33cee6056e3aa513
+source=("${pkgname}::git+${url}.git#tag=${_tag}")
+sha256sums=('SKIP')
+
+prepare() {
+  cd "$srcdir/$pkgname"
+  local head
+  head="$(git rev-parse HEAD)"
+  if [[ "$head" != "$_commit" ]]; then
+    printf 'tag %s resolves to %s, expected %s\n' "$_tag" "$head" "$_commit" >&2
+    return 1
+  fi
+
+  # Fail with a clear message when the toolkit floor (ADR 0021) is missing, before a long build.
+  local want
+  for want in 'gtk4 4.24' 'libadwaita-1 1.10' 'gtksourceview-5 5.22' 'glib-2.0 2.88'; do
+    set -- $want
+    pkg-config --atleast-version="$2" "$1" || {
+      printf '%s %s or newer is required; found %s\n' "$1" "$2" "$(pkg-config --modversion "$1" 2>/dev/null || echo none)" >&2
+      return 1
+    }
+  done
+
+  export CARGO_HOME="$srcdir/cargo-home"
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+_build_profile() {
+  case "${BOOKIE_BUILD_PROFILE:-dist}" in
+    dist | release) printf '%s\n' "${BOOKIE_BUILD_PROFILE:-dist}" ;;
+    *)
+      printf 'BOOKIE_BUILD_PROFILE must be dist or release, got: %s\n' "$BOOKIE_BUILD_PROFILE" >&2
+      return 1
+      ;;
+  esac
+}
+
+build() {
+  local profile
+  profile="$(_build_profile)"
+  cd "$srcdir/$pkgname"
+  export CARGO_HOME="$srcdir/cargo-home" CARGO_TARGET_DIR="$srcdir/target"
+  cargo build --profile "$profile" --frozen -p bookie-app -p bookie-agentd
+  cargo build --profile "$profile" --frozen -p bookie-ssh --bin bookie-askpass
+}
+
+check() {
+  cd "$srcdir/$pkgname"
+  desktop-file-validate apps/linux/flatpak/com.bookie.linux.desktop
+  appstreamcli validate --no-net apps/linux/flatpak/com.bookie.linux.metainfo.xml
+}
+
+package() {
+  local built
+  built="$srcdir/target/$(_build_profile)"
+  cd "$srcdir/$pkgname"
+  install -Dm755 "$built/bookie-app" "$pkgdir/usr/bin/bookie"
+  install -Dm755 "$built/bookie-agentd" "$pkgdir/usr/bin/bookie-agentd"
+  install -Dm755 "$built/bookie-askpass" "$pkgdir/usr/bin/bookie-askpass"
+  install -Dm644 apps/linux/flatpak/com.bookie.linux.desktop \
+    "$pkgdir/usr/share/applications/com.bookie.linux.desktop"
+  install -Dm644 apps/linux/flatpak/com.bookie.linux.metainfo.xml \
+    "$pkgdir/usr/share/metainfo/com.bookie.linux.metainfo.xml"
+  install -Dm644 apps/linux/flatpak/icons/scalable/com.bookie.linux.svg \
+    "$pkgdir/usr/share/icons/hicolor/scalable/apps/com.bookie.linux.svg"
+  install -Dm644 apps/linux/data/com.bookie.linux.gschema.xml \
+    "$pkgdir/usr/share/glib-2.0/schemas/com.bookie.linux.gschema.xml"
+  install -Dm644 LICENSE.md "$pkgdir/usr/share/licenses/$pkgname/LICENSE.md"
+  install -Dm644 apps/linux/packaging/THIRD_PARTY_NOTICES.md \
+    "$pkgdir/usr/share/licenses/$pkgname/THIRD_PARTY_NOTICES.md"
+  install -Dm644 apps/linux/packaging/policy.example.toml \
+    "$pkgdir/usr/share/doc/$pkgname/policy.example.toml"
+
+  local catalog locale
+  for catalog in apps/linux/po/*.po; do
+    [[ -e "$catalog" ]] || continue
+    locale="$(basename "$catalog" .po)"
+    install -d "$pkgdir/usr/share/locale/$locale/LC_MESSAGES"
+    msgfmt "$catalog" -o "$pkgdir/usr/share/locale/$locale/LC_MESSAGES/bookie.mo"
+  done
+}

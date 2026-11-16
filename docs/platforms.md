@@ -42,6 +42,14 @@ Use the [packaging guide](../apps/linux/packaging/README.md) to build Arch packa
 
 The Arch package installs `bookie`, `bookie-agentd` and `bookie-askpass`. It replaces the legacy `tablepro` package; the first start copies legacy state, as described in the [storage guide](storage.md).
 
+## Community AUR recipe
+
+`apps/linux/packaging/aur/PKGBUILD` builds the released source of one `linux-vX.Y.Z` tag on the user's own machine. The release `.pkg.tar.zst` is built in CI against current Arch packages, so it needs the same library versions that image had; the AUR recipe compiles against whatever is installed and only needs the toolkit floor above, so it is the path for an Arch system that has not caught up. Both install `bookie`, `bookie-agentd` and `bookie-askpass`, keep the application ID and keyring schema, and replace the legacy `tablepro` package.
+
+The recipe follows the tag and pins the commit the tag must resolve to; a moved tag fails the build. It checks GTK 4.24, libadwaita 1.10, GtkSourceView 5.22 and GLib 2.88 with `pkg-config` before compiling and stops with the version it found. Release tags are annotated but not yet GPG-signed, so the recipe cannot use `?signed` until the maintainer signs them. The recipe holds no secrets and downloads only the tag and the locked crates.
+
+It is not published until the maintainer pushes it to the AUR. The release workflow produces a copy pointed at each new tag, and the in-tree file is the source for that repository ([release process](release-process.md)).
+
 ## OpenSSL
 
 The Arch package links OpenSSL 4 (`libssl.so.4`, `libcrypto.so.4`) and depends on those sonames (`libssl.so=4-64`, `libcrypto.so=4-64`), so a system still on OpenSSL 3 cannot install it. Builds from source need OpenSSL 4 development headers.
