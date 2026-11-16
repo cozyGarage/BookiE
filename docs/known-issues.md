@@ -13,7 +13,6 @@ This page is an index of ledger IDs to issues. Do not track evidence, owners or 
 | PEER-11 | [#1033](https://github.com/cozyGarage/BookiE/issues/1033) | Data |
 | PEER-12 | [#1034](https://github.com/cozyGarage/BookiE/issues/1034) | UX |
 | PEER-16 | [#1065](https://github.com/cozyGarage/BookiE/issues/1065) | Data |
-| RV-11 | [#1181](https://github.com/cozyGarage/BookiE/issues/1181) | Policy |
 | UP-2 | [#1140](https://github.com/cozyGarage/BookiE/issues/1140) | Data |
 | UP-4 | [#1142](https://github.com/cozyGarage/BookiE/issues/1142) | Policy |
 | UP-7 | [#1145](https://github.com/cozyGarage/BookiE/issues/1145) | UX |
@@ -32,7 +31,6 @@ This page is an index of ledger IDs to issues. Do not track evidence, owners or 
 | TEST-2 | [#559](https://github.com/cozyGarage/BookiE/issues/559) | Data |
 | TEST-6 | [#575](https://github.com/cozyGarage/BookiE/issues/575) | Maintainer |
 | TEST-15 | [#593](https://github.com/cozyGarage/BookiE/issues/593) | Policy |
-| TEST-25 | [#1545](https://github.com/cozyGarage/BookiE/issues/1545) | Data |
 | TEST-28 | [#560](https://github.com/cozyGarage/BookiE/issues/560) | UX |
 | TEST-31 | [#556](https://github.com/cozyGarage/BookiE/issues/556) | UX |
 | TEST-32 | [#594](https://github.com/cozyGarage/BookiE/issues/594) | UX |
@@ -52,8 +50,5 @@ This page is an index of ledger IDs to issues. Do not track evidence, owners or 
 | DRV-1 | [#1688](https://github.com/cozyGarage/BookiE/issues/1688) | UX |
 | B4-24 | [#1365](https://github.com/cozyGarage/BookiE/issues/1365) | Policy |
 | CI-4 | [#573](https://github.com/cozyGarage/BookiE/issues/573) | UX |
-| CI-8 | [#3130](https://github.com/cozyGarage/BookiE/issues/3130) | UX |
-| CI-10 | [#3173](https://github.com/cozyGarage/BookiE/issues/3173) | UX |
-| CI-9 | [#3167](https://github.com/cozyGarage/BookiE/issues/3167) | UX |
 
 When you finish a row, close or move the GitHub issue on the project. Remove its index line in the same docs change. When you move work between lanes, change the project **Lane** field (and `lane:*` label) and update the Lane column here in the same commit.
