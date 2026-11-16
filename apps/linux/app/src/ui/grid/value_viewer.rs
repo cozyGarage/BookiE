@@ -133,7 +133,7 @@ impl Write for PreviewWriter {
     }
 }
 
-fn build_text_view(text: &str) -> gtk::TextView {
+pub(super) fn build_text_view(text: &str) -> gtk::TextView {
     let view = gtk::TextView::builder()
         .editable(false)
         .cursor_visible(false)
