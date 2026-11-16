@@ -288,6 +288,12 @@ fn activate_node(node: &TreeNode, row: &gtk::TreeListRow, sender: &ComponentSend
             name: name.clone(),
             open_mode: OpenMode::SwitchOrAppend,
         }),
+        NodeKind::TemporaryTable { schema, name } => {
+            sender.input(AppMsg::ShowTemporaryTable {
+                schema: schema.clone(),
+                name: name.clone(),
+            });
+        }
         NodeKind::Schema | NodeKind::Group(_) | NodeKind::CatalogLoaded(_) => row.set_expanded(!row.is_expanded()),
         NodeKind::Catalog(_) => row.set_expanded(!row.is_expanded()),
         NodeKind::CatalogObject { kind, .. } | NodeKind::CatalogMore(kind) => {
@@ -350,6 +356,7 @@ fn map_sidebar_output(output: SidebarRowOutput) -> AppMsg {
             name,
             open_mode: OpenMode::NewTab,
         },
+        SidebarRowOutput::ShowTemporaryTable { schema, name } => AppMsg::ShowTemporaryTable { schema, name },
         SidebarRowOutput::EditStructure { schema, name } => AppMsg::EditStructureTab { schema, table: name },
         SidebarRowOutput::ShowCreateTable { schema, name } => AppMsg::TableText {
             schema,

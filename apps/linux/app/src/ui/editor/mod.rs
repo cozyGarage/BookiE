@@ -208,8 +208,7 @@ impl SimpleComponent for SqlEditor {
                         gtk::Label {
                             set_halign: gtk::Align::End,
                             add_css_class: "dim-label",
-                            add_css_class: "monospace",
-                            set_margin_end: 8,
+                            add_css_class: "caption",
                         },
 
                         #[name = "running_spinner"]
@@ -237,8 +236,9 @@ impl SimpleComponent for SqlEditor {
 
                     adw::WrapBox {
                         set_halign: gtk::Align::End,
-                        set_child_spacing: 8,
+                        set_child_spacing: 6,
                         set_line_spacing: 6,
+                        add_css_class: "tp-editor-toolbar",
 
                         #[name = "warnings_button"]
                         append = &gtk::MenuButton {
@@ -316,6 +316,7 @@ impl SimpleComponent for SqlEditor {
                         append = &gtk::MenuButton {
                             set_icon_name: "pan-down-symbolic",
                             set_tooltip_text: Some(bookie_app_services::tr!("Run options").as_str()),
+                            add_css_class: "suggested-action",
                         },
                     },
                 },
@@ -633,6 +634,7 @@ impl SimpleComponent for SqlEditor {
                 }
                 if self.catalog_changes.succeeded(&sql, &driver) {
                     let _ = sender.output(SqlEditorOutput::CatalogChanged(origin));
+                    self.refresh_temporary_tables(&sender);
                 }
             }
             SqlEditorInput::Grid(GridMsg::CopyToClipboard(text)) => {
@@ -710,6 +712,9 @@ impl SimpleComponent for SqlEditor {
             }
             SqlEditorInput::SessionRollbackFinished { session_id, result } => {
                 self.on_session_rollback_finished(session_id, result);
+            }
+            SqlEditorInput::TemporaryTablesLoaded { session_id, result } => {
+                self.on_temporary_tables_loaded(session_id, result, &sender);
             }
             SqlEditorInput::PrepareForTeardown(reply) => self.prepare_for_teardown(reply, &sender),
             SqlEditorInput::SessionTeardownFinished(result) => self.finish_session_teardown(result),

@@ -105,6 +105,17 @@ impl CellEditor {
         }
     }
 
+    pub fn set_xalign(&self, xalign: f32) {
+        self.label_widget().set_xalign(xalign);
+        if let Some(entry) = self.imp().entry.borrow().as_ref() {
+            entry.set_property("xalign", xalign);
+        }
+    }
+
+    pub fn xalign(&self) -> f32 {
+        self.label_widget().xalign()
+    }
+
     pub fn set_inline_editable(&self, editable: bool) {
         self.imp().inline_editable.set(editable);
         if !editable && self.is_editing() {
@@ -220,6 +231,7 @@ impl CellEditor {
             return entry.clone();
         }
         let entry = gtk4::Text::builder().hexpand(true).build();
+        entry.set_property("xalign", self.label_widget().xalign());
         entry.set_visible(false);
         entry.set_parent(self);
         self.install_entry_handlers(&entry);
@@ -392,5 +404,17 @@ mod tests {
         assert_eq!(committed_edit_text("Việt ", "nam"), "Việt nam");
         assert_eq!(committed_edit_text("Việt nam", "nam"), "Việt nam");
         assert_eq!(committed_edit_text("Việt ", ""), "Việt ");
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn editable_cell_tracks_xalign_for_numbers() {
+        gtk4::init().unwrap();
+        let cell = CellEditor::new();
+        assert_eq!(cell.xalign(), 0.0);
+        cell.set_xalign(1.0);
+        assert_eq!(cell.xalign(), 1.0);
+        cell.start_editing_with("12345");
+        assert_eq!(cell.entry().property::<f32>("xalign"), 1.0);
     }
 }

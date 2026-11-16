@@ -656,6 +656,16 @@ struct SqliteTransaction {
     tx: Option<sqlx::Transaction<'static, Sqlite>>,
 }
 
+impl Drop for SqliteTransaction {
+    fn drop(&mut self) {
+        if let Some(tx) = self.tx.take()
+            && let Ok(runtime) = tokio::runtime::Handle::try_current()
+        {
+            runtime.spawn(transaction::rollback_transaction(tx));
+        }
+    }
+}
+
 impl SqliteTransaction {
     fn open(&mut self) -> Result<&mut sqlx::Transaction<'static, Sqlite>, DriverError> {
         self.tx
@@ -775,6 +785,33 @@ impl bookie_core::Transaction for SqliteTransaction {
             .take()
             .ok_or_else(|| DriverError::Internal("transaction closed".into()))?;
         transaction::rollback_transaction(tx).await.map_err(map_sqlx_error)
+    }
+
+    async fn rollback_controlled(mut self: Box<Self>, control: &OperationControl) -> Result<(), DriverError> {
+        check_pre_dispatch(control)?;
+        let tx = self
+            .tx
+            .take()
+            .ok_or_else(|| DriverError::Internal("transaction closed".into()))?;
+        let mut rollback = tokio::spawn(transaction::rollback_transaction(tx));
+        let expiry = async {
+            match control.deadline() {
+                Some(deadline) => tokio::time::sleep_until(deadline).await,
+                None => std::future::pending::<()>().await,
+            }
+        };
+        tokio::select! {
+            biased;
+            () = control.cancellation_token().cancelled() => Err(DriverError::OperationOutcomeUnknown {
+                source: Box::new(DriverError::Cancelled),
+            }),
+            () = expiry => Err(DriverError::OperationOutcomeUnknown {
+                source: Box::new(DriverError::TimedOut),
+            }),
+            joined = &mut rollback => joined
+                .map_err(|error| DriverError::Internal(format!("sqlite rollback task failed: {error}")))?
+                .map_err(map_sqlx_error),
+        }
     }
 }
 

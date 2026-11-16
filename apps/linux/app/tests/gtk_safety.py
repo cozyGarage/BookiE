@@ -1178,7 +1178,7 @@ def run_scenario(binary, scenario):
             open_editor()
         def restart(before_start=None, empty=False, restored=None):
             nonlocal process, stderr
-            invoke_accessible_action("win.quit")
+            invoke(wait_for_node(name="Close", role=pyatspi.ROLE_PUSH_BUTTON))
             process.wait(timeout=WAIT_SECONDS)
             if process.returncode != 0:
                 raise RuntimeError("graceful quit failed")

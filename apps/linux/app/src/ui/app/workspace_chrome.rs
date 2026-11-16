@@ -33,7 +33,8 @@ impl App {
         {
             self.recent_pages.borrow_mut().touch(&page);
         }
-        self.follow_selected_tab_session(sender);
+        self.follow_selected_tab_session(sender.clone());
+        self.sync_sidebar_temporary_tables(sender);
         self.persist_workspace_state();
         self.refresh_window_title();
         self.sync_sidebar_selection();

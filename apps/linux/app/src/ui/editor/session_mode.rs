@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use bookie_core::QueryResult;
 use bookie_core::{
     Connection, DriverError, OperationControl, QueryCursorId, QueryCursorPage, QueryResultBatch, Session,
-    SessionCommitOutcome, Value,
+    SessionCommitOutcome, TableInfo, Value,
 };
 use relm4::ComponentSender;
 use relm4::adw::prelude::*;
@@ -110,6 +110,16 @@ impl SessionHandle {
 
 #[async_trait]
 impl Session for SessionHandle {
+    async fn list_temporary_tables_controlled(
+        &mut self,
+        control: &OperationControl,
+    ) -> Result<Vec<TableInfo>, DriverError> {
+        match self {
+            Self::Audited(session) => session.list_temporary_tables_controlled(control).await,
+            Self::Plain(session) => session.list_temporary_tables_controlled(control).await,
+        }
+    }
+
     async fn query_params_controlled(
         &mut self,
         sql: &str,
@@ -840,6 +850,9 @@ impl SqlEditor {
     }
 
     pub(super) fn end_session(&mut self, sender: &ComponentSender<Self>) {
+        if self.session.is_some() {
+            let _ = sender.output(super::SqlEditorOutput::TemporaryTablesChanged(Vec::new()));
+        }
         self.clear_catalog_changes();
         self.opening_session_id = None;
         self.transaction_clock.reset(&self.session_button);
@@ -984,11 +997,57 @@ impl SqlEditor {
     }
 
     fn publish_catalog_change(&self, sender: &ComponentSender<Self>) {
-        let Some(origin) = self.catalog_origin.as_ref() else {
+        if let Some(origin) = self.catalog_origin.as_ref()
+            && origin.owns_window(self.connection_id, &self.database)
+        {
+            let _ = sender.output(super::SqlEditorOutput::CatalogChanged(origin.clone()));
+        }
+        self.refresh_temporary_tables(sender);
+    }
+
+    pub(super) fn refresh_temporary_tables(&self, sender: &ComponentSender<Self>) {
+        let Some(session) = self.session.as_ref() else {
             return;
         };
-        if origin.owns_window(self.connection_id, &self.database) {
-            let _ = sender.output(super::SqlEditorOutput::CatalogChanged(origin.clone()));
+        let session_id = session.id;
+        let shared = session.shared.clone();
+        let sender = sender.clone();
+        relm4::spawn(async move {
+            let control = OperationControl::with_timeout(std::time::Duration::from_secs(10));
+            let result = {
+                let mut session = shared.lock().await;
+                match session.as_mut() {
+                    Some(session) => session
+                        .list_temporary_tables_controlled(&control)
+                        .await
+                        .map_err(|error| crate::services::error_text::driver_message(&error)),
+                    None => Ok(Vec::new()),
+                }
+            };
+            sender.input(super::SqlEditorInput::TemporaryTablesLoaded { session_id, result });
+        });
+    }
+
+    pub(super) fn on_temporary_tables_loaded(
+        &self,
+        session_id: Uuid,
+        result: Result<Vec<TableInfo>, String>,
+        sender: &ComponentSender<Self>,
+    ) {
+        if !session_callback_matches(session_id, self.session.as_ref().map(|session| session.id)) {
+            return;
+        }
+        match result {
+            Ok(tables) => {
+                let _ = sender.output(super::SqlEditorOutput::TemporaryTablesChanged(tables));
+            }
+            Err(body) => {
+                let _ = sender.output(super::SqlEditorOutput::TemporaryTablesChanged(Vec::new()));
+                let _ = sender.output(super::SqlEditorOutput::ShowAlert {
+                    title: bookie_app_services::tr!("Temporary table refresh failed").to_string(),
+                    body,
+                });
+            }
         }
     }
 

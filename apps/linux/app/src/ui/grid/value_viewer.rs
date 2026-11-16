@@ -210,6 +210,9 @@ pub(crate) fn present(
     if let Some(decoded) = super::value_decoded::section(&value) {
         content.append(&decoded);
     }
+    if let Some(forms) = super::value_decoded::display_as_section(&value) {
+        content.append(&forms);
+    }
 
     let copy = gtk::Button::with_label(&bookie_app_services::tr!("Copy value"));
     copy.add_css_class("suggested-action");

@@ -56,8 +56,9 @@ impl BrowseTab {
         ] {
             button.update_property(&[gtk::accessible::Property::Label(&label)]);
         }
-        let paginator_label = gtk::Label::builder().build();
+        let paginator_label = gtk::Label::builder().ellipsize(gtk::pango::EllipsizeMode::End).build();
         paginator_label.add_css_class("dim-label");
+        paginator_label.add_css_class("numeric");
 
         // Selection count badge — sits beside the paginator label.
         // Hidden when 0–1 rows selected; appears when the user
@@ -103,8 +104,28 @@ impl BrowseTab {
         page_size_spin.set_width_chars(5);
         page_size_spin.set_value(page_size as f64);
         let sender_for_size = sender.clone();
+        let timeout_id = std::rc::Rc::new(std::cell::Cell::new(None::<gtk::glib::SourceId>));
+        let timeout_id_clone = timeout_id.clone();
         page_size_spin.connect_value_changed(move |spin| {
-            sender_for_size.input(BrowseTabInput::PageSizeChanged(spin.value().round() as u64));
+            if let Some(source) = timeout_id_clone.take() {
+                source.remove();
+            }
+            let sender = sender_for_size.clone();
+            let new_size = spin.value().round() as u64;
+            let timeout_id_inner = timeout_id_clone.clone();
+            let source = gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(300), move || {
+                timeout_id_inner.set(None);
+                sender.input(BrowseTabInput::PageSizeChanged(new_size));
+            });
+            timeout_id_clone.set(Some(source));
+        });
+        let sender_for_size_activate = sender.clone();
+        let timeout_id_activate = timeout_id;
+        page_size_spin.connect_activate(move |spin| {
+            if let Some(source) = timeout_id_activate.take() {
+                source.remove();
+            }
+            sender_for_size_activate.input(BrowseTabInput::PageSizeChanged(spin.value().round() as u64));
         });
         let page_size_label = gtk::Label::builder().label(bookie_app_services::tr!("Rows:")).build();
         page_size_label.add_css_class("dim-label");
@@ -120,6 +141,7 @@ impl BrowseTab {
         last_button.connect_clicked(move |_| sender_for_last.input(BrowseTabInput::LastPage));
 
         let paginator_bar = gtk::ActionBar::new();
+        paginator_bar.add_css_class("tp-paginator-bar");
 
         let export_button = gtk::Button::builder()
             .icon_name("document-save-symbolic")

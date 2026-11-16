@@ -127,6 +127,106 @@ class ThirdPartyNoticeTests(unittest.TestCase):
             ):
                 self.assertEqual(NOTICES.main(), 0)
 
+    def check_with_cache(self, argv, generated, marker_exists=False, digest="inputs-1"):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = root / "notices.md"
+            output.write_text("current\n", encoding="utf-8")
+            cache = root / "cache"
+            cache.mkdir()
+            marker = cache / f"notices-check-{digest}.ok"
+            if marker_exists:
+                marker.write_text("ok\n")
+            with (
+                patch.object(NOTICES, "ROOT", root),
+                patch.object(NOTICES, "OUTPUT", output),
+                patch.object(NOTICES, "cache_directory", return_value=cache),
+                patch.object(NOTICES, "input_digest", return_value=digest),
+                patch.object(NOTICES, "generate", side_effect=generated) as generate,
+                patch.object(sys, "argv", [str(SCRIPT), *argv]),
+                contextlib.redirect_stdout(io.StringIO()),
+                contextlib.redirect_stderr(io.StringIO()),
+            ):
+                result = NOTICES.main()
+            return result, generate.call_count, marker.exists()
+
+    def test_cached_check_skips_generation_when_the_inputs_already_passed(self):
+        result, generated, _ = self.check_with_cache(
+            ["--check", "--cached"], AssertionError("must not generate"), marker_exists=True
+        )
+        self.assertEqual((result, generated), (0, 0))
+
+    def test_cached_check_records_a_pass_and_never_a_failure(self):
+        result, generated, recorded = self.check_with_cache(["--check", "--cached"], ["current\n"])
+        self.assertEqual((result, generated, recorded), (0, 1, True))
+        result, generated, recorded = self.check_with_cache(["--check", "--cached"], ["stale\n"])
+        self.assertEqual((result, generated, recorded), (1, 1, False))
+
+    def test_a_check_without_the_cache_flag_ignores_a_recorded_pass(self):
+        result, generated, _ = self.check_with_cache(["--check"], ["stale\n"], marker_exists=True)
+        self.assertEqual((result, generated), (1, 1))
+
+    def test_the_input_digest_follows_every_file_the_notices_depend_on(self):
+        import os
+        import subprocess
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+            files = {
+                "Cargo.lock": "lock 1",
+                "Cargo.toml": "manifest 1",
+                "about.toml": "about 1",
+                "deny.toml": "deny 1",
+                "notices.md": "notices 1",
+                "LICENSE.md": "license 1",
+                "rust-toolchain.toml": "toolchain 1",
+                "script.py": "script 1",
+                "crates/Cargo.toml": "member 1",
+                "crates/LICENSE-MIT": "member license 1",
+                ".cargo/config.toml": "cargo config 1",
+                "about-version.txt": "cargo-about 0.9.2",
+            }
+            for name, text in files.items():
+                (root / name).parent.mkdir(parents=True, exist_ok=True)
+                (root / name).write_text(text)
+            fake_about = root / "fake-cargo-about"
+            fake_about.write_text(f"#!/bin/sh\ncat {root / 'about-version.txt'}\n")
+            fake_about.chmod(0o755)
+            with (
+                patch.object(NOTICES, "ROOT", root),
+                patch.object(NOTICES, "CONFIG", root / "about.toml"),
+                patch.object(NOTICES, "OUTPUT", root / "notices.md"),
+                patch.object(NOTICES, "__file__", str(root / "script.py"), create=True),
+                patch.dict(os.environ, {"CARGO_ABOUT": str(fake_about)}),
+            ):
+                baseline = NOTICES.input_digest()
+                self.assertEqual(NOTICES.input_digest(), baseline)
+                for name in files:
+                    original = (root / name).read_text()
+                    (root / name).write_text(original + " changed")
+                    self.assertNotEqual(NOTICES.input_digest(), baseline, name)
+                    (root / name).write_text(original)
+                self.assertEqual(NOTICES.input_digest(), baseline)
+                (root / "untracked" / "LICENSE-NEW").parent.mkdir()
+                (root / "untracked" / "LICENSE-NEW").write_text("new license")
+                self.assertNotEqual(NOTICES.input_digest(), baseline, "an untracked license file")
+
+    def test_an_empty_or_truncated_marker_is_not_trusted(self):
+        for content in ["", "o", "ok", "ok\nextra\n"]:
+            with tempfile.TemporaryDirectory() as directory:
+                marker = Path(directory) / "notices-check-x.ok"
+                marker.write_text(content)
+                self.assertFalse(NOTICES.read_marker(marker), repr(content))
+                self.assertFalse(NOTICES.read_marker(Path(directory) / "missing"))
+
+    def test_a_marker_is_written_whole_and_leaves_no_temporary_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            marker = Path(directory) / "nested" / "notices-check-x.ok"
+            NOTICES.write_marker(marker)
+            self.assertTrue(NOTICES.read_marker(marker))
+            self.assertEqual([path.name for path in marker.parent.iterdir()], [marker.name])
+
     def test_check_mode_reports_stale_notice_file(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

@@ -2,6 +2,7 @@ use gtk4 as gtk;
 use gtk4::prelude::*;
 
 use bookie_app_services::decoded_preview::{DecodedFormat, DecodedPreview, decoded_preview};
+use bookie_app_services::display_as::{DisplayKind, display_forms};
 use bookie_core::Value;
 
 pub(super) fn preview_of(value: &Value) -> Option<DecodedPreview> {
@@ -21,6 +22,63 @@ pub(super) fn heading(format: DecodedFormat) -> String {
             bookie_app_services::tr!("Decoded as Protobuf without a schema (field numbers only, a best guess)")
         }
     }
+}
+
+pub(super) fn display_kind_heading(kind: DisplayKind) -> String {
+    match kind {
+        DisplayKind::UnixSeconds => bookie_app_services::tr!("As Unix time in seconds (UTC)"),
+        DisplayKind::UnixMilliseconds => bookie_app_services::tr!("As Unix time in milliseconds (UTC)"),
+        DisplayKind::UnixMicroseconds => bookie_app_services::tr!("As Unix time in microseconds (UTC)"),
+        DisplayKind::UuidHyphenated => bookie_app_services::tr!("As UUID"),
+        DisplayKind::UuidUppercase => bookie_app_services::tr!("UUID, uppercase"),
+        DisplayKind::UuidSimple => bookie_app_services::tr!("UUID, no hyphens"),
+        DisplayKind::UuidBraced => bookie_app_services::tr!("UUID, braced"),
+        DisplayKind::UuidUrn => bookie_app_services::tr!("UUID, URN"),
+        DisplayKind::JsonInText => bookie_app_services::tr!("As formatted JSON"),
+    }
+}
+
+pub(super) fn display_as_section(value: &Value) -> Option<gtk::Box> {
+    let forms = display_forms(value);
+    if forms.is_empty() {
+        return None;
+    }
+    let container = gtk::Box::new(gtk::Orientation::Vertical, 4);
+    for form in forms {
+        let title = gtk::Label::builder()
+            .label(display_kind_heading(form.kind))
+            .xalign(0.0)
+            .margin_top(8)
+            .margin_start(12)
+            .margin_end(12)
+            .build();
+        title.add_css_class("heading");
+        let text = gtk::Label::builder()
+            .label(&form.text)
+            .xalign(0.0)
+            .selectable(true)
+            .wrap(true)
+            .wrap_mode(gtk::pango::WrapMode::WordChar)
+            .margin_start(12)
+            .margin_end(12)
+            .build();
+        text.add_css_class("monospace");
+        container.append(&title);
+        container.append(&text);
+    }
+    let note = gtk::Label::builder()
+        .label(bookie_app_services::tr!(
+            "Read only. Copy value copies the stored value."
+        ))
+        .xalign(0.0)
+        .margin_start(12)
+        .margin_end(12)
+        .margin_top(8)
+        .margin_bottom(8)
+        .build();
+    note.add_css_class("dim-label");
+    container.append(&note);
+    Some(container)
 }
 
 fn footer(preview: &DecodedPreview) -> String {

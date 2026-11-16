@@ -240,6 +240,7 @@ pub(super) fn build_column(
             super::highlight_paint::clear_highlight(label.upcast_ref());
             label.reset_property(gtk4::AccessibleProperty::Description);
             label.set_strikethrough(false);
+            label.set_xalign(0.0);
             POSITION_SLOT.take(&label);
             ROW_KEY_SLOT.take(&label);
             SNAPSHOT_SLOT.take(&label);
@@ -572,6 +573,7 @@ fn bind_editable_label(label: &crate::ui::cell_editor::CellEditor, bind: Editabl
     IS_NULL_SLOT.set(label, view.is_null);
     label.set_inline_editable(inline_editable);
     label.set_text(text);
+    label.set_xalign(if right_aligned_column(binding.column) { 1.0 } else { 0.0 });
     apply_cell_tooltip(label.upcast_ref(), text, view.is_null, view.truncated);
     set_class(label.upcast_ref(), "dim-label", view.is_null && !binding.editable);
     set_class(

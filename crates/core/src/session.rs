@@ -2,7 +2,7 @@ use async_trait::async_trait;
 
 use crate::error::DriverError;
 use crate::operation::OperationControl;
-use crate::query::{QueryCursorId, QueryCursorPage, QueryResult, QueryResultBatch, Value};
+use crate::query::{QueryCursorId, QueryCursorPage, QueryResult, QueryResultBatch, TableInfo, Value};
 use crate::sql_syntax::script::LexicalSettings;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -74,6 +74,13 @@ pub trait Session: Send {
         _control: &OperationControl,
     ) -> Result<Vec<String>, DriverError> {
         Err(DriverError::Unsupported("session-scoped completion metadata".into()))
+    }
+
+    async fn list_temporary_tables_controlled(
+        &mut self,
+        _control: &OperationControl,
+    ) -> Result<Vec<TableInfo>, DriverError> {
+        Ok(Vec::new())
     }
 
     fn is_usable(&self) -> bool;

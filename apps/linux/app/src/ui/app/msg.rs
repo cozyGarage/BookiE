@@ -51,6 +51,10 @@ pub enum AppMsg {
         name: String,
         open_mode: OpenMode,
     },
+    ShowTemporaryTable {
+        schema: Option<String>,
+        name: String,
+    },
     OpenReferencedRow {
         schema: Option<String>,
         table: String,
@@ -262,6 +266,7 @@ pub enum AppMsg {
     CloseOtherWorkspaceTabs(Uuid),
     CloseWorkspaceTabsToRight(Uuid),
     WorkspaceTabsChanged,
+    EditorTemporaryTablesChanged(Uuid, Vec<bookie_core::TableInfo>),
     SwitchToRecentTab,
     EndRecentTabWalk,
     ExecuteBrowseTransaction {
