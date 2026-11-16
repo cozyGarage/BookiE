@@ -1,1 +1,1 @@
-SQLite table pages, grid saves and statements inside a transaction that time out or are cancelled now stop inside SQLite instead of running on in the background, a stopped write ends its transaction, and a stopped batch or transaction no longer leaves the connection in a state where later writes fail or are lost.
+SQLite table pages, saves and transaction statements that time out or are cancelled now stop inside SQLite, and a stopped batch or transaction no longer leaves the connection in a state where later writes fail or are lost.
