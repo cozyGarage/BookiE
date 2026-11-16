@@ -56,9 +56,7 @@ impl BrowseTab {
         ] {
             button.update_property(&[gtk::accessible::Property::Label(&label)]);
         }
-        let paginator_label = gtk::Label::builder()
-            .ellipsize(gtk::pango::EllipsizeMode::End)
-            .build();
+        let paginator_label = gtk::Label::builder().ellipsize(gtk::pango::EllipsizeMode::End).build();
         paginator_label.add_css_class("dim-label");
         paginator_label.add_css_class("numeric");
 
@@ -115,13 +113,10 @@ impl BrowseTab {
             let sender = sender_for_size.clone();
             let new_size = spin.value().round() as u64;
             let timeout_id_inner = timeout_id_clone.clone();
-            let source = gtk::glib::timeout_add_local_once(
-                std::time::Duration::from_millis(300),
-                move || {
-                    timeout_id_inner.set(None);
-                    sender.input(BrowseTabInput::PageSizeChanged(new_size));
-                },
-            );
+            let source = gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(300), move || {
+                timeout_id_inner.set(None);
+                sender.input(BrowseTabInput::PageSizeChanged(new_size));
+            });
             timeout_id_clone.set(Some(source));
         });
         let sender_for_size_activate = sender.clone();
