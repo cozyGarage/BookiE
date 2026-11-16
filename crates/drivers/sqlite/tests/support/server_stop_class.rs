@@ -178,7 +178,7 @@ const BOUNDED: &[(&str, &str)] = &[
     ),
     (
         "Transaction::rollback_controlled",
-        "ROLLBACK undoes the journal and is bounded by the transaction's own size",
+        "ROLLBACK is bounded by the transaction's own size; a deadline abandons the wait and the rollback finishes on its own task",
     ),
 ];
 
@@ -551,4 +551,43 @@ async fn a_transaction_ended_by_its_own_text_leaves_the_pool_clean() {
 
         the_pool_stays_clean_for_later_transactions(connection.as_ref(), other.as_ref()).await;
     }
+}
+
+#[tokio::test]
+async fn a_transaction_dropped_after_its_own_commit_text_leaves_the_pool_clean() {
+    let (directory, connection) = open().await;
+    let other = second_connection(&directory).await;
+    let mut transaction = connection.begin().await.unwrap();
+    transaction.execute("COMMIT").await.unwrap();
+    drop(transaction);
+
+    the_pool_stays_clean_for_later_transactions(connection.as_ref(), other.as_ref()).await;
+}
+
+#[tokio::test]
+async fn a_rollback_refused_at_its_deadline_leaves_the_pool_clean_after_the_transactions_own_commit_text() {
+    let (directory, connection) = open().await;
+    let other = second_connection(&directory).await;
+    let mut transaction = connection.begin().await.unwrap();
+    transaction.execute("COMMIT").await.unwrap();
+    let result = transaction
+        .rollback_controlled(&OperationControl::with_timeout(Duration::ZERO))
+        .await;
+    assert!(result.is_err(), "an expired control refuses the rollback");
+
+    the_pool_stays_clean_for_later_transactions(connection.as_ref(), other.as_ref()).await;
+}
+
+#[tokio::test]
+async fn a_controlled_rollback_after_the_transactions_own_commit_text_succeeds_and_leaves_the_pool_clean() {
+    let (directory, connection) = open().await;
+    let other = second_connection(&directory).await;
+    let mut transaction = connection.begin().await.unwrap();
+    transaction.execute("COMMIT").await.unwrap();
+    transaction
+        .rollback_controlled(&OperationControl::with_timeout(Duration::from_secs(30)))
+        .await
+        .unwrap();
+
+    the_pool_stays_clean_for_later_transactions(connection.as_ref(), other.as_ref()).await;
 }
