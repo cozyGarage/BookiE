@@ -5,7 +5,8 @@ use relm4::adw::prelude::*;
 use relm4::{ComponentSender, adw, gtk};
 use uuid::Uuid;
 
-use super::{SqlEditor, SqlEditorInput, StatementOutcomeKind};
+use super::sql_text::text_to_run;
+use super::{RunMessage, SqlEditor, SqlEditorInput, StatementOutcomeKind};
 
 pub(super) struct TransactionActions {
     pub(super) row: gtk::FlowBox,
@@ -38,7 +39,7 @@ impl TransactionActions {
             let sender = sender.clone();
             button.connect_clicked(move |_| {
                 if let Some(session_id) = active.get() {
-                    sender.input(SqlEditorInput::SessionAction { session_id, commit });
+                    sender.input(SqlEditorInput::Run(RunMessage::SessionAction { session_id, commit }));
                 }
             });
             row.insert(&button, -1);
@@ -49,6 +50,84 @@ impl TransactionActions {
 }
 
 impl SqlEditor {
+    pub(super) fn on_run_message(&mut self, message: RunMessage, sender: ComponentSender<Self>) {
+        match message {
+            RunMessage::Run => self.run_all(sender),
+            RunMessage::SessionAction { session_id, commit } => {
+                self.on_session_toolbar_action(session_id, commit, &sender);
+            }
+            RunMessage::RunWithParameters {
+                sql,
+                anchor,
+                planned,
+                values,
+            } => {
+                self.execute_sql(sql, anchor, planned, values, sender);
+            }
+            RunMessage::Cancel => self.cancel_run(),
+            RunMessage::RunWithLongerTimeout => self.retry_with_longer_timeout(sender),
+            RunMessage::RunAtCursor => self.run_scope(true, sender),
+            RunMessage::Explain => self.explain_at_cursor(),
+        }
+    }
+
+    fn run_all(&mut self, sender: ComponentSender<Self>) {
+        self.timeout_retry.clear_override();
+        let sql = text_to_run(&self.source_view.buffer());
+        let trimmed = sql.trim().to_string();
+        if trimmed.is_empty() {
+            self.status.set_label(&bookie_app_services::tr!("empty query"));
+            return;
+        }
+        let buffer = self.source_view.buffer();
+        let start = buffer
+            .selection_bounds()
+            .filter(|(start, end)| !buffer.text(start, end, true).trim().is_empty())
+            .map_or(0, |(start, _)| start.offset() as usize);
+        let anchor = super::SourceAnchor {
+            revision: self.drop_generation.revision(),
+            start: start + sql.chars().take_while(|character| character.is_whitespace()).count(),
+        };
+        self.begin_run(trimmed, Some(anchor), false, sender);
+    }
+
+    fn cancel_run(&mut self) {
+        if self.cancel_button.is_visible()
+            && let Some(token) = self.cancel_token.take()
+        {
+            token.cancel();
+        }
+    }
+
+    fn retry_with_longer_timeout(&mut self, sender: ComponentSender<Self>) {
+        let Some(sql) = self.timeout_retry.accept() else {
+            return;
+        };
+        self.longer_timeout_button.set_visible(false);
+        self.begin_run(sql, None, false, sender);
+    }
+
+    fn explain_at_cursor(&self) {
+        let buffer = self.source_view.buffer();
+        let text = if let Some((a, b)) = buffer.selection_bounds() {
+            buffer.text(&a, &b, true).to_string()
+        } else {
+            let (start, end) = buffer.bounds();
+            let all = buffer.text(&start, &end, true).to_string();
+            let cursor_chars = buffer.iter_at_mark(&buffer.get_insert()).offset() as usize;
+            let driver_id = self.metadata().map(|metadata| metadata.driver_id).unwrap_or_default();
+            let cursor = super::cursor_byte_offset(&all, cursor_chars);
+            super::statement_at_cursor(&all, self.lexing(&driver_id), cursor).unwrap_or(all)
+        };
+        if let Some(window) = self
+            .source_view
+            .root()
+            .and_then(|root| root.downcast::<gtk::Window>().ok())
+        {
+            crate::ui::explain_dialog::present(&window, self.connection_id, &text, &self.database, &self.preferences);
+        }
+    }
+
     pub(super) fn run_scope(&mut self, current: bool, sender: ComponentSender<Self>) {
         self.timeout_retry.clear_override();
         let buffer = self.source_view.buffer();
@@ -114,9 +193,9 @@ impl SqlEditor {
             let sender = sender.clone();
             action.connect_activate(move |_, _| {
                 sender.input(if current {
-                    SqlEditorInput::RunAtCursor
+                    SqlEditorInput::Run(RunMessage::RunAtCursor)
                 } else {
-                    SqlEditorInput::Run
+                    SqlEditorInput::Run(RunMessage::Run)
                 })
             });
             group.add_action(&action);

@@ -382,6 +382,26 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("actions: write", cancel)
         self.assertIn("Queue wait before start", release)
 
+    def test_release_appimage_uses_the_arch_candidate_vendor_inputs_offline(self):
+        release = (ROOT / ".github/workflows/release.yml").read_text()
+        builder = (ROOT / "scripts/build-appimage.sh").read_text()
+        appimage_job = re.search(r"(?ms)^  appimage:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", release).group(1)
+        arch_job = re.search(r"(?ms)^  arch:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", release).group(1)
+
+        self.assertIn("needs: [prepare, arch]", appimage_job)
+        self.assertIn("actions/download-artifact", appimage_job)
+        self.assertIn("name: release-inputs", appimage_job)
+        self.assertIn("BOOKIE_RELEASE_INPUTS_DIR", appimage_job)
+        self.assertIn("BOOKIE_RELEASE_COMMIT: ${{ github.sha }}", appimage_job)
+        self.assertIn("BOOKIE_RELEASE_VERSION: ${{ needs.prepare.outputs.version }}", appimage_job)
+        self.assertIn("name: release-inputs", arch_job)
+        self.assertIn("target/arch-release-inputs/bookie-*", arch_job)
+        self.assertIn("validate_release_inputs.py", builder)
+        self.assertIn("CARGO_NET_OFFLINE=true", builder)
+        self.assertIn("BUILD_INPUTS.json", builder)
+        self.assertIn("appimage_build_toolchain", builder)
+        self.assertIn("vendor_archive", builder)
+
     def test_test_bundle_groups_cover_their_consumers_without_copying_every_test_binary(self):
         bundle_config = json.loads((ROOT / "scripts/ci-test-bundle-groups.json").read_text())
         bundle_groups = bundle_config["groups"]
@@ -679,8 +699,11 @@ class CiWorkflowTests(unittest.TestCase):
                 self.assertIn(f'--publish "$fixture_bind_address::{port}"', script)
         mysql_script = (ROOT / "scripts/test-gtk-mysql.sh").read_text()
         self.assertIn('socket_root="${BOOKIE_GTK_FIXTURE_SHARED_DIR:-$XDG_RUNTIME_DIR}"', mysql_script)
-        self.assertIn('mktemp -d "$socket_root/mysql-socket.XXXXXX"', mysql_script)
-        self.assertIn('rm -rf -- "$socket_directory"', mysql_script)
+        self.assertIn('socket_parent="$(mktemp -d "$socket_root/mysql-socket.XXXXXX")"', mysql_script)
+        self.assertIn('socket_directory="$socket_parent/run"', mysql_script)
+        self.assertIn('chmod 0777 "$socket_directory"', mysql_script)
+        self.assertIn('source=$socket_directory,target=/var/run/mysqld', mysql_script)
+        self.assertIn('rm -rf -- "$socket_parent"', mysql_script)
 
     def test_driver_tls_and_postgres_release_fixtures_reach_the_docker_host(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
@@ -2276,7 +2299,7 @@ class CiWorkflowTests(unittest.TestCase):
         floor_script = (ROOT / "scripts/test-distro-floor.sh").read_text()
         self.assertIn('docker build -t "$tag"', floor_script)
         self.assertIn("apt-get update\n", floor_script)
-        self.assertIn("cat > /tmp/bookie.deb", floor_script)
+        self.assertIn("tar -xf - -C /", floor_script)
         self.assertIn("apt install -y /tmp/bookie.deb", floor_script)
         self.assertNotIn("cd /package", floor_script)
         deb_package_script = (ROOT / "scripts/test-deb-package.sh").read_text()

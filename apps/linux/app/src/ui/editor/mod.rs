@@ -75,7 +75,7 @@ pub use statement_cursor::grammar_for;
 use outcomes::{ScriptRunResult, StatementRun, StreamUpdate, render_outcomes, run_statements_with_spool_manager};
 use run_generation::{RunGeneration, RunTerminal};
 use schema::{apply_editor_preferences, apply_editor_scheme};
-use sql_text::{export_name_for_query, read_sql_text, text_to_run, toggle_line_comment};
+use sql_text::{export_name_for_query, read_sql_text, toggle_line_comment};
 use statement_cursor::{
     PlannedStatements, adjacent_statement_start, cursor_byte_offset, script_statements, statement_at_cursor,
 };
@@ -148,7 +148,9 @@ pub struct SqlEditorInit {
 }
 
 mod messages;
-pub use messages::{SqlEditorInput, SqlEditorOutput, StatementIdentity, StatementOutcome, StatementOutcomeKind};
+pub use messages::{
+    RunMessage, SqlEditorInput, SqlEditorOutput, StatementIdentity, StatementOutcome, StatementOutcomeKind,
+};
 
 pub(super) const MAX_SQL_FILE_BYTES: u64 = bookie_app_services::sql_text::EDITOR_MAX_SQL_BYTES;
 
@@ -229,7 +231,7 @@ impl SimpleComponent for SqlEditor {
                             set_tooltip_text: Some(bookie_app_services::tr!("Cancel running query (Esc)").as_str()),
                             set_visible: false,
                             add_css_class: "flat",
-                            connect_clicked => SqlEditorInput::Cancel,
+                            connect_clicked => SqlEditorInput::Run(RunMessage::Cancel),
                         },
                     },
 
@@ -272,7 +274,7 @@ impl SimpleComponent for SqlEditor {
                             set_can_shrink: true,
                             set_tooltip_text: Some(bookie_app_services::tr!("Explain query plan").as_str()),
                             add_css_class: "flat",
-                            connect_clicked => SqlEditorInput::Explain,
+                            connect_clicked => SqlEditorInput::Run(RunMessage::Explain),
                         },
 
                         #[name = "split_button"]
@@ -307,7 +309,7 @@ impl SimpleComponent for SqlEditor {
                             set_can_shrink: true,
                             set_tooltip_text: Some(bookie_app_services::tr!("Run query (Ctrl+Return)").as_str()),
                             add_css_class: "suggested-action",
-                            connect_clicked => SqlEditorInput::Run,
+                            connect_clicked => SqlEditorInput::Run(RunMessage::Run),
                         },
 
                         #[name = "run_options"]
@@ -327,7 +329,7 @@ impl SimpleComponent for SqlEditor {
                         set_margin_bottom: 8,
                         set_tooltip_text: Some(bookie_app_services::tr!("Runs the same query again. The saved query timeout does not change.").as_str()),
                         add_css_class: "flat",
-                        connect_clicked => SqlEditorInput::RunWithLongerTimeout,
+                        connect_clicked => SqlEditorInput::Run(RunMessage::RunWithLongerTimeout),
                     },
 
                 #[wrap(Some)]
@@ -620,6 +622,7 @@ impl SimpleComponent for SqlEditor {
             return;
         }
         match msg {
+            SqlEditorInput::Run(message) => self.on_run_message(message, sender),
             SqlEditorInput::CatalogStatementSucceeded { origin, driver, sql } => {
                 if !origin.owns_window(self.connection_id, &self.database) {
                     return;
@@ -710,37 +713,6 @@ impl SimpleComponent for SqlEditor {
             }
             SqlEditorInput::PrepareForTeardown(reply) => self.prepare_for_teardown(reply, &sender),
             SqlEditorInput::SessionTeardownFinished(result) => self.finish_session_teardown(result),
-            SqlEditorInput::Run => {
-                self.timeout_retry.clear_override();
-                let sql = text_to_run(&self.source_view.buffer());
-                let trimmed = sql.trim().to_string();
-                if trimmed.is_empty() {
-                    self.status.set_label(&bookie_app_services::tr!("empty query"));
-                    return;
-                }
-                let buffer = self.source_view.buffer();
-                let start = buffer
-                    .selection_bounds()
-                    .filter(|(start, end)| !buffer.text(start, end, true).trim().is_empty())
-                    .map_or(0, |(start, _)| start.offset() as usize);
-                let anchor = SourceAnchor {
-                    revision: self.drop_generation.revision(),
-                    start: start + sql.chars().take_while(|character| character.is_whitespace()).count(),
-                };
-                self.begin_run(trimmed, Some(anchor), false, sender);
-            }
-            SqlEditorInput::SessionAction { session_id, commit } => {
-                self.on_session_toolbar_action(session_id, commit, &sender);
-            }
-            SqlEditorInput::RunWithParameters {
-                sql,
-                anchor,
-                planned,
-                values,
-            } => {
-                self.execute_sql(sql, anchor, planned, values, sender);
-            }
-
             SqlEditorInput::LexingRead {
                 source,
                 sql,
@@ -767,29 +739,6 @@ impl SimpleComponent for SqlEditor {
             SqlEditorInput::UnfoldAll => {
                 if let Ok(buffer) = self.source_view.buffer().downcast::<sourceview5::Buffer>() {
                     self.folding.borrow_mut().unfold_all(&buffer);
-                }
-            }
-
-            SqlEditorInput::Explain => {
-                let buffer = self.source_view.buffer();
-                let text = if let Some((a, b)) = buffer.selection_bounds() {
-                    buffer.text(&a, &b, true).to_string()
-                } else {
-                    let (start, end) = buffer.bounds();
-                    let all = buffer.text(&start, &end, true).to_string();
-                    let cursor_chars = buffer.iter_at_mark(&buffer.get_insert()).offset() as usize;
-                    let driver_id = self.metadata().map(|metadata| metadata.driver_id).unwrap_or_default();
-                    let cursor = cursor_byte_offset(&all, cursor_chars);
-                    statement_at_cursor(&all, self.lexing(&driver_id), cursor).unwrap_or(all)
-                };
-                if let Some(window) = self.source_view.root().and_then(|r| r.downcast::<gtk::Window>().ok()) {
-                    crate::ui::explain_dialog::present(
-                        &window,
-                        self.connection_id,
-                        &text,
-                        &self.database,
-                        &self.preferences,
-                    );
                 }
             }
 
@@ -827,24 +776,6 @@ impl SimpleComponent for SqlEditor {
             SqlEditorInput::ClearBookmarks => {
                 if let Ok(buffer) = self.source_view.buffer().downcast::<sourceview5::Buffer>() {
                     bookmarks::clear(&buffer);
-                }
-            }
-
-            SqlEditorInput::RunAtCursor => self.run_scope(true, sender.clone()),
-
-            SqlEditorInput::RunWithLongerTimeout => {
-                let Some(sql) = self.timeout_retry.accept() else {
-                    return;
-                };
-                self.longer_timeout_button.set_visible(false);
-                self.begin_run(sql, None, false, sender);
-            }
-
-            SqlEditorInput::Cancel => {
-                if self.cancel_button.is_visible()
-                    && let Some(token) = self.cancel_token.take()
-                {
-                    token.cancel();
                 }
             }
 
