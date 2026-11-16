@@ -188,7 +188,11 @@ fn custom_page_size_changes_the_exact_fetch_limit() {
         .unwrap();
 
     page_size.set_value(2_347.0);
-    let fetched = pump(&outputs);
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+    let mut fetched = Vec::new();
+    while controller.model().page_size != 2_347 && std::time::Instant::now() < deadline {
+        fetched.extend(pump(&outputs));
+    }
 
     assert_eq!(controller.model().page_size, 2_347);
     assert!(

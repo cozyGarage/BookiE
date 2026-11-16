@@ -1057,6 +1057,10 @@ fn a_new_query_tab_focuses_its_editor_so_typing_lands_there(cx: &mut TestAppCont
     view.read_with(cx, |view, _| {
         assert!(view.sidebar_open, "the sidebar shortcut still reopens the sidebar");
     });
+    cx.simulate_input(" + 1");
+    view.read_with(cx, |view, cx| {
+        assert_eq!(view.sql_input.read(cx).value(), "select 1 + 1");
+    });
     cx.simulate_keystrokes("ctrl-shift-p");
     view.read_with(cx, |view, _| {
         assert!(view.palette_open, "global shortcuts still work in the editor")
