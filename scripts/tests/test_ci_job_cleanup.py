@@ -164,7 +164,6 @@ class CiJobCleanupTests(unittest.TestCase):
             job_tmp = Path(temporary) / "job-tmp"
             job_tmp.mkdir()
             (scripts / "cleanup-testcontainers.py").touch()
-            (scripts / "ci-cache.py").touch()
             bin_dir = Path(temporary) / "bin"
             bin_dir.mkdir()
             calls = Path(temporary) / "calls"
@@ -174,6 +173,14 @@ class CiJobCleanupTests(unittest.TestCase):
                 encoding="utf-8",
             )
             python.chmod(0o755)
+            cache_helper = bin_dir / "bookie-ci-cache"
+            cache_helper.write_text(
+                "#!/usr/bin/env bash\nset -e\n"
+                "test ! -e \"$GITHUB_WORKSPACE/src\"\n"
+                "printf '%s\\n' \"$*\" >> \"$CLEANUP_CALLS\"\n",
+                encoding="utf-8",
+            )
+            cache_helper.chmod(0o755)
             result = subprocess.run(
                 ["bash", str(CLEANUP)],
                 cwd=workspace,
@@ -185,6 +192,7 @@ class CiJobCleanupTests(unittest.TestCase):
                     "CARGO_TARGET_DIR": "/var/cache/ci/target/unit",
                     "TMPDIR": str(job_tmp),
                     "BOOKIE_TEST_RUN_ID": "forgejo-123-1-postgres",
+                    "BOOKIE_CI_CACHE_HELPER": str(cache_helper),
                     "CLEANUP_CALLS": str(calls),
                 },
                 capture_output=True,
@@ -196,7 +204,7 @@ class CiJobCleanupTests(unittest.TestCase):
                 calls.read_text(encoding="utf-8").splitlines(),
                 [
                     f"{scripts / 'cleanup-testcontainers.py'} forgejo-123-1-postgres",
-                    f"{scripts / 'ci-cache.py'} cleanup --min-free-gib 30",
+                    "cleanup --min-free-gib 30",
                 ],
             )
 
