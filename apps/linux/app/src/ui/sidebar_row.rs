@@ -13,6 +13,7 @@ use bookie_core::TableInfo;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SidebarObjectKind {
     Table,
+    TemporaryTable,
     View,
     Group,
     Schema,
@@ -57,6 +58,7 @@ fn chevron_icon(collapsed: bool) -> &'static str {
 fn sidebar_icon(kind: SidebarObjectKind) -> &'static str {
     match kind {
         SidebarObjectKind::Table => "view-list-symbolic",
+        SidebarObjectKind::TemporaryTable => "view-list-symbolic",
         SidebarObjectKind::View => "view-paged-symbolic",
         SidebarObjectKind::Group => "folder-symbolic",
         SidebarObjectKind::Schema => "folder-symbolic",
@@ -67,10 +69,12 @@ fn sidebar_icon(kind: SidebarObjectKind) -> &'static str {
 fn context_menu_model(kind: SidebarObjectKind) -> gtk::gio::Menu {
     let menu = gtk::gio::Menu::new();
     let open_section = gtk::gio::Menu::new();
-    open_section.append(
-        Some(&bookie_app_services::tr!("Open in new tab")),
-        Some("sidebar-row.open-in-new-tab"),
-    );
+    let open_label = if kind == SidebarObjectKind::TemporaryTable {
+        bookie_app_services::tr!("Show in Session Results")
+    } else {
+        bookie_app_services::tr!("Open in new tab")
+    };
+    open_section.append(Some(&open_label), Some("sidebar-row.open-in-new-tab"));
     menu.append_section(None, &open_section);
     if kind == SidebarObjectKind::Table {
         append_table_context_sections(&menu);
@@ -186,6 +190,10 @@ pub enum SidebarRowOutput {
         schema: Option<String>,
     },
     Open {
+        schema: Option<String>,
+        name: String,
+    },
+    ShowTemporaryTable {
         schema: Option<String>,
         name: String,
     },
@@ -397,7 +405,7 @@ impl FactoryComponent for SidebarRow {
             narrow.add_setter(&row_layout, "orientation", Some(&gtk::Orientation::Vertical.into()));
         }
         widgets.row_layout.add_breakpoint(narrow);
-        if self.group.is_none() {
+        if self.group.is_none() && self.kind != SidebarObjectKind::TemporaryTable {
             self.columns.install(&root, &widgets.actions_row, &sender);
         }
         if let Some(button) = &self.new_table_button {
@@ -556,7 +564,13 @@ impl FactoryComponent for SidebarRow {
         let output = match msg {
             SidebarRowMsg::ToggleColumns(active) => return self.columns.toggle(active, &self.info, sender),
             SidebarRowMsg::SetCollapsed(collapsed) => return self.apply_collapse(collapsed),
+            SidebarRowMsg::Open if self.kind == SidebarObjectKind::TemporaryTable => {
+                SidebarRowOutput::ShowTemporaryTable { schema, name }
+            }
             SidebarRowMsg::Open => SidebarRowOutput::Open { schema, name },
+            SidebarRowMsg::OpenInNewTab if self.kind == SidebarObjectKind::TemporaryTable => {
+                SidebarRowOutput::ShowTemporaryTable { schema, name }
+            }
             SidebarRowMsg::OpenInNewTab => SidebarRowOutput::OpenInNewTab { schema, name },
             SidebarRowMsg::EditStructure => SidebarRowOutput::EditStructure { schema, name },
             SidebarRowMsg::ShowCreateTable => SidebarRowOutput::ShowCreateTable { schema, name },

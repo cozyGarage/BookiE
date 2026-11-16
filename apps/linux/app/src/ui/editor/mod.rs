@@ -633,6 +633,7 @@ impl SimpleComponent for SqlEditor {
                 }
                 if self.catalog_changes.succeeded(&sql, &driver) {
                     let _ = sender.output(SqlEditorOutput::CatalogChanged(origin));
+                    self.refresh_temporary_tables(&sender);
                 }
             }
             SqlEditorInput::Grid(GridMsg::CopyToClipboard(text)) => {
@@ -710,6 +711,9 @@ impl SimpleComponent for SqlEditor {
             }
             SqlEditorInput::SessionRollbackFinished { session_id, result } => {
                 self.on_session_rollback_finished(session_id, result);
+            }
+            SqlEditorInput::TemporaryTablesLoaded { session_id, result } => {
+                self.on_temporary_tables_loaded(session_id, result, &sender);
             }
             SqlEditorInput::PrepareForTeardown(reply) => self.prepare_for_teardown(reply, &sender),
             SqlEditorInput::SessionTeardownFinished(result) => self.finish_session_teardown(result),

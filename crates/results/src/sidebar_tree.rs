@@ -9,6 +9,7 @@ pub enum GroupKind {
     Tables,
     Views,
     Catalog,
+    TemporaryTables,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -16,6 +17,10 @@ pub enum NodeKind {
     Schema,
     Group(GroupKind),
     Table {
+        schema: Option<String>,
+        name: String,
+    },
+    TemporaryTable {
         schema: Option<String>,
         name: String,
     },
@@ -53,9 +58,9 @@ impl TreeNode {
 
     fn matches_search(&self, query: &str) -> bool {
         match &self.kind {
-            NodeKind::Table { schema, name } | NodeKind::View { schema, name } => {
-                qualified_name_matches(schema.as_deref(), name, query)
-            }
+            NodeKind::Table { schema, name }
+            | NodeKind::TemporaryTable { schema, name }
+            | NodeKind::View { schema, name } => qualified_name_matches(schema.as_deref(), name, query),
             _ => false,
         }
     }
@@ -141,6 +146,14 @@ impl CollapseState {
 }
 
 pub fn build_nodes(tables: &[TableInfo], views: &[TableInfo]) -> Vec<TreeNode> {
+    build_nodes_with_temporary(tables, views, &[])
+}
+
+pub fn build_nodes_with_temporary(
+    tables: &[TableInfo],
+    views: &[TableInfo],
+    temporary_tables: &[TableInfo],
+) -> Vec<TreeNode> {
     let mut schemas = BTreeMap::<Option<String>, (Vec<&TableInfo>, Vec<&TableInfo>)>::new();
     let view_keys: HashSet<_> = views
         .iter()
@@ -184,7 +197,40 @@ pub fn build_nodes(tables: &[TableInfo], views: &[TableInfo]) -> Vec<TreeNode> {
         push_group(&mut nodes, depth, &prefix, GroupKind::Tables, schema_tables, parent);
         push_group(&mut nodes, depth, &prefix, GroupKind::Views, schema_views, parent);
     }
+    append_temporary_tables(&mut nodes, temporary_tables);
     nodes
+}
+
+fn append_temporary_tables(nodes: &mut Vec<TreeNode>, tables: &[TableInfo]) {
+    if tables.is_empty() {
+        return;
+    }
+    let group_index = nodes.len();
+    nodes.push(TreeNode {
+        depth: 0,
+        key: "temporary-tables".to_string(),
+        kind: NodeKind::Group(GroupKind::TemporaryTables),
+        schema: None,
+        count: tables.len(),
+        parent: None,
+    });
+    for table in tables {
+        nodes.push(TreeNode {
+            depth: 1,
+            key: format!(
+                "temporary-tables/{}/{}",
+                key_part(table.schema.as_deref().unwrap_or_default()),
+                key_part(&table.name)
+            ),
+            kind: NodeKind::TemporaryTable {
+                schema: table.schema.clone(),
+                name: table.name.clone(),
+            },
+            schema: table.schema.clone(),
+            count: 0,
+            parent: Some(group_index),
+        });
+    }
 }
 
 pub fn append_catalog_entries(nodes: &mut Vec<TreeNode>, kinds: &[CatalogObjectKind]) {
@@ -270,6 +316,7 @@ fn push_group(
         GroupKind::Tables => "tables",
         GroupKind::Views => "views",
         GroupKind::Catalog => "catalog",
+        GroupKind::TemporaryTables => "temporary-tables",
     };
     let group_index = nodes.len();
     nodes.push(TreeNode {
@@ -286,7 +333,7 @@ fn push_group(
             depth: depth + 1,
             key: format!("{prefix}/{suffix}/{}", key_part(&name)),
             kind: match group {
-                GroupKind::Tables | GroupKind::Catalog => NodeKind::Table { schema, name },
+                GroupKind::Tables | GroupKind::Catalog | GroupKind::TemporaryTables => NodeKind::Table { schema, name },
                 GroupKind::Views => NodeKind::View { schema, name },
             },
             schema: object.schema.clone(),

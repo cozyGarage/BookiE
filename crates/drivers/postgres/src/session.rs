@@ -43,6 +43,29 @@ pub(crate) async fn open(options: &PgConnectOptions) -> Result<Box<dyn bookie_co
 
 #[async_trait]
 impl bookie_core::Session for PgSession {
+    async fn list_temporary_tables_controlled(
+        &mut self,
+        control: &OperationControl,
+    ) -> Result<Vec<bookie_core::TableInfo>, DriverError> {
+        self.reject_active_cursor()?;
+        let result = self
+            .run_query_controlled(crate::relations::TEMPORARY_TABLES_SQL, &[], control)
+            .await?;
+        result
+            .rows
+            .iter()
+            .map(|row| match row {
+                [Value::Text(schema), Value::Text(name)] => Ok(bookie_core::TableInfo {
+                    schema: Some(schema.clone()),
+                    name: name.clone(),
+                }),
+                _ => Err(DriverError::Internal(
+                    "PostgreSQL returned invalid temporary table metadata".into(),
+                )),
+            })
+            .collect()
+    }
+
     async fn query_params_controlled(
         &mut self,
         sql: &str,

@@ -197,6 +197,28 @@ async fn a_session_keeps_settings_temp_tables_and_its_transaction_between_statem
     ] {
         session.query_params_controlled(sql, &[], &control).await.unwrap();
     }
+    let temporary = session.list_temporary_tables_controlled(&control).await.unwrap();
+    assert!(matches!(
+        temporary.as_slice(),
+        [bookie_core::TableInfo { schema: Some(schema), name }] if schema.starts_with("pg_temp_") && name == "scratch"
+    ));
+    assert!(
+        !conn
+            .list_tables()
+            .await
+            .unwrap()
+            .iter()
+            .any(|table| table.name == "scratch")
+    );
+    let mut isolated = conn.open_session().await.unwrap();
+    assert!(
+        isolated
+            .list_temporary_tables_controlled(&control)
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    isolated.close().await.unwrap();
     assert_eq!(
         session_value(&mut session, "SELECT current_setting('search_path')").await,
         Value::Text("pg_catalog, public".into())
@@ -204,6 +226,17 @@ async fn a_session_keeps_settings_temp_tables_and_its_transaction_between_statem
     assert_eq!(
         session_value(&mut session, "SELECT n FROM scratch").await,
         Value::Int(7)
+    );
+    session
+        .query_params_controlled("DROP TABLE scratch", &[], &control)
+        .await
+        .unwrap();
+    assert!(
+        session
+            .list_temporary_tables_controlled(&control)
+            .await
+            .unwrap()
+            .is_empty()
     );
 
     for sql in ["BEGIN", "INSERT INTO public.ledger VALUES (1)", "ROLLBACK"] {

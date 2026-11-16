@@ -68,6 +68,9 @@ impl SqlEditor {
             RunMessage::RunWithLongerTimeout => self.retry_with_longer_timeout(sender),
             RunMessage::RunAtCursor => self.run_scope(true, sender),
             RunMessage::Explain => self.explain_at_cursor(),
+            RunMessage::ShowTemporaryTable { schema, name } => {
+                self.begin_run(temporary_table_query(schema.as_deref(), &name), None, true, sender);
+            }
         }
     }
 
@@ -281,4 +284,29 @@ pub(super) fn run_menu_items() -> [(String, &'static str, &'static str); 2] {
             "<Primary><Shift>Return",
         ),
     ]
+}
+
+fn temporary_table_query(schema: Option<&str>, name: &str) -> String {
+    let table = bookie_core::sql_dialect::quote_ident("postgres", name);
+    let relation = schema.map_or(table.clone(), |schema| {
+        format!(
+            "{}.{}",
+            bookie_core::sql_dialect::quote_ident("postgres", schema),
+            table
+        )
+    });
+    format!("SELECT * FROM {relation}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::temporary_table_query;
+
+    #[test]
+    fn a_temporary_table_query_quotes_each_identifier() {
+        assert_eq!(
+            temporary_table_query(Some("pg_temp_4"), "x\"; DROP TABLE users;--"),
+            "SELECT * FROM \"pg_temp_4\".\"x\"\"; DROP TABLE users;--\""
+        );
+    }
 }
