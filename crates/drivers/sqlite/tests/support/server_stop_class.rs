@@ -491,3 +491,64 @@ async fn a_stopped_unchecked_batch_leaves_the_pool_clean_for_later_transactions(
 
     the_pool_stays_clean_for_later_transactions(connection.as_ref(), other.as_ref()).await;
 }
+
+async fn wait_until_the_database_accepts_a_write(other: &dyn Connection) {
+    for _ in 0..120 {
+        if other
+            .execute("INSERT INTO stop_class_rows (id) VALUES (999)")
+            .await
+            .is_ok()
+        {
+            other
+                .execute("DELETE FROM stop_class_rows WHERE id = 999")
+                .await
+                .unwrap();
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    }
+    panic!("the database still refuses writes a minute later");
+}
+
+#[tokio::test]
+async fn a_write_that_cannot_be_interrupted_in_time_leaves_the_pool_clean_once_it_ends() {
+    let (directory, connection) = open().await;
+    let other = second_connection(&directory).await;
+    let slow = vec!["length(randomblob(300000000))"; 28].join(" + ");
+    let write = format!("UPDATE stop_class_rows SET note = 'slow' WHERE {slow} > 0");
+
+    let mut transaction = connection.begin().await.unwrap();
+    let error = transaction
+        .execute_controlled(&write, &OperationControl::with_timeout(STOP_AFTER))
+        .await
+        .expect_err("the slow write is stopped or left unknown");
+    assert!(
+        matches!(
+            error,
+            DriverError::TimedOut | DriverError::OperationOutcomeUnknown { .. }
+        ),
+        "{error:?}"
+    );
+    drop(transaction);
+
+    wait_until_the_database_accepts_a_write(other.as_ref()).await;
+    the_pool_stays_clean_for_later_transactions(connection.as_ref(), other.as_ref()).await;
+}
+
+#[tokio::test]
+async fn a_transaction_ended_by_its_own_text_leaves_the_pool_clean() {
+    for ending in ["COMMIT", "ROLLBACK"] {
+        let (directory, connection) = open().await;
+        let other = second_connection(&directory).await;
+        let mut transaction = connection.begin().await.unwrap();
+        transaction.execute(ending).await.unwrap();
+        let outcome = if ending == "COMMIT" {
+            transaction.rollback().await
+        } else {
+            transaction.commit().await
+        };
+        assert_eq!(outcome.is_ok(), ending == "COMMIT", "{ending}: {outcome:?}");
+
+        the_pool_stays_clean_for_later_transactions(connection.as_ref(), other.as_ref()).await;
+    }
+}

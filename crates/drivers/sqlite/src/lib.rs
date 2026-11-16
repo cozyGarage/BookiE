@@ -16,10 +16,9 @@ use sqlx::{
 use futures::stream::StreamExt;
 
 use bookie_core::{
-    CANCELLATION_GRACE, ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError,
-    DriverValueInputCapabilities, ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS,
-    OperationControl, QueryResult, QueryResultBudget, QueryRows, TableInfo, Value, check_pre_dispatch,
-    run_controlled_setup, run_server_cancellable,
+    ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverValueInputCapabilities, ExecResult,
+    ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBudget,
+    QueryRows, TableInfo, Value, check_pre_dispatch, run_controlled_setup, run_server_cancellable,
 };
 
 mod drop_guard;
@@ -680,7 +679,10 @@ impl SqliteTransaction {
             return;
         }
         if let Some(tx) = self.tx.take() {
-            let _ = tokio::time::timeout(CANCELLATION_GRACE, transaction::rollback_transaction(tx)).await;
+            let rollback = tokio::spawn(transaction::rollback_transaction(tx));
+            if !uncertain {
+                let _ = rollback.await;
+            }
         }
     }
 }
@@ -754,10 +756,16 @@ impl bookie_core::Transaction for SqliteTransaction {
     }
 
     async fn commit(mut self: Box<Self>) -> Result<(), DriverError> {
-        let tx = self
+        let mut tx = self
             .tx
             .take()
             .ok_or_else(|| DriverError::Internal("transaction closed".into()))?;
+        if matches!(interrupt::in_autocommit_mode(&mut tx).await, Ok(true)) {
+            let _ = transaction::rollback_transaction(tx).await;
+            return Err(DriverError::Internal(
+                "the transaction ended before it was committed".into(),
+            ));
+        }
         tx.commit().await.map_err(map_sqlx_error)
     }
 
@@ -766,7 +774,7 @@ impl bookie_core::Transaction for SqliteTransaction {
             .tx
             .take()
             .ok_or_else(|| DriverError::Internal("transaction closed".into()))?;
-        tx.rollback().await.map_err(map_sqlx_error)
+        transaction::rollback_transaction(tx).await.map_err(map_sqlx_error)
     }
 }
 
