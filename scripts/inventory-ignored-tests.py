@@ -146,6 +146,13 @@ for path in sorted(
             if name not in mapped:
                 raise RuntimeError(f"unmapped app-server test: {name}")
             tier, enable = "App server", "scripts/run-test-layer.py app-server"
+        elif relative == "crates/mcp/tests/mysql_preview_engines.rs":
+            tier, enable = "App server", "scripts/run-test-layer.py app-server"
+        elif (
+            relative == "crates/app-services/tests/browse_long_text_preview_engines.rs"
+            and name == "mysql_previews_a_huge_longtext_cell"
+        ):
+            tier, enable = "App server", "scripts/run-test-layer.py app-server"
         elif relative.startswith("apps/gpui/") and "known issue" in reason.lower():
             tier, enable = "GPUI", "Keep ignored until the known issue is resolved"
         elif "docker" in reason.lower() and relative.startswith("crates/ssh/"):
