@@ -238,6 +238,84 @@ async fn a_driver_without_strict_encryption_refuses_the_setting() {
 }
 
 #[tokio::test]
+async fn an_invalid_tls_ca_file_is_named_before_opening_an_ssh_tunnel() {
+    let directory = tempfile::tempdir().unwrap();
+    let ca = directory.path().join("invalid-ca.pem");
+    std::fs::write(
+        &ca,
+        b"-----BEGIN CERTIFICATE-----\nnot base64!\n-----END CERTIFICATE-----\n",
+    )
+    .unwrap();
+    let error = refusal(
+        &FakeDriver::plain(),
+        ConnectOptions {
+            tls: TlsConfig {
+                mode: TlsMode::VerifyCa,
+                root_cert: Some(ca.clone()),
+                ..TlsConfig::disabled()
+            },
+            ..options()
+        },
+        Some(Vec::new()),
+        "an invalid CA must be rejected before SSH setup",
+    )
+    .await;
+
+    assert!(
+        matches!(error, TransportError::Driver(DriverError::Tls(_))),
+        "{error:?}"
+    );
+    assert!(error.to_string().contains(&ca.display().to_string()));
+    assert!(!error.to_string().contains("disable TLS"));
+}
+
+#[tokio::test]
+async fn an_unreadable_tls_ca_file_is_named_before_driver_dispatch() {
+    let ca = PathBuf::from("/no/such/bookie-ca.pem");
+    let error = refusal(
+        &FakeDriver::plain(),
+        ConnectOptions {
+            tls: TlsConfig {
+                mode: TlsMode::VerifyFull,
+                root_cert: Some(ca.clone()),
+                ..TlsConfig::disabled()
+            },
+            ..options()
+        },
+        None,
+        "an unreadable CA must be rejected before the driver",
+    )
+    .await;
+
+    assert!(
+        matches!(error, TransportError::Driver(DriverError::Tls(_))),
+        "{error:?}"
+    );
+    assert!(error.to_string().contains(&ca.display().to_string()));
+}
+
+#[tokio::test]
+async fn an_unused_tls_ca_file_is_not_read_in_encryption_only_mode() {
+    let ca = PathBuf::from("/no/such/bookie-ca.pem");
+    let error = refusal(
+        &FakeDriver::plain(),
+        ConnectOptions {
+            tls: TlsConfig {
+                mode: TlsMode::Require,
+                root_cert: Some(ca),
+                ..TlsConfig::disabled()
+            },
+            ..options()
+        },
+        Some(Vec::new()),
+        "encryption-only modes do not consume the CA file",
+    )
+    .await;
+
+    assert!(error.to_string().contains("chain"), "{error}");
+}
+
+#[tokio::test]
 async fn a_local_socket_is_refused_by_a_driver_that_cannot_do_it() {
     let error = refusal(
         &FakeDriver::plain(),
