@@ -80,6 +80,8 @@ pub fn present(
         ("Blocking locks", ActivityQuery::BlockingLocks),
         ("Long-running", ActivityQuery::LongRunning),
         ("Replication lag", ActivityQuery::ReplicationLag),
+        ("Server variables", ActivityQuery::ServerVariables),
+        ("Server status", ActivityQuery::ServerStatus),
     ];
     let supported = activity_kinds(&driver_id);
     for (label, kind) in actions {

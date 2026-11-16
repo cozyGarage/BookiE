@@ -150,6 +150,8 @@ mod disconnection;
 
 #[path = "support/rollback_failure.rs"]
 mod rollback_failure;
+#[path = "support/server_activity.rs"]
+mod server_activity;
 
 #[path = "../../shared/server_restart.rs"]
 mod server_restart;
