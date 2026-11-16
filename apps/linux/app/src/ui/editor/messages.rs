@@ -1,5 +1,24 @@
 use super::*;
 
+#[derive(Debug)]
+pub enum RunMessage {
+    Run,
+    SessionAction {
+        session_id: Uuid,
+        commit: bool,
+    },
+    RunWithParameters {
+        sql: String,
+        anchor: Option<SourceAnchor>,
+        planned: PlannedStatements,
+        values: std::collections::HashMap<String, bookie_core::Value>,
+    },
+    Cancel,
+    RunWithLongerTimeout,
+    RunAtCursor,
+    Explain,
+}
+
 #[derive(Debug, Clone)]
 pub struct StatementOutcome {
     pub identity: StatementIdentity,
@@ -32,17 +51,7 @@ pub enum SqlEditorInput {
         driver: String,
         sql: String,
     },
-    Run,
-    SessionAction {
-        session_id: Uuid,
-        commit: bool,
-    },
-    RunWithParameters {
-        sql: String,
-        anchor: Option<SourceAnchor>,
-        planned: PlannedStatements,
-        values: std::collections::HashMap<String, bookie_core::Value>,
-    },
+    Run(RunMessage),
     LexingRead {
         source: session_lexing::LexingSource,
         sql: String,
@@ -53,7 +62,6 @@ pub enum SqlEditorInput {
         source: session_lexing::LexingSource,
         settings: Option<bookie_core::sql_syntax::script::LexicalSettings>,
     },
-    Cancel,
     FocusResultGrid,
     FocusEditor,
     TogglePin,
@@ -75,7 +83,6 @@ pub enum SqlEditorInput {
     OpenCompare,
     CompareResults(Box<result_compare::CompareRequest>),
     CompareFinished(Box<result_compare::CompareDone>),
-    RunWithLongerTimeout,
     ShowCancelled(u64),
     ShowTimedOut {
         generation: u64,
@@ -91,7 +98,6 @@ pub enum SqlEditorInput {
     },
     ReplaceQuery(String),
     Format,
-    RunAtCursor,
     JumpStatement {
         forward: bool,
     },
@@ -106,7 +112,6 @@ pub enum SqlEditorInput {
     InsertSnippet(String),
     UnfoldAll,
     ShowFind,
-    Explain,
     Grid(GridMsg),
     SessionToggled(bool),
     SessionOpened {

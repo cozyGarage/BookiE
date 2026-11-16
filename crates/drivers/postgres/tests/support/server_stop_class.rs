@@ -672,3 +672,113 @@ async fn relay(client: TcpStream, upstream: SocketAddr, state: Arc<ProxyState>) 
     }
     outbound.abort();
 }
+
+enum Abandon {
+    PlainWriteThenRollback,
+    ControlledWrite,
+}
+
+async fn abandon_a_transaction_behind_a_lock(how: Abandon) {
+    let (_container, options) = start_pg().await;
+    let options = ConnectOptions {
+        application_name: Some(APPLICATION.into()),
+        ..options
+    };
+    let observer = connect(ConnectOptions {
+        application_name: Some("bookie_stop_class_observer".into()),
+        ..options.clone()
+    })
+    .await;
+    create_fixture(observer.as_ref()).await;
+    let connection = connect(options).await;
+    let no_limit = OperationControl::new(tokio_util::sync::CancellationToken::new(), None);
+
+    let mut lock = observer.begin().await.unwrap();
+    lock.execute_controlled("UPDATE stop_class_rows SET note = 'locked' WHERE id = 1", &no_limit)
+        .await
+        .unwrap();
+    let mut transaction = connection.begin().await.unwrap();
+    let write = "UPDATE stop_class_rows SET note = 'uncertain' WHERE id = 1";
+    match how {
+        Abandon::PlainWriteThenRollback => {
+            let abandoned = tokio::time::timeout(STOP_AFTER, transaction.execute(write)).await;
+            assert!(abandoned.is_err(), "the write behind a row lock cannot finish");
+            let abandoned = tokio::time::timeout(STOP_AFTER, transaction.rollback()).await;
+            assert!(abandoned.is_err(), "the rollback waits behind the pending write");
+        }
+        Abandon::ControlledWrite => {
+            let abandoned = tokio::time::timeout(STOP_AFTER, transaction.execute_controlled(write, &no_limit)).await;
+            assert!(abandoned.is_err(), "the write behind a row lock cannot finish");
+            drop(transaction);
+        }
+    }
+    lock.rollback().await.unwrap();
+
+    for _ in 0..8 {
+        connection.begin().await.unwrap().commit().await.unwrap();
+    }
+    assert_eq!(open_transactions(observer.as_ref()).await, 0);
+    let note = observer
+        .query("SELECT note FROM stop_class_rows WHERE id = 1")
+        .await
+        .unwrap();
+    assert_eq!(note.rows, vec![vec![Value::Text("kept".into())]]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn an_abandoned_postgres_write_and_rollback_never_leave_an_open_transaction_on_the_pool() {
+    abandon_a_transaction_behind_a_lock(Abandon::PlainWriteThenRollback).await;
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn an_abandoned_controlled_postgres_write_never_leaves_an_open_transaction_on_the_pool() {
+    abandon_a_transaction_behind_a_lock(Abandon::ControlledWrite).await;
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_batch_stopped_while_its_commit_runs_is_not_applied() {
+    let (_container, options) = start_pg().await;
+    let options = ConnectOptions {
+        application_name: Some(APPLICATION.into()),
+        ..options
+    };
+    let observer = connect(ConnectOptions {
+        application_name: Some("bookie_stop_class_observer".into()),
+        ..options.clone()
+    })
+    .await;
+    create_fixture(observer.as_ref()).await;
+    for sql in [
+        "CREATE FUNCTION stop_class_slow_commit() RETURNS trigger LANGUAGE plpgsql \
+         AS $$ BEGIN PERFORM pg_sleep(30); RETURN NULL; END $$",
+        "CREATE CONSTRAINT TRIGGER stop_class_slow_commit AFTER UPDATE ON stop_class_rows \
+         DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION stop_class_slow_commit()",
+    ] {
+        observer.execute(sql).await.unwrap();
+    }
+    let connection = connect(options).await;
+
+    let error = connection
+        .execute_in_transaction_checked_controlled(
+            &one_row_write(),
+            &[0],
+            &OperationControl::with_timeout(Duration::from_millis(600)),
+        )
+        .await
+        .expect_err("a commit held by a slow deferred trigger cannot finish");
+    assert!(matches!(error, DriverError::TimedOut), "{error:?}");
+
+    assert_eq!(open_transactions(observer.as_ref()).await, 0);
+    let note = observer
+        .query("SELECT note FROM stop_class_rows WHERE id = 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        note.rows,
+        vec![vec![Value::Text("kept".into())]],
+        "the batch was reported as not applied"
+    );
+}
