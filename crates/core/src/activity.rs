@@ -198,7 +198,10 @@ mod tests {
             for kind in [ActivityQuery::ServerVariables, ActivityQuery::ServerStatus] {
                 let sql = activity_sql(driver, kind, Some(42)).unwrap();
                 let upper = sql.to_ascii_uppercase();
-                assert!(upper.starts_with("SELECT ") || upper.starts_with("SHOW "), "{driver} {kind:?}: {sql}");
+                assert!(
+                    upper.starts_with("SELECT ") || upper.starts_with("SHOW "),
+                    "{driver} {kind:?}: {sql}"
+                );
                 assert!(!sql.contains("42"), "{driver} {kind:?} must not take caller input");
             }
         }
