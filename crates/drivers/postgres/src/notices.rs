@@ -63,4 +63,20 @@ mod tests {
         assert_eq!(items[1].code, None);
         assert_eq!(messages.omitted(), 7);
     }
+
+    #[test]
+    fn oversized_codes_are_omitted_without_losing_a_sqlstate() {
+        let oversized = "x".repeat(bookie_core::MAX_SERVER_MESSAGE_CODE_BYTES + 1);
+        let messages = to_messages(
+            &[
+                notice(PgSeverity::Notice, "01000", "kept"),
+                notice(PgSeverity::Notice, &oversized, "code omitted"),
+            ],
+            0,
+        );
+        let items: Vec<_> = messages.iter().collect();
+        assert_eq!(items[0].code.as_deref(), Some("01000"));
+        assert_eq!(items[1].code, None);
+        assert_eq!(items[1].text, "code omitted");
+    }
 }

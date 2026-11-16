@@ -87,8 +87,8 @@ pub use query_rows::{QueryRowSet, QueryRows};
 pub use registry::DriverRegistry;
 pub use routine::{ROUTINE_DEFINITION_LIMIT_BYTES, RoutineDefinition, RoutineLookup, RoutineRef, cap_definition};
 pub use server_message::{
-    MAX_SERVER_MESSAGE_TEXT_BYTES, MAX_SERVER_MESSAGES, MAX_SERVER_MESSAGES_TOTAL_BYTES, MessageSeverity,
-    ServerMessage, ServerMessages,
+    MAX_SERVER_MESSAGE_CODE_BYTES, MAX_SERVER_MESSAGE_TEXT_BYTES, MAX_SERVER_MESSAGES, MAX_SERVER_MESSAGES_TOTAL_BYTES,
+    MessageSeverity, ServerMessage, ServerMessages,
 };
 pub use session::{Session, SessionCommitOutcome};
 pub use tls::{Environment, TlsConfig, TlsMode, error_chain_text, looks_like_tls_failure};
