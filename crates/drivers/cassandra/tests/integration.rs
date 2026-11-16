@@ -6,40 +6,81 @@ use testcontainers::core::{IntoContainerPort, WaitFor};
 use testcontainers::runners::AsyncRunner;
 use testcontainers::{GenericImage, ImageExt};
 
+const START_ATTEMPTS: u32 = 6;
+
+fn retry_delay(attempt: u32) -> std::time::Duration {
+    std::time::Duration::from_secs((2u64 << attempt.saturating_sub(1)).min(30))
+}
+
+fn host_socket_summary() -> String {
+    let read = |path: &str| {
+        std::fs::read_to_string(path)
+            .unwrap_or_default()
+            .trim()
+            .replace('\n', " | ")
+    };
+    format!(
+        "ephemeral ports {}; sockets {}",
+        read("/proc/sys/net/ipv4/ip_local_port_range"),
+        read("/proc/net/sockstat")
+    )
+}
+
+fn is_port_binding_race(error: &str) -> bool {
+    error.contains("driver failed programming external connectivity")
+}
+
 async fn start_cassandra() -> (testcontainers::ContainerAsync<GenericImage>, ConnectOptions) {
-    let image = GenericImage::new("cassandra", "5.0")
-        .with_exposed_port(9042.tcp())
-        .with_wait_for(WaitFor::message_on_stdout("Starting listening for CQL clients"))
-        .with_env_var("MAX_HEAP_SIZE", "512M")
-        .with_env_var("HEAP_NEWSIZE", "128M");
-    started(image).await
+    started(|| {
+        GenericImage::new("cassandra", "5.0")
+            .with_exposed_port(9042.tcp())
+            .with_wait_for(WaitFor::message_on_stdout("Starting listening for CQL clients"))
+            .with_env_var("MAX_HEAP_SIZE", "512M")
+            .with_env_var("HEAP_NEWSIZE", "128M")
+    })
+    .await
 }
 
 async fn start_scylla() -> (testcontainers::ContainerAsync<GenericImage>, ConnectOptions) {
-    let image = GenericImage::new("scylladb/scylla", "2025.1")
-        .with_exposed_port(9042.tcp())
-        .with_wait_for(WaitFor::message_on_stderr("init - serving"))
-        .with_cmd([
-            "--smp",
-            "1",
-            "--memory",
-            "512M",
-            "--overprovisioned",
-            "1",
-            "--developer-mode",
-            "1",
-        ]);
-    started(image).await
+    started(|| {
+        GenericImage::new("scylladb/scylla", "2025.1")
+            .with_exposed_port(9042.tcp())
+            .with_wait_for(WaitFor::message_on_stderr("init - serving"))
+            .with_cmd([
+                "--smp",
+                "1",
+                "--memory",
+                "512M",
+                "--overprovisioned",
+                "1",
+                "--developer-mode",
+                "1",
+            ])
+    })
+    .await
 }
 
 async fn started(
-    image: testcontainers::core::ContainerRequest<GenericImage>,
+    build: impl Fn() -> testcontainers::core::ContainerRequest<GenericImage>,
 ) -> (testcontainers::ContainerAsync<GenericImage>, ConnectOptions) {
-    let container = image
-        .with_startup_timeout(std::time::Duration::from_secs(240))
-        .start()
-        .await
-        .expect("start container");
+    let mut attempt = 1;
+    let container = loop {
+        match build()
+            .with_startup_timeout(std::time::Duration::from_secs(240))
+            .start()
+            .await
+        {
+            Ok(container) => break container,
+            Err(error) if attempt < START_ATTEMPTS && is_port_binding_race(&error.to_string()) => {
+                attempt += 1;
+                tokio::time::sleep(retry_delay(attempt)).await;
+            }
+            Err(error) => panic!(
+                "start container (attempt {attempt}): {error}\nhost: {}",
+                host_socket_summary()
+            ),
+        }
+    };
     let options = ConnectOptions {
         host: container.get_host().await.unwrap().to_string(),
         port: container.get_host_port_ipv4(9042).await.unwrap(),
@@ -187,4 +228,20 @@ async fn exercise(container: &testcontainers::ContainerAsync<GenericImage>, opti
         Value::Int(3),
         "nothing was written"
     );
+}
+
+#[test]
+fn the_retry_delay_doubles_and_stops_growing_at_thirty_seconds() {
+    let delays: Vec<u64> = (1..=6).map(|attempt| retry_delay(attempt).as_secs()).collect();
+    assert_eq!(delays, [2, 4, 8, 16, 30, 30]);
+}
+
+#[test]
+fn only_the_docker_port_binding_race_is_retried() {
+    let race = "failed to set up container networking: driver failed programming external connectivity on endpoint x \
+                (abc): failed to listen on TCP socket: address already in use";
+    assert!(is_port_binding_race(race));
+    assert!(!is_port_binding_race("image pull access denied for scylladb/scylla"));
+    assert!(!is_port_binding_race("container exited with code 1"));
+    assert!(!is_port_binding_race(""));
 }
