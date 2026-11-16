@@ -19,7 +19,7 @@ The session policies differ by protocol, so the expected result is recorded per 
 
 A driver that reports server cancellation must stop the statement on the server for every controlled call, not only for editor statements. A call that falls back to the contract's default form only stops waiting: the statement keeps running, and the pooled connection is returned while its reply is still pending.
 
-A caller that drops a controlled call's future, for example under its own shorter timeout, instead of passing a control, stops nothing: the statement keeps running on every engine, and on SQLite a write keeps its lock. Use the control's deadline or token.
+A caller that drops a controlled call's future, for example under its own shorter timeout, instead of passing a control, stops nothing on SQLite and DuckDB: the statement keeps running, a SQLite write keeps its lock, and on DuckDB every later call waits. Use the control's deadline or token.
 
 | Driver | State |
 | --- | --- |
