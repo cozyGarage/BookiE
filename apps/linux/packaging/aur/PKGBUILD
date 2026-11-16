@@ -3,7 +3,7 @@
 # shellcheck shell=bash disable=SC2034,SC2154,SC2164
 
 pkgname=bookie
-pkgver=0.2.6
+pkgver=0.2.7
 pkgrel=1
 pkgdesc="Native Linux database client"
 arch=('x86_64')
@@ -11,14 +11,14 @@ url="https://github.com/cozyGarage/BookiE"
 license=('AGPL-3.0-or-later')
 conflicts=('tablepro')
 replaces=('tablepro')
-depends=('gtk4>=1:4.24' 'glib2>=2.88' 'libadwaita>=1:1.10' 'gtksourceview5>=5.22' 'libsecret' 'openssl' 'krb5' 'sqlite')
-makedepends=('git' 'rust>=1:1.98' 'pkgconf' 'clang' 'gettext')
+depends=('gtk4>=1:4.24' 'glib2>=2.88' 'libadwaita>=1:1.10' 'gtksourceview5>=5.22' 'libsecret' 'libssl.so=4-64' 'libcrypto.so=4-64' 'krb5' 'sqlite')
+makedepends=('git' 'rust>=1:1.98' 'pkgconf' 'clang' 'gettext' 'openssl')
 checkdepends=('desktop-file-utils' 'appstream')
 options=('!lto')
 
 # The tag is followed and the commit it must resolve to is pinned, so a moved tag fails the build.
 _tag="linux-v${pkgver}"
-_commit=3b3d4ce1d1dd161df3196ae2f46b18bcefc066c5
+_commit=e293de78f947931d34d5ceac33cee6056e3aa513
 source=("${pkgname}::git+${url}.git#tag=${_tag}")
 sha256sums=('SKIP')
 

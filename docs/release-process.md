@@ -19,7 +19,7 @@ Artifact naming for the Arch package and AppImage, the historical 0.2.4 Debian a
 
 ## After publishing
 
-Update `apps/linux/packaging/aur/PKGBUILD` (`pkgver`, `pkgrel=1` and `_commit`, the commit the tag points at), build it with `makepkg` and push the same file to the AUR repository. The in-tree copy lags until its own pull request merges.
+The tag run's `AUR recipe` job runs `scripts/update-aur-recipe.py` for the new tag and uploads the result as the `aur-recipe` workflow artifact. The file has `pkgver`, `pkgrel=1` and `_commit` (the commit the tag points at) set from the tag and nothing else changed. To refresh the in-tree copy, run `python3 scripts/update-aur-recipe.py linux-vX.Y.Z` and open a pull request, or download the artifact. Then build it with `makepkg` and push the same file to the AUR repository. Nothing in CI pushes to the AUR and CI holds no AUR key.
 
 ## Recovering publication after successful package builds
 

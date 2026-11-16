@@ -48,7 +48,7 @@ The Arch package installs `bookie`, `bookie-agentd` and `bookie-askpass`. It rep
 
 The recipe follows the tag and pins the commit the tag must resolve to; a moved tag fails the build. It checks GTK 4.24, libadwaita 1.10, GtkSourceView 5.22 and GLib 2.88 with `pkg-config` before compiling and stops with the version it found. Release tags are annotated but not yet GPG-signed, so the recipe cannot use `?signed` until the maintainer signs them. The recipe holds no secrets and downloads only the tag and the locked crates.
 
-It is not published until the maintainer pushes it to the AUR; the in-tree file is the source for that repository and is updated after each release ([release process](release-process.md)).
+It is not published until the maintainer pushes it to the AUR. The release workflow produces a copy pointed at each new tag, and the in-tree file is the source for that repository ([release process](release-process.md)).
 
 ## OpenSSL
 
