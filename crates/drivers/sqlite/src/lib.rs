@@ -703,8 +703,36 @@ impl bookie_core::Transaction for SqliteTransaction {
         result
     }
 
+    async fn query_params_controlled(
+        &mut self,
+        sql: &str,
+        params: &[Value],
+        control: &OperationControl,
+    ) -> Result<QueryResult, DriverError> {
+        if params.is_empty() {
+            return self.query_controlled(sql, control).await;
+        }
+        Err(DriverError::Unsupported(
+            "query_params is not implemented for this transaction".into(),
+        ))
+    }
+
     async fn execute(&mut self, sql: &str) -> Result<ExecResult, DriverError> {
         execute_on(self.open()?, sql, &[]).await
+    }
+
+    async fn execute_params_controlled(
+        &mut self,
+        sql: &str,
+        params: &[Value],
+        control: &OperationControl,
+    ) -> Result<ExecResult, DriverError> {
+        if params.is_empty() {
+            return self.execute_controlled(sql, control).await;
+        }
+        Err(DriverError::Unsupported(
+            "execute_params is not implemented for this transaction".into(),
+        ))
     }
 
     async fn execute_controlled(&mut self, sql: &str, control: &OperationControl) -> Result<ExecResult, DriverError> {

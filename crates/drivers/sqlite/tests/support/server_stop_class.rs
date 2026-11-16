@@ -92,37 +92,49 @@ fn stop_cases() -> Vec<StopCase> {
         stoppable("Transaction::execute_controlled", |c, control| async move {
             c.begin().await?.execute_controlled(ENDLESS_INSERT, &control).await
         }),
+        stoppable("Transaction::query_params_controlled", |c, control| async move {
+            c.begin()
+                .await?
+                .query_params_controlled(ENDLESS_SELECT, &[], &control)
+                .await
+        }),
+        stoppable("Transaction::execute_params_controlled", |c, control| async move {
+            c.begin()
+                .await?
+                .execute_params_controlled(ENDLESS_INSERT, &[], &control)
+                .await
+        }),
     ]
 }
 
 const BOUNDED: &[(&str, &str)] = &[
     (
         "list_collations_controlled",
-        "reads the in-process collation list; bounded by the busy timeout",
+        "reads the in-process collation list; bounded by sqlx's default 5 s busy timeout",
     ),
     (
         "list_databases_controlled",
-        "reads the in-process database list; bounded by the busy timeout",
+        "reads the in-process database list; bounded by sqlx's default 5 s busy timeout",
     ),
     (
         "list_tables_controlled",
-        "catalog read in process; bounded by schema size and the busy timeout",
+        "catalog read in process; bounded by schema size and sqlx's default 5 s busy timeout",
     ),
     (
         "list_tables_in",
-        "catalog read in process; bounded by schema size and the busy timeout",
+        "catalog read in process; bounded by schema size and sqlx's default 5 s busy timeout",
     ),
     (
         "list_tables_excluding_controlled",
-        "catalog read in process; bounded by schema size and the busy timeout",
+        "catalog read in process; bounded by schema size and sqlx's default 5 s busy timeout",
     ),
     (
         "list_views_controlled",
-        "catalog read in process; bounded by schema size and the busy timeout",
+        "catalog read in process; bounded by schema size and sqlx's default 5 s busy timeout",
     ),
     (
         "list_views_excluding_controlled",
-        "catalog read in process; bounded by schema size and the busy timeout",
+        "catalog read in process; bounded by schema size and sqlx's default 5 s busy timeout",
     ),
     (
         "lexical_settings_controlled",
@@ -163,14 +175,6 @@ const BOUNDED: &[(&str, &str)] = &[
     (
         "synchronize_auto_increment_sequences_controlled",
         "SQLite has no sequences to synchronise",
-    ),
-    (
-        "Transaction::query_params_controlled",
-        "a SQLite transaction refuses bound parameters before it runs anything",
-    ),
-    (
-        "Transaction::execute_params_controlled",
-        "a SQLite transaction refuses bound parameters before it runs anything",
     ),
     (
         "Transaction::rollback_controlled",
@@ -379,4 +383,25 @@ async fn a_stopped_read_in_a_sqlite_transaction_leaves_the_transaction_usable() 
         .unwrap();
     transaction.commit().await.unwrap();
     assert_eq!(row_count(connection.as_ref()).await, 3);
+}
+
+#[tokio::test]
+async fn a_sqlite_transaction_refuses_bound_parameters_without_running_anything() {
+    let (_directory, connection) = open().await;
+    let mut transaction = connection.begin().await.unwrap();
+    let control = OperationControl::with_timeout(Duration::from_secs(5));
+    let params = [Value::Int(1)];
+
+    let query = transaction
+        .query_params_controlled("SELECT ?", &params, &control)
+        .await
+        .expect_err("a transaction refuses bound parameters");
+    let execute = transaction
+        .execute_params_controlled("INSERT INTO stop_class_rows (id) VALUES (?)", &params, &control)
+        .await
+        .expect_err("a transaction refuses bound parameters");
+    assert!(matches!(query, DriverError::Unsupported(_)), "{query:?}");
+    assert!(matches!(execute, DriverError::Unsupported(_)), "{execute:?}");
+    transaction.commit().await.unwrap();
+    assert_eq!(row_count(connection.as_ref()).await, 1);
 }
