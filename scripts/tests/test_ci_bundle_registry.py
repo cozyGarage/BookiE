@@ -44,6 +44,9 @@ def forgejo_api_request(responses, requests=None):
 
 
 class RegistryExtractionTests(unittest.TestCase):
+    def test_workspace_is_a_supported_bundle_group(self):
+        self.assertIn('workspace', registry.BUNDLE_GROUPS)
+
     def test_forgejo_list_reads_all_pages_using_link_and_total_count(self):
         requests = []
 
