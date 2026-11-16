@@ -485,3 +485,46 @@ fn common_oracle_builtins_remain_reads_but_qualified_calls_need_governance() {
     assert_eq!(facts.class, StatementClass::Administrative);
     assert!(facts.writes());
 }
+
+const DATA_MODIFYING_SUBQUERIES: [&str; 3] = [
+    "WITH d AS (DELETE FROM x RETURNING 1) SELECT * FROM d",
+    "WITH u AS (UPDATE x SET a = 1 RETURNING a) SELECT a FROM u",
+    "SELECT 1 INTO scratch",
+];
+
+#[test]
+fn a_data_modifying_subquery_inside_any_all_or_some_is_a_write() {
+    for inner in DATA_MODIFYING_SUBQUERIES {
+        for comparison in ["= ANY", "= ALL", "= SOME", "> ANY", "<> ALL"] {
+            for position in ["WHERE", "HAVING"] {
+                let sql = format!("SELECT a FROM t GROUP BY a {position} a {comparison} ({inner})");
+                let facts = classify(&sql, "postgres");
+                assert!(facts.writes(), "{sql}: {facts:?}");
+            }
+        }
+    }
+}
+
+#[test]
+fn a_data_modifying_subquery_inside_a_projection_or_join_comparison_is_a_write() {
+    for inner in DATA_MODIFYING_SUBQUERIES {
+        for sql in [
+            format!("SELECT a = ANY ({inner}) FROM t"),
+            format!("SELECT * FROM t JOIN u ON t.a = ANY ({inner})"),
+            format!("SELECT * FROM t WHERE NOT (a = ALL ({inner}))"),
+        ] {
+            let facts = classify(&sql, "postgres");
+            assert!(facts.writes(), "{sql}: {facts:?}");
+        }
+    }
+}
+
+#[test]
+fn a_read_only_subquery_inside_any_all_or_some_stays_a_read() {
+    for comparison in ["= ANY", "= ALL", "= SOME", "> ANY"] {
+        let sql = format!("SELECT a FROM t WHERE a {comparison} (SELECT id FROM u WHERE u.k > 1)");
+        let facts = classify(&sql, "postgres");
+        assert!(!facts.writes(), "{sql}: {facts:?}");
+        assert_eq!(facts.class, StatementClass::Select, "{sql}");
+    }
+}

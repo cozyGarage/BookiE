@@ -1,6 +1,8 @@
+use std::ops::ControlFlow;
+
 use sqlparser::ast::{
-    Expr, Function, FunctionArg, FunctionArgExpr, FunctionArguments, JoinConstraint, JoinOperator, Select, SelectItem,
-    TableFactor,
+    Expr, Function, FunctionArg, FunctionArgExpr, FunctionArguments, JoinConstraint, JoinOperator, Query, Select,
+    SelectItem, TableFactor, Visit, Visitor,
 };
 
 use sqlparser::dialect::Dialect;
@@ -121,8 +123,25 @@ pub(crate) fn expr_writes(expr: &Expr) -> bool {
                     .any(|c| expr_writes(&c.condition) || expr_writes(&c.result))
                 || else_result.as_ref().is_some_and(|e| expr_writes(e))
         }
-        _ => false,
+        _ => nested_query_writes(expr),
     }
+}
+
+struct NestedQueryWrite;
+
+impl Visitor for NestedQueryWrite {
+    type Break = ();
+
+    fn pre_visit_query(&mut self, query: &Query) -> ControlFlow<()> {
+        if classify_query(query).class.is_write() {
+            return ControlFlow::Break(());
+        }
+        ControlFlow::Continue(())
+    }
+}
+
+fn nested_query_writes(expr: &Expr) -> bool {
+    expr.visit(&mut NestedQueryWrite).is_break()
 }
 
 fn function_writes(function: &Function) -> bool {
