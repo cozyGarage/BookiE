@@ -36,11 +36,14 @@ fn the_message_count_is_capped_and_the_rest_is_counted() {
 fn the_total_bytes_are_capped_and_the_rest_is_counted() {
     let mut messages = ServerMessages::default();
     let text = "x".repeat(MAX_SERVER_MESSAGE_TEXT_BYTES);
-    let fits = MAX_SERVER_MESSAGES_TOTAL_BYTES / MAX_SERVER_MESSAGE_TEXT_BYTES;
+    let fits = MAX_SERVER_MESSAGES_TOTAL_BYTES / (MAX_SERVER_MESSAGE_TEXT_BYTES + "00000".len());
     for _ in 0..fits + 3 {
         messages.push(notice(&text));
     }
-    let kept: usize = messages.iter().map(|message| message.text.len()).sum();
+    let kept: usize = messages
+        .iter()
+        .map(|message| message.text.len() + message.code.as_ref().map_or(0, String::len))
+        .sum();
     assert!(kept <= MAX_SERVER_MESSAGES_TOTAL_BYTES);
     assert_eq!(messages.len(), fits);
     assert_eq!(messages.omitted(), 3);
@@ -60,6 +63,41 @@ fn long_text_is_cut_to_the_cap_on_a_character_boundary() {
 fn short_text_is_kept_whole() {
     let message = ServerMessage::new(MessageSeverity::Info, None, "héllo");
     assert_eq!(message.text, "héllo");
+}
+
+#[test]
+fn standard_sqlstate_is_kept_and_oversized_code_is_discarded() {
+    let standard = ServerMessage::new(MessageSeverity::Notice, Some("01000".into()), "notice");
+    let oversized = ServerMessage::new(MessageSeverity::Notice, Some("x".repeat(33)), "notice");
+    assert_eq!(standard.code.as_deref(), Some("01000"));
+    assert_eq!(oversized.code, None);
+
+    let mut messages = ServerMessages::default();
+    messages.push(ServerMessage {
+        severity: MessageSeverity::Notice,
+        code: Some("x".repeat(33)),
+        text: "notice".into(),
+    });
+    assert_eq!(messages.iter().next().and_then(|message| message.code.as_deref()), None);
+}
+
+#[test]
+fn total_byte_budget_counts_code_bytes() {
+    let mut messages = ServerMessages::default();
+    for _ in 0..17 {
+        messages.push(ServerMessage::new(
+            MessageSeverity::Notice,
+            Some("x".repeat(32)),
+            &"t".repeat(4070),
+        ));
+    }
+    let retained_bytes: usize = messages
+        .iter()
+        .map(|message| message.text.len() + message.code.as_ref().map_or(0, String::len))
+        .sum();
+    assert!(retained_bytes <= MAX_SERVER_MESSAGES_TOTAL_BYTES);
+    assert_eq!(messages.len(), 15);
+    assert_eq!(messages.omitted(), 2);
 }
 
 #[test]

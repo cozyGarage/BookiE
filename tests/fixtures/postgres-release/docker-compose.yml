@@ -26,7 +26,12 @@ services:
       - -c
       - max_connections=200
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U bookie -d bookie"]
+      test:
+        - CMD-SHELL
+        - >
+          pg_isready -U bookie -d bookie &&
+          psql -U bookie -d bookie -tAc "SELECT to_regclass('public.release_items') IS NOT NULL" |
+          grep -qx t
       interval: 2s
       timeout: 3s
       retries: 30

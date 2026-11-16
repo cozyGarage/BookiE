@@ -179,6 +179,114 @@ async fn a_row_capped_query_aborts_its_transaction_until_rollback_then_preserves
     assert_eq!(next.rows, vec![vec![Value::Int(42)]]);
 }
 
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_row_capped_read_only_driver_transaction_stops_server_work_and_requires_rollback() {
+    let (_container, options) = super::start_pg().await;
+    let observer = super::connect(options.clone()).await;
+    let connection = super::connect(options).await;
+    let mut transaction = connection.begin().await.expect("begin BookiE transaction");
+    transaction
+        .execute("SET TRANSACTION READ ONLY")
+        .await
+        .expect("make transaction read only");
+
+    let started = std::time::Instant::now();
+    let sql = "WITH RECURSIVE generated(value) AS ( \
+               SELECT 1::bigint UNION ALL \
+               SELECT value + 1 FROM generated WHERE value < 4000000000 \
+               ) SELECT value FROM generated /* bookie_owned_read_row_cap */";
+    let result = transaction
+        .query(sql)
+        .await
+        .expect("row-capped read returns admitted rows");
+    assert!(result.truncated);
+    assert_eq!(result.rows.len(), bookie_core::MAX_QUERY_ROWS);
+    super::assert_capped_and_server_stopped(
+        observer.as_ref(),
+        super::QueryResultProbe {
+            truncated: result.truncated,
+            rows: result.rows.len(),
+            elapsed: started.elapsed(),
+        },
+        "bookie_owned_read_row_cap",
+    )
+    .await;
+
+    let aborted = transaction
+        .query("SELECT 42")
+        .await
+        .expect_err("the canceled read leaves its transaction aborted");
+    assert!(matches!(aborted, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "25P02"));
+    transaction.rollback().await.expect("rollback aborted read transaction");
+    assert_eq!(
+        connection
+            .query("SELECT 42::bigint")
+            .await
+            .expect("pooled connection recovers after rollback")
+            .rows,
+        vec![vec![bookie_core::Value::Int(42)]]
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_row_capped_user_read_transaction_stops_server_work_and_requires_rollback() {
+    let (_container, options) = super::start_pg().await;
+    let observer = super::connect(options.clone()).await;
+    let connection = super::connect(options).await;
+    let mut session = connection.open_session().await.expect("open user session");
+    session
+        .query_params_controlled(
+            "BEGIN READ ONLY ISOLATION LEVEL REPEATABLE READ",
+            &[],
+            &super::no_timeout(),
+        )
+        .await
+        .expect("begin the user's read-only transaction");
+
+    let started = std::time::Instant::now();
+    let sql = "WITH RECURSIVE generated(value) AS ( \
+               SELECT 1::bigint UNION ALL \
+               SELECT value + 1 FROM generated WHERE value < 4000000000 \
+               ) SELECT value FROM generated /* user_read_row_cap */";
+    let result = session
+        .query_params_controlled(sql, &[], &super::no_timeout())
+        .await
+        .expect("row-capped read returns admitted rows");
+    assert!(result.truncated);
+    assert_eq!(result.rows.len(), bookie_core::MAX_QUERY_ROWS);
+    super::assert_capped_and_server_stopped(
+        observer.as_ref(),
+        super::QueryResultProbe {
+            truncated: result.truncated,
+            rows: result.rows.len(),
+            elapsed: started.elapsed(),
+        },
+        "user_read_row_cap",
+    )
+    .await;
+
+    let aborted = session
+        .query_params_controlled("SELECT 42", &[], &super::no_timeout())
+        .await
+        .expect_err("the canceled read leaves the user's transaction aborted");
+    assert!(matches!(aborted, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "25P02"));
+    session
+        .query_params_controlled("ROLLBACK", &[], &super::no_timeout())
+        .await
+        .expect("rollback the user's aborted transaction");
+    assert_eq!(
+        session
+            .query_params_controlled("SELECT 42::bigint", &[], &super::no_timeout())
+            .await
+            .expect("session remains usable after rollback")
+            .rows,
+        vec![vec![bookie_core::Value::Int(42)]]
+    );
+    session.close().await.expect("close user session");
+}
+
 async fn backend_state(observer: &dyn Connection, backend_pid: i64) -> String {
     let result = observer
         .query_params(

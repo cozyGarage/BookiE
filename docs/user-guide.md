@@ -50,7 +50,7 @@ Navigation uses **First**, **Previous**, **Next**, and **Last**. Choose a page s
 - **Copy as formats**: Right-click a row selection and choose **Copy as** to copy complete selected rows as **CSV**, **CSV (with headers)**, **Markdown**, **Text Table** (aligned ASCII borders with right-aligned numeric cells), **JSON Lines** (newline-delimited JSON objects), or **Values List** (multi-row SQL tuples with engine-specific escaping).
 - **Paste rows**: Paste tab-separated spreadsheet data (`Ctrl+V`) directly into cells. Each value is type-checked before staging.
 - **ENUM & SET pickers**: Double-click an ENUM or SET cell to open a dedicated item selection popover with an **Apply** button.
-- **Long values & JSON**: Cells over 8 KiB show a preview and size. Right-click to **View Value** (up to 1 MiB text / 16 KiB hex) or **Edit Full Value…** with automated JSON formatting.
+- **Long values & JSON**: Cells over 8 KiB show a preview and size. Right-click to **View Value** (up to 64 KiB text / 16 KiB hex) or **Edit Full Value…** (up to 1 MiB) with automated JSON formatting.
 - **Row inspector & statistics**: View all columns and data types in the side inspector. Select multiple rows to view aggregate count, sum, average, min, and max.
 
 ## Show an ER diagram

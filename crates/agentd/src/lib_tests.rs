@@ -285,6 +285,7 @@ async fn a_key_material_rotation_during_connect_is_not_cached_under_the_stale_di
     let mut saved = saved_connection();
     saved.driver_id = "sqlite".into();
     saved.database = ":memory:".into();
+    saved.tls_mode = Some(bookie_core::TlsMode::Disabled);
     saved.tls_root_cert = Some(ca_path.clone());
     saved.ssh = None;
 
@@ -415,6 +416,7 @@ async fn a_material_lookup_failure_after_connect_discards_the_new_connection() {
     let mut saved = saved_connection();
     saved.driver_id = "sqlite".into();
     saved.database = ":memory:".into();
+    saved.tls_mode = Some(bookie_core::TlsMode::Disabled);
     saved.tls_root_cert = Some(ca_path.clone());
     saved.ssh = None;
 

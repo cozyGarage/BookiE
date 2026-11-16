@@ -10,6 +10,13 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class PostgresReleaseStartupTests(unittest.TestCase):
+    def test_database_readiness_waits_for_the_release_seed(self):
+        compose = (ROOT / "tests/fixtures/postgres-release/docker-compose.yml").read_text()
+
+        self.assertIn("pg_isready -U bookie -d bookie", compose)
+        self.assertIn("to_regclass('public.release_items')", compose)
+        self.assertIn("grep -qx t", compose)
+
     def test_server_certificate_covers_local_and_container_hostnames(self):
         with tempfile.TemporaryDirectory() as temporary:
             fixture = Path(temporary) / "postgres-release"

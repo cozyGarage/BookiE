@@ -134,6 +134,10 @@ async fn mysql_previews_a_huge_longtext_cell() {
     let container = testcontainers_modules::mysql::Mysql::default()
         .with_tag(MYSQL_TEST_TAG)
         .with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test")
+        .with_cmd([
+            "--mysql-native-password=ON",
+            "--authentication-policy=mysql_native_password",
+        ])
         .start()
         .await
         .unwrap();

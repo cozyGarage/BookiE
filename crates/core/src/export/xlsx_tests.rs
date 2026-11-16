@@ -84,8 +84,20 @@ fn value_contract_workbook_keeps_text_null_labels_as_strings_and_sql_null_blank(
     assert!(strings.contains("<t>東京</t>"), "{strings}");
     assert!(strings.contains("<t>&lt;tag&gt;&amp;amp;</t>"), "{strings}");
     assert!(strings.contains("<t>=1+1</t>"), "{strings}");
-    assert!(!sheet.contains("r=\"A6\""), "{sheet}");
+    assert!(sheet.contains("<c r=\"A6\" s=\""), "{sheet}");
     assert!(!sheet.contains("<f>"), "{sheet}");
+}
+
+#[test]
+fn xlsx_round_trip_preserves_trailing_all_null_rows() {
+    let mut writer = XlsxWriter::new(2).unwrap();
+    let mut output = Vec::new();
+    writer.begin(&mut output, &[column("id"), column("note")]).unwrap();
+    writer.write_row(&mut output, 0, &[Value::Int(1), Value::Null]).unwrap();
+    writer.write_row(&mut output, 1, &[Value::Null, Value::Null]).unwrap();
+    writer.finish(&mut output).unwrap();
+
+    assert_eq!(crate::import::xlsx_to_csv(&output).unwrap(), b"id,note\n1,\n,\n");
 }
 
 #[test]
@@ -154,7 +166,7 @@ fn value_contract_workbook_float_specials_stay_distinct_from_null() {
     for row in [3, 4, 5] {
         assert!(sheet.contains(&format!("<c r=\"A{row}\" t=\"s\">")), "{sheet}");
     }
-    assert!(!sheet.contains("r=\"A6\""), "{sheet}");
+    assert!(sheet.contains("<c r=\"A6\" s=\""), "{sheet}");
 }
 
 #[test]

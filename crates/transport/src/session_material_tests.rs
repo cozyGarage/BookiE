@@ -158,6 +158,30 @@ async fn missing_tls_ca_file_fails_closed() {
 }
 
 #[tokio::test]
+async fn an_invalid_verifying_tls_ca_file_is_typed_before_agent_session_reuse() {
+    let directory = tempfile::tempdir().unwrap();
+    let ca = directory.path().join("invalid-ca.pem");
+    std::fs::write(
+        &ca,
+        b"-----BEGIN CERTIFICATE-----\nnot base64!\n-----END CERTIFICATE-----\n",
+    )
+    .unwrap();
+    let mut saved = sqlite_saved();
+    saved.tls_mode = Some(TlsMode::VerifyCa);
+    saved.tls_root_cert = Some(ca.clone());
+
+    let error = session_material_digest(&saved)
+        .await
+        .expect_err("an invalid verifying CA must be rejected before session lookup");
+
+    assert!(
+        matches!(error, TransportError::Driver(bookie_core::DriverError::Tls(_))),
+        "{error:?}"
+    );
+    assert!(error.to_string().contains(&ca.display().to_string()));
+}
+
+#[tokio::test]
 async fn missing_ssh_key_file_fails_closed() {
     let mut saved = sqlite_saved();
     saved.ssh = Some(key_hop(PathBuf::from("/no/such/id_ed25519")));

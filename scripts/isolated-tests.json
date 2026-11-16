@@ -535,6 +535,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::browse_tab::save_in_flight_tests::invalid_cell_in_multi_cell_paste_leaves_every_target_unchanged"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::browse_tab::save_in_flight_tests::bulk_cancel_tests::dismissing_bulk_delete_preserves_selected_drafts"
     ],
     [

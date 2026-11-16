@@ -1,0 +1,1 @@
+SQLite table pages, saves and transaction statements that time out or are cancelled now stop inside SQLite, and a stopped batch or transaction no longer leaves the connection in a state where later writes fail or are lost.

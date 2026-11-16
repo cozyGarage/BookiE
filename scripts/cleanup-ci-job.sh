@@ -2,6 +2,7 @@
 set -u
 
 workspace="${GITHUB_WORKSPACE:-$PWD}"
+ci_cache_helper="${BOOKIE_CI_CACHE_HELPER:-/usr/local/libexec/bookie-ci-cache}"
 status=0
 
 if [[ -n "${SCCACHE_SERVER_UDS:-}" && -S "$SCCACHE_SERVER_UDS" ]]; then
@@ -20,10 +21,6 @@ if [[ "${GITHUB_JOB:-}" == "driver-tls" && "${BOOKIE_TEST_RUN_ID:-}" =~ ^[A-Za-z
   fi
 fi
 
-if [[ -f "$workspace/src/scripts/ci-cache.py" && "${CARGO_TARGET_DIR:-}" == /var/cache/ci/target/* ]]; then
-  python3 "$workspace/src/scripts/ci-cache.py" cleanup --min-free-gib 30 || status=$?
-fi
-
 if [[ "${GITHUB_RUN_ID:-}" =~ ^[0-9]+$ ]]; then
   if [[ "${CARGO_TARGET_DIR:-}" == "/var/cache/ci/target/bookie-guards-$GITHUB_RUN_ID" ]]; then
     rm -rf -- "$CARGO_TARGET_DIR" || status=$?
@@ -39,7 +36,7 @@ if [[ "${GITHUB_RUN_ID:-}" =~ ^[0-9]+$ ]]; then
   fi
 fi
 
-if [[ "${GITHUB_JOB:-}" == driver && "${TMPDIR:-}" =~ ^/var/cache/ci/tmp/bookie-driver-[0-9]+-[0-9]+-(core|analytics|extended|postgres|mysql|mssql|clickhouse|redis|mongodb|oracle|duckdb|driver-core|driver-analytics|driver-extended|socket-ssh)$ ]]; then
+if [[ "${GITHUB_JOB:-}" == driver && "${TMPDIR:-}" =~ ^/var/cache/ci/tmp/b-[0-9]+-[0-9]+-(core|analytics|extended|postgres|mysql|mssql|clickhouse|redis|mongodb|oracle|duckdb|driver-core|driver-analytics|driver-extended|socket-ssh)$ ]]; then
   rm -rf -- "$TMPDIR" || status=$?
 fi
 if [[ "${GITHUB_JOB:-}" == b4-rollback && "${GITHUB_RUN_ID:-}" =~ ^[0-9]+$ && "${GITHUB_RUN_ATTEMPT:-}" =~ ^[0-9]+$ && "${TMPDIR:-}" == "/var/cache/ci/tmp/bookie-b4-rollback-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" ]]; then
@@ -50,5 +47,14 @@ for entry in src gtk-artifact test-bundles floor-artifact floor-package floor-pa
   rm -rf -- "$workspace/$entry" || status=$?
 done
 rm -rf -- "$workspace"/coverage*.json "$workspace"/mutants-* "$workspace"/soak-*.log || status=$?
+
+if [[ "${CARGO_TARGET_DIR:-}" == /var/cache/ci/target/* ]]; then
+  if [[ -x "$ci_cache_helper" ]]; then
+    "$ci_cache_helper" cleanup --min-free-gib 30 || status=$?
+  else
+    printf 'CI cache helper is unavailable: %s\n' "$ci_cache_helper" >&2
+    status=1
+  fi
+fi
 
 exit "$status"

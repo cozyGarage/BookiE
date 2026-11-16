@@ -31,7 +31,7 @@ services:
         - --tlsCAFile
         - /certs/ca.crt
         - --host
-        - localhost
+        - mongo.bookie.test
         - -u
         - bookie
         - -p
