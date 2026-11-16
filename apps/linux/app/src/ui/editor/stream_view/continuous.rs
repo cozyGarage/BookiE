@@ -196,21 +196,8 @@ mod tests {
             let selection = gtk::MultiSelection::new(Some(model.clone()));
             let view = gtk::ColumnView::new(Some(selection.clone()));
             install_row_navigation(&view, &selection, &model);
-            let controllers = view.observe_controllers();
-            let controller = (0..controllers.n_items())
-                .find_map(|index| controllers.item(index).and_downcast::<gtk::ShortcutController>())
-                .unwrap();
-            assert_eq!(controller.n_items(), 2);
-            for (index, trigger, position) in [(1, "<Primary>End", 199), (0, "<Primary>Home", 0)] {
-                let shortcut = controller.item(index).and_downcast::<gtk::Shortcut>().unwrap();
-                assert_eq!(
-                    shortcut.trigger().unwrap().to_str(),
-                    crate::ui::shortcut::parse(trigger).to_str()
-                );
-                let handled = shortcut
-                    .action()
-                    .unwrap()
-                    .activate(gtk::ShortcutActionFlags::empty(), &view, None);
+            for (trigger, position) in [("<Primary>End", 199), ("<Primary>Home", 0)] {
+                let handled = activate_navigation(&view, trigger);
                 assert_eq!(handled, !counts.is_empty());
                 if handled {
                     assert!(selection.is_selected(position));
@@ -220,6 +207,26 @@ mod tests {
                 }
             }
         }
+    }
+
+    fn activate_navigation(view: &gtk::ColumnView, trigger: &str) -> bool {
+        let wanted = crate::ui::shortcut::parse(trigger).to_str();
+        let controllers = view.observe_controllers();
+        for index in 0..controllers.n_items() {
+            let Some(controller) = controllers.item(index).and_downcast::<gtk::ShortcutController>() else {
+                continue;
+            };
+            for index in 0..controller.n_items() {
+                let shortcut = controller.item(index).and_downcast::<gtk::Shortcut>().unwrap();
+                if shortcut.trigger().unwrap().to_str() == wanted {
+                    return shortcut
+                        .action()
+                        .unwrap()
+                        .activate(gtk::ShortcutActionFlags::empty(), view, None);
+                }
+            }
+        }
+        panic!("continuous navigation shortcut was not installed");
     }
 
     #[test]
@@ -305,9 +312,9 @@ mod tests {
             .unwrap();
         let model_weak = model.downgrade();
         drop(model);
-        view.scroll_to(190, None, gtk::ListScrollFlags::FOCUS, None);
-        wait_for_text(holder.upcast_ref(), "190");
-        view.scroll_to(0, None, gtk::ListScrollFlags::FOCUS, None);
+        assert!(activate_navigation(&view, "<Primary>End"));
+        wait_for_text(holder.upcast_ref(), "199");
+        assert!(activate_navigation(&view, "<Primary>Home"));
         wait_for_text(holder.upcast_ref(), "0");
         drop(view);
         assert!(!pager.is_visible());
