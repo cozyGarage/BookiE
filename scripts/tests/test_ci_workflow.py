@@ -723,6 +723,7 @@ class CiWorkflowTests(unittest.TestCase):
 
         self.assertIn("options: --add-host=host.docker.internal:host-gateway", driver_tls)
         self.assertIn("BOOKIE_DRIVER_TLS_HOST: host.docker.internal", driver_tls)
+        self.assertIn("BOOKIE_DRIVER_TLS_SSH_HOST: host.docker.internal", driver_tls)
         self.assertIn("BOOKIE_DRIVER_TLS_HOSTNAME: host.docker.internal", driver_tls)
         self.assertIn("BOOKIE_FIXTURE_BIND_ADDRESS: 0.0.0.0", driver_tls)
         self.assertEqual(
@@ -1263,6 +1264,11 @@ class CiWorkflowTests(unittest.TestCase):
             self.assertIn("/opt/cargo/bin", cargo_path, name)
             self.assertIn("/home/runner/.cargo/bin", cargo_path, name)
             self.assertIn("/home/ubuntu/.cargo/bin", cargo_path, name)
+
+    def test_driver_tls_mssql_healthchecks_wait_for_the_seeded_database(self):
+        compose = (ROOT / "tests/fixtures/driver-tls/docker-compose.yml").read_text()
+        mssql_services = compose[compose.index("  mssql:"):]
+        self.assertEqual(mssql_services.count('-d bookie -Q "SELECT 1"'), 3)
 
     def test_acceptance_jobs_use_any_host_and_builder_pools(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()

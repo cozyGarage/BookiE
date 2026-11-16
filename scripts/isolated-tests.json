@@ -1250,6 +1250,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::editor::stream_view::continuous::tests::continuous_shortcuts_select_boundary_rows_and_ignore_empty_results"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::editor::stream_view::paged_model::tests::a_failed_offscreen_page_does_not_leave_a_stale_error_message"
     ],
     [
@@ -1841,6 +1846,11 @@
       "bookie-app",
       "--lib",
       "ui::grid::value_decoded::tests::the_decoded_section_is_read_only_and_absent_for_unrecognised_bytes"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::value_decoded::tests::display_alternatives_scroll_without_editing_or_wrapping_large_json"
     ],
     [
       "bookie-app",
