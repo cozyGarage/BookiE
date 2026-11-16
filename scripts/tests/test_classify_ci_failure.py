@@ -58,6 +58,10 @@ class ClassifyCiFailureTests(unittest.TestCase):
         self.assertEqual(tag, "infra")
         self.assertEqual(evidence, line)
 
+    def test_runner_recovering_the_free_space_reserve_is_not_infrastructure(self):
+        text = "free after cleanup: 47399645184 bytes; required reserve: 32212254720 bytes\nJob failed"
+        self.assertEqual(self.tag(text), "unknown")
+
     def test_an_unrelated_git_checkout_failure_stays_unknown(self):
         self.assertEqual(self.tag("fatal: reference is not a tree: missing-revision\nJob failed"), "unknown")
 
