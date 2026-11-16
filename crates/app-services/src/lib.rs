@@ -32,6 +32,7 @@ pub mod database_file;
 pub mod database_service;
 pub mod database_subscription;
 pub mod decoded_preview;
+pub mod display_as;
 pub mod driver_diagnostics;
 pub mod driver_error_presentation;
 pub mod driver_failure_message;
