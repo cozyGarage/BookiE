@@ -45,6 +45,8 @@ mod read_only_session;
 #[path = "support/server_messages.rs"]
 mod server_messages;
 
+#[path = "support/extension_value_qualification.rs"]
+mod extension_value_qualification;
 #[path = "support/vector_contract.rs"]
 mod vector_contract;
 
