@@ -4,6 +4,12 @@
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
+cleanup_distro_floor() {
+  [[ -z "${build_log:-}" ]] || rm -f -- "$build_log"
+  [[ -z "${package_archive:-}" ]] || rm -f -- "$package_archive"
+  [[ -z "${package_stage:-}" ]] || rm -rf -- "$package_stage"
+}
+trap cleanup_distro_floor EXIT
 images=("$@")
 [ ${#images[@]} -gt 0 ] || images=(debian:testing)
 
@@ -11,15 +17,26 @@ for base in "${images[@]}"; do
   tag="bookie-floor-${base//[:\/]/-}"
   echo "== $base"
   package_input=/dev/null
+  package_archive=""
+  package_stage=""
   package_env=()
   package_interactive=()
+  source_mounts=(-v "$PWD:/src:ro")
   build_mounts=()
   build_environment=()
   if [ -n "${DISTRO_FLOOR_PACKAGE:-}" ]; then
     test -s "$DISTRO_FLOOR_PACKAGE"
-    package_input="$(realpath "$DISTRO_FLOOR_PACKAGE")"
-    package_env=(-e "DISTRO_FLOOR_DEB_NAME=$(basename "$DISTRO_FLOOR_PACKAGE")")
+    package_archive="$(mktemp "$PWD/.distro-floor-input.XXXXXX.tar")"
+    package_stage="$(mktemp -d "$PWD/.distro-floor-input.XXXXXX")"
+    mkdir -p "$package_stage/src/scripts" "$package_stage/src/apps/linux/app/tests" "$package_stage/tmp"
+    cp scripts/test-gtk-safety.sh scripts/gtk-test-binary.sh scripts/report-gtk-failure.sh "$package_stage/src/scripts/"
+    cp -a apps/linux/app/tests/. "$package_stage/src/apps/linux/app/tests/"
+    cp "$DISTRO_FLOOR_PACKAGE" "$package_stage/tmp/bookie.deb"
+    tar -C "$package_stage" -cf "$package_archive" .
+    package_input="$package_archive"
+    package_env=(-e DISTRO_FLOOR_DEB_NAME=bookie.deb)
     package_interactive=(-i)
+    source_mounts=()
     dockerfile=scripts/distro-floor/Dockerfile.runtime
   else
     dockerfile=scripts/distro-floor/Dockerfile
@@ -27,7 +44,6 @@ for base in "${images[@]}"; do
     build_environment=(-e CARGO_TARGET_DIR=/target)
   fi
   build_log="$(mktemp "$PWD/.docker-build.XXXXXX")"
-  trap 'rm -f "$build_log"' EXIT
   for attempt in 1 2 3; do
     if docker build -t "$tag" --build-arg "BASE=$base" -f "$dockerfile" scripts/distro-floor 2>&1 | tee "$build_log"; then
       break
@@ -41,9 +57,9 @@ for base in "${images[@]}"; do
     sleep "$((attempt * 20 + RANDOM % 15))"
   done
   rm -f "$build_log"
-  docker run --rm "${package_interactive[@]}" ${CARGO_BUILD_JOBS:+-e CARGO_BUILD_JOBS="$CARGO_BUILD_JOBS"} "${package_env[@]}" -e BOOKIE_GTK_SHARD="${BOOKIE_GTK_SHARD:-}" -e DISTRO_FLOOR_INSTALLED="${DISTRO_FLOOR_INSTALLED:-0}" ${BOOKIE_GTK_Y_OFFSET:+-e BOOKIE_GTK_Y_OFFSET="$BOOKIE_GTK_Y_OFFSET"} ${BOOKIE_GTK_WAIT_SECONDS:+-e BOOKIE_GTK_WAIT_SECONDS="$BOOKIE_GTK_WAIT_SECONDS"} ${BOOKIE_GTK_SCENARIO_RETRIES:+-e BOOKIE_GTK_SCENARIO_RETRIES="$BOOKIE_GTK_SCENARIO_RETRIES"} -v "$PWD:/src:ro" "${build_mounts[@]}" "${build_environment[@]}" "$tag" bash -ceu -o pipefail '
+  docker run --rm "${package_interactive[@]}" ${CARGO_BUILD_JOBS:+-e CARGO_BUILD_JOBS="$CARGO_BUILD_JOBS"} "${package_env[@]}" -e BOOKIE_GTK_SHARD="${BOOKIE_GTK_SHARD:-}" -e DISTRO_FLOOR_INSTALLED="${DISTRO_FLOOR_INSTALLED:-0}" ${BOOKIE_GTK_Y_OFFSET:+-e BOOKIE_GTK_Y_OFFSET="$BOOKIE_GTK_Y_OFFSET"} ${BOOKIE_GTK_WAIT_SECONDS:+-e BOOKIE_GTK_WAIT_SECONDS="$BOOKIE_GTK_WAIT_SECONDS"} ${BOOKIE_GTK_SCENARIO_RETRIES:+-e BOOKIE_GTK_SCENARIO_RETRIES="$BOOKIE_GTK_SCENARIO_RETRIES"} "${source_mounts[@]}" "${build_mounts[@]}" "${build_environment[@]}" "$tag" bash -ceu -o pipefail '
     if [ -n "${DISTRO_FLOOR_DEB_NAME:-}" ]; then
-      cat > /tmp/bookie.deb
+      tar -xf - -C /
       apt-get update
       apt install -y /tmp/bookie.deb
       status=0
@@ -71,4 +87,8 @@ for base in "${images[@]}"; do
       fi
     fi
   ' < "$package_input"
+  cleanup_distro_floor
+  build_log=""
+  package_archive=""
+  package_stage=""
 done

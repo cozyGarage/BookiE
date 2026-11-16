@@ -304,6 +304,10 @@ async fn reset_server(server: &Server) {
         .execute("DROP DATABASE IF EXISTS alpha_db")
         .await
         .expect("remove prior database-list fixture");
+    connection
+        .execute("DROP DATABASE IF EXISTS other_db")
+        .await
+        .expect("remove prior pooled database fixture");
     let sql_mode = format!("SET GLOBAL sql_mode = '{}'", server.sql_mode.replace('\'', "''"));
     connection.execute(&sql_mode).await.expect("reset global sql_mode");
     connection.close().await.expect("close database setup connection");

@@ -17,7 +17,7 @@ use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
-use super::{SqlEditor, SqlEditorInit, SqlEditorInput, bookmarks};
+use super::{RunMessage, SqlEditor, SqlEditorInit, SqlEditorInput, bookmarks};
 use crate::services::database_service::{ConnectionMetadata, DatabaseService, ReconnectParams};
 
 struct PendingQuery {
@@ -200,7 +200,10 @@ impl EditorFixture {
         spin_until(|| self.controller.model().session.is_some());
         let session_id = self.controller.model().session.as_ref().unwrap().id;
         self.controller.model().source_view.buffer().set_text("BEGIN;");
-        self.controller.sender().send(SqlEditorInput::Run).unwrap();
+        self.controller
+            .sender()
+            .send(SqlEditorInput::Run(RunMessage::Run))
+            .unwrap();
         spin_until(|| {
             self.controller.model().session_transaction_open() && self.controller.model().run_button.is_sensitive()
         });
@@ -319,7 +322,11 @@ fn stale_set_null_does_not_modify_a_replacement_query_result_draft() {
         .source_view
         .buffer()
         .set_text("SELECT id, name FROM edit_fixture");
-    fixture.controller.sender().send(SqlEditorInput::Run).unwrap();
+    fixture
+        .controller
+        .sender()
+        .send(SqlEditorInput::Run(RunMessage::Run))
+        .unwrap();
     let query = fixture.next_query();
     fixture.finish(
         query,
@@ -413,7 +420,7 @@ fn stale_set_null_does_not_modify_a_replacement_query_result_draft() {
 }
 
 fn parameter_response() -> SqlEditorInput {
-    SqlEditorInput::RunWithParameters {
+    SqlEditorInput::Run(RunMessage::RunWithParameters {
         sql: "SELECT :value;".into(),
         anchor: None,
         planned: super::PlannedStatements {
@@ -423,7 +430,7 @@ fn parameter_response() -> SqlEditorInput {
             settings_check: None,
         },
         values: [("value".into(), Value::Int(2))].into(),
-    }
+    })
 }
 
 #[test]
@@ -542,7 +549,11 @@ fn editor_dispatch_resumes_after_success_cancel_and_timeout() {
         let running = fixture.next_query();
         assert_eq!(fixture.calls.load(Ordering::SeqCst), count + 1);
         if matches!(&result, Err(DriverError::Cancelled)) {
-            fixture.controller.sender().send(SqlEditorInput::Cancel).unwrap();
+            fixture
+                .controller
+                .sender()
+                .send(SqlEditorInput::Run(RunMessage::Cancel))
+                .unwrap();
             fixture.process_inputs();
             assert!(running.token.is_cancelled());
             fixture.shortcut("<Primary><Shift>Return", false);
@@ -801,7 +812,11 @@ fn completing_a_query_does_not_shift_the_editor_when_status_text_changes() {
     let editor_y_before = source_view.compute_bounds(root).unwrap().y();
     let run_y_before = run_button.compute_bounds(root).unwrap().y();
     let run_options_y_before = run_options.compute_bounds(root).unwrap().y();
-    fixture.controller.sender().send(SqlEditorInput::Run).unwrap();
+    fixture
+        .controller
+        .sender()
+        .send(SqlEditorInput::Run(RunMessage::Run))
+        .unwrap();
     let query = fixture.next_query();
     fixture.finish(query, success());
     spin_until(|| status.label().starts_with("done in"));
@@ -941,10 +956,10 @@ fn transaction_buttons_close_only_the_idle_owned_session() {
     fixture
         .controller
         .sender()
-        .send(SqlEditorInput::SessionAction {
+        .send(SqlEditorInput::Run(RunMessage::SessionAction {
             session_id: id,
             commit: true,
-        })
+        }))
         .unwrap();
     fixture.process_inputs();
     assert_eq!(fixture.sessions.commits.load(Ordering::SeqCst), 0);
@@ -985,10 +1000,10 @@ fn transaction_buttons_close_only_the_idle_owned_session() {
     fixture
         .controller
         .sender()
-        .send(SqlEditorInput::SessionAction {
+        .send(SqlEditorInput::Run(RunMessage::SessionAction {
             session_id: id,
             commit: false,
-        })
+        }))
         .unwrap();
     fixture.process_inputs();
     assert_eq!(fixture.sessions.rollbacks.load(Ordering::SeqCst), 0);
@@ -1034,10 +1049,10 @@ fn a_transaction_action_refuses_a_changed_connection_identity() {
     fixture
         .controller
         .sender()
-        .send(SqlEditorInput::SessionAction {
+        .send(SqlEditorInput::Run(RunMessage::SessionAction {
             session_id: id,
             commit: true,
-        })
+        }))
         .unwrap();
     fixture.process_inputs();
     assert_eq!(fixture.sessions.commits.load(Ordering::SeqCst), 0);
@@ -1319,7 +1334,11 @@ fn running_a_query_dismisses_the_visible_completion_popup() {
             .find(|w| w.is::<gtk::Popover>() && w.has_css_class("completion"))
     };
     spin_until(|| popup().is_some_and(|p| p.is_visible()));
-    fixture.controller.sender().send(SqlEditorInput::Run).unwrap();
+    fixture
+        .controller
+        .sender()
+        .send(SqlEditorInput::Run(RunMessage::Run))
+        .unwrap();
     let query = fixture.next_query();
     fixture.finish(query, success());
     spin_until(|| popup().is_none_or(|p| !p.is_visible()));

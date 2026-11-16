@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import shlex
 import subprocess
+import tarfile
 import tempfile
 import unittest
 
@@ -126,7 +127,15 @@ class DistroFloorShardTests(unittest.TestCase):
                     self.assertLess(position, arguments.index("bash"))
                     if packaged:
                         self.assertIn("-i", arguments)
-                        self.assertEqual(Path(environment["DOCKER_STDIN"]).read_bytes(), b"fixture")
+                        self.assertFalse(any(argument.endswith(":/src:ro") for argument in arguments))
+                        with tarfile.open(environment["DOCKER_STDIN"], "r:") as archive:
+                            names = {member.name for member in archive.getmembers()}
+                            self.assertIn("./src/scripts/test-gtk-safety.sh", names)
+                            self.assertIn("./src/scripts/report-gtk-failure.sh", names)
+                            self.assertIn("./src/apps/linux/app/tests/gtk_safety.py", names)
+                            package_input = archive.extractfile("./tmp/bookie.deb")
+                            self.assertIsNotNone(package_input)
+                            self.assertEqual(package_input.read(), b"fixture")
                         self.assertNotIn(f"{package.parent}:/package:ro", arguments)
 
 
