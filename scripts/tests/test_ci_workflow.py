@@ -723,6 +723,7 @@ class CiWorkflowTests(unittest.TestCase):
 
         self.assertIn("options: --add-host=host.docker.internal:host-gateway", driver_tls)
         self.assertIn("BOOKIE_DRIVER_TLS_HOST: host.docker.internal", driver_tls)
+        self.assertIn("BOOKIE_DRIVER_TLS_SSH_HOST: host.docker.internal", driver_tls)
         self.assertIn("BOOKIE_DRIVER_TLS_HOSTNAME: host.docker.internal", driver_tls)
         self.assertIn("BOOKIE_FIXTURE_BIND_ADDRESS: 0.0.0.0", driver_tls)
         self.assertEqual(
