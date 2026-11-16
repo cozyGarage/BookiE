@@ -48,6 +48,12 @@ sudo apt install ./apps/linux/packaging/out/bookie_0.2.5-1_amd64.deb
 
 The package name is `bookie`. It installs `/usr/bin/bookie`, `/usr/bin/bookie-agentd`, and `/usr/bin/bookie-askpass`. It replaces and conflicts with the legacy `tablepro` package. It does not install or enable a user service.
 
+## Release build inputs
+
+The release workflow creates source and Cargo vendor archives for one immutable commit in the Arch job. Its metadata records checksums, Rust toolchain versions, workspace roots and native build inputs. The AppImage job validates those inputs and builds the Rust binaries with Cargo offline from the same archives. The AppImage carries `BUILD_INPUTS.json` with the source provenance and the AppImage build toolchain.
+
+This does not make the whole release build hermetic. The workflow installs native build tools from Debian testing and downloads pinned linuxdeploy components with SHA-256 verification. These inputs remain separate from Cargo's offline build.
+
 ## Release versions
 
 `[workspace.package].version` in the root `Cargo.toml` is the BookiE release version. Every workspace crate inherits it. For a release or hotfix, update that value, the Meson version and the newest AppStream entry together, then regenerate `Cargo.lock`. Keep older AppStream entries and published upgrade fixtures intact. The published 0.2.0 entry is marked `type="stable"` with release date 2026-10-23.
