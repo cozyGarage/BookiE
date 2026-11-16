@@ -127,21 +127,30 @@ pub(crate) fn expr_writes(expr: &Expr) -> bool {
     }
 }
 
-struct NestedQueryWrite;
+#[derive(Default)]
+struct NestedQueryWrite {
+    depth: usize,
+}
 
 impl Visitor for NestedQueryWrite {
     type Break = ();
 
     fn pre_visit_query(&mut self, query: &Query) -> ControlFlow<()> {
-        if classify_query(query).class.is_write() {
+        if self.depth == 0 && classify_query(query).class.is_write() {
             return ControlFlow::Break(());
         }
+        self.depth += 1;
+        ControlFlow::Continue(())
+    }
+
+    fn post_visit_query(&mut self, _query: &Query) -> ControlFlow<()> {
+        self.depth -= 1;
         ControlFlow::Continue(())
     }
 }
 
 fn nested_query_writes(expr: &Expr) -> bool {
-    expr.visit(&mut NestedQueryWrite).is_break()
+    expr.visit(&mut NestedQueryWrite::default()).is_break()
 }
 
 fn function_writes(function: &Function) -> bool {
