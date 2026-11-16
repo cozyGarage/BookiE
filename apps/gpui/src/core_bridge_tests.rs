@@ -21,7 +21,7 @@ fn copied_driver_timestamp_keeps_its_extended_year() {
     use chrono::TimeZone;
     let value = bookie_core::Value::TimestampTz(chrono::Utc.with_ymd_and_hms(10000, 1, 1, 12, 0, 0).unwrap());
     let row = vec![Cell::Int(1), Cell::Text("row".into()), Cell::Null, value];
-    assert!(render_tsv([row], false).contains("+10000-01-01T12:00:00+00:00"));
+    assert!(render_tsv([row], false).contains("10000-01-01 12:00:00+00:00"));
 }
 
 #[test]

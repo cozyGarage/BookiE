@@ -38,8 +38,10 @@ secrecy.workspace = true
 rust_decimal.workspace = true
 bookie-driver-postgres = { path = "../drivers/postgres" }
 bookie-driver-mssql = { path = "../drivers/mssql" }
+bookie-driver-oracle = { path = "../drivers/oracle" }
 testcontainers.workspace = true
 testcontainers-modules = { workspace = true, features = ["mssql_server", "postgres"] }
+oracledb = "=26.0.0-beta.5"
 
 [lints]
 workspace = true

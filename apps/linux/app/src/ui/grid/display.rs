@@ -70,9 +70,9 @@ impl<'a> CellView<'a> {
 }
 
 impl CellView<'static> {
-    pub(super) fn from_preview(preview: &crate::ui::row_object::CellPreview) -> Self {
+    pub(super) fn from_preview(preview: &crate::ui::row_object::CellPreview, relaxed_mongodb_json: bool) -> Self {
         Self {
-            display_text: Cow::Owned(preview_display_text(preview, 512)),
+            display_text: Cow::Owned(preview_display_text(preview, 512, relaxed_mongodb_json)),
             truncated: true,
             is_null: false,
             inline_editable: false,
@@ -85,20 +85,21 @@ impl CellView<'static> {
 #[cfg(test)]
 pub(super) fn cell_view<'a>(value: &'a Value, column: &ColumnInfo) -> CellView<'a> {
     let column_is_editable = super::presentation::column_is_editable(column);
-    cell_view_with_column_editability(value, column, column_is_editable)
+    cell_view_with_column_editability(value, column, column_is_editable, false)
 }
 
 pub(super) fn cell_view_with_column_editability<'a>(
     value: &'a Value,
     column: &ColumnInfo,
     column_is_editable: bool,
+    relaxed_mongodb_json: bool,
 ) -> CellView<'a> {
     let is_null = matches!(value, Value::Null);
     let auto_filled = column.is_auto_increment || column.is_generated;
     let (display_text, truncated) = if is_null && auto_filled {
         (Cow::Owned(auto_filled_sentinel()), false)
     } else {
-        cell_display_text(value)
+        cell_display_text(value, column, relaxed_mongodb_json)
     };
     CellView {
         display_text,
@@ -119,7 +120,10 @@ pub(super) fn cell_view_with_column_editability<'a>(
     }
 }
 
-fn cell_display_text(value: &Value) -> (Cow<'_, str>, bool) {
+fn cell_display_text<'a>(value: &'a Value, column: &ColumnInfo, relaxed_mongodb_json: bool) -> (Cow<'a, str>, bool) {
+    if let Some(uuid) = bookie_results::uuid_display::format_binary_uuid(value, column) {
+        return (Cow::Owned(uuid), false);
+    }
     match value {
         Value::Text(text) => text_to_display_text_cow(text, GRID_CELL_DISPLAY_MAX_CHARS, true, None),
         Value::Bytes(bytes) if bytes.len() > GRID_CELL_DISPLAY_MAX_BYTES => {
@@ -131,16 +135,20 @@ fn cell_display_text(value: &Value) -> (Cow<'_, str>, bool) {
             }
             _ => bounded_owned_text(value_to_display_text(value), GRID_CELL_DISPLAY_MAX_CHARS),
         },
-        Value::Json(json) => {
-            json_to_display_text_with_limits(json, GRID_CELL_DISPLAY_MAX_CHARS * 4, GRID_CELL_DISPLAY_MAX_CHARS, true)
-        }
+        Value::Json(json) => json_to_display_text_with_limits(
+            json,
+            GRID_CELL_DISPLAY_MAX_CHARS * 4,
+            GRID_CELL_DISPLAY_MAX_CHARS,
+            relaxed_mongodb_json,
+            true,
+        ),
         Value::JsonText(text) => text_to_display_text_cow(text, GRID_CELL_DISPLAY_MAX_CHARS, false, None),
         _ => bounded_owned_text(value_to_display_text(value), GRID_CELL_DISPLAY_MAX_CHARS),
     }
 }
 
-pub(super) fn highlight_display_text(value: &Value, column: &ColumnInfo) -> (String, bool) {
-    let view = cell_view_with_column_editability(value, column, false);
+pub(super) fn highlight_display_text(value: &Value, column: &ColumnInfo, relaxed_mongodb_json: bool) -> (String, bool) {
+    let view = cell_view_with_column_editability(value, column, false, relaxed_mongodb_json);
     (view.text_for_bind(false).into_owned(), view.is_null)
 }
 
@@ -238,18 +246,34 @@ fn text_to_display_text_cow(
 }
 
 fn json_to_display_text(value: &serde_json::Value) -> String {
-    json_to_display_text_with_limits(value, DISPLAY_TEXT_BYTES_THRESHOLD, DISPLAY_TEXT_MAX_CHARS, false)
-        .0
-        .into_owned()
+    json_to_display_text_with_limits(
+        value,
+        DISPLAY_TEXT_BYTES_THRESHOLD,
+        DISPLAY_TEXT_MAX_CHARS,
+        false,
+        false,
+    )
+    .0
+    .into_owned()
 }
 
 fn json_to_display_text_with_limits(
     value: &serde_json::Value,
     byte_limit: usize,
     char_limit: usize,
+    mongodb_extended_json: bool,
     bound_complete: bool,
 ) -> (Cow<'static, str>, bool) {
-    let (text, byte_budget_exceeded) = crate::ui::row_object::bounded_json_prefix(value, byte_limit);
+    let (source_text, source_exceeded) = crate::ui::row_object::bounded_json_prefix(value, byte_limit);
+    let relaxed = if !mongodb_extended_json || source_exceeded || !source_text.contains('$') {
+        None
+    } else {
+        drivers_mongodb::relaxed_extended_json_for_display(value)
+    };
+    let (text, byte_budget_exceeded) = match relaxed {
+        Some(relaxed) => crate::ui::row_object::bounded_json_prefix(&relaxed, byte_limit),
+        None => (source_text, source_exceeded),
+    };
     let (text, truncated) = json_prefix_for_display(text, byte_budget_exceeded, char_limit);
     if truncated {
         (Cow::Owned(text), true)
@@ -285,10 +309,14 @@ pub(crate) fn value_to_search_text(value: &Value) -> Cow<'_, str> {
 }
 
 pub(crate) fn preview_to_display_text(preview: &crate::ui::row_object::CellPreview) -> String {
-    preview_display_text(preview, usize::MAX)
+    preview_display_text(preview, usize::MAX, false)
 }
 
-pub(super) fn preview_display_text(preview: &crate::ui::row_object::CellPreview, text_limit: usize) -> String {
+pub(super) fn preview_display_text(
+    preview: &crate::ui::row_object::CellPreview,
+    text_limit: usize,
+    relaxed_mongodb_json: bool,
+) -> String {
     let total = match preview.byte_count {
         crate::ui::row_object::PreviewByteCount::Exact(bytes) => {
             bookie_app_services::tr!("{n} bytes total").replace("{n}", &bytes.to_string())
@@ -313,6 +341,13 @@ pub(super) fn preview_display_text(preview: &crate::ui::row_object::CellPreview,
                     character => character,
                 })
                 .collect::<String>();
+            format!("{sample}… ({total})")
+        }
+        Value::Json(json) if relaxed_mongodb_json => {
+            let text = drivers_mongodb::relaxed_extended_json_for_display(json)
+                .unwrap_or_else(|| json.as_ref().clone())
+                .to_string();
+            let sample = text.chars().take(text_limit).collect::<String>();
             format!("{sample}… ({total})")
         }
         Value::Bytes(bytes) => {

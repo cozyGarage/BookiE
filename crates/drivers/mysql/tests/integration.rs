@@ -12,18 +12,24 @@ use testcontainers::core::IntoContainerPort;
 use testcontainers_modules::mysql::Mysql;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
 
+const MYSQL_TEST_TAG: &str = "8.4.13";
+
 #[path = "../../shared/server_restart.rs"]
 mod server_restart;
 
 #[path = "support/disconnection.rs"]
 mod disconnection;
 
+#[path = "support/old_server_read_only.rs"]
+mod old_server_read_only;
 #[path = "support/pooled_database.rs"]
 mod pooled_database;
 #[path = "support/read_only_session.rs"]
 mod read_only_session;
 #[path = "support/server_messages.rs"]
 mod server_messages;
+#[path = "support/server_stop_class.rs"]
+mod server_stop_class;
 #[path = "support/shared_container.rs"]
 mod shared_container;
 
@@ -297,8 +303,12 @@ async fn a_restarted_mysql_server_restores_the_existing_pool() {
     let host_port = port_probe.local_addr().expect("test port address").port();
     drop(port_probe);
     let container = Mysql::default()
+        .with_tag(crate::MYSQL_TEST_TAG)
         .with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test")
-        .with_cmd(["--default-authentication-plugin=mysql_native_password"])
+        .with_cmd([
+            "--mysql-native-password=ON",
+            "--authentication-policy=mysql_native_password",
+        ])
         .with_mapped_port(host_port, 3306.tcp())
         .start()
         .await

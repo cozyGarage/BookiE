@@ -64,6 +64,25 @@ async fn an_oversized_single_cell_is_refused_and_connection_remains_usable() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn a_bit_string_expansion_is_refused_and_connection_remains_usable() {
+    let (_container, opts) = super::start_pg().await;
+    let connection = super::connect(opts).await;
+    let result = connection
+        .query("SELECT repeat('0', 67108865)::bit varying AS payload")
+        .await
+        .expect("expanded result is reported as truncated");
+
+    assert!(result.truncated);
+    assert!(result.rows.is_empty());
+    let next = connection
+        .query("SELECT 42::bigint AS usable")
+        .await
+        .expect("connection remains usable after refusing bit expansion");
+    assert_eq!(next.rows, vec![vec![Value::Int(42)]]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn a_byte_capped_query_aborts_its_transaction_until_rollback_then_reuses_the_connection() {
     let (_container, opts) = super::start_pg().await;
     let observer = super::connect(opts.clone()).await;
@@ -99,4 +118,77 @@ async fn a_byte_capped_query_aborts_its_transaction_until_rollback_then_reuses_t
         .await
         .expect("pooled connection recovers after rollback");
     assert_eq!(next.rows, vec![vec![Value::Int(42)]]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_row_capped_query_aborts_its_transaction_until_rollback_then_preserves_data_and_reuses_connection() {
+    let (_container, opts) = super::start_pg().await;
+    let observer = super::connect(opts.clone()).await;
+    let connection = super::connect(opts).await;
+    connection
+        .query("CREATE TABLE bookie_row_cap_transaction (id integer PRIMARY KEY, value integer NOT NULL)")
+        .await
+        .expect("create fixture table");
+    connection
+        .query("INSERT INTO bookie_row_cap_transaction VALUES (1, 0)")
+        .await
+        .expect("seed fixture row");
+
+    let mut transaction = connection.begin().await.expect("begin transaction");
+    let backend = transaction
+        .query("SELECT pg_backend_pid()::bigint")
+        .await
+        .expect("read transaction backend identity");
+    let Some(Value::Int(backend_pid)) = backend.rows.first().and_then(|row| row.first()) else {
+        panic!("PostgreSQL returned no backend identity: {backend:?}");
+    };
+    transaction
+        .query("UPDATE bookie_row_cap_transaction SET value = 1 WHERE id = 1")
+        .await
+        .expect("update inside transaction");
+    let result = transaction
+        .query(&format!(
+            "SELECT row_value::bigint FROM generate_series(1, {}) AS generated(row_value)",
+            bookie_core::MAX_QUERY_ROWS * 10
+        ))
+        .await
+        .expect("row-capped query returns admitted rows");
+
+    assert!(result.truncated);
+    assert_eq!(result.rows.len(), bookie_core::MAX_QUERY_ROWS);
+    let aborted = transaction
+        .query("SELECT 42")
+        .await
+        .expect_err("cancelled statement aborts the PostgreSQL transaction");
+    if !matches!(&aborted, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "25P02") {
+        let backend_state = backend_state(observer.as_ref(), *backend_pid).await;
+        panic!("unexpected post-cancellation transaction error: {aborted:?}; backend state: {backend_state}");
+    }
+    transaction.rollback().await.expect("rollback aborted transaction");
+
+    let stored = observer
+        .query("SELECT value::bigint FROM bookie_row_cap_transaction WHERE id = 1")
+        .await
+        .expect("read fixture row after rollback");
+    assert_eq!(stored.rows, vec![vec![Value::Int(0)]]);
+    let next = connection
+        .query("SELECT 42::bigint")
+        .await
+        .expect("pooled connection recovers after rollback");
+    assert_eq!(next.rows, vec![vec![Value::Int(42)]]);
+}
+
+async fn backend_state(observer: &dyn Connection, backend_pid: i64) -> String {
+    let result = observer
+        .query_params(
+            "SELECT COALESCE((SELECT state FROM pg_catalog.pg_stat_activity WHERE pid = $1), 'backend missing')::text",
+            &[Value::Int(backend_pid)],
+        )
+        .await
+        .expect("inspect transaction backend after unexpected cancellation error");
+    match result.rows.first().and_then(|row| row.first()) {
+        Some(Value::Text(state)) => state.clone(),
+        value => format!("unexpected backend state value: {value:?}"),
+    }
 }

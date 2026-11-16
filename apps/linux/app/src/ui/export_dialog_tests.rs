@@ -40,6 +40,7 @@ fn a_full_export_shows_a_refusal_without_opening_its_source() {
         paged: Some(PagedExport {
             mode: PagedExportMode::FullTable,
             total_rows: Some(1),
+            retained_page: None,
             open: std::sync::Arc::new(move |_| {
                 opened.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 PageFetcher::new(|| Ok(None), || Ok(()))
@@ -172,11 +173,13 @@ fn a_workbook_needs_a_known_row_count_when_rows_are_read_page_by_page() {
     let unknown = PagedExport {
         mode: PagedExportMode::FullTable,
         total_rows: None,
+        retained_page: None,
         open: std::sync::Arc::new(|_| PageFetcher::new(|| Ok(None), || Ok(()))),
     };
     let known = PagedExport {
         mode: PagedExportMode::FullTable,
         total_rows: Some(10),
+        retained_page: None,
         open: unknown.open.clone(),
     };
     assert!(!available_formats("sqlite", Some(&unknown)).contains(&ExportFormat::Xlsx));

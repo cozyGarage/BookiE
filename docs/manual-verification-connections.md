@@ -14,6 +14,19 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 - [ ] For SQLite and DuckDB, use Create a new database file with a new name: the file appears on disk as an empty file readable and writable only by its owner, the path fills the File path row, and Connect opens it. Choosing an existing file in the same dialog leaves the file unchanged and shows a message that it was not replaced. Delete the file of a saved connection and connect: the message says the database file does not exist and no file is created.
 - [ ] Browse shortcuts show the actual Left, Right, Space and pointer modifiers; keyboard and click actions match their labels.
 
+## PostgreSQL connection paths
+
+Run these checks against the installed package and a named PostgreSQL fixture. Record unavailable paths as blocked rather than treating another path as equivalent.
+Current installed-package acceptance is tracked in [#575](https://github.com/cozyGarage/BookiE/issues/575); [#590](https://github.com/cozyGarage/BookiE/issues/590) retains the historical 0.2.0 frozen-candidate results.
+
+- [ ] Connect through the default Unix socket directory and a custom directory. Run `SELECT 1`, cancel a long query, reconnect, and confirm a missing socket fails without trying TCP.
+- [ ] Connect over TCP on a non-default port and save/reopen the connection with the port unchanged.
+- [ ] Connect over IPv6 loopback using bare and bracketed address forms when the fixture supports IPv6; run `SELECT 1` through both forms.
+- [ ] Exercise TLS Disabled, Prefer, Require, Verify CA and Verify Full. A failed TLS handshake must not silently downgrade; Require must refuse a plain server; Verify Full must refuse a hostname mismatch.
+- [ ] Connect with a valid PostgreSQL client certificate and key, then verify an invalid or expired certificate fails with a readable error.
+- [ ] Connect to PostgreSQL through a built-in SSH tunnel with Verify Full and confirm verification uses the database hostname. Existing tunnel-loss and system OpenSSH checks below still apply.
+- [ ] Connect through PgBouncer in session mode and transaction mode with prepared-statement support enabled. In transaction mode without that support, confirm BookiE shows the actionable pooler diagnostic.
+
 ## Production marker
 
 - [ ] Connect to a connection marked Production: the header bar is tinted red, a red **Production** badge shows beside Read-only, and the window title starts with `[Production]` in the taskbar or Alt-Tab. Open a table and change a cell: the title reads `• [Production] …`. The badge text and the tinted bar are readable in light and dark.
@@ -100,6 +113,7 @@ Build and install with the helper (`cargo build -p bookie-ssh --bin bookie-askpa
 - [ ] A saved password is used for the target host; a jump host asking for a password gets a dialog instead of the saved one.
 - [ ] A PostgreSQL connection with Verify Full through the OpenSSH tunnel verifies the database hostname.
 - [ ] After closing the app, no `ssh -M` process is left running.
+- [ ] On a non-Linux target, selecting system OpenSSH reports that the backend is unavailable and directs the user to the built-in client.
 
 ## SQLite attached databases
 

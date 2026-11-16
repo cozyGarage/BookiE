@@ -1,7 +1,3 @@
-//! Activity / monitoring dialog. Runs driver-specific activity SQL through
-//! the policy-gated connection owned by the calling window and shows the
-//! result grid.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 

@@ -82,10 +82,12 @@ impl SplitEditorView {
 
 pub(super) fn install_shortcuts(view: &sourceview5::View, sender: &ComponentSender<SqlEditor>, pane: EditorPane) {
     let shortcuts: [EditorShortcut; 8] = [
-        ("<Primary>Return", || SqlEditorInput::Run),
-        ("Escape", || SqlEditorInput::Cancel),
+        ("<Primary>Return", || SqlEditorInput::Run(super::RunMessage::Run)),
+        ("Escape", || SqlEditorInput::Run(super::RunMessage::Cancel)),
         ("<Primary><Shift>f", || SqlEditorInput::Format),
-        ("<Primary><Shift>Return", || SqlEditorInput::RunAtCursor),
+        ("<Primary><Shift>Return", || {
+            SqlEditorInput::Run(super::RunMessage::RunAtCursor)
+        }),
         ("<Primary>slash", || SqlEditorInput::ToggleLineComment),
         ("<Primary><Shift>bracketleft", || SqlEditorInput::ToggleFold),
         ("<Primary><Shift>bracketright", || SqlEditorInput::UnfoldAll),

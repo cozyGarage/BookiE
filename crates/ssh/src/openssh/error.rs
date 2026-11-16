@@ -24,6 +24,10 @@ pub enum OpenSshError {
     ControlPathTooLong { path: PathBuf },
     #[error("the OpenSSH client {program} was not found")]
     ClientMissing { program: PathBuf },
+    #[error(
+        "system OpenSSH is unavailable on {target}; use the built-in SSH client because BookiE cannot guarantee child cleanup here"
+    )]
+    ParentSupervisionUnavailable { target: String },
     #[error("could not run {program}: {detail}")]
     Spawn { program: PathBuf, detail: String },
     #[error("OpenSSH rejected its configuration: {detail}")]

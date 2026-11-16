@@ -200,14 +200,15 @@ jobs:
           toolchain: 1.98
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
-          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-unit
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-workspace
           path: ${{ runner.temp }}/bookie-unit-bundle
       - name: Run unit archive
         env:
           BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
+          GSETTINGS_SCHEMA_DIR: ${{ runner.temp }}/bookie-unit-bundle/schemas
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          python3 scripts/ci-test-bundle.py verify "$RUNNER_TEMP/bookie-unit-bundle" "$BOOKIE_SOURCE_COMMIT" --expected-group unit
+          python3 scripts/ci-test-bundle.py verify "$RUNNER_TEMP/bookie-unit-bundle" "$BOOKIE_SOURCE_COMMIT" --expected-group workspace
           NEXTEST="$(bash scripts/ensure-nextest.sh)"
           "$NEXTEST" nextest run --archive-file "$RUNNER_TEMP/bookie-unit-bundle/nextest.tar.zst" \
             --workspace-remap "$GITHUB_WORKSPACE" --profile ci --no-tests=fail -E 'kind(lib) | kind(bin)'
@@ -222,7 +223,7 @@ jobs:
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           python3 scripts/ci-test-bundle.py verify "$BOOKIE_TEST_BUNDLE" "$BOOKIE_SOURCE_COMMIT" --expected-group direct
-          find "$BOOKIE_TEST_BUNDLE/tests" "$BOOKIE_TEST_BUNDLE/bin" -type f -exec chmod u+x {} +
+          find "$BOOKIE_TEST_BUNDLE" -type f \( -path "$BOOKIE_TEST_BUNDLE/tests/*" -o -path "$BOOKIE_TEST_BUNDLE/bin/*" \) -exec chmod u+x {} +
       - name: Fetch the comparison base for changed-path tests
         if: github.event_name == 'pull_request' || github.event_name == 'push'
         env:
@@ -255,7 +256,7 @@ jobs:
           toolchain: 1.98
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
-          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-sandbox
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-workspace
           path: ${{ runner.temp }}/bookie-sandbox-bundle
       - name: Run sandbox archive
         env:
@@ -265,7 +266,7 @@ jobs:
           BOOKIE_NEXTEST_PROFILE: ci
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          python3 scripts/ci-test-bundle.py verify "$BOOKIE_TEST_BUNDLE" "$BOOKIE_SOURCE_COMMIT" --expected-group sandbox
+          python3 scripts/ci-test-bundle.py verify "$BOOKIE_TEST_BUNDLE" "$BOOKIE_SOURCE_COMMIT" --expected-group workspace
           python3 scripts/run-test-layer.py sandbox
 
   test-build:
@@ -290,10 +291,14 @@ jobs:
       - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
         with:
           toolchain: 1.98
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+        with:
+          workspaces: .
+          shared-key: linux-test-bundles
       - name: Build versioned executable test bundles
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          bash scripts/build-test-bundles.sh "$GITHUB_WORKSPACE/reusable-builds" github
+          bash scripts/build-test-bundles.sh "$GITHUB_WORKSPACE/reusable-builds" all
       - name: Check the no-default-features layer
         run: python3 scripts/run-test-layer.py no-default-features
       - name: Upload source-pinned direct test bundle
@@ -302,90 +307,115 @@ jobs:
           name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-direct
           path: reusable-builds/direct/
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 1
       - name: Upload source-pinned consumer test bundle
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-consumers
           path: reusable-builds/consumers/
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 1
       - name: Upload source-pinned core driver test bundle
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-driver-core
           path: reusable-builds/driver-core/
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 1
       - name: Upload source-pinned analytics driver test bundle
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-driver-analytics
           path: reusable-builds/driver-analytics/
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 1
       - name: Upload source-pinned extended driver test bundle
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-driver-extended
           path: reusable-builds/driver-extended/
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 1
       - name: Upload source-pinned socket and SSH test bundle
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-socket-ssh
           path: reusable-builds/socket-ssh/
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 1
       - name: Upload source-pinned driver TLS test bundle
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-driver-tls
           path: reusable-builds/driver-tls/
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 1
       - name: Upload source-pinned PostgreSQL release test bundle
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-pg-release
           path: reusable-builds/pg-release/
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 1
       - name: Upload source-pinned keyring test bundle
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-keyring
           path: reusable-builds/keyring/
           if-no-files-found: error
-          retention-days: 14
-      - name: Upload source-pinned unit archive
+          retention-days: 1
+      - name: Upload source-pinned workspace archive
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
-          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-unit
-          path: reusable-builds/unit/
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-workspace
+          path: reusable-builds/workspace/
           if-no-files-found: error
-          retention-days: 14
-      - name: Upload source-pinned sandbox archive
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+          retention-days: 1
+
+  gpui-build:
+    if: github.event_name != 'push'
+    name: Build GPUI test bundle
+    timeout-minutes: 45
+    runs-on: ubuntu-24.04
+    needs: [pin-revision, ensure-ci-gtk-image]
+    container:
+      image: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_BUILD_JOBS: "4"
+      BOOKIE_BUILD_IMAGE: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-sandbox
-          path: reusable-builds/sandbox/
-          if-no-files-found: error
-          retention-days: 14
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
+        with:
+          toolchain: 1.98
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+        with:
+          workspaces: .
+          shared-key: linux-gpui-test-bundles
+      - name: Build versioned GPUI test bundle
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          bash scripts/build-test-bundles.sh "$GITHUB_WORKSPACE/gpui-build" gpui
       - name: Upload source-pinned GPUI bundle
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-gpui
-          path: reusable-builds/gpui/
+          path: gpui-build/gpui/
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 1
 
   gpui-tests:
     if: github.event_name != 'push'
     name: GPUI model and simulated interaction tests
     runs-on: ubuntu-24.04
-    needs: [pin-revision, ensure-ci-gtk-image, test-build]
+    needs: [pin-revision, ensure-ci-gtk-image, gpui-build]
     timeout-minutes: 45
     container:
       image: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}
@@ -450,9 +480,11 @@ jobs:
           BOOKIE_TEST_BUNDLE: ${{ runner.temp }}/bookie-direct-bundle
           BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
           BOOKIE_REQUIRE_PREBUILT: "1"
+          GSETTINGS_SCHEMA_DIR: ${{ runner.temp }}/bookie-direct-bundle/schemas
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           python3 scripts/ci-test-bundle.py verify "$BOOKIE_TEST_BUNDLE" "$BOOKIE_SOURCE_COMMIT" --expected-group direct
+          find "$BOOKIE_TEST_BUNDLE" -type f \( -path "$BOOKIE_TEST_BUNDLE/tests/*" -o -path "$BOOKIE_TEST_BUNDLE/bin/*" \) -exec chmod u+x {} +
           python3 scripts/run-test-layer.py widgets
       - name: Retain GTK widget diagnostics
         if: always()
@@ -497,7 +529,7 @@ jobs:
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           python3 scripts/ci-test-bundle.py verify "$RUNNER_TEMP/bookie-consumers-bundle" "$BOOKIE_SOURCE_COMMIT" --expected-group consumers
-          find "$RUNNER_TEMP/bookie-consumers-bundle/tests" "$RUNNER_TEMP/bookie-consumers-bundle/bin" -type f -exec chmod u+x {} +
+          find "$RUNNER_TEMP/bookie-consumers-bundle" -type f \( -path "$RUNNER_TEMP/bookie-consumers-bundle/tests/*" -o -path "$RUNNER_TEMP/bookie-consumers-bundle/bin/*" \) -exec chmod u+x {} +
       - name: Docker Hub login
         uses: ./.github/actions/dockerhub-login
         with:
@@ -520,10 +552,10 @@ jobs:
           BOOKIE_REQUIRE_PREBUILT: "1"
         run: python3 scripts/run-test-layer.py app-server
 
-  gtk-build:
+  linux-build:
     if: github.event_name != 'push'
-    name: Build shared GTK binary
-    timeout-minutes: 20
+    name: Build Linux app and package artifacts
+    timeout-minutes: 60
     runs-on: ubuntu-24.04
     needs: [pin-revision, ensure-ci-gtk-image, guards]
     container:
@@ -534,6 +566,8 @@ jobs:
     env:
       CARGO_INCREMENTAL: "0"
       CARGO_BUILD_JOBS: "4"
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      BOOKIE_BUILD_PROFILE: dist
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
@@ -545,14 +579,21 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
         with:
           workspaces: .
-          shared-key: linux-gtk-build
-      - name: Build the GTK safety binary
+          shared-key: linux-app-dist
+      - name: Install package validation tools
+        run: |
+          apt-get update -qq
+          apt-get install -y --no-install-recommends desktop-file-utils
+      - name: Build the Linux application binaries once
         env:
+          DEB_OUT: ${{ github.workspace }}/.floor-package
           BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          cargo build --profile ci --locked -p bookie-app --bin bookie-app
-          python3 scripts/ci-gtk-artifact.py create target/ci/bookie-app target/gtk-safety "$BOOKIE_SOURCE_COMMIT"
+          bash scripts/build-deb.sh
+          python3 scripts/ci-gtk-artifact.py create --profile dist target/dist/bookie-app target/gtk-safety "$BOOKIE_SOURCE_COMMIT"
+          package=$(find "$DEB_OUT" -maxdepth 1 -name '*.deb' -print -quit)
+          python3 scripts/ci-gtk-artifact.py create --package "$package" floor-artifact "$BOOKIE_SOURCE_COMMIT"
       - name: Upload the source-pinned GTK binary
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
@@ -560,6 +601,13 @@ jobs:
           path: target/gtk-safety/
           if-no-files-found: error
           retention-days: 1
+      - name: Upload the source-pinned Debian package
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: floor-package-${{ github.run_id }}-${{ github.run_attempt }}
+          path: floor-artifact/
+          if-no-files-found: error
+          retention-days: 2
 
   gtk:
     if: github.event_name != 'push'
@@ -569,8 +617,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
-    needs: [pin-revision, ensure-ci-gtk-image, guards, clippy, gtk-build]
+        shard: [1, 2]
+    needs: [pin-revision, ensure-ci-gtk-image, guards, linux-build]
     container:
       image: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}
       credentials:
@@ -603,7 +651,77 @@ jobs:
         env:
           BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
         run: |
-          binary=$(python3 scripts/ci-gtk-artifact.py verify target/gtk-safety "$BOOKIE_SOURCE_COMMIT")
+          binary=$(python3 scripts/ci-gtk-artifact.py verify --profile dist target/gtk-safety "$BOOKIE_SOURCE_COMMIT")
+          printf 'BOOKIE_GTK_BINARY=%s\nGSETTINGS_SCHEMA_DIR=%s/target/gtk-safety/schemas\n' \
+            "$binary" "$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
+      - name: Install GTK test dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends scrot
+      - name: GTK installed-flow smoke shard ${{ matrix.shard }}
+        env:
+          BOOKIE_GTK_ARTIFACT_DIR: ${{ github.workspace }}/gtk-artifacts/smoke
+          BOOKIE_GTK_SHARD: ${{ matrix.shard }}/3
+        run: python3 scripts/run-test-layer.py ui
+      - name: Upload GTK diagnostics
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: gtk-safety-${{ github.run_id }}-${{ github.run_attempt }}
+          path: gtk-artifacts
+          if-no-files-found: error
+
+      - name: Upload validation evidence
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: regression-gtk-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: target/quality/*-layers
+          if-no-files-found: error
+
+  gtk-followup:
+    if: always() && !cancelled() && github.event_name != 'push' && needs.pin-revision.result == 'success' && needs.guards.result == 'success' && needs.linux-build.result == 'success'
+    name: Installed GTK safety scenarios (${{ matrix.shard }})
+    timeout-minutes: 60
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [3]
+    needs: [pin-revision, ensure-ci-gtk-image, guards, linux-build, gtk]
+    container:
+      image: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      env:
+        DEBIAN_FRONTEND: noninteractive
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - name: Install Git before checkout
+        working-directory: /tmp
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends git ca-certificates
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          persist-credentials: false
+      - name: Record the commit under test
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git rev-parse HEAD
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: gtk-safety-binary-${{ github.run_id }}-${{ github.run_attempt }}
+          path: target/gtk-safety
+      - name: Verify the source-pinned GTK binary and schemas
+        env:
+          BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
+        run: |
+          binary=$(python3 scripts/ci-gtk-artifact.py verify --profile dist target/gtk-safety "$BOOKIE_SOURCE_COMMIT")
           printf 'BOOKIE_GTK_BINARY=%s\nGSETTINGS_SCHEMA_DIR=%s/target/gtk-safety/schemas\n' \
             "$binary" "$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
       - name: Install GTK test dependencies
@@ -667,7 +785,7 @@ jobs:
         run: |
           test "$(git rev-parse HEAD)" = "$BOOKIE_SOURCE_COMMIT"
           python3 scripts/ci-test-bundle.py verify "$BOOKIE_TEST_BUNDLE" "$BOOKIE_SOURCE_COMMIT" --expected-group keyring
-          find "$BOOKIE_TEST_BUNDLE/tests" "$BOOKIE_TEST_BUNDLE/bin" -type f -exec chmod u+x {} +
+          find "$BOOKIE_TEST_BUNDLE" -type f \( -path "$BOOKIE_TEST_BUNDLE/tests/*" -o -path "$BOOKIE_TEST_BUNDLE/bin/*" \) -exec chmod u+x {} +
           python3 scripts/run-test-layer.py keyring
       - name: Upload validation evidence
         if: always()
@@ -682,14 +800,16 @@ jobs:
     name: Installed GTK server scenarios (${{ matrix.server }})
     timeout-minutes: 45
     runs-on: ubuntu-24.04
-    needs: [pin-revision, ensure-ci-gtk-image, guards, clippy, gtk-build]
+    needs: [pin-revision, ensure-ci-gtk-image, guards, linux-build]
     container:
       image: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}
+      options: --add-host=host.docker.internal:host-gateway
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
       volumes:
         - /var/run/docker.sock:/var/run/docker.sock
+        - /var/tmp/bookie-gtk-fixtures:/var/tmp/bookie-gtk-fixtures
       env:
         DEBIAN_FRONTEND: noninteractive
         DOCKER_CONFIG: /github/home/.docker
@@ -700,10 +820,12 @@ jobs:
       BOOKIE_GTK_SCENARIO_RETRIES: "0"
       BOOKIE_TEST_RUN_ID: github-${{ github.run_id }}-${{ github.run_attempt }}-gtk-server-${{ matrix.server }}
       BOOKIE_GTK_SERVER_IMAGE_GROUP: ${{ matrix.server == 'mysql-approval' && 'mysql' || matrix.server }}
+      BOOKIE_GTK_FIXTURE_HOST: host.docker.internal
+      BOOKIE_GTK_FIXTURE_SHARED_DIR: /var/tmp/bookie-gtk-fixtures
     strategy:
       fail-fast: false
       matrix:
-        server: [clickhouse, mongodb, postgres, mysql, mysql-approval]
+        server: [clickhouse, mongodb]
     steps:
       - name: Install Git before checkout
         working-directory: /tmp
@@ -726,7 +848,157 @@ jobs:
         env:
           BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
         run: |
-          binary=$(python3 scripts/ci-gtk-artifact.py verify target/gtk-safety "$BOOKIE_SOURCE_COMMIT")
+          binary=$(python3 scripts/ci-gtk-artifact.py verify --profile dist target/gtk-safety "$BOOKIE_SOURCE_COMMIT")
+          printf 'BOOKIE_GTK_BINARY=%s\nGSETTINGS_SCHEMA_DIR=%s/target/gtk-safety/schemas\n' \
+            "$binary" "$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
+      - name: Log in to Docker Hub
+        uses: ./.github/actions/dockerhub-login
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Pre-pull GTK fixture image with retries
+        run: bash scripts/prepull-test-images.sh "$BOOKIE_GTK_SERVER_IMAGE_GROUP"
+      - name: Installed GTK scenarios against ${{ matrix.server }}
+        run: python3 scripts/run-test-layer.py "gtk-${{ matrix.server }}"
+      - name: Clean fixture containers
+        if: always()
+        run: |
+          if [[ -f scripts/cleanup-testcontainers.py ]]; then
+            python3 scripts/cleanup-testcontainers.py "$BOOKIE_TEST_RUN_ID"
+          fi
+      - name: Upload validation evidence
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: regression-gtk-server-${{ matrix.server }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: target/quality/*-layers
+          if-no-files-found: error
+
+  gtk-server-followup:
+    if: always() && !cancelled() && github.event_name != 'push' && needs.pin-revision.result == 'success' && needs.guards.result == 'success' && needs.linux-build.result == 'success'
+    name: Installed GTK server scenarios (${{ matrix.server }})
+    timeout-minutes: 45
+    runs-on: ubuntu-24.04
+    needs: [pin-revision, ensure-ci-gtk-image, guards, linux-build, gtk-server]
+    container:
+      image: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+      env:
+        DEBIAN_FRONTEND: noninteractive
+        DOCKER_CONFIG: /github/home/.docker
+    defaults:
+      run:
+        working-directory: .
+    env:
+      BOOKIE_GTK_SCENARIO_RETRIES: "0"
+      BOOKIE_TEST_RUN_ID: github-${{ github.run_id }}-${{ github.run_attempt }}-gtk-server-${{ matrix.server }}
+      BOOKIE_GTK_SERVER_IMAGE_GROUP: ${{ matrix.server == 'mysql-approval' && 'mysql' || matrix.server }}
+    strategy:
+      fail-fast: false
+      matrix:
+        server: [postgres, mysql]
+    steps:
+      - name: Install Git before checkout
+        working-directory: /tmp
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends git ca-certificates
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          persist-credentials: false
+      - name: Record the commit under test
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git rev-parse HEAD
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: gtk-safety-binary-${{ github.run_id }}-${{ github.run_attempt }}
+          path: target/gtk-safety
+      - name: Verify the source-pinned GTK binary and schemas
+        env:
+          BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
+        run: |
+          binary=$(python3 scripts/ci-gtk-artifact.py verify --profile dist target/gtk-safety "$BOOKIE_SOURCE_COMMIT")
+          printf 'BOOKIE_GTK_BINARY=%s\nGSETTINGS_SCHEMA_DIR=%s/target/gtk-safety/schemas\n' \
+            "$binary" "$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
+      - name: Log in to Docker Hub
+        uses: ./.github/actions/dockerhub-login
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Pre-pull GTK fixture image with retries
+        run: bash scripts/prepull-test-images.sh "$BOOKIE_GTK_SERVER_IMAGE_GROUP"
+      - name: Installed GTK scenarios against ${{ matrix.server }}
+        run: python3 scripts/run-test-layer.py "gtk-${{ matrix.server }}"
+      - name: Clean fixture containers
+        if: always()
+        run: |
+          if [[ -f scripts/cleanup-testcontainers.py ]]; then
+            python3 scripts/cleanup-testcontainers.py "$BOOKIE_TEST_RUN_ID"
+          fi
+      - name: Upload validation evidence
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: regression-gtk-server-${{ matrix.server }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: target/quality/*-layers
+          if-no-files-found: error
+
+  gtk-server-final:
+    if: always() && !cancelled() && github.event_name != 'push' && needs.pin-revision.result == 'success' && needs.guards.result == 'success' && needs.linux-build.result == 'success' && needs.gtk-server-followup.result != 'skipped'
+    name: Installed GTK server scenarios (${{ matrix.server }})
+    timeout-minutes: 45
+    runs-on: ubuntu-24.04
+    needs: [pin-revision, ensure-ci-gtk-image, guards, linux-build, gtk-server-followup]
+    container:
+      image: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+      env:
+        DEBIAN_FRONTEND: noninteractive
+        DOCKER_CONFIG: /github/home/.docker
+    defaults:
+      run:
+        working-directory: .
+    env:
+      BOOKIE_GTK_SCENARIO_RETRIES: "0"
+      BOOKIE_TEST_RUN_ID: github-${{ github.run_id }}-${{ github.run_attempt }}-gtk-server-${{ matrix.server }}
+      BOOKIE_GTK_SERVER_IMAGE_GROUP: ${{ matrix.server == 'mysql-approval' && 'mysql' || matrix.server }}
+    strategy:
+      fail-fast: false
+      matrix:
+        server: [mysql-approval]
+    steps:
+      - name: Install Git before checkout
+        working-directory: /tmp
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends git ca-certificates
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          persist-credentials: false
+      - name: Record the commit under test
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git rev-parse HEAD
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: gtk-safety-binary-${{ github.run_id }}-${{ github.run_attempt }}
+          path: target/gtk-safety
+      - name: Verify the source-pinned GTK binary and schemas
+        env:
+          BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
+        run: |
+          binary=$(python3 scripts/ci-gtk-artifact.py verify --profile dist target/gtk-safety "$BOOKIE_SOURCE_COMMIT")
           printf 'BOOKIE_GTK_BINARY=%s\nGSETTINGS_SCHEMA_DIR=%s/target/gtk-safety/schemas\n' \
             "$binary" "$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
       - name: Log in to Docker Hub
@@ -821,7 +1093,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        group: [driver-core, driver-analytics, driver-extended, socket-ssh]
+        group: [driver-core, driver-analytics]
     defaults:
       run:
         working-directory: .
@@ -854,7 +1126,89 @@ jobs:
         run: |
           test "$(git rev-parse HEAD)" = "$BOOKIE_SOURCE_COMMIT"
           python3 scripts/ci-test-bundle.py verify "$RUNNER_TEMP/bookie-test-bundle" "$BOOKIE_SOURCE_COMMIT" --expected-group "${{ matrix.group }}"
-          find "$RUNNER_TEMP/bookie-test-bundle/tests" "$RUNNER_TEMP/bookie-test-bundle/bin" -type f -exec chmod u+x {} +
+          find "$RUNNER_TEMP/bookie-test-bundle" -type f \( -path "$RUNNER_TEMP/bookie-test-bundle/tests/*" -o -path "$RUNNER_TEMP/bookie-test-bundle/bin/*" \) -exec chmod u+x {} +
+      - name: Run integration layer in the shared image
+        env:
+          BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
+          BOOKIE_BUILD_IMAGE: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}
+          BOOKIE_TEST_BUNDLE: ${{ runner.temp }}/bookie-test-bundle
+          BOOKIE_TEST_LAYER: ${{ matrix.group }}
+          BOOKIE_TEST_RUN_ID: github-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}
+        run: |
+          task_tmp="$(mktemp -d /tmp/bookie-ci.XXXXXX)"
+          trap 'rm -rf -- "$task_tmp"' EXIT
+          docker run --rm --entrypoint cat "$BOOKIE_BUILD_IMAGE" /etc/passwd > "$RUNNER_TEMP/bookie-integration-passwd"
+          printf 'bookie-ci:x:%s:%s:CI:%s:/usr/sbin/nologin\n' "$(id -u)" "$(id -g)" "$task_tmp" >> "$RUNNER_TEMP/bookie-integration-passwd"
+          docker run --rm --network host \
+            --user "$(id -u):$(id -g)" --group-add "$(stat -c '%g' /var/run/docker.sock)" \
+            --volume "$RUNNER_TEMP/bookie-integration-passwd:/etc/passwd:ro" \
+            --volume /var/run/docker.sock:/var/run/docker.sock \
+            --volume "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" \
+            --volume "$RUNNER_TEMP:$RUNNER_TEMP" \
+            --volume "$task_tmp:$task_tmp" \
+            --volume "$HOME/.docker:/docker:ro" \
+            --workdir "$GITHUB_WORKSPACE" \
+            --env HOME="$task_tmp" --env TMPDIR="$task_tmp" \
+            --env GIT_CONFIG_COUNT=1 --env GIT_CONFIG_KEY_0=safe.directory \
+            --env GIT_CONFIG_VALUE_0="$GITHUB_WORKSPACE" \
+            --env DOCKER_CONFIG=/docker --env GITHUB_WORKSPACE="$GITHUB_WORKSPACE" \
+            --env BOOKIE_TEST_BUNDLE="$BOOKIE_TEST_BUNDLE" \
+            --env BOOKIE_TEST_LAYER="$BOOKIE_TEST_LAYER" \
+            --env BOOKIE_TEST_RUN_ID="$BOOKIE_TEST_RUN_ID" \
+            --env BOOKIE_REQUIRE_PREBUILT=1 --env BOOKIE_SOURCE_COMMIT="$BOOKIE_SOURCE_COMMIT" \
+            "$BOOKIE_BUILD_IMAGE" bash -euo pipefail -c 'python3 scripts/run-test-layer.py "$BOOKIE_TEST_LAYER"; if [[ "$BOOKIE_TEST_LAYER" == driver-core ]]; then python3 scripts/run-test-layer.py pg-dump; fi'
+
+      - name: Upload validation evidence
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: regression-integration-${{ matrix.group }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: target/quality/*-layers
+          if-no-files-found: error
+
+  driver-followup:
+    if: always() && !cancelled() && github.event_name != 'push' && needs.pin-revision.result == 'success' && needs.guards.result == 'success' && needs.clippy.result == 'success' && needs.test-build.result == 'success' && needs.ensure-ci-gtk-image.result == 'success'
+    name: Driver integration tests (docker) (${{ matrix.group }})
+    timeout-minutes: 90
+    runs-on: ubuntu-24.04
+    needs: [pin-revision, ensure-ci-gtk-image, guards, clippy, test-build, driver]
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [driver-extended, socket-ssh]
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          persist-credentials: false
+      - name: Log in to Docker Hub
+        uses: ./.github/actions/dockerhub-login
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Log in to GHCR
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Record the commit under test
+        run: |
+          echo "tree under test: $(git rev-parse HEAD)"
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-${{ matrix.group }}
+          path: ${{ runner.temp }}/bookie-test-bundle
+      - name: Verify the test bundle
+        env:
+          BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$BOOKIE_SOURCE_COMMIT"
+          python3 scripts/ci-test-bundle.py verify "$RUNNER_TEMP/bookie-test-bundle" "$BOOKIE_SOURCE_COMMIT" --expected-group "${{ matrix.group }}"
+          find "$RUNNER_TEMP/bookie-test-bundle" -type f \( -path "$RUNNER_TEMP/bookie-test-bundle/tests/*" -o -path "$RUNNER_TEMP/bookie-test-bundle/bin/*" \) -exec chmod u+x {} +
       - name: Run integration layer in the shared image
         env:
           BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
@@ -954,6 +1308,7 @@ jobs:
     needs: [pin-revision, ensure-ci-gtk-image, guards, clippy, test-build]
     container:
       image: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}
+      options: --add-host=host.docker.internal:host-gateway
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -969,6 +1324,9 @@ jobs:
       BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
       BOOKIE_REQUIRE_PREBUILT: "1"
       BOOKIE_TEST_RUN_ID: github-${{ github.run_id }}-${{ github.run_attempt }}-driver-tls
+      BOOKIE_DRIVER_TLS_HOST: host.docker.internal
+      BOOKIE_DRIVER_TLS_HOSTNAME: host.docker.internal
+      BOOKIE_FIXTURE_BIND_ADDRESS: 0.0.0.0
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
@@ -987,7 +1345,7 @@ jobs:
         run: |
           test "$(git rev-parse HEAD)" = "$BOOKIE_SOURCE_COMMIT"
           python3 scripts/ci-test-bundle.py verify "$BOOKIE_TEST_BUNDLE" "$BOOKIE_SOURCE_COMMIT" --expected-group driver-tls
-          find "$BOOKIE_TEST_BUNDLE/tests" "$BOOKIE_TEST_BUNDLE/bin" -type f -exec chmod u+x {} +
+          find "$BOOKIE_TEST_BUNDLE" -type f \( -path "$BOOKIE_TEST_BUNDLE/tests/*" -o -path "$BOOKIE_TEST_BUNDLE/bin/*" \) -exec chmod u+x {} +
       - name: Log in to Docker Hub
         uses: ./.github/actions/dockerhub-login
         with:
@@ -1013,52 +1371,6 @@ jobs:
           path: target/quality/*-layers
           if-no-files-found: error
 
-  floor-build:
-    runs-on: ubuntu-24.04
-    needs: [pin-revision, ensure-ci-gtk-image, guards, clippy]
-    if: github.event_name != 'push'
-    timeout-minutes: 45
-    container:
-      image: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-      volumes:
-        - /var/run/docker.sock:/var/run/docker.sock
-      env:
-        DEBIAN_FRONTEND: noninteractive
-        DOCKER_CONFIG: /github/home/.docker
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-        with:
-          ref: ${{ needs.pin-revision.outputs.revision }}
-          persist-credentials: false
-      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
-        with:
-          toolchain: 1.98
-      - name: Install package validation tools
-        run: |
-          apt-get update -qq
-          apt-get install -y --no-install-recommends desktop-file-utils
-      - name: Log in to Docker Hub
-        uses: ./.github/actions/dockerhub-login
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Build the shared release package
-        run: |
-          DEB_OUT="$GITHUB_WORKSPACE/floor-package" bash scripts/build-deb.sh
-          package=$(find "$GITHUB_WORKSPACE/floor-package" -maxdepth 1 -name '*.deb' -print -quit)
-          python3 scripts/ci-gtk-artifact.py create --package "$package" \
-            "$GITHUB_WORKSPACE/floor-artifact" "${{ needs.pin-revision.outputs.revision }}"
-      - name: Upload the Debian package for distro-floor scenarios
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
-        with:
-          name: floor-package-${{ github.run_id }}-${{ github.run_attempt }}
-          path: floor-artifact/
-          if-no-files-found: error
-          retention-days: 2
-
   pg-release:
     if: github.event_name != 'push'
     name: PostgreSQL release fixture (docker)
@@ -1070,8 +1382,10 @@ jobs:
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
+      options: --add-host=host.docker.internal:host-gateway
       volumes:
         - /var/run/docker.sock:/var/run/docker.sock
+        - /var/tmp/bookie-pg-release-fixtures:/var/tmp/bookie-pg-release-fixtures
       env:
         DEBIAN_FRONTEND: noninteractive
         DOCKER_CONFIG: /github/home/.docker
@@ -1091,7 +1405,7 @@ jobs:
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           python3 scripts/ci-test-bundle.py verify "$BOOKIE_TEST_BUNDLE" "$BOOKIE_SOURCE_COMMIT" --expected-group pg-release
-          find "$BOOKIE_TEST_BUNDLE/tests" "$BOOKIE_TEST_BUNDLE/bin" -type f -exec chmod u+x {} +
+          find "$BOOKIE_TEST_BUNDLE" -type f \( -path "$BOOKIE_TEST_BUNDLE/tests/*" -o -path "$BOOKIE_TEST_BUNDLE/bin/*" \) -exec chmod u+x {} +
       - name: Log in to Docker Hub
         uses: ./.github/actions/dockerhub-login
         with:
@@ -1103,14 +1417,18 @@ jobs:
         run: python3 scripts/ci-mcp-port.py 4
       - name: PostgreSQL release fixture
         env:
+          BOOKIE_FIXTURE_HOST: host.docker.internal
+          BOOKIE_FIXTURE_TOXIPROXY_CONFIG: /var/tmp/bookie-pg-release-fixtures/toxiproxy.json
           BOOKIE_TEST_BUNDLE: ${{ runner.temp }}/bookie-pg-release-bundle
           BOOKIE_REQUIRE_PREBUILT: "1"
           BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
           BOOKIE_TOOL_DIR: /var/cache/ci/tools
           CARGO_TARGET_DIR: ${{ runner.temp }}/bookie-pg-release-target
-          TMPDIR: ${{ runner.temp }}/bookie-pg-release-tmp
+          TMPDIR: /tmp
         run: |
+          mkdir -p /var/tmp/bookie-pg-release-fixtures
           mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"
+          cp tests/fixtures/postgres-release/toxiproxy/toxiproxy.json "$BOOKIE_FIXTURE_TOXIPROXY_CONFIG"
           python3 scripts/run-test-layer.py postgres-release
       - name: Upload validation evidence
         if: always()
@@ -1119,13 +1437,16 @@ jobs:
           name: regression-pg-release-${{ github.run_id }}-${{ github.run_attempt }}
           path: target/quality/*-layers
           if-no-files-found: error
+      - name: Remove shared PostgreSQL fixture files
+        if: always()
+        run: rm -rf -- /var/tmp/bookie-pg-release-fixtures
 
   distro-floor-scenarios:
     name: Debian testing package GTK scenarios (${{ matrix.shard_group }})
     if: github.event_name != 'push'
     timeout-minutes: 90
     runs-on: ubuntu-24.04
-    needs: [pin-revision, ensure-ci-gtk-image, floor-build]
+    needs: [pin-revision, ensure-ci-gtk-image, linux-build]
     container:
       image: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}
       credentials:
@@ -1138,7 +1459,6 @@ jobs:
         DOCKER_CONFIG: /github/home/.docker
     strategy:
       fail-fast: false
-      max-parallel: 2
       matrix:
         shard_group: [1, 2]
     steps:
@@ -1146,6 +1466,8 @@ jobs:
         with:
           ref: ${{ needs.pin-revision.outputs.revision }}
           persist-credentials: false
+      - name: Mark checkout safe for Git in container
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
           name: floor-package-${{ github.run_id }}-${{ github.run_attempt }}
@@ -1206,7 +1528,7 @@ jobs:
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           python3 scripts/ci-test-bundle.py verify "$BOOKIE_TEST_BUNDLE" "$BOOKIE_SOURCE_COMMIT" --expected-group consumers
-          find "$BOOKIE_TEST_BUNDLE/tests" "$BOOKIE_TEST_BUNDLE/bin" -type f -exec chmod u+x {} +
+          find "$BOOKIE_TEST_BUNDLE" -type f \( -path "$BOOKIE_TEST_BUNDLE/tests/*" -o -path "$BOOKIE_TEST_BUNDLE/bin/*" \) -exec chmod u+x {} +
       - name: Security policy tests
         env:
           BOOKIE_TEST_BUNDLE: ${{ runner.temp }}/bookie-security-policy-bundle
@@ -1248,6 +1570,7 @@ jobs:
     needs:
       - pin-revision
       - test-build
+      - gpui-build
       - guards
       - clippy
       - unit
@@ -1255,14 +1578,17 @@ jobs:
       - gpui-tests
       - widgets
       - consumers
-      - gtk-build
+      - linux-build
       - gtk
+      - gtk-followup
       - keyring
       - gtk-server
+      - gtk-server-followup
+      - gtk-server-final
       - driver
+      - driver-followup
       - b4-rollback
       - driver-tls
-      - floor-build
       - pg-release
       - security-policy
       - supply-chain

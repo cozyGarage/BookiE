@@ -19,7 +19,7 @@ flowchart TD
 
 ## Product constraints
 
-- Native GTK4 and libadwaita interface on Linux.
+- The shipped interface is native GTK4 and libadwaita on Linux. GPUI is the chosen cross-platform frontend and is maintained in parallel; it is not packaged until [ADR 0052](docs/decisions/0052-gpui-is-the-cross-platform-frontend.md) shipping conditions hold ([PRINCIPLES.md](PRINCIPLES.md)).
 - Database drivers are linked at build time and implement shared Rust contracts.
 - Self-contained desktop client with no external telemetry or remote entitlement checks.
 - The GUI and MCP consumers do not receive raw driver connections.

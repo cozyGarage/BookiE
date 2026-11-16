@@ -143,7 +143,7 @@ jobs:
   gpui-tests:
     if: github.event_name != 'push'
     runs-on: any-host
-    needs: [pin-revision, test-build]
+    needs: [pin-revision, gpui-build]
     timeout-minutes: 45
     env:
       CARGO_BUILD_JOBS: 4
@@ -163,12 +163,15 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
           path: src
-      - name: Obtain the source-pinned GPUI test bundle
-        env:
-          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
-          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" gpui
+      - name: Prepare artifact runtime
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Download the source-pinned gpui test bundle
+        uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-gpui
+          path: ${{ runner.temp }}/bookie-gpui-bundle
+      - name: Verify and prepare the gpui test bundle
+        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" gpui "${{ runner.temp }}/bookie-gpui-bundle"
       - name: GPUI model and simulated interaction tests
         run: |
           cd src
@@ -189,11 +192,11 @@ jobs:
           else
             rm -rf -- src
           fi
-  gtk-build:
+  linux-build:
     if: github.event_name != 'push'
     runs-on: build-host
     needs: [pin-revision, guards]
-    timeout-minutes: 20
+    timeout-minutes: 60
     defaults:
       run:
         shell: bash
@@ -210,7 +213,8 @@ jobs:
       CARGO_TARGET_DIR: /target/bookie-${{ github.job }}
       TMPDIR: /target/tmp-${{ github.run_id }}-${{ github.job }}
       BOOKIE_TOOL_DIR: /tools
-      CARGO_PROFILE_CI_STRIP: symbols
+      CARGO_BUILD_JOBS: "8"
+      BOOKIE_BUILD_PROFILE: dist
     steps:
       - name: Prepare runner workspace
         run: |
@@ -226,22 +230,38 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
           path: src
-      - name: Prepare artifact runtime
-        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
-      - name: Build the shared GTK binary
+      - name: Mark checkout safe for Git in container
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE/src"
+      - name: Install package validation tools
+        run: |
+          apt-get update -qq
+          apt-get install -y --no-install-recommends desktop-file-utils
+      - name: Build native application and package artifacts once
         env:
-          CARGO_BUILD_JOBS: "8"
+          BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
+          DEB_OUT: ${{ github.workspace }}/floor-package
         run: |
           exec 9>>/target/.bookie-build-cache.lock
           flock --exclusive 9
           cd src
-          cargo build --profile ci --locked -p bookie-app --bin bookie-app
-          python3 scripts/ci-gtk-artifact.py create "$CARGO_TARGET_DIR/ci/bookie-app" "$GITHUB_WORKSPACE/gtk-artifact" "${{ needs.pin-revision.outputs.revision }}"
+          DEB_OUT="$DEB_OUT" bash scripts/build-deb.sh
+          python3 scripts/ci-gtk-artifact.py create --profile dist "$CARGO_TARGET_DIR/dist/bookie-app" "$GITHUB_WORKSPACE/gtk-artifact" "$BOOKIE_SOURCE_COMMIT"
+          package=$(find "$DEB_OUT" -maxdepth 1 -name '*.deb' -print -quit)
+          python3 scripts/ci-gtk-artifact.py create --package "$package" "$GITHUB_WORKSPACE/floor-artifact" "$BOOKIE_SOURCE_COMMIT"
+      - name: Prepare artifact runtime
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
       - name: Upload the source-pinned GTK binary
         uses: https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
         with:
           name: gtk-ci-${{ github.run_id }}-${{ needs.pin-revision.outputs.revision }}
           path: gtk-artifact/
+          if-no-files-found: error
+          retention-days: 2
+      - name: Upload the source-pinned Debian package
+        uses: https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
+        with:
+          name: floor-package-${{ github.run_id }}-${{ needs.pin-revision.outputs.revision }}
+          path: floor-artifact/
           if-no-files-found: error
           retention-days: 2
       - name: Clean builder scratch
@@ -255,8 +275,6 @@ jobs:
           if [[ -f src/scripts/ci-cache.py ]]; then
             python3 src/scripts/ci-cache.py --root /target --lock /target/.bookie-build-cache.lock cleanup --min-free-gib 30
           fi
-
-
       - name: Finalize runner job
         if: always()
         shell: bash
@@ -264,8 +282,9 @@ jobs:
           if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
             bash src/scripts/cleanup-ci-job.sh
           else
-            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+            rm -rf -- src gtk-artifact floor-artifact floor-package floor-package-path
           fi
+
   clippy:
     needs: [pin-revision]
     runs-on: build-host
@@ -373,28 +392,79 @@ jobs:
         run: |
           exec 9>>/target/.bookie-build-cache.lock
           flock --exclusive 9
-          cd src && bash scripts/build-test-bundles.sh "$GITHUB_WORKSPACE/test-bundles" forgejo
-      - name: Publish source-pinned test bundles
-        env:
-          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: |
-          cd src
-          mapfile -t publish_groups < <(python3 -c 'import json; config=json.load(open("scripts/ci-test-bundle-groups.json")); fallback = ["direct", "consumers", "driver-core", "driver-analytics", "driver-extended", "pg-release", "socket-ssh", "driver-tls", "keyring"]; print(*(config.get("providers", {}).get("forgejo", fallback)), sep="\n")')
-          publish_groups+=(unit sandbox gpui)
-          for group in "${publish_groups[@]}"; do
-            python3 scripts/ci-bundle-registry.py publish "$GITHUB_WORKSPACE/test-bundles/$group" "${{ needs.pin-revision.outputs.revision }}" "$group"
-          done
-      - name: Remove expired test bundles with reference protection
-        if: github.event_name == 'push' || github.event_name == 'schedule'
-        env:
-          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_REGISTRY_API_URL: ${{ github.server_url }}/api/v1/packages/trung
-          BOOKIE_FORGEJO_API_URL: ${{ github.server_url }}/api/v1/repos/${{ github.repository }}
-          BOOKIE_FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
-        run: |
-          cd src
-          python3 scripts/ci-bundle-registry.py prune "${{ needs.pin-revision.outputs.revision }}" --retention-days 14 --delete --discover-references
+          cd src && bash scripts/build-test-bundles.sh "$GITHUB_WORKSPACE/test-bundles" all
+      - name: Prepare artifact runtime
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Upload source-pinned direct test bundle
+        uses: https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-direct
+          path: test-bundles/direct/
+          if-no-files-found: error
+          retention-days: 1
+      - name: Upload source-pinned consumers test bundle
+        uses: https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-consumers
+          path: test-bundles/consumers/
+          if-no-files-found: error
+          retention-days: 1
+      - name: Upload source-pinned driver-core test bundle
+        uses: https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-driver-core
+          path: test-bundles/driver-core/
+          if-no-files-found: error
+          retention-days: 1
+      - name: Upload source-pinned driver-analytics test bundle
+        uses: https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-driver-analytics
+          path: test-bundles/driver-analytics/
+          if-no-files-found: error
+          retention-days: 1
+      - name: Upload source-pinned driver-extended test bundle
+        uses: https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-driver-extended
+          path: test-bundles/driver-extended/
+          if-no-files-found: error
+          retention-days: 1
+      - name: Upload source-pinned pg-release test bundle
+        uses: https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-pg-release
+          path: test-bundles/pg-release/
+          if-no-files-found: error
+          retention-days: 1
+      - name: Upload source-pinned socket-ssh test bundle
+        uses: https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-socket-ssh
+          path: test-bundles/socket-ssh/
+          if-no-files-found: error
+          retention-days: 1
+      - name: Upload source-pinned driver-tls test bundle
+        uses: https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-driver-tls
+          path: test-bundles/driver-tls/
+          if-no-files-found: error
+          retention-days: 1
+      - name: Upload source-pinned keyring test bundle
+        uses: https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-keyring
+          path: test-bundles/keyring/
+          if-no-files-found: error
+          retention-days: 1
+      - name: Upload source-pinned workspace test bundle
+        uses: https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-workspace
+          path: test-bundles/workspace/
+          if-no-files-found: error
+          retention-days: 1
       - name: Check the no-default-features layer
         run: |
           exec 9>>/target/.bookie-build-cache.lock
@@ -412,6 +482,83 @@ jobs:
             python3 src/scripts/ci-cache.py --root /target --lock /target/.bookie-build-cache.lock cleanup --min-free-gib 30
           fi
 
+
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
+  gpui-build:
+    if: github.event_name != 'push'
+    runs-on: build-host
+    needs: [pin-revision]
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    env:
+      CARGO_TARGET_DIR: /target/bookie-${{ github.job }}
+      TMPDIR: /target/tmp-${{ github.run_id }}-${{ github.job }}
+      CARGO_HOME: /cargo
+      BOOKIE_TOOL_DIR: /tools
+      CARGO_BUILD_JOBS: "8"
+      SCCACHE_DIR: /cargo/sccache
+      RUSTC_WRAPPER: sccache
+      SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+      CMAKE_C_COMPILER_LAUNCHER: /tools/sccache
+      CMAKE_CXX_COMPILER_LAUNCHER: /tools/sccache
+      SCCACHE_BASEDIRS: /target/bookie-${{ github.job }}
+      SCCACHE_SERVER_UDS: /target/tmp-${{ github.run_id }}-${{ github.job }}/sccache.sock
+      PATH: /tools:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
+      BOOKIE_BUILD_IMAGE: sha256:f21a3d99fb08a940f7fbf775ad6878d52a3fc957876970ae7d0f607b89696ec4
+    steps:
+      - name: Prepare runner workspace
+        run: |
+          mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
+          touch "$CARGO_TARGET_DIR/.bookie-last-used" /target/.bookie-build-cache.lock
+          sccache --start-server
+          rm -rf src
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
+      - name: Install the GPUI linker dependency
+        run: |
+          apt-get update -qq
+          apt-get install -y --no-install-recommends libxkbcommon-x11-dev
+      - name: Build the GPUI test bundle
+        run: |
+          exec 9>>/target/.bookie-build-cache.lock
+          flock --exclusive 9
+          cd src && bash scripts/build-test-bundles.sh "$GITHUB_WORKSPACE/test-bundles" gpui
+      - name: Prepare artifact runtime
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Upload source-pinned GPUI test bundle
+        uses: https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-gpui
+          path: test-bundles/gpui/
+          if-no-files-found: error
+          retention-days: 1
+      - name: Clean builder scratch
+        if: always()
+        run: |
+          if [[ -S "$SCCACHE_SERVER_UDS" ]]; then
+            sccache --show-stats
+            sccache --stop-server
+          fi
+          rm -rf -- "$TMPDIR"
+          if [[ -f src/scripts/ci-cache.py ]]; then
+            python3 src/scripts/ci-cache.py --root /target --lock /target/.bookie-build-cache.lock cleanup --min-free-gib 30
+          fi
 
       - name: Finalize runner job
         if: always()
@@ -441,12 +588,15 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
           path: src
-      - name: Obtain the source-pinned test bundle
-        env:
-          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
-          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" unit
+      - name: Prepare artifact runtime
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Download the source-pinned workspace test bundle
+        uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-workspace
+          path: ${{ runner.temp }}/bookie-workspace-bundle
+      - name: Verify and prepare the workspace test bundle
+        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" workspace "${{ runner.temp }}/bookie-workspace-bundle"
       - name: Unit tests
         env:
           BOOKIE_TOOL_DIR: /var/cache/ci/tools
@@ -456,12 +606,13 @@ jobs:
           mkdir -p "$CARGO_TARGET_DIR"
           export TMPDIR="$CARGO_TARGET_DIR"
           "$NEXTEST" nextest run --archive-file "$BOOKIE_TEST_BUNDLE/nextest.tar.zst" --workspace-remap "$PWD" --profile ci --no-tests=fail -E 'kind(lib) | kind(bin)'
-      - name: Obtain the source-pinned direct test bundle
-        env:
-          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
-          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" direct
+      - name: Download the source-pinned direct test bundle
+        uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-direct
+          path: ${{ runner.temp }}/bookie-direct-bundle
+      - name: Verify and prepare the direct test bundle
+        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" direct "${{ runner.temp }}/bookie-direct-bundle"
       - name: Focused Data-lane change contracts
         env:
           BOOKIE_CI_REF: ${{ github.ref }}
@@ -504,12 +655,15 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
           path: src
-      - name: Obtain the source-pinned test bundle
-        env:
-          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
-          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" sandbox
+      - name: Prepare artifact runtime
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Download the source-pinned workspace test bundle
+        uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-workspace
+          path: ${{ runner.temp }}/bookie-workspace-bundle
+      - name: Verify and prepare the workspace test bundle
+        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" workspace "${{ runner.temp }}/bookie-workspace-bundle"
       - name: Sandbox tier
         env:
           BOOKIE_TOOL_DIR: /var/cache/ci/tools
@@ -545,16 +699,17 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
           path: src
-      - name: Obtain the source-pinned test bundle
-        env:
-          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
-          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" direct
-      - name: GTK widget tests
-        run: cd src && python3 scripts/run-test-layer.py widgets
       - name: Prepare artifact runtime
         run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Download the source-pinned direct test bundle
+        uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-direct
+          path: ${{ runner.temp }}/bookie-direct-bundle
+      - name: Verify and prepare the direct test bundle
+        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" direct "${{ runner.temp }}/bookie-direct-bundle"
+      - name: GTK widget tests
+        run: cd src && python3 scripts/run-test-layer.py widgets
       - name: Retain GTK widget diagnostics
         if: always()
         uses: https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
@@ -573,96 +728,14 @@ jobs:
           else
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
-  floor-build:
-    runs-on: build-host
-    needs: [pin-revision, guards, clippy]
-    if: github.event_name != 'push'
-    timeout-minutes: 45
-    defaults:
-      run:
-        shell: bash
-    env:
-      CARGO_TARGET_DIR: /target/bookie-${{ github.job }}
-      TMPDIR: /target/tmp-${{ github.run_id }}-${{ github.job }}
-      CARGO_HOME: /cargo
-      BOOKIE_TOOL_DIR: /tools
-      CARGO_BUILD_JOBS: "8"
-      SCCACHE_DIR: /cargo/sccache
-      RUSTC_WRAPPER: sccache
-      SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
-      CMAKE_C_COMPILER_LAUNCHER: /tools/sccache
-      CMAKE_CXX_COMPILER_LAUNCHER: /tools/sccache
-      SCCACHE_BASEDIRS: /target/bookie-${{ github.job }}
-      SCCACHE_SERVER_UDS: /target/tmp-${{ github.run_id }}-${{ github.job }}/sccache.sock
-      PATH: /tools:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
-    steps:
-      - name: Prepare runner workspace
-        run: |
-          mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
-          touch "$CARGO_TARGET_DIR/.bookie-last-used" /target/.bookie-build-cache.lock
-          sccache --start-server
-          rm -rf src
-      - name: Check out source revision
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-        with:
-          ref: ${{ needs.pin-revision.outputs.revision }}
-          token: ${{ secrets.FORGEJO_TOKEN }}
-          persist-credentials: false
-          fetch-depth: 1
-          path: src
-      - name: Install package validation tools
-        run: |
-          apt-get update -qq
-          apt-get install -y --no-install-recommends desktop-file-utils
-      - name: Build the shared release package
-        run: |
-          exec 9>>/target/.bookie-build-cache.lock
-          flock --exclusive 9
-          cd src
-          DEB_OUT="$GITHUB_WORKSPACE/floor-package" bash scripts/build-deb.sh
-          package=$(find "$GITHUB_WORKSPACE/floor-package" -maxdepth 1 -name '*.deb' -print -quit)
-          python3 scripts/ci-gtk-artifact.py create --package "$package" "$GITHUB_WORKSPACE/floor-artifact" "${{ needs.pin-revision.outputs.revision }}"
-      - name: Prepare artifact runtime
-        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
-      - name: Upload the shared release package
-        uses: https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
-        with:
-          name: floor-package-${{ github.run_id }}-${{ needs.pin-revision.outputs.revision }}
-          path: floor-artifact/
-          if-no-files-found: error
-          retention-days: 2
-      - name: Clean builder scratch
-        if: always()
-        run: |
-          if [[ -S "$SCCACHE_SERVER_UDS" ]]; then
-            sccache --show-stats
-            sccache --stop-server
-          fi
-          rm -rf -- "$TMPDIR"
-          if [[ -f src/scripts/ci-cache.py ]]; then
-            python3 src/scripts/ci-cache.py --root /target --lock /target/.bookie-build-cache.lock cleanup --min-free-gib 30
-          fi
 
-
-      - name: Finalize runner job
-        if: always()
-        shell: bash
-        run: |
-          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
-            bash src/scripts/cleanup-ci-job.sh
-          else
-            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
-          fi
   distro-floor-scenarios:
     runs-on: any-host
-    needs: [pin-revision, floor-build]
+    needs: [pin-revision, linux-build]
     if: github.event_name != 'push'
     timeout-minutes: 90
-    env:
-      CARGO_TARGET_DIR: /var/cache/ci/target/floor-debian:testing
     strategy:
       fail-fast: false
-      max-parallel: 2
       matrix:
         shard_group: [1, 2]
     steps:
@@ -729,7 +802,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        group: [driver-core, driver-analytics, driver-extended, socket-ssh]
+        group: [driver-core, driver-analytics]
     steps:
       - name: Prepare runner workspace
         run: |
@@ -746,12 +819,91 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
           path: src
-      - name: Obtain the source-pinned test bundle
+      - name: Prepare artifact runtime
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Download the source-pinned ${{ matrix.group }} test bundle
+        uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-${{ matrix.group }}
+          path: ${{ runner.temp }}/bookie-${{ matrix.group }}-bundle
+      - name: Verify and prepare the ${{ matrix.group }} test bundle
+        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" "${{ matrix.group }}" "${{ runner.temp }}/bookie-${{ matrix.group }}-bundle"
+      - name: Docker Hub login
         env:
-          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
-          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" "${{ matrix.group }}"
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: bash src/scripts/docker-hub-login.sh
+      - name: Pre-pull PostgreSQL socket fixture image
+        if: matrix.group == 'socket-ssh'
+        run: bash src/scripts/prepull-test-images.sh socket-ssh
+      - name: Driver integration
+        env:
+          BOOKIE_TEST_LAYER: ${{ matrix.group }}
+        run: |
+          cd src
+          if [[ "$BOOKIE_TEST_LAYER" == socket-ssh ]]; then
+            cleanup_testcontainers() {
+              python3 scripts/cleanup-testcontainers.py "$BOOKIE_TEST_RUN_ID"
+            }
+            trap cleanup_testcontainers EXIT
+            trap 'cleanup_testcontainers; exit 143' TERM
+            trap 'cleanup_testcontainers; exit 130' INT
+          fi
+          python3 scripts/run-test-layer.py "$BOOKIE_TEST_LAYER"
+      - name: Pre-pull pg_dump image
+        if: matrix.group == 'driver-core'
+        run: bash src/scripts/prepull-test-images.sh pg-dump
+      - name: PostgreSQL dump and restore
+        if: matrix.group == 'driver-core'
+        run: cd src && python3 scripts/run-test-layer.py pg-dump
+
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
+  driver-followup:
+    if: always() && !cancelled() && github.event_name != 'push' && needs.pin-revision.result == 'success' && needs.guards.result == 'success' && needs.clippy.result == 'success' && needs.test-build.result == 'success'
+    runs-on: any-host
+    needs: [pin-revision, guards, clippy, test-build, driver]
+    timeout-minutes: 90
+    env:
+      CARGO_TARGET_DIR: /var/cache/ci/target/${{ matrix.group }}
+      TMPDIR: /var/cache/ci/tmp/bookie-driver-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}
+      BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [driver-extended, socket-ssh]
+    steps:
+      - name: Prepare runner workspace
+        run: |
+          mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"
+          rm -rf src
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
+      - name: Prepare artifact runtime
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Download the source-pinned ${{ matrix.group }} test bundle
+        uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-${{ matrix.group }}
+          path: ${{ runner.temp }}/bookie-${{ matrix.group }}-bundle
+      - name: Verify and prepare the ${{ matrix.group }} test bundle
+        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" "${{ matrix.group }}" "${{ runner.temp }}/bookie-${{ matrix.group }}-bundle"
       - name: Docker Hub login
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -797,11 +949,11 @@ jobs:
     timeout-minutes: 45
     env:
       TMPDIR: /var/cache/ci/tmp/bookie-b4-rollback-${{ github.run_id }}-${{ github.run_attempt }}
+      SCCACHE_SERVER_UDS: /var/cache/ci/tmp/bookie-b4-rollback-${{ github.run_id }}-${{ github.run_attempt }}/sccache.sock
       BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-b4-rollback
     steps:
       - name: Prepare runner workspace
         run: |
-          mkdir -p "$TMPDIR"
           rm -rf src
       - name: Check runner space before checkout
         shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
@@ -814,6 +966,10 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
           path: src
+      - name: Start job-scoped compiler cache
+        run: |
+          mkdir -p "$TMPDIR"
+          sccache --start-server
       - name: Docker Hub login
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -855,12 +1011,15 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
           path: src
-      - name: Obtain the source-pinned test bundle
-        env:
-          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
-          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" consumers
+      - name: Prepare artifact runtime
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Download the source-pinned consumers test bundle
+        uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-consumers
+          path: ${{ runner.temp }}/bookie-consumers-bundle
+      - name: Verify and prepare the consumers test bundle
+        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" consumers "${{ runner.temp }}/bookie-consumers-bundle"
       - name: Security policy tests
         run: cd src && python3 scripts/run-test-layer.py security-policy
 
@@ -895,12 +1054,15 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
           path: src
-      - name: Obtain the source-pinned test bundle
-        env:
-          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
-          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" consumers
+      - name: Prepare artifact runtime
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Download the source-pinned consumers test bundle
+        uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-consumers
+          path: ${{ runner.temp }}/bookie-consumers-bundle
+      - name: Verify and prepare the consumers test bundle
+        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" consumers "${{ runner.temp }}/bookie-consumers-bundle"
       - name: Docker Hub login
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -928,14 +1090,12 @@ jobs:
   gtk:
     if: github.event_name != 'push'
     runs-on: any-host
-    needs: [pin-revision, guards, clippy, gtk-build]
+    needs: [pin-revision, guards, linux-build]
     timeout-minutes: 60
-    env:
-      CARGO_TARGET_DIR: /var/cache/ci/target/gtk-build
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2]
     steps:
       - name: Prepare runner workspace
         run: |
@@ -962,7 +1122,64 @@ jobs:
           path: gtk-artifact/
       - name: Verify the shared GTK binary
         run: |
-          binary=$(python3 src/scripts/ci-gtk-artifact.py verify "$GITHUB_WORKSPACE/gtk-artifact" "${{ needs.pin-revision.outputs.revision }}")
+          binary=$(python3 src/scripts/ci-gtk-artifact.py verify --profile dist "$GITHUB_WORKSPACE/gtk-artifact" "${{ needs.pin-revision.outputs.revision }}")
+          printf 'BOOKIE_GTK_BINARY=%s\nGSETTINGS_SCHEMA_DIR=%s/schemas\n' "$binary" "$GITHUB_WORKSPACE/gtk-artifact" >> "$GITHUB_ENV"
+      - name: Docker Hub login
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: bash src/scripts/docker-hub-login.sh
+      - name: Select isolated MCP HTTP port
+        run: cd src && python3 scripts/ci-mcp-port.py "${{ matrix.shard }}"
+      - name: Installed GTK end-to-end suite, one third
+        run: |
+          cd src && BOOKIE_GTK_SHARD="${{ matrix.shard }}/3" python3 scripts/run-test-layer.py ui
+
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
+  gtk-followup:
+    if: always() && !cancelled() && github.event_name != 'push' && needs.pin-revision.result == 'success' && needs.guards.result == 'success' && needs.linux-build.result == 'success'
+    runs-on: any-host
+    needs: [pin-revision, guards, linux-build, gtk]
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [3]
+    steps:
+      - name: Prepare runner workspace
+        run: |
+          rm -rf src
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
+      - name: Prepare artifact runtime
+        env:
+          BOOKIE_TOOL_DIR: /var/cache/ci/tools
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Download the shared GTK binary
+        uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
+        with:
+          name: gtk-ci-${{ github.run_id }}-${{ needs.pin-revision.outputs.revision }}
+          path: gtk-artifact/
+      - name: Verify the shared GTK binary
+        run: |
+          binary=$(python3 src/scripts/ci-gtk-artifact.py verify --profile dist "$GITHUB_WORKSPACE/gtk-artifact" "${{ needs.pin-revision.outputs.revision }}")
           printf 'BOOKIE_GTK_BINARY=%s\nGSETTINGS_SCHEMA_DIR=%s/schemas\n' "$binary" "$GITHUB_WORKSPACE/gtk-artifact" >> "$GITHUB_ENV"
       - name: Docker Hub login
         env:
@@ -1007,12 +1224,15 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
           path: src
-      - name: Obtain the source-pinned test bundle
-        env:
-          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
-          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" pg-release
+      - name: Prepare artifact runtime
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Download the source-pinned pg-release test bundle
+        uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-pg-release
+          path: ${{ runner.temp }}/bookie-pg-release-bundle
+      - name: Verify and prepare the pg-release test bundle
+        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" pg-release "${{ runner.temp }}/bookie-pg-release-bundle"
       - name: Docker Hub login
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -1039,13 +1259,13 @@ jobs:
   gtk-server:
     if: github.event_name != 'push'
     runs-on: any-host
-    needs: [pin-revision, guards, clippy, gtk-build]
+    needs: [pin-revision, guards, linux-build]
     timeout-minutes: 45
     env:
-      CARGO_TARGET_DIR: /var/cache/ci/target/gtk-build
       BOOKIE_GTK_SCENARIO_RETRIES: "0"
       BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-gtk-server-${{ matrix.server }}
       BOOKIE_GTK_SERVER_IMAGE_GROUP: ${{ matrix.server == 'mysql-approval' && 'mysql' || matrix.server }}
+      TMPDIR: /var/cache/ci/tmp
     strategy:
       fail-fast: false
       matrix:
@@ -1054,10 +1274,134 @@ jobs:
             mcp_port_slot: 5
           - server: mongodb
             mcp_port_slot: 6
+    steps:
+      - name: Prepare runner workspace
+        run: |
+          rm -rf src
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
+      - name: Prepare artifact runtime
+        env:
+          BOOKIE_TOOL_DIR: /var/cache/ci/tools
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Download the shared GTK binary
+        uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
+        with:
+          name: gtk-ci-${{ github.run_id }}-${{ needs.pin-revision.outputs.revision }}
+          path: gtk-artifact/
+      - name: Verify the shared GTK binary
+        run: |
+          binary=$(python3 src/scripts/ci-gtk-artifact.py verify --profile dist "$GITHUB_WORKSPACE/gtk-artifact" "${{ needs.pin-revision.outputs.revision }}")
+          printf 'BOOKIE_GTK_BINARY=%s\nGSETTINGS_SCHEMA_DIR=%s/schemas\n' "$binary" "$GITHUB_WORKSPACE/gtk-artifact" >> "$GITHUB_ENV"
+      - name: Docker Hub login
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: bash src/scripts/docker-hub-login.sh
+      - name: Pre-pull GTK fixture image with retries
+        run: bash src/scripts/prepull-test-images.sh "$BOOKIE_GTK_SERVER_IMAGE_GROUP"
+      - name: Select isolated MCP HTTP port
+        run: cd src && python3 scripts/ci-mcp-port.py "${{ matrix.mcp_port_slot }}"
+      - name: Installed GTK scenarios against a real server
+        run: cd src && python3 scripts/run-test-layer.py "gtk-${{ matrix.server }}"
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
+  gtk-server-followup:
+    if: always() && !cancelled() && github.event_name != 'push' && needs.pin-revision.result == 'success' && needs.guards.result == 'success' && needs.linux-build.result == 'success'
+    runs-on: any-host
+    needs: [pin-revision, guards, linux-build, gtk-server]
+    timeout-minutes: 45
+    env:
+      BOOKIE_GTK_SCENARIO_RETRIES: "0"
+      BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-gtk-server-${{ matrix.server }}
+      BOOKIE_GTK_SERVER_IMAGE_GROUP: ${{ matrix.server == 'mysql-approval' && 'mysql' || matrix.server }}
+      TMPDIR: /var/cache/ci/tmp
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
           - server: postgres
             mcp_port_slot: 7
           - server: mysql
             mcp_port_slot: 8
+    steps:
+      - name: Prepare runner workspace
+        run: |
+          rm -rf src
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
+      - name: Prepare artifact runtime
+        env:
+          BOOKIE_TOOL_DIR: /var/cache/ci/tools
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Download the shared GTK binary
+        uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
+        with:
+          name: gtk-ci-${{ github.run_id }}-${{ needs.pin-revision.outputs.revision }}
+          path: gtk-artifact/
+      - name: Verify the shared GTK binary
+        run: |
+          binary=$(python3 src/scripts/ci-gtk-artifact.py verify --profile dist "$GITHUB_WORKSPACE/gtk-artifact" "${{ needs.pin-revision.outputs.revision }}")
+          printf 'BOOKIE_GTK_BINARY=%s\nGSETTINGS_SCHEMA_DIR=%s/schemas\n' "$binary" "$GITHUB_WORKSPACE/gtk-artifact" >> "$GITHUB_ENV"
+      - name: Docker Hub login
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: bash src/scripts/docker-hub-login.sh
+      - name: Pre-pull GTK fixture image with retries
+        run: bash src/scripts/prepull-test-images.sh "$BOOKIE_GTK_SERVER_IMAGE_GROUP"
+      - name: Select isolated MCP HTTP port
+        run: cd src && python3 scripts/ci-mcp-port.py "${{ matrix.mcp_port_slot }}"
+      - name: Installed GTK scenarios against a real server
+        run: cd src && python3 scripts/run-test-layer.py "gtk-${{ matrix.server }}"
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
+  gtk-server-final:
+    if: always() && !cancelled() && github.event_name != 'push' && needs.pin-revision.result == 'success' && needs.guards.result == 'success' && needs.linux-build.result == 'success' && needs.gtk-server-followup.result != 'skipped'
+    runs-on: any-host
+    needs: [pin-revision, guards, linux-build, gtk-server-followup]
+    timeout-minutes: 45
+    env:
+      BOOKIE_GTK_SCENARIO_RETRIES: "0"
+      BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-gtk-server-${{ matrix.server }}
+      BOOKIE_GTK_SERVER_IMAGE_GROUP: ${{ matrix.server == 'mysql-approval' && 'mysql' || matrix.server }}
+      TMPDIR: /var/cache/ci/tmp
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
           - server: mysql-approval
             mcp_port_slot: 9
     steps:
@@ -1086,7 +1430,7 @@ jobs:
           path: gtk-artifact/
       - name: Verify the shared GTK binary
         run: |
-          binary=$(python3 src/scripts/ci-gtk-artifact.py verify "$GITHUB_WORKSPACE/gtk-artifact" "${{ needs.pin-revision.outputs.revision }}")
+          binary=$(python3 src/scripts/ci-gtk-artifact.py verify --profile dist "$GITHUB_WORKSPACE/gtk-artifact" "${{ needs.pin-revision.outputs.revision }}")
           printf 'BOOKIE_GTK_BINARY=%s\nGSETTINGS_SCHEMA_DIR=%s/schemas\n' "$binary" "$GITHUB_WORKSPACE/gtk-artifact" >> "$GITHUB_ENV"
       - name: Docker Hub login
         env:
@@ -1131,12 +1475,15 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
           path: src
-      - name: Obtain the source-pinned test bundle
-        env:
-          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
-          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" driver-tls
+      - name: Prepare artifact runtime
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Download the source-pinned driver-tls test bundle
+        uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-driver-tls
+          path: ${{ runner.temp }}/bookie-driver-tls-bundle
+      - name: Verify and prepare the driver-tls test bundle
+        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" driver-tls "${{ runner.temp }}/bookie-driver-tls-bundle"
       - name: Docker Hub login
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -1146,6 +1493,14 @@ jobs:
         run: bash src/scripts/prepull-test-images.sh driver-tls
       - name: Driver TLS fixtures
         run: cd src && python3 scripts/run-test-layer.py tls
+      - name: Retain driver TLS diagnostics
+        if: always()
+        uses: https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
+        with:
+          name: driver-tls-${{ github.run_id }}-${{ github.run_attempt }}
+          path: src/target/quality/*-layers
+          if-no-files-found: error
+          retention-days: 2
 
       - name: Finalize runner job
         if: always()
@@ -1178,12 +1533,15 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
           path: src
-      - name: Obtain the source-pinned test bundle
-        env:
-          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
-          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" keyring
+      - name: Prepare artifact runtime
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Download the source-pinned keyring test bundle
+        uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-keyring
+          path: ${{ runner.temp }}/bookie-keyring-bundle
+      - name: Verify and prepare the keyring test bundle
+        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" keyring "${{ runner.temp }}/bookie-keyring-bundle"
       - name: Secret Service tier
         run: cd src && python3 scripts/run-test-layer.py keyring
 
@@ -1257,21 +1615,25 @@ jobs:
       - pin-revision
       - guards
       - gpui-tests
-      - gtk-build
+      - gpui-build
+      - linux-build
       - clippy
       - test-build
       - b4-rollback
       - unit
       - sandbox
       - widgets
-      - floor-build
       - distro-floor-scenarios
       - driver
+      - driver-followup
       - security-policy
       - consumers
       - gtk
+      - gtk-followup
       - pg-release
       - gtk-server
+      - gtk-server-followup
+      - gtk-server-final
       - driver-tls
       - keyring
       - supply-chain

@@ -103,6 +103,16 @@ fn value_contract_bit_arrays_decode_binary_elements_and_refuse_nul_text() {
 }
 
 #[test]
+fn value_contract_bit_array_expansion_is_bounded_before_materialization() {
+    let bit_length = MAX_ARRAY_TEXT_BYTES * 4;
+    let mut bit_value = i32::try_from(bit_length).unwrap().to_be_bytes().to_vec();
+    bit_value.resize(4 + bit_length.div_ceil(8), 0);
+    let array = wire(VARBIT_OID, &[(1, 1)], &[Some(&bit_value)]);
+
+    assert!(decode_binary(&array, VARBIT_OID, false).is_none());
+}
+
+#[test]
 fn value_contract_array_null_empty_and_escaped_text_stay_distinct() {
     assert_eq!(decode_binary(&wire(25, &[], &[]), 25, false).as_deref(), Some("{}"));
     let bytes = wire(

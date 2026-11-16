@@ -189,8 +189,12 @@ async fn mysql_value_query_refetches_the_exact_blob_for_a_composite_key() {
     use testcontainers_modules::mysql::Mysql;
 
     let container = Mysql::default()
+        .with_tag(crate::test_image_tags::MYSQL_TEST_TAG)
         .with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test")
-        .with_cmd(["--default-authentication-plugin=mysql_native_password"])
+        .with_cmd([
+            "--mysql-native-password=ON",
+            "--authentication-policy=mysql_native_password",
+        ])
         .with_startup_timeout(std::time::Duration::from_secs(180))
         .start()
         .await
@@ -605,6 +609,7 @@ async fn mssql_value_query_refetches_the_exact_blob_for_a_composite_key() {
 
     let container = MssqlServer::default()
         .with_accept_eula()
+        .with_tag(crate::test_image_tags::MSSQL_TEST_TAG)
         .with_startup_timeout(std::time::Duration::from_secs(180))
         .start()
         .await

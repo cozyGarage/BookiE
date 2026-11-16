@@ -4,6 +4,26 @@ use mongodb::bson::{Bson, Document};
 
 use bookie_core::{ColumnInfo, DriverError, Value};
 
+const EXTJSON_MARKERS: &[&str] = &[
+    "$binary",
+    "$code",
+    "$date",
+    "$dbPointer",
+    "$decimal128",
+    "$maxKey",
+    "$minKey",
+    "$numberDecimal",
+    "$numberDouble",
+    "$numberInt",
+    "$numberLong",
+    "$oid",
+    "$regularExpression",
+    "$scope",
+    "$symbol",
+    "$timestamp",
+    "$undefined",
+];
+
 pub(super) fn value_to_bson(value: &Value) -> Result<Bson, DriverError> {
     use mongodb::bson::{Binary, DateTime, spec::BinarySubtype};
 
@@ -225,29 +245,27 @@ fn json_to_bson(value: serde_json::Value) -> Result<Bson, String> {
     })
 }
 
+pub(super) fn relaxed_extended_json_for_display(value: &serde_json::Value) -> Option<serde_json::Value> {
+    if !contains_extended_json_marker(value) {
+        return None;
+    }
+    json_to_bson(value.clone()).ok().map(|bson| bson.into_relaxed_extjson())
+}
+
+fn contains_extended_json_marker(value: &serde_json::Value) -> bool {
+    match value {
+        serde_json::Value::Array(values) => values.iter().any(contains_extended_json_marker),
+        serde_json::Value::Object(values) => values
+            .iter()
+            .any(|(key, value)| EXTJSON_MARKERS.contains(&key.as_str()) || contains_extended_json_marker(value)),
+        _ => false,
+    }
+}
+
 // Canonical and relaxed Extended JSON objects encode BSON scalar types.
 // Recognize these before recursively treating the object as a plain document
 // so exported Mongo results can be re-imported.
 fn bson_from_json_object(values: serde_json::Map<String, serde_json::Value>) -> Result<Bson, String> {
-    const EXTJSON_MARKERS: &[&str] = &[
-        "$binary",
-        "$code",
-        "$date",
-        "$dbPointer",
-        "$decimal128",
-        "$maxKey",
-        "$minKey",
-        "$numberDecimal",
-        "$numberDouble",
-        "$numberInt",
-        "$numberLong",
-        "$oid",
-        "$regularExpression",
-        "$scope",
-        "$symbol",
-        "$timestamp",
-        "$undefined",
-    ];
     if values.keys().any(|key| EXTJSON_MARKERS.contains(&key.as_str())) {
         return Bson::try_from(serde_json::Value::Object(values)).map_err(|error| error.to_string());
     }

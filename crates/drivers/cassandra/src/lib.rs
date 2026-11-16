@@ -137,8 +137,13 @@ pub(crate) fn text(value: &Value) -> Option<String> {
 
 impl CassandraConnection {
     pub(crate) async fn read(&self, cql: &str, _binds: &[Value], limit: usize) -> Result<QueryResult, DriverError> {
+        self.read_window(cql, 0, limit).await
+    }
+
+    pub(crate) async fn read_window(&self, cql: &str, skip: usize, limit: usize) -> Result<QueryResult, DriverError> {
         let mut statement = Statement::new(cql);
-        let page = i32::try_from(limit.saturating_add(1).min(MAX_QUERY_ROWS + 1)).unwrap_or(i32::MAX);
+        let wanted = skip.saturating_add(limit);
+        let page = i32::try_from(wanted.saturating_add(1).min(MAX_QUERY_ROWS + 1)).unwrap_or(i32::MAX);
         statement.set_page_size(page);
         let (result, paging) = self
             .session
@@ -172,27 +177,36 @@ impl CassandraConnection {
                 domain_type: None,
             })
             .collect();
-        let mut budget = QueryResultBudget::default();
-        let mut cells = Vec::new();
-        let mut truncated = !paging.finished();
-        for row in rows
+        let page = rows
             .rows::<scylla::value::Row>()
             .map_err(|error| DriverError::Internal(format!("cassandra rows: {error}")))?
-        {
-            let row = row.map_err(|error| DriverError::Internal(format!("cassandra row: {error}")))?;
-            let values: Vec<Value> = row.columns.into_iter().map(value::cell).collect();
-            if cells.len() >= limit || !budget.admit(&values) {
-                truncated = true;
-                break;
-            }
-            cells.push(values);
-        }
+            .map(|row| row.map_err(|error| DriverError::Internal(format!("cassandra row: {error}"))));
+        let (cells, truncated) = take_window(page, skip, limit, !paging.finished())?;
         Ok(QueryResult {
             columns,
             rows: QueryRows::from_rows(cells),
             truncated,
         })
     }
+}
+
+fn take_window(
+    rows: impl Iterator<Item = Result<scylla::value::Row, DriverError>>,
+    skip: usize,
+    limit: usize,
+    mut truncated: bool,
+) -> Result<(Vec<Vec<Value>>, bool), DriverError> {
+    let mut budget = QueryResultBudget::default();
+    let mut cells = Vec::new();
+    for row in rows.skip(skip) {
+        let values: Vec<Value> = row?.columns.into_iter().map(value::cell).collect();
+        if cells.len() >= limit || !budget.admit(&values) {
+            truncated = true;
+            break;
+        }
+        cells.push(values);
+    }
+    Ok((cells, truncated))
 }
 
 fn refuse_write() -> DriverError {
@@ -225,21 +239,11 @@ impl Connection for CassandraConnection {
                 "Cassandra has no row offset; pages are limited to the first {MAX_OFFSET} rows"
             )));
         }
-        let wanted = usize::try_from(offset.saturating_add(limit)).unwrap_or(MAX_QUERY_ROWS);
-        let target = guard::qualified(schema.or(self.keyspace.as_deref()), table);
-        let mut result = self
-            .read(&format!("SELECT * FROM {target} LIMIT {wanted}"), &[], wanted)
-            .await?;
         let skip = usize::try_from(offset).unwrap_or(usize::MAX);
-        let rows: Vec<Vec<Value>> = result
-            .rows
-            .iter()
-            .skip(skip)
-            .take(usize::try_from(limit).unwrap_or(MAX_QUERY_ROWS))
-            .map(|row| row.to_vec())
-            .collect();
-        result.rows = QueryRows::from_rows(rows);
-        Ok(result)
+        let take = usize::try_from(limit).unwrap_or(MAX_QUERY_ROWS);
+        let target = guard::qualified(schema.or(self.keyspace.as_deref()), table);
+        let cql = format!("SELECT * FROM {target} LIMIT {}", skip.saturating_add(take));
+        self.read_window(&cql, skip, take).await
     }
 
     async fn query(&self, cql: &str) -> Result<QueryResult, DriverError> {
@@ -267,5 +271,27 @@ impl Connection for CassandraConnection {
 
     async fn close(self: Box<Self>) -> Result<(), DriverError> {
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod window_tests {
+    use scylla::value::{CqlValue, Row};
+
+    use super::*;
+
+    fn wide(len: usize) -> Result<Row, DriverError> {
+        Ok(Row {
+            columns: vec![Some(CqlValue::Text("x".repeat(len)))],
+        })
+    }
+
+    #[test]
+    fn rows_before_the_page_do_not_use_up_the_result_budget() {
+        let thirty_mib = 30 * 1024 * 1024;
+        let rows = (0..3).map(move |_| wide(thirty_mib));
+        let (cells, truncated) = take_window(rows, 2, 1, false).unwrap();
+        assert_eq!(cells.len(), 1, "the one wanted row fits after two skipped ones");
+        assert!(!truncated);
     }
 }

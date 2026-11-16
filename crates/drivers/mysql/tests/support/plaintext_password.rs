@@ -204,7 +204,9 @@ async fn an_initial_cleartext_plugin_handshake_never_receives_the_password() {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn a_real_mysql_default_login_needs_tls_over_tcp_and_succeeds_with_it() {
-    let image = Mysql::default().with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test");
+    let image = Mysql::default()
+        .with_tag(crate::MYSQL_TEST_TAG)
+        .with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test");
     let image = match std::env::var("BOOKIE_TEST_RUN_ID") {
         Ok(run_id) => image.with_label("com.bookie.test-run", run_id),
         Err(_) => image,

@@ -33,14 +33,19 @@ pub enum CatalogDdlMsg {
 }
 
 #[derive(Debug)]
-pub enum AppMsg {
-    OpenConnect,
-    ConnectionPrepared(Box<crate::services::connection_service::PreparedConnection>),
-    ConnectionPrepareFailed(String, Box<SavedConnection>),
-    CancelConnect,
-    ConnectionCancelled,
-    ConnectionSwitchDecision(super::types::SwitchDecision),
+pub enum ConnectionMessage {
+    Open,
+    Cancel,
+    Prepared(Box<crate::services::connection_service::PreparedConnection>),
+    PrepareFailed(String, Box<SavedConnection>),
+    SwitchDecision(super::types::SwitchDecision),
+    Cancelled,
     DialogClosed,
+}
+
+#[derive(Debug)]
+pub enum AppMsg {
+    Connection(ConnectionMessage),
     SelectTable {
         schema: Option<String>,
         name: String,
@@ -228,7 +233,8 @@ pub enum AppMsg {
         row_positions: Vec<u32>,
         statement: bookie_core::sql_literal::RowStatement,
     },
-    FetchBrowsePage(Uuid),
+    FetchBrowsePage(Uuid, bool),
+    AutoRefreshFailed(Uuid, crate::ui::browse_tab::BrowsePageRequest, String),
     AttachWorkspaceTab {
         tab_id: Uuid,
         connection_id: Option<Uuid>,

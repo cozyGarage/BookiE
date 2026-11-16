@@ -8,7 +8,7 @@ use bookie_gpui::source::{ResultSource, Source};
 use gpui::{Context, Window};
 use tokio_util::sync::CancellationToken;
 
-use crate::{GridView, Mode};
+use crate::{GridView, Mode, Work};
 
 impl GridView {
     pub(super) fn attach_live(&mut self, table: Arc<LiveTable>) {
@@ -43,6 +43,7 @@ impl GridView {
         }
         self.status = "Connecting…".into();
         self.begin_background(
+            Work::Load,
             cx,
             move |cancel| open_first_table(&origin, &cancel),
             |this, opened| match opened {
@@ -130,6 +131,7 @@ impl GridView {
         self.status = format!("Loading {}…", table_label(table));
         let wanted = table.clone();
         self.begin_background(
+            Work::Load,
             cx,
             move |cancel| load(&session, &wanted, &cancel),
             move |this, loaded| match loaded {
@@ -223,11 +225,11 @@ mod tests {
     fn a_cancelled_connection_request_does_not_open_its_file() {
         let cancellation = tokio_util::sync::CancellationToken::new();
         cancellation.cancel();
-        let result = open_first_table(&Origin::File(PathBuf::from("/missing/bookie.db")), &cancellation);
-        assert!(
-            result.as_ref().is_err_and(|message| message.contains("Cancelled")),
-            "{:?}",
-            result.as_ref().map(|_| ())
-        );
+        let path = std::env::temp_dir().join(format!("bookie-cancelled-open-{}.sqlite", uuid::Uuid::new_v4()));
+        let result = open_first_table(&Origin::File(PathBuf::from(&path)), &cancellation);
+        let was_opened = path.exists();
+        let _ = std::fs::remove_file(path);
+        assert!(result.is_err(), "cancelled request succeeded");
+        assert!(!was_opened, "cancelled request created its database file");
     }
 }

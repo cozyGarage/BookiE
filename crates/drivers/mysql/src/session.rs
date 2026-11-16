@@ -10,7 +10,7 @@ use sqlx::{Connection as SqlxConnection, Pool};
 
 use crate::{
     confirms_cancellation, connection_id, map_sqlx_error, params_into_result, prepare_session,
-    refuse_non_utc_timestamps, request_cancellation, session_lexical_settings, timezone_is_utc,
+    refuse_non_utc_timestamps, report_read_only_setup, request_cancellation, session_lexical_settings, timezone_is_utc,
 };
 
 const SESSION_SETUP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
@@ -36,10 +36,11 @@ pub(crate) async fn open(
         .map_err(|_| DriverError::TimedOut)?
         .map_err(map_sqlx_error)?;
     connection.close_on_drop();
-    tokio::time::timeout(SESSION_SETUP_TIMEOUT, prepare_session(&mut connection, read_only))
+    let server_read_only = tokio::time::timeout(SESSION_SETUP_TIMEOUT, prepare_session(&mut connection, read_only))
         .await
         .map_err(|_| DriverError::TimedOut)?
         .map_err(map_sqlx_error)?;
+    report_read_only_setup(read_only, server_read_only);
     let connection_id = tokio::time::timeout(SESSION_SETUP_TIMEOUT, connection_id(&mut connection))
         .await
         .map_err(|_| DriverError::TimedOut)??;

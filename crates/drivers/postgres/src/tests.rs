@@ -36,6 +36,16 @@ fn pooler_symptoms_get_a_hint_and_other_errors_are_left_alone() {
     }
 }
 
+#[tokio::test]
+async fn discarded_connection_cleanup_does_not_wait_for_an_unresponsive_peer() {
+    let result = tokio::time::timeout(
+        Duration::from_millis(20),
+        bounded_cleanup(Duration::from_millis(5), std::future::pending::<()>()),
+    )
+    .await;
+    assert_eq!(result, Ok(false), "connection cleanup must return within its bound");
+}
+
 #[test]
 fn undecodable_cell_cannot_be_bound_as_null() {
     let params = [Value::Undecodable("NUMERIC".into())];
@@ -47,7 +57,7 @@ fn undecodable_cell_cannot_be_bound_as_null() {
 
 #[test]
 fn server_termination_states_are_disconnections_but_query_cancel_is_not() {
-    for sqlstate in ["57P01", "57P02", "57P03", "57P04"] {
+    for sqlstate in ["25P03", "57P01", "57P02", "57P03", "57P04"] {
         assert!(is_server_disconnect_sqlstate(Some(sqlstate)), "{sqlstate}");
     }
     assert!(!is_server_disconnect_sqlstate(Some("57014")));

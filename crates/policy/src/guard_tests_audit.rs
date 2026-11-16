@@ -606,13 +606,71 @@ async fn ambiguous_driver_error_records_unknown_and_poisons_state() {
     guard
         .execute("INSERT INTO jobs(id) VALUES (1)")
         .await
-        .expect_err("TLS error must surface");
+        .expect_err("ambiguous error must surface");
 
     assert!(state.governed_writes_disabled());
     let events = audit.events.lock().expect("event lock");
     let outcome = events.last().expect("outcome event");
     assert_eq!(outcome.terminal_status, AuditTerminalStatus::Unknown);
-    assert_eq!(outcome.error_category, Some(AuditErrorCategory::Tls));
+    assert_eq!(outcome.error_category, Some(AuditErrorCategory::Internal));
+}
+
+#[tokio::test]
+async fn a_write_refused_before_dispatch_fails_cleanly_and_does_not_block_later_writes() {
+    for (error, category) in [
+        (
+            (|| DriverError::ConnectionRefused) as fn() -> DriverError,
+            AuditErrorCategory::Connection,
+        ),
+        (
+            || DriverError::DatabaseFileNotFound("/tmp/gone.db".into()),
+            AuditErrorCategory::Connection,
+        ),
+        (|| DriverError::AuthFailed, AuditErrorCategory::Authentication),
+        (
+            || DriverError::IntegratedAuth("no ticket".into()),
+            AuditErrorCategory::Authentication,
+        ),
+        (
+            || DriverError::Tls("certificate rejected".into()),
+            AuditErrorCategory::Tls,
+        ),
+    ] {
+        let state = Arc::new(AuditState::new());
+        let audit = Arc::new(SequenceAuditSink::new(vec![]));
+        let guard = PolicyGuard::new(
+            Arc::new(ErrorConn(error)),
+            context(
+                Principal::human_gui(),
+                Environment::Prod,
+                PolicyConfig::default(),
+                Arc::new(AutoApproveSink),
+                audit.clone(),
+                state.clone(),
+            ),
+        );
+
+        guard
+            .execute("INSERT INTO jobs(id) VALUES (1)")
+            .await
+            .expect_err("the driver refuses the write");
+        guard
+            .execute("INSERT INTO jobs(id) VALUES (2)")
+            .await
+            .expect_err("the second write reaches the driver again");
+
+        assert!(!state.governed_writes_disabled(), "{category:?}");
+        let events = audit.events.lock().expect("event lock");
+        let outcomes: Vec<_> = events
+            .iter()
+            .filter(|event| event.phase == AuditRecordPhase::Outcome)
+            .collect();
+        assert_eq!(outcomes.len(), 2, "{category:?}");
+        for outcome in outcomes {
+            assert_eq!(outcome.terminal_status, AuditTerminalStatus::Failed, "{category:?}");
+            assert_eq!(outcome.error_category, Some(category));
+        }
+    }
 }
 
 #[tokio::test]
@@ -637,14 +695,14 @@ async fn audit_events_sanitize_driver_details_and_agent_token() {
     guard
         .execute("INSERT INTO jobs(id) VALUES (1)")
         .await
-        .expect_err("TLS error must surface");
+        .expect_err("driver error must surface");
 
     let events = audit.events.lock().expect("event lock");
     let serialized = serde_json::to_string(&*events).expect("serialize events");
     assert!(!serialized.contains("raw-agent-token"));
     assert!(!serialized.contains("raw-driver-secret"));
     assert!(serialized.contains("sha256:"));
-    assert!(serialized.contains("tls_error"));
+    assert!(serialized.contains("internal"));
 }
 
 #[tokio::test]

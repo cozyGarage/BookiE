@@ -1,3 +1,4 @@
+use super::super::ConnectionMessage;
 use super::*;
 use bookie_core::Value;
 use relm4::{Component, ComponentController};
@@ -91,9 +92,9 @@ fn open_connection(
     prepared: crate::services::connection_service::PreparedConnection,
 ) -> uuid::Uuid {
     let id = prepared.id();
-    controller.emit(AppMsg::OpenConnect);
+    controller.emit(AppMsg::Connection(ConnectionMessage::Open));
     spin_until(|| controller.model().switch.transition == super::super::ConnectionTransition::Connecting);
-    controller.emit(AppMsg::ConnectionPrepared(Box::new(prepared)));
+    controller.emit(AppMsg::Connection(ConnectionMessage::Prepared(Box::new(prepared))));
     spin_until(|| controller.model().multi.sessions.is_working(id));
     id
 }
@@ -261,14 +262,15 @@ struct WindowPair {
 fn primary_and_secondary_window() -> WindowPair {
     relm4::adw::init().unwrap();
     gtk4::gio::resources_register_include!("bookie.gresource").unwrap();
-    relm4::main_application()
-        .register(None::<&gtk4::gio::Cancellable>)
-        .unwrap();
+    let application = relm4::main_application();
+    application.register(None::<&gtk4::gio::Cancellable>).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let controller = launch(directory.path());
+    controller.widget().set_application(Some(&application));
     controller.widget().present();
     controller.emit(AppMsg::NewWindow);
     spin_until(|| controller.model().extra_windows.len() == 1);
+    assert_eq!(application.windows().len(), 2);
     let key = controller.model().extra_windows[0].0;
     let primary = uuid::Uuid::new_v4();
     let secondary = uuid::Uuid::new_v4();
@@ -293,8 +295,17 @@ fn recorded_groups() -> Vec<Vec<uuid::Uuid>> {
 fn closing_a_secondary_window_forgets_only_its_own_group() {
     let pair = primary_and_secondary_window();
     let window = pair.controller.model().extra_windows[0].1.widget().clone();
+    spin_until(|| window.is_mapped());
+    let expected = vec![vec![pair.primary]];
     window.close();
-    spin_until(|| recorded_groups() == vec![vec![pair.primary]]);
+    spin_until(|| {
+        if recorded_groups() == expected {
+            return true;
+        }
+        window.emit_by_name::<bool>("close-request", &[]);
+        false
+    });
+    window.destroy();
 }
 
 #[test]

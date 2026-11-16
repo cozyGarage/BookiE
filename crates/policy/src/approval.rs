@@ -7,6 +7,41 @@ use crate::principal::Principal;
 use bookie_core::Environment;
 use tokio_util::sync::CancellationToken;
 
+pub const MAX_APPROVAL_SQL_CHARS: usize = 16_384;
+
+pub(crate) fn sql_is_reviewable(sql: &str) -> bool {
+    sql.chars().count() <= MAX_APPROVAL_SQL_CHARS && !sql.chars().any(is_unreviewable_character)
+}
+
+fn is_unreviewable_character(character: char) -> bool {
+    (character.is_control() && !matches!(character, '\n' | '\r' | '\t'))
+        || is_default_ignorable_code_point(character)
+        || matches!(character, '\u{2028}'..='\u{2029}' | '\u{FFF9}'..='\u{FFFB}')
+}
+
+fn is_default_ignorable_code_point(character: char) -> bool {
+    matches!(
+        character,
+        '\u{00AD}'
+            | '\u{034F}'
+            | '\u{061C}'
+            | '\u{115F}'..='\u{1160}'
+            | '\u{17B4}'..='\u{17B5}'
+            | '\u{180B}'..='\u{180F}'
+            | '\u{200B}'..='\u{200F}'
+            | '\u{202A}'..='\u{202E}'
+            | '\u{2060}'..='\u{206F}'
+            | '\u{3164}'
+            | '\u{FE00}'..='\u{FE0F}'
+            | '\u{FEFF}'
+            | '\u{FFA0}'
+            | '\u{FFF0}'..='\u{FFF8}'
+            | '\u{1BCA0}'..='\u{1BCA3}'
+            | '\u{1D173}'..='\u{1D17A}'
+            | '\u{E0000}'..='\u{E0FFF}'
+    )
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApprovalRequest {
     pub principal: Principal,
@@ -22,6 +57,12 @@ pub struct ApprovalRequest {
     /// Runtime-only cancellation scope for interactive approval UI.
     #[serde(skip)]
     pub cancellation: Option<CancellationToken>,
+}
+
+impl ApprovalRequest {
+    pub fn may_be_remembered(&self) -> bool {
+        self.environment != Environment::Prod && matches!(self.principal, Principal::Human { .. })
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -126,7 +167,7 @@ impl<S: ApprovalSink> RememberingApprovalSink<S> {
 #[async_trait]
 impl<S: ApprovalSink> ApprovalSink for RememberingApprovalSink<S> {
     async fn request(&self, req: ApprovalRequest) -> ApprovalOutcome {
-        let may_remember = req.environment != Environment::Prod;
+        let may_remember = req.may_be_remembered();
         let grant = grant_for(&req);
         if may_remember && self.grants.covers(&grant) {
             return ApprovalOutcome::UsedGrant;
@@ -139,5 +180,40 @@ impl<S: ApprovalSink> ApprovalSink for RememberingApprovalSink<S> {
             ApprovalOutcome::AllowAndRemember | ApprovalOutcome::UsedGrant => ApprovalOutcome::AllowOnce,
             other => other,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn request(principal: Principal, environment: Environment) -> ApprovalRequest {
+        ApprovalRequest {
+            principal,
+            environment,
+            connection_id: Uuid::nil(),
+            connection_name: "db".into(),
+            sql: "DELETE FROM t".into(),
+            facts: StatementFacts::unparseable("test"),
+            rule: "rule".into(),
+            reason: "reason".into(),
+            preview: None,
+            estimated_rows: None,
+            cancellation: None,
+        }
+    }
+
+    #[test]
+    fn only_a_person_outside_production_is_offered_remember() {
+        let agent = || Principal::Agent {
+            token: "token".into(),
+            client: None,
+            model: None,
+        };
+        assert!(request(Principal::human_gui(), Environment::Local).may_be_remembered());
+        assert!(request(Principal::human_gui(), Environment::Staging).may_be_remembered());
+        assert!(!request(Principal::human_gui(), Environment::Prod).may_be_remembered());
+        assert!(!request(agent(), Environment::Local).may_be_remembered());
+        assert!(!request(agent(), Environment::Prod).may_be_remembered());
     }
 }

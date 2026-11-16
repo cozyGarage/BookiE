@@ -967,8 +967,10 @@ dependencies = [
  "chrono",
  "clap",
  "libc",
+ "serde_json",
  "tempfile",
  "tokio",
+ "tokio-util",
  "tracing",
  "tracing-subscriber",
  "uuid",
@@ -1049,6 +1051,7 @@ dependencies = [
  "bookie-transport",
  "chrono",
  "gettext-rs",
+ "quick-xml",
  "rust_decimal",
  "secrecy",
  "serde",
@@ -1174,6 +1177,8 @@ dependencies = [
  "csv",
  "futures",
  "mongodb",
+ "rustls",
+ "rustls-pki-types",
  "secrecy",
  "serde_json",
  "sqlparser",
@@ -1181,6 +1186,7 @@ dependencies = [
  "testcontainers",
  "testcontainers-modules",
  "tokio",
+ "tokio-rustls",
  "tokio-util",
  "zip",
 ]
@@ -1244,6 +1250,7 @@ dependencies = [
  "secrecy",
  "testcontainers",
  "tokio",
+ "tokio-util",
 ]
 
 [[package]]
@@ -1417,11 +1424,13 @@ dependencies = [
  "async-trait",
  "bookie-core",
  "bookie-driver-mssql",
+ "bookie-driver-oracle",
  "bookie-driver-postgres",
  "chrono",
  "futures",
  "glob",
  "hex",
+ "oracledb",
  "proptest",
  "rust_decimal",
  "secrecy",
@@ -4472,6 +4481,7 @@ dependencies = [
  "rand 0.9.5",
  "rustc_version_runtime",
  "rustls",
+ "rustls-native-certs",
  "serde",
  "serde_bytes",
  "serde_with",
@@ -6698,8 +6708,6 @@ dependencies = [
 [[package]]
 name = "sqlx-core"
 version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05b44e85bf579a8eeb4ceaa77a3a523baf2bf0e9bac7e40f405d537b5d2d5ccb"
 dependencies = [
  "base64 0.22.1",
  "bytes",
@@ -7175,7 +7183,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",

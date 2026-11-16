@@ -80,6 +80,9 @@ pub fn transaction_control(sql: &str, driver_id: &str) -> Option<TransactionCont
 }
 
 pub(crate) fn transaction_control_parsed(parsed: &ParsedSql, driver_id: &str) -> Option<TransactionControl> {
+    if parsed.lexical_mode_ambiguous() {
+        return None;
+    }
     if driver_id == "mssql" {
         return tsql_transaction_control(parsed);
     }
@@ -140,6 +143,9 @@ fn tsql_transaction_control(parsed: &ParsedSql) -> Option<TransactionControl> {
 }
 
 pub(crate) fn hides_transaction_control(parsed: &ParsedSql, driver_id: &str) -> bool {
+    if parsed.lexical_mode_ambiguous() {
+        return false;
+    }
     if driver_id == "mssql" && tsql_transaction::scan(parsed.sql()).hides_control() {
         return true;
     }

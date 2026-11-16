@@ -169,6 +169,60 @@ class CiCacheTests(unittest.TestCase):
         self.assertTrue((unrelated / 'payload').is_file())
         self.assertTrue((target / 'debug/deps/artifact').exists())
 
+    def test_pressure_cleanup_evicts_orphaned_bundle_download_directories(self):
+        target = self.target('current-build', 0.1)
+        bundle_root = self.directory / 'shared-bundles'
+        bundle_root.mkdir()
+        old_temp = Path(tempfile.mkdtemp(dir=bundle_root))
+        new_temp = Path(tempfile.mkdtemp(prefix='bookie-bundle-', dir=bundle_root))
+        current = bundle_root / ('c' * 40 + '-direct')
+        unrelated = bundle_root / 'tmp-unrelated'
+        for path in (current, unrelated):
+            path.mkdir()
+            (path / 'payload').write_text('keep')
+        (old_temp / 'partial').write_text('interrupted download')
+        (new_temp / 'partial').write_text('interrupted download')
+        os.utime(old_temp, (1, 1))
+        spec = importlib.util.spec_from_file_location('ci_cache', SCRIPT)
+        helper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(helper)
+
+        def disk_usage(_):
+            recovered = not old_temp.exists()
+            return SimpleNamespace(free=100 if recovered else 0)
+
+        with patch.object(helper.shutil, 'disk_usage', side_effect=disk_usage), patch.dict(
+            os.environ, {'GITHUB_SHA': 'c' * 40, 'BOOKIE_BUNDLE_CACHE': str(bundle_root)}
+        ):
+            result = helper.cleanup(self.cache, 50)
+
+        self.assertEqual(result, 0)
+        self.assertFalse(old_temp.exists())
+        self.assertTrue((new_temp / 'partial').exists())
+        self.assertTrue((current / 'payload').exists())
+        self.assertTrue((unrelated / 'payload').exists())
+        self.assertTrue((target / 'debug/deps/artifact').exists())
+
+    def test_pressure_cleanup_preserves_recent_bundle_downloads_if_reserve_is_still_low(self):
+        bundle_root = self.directory / 'shared-bundles'
+        bundle_root.mkdir()
+        old_temp = Path(tempfile.mkdtemp(prefix='bookie-bundle-', dir=bundle_root))
+        active_temp = Path(tempfile.mkdtemp(prefix='bookie-bundle-', dir=bundle_root))
+        (old_temp / 'partial').write_text('interrupted download')
+        (active_temp / 'partial').write_text('active download')
+        os.utime(old_temp, (1, 1))
+        spec = importlib.util.spec_from_file_location('ci_cache', SCRIPT)
+        helper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(helper)
+
+        with patch.object(helper.shutil, 'disk_usage', return_value=SimpleNamespace(free=0)), patch.dict(
+            os.environ, {'BOOKIE_BUNDLE_CACHE': str(bundle_root)}
+        ):
+            helper.prune_bundles(self.cache, 50, '')
+
+        self.assertFalse(old_temp.exists())
+        self.assertTrue((active_temp / 'partial').exists())
+
     def test_pressure_cleanup_evicts_each_supported_test_bundle_group(self):
         spec = importlib.util.spec_from_file_location('ci_cache', SCRIPT)
         helper = importlib.util.module_from_spec(spec)
@@ -343,11 +397,17 @@ class CiCacheTests(unittest.TestCase):
             with self.lock.open('r+') as lock:
                 fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             status = Path(f'/proc/{int(child_pid.read_text())}/stat')
-            try:
-                process_state = status.read_text().split()[2]
-            except (FileNotFoundError, ProcessLookupError):
-                process_state = 'Z'
-            self.assertEqual(process_state, 'Z')
+            deadline = time.monotonic() + 2
+            process_state = None
+            while time.monotonic() < deadline:
+                try:
+                    process_state = status.read_text().split()[2]
+                except (FileNotFoundError, ProcessLookupError):
+                    process_state = 'Z'
+                if process_state in {'Z', 'X'}:
+                    break
+                time.sleep(0.01)
+            self.assertIn(process_state, {'Z', 'X'})
         finally:
             for pid_file in (child_pid, shell_pid):
                 if pid_file.exists():
@@ -406,7 +466,7 @@ class CiCacheTests(unittest.TestCase):
             self.assertEqual(workflow.count('shell: /usr/local/libexec/bookie-ci-cache run {0}'), 1)
             for step in workflow.split('      - name: ')[1:]:
                 if 'uses: https://code.forgejo.org/actions/' in step:
-                    self.assertRegex(step, r'(?m)^          path: ((gtk|floor)-artifact/|src/target/quality/\*-layers)$')
+                    self.assertRegex(step, r'(?m)^          path: ((gtk|floor)-artifact/|src/target/quality/\*-layers|test-bundles/[a-z-]+/|\$\{\{ runner\.temp \}\}/bookie-.+-bundle)$')
                     self.assertNotIn('path: /var/cache/', step)
                     self.assertNotIn('path: ${{ env.CARGO_TARGET_DIR }}', step)
 

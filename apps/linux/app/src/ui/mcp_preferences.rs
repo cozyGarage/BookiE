@@ -26,6 +26,7 @@ pub fn build_page(
 
     let name_for_issue = issue.name_row.clone();
     let scope_for_issue = issue.scope_combo.clone();
+    let expiry_for_issue = issue.expiry_combo.clone();
     let tools_for_issue = issue.tool_checks.clone();
     let tokens_for_issue = tokens_group.clone();
     let page_for_dialog = page.clone();
@@ -39,6 +40,7 @@ pub fn build_page(
             _ => TokenPermissions::ReadOnly,
         };
         let tool_allowlist = selected_tools(&tools_for_issue);
+        let expires_at = mcp_service::expiry_for_choice(expiry_for_issue.selected(), chrono::Utc::now());
         glib::spawn_future_local(issue_token_flow(
             page_for_dialog.clone(),
             tokens_for_issue.clone(),
@@ -46,6 +48,7 @@ pub fn build_page(
             name,
             permissions,
             tool_allowlist,
+            expires_at,
         ));
     });
 
@@ -61,6 +64,7 @@ struct IssueGroup {
     tools_group: adw::PreferencesGroup,
     name_row: adw::EntryRow,
     scope_combo: adw::ComboRow,
+    expiry_combo: adw::ComboRow,
     tool_checks: Vec<(String, gtk::CheckButton)>,
     button: gtk::Button,
 }
@@ -89,11 +93,28 @@ fn status_group(database: &crate::services::database_service::DatabaseService) -
         status_group.add(&row);
     }
 
+    if let Some(message) = mcp_service::server_failure() {
+        let row = adw::ActionRow::builder()
+            .use_markup(false)
+            .title(tr!("MCP server is not running"))
+            .subtitle(message)
+            .build();
+        status_group.add(&row);
+    }
+
     let endpoint_row = adw::ActionRow::builder()
         .title(tr!("Endpoint"))
         .subtitle("http://127.0.0.1:17432/mcp")
         .build();
     status_group.add(&endpoint_row);
+    if let Some(path) = bookie_mcp::default_socket_path() {
+        let socket_row = adw::ActionRow::builder()
+            .use_markup(false)
+            .title(tr!("Socket"))
+            .subtitle(tr!("{path}. Run bookie-agentd --connect-socket as the client command; set BOOKIE_MCP_HTTP=off to close the TCP port.").replace("{path}", &path.display().to_string()))
+            .build();
+        status_group.add(&socket_row);
+    }
     status_group
 }
 
@@ -112,6 +133,11 @@ fn issue_group() -> IssueGroup {
     let scope_model = gtk::StringList::new(&["Read only", "Read and write"]);
     scope_combo.set_model(Some(&scope_model));
     scope_combo.set_selected(0);
+
+    let expiry_combo = adw::ComboRow::builder().title(tr!("Expires")).build();
+    let expiry_model = gtk::StringList::new(&["After 30 days", "After 90 days", "After 1 year", "Never"]);
+    expiry_combo.set_model(Some(&expiry_model));
+    expiry_combo.set_selected(1);
 
     let tool_group = adw::PreferencesGroup::builder()
         .title(tr!("Tool access"))
@@ -142,12 +168,14 @@ fn issue_group() -> IssueGroup {
 
     group.add(&name_row);
     group.add(&scope_combo);
+    group.add(&expiry_combo);
     group.add(&issue_row);
     IssueGroup {
         group,
         tools_group: tool_group,
         name_row,
         scope_combo,
+        expiry_combo,
         tool_checks,
         button,
     }
@@ -167,6 +195,7 @@ async fn issue_token_flow(
     name: String,
     permissions: TokenPermissions,
     tool_allowlist: Option<Vec<String>>,
+    expires_at: Option<chrono::DateTime<chrono::Utc>>,
 ) {
     let allowlist = match bookie_storage::load_connections().await {
         Ok(list) => list.into_iter().map(|c| c.id).collect::<Vec<_>>(),
@@ -184,7 +213,16 @@ async fn issue_token_flow(
         );
         return;
     }
-    match mcp_service::issue_token(bridge.as_ref(), name, permissions, allowlist, tool_allowlist).await {
+    match mcp_service::issue_token(
+        bridge.as_ref(),
+        name,
+        permissions,
+        allowlist,
+        tool_allowlist,
+        expires_at,
+    )
+    .await
+    {
         Ok(issued) => {
             show_issued_token(&parent, &issued.plaintext, issued.keyring_saved);
             clear_and_refresh(&tokens_group, bridge.clone());
@@ -337,6 +375,68 @@ mod copy_tests {
         let (tool, check) = &issue.tool_checks[0];
         check.set_active(true);
         assert_eq!(selected_tools(&issue.tool_checks), Some(vec![tool.clone()]));
+    }
+
+    fn row_titles(widget: &gtk::Widget, titles: &mut Vec<String>) {
+        if let Some(row) = widget.downcast_ref::<adw::ActionRow>() {
+            titles.push(row.title().to_string());
+        }
+        let mut child = widget.first_child();
+        while let Some(current) = child {
+            row_titles(&current, titles);
+            child = current.next_sibling();
+        }
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn the_issue_form_offers_four_expiry_choices_and_defaults_to_ninety_days() {
+        adw::init().unwrap();
+        let issue = issue_group();
+
+        let model = issue
+            .expiry_combo
+            .model()
+            .unwrap()
+            .downcast::<gtk::StringList>()
+            .unwrap();
+        let choices: Vec<String> = (0..model.n_items())
+            .filter_map(|index| model.string(index))
+            .map(|choice| choice.to_string())
+            .collect();
+        assert_eq!(choices, ["After 30 days", "After 90 days", "After 1 year", "Never"]);
+        assert_eq!(issue.expiry_combo.selected(), 1);
+        assert!(mcp_service::expiry_for_choice(issue.expiry_combo.selected(), chrono::Utc::now()).is_some());
+        assert!(mcp_service::expiry_for_choice(3, chrono::Utc::now()).is_none());
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn the_status_group_shows_the_socket_and_a_server_that_could_not_start() {
+        adw::init().unwrap();
+        let database = crate::services::database_service::DatabaseService::new_isolated();
+        let titles = |database: &crate::services::database_service::DatabaseService| {
+            let mut titles = Vec::new();
+            row_titles(status_group(database).upcast_ref::<gtk::Widget>(), &mut titles);
+            titles
+        };
+
+        let before = titles(&database);
+        assert!(before.iter().any(|title| title == "Endpoint"), "{before:?}");
+        assert_eq!(
+            before.iter().any(|title| title == "Socket"),
+            bookie_mcp::default_socket_path().is_some(),
+            "{before:?}"
+        );
+        assert!(!before.iter().any(|title| title == "MCP server is not running"));
+
+        mcp_service::record_server_failure("Address already in use (os error 98)", 17432);
+
+        assert!(
+            titles(&database)
+                .iter()
+                .any(|title| title == "MCP server is not running")
+        );
     }
 
     #[test]

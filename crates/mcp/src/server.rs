@@ -131,7 +131,7 @@ impl<W> Clone for StdioSession<W> {
     }
 }
 
-async fn serve_json_rpc_lines<R, W>(bridge: Arc<McpBridge>, mut reader: R, stdout: W) -> Result<(), String>
+pub(crate) async fn serve_json_rpc_lines<R, W>(bridge: Arc<McpBridge>, mut reader: R, stdout: W) -> Result<(), String>
 where
     R: tokio::io::AsyncBufRead + Unpin,
     W: tokio::io::AsyncWrite + Unpin + Send + 'static,
@@ -208,7 +208,10 @@ where
     async fn handle_message(&self, request: JsonValue, calls: &mut tokio::task::JoinSet<()>) -> Result<(), String> {
         let id = request.get("id").cloned().unwrap_or(JsonValue::Null);
         let method = request.get("method").and_then(|m| m.as_str()).unwrap_or("");
-        let params = request.get("params").cloned().unwrap_or(json!({}));
+        let mut params = request.get("params").cloned().unwrap_or(json!({}));
+        if let Some(token) = self.bridge.default_token() {
+            add_token(&mut params, token);
+        }
         let response = match method {
             "notifications/initialized" | "initialized" => return Ok(()),
             "notifications/cancelled" => {
@@ -219,6 +222,7 @@ where
                 Some(refusal) => refusal,
                 None => return Ok(()),
             },
+            _ if request.get("id").is_none() => return Ok(()),
             other => immediate_response(&self.bridge, other, id, &params),
         };
         self.reply(response).await
@@ -322,12 +326,33 @@ fn call_response(id: JsonValue, result: Result<JsonValue, crate::errors::McpTool
 
 /// Shared lookup for every method that requires a token: `params.token`,
 /// `params._meta.authorization`, then (for `tools/call`) `arguments.token`.
-fn extract_token_str(params: &JsonValue) -> Option<&str> {
+pub(crate) fn extract_token_str(params: &JsonValue) -> Option<&str> {
     params
         .get("token")
         .and_then(|v| v.as_str())
         .or_else(|| params.pointer("/_meta/authorization").and_then(|v| v.as_str()))
         .or_else(|| params.pointer("/arguments/token").and_then(|v| v.as_str()))
+}
+
+fn add_token(params: &mut JsonValue, token: &str) {
+    if extract_token_str(params).is_some() {
+        return;
+    }
+    if let Some(object) = params.as_object_mut()
+        && let Some(meta) = object.entry("_meta").or_insert_with(|| json!({})).as_object_mut()
+    {
+        meta.insert("authorization".into(), json!(token));
+    }
+}
+
+fn bearer_token(headers: &HeaderMap) -> Option<&str> {
+    headers
+        .get(axum::http::header::AUTHORIZATION)?
+        .to_str()
+        .ok()?
+        .strip_prefix("Bearer ")
+        .map(str::trim)
+        .filter(|token| !token.is_empty())
 }
 
 async fn handle_tool_call(bridge: &McpBridge, params: JsonValue) -> Result<JsonValue, crate::errors::McpToolError> {
@@ -383,7 +408,9 @@ mod structured_error_tests {
 /// reach the loopback listener.
 fn handle_tools_list(bridge: &McpBridge, params: &JsonValue) -> Result<JsonValue, String> {
     let token_str = extract_token_str(params).ok_or("missing token (pass params.token)")?;
-    let token = bridge.authenticate(token_str)?;
+    let token = bridge
+        .authenticate(token_str)
+        .map_err(|_| "authentication failed".to_string())?;
     Ok(json!({
         "tools": TOOL_NAMES.iter().filter(|name| token.allows_tool(name)).map(|name| json!({
             "name": name,
@@ -579,19 +606,32 @@ fn http_router(bridge: Arc<McpBridge>) -> axum::Router {
     use axum::response::IntoResponse;
     use axum::{Json, Router, http::StatusCode, routing::post};
 
+    let slots = Arc::new(tokio::sync::Semaphore::new(MAX_IN_FLIGHT_CALLS));
     Router::new()
         .route(
             "/mcp",
             post(move |headers: HeaderMap, Json(body): Json<JsonValue>| {
                 let bridge = bridge.clone();
+                let slots = slots.clone();
                 async move {
+                    let Ok(slot) = slots.try_acquire_owned() else {
+                        return (
+                            StatusCode::TOO_MANY_REQUESTS,
+                            Json(json_rpc_error(
+                                &JsonValue::Null,
+                                -32000,
+                                format!("too many concurrent requests (limit {MAX_IN_FLIGHT_CALLS})"),
+                            )),
+                        )
+                            .into_response();
+                    };
                     let cancellation = bridge.request_cancellation();
                     let request_cancellation = cancellation.clone();
                     let (response_tx, response_rx) = tokio::sync::oneshot::channel();
-                    let operation = crate::bridge::scope_request_cancellation(
-                        request_cancellation,
-                        process_http_request(bridge, headers, body),
-                    );
+                    let operation = crate::bridge::scope_request_cancellation(request_cancellation, async move {
+                        let _slot = slot;
+                        process_http_request(bridge, headers, body).await
+                    });
                     tokio::spawn(supervise_disconnect_aware(response_tx, cancellation, operation));
                     response_rx.await.unwrap_or_else(|_| {
                         (
@@ -626,7 +666,13 @@ async fn process_http_request(bridge: Arc<McpBridge>, headers: HeaderMap, body: 
     }
     let id = body.get("id").cloned().unwrap_or(JsonValue::Null);
     let method = body.get("method").and_then(|m| m.as_str()).unwrap_or("");
-    let params = body.get("params").cloned().unwrap_or(json!({}));
+    if body.get("id").is_none() && !method.is_empty() {
+        return StatusCode::ACCEPTED.into_response();
+    }
+    let mut params = body.get("params").cloned().unwrap_or(json!({}));
+    if let Some(token) = bearer_token(&headers) {
+        add_token(&mut params, token);
+    }
     let result = match method {
         "tools/call" => match handle_tool_call(&bridge, params).await {
             Ok(content) => Ok(json!({
@@ -636,6 +682,7 @@ async fn process_http_request(bridge: Arc<McpBridge>, headers: HeaderMap, body: 
             Err(error) => Ok(tool_error_result(&error)),
         },
         "tools/list" => handle_tools_list(&bridge, &params),
+        "ping" => Ok(json!({})),
         "initialize" => match initialize_result(&params) {
             Ok(result) => Ok(result),
             Err(message) => return Json(json_rpc_error(&id, -32602, message)).into_response(),

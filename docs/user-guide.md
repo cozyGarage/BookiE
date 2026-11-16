@@ -33,7 +33,7 @@ BookiE is a database client for Linux. It opens PostgreSQL, MySQL and MariaDB, S
 
 Click any table in the sidebar to open it in a preview tab. Editing the table or selecting **Keep Tab** makes it permanent.
 
-Navigation uses **First**, **Previous**, **Next**, and **Last**. Unsorted tables with primary keys use fast keyset seeks.
+Navigation uses **First**, **Previous**, **Next**, and **Last**. Choose a page size from 1 to 5,000 rows on the pager; Preferences sets the default. The status line shows how long the current page took to load beside its row count. Unsorted tables with primary keys use fast keyset seeks.
 
 ![Structured filter presets and condition builder](images/filter-builder.png)
 
@@ -87,10 +87,10 @@ In a focused result grid, **Ctrl+Shift+J** opens **Jump to Column** and **Ctrl+A
 
 Single-statement PostgreSQL `SELECT` queries stream progressively:
 - The first page remains visible while more rows arrive. The result reports whether it is receiving rows, complete, cancelled, timed out or incomplete.
-- **In-memory cache**: Keeps pages within an estimated 64 MiB row budget.
+- **In-memory cache**: Each result cache keeps pages within an estimated 64 MiB row window. The GTK app shares a 256 MiB estimated page budget across streamed-result pages, including pages retained by pins and exports; this estimate is not a process RSS limit.
 - **Encrypted disk spool**: Evicted pages write to a local encrypted spool (up to 4,096 pages, 1 GiB quota), keeping earlier pages navigable via **Previous page** without re-running the query.
 - **Export all rows** is available once the query completes and reads the saved result without running the SQL again. For an incomplete result, export the available page instead.
-- After a streamed query completes, **Continuous scrolling** switches from the page controls to a single scrollable grid. Pages load from temporary storage as rows come into view. The grid can retain two visible pages over its 64 MiB estimated row budget; if the visible range needs more memory, it offers the page view. If a page cannot be loaded, use **Retry loading pages** or return to the page view. Find in Loaded Rows is available in the page view.
+- After a streamed query completes, **Continuous scrolling** switches from the page controls to a single scrollable grid. Pages load from temporary storage as rows come into view. The grid can retain two visible pages within its 64 MiB estimated row window and the shared 256 MiB page budget; if the visible range needs more memory, it offers the page view. If a page cannot be loaded, use **Retry loading pages** or return to the page view. Find in Loaded Rows is available in the page view.
 - A completed streamed result also has **Find in all rows** in its header. Type text and press Enter to search every saved page in the background; use match case, whole words, regular expression and column scope as needed; use the match buttons to step through up to 10,000 matches; a jump selects the matching row even when the page is sorted locally. **Show matching rows** opens the matches as a new result that you can page through, pin and export. **Cancel** stops a running search. Cells that cannot be read are skipped and counted, and NULL never matches text. Replace stays on the loaded page through **Find in Loaded Rows**, not through the spool.
 - In a completed streamed result, right-click a cell and choose **Show All Rows Equal to This Value** or **Show All Rows Not Equal to This Value** to filter every saved page by that exact value, with the same new result as **Show matching rows**. The match is exact and typed: a NULL cell matches only NULL, empty text only empty text, and "not equal" keeps NULL rows. Values that cannot be read are refused. The older **Filter by This Value** still filters only the loaded page.
 - **Compare…** in the editor toolbar compares two complete results from this connection. Pick the left and right result, optionally tick the key columns, and choose **Compare**. Without a key, whole rows are compared and row order is ignored. With a key, a changed row appears as a **Before** and **After** pair, and the cells whose value changed are highlighted (and described as Changed to screen readers) in both rows. The key must be unique and have no NULL values. Values hidden by policy masking compare as the text shown. The comparison reads saved results only, shows at most 100,000 differing rows or 64 MiB of them, whichever comes first (counts stay exact), and writes an entry to the audit journal. A comparison that cannot run, such as one with a duplicate or NULL key, keeps the dialog open with the reason so you can pick another key. **Compare…** is reachable with Tab and Enter. Results whose columns share a name, as in a join that returns two `id` columns, cannot be compared yet.
@@ -104,7 +104,7 @@ Single-statement PostgreSQL `SELECT` queries stream progressively:
 - **Session mode**: Toggle **Session** to bind the tab to a dedicated connection for transactions and temporary tables. When a transaction is active, use **Commit & close session** or **Roll back & close session**.
 - **Explain plans**: Click **Explain** to inspect execution plans. PostgreSQL displays a visual **Tree** with cost-distribution bars alongside raw text; SQLite provides an indented tree.
 - **Query history**: Press `Ctrl+H` to toggle the bottom history drawer. Statements containing secrets are automatically excluded.
-- **Saved queries & Open Quickly**: Press `Ctrl+D` to save a query, `Ctrl+Shift+B` to browse queries, create folders, assign queries and keywords, and `Ctrl+P` for Open Quickly across tabs, saved queries, and connections. Search matches query names, SQL, and keywords. Deleting a folder leaves its queries available as unfiled.
+- **Saved queries & Open Quickly**: Press `Ctrl+D` to save a query, `Ctrl+Shift+B` to browse queries, create folders, assign queries and keywords, and `Ctrl+P` for Open Quickly across tabs, saved queries, connections and up to 50 recent successful editor queries from the current connection. Choosing a past query opens it in a new editor tab. Search matches query names, SQL, and keywords. Deleting a folder leaves its queries available as unfiled.
 
 ## Search database values
 
@@ -120,10 +120,18 @@ A search covers at most 200 tables, 24 columns in each table and 25 matching row
 
 ![Export scope dialog choosing data scope before format](images/export-wizard.png)
 
-- **Export**: Press `Ctrl+Shift+E`, or use Export Results from a result grid, to export the front tab's shown rows. Select **Scope** (Current table page or loaded query result) before choosing your format: CSV, JSON, Markdown, HTML, XML, SQL, or Excel (`.xlsx`). On PostgreSQL, **All matching table rows** exports the whole table, or the active filter and sort, from one consistent snapshot taken when the export starts. Other engines refuse a full-table export; export the current page or a query result instead.
+- **Export**: Press `Ctrl+Shift+E`, or use Export Results from a result grid, to export the front tab. Select **Scope** before choosing your format: CSV, JSON, Markdown, HTML, XML, SQL, or Excel (`.xlsx`). For a browse tab, Scope offers the current table page; for a SQL result it offers the visible page or the complete saved result. On PostgreSQL, **All matching table rows** exports the whole table, or the active filter and sort, from one consistent snapshot taken when the export starts. Other engines refuse a full-table export; export the current page or a query result instead.
 - **Import**: Right-click any table and choose **Import CSV…**, or import from a schema header to create a new table. Excel `.xlsx` files read the first populated sheet. Delimiters, headers, encodings (UTF-8, Windows-1252, UTF-16), and column mappings are detected automatically and can be remembered per table.
 - **Update existing rows**: When you import into an existing table on PostgreSQL, SQLite, DuckDB, MySQL or MariaDB, **Existing rows** offers **Update the existing row**. Pick the key under **Match rows by**: the table's primary key or one of its unique indexes. A row in the file whose key is already in the table replaces the other mapped columns of that row, and a row with a new key is added. A table with no primary key or unique index cannot use this mode. The approval prompt and the audit record state that existing rows may change. Without this mode, a duplicate key stops the import.
 - **Several files**: In the file chooser of **Import CSV…** for an existing table, select up to 20 files. You set the separator, header, mapping and write mode once, for the first file, and the same choices apply to the others, so every file needs the same columns in the same order. Each file asks for its own approval and is written in batches as for a single file. **Cancel** stops the file in progress and cancels the rest. The run stops at the first file that fails, and the final message lists every file as written, stopped, cancelled or not started. A run is limited to 256 MB of files and 2,000,000 rows.
+
+## Preferences and updates
+
+Open **Preferences** from the primary menu.
+
+- **Default page size** sets how many rows a new browse tab loads (1 to 5,000).
+- **Appearance** can set font family, size and weight independently for the application interface, SQL editor, result grid and error text. Blank family, size 0 and System weight restore each default.
+- **Check for Updates** reports whether a newer release is available. The first launch of a new version shows a What's new dialog with that version's AppStream notes. A quieter startup check can show a dismissible banner when a newer release exists.
 
 ## Safety
 
@@ -183,6 +191,8 @@ flowchart LR
 ```
 
 The token appears once; the dialog reports whether it was saved in the system keyring. If saving fails, copy it into your MCP client configuration before closing the dialog. Every agent statement goes through the same safety checks, and agent changes follow the approval rules of the connection's environment. `bookie-agentd` runs the same server without the window, for headless use.
+
+**Connecting without a network port.** Besides the loopback address `127.0.0.1:17432`, the desktop app listens on a Unix socket at `$XDG_RUNTIME_DIR/bookie/mcp.sock`. Only your own user can open it, and the tokens work the same way. An MCP client that can start a command should use `bookie-agentd --connect-socket` as that command; it relays the client's standard input and output to the socket and needs no policy file. Pass a path after the flag for a socket in another place. MCP clients do not send a token on their own, so put one in the command's environment as `BOOKIE_MCP_TOKEN`; the relay adds it to every request that carries none, and a token the client sends itself wins. The same applies to `bookie-agentd --policy` over standard input, which reads `BOOKIE_MCP_TOKEN` as the default token, and to the HTTP endpoint, which accepts `Authorization: Bearer <token>` (for example Claude Code's `--header`). To close the TCP port completely, start BookiE with `BOOKIE_MCP_HTTP=off`; the socket stays available. The socket exists only while the desktop app is running, and **Preferences → MCP** shows its path.
 
 Open **Audit Log** from the main menu to review persisted operation records. Each record shows its connection, principal, kind, outcome, row count and duration, and expands to its operation id, policy rule, stored statement and error. Statement text appears in the redacted form the journal keeps. A Local or Dev policy may allow a human write to continue after audit-intent failure without a persisted record; see [Safety](#safety).
 

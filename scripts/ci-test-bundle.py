@@ -10,7 +10,7 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 BUNDLE_GROUP_CONFIG = json.loads((ROOT / 'scripts/ci-test-bundle-groups.json').read_text())['groups']
-BUNDLE_GROUPS = {'default', 'direct', 'unit', 'sandbox', 'gpui'} | set(BUNDLE_GROUP_CONFIG)
+BUNDLE_GROUPS = {'default', 'direct', 'unit', 'sandbox', 'workspace', 'gpui'} | set(BUNDLE_GROUP_CONFIG)
 
 
 def digest(path):

@@ -141,7 +141,7 @@ pub(super) fn load_connection_drafts(
         if let WorkspaceTabRecord::Editor { query, draft_id, .. } = tab
             && let Some(id) = *draft_id
         {
-            match std::fs::read_to_string(drafts.join(connection.to_string()).join(format!("{id}.sql"))) {
+            match read_draft(&drafts.join(connection.to_string()).join(format!("{id}.sql"))) {
                 Ok(text) => *query = text,
                 Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
                     tracing::warn!(
@@ -160,6 +160,23 @@ pub(super) fn load_connection_drafts(
     Ok(())
 }
 
+fn read_draft(path: &Path) -> std::io::Result<String> {
+    use std::io::Read;
+
+    let limit = crate::sql_text::EDITOR_MAX_SQL_BYTES;
+    let mut text = String::new();
+    std::fs::File::open(path)?
+        .take(limit.saturating_add(1))
+        .read_to_string(&mut text)?;
+    if text.len() as u64 > limit {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "workspace draft is larger than the editor accepts",
+        ));
+    }
+    Ok(text)
+}
+
 fn clean_previous_drafts(drafts: &Path, connection: Uuid, previous: &mut WorkspaceState) -> std::io::Result<()> {
     let mut empty = ConnectionWorkspaceState::default();
     let workspace = previous
@@ -175,6 +192,39 @@ mod staged_drafts;
 mod tests {
     use super::super::workspace_state::ConnectionWorkspaceState;
     use super::*;
+
+    #[test]
+    fn a_draft_larger_than_the_editor_limit_is_refused_and_left_on_disk() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("workspace.json");
+        let drafts = dir.path().join("drafts");
+        let connection = Uuid::new_v4();
+        let draft = Uuid::new_v4();
+        let mut state = WorkspaceState::default();
+        state.connections.insert(
+            connection.to_string(),
+            ConnectionWorkspaceState {
+                tabs: vec![WorkspaceTabRecord::Editor {
+                    mark: Default::default(),
+                    query: "SELECT 1".into(),
+                    draft_id: Some(draft),
+                    file: None,
+                }],
+                ..Default::default()
+            },
+        );
+        save(&path, &drafts, state).unwrap();
+        let draft_path = drafts.join(connection.to_string()).join(format!("{draft}.sql"));
+        let limit = crate::sql_text::EDITOR_MAX_SQL_BYTES as usize;
+
+        std::fs::write(&draft_path, "a".repeat(limit)).unwrap();
+        assert!(load_connection(&path, &drafts, connection).is_ok());
+
+        std::fs::write(&draft_path, "a".repeat(limit + 1)).unwrap();
+        assert!(load(&path, &drafts).is_err());
+        assert!(load_connection(&path, &drafts, connection).is_err());
+        assert_eq!(std::fs::metadata(&draft_path).unwrap().len() as usize, limit + 1);
+    }
 
     #[test]
     fn an_unreadable_draft_fails_both_load_paths_without_changing_files() {

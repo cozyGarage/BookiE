@@ -150,3 +150,26 @@ fn a_word_ending_before_a_quote_or_dollar_sign_is_not_a_string_prefix() {
         assert_eq!(found[1], "SELECT 2");
     }
 }
+
+#[test]
+fn pasted_sql_with_trailing_blank_lines_yields_only_its_statements() {
+    for grammar in [
+        SqlGrammar::PostgreSql,
+        SqlGrammar::MySql,
+        SqlGrammar::Sqlite,
+        SqlGrammar::MsSql,
+    ] {
+        for text in ["SELECT 1;\n\n\n", "SELECT 1\n\n\n  \t\n", "\n\nSELECT 1;\r\n\r\n"] {
+            let plan = ScriptPlan::build(text, grammar, LexicalSettings::default_for(grammar));
+            let found: Vec<&str> = plan
+                .statements()
+                .iter()
+                .map(|statement| statement.text(text).trim())
+                .filter(|statement| !statement.is_empty())
+                .collect();
+            let found: Vec<&str> = found.iter().map(|statement| statement.trim_end_matches(';')).collect();
+            assert_eq!(found, ["SELECT 1"], "{grammar:?} {text:?}");
+            assert!(plan.diagnostics().is_empty(), "{grammar:?} {text:?}");
+        }
+    }
+}

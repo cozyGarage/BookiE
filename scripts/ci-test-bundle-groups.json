@@ -21,7 +21,7 @@
       "test": ["bookie-driver-clickhouse", "bookie-driver-mongodb", "bookie-driver-redis"]
     },
     "driver-extended": {
-      "test": ["bookie-driver-cassandra", "bookie-driver-duckdb", "bookie-driver-oracle"]
+      "test": ["bookie-driver-cassandra", "bookie-driver-duckdb", "bookie-driver-oracle", "bookie-policy"]
     },
     "drivers": {
       "test": [
@@ -32,7 +32,7 @@
       ]
     },
     "pg-release": {
-      "bin": ["bookie-agentd", "bookie-app"],
+      "bin": ["bookie-agentd", "bookie-app", "bookie-ssh"],
       "lib": ["bookie-release-tests"],
       "test": ["bookie-agentd", "bookie-release-tests"]
     },
@@ -50,8 +50,5 @@
       "test": ["bookie-agentd"]
     }
   },
-  "providers": {
-    "github": ["direct", "consumers", "driver-core", "driver-analytics", "driver-extended", "pg-release", "socket-ssh", "driver-tls", "keyring"],
-    "forgejo": ["direct", "consumers", "driver-core", "driver-analytics", "driver-extended", "pg-release", "socket-ssh", "driver-tls", "keyring"]
-  }
+  "publish_groups": ["direct", "consumers", "driver-core", "driver-analytics", "driver-extended", "pg-release", "socket-ssh", "driver-tls", "keyring"]
 }

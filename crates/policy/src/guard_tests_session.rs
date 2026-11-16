@@ -1,4 +1,5 @@
 use super::*;
+use bookie_core::sql_syntax::script::LexicalSettings;
 
 #[path = "guard_tests_session/blast_radius.rs"]
 mod blast_radius;
@@ -20,9 +21,12 @@ struct SessionScript {
     panic_on_status: bool,
     panic_once_on_status: std::sync::atomic::AtomicBool,
     result_sets_on: Option<&'static str>,
+    query_rows_affected: Option<u64>,
     completion_targets: Mutex<Vec<(Option<String>, String)>>,
     completion_timed_out: bool,
     blast_count: Option<i64>,
+    lexical_settings: Option<LexicalSettings>,
+    lexical_settings_reads: std::sync::atomic::AtomicUsize,
 }
 
 struct ScriptedSession {
@@ -87,6 +91,7 @@ impl bookie_core::Session for ScriptedSession {
             result_sets: vec![secret_set("first-secret"), secret_set("second-secret")],
             truncated: false,
             messages: Default::default(),
+            rows_affected: self.script.query_rows_affected,
         })
     }
 
@@ -105,6 +110,16 @@ impl bookie_core::Session for ScriptedSession {
             return Err(DriverError::TimedOut);
         }
         Ok(vec!["id".into()])
+    }
+
+    async fn lexical_settings_controlled(
+        &mut self,
+        _control: &OperationControl,
+    ) -> Result<Option<LexicalSettings>, DriverError> {
+        self.script
+            .lexical_settings_reads
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        Ok(self.script.lexical_settings)
     }
 
     fn is_usable(&self) -> bool {
@@ -247,6 +262,93 @@ fn harness_with_principal(
         audit,
         audit_state,
     }
+}
+
+#[tokio::test]
+async fn mysql_session_mode_cannot_hide_a_commit_inside_a_string() {
+    let h = harness_with_driver(SessionScript::default(), false, "mysql");
+    let mut session = h.guard.open_session().await.expect("open session");
+
+    let error = run(&mut session, r#"SELECT 'x\'; COMMIT -- '"#)
+        .await
+        .expect_err("session-mode-dependent SQL must be refused");
+
+    assert!(matches!(error, DriverError::PolicyDenied(_)), "{error:?}");
+    assert!(h.script.sent.lock().expect("sent lock").is_empty());
+    let events = h.audit.events.lock().expect("audit lock");
+    let outcomes = events
+        .iter()
+        .filter(|event| event.phase == AuditRecordPhase::Outcome)
+        .collect::<Vec<_>>();
+    assert_eq!(outcomes.len(), 1);
+    assert_eq!(outcomes[0].terminal_status, AuditTerminalStatus::Denied);
+    assert_eq!(outcomes[0].error_category, Some(AuditErrorCategory::Policy));
+}
+
+#[tokio::test]
+async fn mysql_session_allows_a_statement_stable_under_its_reported_lexical_mode() {
+    let script = SessionScript {
+        lexical_settings: Some(LexicalSettings::default_for(bookie_core::sql_syntax::SqlGrammar::MySql)),
+        ..SessionScript::default()
+    };
+    let h = harness_with_driver(script, false, "mysql");
+    let mut session = h.guard.open_session().await.expect("open session");
+    let sql = r#"SELECT 'x\'; COMMIT -- '"#;
+
+    run(&mut session, sql)
+        .await
+        .expect("the statement is stable under the reported backslash-escape mode");
+
+    assert_eq!(*h.script.sent.lock().expect("sent lock"), vec![sql]);
+    assert_eq!(
+        h.script
+            .lexical_settings_reads
+            .load(std::sync::atomic::Ordering::SeqCst),
+        1
+    );
+    assert!(
+        h.audit
+            .events
+            .lock()
+            .expect("audit lock")
+            .iter()
+            .all(|event| event.terminal_status != AuditTerminalStatus::Denied)
+    );
+}
+
+#[tokio::test]
+async fn mysql_mode_change_cannot_retokenize_later_statements_in_the_same_request() {
+    let script = SessionScript {
+        lexical_settings: Some(LexicalSettings::default_for(bookie_core::sql_syntax::SqlGrammar::MySql)),
+        ..SessionScript::default()
+    };
+    let h = harness_with_driver(script, false, "mysql");
+    let mut session = h.guard.open_session().await.expect("open session");
+    let sql = "SET SESSION sql_mode = 'NO_BACKSLASH_ESCAPES'; SELECT 'x\\'; DROP TABLE users; SELECT 'z'";
+
+    let error = run(&mut session, sql)
+        .await
+        .expect_err("a mode change cannot alter policy token boundaries mid-request");
+
+    assert!(matches!(error, DriverError::PolicyDenied(_)), "{error:?}");
+    assert!(h.script.sent.lock().expect("sent lock").is_empty());
+}
+
+#[tokio::test]
+async fn mysql_session_skips_lexical_settings_lookup_for_mode_stable_sql() {
+    let h = harness_with_driver(SessionScript::default(), false, "mysql");
+    let mut session = h.guard.open_session().await.expect("open session");
+
+    run(&mut session, "SELECT 1")
+        .await
+        .expect("ordinary SQL is independent of the lexical mode");
+
+    assert_eq!(
+        h.script
+            .lexical_settings_reads
+            .load(std::sync::atomic::Ordering::SeqCst),
+        0
+    );
 }
 
 #[tokio::test]
@@ -396,6 +498,30 @@ fn outcomes_of(audit: &SequenceAuditSink, class: AuditOperationClass) -> Vec<Aud
 }
 
 #[tokio::test]
+async fn a_mysql_session_transaction_refuses_a_statement_that_would_commit_it() {
+    let h = harness_with_driver(SessionScript::default(), false, "mysql");
+    let mut session = h.guard.open_session().await.expect("open session");
+
+    run(&mut session, "BEGIN").await.expect("begin");
+    run(&mut session, "UPDATE items SET v = 1 WHERE id = 1")
+        .await
+        .expect("write");
+    let ddl = run(&mut session, "CREATE TABLE audit_copy (id INT)")
+        .await
+        .expect_err("DDL would commit the open transaction");
+    assert!(matches!(ddl, DriverError::PolicyDenied { .. }), "{ddl:?}");
+    assert!(session.transaction_open());
+    let sent = h.script.sent.lock().expect("sent lock").clone();
+    assert!(!sent.iter().any(|sql| sql.contains("CREATE TABLE")), "{sent:?}");
+
+    run(&mut session, "SAVEPOINT s").await.expect("savepoint");
+    run(&mut session, "SELECT 1").await.expect("read");
+    run(&mut session, "ROLLBACK").await.expect("rollback");
+    let rollbacks = outcomes_of(&h.audit, AuditOperationClass::TransactionRollback);
+    assert_eq!(rollbacks[0].transaction_outcome, AuditTransactionOutcome::RolledBack);
+}
+
+#[tokio::test]
 async fn a_session_runs_its_own_transaction_and_audits_the_rollback_against_its_batch() {
     let h = harness(SessionScript::default(), false);
     let mut session = h.guard.open_session().await.expect("open session");
@@ -501,6 +627,61 @@ async fn policy_still_denies_a_write_inside_a_session_on_a_read_only_connection(
             .expect("sent lock")
             .iter()
             .any(|sql| sql.starts_with("DELETE"))
+    );
+}
+
+#[tokio::test]
+async fn a_read_only_mysql_connection_cannot_enable_read_write_transactions() {
+    let h = harness_with_driver(SessionScript::default(), true, "mysql");
+    let mut session = h.guard.open_session().await.expect("open session");
+
+    for sql in [
+        "SET SESSION TRANSACTION READ WRITE",
+        "SET SESSION transaction_read_only = OFF",
+        "SET SESSION tx_read_only = 0",
+        "SET @@session.transaction_read_only = 0",
+        "SET @@session.tx_read_only = 0",
+    ] {
+        let error = run(&mut session, sql)
+            .await
+            .expect_err("read-only connection must refuse a read-write session mode");
+        assert!(
+            matches!(error, DriverError::PolicyDenied(_) | DriverError::ReadOnly),
+            "{sql}: {error:?}"
+        );
+    }
+    assert!(h.script.sent.lock().expect("sent lock").is_empty());
+}
+
+#[tokio::test]
+async fn a_read_only_mysql_connection_does_not_execute_routines() {
+    let h = harness_with_driver(SessionScript::default(), true, "mysql");
+    let mut session = h.guard.open_session().await.expect("open session");
+
+    for sql in ["CALL change_read_only_mode()", "SELECT change_read_only_mode()"] {
+        let error = run(&mut session, sql)
+            .await
+            .expect_err(&format!("read-only connection must refuse {sql}"));
+        assert!(
+            matches!(error, DriverError::PolicyDenied(_) | DriverError::ReadOnly),
+            "{sql}: {error:?}"
+        );
+    }
+    assert!(h.script.sent.lock().expect("sent lock").is_empty());
+}
+
+#[tokio::test]
+async fn a_read_only_mysql_connection_allows_known_pure_functions() {
+    let h = harness_with_driver(SessionScript::default(), true, "mysql");
+    let mut session = h.guard.open_session().await.expect("open session");
+
+    run(&mut session, "SELECT CONCAT('book', UPPER('ie'))")
+        .await
+        .expect("known pure functions are safe on read-only connections");
+
+    assert_eq!(
+        h.script.sent.lock().expect("sent lock").as_slice(),
+        ["SELECT CONCAT('book', UPPER('ie'))"],
     );
 }
 
@@ -1185,6 +1366,27 @@ async fn the_audit_outcome_of_a_session_batch_counts_the_rows_of_every_set() {
 
     let reads = outcomes_of(&h.audit, AuditOperationClass::Read);
     assert_eq!(reads.last().and_then(|event| event.rows_affected), Some(2));
+}
+
+#[tokio::test]
+async fn a_session_write_audits_server_affected_rows_separately_from_returning_rows() {
+    const SQL: &str = "INSERT INTO accounts VALUES (1) RETURNING id";
+    let h = harness(
+        SessionScript {
+            result_sets_on: Some(SQL),
+            query_rows_affected: Some(5),
+            ..SessionScript::default()
+        },
+        false,
+    );
+    let mut session = h.guard.open_session().await.expect("open session");
+
+    let result = run_sets(&mut session, SQL).await.expect("result");
+
+    assert_eq!(result.retained_rows(), 2);
+    assert_eq!(result.rows_affected, Some(5));
+    let writes = outcomes_of(&h.audit, AuditOperationClass::Mutation);
+    assert_eq!(writes.last().and_then(|event| event.rows_affected), Some(5));
 }
 
 #[tokio::test]

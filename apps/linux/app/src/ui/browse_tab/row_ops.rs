@@ -730,6 +730,9 @@ impl BrowseTab {
     }
 
     pub(super) fn emit_fetch_page(&self, sender: &ComponentSender<Self>) {
+        self.auto_refresh_status_label.set_text("");
+        self.auto_refresh_status_label.set_tooltip_text(None);
+        self.auto_refresh_in_flight.set(false);
         self.page_requests.invalidate();
         self.cell_value_requests.invalidate();
         self.pending_cell_edit.borrow_mut().take();
@@ -738,6 +741,16 @@ impl BrowseTab {
 
     pub(super) fn emit_fetch_page_and_count(&self, sender: &ComponentSender<Self>) {
         self.emit_fetch_page(sender);
+        self.row_count_requests.invalidate();
+        let _ = sender.output(BrowseTabOutput::FetchRowCount);
+    }
+
+    pub(super) fn emit_auto_fetch_page_and_count(&self, sender: &ComponentSender<Self>) {
+        self.auto_refresh_in_flight.set(true);
+        self.page_requests.invalidate();
+        self.cell_value_requests.invalidate();
+        self.pending_cell_edit.borrow_mut().take();
+        let _ = sender.output(BrowseTabOutput::AutoRefreshPage);
         self.row_count_requests.invalidate();
         let _ = sender.output(BrowseTabOutput::FetchRowCount);
     }

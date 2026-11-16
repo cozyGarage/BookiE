@@ -300,3 +300,37 @@ fn ordinary_qualified_columns_remain_visible() {
         );
     }
 }
+
+#[test]
+fn a_statistics_catalog_masks_every_column() {
+    for (sql, driver) in [
+        (
+            "SELECT histogram_bounds FROM pg_stats WHERE attname = 'pan'",
+            "postgres",
+        ),
+        ("SELECT s.most_common_vals FROM pg_catalog.pg_stats s", "postgres"),
+        ("SELECT stavalues1 FROM pg_statistic", "postgres"),
+        (
+            "SELECT (SELECT max(most_common_vals::text) FROM pg_stats_ext) AS v",
+            "postgres",
+        ),
+        ("SELECT histogram FROM information_schema.column_statistics", "mysql"),
+        ("SELECT min_value FROM mysql.column_stats", "mysql"),
+        ("SELECT range_high_key FROM sys.dm_db_stats_histogram(1, 1)", "mssql"),
+        ("SELECT sample FROM sqlite_stat4", "sqlite"),
+        ("SELECT endpoint_actual_value FROM all_tab_histograms", "oracle"),
+        ("SELECT low_value FROM user_tab_col_statistics", "oracle"),
+    ] {
+        assert_eq!(
+            sensitive_projection(sql, driver, &sensitive_patterns(), 1),
+            vec![true],
+            "{driver}: {sql}"
+        );
+    }
+}
+
+#[test]
+fn an_ordinary_catalog_keeps_its_columns_visible() {
+    let positions = sensitive_projection("SELECT relname FROM pg_class", "postgres", &sensitive_patterns(), 1);
+    assert_eq!(positions, vec![false]);
+}

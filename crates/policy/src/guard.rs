@@ -82,6 +82,16 @@ struct Authorization {
     analysis: StatementAnalysis,
     approval_outcome: AuditApprovalOutcome,
     preview_state: AuditPreviewState,
+    approval_wait: Duration,
+}
+
+impl Authorization {
+    fn rearm(&self, control: &OperationControl) -> OperationControl {
+        OperationControl::new(
+            control.cancellation_token().clone(),
+            control.deadline().map(|deadline| deadline + self.approval_wait),
+        )
+    }
 }
 
 struct AuditOperation<'a> {
@@ -168,12 +178,7 @@ impl PolicyGuard {
         analyze_parsed(parsed, &self.ctx.driver_id, self.mask_patterns.as_deref(), true)
     }
 
-    async fn authorize(
-        &self,
-        sql: &str,
-        _is_params_exec: bool,
-        control: Option<&OperationControl>,
-    ) -> Result<Authorization, DriverError> {
+    async fn authorize(&self, sql: &str, control: Option<&OperationControl>) -> Result<Authorization, DriverError> {
         self.authorize_analysis(sql, self.analyze_statement(sql), None, control)
             .await
     }
@@ -230,6 +235,13 @@ impl PolicyGuard {
         control: Option<&OperationControl>,
         counter: Option<Counter<'_>>,
     ) -> Result<Authorization, DriverError> {
+        if analysis.lexical_mode_ambiguous {
+            let decision = Decision::Deny {
+                rule: "session_lexical_mode_ambiguous".into(),
+                message: "SQL token boundaries depend on the database session lexical mode".into(),
+            };
+            return self.resolve_authorization(sql, analysis, decision, None, control).await;
+        }
         let facts = &analysis.facts;
         let effects = facts.effects;
         let env_policy = self
@@ -292,12 +304,27 @@ impl PolicyGuard {
         control: Option<&OperationControl>,
     ) -> Result<Authorization, DriverError> {
         let facts = &analysis.facts;
+        let decision = match decision {
+            Decision::RequireApproval { .. }
+                if matches!(self.ctx.principal, Principal::Agent { .. })
+                    && !crate::approval::sql_is_reviewable(sql) =>
+            {
+                Decision::Deny {
+                    rule: "agent_sql_not_reviewable".into(),
+                    message: "This statement is too long or contains invisible or direction-changing characters, so \
+                              a person cannot review it in the approval dialog"
+                        .into(),
+                }
+            }
+            other => other,
+        };
         match decision {
             Decision::Allow { .. } => Ok(Authorization {
                 decision,
                 analysis,
                 approval_outcome: AuditApprovalOutcome::NotRequired,
                 preview_state: AuditPreviewState::NotRequested,
+                approval_wait: Duration::ZERO,
             }),
             Decision::Deny { ref message, .. } => {
                 let operation = self.operation(
@@ -342,11 +369,12 @@ impl PolicyGuard {
                     cancellation: control.map(|control| control.cancellation_token().clone()),
                 });
                 tokio::pin!(approval);
+                let approval_started = tokio::time::Instant::now();
                 let outcome = match control {
                     Some(control) => tokio::select! {
                         biased;
                         _ = control.cancellation_token().cancelled() => Err(DriverError::Cancelled),
-                        _ = wait_for_control_deadline(control) => {
+                        _ = tokio::time::sleep(APPROVAL_WAIT_LIMIT) => {
                             control.cancellation_token().cancel();
                             Err(DriverError::TimedOut)
                         },
@@ -394,6 +422,7 @@ impl PolicyGuard {
                             analysis,
                             approval_outcome: approved_audit_outcome(outcome),
                             preview_state,
+                            approval_wait: approval_started.elapsed(),
                         })
                     }
                     ApprovalOutcome::Deny => {
@@ -811,6 +840,7 @@ impl PolicyGuard {
             return batch;
         }
         let truncated = batch.truncated;
+        let rows_affected = batch.rows_affected;
         let result_sets = batch
             .result_sets
             .into_iter()
@@ -820,6 +850,7 @@ impl PolicyGuard {
             result_sets,
             truncated,
             messages: ServerMessages::default(),
+            rows_affected,
         }
     }
 
@@ -1049,12 +1080,27 @@ fn transaction_error_outcome(error: &DriverError) -> (AuditTerminalStatus, Audit
     match error {
         DriverError::Cancelled => (AuditTerminalStatus::Cancelled, AuditTransactionOutcome::Pending, false),
         DriverError::TimedOut => (AuditTerminalStatus::TimedOut, AuditTransactionOutcome::Pending, false),
+        DriverError::Transaction { source, .. } if matches!(source.as_ref(), DriverError::Cancelled) => (
+            AuditTerminalStatus::Cancelled,
+            AuditTransactionOutcome::RolledBack,
+            false,
+        ),
+        DriverError::Transaction { source, .. } if matches!(source.as_ref(), DriverError::TimedOut) => (
+            AuditTerminalStatus::TimedOut,
+            AuditTransactionOutcome::RolledBack,
+            false,
+        ),
         DriverError::Transaction { source, .. } if !is_ambiguous_post_dispatch(source) => {
             (AuditTerminalStatus::Failed, AuditTransactionOutcome::RolledBack, false)
         }
         DriverError::PartiallyApplied { source, .. } if !is_ambiguous_post_dispatch(source) => {
             (AuditTerminalStatus::Failed, AuditTransactionOutcome::Failed, false)
         }
+        DriverError::ConnectionRefused
+        | DriverError::DatabaseFileNotFound(_)
+        | DriverError::AuthFailed
+        | DriverError::IntegratedAuth(_)
+        | DriverError::Tls(_) => (AuditTerminalStatus::Failed, AuditTransactionOutcome::RolledBack, false),
         _ => (AuditTerminalStatus::Unknown, AuditTransactionOutcome::Unknown, true),
     }
 }
@@ -1070,12 +1116,7 @@ fn interactive_transaction_error_outcome(error: &DriverError) -> (AuditTerminalS
 
 pub fn is_ambiguous_post_dispatch(error: &DriverError) -> bool {
     match error {
-        DriverError::ConnectionRefused
-        | DriverError::DatabaseFileNotFound(_)
-        | DriverError::Disconnected
-        | DriverError::AuthFailed
-        | DriverError::IntegratedAuth(_)
-        | DriverError::Tls(_)
+        DriverError::Disconnected
         | DriverError::Internal(_)
         | DriverError::CommitUnconfirmed(_)
         | DriverError::OperationOutcomeUnknown { .. } => true,
@@ -1083,7 +1124,12 @@ pub fn is_ambiguous_post_dispatch(error: &DriverError) -> bool {
             is_ambiguous_post_dispatch(source)
         }
         DriverError::TransactionRollbackFailed { .. } => true,
-        DriverError::Query { .. }
+        DriverError::ConnectionRefused
+        | DriverError::DatabaseFileNotFound(_)
+        | DriverError::AuthFailed
+        | DriverError::IntegratedAuth(_)
+        | DriverError::Tls(_)
+        | DriverError::Query { .. }
         | DriverError::ConcurrentModification
         | DriverError::ReadOnly
         | DriverError::PolicyDenied(_)

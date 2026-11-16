@@ -18,7 +18,7 @@ The dial endpoint and authenticated service hostname are separate. SSH retains t
 
 Saved custom CA and client certificate/key paths are assembled through saved connections, bundles, GUI setup and agentd transport. PostgreSQL and MySQL drivers accept configured client identities; other drivers refuse them. TLS modes that can fall back to plaintext are rejected, and missing, partial, non-file or oversized identity material fails closed.
 
-MongoDB and Redis TLS backends have no CA-only mode, so `VerifyCa` also verifies the hostname. PostgreSQL and MySQL Verify CA and Verify Full use the operating system trust store when no custom authority is named. A named authority is added to those roots. Verify CA checks the certificate chain; Verify Full also checks the service hostname. Typed keyring failure propagates instead of becoming a missing password; see [storage](storage.md#secrets).
+MongoDB and Redis TLS backends have no CA-only mode, so `VerifyCa` also verifies the hostname. PostgreSQL and MySQL Verify CA and Verify Full use the operating system trust store when no custom authority is named; a named authority is added to those roots. MongoDB uses the operating system trust store when no CA file is configured; an explicit CA file defines its trust roots. Verify CA checks the certificate chain; Verify Full also checks the service hostname. Typed keyring failure propagates instead of becoming a missing password; see [storage](storage.md#secrets).
 
 ## SSH jump hosts
 
@@ -36,7 +36,7 @@ The GUI defaults to `UnknownHostKey::Refuse` and installs a prompter. An unknown
 
 A saved tunnel can select `client: open_ssh`. Its ControlMaster/forward lives in a private runtime directory; `StrictHostKeyChecking=ask` applies to the destination and every `ProxyJump` hop. GUI prompts explicitly and agentd declines unanswered prompts. Saved passwords/passphrases answer only a matching destination/key prompt. Jump routing comes from `~/.ssh/config`/`ProxyJump`; effective `ProxyCommand` routes are refused. Saved per-hop chains are refused for this backend. Built-in SSH supports saved chains and ssh-agent.
 
-Inside Flatpak, selecting system OpenSSH fails with an explicit message before resolving saved SSH credentials or dispatching the database driver. The client does not switch to built-in SSH; select that backend explicitly if it is wanted. Native system OpenSSH remains available outside Flatpak. The executable `bookie-askpass` helper must be installed beside the app or on PATH. Debian packages install it with the application binaries.
+Inside Flatpak, selecting system OpenSSH fails with an explicit message before resolving saved SSH credentials or dispatching the database driver. The client does not switch to built-in SSH; select that backend explicitly if it is wanted. Native Linux builds can use system OpenSSH outside Flatpak. Other targets refuse this backend because BookiE cannot guarantee its child exits when BookiE stops; select the built-in SSH client instead. The executable `bookie-askpass` helper must be installed beside the app or on PATH. Debian packages install it with the application binaries.
 
 ## Daemon session cache and DuckDB flat files
 

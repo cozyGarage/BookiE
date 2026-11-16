@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 use bookie_core::{
@@ -19,6 +19,7 @@ use bookie_storage::{SavedConnection, SavedSshConfig, load_connections};
 use uuid::Uuid;
 
 const SESSION_PING_TIMEOUT: Duration = Duration::from_secs(5);
+const IDLE_SESSION_LIMIT: Duration = Duration::from_secs(15 * 60);
 
 pub(crate) const AGENT_UNKNOWN_HOST_KEY: bookie_ssh::UnknownHostKey = bookie_ssh::UnknownHostKey::Refuse;
 
@@ -27,6 +28,7 @@ struct OpenSession {
     connection: Arc<dyn Connection>,
     audit_state: Arc<AuditState>,
     retired: Arc<std::sync::atomic::AtomicBool>,
+    last_used: Instant,
 }
 
 struct SessionFaultSink {
@@ -457,6 +459,10 @@ struct SessionKey {
     tls_root_cert: Option<PathBuf>,
     auth_mode: AuthMode,
     ssh: Option<SavedSshConfig>,
+    strict_encryption: bool,
+    auth_source: Option<String>,
+    connect_timeout_secs: Option<u32>,
+    attached_databases: Vec<bookie_core::AttachedDatabase>,
     material: [u8; 32],
 }
 
@@ -474,6 +480,10 @@ impl SessionKey {
             tls_root_cert: saved.tls_root_cert.clone(),
             auth_mode: saved.auth_mode,
             ssh: saved.ssh.clone(),
+            strict_encryption: saved.tls_strict_encryption,
+            auth_source: saved.auth_source.clone(),
+            connect_timeout_secs: saved.connect_timeout_secs,
+            attached_databases: saved.attached_databases.clone(),
             material,
         }
     }
@@ -535,6 +545,34 @@ impl DaemonProvider {
             connection,
             audit_state: Arc::new(self.audit_state.new_connection_generation()),
             retired: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            last_used: Instant::now(),
+        }
+    }
+
+    fn evict_idle_sessions(&self) {
+        self.evict_sessions_idle_longer_than(IDLE_SESSION_LIMIT);
+    }
+
+    fn evict_sessions_idle_longer_than(&self, limit: Duration) {
+        let idle: Vec<OpenSession> = match self.sessions.lock() {
+            Ok(mut sessions) => {
+                let ids: Vec<Uuid> = sessions
+                    .iter()
+                    .filter(|(_, session)| session.last_used.elapsed() > limit)
+                    .map(|(id, _)| *id)
+                    .collect();
+                ids.iter().filter_map(|id| sessions.remove(id)).collect()
+            }
+            Err(_) => return,
+        };
+        drop(idle);
+    }
+
+    fn touch_session(&self, id: Uuid) {
+        if let Ok(mut sessions) = self.sessions.lock()
+            && let Some(session) = sessions.get_mut(&id)
+        {
+            session.last_used = Instant::now();
         }
     }
 
@@ -598,6 +636,7 @@ impl DaemonProvider {
         saved: &SavedConnection,
         principal: Principal,
     ) -> Result<Arc<dyn Connection>, String> {
+        self.evict_idle_sessions();
         let session_lock = self.session_lock(saved.id)?;
         let _open = session_lock.lock_owned().await;
         let material = match bookie_transport::session_material_digest(saved).await {
@@ -612,6 +651,7 @@ impl DaemonProvider {
                 .session_retirement(saved.id, &connection)
                 .load(std::sync::atomic::Ordering::Acquire);
             if healthy && !retired && self.session_is_current(saved.id, &key, &connection)? {
+                self.touch_session(saved.id);
                 return Ok(connection);
             }
             self.remove_session(saved.id, &key, &connection)?;

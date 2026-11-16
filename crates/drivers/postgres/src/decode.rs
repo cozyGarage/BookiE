@@ -17,6 +17,13 @@ pub(crate) fn decode_pg_binary_text(type_name: &str, bytes: &[u8]) -> Option<Str
     }
 }
 
+pub(crate) fn decoded_payload_length(type_name: &str, bytes: &[u8]) -> usize {
+    match type_name {
+        "BIT" | "VARBIT" => bit_string_text_length(bytes).unwrap_or(bytes.len()),
+        _ => bytes.len(),
+    }
+}
+
 fn decode_macaddr(bytes: &[u8]) -> Option<String> {
     let [a, b, c, d, e, f] = bytes else {
         return None;
@@ -34,6 +41,23 @@ fn decode_macaddr8(bytes: &[u8]) -> Option<String> {
 }
 
 fn decode_bit_string(bytes: &[u8]) -> Option<String> {
+    decode_bit_string_with_limit(bytes, usize::MAX)
+}
+
+pub(crate) fn decode_bit_string_with_limit(bytes: &[u8], max_text_length: usize) -> Option<String> {
+    let bit_length = bit_string_text_length(bytes)?;
+    if bit_length > max_text_length {
+        return None;
+    }
+    let mut text = String::with_capacity(bit_length);
+    for index in 0..bit_length {
+        let mask = 1 << (7 - index % 8);
+        text.push(if bytes[4 + index / 8] & mask == 0 { '0' } else { '1' });
+    }
+    Some(text)
+}
+
+fn bit_string_text_length(bytes: &[u8]) -> Option<usize> {
     let bit_length = usize::try_from(i32::from_be_bytes(bytes.get(..4)?.try_into().ok()?)).ok()?;
     let byte_length = bit_length.checked_add(7)? / 8;
     if bytes.len() != 4 + byte_length {
@@ -45,14 +69,7 @@ fn decode_bit_string(bytes: &[u8]) -> Option<String> {
             return None;
         }
     }
-    Some(
-        (0..bit_length)
-            .map(|index| {
-                let mask = 1 << (7 - index % 8);
-                if bytes[4 + index / 8] & mask == 0 { '0' } else { '1' }
-            })
-            .collect(),
-    )
+    Some(bit_length)
 }
 
 fn decode_interval(bytes: &[u8]) -> Option<String> {

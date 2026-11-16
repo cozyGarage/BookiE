@@ -39,6 +39,8 @@ import gtk_input
 import gtk_runner
 import gtk_shard
 import gtk_process
+import gtk_allocator_trim
+import gtk_server_messages
 
 _owned_application = None
 
@@ -1076,7 +1078,12 @@ def start_application(binary, environment, restored=False):
     heaptrack_output = os.environ.get("BOOKIE_GTK_APP_HEAPTRACK_OUTPUT")
     if (heaptrack_preload is None) != (heaptrack_output is None):
         raise AssertionError("Heaptrack requires both an app preload library and output pipe")
-    if heaptrack_preload is not None and heaptrack_output is not None:
+    trim_preload = gtk_allocator_trim.preload(environment)
+    if trim_preload is not None:
+        if heaptrack_preload is not None or environment.get("LD_PRELOAD"):
+            raise AssertionError("allocator trim profiling cannot be combined with another preload")
+        environment["LD_PRELOAD"] = trim_preload
+    elif heaptrack_preload is not None and heaptrack_output is not None:
         environment["LD_PRELOAD"] = heaptrack_preload
         environment["DUMP_HEAPTRACK_OUTPUT"] = heaptrack_output
     stderr_capture = tempfile.TemporaryFile(mode="w+", encoding="utf-8")
@@ -1153,7 +1160,7 @@ def run_sql(sql):
 
 
 def run_scenario(binary, scenario):
-    base = Path(tempfile.mkdtemp(prefix=f"bookie-{scenario.__name__}-"))
+    base = Path(tempfile.mkdtemp(prefix="bk-"))
     process = None
     failure = None
     stderr = ""
@@ -3376,6 +3383,8 @@ def main():
     scenarios.extend(gtk_whole_result.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_active_edit.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_editor_panel.scenarios(sys.modules[__name__]))
+    if os.environ.get("BOOKIE_GTK_POSTGRES_PORT"):
+        scenarios.extend(gtk_server_messages.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_csv_refresh.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_copy_statements.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_catalog.scenarios(sys.modules[__name__]))

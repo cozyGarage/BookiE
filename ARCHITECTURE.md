@@ -24,7 +24,8 @@ DuckDB is a built-in driver. The diagrams below give the detail.
 | Path | Holds |
 | --- | --- |
 | `crates/` | GTK-free workspace crates: `core`, `policy`, `storage`, `ssh`, `transport`, `results`, `app-services`, `dump`, `mcp`, `agentd`, and `drivers/*`. None depends on GTK. |
-| `apps/linux/` | The GTK application (`app/`) and what only it needs: `data/`, `po/`, `flatpak/`, `packaging/`. |
+| `apps/linux/` | The shipped GTK application (`app/`) and what only it needs: `data/`, `po/`, `flatpak/`, `packaging/`. |
+| `apps/gpui/` | The chosen cross-platform GPUI frontend ([ADR 0052](docs/decisions/0052-gpui-is-the-cross-platform-frontend.md)); own lockfile, not packaged until that ADR's shipping conditions hold. |
 | `tests/` | Cross-crate test crates (`release/`, `driver-tls/`), fixtures and shared test data (`data/`). Unit tests stay beside their code; per-crate integration tests stay in `crates/<name>/tests`. |
 | `scripts/`, `ci/`, `vendor/`, `docs/` | Tooling, CI helpers, vendored patches and documentation. |
 | root | `Cargo.toml` workspace, toolchain and lint config, `meson.build`, this file, `AGENTS.md`, `README.md`. |
@@ -170,6 +171,11 @@ flowchart TB
 | `bookie-dump` | GTK-free vendor-tool supervision, private password files and PostgreSQL dump/restore requests. Application services run backup and restore through `PolicyGuard::run_administrative`. Depends on `core`; [ADR 0019](docs/decisions/0019-database-tooling-without-sidecars.md) governs the feature. |
 | `bookie-mcp` | MCP auth, scopes, connection allowlists, rate limits, tools. Never exposes a raw driver connection. |
 | `bookie-driver-*` | One static crate per engine. |
+| `bookie-driver-registry` | Registers every static driver in one `default_registry()` for the two composition roots and GPUI. |
+| `bookie-checks` | TCP reachability checks and their rolling result history; re-exported by `app-services` and used by `apps/gpui`. |
+| `bookie-pg-sessions` | The PostgreSQL session list query and its row type; re-exported by `app-services` and used by `apps/gpui`. |
+| `bookie-kafka-browser` | Read-only Kafka topic listing and bounded record tail through `rskafka`; re-exported by `app-services` and used by `apps/gpui`. |
+| `bookie-avro-container` | Bounded Avro object container decoding for [ADR 0050](docs/decisions/0050-avro-container-decode.md). No crate depends on it yet. |
 | `bookie-driver-tls-tests` / `bookie-release-tests` | Test-only fixtures. |
 
 `crates/drivers/shared/` holds shared test helpers and is not a workspace member. Domain and driver crates never import GTK or Relm4.
@@ -373,6 +379,8 @@ Each engine exports a type implementing `bookie_core::DatabaseDriver`. Connect r
 | Redis | `redis` | Experimental; one host and port. Sentinel and Cluster are unsupported. |
 | MongoDB | `mongodb` | Experimental |
 | DuckDB | DuckDB | Built in |
+| Cassandra / ScyllaDB | `scylla` | Experimental, read-only; plain TCP only |
+| Oracle Database | `oracledb` | Experimental, read-only; plain TCP only |
 
 `rust_decimal` is the shared decimal carrier; exact support is recorded per type/consumer under [ADR 0007](docs/decisions/0007-type-and-value-preservation.md). Session trust: [ADR 0008](docs/decisions/0008-connection-and-session-ownership.md). Durable identity: [ADR 0009](docs/decisions/0009-persistence-and-identity-compatibility.md). Registration: [adding drivers](docs/adding-drivers.md).
 
@@ -461,7 +469,7 @@ Workspace Clippy and unit checks include the DuckDB driver like every other crat
 | No embedded browser | Native GTK widgets only. |
 | No in-process user scripting | Reduces attack surface beside SQL policy. |
 | Redis topology | Single endpoint; unsupported topologies and release status are in [known limitations](docs/known-limitations.md#editing-and-connections). |
-| Packaging | GitHub releases provide an Arch package and an AppImage (0.2.4 also has Debian and Flatpak; see ADRs 0031 and 0032). Native package requirements are listed in [platforms](docs/platforms.md). |
+| Packaging | Current GitHub releases provide an Arch package and an AppImage; 0.2.4 also has Debian and Flatpak (ADRs 0031 and 0032). Native package requirements, OpenSSL sonames and AppImage toolkit notes are in [platforms](docs/platforms.md). |
 
 ## How to read this architecture map
 

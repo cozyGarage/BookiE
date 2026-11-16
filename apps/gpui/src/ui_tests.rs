@@ -5,9 +5,9 @@ use gpui::{TestAppContext, VisualTestContext};
 
 use bookie_results::grid_cursor::Cursor;
 
-use crate::GridView;
 use crate::text_input;
 use crate::ui_theme::ThemeExt;
+use crate::{GridView, Work};
 
 pub(super) fn open(cx: &mut TestAppContext) -> (gpui::Entity<GridView>, &mut VisualTestContext) {
     cx.update(text_input::bind_keys);
@@ -134,7 +134,7 @@ fn changing_find_text_discards_a_pending_search_result(cx: &mut TestAppContext) 
             view.run_find(true, cx);
         });
     });
-    let cancel = view.read_with(cx, |view, _| view.operation_cancel.clone());
+    let cancel = view.read_with(cx, |view, _| view.scans.cancel.clone());
     view.update(cx, |view, cx| {
         view.find.update(cx, |input, cx| input.set_content("new search", cx))
     });
@@ -142,6 +142,63 @@ fn changing_find_text_discards_a_pending_search_result(cx: &mut TestAppContext) 
     cx.run_until_parked();
     assert!(cancel.is_cancelled());
     view.read_with(cx, |view, _| assert!(view.cursor.matches.is_empty()));
+}
+
+fn flag() -> (std::rc::Rc<std::cell::Cell<bool>>, std::rc::Rc<std::cell::Cell<bool>>) {
+    let flag = std::rc::Rc::new(std::cell::Cell::new(false));
+    (flag.clone(), flag)
+}
+
+#[gpui::test]
+fn starting_a_find_does_not_discard_a_pending_load(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    let (applied, mark) = flag();
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.begin_background(Work::Load, cx, |_| (), move |_, ()| mark.set(true));
+            view.find.update(cx, |input, cx| input.set_content("Sample 7", cx));
+            view.run_find(true, cx);
+            assert!(!view.loads.cancel.is_cancelled(), "a find must not cancel the load");
+        });
+    });
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    assert!(applied.get(), "the load result was dropped by a find");
+}
+
+#[gpui::test]
+fn applying_a_filter_does_not_discard_a_pending_load(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    let (applied, mark) = flag();
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.begin_background(Work::Load, cx, |_| (), move |_, ()| mark.set(true));
+            view.filter
+                .update(cx, |input, cx| input.set_content("label contains 7", cx));
+            view.apply_filter(cx);
+            assert!(!view.loads.cancel.is_cancelled(), "a filter must not cancel the load");
+        });
+    });
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    assert!(applied.get(), "the load result was dropped by a filter");
+}
+
+#[gpui::test]
+fn starting_a_load_discards_a_pending_scan(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    let (applied, mark) = flag();
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.begin_background(Work::Scan, cx, |_| (), move |_, ()| mark.set(true));
+            let scan = view.scans.cancel.clone();
+            view.begin_background(Work::Load, cx, |_| (), |_, ()| {});
+            assert!(scan.is_cancelled(), "a scan of the old data must be cancelled");
+        });
+    });
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    assert!(!applied.get(), "a scan result for replaced data was applied");
 }
 
 #[gpui::test]
@@ -154,7 +211,7 @@ fn changing_filter_text_discards_a_pending_filter(cx: &mut TestAppContext) {
             view.apply_filter(cx);
         });
     });
-    let cancel = view.read_with(cx, |view, _| view.operation_cancel.clone());
+    let cancel = view.read_with(cx, |view, _| view.scans.cancel.clone());
     view.update(cx, |view, cx| {
         view.filter
             .update(cx, |input, cx| input.set_content("label contains 8", cx))
@@ -180,7 +237,28 @@ fn the_arrow_keys_move_the_active_cell_and_space_selects_its_row(cx: &mut TestAp
     view.read_with(cx, |view, _| assert_eq!(view.selection.map(|s| s.count()), Some(1)));
     cx.simulate_keystrokes("shift-down shift-down");
     view.read_with(cx, |view, _| {
-        assert_eq!(view.cell_cursor, Some(Cursor { row: 2, column: 1 }));
+        assert_eq!(view.cell_cursor, Some(Cursor { row: 4, column: 1 }));
+        assert_eq!(view.selection.map(|s| s.count()), Some(3));
+        assert_eq!(view.selection.map(|s| s.anchor), Some(2));
+        assert_eq!(view.selection.map(|s| s.focus), Some(4));
+        assert_eq!(view.status, "3 rows selected");
+    });
+}
+
+#[gpui::test]
+fn shift_arrow_seeds_a_range_from_the_active_cell(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("down down");
+    view.read_with(cx, |view, _| {
+        assert!(view.selection.is_none());
+        assert_eq!(view.cell_cursor, Some(Cursor { row: 2, column: 0 }));
+    });
+    cx.simulate_keystrokes("shift-down");
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.cell_cursor, Some(Cursor { row: 3, column: 0 }));
+        assert_eq!(view.selection.map(|s| s.count()), Some(2));
+        assert_eq!(view.selection.map(|s| s.anchor), Some(2));
+        assert_eq!(view.selection.map(|s| s.focus), Some(3));
     });
 }
 
@@ -972,8 +1050,8 @@ fn closing_query_from_home_discards_its_pending_result(cx: &mut TestAppContext) 
     cx.simulate_keystrokes("ctrl-t");
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
-            view.begin_background(cx, |_| (), |view, ()| view.status = "stale".into());
-            let cancel = view.operation_cancel.clone();
+            view.begin_background(Work::Load, cx, |_| (), |view, ()| view.status = "stale".into());
+            let cancel = view.loads.cancel.clone();
             let query = view.tabs.active;
             view.tabs.open_home();
             view.sync_grid_owner();
@@ -1087,7 +1165,7 @@ fn closing_the_active_run_restores_the_surviving_runs_edits(cx: &mut TestAppCont
         view.update(cx, |view, cx| {
             view.add_run(None);
             view.edits.insert((1, 1), Cell::Text("second".into()));
-            view.begin_background(cx, |_| (), |view, ()| view.status = "stale result".into());
+            view.begin_background(Work::Load, cx, |_| (), |view, ()| view.status = "stale result".into());
             view.close_run(1);
             assert_eq!(view.runs.len(), 2);
             assert_eq!(view.cell_at(1, 1), Cell::Text("second".into()));
@@ -1107,7 +1185,7 @@ fn a_previous_runs_background_result_cannot_replace_the_current_run(cx: &mut Tes
     let (view, cx) = open(cx);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
-            view.begin_background(cx, |_| (), |view, ()| view.status = "stale result".into());
+            view.begin_background(Work::Load, cx, |_| (), |view, ()| view.status = "stale result".into());
             view.add_run(None);
         });
     });

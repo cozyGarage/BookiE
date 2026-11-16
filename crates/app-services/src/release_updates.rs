@@ -1,3 +1,6 @@
+use quick_xml::events::Event;
+use quick_xml::reader::Reader;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ReleaseVersion {
     pub major: u32,
@@ -133,11 +136,73 @@ pub fn metainfo_release_notes(metainfo_xml: &str, version: &str) -> Option<Strin
     let block = &after_attr[block_start..];
     let inner_start = "<description>".len();
     let inner_end = block.find("</description>")?;
-    let html = block[inner_start..inner_end].trim();
-    if html.is_empty() {
-        return None;
+    let markup = block[inner_start..inner_end].trim();
+    (!markup.is_empty()).then(|| markup.to_owned())
+}
+
+pub fn metainfo_release_notes_text(metainfo_xml: &str, version: &str) -> Option<String> {
+    let markup = metainfo_release_notes(metainfo_xml, version)?;
+    let mut reader = Reader::from_str(&markup);
+    let mut notes = String::new();
+    loop {
+        match reader.read_event().ok()? {
+            Event::Start(element) => append_release_tag(element.local_name().as_ref(), &mut notes),
+            Event::Empty(element) => append_release_tag(element.local_name().as_ref(), &mut notes),
+            Event::End(element) => append_release_tag_end(element.local_name().as_ref(), &mut notes),
+            Event::Text(text) => notes.push_str(&text),
+            Event::GeneralRef(reference) => notes.push(release_entity(&reference)?),
+            Event::CData(text) => notes.push_str(&text),
+            Event::Eof => return normalize_release_notes(notes),
+            _ => {}
+        }
     }
-    Some(html.to_owned())
+}
+
+fn release_entity(reference: &quick_xml::events::BytesRef<'_>) -> Option<char> {
+    if let Some(character) = reference.resolve_char_ref().ok()? {
+        return Some(character);
+    }
+    match &**reference {
+        "amp" => Some('&'),
+        "apos" => Some('\''),
+        "gt" => Some('>'),
+        "lt" => Some('<'),
+        "quot" => Some('"'),
+        _ => None,
+    }
+}
+
+fn append_release_tag(tag: &str, notes: &mut String) {
+    match tag {
+        "p" | "ul" | "ol" => append_newline(notes),
+        "li" => {
+            append_newline(notes);
+            notes.push_str("• ");
+        }
+        "br" => append_newline(notes),
+        _ => {}
+    }
+}
+
+fn append_release_tag_end(tag: &str, notes: &mut String) {
+    if matches!(tag, "p" | "li" | "ul" | "ol") {
+        append_newline(notes);
+    }
+}
+
+fn append_newline(notes: &mut String) {
+    if !notes.is_empty() && !notes.ends_with('\n') {
+        notes.push('\n');
+    }
+}
+
+fn normalize_release_notes(notes: String) -> Option<String> {
+    let lines = notes
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .collect::<Vec<_>>();
+    (!lines.is_empty()).then(|| lines.join("\n"))
 }
 
 pub const GITHUB_LATEST_RELEASE_URL: &str = "https://api.github.com/repos/cozyGarage/BookiE/releases/latest";
@@ -254,7 +319,7 @@ mod tests {
     }
 
     #[test]
-    fn metainfo_notes_extract_the_matching_release_html() {
+    fn metainfo_notes_extract_the_matching_release_markup() {
         let xml = r#"
         <releases>
           <release version="0.2.7" type="stable" date="2026-11-12">
@@ -270,6 +335,15 @@ mod tests {
             Some("<p>Release after 0.2.6: notes for seven.</p>")
         );
         assert_eq!(metainfo_release_notes(xml, "0.9.9"), None);
+    }
+
+    #[test]
+    fn metainfo_notes_text_renders_blocks_and_decodes_entities() {
+        let xml = r#"<releases><release version="0.2.7"><description><p>A &amp; B</p><ul><li>First</li><li>Second <a href="https://example.test">docs</a></li></ul><p>Done</p></description></release></releases>"#;
+        assert_eq!(
+            metainfo_release_notes_text(xml, "0.2.7").as_deref(),
+            Some("A & B\n• First\n• Second docs\nDone")
+        );
     }
 
     #[test]

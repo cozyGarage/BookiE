@@ -1,10 +1,13 @@
 import importlib.util
+import io
 import json
 from pathlib import Path
 import re
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 import unittest
 from unittest.mock import patch
 
@@ -19,7 +22,9 @@ class LayerRunnerTests(unittest.TestCase):
         return {"argv": [sys.executable, "-c", code], "evidence": evidence, "timeout_seconds": timeout}
 
     def execute(self, step):
-        with tempfile.TemporaryDirectory() as temporary, tempfile.TemporaryDirectory() as evidence:
+        with tempfile.TemporaryDirectory() as temporary, tempfile.TemporaryDirectory() as evidence, patch.object(
+            runner.sys, "stdout", io.StringIO()
+        ):
             return runner.execute(step, Path(temporary) / "step.log")
 
     def test_catalog_has_real_entrypoints_and_unique_steps(self):
@@ -29,6 +34,25 @@ class LayerRunnerTests(unittest.TestCase):
                 for arg in step["argv"]:
                     if arg.startswith("scripts/"):
                         self.assertTrue((ROOT / arg).exists(), arg)
+
+    def test_only_ci_fixture_layers_reconcile_abandoned_resources(self):
+        with patch.dict("os.environ", {"BOOKIE_TEST_RUN_ID": "forgejo-123-1-driver-core"}), patch.object(
+            runner.subprocess, "run"
+        ) as run:
+            runner.reconcile_ci_fixtures(["sandbox"])
+            run.assert_not_called()
+            runner.reconcile_ci_fixtures(["driver-core"])
+            run.assert_called_once_with(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/cleanup-stale-ci-fixtures.py"),
+                    "forgejo-123-1-driver-core",
+                ],
+                cwd=ROOT,
+                check=True,
+            )
+            runner.reconcile_ci_fixtures(["postgres-release"])
+            self.assertEqual(run.call_count, 2)
 
     def test_untracked_source_contents_change_evidence_identity_but_ignored_outputs_do_not(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -141,7 +165,8 @@ class LayerRunnerTests(unittest.TestCase):
         ):
             for output in (other + success, success + other):
                 with self.subTest(output=output):
-                    result = self.execute(self.step(f"print({output!r})", "python-tests"))
+                    with patch.object(runner.sys, "stdout", io.StringIO()):
+                        result = self.execute(self.step(f"print({output!r})", "python-tests"))
                     self.assertEqual(result["exit_code"], 0)
                     self.assertEqual(result["status"], "failed")
 
@@ -155,7 +180,8 @@ class LayerRunnerTests(unittest.TestCase):
                 "    unittest.TextTestRunner().run(Contract())\n"
             )
             with self.subTest(outcomes=outcomes):
-                result = self.execute(self.step(code, "python-tests"))
+                with patch.object(runner.sys, "stdout", io.StringIO()):
+                    result = self.execute(self.step(code, "python-tests"))
                 self.assertEqual(result["exit_code"], 0)
                 self.assertEqual(result["status"], expected)
 
@@ -174,10 +200,44 @@ class LayerRunnerTests(unittest.TestCase):
 
     def test_timeout_and_missing_executable_fail_explicitly(self):
         self.assertEqual(self.execute(self.step("import time; time.sleep(60)", timeout=0.05))["status"], "timed_out")
+        self.assertEqual(
+            self.execute(self.step("import os,time; os.close(1); os.close(2); time.sleep(60)", timeout=0.05))["status"],
+            "timed_out",
+        )
+        code = (
+            "import time\n"
+            "deadline = time.monotonic() + 0.2\n"
+            "while time.monotonic() < deadline:\n"
+            " print('output', flush=True)\n"
+            " time.sleep(0.005)"
+        )
+        self.assertEqual(
+            self.execute(self.step(code, timeout=0.05))["status"],
+            "timed_out",
+        )
         step = {"argv": ["/missing/bookie-fixture"], "evidence": "exit", "timeout_seconds": 1}
         self.assertEqual(self.execute(step)["status"], "blocked")
         step = dict(self.step("pass"), required_tools=["bookie-missing-prerequisite"])
         self.assertEqual(self.execute(step)["status"], "blocked")
+
+    def test_output_is_visible_before_the_child_exits(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output = io.StringIO()
+            result = {}
+            step = self.step("import time; print('early output', flush=True); time.sleep(0.5)")
+            with patch.object(runner.sys, "stdout", output):
+                thread = threading.Thread(
+                    target=lambda: result.update(runner.execute(step, Path(temporary) / "step.log"))
+                )
+                thread.start()
+                deadline = time.monotonic() + 0.3
+                while "early output" not in output.getvalue() and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                self.assertIn("early output", output.getvalue())
+                self.assertTrue(thread.is_alive())
+                thread.join(timeout=2)
+            self.assertFalse(thread.is_alive())
+            self.assertEqual(result["status"], "passed")
 
     def test_interruption_is_not_passed(self):
         with patch.object(runner.subprocess, "Popen", side_effect=KeyboardInterrupt):
@@ -278,7 +338,8 @@ class LayerRunnerTests(unittest.TestCase):
         for layer in ["sandbox", "change-contracts", "b4-rollback", "tls", "postgres-release", "ui", "widgets", "keyring", "security-policy"]:
             self.assertIn(f"run-test-layer.py {layer}", build)
         driver = build.split("  driver:\n", 1)[1].split("  b4-rollback:\n", 1)[0]
-        self.assertIn("group: [driver-core, driver-analytics, driver-extended, socket-ssh]", driver)
+        self.assertIn("group: [driver-core, driver-analytics]", driver)
+        self.assertIn("group: [driver-extended, socket-ssh]", driver)
         self.assertIn('python3 scripts/run-test-layer.py "$BOOKIE_TEST_LAYER"', driver)
         self.assertNotIn("if-no-files-found: ignore", build)
         contracts = (workflows / "linux-ci-contracts.yml").read_text()

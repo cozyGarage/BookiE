@@ -176,7 +176,7 @@ pub fn diff_to_ops(
             ops.push(StructureOp::AddIndex {
                 schema: schema_owned.clone(),
                 table: table.clone(),
-                index: idx.clone(),
+                index: without_outdated_definition(idx, original_indexes),
             });
         }
     }
@@ -193,6 +193,18 @@ pub fn diff_to_ops(
     }
 
     ops
+}
+
+fn without_outdated_definition(edited: &IndexInfo, original_indexes: &[IndexInfo]) -> IndexInfo {
+    let definition_predates_the_edit = original_indexes.iter().any(|original| {
+        original.using_clause.is_some()
+            && original.using_clause == edited.using_clause
+            && (original.columns != edited.columns || original.predicate != edited.predicate)
+    });
+    IndexInfo {
+        using_clause: edited.using_clause.clone().filter(|_| !definition_predates_the_edit),
+        ..edited.clone()
+    }
 }
 
 pub(super) fn same_index(left: &IndexInfo, right: &IndexInfo) -> bool {

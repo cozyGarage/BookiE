@@ -134,25 +134,29 @@ pub fn equality_rule(column: &str, value: &Value) -> Option<FilterRule> {
 }
 
 pub fn cell_filter_rule(column: &str, value: &Value, exclude: bool) -> Option<FilterRule> {
-    let text = match value {
-        Value::Null => {
-            return Some(FilterRule {
-                column: column.to_string(),
-                op: if exclude { FilterOp::IsNotNull } else { FilterOp::IsNull },
-                value: None,
-            });
+    let text = if let Some(text) = crate::sql_literal::postgres_extended_temporal_text(value) {
+        text
+    } else {
+        match value {
+            Value::Null => {
+                return Some(FilterRule {
+                    column: column.to_string(),
+                    op: if exclude { FilterOp::IsNotNull } else { FilterOp::IsNull },
+                    value: None,
+                });
+            }
+            Value::Bool(b) => b.to_string(),
+            Value::Int(i) => i.to_string(),
+            Value::Float(f) => f.to_string(),
+            Value::Decimal(d) => d.to_string(),
+            Value::Text(t) => t.clone(),
+            Value::Date(d) => d.format("%Y-%m-%d").to_string(),
+            Value::Time(t) => t.format("%H:%M:%S%.f").to_string(),
+            Value::DateTime(dt) => dt.format("%Y-%m-%d %H:%M:%S%.f").to_string(),
+            Value::TimestampTz(ts) => ts.to_rfc3339(),
+            Value::Uuid(u) => u.to_string(),
+            Value::Json(_) | Value::JsonText(_) | Value::Bytes(_) | Value::Undecodable(_) => return None,
         }
-        Value::Bool(b) => b.to_string(),
-        Value::Int(i) => i.to_string(),
-        Value::Float(f) => f.to_string(),
-        Value::Decimal(d) => d.to_string(),
-        Value::Text(t) => t.clone(),
-        Value::Date(d) => d.format("%Y-%m-%d").to_string(),
-        Value::Time(t) => t.format("%H:%M:%S%.f").to_string(),
-        Value::DateTime(dt) => dt.format("%Y-%m-%d %H:%M:%S%.f").to_string(),
-        Value::TimestampTz(ts) => ts.to_rfc3339(),
-        Value::Uuid(u) => u.to_string(),
-        Value::Json(_) | Value::JsonText(_) | Value::Bytes(_) | Value::Undecodable(_) => return None,
     };
     Some(FilterRule {
         column: column.to_string(),

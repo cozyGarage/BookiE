@@ -16,6 +16,7 @@ mod init_css;
 mod init_sidebar;
 mod init_window;
 mod init_workspace;
+mod lifecycle_messages;
 mod msg;
 mod multi_session;
 mod open_request;
@@ -41,6 +42,7 @@ mod whats_new;
 mod window_close_prompt;
 mod workspace_chrome;
 mod workspace_close;
+mod workspace_editing_messages;
 mod workspace_overview;
 mod workspace_persist;
 mod workspace_preview;
@@ -66,7 +68,7 @@ use super::history_dialog::HistoryDialog;
 use super::welcome_view::{WelcomeView, WelcomeViewInit, WelcomeViewOutput};
 use crate::services::database_service::ConnectionHealth;
 
-pub use msg::AppMsg;
+pub use msg::{AppMsg, ConnectionMessage};
 use render::qualified_label;
 use types::{CLOSED_TABS_CAPACITY, ConnectionSwitch, ConnectionTransition, ExportFormat, StatusKind, SwitchDecision};
 pub use types::{ClosedTabDescriptor, EditorTabSlot, OpenMode, StructureTabSlot, TableTabSlot, WorkspaceTab};
@@ -306,7 +308,7 @@ impl SimpleComponent for App {
                     pack_start = &gtk::Button {
                         set_icon_name: "list-add-symbolic",
                         set_tooltip_text: Some(bookie_app_services::tr!("New connection").as_str()),
-                        connect_clicked => AppMsg::OpenConnect,
+                        connect_clicked => AppMsg::Connection(ConnectionMessage::Open),
                     },
 
                     #[name = "saved_connections_button"]
@@ -536,7 +538,7 @@ impl SimpleComponent for App {
                 registry: registry.clone(),
             })
             .forward(sender.input_sender(), |out| match out {
-                WelcomeViewOutput::OpenConnect => AppMsg::OpenConnect,
+                WelcomeViewOutput::OpenConnect => AppMsg::Connection(ConnectionMessage::Open),
                 WelcomeViewOutput::ImportUrl => AppMsg::ImportConnectionUrl,
                 WelcomeViewOutput::OpenSaved(saved) => AppMsg::OpenSaved(*saved),
                 WelcomeViewOutput::ToggleFavorite(id) => AppMsg::ToggleConnectionFavorite(id),
@@ -741,19 +743,11 @@ impl SimpleComponent for App {
             return;
         }
         match msg {
-            AppMsg::FlushWindowEdits => {
-                self.grid_close.window_ready.set(true);
-                self.window.close();
-            }
+            AppMsg::FlushWindowEdits => lifecycle_messages::flush_window_edits(self),
             AppMsg::GridEditsPrepared { intent, ticket, result } => {
                 self.grid_edits_prepared(intent, ticket, result, sender)
             }
-            AppMsg::OpenConnect => self.on_open_connect(sender),
-            AppMsg::ConnectionPrepared(prepared) => self.on_connection_prepared(prepared, sender),
-            AppMsg::ConnectionPrepareFailed(message, saved) => {
-                self.on_connection_prepare_failed(message, *saved, sender)
-            }
-            AppMsg::ConnectionSwitchDecision(decision) => self.on_connection_switch_decision(decision, sender),
+            AppMsg::Connection(message) => self.on_connection_message(message, sender),
             AppMsg::Disconnect => self.on_disconnect(sender),
             AppMsg::ForceDisconnect => self.request_disconnect(sender),
             AppMsg::PrepareWindowClose => self.prepare_window_close(sender),
@@ -762,43 +756,17 @@ impl SimpleComponent for App {
                 width,
                 height,
                 maximized,
-            } => {
-                let mut state = self.window_state.borrow_mut();
-                state.width = width;
-                state.height = height;
-                state.maximized = maximized;
-                drop(state);
-                self.persist_window_state(sender, true);
-            }
-            AppMsg::WindowStatePersisted(result) => {
-                if let Err(error) = result {
-                    tracing::warn!(error = %error, "window state write failed");
-                }
-            }
+            } => lifecycle_messages::persist_window_state_for_close(self, width, height, maximized, sender),
+            AppMsg::WindowStatePersisted(result) => lifecycle_messages::window_state_persisted(result),
             AppMsg::WindowStatePersistedForClose(result) => {
-                self.window_close_state_pending.set(false);
-                if let Err(error) = result {
-                    tracing::warn!(error = %error, "window state write failed before close");
-                }
-                self.window_close_state_saved.set(true);
-                self.window.close();
+                lifecycle_messages::window_state_persisted_for_close(self, result)
             }
             AppMsg::ConnectionDeleted(id) => self.on_connection_deleted(id, sender),
             AppMsg::ConfirmSessionTeardown(action) => self.prepare_editor_sessions(action, sender),
-            AppMsg::CancelSessionTeardown(action) => match action {
-                SessionTeardownAction::WindowClose => self.session_teardown_pending.set(false),
-                SessionTeardownAction::ConnectionSwitch => {
-                    self.switch.transition = ConnectionTransition::Idle;
-                    self.switch.prepared = None;
-                    self.switch.saves_pending.clear();
-                    self.switch.cancel_audit_was_disabled = None;
-                }
-                SessionTeardownAction::CloseTab(_) | SessionTeardownAction::Disconnect => {}
-            },
+            AppMsg::CancelSessionTeardown(action) => lifecycle_messages::cancel_session_teardown(self, action),
             AppMsg::SessionTeardownCompleted { action, result } => {
                 self.on_session_teardown_completed(action, result, sender);
             }
-            AppMsg::DialogClosed => self.on_connect_dialog_closed(),
             AppMsg::SelectTable {
                 schema,
                 name,
@@ -829,7 +797,10 @@ impl SimpleComponent for App {
             AppMsg::LoadFailed(tab_id, msg) => self.on_browse_load_failed(tab_id, msg),
             AppMsg::RowCountLoaded(tab_id, request, count) => self.on_browse_row_count_loaded(tab_id, request, count),
             AppMsg::RowCountFailed(tab_id, request) => self.on_browse_row_count_failed(tab_id, request),
-            AppMsg::FetchBrowsePage(tab_id) => self.fetch_browse_page(tab_id, sender),
+            AppMsg::FetchBrowsePage(tab_id, auto_refresh) => self.fetch_browse_page(tab_id, auto_refresh, sender),
+            AppMsg::AutoRefreshFailed(tab_id, request, message) => {
+                self.on_auto_refresh_failed(tab_id, request, message)
+            }
             AppMsg::FetchBrowseCellValue(tab_id, request, col_index, column_name, row_key) => {
                 self.fetch_browse_cell_value(tab_id, request, col_index, column_name, row_key, sender)
             }
@@ -872,47 +843,19 @@ impl SimpleComponent for App {
                 self.dispatch_to_tab(tab_id, BrowseTabInput::FlashErrorRow(source.clone()));
                 self.dispatch_to_editor(tab_id, SqlEditorInput::ResultFlashError(source));
             }
-            AppMsg::FocusActiveGrid => {
-                if let Some(id) = self.selected_editor_tab_id() {
-                    self.dispatch_to_editor(id, crate::ui::editor::SqlEditorInput::FocusResultGrid);
-                } else if let Some(id) = self.selected_browse_tab_id() {
-                    self.dispatch_to_tab(id, BrowseTabInput::FocusGrid);
-                }
-            }
-            AppMsg::FocusActiveEditor => {
-                if let Some(id) = self.selected_editor_tab_id() {
-                    self.dispatch_to_editor(id, crate::ui::editor::SqlEditorInput::FocusEditor);
-                }
-            }
-            AppMsg::SaveActiveBrowseTab => {
-                if let Some(id) = self.selected_editor_tab_id() {
-                    if self.change_trackers.with_tab_ref(id, |tracker| tracker.has_pending()) == Some(true) {
-                        self.dispatch_to_editor(id, SqlEditorInput::CommitResultEdits);
-                    } else {
-                        self.save_editor_file(id, false, sender);
-                    }
-                } else if let Some(id) = self.selected_browse_tab_id() {
-                    self.dispatch_to_tab(id, BrowseTabInput::CommitSave);
-                }
-            }
-            AppMsg::SaveActiveBrowseTabById(id) => {
-                self.dispatch_to_tab(id, BrowseTabInput::CommitSave);
-            }
+            AppMsg::FocusActiveGrid => workspace_editing_messages::focus_active_grid(self),
+            AppMsg::FocusActiveEditor => workspace_editing_messages::focus_active_editor(self),
+            AppMsg::SaveActiveBrowseTab => workspace_editing_messages::save_active_browse_tab(self, sender),
+            AppMsg::SaveActiveBrowseTabById(id) => workspace_editing_messages::save_browse_tab_by_id(self, id),
             AppMsg::UndoActiveBrowseTab => {
                 // Ctrl+Z routes to BrowseTab undo only. Structure
                 // editing follows the snapshot+diff model — DDL undo
                 // is a session-level Discard, not a per-keystroke
                 // history. Inside a Structure-mode Entry, the native
                 // `gtk::Text` undo handles per-field text revert.
-                if let Some(id) = self.selected_browse_tab_id() {
-                    self.dispatch_to_tab(id, BrowseTabInput::Undo);
-                }
+                workspace_editing_messages::undo_active_browse_tab(self)
             }
-            AppMsg::RedoActiveBrowseTab => {
-                if let Some(id) = self.selected_browse_tab_id() {
-                    self.dispatch_to_tab(id, BrowseTabInput::Redo);
-                }
-            }
+            AppMsg::RedoActiveBrowseTab => workspace_editing_messages::redo_active_browse_tab(self),
             AppMsg::WorkspaceTabClosed(id) => self.close_workspace_tab_by_id(id, sender),
             AppMsg::FinishCloseWorkspaceTab(id) => {
                 if let Some(tab_view) = self.workspace_tab_view.clone() {
@@ -1127,24 +1070,9 @@ impl SimpleComponent for App {
                 self.mcp_bridge.clone(),
             ),
             AppMsg::NewWindow => {
-                let ctrl = App::builder()
-                    .launch(AppInit {
-                        registry: self.registry.clone(),
-                        persistence: self.persistence.clone(),
-                        workspace: self.workspace.clone(),
-                        history: self.history.clone(),
-                        database: self.database.clone(),
-                        preferences: self.preferences.clone(),
-                        mcp_bridge: self.mcp_bridge.clone(),
-                    })
-                    .detach();
                 // Only the window relm4 starts the application with is
                 // presented for us. A window spawned here stays unmapped
                 // unless it joins the application and is presented.
-                if let Some(application) = self.window.application() {
-                    ctrl.widget().set_application(Some(&application));
-                }
-                ctrl.widget().present();
                 // Dropping a Controller is what actually runs the child's
                 // Component::shutdown (which closes its connection and
                 // cancels its timers), but nothing does that when the user
@@ -1152,13 +1080,7 @@ impl SimpleComponent for App {
                 // while this Vec keeps the Controller alive forever. Watch
                 // for that destruction and remove our own entry so the
                 // Controller drops.
-                let key = ctrl.widget().as_ptr() as usize;
-                let destroy_sender = sender.clone();
-                session_restore::forget_group_on_close(ctrl.widget().upcast_ref(), key, sender.clone());
-                ctrl.widget().connect_destroy(move |_| {
-                    destroy_sender.input(AppMsg::ExtraWindowClosed(key));
-                });
-                self.extra_windows.push((key, ctrl));
+                session_restore::open_extra_window(self, sender)
             }
             AppMsg::ExtraWindowClosed(key) => {
                 self.extra_windows.retain(|(k, _)| *k != key);
@@ -1186,8 +1108,6 @@ impl SimpleComponent for App {
                 statement,
             } => self.on_copy_row_as_statement(tab_id, &row_positions, statement),
             AppMsg::DeleteConnection(id) => self.on_delete_connection(id, sender),
-            AppMsg::CancelConnect => self.on_cancel_connect(),
-            AppMsg::ConnectionCancelled => self.on_connection_cancelled(),
             AppMsg::ContinueSessionRestore => self.continue_session_restore(sender),
             AppMsg::EditConnection(saved) => self.on_edit_connection(saved, sender),
             AppMsg::EditConnectionLoaded(prefill) => self.open_connect_dialog(Some(*prefill), sender),
