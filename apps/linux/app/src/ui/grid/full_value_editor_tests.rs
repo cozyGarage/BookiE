@@ -163,6 +163,24 @@ fn formatting_json_is_explicit_and_preserves_large_number_lexemes() {
 }
 
 #[test]
+fn formatting_json_keeps_duplicate_entries_when_staged() {
+    let formatted = format_json_text(r#"{"a":1,"a":2,"s":"\u0041"}"#).unwrap();
+    assert_eq!(formatted.matches("\"a\"").count(), 2);
+    assert!(formatted.contains(r#""s": "\u0041""#));
+    assert!(matches!(
+        full_value_payload(FullValueKind::JsonText, &formatted),
+        Ok(Value::JsonText(text)) if text == formatted
+    ));
+}
+
+#[test]
+fn formatting_json_refuses_expansion_past_the_editor_budget() {
+    let source = format!("{}[{}0]{}", "[".repeat(100), "0,".repeat(10_000), "]".repeat(100));
+    assert!(source.len() < MAX_EDIT_BYTES);
+    assert!(format_json_text(&source).is_err());
+}
+
+#[test]
 fn staging_rejects_noneditable_cells_and_nontext_values() {
     let column = ColumnInfo {
         name: "notes".into(),

@@ -128,7 +128,7 @@ fn start_view(
                 database,
             },
         );
-        model.attach_selection(&selection, &view);
+        install_row_navigation(&view, &selection, &model);
         let status = gtk::Label::new(None);
         status.set_wrap(true);
         model.attach_status(&status);
@@ -146,10 +146,88 @@ fn start_view(
     });
 }
 
+fn install_row_navigation(view: &gtk::ColumnView, selection: &gtk::MultiSelection, model: &PagedModel) {
+    model.attach_selection(selection, view);
+    let controller = gtk::ShortcutController::new();
+    controller.set_scope(gtk::ShortcutScope::Local);
+    for (trigger, last) in [("<Primary>Home", false), ("<Primary>End", true)] {
+        let view = view.downgrade();
+        let selection = selection.downgrade();
+        let model = model.downgrade();
+        controller.add_shortcut(
+            gtk::Shortcut::builder()
+                .trigger(&crate::ui::shortcut::parse(trigger))
+                .action(&gtk::CallbackAction::new(move |_, _| {
+                    let (Some(view), Some(selection), Some(model)) =
+                        (view.upgrade(), selection.upgrade(), model.upgrade())
+                    else {
+                        return gtk::glib::Propagation::Proceed;
+                    };
+                    let Some(end) = model.n_items().checked_sub(1) else {
+                        return gtk::glib::Propagation::Proceed;
+                    };
+                    let position = if last { end } else { 0 };
+                    selection.select_item(position, true);
+                    view.scroll_to(
+                        position,
+                        None,
+                        gtk::ListScrollFlags::FOCUS | gtk::ListScrollFlags::SELECT,
+                        None,
+                    );
+                    gtk::glib::Propagation::Stop
+                }))
+                .build(),
+        );
+    }
+    view.add_controller(controller);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::ui::editor::stream_pages::{ResidentPageStore, StreamTerminal};
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn continuous_shortcuts_select_boundary_rows_and_ignore_empty_results() {
+        gtk::init().unwrap();
+        for counts in [vec![100, 100], vec![]] {
+            let model = PagedModel::new(&counts, 1);
+            let selection = gtk::MultiSelection::new(Some(model.clone()));
+            let view = gtk::ColumnView::new(Some(selection.clone()));
+            install_row_navigation(&view, &selection, &model);
+            for (trigger, position) in [("<Primary>End", 199), ("<Primary>Home", 0)] {
+                let handled = activate_navigation(&view, trigger);
+                assert_eq!(handled, !counts.is_empty());
+                if handled {
+                    assert!(selection.is_selected(position));
+                    assert_eq!(selection.selection().size(), 1);
+                } else {
+                    assert!(selection.selection().is_empty());
+                }
+            }
+        }
+    }
+
+    fn activate_navigation(view: &gtk::ColumnView, trigger: &str) -> bool {
+        let wanted = crate::ui::shortcut::parse(trigger).to_str();
+        let controllers = view.observe_controllers();
+        for index in 0..controllers.n_items() {
+            let Some(controller) = controllers.item(index).and_downcast::<gtk::ShortcutController>() else {
+                continue;
+            };
+            for index in 0..controller.n_items() {
+                let shortcut = controller.item(index).and_downcast::<gtk::Shortcut>().unwrap();
+                if shortcut.trigger().unwrap().to_str() == wanted {
+                    return shortcut
+                        .action()
+                        .unwrap()
+                        .activate(gtk::ShortcutActionFlags::empty(), view, None);
+                }
+            }
+        }
+        panic!("continuous navigation shortcut was not installed");
+    }
 
     #[test]
     #[ignore = "requires an isolated GTK display"]
@@ -234,9 +312,9 @@ mod tests {
             .unwrap();
         let model_weak = model.downgrade();
         drop(model);
-        view.scroll_to(190, None, gtk::ListScrollFlags::FOCUS, None);
-        wait_for_text(holder.upcast_ref(), "190");
-        view.scroll_to(0, None, gtk::ListScrollFlags::FOCUS, None);
+        assert!(activate_navigation(&view, "<Primary>End"));
+        wait_for_text(holder.upcast_ref(), "199");
+        assert!(activate_navigation(&view, "<Primary>Home"));
         wait_for_text(holder.upcast_ref(), "0");
         drop(view);
         assert!(!pager.is_visible());

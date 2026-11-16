@@ -207,8 +207,14 @@ fn full_value_payload(kind: FullValueKind, text: &str) -> Result<Value, PayloadE
     }
 }
 
-fn format_json_text(text: &str) -> Result<String, serde_json::Error> {
-    serde_json::from_str::<serde_json::Value>(text).and_then(|value| serde_json::to_string_pretty(&value))
+fn format_json_text(text: &str) -> Result<String, PayloadError> {
+    bookie_app_services::json_format::pretty_json(text, MAX_EDIT_BYTES).map_err(|error| {
+        if error.is_io() {
+            PayloadError::TooLarge
+        } else {
+            invalid_json_error(error)
+        }
+    })
 }
 
 fn invalid_json_error(error: serde_json::Error) -> PayloadError {
@@ -390,7 +396,7 @@ fn connect_format(button: Option<gtk::Button>, buffer: &gtk::TextBuffer, error: 
         let text = buffer.text(&buffer.start_iter(), &buffer.end_iter(), true);
         match format_json_text(text.as_str()) {
             Ok(formatted) => buffer.set_text(&formatted),
-            Err(json_error) => show_json_error(&error, json_error.line(), json_error.column()),
+            Err(format_error) => show_payload_error(&error, format_error),
         }
     });
 }

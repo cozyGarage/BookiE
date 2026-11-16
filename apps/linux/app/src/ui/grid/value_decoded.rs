@@ -45,26 +45,25 @@ pub(super) fn display_as_section(value: &Value) -> Option<gtk::Box> {
     }
     let container = gtk::Box::new(gtk::Orientation::Vertical, 4);
     for form in forms {
+        let heading = display_kind_heading(form.kind);
         let title = gtk::Label::builder()
-            .label(display_kind_heading(form.kind))
+            .label(&heading)
             .xalign(0.0)
             .margin_top(8)
             .margin_start(12)
             .margin_end(12)
             .build();
         title.add_css_class("heading");
-        let text = gtk::Label::builder()
-            .label(&form.text)
-            .xalign(0.0)
-            .selectable(true)
-            .wrap(true)
-            .wrap_mode(gtk::pango::WrapMode::WordChar)
-            .margin_start(12)
-            .margin_end(12)
+        let text = super::value_viewer::build_text_view(&form.text);
+        text.update_property(&[gtk::accessible::Property::Label(&heading)]);
+        let scroller = gtk::ScrolledWindow::builder()
+            .child(&text)
+            .max_content_height(160)
+            .propagate_natural_height(true)
+            .vexpand(true)
             .build();
-        text.add_css_class("monospace");
         container.append(&title);
-        container.append(&text);
+        container.append(&scroller);
     }
     let note = gtk::Label::builder()
         .label(bookie_app_services::tr!(
@@ -133,6 +132,26 @@ pub(super) fn section(value: &Value) -> Option<gtk::Box> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn display_alternatives_scroll_without_editing_or_wrapping_large_json() {
+        gtk::init().expect("display");
+        let value = Value::Text(format!("[{}0]", "0,".repeat(2_000)));
+        let section = display_as_section(&value).expect("display alternatives");
+        let scroller = section
+            .first_child()
+            .and_then(|title| title.next_sibling())
+            .and_downcast::<gtk::ScrolledWindow>()
+            .expect("scrollable alternative");
+        assert_eq!(scroller.max_content_height(), 160);
+        let view = scroller.child().and_downcast::<gtk::TextView>().expect("text view");
+        assert!(!view.is_editable());
+        assert!(gtk::test_accessible_has_property(&view, gtk::AccessibleProperty::Label));
+        assert_eq!(view.wrap_mode(), gtk::WrapMode::None);
+        let buffer = view.buffer();
+        assert!(buffer.text(&buffer.start_iter(), &buffer.end_iter(), false).len() > 4 * 1024);
+    }
 
     #[test]
     fn only_binary_bytes_get_a_decoded_section() {
