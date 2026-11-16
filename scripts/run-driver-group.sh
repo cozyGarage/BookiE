@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-group=${1:?usage: run-driver-group.sh <core|analytics|extended>}
+group=${1:?usage: run-driver-group.sh <core|analytics|extended|DRIVER>}
 case "$group" in
   core) drivers=(mssql mysql postgres) ;;
   analytics) drivers=(clickhouse mongodb redis) ;;
   extended) drivers=(cassandra duckdb oracle) ;;
-  *) echo "unknown driver group: $group" >&2; exit 2 ;;
+  *)
+    case " mssql mysql postgres clickhouse mongodb redis cassandra duckdb oracle " in
+      *" $group "*) drivers=("$group") ;;
+      *) echo "unknown driver group or driver: $group" >&2; exit 2 ;;
+    esac
+    ;;
 esac
 
 base_run_id=${BOOKIE_TEST_RUN_ID:-ci-$$}
