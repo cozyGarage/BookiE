@@ -6,43 +6,53 @@ pub async fn assert_scalar_contract(connection: &dyn Connection, driver: &str) {
     let corpus: serde_json::Value =
         serde_json::from_str(include_str!("../../../../tests/data/value-contract.json")).unwrap();
     for text in corpus["integers"].as_array().unwrap() {
-        assert_scalar(
+        assert_scalar_with_native_oracle(
             connection,
             driver,
             "integer",
             Value::Int(text.as_str().unwrap().parse().unwrap()),
+            text.as_str().unwrap(),
         )
         .await;
     }
     for text in corpus["floats"].as_array().unwrap() {
-        assert_scalar(
+        assert_scalar_with_native_oracle(
             connection,
             driver,
             "float",
             Value::Float(text.as_str().unwrap().parse().unwrap()),
+            text.as_str().unwrap(),
         )
         .await;
     }
     for text in corpus["texts"].as_array().unwrap() {
-        assert_scalar(connection, driver, "text", Value::Text(text.as_str().unwrap().into())).await;
+        assert_scalar_with_native_oracle(
+            connection,
+            driver,
+            "text",
+            Value::Text(text.as_str().unwrap().into()),
+            text.as_str().unwrap(),
+        )
+        .await;
     }
     if matches!(driver, "postgres" | "mssql" | "clickhouse" | "duckdb") {
         let uuid = "12345678-9abc-def0-1122-334455667788";
-        assert_scalar(connection, driver, "uuid", Value::Uuid(uuid.parse().unwrap())).await;
-        assert_scalar(connection, driver, "text", Value::Text(uuid.into())).await;
-        assert_scalar(connection, driver, "uuid", Value::Null).await;
+        assert_scalar(connection, driver, "uuid", &Value::Uuid(uuid.parse().unwrap())).await;
+        assert_scalar(connection, driver, "text", &Value::Text(uuid.into())).await;
+        assert_scalar(connection, driver, "uuid", &Value::Null).await;
     }
     assert_named_parameter_order(connection, driver).await;
     assert_long_text(connection, driver, corpus["long_text_bytes"].as_u64().unwrap() as usize).await;
-    assert_scalar(connection, driver, "integer", Value::Null).await;
-    assert_scalar(connection, driver, "text", Value::Null).await;
+    assert_scalar(connection, driver, "integer", &Value::Null).await;
+    assert_scalar(connection, driver, "text", &Value::Null).await;
     if driver != "sqlite" {
         for text in corpus["decimals"].as_array().unwrap() {
-            assert_scalar(
+            assert_scalar_with_native_oracle(
                 connection,
                 driver,
                 "decimal",
                 Value::Decimal(text.as_str().unwrap().parse().unwrap()),
+                text.as_str().unwrap(),
             )
             .await;
         }
@@ -52,7 +62,7 @@ pub async fn assert_scalar_contract(connection: &dyn Connection, driver: &str) {
 async fn assert_long_text(connection: &dyn Connection, driver: &str, length: usize) {
     let expected = Value::Text("x".repeat(length));
     if driver != "clickhouse" {
-        assert_scalar(connection, driver, "text", expected).await;
+        assert_scalar(connection, driver, "text", &expected).await;
         return;
     }
     let result = connection
@@ -73,7 +83,40 @@ async fn assert_long_text(connection: &dyn Connection, driver: &str, length: usi
     );
 }
 
-async fn assert_scalar(connection: &dyn Connection, driver: &str, kind: &str, expected: Value) {
+async fn assert_scalar_with_native_oracle(
+    connection: &dyn Connection,
+    driver: &str,
+    kind: &str,
+    expected: Value,
+    corpus_text: &str,
+) {
+    let sql_type = scalar_type(driver, kind);
+    let literal = bookie_core::sql_literal::render_sql_literal(driver, &expected).unwrap();
+    let (bound_placeholder, text_placeholder) = match driver {
+        "postgres" => ("$1", "$2"),
+        "mssql" => ("@P1", "@P2"),
+        _ => ("?", "?"),
+    };
+    let oracle_sql = format!(
+        "SELECT 1 WHERE CAST({bound_placeholder} AS {sql_type}) <> CAST({text_placeholder} AS {sql_type}) \
+         OR CAST({literal} AS {sql_type}) <> CAST({text_placeholder} AS {sql_type})"
+    );
+    let corpus_value = Value::Text(corpus_text.into());
+    let parameters = if matches!(driver, "postgres" | "mssql") {
+        vec![expected.clone(), corpus_value]
+    } else {
+        vec![expected.clone(), corpus_value.clone(), corpus_value]
+    };
+    let oracle = connection.query_params(&oracle_sql, &parameters).await.unwrap();
+    assert!(
+        oracle.rows.is_empty(),
+        "{driver} {kind} corpus text {corpus_text:?} disagrees with bound or rendered values: {:?}",
+        oracle.rows
+    );
+    assert_scalar(connection, driver, kind, &expected).await;
+}
+
+async fn assert_scalar(connection: &dyn Connection, driver: &str, kind: &str, expected: &Value) {
     let placeholder = match driver {
         "postgres" => "$1",
         "mssql" => "@P1",
@@ -82,20 +125,20 @@ async fn assert_scalar(connection: &dyn Connection, driver: &str, kind: &str, ex
     let sql_type = scalar_type(driver, kind);
     let sql = format!("SELECT CAST({placeholder} AS {sql_type}) AS value");
     let bound = connection
-        .query_params(&sql, std::slice::from_ref(&expected))
+        .query_params(&sql, std::slice::from_ref(expected))
         .await
         .unwrap();
     assert_eq!(bound.rows.len(), 1, "{driver} bound {kind}");
     assert_eq!(bound.rows[0].len(), 1, "{driver} bound {kind}");
-    assert_value(&bound.rows[0][0], &expected, driver, &format!("bound {kind}"));
-    let literal = bookie_core::sql_literal::render_sql_literal(driver, &expected).unwrap();
+    assert_value(&bound.rows[0][0], expected, driver, &format!("bound {kind}"));
+    let literal = bookie_core::sql_literal::render_sql_literal(driver, expected).unwrap();
     let exported = connection
         .query(&format!("SELECT CAST({literal} AS {sql_type}) AS value"))
         .await
         .unwrap();
     assert_eq!(exported.rows.len(), 1, "{driver} exported {kind}");
     assert_eq!(exported.rows[0].len(), 1, "{driver} exported {kind}");
-    assert_value(&exported.rows[0][0], &expected, driver, &format!("exported {kind}"));
+    assert_value(&exported.rows[0][0], expected, driver, &format!("exported {kind}"));
 }
 
 fn assert_value(actual: &Value, expected: &Value, driver: &str, kind: &str) {
