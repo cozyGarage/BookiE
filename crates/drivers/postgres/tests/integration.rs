@@ -731,11 +731,27 @@ async fn assert_capped_and_server_stopped(observer: &dyn Connection, result: Que
         rows,
         elapsed,
     } = result;
-    assert!(truncated, "{rows} rows in {elapsed:?}");
-    assert!(rows <= bookie_core::MAX_QUERY_ROWS);
+    let version_result = observer
+        .query("SHOW server_version")
+        .await
+        .expect("read PostgreSQL server version");
+    let server_version = version_result
+        .rows
+        .first()
+        .and_then(|row| row.first())
+        .and_then(|value| match value {
+            Value::Text(version) => Some(version.as_str()),
+            _ => None,
+        })
+        .expect("PostgreSQL reports its server version");
+    assert!(truncated, "PostgreSQL {server_version}: {rows} rows in {elapsed:?}");
+    assert!(
+        rows <= bookie_core::MAX_QUERY_ROWS,
+        "PostgreSQL {server_version}: {rows} rows"
+    );
     assert!(
         elapsed < std::time::Duration::from_secs(30),
-        "{rows} rows in {elapsed:?}"
+        "PostgreSQL {server_version}: {rows} rows in {elapsed:?}"
     );
     let still_running = format!(
         "SELECT count(*) FROM pg_stat_activity WHERE state = 'active' AND query LIKE '%{tag}%' AND pid <> pg_backend_pid()"
@@ -751,7 +767,10 @@ async fn assert_capped_and_server_stopped(observer: &dyn Connection, result: Que
         }
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     }
-    assert_eq!(running, 0, "the server kept producing rows after the cap");
+    assert_eq!(
+        running, 0,
+        "PostgreSQL {server_version} kept producing rows after the cap"
+    );
 }
 
 struct QueryResultProbe {
