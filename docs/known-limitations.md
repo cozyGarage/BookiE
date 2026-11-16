@@ -63,5 +63,5 @@ This page describes user-visible behavior and limits in the current source. Curr
 Limits of the GPUI frontend after the DataTable change. It is the chosen cross-platform frontend ([ADR 0052](decisions/0052-gpui-is-the-cross-platform-frontend.md)) and is not included in packages or releases yet.
 
 - **Cell selection:** a cell is always selected while rows are shown (the top-left cell at first), so the cursor is always visible.
-- **Sidebar:** the narrow header label clips; the regex, locate and show-active-only controls are placeholders; the import menu entries do nothing yet.
+- **Sidebar:** the narrow header label clips when the pane is narrow; connection import and export menu entries report that they are not available yet.
 - **Settings:** one switch (Dark theme); the palette opens the page.

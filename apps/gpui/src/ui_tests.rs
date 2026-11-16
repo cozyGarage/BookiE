@@ -421,6 +421,61 @@ fn the_sidebar_search_takes_typed_text_and_filters_the_tree(cx: &mut TestAppCont
 }
 
 #[gpui::test]
+fn the_sidebar_locate_regex_and_active_only_controls_filter_the_tree(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.sidebar_open = false;
+            view.locate_active_table(cx);
+            assert!(view.sidebar_open);
+            assert_eq!(view.sidebar_search.read(cx).content(), "synthetic_rows");
+            assert!(view.status.starts_with("Located "));
+            view.toggle_sidebar_regex(cx);
+            assert!(view.sidebar_regex);
+            view.sidebar_search
+                .update(cx, |input, cx| input.set_content(r"^cust", cx));
+            let rows = bookie_gpui::shell::tree_rows_in(
+                &view.catalog,
+                r"^cust",
+                true,
+                true,
+                bookie_gpui::shell::SidebarFilter {
+                    regex: true,
+                    active_only: false,
+                },
+            );
+            assert_eq!(
+                rows.iter()
+                    .filter(|(_, row)| matches!(row, bookie_gpui::shell::TreeRow::Table(_)))
+                    .count(),
+                1
+            );
+            view.sidebar_active_only = true;
+            let active = bookie_gpui::shell::tree_rows_in(
+                &view.catalog,
+                "",
+                true,
+                true,
+                bookie_gpui::shell::SidebarFilter {
+                    regex: false,
+                    active_only: true,
+                },
+            );
+            assert_eq!(
+                active
+                    .iter()
+                    .filter_map(|(_, row)| match row {
+                        bookie_gpui::shell::TreeRow::Table(table) => Some(table.name.as_str()),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>(),
+                ["synthetic_rows"]
+            );
+        })
+    });
+}
+
+#[gpui::test]
 fn the_palette_lists_installed_fonts_and_the_chosen_one_becomes_the_ui_font(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.update(|_, cx| {

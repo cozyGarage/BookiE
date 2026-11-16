@@ -2,6 +2,13 @@ use std::collections::HashSet;
 
 use bookie_core::TableInfo;
 use bookie_results::sidebar_tree::{CollapseState, NodeKind, build_nodes, visible_nodes_with_hidden_schemas};
+use regex::RegexBuilder;
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SidebarFilter {
+    pub regex: bool,
+    pub active_only: bool,
+}
 
 pub const CONNECTION: &str = "PostgreSQL · sample";
 pub const DATABASE: &str = "sample";
@@ -35,7 +42,13 @@ pub enum TreeRow {
 }
 
 pub fn tree_rows(search: &str, connection_open: bool, database_open: bool) -> Vec<(usize, TreeRow)> {
-    tree_rows_in(&Catalog::synthetic(), search, connection_open, database_open)
+    tree_rows_in(
+        &Catalog::synthetic(),
+        search,
+        connection_open,
+        database_open,
+        SidebarFilter::default(),
+    )
 }
 
 pub fn tree_rows_in(
@@ -43,20 +56,10 @@ pub fn tree_rows_in(
     search: &str,
     connection_open: bool,
     database_open: bool,
+    filter: SidebarFilter,
 ) -> Vec<(usize, TreeRow)> {
-    let searching = !search.trim().is_empty();
-    let nodes = build_nodes(&catalog.tables, &[]);
-    let shown = visible_nodes_with_hidden_schemas(&nodes, &CollapseState::default(), search, &HashSet::new());
-    let tables: Vec<TableInfo> = shown
-        .into_iter()
-        .filter_map(|index| match &nodes[index].kind {
-            NodeKind::Table { schema, name } => Some(TableInfo {
-                schema: schema.clone(),
-                name: name.clone(),
-            }),
-            _ => None,
-        })
-        .collect();
+    let tables = filtered_tables(catalog, search, filter);
+    let searching = filter.active_only || !search.trim().is_empty();
     if searching && tables.is_empty() {
         return Vec::new();
     }
@@ -69,6 +72,47 @@ pub fn tree_rows_in(
         }
     }
     rows
+}
+
+fn filtered_tables(catalog: &Catalog, search: &str, filter: SidebarFilter) -> Vec<TableInfo> {
+    let mut tables: Vec<TableInfo> = if filter.active_only {
+        catalog
+            .tables
+            .iter()
+            .filter(|table| *table == &catalog.grid_table)
+            .cloned()
+            .collect()
+    } else {
+        catalog.tables.clone()
+    };
+    let needle = search.trim();
+    if needle.is_empty() {
+        return tables;
+    }
+    if filter.regex {
+        let Ok(pattern) = RegexBuilder::new(needle).case_insensitive(true).build() else {
+            return Vec::new();
+        };
+        tables.retain(|table| pattern.is_match(&table.name) || pattern.is_match(&table_label(table)));
+        return tables;
+    }
+    let nodes = build_nodes(&tables, &[]);
+    let shown = visible_nodes_with_hidden_schemas(&nodes, &CollapseState::default(), needle, &HashSet::new());
+    shown
+        .into_iter()
+        .filter_map(|index| match &nodes[index].kind {
+            NodeKind::Table { schema, name } => Some(TableInfo {
+                schema: schema.clone(),
+                name: name.clone(),
+            }),
+            _ => None,
+        })
+        .collect()
+}
+
+pub fn sidebar_regex_ok(search: &str) -> bool {
+    let needle = search.trim();
+    needle.is_empty() || RegexBuilder::new(needle).case_insensitive(true).build().is_ok()
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -274,7 +318,7 @@ mod tests {
             ],
             grid_table: table_info("orders"),
         };
-        let rows = tree_rows_in(&catalog, "", true, true);
+        let rows = tree_rows_in(&catalog, "", true, true, SidebarFilter::default());
         assert_eq!(rows.len(), 4);
         assert_eq!(
             rows[3].1,
@@ -283,7 +327,57 @@ mod tests {
                 name: "orders".into(),
             })
         );
-        assert_eq!(tree_rows_in(&catalog, "cust", false, false).len(), 3);
+        assert_eq!(
+            tree_rows_in(&catalog, "cust", false, false, SidebarFilter::default()).len(),
+            3
+        );
+    }
+
+    #[test]
+    fn active_only_keeps_the_grid_table_and_regex_matches_names() {
+        let catalog = Catalog::synthetic();
+        let active = tree_rows_in(
+            &catalog,
+            "",
+            true,
+            true,
+            SidebarFilter {
+                active_only: true,
+                ..SidebarFilter::default()
+            },
+        );
+        assert_eq!(
+            active
+                .iter()
+                .filter_map(|(_, row)| match row {
+                    TreeRow::Table(table) => Some(table.name.as_str()),
+                    _ => None,
+                })
+                .collect::<Vec<_>>(),
+            ["synthetic_rows"]
+        );
+        let regex = tree_rows_in(
+            &catalog,
+            r"^aud",
+            true,
+            true,
+            SidebarFilter {
+                regex: true,
+                ..SidebarFilter::default()
+            },
+        );
+        assert_eq!(
+            regex
+                .iter()
+                .filter_map(|(_, row)| match row {
+                    TreeRow::Table(table) => Some(table.name.as_str()),
+                    _ => None,
+                })
+                .collect::<Vec<_>>(),
+            ["audit_log"]
+        );
+        assert!(!sidebar_regex_ok("("));
+        assert!(sidebar_regex_ok(r"^aud"));
     }
 
     #[test]
@@ -302,7 +396,7 @@ mod tests {
             tables: vec![first.clone(), second.clone()],
             grid_table: first.clone(),
         };
-        let rows = tree_rows_in(&catalog, "orders", true, true);
+        let rows = tree_rows_in(&catalog, "orders", true, true, SidebarFilter::default());
         assert!(rows.iter().any(|(_, row)| *row == TreeRow::Table(first.clone())));
         assert!(rows.iter().any(|(_, row)| *row == TreeRow::Table(second.clone())));
         let mut tabs = Tabs::default();
