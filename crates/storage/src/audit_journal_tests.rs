@@ -302,3 +302,40 @@ async fn recent_with_a_short_limit_still_detects_tampering_in_older_records() {
 
     assert!(journal.recent(1).await.is_err());
 }
+
+extern "C" fn ignore_signal(_: libc::c_int) {}
+
+#[test]
+fn a_signal_during_a_blocking_journal_lock_does_not_fail_the_append() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("journal.lock");
+    let holder = File::create(&path).unwrap();
+    let held = FileLock::exclusive(&holder).unwrap();
+    unsafe {
+        let mut action: libc::sigaction = std::mem::zeroed();
+        action.sa_sigaction = ignore_signal as *const () as libc::sighandler_t;
+        action.sa_flags = 0;
+        libc::sigemptyset(&mut action.sa_mask);
+        assert_eq!(libc::sigaction(libc::SIGUSR2, &action, std::ptr::null_mut()), 0);
+    }
+    let waiter_file = File::open(&path).unwrap();
+    let (thread_id, thread) = {
+        let (send, receive) = std::sync::mpsc::channel();
+        let waiter = std::thread::spawn(move || {
+            send.send(unsafe { libc::pthread_self() }).unwrap();
+            FileLock::exclusive(&waiter_file).map(|lock| (lock, waiter_file))
+        });
+        (receive.recv().unwrap(), waiter)
+    };
+    std::thread::sleep(std::time::Duration::from_millis(200));
+    for _ in 0..3 {
+        unsafe { libc::pthread_kill(thread_id, libc::SIGUSR2) };
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    assert!(!thread.is_finished(), "the waiter must still be waiting for the lock");
+    drop(held);
+    assert!(
+        thread.join().unwrap().is_ok(),
+        "an interrupted wait for the journal lock must continue, not fail"
+    );
+}
