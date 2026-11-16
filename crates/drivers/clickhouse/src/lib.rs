@@ -203,12 +203,174 @@ fn resolution_from_kinds(kinds: &[String]) -> CommitResolution {
 }
 
 impl ClickhouseConnection {
-    async fn require_one_row(&self, sql: &str, params: &[Value]) -> Result<(), DriverError> {
+    async fn read_list_databases(&self, query_id: Option<&str>) -> Result<Vec<String>, DriverError> {
+        #[derive(Debug, Deserialize, clickhouse::Row)]
+        struct NameRow {
+            name: String,
+        }
+
+        let rows = tag_query(
+            self.client.query(
+                "SELECT name FROM system.databases
+                 WHERE name NOT IN ('system', 'information_schema', 'INFORMATION_SCHEMA')
+                 ORDER BY name",
+            ),
+            query_id,
+        )
+        .fetch_all::<NameRow>()
+        .await
+        .map_err(map_clickhouse_error)?;
+        Ok(rows.into_iter().map(|row| row.name).collect())
+    }
+
+    async fn read_list_tables(&self, query_id: Option<&str>) -> Result<Vec<TableInfo>, DriverError> {
+        #[derive(Debug, Deserialize, clickhouse::Row)]
+        struct Row {
+            database: String,
+            name: String,
+        }
+
+        let rows = tag_query(
+            self.client
+                .query(
+                    "SELECT database, name
+                 FROM system.tables
+                 WHERE database = ?
+                   AND is_temporary = 0
+                 ORDER BY name",
+                )
+                .bind(self.database.as_str()),
+            query_id,
+        )
+        .fetch_all::<Row>()
+        .await
+        .map_err(map_clickhouse_error)?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| TableInfo {
+                schema: Some(r.database),
+                name: r.name,
+            })
+            .collect())
+    }
+
+    async fn read_fetch_columns(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        query_id: Option<&str>,
+    ) -> Result<Vec<ColumnInfo>, DriverError> {
+        let rows = tag_query(
+            self.client
+                .query(
+                    "SELECT
+                    name,
+                    type,
+                    default_kind,
+                    default_expression,
+                    comment
+                 FROM system.columns
+                 WHERE database = ?
+                   AND table = ?
+                 ORDER BY position",
+                )
+                .bind(self.database_of(schema))
+                .bind(table),
+            query_id,
+        )
+        .fetch_all::<CatalogColumnRow>()
+        .await
+        .map_err(map_clickhouse_error)?;
+
+        Ok(rows.into_iter().map(catalog_row_to_column_info).collect())
+    }
+
+    async fn read_fetch_indexes(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        query_id: Option<&str>,
+    ) -> Result<Vec<IndexInfo>, DriverError> {
+        #[derive(Debug, Deserialize, clickhouse::Row)]
+        struct Row {
+            name: String,
+            primary_key: String,
+        }
+
+        let rows = tag_query(
+            self.client
+                .query(
+                    "SELECT name, primary_key
+                 FROM system.tables
+                 WHERE database = ?
+                   AND name = ?
+                 LIMIT 1",
+                )
+                .bind(self.database_of(schema))
+                .bind(table),
+            query_id,
+        )
+        .fetch_all::<Row>()
+        .await
+        .map_err(map_clickhouse_error)?;
+
+        let Some(row) = rows.into_iter().next() else {
+            return Ok(Vec::new());
+        };
+        let columns = split_key_expression(&row.primary_key);
+        if columns.is_empty() {
+            return Ok(Vec::new());
+        }
+        Ok(vec![IndexInfo {
+            constraint: None,
+            name: format!("{}_sorting_key", row.name),
+            columns,
+            // A MergeTree primary key is a sparse sorting key, not a
+            // uniqueness constraint: duplicate keys are legal and common.
+            // Advertising it as unique would tell the UI that an UPDATE
+            // built from these columns touches exactly one row.
+            unique: false,
+            primary: true,
+            predicate: None,
+            has_expression_key: false,
+            using_clause: None,
+        }])
+    }
+
+    async fn stopped_on_server<T>(
+        &self,
+        control: &OperationControl,
+        query_id: &str,
+        operation: impl std::future::Future<Output = Result<T, DriverError>>,
+    ) -> Result<T, DriverError> {
+        run_server_cancellable(
+            operation,
+            request_cancellation(&self.client, query_id),
+            confirms_cancellation,
+            control,
+        )
+        .await
+    }
+
+    async fn require_one_row(
+        &self,
+        sql: &str,
+        params: &[Value],
+        control: Option<&OperationControl>,
+    ) -> Result<(), DriverError> {
         let Some(probe) = row_probe::single_row_probe(sql) else {
             return Ok(());
         };
         let skip = params.len().saturating_sub(probe.placeholders);
-        let matched = self.query_params(&probe.sql, &params[skip..]).await?.rows.len();
+        let probed = match control {
+            Some(control) => {
+                self.query_params_controlled(&probe.sql, &params[skip..], control)
+                    .await?
+            }
+            None => self.query_params(&probe.sql, &params[skip..]).await?,
+        };
+        let matched = probed.rows.len();
         match matched {
             0 => Err(DriverError::ConcurrentModification),
             1 => Ok(()),
@@ -216,6 +378,11 @@ impl ClickhouseConnection {
                 "this edit would change more than one row: ClickHouse has no unique key, so the sorting key matches several rows. Nothing was changed".into(),
             )),
         }
+    }
+
+    fn rows_page_sql(&self, schema: Option<&str>, table: &str, offset: u64, limit: u64) -> String {
+        let qualified = qualify(self.database_of(schema), table);
+        format!("SELECT * FROM {qualified} LIMIT {limit} OFFSET {offset}")
     }
 
     fn database_of<'a>(&'a self, schema: Option<&'a str>) -> &'a str {
@@ -270,76 +437,62 @@ impl Connection for ClickhouseConnection {
     }
 
     async fn list_databases(&self) -> Result<Vec<String>, DriverError> {
-        #[derive(Debug, Deserialize, clickhouse::Row)]
-        struct NameRow {
-            name: String,
-        }
+        self.read_list_databases(None).await
+    }
 
-        let rows = self
-            .client
-            .query(
-                "SELECT name FROM system.databases
-                 WHERE name NOT IN ('system', 'information_schema', 'INFORMATION_SCHEMA')
-                 ORDER BY name",
-            )
-            .fetch_all::<NameRow>()
+    async fn list_databases_controlled(&self, control: &OperationControl) -> Result<Vec<String>, DriverError> {
+        let query_id = new_query_id();
+        self.stopped_on_server(control, &query_id, self.read_list_databases(Some(&query_id)))
             .await
-            .map_err(map_clickhouse_error)?;
-        Ok(rows.into_iter().map(|row| row.name).collect())
     }
 
     async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
-        #[derive(Debug, Deserialize, clickhouse::Row)]
-        struct Row {
-            database: String,
-            name: String,
-        }
+        self.read_list_tables(None).await
+    }
 
-        let rows = self
-            .client
-            .query(
-                "SELECT database, name
-                 FROM system.tables
-                 WHERE database = ?
-                   AND is_temporary = 0
-                 ORDER BY name",
-            )
-            .bind(self.database.as_str())
-            .fetch_all::<Row>()
+    async fn list_tables_controlled(&self, control: &OperationControl) -> Result<Vec<TableInfo>, DriverError> {
+        let query_id = new_query_id();
+        self.stopped_on_server(control, &query_id, self.read_list_tables(Some(&query_id)))
             .await
-            .map_err(map_clickhouse_error)?;
+    }
 
-        Ok(rows
-            .into_iter()
-            .map(|r| TableInfo {
-                schema: Some(r.database),
-                name: r.name,
-            })
-            .collect())
+    async fn list_tables_in(
+        &self,
+        schemas: &[String],
+        control: &OperationControl,
+    ) -> Result<Vec<TableInfo>, DriverError> {
+        let mut tables = self.list_tables_controlled(control).await?;
+        tables.retain(|table| table.schema.as_ref().is_none_or(|schema| schemas.contains(schema)));
+        Ok(tables)
+    }
+
+    async fn list_tables_excluding_controlled(
+        &self,
+        schemas: &[String],
+        control: &OperationControl,
+    ) -> Result<Vec<TableInfo>, DriverError> {
+        let mut tables = self.list_tables_controlled(control).await?;
+        tables.retain(|table| table.schema.as_ref().is_none_or(|schema| !schemas.contains(schema)));
+        Ok(tables)
     }
 
     async fn fetch_columns(&self, schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
-        let rows = self
-            .client
-            .query(
-                "SELECT
-                    name,
-                    type,
-                    default_kind,
-                    default_expression,
-                    comment
-                 FROM system.columns
-                 WHERE database = ?
-                   AND table = ?
-                 ORDER BY position",
-            )
-            .bind(self.database_of(schema))
-            .bind(table)
-            .fetch_all::<CatalogColumnRow>()
-            .await
-            .map_err(map_clickhouse_error)?;
+        self.read_fetch_columns(schema, table, None).await
+    }
 
-        Ok(rows.into_iter().map(catalog_row_to_column_info).collect())
+    async fn fetch_columns_controlled(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        control: &OperationControl,
+    ) -> Result<Vec<ColumnInfo>, DriverError> {
+        let query_id = new_query_id();
+        self.stopped_on_server(
+            control,
+            &query_id,
+            self.read_fetch_columns(schema, table, Some(&query_id)),
+        )
+        .await
     }
 
     async fn fetch_rows(
@@ -349,9 +502,32 @@ impl Connection for ClickhouseConnection {
         offset: u64,
         limit: u64,
     ) -> Result<QueryResult, DriverError> {
-        let qualified = qualify(self.database_of(schema), table);
-        let sql = format!("SELECT * FROM {qualified} LIMIT {limit} OFFSET {offset}");
+        let sql = self.rows_page_sql(schema, table, offset, limit);
         fetch_result(&self.client, &sql, limit as usize, None, self.output_settings_allowed).await
+    }
+
+    async fn fetch_rows_controlled(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        offset: u64,
+        limit: u64,
+        control: &OperationControl,
+    ) -> Result<QueryResult, DriverError> {
+        let query_id = new_query_id();
+        let sql = self.rows_page_sql(schema, table, offset, limit);
+        self.stopped_on_server(
+            control,
+            &query_id,
+            fetch_result(
+                &self.client,
+                &sql,
+                limit as usize,
+                Some(&query_id),
+                self.output_settings_allowed,
+            ),
+        )
+        .await
     }
 
     async fn query(&self, sql: &str) -> Result<QueryResult, DriverError> {
@@ -465,7 +641,7 @@ impl Connection for ClickhouseConnection {
         // uses to flag the offending row.
         let mut affected = Vec::with_capacity(statements.len());
         for (i, (sql, params)) in statements.iter().enumerate() {
-            let outcome = match self.require_one_row(sql, params).await {
+            let outcome = match self.require_one_row(sql, params, None).await {
                 Ok(()) => self.execute_params(sql, params).await,
                 Err(error) => Err(error),
             };
@@ -480,48 +656,41 @@ impl Connection for ClickhouseConnection {
     }
 
     async fn fetch_indexes(&self, schema: Option<&str>, table: &str) -> Result<Vec<IndexInfo>, DriverError> {
-        #[derive(Debug, Deserialize, clickhouse::Row)]
-        struct Row {
-            name: String,
-            primary_key: String,
-        }
+        self.read_fetch_indexes(schema, table, None).await
+    }
 
-        let rows = self
-            .client
-            .query(
-                "SELECT name, primary_key
-                 FROM system.tables
-                 WHERE database = ?
-                   AND name = ?
-                 LIMIT 1",
-            )
-            .bind(self.database_of(schema))
-            .bind(table)
-            .fetch_all::<Row>()
-            .await
-            .map_err(map_clickhouse_error)?;
-
-        let Some(row) = rows.into_iter().next() else {
-            return Ok(Vec::new());
-        };
-        let columns = split_key_expression(&row.primary_key);
-        if columns.is_empty() {
-            return Ok(Vec::new());
+    async fn execute_in_transaction_controlled(
+        &self,
+        statements: &[(String, Vec<Value>)],
+        control: &OperationControl,
+    ) -> Result<Vec<u64>, DriverError> {
+        let mut affected = Vec::with_capacity(statements.len());
+        for (i, (sql, params)) in statements.iter().enumerate() {
+            let outcome = match self.require_one_row(sql, params, Some(control)).await {
+                Ok(()) => self.execute_params_controlled(sql, params, control).await,
+                Err(error) => Err(error),
+            };
+            match outcome {
+                Ok(r) => affected.push(r.rows_affected),
+                Err(e) => return Err(DriverError::non_atomic_batch_failure(i, e)),
+            }
         }
-        Ok(vec![IndexInfo {
-            constraint: None,
-            name: format!("{}_sorting_key", row.name),
-            columns,
-            // A MergeTree primary key is a sparse sorting key, not a
-            // uniqueness constraint: duplicate keys are legal and common.
-            // Advertising it as unique would tell the UI that an UPDATE
-            // built from these columns touches exactly one row.
-            unique: false,
-            primary: true,
-            predicate: None,
-            has_expression_key: false,
-            using_clause: None,
-        }])
+        Ok(affected)
+    }
+
+    async fn fetch_indexes_controlled(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        control: &OperationControl,
+    ) -> Result<Vec<IndexInfo>, DriverError> {
+        let query_id = new_query_id();
+        self.stopped_on_server(
+            control,
+            &query_id,
+            self.read_fetch_indexes(schema, table, Some(&query_id)),
+        )
+        .await
     }
 
     async fn fetch_foreign_keys(
