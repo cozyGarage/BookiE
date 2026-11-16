@@ -84,26 +84,14 @@ pub struct StructureTab {
     columns: Rc<RefCell<Vec<DraftColumn>>>,
     indexes: Rc<RefCell<Vec<IndexInfo>>>,
     foreign_keys: Rc<RefCell<Vec<ForeignKeyInfo>>>,
-    /// Snapshot of the columns / indexes / FKs / table name the
-    /// driver returned at load time. The "edit" surface is the diff
-    /// between these and the live `columns` / `indexes` /
-    /// `foreign_keys` / `table_name` fields — `materialize_ops`
-    /// produces SQL by walking that diff. Discard simply copies the
-    /// snapshots back over the live fields.
     original_table_name: Rc<RefCell<String>>,
     original_columns: Rc<RefCell<Vec<bookie_core::ColumnInfo>>>,
     original_indexes: Rc<RefCell<Vec<IndexInfo>>>,
     original_fks: Rc<RefCell<Vec<ForeignKeyInfo>>>,
 
     inner_stack: gtk::Stack,
-    /// `AdwStatusPage` shown when initial structure fetch fails.
-    /// Holding a reference so `LoadFailed` can set its description
-    /// to the driver error inline — replaces the previous redundant
-    /// modal `ShowAlert` that double-surfaced the same text.
     error_status: adw::StatusPage,
     name_entry: adw::EntryRow,
-    /// The PreferencesGroup wrapping `name_entry` — visible only in
-    /// New mode. Hidden after SaveCompleted promotes the tab to Edit.
     name_row: adw::PreferencesGroup,
     columns_box: gtk::Box,
     indexes_box: gtk::Box,
@@ -227,12 +215,6 @@ impl StructureTab {
         self.suppress_emit.set(false);
     }
 
-    /// Compute the pending-op list from the diff between original
-    /// snapshot and current model state. The single source of truth
-    /// for "what will Save emit?". Pure function on the live state.
-    ///
-    /// New-mode short-circuits to a single `CreateTable` op (or zero
-    /// ops when the column list is empty).
     fn current_diff_ops(&self) -> Vec<StructureOp> {
         if matches!(*self.mode.borrow(), StructureMode::New) {
             let columns = self.columns.borrow().clone();
@@ -265,18 +247,6 @@ impl StructureTab {
         )
     }
 
-    /// Refresh action-bar state + SQL preview + emit `DirtyChanged`
-    /// based on the current diff. Called after every model mutation.
-    /// Also populates the per-tab tracker cache so out-of-band
-    /// callers (close-with-pending, save-by-id) can read the same op
-    /// list without re-deriving it from the tab's model.
-    ///
-    /// No-op while `refetching` is set: between `SaveCompleted` and
-    /// `StructureLoaded`, `original_*` is stale, so diffing the live
-    /// model would produce ops for changes that were already
-    /// committed. The cache is left at whatever `SaveCompleted`
-    /// cleared it to (empty); `StructureLoaded` flips the flag and
-    /// runs a fresh recompute against the up-to-date snapshots.
     fn recompute_dirty_state(&self, sender: &ComponentSender<Self>) {
         if self.refetching.get() {
             return;
@@ -795,12 +765,6 @@ impl SimpleComponent for StructureTab {
     fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>) {
         match msg {
             StructureTabInput::StructureLoaded { columns, metadata } => {
-                // App coalesces the three fetches into one message.
-                // Snapshot all three lists into `original_*` slots so
-                // Discard restores the canonical loaded state without
-                // a refetch — including columns the user later removed
-                // (whose `DraftColumn.original` would otherwise vanish
-                // when the row is dropped from `self.columns`).
                 *self.original_columns.borrow_mut() = columns.clone();
                 *self.columns.borrow_mut() = columns.into_iter().map(DraftColumn::from_info).collect();
                 *self.indexes.borrow_mut() = metadata.indexes.clone();
@@ -811,11 +775,6 @@ impl SimpleComponent for StructureTab {
                 self.supports_foreign_key_metadata = metadata.foreign_keys_supported;
                 self.collations = metadata.collations.iter().map(|item| item.name.clone()).collect();
                 self.inner_stack.set_visible_child_name("editor");
-                // End of refetch window: snapshots are now authoritative,
-                // so resume diff-based dirty tracking. The recompute call
-                // sees live model == snapshots and clears the tracker /
-                // emits DirtyChanged(false), which discards any phantom
-                // ops the user could have provoked during the window.
                 self.refetching.set(false);
                 self.recompute_dirty_state(&sender);
                 sender.input(StructureTabInput::Refresh);
@@ -836,16 +795,9 @@ impl SimpleComponent for StructureTab {
                 self.recompute_dirty_state(&sender);
             }
             StructureTabInput::LoadFailed(message) => {
-                // Surface the driver error inline on the StatusPage —
-                // a modal AdwAlertDialog would duplicate the same
-                // text and force the user to dismiss it before they
-                // can see the page.
                 self.error_status
                     .set_description(Some(&crate::ui::plain_text::escape_markup(&message)));
                 self.inner_stack.set_visible_child_name("error");
-                // Bail out of the refetch window even on failure so
-                // recompute_dirty_state doesn't stay frozen if the user
-                // later retries via the error page's reload action.
                 self.refetching.set(false);
             }
             StructureTabInput::Refresh => {
@@ -1010,9 +962,6 @@ impl SimpleComponent for StructureTab {
                 }
             }
             StructureTabInput::Discard => {
-                // Snapshot+diff model: Discard = current state ←
-                // original snapshot. New mode clears everything since
-                // the snapshot itself is empty.
                 let mode = *self.mode.borrow();
                 if matches!(mode, StructureMode::New) {
                     self.columns.borrow_mut().clear();
