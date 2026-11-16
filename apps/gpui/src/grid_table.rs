@@ -78,8 +78,21 @@ impl TableDelegate for GridDelegate {
         _window: &mut Window,
         _cx: &mut Context<TableState<Self>>,
     ) -> impl IntoElement {
+        let is_numeric = self.numeric.get(col_ix).copied().unwrap_or(false);
         match &self.editor {
-            Some((row, column, view)) if *row == row_ix && *column == col_ix => div().flex_1().child(view.clone()),
+            Some((row, column, view)) if *row == row_ix && *column == col_ix => {
+                div()
+                    .w_full()
+                    .flex()
+                    .when(is_numeric, |el| el.justify_end())
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .when(is_numeric, |el| el.text_right())
+                            .child(view.clone()),
+                    )
+            }
             _ => {
                 let (text, right) = self.label_of(row_ix, col_ix);
                 div().w_full().flex().child(
