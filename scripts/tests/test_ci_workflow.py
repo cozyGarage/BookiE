@@ -203,6 +203,13 @@ class CiWorkflowTests(unittest.TestCase):
                     self.assertIn("always()", condition)
                     for prerequisite in prerequisites:
                         self.assertIn(prerequisite, condition)
+    def test_forgejo_and_github_gate_concurrency_matches(self):
+        concurrency = re.compile(r"(?ms)^concurrency:\n(.*?)(?=^[A-Za-z_][A-Za-z0-9_-]*:|\Z)")
+        github = concurrency.search((ROOT / ".github/workflows/build-linux.yml").read_text())
+        forgejo = concurrency.search((ROOT / ".forgejo/workflows/ci.yml").read_text())
+        self.assertIsNotNone(github)
+        self.assertIsNotNone(forgejo)
+        self.assertEqual(github.group(1), forgejo.group(1))
 
     def test_every_forgejo_gate_job_finalizes_its_runner(self):
         source = (ROOT / ".forgejo/workflows/ci.yml").read_text().split("\njobs:\n", 1)[1]
