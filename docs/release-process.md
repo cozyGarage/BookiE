@@ -17,6 +17,10 @@ A release is a tag named `linux-vX.Y.Z` on the protected `main` branch. The GitH
 
 Artifact naming for the Arch package and AppImage, the historical 0.2.4 Debian and Flatpak assets, and installation notes are in the [platform guide](platforms.md).
 
+## After publishing
+
+The tag run's `AUR recipe` job runs `scripts/update-aur-recipe.py` for the new tag and uploads the result as the `aur-recipe` workflow artifact. The file has `pkgver`, `pkgrel=1` and `_commit` (the commit the tag points at) set from the tag and nothing else changed. To refresh the in-tree copy, run `python3 scripts/update-aur-recipe.py linux-vX.Y.Z` and open a pull request, or download the artifact. Then build it with `makepkg` and push the same file to the AUR repository. Nothing in CI pushes to the AUR and CI holds no AUR key.
+
 ## Recovering publication after successful package builds
 
 The release workflow supports recovery when package builds succeed but draft creation fails. Dispatch `release.yml` with `artifact_run_id` and `release_tag` set to the original tag run. The recovery path validates the run and tagged commit, reuses only that run's artifacts, regenerates checksums and provenance, and does not move the tag or rebuild packages. Verify the original build identity and the workflow revision that finalized the assets.
