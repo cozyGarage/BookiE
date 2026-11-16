@@ -128,7 +128,7 @@ fn start_view(
                 database,
             },
         );
-        attach_view_navigation(&view, &selection, &model);
+        install_row_navigation(&view, &selection, &model);
         let status = gtk::Label::new(None);
         status.set_wrap(true);
         model.attach_status(&status);
@@ -146,12 +146,8 @@ fn start_view(
     });
 }
 
-fn attach_view_navigation(view: &gtk::ColumnView, selection: &gtk::MultiSelection, model: &PagedModel) {
-    model.attach_selection(selection, view);
-    install_row_navigation(view, selection, model);
-}
-
 fn install_row_navigation(view: &gtk::ColumnView, selection: &gtk::MultiSelection, model: &PagedModel) {
+    model.attach_selection(selection, view);
     let controller = gtk::ShortcutController::new();
     controller.set_scope(gtk::ShortcutScope::Local);
     for (trigger, last) in [("<Primary>Home", false), ("<Primary>End", true)] {
@@ -167,9 +163,10 @@ fn install_row_navigation(view: &gtk::ColumnView, selection: &gtk::MultiSelectio
                     else {
                         return gtk::glib::Propagation::Proceed;
                     };
-                    let Some(position) = (if last { model.n_items().checked_sub(1) } else { Some(0) }) else {
+                    let Some(end) = model.n_items().checked_sub(1) else {
                         return gtk::glib::Propagation::Proceed;
                     };
+                    let position = if last { end } else { 0 };
                     selection.select_item(position, true);
                     view.scroll_to(
                         position,
@@ -189,6 +186,41 @@ fn install_row_navigation(view: &gtk::ColumnView, selection: &gtk::MultiSelectio
 mod tests {
     use super::*;
     use crate::ui::editor::stream_pages::{ResidentPageStore, StreamTerminal};
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn continuous_shortcuts_select_boundary_rows_and_ignore_empty_results() {
+        gtk::init().unwrap();
+        for counts in [vec![100, 100], vec![]] {
+            let model = PagedModel::new(&counts, 1);
+            let selection = gtk::MultiSelection::new(Some(model.clone()));
+            let view = gtk::ColumnView::new(Some(selection.clone()));
+            install_row_navigation(&view, &selection, &model);
+            let controllers = view.observe_controllers();
+            let controller = (0..controllers.n_items())
+                .find_map(|index| controllers.item(index).and_downcast::<gtk::ShortcutController>())
+                .unwrap();
+            assert_eq!(controller.n_items(), 2);
+            for (index, trigger, position) in [(1, "<Primary>End", 199), (0, "<Primary>Home", 0)] {
+                let shortcut = controller.item(index).and_downcast::<gtk::Shortcut>().unwrap();
+                assert_eq!(
+                    shortcut.trigger().unwrap().to_str(),
+                    crate::ui::shortcut::parse(trigger).to_str()
+                );
+                let handled = shortcut
+                    .action()
+                    .unwrap()
+                    .activate(gtk::ShortcutActionFlags::empty(), &view, None);
+                assert_eq!(handled, !counts.is_empty());
+                if handled {
+                    assert!(selection.is_selected(position));
+                    assert_eq!(selection.selection().size(), 1);
+                } else {
+                    assert!(selection.selection().is_empty());
+                }
+            }
+        }
+    }
 
     #[test]
     #[ignore = "requires an isolated GTK display"]
