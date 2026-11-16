@@ -4,8 +4,7 @@ use std::sync::atomic::{AtomicU8, Ordering};
 
 use bookie_core::DriverError;
 use libsqlite3_sys::{sqlite3, sqlite3_get_autocommit, sqlite3_interrupt};
-use sqlx::Sqlite;
-use sqlx::pool::PoolConnection;
+use sqlx::SqliteConnection;
 
 /// A pointer to the open SQLite database, used only to call
 /// `sqlite3_interrupt`. SQLite documents that call as safe from a thread
@@ -31,7 +30,7 @@ unsafe impl Send for InterruptHandle {}
 unsafe impl Sync for InterruptHandle {}
 
 impl InterruptHandle {
-    pub(crate) async fn of(connection: &mut PoolConnection<Sqlite>) -> Result<Self, DriverError> {
+    pub(crate) async fn of(connection: &mut SqliteConnection) -> Result<Self, DriverError> {
         let mut handle = connection
             .lock_handle()
             .await
@@ -64,7 +63,7 @@ impl Drop for InterruptHandle {
     }
 }
 
-pub(crate) async fn in_autocommit_mode(connection: &mut PoolConnection<Sqlite>) -> Result<bool, DriverError> {
+pub(crate) async fn in_autocommit_mode(connection: &mut SqliteConnection) -> Result<bool, DriverError> {
     let mut handle = connection
         .lock_handle()
         .await
