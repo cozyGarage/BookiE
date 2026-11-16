@@ -93,6 +93,7 @@ fn row_widget(row: &MessageRow) -> gtk::Box {
         .halign(gtk::Align::Start)
         .hexpand(true)
         .wrap(true)
+        .wrap_mode(gtk::pango::WrapMode::WordChar)
         .xalign(0.0)
         .selectable(true)
         .build();
@@ -115,7 +116,8 @@ mod tests {
     use relm4::gtk;
     use relm4::gtk::prelude::*;
 
-    use super::{attach, severity_class};
+    use super::MessageRow;
+    use super::{attach, row_widget, severity_class};
     use bookie_core::MessageSeverity;
 
     #[test]
@@ -140,5 +142,16 @@ mod tests {
                 .downcast_ref::<gtk::Box>()
                 .is_some_and(|holder| holder.last_child().is_some())
         );
+        let row = row_widget(&MessageRow {
+            severity: MessageSeverity::Notice,
+            severity_label: "Notice".into(),
+            code: None,
+            text: "a".repeat(160),
+        });
+        let text = row
+            .last_child()
+            .and_downcast::<gtk::Label>()
+            .expect("message row has a text label");
+        assert_eq!(text.wrap_mode(), gtk::pango::WrapMode::WordChar);
     }
 }
