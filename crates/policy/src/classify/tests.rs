@@ -545,3 +545,17 @@ fn a_write_nested_in_any_subquery_clauses_that_classification_does_not_scan_is_s
         assert!(facts.writes(), "{sql}: {facts:?}");
     }
 }
+
+#[test]
+fn a_locking_read_inside_any_all_or_some_is_a_write_in_a_transaction_script_too() {
+    for lock in ["FOR UPDATE", "FOR SHARE"] {
+        for comparison in ["= ANY", "= ALL", "= SOME"] {
+            for wrapper in ["BEGIN; {} ; COMMIT", "START TRANSACTION; {} ; COMMIT", "{}"] {
+                let statement = format!("SELECT * FROM t WHERE a {comparison} (SELECT a FROM x {lock})");
+                let sql = wrapper.replace("{}", &statement);
+                let facts = classify(&sql, "postgres");
+                assert!(facts.writes(), "{sql}: {facts:?}");
+            }
+        }
+    }
+}

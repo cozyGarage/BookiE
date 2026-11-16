@@ -133,7 +133,7 @@ impl Visitor for NestedQueryWrite {
     type Break = ();
 
     fn pre_visit_query(&mut self, query: &Query) -> ControlFlow<()> {
-        if set_expr_is_write_node(&query.body) {
+        if set_expr_is_write_node(&query.body) || !query.locks.is_empty() {
             return ControlFlow::Break(());
         }
         ControlFlow::Continue(())
