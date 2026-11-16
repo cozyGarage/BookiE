@@ -13,6 +13,8 @@ on:
       - "scripts/tests/test_release_inputs.py"
       - "scripts/validate-deb-package.sh"
       - "scripts/release-notes.py"
+      - "scripts/update-aur-recipe.py"
+      - "scripts/tests/test_update_aur_recipe.py"
   workflow_dispatch:
     inputs:
       artifact_run_id:
@@ -198,6 +200,34 @@ jobs:
           path: target/arch-release-inputs/bookie-*
           if-no-files-found: error
           retention-days: 1
+
+  aur-recipe:
+    name: AUR recipe
+    if: >-
+      github.event_name == 'push' && needs.prepare.result == 'success' && needs.prepare.outputs.publish == 'true'
+    needs: [prepare]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Point the recipe at this tag
+        env:
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          mkdir aur-recipe
+          python3 scripts/update-aur-recipe.py "$TAG" --output aur-recipe/PKGBUILD
+          bash -n aur-recipe/PKGBUILD
+          cat aur-recipe/PKGBUILD
+      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: aur-recipe
+          path: aur-recipe/PKGBUILD
+          if-no-files-found: error
 
   publish:
     name: Draft GitHub release
