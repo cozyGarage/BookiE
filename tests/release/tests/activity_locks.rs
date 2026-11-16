@@ -32,6 +32,8 @@ async fn activity_templates_run_against_a_verified_session() {
     activity_rows(connection.as_ref(), ActivityQuery::LongRunning).await;
     activity_rows(connection.as_ref(), ActivityQuery::BlockingLocks).await;
     activity_rows(connection.as_ref(), ActivityQuery::ReplicationLag).await;
+    assert!(activity_rows(connection.as_ref(), ActivityQuery::ServerVariables).await >= 100);
+    assert!(activity_rows(connection.as_ref(), ActivityQuery::ServerStatus).await >= 1);
 }
 
 #[tokio::test]

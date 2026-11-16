@@ -26,6 +26,8 @@ mod old_server_read_only;
 mod pooled_database;
 #[path = "support/read_only_session.rs"]
 mod read_only_session;
+#[path = "support/server_activity.rs"]
+mod server_activity;
 #[path = "support/server_messages.rs"]
 mod server_messages;
 #[path = "support/server_stop_class.rs"]
