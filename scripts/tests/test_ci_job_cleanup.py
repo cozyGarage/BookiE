@@ -94,8 +94,9 @@ class CiJobCleanupTests(unittest.TestCase):
                 for name, block in runner_jobs(workflow).items():
                     if "/usr/local/libexec/bookie-ci-cache checkout" in block:
                         with self.subTest(job=name):
+                            reserve = 20 if workflow.name == "ci.yml" and name == "sandbox" else 30
                             self.assertIn(
-                                "shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}",
+                                f"shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib {reserve} {{0}}",
                                 block,
                             )
 
@@ -164,7 +165,6 @@ class CiJobCleanupTests(unittest.TestCase):
             job_tmp = Path(temporary) / "job-tmp"
             job_tmp.mkdir()
             (scripts / "cleanup-testcontainers.py").touch()
-            (scripts / "ci-cache.py").touch()
             bin_dir = Path(temporary) / "bin"
             bin_dir.mkdir()
             calls = Path(temporary) / "calls"
@@ -174,6 +174,14 @@ class CiJobCleanupTests(unittest.TestCase):
                 encoding="utf-8",
             )
             python.chmod(0o755)
+            cache_helper = bin_dir / "bookie-ci-cache"
+            cache_helper.write_text(
+                "#!/usr/bin/env bash\nset -e\n"
+                "test ! -e \"$GITHUB_WORKSPACE/src\"\n"
+                "printf '%s\\n' \"$*\" >> \"$CLEANUP_CALLS\"\n",
+                encoding="utf-8",
+            )
+            cache_helper.chmod(0o755)
             result = subprocess.run(
                 ["bash", str(CLEANUP)],
                 cwd=workspace,
@@ -185,6 +193,7 @@ class CiJobCleanupTests(unittest.TestCase):
                     "CARGO_TARGET_DIR": "/var/cache/ci/target/unit",
                     "TMPDIR": str(job_tmp),
                     "BOOKIE_TEST_RUN_ID": "forgejo-123-1-postgres",
+                    "BOOKIE_CI_CACHE_HELPER": str(cache_helper),
                     "CLEANUP_CALLS": str(calls),
                 },
                 capture_output=True,
@@ -196,7 +205,7 @@ class CiJobCleanupTests(unittest.TestCase):
                 calls.read_text(encoding="utf-8").splitlines(),
                 [
                     f"{scripts / 'cleanup-testcontainers.py'} forgejo-123-1-postgres",
-                    f"{scripts / 'ci-cache.py'} cleanup --min-free-gib 30",
+                    "cleanup --min-free-gib 30",
                 ],
             )
 
@@ -259,7 +268,7 @@ class CiJobCleanupTests(unittest.TestCase):
 
     def test_pg_dump_uses_and_removes_a_run_scoped_temp_directory(self):
         job = runner_jobs(WORKFLOWS[0])["driver"]
-        self.assertIn("TMPDIR: /var/cache/ci/tmp/bookie-driver-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}", job)
+        self.assertIn("TMPDIR: /var/cache/ci/tmp/b-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}", job)
         self.assertNotIn(".tmp-pg-dump-${{ github.run_id }}-${{ github.run_attempt }}", job)
         with tempfile.TemporaryDirectory() as temporary:
             workspace = Path(temporary) / "workspace"
@@ -290,7 +299,7 @@ class CiJobCleanupTests(unittest.TestCase):
                 "GITHUB_JOB": "driver",
                 "GITHUB_WORKSPACE": str(workspace),
                 "CARGO_TARGET_DIR": str(Path(temporary) / "target"),
-                "TMPDIR": "/var/cache/ci/tmp/bookie-driver-123-2-core",
+                "TMPDIR": "/var/cache/ci/tmp/b-123-2-core",
                 "RM_CALLS": str(calls),
             }
             child_env.pop("BASH_ENV", None)
@@ -308,7 +317,7 @@ class CiJobCleanupTests(unittest.TestCase):
                 f"cleanup output: {result.stdout}\ncleanup errors: {result.stderr}\nrm calls: {calls.read_text(encoding='utf-8')}",
             )
             rm_calls = [json.loads(line) for line in calls.read_text(encoding="utf-8").splitlines()]
-            self.assertIn(["-rf", "--", "/var/cache/ci/tmp/bookie-driver-123-2-core"], rm_calls)
+            self.assertIn(["-rf", "--", "/var/cache/ci/tmp/b-123-2-core"], rm_calls)
 
     def test_b4_rollback_finalizer_removes_only_its_run_scoped_temp_path(self):
         job = runner_jobs(WORKFLOWS[0])["b4-rollback"]
@@ -482,7 +491,7 @@ class CiJobCleanupTests(unittest.TestCase):
             rm.chmod(0o755)
             for group in ("core", "driver-core", "driver-analytics", "driver-extended", "socket-ssh"):
                 with self.subTest(group=group):
-                    scratch = f"/var/cache/ci/tmp/bookie-driver-123-2-{group}"
+                    scratch = f"/var/cache/ci/tmp/b-123-2-{group}"
                     result = subprocess.run(
                         ["bash", str(CLEANUP)],
                         env={

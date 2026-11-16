@@ -151,6 +151,7 @@ async fn reset_server(server: &Server) {
         "DROP DATABASE IF EXISTS alpha_db WITH (FORCE)",
         "ALTER ROLE postgres RESET search_path",
         "ALTER ROLE postgres RESET TimeZone",
+        "ALTER ROLE postgres RESET idle_in_transaction_session_timeout",
     ] {
         connection.execute(statement).await.expect("reset postgres test server");
     }
@@ -159,7 +160,7 @@ async fn reset_server(server: &Server) {
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn value_contract_postgres_fixtures_reset_database_and_role_search_path() {
+async fn value_contract_postgres_fixtures_reset_database_and_role_settings() {
     let (_container, server) = create_server(false).await;
     let options = test_options(&server.options);
     let expected_time_zone;
@@ -178,6 +179,10 @@ async fn value_contract_postgres_fixtures_reset_database_and_role_search_path() 
             .execute("ALTER ROLE postgres SET TimeZone TO 'Europe/Vienna'")
             .await
             .unwrap();
+        connection
+            .execute("ALTER ROLE postgres SET idle_in_transaction_session_timeout = '2s'")
+            .await
+            .unwrap();
     }
     reset_server(&server).await;
     let connection = PgDriver.connect(options).await.unwrap();
@@ -189,6 +194,14 @@ async fn value_contract_postgres_fixtures_reset_database_and_role_search_path() 
     assert_eq!(
         connection.query("SHOW TimeZone").await.unwrap().rows,
         vec![vec![expected_time_zone]]
+    );
+    assert_eq!(
+        connection
+            .query("SELECT current_setting('idle_in_transaction_session_timeout')::interval = interval '0'")
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![Value::Bool(true)]]
     );
 }
 

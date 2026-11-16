@@ -645,7 +645,7 @@ jobs:
         run: |
           rm -rf src
       - name: Check runner space before checkout
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 20 {0}
         run: true
       - name: Check out source revision
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
@@ -797,7 +797,7 @@ jobs:
     timeout-minutes: 90
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/${{ matrix.group }}
-      TMPDIR: /var/cache/ci/tmp/bookie-driver-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}
+      TMPDIR: /var/cache/ci/tmp/b-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}
       BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}
     strategy:
       fail-fast: false

@@ -57,6 +57,10 @@ SIGNATURES = [
 
 def classify_log(text):
     tail = text[-TAIL_BYTES:]
+    reserve = re.search(r"free after cleanup: (\d+) bytes; required reserve: (\d+) bytes", tail)
+    if reserve and int(reserve.group(1)) < int(reserve.group(2)):
+        evidence = reserve.group(0)
+        return "infra", "runner filesystem below the required free-space reserve", evidence[:200]
     for tag, label, pattern in SIGNATURES:
         match = re.search(pattern, tail)
         if match:
