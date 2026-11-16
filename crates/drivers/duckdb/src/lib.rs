@@ -380,7 +380,7 @@ impl DuckdbConnection {
                 handle.interrupt();
                 Ok(())
             },
-            |error| matches!(error, DriverError::Query { message, .. } if message.to_lowercase().contains("interrupt")),
+            confirms_interrupt,
             control,
         )
         .await
@@ -499,11 +499,19 @@ impl Connection for DuckdbConnection {
         offset: u64,
         limit: u64,
     ) -> Result<QueryResult, DriverError> {
-        let sql = format!(
-            "SELECT * FROM {} LIMIT {limit} OFFSET {offset}",
-            qualified(schema, table)
-        );
-        self.query(&sql).await
+        self.query(&rows_page_sql(schema, table, offset, limit)).await
+    }
+
+    async fn fetch_rows_controlled(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        offset: u64,
+        limit: u64,
+        control: &OperationControl,
+    ) -> Result<QueryResult, DriverError> {
+        self.query_controlled(&rows_page_sql(schema, table, offset, limit), control)
+            .await
     }
 
     fn supports_server_cancellation(&self) -> bool {
@@ -588,6 +596,25 @@ impl Connection for DuckdbConnection {
         self.execute_in_transaction_checked(statements, &[]).await
     }
 
+    async fn execute_in_transaction_controlled(
+        &self,
+        statements: &[(String, Vec<Value>)],
+        control: &OperationControl,
+    ) -> Result<Vec<u64>, DriverError> {
+        self.execute_in_transaction_checked_controlled(statements, &[], control)
+            .await
+    }
+
+    async fn execute_in_transaction_checked_controlled(
+        &self,
+        statements: &[(String, Vec<Value>)],
+        expect_one: &[usize],
+        control: &OperationControl,
+    ) -> Result<Vec<u64>, DriverError> {
+        self.interruptible(self.execute_in_transaction_checked(statements, expect_one), control)
+            .await
+    }
+
     async fn execute_in_transaction_checked(
         &self,
         statements: &[(String, Vec<Value>)],
@@ -609,32 +636,16 @@ impl Connection for DuckdbConnection {
                 } else {
                     let bind = match values_to_duck_params(params) {
                         Ok(bind) => bind,
-                        Err(error) => {
-                            let _ = guard.execute_batch("ROLLBACK");
-                            return Err(DriverError::Transaction {
-                                statement_index: idx,
-                                source: Box::new(error),
-                            });
-                        }
+                        Err(error) => return Err(rolled_back(&guard, idx, error)),
                     };
                     guard.execute(sql, params_from_iter(bind.iter()))
                 };
                 match result {
                     Ok(n) if expect_one.contains(&idx) && n != 1 => {
-                        let _ = guard.execute_batch("ROLLBACK");
-                        return Err(DriverError::Transaction {
-                            statement_index: idx,
-                            source: Box::new(DriverError::ConcurrentModification),
-                        });
+                        return Err(rolled_back(&guard, idx, DriverError::ConcurrentModification));
                     }
                     Ok(n) => affected.push(n as u64),
-                    Err(e) => {
-                        let _ = guard.execute_batch("ROLLBACK");
-                        return Err(DriverError::Transaction {
-                            statement_index: idx,
-                            source: Box::new(map_duck_error(e)),
-                        });
-                    }
+                    Err(e) => return Err(rolled_back(&guard, idx, map_duck_error(e))),
                 }
             }
             guard.execute_batch("COMMIT").map_err(map_duck_error)?;
@@ -658,6 +669,35 @@ impl Connection for DuckdbConnection {
 
     async fn close(self: Box<Self>) -> Result<(), DriverError> {
         Ok(())
+    }
+}
+
+fn rows_page_sql(schema: Option<&str>, table: &str, offset: u64, limit: u64) -> String {
+    format!(
+        "SELECT * FROM {} LIMIT {limit} OFFSET {offset}",
+        qualified(schema, table)
+    )
+}
+
+fn confirms_interrupt(error: &DriverError) -> bool {
+    match error {
+        DriverError::Transaction { source, .. } => confirms_interrupt(source),
+        DriverError::Query { message, .. } => message.to_lowercase().contains("interrupt"),
+        _ => false,
+    }
+}
+
+fn rolled_back(connection: &DuckConnection, statement_index: usize, source: DriverError) -> DriverError {
+    match connection.execute_batch("ROLLBACK") {
+        Ok(()) => DriverError::Transaction {
+            statement_index,
+            source: Box::new(source),
+        },
+        Err(error) => DriverError::TransactionRollbackFailed {
+            statement_index,
+            source: Box::new(source),
+            rollback_error: Box::new(map_duck_error(error)),
+        },
     }
 }
 

@@ -23,7 +23,9 @@ A driver that reports server cancellation must stop the statement on the server 
 | --- | --- |
 | PostgreSQL | Every controlled call stops on the server. `every_controlled_call_of_the_contract_has_a_stop_case` fails when the contract gains a controlled call without a stop case. |
 | MySQL | Every controlled call that sends a statement stops on the server through `KILL QUERY`, on a connection and inside an interactive transaction. `every_controlled_call_of_the_contract_has_a_mysql_stop_case` fails when the contract gains a controlled call without a stop case. |
-| SQLite, DuckDB, ClickHouse | Query and execute calls stop on the server, and so does the SQLite transaction batch. Metadata reads, browse pages and the other transaction batches still use the default form. |
+| SQLite | Every controlled call that can run unboundedly stops inside SQLite through its interrupt: queries, writes, table pages, both transaction batches, and statements inside an interactive transaction. An interrupted write ends the transaction, because SQLite rolls it back, and the transaction object refuses further statements. The catalog reads keep the default form and are listed with the reason in `every_controlled_call_of_the_contract_is_stoppable_or_bounded_with_a_reason`, which fails when the contract gains a controlled call that is in neither list. |
+| DuckDB | The same for queries, writes, table pages and both transaction batches, through DuckDB's interrupt. DuckDB has one connection, so a statement that is not interrupted blocks every later call. The catalog reads keep the default form and are listed with the reason in the matching test. |
+| ClickHouse | Query and execute calls stop on the server. Metadata reads and browse pages still use the default form. |
 
 PostgreSQL, MySQL and SQL Server sessions are retired when an established backend is lost. A session must not reconnect transparently and present a replacement backend as the same session, because temporary tables, settings and transaction state no longer match.
 

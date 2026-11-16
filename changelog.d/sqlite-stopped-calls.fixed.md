@@ -1,0 +1,1 @@
+SQLite table pages, grid saves and statements inside a transaction that time out or are cancelled now stop inside SQLite instead of running on in the background, and a stopped write ends its transaction.

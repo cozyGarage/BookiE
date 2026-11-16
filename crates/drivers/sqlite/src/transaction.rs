@@ -13,10 +13,11 @@ pub(super) async fn execute_in_transaction_checked(
 pub(super) async fn execute_in_transaction_on(
     connection: &mut PoolConnection<Sqlite>,
     statements: &[(String, Vec<Value>)],
+    expect_one: &[usize],
     stop_requested: &(dyn Fn() -> bool + Sync),
 ) -> Result<Vec<u64>, DriverError> {
     let tx = connection.begin().await.map_err(map_sqlx_error)?;
-    run_statements(tx, statements, &[], stop_requested).await
+    run_statements(tx, statements, expect_one, stop_requested).await
 }
 
 async fn run_statements(

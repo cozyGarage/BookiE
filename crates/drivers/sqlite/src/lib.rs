@@ -346,13 +346,21 @@ impl Connection for SqliteConnection {
         offset: u64,
         limit: u64,
     ) -> Result<QueryResult, DriverError> {
-        let table_ref = match schema {
-            Some(s) => format!("{}.{}", quote_ident(s), quote_ident(table)),
-            None => quote_ident(table),
-        };
-        let sql = format!("SELECT * FROM {table_ref} LIMIT {limit} OFFSET {offset}");
+        let sql = rows_page_sql(schema, table, offset, limit);
         let mut connection = self.pool.acquire().await.map_err(map_sqlx_error)?;
         stream_into_result(&mut connection, &sql, limit as usize).await
+    }
+
+    async fn fetch_rows_controlled(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        offset: u64,
+        limit: u64,
+        control: &OperationControl,
+    ) -> Result<QueryResult, DriverError> {
+        self.query_controlled(&rows_page_sql(schema, table, offset, limit), control)
+            .await
     }
 
     async fn query(&self, sql: &str) -> Result<QueryResult, DriverError> {
@@ -450,10 +458,20 @@ impl Connection for SqliteConnection {
         statements: &[(String, Vec<Value>)],
         control: &OperationControl,
     ) -> Result<Vec<u64>, DriverError> {
+        self.execute_in_transaction_checked_controlled(statements, &[], control)
+            .await
+    }
+
+    async fn execute_in_transaction_checked_controlled(
+        &self,
+        statements: &[(String, Vec<Value>)],
+        expect_one: &[usize],
+        control: &OperationControl,
+    ) -> Result<Vec<u64>, DriverError> {
         let mut connection = acquire_controlled(&self.pool, control).await?;
         let handle = InterruptHandle::of(&mut connection).await?;
         let result = run_server_cancellable(
-            transaction::execute_in_transaction_on(&mut connection, statements, &|| {
+            transaction::execute_in_transaction_on(&mut connection, statements, expect_one, &|| {
                 control.cancellation_token().is_cancelled()
             }),
             request_interrupt(&handle),
@@ -638,22 +656,70 @@ struct SqliteTransaction {
     tx: Option<sqlx::Transaction<'static, Sqlite>>,
 }
 
+impl SqliteTransaction {
+    fn open(&mut self) -> Result<&mut sqlx::Transaction<'static, Sqlite>, DriverError> {
+        self.tx
+            .as_mut()
+            .ok_or_else(|| DriverError::Internal("transaction closed".into()))
+    }
+
+    async fn settle_stop<T>(&mut self, result: &Result<T, DriverError>) {
+        let stopped = matches!(
+            result,
+            Err(DriverError::Cancelled | DriverError::TimedOut | DriverError::OperationOutcomeUnknown { .. })
+        );
+        if !stopped {
+            return;
+        }
+        let uncertain = matches!(result, Err(DriverError::OperationOutcomeUnknown { .. }));
+        let Some(tx) = self.tx.as_mut() else {
+            return;
+        };
+        let still_open = matches!(interrupt::in_autocommit_mode(tx).await, Ok(false));
+        if uncertain || !still_open {
+            self.tx = None;
+        }
+    }
+}
+
 #[async_trait]
 impl bookie_core::Transaction for SqliteTransaction {
     async fn query(&mut self, sql: &str) -> Result<QueryResult, DriverError> {
-        let tx = self
-            .tx
-            .as_mut()
-            .ok_or_else(|| DriverError::Internal("transaction closed".into()))?;
-        stream_into_result(tx, sql, MAX_QUERY_ROWS).await
+        stream_into_result(self.open()?, sql, MAX_QUERY_ROWS).await
+    }
+
+    async fn query_controlled(&mut self, sql: &str, control: &OperationControl) -> Result<QueryResult, DriverError> {
+        let tx = self.open()?;
+        let handle = InterruptHandle::of(tx).await?;
+        let result = run_server_cancellable(
+            stream_into_result(tx, sql, MAX_QUERY_ROWS),
+            request_interrupt(&handle),
+            confirms_cancellation,
+            control,
+        )
+        .await;
+        drop(handle);
+        self.settle_stop(&result).await;
+        result
     }
 
     async fn execute(&mut self, sql: &str) -> Result<ExecResult, DriverError> {
-        let tx = self
-            .tx
-            .as_mut()
-            .ok_or_else(|| DriverError::Internal("transaction closed".into()))?;
-        execute_on(tx, sql, &[]).await
+        execute_on(self.open()?, sql, &[]).await
+    }
+
+    async fn execute_controlled(&mut self, sql: &str, control: &OperationControl) -> Result<ExecResult, DriverError> {
+        let tx = self.open()?;
+        let handle = InterruptHandle::of(tx).await?;
+        let result = run_server_cancellable(
+            execute_on(tx, sql, &[]),
+            request_interrupt(&handle),
+            confirms_cancellation,
+            control,
+        )
+        .await;
+        drop(handle);
+        self.settle_stop(&result).await;
+        result
     }
 
     async fn commit(mut self: Box<Self>) -> Result<(), DriverError> {
@@ -1109,6 +1175,14 @@ fn bind_sqlite_params<'q>(
 fn exact_real(decimal: &rust_decimal::Decimal) -> Option<f64> {
     let digits = decimal.normalize().to_string();
     digits.parse::<f64>().ok().filter(|real| real.to_string() == digits)
+}
+
+fn rows_page_sql(schema: Option<&str>, table: &str, offset: u64, limit: u64) -> String {
+    let table_ref = match schema {
+        Some(s) => format!("{}.{}", quote_ident(s), quote_ident(table)),
+        None => quote_ident(table),
+    };
+    format!("SELECT * FROM {table_ref} LIMIT {limit} OFFSET {offset}")
 }
 
 fn quote_ident(name: &str) -> String {
