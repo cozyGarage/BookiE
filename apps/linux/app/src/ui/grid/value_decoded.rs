@@ -45,8 +45,9 @@ pub(super) fn display_as_section(value: &Value) -> Option<gtk::Box> {
     }
     let container = gtk::Box::new(gtk::Orientation::Vertical, 4);
     for form in forms {
+        let heading = display_kind_heading(form.kind);
         let title = gtk::Label::builder()
-            .label(display_kind_heading(form.kind))
+            .label(&heading)
             .xalign(0.0)
             .margin_top(8)
             .margin_start(12)
@@ -54,6 +55,7 @@ pub(super) fn display_as_section(value: &Value) -> Option<gtk::Box> {
             .build();
         title.add_css_class("heading");
         let text = super::value_viewer::build_text_view(&form.text);
+        text.update_property(&[gtk::accessible::Property::Label(&heading)]);
         let scroller = gtk::ScrolledWindow::builder()
             .child(&text)
             .max_content_height(160)
@@ -145,6 +147,7 @@ mod tests {
         assert_eq!(scroller.max_content_height(), 160);
         let view = scroller.child().and_downcast::<gtk::TextView>().expect("text view");
         assert!(!view.is_editable());
+        assert!(gtk::test_accessible_has_property(&view, gtk::AccessibleProperty::Label));
         assert_eq!(view.wrap_mode(), gtk::WrapMode::None);
         let buffer = view.buffer();
         assert!(buffer.text(&buffer.start_iter(), &buffer.end_iter(), false).len() > 4 * 1024);
