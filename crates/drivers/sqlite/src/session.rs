@@ -40,6 +40,32 @@ pub(crate) async fn open(
 
 #[async_trait]
 impl bookie_core::Session for SqliteSession {
+    async fn list_temporary_tables_controlled(
+        &mut self,
+        control: &OperationControl,
+    ) -> Result<Vec<bookie_core::TableInfo>, DriverError> {
+        let result = self
+            .query_params_controlled(
+                "SELECT name FROM sqlite_temp_schema WHERE type = 'table' AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\' ORDER BY name",
+                &[],
+                control,
+            )
+            .await?;
+        result
+            .rows
+            .iter()
+            .map(|row| match row {
+                [Value::Text(name)] => Ok(bookie_core::TableInfo {
+                    schema: Some("temp".into()),
+                    name: name.clone(),
+                }),
+                _ => Err(DriverError::Internal(
+                    "SQLite returned invalid temporary table metadata".into(),
+                )),
+            })
+            .collect()
+    }
+
     async fn query_params_controlled(
         &mut self,
         sql: &str,

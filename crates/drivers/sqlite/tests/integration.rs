@@ -1093,3 +1093,6 @@ async fn an_auto_decimal_parameter_binds_as_real_unless_only_text_keeps_its_digi
 mod float_boundaries;
 #[path = "support/server_stop_class.rs"]
 mod server_stop_class;
+
+#[path = "support/session_catalog.rs"]
+mod session_catalog;
