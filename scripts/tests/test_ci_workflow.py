@@ -1349,7 +1349,7 @@ class CiWorkflowTests(unittest.TestCase):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         driver = workflow.split("  driver:\n", 1)[1].split("  consumers:\n", 1)[0]
         script = (ROOT / "scripts/run-driver-group.sh").read_text()
-        self.assertIn("TMPDIR: /var/cache/ci/tmp/bookie-driver-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}", driver)
+        self.assertIn("TMPDIR: /var/cache/ci/tmp/b-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}", driver)
         self.assertIn("BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}", driver)
         self.assertIn('python3 scripts/run-test-layer.py "$BOOKIE_TEST_LAYER"', driver)
         self.assertIn("timeout-minutes: 90", driver)
@@ -1357,6 +1357,11 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("cleanup-testcontainers.py", script)
         self.assertIn("trap finish EXIT", script)
         self.assertIn("--test-threads=1", script)
+
+    def test_socket_ssh_control_path_fits_the_unix_socket_limit(self):
+        temporary = "/var/cache/ci/tmp/b-" + "9" * 12 + "-99-socket-ssh"
+        control_path = f"{temporary}/.tmpABCDEF/run/ssh/{'a' * 16}/{'b' * 8}/control.askpass"
+        self.assertLessEqual(len(control_path.encode()), 107)
 
     def test_socket_ssh_job_cleans_run_scoped_containers_on_cancel(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
