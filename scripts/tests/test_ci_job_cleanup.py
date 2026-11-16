@@ -267,7 +267,7 @@ class CiJobCleanupTests(unittest.TestCase):
 
     def test_pg_dump_uses_and_removes_a_run_scoped_temp_directory(self):
         job = runner_jobs(WORKFLOWS[0])["driver"]
-        self.assertIn("TMPDIR: /var/cache/ci/tmp/bookie-driver-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}", job)
+        self.assertIn("TMPDIR: /var/cache/ci/tmp/b-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}", job)
         self.assertNotIn(".tmp-pg-dump-${{ github.run_id }}-${{ github.run_attempt }}", job)
         with tempfile.TemporaryDirectory() as temporary:
             workspace = Path(temporary) / "workspace"
@@ -298,7 +298,7 @@ class CiJobCleanupTests(unittest.TestCase):
                 "GITHUB_JOB": "driver",
                 "GITHUB_WORKSPACE": str(workspace),
                 "CARGO_TARGET_DIR": str(Path(temporary) / "target"),
-                "TMPDIR": "/var/cache/ci/tmp/bookie-driver-123-2-core",
+                "TMPDIR": "/var/cache/ci/tmp/b-123-2-core",
                 "RM_CALLS": str(calls),
             }
             child_env.pop("BASH_ENV", None)
@@ -316,7 +316,7 @@ class CiJobCleanupTests(unittest.TestCase):
                 f"cleanup output: {result.stdout}\ncleanup errors: {result.stderr}\nrm calls: {calls.read_text(encoding='utf-8')}",
             )
             rm_calls = [json.loads(line) for line in calls.read_text(encoding="utf-8").splitlines()]
-            self.assertIn(["-rf", "--", "/var/cache/ci/tmp/bookie-driver-123-2-core"], rm_calls)
+            self.assertIn(["-rf", "--", "/var/cache/ci/tmp/b-123-2-core"], rm_calls)
 
     def test_b4_rollback_finalizer_removes_only_its_run_scoped_temp_path(self):
         job = runner_jobs(WORKFLOWS[0])["b4-rollback"]
@@ -490,7 +490,7 @@ class CiJobCleanupTests(unittest.TestCase):
             rm.chmod(0o755)
             for group in ("core", "driver-core", "driver-analytics", "driver-extended", "socket-ssh"):
                 with self.subTest(group=group):
-                    scratch = f"/var/cache/ci/tmp/bookie-driver-123-2-{group}"
+                    scratch = f"/var/cache/ci/tmp/b-123-2-{group}"
                     result = subprocess.run(
                         ["bash", str(CLEANUP)],
                         env={
