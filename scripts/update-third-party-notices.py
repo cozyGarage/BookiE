@@ -96,13 +96,18 @@ def cache_directory() -> Path:
 def input_digest() -> str:
     digest = hashlib.sha256()
     listing = subprocess.run(
-        ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", "Cargo.lock", "*Cargo.toml"],
+        [
+            "git", "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--",
+            "Cargo.lock", "*Cargo.toml", "*LICENSE*", "*LICENCE*", "*COPYING*", "*NOTICE*",
+            "rust-toolchain", "rust-toolchain.toml", ".cargo/config", ".cargo/config.toml",
+        ],
         cwd=ROOT,
         check=True,
         capture_output=True,
     ).stdout
-    inputs = sorted(path for path in listing.split(b"\0") if path)
-    inputs += [os.fsencode(str(path.relative_to(ROOT))) for path in (CONFIG, ROOT / "deny.toml", OUTPUT, Path(__file__).resolve())]
+    inputs = {path for path in listing.split(b"\0") if path}
+    inputs |= {os.fsencode(str(path.relative_to(ROOT))) for path in (CONFIG, ROOT / "deny.toml", OUTPUT, Path(__file__).resolve())}
+    inputs = sorted(inputs)
     for raw in inputs:
         path = ROOT / os.fsdecode(raw)
         digest.update(len(raw).to_bytes(8, "big") + raw)
@@ -113,6 +118,26 @@ def input_digest() -> str:
     ).stdout
     digest.update(version)
     return digest.hexdigest()
+
+
+MARKER_TEXT = "ok\n"
+
+
+def read_marker(marker: Path) -> bool:
+    try:
+        return marker.read_text() == MARKER_TEXT
+    except OSError:
+        return False
+
+
+def write_marker(marker: Path) -> None:
+    try:
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        pending = marker.with_name(f"{marker.name}.{os.getpid()}.tmp")
+        pending.write_text(MARKER_TEXT)
+        os.replace(pending, marker)
+    except OSError:
+        pass
 
 
 def main() -> int:
@@ -130,7 +155,7 @@ def main() -> int:
             marker = cache_directory() / f"notices-check-{input_digest()}.ok"
         except (OSError, ValueError, subprocess.CalledProcessError):
             marker = None
-        if marker is not None and marker.exists():
+        if marker is not None and read_marker(marker):
             print("third-party notices: inputs unchanged since a passing check, skipped")
             return 0
     try:
@@ -156,11 +181,7 @@ def main() -> int:
                 print("".join(islice(diff, 80)), file=sys.stderr, end="")
             return 1
         if marker is not None:
-            try:
-                marker.parent.mkdir(parents=True, exist_ok=True)
-                marker.write_text("ok\n")
-            except OSError:
-                pass
+            write_marker(marker)
         return 0
     OUTPUT.write_text(generated)
     return 0

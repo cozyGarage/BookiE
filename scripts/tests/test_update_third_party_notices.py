@@ -173,32 +173,59 @@ class ThirdPartyNoticeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             subprocess.run(["git", "init", "-q"], cwd=root, check=True)
-            for name, text in {
+            files = {
                 "Cargo.lock": "lock 1",
                 "Cargo.toml": "manifest 1",
                 "about.toml": "about 1",
                 "deny.toml": "deny 1",
                 "notices.md": "notices 1",
-            }.items():
+                "LICENSE.md": "license 1",
+                "rust-toolchain.toml": "toolchain 1",
+                "script.py": "script 1",
+                "crates/Cargo.toml": "member 1",
+                "crates/LICENSE-MIT": "member license 1",
+                ".cargo/config.toml": "cargo config 1",
+                "about-version.txt": "cargo-about 0.9.2",
+            }
+            for name, text in files.items():
+                (root / name).parent.mkdir(parents=True, exist_ok=True)
                 (root / name).write_text(text)
-            (root / "crates").mkdir()
-            (root / "crates" / "Cargo.toml").write_text("member 1")
+            fake_about = root / "fake-cargo-about"
+            fake_about.write_text(f"#!/bin/sh\ncat {root / 'about-version.txt'}\n")
+            fake_about.chmod(0o755)
             with (
                 patch.object(NOTICES, "ROOT", root),
                 patch.object(NOTICES, "CONFIG", root / "about.toml"),
                 patch.object(NOTICES, "OUTPUT", root / "notices.md"),
                 patch.object(NOTICES, "__file__", str(root / "script.py"), create=True),
-                patch.dict(os.environ, {"CARGO_ABOUT": "true"}),
+                patch.dict(os.environ, {"CARGO_ABOUT": str(fake_about)}),
             ):
-                (root / "script.py").write_text("script 1")
                 baseline = NOTICES.input_digest()
                 self.assertEqual(NOTICES.input_digest(), baseline)
-                for name in ["Cargo.lock", "crates/Cargo.toml", "about.toml", "deny.toml", "notices.md"]:
+                for name in files:
                     original = (root / name).read_text()
                     (root / name).write_text(original + " changed")
                     self.assertNotEqual(NOTICES.input_digest(), baseline, name)
                     (root / name).write_text(original)
                 self.assertEqual(NOTICES.input_digest(), baseline)
+                (root / "untracked" / "LICENSE-NEW").parent.mkdir()
+                (root / "untracked" / "LICENSE-NEW").write_text("new license")
+                self.assertNotEqual(NOTICES.input_digest(), baseline, "an untracked license file")
+
+    def test_an_empty_or_truncated_marker_is_not_trusted(self):
+        for content in ["", "o", "ok", "ok\nextra\n"]:
+            with tempfile.TemporaryDirectory() as directory:
+                marker = Path(directory) / "notices-check-x.ok"
+                marker.write_text(content)
+                self.assertFalse(NOTICES.read_marker(marker), repr(content))
+                self.assertFalse(NOTICES.read_marker(Path(directory) / "missing"))
+
+    def test_a_marker_is_written_whole_and_leaves_no_temporary_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            marker = Path(directory) / "nested" / "notices-check-x.ok"
+            NOTICES.write_marker(marker)
+            self.assertTrue(NOTICES.read_marker(marker))
+            self.assertEqual([path.name for path in marker.parent.iterdir()], [marker.name])
 
     def test_check_mode_reports_stale_notice_file(self):
         with tempfile.TemporaryDirectory() as directory:

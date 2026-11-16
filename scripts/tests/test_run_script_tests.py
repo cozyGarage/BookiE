@@ -60,6 +60,13 @@ class RunScriptTestsTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("0 failed", out)
 
+    def test_exit_code_five_without_the_no_tests_message_is_a_failure(self):
+        impostor = "import os\nos._exit(5)\n"
+        code, out, err = self.run_directory({"test_impostor.py": impostor})
+        self.assertEqual(code, 1)
+        self.assertIn("1 files, 1 failed", out)
+        self.assertIn("FAILED test_impostor.py", err)
+
     def test_an_empty_directory_is_an_error_and_not_a_silent_pass(self):
         code, _, err = self.run_directory({})
         self.assertEqual(code, 1)

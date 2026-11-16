@@ -32,8 +32,9 @@ def run_file(directory, path):
         text=True,
         check=False,
     )
-    passed = result.returncode in (0, NO_TESTS_RAN)
-    return path, passed, time.monotonic() - started, result.stdout + result.stderr
+    output = result.stdout + result.stderr
+    passed = result.returncode == 0 or (result.returncode == NO_TESTS_RAN and "NO TESTS RAN" in output)
+    return path, passed, time.monotonic() - started, output
 
 
 def default_jobs():

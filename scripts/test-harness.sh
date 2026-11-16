@@ -16,12 +16,13 @@ if [ -z "${CARGO_ABOUT:-}" ]; then
   CARGO_ABOUT="$(scripts/ensure-cargo-about.sh)"
   export CARGO_ABOUT
 fi
-if [[ -z "${CI:-}" ]]; then
+on_ci="${CI:-}${GITHUB_ACTIONS:-}${GITEA_ACTIONS:-}${FORGEJO_ACTIONS:-}"
+if [[ -z "$on_ci" ]]; then
   python3 scripts/update-third-party-notices.py --check --cached
 else
   python3 scripts/update-third-party-notices.py --check
 fi
-if [[ -n "${CI:-}" || -n "${BOOKIE_SERIAL_SCRIPT_TESTS:-}" ]]; then
+if [[ -n "$on_ci" || -n "${BOOKIE_SERIAL_SCRIPT_TESTS:-}" ]]; then
   python3 -m unittest discover -s scripts/tests -p 'test_*.py'
 else
   python3 scripts/run-script-tests.py
