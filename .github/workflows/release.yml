@@ -9,6 +9,8 @@ on:
       - ".github/workflows/release.yml"
       - "scripts/build-appimage.sh"
       - "scripts/build-deb.sh"
+      - "scripts/validate_release_inputs.py"
+      - "scripts/tests/test_release_inputs.py"
       - "scripts/validate-deb-package.sh"
       - "scripts/release-notes.py"
   workflow_dispatch:
@@ -107,7 +109,7 @@ jobs:
   appimage:
     name: AppImage
     if: inputs.artifact_run_id == ''
-    needs: prepare
+    needs: [prepare, arch]
     runs-on: ubuntu-24.04
     container: debian:testing
     steps:
@@ -125,6 +127,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
         with:
           toolchain: "1.98"
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: release-inputs
+          path: ${{ runner.temp }}/bookie-release-inputs
       # Only the pull request dry run reuses a cache. A tag or dispatch build that publishes starts clean, so
       # no earlier cache can reach a released package.
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # zizmor: ignore[cache-poisoning]
@@ -134,6 +140,9 @@ jobs:
       - name: Build
         env:
           APPIMAGE_OUT: ${{ runner.temp }}/bookie-appimage-output-sentinel
+          BOOKIE_RELEASE_INPUTS_DIR: ${{ runner.temp }}/bookie-release-inputs
+          BOOKIE_RELEASE_COMMIT: ${{ github.sha }}
+          BOOKIE_RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
         run: |
           mkdir -p "$APPIMAGE_OUT"
           touch "$APPIMAGE_OUT/preserve"
@@ -183,6 +192,12 @@ jobs:
           path: |
             apps/linux/packaging/arch/bookie-*.pkg.tar.zst
             apps/linux/packaging/arch/bookie-*.pkg.tar.zst.sha256
+      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: release-inputs
+          path: target/arch-release-inputs/bookie-*
+          if-no-files-found: error
+          retention-days: 1
 
   publish:
     name: Draft GitHub release
