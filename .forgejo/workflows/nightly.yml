@@ -1,3 +1,12 @@
+# Runner budget: the nightly may use at most 7 of the 15 runners (50%) at once.
+# Jobs run in stages chained by needs, so only one stage is active at a time:
+#   plan 1 -> coverage 1 -> docker-coverage 3 -> mutation 3 -> values 1 + gtk-soak 3 + arch-package 1 = 5
+# The widest stage is 5, under the cap of 7; scripts/tests/test_ci_workflow.py sums these.
+#
+# Enable later (operator): label 7 runners `nightly` in the Forgejo runner settings, set the
+# repository variable NIGHTLY_LABEL=nightly, then add the schedule under `on:`:
+#   schedule: [{cron: "0 23 * * *"}]
+# Until NIGHTLY_LABEL is set the jobs use the `any-host` label, which every runner has.
 name: nightly
 on:
   workflow_dispatch:
@@ -30,7 +39,7 @@ env:
 
 jobs:
   plan:
-    runs-on: any-host
+    runs-on: ${{ vars.NIGHTLY_LABEL || 'any-host' }}
     timeout-minutes: 15
     outputs:
       skip: ${{ steps.plan.outputs.skip }}
@@ -79,7 +88,7 @@ jobs:
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
   coverage:
-    runs-on: any-host
+    runs-on: ${{ vars.NIGHTLY_LABEL || 'any-host' }}
     needs: plan
     if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.skip != 'true' }}
     timeout-minutes: 90
@@ -121,7 +130,7 @@ jobs:
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
   docker-coverage:
-    runs-on: any-host
+    runs-on: ${{ vars.NIGHTLY_LABEL || 'any-host' }}
     needs: [plan, coverage]
     if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.skip != 'true' && needs.plan.outputs.drivers != '[]' }}
     timeout-minutes: 120
@@ -180,7 +189,7 @@ jobs:
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
   mutation:
-    runs-on: any-host
+    runs-on: ${{ vars.NIGHTLY_LABEL || 'any-host' }}
     needs: [plan, docker-coverage]
     if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.skip != 'true' && needs.plan.outputs.mutation != '[]' }}
     timeout-minutes: 120
@@ -236,7 +245,7 @@ jobs:
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
   gtk-soak:
-    runs-on: any-host
+    runs-on: ${{ vars.NIGHTLY_LABEL || 'any-host' }}
     needs: [plan, mutation]
     if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.skip != 'true' && needs.plan.outputs.gtk_soak != '[]' }}
     timeout-minutes: 90
@@ -288,7 +297,7 @@ jobs:
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
   arch-package:
-    runs-on: any-host
+    runs-on: ${{ vars.NIGHTLY_LABEL || 'any-host' }}
     needs: [plan, mutation]
     if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.skip != 'true' && needs.plan.outputs.arch_package == 'true' }}
     timeout-minutes: 60
@@ -320,7 +329,7 @@ jobs:
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
   values:
-    runs-on: any-host
+    runs-on: ${{ vars.NIGHTLY_LABEL || 'any-host' }}
     needs: [plan, mutation]
     if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.skip != 'true' && needs.plan.outputs.values == 'true' }}
     timeout-minutes: 60

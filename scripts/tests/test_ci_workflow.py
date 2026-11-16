@@ -2493,9 +2493,10 @@ class NightlyWorkflowContractTests(unittest.TestCase):
         self.jobs = dict(re.findall(r"(?ms)^  ([a-z][a-z0-9-]*):\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", body))
 
     def test_nightly_has_no_schedule_trigger(self):
-        triggers = self.workflow.split("\njobs:\n", 1)[0]
+        code = "\n".join(line for line in self.workflow.splitlines() if not line.startswith("#"))
+        triggers = code.split("\njobs:\n", 1)[0]
         self.assertNotIn("schedule:", triggers)
-        self.assertNotIn("cron:", self.workflow)
+        self.assertNotIn("cron:", code)
         self.assertIn("  workflow_dispatch:\n", triggers)
 
     def test_dispatch_offers_full_and_plan_only_booleans(self):
@@ -2562,6 +2563,36 @@ class NightlyWorkflowContractTests(unittest.TestCase):
         mutation = self.jobs["mutation"]
         self.assertIn("MUTANT_FILES: ${{ matrix.files }}", mutation)
         self.assertNotIn("${{ matrix.files }}\"", mutation.split("run: |", 1)[1])
+
+    def test_nightly_never_holds_more_than_half_the_runner_pool(self):
+        needs = {}
+        for name, block in self.jobs.items():
+            found = re.search(r"(?m)^    needs: (.*)$", block)
+            needs[name] = [item.strip() for item in found.group(1).strip("[]").split(",")] if found else []
+
+        def depth(name):
+            return 0 if not needs[name] else 1 + max(depth(parent) for parent in needs[name])
+
+        def width(name):
+            found = re.search(r"max-parallel: (\d+)", self.jobs[name])
+            return int(found.group(1)) if found else 1
+
+        stages = {}
+        for name in self.jobs:
+            stages[depth(name)] = stages.get(depth(name), 0) + width(name)
+        self.assertLessEqual(max(stages.values()), 7)
+        self.assertEqual(len(needs), len(self.jobs))
+
+    def test_every_nightly_job_picks_its_runner_from_one_variable(self):
+        for name, block in self.jobs.items():
+            with self.subTest(job=name):
+                self.assertIn("    runs-on: ${{ vars.NIGHTLY_LABEL || 'any-host' }}\n", block)
+        self.assertNotIn("runs-on: build-host", self.workflow)
+
+    def test_the_workflow_header_tells_the_operator_how_to_enable_it(self):
+        header = self.workflow.split("\nname: nightly\n", 1)[0]
+        for text in ("7 of the 15 runners", "NIGHTLY_LABEL=nightly", "schedule:"):
+            self.assertIn(text, header)
 
     def test_the_planner_never_receives_a_printed_token(self):
         self.assertEqual(self.workflow.count("FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}"), 1)
