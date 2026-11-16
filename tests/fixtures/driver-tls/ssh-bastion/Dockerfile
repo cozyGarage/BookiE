@@ -15,7 +15,7 @@ RUN apk add --no-cache openssh-server \
       'PubkeyAuthentication yes' \
       'AllowTcpForwarding local' \
       'AllowStreamLocalForwarding yes' \
-      'PermitOpen mysql-ssh.bookie.test:3306 mysql-mtls-ssh.bookie.test:3306 mssql-ssh.bookie.test:1433' \
+      'PermitOpen postgres:5432 mongo.bookie.test:27017 redis.bookie.test:6379 mysql-ssh.bookie.test:3306 mysql-mtls-ssh.bookie.test:3306 clickhouse.bookie.test:8443 mssql-ssh.bookie.test:1433' \
       'X11Forwarding no' \
       'AllowAgentForwarding no' \
       > /etc/ssh/sshd_config

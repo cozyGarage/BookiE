@@ -55,7 +55,7 @@ openssl req -x509 -newkey rsa:2048 -sha256 -days 3650 -nodes \
 cat > server.ext <<EXT
 basicConstraints=CA:FALSE
 extendedKeyUsage=serverAuth
-subjectAltName=DNS:${SERVER_HOSTNAME},DNS:mongo.bookie.test,DNS:redis.bookie.test,DNS:mysql.bookie.test,DNS:mysql-ssh.bookie.test,DNS:mysql-mtls.bookie.test,DNS:mysql-mtls-ssh.bookie.test,DNS:clickhouse.bookie.test,DNS:mssql.bookie.test,DNS:mssql-ssh.bookie.test
+subjectAltName=DNS:${SERVER_HOSTNAME},DNS:postgres,DNS:mongo.bookie.test,DNS:redis.bookie.test,DNS:mysql.bookie.test,DNS:mysql-ssh.bookie.test,DNS:mysql-mtls.bookie.test,DNS:mysql-mtls-ssh.bookie.test,DNS:clickhouse.bookie.test,DNS:mssql.bookie.test,DNS:mssql-ssh.bookie.test
 EXT
 
 cat > client.ext <<EXT
