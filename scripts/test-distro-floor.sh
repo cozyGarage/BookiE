@@ -63,7 +63,7 @@ for base in "${images[@]}"; do
       apt-get update
       apt install -y /tmp/bookie.deb
       status=0
-      BOOKIE_GTK_BINARY=/usr/bin/bookie bash /src/scripts/test-gtk-safety.sh >/tmp/gtk-safety.log 2>&1 || status=$?
+      BOOKIE_GTK_BINARY=/usr/bin/bookie bash /src/scripts/test-gtk-safety.sh 2>&1 | tee /tmp/gtk-safety.log || status=$?
       if [ "$status" -ne 0 ]; then
         bash /src/scripts/report-gtk-failure.sh /tmp/gtk-safety.log "$status"
       fi
@@ -79,7 +79,7 @@ for base in "${images[@]}"; do
       fi
       if [ "${DISTRO_FLOOR_INSTALLED:-0}" = 1 ]; then
         status=0
-        bash /src/scripts/test-gtk-safety.sh >/tmp/gtk-safety.log 2>&1 || status=$?
+        bash /src/scripts/test-gtk-safety.sh 2>&1 | tee /tmp/gtk-safety.log || status=$?
         if [ "$status" -ne 0 ]; then
           bash /src/scripts/report-gtk-failure.sh /tmp/gtk-safety.log "$status"
         fi

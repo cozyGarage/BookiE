@@ -55,6 +55,7 @@ class DistroFloorShardTests(unittest.TestCase):
 
     def test_success_output_keeps_every_scenario_for_cross_shard_coverage_checks(self):
         script = (ROOT / "scripts/test-distro-floor.sh").read_text()
+        self.assertEqual(script.count("2>&1 | tee /tmp/gtk-safety.log"), 2)
         summaries = [line.strip() for line in script.splitlines() if 'grep -aE "^passed:' in line]
         self.assertEqual(len(summaries), 2)
         with tempfile.TemporaryDirectory() as temporary:
