@@ -107,12 +107,12 @@ impl SqlEditor {
             return;
         };
         crate::ui::parameters_dialog::present(&window, &names, move |values| {
-            sender.input(SqlEditorInput::RunWithParameters {
+            sender.input(SqlEditorInput::Run(super::RunMessage::RunWithParameters {
                 sql: sql.clone(),
                 anchor,
                 planned: planned.clone(),
                 values,
-            });
+            }));
         });
     }
 
