@@ -94,8 +94,9 @@ class CiJobCleanupTests(unittest.TestCase):
                 for name, block in runner_jobs(workflow).items():
                     if "/usr/local/libexec/bookie-ci-cache checkout" in block:
                         with self.subTest(job=name):
+                            reserve = 20 if workflow.name == "ci.yml" and name == "sandbox" else 30
                             self.assertIn(
-                                "shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}",
+                                f"shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib {reserve} {{0}}",
                                 block,
                             )
 
