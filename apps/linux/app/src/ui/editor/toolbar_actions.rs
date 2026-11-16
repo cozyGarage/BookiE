@@ -271,6 +271,21 @@ impl SqlEditor {
     }
 }
 
+pub(super) fn run_menu_items() -> [(String, &'static str, &'static str); 2] {
+    [
+        (
+            bookie_app_services::tr!("Run selection or all statements"),
+            "editor-run.all",
+            "<Primary>Return",
+        ),
+        (
+            bookie_app_services::tr!("Run current statement"),
+            "editor-run.current",
+            "<Primary><Shift>Return",
+        ),
+    ]
+}
+
 fn temporary_table_query(schema: Option<&str>, name: &str) -> String {
     let table = bookie_core::sql_dialect::quote_ident("postgres", name);
     let relation = schema.map_or(table.clone(), |schema| {
@@ -294,19 +309,4 @@ mod tests {
             "SELECT * FROM \"pg_temp_4\".\"x\"\"; DROP TABLE users;--\""
         );
     }
-}
-
-pub(super) fn run_menu_items() -> [(String, &'static str, &'static str); 2] {
-    [
-        (
-            bookie_app_services::tr!("Run selection or all statements"),
-            "editor-run.all",
-            "<Primary>Return",
-        ),
-        (
-            bookie_app_services::tr!("Run current statement"),
-            "editor-run.current",
-            "<Primary><Shift>Return",
-        ),
-    ]
 }

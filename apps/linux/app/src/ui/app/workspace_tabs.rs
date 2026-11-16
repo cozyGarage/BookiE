@@ -639,8 +639,7 @@ impl App {
         let Some(mut removed) = removed else {
             return;
         };
-        let owner = self.multi.sessions.detach_tab(id);
-        self.temporary_tables_by_tab.remove(&id);
+        let owner = self.detach_tab_session(id);
         // Snapshot the closed tab into the reopen stack BEFORE running
         // the per-kind teardown below — the BrowseModel still has its
         // pagination + sort state intact, and the EditorTabSlot still
@@ -695,6 +694,11 @@ impl App {
         focus_after_tab_close(tab_view, &self.workspace_outer_stack);
         self.refresh_schema_index();
         self.refresh_window_title();
+    }
+
+    fn detach_tab_session(&mut self, id: Uuid) -> Option<Uuid> {
+        self.temporary_tables_by_tab.remove(&id);
+        self.multi.sessions.detach_tab(id)
     }
 }
 

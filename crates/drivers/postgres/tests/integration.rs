@@ -202,12 +202,14 @@ async fn a_session_keeps_settings_temp_tables_and_its_transaction_between_statem
         temporary.as_slice(),
         [bookie_core::TableInfo { schema: Some(schema), name }] if schema.starts_with("pg_temp_") && name == "scratch"
     ));
-    assert!(!conn
-        .list_tables()
-        .await
-        .unwrap()
-        .iter()
-        .any(|table| table.name == "scratch"));
+    assert!(
+        !conn
+            .list_tables()
+            .await
+            .unwrap()
+            .iter()
+            .any(|table| table.name == "scratch")
+    );
     let mut isolated = conn.open_session().await.unwrap();
     assert!(
         isolated

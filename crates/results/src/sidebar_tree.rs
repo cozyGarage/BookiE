@@ -197,35 +197,40 @@ pub fn build_nodes_with_temporary(
         push_group(&mut nodes, depth, &prefix, GroupKind::Tables, schema_tables, parent);
         push_group(&mut nodes, depth, &prefix, GroupKind::Views, schema_views, parent);
     }
-    if !temporary_tables.is_empty() {
-        let group_index = nodes.len();
-        nodes.push(TreeNode {
-            depth: 0,
-            key: "temporary-tables".to_string(),
-            kind: NodeKind::Group(GroupKind::TemporaryTables),
-            schema: None,
-            count: temporary_tables.len(),
-            parent: None,
-        });
-        for table in temporary_tables {
-            nodes.push(TreeNode {
-                depth: 1,
-                key: format!(
-                    "temporary-tables/{}/{}",
-                    key_part(table.schema.as_deref().unwrap_or_default()),
-                    key_part(&table.name)
-                ),
-                kind: NodeKind::TemporaryTable {
-                    schema: table.schema.clone(),
-                    name: table.name.clone(),
-                },
-                schema: table.schema.clone(),
-                count: 0,
-                parent: Some(group_index),
-            });
-        }
-    }
+    append_temporary_tables(&mut nodes, temporary_tables);
     nodes
+}
+
+fn append_temporary_tables(nodes: &mut Vec<TreeNode>, tables: &[TableInfo]) {
+    if tables.is_empty() {
+        return;
+    }
+    let group_index = nodes.len();
+    nodes.push(TreeNode {
+        depth: 0,
+        key: "temporary-tables".to_string(),
+        kind: NodeKind::Group(GroupKind::TemporaryTables),
+        schema: None,
+        count: tables.len(),
+        parent: None,
+    });
+    for table in tables {
+        nodes.push(TreeNode {
+            depth: 1,
+            key: format!(
+                "temporary-tables/{}/{}",
+                key_part(table.schema.as_deref().unwrap_or_default()),
+                key_part(&table.name)
+            ),
+            kind: NodeKind::TemporaryTable {
+                schema: table.schema.clone(),
+                name: table.name.clone(),
+            },
+            schema: table.schema.clone(),
+            count: 0,
+            parent: Some(group_index),
+        });
+    }
 }
 
 pub fn append_catalog_entries(nodes: &mut Vec<TreeNode>, kinds: &[CatalogObjectKind]) {

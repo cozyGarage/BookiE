@@ -54,7 +54,7 @@ impl bookie_core::Session for PgSession {
         result
             .rows
             .iter()
-            .map(|row| match row.as_ref() {
+            .map(|row| match row {
                 [Value::Text(schema), Value::Text(name)] => Ok(bookie_core::TableInfo {
                     schema: Some(schema.clone()),
                     name: name.clone(),
