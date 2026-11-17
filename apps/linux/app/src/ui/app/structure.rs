@@ -618,7 +618,9 @@ impl App {
                     Some(name) => StructureSaveKind::PromoteNewToTable(slot.schema.clone(), name),
                     None => StructureSaveKind::UpdateInPlace(slot.schema.clone(), slot.table.clone()),
                 },
-                Some(WorkspaceTab::Table(slot)) => StructureSaveKind::UpdateInPlace(slot.schema.clone(), slot.table.clone()),
+                Some(WorkspaceTab::Table(slot)) => {
+                    StructureSaveKind::UpdateInPlace(slot.schema.clone(), slot.table.clone())
+                }
                 _ => StructureSaveKind::Skip,
             }
         };
@@ -773,20 +775,16 @@ impl App {
                         return;
                     };
                     let control = crate::services::operation_control::bounded(timeout_secs);
-                    let op = match fetch_create_table_op(
-                        conn.as_ref(),
-                        schema_for_cmd.as_deref(),
-                        &table_for_cmd,
-                        &control,
-                    )
-                    .await
-                    {
-                        Ok(op) => op,
-                        Err(msg) => {
-                            sender_for_cmd.input(AppMsg::ShowToast(msg));
-                            return;
-                        }
-                    };
+                    let op =
+                        match fetch_create_table_op(conn.as_ref(), schema_for_cmd.as_deref(), &table_for_cmd, &control)
+                            .await
+                        {
+                            Ok(op) => op,
+                            Err(msg) => {
+                                sender_for_cmd.input(AppMsg::ShowToast(msg));
+                                return;
+                            }
+                        };
                     match bookie_core::sql_ddl::materialize_ops(&[op], &driver_id) {
                         Ok(stmts) if !stmts.is_empty() => {
                             let sql = stmts.join(";\n\n") + ";";
@@ -1074,8 +1072,7 @@ async fn execute_structure_statements(
 ) {
     let control = crate::services::operation_control::bounded(timeout_secs);
     if ddl_is_transactional {
-        let batch: Vec<(String, Vec<Value>)> =
-            statements.iter().map(|sql| (sql.clone(), Vec::new())).collect();
+        let batch: Vec<(String, Vec<Value>)> = statements.iter().map(|sql| (sql.clone(), Vec::new())).collect();
         if let Err(e) = conn.execute_in_transaction_controlled(&batch, &control).await {
             let msg = error_text::driver_message(&e);
             finish_if_recorded(&mut recorded, Outcome::Error(msg.clone())).await;
@@ -1130,13 +1127,18 @@ async fn fetch_create_table_op(
     let fks = match conn.fetch_foreign_keys_controlled(schema, table, control).await {
         Ok(fks) => fks,
         Err(e) => {
-            return Err(bookie_app_services::tr!("Couldn't read foreign keys: {error}").replace("{error}", &format!("{e}")));
+            return Err(
+                bookie_app_services::tr!("Couldn't read foreign keys: {error}").replace("{error}", &format!("{e}"))
+            );
         }
     };
     Ok(bookie_core::sql_ddl::StructureOp::CreateTable {
         schema: schema.map(str::to_owned),
         table: table.to_string(),
-        columns: columns.into_iter().map(bookie_core::sql_ddl::DraftColumn::from_info).collect(),
+        columns: columns
+            .into_iter()
+            .map(bookie_core::sql_ddl::DraftColumn::from_info)
+            .collect(),
         indexes,
         fks,
         default_collation: None,

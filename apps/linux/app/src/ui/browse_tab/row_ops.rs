@@ -153,9 +153,7 @@ impl BrowseTab {
             return;
         }
         let DeleteSelectionItems {
-            snapshot,
-            draft_ids,
-            ..
+            snapshot, draft_ids, ..
         } = items;
         if snapshot.is_empty() && draft_ids.is_empty() {
             return;
@@ -948,11 +946,10 @@ fn prompt_bulk_delete_dialog(
     draft_ids: Vec<u64>,
     commit_delete: impl FnOnce(Vec<(crate::services::change_tracker::RowKey, Vec<Value>)>, Vec<u64>) + 'static,
 ) {
-    let title = bookie_app_services::trn!("Delete {n} row?", "Delete {n} rows?", count)
-        .replace("{n}", &count.to_string());
-    let body = bookie_app_services::tr!(
-        "These rows will be marked for deletion. They aren't removed until you click Save."
-    );
+    let title =
+        bookie_app_services::trn!("Delete {n} row?", "Delete {n} rows?", count).replace("{n}", &count.to_string());
+    let body =
+        bookie_app_services::tr!("These rows will be marked for deletion. They aren't removed until you click Save.");
     let dialog = adw::AlertDialog::new(Some(&title), Some(&body));
     dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
     dialog.add_response("delete", &bookie_app_services::tr!("Delete"));
