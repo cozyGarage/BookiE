@@ -1,0 +1,1 @@
+Match GPUI command palette with backend activity queries across PostgreSQL, MySQL, and SQL Server; connect home page shortcuts and query history; modularize GPUI sidebar, query editor, and results view components down to zero over-limit functions.

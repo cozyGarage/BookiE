@@ -74,7 +74,7 @@ svg = '''<svg xmlns="http://www.w3.org/2000/svg" width="1250" height="240" viewB
     <rect x="18" y="16" width="30" height="30" rx="8" fill="#1F4F48"/>
     <text x="33" y="36" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="15" font-weight="700" fill="#C9A24B" text-anchor="middle">3</text>
     <text x="58" y="37" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="15" font-weight="700" fill="#F3EAD6">Write SQL</text>
-    <text x="18" y="68" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="600" fill="#9EAE9A">GtkSourceView Editor</text>
+    <text x="18" y="68" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="600" fill="#9EAE9A">Native SQL Editor</text>
     <text x="18" y="86" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#F3EAD6">Fast syntax shading, completions,</text>
     <text x="18" y="100" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#F3EAD6">bracket matching &amp; split views</text>
     <line x1="18" y1="112" x2="247" y2="112" stroke="#1F4F48" stroke-width="1"/>
