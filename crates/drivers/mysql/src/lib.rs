@@ -98,6 +98,10 @@ impl DatabaseDriver for MysqlDriver {
         "root"
     }
 
+    fn supports_updatable_views(&self) -> bool {
+        true
+    }
+
     fn supports_index_metadata(&self) -> bool {
         true
     }
