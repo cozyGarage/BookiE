@@ -833,6 +833,14 @@ fn error_page(idx: usize, message: &super::StatementFailure) -> gtk::Box {
     holder
 }
 
+fn audit_button_label(index: usize, several: bool) -> String {
+    if several {
+        bookie_app_services::tr!("View in Audit Log ({n})").replace("{n}", &(index + 1).to_string())
+    } else {
+        bookie_app_services::tr!("View in Audit Log")
+    }
+}
+
 fn append_audit_actions(holder: &gtk::Box, actions: &gtk::FlowBox, message: &super::StatementFailure) {
     if !message.audit_operation_ids().is_empty() {
         let audit_ids = message
@@ -850,10 +858,11 @@ fn append_audit_actions(holder: &gtk::Box, actions: &gtk::FlowBox, message: &sup
             .build();
         holder.append(&label);
     }
-    for operation_id in message.audit_operation_ids() {
+    let several = message.audit_operation_ids().len() > 1;
+    for (index, operation_id) in message.audit_operation_ids().iter().enumerate() {
         let action_target = operation_id.to_string().to_variant();
         let audit = gtk::Button::builder()
-            .label(bookie_app_services::tr!("View in Audit Log"))
+            .label(audit_button_label(index, several))
             .action_name("win.show-audit-for")
             .action_target(&action_target)
             .css_classes(["pill", "flat"])
@@ -1217,6 +1226,10 @@ fn result_view_keys(outcomes: &[StatementOutcome]) -> std::collections::HashSet<
 #[cfg(test)]
 #[path = "outcomes/affected_rows_tests.rs"]
 mod affected_rows_tests;
+
+#[cfg(test)]
+#[path = "outcomes/audit_button_tests.rs"]
+mod audit_button_tests;
 #[cfg(test)]
 #[path = "outcomes/lexing_tests.rs"]
 mod lexing_tests;
