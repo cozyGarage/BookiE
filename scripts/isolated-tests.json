@@ -340,6 +340,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::grid::row_number_tests::a_shared_base_handle_renumbers_rows_that_are_bound_again"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::import_dialog::lifetime_tests::opening_a_double_pipe_file_fills_the_multi_character_row_and_the_header_switch"
     ],
     [
