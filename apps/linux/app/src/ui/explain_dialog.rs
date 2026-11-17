@@ -25,9 +25,7 @@ fn resolve_explain_sql(
         return None;
     }
     let connection_id = connection_id?;
-    if database.get(connection_id).is_none() {
-        return None;
-    }
+    database.get(connection_id)?;
     let driver_id = database
         .metadata(connection_id)
         .map(|metadata| metadata.driver_id)
@@ -54,7 +52,13 @@ fn resolve_explain_sql(
 
 fn build_explain_window(
     parent: &impl IsA<gtk::Window>,
-) -> (adw::Window, adw::ViewStack, adw::ViewStackPage, gtk::ScrolledWindow, gtk::TextView) {
+) -> (
+    adw::Window,
+    adw::ViewStack,
+    adw::ViewStackPage,
+    gtk::ScrolledWindow,
+    gtk::TextView,
+) {
     let window = adw::Window::builder()
         .title(tr!("Explain plan"))
         .transient_for(parent)

@@ -219,7 +219,9 @@ fn parse_fk_submission(
         return Err(bookie_app_services::tr!("Reference columns are required."));
     }
     if ref_cols.len() != cols.len() {
-        return Err(bookie_app_services::tr!("Source and reference column counts must match."));
+        return Err(bookie_app_services::tr!(
+            "Source and reference column counts must match."
+        ));
     }
     let (ref_schema, ref_table_only) = match ref_table.split_once('.') {
         Some((s, t)) => (Some(s.trim().to_string()), t.trim().to_string()),
@@ -258,8 +260,7 @@ pub(super) fn present_fk_dialog(
     let (columns_list, column_checks) = build_column_checklist(columns);
     body.append(&columns_list);
 
-    let (ref_group, ref_table_row, ref_cols_row, on_delete_row, on_update_row) =
-        build_fk_reference_group(fk_actions);
+    let (ref_group, ref_table_row, ref_cols_row, on_delete_row, on_update_row) = build_fk_reference_group(fk_actions);
     body.append(&ref_group);
 
     let column_checks_for_resp = column_checks.clone();

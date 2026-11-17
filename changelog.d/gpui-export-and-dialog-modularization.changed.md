@@ -1,1 +1,1 @@
-GPUI grid toolbar connects dead "Export…" button to `export_selection_or_page` (CSV export to clipboard with status notification) and adds palette command `export-csv`; all GPUI components and GTK dialogs modularized with zero over-limit functions across `apps/gpui/src/` and dialog baselines ratcheted down to zero; added unit tests for driver activity query capabilities, execution dispatch, and CSV clipboard export.
+GPUI can inspect server activity and copy selected rows or the current page as CSV to the clipboard.

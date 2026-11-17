@@ -468,12 +468,7 @@ impl FactoryComponent for SidebarRow {
 }
 
 impl SidebarRow {
-    fn setup_row_layout(
-        &mut self,
-        root: &gtk::ListBoxRow,
-        widgets: &SidebarRowWidgets,
-        sender: &FactorySender<Self>,
-    ) {
+    fn setup_row_layout(&mut self, root: &gtk::ListBoxRow, widgets: &SidebarRowWidgets, sender: &FactorySender<Self>) {
         let narrow = adw::Breakpoint::new(adw::BreakpointCondition::new_length(
             adw::BreakpointConditionLengthType::MaxWidth,
             260.0,

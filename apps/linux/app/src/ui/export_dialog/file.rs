@@ -108,10 +108,7 @@ fn result_format(format: super::ExportFormat) -> ResultFormat {
     }
 }
 
-fn build_progress_dialog(
-    cancel: &CancellationToken,
-    paged: bool,
-) -> (adw::Dialog, gtk::Label, gtk::ProgressBar) {
+fn build_progress_dialog(cancel: &CancellationToken, paged: bool) -> (adw::Dialog, gtk::Label, gtk::ProgressBar) {
     let label = gtk::Label::new(Some(&if paged {
         bookie_app_services::tr!("Exporting all rows…")
     } else {
@@ -239,13 +236,7 @@ pub(super) fn start(parent: &adw::ApplicationWindow, toast: &adw::ToastOverlay, 
         drop(busy);
         timer.remove();
         dialog.close();
-        handle_export_outcome(
-            &parent,
-            &toast,
-            &path,
-            final_count.load(Ordering::Relaxed),
-            outcome,
-        );
+        handle_export_outcome(&parent, &toast, &path, final_count.load(Ordering::Relaxed), outcome);
     });
 }
 

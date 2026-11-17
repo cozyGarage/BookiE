@@ -77,7 +77,9 @@ impl LiveSession {
     pub fn with_driver_id(self: &Arc<Self>, driver_id: &str) -> Arc<Self> {
         let registry = Arc::new(drivers_registry::default_registry());
         let sessions = ReadSessionStore::new(registry, Arc::new(DatabaseService::new()));
-        let runtime = tokio::runtime::Builder::new_current_thread().build().unwrap();
+        let Ok(runtime) = tokio::runtime::Builder::new_current_thread().build() else {
+            return self.clone();
+        };
         Arc::new(LiveSession {
             runtime,
             sessions,

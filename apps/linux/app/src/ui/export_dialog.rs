@@ -487,7 +487,11 @@ fn attach_export_action(
                 suggested_name: params.suggested_name.clone(),
                 driver_id: params.driver_id.clone(),
                 result: params.result.clone(),
-                paged: if all_rows { params.full_export.clone() } else { params.paged.clone() },
+                paged: if all_rows {
+                    params.full_export.clone()
+                } else {
+                    params.paged.clone()
+                },
                 retained_page: if all_rows {
                     None
                 } else {
@@ -496,7 +500,11 @@ fn attach_export_action(
                 include_header,
                 sanitize_formulas: params.safe_csv.is_active(),
                 spare_plain_numbers: params.spare_numbers.is_active(),
-                null_marker: if all_rows { "\\N".to_string() } else { params.null_marker.clone() },
+                null_marker: if all_rows {
+                    "\\N".to_string()
+                } else {
+                    params.null_marker.clone()
+                },
                 sql_target: params.sql_target.text().to_string(),
             },
         );

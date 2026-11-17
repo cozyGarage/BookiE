@@ -102,9 +102,7 @@ fn spawn_activity_query(
                 let rendered = render_result(&cols, &result.rows);
                 let n = result.rows.len();
                 text_buf.set_text(&rendered);
-                status_l.set_text(
-                    &bookie_app_services::trn!("{n} row", "{n} rows", n).replace("{n}", &n.to_string()),
-                );
+                status_l.set_text(&bookie_app_services::trn!("{n} row", "{n} rows", n).replace("{n}", &n.to_string()));
             }
             Err(e) => {
                 if token.is_cancelled() {
@@ -117,16 +115,28 @@ fn spawn_activity_query(
     });
 }
 
-fn append_activity_query_buttons(
-    button_row: &adw::WrapBox,
-    text: &gtk::TextView,
-    status: &gtk::Label,
-    driver_id: &str,
+struct ActivityQueryButtonContext<'a> {
+    button_row: &'a adw::WrapBox,
+    text: &'a gtk::TextView,
+    status: &'a gtk::Label,
+    driver_id: &'a str,
     connection: uuid::Uuid,
-    database: &std::sync::Arc<DatabaseService>,
-    preferences: &PreferencesStore,
-    in_flight: &Rc<RefCell<CancellationToken>>,
-) {
+    database: &'a std::sync::Arc<DatabaseService>,
+    preferences: &'a PreferencesStore,
+    in_flight: &'a Rc<RefCell<CancellationToken>>,
+}
+
+fn append_activity_query_buttons(context: ActivityQueryButtonContext<'_>) {
+    let ActivityQueryButtonContext {
+        button_row,
+        text,
+        status,
+        driver_id,
+        connection,
+        database,
+        preferences,
+        in_flight,
+    } = context;
     let actions = [
         (tr!("Sessions"), ActivityQuery::Sessions),
         (tr!("Blocking locks"), ActivityQuery::BlockingLocks),
@@ -254,7 +264,15 @@ fn append_kill_controls(
             &database_for_kill,
             Some(connection),
         );
-        spawn_kill_session(conn, sql, text_buf.clone(), status_l.clone(), flight, token, timeout_secs);
+        spawn_kill_session(
+            conn,
+            sql,
+            text_buf.clone(),
+            status_l.clone(),
+            flight,
+            token,
+            timeout_secs,
+        );
     });
     button_row.append(&kill_entry);
     button_row.append(&kill_btn);
@@ -272,16 +290,16 @@ pub fn present(
     let (dialog, button_row, text, status) = build_activity_dialog();
     let in_flight = Rc::new(RefCell::new(CancellationToken::new()));
 
-    append_activity_query_buttons(
-        &button_row,
-        &text,
-        &status,
-        &driver_id,
+    append_activity_query_buttons(ActivityQueryButtonContext {
+        button_row: &button_row,
+        text: &text,
+        status: &status,
+        driver_id: &driver_id,
         connection,
         database,
         preferences,
-        &in_flight,
-    );
+        in_flight: &in_flight,
+    });
     append_kill_controls(
         &button_row,
         &text,
