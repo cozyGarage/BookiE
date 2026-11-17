@@ -288,7 +288,7 @@ fn render_result<R: QueryRowSet + ?Sized>(columns: &[String], rows: &R) -> Strin
                 out.push_str("  ");
             }
             let w = widths.get(i).copied().unwrap_or(cell.chars().count());
-            out.push_str(&cell);
+            out.push_str(cell);
             if cell.chars().count() < w {
                 out.push_str(&" ".repeat(w - cell.chars().count()));
             }
