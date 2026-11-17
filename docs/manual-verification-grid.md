@@ -12,7 +12,7 @@ Create `items(id int primary key, name text)`, `v_items` as `SELECT id, name FRO
 - [ ] Add an INSTEAD OF trigger to `v_items` and reopen it. It becomes read-only with the not-updatable banner.
 - [ ] On a read-only connection `v_items` stays read-only.
 - [ ] On SQL Server, use a candidate with app capability integration before qualifying view edits. An eligible single-table view exposing the complete key must reach the metadata request and use staged Save for update/delete; computed columns stay read-only, inserts are disabled, and aggregate/grouped views remain read-only. A missing key is distinguished from a non-updatable view. Driver-only metadata tests do not prove this route.
-- [ ] On MySQL and MariaDB, use a candidate containing the #3392 metadata repair and the app capability integration before qualifying view edits. Confirm the app requests editability metadata, then check an aliased composite key, computed-column read-only behavior, refusal of a computed key expression, base-table read-back after Save and cancellation of metadata reads. Record the exact candidate source.
+- [ ] On MySQL and MariaDB, use a candidate containing the #3392 metadata repair and the `supports_updatable_views` declaration before qualifying view edits. Confirm the app requests editability metadata (no no-primary-key banner), then check an aliased composite key, computed-column read-only behavior, refusal of a computed key expression, base-table read-back after Save and cancellation of metadata reads. Record the exact candidate source.
 
 ## Export dialog
 
