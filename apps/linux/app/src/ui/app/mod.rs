@@ -896,6 +896,7 @@ impl SimpleComponent for App {
                     scope,
                     paged: None,
                     result,
+                    retained_page: None,
                     suggested_name: name,
                     driver_id: self.driver_id().to_string(),
                 },

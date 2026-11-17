@@ -59,25 +59,36 @@ fn visible_stack_index(root: &gtk::Widget, prefix: &str) -> Option<usize> {
     parse_prefixed_index(stack.visible_child_name()?.as_str(), prefix)
 }
 
-fn streamed_page_for(holder: &gtk::Box, result: &StreamedResult) -> Option<Arc<QueryResult>> {
+fn streamed_page_for(holder: &gtk::Box, result: &StreamedResult) -> Option<crate::ui::export_dialog::StreamExportPage> {
     let root = holder.clone().upcast::<gtk::Widget>();
     let page_index = visible_page_index(&root, result.generation)?;
     streamed_page_at(result, page_index)
 }
 
-fn streamed_page_at(result: &StreamedResult, page_index: u64) -> Option<Arc<QueryResult>> {
-    result.resident_pages.get(page_index).or_else(|| {
+fn streamed_page_at(result: &StreamedResult, page_index: u64) -> Option<crate::ui::export_dialog::StreamExportPage> {
+    let (page, lease) = result.resident_pages.get_with_lease(page_index).or_else(|| {
         result
             .pages
             .iter()
             .zip(result.page_indices.iter())
             .find(|(_, index)| **index == page_index)
             .and_then(|(page, _)| page.upgrade())
+            .and_then(|page| result.resident_pages.retain(&page).map(|lease| (page, lease)))
+    })?;
+    Some(crate::ui::export_dialog::StreamExportPage {
+        result: page,
+        _lease: lease,
     })
 }
 
 impl SqlEditor {
-    pub(crate) fn export_shown_result(&self) -> Option<(Arc<QueryResult>, String)> {
+    pub(crate) fn export_shown_result(
+        &self,
+    ) -> Option<(
+        Arc<QueryResult>,
+        Option<crate::ui::export_dialog::StreamExportPage>,
+        String,
+    )> {
         let outcomes = self.pinned.displayed();
         let root = self.results_holder.clone().upcast::<gtk::Widget>();
         let outcome_index = visible_stack_index(&root, "r");
@@ -89,8 +100,9 @@ impl SqlEditor {
                 StatementOutcomeKind::Streamed(result) => streamed_page_for(&self.results_holder, result),
                 _ => None,
             });
-        let result = pick_shown_export(&outcomes, outcome_index, set_index, streamed_page)?;
-        Some((result, self.export_name()))
+        let page = streamed_page.as_ref().map(|page| page.result.clone());
+        let result = pick_shown_export(&outcomes, outcome_index, set_index, page)?;
+        Some((result, streamed_page, self.export_name()))
     }
 }
 
@@ -213,7 +225,27 @@ mod tests {
         result.pages.push(Arc::downgrade(&page));
         result.page_indices.push(2);
 
-        assert!(Arc::ptr_eq(&streamed_page_at(result, 2).unwrap(), &page));
+        assert!(Arc::ptr_eq(&streamed_page_at(result, 2).unwrap().result, &page));
         assert!(streamed_page_at(result, 3).is_none());
+    }
+
+    #[test]
+    fn exporting_a_streamed_page_keeps_its_budget_until_export_is_dropped() {
+        let budget = bookie_results::stream_page_budget::StreamPageBudget::new(1024 * 1024);
+        let mut cache = super::super::stream_pages::StreamPageCache::with_budget(budget.clone());
+        cache.append(0, Arc::new(query(1, 1))).unwrap();
+        let snapshot = cache.snapshot(super::super::stream_pages::StreamTerminal::Complete, None);
+        let retained = streamed_page_at(&snapshot, 0).unwrap();
+        let second = streamed_page_at(&snapshot, 0).unwrap();
+
+        drop(snapshot);
+        drop(cache);
+        assert_eq!(budget.used_pages(), 1);
+        assert!(budget.used_bytes() > 0);
+        drop(retained);
+        assert_eq!(budget.used_pages(), 1);
+        drop(second);
+        assert_eq!(budget.used_pages(), 0);
+        assert_eq!(budget.used_bytes(), 0);
     }
 }
