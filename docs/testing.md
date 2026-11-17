@@ -71,7 +71,7 @@ Locally, `scripts/test-harness.sh` is faster than it is in CI. It runs the scrip
 
 ### Running one driver's Docker suite
 
-`bash scripts/run-driver-group.sh <driver>` runs one driver's integration target the way CI does: it pulls that driver's pinned images, runs the target with `--include-ignored --test-threads=1`, and removes the containers it started. `<driver>` is one of `mssql`, `mysql`, `postgres`, `clickhouse`, `mongodb`, `redis`, `cassandra`, `duckdb` or `oracle`. `core`, `analytics` and `extended` run the three CI groups.
+`bash scripts/run-driver-group.sh <driver>` runs one driver's integration target, and its conformance target when the driver has `tests/conformance.rs`, the way CI does: it pulls that driver's pinned images, runs the targets with `--include-ignored --test-threads=1`, and removes the containers it started. `<driver>` is one of `mssql`, `mysql`, `postgres`, `clickhouse`, `mongodb`, `redis`, `cassandra`, `duckdb` or `oracle`. `core`, `analytics` and `extended` run the three CI groups.
 
 Prefer it to a plain `cargo test` for a whole suite. The PostgreSQL and MySQL fixtures share one server and reset its database between tests only when all of these hold: `BOOKIE_TEST_RUN_ID` is set (the script sets it, together with the cleanup that goes with it), the run uses `--test-threads=1`, and it has no test-name filter. Otherwise every test starts its own container. On one machine the full PostgreSQL target took 256 to 274 s with the shared server and 811 s without it. A filtered run always starts one container per test, about 2 to 3 s each, which is the right trade for a handful of tests. If you set `BOOKIE_TEST_RUN_ID` yourself, remove the containers afterwards with `python3 scripts/cleanup-testcontainers.py <id>`.
 
