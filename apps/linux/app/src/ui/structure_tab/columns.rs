@@ -196,26 +196,18 @@ pub(super) fn build_column_expander_row(
     remove_button.connect_clicked(move |_| sender_for_remove.input(StructureTabInput::RemoveColumn(index)));
     row.add_suffix(&remove_button);
 
-    add_name_and_type_rows(
-        &row,
+    let builder = ColumnRowBuilder {
         index,
         col,
         driver_id,
         limit_for_existing,
-        &sender,
-        &suppress_emit,
-        &popover_registry,
-    );
-    add_nullable_and_default_rows(
-        &row,
-        index,
-        col,
-        driver_id,
-        limit_for_existing,
-        &sender,
-        &suppress_emit,
-    );
-    add_key_and_increment_rows(&row, index, col, &sender, &suppress_emit);
+        sender: &sender,
+        suppress_emit: &suppress_emit,
+        popover_registry: &popover_registry,
+    };
+    builder.add_name_and_type_rows(&row);
+    builder.add_nullable_and_default_rows(&row);
+    builder.add_key_and_increment_rows(&row);
 
     add_collation_row(
         &row,
@@ -230,166 +222,161 @@ pub(super) fn build_column_expander_row(
     row
 }
 
-fn add_name_and_type_rows(
-    row: &adw::ExpanderRow,
+struct ColumnRowBuilder<'a> {
     index: usize,
-    col: &DraftColumn,
-    driver_id: &str,
+    col: &'a DraftColumn,
+    driver_id: &'a str,
     limit_for_existing: bool,
-    sender: &ComponentSender<StructureTab>,
-    suppress_emit: &Rc<Cell<bool>>,
-    popover_registry: &Rc<RefCell<Vec<gtk::Popover>>>,
-) {
-    let name_row = adw::EntryRow::builder().title(bookie_app_services::tr!("Name")).build();
-    name_row.set_text(&col.name);
-    name_row.set_widget_name(&format!("col-name-{index}"));
-    let sender_for_name = sender.clone();
-    let suppress_for_name = suppress_emit.clone();
-    let row_for_name = row.clone();
-    name_row.connect_changed(move |e| {
-        if suppress_for_name.get() {
-            return;
-        }
-        let text = e.text().to_string();
-        row_for_name.set_title(&glib::markup_escape_text(&text));
-        sender_for_name.input(StructureTabInput::ColumnEdited {
-            index,
-            field: ColumnField::Name(text),
-        });
-    });
-    row.add_row(&name_row);
-
-    let type_row = adw::EntryRow::builder().title(bookie_app_services::tr!("Type")).build();
-    type_row.set_text(&col.data_type);
-    if limit_for_existing && !driver_can_alter_existing_column(driver_id) {
-        type_row.set_sensitive(false);
-        type_row.set_tooltip_text(Some(&bookie_app_services::tr!(
-            "Type changes aren't supported by SQLite."
-        )));
-    }
-    let sender_for_type = sender.clone();
-    let suppress_for_type = suppress_emit.clone();
-    type_row.connect_changed(move |e| {
-        if suppress_for_type.get() {
-            return;
-        }
-        sender_for_type.input(StructureTabInput::ColumnEdited {
-            index,
-            field: ColumnField::Type(e.text().to_string()),
-        });
-    });
-    let (suggestions_button, suggestions_popover) = build_type_suggestions_button(driver_id, &type_row);
-    type_row.add_suffix(&suggestions_button);
-    if let Some(suggestions_popover) = suggestions_popover {
-        popover_registry.borrow_mut().push(suggestions_popover);
-    }
-    row.add_row(&type_row);
+    sender: &'a ComponentSender<StructureTab>,
+    suppress_emit: &'a Rc<Cell<bool>>,
+    popover_registry: &'a Rc<RefCell<Vec<gtk::Popover>>>,
 }
 
-fn add_nullable_and_default_rows(
-    row: &adw::ExpanderRow,
-    index: usize,
-    col: &DraftColumn,
-    driver_id: &str,
-    limit_for_existing: bool,
-    sender: &ComponentSender<StructureTab>,
-    suppress_emit: &Rc<Cell<bool>>,
-) {
-    let nullable_row = adw::SwitchRow::builder()
-        .title(bookie_app_services::tr!("Nullable"))
-        .active(col.nullable)
-        .build();
-    if limit_for_existing && !driver_can_alter_existing_column(driver_id) {
-        nullable_row.set_sensitive(false);
-        nullable_row.set_tooltip_text(Some(&bookie_app_services::tr!(
-            "Nullability changes aren't supported by SQLite."
-        )));
+impl ColumnRowBuilder<'_> {
+    fn add_name_and_type_rows(&self, row: &adw::ExpanderRow) {
+        let name_row = adw::EntryRow::builder().title(bookie_app_services::tr!("Name")).build();
+        name_row.set_text(&self.col.name);
+        name_row.set_widget_name(&format!("col-name-{}", self.index));
+        let sender_for_name = self.sender.clone();
+        let suppress_for_name = self.suppress_emit.clone();
+        let row_for_name = row.clone();
+        let index = self.index;
+        name_row.connect_changed(move |e| {
+            if suppress_for_name.get() {
+                return;
+            }
+            let text = e.text().to_string();
+            row_for_name.set_title(&glib::markup_escape_text(&text));
+            sender_for_name.input(StructureTabInput::ColumnEdited {
+                index,
+                field: ColumnField::Name(text),
+            });
+        });
+        row.add_row(&name_row);
+
+        let type_row = adw::EntryRow::builder().title(bookie_app_services::tr!("Type")).build();
+        type_row.set_text(&self.col.data_type);
+        if self.limit_for_existing && !driver_can_alter_existing_column(self.driver_id) {
+            type_row.set_sensitive(false);
+            type_row.set_tooltip_text(Some(&bookie_app_services::tr!(
+                "Type changes aren't supported by SQLite."
+            )));
+        }
+        let sender_for_type = self.sender.clone();
+        let suppress_for_type = self.suppress_emit.clone();
+        let index = self.index;
+        type_row.connect_changed(move |e| {
+            if suppress_for_type.get() {
+                return;
+            }
+            sender_for_type.input(StructureTabInput::ColumnEdited {
+                index,
+                field: ColumnField::Type(e.text().to_string()),
+            });
+        });
+        let (suggestions_button, suggestions_popover) = build_type_suggestions_button(self.driver_id, &type_row);
+        type_row.add_suffix(&suggestions_button);
+        if let Some(suggestions_popover) = suggestions_popover {
+            self.popover_registry.borrow_mut().push(suggestions_popover);
+        }
+        row.add_row(&type_row);
     }
-    let sender_for_null = sender.clone();
-    let suppress_for_null = suppress_emit.clone();
-    nullable_row.connect_active_notify(move |s| {
-        if suppress_for_null.get() {
-            return;
-        }
-        sender_for_null.input(StructureTabInput::ColumnEdited {
-            index,
-            field: ColumnField::Nullable(s.is_active()),
-        });
-    });
-    row.add_row(&nullable_row);
 
-    let default_row = adw::EntryRow::builder()
-        .title(bookie_app_services::tr!("Default value"))
-        .build();
-    default_row.set_text(col.default_value.as_deref().unwrap_or(""));
-    if limit_for_existing && !driver_can_alter_existing_column(driver_id) {
-        default_row.set_sensitive(false);
-        default_row.set_tooltip_text(Some(&bookie_app_services::tr!(
-            "Default changes aren't supported by SQLite."
-        )));
+    fn add_nullable_and_default_rows(&self, row: &adw::ExpanderRow) {
+        let nullable_row = adw::SwitchRow::builder()
+            .title(bookie_app_services::tr!("Nullable"))
+            .active(self.col.nullable)
+            .build();
+        if self.limit_for_existing && !driver_can_alter_existing_column(self.driver_id) {
+            nullable_row.set_sensitive(false);
+            nullable_row.set_tooltip_text(Some(&bookie_app_services::tr!(
+                "Nullability changes aren't supported by SQLite."
+            )));
+        }
+        let sender_for_null = self.sender.clone();
+        let suppress_for_null = self.suppress_emit.clone();
+        let index = self.index;
+        nullable_row.connect_active_notify(move |s| {
+            if suppress_for_null.get() {
+                return;
+            }
+            sender_for_null.input(StructureTabInput::ColumnEdited {
+                index,
+                field: ColumnField::Nullable(s.is_active()),
+            });
+        });
+        row.add_row(&nullable_row);
+
+        let default_row = adw::EntryRow::builder()
+            .title(bookie_app_services::tr!("Default value"))
+            .build();
+        default_row.set_text(self.col.default_value.as_deref().unwrap_or(""));
+        if self.limit_for_existing && !driver_can_alter_existing_column(self.driver_id) {
+            default_row.set_sensitive(false);
+            default_row.set_tooltip_text(Some(&bookie_app_services::tr!(
+                "Default changes aren't supported by SQLite."
+            )));
+        }
+        let sender_for_default = self.sender.clone();
+        let suppress_for_default = self.suppress_emit.clone();
+        let index = self.index;
+        default_row.connect_changed(move |e| {
+            if suppress_for_default.get() {
+                return;
+            }
+            let text = e.text().to_string();
+            let value = if text.is_empty() { None } else { Some(text) };
+            sender_for_default.input(StructureTabInput::ColumnEdited {
+                index,
+                field: ColumnField::Default(value),
+            });
+        });
+        row.add_row(&default_row);
     }
-    let sender_for_default = sender.clone();
-    let suppress_for_default = suppress_emit.clone();
-    default_row.connect_changed(move |e| {
-        if suppress_for_default.get() {
-            return;
-        }
-        let text = e.text().to_string();
-        let value = if text.is_empty() { None } else { Some(text) };
-        sender_for_default.input(StructureTabInput::ColumnEdited {
-            index,
-            field: ColumnField::Default(value),
-        });
-    });
-    row.add_row(&default_row);
-}
 
-fn add_key_and_increment_rows(
-    row: &adw::ExpanderRow,
-    index: usize,
-    col: &DraftColumn,
-    sender: &ComponentSender<StructureTab>,
-    suppress_emit: &Rc<Cell<bool>>,
-) {
-    let pk_row = adw::SwitchRow::builder()
-        .title(bookie_app_services::tr!("Primary key"))
-        .active(col.primary_key)
-        .build();
-    let sender_for_pk = sender.clone();
-    let suppress_for_pk = suppress_emit.clone();
-    pk_row.connect_active_notify(move |s| {
-        if suppress_for_pk.get() {
-            return;
-        }
-        sender_for_pk.input(StructureTabInput::ColumnEdited {
-            index,
-            field: ColumnField::PrimaryKey(s.is_active()),
+    fn add_key_and_increment_rows(&self, row: &adw::ExpanderRow) {
+        let pk_row = adw::SwitchRow::builder()
+            .title(bookie_app_services::tr!("Primary key"))
+            .active(self.col.primary_key)
+            .build();
+        let sender_for_pk = self.sender.clone();
+        let suppress_for_pk = self.suppress_emit.clone();
+        let index = self.index;
+        pk_row.connect_active_notify(move |s| {
+            if suppress_for_pk.get() {
+                return;
+            }
+            sender_for_pk.input(StructureTabInput::ColumnEdited {
+                index,
+                field: ColumnField::PrimaryKey(s.is_active()),
+            });
         });
-    });
-    row.add_row(&pk_row);
+        row.add_row(&pk_row);
 
-    let auto_row = adw::SwitchRow::builder()
-        .title(bookie_app_services::tr!("Auto increment"))
-        .subtitle(bookie_app_services::tr!("MySQL AUTO_INCREMENT / Postgres SERIAL"))
-        .active(col.auto_increment)
-        .build();
-    auto_row.set_sensitive(col.primary_key);
-    pk_row
-        .bind_property("active", &auto_row, "sensitive")
-        .sync_create()
-        .build();
-    let sender_for_auto = sender.clone();
-    let suppress_for_auto = suppress_emit.clone();
-    auto_row.connect_active_notify(move |s| {
-        if suppress_for_auto.get() {
-            return;
-        }
-        sender_for_auto.input(StructureTabInput::ColumnEdited {
-            index,
-            field: ColumnField::AutoIncrement(s.is_active()),
+        let auto_row = adw::SwitchRow::builder()
+            .title(bookie_app_services::tr!("Auto increment"))
+            .subtitle(bookie_app_services::tr!("MySQL AUTO_INCREMENT / Postgres SERIAL"))
+            .active(self.col.auto_increment)
+            .build();
+        auto_row.set_sensitive(self.col.primary_key);
+        pk_row
+            .bind_property("active", &auto_row, "sensitive")
+            .sync_create()
+            .build();
+        let sender_for_auto = self.sender.clone();
+        let suppress_for_auto = self.suppress_emit.clone();
+        let index = self.index;
+        auto_row.connect_active_notify(move |s| {
+            if suppress_for_auto.get() {
+                return;
+            }
+            sender_for_auto.input(StructureTabInput::ColumnEdited {
+                index,
+                field: ColumnField::AutoIncrement(s.is_active()),
+            });
         });
-    });
-    row.add_row(&auto_row);
+        row.add_row(&auto_row);
+    }
 }
 
 pub(super) fn collation_choices(collations: &[String], current: Option<&str>) -> Vec<String> {
