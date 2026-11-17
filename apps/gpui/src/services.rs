@@ -1,0 +1,99 @@
+use super::*;
+
+impl GridView {
+    pub(crate) fn sample_pubsub(&mut self, pattern: String, cx: &mut Context<Self>) {
+        let Some(live) = self.live.clone() else {
+            return;
+        };
+        self.status = format!(
+            "Listening to {pattern} for {} s…",
+            bookie_gpui::pubsub_view::SAMPLE_SECONDS
+        );
+        let target = pattern.clone();
+        self.begin_background(
+            Work::Load,
+            cx,
+            move |cancel| {
+                live.sample_pubsub(
+                    std::slice::from_ref(&target),
+                    bookie_gpui::pubsub_view::SAMPLE_MESSAGES,
+                    Duration::from_secs(bookie_gpui::pubsub_view::SAMPLE_SECONDS),
+                    &cancel,
+                )
+            },
+            move |this, outcome| {
+                let lines = bookie_gpui::pubsub_view::describe(&pattern, outcome);
+                if let Some((_, headline)) = lines.first() {
+                    this.status = headline.clone();
+                }
+                for (kind, text) in lines {
+                    this.messages.push(kind, text);
+                }
+            },
+        );
+    }
+
+    pub(crate) fn kafka_topics(&mut self, broker: String, cx: &mut Context<Self>) {
+        self.status = format!("Listing topics at {broker}…");
+        self.begin_background(
+            Work::Load,
+            cx,
+            move |_| bookie_gpui::net_check::kafka_topics(&broker),
+            |this, outcome| {
+                let (kind, text) = match outcome {
+                    Ok(text) => (MessageKind::Success, text),
+                    Err(error) => (MessageKind::Error, format!("Kafka · {error}")),
+                };
+                this.messages.push(kind, text.clone());
+                this.status = text;
+            },
+        );
+    }
+
+    pub(crate) fn check_tcp(&mut self, address: String, cx: &mut Context<Self>) {
+        self.status = format!("Checking {address}…");
+        let target = address.clone();
+        self.begin_background(
+            Work::Load,
+            cx,
+            move |_| bookie_gpui::net_check::run_check(&target),
+            move |this, outcome| {
+                let (up, text) = bookie_gpui::net_check::record(&mut this.check_histories, &address, outcome);
+                let kind = if up { MessageKind::Success } else { MessageKind::Error };
+                this.messages.push(kind, text.clone());
+                this.status = text;
+            },
+        );
+    }
+
+    pub(crate) fn show_status(&mut self) {
+        let Some(live) = self.live.clone() else {
+            return;
+        };
+        let overview = match live.overview() {
+            Ok(overview) => overview,
+            Err(error) => {
+                let message = format!("Could not read connection status: {error}");
+                self.status = message.clone();
+                self.messages.push(MessageKind::Error, message);
+                return;
+            }
+        };
+        let lines = bookie_gpui::status_view::describe(&overview);
+        if let Some((_, headline)) = lines.first() {
+            self.status = headline.clone();
+        }
+        for (kind, text) in lines {
+            self.messages.push(kind, text);
+        }
+    }
+
+    pub(crate) fn show_sessions(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.tabs.open_query();
+        self.sync_grid_owner();
+        self.sql_input.update(cx, |input, cx| {
+            input.set_value(bookie_app_services::pg_sessions::SESSIONS_SQL, window, cx)
+        });
+        self.run_query(cx);
+    }
+}

@@ -123,7 +123,7 @@ def scenarios(ui):
         ui.invoke(ui.wait_for_node(name="Show matching rows", role=pyatspi.ROLE_PUSH_BUTTON))
         ui.wait_for_node_containing(f"Complete · Received {total:,} rows", timeout=120)
         ui.wait_for_node_containing("FILTER " + NEEDLE)
-        ui.wait_for_node(name="Export all rows…", role=pyatspi.ROLE_PUSH_BUTTON)
+        ui.wait_for_node(name="Export rows…", role=pyatspi.ROLE_PUSH_BUTTON)
 
     def compare_steps(counts):
         ui.invoke(ui.wait_for_sensitive_node(name="Compare…", role=pyatspi.ROLE_PUSH_BUTTON))
