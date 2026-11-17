@@ -9,10 +9,66 @@ use relm4::{adw, gtk};
 use crate::services::quick_switcher::{QuickItem, QuickTarget, filter};
 use bookie_app_services::tr;
 
-pub fn present<F>(parent: &impl IsA<gtk::Window>, items: Vec<QuickItem>, on_choice: F)
-where
-    F: Fn(QuickTarget) + 'static,
-{
+fn build_switcher_row(item: &QuickItem, index: usize, activate: &Rc<dyn Fn(usize)>) -> adw::ActionRow {
+    let row = adw::ActionRow::builder()
+        .title(glib::markup_escape_text(&item.title))
+        .subtitle(glib::markup_escape_text(&item.subtitle))
+        .activatable(true)
+        .build();
+    let icon = match item.target {
+        QuickTarget::Favorite(_) => "starred-symbolic",
+        QuickTarget::Tab(_) => "tab-new-symbolic",
+        QuickTarget::Connection(_) => "network-server-symbolic",
+        QuickTarget::Relation { .. } => "view-list-symbolic",
+        QuickTarget::Command(_) => "system-run-symbolic",
+        QuickTarget::History(_) => "document-open-recent-symbolic",
+    };
+    row.add_prefix(&gtk::Image::from_icon_name(icon));
+    let open_label = tr!("Open {name}").replace("{name}", &item.title);
+    let open = gtk::Button::builder()
+        .icon_name("go-next-symbolic")
+        .tooltip_text(&open_label)
+        .valign(gtk::Align::Center)
+        .css_classes(["flat"])
+        .build();
+    open.update_property(&[gtk::accessible::Property::Label(&open_label)]);
+    let activate_for_button = activate.clone();
+    open.connect_clicked(move |_| activate_for_button(index));
+    row.add_suffix(&open);
+    row
+}
+
+fn connect_switcher_keys(window: &adw::Window, search: &gtk::SearchEntry, list: &gtk::ListBox) {
+    let list_for_keys = list.clone();
+    let keys = gtk::EventControllerKey::new();
+    keys.connect_key_pressed(move |_, keyval, _, _| match keyval {
+        gtk::gdk::Key::Down => {
+            move_selection(&list_for_keys, 1);
+            glib::Propagation::Stop
+        }
+        gtk::gdk::Key::Up => {
+            move_selection(&list_for_keys, -1);
+            glib::Propagation::Stop
+        }
+        _ => glib::Propagation::Proceed,
+    });
+    search.add_controller(keys);
+
+    let window_for_escape = window.downgrade();
+    let escape = gtk::EventControllerKey::new();
+    escape.connect_key_pressed(move |_, keyval, _, _| {
+        if keyval == gtk::gdk::Key::Escape {
+            if let Some(window) = window_for_escape.upgrade() {
+                window.close();
+            }
+            return glib::Propagation::Stop;
+        }
+        glib::Propagation::Proceed
+    });
+    window.add_controller(escape);
+}
+
+fn build_switcher_widgets(parent: &impl IsA<gtk::Window>) -> (adw::Window, gtk::SearchEntry, gtk::ListBox, gtk::Stack) {
     let window = adw::Window::builder()
         .title(tr!("Open quickly"))
         .transient_for(parent)
@@ -62,7 +118,36 @@ where
     toolbar.add_top_bar(&adw::HeaderBar::new());
     toolbar.set_content(Some(&content));
     window.set_content(Some(&toolbar));
+    (window, search, list, stack)
+}
 
+fn connect_switcher_actions(
+    search: &gtk::SearchEntry,
+    list: &gtk::ListBox,
+    rebuild: Rc<dyn Fn(&str)>,
+    activate: Rc<dyn Fn(usize)>,
+) {
+    let rebuild_for_search = rebuild;
+    search.connect_search_changed(move |entry| rebuild_for_search(entry.text().as_str()));
+
+    let activate_for_row = activate.clone();
+    list.connect_row_activated(move |_, row| activate_for_row(row.index().max(0) as usize));
+
+    let list_for_entry = list.clone();
+    search.connect_activate(move |_| {
+        let index = list_for_entry
+            .selected_row()
+            .map(|row| row.index().max(0) as usize)
+            .unwrap_or(0);
+        activate(index);
+    });
+}
+
+pub fn present<F>(parent: &impl IsA<gtk::Window>, items: Vec<QuickItem>, on_choice: F)
+where
+    F: Fn(QuickTarget) + 'static,
+{
+    let (window, search, list, stack) = build_switcher_widgets(parent);
     let visible: Rc<RefCell<Vec<QuickItem>>> = Rc::new(RefCell::new(Vec::new()));
     let on_choice: Rc<dyn Fn(QuickTarget)> = Rc::new(on_choice);
 
@@ -81,7 +166,7 @@ where
         })
     };
 
-    let rebuild = {
+    let rebuild: Rc<dyn Fn(&str)> = {
         let list = list.clone();
         let stack = stack.clone();
         let items = items.clone();
@@ -93,31 +178,7 @@ where
                 list.remove(&child);
             }
             for (index, item) in matched.iter().enumerate() {
-                let row = adw::ActionRow::builder()
-                    .title(glib::markup_escape_text(&item.title))
-                    .subtitle(glib::markup_escape_text(&item.subtitle))
-                    .activatable(true)
-                    .build();
-                let icon = match item.target {
-                    QuickTarget::Favorite(_) => "starred-symbolic",
-                    QuickTarget::Tab(_) => "tab-new-symbolic",
-                    QuickTarget::Connection(_) => "network-server-symbolic",
-                    QuickTarget::Relation { .. } => "view-list-symbolic",
-                    QuickTarget::Command(_) => "system-run-symbolic",
-                    QuickTarget::History(_) => "document-open-recent-symbolic",
-                };
-                row.add_prefix(&gtk::Image::from_icon_name(icon));
-                let open_label = tr!("Open {name}").replace("{name}", &item.title);
-                let open = gtk::Button::builder()
-                    .icon_name("go-next-symbolic")
-                    .tooltip_text(&open_label)
-                    .valign(gtk::Align::Center)
-                    .css_classes(["flat"])
-                    .build();
-                open.update_property(&[gtk::accessible::Property::Label(&open_label)]);
-                let activate_for_button = activate.clone();
-                open.connect_clicked(move |_| activate_for_button(index));
-                row.add_suffix(&open);
+                let row = build_switcher_row(item, index, &activate);
                 list.append(&row);
             }
             stack.set_visible_child_name(if matched.is_empty() { "empty" } else { "results" });
@@ -129,50 +190,8 @@ where
     };
     rebuild("");
 
-    let rebuild_for_search = rebuild.clone();
-    search.connect_search_changed(move |entry| rebuild_for_search(entry.text().as_str()));
-
-    let activate_for_row = activate.clone();
-    list.connect_row_activated(move |_, row| activate_for_row(row.index().max(0) as usize));
-
-    let activate_for_entry = activate.clone();
-    let list_for_entry = list.clone();
-    search.connect_activate(move |_| {
-        let index = list_for_entry
-            .selected_row()
-            .map(|row| row.index().max(0) as usize)
-            .unwrap_or(0);
-        activate_for_entry(index);
-    });
-
-    let list_for_keys = list.clone();
-    let keys = gtk::EventControllerKey::new();
-    keys.connect_key_pressed(move |_, keyval, _, _| match keyval {
-        gtk::gdk::Key::Down => {
-            move_selection(&list_for_keys, 1);
-            glib::Propagation::Stop
-        }
-        gtk::gdk::Key::Up => {
-            move_selection(&list_for_keys, -1);
-            glib::Propagation::Stop
-        }
-        _ => glib::Propagation::Proceed,
-    });
-    search.add_controller(keys);
-
-    let window_for_escape = window.downgrade();
-    let escape = gtk::EventControllerKey::new();
-    escape.connect_key_pressed(move |_, keyval, _, _| {
-        if keyval == gtk::gdk::Key::Escape {
-            if let Some(window) = window_for_escape.upgrade() {
-                window.close();
-            }
-            return glib::Propagation::Stop;
-        }
-        glib::Propagation::Proceed
-    });
-    window.add_controller(escape);
-
+    connect_switcher_actions(&search, &list, rebuild, activate);
+    connect_switcher_keys(&window, &search, &list);
     crate::ui::leak_probe::track("quick_switcher", &window);
     window.present();
     search.grab_focus();

@@ -74,6 +74,22 @@ impl LiveSession {
         }))
     }
 
+    pub fn with_driver_id(self: &Arc<Self>, driver_id: &str) -> Arc<Self> {
+        let registry = Arc::new(drivers_registry::default_registry());
+        let sessions = ReadSessionStore::new(registry, Arc::new(DatabaseService::new()));
+        let runtime = tokio::runtime::Builder::new_current_thread().build().unwrap();
+        Arc::new(LiveSession {
+            runtime,
+            sessions,
+            session_id: self.session_id,
+            epoch: AtomicU64::new(0),
+            driver_id: driver_id.to_string(),
+            label: self.label.clone(),
+            tables: self.tables.clone(),
+            supports_snapshot_cursor: self.supports_snapshot_cursor,
+        })
+    }
+
     pub fn run_query(self: &Arc<Self>, sql: &str, max_rows: u64) -> Result<LiveTable, String> {
         self.run_query_controlled(sql, max_rows, &CancellationToken::new())
     }
