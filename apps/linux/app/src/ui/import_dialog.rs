@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use crate::services::csv_import_mappings::{CsvMappingScope, CsvMappingStore};
 use crate::ui::progress_dialog::CancellableDialog;
-use bookie_core::export::CsvDelimiter;
+use bookie_core::export::{CsvDelimiter, CustomDelimiter, CustomDelimiterError};
 use bookie_core::import::{
     CsvFormat, CsvImportOptions, CsvSheet, INFER_SAMPLE_ROWS, MAX_PREVIEW_ROWS, infer_columns, read_csv,
     suggest_mapping,
@@ -170,9 +170,18 @@ impl State {
         if self.suppress_refresh.get() {
             return;
         }
-        let options = self.file.options();
         self.ready_generation.set(None);
         self.set_start_sensitive(false);
+        if let Err(error) = self.file.custom_delimiter_choice() {
+            self.file.custom_delimiter.add_css_class("error");
+            self.preview_status
+                .set_text(&crate::ui::custom_delimiter::message(error));
+            self.preview_status.remove_css_class("dim-label");
+            self.preview_status.add_css_class("error");
+            return;
+        }
+        self.file.custom_delimiter.remove_css_class("error");
+        let options = self.file.options();
         self.preview_status
             .set_text(&bookie_app_services::tr!("Preparing CSV preview…"));
         self.preview_status.remove_css_class("error");
@@ -321,6 +330,12 @@ fn connect_refresh(state: &std::rc::Rc<State>) {
             state.refresh();
         }
     });
+    let for_custom = std::rc::Rc::downgrade(state);
+    state.file.custom_delimiter.connect_changed(move |_| {
+        if let Some(state) = for_custom.upgrade() {
+            state.refresh();
+        }
+    });
     let for_quote = std::rc::Rc::downgrade(state);
     state.file.quote.connect_selected_notify(move |_| {
         if let Some(state) = for_quote.upgrade() {
@@ -351,6 +366,7 @@ fn connect_refresh(state: &std::rc::Rc<State>) {
 struct FileOptions {
     group: adw::PreferencesGroup,
     delimiter: adw::ComboRow,
+    custom_delimiter: adw::EntryRow,
     quote: adw::ComboRow,
     backslash: adw::SwitchRow,
     encoding: adw::ComboRow,
@@ -369,6 +385,11 @@ impl FileOptions {
     fn new(request: &ImportRequest) -> Self {
         let group = file_group(&request.path);
         let delimiter = delimiter_row(request.format.delimiter);
+        let custom_delimiter = adw::EntryRow::builder()
+            .title(bookie_app_services::tr!(
+                "Multi-character delimiter (overrides the choice above)"
+            ))
+            .build();
         let header = adw::SwitchRow::builder()
             .title(bookie_app_services::tr!("First row names the columns"))
             .active(request.format.has_header)
@@ -387,7 +408,15 @@ impl FileOptions {
             &bookie_app_services::tr!("Encoding"),
             &["UTF-8", "Windows-1252", "UTF-16 LE", "UTF-16 BE"],
         );
+        if let Some(detected) = bookie_core::import::detect_custom_delimiter(&request.bytes) {
+            custom_delimiter.set_text(detected.as_str());
+            header.set_active(bookie_core::import::detect_header_with_custom_delimiter(
+                &request.bytes,
+                &detected,
+            ));
+        }
         group.add(&delimiter);
+        group.add(&custom_delimiter);
         group.add(&quote);
         group.add(&backslash);
         group.add(&encoding);
@@ -396,6 +425,7 @@ impl FileOptions {
         Self {
             group,
             delimiter,
+            custom_delimiter,
             quote,
             backslash,
             encoding,
@@ -404,10 +434,14 @@ impl FileOptions {
         }
     }
 
+    fn custom_delimiter_choice(&self) -> Result<Option<CustomDelimiter>, CustomDelimiterError> {
+        crate::ui::custom_delimiter::parse(self.custom_delimiter.text().as_str())
+    }
+
     fn options(&self) -> CsvImportOptions {
         CsvImportOptions {
             delimiter: selected_delimiter(self.delimiter.selected()),
-            custom_delimiter: None,
+            custom_delimiter: self.custom_delimiter_choice().ok().flatten(),
             quote: CsvImportQuote::ALL
                 .get(self.quote.selected() as usize)
                 .copied()

@@ -133,6 +133,7 @@ pub struct BrowseTab {
     /// Type and editability changes can require a rebuild even when the
     /// number of columns stays the same (for example, MongoDB page types).
     rendered_columns: Vec<ColumnInfo>,
+    row_number_base: std::rc::Rc<std::cell::Cell<u64>>,
     /// Persistent-state banners (per HIG: banners for state, toasts
     /// for events). Pending-changes is communicated through the
     /// ActionBar footer + tab-title bullet, not a banner — the banner
@@ -963,6 +964,7 @@ impl SimpleComponent for BrowseTab {
             grid_holder,
             current_column_view: None,
             rendered_columns: Vec::new(),
+            row_number_base: Default::default(),
             read_only_banner,
             no_pk_banner,
             view_restriction: None,

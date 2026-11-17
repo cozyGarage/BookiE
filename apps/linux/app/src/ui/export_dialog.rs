@@ -5,7 +5,7 @@ pub(crate) use scope::ExportScope;
 pub(crate) use spool::spool_export_factory;
 
 use bookie_core::QueryResult;
-use bookie_core::export::{ExportError, RowPage};
+use bookie_core::export::{CustomDelimiter, CustomDelimiterError, ExportError, RowPage};
 use relm4::adw::prelude::*;
 use relm4::gtk::gio;
 use relm4::{adw, gtk};
@@ -323,6 +323,7 @@ struct CsvControls {
     include_header: adw::SwitchRow,
     safe_csv: adw::SwitchRow,
     spare_numbers: adw::SwitchRow,
+    custom_delimiter: adw::EntryRow,
 }
 
 fn build_csv_group(preferences: &PreferencesStore, null_marker: &str, json: bool) -> CsvControls {
@@ -360,20 +361,23 @@ fn build_csv_group(preferences: &PreferencesStore, null_marker: &str, json: bool
     null_marker_row.set_text(null_marker);
     null_marker_row.set_editable(false);
     group.add(&null_marker_row);
+    let custom_delimiter = adw::EntryRow::builder()
+        .title(bookie_app_services::tr!("Multi-character delimiter (optional)"))
+        .build();
+    group.add(&custom_delimiter);
     group.set_visible(!json);
     CsvControls {
         group,
         include_header,
         safe_csv,
         spare_numbers,
+        custom_delimiter,
     }
 }
 
-fn build_footer(
-    include_header: &adw::SwitchRow,
-    safe_csv: &adw::SwitchRow,
-    spare_numbers: &adw::SwitchRow,
-) -> (gtk::Box, gtk::Button) {
+fn build_footer(csv: &CsvControls) -> (gtk::Box, gtk::Button) {
+    let (include_header, safe_csv, spare_numbers) = (&csv.include_header, &csv.safe_csv, &csv.spare_numbers);
+    let custom_delimiter = csv.custom_delimiter.clone();
     let reset_button = gtk::Button::builder()
         .label(bookie_app_services::tr!("Reset to Defaults"))
         .build();
@@ -385,6 +389,7 @@ fn build_footer(
         include_header_for_reset.set_active(true);
         safe_csv_for_reset.set_active(true);
         spare_numbers_for_reset.set_active(false);
+        custom_delimiter.set_text("");
     });
 
     let export_button = gtk::Button::builder()
@@ -429,19 +434,49 @@ fn wire_export_signals(
     });
 }
 
-fn wire_scope_sensitivity(
+fn custom_delimiter_choice(row: &adw::EntryRow) -> Result<Option<CustomDelimiter>, CustomDelimiterError> {
+    super::custom_delimiter::parse(row.text().as_str())
+}
+
+fn wire_export_sensitivity(
     scope_choice: &Option<adw::ComboRow>,
     full_export_available: bool,
+    csv: &CsvControls,
     export_button: &gtk::Button,
 ) {
-    if let Some(choice) = scope_choice.as_ref() {
+    let update = {
+        let scope_choice = scope_choice.clone();
+        let custom_delimiter = csv.custom_delimiter.clone();
+        let group = csv.group.clone();
         let export_button = export_button.downgrade();
-        choice.connect_selected_notify(move |choice| {
-            if let Some(export_button) = export_button.upgrade() {
-                export_button.set_sensitive(choice.selected() == 0 || full_export_available);
+        std::rc::Rc::new(move || {
+            let Some(export_button) = export_button.upgrade() else {
+                return;
+            };
+            let scope_ok = scope_choice
+                .as_ref()
+                .is_none_or(|choice| choice.selected() == 0 || full_export_available);
+            let delimiter = custom_delimiter_choice(&custom_delimiter);
+            match &delimiter {
+                Err(error) => {
+                    custom_delimiter.add_css_class("error");
+                    custom_delimiter.set_tooltip_text(Some(&super::custom_delimiter::message(*error)));
+                }
+                Ok(_) => {
+                    custom_delimiter.remove_css_class("error");
+                    custom_delimiter.set_tooltip_text(None);
+                }
             }
-        });
+            export_button.set_sensitive(scope_ok && (delimiter.is_ok() || !group.is_visible()));
+        })
+    };
+    if let Some(choice) = scope_choice.as_ref() {
+        let update = update.clone();
+        choice.connect_selected_notify(move |_| update());
     }
+    let for_text = update.clone();
+    csv.custom_delimiter.connect_changed(move |_| for_text());
+    csv.group.connect_visible_notify(move |_| update());
 }
 
 struct ExportActionParams {
@@ -453,6 +488,7 @@ struct ExportActionParams {
     include_header: adw::SwitchRow,
     safe_csv: adw::SwitchRow,
     spare_numbers: adw::SwitchRow,
+    custom_delimiter: adw::EntryRow,
     null_marker: String,
     sql_target: adw::EntryRow,
     suggested_name: String,
@@ -500,6 +536,7 @@ fn attach_export_action(
                 include_header,
                 sanitize_formulas: params.safe_csv.is_active(),
                 spare_plain_numbers: params.spare_numbers.is_active(),
+                custom_delimiter: custom_delimiter_choice(&params.custom_delimiter).ok().flatten(),
                 null_marker: if all_rows {
                     "\\N".to_string()
                 } else {
@@ -567,8 +604,8 @@ fn present_export(
 
     wire_export_signals(preferences, &csv, &sql_group, &formats, &format_row);
 
-    let (footer, export_button) = build_footer(&csv.include_header, &csv.safe_csv, &csv.spare_numbers);
-    wire_scope_sensitivity(&scope_choice, full_export.is_some(), &export_button);
+    let (footer, export_button) = build_footer(&csv);
+    wire_export_sensitivity(&scope_choice, full_export.is_some(), &csv, &export_button);
     let dialog = build_export_dialog(&page, &footer, &export_button);
 
     let action_params = ExportActionParams {
@@ -580,6 +617,7 @@ fn present_export(
         include_header: csv.include_header,
         safe_csv: csv.safe_csv,
         spare_numbers: csv.spare_numbers,
+        custom_delimiter: csv.custom_delimiter,
         null_marker,
         sql_target,
         suggested_name,
@@ -601,6 +639,7 @@ struct SaveRequest {
     include_header: bool,
     sanitize_formulas: bool,
     spare_plain_numbers: bool,
+    custom_delimiter: Option<CustomDelimiter>,
     null_marker: String,
     sql_target: String,
 }
@@ -628,6 +667,7 @@ fn save_with_file_dialog(parent: &adw::ApplicationWindow, toast_overlay: &adw::T
         include_header,
         sanitize_formulas,
         spare_plain_numbers,
+        custom_delimiter,
         null_marker,
         sql_target,
     } = request;
@@ -655,6 +695,7 @@ fn save_with_file_dialog(parent: &adw::ApplicationWindow, toast_overlay: &adw::T
             header_row: include_header,
             sanitize_formulas,
             spare_plain_numbers,
+            custom_delimiter,
             preserve_sqlite_result_types: driver_id == "sqlite",
             null_marker: Some(null_marker),
             ..Default::default()

@@ -497,3 +497,13 @@ fn a_single_byte_file_reads_the_same_with_and_without_the_custom_path() {
     let through_custom = read_custom(text, ",");
     assert_eq!(plain, through_custom);
 }
+
+#[test]
+fn a_header_is_detected_with_a_custom_delimiter() {
+    let delimiter = CustomDelimiter::new("||").unwrap();
+    assert!(detect_header_with_custom_delimiter(
+        b"id||name\n1||ada\n2||grace\n",
+        &delimiter
+    ));
+    assert!(!detect_header_with_custom_delimiter(b"1||ada\n2||grace\n", &delimiter));
+}
