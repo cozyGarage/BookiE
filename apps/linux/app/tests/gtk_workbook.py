@@ -30,7 +30,7 @@ def assert_workbook(cells):
     assert [Decimal(cells[f"A{row}"][1]) for row in range(2, 102)] == list(range(1, 101))
     assert "A102" not in cells, "export included a row outside the current page"
     for cell, expected in {
-        "B2": '=1+1 & "東京"', "C2": "9223372036854775807", "D2": "0000-01-01",
+        "B2": '=1+1 & "東京"', "C2": "9223372036854775807", "D2": "0001-01-01 BC",
         "E2": "12:34:56.123456789", "F2": "2026-09-27 12:34:56.123456789",
         "C3": "-9223372036854775808", "G2": "inf",
         "D5": "+10000-01-01", "F5": "+10000-01-01 00:00:00",
