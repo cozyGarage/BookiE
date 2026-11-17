@@ -9,6 +9,7 @@ pub(crate) mod connection_bundle;
 mod connection_row;
 mod context_menu;
 mod count_format;
+mod custom_delimiter;
 mod diagram;
 mod editor;
 mod explain_dialog;
