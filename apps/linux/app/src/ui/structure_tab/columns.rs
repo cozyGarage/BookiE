@@ -9,72 +9,82 @@ use bookie_core::sql_ddl::{ColumnCommentCapability, DraftColumn};
 
 use super::{ColumnField, StructureTab, StructureTabInput};
 
+const POSTGRES_TYPES: &[&str] = &[
+    "integer",
+    "bigint",
+    "smallint",
+    "text",
+    "varchar(255)",
+    "boolean",
+    "timestamp",
+    "timestamp with time zone",
+    "date",
+    "time",
+    "numeric(10, 2)",
+    "real",
+    "double precision",
+    "uuid",
+    "jsonb",
+    "json",
+    "bytea",
+    "serial",
+    "bigserial",
+];
+
+const MYSQL_TYPES: &[&str] = &[
+    "INT",
+    "BIGINT",
+    "SMALLINT",
+    "TINYINT",
+    "VARCHAR(255)",
+    "TEXT",
+    "BOOLEAN",
+    "DATETIME",
+    "TIMESTAMP",
+    "DATE",
+    "TIME",
+    "DECIMAL(10, 2)",
+    "FLOAT",
+    "DOUBLE",
+    "JSON",
+    "BLOB",
+    "CHAR(36)",
+];
+
+const SQLITE_TYPES: &[&str] = &[
+    "INTEGER", "TEXT", "REAL", "BLOB", "NUMERIC", "BOOLEAN", "DATETIME", "DATE",
+];
+
+const MSSQL_TYPES: &[&str] = &[
+    "int",
+    "bigint",
+    "smallint",
+    "tinyint",
+    "bit",
+    "nvarchar(255)",
+    "nvarchar(max)",
+    "varchar(255)",
+    "decimal(18, 2)",
+    "float",
+    "real",
+    "money",
+    "date",
+    "time",
+    "datetime2",
+    "datetimeoffset",
+    "uniqueidentifier",
+    "varbinary(max)",
+];
+
+const DEFAULT_TYPES: &[&str] = &["TEXT"];
+
 pub(super) fn driver_types(driver_id: &str) -> &'static [&'static str] {
     match driver_id {
-        "postgres" => &[
-            "integer",
-            "bigint",
-            "smallint",
-            "text",
-            "varchar(255)",
-            "boolean",
-            "timestamp",
-            "timestamp with time zone",
-            "date",
-            "time",
-            "numeric(10, 2)",
-            "real",
-            "double precision",
-            "uuid",
-            "jsonb",
-            "json",
-            "bytea",
-            "serial",
-            "bigserial",
-        ],
-        "mysql" => &[
-            "INT",
-            "BIGINT",
-            "SMALLINT",
-            "TINYINT",
-            "VARCHAR(255)",
-            "TEXT",
-            "BOOLEAN",
-            "DATETIME",
-            "TIMESTAMP",
-            "DATE",
-            "TIME",
-            "DECIMAL(10, 2)",
-            "FLOAT",
-            "DOUBLE",
-            "JSON",
-            "BLOB",
-            "CHAR(36)",
-        ],
-        "sqlite" => &[
-            "INTEGER", "TEXT", "REAL", "BLOB", "NUMERIC", "BOOLEAN", "DATETIME", "DATE",
-        ],
-        "mssql" => &[
-            "int",
-            "bigint",
-            "smallint",
-            "tinyint",
-            "bit",
-            "nvarchar(255)",
-            "nvarchar(max)",
-            "varchar(255)",
-            "decimal(18, 2)",
-            "float",
-            "real",
-            "money",
-            "date",
-            "time",
-            "datetime2",
-            "datetimeoffset",
-            "uniqueidentifier",
-            "varbinary(max)",
-        ],
-        _ => &["TEXT"],
+        "postgres" => POSTGRES_TYPES,
+        "mysql" => MYSQL_TYPES,
+        "sqlite" => SQLITE_TYPES,
+        "mssql" => MSSQL_TYPES,
+        _ => DEFAULT_TYPES,
     }
 }
 
@@ -186,6 +196,50 @@ pub(super) fn build_column_expander_row(
     remove_button.connect_clicked(move |_| sender_for_remove.input(StructureTabInput::RemoveColumn(index)));
     row.add_suffix(&remove_button);
 
+    add_name_and_type_rows(
+        &row,
+        index,
+        col,
+        driver_id,
+        limit_for_existing,
+        &sender,
+        &suppress_emit,
+        &popover_registry,
+    );
+    add_nullable_and_default_rows(
+        &row,
+        index,
+        col,
+        driver_id,
+        limit_for_existing,
+        &sender,
+        &suppress_emit,
+    );
+    add_key_and_increment_rows(&row, index, col, &sender, &suppress_emit);
+
+    add_collation_row(
+        &row,
+        index,
+        col,
+        editing.collations,
+        sender.clone(),
+        suppress_emit.clone(),
+    );
+    add_comment_row(&row, index, col, editing.comment_capability, sender, suppress_emit);
+
+    row
+}
+
+fn add_name_and_type_rows(
+    row: &adw::ExpanderRow,
+    index: usize,
+    col: &DraftColumn,
+    driver_id: &str,
+    limit_for_existing: bool,
+    sender: &ComponentSender<StructureTab>,
+    suppress_emit: &Rc<Cell<bool>>,
+    popover_registry: &Rc<RefCell<Vec<gtk::Popover>>>,
+) {
     let name_row = adw::EntryRow::builder().title(bookie_app_services::tr!("Name")).build();
     name_row.set_text(&col.name);
     name_row.set_widget_name(&format!("col-name-{index}"));
@@ -230,7 +284,17 @@ pub(super) fn build_column_expander_row(
         popover_registry.borrow_mut().push(suggestions_popover);
     }
     row.add_row(&type_row);
+}
 
+fn add_nullable_and_default_rows(
+    row: &adw::ExpanderRow,
+    index: usize,
+    col: &DraftColumn,
+    driver_id: &str,
+    limit_for_existing: bool,
+    sender: &ComponentSender<StructureTab>,
+    suppress_emit: &Rc<Cell<bool>>,
+) {
     let nullable_row = adw::SwitchRow::builder()
         .title(bookie_app_services::tr!("Nullable"))
         .active(col.nullable)
@@ -278,7 +342,15 @@ pub(super) fn build_column_expander_row(
         });
     });
     row.add_row(&default_row);
+}
 
+fn add_key_and_increment_rows(
+    row: &adw::ExpanderRow,
+    index: usize,
+    col: &DraftColumn,
+    sender: &ComponentSender<StructureTab>,
+    suppress_emit: &Rc<Cell<bool>>,
+) {
     let pk_row = adw::SwitchRow::builder()
         .title(bookie_app_services::tr!("Primary key"))
         .active(col.primary_key)
@@ -318,18 +390,6 @@ pub(super) fn build_column_expander_row(
         });
     });
     row.add_row(&auto_row);
-
-    add_collation_row(
-        &row,
-        index,
-        col,
-        editing.collations,
-        sender.clone(),
-        suppress_emit.clone(),
-    );
-    add_comment_row(&row, index, col, editing.comment_capability, sender, suppress_emit);
-
-    row
 }
 
 pub(super) fn collation_choices(collations: &[String], current: Option<&str>) -> Vec<String> {

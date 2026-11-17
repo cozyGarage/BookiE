@@ -63,6 +63,31 @@ fn present(
         "Search columns"
     ))]);
     content.append(&search);
+
+    let (list, choices) = build_choices_list(names);
+    let empty = gtk::Label::new(Some(&bookie_app_services::tr!("No matching columns")));
+    empty.set_visible(false);
+    content.append(&empty);
+    content.append(
+        &gtk::ScrolledWindow::builder()
+            .child(&list)
+            .vexpand(true)
+            .margin_start(12)
+            .margin_end(12)
+            .margin_bottom(12)
+            .build(),
+    );
+
+    wire_search_input(&search, &list, &empty, Rc::new(choices), &dialog);
+    wire_dialog_lifecycle(&dialog, view, &list, columns, connection, database);
+
+    dialog.set_child(Some(&content));
+    crate::ui::leak_probe::track("column_jump", &dialog);
+    dialog.present(Some(view));
+    search.grab_focus();
+}
+
+fn build_choices_list(names: &[String]) -> (gtk::ListBox, Vec<(gtk::ListBoxRow, String)>) {
     let list = gtk::ListBox::builder()
         .selection_mode(gtk::SelectionMode::Single)
         .activate_on_single_click(true)
@@ -89,22 +114,20 @@ fn present(
         })
         .collect::<Vec<_>>();
     list.select_row(list.row_at_index(0).as_ref());
-    let empty = gtk::Label::new(Some(&bookie_app_services::tr!("No matching columns")));
-    empty.set_visible(false);
-    content.append(&empty);
-    content.append(
-        &gtk::ScrolledWindow::builder()
-            .child(&list)
-            .vexpand(true)
-            .margin_start(12)
-            .margin_end(12)
-            .margin_bottom(12)
-            .build(),
-    );
-    let choices = Rc::new(choices);
+    (list, choices)
+}
+
+fn wire_search_input(
+    search: &gtk::SearchEntry,
+    list: &gtk::ListBox,
+    empty: &gtk::Label,
+    choices: Rc<Vec<(gtk::ListBoxRow, String)>>,
+    dialog: &adw::Dialog,
+) {
     search.connect_search_changed({
         let list = list.clone();
         let choices = choices.clone();
+        let empty = empty.clone();
         move |search| {
             let needle = search.text().to_lowercase();
             let mut first = None;
@@ -156,8 +179,18 @@ fn present(
         }
     });
     search.add_controller(keys);
+}
+
+fn wire_dialog_lifecycle(
+    dialog: &adw::Dialog,
+    view: &gtk::ColumnView,
+    list: &gtk::ListBox,
+    columns: Rc<Vec<glib::WeakRef<gtk::ColumnViewColumn>>>,
+    connection: Option<uuid::Uuid>,
+    database: Arc<DatabaseService>,
+) {
     let selected_column: Rc<std::cell::RefCell<Option<glib::WeakRef<gtk::ColumnViewColumn>>>> = Rc::default();
-    super::dialog_focus::restore_on_close(&dialog, view, {
+    super::dialog_focus::restore_on_close(dialog, view, {
         let selected_column = selected_column.clone();
         let database = database.clone();
         move |view| {
@@ -206,10 +239,6 @@ fn present(
             }
         }
     });
-    dialog.set_child(Some(&content));
-    crate::ui::leak_probe::track("column_jump", &dialog);
-    dialog.present(Some(view));
-    search.grab_focus();
 }
 
 fn reveal(view: &gtk::ColumnView, column: &gtk::ColumnViewColumn) -> bool {

@@ -27,6 +27,12 @@ pub(crate) enum StructureText {
     JoinSkeleton,
 }
 
+enum StructureSaveKind {
+    PromoteNewToTable(Option<String>, String),
+    UpdateInPlace(Option<String>, String),
+    Skip,
+}
+
 impl App {
     pub(super) fn on_show_er_diagram(&self, schema: Option<String>) {
         crate::ui::diagram::present(
@@ -502,43 +508,16 @@ impl App {
         }
     }
 
-    /// Run transactional DDL as one batch; run non-transactional DDL sequentially.
-    pub(super) fn on_execute_structure_transaction(
-        &mut self,
-        tab_id: Uuid,
-        statements: Vec<String>,
-        sender: ComponentSender<Self>,
-    ) {
-        // Prevent concurrent saves from committing the same DDL twice.
-        if !self.structure_saves_in_flight.borrow_mut().insert(tab_id) {
-            tracing::debug!(?tab_id, "structure save already in flight; ignoring duplicate");
-            return;
-        }
-        let Some(driver_id) = self.tab_driver_id(tab_id) else {
-            self.structure_saves_in_flight.borrow_mut().remove(&tab_id);
-            self.report_refused_tab_save(tab_id, &sender);
-            return;
-        };
+    fn resolve_structure_save_target(&self, tab_id: Uuid) -> Option<(bool, Option<String>)> {
+        let driver_id = self.tab_driver_id(tab_id)?;
         let ddl_is_transactional = self
             .registry
             .get(&driver_id)
             .is_some_and(|driver| driver.capabilities().ddl_is_transactional);
-        let mode = {
-            let tabs = self.workspace_tabs.borrow();
-            let Some(slot) = tabs.get(&tab_id) else {
-                self.structure_saves_in_flight.borrow_mut().remove(&tab_id);
-                return;
-            };
-            match slot {
-                WorkspaceTab::Structure(s) => s.mode,
-                // A table-tab save is stale because DDL now uses Structure tabs.
-                _ => {
-                    self.structure_saves_in_flight.borrow_mut().remove(&tab_id);
-                    return;
-                }
-            }
+        let mode = match self.workspace_tabs.borrow().get(&tab_id)? {
+            WorkspaceTab::Structure(s) => s.mode,
+            _ => return None,
         };
-        // The first CreateTable op carries the name for a new-table draft.
         let new_table_name = if matches!(mode, StructureMode::New) {
             self.structure_trackers
                 .with_tab_ref(tab_id, |t| {
@@ -554,7 +533,28 @@ impl App {
         } else {
             None
         };
+        Some((ddl_is_transactional, new_table_name))
+    }
 
+    /// Run transactional DDL as one batch; run non-transactional DDL sequentially.
+    pub(super) fn on_execute_structure_transaction(
+        &mut self,
+        tab_id: Uuid,
+        statements: Vec<String>,
+        sender: ComponentSender<Self>,
+    ) {
+        // Prevent concurrent saves from committing the same DDL twice.
+        if !self.structure_saves_in_flight.borrow_mut().insert(tab_id) {
+            tracing::debug!(?tab_id, "structure save already in flight; ignoring duplicate");
+            return;
+        }
+        let Some((ddl_is_transactional, new_table_name)) = self.resolve_structure_save_target(tab_id) else {
+            self.structure_saves_in_flight.borrow_mut().remove(&tab_id);
+            if self.tab_driver_id(tab_id).is_none() {
+                self.report_refused_tab_save(tab_id, &sender);
+            }
+            return;
+        };
         let Some(origin) = self.tab_origin(tab_id) else {
             self.structure_saves_in_flight.borrow_mut().remove(&tab_id);
             sender.input(AppMsg::StructureSaveFailed(
@@ -565,7 +565,7 @@ impl App {
         };
         self.in_flight_saves.set(self.in_flight_saves.get() + 1);
         let sender_for_cmd = sender.clone();
-        let mut recorded = self.ran_statements(tab_id, Source::Structure, &statements);
+        let recorded = self.ran_statements(tab_id, Source::Structure, &statements);
         let connection = origin.connection(&self.database);
         let timeout_secs = self.tab_timeout_secs(tab_id);
         sender.command(move |_, shutdown| {
@@ -578,32 +578,18 @@ impl App {
                         ));
                         return;
                     };
-                    let control = crate::services::operation_control::bounded(timeout_secs);
-                    if ddl_is_transactional {
-                        let batch: Vec<(String, Vec<Value>)> =
-                            statements.iter().map(|sql| (sql.clone(), Vec::new())).collect();
-                        if let Err(e) = conn.execute_in_transaction_controlled(&batch, &control).await {
-                            let msg = error_text::driver_message(&e);
-                            finish_if_recorded(&mut recorded, Outcome::Error(msg.clone())).await;
-                            sender_for_cmd.input(AppMsg::StructureSaveFailed(tab_id, msg));
-                            return;
-                        }
-                    } else {
-                        for sql in &statements {
-                            if let Err(e) = conn.execute_controlled(sql, &control).await {
-                                let msg = error_text::driver_message(&e);
-                                finish_if_recorded(&mut recorded, Outcome::Error(msg.clone())).await;
-                                sender_for_cmd.input(AppMsg::StructureSaveFailed(tab_id, msg));
-                                return;
-                            }
-                        }
-                    }
-                    finish_if_recorded(&mut recorded, Outcome::Success).await;
-                    sender_for_cmd.input(AppMsg::StructureSaveCompleted {
-                        origin: Some(origin.clone()),
+                    execute_structure_statements(
+                        conn,
+                        statements,
+                        ddl_is_transactional,
+                        timeout_secs,
+                        recorded,
                         tab_id,
-                        new_table_name: new_table_name.clone(),
-                    });
+                        origin,
+                        new_table_name,
+                        sender_for_cmd,
+                    )
+                    .await;
                 })
                 .drop_on_shutdown()
         });
@@ -625,26 +611,42 @@ impl App {
             return;
         };
 
-        enum SaveKind {
-            PromoteNewToTable(Option<String>, String),
-            UpdateInPlace(Option<String>, String),
-            Skip,
-        }
         let kind = {
             let tabs = self.workspace_tabs.borrow();
             match tabs.get(&tab_id) {
                 Some(WorkspaceTab::Structure(slot)) => match new_table_name.clone() {
-                    Some(name) => SaveKind::PromoteNewToTable(slot.schema.clone(), name),
-                    None => SaveKind::UpdateInPlace(slot.schema.clone(), slot.table.clone()),
+                    Some(name) => StructureSaveKind::PromoteNewToTable(slot.schema.clone(), name),
+                    None => StructureSaveKind::UpdateInPlace(slot.schema.clone(), slot.table.clone()),
                 },
-                Some(WorkspaceTab::Table(slot)) => SaveKind::UpdateInPlace(slot.schema.clone(), slot.table.clone()),
-                _ => SaveKind::Skip,
+                Some(WorkspaceTab::Table(slot)) => StructureSaveKind::UpdateInPlace(slot.schema.clone(), slot.table.clone()),
+                _ => StructureSaveKind::Skip,
             }
         };
 
-        let kind_promoted = matches!(kind, SaveKind::PromoteNewToTable(..));
+        let kind_promoted = matches!(kind, StructureSaveKind::PromoteNewToTable(..));
+        self.apply_structure_save_kind(kind, tab_id, new_table_name, &origin, &sender);
+
+        // Consume close-after-save state even when a new-table draft was already closed.
+        let drained = self.close_after_save.borrow_mut().complete(&tab_id);
+        if drained && !kind_promoted {
+            self.request_workspace_tab_close(tab_id);
+        }
+        if self.close_window_after_save.get() && self.close_after_save.borrow().is_empty() {
+            self.close_window_after_save.set(false);
+            self.window.close();
+        }
+    }
+
+    fn apply_structure_save_kind(
+        &mut self,
+        kind: StructureSaveKind,
+        tab_id: Uuid,
+        new_table_name: Option<String>,
+        origin: &CatalogOrigin,
+        sender: &ComponentSender<Self>,
+    ) {
         match kind {
-            SaveKind::PromoteNewToTable(schema, name) => {
+            StructureSaveKind::PromoteNewToTable(schema, name) => {
                 if let Some(tab_view) = self.workspace_tab_view.clone() {
                     self.finish_close_workspace_tab_now(tab_id, &tab_view);
                 }
@@ -661,7 +663,7 @@ impl App {
                     origin: origin.clone(),
                 });
             }
-            SaveKind::UpdateInPlace(schema, table) => {
+            StructureSaveKind::UpdateInPlace(schema, table) => {
                 if let Some(controller) = self
                     .workspace_tabs
                     .borrow()
@@ -678,17 +680,7 @@ impl App {
                     origin: origin.clone(),
                 });
             }
-            SaveKind::Skip => {}
-        }
-
-        // Consume close-after-save state even when a new-table draft was already closed.
-        let drained = self.close_after_save.borrow_mut().complete(&tab_id);
-        if drained && !kind_promoted {
-            self.request_workspace_tab_close(tab_id);
-        }
-        if self.close_window_after_save.get() && self.close_after_save.borrow().is_empty() {
-            self.close_window_after_save.set(false);
-            self.window.close();
+            StructureSaveKind::Skip => {}
         }
     }
 
@@ -781,77 +773,19 @@ impl App {
                         return;
                     };
                     let control = crate::services::operation_control::bounded(timeout_secs);
-                    let columns = match conn
-                        .fetch_columns_controlled(schema_for_cmd.as_deref(), &table_for_cmd, &control)
-                        .await
+                    let op = match fetch_create_table_op(
+                        conn.as_ref(),
+                        schema_for_cmd.as_deref(),
+                        &table_for_cmd,
+                        &control,
+                    )
+                    .await
                     {
-                        Ok(c) => c,
-                        Err(e) => {
-                            sender_for_cmd.input(AppMsg::ShowToast(
-                                bookie_app_services::tr!("Couldn't read columns: {error}")
-                                    .replace("{error}", &format!("{e}")),
-                            ));
+                        Ok(op) => op,
+                        Err(msg) => {
+                            sender_for_cmd.input(AppMsg::ShowToast(msg));
                             return;
                         }
-                    };
-                    if columns.is_empty() {
-                        sender_for_cmd.input(AppMsg::ShowToast(
-                            bookie_app_services::tr!("Table {table} has no columns.")
-                                .replace("{table}", &table_for_cmd),
-                        ));
-                        return;
-                    }
-                    if let Err(e) = bookie_core::check_pre_dispatch(&control) {
-                        sender_for_cmd.input(AppMsg::ShowToast(
-                            bookie_app_services::tr!("Couldn't read indexes: {error}")
-                                .replace("{error}", &format!("{e}")),
-                        ));
-                        return;
-                    }
-                    let indexes = match conn
-                        .fetch_indexes_controlled(schema_for_cmd.as_deref(), &table_for_cmd, &control)
-                        .await
-                    {
-                        Ok(indexes) => indexes,
-                        Err(e) => {
-                            sender_for_cmd.input(AppMsg::ShowToast(
-                                bookie_app_services::tr!("Couldn't read indexes: {error}")
-                                    .replace("{error}", &format!("{e}")),
-                            ));
-                            return;
-                        }
-                    };
-                    if let Err(e) = bookie_core::check_pre_dispatch(&control) {
-                        sender_for_cmd.input(AppMsg::ShowToast(
-                            bookie_app_services::tr!("Couldn't read foreign keys: {error}")
-                                .replace("{error}", &format!("{e}")),
-                        ));
-                        return;
-                    }
-                    let fks = match conn
-                        .fetch_foreign_keys_controlled(schema_for_cmd.as_deref(), &table_for_cmd, &control)
-                        .await
-                    {
-                        Ok(fks) => fks,
-                        Err(e) => {
-                            sender_for_cmd.input(AppMsg::ShowToast(
-                                bookie_app_services::tr!("Couldn't read foreign keys: {error}")
-                                    .replace("{error}", &format!("{e}")),
-                            ));
-                            return;
-                        }
-                    };
-                    // Preserve fetched metadata so generated SQL retains driver-specific types and defaults.
-                    let op = bookie_core::sql_ddl::StructureOp::CreateTable {
-                        schema: schema_for_cmd.clone(),
-                        table: table_for_cmd.clone(),
-                        columns: columns
-                            .into_iter()
-                            .map(bookie_core::sql_ddl::DraftColumn::from_info)
-                            .collect(),
-                        indexes,
-                        fks,
-                        default_collation: None,
                     };
                     match bookie_core::sql_ddl::materialize_ops(&[op], &driver_id) {
                         Ok(stmts) if !stmts.is_empty() => {
@@ -908,46 +842,17 @@ impl App {
                         });
                         return;
                     };
-                    let control = crate::services::operation_control::bounded_with(timeout_secs, token);
-                    let fail = |message: String| {
-                        if !control.cancellation_token().is_cancelled() {
-                            sender_for_cmd.input(AppMsg::StructureLoadFailed { tab_id, message });
-                        }
-                    };
-                    let columns = match conn.fetch_columns_controlled(schema.as_deref(), &table, &control).await {
-                        Ok(c) => c,
-                        Err(e) => {
-                            fail(format!("{e}"));
-                            return;
-                        }
-                    };
-                    if let Err(e) = bookie_core::check_pre_dispatch(&control) {
-                        fail(format!("{e}"));
-                        return;
-                    }
-                    let metadata = match bookie_app_services::structure_metadata::load_structure_metadata(
+                    execute_fetch_structure_data(
                         conn.as_ref(),
-                        schema.as_deref(),
-                        &table,
-                        capabilities,
-                        &control,
-                    )
-                    .await
-                    {
-                        Ok(metadata) => metadata,
-                        Err(e) => {
-                            fail(format!("{e}"));
-                            return;
-                        }
-                    };
-                    if control.cancellation_token().is_cancelled() {
-                        return;
-                    }
-                    sender_for_cmd.input(AppMsg::StructureDataLoaded {
                         tab_id,
-                        columns,
-                        metadata,
-                    });
+                        schema,
+                        table,
+                        capabilities,
+                        timeout_secs,
+                        token,
+                        sender_for_cmd,
+                    )
+                    .await;
                 })
                 .drop_on_shutdown()
         });
@@ -1153,6 +1058,142 @@ impl App {
         page.set_needs_attention(combined_dirty && !is_selected);
         self.refresh_window_title();
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn execute_structure_statements(
+    conn: std::sync::Arc<dyn bookie_core::Connection>,
+    statements: Vec<String>,
+    ddl_is_transactional: bool,
+    timeout_secs: u32,
+    mut recorded: Option<crate::ui::app::ran_statements::RanStatements>,
+    tab_id: Uuid,
+    origin: CatalogOrigin,
+    new_table_name: Option<String>,
+    sender: ComponentSender<App>,
+) {
+    let control = crate::services::operation_control::bounded(timeout_secs);
+    if ddl_is_transactional {
+        let batch: Vec<(String, Vec<Value>)> =
+            statements.iter().map(|sql| (sql.clone(), Vec::new())).collect();
+        if let Err(e) = conn.execute_in_transaction_controlled(&batch, &control).await {
+            let msg = error_text::driver_message(&e);
+            finish_if_recorded(&mut recorded, Outcome::Error(msg.clone())).await;
+            sender.input(AppMsg::StructureSaveFailed(tab_id, msg));
+            return;
+        }
+    } else {
+        for sql in &statements {
+            if let Err(e) = conn.execute_controlled(sql, &control).await {
+                let msg = error_text::driver_message(&e);
+                finish_if_recorded(&mut recorded, Outcome::Error(msg.clone())).await;
+                sender.input(AppMsg::StructureSaveFailed(tab_id, msg));
+                return;
+            }
+        }
+    }
+    finish_if_recorded(&mut recorded, Outcome::Success).await;
+    sender.input(AppMsg::StructureSaveCompleted {
+        origin: Some(origin),
+        tab_id,
+        new_table_name,
+    });
+}
+
+async fn fetch_create_table_op(
+    conn: &dyn bookie_core::Connection,
+    schema: Option<&str>,
+    table: &str,
+    control: &bookie_core::OperationControl,
+) -> Result<bookie_core::sql_ddl::StructureOp, String> {
+    let columns = match conn.fetch_columns_controlled(schema, table, control).await {
+        Ok(c) => c,
+        Err(e) => {
+            return Err(bookie_app_services::tr!("Couldn't read columns: {error}").replace("{error}", &format!("{e}")));
+        }
+    };
+    if columns.is_empty() {
+        return Err(bookie_app_services::tr!("Table {table} has no columns.").replace("{table}", table));
+    }
+    if let Err(e) = bookie_core::check_pre_dispatch(control) {
+        return Err(bookie_app_services::tr!("Couldn't read indexes: {error}").replace("{error}", &format!("{e}")));
+    }
+    let indexes = match conn.fetch_indexes_controlled(schema, table, control).await {
+        Ok(indexes) => indexes,
+        Err(e) => {
+            return Err(bookie_app_services::tr!("Couldn't read indexes: {error}").replace("{error}", &format!("{e}")));
+        }
+    };
+    if let Err(e) = bookie_core::check_pre_dispatch(control) {
+        return Err(bookie_app_services::tr!("Couldn't read foreign keys: {error}").replace("{error}", &format!("{e}")));
+    }
+    let fks = match conn.fetch_foreign_keys_controlled(schema, table, control).await {
+        Ok(fks) => fks,
+        Err(e) => {
+            return Err(bookie_app_services::tr!("Couldn't read foreign keys: {error}").replace("{error}", &format!("{e}")));
+        }
+    };
+    Ok(bookie_core::sql_ddl::StructureOp::CreateTable {
+        schema: schema.map(str::to_owned),
+        table: table.to_string(),
+        columns: columns.into_iter().map(bookie_core::sql_ddl::DraftColumn::from_info).collect(),
+        indexes,
+        fks,
+        default_collation: None,
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn execute_fetch_structure_data(
+    conn: &dyn bookie_core::Connection,
+    tab_id: Uuid,
+    schema: Option<String>,
+    table: String,
+    capabilities: bookie_core::DriverCapabilities,
+    timeout_secs: u32,
+    token: tokio_util::sync::CancellationToken,
+    sender: ComponentSender<App>,
+) {
+    let control = crate::services::operation_control::bounded_with(timeout_secs, token);
+    let fail = |message: String| {
+        if !control.cancellation_token().is_cancelled() {
+            sender.input(AppMsg::StructureLoadFailed { tab_id, message });
+        }
+    };
+    let columns = match conn.fetch_columns_controlled(schema.as_deref(), &table, &control).await {
+        Ok(c) => c,
+        Err(e) => {
+            fail(format!("{e}"));
+            return;
+        }
+    };
+    if let Err(e) = bookie_core::check_pre_dispatch(&control) {
+        fail(format!("{e}"));
+        return;
+    }
+    let metadata = match bookie_app_services::structure_metadata::load_structure_metadata(
+        conn,
+        schema.as_deref(),
+        &table,
+        capabilities,
+        &control,
+    )
+    .await
+    {
+        Ok(metadata) => metadata,
+        Err(e) => {
+            fail(format!("{e}"));
+            return;
+        }
+    };
+    if control.cancellation_token().is_cancelled() {
+        return;
+    }
+    sender.input(AppMsg::StructureDataLoaded {
+        tab_id,
+        columns,
+        metadata,
+    });
 }
 
 fn drop_table_body(referencing: &[String]) -> String {
