@@ -104,7 +104,6 @@ impl DriverError {
         }
     }
 
-    /// True for a server query error that carries exactly this SQLSTATE.
     pub fn has_sqlstate(&self, code: &str) -> bool {
         matches!(self, Self::Query { sqlstate: Some(state), .. } if state == code)
     }

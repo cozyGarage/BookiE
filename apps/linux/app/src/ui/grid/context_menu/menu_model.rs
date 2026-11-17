@@ -1,5 +1,3 @@
-//! Popovers and gio menu models for the grid context menu.
-
 use super::*;
 
 pub(super) fn build_menu_popovers(column_view: &gtk::ColumnView, models: MenuModels) -> MenuPopovers {

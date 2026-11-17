@@ -1,5 +1,3 @@
-//! Mapping of IO, TDS and server failures onto DriverError.
-
 use super::*;
 
 pub(crate) fn map_io_error(e: std::io::Error) -> DriverError {

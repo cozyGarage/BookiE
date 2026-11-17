@@ -1,5 +1,3 @@
-//! Copy-as actions: text, structured and IN-clause.
-
 use super::*;
 
 pub(super) fn add_copy_actions(group: &gio::SimpleActionGroup, setup: &MenuActionSetup) {

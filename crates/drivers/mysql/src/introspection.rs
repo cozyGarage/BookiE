@@ -1,5 +1,3 @@
-//! Catalog reads: collations, databases, columns, indexes, foreign keys and server version.
-
 use super::*;
 
 pub(crate) async fn read_list_collations(

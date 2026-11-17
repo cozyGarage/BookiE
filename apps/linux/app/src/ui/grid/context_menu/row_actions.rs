@@ -1,5 +1,3 @@
-//! Row, mutation, filter and selection actions.
-
 use super::*;
 
 pub(super) fn add_row_actions(group: &gio::SimpleActionGroup, setup: &MenuActionSetup) {
