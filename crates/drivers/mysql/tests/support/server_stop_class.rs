@@ -155,10 +155,14 @@ fn table_metadata_cases() -> Vec<StopCase> {
         sends("fetch_rows_controlled", b"stop_class_rows", |c, control| async move {
             c.fetch_rows_controlled(None, "stop_class_rows", 0, 10, &control).await
         }),
-        sends_nothing("fetch_view_editability_controlled", |c, control| async move {
-            c.fetch_view_editability_controlled(None, "stop_class_rows", &control)
-                .await
-        }),
+        sends(
+            "fetch_view_editability_controlled",
+            b"information_schema.views",
+            |c, control| async move {
+                c.fetch_view_editability_controlled(None, "stop_class_rows", &control)
+                    .await
+            },
+        ),
         sends_nothing("fetch_enum_labels_controlled", |c, control| async move {
             c.fetch_enum_labels_controlled("stop", "mood", &control).await
         }),
