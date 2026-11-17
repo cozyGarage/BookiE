@@ -124,7 +124,7 @@ impl GridView {
                 self.status = "No rows to export".into();
                 return;
             }
-            let rows: Vec<Vec<Cell>> = (first..=last)
+            let rows: Vec<Vec<Cell>> = (first.saturating_sub(1)..last)
                 .map(|idx| {
                     let source = self.source_row(idx);
                     let mut row = self.source.row(source);
