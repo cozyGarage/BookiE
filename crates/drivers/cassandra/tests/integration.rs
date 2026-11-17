@@ -33,10 +33,10 @@ fn is_port_binding_race(error: &str) -> bool {
 async fn start_cassandra() -> (testcontainers::ContainerAsync<GenericImage>, ConnectOptions) {
     started(|| {
         GenericImage::new("cassandra", "5.0")
-            .with_exposed_port(9042.tcp())
             .with_wait_for(WaitFor::message_on_stdout("Starting listening for CQL clients"))
             .with_env_var("MAX_HEAP_SIZE", "512M")
             .with_env_var("HEAP_NEWSIZE", "128M")
+            .with_mapped_port(0, 9042.tcp())
     })
     .await
 }
@@ -44,7 +44,6 @@ async fn start_cassandra() -> (testcontainers::ContainerAsync<GenericImage>, Con
 async fn start_scylla() -> (testcontainers::ContainerAsync<GenericImage>, ConnectOptions) {
     started(|| {
         GenericImage::new("scylladb/scylla", "2025.1")
-            .with_exposed_port(9042.tcp())
             .with_wait_for(WaitFor::message_on_stderr("init - serving"))
             .with_cmd([
                 "--smp",
@@ -56,6 +55,7 @@ async fn start_scylla() -> (testcontainers::ContainerAsync<GenericImage>, Connec
                 "--developer-mode",
                 "1",
             ])
+            .with_mapped_port(0, 9042.tcp())
     })
     .await
 }
