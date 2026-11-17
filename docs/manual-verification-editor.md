@@ -46,6 +46,7 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 ## Editor sessions (PostgreSQL, MySQL, SQL Server and SQLite files)
 
 - [ ] Turn on Session in an editor tab: `SET search_path` and a `CREATE TEMP TABLE` from one run are still in effect on the next run.
+- [ ] On PostgreSQL and a SQLite file, create a temporary table in an editor Session. It appears under Temporary tables and opens its rows in that editor's results. A second session does not list it; switching sessions changes the group, DROP refreshes it, and closing the owning session removes it. Do not treat session-aware Structure editing as implemented.
 - [ ] `BEGIN`, then an `UPDATE` in a later run: the button reads "Session · transaction open"; another tab cannot see the change.
 - [ ] In a MySQL Session transaction, locking reads, `SET @user_variable`, savepoints and supported `SHOW` forms run; raw `BEGIN`, `COMMIT` and `ROLLBACK`, DDL, account statements, `LOCK TABLES` and `SET autocommit` remain refused. Confirm `ROLLBACK` leaves user-variable values unchanged and does not release named locks acquired by functions in assignment expressions; release the lock explicitly.
 - [ ] Turning Session off with a transaction open asks Commit / Roll Back / Cancel, and each does what it says; Cancel leaves the session on.
