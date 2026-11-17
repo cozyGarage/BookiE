@@ -10,14 +10,18 @@ Create `items(id int primary key, name text)`, `v_items` as `SELECT id, name FRO
 - [ ] Open `v_names`. The banner says the view does not expose the table's primary key; nothing is editable.
 - [ ] Open `v_counts`. The banner says the view is not automatically updatable, which differs from the previous banner.
 - [ ] Add an INSTEAD OF trigger to `v_items` and reopen it. It becomes read-only with the not-updatable banner.
-- [ ] On a read-only connection `v_items` stays read-only. On a MySQL or SQL Server connection views stay read-only.
+- [ ] On a read-only connection `v_items` stays read-only.
+- [ ] On SQL Server, use a candidate with app capability integration before qualifying view edits. An eligible single-table view exposing the complete key must reach the metadata request and use staged Save for update/delete; computed columns stay read-only, inserts are disabled, and aggregate/grouped views remain read-only. A missing key is distinguished from a non-updatable view. Driver-only metadata tests do not prove this route.
+- [ ] On MySQL and MariaDB, use a candidate containing the #3392 metadata repair and the `supports_updatable_views` declaration before qualifying view edits. Confirm the app requests editability metadata (no no-primary-key banner), then check an aliased composite key, computed-column read-only behavior, refusal of a computed key expression, base-table read-back after Save and cancellation of metadata reads. Record the exact candidate source.
 
 ## Export dialog
 
 Open a result, then Export Results.
 
 - [ ] Scope appears before Format. For a browse tab it offers the current table page; for a completed SQL result it offers the visible page and the complete saved result.
-- [ ] The Format list offers CSV, JSON, JSON Lines, Markdown, HTML, XML, SQL and Excel. A JSON Lines export has one JSON object per line and the same values as the JSON export.
+- [ ] The Format list offers CSV, JSON, JSON Lines, Markdown, HTML, XML, SQL and Excel. JSON Lines writes one object per physical line. Exact-source JSON cells retain whitespace, duplicate keys and number spelling inside a string; parsed JSON cells remain nested values. Repeat through Copy as JSON Lines.
+- [ ] Leave Maximum rows empty, then export with a positive cap smaller than, equal to and larger than the source row count. The output contains at most the cap and reports omitted rows only when more exist. Zero, negative, fractional and overflowing values disable Export. Repeat for a current page and a completed saved result; a cap never enables an unsupported full-table scope.
+- [ ] Export CSV with `||` as the custom delimiter, including cells containing `||`, quotes, newlines and a delimiter prefix at the end. Reimport it and compare exact values. Quotes, line breaks and more than 8 characters in the delimiter are refused before export/import.
 - [ ] SQL is absent for a MongoDB or Redis connection, present for the others.
 - [ ] The CSV options group shows for CSV and hides for every other format.
 - [ ] A SQL options group with an editable Table name shows only for SQL.
@@ -132,7 +136,7 @@ Use a stable collection with enough documents to browse multiple pages. Pages ou
 
 ## Grid previews for long values
 
-In browse and SQL result grids, text and JSON cells display at most 512 Unicode characters. Text and JSON text show their exact byte count. Parsed JSON larger than 8 KiB shows `More than 8192 bytes total`; the preview stops counting once it proves the serialized value exceeds the sample budget. This bounds GTK/Pango work for long values in wide grids. Text, JSON text and binary previews over 8 KiB show their exact original byte count. SQL result grids are editable when a single SELECT reads one base table and includes that table's full primary key; otherwise they stay read-only and show why. In an editable browse or SQL result grid, confirm that a long text cell opens for inline editing with the full value, not the displayed preview. **View Value** shows a bounded rendering. **Copy Value** copies complete text and JSON values; binary values copy only a byte-count placeholder. Text and JSON cells over 8 KiB and up to 1 MiB can be edited in the bounded full-value dialog. Use values just below and just above the 512-character and 8 KiB thresholds, plus a value over 1 MiB for the read-only view.
+In browse and SQL result grids, text and JSON cells display at most 512 Unicode characters. Text and JSON text show their exact byte count. Parsed JSON larger than 8 KiB shows `More than 8192 bytes total`; the preview stops counting once it proves the serialized value exceeds the sample budget. This bounds GTK/Pango work for long values in wide grids. Text, JSON text and binary previews over 8 KiB show their exact original byte count. SQL result grids are editable when a single SELECT reads one base table and includes that table's full primary key; otherwise they stay read-only and show why. In an editable browse or SQL result grid, confirm that a long text cell opens for inline editing with the full value, not the displayed preview. **View Value** shows a bounded rendering. **Copy Value** copies complete text and JSON values; binary values copy the complete bytes as a hexadecimal string. Text and JSON cells over 8 KiB and up to 1 MiB can be edited in the bounded full-value dialog. Use values just below and just above the 512-character and 8 KiB thresholds, plus a value over 1 MiB for the read-only view.
 
 - [ ] Values up to 512 Unicode characters display in full; longer text shows a byte-count suffix, while oversized parsed JSON shows a `More than 8192 bytes total` suffix. Copy Value retains the complete source value; View Value applies its display cap.
 - [ ] Values over the threshold show a prefix and an accurate size notice (`N bytes total` for known lengths and `More than 8192 bytes total` for parsed JSON when size counting stops); SQL result cells and binary/unsupported browse values do not offer inline editing. Editable browse text opens with the full value.
@@ -174,6 +178,8 @@ Use a keyed table with a nullable text column and values above 8 KiB. Include CR
 
 ## Foreign key navigation (Referenced and Referencing rows)
 
+- [ ] Edit a single-column foreign key: up to 100 candidate values are offered and choosing one stages a change without writing until Save. A composite foreign key does not offer the candidate picker; navigation remains separately available.
+- [ ] Open an unfiltered PostgreSQL, MySQL/MariaDB or SQL Server table with statistics: the total is marked estimated. Apply a filter and confirm an exact count is requested. A failed count leaves the total unknown without hiding loaded rows.
 - [ ] In a table browse tab, right-click a foreign key cell and choose **Go to Referenced Row**: opens a tab for the referenced parent table filtered to `parent_pk = <fk_value>`.
 - [ ] On a table referenced by inbound foreign keys (e.g. `customers` referenced by `orders.customer_id`), right-click any persisted row and choose **Show Referencing Rows**: a sub-menu lists referencing child tables. Selecting a target opens that table in a new tab filtered to matching child rows (`customer_id = <id>`).
 - [ ] On an unpersisted newly inserted row or a table with no inbound foreign keys, **Show Referencing Rows** is absent or greyed out.

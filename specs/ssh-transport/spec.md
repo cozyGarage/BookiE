@@ -149,7 +149,7 @@ OpenSSH: force `StrictHostKeyChecking=ask` for the destination and every `ProxyJ
 |------|--------|
 | `UnknownHostKey::Learn` | First-seen keys may be written after the backend's learn/prompt path. |
 | `UnknownHostKey::Refuse` | First-seen keys fail. |
-| OpenSSH backend | Optional; still asks on unknown keys. Flatpak may refuse this backend entirely (packaging). |
+| OpenSSH backend | Optional native-Linux route; still asks on unknown keys. Saved jump chains require the built-in backend. Current releases do not include Flatpak (ADR 0032). |
 
 ## Edge cases
 
