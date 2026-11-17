@@ -315,10 +315,14 @@ fn failed_spool_read_shows_status_and_retry_loads_the_page() {
         .unwrap();
     let model = PagedModel::new(&[1], 1);
     let status = gtk4::Label::new(None);
+    let retry = gtk4::Button::new();
     model.attach_status(&status);
+    model.attach_retry(&retry);
+    assert!(!retry.is_visible(), "the retry button stays hidden until a page fails");
     model.show(0, 1);
     model.load_from_spool(runtime.handle(), &spool, &[]);
     wait_for_condition(|| !status.text().is_empty());
+    assert!(retry.is_visible(), "a failed page offers the retry button");
     let page = std::sync::Arc::new(bookie_core::QueryResult {
         columns: Vec::new(),
         rows: vec![vec![bookie_core::Value::Int(42)]].into(),
@@ -334,6 +338,7 @@ fn failed_spool_read_shows_status_and_retry_loads_the_page() {
             == Some(vec![bookie_core::Value::Int(42)])
     });
     assert!(status.text().is_empty());
+    assert!(!retry.is_visible(), "the retry button hides again once the page loads");
 }
 
 #[cfg(test)]

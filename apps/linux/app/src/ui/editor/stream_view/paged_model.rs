@@ -27,6 +27,7 @@ mod imp {
         pub(super) selection: glib::WeakRef<gtk4::MultiSelection>,
         pub(super) view: glib::WeakRef<gtk4::ColumnView>,
         pub(super) status: glib::WeakRef<gtk4::Label>,
+        pub(super) retry: glib::WeakRef<gtk4::Button>,
     }
 
     #[glib::object_subclass]
@@ -362,6 +363,11 @@ impl PagedModel {
         self.imp().status.set(Some(status));
     }
 
+    pub(super) fn attach_retry(&self, retry: &gtk4::Button) {
+        self.imp().retry.set(Some(retry));
+        retry.set_visible(false);
+    }
+
     fn show_failure(&self) {
         self.sync_status();
     }
@@ -372,6 +378,9 @@ impl PagedModel {
         };
         let pages = self.imp().pages.borrow();
         let Some(pages) = pages.as_ref() else { return };
+        if let Some(retry) = self.imp().retry.upgrade() {
+            retry.set_visible(pages.has_failed());
+        }
         let message = if pages.has_failed() {
             bookie_app_services::tr!("A saved result page could not be loaded. Retry or use the page view.")
         } else if pages.has_deferred() {
