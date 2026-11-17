@@ -219,3 +219,18 @@ fn the_multi_character_row_overrides_the_delimiter_choice_and_rejects_bad_text()
     file.custom_delimiter.set_text("");
     assert_eq!(file.custom_delimiter_choice(), Ok(None));
 }
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn opening_a_double_pipe_file_fills_the_multi_character_row_and_the_header_switch() {
+    adw::init().unwrap();
+    let mut request = request();
+    request.bytes = b"id||name\n1||ada\n2||grace\n".as_slice().into();
+    request.format.has_header = false;
+    let file = FileOptions::new(&request);
+    assert_eq!(file.custom_delimiter.text().as_str(), "||");
+    assert!(file.header.is_active());
+    assert_eq!(file.options().custom_delimiter.as_ref().map(|d| d.as_str()), Some("||"));
+    let plain = FileOptions::new(&self::request());
+    assert!(plain.custom_delimiter.text().is_empty());
+}

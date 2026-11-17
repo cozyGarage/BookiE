@@ -407,6 +407,13 @@ impl FileOptions {
             &bookie_app_services::tr!("Encoding"),
             &["UTF-8", "Windows-1252", "UTF-16 LE", "UTF-16 BE"],
         );
+        if let Some(detected) = bookie_core::import::detect_custom_delimiter(&request.bytes) {
+            custom_delimiter.set_text(detected.as_str());
+            header.set_active(bookie_core::import::detect_header_with_custom_delimiter(
+                &request.bytes,
+                &detected,
+            ));
+        }
         group.add(&delimiter);
         group.add(&custom_delimiter);
         group.add(&quote);
