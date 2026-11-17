@@ -237,4 +237,52 @@ mod tests {
         let parsed: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
         assert_eq!(parsed.as_array().unwrap().len(), 4);
     }
+
+    #[test]
+    fn json_lines_pages_and_materialized_files_preserve_source_text_and_parsed_json() {
+        let directory = tempfile::tempdir().unwrap();
+        let columns = vec![column("payload")];
+        let source = " \n{\"key\": -0, \"key\": 1.00e+09, \"n\": 123456789012345678901234567890}\t ";
+        let raw = vec![vec![Value::JsonText(source.into())]];
+        let parsed = vec![vec![Value::Json(Box::new(serde_json::json!({"nested": [true, null]})))]];
+        let options = CsvOptions::default();
+        let export = ResultExport {
+            format: ResultFormat::JsonLines,
+            csv: &options,
+            sql: None,
+        };
+        let paged = directory.path().join("paged.jsonl");
+        write_paged_file(
+            &paged,
+            &columns,
+            2,
+            &export,
+            pages(vec![raw.clone(), Vec::new(), parsed.clone()]),
+            || false,
+            |_| {},
+        )
+        .unwrap();
+        let mut rows = raw;
+        rows.extend(parsed);
+        let result = crate::QueryResult {
+            columns,
+            rows: rows.into(),
+            truncated: false,
+        };
+        let materialized = directory.path().join("materialized.jsonl");
+        crate::export::write_result_file(&materialized, &result, &export, || false, |_| {}).unwrap();
+        let text = std::fs::read_to_string(&paged).unwrap();
+        assert_eq!(text.as_bytes(), std::fs::read(&materialized).unwrap());
+        let lines = text
+            .lines()
+            .map(|line| serde_json::from_str::<serde_json::Value>(line).unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            lines,
+            [
+                serde_json::json!({"payload": source}),
+                serde_json::json!({"payload": {"nested": [true, null]}})
+            ]
+        );
+    }
 }
