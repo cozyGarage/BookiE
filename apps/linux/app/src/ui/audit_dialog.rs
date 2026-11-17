@@ -30,7 +30,7 @@ fn present_with_operation(parent: &gtk::Window, database: &Arc<DatabaseService>,
     let toolbar = adw::ToolbarView::new();
     toolbar.add_top_bar(&adw::HeaderBar::new());
     let search = gtk::SearchEntry::builder()
-        .placeholder_text(tr!("Filter by operation id, connection, outcome or SQL"))
+        .placeholder_text(tr!("Filter by operation id, connection, principal, kind or outcome"))
         .margin_start(12)
         .margin_end(12)
         .margin_bottom(6)
