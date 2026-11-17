@@ -138,6 +138,7 @@ async fn mysql_previews_a_huge_longtext_cell() {
             "--mysql-native-password=ON",
             "--authentication-policy=mysql_native_password",
         ])
+        .with_startup_timeout(std::time::Duration::from_secs(180))
         .start()
         .await
         .unwrap();

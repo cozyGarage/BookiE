@@ -8,7 +8,7 @@ async fn value_contract_mssql_server_owned_columns_use_native_defaults_across_co
     let container = MssqlServer::default()
         .with_accept_eula()
         .with_tag(crate::test_image_tags::MSSQL_TEST_TAG)
-        .with_startup_timeout(std::time::Duration::from_secs(180))
+        .with_startup_timeout(std::time::Duration::from_secs(300))
         .start()
         .await
         .unwrap();
