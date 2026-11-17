@@ -42,6 +42,10 @@ pub(crate) async fn text_protocol(
         }
     }
     finish_result_set(&mut current, &mut result_sets, &mut truncated);
+    drop(stream);
+    crate::forget_statements_after_use(connection, sql)
+        .await
+        .map_err(crate::map_sqlx_error)?;
     Ok(QueryResultBatch {
         result_sets,
         truncated,
@@ -102,6 +106,18 @@ fn mark_truncated(current: &mut Option<QueryResult>, truncated: &mut bool) {
     *truncated = true;
     if let Some(result_set) = current {
         result_set.truncated = true;
+    }
+}
+
+pub(crate) fn contains_use_statement(sql: &str) -> bool {
+    match Parser::parse_sql(&MySqlDialect {}, sql) {
+        Ok(statements) => statements
+            .iter()
+            .any(|statement| matches!(statement, SqlStatement::Use(_))),
+        Err(_) => sql
+            .trim_start()
+            .get(..3)
+            .is_some_and(|head| head.eq_ignore_ascii_case("use")),
     }
 }
 
