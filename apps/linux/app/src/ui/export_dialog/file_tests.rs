@@ -44,6 +44,7 @@ fn job(path: std::path::PathBuf, source: JobSource) -> ExportJob {
         driver_id: "postgres".into(),
         schema: None,
         table: "t".into(),
+        row_limit: None,
     }
 }
 
@@ -79,6 +80,7 @@ fn current_page_export_keeps_its_budget_lease_until_the_write_finishes() {
         driver_id: "sqlite".into(),
         schema: None,
         table: "t".into(),
+        row_limit: None,
     };
 
     assert!(budget.used_bytes() > 0);
@@ -277,4 +279,71 @@ fn a_failed_guarded_query_export_finishes_its_source_and_keeps_the_source_error(
     assert!(matches!(outcome, Err(ExportError::Source(message)) if message == "source page failed"));
     assert!(finished.load(Ordering::SeqCst));
     assert!(!path.exists());
+}
+
+fn numbered_result(rows: i64) -> Arc<bookie_core::QueryResult> {
+    Arc::new(bookie_core::QueryResult {
+        columns: vec![bookie_core::ColumnInfo {
+            name: "n".into(),
+            data_type: "integer".into(),
+            nullable: true,
+            primary_key: false,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: None,
+            domain_type: None,
+        }],
+        rows: (1..=rows)
+            .map(|n| vec![bookie_core::Value::Int(n)])
+            .collect::<Vec<_>>()
+            .into(),
+        truncated: false,
+    })
+}
+
+fn limited(path: &std::path::Path, source: JobSource, limit: usize) -> Result<bool, ExportError> {
+    let mut limited = job(path.to_path_buf(), source);
+    limited.row_limit = Some(limit);
+    write_export(limited, &CancellationToken::new(), &AtomicUsize::new(0))
+}
+
+#[test]
+fn a_row_limit_cuts_a_loaded_export_and_reports_it() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("limited.csv");
+    assert!(limited(&path, JobSource::Loaded(numbered_result(5)), 2).unwrap());
+    assert_eq!(
+        std::fs::read_to_string(&path).unwrap().lines().collect::<Vec<_>>(),
+        ["n", "1", "2"]
+    );
+    assert!(!limited(&path, JobSource::Loaded(numbered_result(2)), 2).unwrap());
+}
+
+#[test]
+fn a_row_limit_stops_a_paged_export_without_reading_the_rest() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("paged.csv");
+    let fetched = Arc::new(AtomicUsize::new(0));
+    let counter = fetched.clone();
+    let source = JobSource::Paged {
+        mode: super::super::PagedExportMode::StoredQuery,
+        columns: numbered_result(1).columns.clone(),
+        total: Some(9),
+        open: Arc::new(move |_| {
+            let counter = counter.clone();
+            super::super::PageFetcher::new(
+                move || {
+                    let page = counter.fetch_add(1, Ordering::SeqCst) as i64;
+                    Ok((page < 3).then(|| (0..3).map(|n| vec![bookie_core::Value::Int(page * 3 + n)]).collect()))
+                },
+                || Ok(()),
+            )
+        }),
+    };
+    assert!(limited(&path, source, 4).unwrap());
+    assert_eq!(std::fs::read_to_string(&path).unwrap().lines().count(), 5);
+    assert_eq!(fetched.load(Ordering::SeqCst), 2);
 }

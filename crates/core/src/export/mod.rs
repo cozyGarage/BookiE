@@ -16,6 +16,7 @@ mod in_clause;
 mod json;
 mod markdown;
 mod paged;
+mod row_limit;
 mod sql;
 mod text_table;
 mod xlsx;
@@ -32,6 +33,7 @@ pub use in_clause::{InClause, render_in_clause, render_value_list};
 pub use json::{json_field_names, render_json, render_json_lines, render_row_json, row_to_json};
 pub use markdown::render_markdown;
 pub use paged::{RowPage, write_paged_file};
+pub use row_limit::{cap_pages, limit_result};
 pub use text_table::render_text_table;
 pub use xlsx::MAX_WORKBOOK_ROWS;
 

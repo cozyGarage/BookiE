@@ -3,7 +3,7 @@ use bookie_core::export::{CsvOptions, ExportError, ResultExport, ResultFormat, S
 use relm4::{adw, gtk};
 use std::sync::{
     Arc,
-    atomic::{AtomicUsize, Ordering},
+    atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 use tokio_util::sync::CancellationToken;
 
@@ -26,9 +26,10 @@ pub(super) struct ExportJob {
     pub(super) driver_id: String,
     pub(super) schema: Option<String>,
     pub(super) table: String,
+    pub(super) row_limit: Option<usize>,
 }
 
-fn write_export(job: ExportJob, cancel: &CancellationToken, completed: &AtomicUsize) -> Result<(), ExportError> {
+fn write_export(job: ExportJob, cancel: &CancellationToken, completed: &AtomicUsize) -> Result<bool, ExportError> {
     let _retained_page = job.retained_page;
     if matches!(
         &job.source,
@@ -52,7 +53,9 @@ fn write_export(job: ExportJob, cancel: &CancellationToken, completed: &AtomicUs
     let progress = |rows| completed.store(rows, Ordering::Relaxed);
     match job.source {
         JobSource::Loaded(result) => {
-            bookie_core::export::write_result_file(&job.path, &result, &export, cancelled, progress)
+            let (result, capped) = limited_result(result, job.row_limit);
+            bookie_core::export::write_result_file(&job.path, &result, &export, cancelled, progress)?;
+            Ok(capped)
         }
         JobSource::Paged {
             mode: super::PagedExportMode::StoredQuery | super::PagedExportMode::SnapshotTable,
@@ -61,21 +64,44 @@ fn write_export(job: ExportJob, cancel: &CancellationToken, completed: &AtomicUs
             open,
         } => {
             let mut pages = open(cancel.clone());
+            let capped = Arc::new(AtomicBool::new(false));
+            let total = match job.row_limit {
+                Some(limit) => total.map_or(limit, |total| total.min(limit)),
+                None => total.unwrap_or(0),
+            };
+            let mut next: Box<dyn FnMut() -> Result<Option<bookie_core::export::RowPage>, ExportError>> =
+                match job.row_limit {
+                    Some(limit) => Box::new(bookie_core::export::cap_pages(
+                        || pages.next_page(),
+                        limit,
+                        capped.clone(),
+                    )),
+                    None => Box::new(|| pages.next_page()),
+                };
             let result = bookie_core::export::write_paged_file(
-                &job.path,
-                &columns,
-                total.unwrap_or(0),
-                &export,
-                || pages.next_page(),
-                cancelled,
-                progress,
+                &job.path, &columns, total, &export, &mut next, cancelled, progress,
             );
-            finish_pages(result, pages.finish())
+            drop(next);
+            finish_pages(result, pages.finish())?;
+            Ok(capped.load(Ordering::SeqCst))
         }
         JobSource::Paged {
             mode: super::PagedExportMode::FullTable,
             ..
         } => Err(ExportError::Source(snapshot_refusal_message())),
+    }
+}
+
+fn limited_result(
+    result: Arc<bookie_core::QueryResult>,
+    limit: Option<usize>,
+) -> (Arc<bookie_core::QueryResult>, bool) {
+    match limit {
+        Some(limit) if result.rows.len() > limit => {
+            let (cut, capped) = bookie_core::export::limit_result(&result, limit);
+            (Arc::new(cut), capped)
+        }
+        _ => (result, false),
     }
 }
 
@@ -178,13 +204,20 @@ fn handle_export_outcome(
     toast: &glib::WeakRef<adw::ToastOverlay>,
     path: &std::path::Path,
     final_count: usize,
-    outcome: Result<Result<(), ExportError>, async_channel::RecvError>,
+    outcome: Result<Result<bool, ExportError>, async_channel::RecvError>,
 ) {
     match outcome {
-        Ok(Ok(())) => {
+        Ok(Ok(capped)) => {
             if let Some(toast) = toast.upgrade() {
+                let message = if capped {
+                    bookie_app_services::tr!(
+                        "Exported the first {n} rows to {path} (row limit reached, more rows exist)"
+                    )
+                } else {
+                    bookie_app_services::tr!("Exported {n} rows to {path}")
+                };
                 toast.add_toast(crate::ui::plain_text::toast(
-                    &bookie_app_services::tr!("Exported {n} rows to {path}")
+                    &message
                         .replace("{n}", &final_count.to_string())
                         .replace("{path}", &path.display().to_string()),
                 ));

@@ -51,6 +51,7 @@ pub struct ConnectDialog {
     submit: gtk::Button,
     toast_overlay: adw::ToastOverlay,
     test_banner: adw::Banner,
+    banner_remedy: std::cell::Cell<Option<bookie_app_services::tls_failure::TlsRemedy>>,
     header_title: gtk::Label,
     form: ConnectFormState,
     preferences: crate::services::preferences::PreferencesStore,
@@ -101,12 +102,19 @@ mod socket_endpoint;
 mod error_tests;
 
 use bootstrap::{CandidateBootstrap, ConnectRequest, OpenedCandidate, open_candidate};
-use connect_failure::{ConnectFailure, remedy_label};
+use connect_failure::{ConnectFailure, remedy_applies_to_host, remedy_label};
 pub(super) use controls::AUTH_MODE_ROWS;
 use controls::{AccessibleChoice, auth_mode_for_row, choice_row, timeout_rows, timeout_value};
 use form::{default_driver_row, test_result_text};
 use identity::{ConnectionIdentity, find_existing, preserve_attached_databases, saved_connection_name};
 pub use prefill::{ConnectionPrefill, load_prefill};
+
+const MIN_CONTENT_HEIGHT: i32 = 720;
+const MAX_CONTENT_HEIGHT: i32 = 1000;
+
+pub(crate) fn content_height_for(window_height: i32) -> i32 {
+    (window_height.saturating_mul(85) / 100).clamp(MIN_CONTENT_HEIGHT, MAX_CONTENT_HEIGHT)
+}
 
 pub struct ConnectDialogInit {
     pub registry: Arc<DriverRegistry>,
@@ -139,6 +147,8 @@ pub enum ConnectDialogInput {
         path: std::path::PathBuf,
         outcome: Result<(), bookie_app_services::database_file::CreateDatabaseFileError>,
     },
+    ApplyRemedy(bookie_app_services::tls_failure::TlsRemedy),
+    BannerRemedy,
     Closed,
 }
 
@@ -152,7 +162,7 @@ pub enum ConnectDialogOutput {
 pub enum ConnectDialogCmd {
     Result(Result<Box<connection_service::PreparedConnection>, ConnectFailure>),
     Cancelled,
-    TestResult(Result<usize, String>),
+    TestResult(Result<usize, ConnectFailure>),
 }
 
 /// Which async operation (if any) is currently in flight. Drives
@@ -411,6 +421,8 @@ impl Component for ConnectDialog {
         });
         let test_banner = adw::Banner::new("");
         test_banner.set_use_markup(false);
+        let sender_for_banner = sender.clone();
+        test_banner.connect_button_clicked(move |_| sender_for_banner.input(ConnectDialogInput::BannerRemedy));
         let body = gtk::Box::new(gtk::Orientation::Vertical, 0);
         page.set_vexpand(true);
         body.append(&test_banner);
@@ -455,6 +467,7 @@ impl Component for ConnectDialog {
             submit,
             toast_overlay,
             test_banner,
+            banner_remedy: std::cell::Cell::new(None),
             header_title,
             form: ConnectFormState::default(),
             preferences: init.preferences,
@@ -528,6 +541,9 @@ impl Component for ConnectDialog {
 
             ConnectDialogInput::TestConnection => self.test_connection(&sender),
 
+            ConnectDialogInput::ApplyRemedy(remedy) => self.apply_remedy(remedy),
+            ConnectDialogInput::BannerRemedy => self.apply_banner_remedy(),
+
             ConnectDialogInput::Closed => {
                 if let Some(cancel) = self.connect_cancel.take() {
                     cancel.cancel();
@@ -549,10 +565,11 @@ impl Component for ConnectDialog {
             }
             ConnectDialogCmd::Result(Err(failure)) => {
                 tracing::warn!(error = %failure.message, "connect failed");
-                self.show_failure(&failure);
+                self.show_failure(&failure, &sender);
             }
             ConnectDialogCmd::TestResult(result) => {
                 self.test_banner.set_title(&test_result_text(&result));
+                self.show_test_remedy(result.as_ref().err());
                 self.test_banner.set_revealed(true);
             }
         }
@@ -749,22 +766,45 @@ impl ConnectDialog {
         self.driver_row.set_subtitle(&subtitle);
     }
 
-    fn show_failure(&self, failure: &ConnectFailure) {
+    fn applicable_remedy(&self, failure: &ConnectFailure) -> Option<bookie_app_services::tls_failure::TlsRemedy> {
+        failure
+            .tls_remedy
+            .filter(|remedy| remedy_applies_to_host(*remedy, self.host.text().as_str()))
+    }
+
+    fn show_failure(&self, failure: &ConnectFailure, sender: &ComponentSender<Self>) {
         let toast = crate::ui::plain_text::toast(&failure.message);
-        if let Some(remedy) = failure.tls_remedy {
-            let row = self.remedy_row(remedy);
+        if let Some(remedy) = self.applicable_remedy(failure) {
             toast.set_button_label(Some(&remedy_label(remedy)));
-            toast.connect_button_clicked(move |_| {
-                row.grab_focus();
-            });
+            let sender = sender.clone();
+            toast.connect_button_clicked(move |_| sender.input(ConnectDialogInput::ApplyRemedy(remedy)));
         }
         self.toast_overlay.add_toast(toast);
     }
 
-    fn remedy_row(&self, remedy: bookie_app_services::tls_failure::TlsRemedy) -> adw::EntryRow {
+    fn show_test_remedy(&self, failure: Option<&ConnectFailure>) {
+        let remedy = failure.and_then(|failure| self.applicable_remedy(failure));
+        self.banner_remedy.set(remedy);
+        self.test_banner.set_button_label(remedy.map(remedy_label).as_deref());
+    }
+
+    fn apply_banner_remedy(&self) {
+        if let Some(remedy) = self.banner_remedy.take() {
+            self.apply_remedy(remedy);
+            self.test_banner.set_revealed(false);
+        }
+    }
+
+    fn apply_remedy(&self, remedy: bookie_app_services::tls_failure::TlsRemedy) {
+        use bookie_app_services::tls_failure::TlsRemedy;
         match remedy {
-            bookie_app_services::tls_failure::TlsRemedy::ChooseCertificateAuthority => self.tls_root_cert.clone(),
-            bookie_app_services::tls_failure::TlsRemedy::CheckServerName => self.host.clone(),
+            TlsRemedy::ChooseCertificateAuthority => {
+                self.tls_root_cert.grab_focus();
+            }
+            TlsRemedy::CheckServerName => {
+                self.host.grab_focus();
+            }
+            TlsRemedy::DisableTls => self.tls_mode.set_selected(TlsMode::Disabled.index()),
         }
     }
 
@@ -963,4 +1003,19 @@ async fn run_connect(
         )
         .with_dial_identity(dial),
     ))
+}
+
+#[cfg(test)]
+mod height_tests {
+    use super::content_height_for;
+
+    #[test]
+    fn the_dialog_follows_the_window_between_its_minimum_and_maximum() {
+        assert_eq!(content_height_for(0), 720);
+        assert_eq!(content_height_for(600), 720);
+        assert_eq!(content_height_for(1000), 850);
+        assert_eq!(content_height_for(1150), 977);
+        assert_eq!(content_height_for(4000), 1000);
+        assert_eq!(content_height_for(i32::MAX), 1000);
+    }
 }
