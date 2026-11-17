@@ -549,6 +549,19 @@ fn nested_certificate_name_mismatch_is_tls() {
 }
 
 #[test]
+fn a_plain_text_answer_to_a_tls_hello_is_not_reported_as_a_certificate_problem() {
+    let raw = std::io::Error::new(
+        std::io::ErrorKind::InvalidData,
+        "received corrupt message of type InvalidContentType",
+    );
+    let err = clickhouse::error::Error::Network(Box::new(raw));
+    assert!(matches!(
+        map_clickhouse_connect_error(err, true),
+        DriverError::Tls(detail) if detail.contains("does not use TLS") && !detail.contains("hostname")
+    ));
+}
+
+#[test]
 fn connect_error_text_during_connect_is_connection_refused() {
     for message in ["connection refused", "connect error: network unreachable"] {
         let err = clickhouse::error::Error::Network(Box::new(std::io::Error::other(message)));

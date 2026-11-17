@@ -207,6 +207,7 @@ mod tests {
         for text in [
             "error occurred while attempting to establish a TLS connection: server does not support TLS",
             "the server does not offer the requested encryption",
+            "TLS handshake failed: the server does not use TLS; it answered in plain text",
         ] {
             let kind = classify_tls_failure(text);
             assert_eq!(kind, ServerRefusedTls, "{text}");
