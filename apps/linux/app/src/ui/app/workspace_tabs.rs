@@ -74,6 +74,9 @@ impl App {
             .tooltip_text(bookie_app_services::tr!("View open tabs"))
             .valign(gtk::Align::Center)
             .build();
+        // Hide the overview button until there are at least 2 tabs —
+        // its grid is meaningless when there's only one page open.
+        // Bound via property-binding so it tracks `n-pages` live.
         overview_button.set_visible(tab_view.n_pages() > 1);
         let overview_button_for_pages = overview_button.clone();
         tab_view.connect_n_pages_notify(move |view| {
@@ -99,6 +102,12 @@ impl App {
             glib::Propagation::Stop
         });
 
+        // Right-click tab → context menu. AdwTabView reads a menu model
+        // and fires `connect_setup_menu` with the target page just
+        // before the popover opens; we stash that page in a shared
+        // Cell so the action callbacks know which tab the user
+        // right-clicked. Setting `menu-model` on AdwTabView is the
+        // documented way to extend the per-tab popover.
         let menu_target: Rc<RefCell<Option<adw::TabPage>>> = Rc::new(RefCell::new(None));
         let menu_target_setup = menu_target.clone();
         let keep_tab_action = gio::SimpleAction::new("keep", None);
@@ -212,6 +221,11 @@ impl App {
             page
         });
 
+        // Ctrl+T is bound globally (alongside Ctrl+E) in
+        // `install_window_shortcuts` so it fires even when this
+        // tab-area widget tree isn't focused (e.g. the empty-state
+        // status page). Keeping a local controller here would just
+        // duplicate the binding.
         let _ = sender;
 
         self.workspace_root = Some(tab_overview);
@@ -599,6 +613,12 @@ impl App {
         if let (Some(owner), Some(descriptor)) = (owner, describe_closed_tab(&mut removed, preview)) {
             push_closed_tab(&self.closed_tabs_stack, owner, descriptor);
         }
+        // Drop any close-after-save / window-close-after-save intent
+        // pinned to this tab. `close_tabs_for_table` (Drop Table)
+        // calls into here directly without going through the per-tab
+        // close prompt, so a stale entry would otherwise live on
+        // forever and cause a future unrelated SaveCompleted to
+        // spuriously close the window.
         self.close_after_save.borrow_mut().cancel(&id);
         match &removed {
             WorkspaceTab::Editor(slot) => {
@@ -610,6 +630,12 @@ impl App {
                 self.structure_saves_in_flight.borrow_mut().remove(&slot.id);
             }
             WorkspaceTab::Table(slot) => {
+                // A Table tab owns BOTH a Browse-side row tracker and a
+                // Structure-side DDL tracker against the same uuid; close
+                // both registries. Also drop the in-flight-save guard
+                // entry so a re-opened tab with the same uuid (or a
+                // dropped async future from `drop_on_shutdown`) doesn't
+                // leave the save path permanently locked.
                 self.change_trackers.close_tab(slot.id);
                 self.structure_trackers.close_tab(slot.id);
                 self.structure_saves_in_flight.borrow_mut().remove(&slot.id);

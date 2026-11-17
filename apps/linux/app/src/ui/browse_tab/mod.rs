@@ -9,6 +9,12 @@ use bookie_core::{ColumnInfo, ForeignKeyInfo, QueryResult, Value};
 
 use crate::ui::grid::{GridMsg, TabGridContext, build_column_view};
 
+/// Bulk-delete safety net: when the user marks at least this many
+/// rows pending-delete in one shot, surface a confirmation dialog
+/// before tracking. The marker is reversible via Discard / Ctrl+Z,
+/// but a 200-row Ctrl+A → Delete sequence is destructive enough at
+/// a glance that an explicit confirmation matches GNOME Files'
+/// "Delete N items?" pattern.
 const BULK_DELETE_CONFIRM_THRESHOLD: usize = 10;
 
 pub(super) fn columns_for_browse_page(
@@ -238,6 +244,13 @@ impl BrowseTab {
         self.last_page = false;
         self.current_projection = projected_columns;
         self.current_result = Some(std::sync::Arc::new(result));
+        // Defer rendering until columns are also loaded — the
+        // QueryResult's ColumnInfo lacks `primary_key` /
+        // `is_generated` / `is_auto_increment`, so rendering
+        // before the schema fetch would let the user edit cells
+        // (PK, generated columns) that the DB will reject on
+        // save. Waiting also avoids a wasted full rebuild when
+        // ColumnsLoaded fires next and triggers a re-render.
         self.render_grid_if_ready(sender);
     }
 
@@ -246,6 +259,11 @@ impl BrowseTab {
         let words: Vec<String> = columns.iter().map(|c| c.name.clone()).collect();
         self.current_columns = columns.clone();
         self.refresh_member_choices();
+        // Late-arriving columns: if RowsLoaded already cached a
+        // zero-row result with an empty `columns` vector (the
+        // driver derives it from the first row), refill it now
+        // so the upcoming `render_grid_if_ready` builds headers
+        // against the real schema instead of an empty list.
         if let Some(result) = self.current_result.as_mut().map(std::sync::Arc::make_mut) {
             merge_table_columns(result, &self.current_columns);
         }
@@ -736,6 +754,11 @@ impl SimpleComponent for BrowseTab {
                 glib::Propagation::Stop
             }))
             .build();
+        // Page Up / Page Down on the BrowseTab navigate the paginator.
+        // GtkColumnView's built-in scrolling normally handles these,
+        // but our offset-based pagination means scrolling stops at
+        // the page boundary. Mapping PgUp/PgDn to Prev/Next page
+        // keeps the keyboard fluent across pages.
         let sender_for_pgup = sender.clone();
         let page_up_shortcut = gtk::Shortcut::builder()
             .trigger(&crate::ui::shortcut::parse("Page_Up"))
@@ -875,6 +898,11 @@ impl SimpleComponent for BrowseTab {
                 BrowseTabInput::PendingCountChanged(n)
             }
             crate::services::change_tracker::TrackerEvent::Cleared => BrowseTabInput::PendingCountChanged(0),
+            // ChangedRows drives targeted items_changed so only the
+            // affected rows re-bind, not the whole visible viewport.
+            // PendingCountChanged is emitted alongside by the tracker
+            // (see emit_changed) so banner / dirty-flag updates still
+            // run for the same mutation.
             crate::services::change_tracker::TrackerEvent::ChangedRows(keys) => BrowseTabInput::ChangedRows(keys),
         }));
         let _ = sender.output(BrowseTabOutput::FetchColumns);
