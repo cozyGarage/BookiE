@@ -195,9 +195,12 @@ fn disabled_kerberos_is_rejected_before_connecting() {
 
 #[test]
 fn quote_ident_brackets_and_escapes() {
-    assert_eq!(quote_ident("users"), "[users]");
-    assert_eq!(quote_ident("My Table"), "[My Table]");
-    assert_eq!(quote_ident("weird]name"), "[weird]]name]");
+    assert_eq!(bookie_core::sql_dialect::quote_ident("mssql", "users"), "[users]");
+    assert_eq!(bookie_core::sql_dialect::quote_ident("mssql", "My Table"), "[My Table]");
+    assert_eq!(
+        bookie_core::sql_dialect::quote_ident("mssql", "weird]name"),
+        "[weird]]name]"
+    );
 }
 
 #[test]

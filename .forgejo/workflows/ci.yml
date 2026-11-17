@@ -1003,6 +1003,7 @@ jobs:
           bash scripts/run-rust-tests.sh --locked -p bookie-mcp --test mongodb_extended_json -- --include-ignored --test-threads=1
           bash scripts/run-rust-tests.sh --locked -p bookie-mcp --test postgres_custom_enum -- --include-ignored --test-threads=1
           bash scripts/run-rust-tests.sh --locked -p bookie-policy --test session_postgres -- --include-ignored --test-threads=1
+          bash scripts/run-rust-tests.sh --locked -p bookie-app-services --test value_search_postgres -- --include-ignored --test-threads=1
           bash scripts/run-rust-tests.sh --locked -p bookie-policy --test session_mssql -- --include-ignored --test-threads=1
       - name: App server tests
         run: cd src && python3 scripts/run-test-layer.py app-server

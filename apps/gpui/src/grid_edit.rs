@@ -26,6 +26,9 @@ impl GridView {
 
     fn stop_edit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.editing = None;
+        self.editor.update(cx, |editor, cx| {
+            editor.set_text_align(gpui::TextAlign::Left, cx);
+        });
         window.focus(&self.focus, cx);
         cx.notify();
     }
@@ -63,12 +66,22 @@ impl GridView {
             cx.notify();
             return;
         }
+        let is_numeric = crate::right_aligned(
+            self.source.columns().get(column).map_or(false, |c| c.numeric),
+            &cell,
+        );
         self.editing = Some(Editing {
             row,
             column,
             kind: cell.kind(),
         });
-        self.editor.update(cx, |editor, cx| editor.set_content(&text, cx));
+        self.editor.update(cx, |editor, cx| {
+            editor.set_text_align(
+                if is_numeric { gpui::TextAlign::Right } else { gpui::TextAlign::Left },
+                cx,
+            );
+            editor.set_content(&text, cx);
+        });
         window.focus(&self.editor.read(cx).focus_handle(cx), cx);
         cx.notify();
     }

@@ -20,6 +20,7 @@ import gtk_workbook
 import gtk_parameters
 import gtk_xml
 from paginator_names import paginator_name_matches
+from process_stop import terminate
 import gtk_ux
 import gtk_whole_result
 import gtk_active_edit
@@ -1154,13 +1155,7 @@ def stop_application(process):
     global _owned_application
     if _owned_application is not None and _owned_application.process is process:
         _owned_application = None
-    if process.poll() is None:
-        process.send_signal(signal.SIGTERM)
-        try:
-            process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            process.kill()
-            process.wait(timeout=5)
+    terminate(process)
     stderr = read_application_stderr(process)
     if process.returncode not in {0, -signal.SIGTERM}:
         raise AssertionError(f"application exited with {process.returncode}: {stderr}")

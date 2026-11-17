@@ -335,7 +335,15 @@ pub(super) fn keyed_where_clause(
     clauses.join(" AND ")
 }
 
-pub(super) fn qualified_table(driver_id: &str, schema: Option<&str>, table: &str) -> String {
+pub fn rows_page_sql(driver_id: &str, schema: Option<&str>, table: &str, offset: u64, limit: u64) -> String {
+    let qualified = qualified_table(driver_id, schema, table);
+    match driver_id {
+        "postgres" => format!("SELECT * FROM {qualified} OFFSET {offset} LIMIT {limit}"),
+        _ => format!("SELECT * FROM {qualified} LIMIT {limit} OFFSET {offset}"),
+    }
+}
+
+pub fn qualified_table(driver_id: &str, schema: Option<&str>, table: &str) -> String {
     match schema {
         Some(s) => format!("{}.{}", quote_ident(driver_id, s), quote_ident(driver_id, table)),
         None => quote_ident(driver_id, table),

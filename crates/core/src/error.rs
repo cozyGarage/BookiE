@@ -103,4 +103,26 @@ impl DriverError {
             position: None,
         }
     }
+
+    pub fn has_sqlstate(&self, code: &str) -> bool {
+        matches!(self, Self::Query { sqlstate: Some(state), .. } if state == code)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn has_sqlstate_matches_only_a_query_error_with_that_code() {
+        let with = |state: Option<&str>| DriverError::Query {
+            message: "m".into(),
+            sqlstate: state.map(str::to_string),
+            position: None,
+        };
+        assert!(with(Some("57014")).has_sqlstate("57014"));
+        assert!(!with(Some("57014")).has_sqlstate("70100"));
+        assert!(!with(None).has_sqlstate("57014"));
+        assert!(!DriverError::Cancelled.has_sqlstate("57014"));
+    }
 }

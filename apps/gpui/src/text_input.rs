@@ -41,12 +41,21 @@ pub struct TextInput {
     focus_handle: FocusHandle,
     content: SharedString,
     placeholder: SharedString,
+    text_align: gpui::TextAlign,
     selected_range: Range<usize>,
     selection_reversed: bool,
     marked_range: Option<Range<usize>>,
     last_layout: Option<ShapedLine>,
     last_bounds: Option<Bounds<Pixels>>,
     is_selecting: bool,
+}
+
+fn compute_x_offset(align: gpui::TextAlign, bounds: Bounds<Pixels>, line_width: Pixels) -> Pixels {
+    if align == gpui::TextAlign::Right && bounds.size.width > line_width {
+        bounds.size.width - line_width
+    } else {
+        px(0.0)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -85,6 +94,7 @@ impl TextInput {
             focus_handle: cx.focus_handle(),
             content: "".into(),
             placeholder: placeholder.to_string().into(),
+            text_align: gpui::TextAlign::Left,
             selected_range: 0..0,
             selection_reversed: false,
             marked_range: None,
@@ -92,6 +102,17 @@ impl TextInput {
             last_bounds: None,
             is_selecting: false,
         }
+    }
+
+    pub fn set_text_align(&mut self, text_align: gpui::TextAlign, cx: &mut Context<Self>) {
+        if self.text_align != text_align {
+            self.text_align = text_align;
+            cx.notify();
+        }
+    }
+
+    pub fn text_align(&self) -> gpui::TextAlign {
+        self.text_align
     }
 
     #[cfg(test)]
@@ -240,7 +261,9 @@ impl TextInput {
         if position.y > bounds.bottom() {
             return self.content.len();
         }
-        line.closest_index_for_x(position.x - bounds.left())
+        let x_offset = compute_x_offset(self.text_align, *bounds, line.width);
+        let rel_x = (position.x - bounds.left() - x_offset).max(px(0.0));
+        line.closest_index_for_x(rel_x)
     }
 
     fn select_to(&mut self, offset: usize, cx: &mut Context<Self>) {
@@ -407,10 +430,11 @@ impl EntityInputHandler for TextInput {
         _cx: &mut Context<Self>,
     ) -> Option<Bounds<Pixels>> {
         let last_layout = self.last_layout.as_ref()?;
+        let x_offset = compute_x_offset(self.text_align, bounds, last_layout.width);
         let range = self.range_from_utf16(&range_utf16);
         Some(Bounds::from_corners(
-            point(bounds.left() + last_layout.x_for_index(range.start), bounds.top()),
-            point(bounds.left() + last_layout.x_for_index(range.end), bounds.bottom()),
+            point(bounds.left() + x_offset + last_layout.x_for_index(range.start), bounds.top()),
+            point(bounds.left() + x_offset + last_layout.x_for_index(range.end), bounds.bottom()),
         ))
     }
 
@@ -420,11 +444,14 @@ impl EntityInputHandler for TextInput {
         _window: &mut Window,
         _cx: &mut Context<Self>,
     ) -> Option<usize> {
-        let line_point = self.last_bounds?.localize(&point)?;
+        let last_bounds = *self.last_bounds.as_ref()?;
+        let line_point = last_bounds.localize(&point)?;
         let last_layout = self.last_layout.as_ref()?;
+        let x_offset = compute_x_offset(self.text_align, last_bounds, last_layout.width);
 
         assert_eq!(last_layout.text, self.content);
-        let utf8_index = last_layout.index_for_x(point.x - line_point.x)?;
+        let rel_x = (point.x - line_point.x - x_offset).max(px(0.0));
+        let utf8_index = last_layout.index_for_x(rel_x)?;
         Some(self.offset_to_utf16(utf8_index))
     }
 }
@@ -531,13 +558,14 @@ impl Element for TextElement {
         let font_size = style.font_size.to_pixels(window.rem_size());
         let line = window.text_system().shape_line(display_text, font_size, &runs, None);
 
+        let x_offset = compute_x_offset(input.text_align, bounds, line.width);
         let cursor_pos = line.x_for_index(cursor);
         let (selection, cursor) = if selected_range.is_empty() {
             (
                 None,
                 Some(fill(
                     Bounds::new(
-                        point(bounds.left() + cursor_pos, bounds.top()),
+                        point(bounds.left() + x_offset + cursor_pos, bounds.top()),
                         size(px(2.), bounds.bottom() - bounds.top()),
                     ),
                     rgb(bookie_gpui::theme::Theme::current(cx).foreground),
@@ -547,8 +575,8 @@ impl Element for TextElement {
             (
                 Some(fill(
                     Bounds::from_corners(
-                        point(bounds.left() + line.x_for_index(selected_range.start), bounds.top()),
-                        point(bounds.left() + line.x_for_index(selected_range.end), bounds.bottom()),
+                        point(bounds.left() + x_offset + line.x_for_index(selected_range.start), bounds.top()),
+                        point(bounds.left() + x_offset + line.x_for_index(selected_range.end), bounds.bottom()),
                     ),
                     rgba(0x5b8cff55),
                 )),
@@ -580,8 +608,9 @@ impl Element for TextElement {
         let Some(line) = prepaint.line.take() else {
             return;
         };
+        let x_offset = compute_x_offset(self.input.read(cx).text_align, bounds, line.width);
         line.paint(
-            bounds.origin,
+            point(bounds.origin.x + x_offset, bounds.origin.y),
             window.line_height(),
             gpui::TextAlign::Left,
             None,
@@ -650,5 +679,27 @@ impl Render for TextInput {
 impl Focusable for TextInput {
     fn focus_handle(&self, _: &App) -> FocusHandle {
         self.focus_handle.clone()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn compute_x_offset_right_aligns_when_bounds_exceed_line_width() {
+        let bounds = Bounds::new(point(px(10.0), px(10.0)), size(px(100.0), px(20.0)));
+        assert_eq!(
+            compute_x_offset(gpui::TextAlign::Right, bounds, px(40.0)),
+            px(60.0)
+        );
+        assert_eq!(
+            compute_x_offset(gpui::TextAlign::Right, bounds, px(120.0)),
+            px(0.0)
+        );
+        assert_eq!(
+            compute_x_offset(gpui::TextAlign::Left, bounds, px(40.0)),
+            px(0.0)
+        );
     }
 }

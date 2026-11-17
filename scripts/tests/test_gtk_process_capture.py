@@ -16,6 +16,10 @@ PROCESS_PATH = Path(__file__).resolve().parents[2] / "apps/linux/app/tests/gtk_p
 PROCESS_SPEC = importlib.util.spec_from_file_location("gtk_process", PROCESS_PATH)
 gtk_process = importlib.util.module_from_spec(PROCESS_SPEC)
 PROCESS_SPEC.loader.exec_module(gtk_process)
+STOP_PATH = Path(__file__).resolve().parents[2] / "apps/linux/app/tests/process_stop.py"
+STOP_SPEC = importlib.util.spec_from_file_location("process_stop", STOP_PATH)
+process_stop = importlib.util.module_from_spec(STOP_SPEC)
+STOP_SPEC.loader.exec_module(process_stop)
 TRIM_PATH = Path(__file__).resolve().parents[2] / "apps/linux/app/tests/gtk_allocator_trim.py"
 TRIM_SPEC = importlib.util.spec_from_file_location("gtk_allocator_trim", TRIM_PATH)
 gtk_allocator_trim = importlib.util.module_from_spec(TRIM_SPEC)
@@ -38,7 +42,7 @@ class GtkProcessCaptureTests(unittest.TestCase):
             raise AssertionError("the child did not finish writing its diagnostics")
 
         namespace = dict(os=os, subprocess=subprocess, signal=signal, tempfile=tempfile, gtk_process=gtk_process,
-                         gtk_allocator_trim=gtk_allocator_trim, _owned_application=None,
+                         gtk_allocator_trim=gtk_allocator_trim, terminate=process_stop.terminate, _owned_application=None,
                          wait_for_node=wait_for_window, CONNECTION_NAME="fixture", pyatspi=SimpleNamespace(ROLE_FRAME=1))
         exec(compile(ast.Module(body=functions, type_ignores=[]), str(source), "exec"), namespace)
         return namespace
