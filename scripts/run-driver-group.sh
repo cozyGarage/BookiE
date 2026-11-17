@@ -42,9 +42,6 @@ for driver in "${drivers[@]}"; do
   if [[ "$driver" == duckdb ]]; then
     bash scripts/run-rust-tests.sh --locked -p bookie-driver-duckdb \
       --test integration --test read_only --test missing_file -- --include-ignored --test-threads=1
-  elif [[ "$driver" == redis ]]; then
-    bash scripts/run-rust-tests.sh --locked -p bookie-driver-redis \
-      --test integration --test conformance -- --include-ignored --test-threads=1
   else
     test_targets=(--test integration)
     if [[ -f "crates/drivers/$driver/tests/conformance.rs" ]]; then

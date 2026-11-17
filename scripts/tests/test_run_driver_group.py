@@ -70,7 +70,7 @@ class ConformanceTargetTests(unittest.TestCase):
             return log.read_text().splitlines()
 
     def test_a_driver_with_a_conformance_file_runs_its_conformance_target(self):
-        for driver in ("postgres", "mysql", "mssql", "clickhouse"):
+        for driver in ("postgres", "mysql", "mssql", "clickhouse", "redis"):
             commands = self.run_in_scratch_tree(driver, with_conformance=True)
             self.assertEqual(len(commands), 1, commands)
             self.assertIn(f"-p bookie-driver-{driver} --test integration --test conformance -- ", commands[0])
