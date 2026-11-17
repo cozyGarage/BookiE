@@ -48,6 +48,11 @@ class WorkbookOracleTests(unittest.TestCase):
     def test_exact_cells_pass(self):
         workbook.assert_workbook(valid_cells())
 
+    def test_styled_blank_trailing_null_passes(self):
+        cells = valid_cells()
+        cells["G4"] = ("n", "")
+        workbook.assert_workbook(cells)
+
     def test_wrong_values_types_nulls_and_page_boundaries_fail(self):
         for cell, replacement in [
             ("C2", ("n", "9223372036854776000")), ("E2", ("s", "12:34:56")),
