@@ -277,8 +277,8 @@ impl FactoryComponent for SidebarRow {
                     set_child = &gtk::Box {
                 set_orientation: gtk::Orientation::Horizontal,
                 set_spacing: 8,
-                set_margin_start: 12 + 14 * i32::from(self.depth),
-                set_margin_end: 12,
+                set_margin_start: 4 + 12 * i32::from(self.depth),
+                set_margin_end: 8,
                 set_margin_top: 6,
                 set_margin_bottom: 6,
 
