@@ -1280,6 +1280,20 @@ fn the_csv_delimiter_command_changes_exports_until_it_is_reset(cx: &mut TestAppC
 }
 
 #[gpui::test]
+fn exporting_the_page_writes_every_row_of_the_page_from_the_first(cx: &mut TestAppContext) {
+    let (view, cx) = open_live(cx);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.export_selection_or_page(cx)));
+    view.read_with(cx, |view, cx| {
+        let text = cx.read_from_clipboard().expect("clipboard text").text().expect("text");
+        let lines: Vec<&str> = text.lines().collect();
+        assert_eq!(lines.len(), 7, "1 header line + all 6 rows: {text}");
+        assert!(lines[1].starts_with("1,Ada,"), "the first row comes first: {}", lines[1]);
+        assert!(lines[6].starts_with("6,"), "the last row comes last: {}", lines[6]);
+        assert_eq!(view.status, "Exported 6 rows as CSV to clipboard");
+    });
+}
+
+#[gpui::test]
 fn header_collapse_all_and_feedback_actions(cx: &mut TestAppContext) {
     let (view, cx) = open_live(cx);
 
