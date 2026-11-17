@@ -132,18 +132,29 @@ fn start_view(
         let status = gtk::Label::new(None);
         status.set_wrap(true);
         model.attach_status(&status);
-        let retry = gtk::Button::with_label(&bookie_app_services::tr!("Retry loading pages"));
-        let weak_model = model.downgrade();
-        retry.connect_clicked(move |_| {
-            if let Some(model) = weak_model.upgrade() {
-                model.retry_visible(&runtime, &spool, &columns);
-            }
-        });
+        let retry = retry_button(&model, runtime, spool, columns);
         container.append(&status);
         container.append(&retry);
         container.append(&column_selection_chrome);
         container.append(&crate::ui::grid::wrap_grid_scrolled(&view));
     });
+}
+
+fn retry_button(
+    model: &PagedModel,
+    runtime: tokio::runtime::Handle,
+    spool: bookie_app_services::stream_result_spool::StreamResultSpool,
+    columns: Vec<bookie_core::ColumnInfo>,
+) -> gtk::Button {
+    let retry = gtk::Button::with_label(&bookie_app_services::tr!("Retry loading pages"));
+    model.attach_retry(&retry);
+    let weak_model = model.downgrade();
+    retry.connect_clicked(move |_| {
+        if let Some(model) = weak_model.upgrade() {
+            model.retry_visible(&runtime, &spool, &columns);
+        }
+    });
+    retry
 }
 
 fn install_row_navigation(view: &gtk::ColumnView, selection: &gtk::MultiSelection, model: &PagedModel) {
