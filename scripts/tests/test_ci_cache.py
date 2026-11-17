@@ -489,7 +489,12 @@ class CiCacheTests(unittest.TestCase):
                 self.assertIn('path: src', block, name)
                 if '      - name: Check runner space before checkout\n' in block:
                     step = block.split('      - name: Check runner space before checkout\n', 1)[1].split('\n      - name:', 1)[0]
-                    self.assertIn('shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}', step, filename)
+                    reserve = 20 if filename == 'ci.yml' and name == 'sandbox' else 30
+                    self.assertIn(
+                        f'shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib {reserve} {{0}}',
+                        step,
+                        filename,
+                    )
                     self.assertIn('run: true', step, filename)
                 if name == 'guards':
                     self.assertIn(f'CARGO_TARGET_DIR: {pilot_target}', block, filename)
