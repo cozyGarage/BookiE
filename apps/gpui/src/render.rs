@@ -1,4 +1,5 @@
 use super::*;
+use crate::chrome::{STATUS_HEIGHT, TAB_HEIGHT, TOOLBAR_HEIGHT};
 
 impl Render for GridView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
@@ -235,8 +236,9 @@ impl Render for GridView {
                     cx.notify();
                 }
                 if this.resizing_split {
-                    let height = f32::from(window.viewport_size().height) - 72.0 - 24.0;
-                    this.result_ratio = result_ratio_from_drag(f32::from(event.position.y), 72.0, height);
+                    let top_offset = TOOLBAR_HEIGHT + TAB_HEIGHT;
+                    let height = f32::from(window.viewport_size().height) - top_offset - STATUS_HEIGHT;
+                    this.result_ratio = result_ratio_from_drag(f32::from(event.position.y), top_offset, height);
                     cx.notify();
                 }
             }))

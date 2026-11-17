@@ -13,9 +13,9 @@ use crate::ui_theme::ThemeExt;
 use crate::{GridView, thousands};
 use bookie_gpui::theme::Theme;
 
-const TOOLBAR_HEIGHT: f32 = 40.0;
-const TAB_HEIGHT: f32 = 32.0;
-const STATUS_HEIGHT: f32 = 24.0;
+pub(crate) const TOOLBAR_HEIGHT: f32 = 40.0;
+pub(crate) const TAB_HEIGHT: f32 = 32.0;
+pub(crate) const STATUS_HEIGHT: f32 = 24.0;
 
 fn ghost(id: impl Into<gpui::ElementId>, label: impl Into<String>, theme: Theme) -> Stateful<Div> {
     div()
@@ -689,10 +689,23 @@ impl GridView {
                 )
         };
         let shortcut = |id: &'static str, icon_name: &'static str, label: &'static str, cx: &mut Context<Self>| {
-            ghost_icon(id, icon_name, label, theme).on_click(cx.listener(|this, _, _, cx| {
-                this.status = "Synthetic prototype: nothing to open here.".into();
-                cx.notify();
-            }))
+            div()
+                .id(id)
+                .flex()
+                .items_center()
+                .gap_2()
+                .h(px(28.0))
+                .px_2()
+                .rounded(px(theme.radius))
+                .cursor_pointer()
+                .text_color(rgb(theme.foreground))
+                .hover(move |style| style.bg(rgb(theme.accent)))
+                .child(icon(icon_name, theme.muted_foreground))
+                .child(label)
+                .on_click(cx.listener(|this, _, _, cx| {
+                    this.status = "Synthetic prototype: nothing to open here.".into();
+                    cx.notify();
+                }))
         };
         div()
             .flex_1()
@@ -830,7 +843,17 @@ impl GridView {
             .border_color(rgb(theme.border))
             .text_size(px(12.0))
             .text_color(rgb(theme.muted_foreground))
-            .child(self.source.origin())
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap_2()
+                    .child(self.source.origin())
+                    .when(!self.status.is_empty(), |row| {
+                        row.child(div().child("·"))
+                            .child(div().text_color(rgb(theme.foreground)).child(self.status.clone()))
+                    }),
+            )
             .child(right)
     }
 

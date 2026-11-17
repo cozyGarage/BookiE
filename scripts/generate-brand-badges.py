@@ -54,7 +54,7 @@ for slug, name, status, accent, sbg, stxt in ENGINES:
 
 # Feature badges
 FEATURES = [
-    ("badge-gtk4", "Linux Native", "GTK4 & Libadwaita", "#1F4F48", "#C9A24B"),
+    ("badge-gtk4", "Linux First", "GTK4 & GPUI", "#1F4F48", "#C9A24B"),
     ("badge-policy", "PolicyGuard", "Zero-Account Gate", "#1F4F48", "#9EAE9A"),
     ("badge-keyring", "Secret Service", "Keyring Protected", "#1F4F48", "#9EAE9A"),
     ("badge-mcp", "AI Assistant", "MCP Ready", "#1F4F48", "#C9A24B"),

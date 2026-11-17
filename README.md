@@ -1,11 +1,11 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/brand/banner-dark.svg">
-    <img alt="BookiE: a native database client for Linux" src="docs/brand/banner-light.svg" width="100%">
+    <img alt="BookiE: a modern native database client (Linux first, cross-platform underway)" src="docs/brand/banner-light.svg" width="100%">
   </picture>
 </p>
 
-BookiE is a free, open-source database client for Linux, built for data analysts, database administrators, and developers. Browse tables, write SQL, investigate results, and review changes in a native desktop workspace.
+BookiE is a free, open-source database client focused on Linux first, built for data analysts, database administrators, and developers. Browse tables, write SQL, investigate results, and review changes in a native desktop workspace. A modern cross-platform GPUI frontend is in active parallel development ([ADR 0052](docs/decisions/0052-gpui-is-the-cross-platform-frontend.md)).
 
 <p align="center">
   <picture>
@@ -15,7 +15,7 @@ BookiE is a free, open-source database client for Linux, built for data analysts
 </p>
 
 <p align="center">
-  <img src="docs/brand/badges/badge-gtk4.svg" alt="Linux Native">
+  <img src="docs/brand/badges/badge-gtk4.svg" alt="Linux First">
   <img src="docs/brand/badges/badge-policy.svg" alt="PolicyGuard Safety">
   <img src="docs/brand/badges/badge-keyring.svg" alt="Secret Service">
   <img src="docs/brand/badges/badge-mcp.svg" alt="Model Context Protocol">
@@ -40,7 +40,7 @@ BookiE is a free, open-source database client for Linux, built for data analysts
 
 | | |
 |---|---|
-| Platform | Linux, with a native GTK4 and libadwaita interface. Cross-platform GPUI frontend in active parallel development ([ADR 0052](docs/decisions/0052-gpui-is-the-cross-platform-frontend.md)). |
+| Platform | Linux first, with a flagship GTK4 and libadwaita desktop interface. Cross-platform GPUI desktop frontend in active parallel development ([ADR 0052](docs/decisions/0052-gpui-is-the-cross-platform-frontend.md)). |
 | Databases | **11 engines**: PostgreSQL, MySQL, MariaDB, SQLite, SQL Server, and ClickHouse (Stable). DuckDB (built in), MongoDB, and Redis (Experimental). Read-only Oracle Database and Cassandra / ScyllaDB drivers (Experimental). See the [driver maturity table](docs/adding-drivers.md#driver-maturity). |
 | Cost | Free and open source under [AGPL-3.0-or-later](LICENSE). No accounts, subscriptions, license keys, paid tiers, or remote entitlement checks. |
 | Credentials | Securely stored in the system keyring (Secret Service via `oo7`). Plaintext files never hold passwords or passphrases. |
@@ -85,7 +85,7 @@ The name grew out of watching *Peaky Blinders* and thinking about the bookies ke
 
 BookiE is for the people doing that work today. Its purpose is to help you understand your data, maintain your databases, and make deliberate changes with a clear record of what happened.
 
-Open source makes this project possible. BookiE is an independent database client developed for the Linux desktop, drawing inspiration from the wider open-source database community. Building it is a way to give back through high-performance software, robust safety policy, comprehensive tests, documentation, and shared lessons. Contributions and credit belong alongside the code.
+Open source makes this project possible. BookiE is an independent database client developed with a Linux-first focus, drawing inspiration from the wider open-source database community. Building it is a way to give back through high-performance software, robust safety policy, comprehensive tests, documentation, and shared lessons. Contributions and credit belong alongside the code.
 
 ## Status
 
@@ -93,7 +93,7 @@ See the [release page](https://github.com/cozyGarage/BookiE/releases) for publis
 
 ## Supported platforms
 
-BookiE targets Linux. The [platform guide](docs/platforms.md) lists the current native-library floor and published artifacts.
+BookiE is focused on Linux first with its flagship GTK4 and libadwaita desktop application, and cross-platform desktop development is actively underway via GPUI ([ADR 0052](docs/decisions/0052-gpui-is-the-cross-platform-frontend.md)). The [platform guide](docs/platforms.md) lists the current native-library floor and published Linux artifacts.
 
 ## Architecture
 
@@ -111,7 +111,7 @@ Start with the [documentation map](docs/README.md) and [Project #3](https://gith
 
 ### Independence and system compatibility identifiers
 
-BookiE is an independent, standalone Linux database client with its own autonomous architecture, development lifecycle, and product roadmap.
+BookiE is an independent, standalone database client with a Linux-first focus, its own autonomous architecture, development lifecycle, and product roadmap.
 
 Installed commands are `bookie`, `bookie-agentd` and `bookie-askpass`. The app ID is `com.bookie.linux` and state lives under `~/.config/bookie/` and `~/.local/share/bookie/`. On first start the app copies state from the legacy `tablepro` locations and keyring entries and leaves the originals in place for rollback ([ADR 0027](docs/decisions/0027-complete-bookie-rename.md)). Cargo packages are `bookie-*`.
 
