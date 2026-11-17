@@ -666,7 +666,7 @@ fn exposed_toolbar(fixture: &EditorFixture) -> ([gtk::Button; 3], [gtk::Widget; 
             model.cancel_button.clone(),
             model.longer_timeout_button.clone(),
         ],
-        [model.run_button.parent().unwrap(), secondary],
+        [model.run_button.parent().unwrap().parent().unwrap(), secondary],
     )
 }
 

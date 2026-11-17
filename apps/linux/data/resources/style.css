@@ -219,25 +219,25 @@ columnview > header .tp-column-header-selected {
 }
 
 /* Compact SQL editor toolbar matching DBX and TablePro */
-.tp-editor-toolbar button {
-  padding-left: 6px;
-  padding-right: 6px;
+.tp-editor-toolbar button,
+.tp-editor-toolbar menubutton > button {
+  min-height: 24px;
+  padding: 0 6px;
+  -gtk-icon-size: 14px;
 }
 
-/* Link Run button and Run Options dropdown in editor toolbar */
-.tp-editor-toolbar button.suggested-action {
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
-  margin-right: 0;
+.tp-editor-toolbar {
+  font-size: 0.92em;
 }
 
-.tp-editor-toolbar menubutton.suggested-action > button {
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
-  border-left: 1px solid color-mix(in srgb, white 25%, transparent);
-  margin-left: 0;
-  padding-left: 4px;
-  padding-right: 4px;
+.tp-editor-toolbar .linked > button.suggested-action,
+.tp-editor-toolbar .linked > menubutton.suggested-action > button {
+  min-height: 24px;
+}
+
+.tp-editor-toolbar .linked > menubutton.suggested-action > button {
+  padding-left: 3px;
+  padding-right: 3px;
 }
 
 list.tp-sidebar-item,
