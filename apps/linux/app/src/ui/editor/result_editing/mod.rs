@@ -244,8 +244,7 @@ impl SqlEditor {
             .change_trackers
             .with_tab(editing.tab_id, |tracker| tracker.clear());
         self.refresh_result_pending_bar(0, Some(sender));
-        if let Some(refusal) = common_refusal(self, outcomes) {
-            self.lock_result_edits(ResultEdit::Locked(refusal));
+        if self.lock_when_refused_up_front(outcomes) {
             return;
         }
         let Some(outcome) = outcomes.first() else {
@@ -286,6 +285,25 @@ impl SqlEditor {
         };
         self.show_refusal(ResultRefusal::Checking);
         self.fetch_edit_columns(run, source, sender);
+    }
+
+    fn lock_when_refused_up_front(&mut self, outcomes: &[StatementOutcome]) -> bool {
+        if !outcomes.iter().any(|outcome| outcome_has_grid(&outcome.kind)) {
+            self.lock_result_edits_without_banner(ResultRefusal::NotOneSelect);
+            return true;
+        }
+        let Some(refusal) = common_refusal(self, outcomes) else {
+            return false;
+        };
+        self.lock_result_edits(ResultEdit::Locked(refusal));
+        true
+    }
+
+    fn lock_result_edits_without_banner(&mut self, refusal: ResultRefusal) {
+        self.hide_refusal();
+        if let Some(editing) = self.result_editing.as_mut() {
+            editing.state = Some(ResultEdit::Locked(refusal));
+        }
     }
 
     fn lock_result_edits(&mut self, state: ResultEdit) {
@@ -570,10 +588,52 @@ fn common_refusal(editor: &SqlEditor, outcomes: &[StatementOutcome]) -> Option<R
     None
 }
 
+fn outcome_has_grid(kind: &StatementOutcomeKind) -> bool {
+    match kind {
+        StatementOutcomeKind::Streamed(_) => true,
+        StatementOutcomeKind::Rows(sets) => sets.iter().any(|set| !set.columns.is_empty()),
+        StatementOutcomeKind::Error(_) | StatementOutcomeKind::NotRun => false,
+    }
+}
+
 fn stream_or_other_refusal(kind: &StatementOutcomeKind) -> ResultRefusal {
     match kind {
         StatementOutcomeKind::Streamed(_) => ResultRefusal::NotOneSelect,
         StatementOutcomeKind::Rows(_) => ResultRefusal::MultiResult,
         StatementOutcomeKind::Error(_) | StatementOutcomeKind::NotRun => ResultRefusal::NotOneSelect,
+    }
+}
+
+#[cfg(test)]
+mod grid_tests {
+    use super::*;
+
+    fn result(columns: usize) -> std::sync::Arc<bookie_core::QueryResult> {
+        let column = |index: usize| bookie_core::ColumnInfo {
+            name: format!("c{index}"),
+            data_type: "text".into(),
+            nullable: true,
+            primary_key: false,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: None,
+            domain_type: None,
+        };
+        std::sync::Arc::new(bookie_core::QueryResult {
+            columns: (0..columns).map(column).collect(),
+            rows: Vec::new().into(),
+            truncated: false,
+        })
+    }
+
+    #[test]
+    fn only_outcomes_that_show_a_grid_can_carry_an_edit_refusal_banner() {
+        assert!(outcome_has_grid(&StatementOutcomeKind::Rows(vec![result(2)])));
+        assert!(!outcome_has_grid(&StatementOutcomeKind::Rows(vec![result(0)])));
+        assert!(!outcome_has_grid(&StatementOutcomeKind::Rows(Vec::new())));
+        assert!(!outcome_has_grid(&StatementOutcomeKind::NotRun));
     }
 }
