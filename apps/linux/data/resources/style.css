@@ -231,6 +231,20 @@ columnview > header .tp-column-header-selected {
 .tp-zoom-p7 { font-size: 170%; }
 .tp-zoom-p8 { font-size: 180%; }
 
+.tp-zoom-m1 textview,
+.tp-zoom-m2 textview,
+.tp-zoom-m3 textview,
+.tp-zoom-p1 textview,
+.tp-zoom-p2 textview,
+.tp-zoom-p3 textview,
+.tp-zoom-p4 textview,
+.tp-zoom-p5 textview,
+.tp-zoom-p6 textview,
+.tp-zoom-p7 textview,
+.tp-zoom-p8 textview {
+  font-size: 100%;
+}
+
 /* Compact SQL editor toolbar matching DBX and TablePro */
 .tp-editor-toolbar button {
   padding-left: 6px;
