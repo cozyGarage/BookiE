@@ -202,3 +202,20 @@ fn malformed_preview_displays_an_error_and_keeps_import_disabled() {
     dialog.close();
     window.close();
 }
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn the_multi_character_row_overrides_the_delimiter_choice_and_rejects_bad_text() {
+    adw::init().unwrap();
+    let file = FileOptions::new(&request());
+    assert!(file.options().custom_delimiter.is_none());
+    file.custom_delimiter.set_text("||");
+    assert_eq!(file.options().custom_delimiter.as_ref().map(|d| d.as_str()), Some("||"));
+    file.custom_delimiter.set_text("a'b");
+    assert_eq!(file.custom_delimiter_choice(), Err(CustomDelimiterError::Quote));
+    assert!(file.options().custom_delimiter.is_none());
+    file.custom_delimiter.set_text("123456789");
+    assert_eq!(file.custom_delimiter_choice(), Err(CustomDelimiterError::TooLong));
+    file.custom_delimiter.set_text("");
+    assert_eq!(file.custom_delimiter_choice(), Ok(None));
+}
