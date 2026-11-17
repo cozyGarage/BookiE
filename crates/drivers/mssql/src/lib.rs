@@ -1059,15 +1059,8 @@ fn boxed_params(params: &[Value]) -> Result<Vec<Box<dyn ToSql>>, DriverError> {
         .collect()
 }
 
-fn quote_ident(name: &str) -> String {
-    format!("[{}]", name.replace(']', "]]"))
-}
-
 fn qualified(schema: Option<&str>, table: &str) -> String {
-    match schema {
-        Some(s) => format!("{}.{}", quote_ident(s), quote_ident(table)),
-        None => quote_ident(table),
-    }
+    bookie_core::sql_dialect::qualified_table("mssql", schema, table)
 }
 
 fn text_param(s: &str) -> Value {

@@ -1053,7 +1053,7 @@ fn rows_page_sql(schema: Option<&str>, table: &str, offset: u64, limit: u64) -> 
 }
 
 fn quote_ident(name: &str) -> String {
-    format!("\"{}\"", name.replace('"', "\"\""))
+    bookie_core::sql_dialect::quote_ident("postgres", name)
 }
 
 fn normalize_pg_default(raw: String) -> String {
@@ -1075,10 +1075,7 @@ fn is_quoted_literal(operand: &str) -> bool {
 }
 
 fn qualified(schema: Option<&str>, table: &str) -> String {
-    match schema {
-        Some(s) => format!("{}.{}", quote_ident(s), quote_ident(table)),
-        None => quote_ident(table),
-    }
+    bookie_core::sql_dialect::qualified_table("postgres", schema, table)
 }
 
 /// Map `pg_constraint.confdeltype` / `confupdtype` single-char codes

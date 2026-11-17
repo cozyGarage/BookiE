@@ -1044,15 +1044,8 @@ fn mysql_connect_options(opts: &ConnectOptions) -> MySqlConnectOptions {
     mysql_opts
 }
 
-fn quote_ident(name: &str) -> String {
-    format!("`{}`", name.replace('`', "``"))
-}
-
 fn qualified(schema: Option<&str>, table: &str) -> String {
-    match schema {
-        Some(s) => format!("{}.{}", quote_ident(s), quote_ident(table)),
-        None => quote_ident(table),
-    }
+    bookie_core::sql_dialect::qualified_table("mysql", schema, table)
 }
 
 const UNQUOTED_DEFAULT_TYPE_PREFIXES: [&str; 12] = [

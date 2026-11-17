@@ -1059,7 +1059,7 @@ fn rows_page_sql(schema: Option<&str>, table: &str, offset: u64, limit: u64) -> 
 }
 
 fn quote_ident(name: &str) -> String {
-    format!("\"{}\"", name.replace('"', "\"\""))
+    bookie_core::sql_dialect::quote_ident("sqlite", name)
 }
 
 async fn params_into_result(

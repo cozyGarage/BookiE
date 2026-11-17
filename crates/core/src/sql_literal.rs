@@ -1,5 +1,5 @@
 use crate::query::{ColumnInfo, Value};
-use crate::sql_dialect::{BuildSqlError, quote_ident};
+use crate::sql_dialect::{BuildSqlError, qualified_table, quote_ident};
 use chrono::{Datelike, Timelike};
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -228,7 +228,7 @@ pub fn build_insert_literal(
         names.push(quote_ident(driver_id, &column.name));
         values.push(column_literal(driver_id, column, value)?);
     }
-    let qualified = qualified_table_name(driver_id, schema, table);
+    let qualified = qualified_table(driver_id, schema, table);
     if names.is_empty() {
         return if matches!(driver_id, "postgres" | "mssql") {
             Ok(format!("INSERT INTO {qualified} DEFAULT VALUES;"))
@@ -294,13 +294,6 @@ impl RowStatement {
     }
 }
 
-fn qualified_table_name(driver_id: &str, schema: Option<&str>, table: &str) -> String {
-    match schema {
-        Some(schema) => format!("{}.{}", quote_ident(driver_id, schema), quote_ident(driver_id, table)),
-        None => quote_ident(driver_id, table),
-    }
-}
-
 fn column_literal(driver_id: &str, column: &ColumnInfo, value: &Value) -> Result<String, BuildSqlError> {
     if driver_id == "mysql" && matches!(value, Value::Text(text) if text.is_empty()) {
         // MariaDB's EMPTY_STRING_IS_NULL mode turns an empty SQL string
@@ -363,7 +356,7 @@ pub fn build_update_literal(
     }
     Ok(format!(
         "UPDATE {} SET {} WHERE {};",
-        qualified_table_name(driver_id, schema, table),
+        qualified_table(driver_id, schema, table),
         assignments.join(", "),
         predicate
     ))
@@ -379,7 +372,7 @@ pub fn build_delete_literal(
     let predicate = primary_key_predicate(driver_id, columns, row)?;
     Ok(format!(
         "DELETE FROM {} WHERE {};",
-        qualified_table_name(driver_id, schema, table),
+        qualified_table(driver_id, schema, table),
         predicate
     ))
 }

@@ -335,7 +335,8 @@ pub(super) fn keyed_where_clause(
     clauses.join(" AND ")
 }
 
-pub(super) fn qualified_table(driver_id: &str, schema: Option<&str>, table: &str) -> String {
+/// Quotes `schema.table` (or just `table`) the way the driver's dialect requires.
+pub fn qualified_table(driver_id: &str, schema: Option<&str>, table: &str) -> String {
     match schema {
         Some(s) => format!("{}.{}", quote_ident(driver_id, s), quote_ident(driver_id, table)),
         None => quote_ident(driver_id, table),
