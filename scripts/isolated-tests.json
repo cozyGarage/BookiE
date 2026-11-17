@@ -345,6 +345,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::export_dialog::lifetime_tests::an_invalid_row_limit_blocks_export_until_it_is_fixed"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::grid::row_number_tests::a_shared_base_handle_renumbers_rows_that_are_bound_again"
     ],
     [

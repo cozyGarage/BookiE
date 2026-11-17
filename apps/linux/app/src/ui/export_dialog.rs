@@ -1,4 +1,5 @@
 mod file;
+mod row_limit;
 mod scope;
 mod spool;
 pub(crate) use scope::ExportScope;
@@ -450,9 +451,11 @@ fn wire_export_sensitivity(
     scope_choice: &Option<adw::ComboRow>,
     full_export_available: bool,
     csv: &CsvControls,
+    row_limit: &adw::EntryRow,
     export_button: &gtk::Button,
 ) {
     let update = {
+        let row_limit = row_limit.clone();
         let scope_choice = scope_choice.clone();
         let custom_delimiter = csv.custom_delimiter.clone();
         let group = csv.group.clone();
@@ -475,7 +478,8 @@ fn wire_export_sensitivity(
                     custom_delimiter.set_tooltip_text(None);
                 }
             }
-            export_button.set_sensitive(scope_ok && (delimiter.is_ok() || !group.is_visible()));
+            let limit_ok = row_limit::choice(&row_limit).is_ok();
+            export_button.set_sensitive(scope_ok && limit_ok && (delimiter.is_ok() || !group.is_visible()));
         })
     };
     if let Some(choice) = scope_choice.as_ref() {
@@ -484,6 +488,8 @@ fn wire_export_sensitivity(
     }
     let for_text = update.clone();
     csv.custom_delimiter.connect_changed(move |_| for_text());
+    let for_limit = update.clone();
+    row_limit.connect_changed(move |_| for_limit());
     csv.group.connect_visible_notify(move |_| update());
 }
 
@@ -497,6 +503,7 @@ struct ExportActionParams {
     safe_csv: adw::SwitchRow,
     spare_numbers: adw::SwitchRow,
     custom_delimiter: adw::EntryRow,
+    row_limit: adw::EntryRow,
     null_marker: String,
     sql_target: adw::EntryRow,
     suggested_name: String,
@@ -545,6 +552,7 @@ fn attach_export_action(
                 sanitize_formulas: params.safe_csv.is_active(),
                 spare_plain_numbers: params.spare_numbers.is_active(),
                 custom_delimiter: custom_delimiter_choice(&params.custom_delimiter).ok().flatten(),
+                row_limit: row_limit::choice(&params.row_limit).ok().flatten(),
                 null_marker: if all_rows {
                     "\\N".to_string()
                 } else {
@@ -601,6 +609,8 @@ fn present_export(
     page.add(&scope_group);
     let formats = available_formats(&driver_id, paged.as_ref());
     let (format_group, format_row) = build_format_group(&formats, &result, paged.as_ref(), json);
+    let row_limit = row_limit::build();
+    format_group.add(&row_limit);
     page.add(&format_group);
 
     let csv = build_csv_group(preferences, &null_marker, json);
@@ -613,7 +623,7 @@ fn present_export(
     wire_export_signals(preferences, &csv, &sql_group, &formats, &format_row);
 
     let (footer, export_button) = build_footer(&csv);
-    wire_export_sensitivity(&scope_choice, full_export.is_some(), &csv, &export_button);
+    wire_export_sensitivity(&scope_choice, full_export.is_some(), &csv, &row_limit, &export_button);
     let dialog = build_export_dialog(&page, &footer, &export_button);
 
     let action_params = ExportActionParams {
@@ -626,6 +636,7 @@ fn present_export(
         safe_csv: csv.safe_csv,
         spare_numbers: csv.spare_numbers,
         custom_delimiter: csv.custom_delimiter,
+        row_limit,
         null_marker,
         sql_target,
         suggested_name,
@@ -648,6 +659,7 @@ struct SaveRequest {
     sanitize_formulas: bool,
     spare_plain_numbers: bool,
     custom_delimiter: Option<CustomDelimiter>,
+    row_limit: Option<usize>,
     null_marker: String,
     sql_target: String,
 }
@@ -664,6 +676,26 @@ fn export_filters(format: ExportFormat) -> (gtk::FileFilter, gio::ListStore) {
     (filter, filters)
 }
 
+fn csv_options(
+    include_header: bool,
+    sanitize_formulas: bool,
+    spare_plain_numbers: bool,
+    custom_delimiter: Option<CustomDelimiter>,
+    driver_id: &str,
+    null_marker: String,
+) -> bookie_core::export::CsvOptions {
+    bookie_core::export::CsvOptions {
+        null_to_empty: false,
+        header_row: include_header,
+        sanitize_formulas,
+        spare_plain_numbers,
+        custom_delimiter,
+        preserve_sqlite_result_types: driver_id == "sqlite",
+        null_marker: Some(null_marker),
+        ..Default::default()
+    }
+}
+
 fn save_with_file_dialog(parent: &adw::ApplicationWindow, toast_overlay: &adw::ToastOverlay, request: SaveRequest) {
     let SaveRequest {
         format,
@@ -676,6 +708,7 @@ fn save_with_file_dialog(parent: &adw::ApplicationWindow, toast_overlay: &adw::T
         sanitize_formulas,
         spare_plain_numbers,
         custom_delimiter,
+        row_limit,
         null_marker,
         sql_target,
     } = request;
@@ -698,16 +731,14 @@ fn save_with_file_dialog(parent: &adw::ApplicationWindow, toast_overlay: &adw::T
             return;
         };
         let path = normalize_duplicate_extension(path, format.extension());
-        let options = bookie_core::export::CsvOptions {
-            null_to_empty: false,
-            header_row: include_header,
+        let options = csv_options(
+            include_header,
             sanitize_formulas,
             spare_plain_numbers,
             custom_delimiter,
-            preserve_sqlite_result_types: driver_id == "sqlite",
-            null_marker: Some(null_marker),
-            ..Default::default()
-        };
+            &driver_id,
+            null_marker.clone(),
+        );
         let (schema, table) = insert_target(&sql_target);
         file::start(
             &parent_for_alert,
@@ -721,6 +752,7 @@ fn save_with_file_dialog(parent: &adw::ApplicationWindow, toast_overlay: &adw::T
                 driver_id: driver_id.clone(),
                 schema,
                 table,
+                row_limit,
             },
         );
     });
