@@ -1280,6 +1280,41 @@ fn the_csv_delimiter_command_changes_exports_until_it_is_reset(cx: &mut TestAppC
 }
 
 #[gpui::test]
+fn the_export_limit_command_stops_the_csv_export_until_it_is_removed(cx: &mut TestAppContext) {
+    let (view, cx) = open_live(cx);
+
+    view.update(cx, |view, _| {
+        view.palette_limit = bookie_gpui::export_limit::parse_command("export limit 1");
+        let actions = view.palette_actions();
+        let set = actions.iter().find(|action| action.id == "set-export-limit").expect("set action");
+        assert!(set.enabled && set.label.starts_with("Export limit 1"));
+        assert!(actions.iter().all(|action| action.id != "reset-export-limit"));
+        view.set_export_limit();
+        assert_eq!(view.status, "Export limit set to 1 rows");
+    });
+    cx.update(|_, cx| view.update(cx, |view, cx| view.export_selection_or_page(cx)));
+    view.read_with(cx, |view, cx| {
+        let text = cx.read_from_clipboard().expect("clipboard text").text().expect("text");
+        assert_eq!(text.lines().count(), 2, "1 header line + 1 data row: {text}");
+        assert!(view.status.contains("Exported the first 1 row"), "{}", view.status);
+        assert!(view.palette_actions().iter().any(|action| action.id == "reset-export-limit"));
+    });
+
+    view.update(cx, |view, _| {
+        view.palette_limit = bookie_gpui::export_limit::parse_command("export limit 0");
+        view.set_export_limit();
+        assert_eq!(view.status, "Export limit refused: a whole number of at least 1");
+        view.set_export_limit_to(None);
+        assert_eq!(view.status, "Export limit removed");
+    });
+    cx.update(|_, cx| view.update(cx, |view, cx| view.export_selection_or_page(cx)));
+    view.read_with(cx, |_, cx| {
+        let text = cx.read_from_clipboard().expect("clipboard text").text().expect("text");
+        assert!(text.lines().count() > 2, "{text}");
+    });
+}
+
+#[gpui::test]
 fn header_collapse_all_and_feedback_actions(cx: &mut TestAppContext) {
     let (view, cx) = open_live(cx);
 

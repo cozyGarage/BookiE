@@ -129,6 +129,8 @@ struct GridView {
     palette_pattern: Option<String>,
     palette_delimiter: Option<bookie_gpui::csv_delimiter::Parsed>,
     csv_delimiter: Option<bookie_core::export::CustomDelimiter>,
+    palette_limit: Option<bookie_gpui::export_limit::Parsed>,
+    export_limit: Option<usize>,
     check_histories: Vec<(String, bookie_app_services::checks::History)>,
     sidebar_open: bool,
     import_menu_open: bool,
@@ -275,6 +277,7 @@ impl GridView {
                     let typed = this.palette_input.read(cx).content().to_string();
                     this.palette_address = bookie_gpui::net_check::parse_address(&typed);
                     this.palette_delimiter = bookie_gpui::csv_delimiter::parse_command(&typed);
+                    this.palette_limit = bookie_gpui::export_limit::parse_command(&typed);
                     this.palette_pattern = this
                         .live
                         .as_ref()
@@ -354,7 +357,7 @@ impl GridView {
             sidebar_search,
             palette_input,
             keystroke_hook: None, editing: None, cell_cursor: None,
-            palette_address: None, palette_pattern: None, palette_delimiter: None, csv_delimiter: None, compare: None,
+            palette_address: None, palette_pattern: None, palette_delimiter: None, csv_delimiter: None, palette_limit: None, export_limit: None, compare: None,
             selection: None, pace: None, last_frame: None,
             focus_editor: false, continuous: false, filter_visible: false,
             grid_is_query: false, find_reset: false, palette_open: false,
