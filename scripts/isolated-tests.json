@@ -350,6 +350,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::import_dialog::lifetime_tests::opening_a_double_pipe_file_fills_the_multi_character_row_and_the_header_switch"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::import_dialog::lifetime_tests::the_multi_character_row_overrides_the_delimiter_choice_and_rejects_bad_text"
     ],
     [

@@ -6,6 +6,7 @@
 
 mod cell;
 mod csv_import;
+mod custom_detect;
 mod extended_temporal;
 mod infer;
 mod integer_type;
@@ -17,9 +18,10 @@ mod xlsx_import;
 pub use cell::{CellError, ColumnKind, CsvRowError, column_kind, parse_cell, row_to_values};
 pub use csv_import::{
     CsvFormat, CsvImportEncoding, CsvImportOptions, CsvImportQuote, CsvSheet, ImportError, MAX_COLUMNS,
-    MAX_FIELD_BYTES, MAX_FILE_BYTES, MAX_IMPORT_ROWS, MAX_PREVIEW_ROWS, detect_format, read_csv, read_csv_file,
-    read_import_file, suggest_mapping,
+    MAX_FIELD_BYTES, MAX_FILE_BYTES, MAX_IMPORT_ROWS, MAX_PREVIEW_ROWS, detect_format,
+    detect_header_with_custom_delimiter, read_csv, read_csv_file, read_import_file, suggest_mapping,
 };
+pub use custom_detect::detect_custom_delimiter;
 pub use extended_temporal::duckdb_extended_timestamptz_nanos;
 pub use infer::{INFER_SAMPLE_ROWS, infer_columns, supports_table_creation, type_name};
 pub use plan::{

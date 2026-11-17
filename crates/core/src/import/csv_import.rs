@@ -432,8 +432,17 @@ fn delimiter_score(bytes: &[u8], delimiter: CsvDelimiter) -> usize {
 }
 
 fn sample_records(bytes: &[u8], delimiter: CsvDelimiter) -> Vec<Vec<String>> {
+    sample_records_with(bytes, delimiter, None)
+}
+
+fn sample_records_with(
+    bytes: &[u8],
+    delimiter: CsvDelimiter,
+    custom_delimiter: Option<&CustomDelimiter>,
+) -> Vec<Vec<String>> {
     let options = CsvImportOptions {
         delimiter,
+        custom_delimiter: custom_delimiter.cloned(),
         has_header: false,
         ..CsvImportOptions::default()
     };
@@ -441,7 +450,14 @@ fn sample_records(bytes: &[u8], delimiter: CsvDelimiter) -> Vec<Vec<String>> {
 }
 
 fn detect_header(bytes: &[u8], delimiter: CsvDelimiter) -> bool {
-    let records = sample_records(bytes, delimiter);
+    header_in(sample_records(bytes, delimiter))
+}
+
+pub fn detect_header_with_custom_delimiter(bytes: &[u8], custom_delimiter: &CustomDelimiter) -> bool {
+    header_in(sample_records_with(bytes, CsvDelimiter::Comma, Some(custom_delimiter)))
+}
+
+fn header_in(records: Vec<Vec<String>>) -> bool {
     let Some(first) = records.first() else {
         return false;
     };
