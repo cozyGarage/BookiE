@@ -18,9 +18,14 @@ pub enum BrowseTabInput {
     ForeignKeysLoaded(Vec<ForeignKeyInfo>),
     InboundForeignKeysLoaded(Vec<InboundForeignKeyInfo>),
     EnumLabelsLoaded(Vec<(String, Vec<String>)>),
+    ForeignKeyCandidatesLoaded {
+        column: String,
+        candidates: Vec<String>,
+    },
     RowCountLoaded {
         request: BrowseRowCountRequest,
         count: u64,
+        is_estimated: bool,
     },
     RowCountFailed(BrowseRowCountRequest),
     ShowError(String),

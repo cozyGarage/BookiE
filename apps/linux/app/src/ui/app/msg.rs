@@ -217,7 +217,8 @@ pub enum AppMsg {
     /// `extra_windows` can be found and dropped.
     ExtraWindowClosed(usize),
     ExtraWindowDismissed(usize),
-    RowCountLoaded(Uuid, crate::ui::browse_tab::BrowseRowCountRequest, u64),
+    RowCountLoaded(Uuid, crate::ui::browse_tab::BrowseRowCountRequest, u64, bool),
+    ForeignKeyCandidatesLoaded(Uuid, String, Vec<String>),
     RowCountFailed(Uuid, crate::ui::browse_tab::BrowseRowCountRequest),
     JumpToColumn,
     ExportCsv,

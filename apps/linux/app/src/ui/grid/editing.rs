@@ -428,29 +428,10 @@ fn show_spin_button_popover(
 }
 
 fn show_json_popover(label: &CellEditor, col_index: usize, sender: &relm4::Sender<GridMsg>) {
-    let buffer = sourceview5::Buffer::new(None);
-    if let Some(lang) = sourceview5::LanguageManager::default().language("json") {
-        buffer.set_language(Some(&lang));
-    }
     let seed = FULL_EDIT_TEXT_SLOT
         .cloned(label)
         .unwrap_or_else(|| label.text().to_string());
-    buffer.set_text(&seed);
-
-    let view = sourceview5::View::with_buffer(&buffer);
-    crate::ui::theme::style_editor(&view);
-    view.set_show_line_numbers(true);
-    view.set_monospace(true);
-    view.set_auto_indent(true);
-    view.set_tab_width(2);
-    view.set_indent_width(2);
-
-    let scrolled = gtk::ScrolledWindow::builder()
-        .child(&view)
-        .min_content_width(420)
-        .min_content_height(280)
-        .has_frame(true)
-        .build();
+    let (view, buffer, scrolled) = build_json_editor_view(&seed);
 
     let save_button = gtk::Button::with_label(&bookie_app_services::tr!("Save"));
     save_button.add_css_class("suggested-action");
@@ -504,6 +485,30 @@ fn show_json_popover(label: &CellEditor, col_index: usize, sender: &relm4::Sende
     install_popover_close_cleanup(label, &popover);
     popover.popup();
     view.grab_focus();
+}
+
+fn build_json_editor_view(seed: &str) -> (sourceview5::View, sourceview5::Buffer, gtk::ScrolledWindow) {
+    let buffer = sourceview5::Buffer::new(None);
+    if let Some(lang) = sourceview5::LanguageManager::default().language("json") {
+        buffer.set_language(Some(&lang));
+    }
+    buffer.set_text(seed);
+
+    let view = sourceview5::View::with_buffer(&buffer);
+    crate::ui::theme::style_editor(&view);
+    view.set_show_line_numbers(true);
+    view.set_monospace(true);
+    view.set_auto_indent(true);
+    view.set_tab_width(2);
+    view.set_indent_width(2);
+
+    let scrolled = gtk::ScrolledWindow::builder()
+        .child(&view)
+        .min_content_width(420)
+        .min_content_height(280)
+        .has_frame(true)
+        .build();
+    (view, buffer, scrolled)
 }
 
 fn install_popover_close_cleanup(label: &CellEditor, popover: &gtk::Popover) {

@@ -303,8 +303,17 @@ pub(super) fn build_shortcuts_dialog() -> adw::ShortcutsDialog {
     let dialog = adw::ShortcutsDialog::builder()
         .title(bookie_app_services::tr!("Keyboard Shortcuts"))
         .build();
+    add_general_shortcuts(&dialog);
+    add_browse_shortcuts(&dialog);
+    add_selection_shortcuts(&dialog);
+    add_editor_shortcuts(&dialog);
+    add_context_shortcuts(&dialog);
+    dialog
+}
+
+fn add_general_shortcuts(dialog: &adw::ShortcutsDialog) {
     add_shortcut_group(
-        &dialog,
+        dialog,
         &bookie_app_services::tr!("General"),
         &[
             ("<Primary>e", bookie_app_services::tr!("Open SQL editor")),
@@ -338,8 +347,11 @@ pub(super) fn build_shortcuts_dialog() -> adw::ShortcutsDialog {
             ("<Primary>q", bookie_app_services::tr!("Quit")),
         ],
     );
+}
+
+fn add_browse_shortcuts(dialog: &adw::ShortcutsDialog) {
     add_shortcut_group(
-        &dialog,
+        dialog,
         &bookie_app_services::tr!("Browse table"),
         &[
             ("F2", bookie_app_services::tr!("Edit focused cell (or press Return)")),
@@ -388,8 +400,11 @@ pub(super) fn build_shortcuts_dialog() -> adw::ShortcutsDialog {
             ("<Primary>End", bookie_app_services::tr!("Jump to last row of page")),
         ],
     );
+}
+
+fn add_selection_shortcuts(dialog: &adw::ShortcutsDialog) {
     add_shortcut_group(
-        &dialog,
+        dialog,
         &bookie_app_services::tr!("Row selection"),
         &[
             (
@@ -402,8 +417,11 @@ pub(super) fn build_shortcuts_dialog() -> adw::ShortcutsDialog {
             ),
         ],
     );
+}
+
+fn add_editor_shortcuts(dialog: &adw::ShortcutsDialog) {
     add_shortcut_group(
-        &dialog,
+        dialog,
         &bookie_app_services::tr!("SQL editor"),
         &[
             ("<Primary><Alt>g", bookie_app_services::tr!("Focus result grid")),
@@ -454,8 +472,11 @@ pub(super) fn build_shortcuts_dialog() -> adw::ShortcutsDialog {
             ),
         ],
     );
+}
+
+fn add_context_shortcuts(dialog: &adw::ShortcutsDialog) {
     add_shortcut_group(
-        &dialog,
+        dialog,
         &bookie_app_services::tr!("Context-sensitive actions"),
         &[
             (
@@ -476,7 +497,6 @@ pub(super) fn build_shortcuts_dialog() -> adw::ShortcutsDialog {
             ),
         ],
     );
-    dialog
 }
 
 fn add_shortcut_group(dialog: &adw::ShortcutsDialog, title: &str, entries: &[(&str, String)]) {

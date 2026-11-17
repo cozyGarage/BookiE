@@ -80,6 +80,54 @@ impl BrowseTarget<'_> {
         self.filtered_query("COUNT(*)")
     }
 
+    pub fn estimated_count(&self) -> Option<BoundQuery> {
+        if !self.filter.is_empty() {
+            return None;
+        }
+        match self.driver_id {
+            "postgres" => {
+                let schema = self.schema.unwrap_or("public");
+                Some(BoundQuery {
+                    sql: "SELECT reltuples::bigint AS count FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = $1 AND c.relname = $2 AND c.reltuples >= 0".to_string(),
+                    params: vec![Value::Text(schema.to_string()), Value::Text(self.table.to_string())],
+                    projected_columns: None,
+                    reverse_rows: false,
+                    preview_columns: Vec::new(),
+                })
+            }
+            "mysql" | "mariadb" => {
+                let (sql, params) = match self.schema {
+                    Some(schema) => (
+                        "SELECT table_rows AS count FROM information_schema.tables WHERE table_schema = ? AND table_name = ? AND table_rows IS NOT NULL".to_string(),
+                        vec![Value::Text(schema.to_string()), Value::Text(self.table.to_string())],
+                    ),
+                    None => (
+                        "SELECT table_rows AS count FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ? AND table_rows IS NOT NULL".to_string(),
+                        vec![Value::Text(self.table.to_string())],
+                    ),
+                };
+                Some(BoundQuery {
+                    sql,
+                    params,
+                    projected_columns: None,
+                    reverse_rows: false,
+                    preview_columns: Vec::new(),
+                })
+            }
+            "mssql" => {
+                let schema = self.schema.unwrap_or("dbo");
+                Some(BoundQuery {
+                    sql: "SELECT SUM(p.rows) AS count FROM sys.tables t JOIN sys.partitions p ON t.object_id = p.object_id JOIN sys.schemas s ON t.schema_id = s.schema_id WHERE s.name = @P1 AND t.name = @P2 AND p.index_id IN (0, 1)".to_string(),
+                    params: vec![Value::Text(schema.to_string()), Value::Text(self.table.to_string())],
+                    projected_columns: None,
+                    reverse_rows: false,
+                    preview_columns: Vec::new(),
+                })
+            }
+            _ => None,
+        }
+    }
+
     pub fn value_query(&self, column_index: usize, pk_values: &[Value]) -> Result<BoundQuery, String> {
         if self.driver_id == "mongodb" {
             return mongodb::value_query(self, column_index, pk_values);
@@ -287,6 +335,50 @@ fn append_keyset_clause(
     query.sql.push_str(&clause);
     query.params.extend(params);
     Ok(true)
+}
+
+pub fn foreign_key_candidates_query(
+    driver_id: &str,
+    schema: Option<&str>,
+    table: &str,
+    column: &str,
+    limit: usize,
+) -> BoundQuery {
+    let quote = |s: &str| bookie_core::sql_dialect::quote_ident(driver_id, s);
+    let target = match schema {
+        Some(s) if !s.is_empty() => format!("{}.{}", quote(s), quote(table)),
+        _ => quote(table),
+    };
+    let col = quote(column);
+    let sql = match driver_id {
+        "mssql" => format!("SELECT DISTINCT TOP ({limit}) {col} FROM {target} WHERE {col} IS NOT NULL ORDER BY {col}"),
+        "oracle" => format!(
+            "SELECT DISTINCT {col} FROM {target} WHERE {col} IS NOT NULL ORDER BY {col} FETCH FIRST {limit} ROWS ONLY"
+        ),
+        _ => format!("SELECT DISTINCT {col} FROM {target} WHERE {col} IS NOT NULL ORDER BY {col} LIMIT {limit}"),
+    };
+    BoundQuery {
+        sql,
+        params: Vec::new(),
+        projected_columns: None,
+        reverse_rows: false,
+        preview_columns: Vec::new(),
+    }
+}
+
+pub fn format_candidate_value(val: &Value) -> Option<String> {
+    match val {
+        Value::Null => None,
+        Value::Text(t) => Some(t.clone()),
+        Value::Int(i) => Some(i.to_string()),
+        Value::Float(f) => Some(f.to_string()),
+        Value::Decimal(d) => Some(d.to_string()),
+        Value::Uuid(u) => Some(u.to_string()),
+        Value::Date(d) => Some(d.to_string()),
+        Value::DateTime(dt) => Some(dt.to_string()),
+        Value::TimestampTz(ts) => Some(ts.to_rfc3339()),
+        _ => None,
+    }
 }
 
 #[cfg(test)]
