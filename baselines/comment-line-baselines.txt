@@ -23,7 +23,7 @@ apps/linux/app/src/ui/app/row_ops.rs 9
 apps/linux/app/src/ui/app/status_pages.rs 4
 apps/linux/app/src/ui/app/structure.rs 16
 apps/linux/app/src/ui/app/workspace_chrome.rs 4
-apps/linux/app/src/ui/app/workspace_tabs.rs 111
+apps/linux/app/src/ui/app/workspace_tabs.rs 107
 apps/linux/app/src/ui/browse_tab/chrome.rs 18
 apps/linux/app/src/ui/browse_tab/grid_render.rs 12
 apps/linux/app/src/ui/browse_tab/mod.rs 189
