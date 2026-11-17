@@ -71,7 +71,7 @@ async fn describe_view(
     let result = connection
         .query_result(
             client,
-            "SELECT name, source_schema_name, source_table_name, source_column_name, \
+            "SELECT name, source_schema, source_table, source_column, \
                     is_updateable, is_computed_column \
              FROM sys.dm_exec_describe_first_result_set(@P1, NULL, 1) \
              WHERE error_number IS NULL AND is_hidden = 0 ORDER BY column_ordinal",
