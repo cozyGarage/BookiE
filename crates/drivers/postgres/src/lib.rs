@@ -1046,10 +1046,7 @@ pub(crate) async fn request_cancellation(cancel_token: PgCancelToken) -> Result<
 }
 
 fn rows_page_sql(schema: Option<&str>, table: &str, offset: u64, limit: u64) -> String {
-    format!(
-        "SELECT * FROM {} OFFSET {offset} LIMIT {limit}",
-        qualified(schema, table)
-    )
+    bookie_core::sql_dialect::rows_page_sql("postgres", schema, table, offset, limit)
 }
 
 fn quote_ident(name: &str) -> String {

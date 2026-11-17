@@ -882,10 +882,7 @@ where
 }
 
 fn rows_page_sql(schema: Option<&str>, table: &str, offset: u64, limit: u64) -> String {
-    format!(
-        "SELECT * FROM {} LIMIT {limit} OFFSET {offset}",
-        qualified(schema, table)
-    )
+    bookie_core::sql_dialect::rows_page_sql("mysql", schema, table, offset, limit)
 }
 
 async fn acquire_controlled(
@@ -1042,10 +1039,6 @@ fn mysql_connect_options(opts: &ConnectOptions) -> MySqlConnectOptions {
         }
     }
     mysql_opts
-}
-
-fn qualified(schema: Option<&str>, table: &str) -> String {
-    bookie_core::sql_dialect::qualified_table("mysql", schema, table)
 }
 
 const UNQUOTED_DEFAULT_TYPE_PREFIXES: [&str; 12] = [

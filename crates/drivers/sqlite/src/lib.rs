@@ -1051,11 +1051,7 @@ async fn refresh_schema(connection: &mut SqlxSqliteConnection, schema: &str) -> 
 }
 
 fn rows_page_sql(schema: Option<&str>, table: &str, offset: u64, limit: u64) -> String {
-    let table_ref = match schema {
-        Some(s) => format!("{}.{}", quote_ident(s), quote_ident(table)),
-        None => quote_ident(table),
-    };
-    format!("SELECT * FROM {table_ref} LIMIT {limit} OFFSET {offset}")
+    bookie_core::sql_dialect::rows_page_sql("sqlite", schema, table, offset, limit)
 }
 
 fn quote_ident(name: &str) -> String {
