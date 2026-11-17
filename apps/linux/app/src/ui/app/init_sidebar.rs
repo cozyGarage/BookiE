@@ -117,7 +117,7 @@ fn connect_setup(factory: &gtk::SignalListItemFactory, sender: &ComponentSender<
         let list_box = gtk::ListBox::builder()
             .selection_mode(gtk::SelectionMode::None)
             .activate_on_single_click(false)
-            .css_classes(["navigation-sidebar"])
+            .css_classes(["navigation-sidebar", "tp-sidebar-item"])
             .build();
         tree_expander.set_child(Some(&list_box));
         item.set_child(Some(&tree_expander));

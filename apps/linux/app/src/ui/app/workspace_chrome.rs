@@ -121,7 +121,10 @@ impl App {
 fn format_connection_subtitle(name: &str, driver: &str, metadata: Option<&ConnectionMetadata>) -> String {
     let mut parts = vec![name.to_string()];
     if let Some(meta) = metadata {
-        parts.push(meta.environment.display_name().to_string());
+        parts.push(match meta.environment {
+            bookie_core::Environment::Prod => bookie_app_services::tr!("Production"),
+            other => other.display_name().to_string(),
+        });
         match meta.server_version.as_deref().filter(|version| !version.is_empty()) {
             Some(version) if version_starts_with_driver_name(version, driver) => parts.push(version.to_string()),
             Some(version) => {
@@ -179,6 +182,20 @@ mod tests {
         assert_eq!(
             format_connection_subtitle("pg-local", "PostgreSQL", Some(&metadata)),
             "pg-local · Local · PostgreSQL 17.11"
+        );
+    }
+
+    #[test]
+    fn a_prod_connection_is_called_production_in_the_subtitle_like_its_badge() {
+        let metadata = ConnectionMetadata {
+            environment: bookie_core::Environment::Prod,
+            server_version: Some("PostgreSQL 17.11".into()),
+            ..metadata()
+        };
+
+        assert_eq!(
+            format_connection_subtitle("pg-prod", "PostgreSQL", Some(&metadata)),
+            "pg-prod · Production · PostgreSQL 17.11"
         );
     }
 
