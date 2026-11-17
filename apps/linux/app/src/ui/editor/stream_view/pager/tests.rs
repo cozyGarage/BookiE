@@ -10,9 +10,18 @@ fn pager_navigates_retained_pages_and_status_without_retaining_its_pages() {
     }
     pages.set_visible_child_name("Rows 6-7");
     let controls = build(&pages);
-    let previous = controls.first_child().unwrap().downcast::<gtk::Button>().unwrap();
+    let first = controls.first_child().unwrap().downcast::<gtk::Button>().unwrap();
+    let previous = first.next_sibling().unwrap().downcast::<gtk::Button>().unwrap();
     let range = previous.next_sibling().unwrap().downcast::<gtk::Label>().unwrap();
-    let next = controls.last_child().unwrap().downcast::<gtk::Button>().unwrap();
+    let next = range.next_sibling().unwrap().downcast::<gtk::Button>().unwrap();
+    let last = controls.last_child().unwrap().downcast::<gtk::Button>().unwrap();
+    assert!(!first.is_sensitive());
+    assert!(last.is_sensitive());
+    last.emit_clicked();
+    assert_eq!(pages.visible_child_name().as_deref(), Some("Status"));
+    assert!(first.is_sensitive());
+    first.emit_clicked();
+    assert_eq!(pages.visible_child_name().as_deref(), Some("Rows 6-7"));
     assert!(!previous.is_sensitive());
     assert!(next.is_sensitive());
     assert_eq!(range.text(), "Rows 6-7");
