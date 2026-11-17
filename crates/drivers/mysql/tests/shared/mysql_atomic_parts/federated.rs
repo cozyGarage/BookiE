@@ -9,29 +9,7 @@ use testcontainers_modules::testcontainers::runners::AsyncRunner;
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn mysql_failed_batch_federated_write_survives_rollback() {
-    let container = Mysql::default()
-        .with_tag(crate::MYSQL_TEST_TAG)
-        .with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test")
-        .with_cmd([
-            "--mysql-native-password=ON",
-            "--authentication-policy=mysql_native_password",
-            "--federated",
-            "--innodb-flush-log-at-trx-commit=0",
-            "--innodb-doublewrite=0",
-            "--sync-binlog=0",
-        ])
-        .start()
-        .await
-        .unwrap();
-    let opts = ConnectOptions {
-        host: container.get_host().await.unwrap().to_string(),
-        port: container.get_host_port_ipv4(3306).await.unwrap(),
-        database: "test".into(),
-        username: "root".into(),
-        password: secrecy::SecretString::new("bookie_test".to_string().into()),
-        tls: bookie_core::TlsConfig::disabled(),
-        ..Default::default()
-    };
+    let (container, opts) = start_mysql_with_federated().await;
     let conn = connect(opts.clone()).await;
     conn.execute("CREATE TABLE federated_remote_effects (id INT PRIMARY KEY) ENGINE=InnoDB")
         .await
@@ -212,7 +190,11 @@ async fn start_mariadb_with_federated() -> (testcontainers::ContainerAsync<Gener
         .with_env_var("MARIADB_ROOT_PASSWORD", "bookie_test")
         .with_env_var("MARIADB_DATABASE", "test")
         .with_cmd(["mariadbd", "--plugin-load-add=ha_federated"]);
-    let container = image.start().await.unwrap();
+    let container = image
+        .with_startup_timeout(std::time::Duration::from_secs(180))
+        .start()
+        .await
+        .unwrap();
     let opts = ConnectOptions {
         host: container.get_host().await.unwrap().to_string(),
         port: container.get_host_port_ipv4(3306).await.unwrap(),
@@ -272,6 +254,7 @@ async fn start_mysql_with_federated() -> (testcontainers::ContainerAsync<Mysql>,
             "--innodb-doublewrite=0",
             "--sync-binlog=0",
         ])
+        .with_startup_timeout(std::time::Duration::from_secs(180))
         .start()
         .await
         .unwrap();
