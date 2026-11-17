@@ -119,6 +119,11 @@ jobs:
           cd src
           cargo llvm-cov --workspace --lib --bins --json --summary-only --output-path "$GITHUB_WORKSPACE/coverage.json"
           python3 scripts/check-coverage-floor.py "$GITHUB_WORKSPACE/coverage.json"
+      - name: Per-crate line coverage floors
+        run: |
+          cd src
+          cargo llvm-cov --lib --bins --tests --no-fail-fast -p bookie-core -p bookie-policy -p bookie-results -p bookie-storage -p bookie-ssh -p bookie-transport -p bookie-mcp -p bookie-app-services -p bookie-dump -p bookie-pg-sessions --json --summary-only --output-path "$GITHUB_WORKSPACE/coverage-crates.json"
+          python3 scripts/check-crate-coverage-floors.py "$GITHUB_WORKSPACE/coverage-crates.json" --only crates/core crates/policy crates/results crates/storage crates/ssh crates/transport crates/mcp crates/app-services crates/dump crates/pg-sessions
 
       - name: Finalize runner job
         if: always()

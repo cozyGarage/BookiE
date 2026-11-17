@@ -1,7 +1,8 @@
 # Line coverage floors per crate, checked nightly by scripts/check-crate-coverage-floors.py.
-# Driver crates are measured with their Docker suites included (--include-ignored);
-# core and policy by their own tests. Each floor is about 3 points under the value measured
-# on 2026-10-14 with the nightly job's own commands (postgres: --lib --test integration; the rest: --lib --tests), so churn does not trip it but a real loss of tests does.
+# Driver crates are measured with their Docker suites included (--include-ignored); the rest by the
+# nightly `coverage` job's per-crate step: `cargo llvm-cov --lib --bins --tests --no-fail-fast` over the
+# crates listed there. Each floor is 3 points under the value measured with those commands (drivers:
+# 2026-10-14; the other crates: 2026-11-17), so churn does not trip it but a real loss of tests does.
 crates/drivers/postgres 84
 crates/drivers/mysql 91
 crates/drivers/sqlite 89
@@ -9,4 +10,12 @@ crates/drivers/mongodb 88
 crates/drivers/redis 85
 crates/drivers/clickhouse 80
 crates/core 92
-crates/policy 92
+crates/policy 93
+crates/pg-sessions 91
+crates/dump 87
+crates/mcp 87
+crates/results 86
+crates/app-services 84
+crates/storage 80
+crates/ssh 79
+crates/transport 77
