@@ -946,7 +946,7 @@ fn values_to_duck_params(params: &[Value]) -> Result<Vec<duckdb::types::Value>, 
 }
 
 fn quote_ident(name: &str) -> String {
-    format!("\"{}\"", name.replace('"', "\"\""))
+    bookie_core::sql_dialect::quote_ident("duckdb", name)
 }
 
 fn qualified(schema: Option<&str>, table: &str) -> String {

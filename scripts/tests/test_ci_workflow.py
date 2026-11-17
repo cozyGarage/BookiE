@@ -1293,7 +1293,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("compose logs --no-color --tail 50", script)
 
     def test_forgejo_jobs_bound_runtime_and_scope_checkout_credentials(self):
-        for name, expected_checkouts in (("ci", 26), ("nightly", 6)):
+        for name, expected_checkouts in (("ci", 26), ("nightly", 7)):
             workflow = (ROOT / f".forgejo/workflows/{name}.yml").read_text()
             jobs = workflow.split("\njobs:\n", 1)[1]
             headings = list(re.finditer(r"^  ([A-Za-z0-9_-]+):\s*$", jobs, re.MULTILINE))
@@ -1311,7 +1311,7 @@ class CiWorkflowTests(unittest.TestCase):
             self.assertEqual(workflow.count("uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683"), expected_checkouts)
             self.assertEqual(workflow.count("token: ${{ secrets.FORGEJO_TOKEN }}"), expected_checkouts)
             self.assertEqual(workflow.count("persist-credentials: false"), expected_checkouts)
-            expected_full_fetches = 2 if name == "ci" else 0
+            expected_full_fetches = 2 if name == "ci" else 1
             self.assertEqual(workflow.count("fetch-depth: 0"), expected_full_fetches)
             self.assertEqual(workflow.count("fetch-depth: 1"), expected_checkouts - expected_full_fetches)
             self.assertEqual(len(re.findall(r"(?m)^\s+path: src\s*$", workflow)), expected_checkouts)
@@ -1321,7 +1321,8 @@ class CiWorkflowTests(unittest.TestCase):
                 block = jobs[heading.start() : end]
                 if "uses: actions/checkout@" not in block:
                     continue
-                expected_depth = "0" if name == "ci" and heading.group(1) in {"pin-revision", "unit"} else "1"
+                full_history = {"ci": {"pin-revision", "unit"}, "nightly": {"plan"}}[name]
+                expected_depth = "0" if heading.group(1) in full_history else "1"
                 self.assertRegex(block, rf"(?m)^          fetch-depth: {expected_depth}$", heading.group(1))
 
     def test_cargo_about_comes_from_the_pinned_installer_and_is_never_built_in_ci(self):
@@ -1338,23 +1339,16 @@ class CiWorkflowTests(unittest.TestCase):
             harness.index("scripts/update-third-party-notices.py --check"),
         )
 
-    def test_forgejo_ci_and_nightly_share_a_per_ref_concurrency_group(self):
-        groups = []
-        for name in ("ci", "nightly"):
-            workflow = (ROOT / f".forgejo/workflows/{name}.yml").read_text()
-            match = re.search(r"^concurrency:\n((?:[ \t]+[^\n]*\n)+)", workflow, re.MULTILINE)
-            self.assertIsNotNone(match, name)
-            settings = dict(line.strip().split(":", 1) for line in match[1].splitlines())
-            expected_group = (
-                "build-linux-${{ github.event_name }}-${{ github.ref }}-${{ inputs.ref || 'auto' }}"
-                if name == "ci"
-                else "build-linux-${{ github.event_name }}-${{ github.ref }}-auto"
-            )
-            self.assertEqual(settings["group"].strip(), expected_group, name)
-            expected_cancel = "${{ github.event_name == 'pull_request' }}" if name == "ci" else "false"
-            self.assertEqual(settings["cancel-in-progress"].strip(), expected_cancel, name)
-            groups.append(settings["group"].strip())
-        self.assertEqual(groups[0].replace("-${{ inputs.ref || 'auto' }}", "-auto"), groups[1])
+    def test_forgejo_ci_concurrency_group_is_per_ref(self):
+        workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        match = re.search(r"^concurrency:\n((?:[ \t]+[^\n]*\n)+)", workflow, re.MULTILINE)
+        self.assertIsNotNone(match)
+        settings = dict(line.strip().split(":", 1) for line in match[1].splitlines())
+        self.assertEqual(
+            settings["group"].strip(),
+            "build-linux-${{ github.event_name }}-${{ github.ref }}-${{ inputs.ref || 'auto' }}",
+        )
+        self.assertEqual(settings["cancel-in-progress"].strip(), "${{ github.event_name == 'pull_request' }}")
         gate = (ROOT / "scripts/forgejo-gate.sh").read_text()
         self.assertIn('printf \'%s/%s\' "$remote" "$target" | sha256sum', gate)
 
@@ -2485,6 +2479,124 @@ class CiWorkflowTests(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(docker_count.read_text(), "2")
+
+
+nightly_plan_spec = importlib.util.spec_from_file_location("ci_nightly_plan", ROOT / "scripts/ci-nightly-plan.py")
+nightly_plan = importlib.util.module_from_spec(nightly_plan_spec)
+nightly_plan_spec.loader.exec_module(nightly_plan)
+
+
+class NightlyWorkflowContractTests(unittest.TestCase):
+    def setUp(self):
+        self.workflow = (ROOT / ".forgejo/workflows/nightly.yml").read_text()
+        body = self.workflow.split("\njobs:\n", 1)[1]
+        self.jobs = dict(re.findall(r"(?ms)^  ([a-z][a-z0-9-]*):\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", body))
+
+    def test_nightly_has_no_schedule_trigger(self):
+        code = "\n".join(line for line in self.workflow.splitlines() if not line.startswith("#"))
+        triggers = code.split("\njobs:\n", 1)[0]
+        self.assertNotIn("schedule:", triggers)
+        self.assertNotIn("cron:", code)
+        self.assertIn("  workflow_dispatch:\n", triggers)
+
+    def test_dispatch_offers_full_and_plan_only_booleans(self):
+        triggers = self.workflow.split("\njobs:\n", 1)[0]
+        for name in ("full", "plan_only"):
+            self.assertRegex(triggers, rf"(?m)^      {name}:\n(?:        .*\n)*?        type: boolean\n")
+
+    def test_a_new_nightly_cancels_the_old_one_instead_of_queueing(self):
+        self.assertRegex(self.workflow, r"(?m)^concurrency:\n  group: nightly-\$\{\{ github.ref \}\}")
+        self.assertRegex(self.workflow, r"(?m)^  cancel-in-progress: true$")
+
+    def test_the_plan_job_runs_the_planner_and_exposes_skip_and_the_matrices(self):
+        plan = self.jobs["plan"]
+        self.assertIn("python3 scripts/ci-nightly-plan.py", plan)
+        self.assertIn("--github-output", plan)
+        for output in ("skip", "drivers", "mutation", "gtk_soak", "values", "arch_package"):
+            self.assertIn(f"      {output}: ${{{{ steps.plan.outputs.{output} }}}}", plan)
+        self.assertNotIn("needs:", plan)
+
+    def test_every_other_job_waits_for_the_plan_and_honours_skip(self):
+        others = {name: block for name, block in self.jobs.items() if name != "plan"}
+        self.assertEqual(
+            set(others), {"coverage", "docker-coverage", "mutation", "gtk-soak", "arch-package", "values"}
+        )
+        for name, block in others.items():
+            with self.subTest(job=name):
+                self.assertRegex(block, r"(?m)^    needs: (plan|\[plan, [a-z-]+\])$")
+                condition = re.search(r"(?m)^    if: (.*)$", block).group(1)
+                self.assertIn("needs.plan.outputs.skip != 'true'", condition)
+                self.assertIn("needs.plan.result == 'success'", condition)
+
+    def test_matrices_come_from_the_plan(self):
+        expected = {
+            "docker-coverage": "driver: ${{ fromJSON(needs.plan.outputs.drivers) }}",
+            "mutation": "include: ${{ fromJSON(needs.plan.outputs.mutation) }}",
+            "gtk-soak": "run: ${{ fromJSON(needs.plan.outputs.gtk_soak) }}",
+        }
+        for name, line in expected.items():
+            self.assertIn(line, self.jobs[name], name)
+
+    def test_every_matrix_caps_parallelism_at_the_planner_value(self):
+        matrix_jobs = [name for name, block in self.jobs.items() if "    strategy:\n" in block]
+        self.assertEqual(set(matrix_jobs), {"docker-coverage", "mutation", "gtk-soak"})
+        for name in matrix_jobs:
+            self.assertIn(f"      max-parallel: {nightly_plan.MAX_PARALLEL}\n", self.jobs[name], name)
+        self.assertEqual(nightly_plan.MAX_PARALLEL, 3)
+
+    def test_every_job_has_the_timeout_the_planner_budgets(self):
+        self.assertEqual(set(self.jobs), set(nightly_plan.JOB_TIMEOUT_MINUTES))
+        for name, block in self.jobs.items():
+            with self.subTest(job=name):
+                self.assertIn(
+                    f"    timeout-minutes: {nightly_plan.JOB_TIMEOUT_MINUTES[name]}\n", block
+                )
+
+    def test_the_plan_step_passes_the_dispatch_inputs_to_the_planner(self):
+        plan = self.jobs["plan"]
+        self.assertIn("FULL_RUN: ${{ inputs.full }}", plan)
+        self.assertIn("PLAN_ONLY: ${{ inputs.plan_only }}", plan)
+        self.assertIn("args+=(--force)", plan)
+        self.assertIn("args+=(--plan-only)", plan)
+
+    def test_mutation_files_reach_the_shell_through_the_environment(self):
+        mutation = self.jobs["mutation"]
+        self.assertIn("MUTANT_FILES: ${{ matrix.files }}", mutation)
+        self.assertNotIn("${{ matrix.files }}\"", mutation.split("run: |", 1)[1])
+
+    def test_nightly_never_holds_more_than_half_the_runner_pool(self):
+        needs = {}
+        for name, block in self.jobs.items():
+            found = re.search(r"(?m)^    needs: (.*)$", block)
+            needs[name] = [item.strip() for item in found.group(1).strip("[]").split(",")] if found else []
+
+        def depth(name):
+            return 0 if not needs[name] else 1 + max(depth(parent) for parent in needs[name])
+
+        def width(name):
+            found = re.search(r"max-parallel: (\d+)", self.jobs[name])
+            return int(found.group(1)) if found else 1
+
+        stages = {}
+        for name in self.jobs:
+            stages[depth(name)] = stages.get(depth(name), 0) + width(name)
+        self.assertLessEqual(max(stages.values()), 7)
+        self.assertEqual(len(needs), len(self.jobs))
+
+    def test_every_nightly_job_picks_its_runner_from_one_variable(self):
+        for name, block in self.jobs.items():
+            with self.subTest(job=name):
+                self.assertIn("    runs-on: ${{ vars.NIGHTLY_LABEL || 'any-host' }}\n", block)
+        self.assertNotIn("runs-on: build-host", self.workflow)
+
+    def test_the_workflow_header_tells_the_operator_how_to_enable_it(self):
+        header = self.workflow.split("\nname: nightly\n", 1)[0]
+        for text in ("7 of the 15 runners", "NIGHTLY_LABEL=nightly", "schedule:"):
+            self.assertIn(text, header)
+
+    def test_the_planner_never_receives_a_printed_token(self):
+        self.assertEqual(self.workflow.count("FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}"), 1)
+        self.assertNotIn("echo \"$FORGEJO_TOKEN", self.workflow)
 
 
 if __name__ == "__main__":

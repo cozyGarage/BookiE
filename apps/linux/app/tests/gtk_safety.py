@@ -19,6 +19,8 @@ import pyatspi
 import gtk_workbook
 import gtk_parameters
 import gtk_xml
+from paginator_names import paginator_name_matches
+from process_stop import terminate
 import gtk_ux
 import gtk_whole_result
 import gtk_active_edit
@@ -188,6 +190,25 @@ def wait_within(root, name=None, role=None, present=True, timeout=WAIT_SECONDS):
     raise AssertionError(
         f"expected {name!r} to {expectation} inside {node_name(root)!r}:\n{accessible_snapshot()}"
     )
+
+
+def find_paginator(text, root=None):
+    for start in [root] if root is not None else desktop_applications():
+        for node in descendants(start):
+            if paginator_name_matches(node_name(node), text):
+                return node
+    return None
+
+
+def wait_for_paginator(text, root=None, present=True, timeout=WAIT_SECONDS):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        node = find_paginator(text, root)
+        if (node is not None) == present:
+            return node
+        time.sleep(POLL_SECONDS)
+    expectation = "appear" if present else "disappear"
+    raise AssertionError(f"expected paginator text {text!r} to {expectation}:\n{accessible_snapshot()}")
 
 
 def set_text_within(root, text):
@@ -1134,13 +1155,7 @@ def stop_application(process):
     global _owned_application
     if _owned_application is not None and _owned_application.process is process:
         _owned_application = None
-    if process.poll() is None:
-        process.send_signal(signal.SIGTERM)
-        try:
-            process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            process.kill()
-            process.wait(timeout=5)
+    terminate(process)
     stderr = read_application_stderr(process)
     if process.returncode not in {0, -signal.SIGTERM}:
         raise AssertionError(f"application exited with {process.returncode}: {stderr}")
@@ -2186,7 +2201,7 @@ def current_page_csv_export_is_pk_ordered(database, base):
     # The total comes from COUNT(*). SQLite used to decode that column as
     # NULL, so the label silently dropped the "of 150" half; asserting the
     # full label keeps that from regressing.
-    wait_for_node(name="Rows 1 – 100 of 150")
+    wait_for_paginator("Rows 1 – 100 of 150")
     invoke_accessible_action("win.export-csv")
     marker_field = wait_for_node(name="Text that means NULL", role=pyatspi.ROLE_TEXT)
     marker_text = marker_field.queryText()
@@ -2240,7 +2255,7 @@ def current_page_json_export_preserves_values(database, base):
             ((i, notes.get(i), blobs.get(i)) for i in range(150, 0, -1)),
         )
     invoke_named_action_within("safety_items", "Open safety_items")
-    wait_for_node(name="Rows 1 – 100 of 150")
+    wait_for_paginator("Rows 1 – 100 of 150")
     invoke_accessible_action("win.export-json")
     invoke(wait_for_node(name="Export…", role=pyatspi.ROLE_PUSH_BUTTON))
     export = base / "home" / "current-page.json"
@@ -2270,7 +2285,7 @@ def restart_restores_active_editor_and_connection(database, base, restart):
     wait_for_frame_containing(f"{CONNECTION_B_NAME} — BookiE")
     open_table_in_new_tab("kept_items")
     invoke_named_action_within("safety_items", "Open safety_items")
-    wait_for_node(name="Rows 1 – 3 of 3")
+    wait_for_paginator("Rows 1 – 3 of 3")
     invoke_accessible_action("win.open-editor")
     wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
     chunk = "Grüße 東京🙂 " * 10000
@@ -2296,7 +2311,7 @@ def restart_restores_active_editor_and_connection(database, base, restart):
     assert database_ids(database_b) == [1, 2, 3, 901]
     assert database_ids(database) == [], "restored editor wrote to the other connection"
     invoke_named_action_within("safety_items", "Open safety_items")
-    wait_for_node(name="Rows 1 – 4 of 4")
+    wait_for_paginator("Rows 1 – 4 of 4")
 
 
 restart_restores_active_editor_and_connection.environment = "local"
@@ -2435,7 +2450,7 @@ a_bundle_from_one_profile_imports_unchanged_into_an_empty_second_profile.needs_r
 
 def pending_edits_survive_opening_another_connection(database, base):
     invoke_named_action_within("safety_items", "Open safety_items")
-    wait_for_node(name="No rows on this page")
+    wait_for_paginator("No rows on this page")
     invoke(wait_for_node(name="Insert row", role=pyatspi.ROLE_PUSH_BUTTON))
     wait_for_node(name="1 unsaved change")
 
@@ -2462,7 +2477,7 @@ pending_edits_survive_opening_another_connection.environment = "local"
 
 def preview_sql_shows_the_pending_statement_without_saving(database, _base):
     invoke_named_action_within("safety_items", "Open safety_items")
-    wait_for_node(name="No rows on this page")
+    wait_for_paginator("No rows on this page")
     invoke(wait_for_node(name="Insert row", role=pyatspi.ROLE_PUSH_BUTTON))
     wait_for_node(name="1 unsaved change")
     invoke(wait_for_node(name="Preview SQL", role=pyatspi.ROLE_PUSH_BUTTON))
@@ -2899,7 +2914,7 @@ def switching_one_window_leaves_the_other_windows_edits(database, base):
     second_window = wait_for_frame_containing(f"{CONNECTION_B_NAME} — BookiE")
 
     invoke_named_action_within_node(second_window, "safety_items", "Open safety_items")
-    wait_within(second_window, name="No rows on this page")
+    wait_for_paginator("No rows on this page", root=second_window)
     invoke(wait_within(second_window, name="Insert row", role=pyatspi.ROLE_PUSH_BUTTON))
     wait_within(second_window, name="1 unsaved change")
 

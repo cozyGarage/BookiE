@@ -18,6 +18,10 @@ use testcontainers::{ContainerAsync, GenericImage, ImageExt};
 use tokio::io::AsyncReadExt;
 use tokio_util::sync::CancellationToken;
 
+fn short_tempdir() -> std::io::Result<tempfile::TempDir> {
+    tempfile::Builder::new().prefix("bk").tempdir_in("/tmp")
+}
+
 type TestResult<T> = Result<T, Box<dyn Error>>;
 
 const SSHD_SCRIPT: &str = "apk add --no-cache openssh >/dev/null \
@@ -84,7 +88,7 @@ async fn start_with_script(script: &str) -> TestResult<Fixture> {
     let host = container.get_host().await?.to_string();
     let port = container.get_host_port_ipv4(2222).await?;
 
-    let temp = tempfile::tempdir()?;
+    let temp = short_tempdir()?;
     let known_hosts = temp.path().join("known_hosts");
     let ssh_home = temp.path().join("home");
     let ssh_dir = ssh_home.join(".ssh");
@@ -316,7 +320,7 @@ async fn openssh_dropping_last_arc_ends_master() {
 
 #[tokio::test]
 async fn an_effective_proxy_command_is_refused_without_running_it() -> TestResult<()> {
-    let temp = tempfile::tempdir()?;
+    let temp = short_tempdir()?;
     let ssh_home = temp.path().join("home");
     let ssh_dir = ssh_home.join(".ssh");
     std::fs::create_dir_all(&ssh_dir)?;
@@ -410,7 +414,7 @@ async fn openssh_a_proxyjump_line_in_the_ssh_config_reaches_the_target() {
     let jump_port = jump.get_host_port_ipv4(2222).await.unwrap();
     let target_ip = target.get_bridge_ip_address().await.unwrap();
 
-    let temp = tempfile::tempdir().unwrap();
+    let temp = short_tempdir().unwrap();
     let known_hosts = temp.path().join("known_hosts");
     let ssh_home = temp.path().join("home");
     let ssh_dir = ssh_home.join(".ssh");
@@ -576,7 +580,7 @@ async fn start_with_authorized_key(public_key: &str, agent_socket: Option<&Path>
     let host = container.get_host().await?.to_string();
     let port = container.get_host_port_ipv4(2222).await?;
 
-    let temp = tempfile::tempdir()?;
+    let temp = short_tempdir()?;
     let known_hosts = temp.path().join("known_hosts");
     let identity_agent = agent_socket.map_or_else(|| "none".to_owned(), |socket| socket.display().to_string());
     let ssh_home = temp.path().join("home");
@@ -634,7 +638,7 @@ fn generate_ed25519_key(dir: &Path, passphrase: &str) -> (PathBuf, String) {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn openssh_authenticates_with_an_unencrypted_private_key() {
-    let dir = tempfile::tempdir().unwrap();
+    let dir = short_tempdir().unwrap();
     let (key, public) = generate_ed25519_key(dir.path(), "");
     let fixture = start_with_authorized_key(&public, None).await.unwrap();
 
@@ -658,7 +662,7 @@ async fn openssh_authenticates_with_an_unencrypted_private_key() {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn openssh_authenticates_with_a_passphrase_protected_private_key() {
-    let dir = tempfile::tempdir().unwrap();
+    let dir = short_tempdir().unwrap();
     let (key, public) = generate_ed25519_key(dir.path(), "s3cret-passphrase");
     let fixture = start_with_authorized_key(&public, None).await.unwrap();
 
@@ -708,7 +712,7 @@ fn start_agent(socket: &Path) -> SpawnedAgent {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn openssh_authenticates_with_a_key_held_by_ssh_agent() {
-    let dir = tempfile::tempdir().unwrap();
+    let dir = short_tempdir().unwrap();
     let (key, public) = generate_ed25519_key(dir.path(), "");
     let socket = dir.path().join("agent.sock");
     let agent = start_agent(&socket);

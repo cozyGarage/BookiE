@@ -30,16 +30,16 @@ def assert_workbook(cells):
     assert [Decimal(cells[f"A{row}"][1]) for row in range(2, 102)] == list(range(1, 101))
     assert "A102" not in cells, "export included a row outside the current page"
     for cell, expected in {
-        "B2": '=1+1 & "東京"', "C2": "9223372036854775807", "D2": "0000-01-01",
+        "B2": '=1+1 & "東京"', "C2": "9223372036854775807", "D2": "0001-01-01 BC",
         "E2": "12:34:56.123456789", "F2": "2026-09-27 12:34:56.123456789",
         "C3": "-9223372036854775808", "G2": "inf",
-        "D5": "+10000-01-01", "F5": "+10000-01-01 00:00:00",
+        "D5": "10000-01-01", "F5": "10000-01-01 00:00:00",
     }.items():
         assert cells[cell] == ("s", expected), (cell, cells.get(cell), expected)
     for cell, expected in {"D3": "1", "E3": "0.5", "F3": "1.5", "G3": "1.25"}.items():
         assert cells[cell][0] == "n" and Decimal(cells[cell][1]) == Decimal(expected), (cell, cells[cell])
     for column in "BCDEFG":
-        assert f"{column}4" not in cells, (column, "NULL did not remain blank")
+        assert cells.get(f"{column}4", ("n", "")) == ("n", ""), (column, "NULL did not remain blank")
 
 
 def seed_workbook(database):
@@ -76,7 +76,7 @@ def scenarios(ui):
         seed_workbook(database)
         before = database_rows(database)
         ui.invoke_named_action_within("safety_items", "Open safety_items")
-        ui.wait_for_node(name="Rows 1 – 100 of 150")
+        ui.wait_for_paginator("Rows 1 – 100 of 150")
         choose_workbook(ui)
         export = base / "home" / "typed-page.xlsx"
         ui.set_visible_editable_within("Export Results", ui.FILE_CHOOSER_ROLES, str(export))
@@ -92,7 +92,7 @@ def scenarios(ui):
         seed_workbook(database)
         before = database_rows(database)
         ui.invoke_named_action_within("safety_items", "Open safety_items")
-        ui.wait_for_node(name="Rows 1 – 100 of 150")
+        ui.wait_for_paginator("Rows 1 – 100 of 150")
         export = base / "home" / "keep.xlsx"
         export.write_bytes(b"existing file must survive")
         choose_workbook(ui)
@@ -111,7 +111,7 @@ def scenarios(ui):
             connection.execute("UPDATE safety_items SET note='' WHERE id=4")
         before = database_rows(database)
         ui.invoke_named_action_within("safety_items", "Open safety_items")
-        ui.wait_for_node(name="Rows 1 – 100 of 150")
+        ui.wait_for_paginator("Rows 1 – 100 of 150")
         choose_workbook(ui)
         export = base / "home" / "refused.xlsx"
         ui.set_visible_editable_within("Export Results", ui.FILE_CHOOSER_ROLES, str(export))

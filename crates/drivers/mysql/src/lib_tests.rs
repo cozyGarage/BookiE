@@ -116,9 +116,12 @@ fn only_unsupported_read_only_transaction_errors_use_the_policy_fallback() {
 
 #[test]
 fn quote_ident_doubles_embedded_backticks() {
-    assert_eq!(quote_ident("users"), "`users`");
-    assert_eq!(quote_ident("My Table"), "`My Table`");
-    assert_eq!(quote_ident("evil`; DROP TABLE x; --"), "`evil``; DROP TABLE x; --`");
+    assert_eq!(bookie_core::sql_dialect::quote_ident("mysql", "users"), "`users`");
+    assert_eq!(bookie_core::sql_dialect::quote_ident("mysql", "My Table"), "`My Table`");
+    assert_eq!(
+        bookie_core::sql_dialect::quote_ident("mysql", "evil`; DROP TABLE x; --"),
+        "`evil``; DROP TABLE x; --`"
+    );
 }
 
 fn connect_opts_with_client_tls(mode: bookie_core::TlsMode) -> ConnectOptions {

@@ -593,3 +593,19 @@ fn single_cell_update_refuses_a_column_index_past_the_schema() {
     let result = build_single_cell_update("postgres", "u", &columns, &original, 2, Value::Text("bob".into()));
     assert!(matches!(result, Err(BuildSqlError::StaleColumns)), "{result:?}");
 }
+
+#[test]
+fn rows_page_sql_keeps_each_dialects_clause_order_and_quoting() {
+    assert_eq!(
+        rows_page_sql("postgres", Some("public"), "us\"ers", 20, 10),
+        "SELECT * FROM \"public\".\"us\"\"ers\" OFFSET 20 LIMIT 10"
+    );
+    assert_eq!(
+        rows_page_sql("mysql", Some("app"), "users", 0, 5),
+        "SELECT * FROM `app`.`users` LIMIT 5 OFFSET 0"
+    );
+    assert_eq!(
+        rows_page_sql("sqlite", None, "users", 3, 4),
+        "SELECT * FROM \"users\" LIMIT 4 OFFSET 3"
+    );
+}
