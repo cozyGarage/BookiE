@@ -14,9 +14,9 @@ def valid_cells():
     cells = {f"A{row}": ("n", str(row - 1)) for row in range(2, 102)}
     cells.update({f"{column}1": ("s", name) for column, name in zip("ABCDEFG", ["id", "note", "wide", "day", "clock", "stamp", "measure"])})
     cells.update({cell: ("s", value) for cell, value in {
-        "B2": '=1+1 & "東京"', "C2": "9223372036854775807", "D2": "0000-01-01",
+        "B2": '=1+1 & "東京"', "C2": "9223372036854775807", "D2": "0001-01-01 BC",
         "E2": "12:34:56.123456789", "F2": "2026-09-27 12:34:56.123456789", "C3": "-9223372036854775808", "G2": "inf",
-        "D5": "+10000-01-01", "F5": "+10000-01-01 00:00:00",
+        "D5": "10000-01-01", "F5": "10000-01-01 00:00:00",
     }.items()})
     cells.update({cell: ("n", value) for cell, value in {"D3": "1", "E3": "0.5", "F3": "1.5", "G3": "1.25"}.items()})
     return cells
