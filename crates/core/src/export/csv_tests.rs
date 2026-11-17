@@ -651,3 +651,66 @@ fn the_formula_guard_can_spare_plain_numbers_but_not_formulas() {
         assert_eq!(escape_csv_field(text, &spared, false), format!("\"'{text}\""), "{text}");
     }
 }
+
+fn custom_options(delimiter: &str) -> CsvOptions {
+    CsvOptions {
+        custom_delimiter: Some(CustomDelimiter::new(delimiter).unwrap()),
+        ..CsvOptions::default()
+    }
+}
+
+#[test]
+fn a_multi_character_delimiter_separates_the_header_and_every_cell() {
+    let columns = [column("id"), column("note")];
+    let rows = vec![vec![Value::Int(1), Value::Text("plain".into())]];
+    let csv = render_csv(&columns, &rows, &custom_options("||"));
+    assert_eq!(csv, "id||note\n1||plain\n");
+}
+
+#[test]
+fn a_cell_holding_the_multi_character_delimiter_is_quoted() {
+    let columns = [column("id"), column("note")];
+    let rows = vec![vec![Value::Int(1), Value::Text("a||b".into())]];
+    let csv = render_csv(&columns, &rows, &custom_options("||"));
+    assert_eq!(csv, "id||note\n1||\"a||b\"\n");
+}
+
+#[test]
+fn an_export_with_a_multi_character_delimiter_is_re_imported_losslessly() {
+    let columns = [column("id"), column("note")];
+    let rows = vec![
+        vec![Value::Int(1), Value::Text("a||b".into())],
+        vec![Value::Int(2), Value::Text("say \"hi\"".into())],
+        vec![Value::Int(3), Value::Text("two\nlines||x".into())],
+        vec![Value::Int(4), Value::Text("::".into())],
+    ];
+    for delimiter in ["||", "::", "<>", "\u{2192}\u{2192}"] {
+        let csv = render_csv(&columns, &rows, &custom_options(delimiter));
+        let options = crate::import::CsvImportOptions {
+            custom_delimiter: Some(CustomDelimiter::new(delimiter).unwrap()),
+            ..Default::default()
+        };
+        let sheet = crate::import::read_csv(csv.as_bytes(), &options, None).unwrap();
+        assert_eq!(sheet.headers, ["id", "note"], "{delimiter}");
+        assert_eq!(
+            sheet.rows,
+            [["1", "a||b"], ["2", "say \"hi\""], ["3", "two\nlines||x"], ["4", "::"]],
+            "{delimiter}"
+        );
+    }
+}
+
+#[test]
+fn the_single_byte_delimiters_still_ignore_an_unset_custom_delimiter() {
+    let columns = [column("a"), column("b")];
+    let rows = vec![vec![Value::Int(1), Value::Int(2)]];
+    for delimiter in CsvDelimiter::ALL {
+        let options = CsvOptions {
+            delimiter,
+            ..CsvOptions::default()
+        };
+        assert_eq!(options.delimiter_text(), delimiter.as_str());
+        let csv = render_csv(&columns, &rows, &options);
+        assert_eq!(csv, format!("a{0}b\n1{0}2\n", delimiter.as_str()));
+    }
+}
