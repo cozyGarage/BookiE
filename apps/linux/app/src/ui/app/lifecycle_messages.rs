@@ -43,6 +43,7 @@ pub(super) fn cancel_session_teardown(app: &mut App, action: SessionTeardownActi
         SessionTeardownAction::ConnectionSwitch => {
             app.switch.transition = ConnectionTransition::Idle;
             app.switch.prepared = None;
+            app.pending_database_switch = None;
             app.switch.saves_pending.clear();
             app.switch.cancel_audit_was_disabled = None;
         }
