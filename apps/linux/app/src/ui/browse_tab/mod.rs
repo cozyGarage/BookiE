@@ -347,9 +347,6 @@ impl SimpleComponent for BrowseTab {
         // removed. Idempotent — calling twice is a no-op.
         init.change_trackers.open_tab(init.tab_id);
 
-        // Restore the saved filter for this (connection, schema,
-        // table) up front so both the model field and the inline
-        // strip start with the same FilterSet.
         let initial_filter = init
             .connection_id
             .filter(|_| init.browse_filters)
@@ -369,7 +366,6 @@ impl SimpleComponent for BrowseTab {
             .transition_type(gtk::StackTransitionType::Crossfade)
             .build();
         inner_stack.add_named(&grid_holder, Some("grid"));
-        // Initial state: loading. The first RowsLoaded swaps to "grid".
         let initial_loading = adw::StatusPage::builder()
             .title(bookie_app_services::tr!("Loading…"))
             .description(bookie_app_services::tr!("Fetching rows from {table}").replace(
@@ -485,12 +481,6 @@ impl SimpleComponent for BrowseTab {
             let sync = sync_top_bar_slot.clone();
             filter_strip.widget.connect_reveal_child_notify(move |_| sync());
         }
-        // Bottom toolbars (stacked in `add_bottom_bar` call order):
-        //   1. Paginator — always visible (nav + count + page size +
-        //      Filter + Export).
-        //   2. Pending revealer — slides into view only when the tab
-        //      has unsaved edits (Save / Discard / "N unsaved" label).
-        // Visual hierarchy: grid → paginator → pending (transient).
         root.add_bottom_bar(&paginator.bar);
         root.add_bottom_bar(&pending.widget);
         // Per-tab GridMsg channel: events from this tab's grid (sort
@@ -650,10 +640,6 @@ impl SimpleComponent for BrowseTab {
         esc_controller.add_shortcut(end_shortcut);
         root.add_controller(esc_controller);
 
-        // Wire the GridMsg receiver into this tab's input queue. Each
-        // GridMsg becomes a BrowseTabInput tagged with the same payload
-        // shape; the tab's update() then routes them to the App via
-        // outputs that App's forwarder tags with this tab's id.
         let grid_input = sender.input_sender().clone();
         relm4::spawn_local(grid_receiver.forward(grid_input, grid_messages::to_input));
 
@@ -733,10 +719,6 @@ impl SimpleComponent for BrowseTab {
         model.refresh_crud_buttons();
         model.refresh_pending_bar(0);
         model.refresh_auto_refresh_availability();
-        // If the user has a saved filter on this (connection, schema,
-        // table), the button picks up the .accent badge before the
-        // first fetch returns so the filter state is visible from
-        // the moment the tab opens.
         model.refresh_filter_chrome();
 
         // Subscribe to the tracker so we can refresh the pending UI
@@ -853,8 +835,6 @@ impl SimpleComponent for BrowseTab {
                 }
                 let _ = sender.output(BrowseTabOutput::SchemaWordsChanged(words));
                 self.emit_fetch_page_and_count(&sender);
-                // If rows are already cached, render now with the proper
-                // editability map. Otherwise wait for RowsLoaded.
                 self.render_grid_if_ready(sender);
             }
             BrowseTabInput::EnumLabelsLoaded(labels) => self.apply_enum_labels(labels),
@@ -1016,9 +996,6 @@ impl SimpleComponent for BrowseTab {
             }
             BrowseTabInput::LastPage => {
                 let Some(total) = self.current_total_rows else {
-                    // Total unknown — Last has no target. UI keeps the
-                    // button disabled until RowCountLoaded fires, so
-                    // this branch is a defensive guard.
                     return;
                 };
                 if total == 0 {

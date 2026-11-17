@@ -96,12 +96,6 @@ impl BrowseTab {
         if self.current_columns.is_empty() {
             return;
         }
-        // Inline draft: track in the changeset (returns a
-        // RowKey::Draft(N) handle), then prepend a fresh
-        // RowObject tagged with the same draft id to the
-        // grid's ListStore. The new row appears at the top
-        // with a green tint and editable cells; user fills
-        // them inline and clicks Save to commit.
         let default_values: Vec<Value> = self.current_columns.iter().map(|_| Value::Null).collect();
         let key_opt = self
             .change_trackers
@@ -137,11 +131,6 @@ impl BrowseTab {
     }
 
     pub(super) fn handle_delete_selected_row(&mut self, sender: ComponentSender<Self>) {
-        // Toolbar Delete now marks the selected rows for
-        // pending deletion (red strikethrough via tracker
-        // overlay). User reviews + clicks Save to commit, or
-        // Discard / Ctrl+Z to revert. Replaces the previous
-        // confirm-dialog-then-immediate-DELETE flow.
         let Some(selection) = self.current_selection.as_ref() else {
             return;
         };
@@ -209,8 +198,6 @@ impl BrowseTab {
             });
             return;
         }
-        // PK gate only fires when persisted rows are involved.
-        // Pure-draft selections sail through to discard.
         if had_persisted_row && pk_indices.is_empty() {
             let _ = sender.output(BrowseTabOutput::ShowSelectionAlert {
                 title: bookie_app_services::tr!("Cannot delete"),
@@ -304,22 +291,6 @@ impl BrowseTab {
             self.refresh_row(row_position);
             return false;
         }
-        // Cell edits route through the per-tab change tracker
-        // so the user can review / Save / Discard a batch.
-        //
-        // Empty input on a nullable column becomes Value::Null
-        // (canonical SQL convention for "user cleared the
-        // cell"). Non-empty input is parsed against the
-        // column's data_type. SQLite STRICT ANY cells also use
-        // their current runtime value kind, since the declaration
-        // intentionally permits multiple storage classes.
-        //
-        // On parse failure the edit is rejected: a toast
-        // explains why and `refresh_row` forces a re-bind so
-        // the cell goes back to the canonical pre-edit
-        // display. The tracker stays untouched so a single
-        // bad keystroke can't sneak into the batch.
-        //
         let col = self.current_columns.get(col_index);
         let row_obj = self.row_object_at(row_position);
         let current_value = row_obj.as_ref().map(|row| row.cell_value(col_index));
@@ -344,10 +315,6 @@ impl BrowseTab {
         if let Some(row_obj) = &self.row_object_at(row_position)
             && let Some(draft_id) = row_obj.draft_id()
         {
-            // Draft row — mutate the tracker's draft buffer
-            // directly. The RowObject's own cells are also
-            // updated so the grid's display reflects the
-            // pending value without waiting for re-fetch.
             self.change_trackers.with_tab(self.tab_id, |t| {
                 t.track_draft_cell_edit(draft_id, col_index, new.clone());
             });
@@ -824,7 +791,6 @@ impl BrowseTab {
                 });
             }
             Some(Ok(_)) => {
-                // Nothing to save (tracker empty) — refresh bar.
                 self.refresh_pending_bar(0);
             }
             Some(Err(e)) => {
@@ -885,11 +851,6 @@ impl BrowseTab {
     }
 
     pub(super) fn handle_changed_rows(&mut self, keys: Vec<crate::services::change_tracker::RowKey>) {
-        // Walk the model once per key. For typical interactive
-        // edits (one cell at a time) this is O(n) per keystroke
-        // where n = visible row count — bounded and cheap.
-        // Bulk operations (Discard) emit one ChangedRows per
-        // op via undo unwind, again bounded.
         for key in &keys {
             if let Some(pos) = self.find_row_position_by_key(key) {
                 self.refresh_row_at(pos);
@@ -926,12 +887,6 @@ impl BrowseTab {
                 }
             }
             UndoOp::Insert { draft_id, .. } => {
-                // The draft RowObject is still in the
-                // ListStore (prepended by InsertRow). Walk
-                // the store, find the row whose draft_id
-                // matches, remove it. The subsequent
-                // ChangedRows event for `Draft(id)` is a
-                // no-op once the row is gone.
                 if let Some(store) = self.list_store() {
                     let n = store.n_items();
                     for i in 0..n {
@@ -980,8 +935,6 @@ impl BrowseTab {
                 }
             }
             UndoOp::Insert { draft_id, values } => {
-                // Re-add the draft RowObject. Match the
-                // original insert path: prepend at position 0.
                 if let Some(store) = self.list_store() {
                     let draft_row = crate::ui::row_object::RowObject::new_draft(draft_id, values);
                     store.insert(0, &draft_row);
