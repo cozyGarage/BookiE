@@ -226,17 +226,44 @@ fn opening_a_hit_filters_on_the_matched_columns_with_the_right_operator() {
     let plain = open_filter(&outcome, "ada", SearchMode::Contains);
     assert_eq!(plain.combinator, bookie_core::Combinator::Or);
     assert_eq!(plain.rules.len(), 2);
-    assert_eq!(plain.rules[0].op, bookie_core::FilterOp::Ilike);
+    assert_eq!(plain.rules[0].op, bookie_core::FilterOp::IContains);
     assert_eq!(
         plain.rules[0].value,
-        Some(bookie_core::FilterValue::Single("%ada%".into()))
+        Some(bookie_core::FilterValue::Single("ada".into()))
     );
     let wildcard = open_filter(&outcome, "50%", SearchMode::Contains);
-    assert_eq!(wildcard.rules[0].op, bookie_core::FilterOp::Contains);
+    assert_eq!(wildcard.rules[0].op, bookie_core::FilterOp::IContains);
     assert_eq!(
         wildcard.rules[0].value,
         Some(bookie_core::FilterValue::Single("50%".into()))
     );
     let exact = open_filter(&outcome, "ada", SearchMode::Exact);
     assert_eq!(exact.rules[0].op, bookie_core::FilterOp::Eq);
+}
+
+#[test]
+fn opening_a_literal_match_preserves_the_search_predicate_for_every_engine() {
+    let outcome = TableOutcome {
+        target: TableTarget {
+            schema: None,
+            name: "people".into(),
+        },
+        status: TableStatus::Searched,
+        hits: Vec::new(),
+        matched_columns: vec!["name".into()],
+        more_rows_exist: false,
+        columns_not_searched: 0,
+    };
+    let column = column("name", "text", false);
+    for driver in ["postgres", "mysql", "sqlite", "duckdb", "mssql"] {
+        for term in ["ADA", "50%_x\\[y]|"] {
+            let search =
+                bookie_core::search_clause(driver, &column, term, SearchMode::Contains, false, 0).expect("searchable");
+            let filter = open_filter(&outcome, term, SearchMode::Contains);
+            let (sql, params) = bookie_core::build_filter_where(driver, std::slice::from_ref(&column), &filter)
+                .expect("valid filter")
+                .expect("nonempty filter");
+            assert_eq!((sql, params), (search.sql, vec![search.value]), "{driver}: {term}");
+        }
+    }
 }

@@ -43,6 +43,7 @@ pub enum FilterOp {
     /// `LIKE '%value%'` — wildcards added by the builder so the user
     /// can type plain text without escaping.
     Contains,
+    IContains,
     /// `LIKE 'value%'`.
     StartsWith,
     /// `LIKE '%value'`.
@@ -266,11 +267,11 @@ fn build_rule_sql(
             Ok(format!("{col_sql} {op_sql} {ph}"))
         }
 
-        FilterOp::Contains | FilterOp::StartsWith | FilterOp::EndsWith => {
+        FilterOp::Contains | FilterOp::IContains | FilterOp::StartsWith | FilterOp::EndsWith => {
             let raw = require_single(rule)?;
             let escaped = escape_like(driver_id, raw);
             let pattern = match rule.op {
-                FilterOp::Contains => format!("%{escaped}%"),
+                FilterOp::Contains | FilterOp::IContains => format!("%{escaped}%"),
                 FilterOp::StartsWith => format!("{escaped}%"),
                 FilterOp::EndsWith => format!("%{escaped}"),
                 _ => return Err(BuildFilterError::WrongValueShape { op: rule.op }),
@@ -285,7 +286,12 @@ fn build_rule_sql(
                 _ if like_needs_escape_clause(driver_id) => " ESCAPE '\\'",
                 _ => "",
             };
-            Ok(format!("{pattern_sql} LIKE {ph}{escape}"))
+            let operator = if matches!(rule.op, FilterOp::IContains) && has_native_ilike(driver_id) {
+                "ILIKE"
+            } else {
+                "LIKE"
+            };
+            Ok(format!("{pattern_sql} {operator} {ph}{escape}"))
         }
 
         FilterOp::Like | FilterOp::NotLike => {
