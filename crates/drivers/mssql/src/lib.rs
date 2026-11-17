@@ -26,6 +26,7 @@ mod info;
 mod schema_types;
 mod session;
 mod variant_guard;
+mod view_editability;
 mod zoned;
 
 pub(crate) type MssqlClient = Client<Compat<TcpStream>>;
@@ -564,6 +565,14 @@ impl Connection for MssqlConnection {
             )
             .await?;
         Ok(result.rows.iter().map(row_to_column_info).collect())
+    }
+
+    async fn fetch_view_editability(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+    ) -> Result<bookie_core::ViewEditability, DriverError> {
+        view_editability::fetch(self, schema, table).await
     }
 
     async fn fetch_rows(

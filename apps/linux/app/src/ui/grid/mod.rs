@@ -60,6 +60,10 @@ pub(crate) use display::focused_row_position;
 pub(crate) use display::preview_to_display_text;
 pub use display::{focused_cell_identity, last_clicked_cell, set_date_format, set_null_display, value_to_display_text};
 
+pub(crate) fn refit_row_numbers(view: &gtk4::ColumnView, base: u64) {
+    row_number_column::fit(view, base);
+}
+
 pub(crate) fn apply_typography(typography: &bookie_app_services::preferences::TypographyOverride) {
     font_zoom::apply_typography(typography);
 }
@@ -213,6 +217,7 @@ pub struct TabGridContext {
     pub choices: ChoiceMap,
     pub ambiguous_keys: AmbiguousKeys,
     pub row_number_base: u64,
+    pub row_number_base_handle: Option<Rc<Cell<u64>>>,
     pub column_selection: ColumnSelectionHandle,
     pub set_cells_enabled: bool,
     pub column_selection_chrome: Option<gtk4::Box>,
@@ -325,7 +330,11 @@ pub fn build_column_view(
         .show_column_separators(true)
         .build();
     column_view.add_css_class("data-table");
-    let row_number_base = Rc::new(Cell::new(tab_ctx.row_number_base));
+    let row_number_base = tab_ctx
+        .row_number_base_handle
+        .clone()
+        .unwrap_or_else(|| Rc::new(Cell::new(tab_ctx.row_number_base)));
+    row_number_base.set(tab_ctx.row_number_base);
     let numbers = row_number_column::build(row_number_base.clone());
     column_view.append_column(&numbers);
 
