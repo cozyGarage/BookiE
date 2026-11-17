@@ -628,6 +628,10 @@ impl App {
     }
 
     pub(super) fn on_export(&self, format: ExportFormat) {
+        if self.selected_tab_is_editor() {
+            self.export_front_results(matches!(format, ExportFormat::Json));
+            return;
+        }
         let Some(request) = self.browse_export_request() else {
             return;
         };
@@ -640,7 +644,20 @@ impl App {
         );
     }
 
+    fn selected_tab_is_editor(&self) -> bool {
+        self.selected_workspace_tab_id().is_some_and(|id| {
+            matches!(
+                self.workspace_tabs.borrow().get(&id),
+                Some(super::WorkspaceTab::Editor(_))
+            )
+        })
+    }
+
     pub(super) fn on_export_front_results(&self) {
+        self.export_front_results(false);
+    }
+
+    fn export_front_results(&self, json: bool) {
         let Some(id) = self.selected_workspace_tab_id() else {
             self.show_toast(&bookie_app_services::tr!("Nothing to export"));
             return;
@@ -661,14 +678,20 @@ impl App {
                 let Some(request) = self.browse_export_request() else {
                     return;
                 };
-                crate::ui::export_dialog::present(&self.window, &self.toast_overlay, request, &self.preferences);
+                crate::ui::export_dialog::present_with_format(
+                    &self.window,
+                    &self.toast_overlay,
+                    request,
+                    json,
+                    &self.preferences,
+                );
             }
             FrontExport::Editor { result, name } => {
                 let Some(driver_id) = self.tab_driver_id(id) else {
                     self.show_toast(&bookie_app_services::tr!("Nothing to export"));
                     return;
                 };
-                crate::ui::export_dialog::present(
+                crate::ui::export_dialog::present_with_format(
                     &self.window,
                     &self.toast_overlay,
                     crate::ui::export_dialog::ExportRequest {
@@ -678,6 +701,7 @@ impl App {
                         suggested_name: name,
                         driver_id,
                     },
+                    json,
                     &self.preferences,
                 )
             }
