@@ -81,6 +81,7 @@ fn a_running_export_counts_as_busy_work_until_it_finishes() {
             driver_id: "sqlite".into(),
             schema: None,
             table: "t".into(),
+            row_limit: None,
         },
     );
 
@@ -117,7 +118,7 @@ fn a_bad_custom_delimiter_blocks_export_only_while_the_csv_options_are_shown() {
     adw::init().unwrap();
     let csv = build_csv_group(&PreferencesStore::new(), "\\N", false);
     let (_footer, export_button) = build_footer(&csv);
-    wire_export_sensitivity(&None, true, &csv, &export_button);
+    wire_export_sensitivity(&None, true, &csv, &row_limit::build(), &export_button);
     assert!(custom_delimiter_choice(&csv.custom_delimiter).unwrap().is_none());
     csv.custom_delimiter.set_text("||");
     assert!(export_button.is_sensitive());
@@ -137,4 +138,23 @@ fn a_bad_custom_delimiter_blocks_export_only_while_the_csv_options_are_shown() {
     csv.custom_delimiter.set_text("");
     assert!(export_button.is_sensitive());
     assert!(!csv.custom_delimiter.has_css_class("error"));
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn an_invalid_row_limit_blocks_export_until_it_is_fixed() {
+    adw::init().unwrap();
+    let csv = build_csv_group(&PreferencesStore::new(), "\\N", false);
+    let (_footer, export_button) = build_footer(&csv);
+    let limit = row_limit::build();
+    wire_export_sensitivity(&None, true, &csv, &limit, &export_button);
+    limit.set_text("0");
+    assert!(!export_button.is_sensitive());
+    limit.set_text("12x");
+    assert!(!export_button.is_sensitive());
+    limit.set_text("500");
+    assert!(export_button.is_sensitive());
+    assert_eq!(row_limit::choice(&limit), Ok(Some(500)));
+    limit.set_text("");
+    assert!(export_button.is_sensitive());
 }
