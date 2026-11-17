@@ -47,7 +47,7 @@ container="$(docker run --rm --detach --label "com.bookie.test-run=${BOOKIE_TEST
   --env POSTGRES_PASSWORD=bookie_test --env POSTGRES_DB=bookie_test \
   postgres:17-alpine)"
 cleanup() {
-  docker rm --force "$container" >/dev/null 2>&1 || true
+  docker rm --force --volumes "$container" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 

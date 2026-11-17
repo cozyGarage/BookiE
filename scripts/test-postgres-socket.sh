@@ -12,7 +12,7 @@ container_name="bookie-pg-socket-${RANDOM}-$$"
 test_run_id="${BOOKIE_TEST_RUN_ID:-local-$$}"
 [[ "$test_run_id" =~ ^[A-Za-z0-9_-]+$ ]] || { echo 'invalid test-container run id' >&2; exit 1; }
 cleanup() {
-  docker rm -f "$container_name" >/dev/null 2>&1 || true
+  docker rm -f --volumes "$container_name" >/dev/null 2>&1 || true
   # PostgreSQL owns the sticky socket directory and its lock file inside the
   # bind mount. Clear those as container root before removing our temp root.
   docker run --rm --entrypoint sh --volume "$socket_root:/cleanup" postgres:16-alpine \
