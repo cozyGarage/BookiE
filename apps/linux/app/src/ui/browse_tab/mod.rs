@@ -93,15 +93,8 @@ pub struct BrowseTab {
     page_size: u64,
     current_sort: Option<(usize, bool)>,
     current_sort_keys: Vec<(usize, bool)>,
-    /// Server-side WHERE filter applied to every fetch. Persisted per
-    /// `(connection_id, schema, table)` via `services::filter_settings`.
-    /// Empty FilterSet means no WHERE clause; updates restart pagination
-    /// at offset 0 since filtered counts shift.
     current_filter: bookie_core::FilterSet,
     current_columns: Vec<ColumnInfo>,
-    /// Foreign keys declared on this table, fetched alongside
-    /// `current_columns`. Drives the cell value picker; empty for a
-    /// driver that doesn't report foreign keys or a table with none.
     foreign_keys: Vec<ForeignKeyInfo>,
     inbound_foreign_keys: Vec<bookie_core::InboundForeignKeyInfo>,
     choice_labels: crate::ui::grid::ChoiceMap,
@@ -109,8 +102,6 @@ pub struct BrowseTab {
     current_result: Option<std::sync::Arc<QueryResult>>,
     last_page_elapsed: Option<std::time::Duration>,
     current_projection: Option<Vec<usize>>,
-    /// Last row's primary-key values from the most recent page. Used
-    /// for keyset seek when offset exceeds `KEYSET_OFFSET_THRESHOLD`.
     keyset_cursor: Option<Vec<bookie_core::Value>>,
     keyset_first_cursor: Option<Vec<bookie_core::Value>>,
     keyset_before_cursor: Option<Vec<bookie_core::Value>>,
@@ -126,44 +117,18 @@ pub struct BrowseTab {
 
     inner_stack: gtk::Stack,
     grid_holder: gtk::Box,
-    /// Live reference to the current page's `gtk::ColumnView`. Replaced
-    /// on every `RowsLoaded`. Used by the inline-Insert flow to
-    /// scroll-to-and-focus the freshly-prepended draft row.
     current_column_view: Option<gtk::ColumnView>,
-    /// Column metadata used when the live factories were last built.
-    /// Type and editability changes can require a rebuild even when the
-    /// number of columns stays the same (for example, MongoDB page types).
     rendered_columns: Vec<ColumnInfo>,
     row_number_base: std::rc::Rc<std::cell::Cell<u64>>,
-    /// Persistent-state banners (per HIG: banners for state, toasts
-    /// for events). Pending-changes is communicated through the
-    /// ActionBar footer + tab-title bullet, not a banner — the banner
-    /// is reserved for constraint states (read-only, no-PK) the user
-    /// can't dismiss by saving.
     read_only_banner: adw::Banner,
     no_pk_banner: adw::Banner,
     view_restriction: Option<bookie_app_services::view_edit::ViewEditRestriction>,
-    /// Last-emitted dirty state. PendingCountChanged fires on every
-    /// tracker mutation including count-only changes (2 → 3) where the
-    /// dirty flag hasn't actually flipped. Tracking the previous flag
-    /// here lets us emit `BrowseTabOutput::DirtyChanged` only on real
-    /// transitions and avoid redundant tab-title rewrites in App.
     was_dirty: std::cell::Cell<bool>,
     save_in_flight: std::cell::Cell<Option<uuid::Uuid>>,
-    /// Row identity captured before a sort/save/refresh-driven reload
-    /// so the focused row can be re-selected and re-scrolled into view
-    /// once the new page lands. Persisted rows match by PK; drafts
-    /// match by draft_id (for the rare case where a draft is focused
-    /// when a sort happens). Cleared by `restore_focused_row`.
     pending_focus_restore: std::cell::RefCell<Option<crate::services::change_tracker::RowKey>>,
     paginator_label: gtk::Label,
     sort_status_label: gtk::Label,
     clear_sort_button: gtk::Button,
-    /// Live count of selected rows. Hidden when 0 or 1 rows are
-    /// selected; shows "{n} selected" once the user shift-clicks
-    /// or Ctrl+clicks to build a multi-row selection. Updated via
-    /// the selection model's connect_selection_changed signal so it
-    /// stays in sync without polling.
     selection_label: gtk::MenuButton,
     selection_count_label: gtk::Label,
     selection_details_label: gtk::Label,
@@ -176,30 +141,10 @@ pub struct BrowseTab {
     auto_refresh_status_label: gtk::Label,
     auto_refresh_source: Option<glib::SourceId>,
     auto_refresh_in_flight: std::cell::Cell<bool>,
-    /// Toolbar button that toggles the filter strip. Text-only
-    /// ("Filter") because adwaita-icon-theme has no canonical
-    /// symbolic icon for filtering and reusing a search/find icon
-    /// would clash with the universal Ctrl+F shortcut now bound to
-    /// this filter action. When the current filter has any rules, a
-    /// small count badge appears next to the word; hidden otherwise.
     filter_button: gtk::Button,
-    /// Count badge inside `filter_button`. Hidden when the filter
-    /// is empty, otherwise reads `N` for N active rules.
     filter_badge: gtk::Label,
-    /// Inline filter editor — slides in above the grid when
-    /// revealed. Owned per-tab so the rules editor doesn't lose
-    /// in-progress state if the user accidentally clicks outside it.
     filter_strip: Option<crate::ui::filter_strip::FilterStrip>,
-    /// Insert row button — sits at the start of the paginator bar
-    /// (`gtk::ActionBar` pack_start), separated from the nav arrows
-    /// by the actionbar's start group. Delete affordance is gone
-    /// from the toolbar — right-click "Delete row" + the Delete key
-    /// shortcut cover the action surface (Files / Contacts pattern).
     insert_button: gtk::Button,
-    /// Pending-changes footer (Save / Discard / count label) wrapped
-    /// in a `GtkRevealer` so it slides into view only when there are
-    /// unsaved edits. Lives as the BrowseTab's only bottom bar besides
-    /// the paginator; reveal flips inside `refresh_pending_bar`.
     pending_revealer: gtk::Revealer,
     save_button: gtk::Button,
     discard_button: gtk::Button,
@@ -332,10 +277,6 @@ impl BrowseTab {
             merge_table_columns(result, &self.current_columns);
         }
         self.refresh_crud_buttons();
-        // Filter strip rebuilds against the new schema —
-        // operator allowlists narrow per type, so a column
-        // that switched from text to int needs its operator
-        // dropdown refreshed.
         if let Some(strip) = self.filter_strip.as_ref() {
             strip.update_columns(columns);
         }
@@ -356,9 +297,6 @@ impl BrowseTab {
         }
         self.current_total_rows = Some(count);
         self.is_count_estimated = is_estimated;
-        // If the saved offset is now past the end, clamp it back to
-        // the last full page and refetch — guards against stale
-        // persistence after rows were deleted in another session.
         if self.current_offset > 0 && count > 0 && self.current_offset >= count {
             let last_page_offset = count.saturating_sub(1) / self.page_size * self.page_size;
             if last_page_offset != self.current_offset {
@@ -372,10 +310,6 @@ impl BrowseTab {
     }
 
     fn on_show_error(&mut self, message: String, sender: ComponentSender<Self>) {
-        // Clear any cached page state so a follow-up refresh
-        // doesn't render against the stale snapshot before
-        // RowsLoaded arrives. Paginator label is left empty
-        // until next RowCountLoaded.
         self.current_result = None;
         self.last_page_elapsed = None;
         self.current_total_rows = None;
@@ -564,12 +498,6 @@ impl BrowseTab {
         Some(result)
     }
 
-    /// Cell values for the row at `position` in the live grid, which
-    /// reflects the user's current sort and any prepended draft rows.
-    /// `snapshot().rows` is fetch order only: with one pending draft,
-    /// indexing it directly at a grid position off by one row -- position
-    /// 1 (the first persisted row on screen) would read fetch-order row 1
-    /// instead of row 0.
     pub fn row_cells_at(&self, position: u32) -> Option<Vec<Value>> {
         let mut cells = self.row_object_at(position)?.complete_cells()?;
         if let Some((key, _)) = self.row_key_at(position) {
@@ -632,9 +560,6 @@ impl SimpleComponent for BrowseTab {
     }
 
     fn init(init: Self::Init, root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
-        // Open this tab's pending-changeset tracker. Closed in
-        // workspace_tabs::close_workspace_tab_by_id when the tab is
-        // removed. Idempotent — calling twice is a no-op.
         init.change_trackers.open_tab(init.tab_id);
 
         let initial_filter = init
@@ -681,15 +606,6 @@ impl SimpleComponent for BrowseTab {
         let paginator = Self::build_paginator(sender.clone(), page_size, init.browse_filters);
         let pending = Self::build_pending_revealer(sender.clone());
 
-        // Per-HIG banner rule: banners persist hard constraints the
-        // user can't fix by saving. Both reveal only when their
-        // condition triggers:
-        //   - read-only: connection-wide constraint (most permanent).
-        //   - no-PK: table-level constraint (per browse tab, persists
-        //     until the user opens a different table).
-        // Pending-changes state lives in the tab-title bullet plus the
-        // ActionBar footer ("N unsaved changes / Discard / Save") —
-        // an additional banner would just duplicate that signal.
         let read_only_banner = adw::Banner::builder()
             .use_markup(false)
             .title(bookie_app_services::tr!("Read-only connection. Editing disabled."))
@@ -703,10 +619,6 @@ impl SimpleComponent for BrowseTab {
             .revealed(false)
             .build();
 
-        // Filter strip — inline editor that slides down above the
-        // grid when revealed. Ownership stays inside this BrowseTab
-        // so the user's in-progress rule edits survive a click into
-        // a cell or the SQL editor.
         let filter_set_for_strip = initial_filter.clone();
         let sender_for_strip = sender.clone();
         let on_apply_filter: std::rc::Rc<dyn Fn(bookie_core::FilterSet)> = std::rc::Rc::new(move |set| {
@@ -773,12 +685,6 @@ impl SimpleComponent for BrowseTab {
         }
         root.add_bottom_bar(&paginator.bar);
         root.add_bottom_bar(&pending.widget);
-        // Per-tab GridMsg channel: events from this tab's grid (sort
-        // change, cell edits, context-menu actions) flow into this tab's
-        // own input queue, which then re-emits them as outputs to App
-        // tagged with this tab's id (via the forward closure App sets up).
-        // Created up-front so tab-local shortcuts (Ctrl+Shift+N → set
-        // focused cell to NULL) can route directly to the grid sender.
         let (grid_sender, grid_receiver) = relm4::channel::<GridMsg>();
 
         let sender_for_esc = sender.clone();
@@ -800,20 +706,6 @@ impl SimpleComponent for BrowseTab {
             }))
             .build();
 
-        // Tab-local shortcuts for browse-grid keyboard model. Local
-        // scope means these only fire while focus is inside this
-        // BrowseTab. When the user is in another tab or in the editor,
-        // these triggers fall through to whatever that context wires.
-        //
-        // - Delete: mark selected rows for pending deletion (matches
-        //   the Delete-button toolbar action; HIG keyboard reference
-        //   "Delete = Delete the selected item").
-        // - Ctrl+N: insert a draft row (HIG "Ctrl+N = Create a new
-        //   document"; document = row in this context).
-        // - Ctrl+Shift+N: set the focused cell to SQL NULL. App-
-        //   specific binding (no GNOME precedent for "set NULL");
-        //   chosen because Ctrl+Backspace conflicts with delete-word
-        //   in every text-edit widget.
         let sender_for_delete = sender.clone();
         let delete_shortcut = gtk::Shortcut::builder()
             .trigger(&crate::ui::shortcut::parse("Delete"))
@@ -863,10 +755,6 @@ impl SimpleComponent for BrowseTab {
             }))
             .build();
         let paste_shortcut = paste::paste_shortcut(sender.clone());
-        // Ctrl+A: select every visible row. Standard "select all"
-        // affordance — gives the user a quick path into bulk-delete
-        // (which then triggers the M3 confirmation dialog when the
-        // count exceeds the threshold).
         let sender_for_select_all = sender.clone();
         let select_all_shortcut = gtk::Shortcut::builder()
             .trigger(&crate::ui::shortcut::parse("<Primary>a"))
@@ -896,8 +784,6 @@ impl SimpleComponent for BrowseTab {
                 glib::Propagation::Stop
             }))
             .build();
-        // Home / End scoped to row navigation: jump to the first /
-        // last visible row of the current page.
         let sender_for_home = sender.clone();
         let home_shortcut = gtk::Shortcut::builder()
             .trigger(&crate::ui::shortcut::parse("<Primary>Home"))
@@ -1013,10 +899,6 @@ impl SimpleComponent for BrowseTab {
         model.refresh_auto_refresh_availability();
         model.refresh_filter_chrome();
 
-        // Subscribe to the tracker so we can refresh the pending UI
-        // any time the user adds / undoes / commits a change. The
-        // channel is leaked into the GTK main loop via spawn_local,
-        // matching how the per-tab GridMsg channel above is wired.
         let (tracker_sender, tracker_receiver) = relm4::channel::<crate::services::change_tracker::TrackerEvent>();
         model.change_trackers.subscribe(init.tab_id, tracker_sender);
         let input_for_tracker = sender.input_sender().clone();

@@ -39,8 +39,6 @@ fn focus_after_tab_close(tab_view: &adw::TabView, workspace_outer_stack: &gtk::S
 }
 
 impl App {
-    /// Builds the unified AdwTabOverview tree once per connection.
-    /// Idempotent via `workspace_root_added`.
     pub(super) fn ensure_workspace_root(&mut self, sender: ComponentSender<Self>) {
         if self.workspace_root_added.get() {
             return;
@@ -86,9 +84,6 @@ impl App {
         });
         tab_bar.set_start_action_widget(Some(&overview_button));
 
-        // "+" button in the tab bar opens a new editor (query) tab —
-        // this is the only way to create an editor tab from the UI.
-        // Browse tabs come from sidebar clicks.
         let new_query_button = gtk::Button::builder()
             .icon_name("tab-new-symbolic")
             .tooltip_text(bookie_app_services::tr!("New query (Ctrl+E)"))
@@ -99,7 +94,6 @@ impl App {
         new_query_button.connect_clicked(move |_| new_tab_sender.input(AppMsg::NewEditorTab));
         tab_bar.set_end_action_widget(Some(&new_query_button));
 
-        // 2-step close: TabView signals close → App message → close_finish.
         let close_sender = sender.clone();
         tab_view.connect_close_page(move |_view, page| {
             if let Some(id) = read_workspace_tab_id(page) {
@@ -175,10 +169,6 @@ impl App {
         inner.add_controller(rename_shortcut(&tab_view, &sender));
 
         let tab_overview = build_workspace_tab_overview(&tab_view, &inner);
-        // Overview "+" must return a real TabPage synchronously. We
-        // construct an editor slot inline using the same label scheme
-        // as `append_editor_tab` ("Query 1", "Query 2", …) so the two
-        // entry points are visually indistinguishable.
         let workspace_tabs_for_create = self.workspace_tabs.clone();
         let tab_view_for_create = tab_view.clone();
         let schema_index_for_create = self.schema_index.clone();
@@ -207,8 +197,6 @@ impl App {
             let page = tab_view_for_create.append(editor.widget());
             let label = first_free_editor_label(editor_titles(&workspace_tabs_for_create.borrow()));
             super::tab_title::set_tab_title(&page, &label);
-            // Empty query → no tooltip; tooltip will be set on first edit
-            // via on_editor_tab_query_changed.
             write_workspace_tab_id(&page, tab_id);
             let slot = EditorTabSlot {
                 controller: editor,
@@ -242,7 +230,6 @@ impl App {
         self.apply_connection_strip();
     }
 
-    /// Restore workspace tabs from disk for the just-connected database.
     pub(super) fn restore_workspace_tabs(&mut self, connection_id: Uuid, sender: ComponentSender<Self>) {
         let saved = self
             .connected_database
@@ -301,10 +288,6 @@ impl App {
         }
     }
 
-    /// Public entry: append a Structure draft tab for the New-Table
-    /// flow. Edit-mode is no longer reachable through this helper;
-    /// use `append_table_tab` for the unified Browse + Structure
-    /// view of an existing table.
     pub(super) fn append_new_structure_tab(&mut self, schema: Option<String>, sender: ComponentSender<Self>) {
         self.ensure_workspace_root(sender.clone());
         let Some(tab_view) = self.workspace_tab_view.clone() else {
@@ -321,7 +304,6 @@ impl App {
             mode: crate::ui::structure_tab::StructureMode::New,
             driver_id,
             column_comment_capability,
-            // New mode has nothing to introspect (no real table yet).
             defer_initial_fetch: false,
         };
         let controller = crate::ui::structure_tab::StructureTab::builder()
@@ -350,15 +332,6 @@ impl App {
         self.persist_workspace_state();
     }
 
-    /// Public entry: append a unified Table tab (Browse + Structure
-    /// share one AdwTabPage with an `AdwViewSwitcher` toggle). Both
-    /// sub-controllers initialise eagerly so switching modes is
-    /// instant and per-side state (pagination, sort, search,
-    /// pending edits) survives a round trip.
-    /// Append a Browse (Data-view) tab for an existing
-    /// `(schema, table)`. The DDL editor for the same table opens as
-    /// a separate `WorkspaceTab::Structure` page via the sidebar
-    /// right-click "Edit Structure" action (`append_existing_structure_tab`).
     pub(super) fn append_table_tab(
         &mut self,
         schema: Option<String>,
@@ -481,11 +454,6 @@ impl App {
         self.persist_workspace_state();
     }
 
-    /// Open a Structure (DDL editor) tab for an EXISTING
-    /// `(schema, table)`. Mirrors `append_new_structure_tab` shape
-    /// but uses `StructureMode::Edit` and fetches the table's columns
-    /// / indexes / FKs immediately. Called from
-    /// `on_edit_structure_tab` (sidebar right-click → Edit Structure).
     pub(super) fn append_existing_structure_tab(
         &mut self,
         schema: Option<String>,
@@ -537,7 +505,6 @@ impl App {
         self.persist_workspace_state();
     }
 
-    /// Public entry: append an Editor tab with optional initial query.
     pub(super) fn append_editor_tab(&mut self, initial_query: Option<String>, sender: ComponentSender<Self>) {
         self.append_editor_draft(initial_query, None, sender);
     }
@@ -612,8 +579,6 @@ impl App {
         self.finish_close_workspace_tab(id, tab_view, sender);
     }
 
-    /// Tear down a tab without prompting. Internal helper called once
-    /// the close-with-pending dialog (if any) has resolved.
     pub(super) fn finish_close_workspace_tab(
         &mut self,
         id: Uuid,
@@ -641,12 +606,6 @@ impl App {
             return;
         };
         let owner = self.detach_tab_session(id);
-        // Snapshot the closed tab into the reopen stack BEFORE running
-        // the per-kind teardown below — the BrowseModel still has its
-        // pagination + sort state intact, and the EditorTabSlot still
-        // owns the latest query buffer. New-mode Structure drafts are
-        // skipped because the table they describe doesn't exist yet,
-        // so reopening a draft would be useless.
         if let (Some(owner), Some(descriptor)) = (owner, describe_closed_tab(&mut removed, preview)) {
             push_closed_tab(&self.closed_tabs_stack, owner, descriptor);
         }
@@ -748,10 +707,6 @@ impl App {
         let id = self.selected_workspace_tab_id()?;
         let tabs = self.workspace_tabs.borrow();
         let slot = tabs.get(&id)?;
-        // Treat both legacy `Browse` and unified `Table` (regardless of
-        // active mode) as candidates — the Browse-side controller is
-        // present in both. Save / Discard / Find paths route through
-        // this helper.
         if slot.browse_controller().is_some() {
             Some(id)
         } else {
@@ -799,9 +754,6 @@ impl App {
         self.cancel_all_editor_runs();
         self.read_scopes.borrow_mut().cancel_all();
         self.database_list_cancel.borrow().cancel();
-        // Drop per-tab pending-change trackers — disconnecting wipes
-        // the connection and its row identities, so any pending edits
-        // would no longer be commitable.
         for tab in self.workspace_tabs.borrow().values() {
             match tab {
                 WorkspaceTab::Structure(slot) => self.structure_trackers.close_tab(slot.id),
@@ -841,9 +793,6 @@ impl App {
         }
     }
 
-    /// Forward a per-tab Browse input to the right slot. Routes to the
-    /// Browse-side controller in both legacy `Browse` slots and the
-    /// unified `Table` slot.
     pub(super) fn dispatch_to_tab(&self, tab_id: Uuid, msg: BrowseTabInput) {
         if let Some(controller) = self
             .workspace_tabs
@@ -861,9 +810,6 @@ impl App {
         }
     }
 
-    /// Editor tab title update on query change. Mirrors what was on
-    /// editor_tabs.rs::on_editor_tab_query_changed; lives here now since
-    /// editor tabs are first-class workspace tabs.
     pub(super) fn refresh_editor_result_dirty(&self, tab_id: Uuid, dirty: bool) {
         let rows_dirty = self
             .change_trackers
@@ -941,11 +887,6 @@ impl App {
     }
 
     pub(super) fn on_replace_active_tab_query(&mut self, text: String, sender: ComponentSender<Self>) {
-        // If an editor tab is active, replace its buffer in-place. If a
-        // browse tab is active (or no tab at all), fall back to opening
-        // a new editor tab with the query — silent no-op was the prior
-        // (annoying) behaviour for users invoking from history while
-        // browsing.
         if let Some(id) = self.selected_workspace_tab_id()
             && let Some(WorkspaceTab::Editor(slot)) = self.workspace_tabs.borrow().get(&id)
         {
@@ -999,10 +940,6 @@ fn first_free_editor_label(titles: Vec<String>) -> String {
         .unwrap_or_else(|| default_editor_tab_label(fallback))
 }
 
-/// Returns a tooltip for a Browse tab, but only when it would add info
-/// beyond the visible label. When the label is already
-/// `schema.table`, or there is no schema, the tooltip would just
-/// duplicate the tab title and we skip it.
 fn browse_tab_tooltip(schema: Option<&str>, table: &str, label: &str) -> Option<String> {
     let s = schema?;
     let qualified = format!("{s}.{table}");
@@ -1029,10 +966,6 @@ impl App {
         let descriptor =
             bookie_app_services::window_sessions::take_latest_for(&mut self.closed_tabs_stack.borrow_mut(), front);
         let Some(descriptor) = descriptor else {
-            // Stack empty — nothing to reopen. Toast keeps the
-            // shortcut from feeling broken when the user hits it
-            // before having closed anything (or after a reconnect
-            // wiped the stack).
             self.show_toast(&bookie_app_services::tr!("No recently closed tab"));
             return;
         };
@@ -1066,19 +999,11 @@ impl App {
     }
 }
 
-/// Returns a tooltip for an Editor tab. Empty for blank queries; for
-/// non-empty queries, a 200-char preview — but only when distinct from
-/// the (truncated) label, so non-truncated labels don't get a redundant
-/// hover popup.
 fn editor_tab_tooltip(query: &str, label: &str) -> Option<String> {
     let q = query.trim();
     if q.is_empty() {
         return None;
     }
-    // Use char_indices().nth(200) to walk only the first 201 chars
-    // instead of materialising the whole query as a Vec<char> via
-    // chars().count(). For a multi-megabyte SQL dump this avoids an
-    // O(n) scan when only a 200-char preview matters.
     let mut iter = q.char_indices();
     let mut last_idx = 0;
     for _ in 0..200 {
