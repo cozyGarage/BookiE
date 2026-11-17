@@ -93,8 +93,26 @@ impl GridView {
         self.csv_delimiter = delimiter;
     }
 
+    pub(crate) fn set_export_limit(&mut self) {
+        match self.palette_limit.clone() {
+            Some((_, Ok(limit))) => self.set_export_limit_to(Some(limit)),
+            Some((_, Err(()))) => {
+                self.status = format!("Export limit refused: {}", bookie_gpui::export_limit::error_label());
+            }
+            None => {}
+        }
+    }
+
+    pub(crate) fn set_export_limit_to(&mut self, limit: Option<usize>) {
+        self.status = match limit {
+            Some(limit) => format!("Export limit set to {limit} rows"),
+            None => "Export limit removed".into(),
+        };
+        self.export_limit = limit;
+    }
+
     pub(crate) fn export_selection_or_page(&mut self, cx: &mut Context<Self>) {
-        let (rows, count) = if let Some(selection) = self.selection {
+        let (mut rows, count) = if let Some(selection) = self.selection {
             if !selection.copyable() {
                 self.status = selection.label();
                 return;
@@ -121,6 +139,11 @@ impl GridView {
             let count = rows.len() as u64;
             (rows, count)
         };
+        let cut = self.export_limit.is_some_and(|limit| rows.len() > limit);
+        if let Some(limit) = self.export_limit {
+            rows.truncate(limit);
+        }
+        let count = if cut { rows.len() as u64 } else { count };
         let driver_id = self
             .live
             .as_ref()
@@ -136,7 +159,11 @@ impl GridView {
             Ok(copied) => {
                 cx.write_to_clipboard(ClipboardItem::new_string(copied.text));
                 let noun = if count == 1 { "row" } else { "rows" };
-                self.status = format!("Exported {count} {noun} as CSV to clipboard");
+                self.status = if cut {
+                    format!("Exported the first {count} {noun} as CSV to clipboard (export limit reached, more rows were not exported)")
+                } else {
+                    format!("Exported {count} {noun} as CSV to clipboard")
+                };
             }
             Err(message) => self.status = message,
         }
