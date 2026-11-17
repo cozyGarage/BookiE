@@ -2296,7 +2296,7 @@ GLib.MainLoop().run()
             ):
                 return
             time.sleep(ui.POLL_SECONDS)
-        raise AssertionError(f"{name!r} was not visible")
+        raise AssertionError(f"{name!r} was not visible:\n{ui.accessible_snapshot()}")
 
     def wait_for_visible_cell_value(value):
         deadline = time.monotonic() + 30
@@ -2310,7 +2310,7 @@ GLib.MainLoop().run()
             ):
                 return
             time.sleep(ui.POLL_SECONDS)
-        raise AssertionError(f"cell value {value!r} was not visible")
+        raise AssertionError(f"cell value {value!r} was not visible:\n{ui.accessible_snapshot()}")
 
     def wait_for_visible_marker(name):
         deadline = time.monotonic() + 30
@@ -2322,7 +2322,7 @@ GLib.MainLoop().run()
             ):
                 return
             time.sleep(ui.POLL_SECONDS)
-        raise AssertionError(f"{name!r} was not visible")
+        raise AssertionError(f"{name!r} was not visible:\n{ui.accessible_snapshot()}")
 
     def wait_for_streamed_page_after_rows_arrive(marker, minimum_rows):
         deadline = time.monotonic() + 120
