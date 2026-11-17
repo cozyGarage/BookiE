@@ -17,6 +17,7 @@ pub(super) struct RowIdentity {
 pub struct SharedRow {
     result: Weak<QueryResult>,
     source_index: usize,
+    display_base: usize,
     projection: Option<Arc<[Option<usize>]>>,
 }
 
@@ -121,9 +122,23 @@ impl RowObject {
         *row.imp().source.borrow_mut() = Some(SharedRow {
             result: Arc::downgrade(result),
             source_index,
+            display_base: 0,
             projection,
         });
         Some(row)
+    }
+
+    pub(crate) fn set_display_base(&self, base: usize) {
+        if let Some(shared) = self.imp().source.borrow_mut().as_mut() {
+            shared.display_base = base;
+        }
+    }
+
+    pub(crate) fn display_index(&self) -> Option<usize> {
+        let source = self.imp().source.borrow();
+        source
+            .as_ref()
+            .map(|shared| shared.display_base.saturating_add(shared.source_index))
     }
 
     pub(crate) fn source_index(&self) -> Option<usize> {
