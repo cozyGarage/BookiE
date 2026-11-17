@@ -41,11 +41,15 @@ impl GridView {
         } else {
             format!("Rows {}-{}", thousands(first), thousands(last))
         };
-        div()
+        let pager = div()
             .flex()
             .items_center()
             .gap_1()
-            .child(div().child(progress))
+            .child(div().child(progress));
+        if self.continuous {
+            return pager.child(div().child(range_label));
+        }
+        pager
             .child(button("first", "|‹", theme).on_click(cx.listener(|this, _, _, cx| {
                 this.pager.first();
                 cx.notify();
@@ -102,7 +106,6 @@ impl GridView {
                     cx.notify();
                 }),
             ))
-            .child(div().ml_auto().whitespace_nowrap().text_color(rgb(theme.muted_foreground)).child(self.status.clone()))
     }
 
     fn grid_control_strip(&self, theme: Theme, cx: &mut Context<Self>) -> Div {

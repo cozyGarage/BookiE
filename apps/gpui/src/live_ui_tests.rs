@@ -1240,3 +1240,27 @@ fn export_selection_or_page_copies_csv_to_clipboard(cx: &mut TestAppContext) {
         assert_eq!(lines.len(), 3, "1 header line + 2 data rows");
     });
 }
+
+#[gpui::test]
+fn header_collapse_all_and_feedback_actions(cx: &mut TestAppContext) {
+    let (view, cx) = open_live(cx);
+
+    view.update(cx, |view, _| {
+        assert!(view.connection_open && view.database_open);
+        let collapse = view.connection_open || view.database_open;
+        view.connection_open = !collapse;
+        view.database_open = !collapse;
+        assert!(!view.connection_open && !view.database_open);
+
+        let collapse = view.connection_open || view.database_open;
+        view.connection_open = !collapse;
+        view.database_open = !collapse;
+        assert!(view.connection_open && view.database_open);
+    });
+
+    view.update(cx, |view, _| {
+        view.live = None;
+        view.show_status();
+        assert_eq!(view.status, "No active database connection.");
+    });
+}

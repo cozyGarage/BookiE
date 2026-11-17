@@ -68,6 +68,7 @@ impl GridView {
 
     pub(crate) fn show_status(&mut self) {
         let Some(live) = self.live.clone() else {
+            self.status = "No active database connection.".into();
             return;
         };
         let overview = match live.overview() {

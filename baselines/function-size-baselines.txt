@@ -26,8 +26,8 @@ apps/linux/app/src/ui/connect_dialog/mod.rs 3
 apps/linux/app/src/ui/editor/diagnostics.rs 1
 apps/linux/app/src/ui/editor/mod.rs 3
 apps/linux/app/src/ui/explain_dialog.rs 0
-apps/linux/app/src/ui/export_dialog.rs 1
-apps/linux/app/src/ui/export_dialog/file.rs 1
+apps/linux/app/src/ui/export_dialog.rs 0
+apps/linux/app/src/ui/export_dialog/file.rs 0
 apps/linux/app/src/ui/grid/column.rs 1
 apps/linux/app/src/ui/grid/column_jump.rs 1
 apps/linux/app/src/ui/grid/context_menu.rs 0
@@ -35,11 +35,11 @@ apps/linux/app/src/ui/grid/editing.rs 1
 apps/linux/app/src/ui/grid/mod.rs 1
 apps/linux/app/src/ui/parameters_dialog.rs 0
 apps/linux/app/src/ui/quick_switcher_dialog.rs 0
-apps/linux/app/src/ui/sidebar_row.rs 1
-apps/linux/app/src/ui/ssh_section.rs 1
+apps/linux/app/src/ui/sidebar_row.rs 0
+apps/linux/app/src/ui/ssh_section.rs 0
 apps/linux/app/src/ui/structure_tab/columns.rs 2
 apps/linux/app/src/ui/structure_tab/mod.rs 2
-apps/linux/app/src/ui/structure_tab_dialogs.rs 1
+apps/linux/app/src/ui/structure_tab_dialogs.rs 0
 apps/linux/app/src/ui/welcome_view.rs 0
 crates/app-services/src/connection_service.rs 1
 crates/core/src/activity.rs 1

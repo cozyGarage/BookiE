@@ -151,7 +151,7 @@ where
     let visible: Rc<RefCell<Vec<QuickItem>>> = Rc::new(RefCell::new(Vec::new()));
     let on_choice: Rc<dyn Fn(QuickTarget)> = Rc::new(on_choice);
 
-    let activate = {
+    let activate: Rc<dyn Fn(usize)> = {
         let window = window.downgrade();
         let visible = visible.clone();
         let on_choice = on_choice.clone();

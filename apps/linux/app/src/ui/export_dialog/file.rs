@@ -108,14 +108,10 @@ fn result_format(format: super::ExportFormat) -> ResultFormat {
     }
 }
 
-pub(super) fn start(parent: &adw::ApplicationWindow, toast: &adw::ToastOverlay, job: ExportJob) {
-    let cancel = CancellationToken::new();
-    let completed = Arc::new(AtomicUsize::new(0));
-    let (total, paged) = match &job.source {
-        JobSource::Loaded(result) => (Some(result.rows.len()), false),
-        JobSource::Paged { total, .. } => (*total, true),
-    };
-    let path = job.path.clone();
+fn build_progress_dialog(
+    cancel: &CancellationToken,
+    paged: bool,
+) -> (adw::Dialog, gtk::Label, gtk::ProgressBar) {
     let label = gtk::Label::new(Some(&if paged {
         bookie_app_services::tr!("Exporting all rows…")
     } else {
@@ -150,21 +146,16 @@ pub(super) fn start(parent: &adw::ApplicationWindow, toast: &adw::ToastOverlay, 
         let cancel = cancel.clone();
         move |_| cancel.cancel()
     });
-    dialog.present(Some(parent));
-    let busy = bookie_app_services::busy_jobs::global()
-        .begin_owned(crate::ui::progress_dialog::owner_id(parent), cancel.clone());
-    let (send, recv) = async_channel::bounded(1);
-    let count = completed.clone();
-    let final_count = completed.clone();
-    let worker = std::thread::Builder::new().name("result-export".into()).spawn(move || {
-        let _ = send.send_blocking(write_export(job, &cancel, &count));
-    });
-    if let Err(error) = worker {
-        dialog.close();
-        super::show_export_error(parent, &path, &ExportError::Write(error));
-        return;
-    }
-    let timer = glib::timeout_add_local(std::time::Duration::from_millis(100), move || {
+    (dialog, label, progress)
+}
+
+fn start_progress_timer(
+    progress: gtk::ProgressBar,
+    label: gtk::Label,
+    completed: Arc<AtomicUsize>,
+    total: Option<usize>,
+) -> glib::SourceId {
+    glib::timeout_add_local(std::time::Duration::from_millis(100), move || {
         let done = completed.load(Ordering::Relaxed);
         match total {
             Some(total) => {
@@ -181,7 +172,66 @@ pub(super) fn start(parent: &adw::ApplicationWindow, toast: &adw::ToastOverlay, 
             }
         }
         glib::ControlFlow::Continue
+    })
+}
+
+fn handle_export_outcome(
+    parent: &glib::WeakRef<adw::ApplicationWindow>,
+    toast: &glib::WeakRef<adw::ToastOverlay>,
+    path: &std::path::Path,
+    final_count: usize,
+    outcome: Result<Result<(), ExportError>, async_channel::RecvError>,
+) {
+    match outcome {
+        Ok(Ok(())) => {
+            if let Some(toast) = toast.upgrade() {
+                toast.add_toast(crate::ui::plain_text::toast(
+                    &bookie_app_services::tr!("Exported {n} rows to {path}")
+                        .replace("{n}", &final_count.to_string())
+                        .replace("{path}", &path.display().to_string()),
+                ));
+            }
+        }
+        Ok(Err(error)) if error.is_cancelled() => {}
+        Ok(Err(error)) => {
+            if let Some(parent) = parent.upgrade() {
+                super::show_export_error(&parent, path, &error);
+            }
+        }
+        Err(_) => {
+            if let Some(parent) = parent.upgrade() {
+                let stopped = ExportError::Write(std::io::Error::other("Export worker stopped"));
+                super::show_export_error(&parent, path, &stopped);
+            }
+        }
+    }
+}
+
+pub(super) fn start(parent: &adw::ApplicationWindow, toast: &adw::ToastOverlay, job: ExportJob) {
+    let cancel = CancellationToken::new();
+    let completed = Arc::new(AtomicUsize::new(0));
+    let (total, paged) = match &job.source {
+        JobSource::Loaded(result) => (Some(result.rows.len()), false),
+        JobSource::Paged { total, .. } => (*total, true),
+    };
+    let path = job.path.clone();
+    let (dialog, label, progress) = build_progress_dialog(&cancel, paged);
+    dialog.present(Some(parent));
+
+    let busy = bookie_app_services::busy_jobs::global()
+        .begin_owned(crate::ui::progress_dialog::owner_id(parent), cancel.clone());
+    let (send, recv) = async_channel::bounded(1);
+    let count = completed.clone();
+    let final_count = completed.clone();
+    let worker = std::thread::Builder::new().name("result-export".into()).spawn(move || {
+        let _ = send.send_blocking(write_export(job, &cancel, &count));
     });
+    if let Err(error) = worker {
+        dialog.close();
+        super::show_export_error(parent, &path, &ExportError::Write(error));
+        return;
+    }
+    let timer = start_progress_timer(progress, label, completed, total);
     let parent = parent.downgrade();
     let toast = toast.downgrade();
     glib::spawn_future_local(async move {
@@ -189,29 +239,13 @@ pub(super) fn start(parent: &adw::ApplicationWindow, toast: &adw::ToastOverlay, 
         drop(busy);
         timer.remove();
         dialog.close();
-        match outcome {
-            Ok(Ok(())) => {
-                if let Some(toast) = toast.upgrade() {
-                    toast.add_toast(crate::ui::plain_text::toast(
-                        &bookie_app_services::tr!("Exported {n} rows to {path}")
-                            .replace("{n}", &final_count.load(Ordering::Relaxed).to_string())
-                            .replace("{path}", &path.display().to_string()),
-                    ));
-                }
-            }
-            Ok(Err(error)) if error.is_cancelled() => {}
-            Ok(Err(error)) => {
-                if let Some(parent) = parent.upgrade() {
-                    super::show_export_error(&parent, &path, &error);
-                }
-            }
-            Err(_) => {
-                if let Some(parent) = parent.upgrade() {
-                    let stopped = ExportError::Write(std::io::Error::other("Export worker stopped"));
-                    super::show_export_error(&parent, &path, &stopped);
-                }
-            }
-        }
+        handle_export_outcome(
+            &parent,
+            &toast,
+            &path,
+            final_count.load(Ordering::Relaxed),
+            outcome,
+        );
     });
 }
 

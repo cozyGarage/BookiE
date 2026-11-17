@@ -2,14 +2,14 @@
 
 ## Purpose
 
-BookiE is an independent native Linux database client for local database work. It provides saved connections, optional SSH transport, database browsing, SQL editing, and guarded access for both the desktop application and the local `bookie-agentd` MCP process.
+BookiE is an independent native database client focused on Linux first (with cross-platform desktop underway via GPUI) for local database work. It provides saved connections, optional SSH transport, database browsing, SQL editing, and guarded access for both the desktop applications and the local `bookie-agentd` MCP process.
 
 Every shipped feature works without an account, license key, subscription, paid tier, or remote entitlement check. Database and SSH credentials use the system Secret Service. Database operations from the GUI, MCP, and agent process use the same policy and audit boundary. BookiE is an independent project with its own architecture and governance.
 
 ```mermaid
 flowchart TD
     subgraph CorePillars ["BookiE Core Product Pillars"]
-        P1["Linux-Native Craft<br/>GTK4 · Libadwaita · Relm4"]
+        P1["Linux-First & Modern Desktop<br/>Flagship GTK4/Adwaita & Cross-Platform GPUI"]
         P2["PolicyGuard Governance<br/>Local safety rules & audit journal"]
         P3["Zero Accounts / Free<br/>No subscriptions · No remote gates · AGPL-3.0"]
         P4["Type & Value Fidelity<br/>Lossless integers · Exact decimals · Keyset seeks"]

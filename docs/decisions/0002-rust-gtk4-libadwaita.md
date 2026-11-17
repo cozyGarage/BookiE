@@ -19,7 +19,7 @@ Changing the GUI stack after product development starts would require a large re
 
 ## Decision
 
-BookiE uses Rust and the gtk-rs stack on Linux only. Rust bindings come from the gtk-rs project, and Rust 1.98 is the language floor. The native-library floor is one line, set by [ADR 0021](0021-toolkit-floor.md): GTK 4.24, libadwaita 1.10 and GtkSourceView 5.22 ([platforms](../platforms.md), [packaging](../../apps/linux/packaging/README.md)).
+BookiE uses Rust and the gtk-rs stack for its flagship Linux application. Rust bindings come from the gtk-rs project, and Rust 1.98 is the language floor. The native-library floor is one line, set by [ADR 0021](0021-toolkit-floor.md): GTK 4.24, libadwaita 1.10 and GtkSourceView 5.22 ([platforms](../platforms.md), [packaging](../../apps/linux/packaging/README.md)).
 
 ## Rationale
 
@@ -33,7 +33,7 @@ Rust provides the async and database libraries used by the static driver crates.
 
 Accepted:
 
-- The application targets Linux only.
+- Shipped packages currently focus on Linux first (with cross-platform desktop underway via GPUI per [ADR 0052](0052-gpui-is-the-cross-platform-frontend.md)).
 - GNOME behavior is the primary desktop reference.
 - KDE Plasma is supported through GTK and standard desktop services.
 - Wayland is the primary display path. X11 remains supported by GTK.

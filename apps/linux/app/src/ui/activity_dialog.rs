@@ -84,12 +84,12 @@ fn build_activity_dialog() -> (adw::Dialog, adw::WrapBox, gtk::TextView, gtk::La
 }
 
 fn spawn_activity_query(
-    conn: std::sync::Arc<dyn bookie_core::DatabaseConnection>,
+    conn: std::sync::Arc<dyn bookie_core::Connection>,
     sql: String,
     text_buf: gtk::TextBuffer,
     status_l: gtk::Label,
     token: CancellationToken,
-    timeout_secs: u64,
+    timeout_secs: u32,
 ) {
     glib::spawn_future_local(async move {
         let control = crate::services::operation_control::bounded_with(timeout_secs, token.clone());
@@ -174,13 +174,13 @@ fn append_activity_query_buttons(
 }
 
 fn spawn_kill_session(
-    conn: std::sync::Arc<dyn bookie_core::DatabaseConnection>,
+    conn: std::sync::Arc<dyn bookie_core::Connection>,
     sql: String,
     text_buf: gtk::TextBuffer,
     status_l: gtk::Label,
     flight: crate::services::single_flight::Flight,
     token: CancellationToken,
-    timeout_secs: u64,
+    timeout_secs: u32,
 ) {
     glib::spawn_future_local(async move {
         let _flight = flight;
