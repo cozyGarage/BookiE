@@ -174,7 +174,8 @@ impl State {
         self.set_start_sensitive(false);
         if let Err(error) = self.file.custom_delimiter_choice() {
             self.file.custom_delimiter.add_css_class("error");
-            self.preview_status.set_text(&custom_delimiter_message(error));
+            self.preview_status
+                .set_text(&crate::ui::custom_delimiter::message(error));
             self.preview_status.remove_css_class("dim-label");
             self.preview_status.add_css_class("error");
             return;
@@ -427,11 +428,7 @@ impl FileOptions {
     }
 
     fn custom_delimiter_choice(&self) -> Result<Option<CustomDelimiter>, CustomDelimiterError> {
-        let text = self.custom_delimiter.text();
-        if text.is_empty() {
-            return Ok(None);
-        }
-        CustomDelimiter::new(text.as_str()).map(Some)
+        crate::ui::custom_delimiter::parse(self.custom_delimiter.text().as_str())
     }
 
     fn options(&self) -> CsvImportOptions {
@@ -990,15 +987,6 @@ fn delimiter_row(selected: CsvDelimiter) -> adw::ComboRow {
             .unwrap_or(0) as u32,
     );
     row
-}
-
-fn custom_delimiter_message(error: CustomDelimiterError) -> String {
-    match error {
-        CustomDelimiterError::Empty => bookie_app_services::tr!("The delimiter is empty."),
-        CustomDelimiterError::TooLong => bookie_app_services::tr!("The delimiter is too long (at most 8 characters)."),
-        CustomDelimiterError::LineBreak => bookie_app_services::tr!("The delimiter cannot contain a line break."),
-        CustomDelimiterError::Quote => bookie_app_services::tr!("The delimiter cannot contain a quote character."),
-    }
 }
 
 fn delimiter_label(delimiter: CsvDelimiter) -> &'static str {

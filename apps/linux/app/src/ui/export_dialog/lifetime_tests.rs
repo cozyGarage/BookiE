@@ -110,3 +110,31 @@ fn export_button(widget: &gtk::Widget) -> Option<gtk::Button> {
     }
     None
 }
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn a_bad_custom_delimiter_blocks_export_only_while_the_csv_options_are_shown() {
+    adw::init().unwrap();
+    let csv = build_csv_group(&PreferencesStore::new(), "\\N", false);
+    let (_footer, export_button) = build_footer(&csv);
+    wire_export_sensitivity(&None, true, &csv, &export_button);
+    assert!(custom_delimiter_choice(&csv.custom_delimiter).unwrap().is_none());
+    csv.custom_delimiter.set_text("||");
+    assert!(export_button.is_sensitive());
+    assert_eq!(
+        custom_delimiter_choice(&csv.custom_delimiter)
+            .unwrap()
+            .map(|d| d.as_str().to_string()),
+        Some("||".to_string())
+    );
+    csv.custom_delimiter.set_text("it's");
+    assert!(!export_button.is_sensitive());
+    assert!(csv.custom_delimiter.has_css_class("error"));
+    csv.group.set_visible(false);
+    assert!(export_button.is_sensitive());
+    csv.group.set_visible(true);
+    assert!(!export_button.is_sensitive());
+    csv.custom_delimiter.set_text("");
+    assert!(export_button.is_sensitive());
+    assert!(!csv.custom_delimiter.has_css_class("error"));
+}
