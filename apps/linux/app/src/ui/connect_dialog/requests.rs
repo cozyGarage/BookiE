@@ -114,7 +114,7 @@ impl ConnectDialog {
     }
 }
 
-async fn run_test(request: ConnectRequest) -> Result<usize, String> {
+async fn run_test(request: ConnectRequest) -> Result<usize, ConnectFailure> {
     let ConnectRequest {
         driver,
         driver_id,
@@ -162,16 +162,16 @@ async fn run_test(request: ConnectRequest) -> Result<usize, String> {
     let (conn, _tunnel) =
         bookie_transport::establish_with_cancellation(driver.as_ref(), opts, route, &ssh_environment, cancel)
             .await
-            .map_err(crate::services::error_text::transport_message)?;
+            .map_err(ConnectFailure::from_transport)?;
     let conn: Arc<dyn bookie_core::Connection> = Arc::from(conn);
     let control = crate::services::operation_control::bounded(timeout_secs);
     let guarded = guard_factory
         .guard(conn, &metadata, bookie_policy::Principal::human_gui())
-        .map_err(|error| policy_denied_text(&error))?;
+        .map_err(|error| ConnectFailure::from(policy_denied_text(&error)))?;
     crate::services::catalog::list_tables_excluding(&guarded, &hidden_schemas, &control)
         .await
         .map(|tables| tables.len())
-        .map_err(|error| crate::services::error_text::driver_message(&error))
+        .map_err(|error| ConnectFailure::from(crate::services::error_text::driver_message(&error)))
 }
 
 fn stored_hidden_schemas(

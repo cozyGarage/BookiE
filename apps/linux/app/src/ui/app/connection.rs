@@ -97,6 +97,9 @@ impl App {
                 ConnectDialogOutput::Closed => AppMsg::Connection(ConnectionMessage::DialogClosed),
             });
         crate::ui::leak_probe::track("connect", dialog.widget());
+        dialog
+            .widget()
+            .set_content_height(super::super::connect_dialog::content_height_for(self.window.height()));
         dialog.widget().present(Some(&self.window));
         self.dialog = Some(dialog);
     }
