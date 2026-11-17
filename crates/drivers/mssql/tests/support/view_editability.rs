@@ -14,8 +14,8 @@ async fn identifies_updatable_views_and_their_exposed_keys() {
                    UPPER(name) AS upper_name FROM dbo.editable_base'); \
              EXEC('CREATE VIEW dbo.editable_partial AS SELECT id, name FROM dbo.editable_base'); \
              EXEC('CREATE VIEW dbo.editable_spoof AS SELECT id + 0 AS id, part, name FROM dbo.editable_base'); \
-             EXEC('CREATE VIEW dbo.editable_aggregate AS SELECT name, COUNT(*) AS total \
-                   FROM dbo.editable_base GROUP BY name');",
+             EXEC('CREATE VIEW dbo.editable_aggregate AS SELECT id, part, name, COUNT(*) AS total \
+                   FROM dbo.editable_base GROUP BY id, part, name');",
         )
         .await
         .unwrap();
