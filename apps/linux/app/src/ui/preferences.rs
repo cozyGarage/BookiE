@@ -432,9 +432,6 @@ fn clear_history_row(
     // dialog itself carries the destructive (red) appearance. Pre-
     // coloring the trigger anticipates an action the user hasn't
     // taken yet.
-    //
-    // Ellipsis on the label per GTK4 HIG: "Use ellipsis when the
-    // action requires more user input or confirmation."
     let clear_button = gtk::Button::builder()
         .label(bookie_app_services::tr!("Clear\u{2026}"))
         .valign(gtk::Align::Center)
@@ -557,9 +554,6 @@ fn editor_page(current: &Preferences) -> EditorPage {
         .build();
     editor_group.add(&vim_row);
 
-    // 0 disables, 1..=3600s allowed range. Subtitle exposes the
-    // disable-via-zero contract so power users editing long-running
-    // analytical queries can opt out without spelunking the JSON.
     let timeout_row = adw::SpinRow::with_range(0.0, 3600.0, 5.0);
     timeout_row.set_title(&bookie_app_services::tr!("Query timeout (seconds)"));
     timeout_row.set_subtitle(&bookie_app_services::tr!(

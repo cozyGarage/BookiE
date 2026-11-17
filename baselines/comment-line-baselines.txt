@@ -46,7 +46,7 @@ apps/linux/app/src/ui/grid/presentation.rs 2
 apps/linux/app/src/ui/history_dialog.rs 13
 apps/linux/app/src/ui/import_dialog.rs 6
 apps/linux/app/src/ui/mcp_preferences.rs 1
-apps/linux/app/src/ui/preferences.rs 19
+apps/linux/app/src/ui/preferences.rs 13
 apps/linux/app/src/ui/row_object.rs 9
 apps/linux/app/src/ui/row_store.rs 5
 apps/linux/app/src/ui/sidebar_row.rs 7
