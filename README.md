@@ -99,13 +99,13 @@ BookiE is focused on Linux first with its flagship GTK4 and libadwaita desktop a
 
 ![BookiE architecture overview: the desktop app and the headless MCP host reach every database through one PolicyGuard, then routing and static drivers](docs/images/architecture-overview.svg)
 
-Every database handle that the desktop app, the MCP tools and `bookie-agentd` receive is a `PolicyGuard`. Token scopes and connection allowlists do not replace it. Drivers are linked at build time and the interface is native GTK, with no embedded browser. The desktop app uses `bookie-app-services` for GTK-free application state and service logic.
+Every database handle that the desktop app, the MCP tools and `bookie-agentd` receive is a `PolicyGuard`. Token scopes and connection allowlists do not replace it. Drivers are linked at build time and frontends (flagship native GTK4/libadwaita for Linux and cross-platform GPUI) run with no embedded browser. Applications use `bookie-app-services` and `bookie-core` for UI-agnostic application state and service logic.
 
 [`ARCHITECTURE.md`](ARCHITECTURE.md) has the crate map, the request pipeline, trait boundaries and deliberate limits.
 
 ## Development
 
-The product repository is [`cozyGarage/BookiE`](https://github.com/cozyGarage/BookiE), and current development is on the `main` branch. BookiE is built with Rust, GTK4, libadwaita, GtkSourceView, and Relm4. The Cargo workspace lives at the repository root (`crates/`, `apps/linux/`, `tests/`, `scripts/`, `docs/`) and requires Rust 1.98.
+The product repository is [`cozyGarage/BookiE`](https://github.com/cozyGarage/BookiE), and current development is on the `main` branch. BookiE is built with Rust, GTK4, libadwaita, GtkSourceView, Relm4, and GPUI. The root Cargo workspace contains `crates/` and `apps/linux/` and requires Rust 1.98. The GPUI application has a separate workspace in `apps/gpui/`.
 
 Start with the [documentation map](docs/README.md) and [Project #3](https://github.com/users/cozyGarage/projects/3) for selected work and acceptance criteria.
 
@@ -146,7 +146,11 @@ rustc --version
 From the repository root:
 
 ```bash
+# Flagship Linux GTK application
 cargo run -p bookie-app
+
+# Cross-platform GPUI application
+cargo run --manifest-path apps/gpui/Cargo.toml
 ```
 
 The first build compiles the bundled DuckDB engine, which takes several minutes.

@@ -89,11 +89,34 @@ impl GridView {
     }
 
     pub(crate) fn show_sessions(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.tabs.open_query();
-        self.sync_grid_owner();
-        self.sql_input.update(cx, |input, cx| {
-            input.set_value(bookie_app_services::pg_sessions::SESSIONS_SQL, window, cx)
-        });
-        self.run_query(cx);
+        if let Some(live) = &self.live {
+            if live.driver_id == "postgres" {
+                self.tabs.open_query();
+                self.sync_grid_owner();
+                self.sql_input.update(cx, |input, cx| {
+                    input.set_value(bookie_app_services::pg_sessions::SESSIONS_SQL, window, cx)
+                });
+                self.run_query(cx);
+                return;
+            }
+        }
+        self.show_activity(bookie_core::ActivityQuery::Sessions, window, cx);
+    }
+
+    pub(crate) fn show_activity(
+        &mut self,
+        kind: bookie_core::ActivityQuery,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(live) = &self.live else { return };
+        if let Ok(sql) = bookie_core::activity_sql(&live.driver_id, kind, None) {
+            self.tabs.open_query();
+            self.sync_grid_owner();
+            self.sql_input.update(cx, |input, cx| {
+                input.set_value(&sql, window, cx)
+            });
+            self.run_query(cx);
+        }
     }
 }

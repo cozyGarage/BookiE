@@ -3,9 +3,7 @@
 # over-limit function, or when an unlisted file has one at all.
 # Lower a count when you split a function. Do not raise one.
 # Empty means every function under crates/ is within the limit.
-apps/gpui/src/chrome.rs 5
 apps/gpui/src/main.rs 1
-apps/gpui/src/palette_actions.rs 2
 apps/gpui/src/render.rs 1
 apps/gpui/src/text_input.rs 1
 apps/linux/app/src/lib.rs 0
