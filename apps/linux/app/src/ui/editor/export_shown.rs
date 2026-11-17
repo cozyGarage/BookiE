@@ -61,19 +61,19 @@ fn visible_stack_index(root: &gtk::Widget, prefix: &str) -> Option<usize> {
 
 fn streamed_page_for(holder: &gtk::Box, result: &StreamedResult) -> Option<Arc<QueryResult>> {
     let root = holder.clone().upcast::<gtk::Widget>();
-    let page_index = visible_page_index(&root, result.generation).or_else(|| result.page_indices.first().copied())?;
-    result
-        .resident_pages
-        .get(page_index)
-        .or_else(|| {
-            result
-                .pages
-                .iter()
-                .zip(result.page_indices.iter())
-                .find(|(_, index)| **index == page_index)
-                .and_then(|(page, _)| page.upgrade())
-        })
-        .or_else(|| result.pages.iter().find_map(std::sync::Weak::upgrade))
+    let page_index = visible_page_index(&root, result.generation)?;
+    streamed_page_at(result, page_index)
+}
+
+fn streamed_page_at(result: &StreamedResult, page_index: u64) -> Option<Arc<QueryResult>> {
+    result.resident_pages.get(page_index).or_else(|| {
+        result
+            .pages
+            .iter()
+            .zip(result.page_indices.iter())
+            .find(|(_, index)| **index == page_index)
+            .and_then(|(page, _)| page.upgrade())
+    })
 }
 
 impl SqlEditor {
@@ -201,5 +201,19 @@ mod tests {
         let page = Arc::new(query(2, 3));
         let picked = pick_shown_export(&[streamed_outcome()], None, None, Some(page.clone())).unwrap();
         assert!(Arc::ptr_eq(&picked, &page));
+    }
+
+    #[test]
+    fn an_unavailable_streamed_page_does_not_export_a_different_page() {
+        let page = Arc::new(query(1, 1));
+        let mut outcome = streamed_outcome();
+        let StatementOutcomeKind::Streamed(result) = &mut outcome.kind else {
+            panic!("expected streamed result");
+        };
+        result.pages.push(Arc::downgrade(&page));
+        result.page_indices.push(2);
+
+        assert!(Arc::ptr_eq(&streamed_page_at(result, 2).unwrap(), &page));
+        assert!(streamed_page_at(result, 3).is_none());
     }
 }
