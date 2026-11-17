@@ -60,7 +60,8 @@ async fn start_oracle() -> (ContainerAsync<GenericImage>, u16) {
     let image = GenericImage::new("gvenzl/oracle-free", "slim-faststart")
         .with_exposed_port(1521.tcp())
         .with_wait_for(WaitFor::message_on_stdout("DATABASE IS READY TO USE!"))
-        .with_env_var("ORACLE_PASSWORD", ADMIN_PASSWORD);
+        .with_env_var("ORACLE_PASSWORD", ADMIN_PASSWORD)
+        .with_startup_timeout(std::time::Duration::from_secs(240));
     let image = match std::env::var("BOOKIE_TEST_RUN_ID") {
         Ok(run_id) => image.with_label("com.bookie.test-run", run_id),
         Err(_) => image,
