@@ -1,5 +1,3 @@
-//! Lookups of the rows and cells a menu acts on.
-
 use super::*;
 
 pub(super) fn cell_row_identity(widget: &gtk::Widget) -> (u32, Vec<Value>) {

@@ -1,5 +1,3 @@
-//! Decoding and binding of SQLite values.
-
 use super::*;
 
 pub(crate) fn extract_value(row: &SqliteRow, idx: usize) -> Value {

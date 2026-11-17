@@ -1,5 +1,3 @@
-//! Catalog reads: tables, columns, indexes, foreign keys, enums and server metadata.
-
 use super::*;
 
 pub(crate) async fn read_list_tables_scoped(

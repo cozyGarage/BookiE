@@ -1,5 +1,3 @@
-//! Mapping of sqlx failures onto DriverError.
-
 use super::*;
 
 pub(crate) fn map_sqlx_error(err: sqlx::Error) -> DriverError {

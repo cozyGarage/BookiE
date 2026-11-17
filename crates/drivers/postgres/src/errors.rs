@@ -1,5 +1,3 @@
-//! Mapping of sqlx and server failures onto `DriverError`.
-
 use super::*;
 
 pub(crate) fn is_certificate_failure(err: &std::io::Error) -> bool {

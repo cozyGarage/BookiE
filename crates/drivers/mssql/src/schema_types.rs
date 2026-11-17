@@ -1,5 +1,3 @@
-//! Column metadata and default-expression helpers.
-
 use super::*;
 
 pub(crate) fn row_to_column_info(row: &[Value]) -> ColumnInfo {

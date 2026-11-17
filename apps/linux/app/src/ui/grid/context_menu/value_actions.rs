@@ -1,5 +1,3 @@
-//! Copy, view, show-JSON and export actions for cell values.
-
 use super::*;
 
 pub(super) fn add_value_actions(group: &gio::SimpleActionGroup, setup: &MenuActionSetup) {

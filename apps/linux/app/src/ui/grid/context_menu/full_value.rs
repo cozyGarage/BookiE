@@ -1,5 +1,3 @@
-//! Seeding and targeting of the full-value editor from a cell.
-
 use super::*;
 
 pub(super) enum TextSeed {
