@@ -846,7 +846,7 @@ fn the_sql_editor_takes_several_lines_and_ctrl_enter_runs_them(cx: &mut TestAppC
 }
 
 #[gpui::test]
-fn the_sessions_command_is_hidden_off_postgres_and_fills_the_editor_with_the_sessions_query(cx: &mut TestAppContext) {
+fn the_sessions_command_is_hidden_and_does_nothing_off_postgres(cx: &mut TestAppContext) {
     use bookie_gpui::live::{LiveTable, Origin};
     let origin = Origin::File(orders_fixture());
     let table = std::sync::Arc::new(
@@ -877,11 +877,8 @@ fn the_sessions_command_is_hidden_off_postgres_and_fills_the_editor_with_the_ses
     });
     cx.update(|window, cx| view.update(cx, |view, cx| view.show_sessions(window, cx)));
     view.read_with(cx, |view, cx| {
-        assert_eq!(
-            view.sql_input.read(cx).value(),
-            bookie_app_services::pg_sessions::SESSIONS_SQL
-        );
-        assert!(matches!(view.tabs.current(), crate::Tab::Query));
+        assert_eq!(view.sql_input.read(cx).value(), "", "no activity query exists for SQLite");
+        assert!(!matches!(view.tabs.current(), crate::Tab::Query));
     });
 }
 
