@@ -41,6 +41,8 @@ mod temporal_boundaries;
 mod transaction_cleanup;
 #[path = "support/unicode_object_names.rs"]
 mod unicode_object_names;
+#[path = "support/view_editability.rs"]
+mod view_editability;
 
 #[tokio::test]
 async fn an_unavailable_sql_server_is_classified_as_connection_refused() {
