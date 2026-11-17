@@ -99,7 +99,6 @@ pub(super) fn parse_pasted_cell_with_style(
 }
 
 /// The hooks for one driver, from the driver registry.
-/// The hooks for one driver, from the driver registry.
 pub(crate) fn hooks_for(driver_id: &str) -> ParseHooks {
     use std::sync::OnceLock;
 
