@@ -218,6 +218,19 @@ columnview > header .tp-column-header-selected {
   min-width: 28px;
 }
 
+/* Zoom levels for dialogs: Ctrl+scroll, Ctrl+plus, Ctrl+minus, Ctrl+0 */
+.tp-zoom-m1 { font-size: 90%; }
+.tp-zoom-m2 { font-size: 80%; }
+.tp-zoom-m3 { font-size: 70%; }
+.tp-zoom-p1 { font-size: 110%; }
+.tp-zoom-p2 { font-size: 120%; }
+.tp-zoom-p3 { font-size: 130%; }
+.tp-zoom-p4 { font-size: 140%; }
+.tp-zoom-p5 { font-size: 150%; }
+.tp-zoom-p6 { font-size: 160%; }
+.tp-zoom-p7 { font-size: 170%; }
+.tp-zoom-p8 { font-size: 180%; }
+
 /* Compact SQL editor toolbar matching DBX and TablePro */
 .tp-editor-toolbar button {
   padding-left: 6px;
