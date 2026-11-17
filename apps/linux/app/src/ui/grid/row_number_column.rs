@@ -129,7 +129,7 @@ fn row_label(cell: &gtk::ColumnViewCell, base: u64) -> Option<String> {
     }
     let row = cell.item().and_downcast::<RowObject>();
     let draft = row.as_ref().is_some_and(|row| row.draft_id().is_some());
-    let source = row.as_ref().and_then(|row| row.source_index());
+    let source = row.as_ref().and_then(|row| row.display_index());
     number_for(base, position, source, draft).map(|number| number.to_string())
 }
 
