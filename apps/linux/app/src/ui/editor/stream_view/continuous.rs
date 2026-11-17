@@ -161,6 +161,7 @@ fn install_row_navigation(view: &gtk::ColumnView, selection: &gtk::MultiSelectio
     model.attach_selection(selection, view);
     let controller = gtk::ShortcutController::new();
     controller.set_scope(gtk::ShortcutScope::Local);
+    controller.set_propagation_phase(gtk::PropagationPhase::Capture);
     for (trigger, last) in [("<Primary>Home", false), ("<Primary>End", true)] {
         let view = view.downgrade();
         let selection = selection.downgrade();
