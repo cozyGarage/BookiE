@@ -27,6 +27,17 @@ class GtkClickOffsetTests(unittest.TestCase):
         self.assertEqual(self.offset("0"), 0)
         self.assertEqual(self.offset("7"), 7)
 
+    def x_offset(self, override=None):
+        environment = {} if override is None else {"BOOKIE_GTK_X_OFFSET": override}
+        with patch.dict(os.environ, environment, clear=True):
+            return gtk_input.window_x_offset()
+
+    def test_the_horizontal_calibration_defaults_to_the_measured_window_inset(self):
+        self.assertEqual(self.x_offset(), 16)
+
+    def test_an_explicit_horizontal_calibration_wins_including_zero(self):
+        self.assertEqual(self.x_offset("0"), 0)
+        self.assertEqual(self.x_offset("5"), 5)
 
 
 class GtkKeyboardWindowTests(unittest.TestCase):
@@ -47,6 +58,7 @@ class GtkPointerWindowTests(unittest.TestCase):
         with patch.dict(sys.modules, {"gtk_input": gtk_input, "keyboard_paths": Mock()}):
             spec.loader.exec_module(self.ui)
         self.ui.ATSPI_WINDOW_Y_OFFSET = 19
+        self.ui.ATSPI_WINDOW_X_OFFSET = 16
         self.windows = (ctypes.c_ulong * 2)(5, 91)
         self.x11 = Mock()
         self.xtst = Mock()
@@ -81,7 +93,7 @@ class GtkPointerWindowTests(unittest.TestCase):
              patch.object(gtk_input, "uses_atspi_input", return_value=False), \
              patch.object(self.ui.time, "sleep"):
             self.ui.x11_click(10, 20)
-        self.xtst.XTestFakeMotionEvent.assert_called_once_with(1, -1, 110, 89, 0)
+        self.xtst.XTestFakeMotionEvent.assert_called_once_with(1, -1, 126, 89, 0)
         self.xtst.XTestFakeButtonEvent.assert_any_call(1, 3, 1, 0)
         self.xtst.XTestFakeButtonEvent.assert_any_call(1, 3, 0, 0)
 

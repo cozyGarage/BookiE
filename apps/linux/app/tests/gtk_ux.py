@@ -30,6 +30,7 @@ class XWindowAttributes(ctypes.Structure):
 
 
 ATSPI_WINDOW_Y_OFFSET = gtk_input.window_y_offset()
+ATSPI_WINDOW_X_OFFSET = gtk_input.window_x_offset()
 
 
 def capture_grid_navigation_artifact(_name):
@@ -109,7 +110,7 @@ def x11_resize_window(width, height):
 
 def x11_click(window_x, window_y, button=3, clicks=1, interval=0.08):
     if gtk_input.uses_atspi_input():
-        gtk_input.click(window_x, int(window_y) + ATSPI_WINDOW_Y_OFFSET, button, clicks)
+        gtk_input.click(int(window_x) + ATSPI_WINDOW_X_OFFSET, int(window_y) + ATSPI_WINDOW_Y_OFFSET, button, clicks)
         return
     x11 = ctypes.CDLL("libX11.so.6")
     xtst = ctypes.CDLL("libXtst.so.6")
@@ -146,7 +147,7 @@ def x11_click(window_x, window_y, button=3, clicks=1, interval=0.08):
         xtst.XTestFakeMotionEvent(
             display,
             -1,
-            origin[0] + int(window_x) * scale,
+            origin[0] + (int(window_x) + ATSPI_WINDOW_X_OFFSET) * scale,
             origin[1] + (int(window_y) + ATSPI_WINDOW_Y_OFFSET) * scale,
             0,
         )

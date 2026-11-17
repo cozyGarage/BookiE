@@ -11,6 +11,12 @@ def window_y_offset():
     return 19
 
 
+def window_x_offset():
+    if "BOOKIE_GTK_X_OFFSET" in os.environ:
+        return int(os.environ["BOOKIE_GTK_X_OFFSET"])
+    return 16
+
+
 def keyboard_window(windows):
     """Topmost viewable window that is not override-redirect; windows are (id, map_state, override) bottom to top."""
     for window, map_state, override_redirect in reversed(windows):
