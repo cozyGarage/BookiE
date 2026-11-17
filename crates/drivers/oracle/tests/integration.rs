@@ -25,6 +25,7 @@ async fn start_oracle() -> (ContainerAsync<GenericImage>, u16) {
         .with_exposed_port(1521.tcp())
         .with_wait_for(WaitFor::message_on_stdout("DATABASE IS READY TO USE!"))
         .with_env_var("ORACLE_PASSWORD", PASSWORD)
+        .with_startup_timeout(std::time::Duration::from_secs(240))
         .start()
         .await
         .expect("start Oracle Free");
