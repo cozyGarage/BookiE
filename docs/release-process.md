@@ -4,9 +4,19 @@ A release is a tag named `linux-vX.Y.Z` on the protected `main` branch. The GitH
 
 ## Before tagging
 
+Finish the selected [release scope](backlog.md#finishing-028) before cutting a candidate. A merged change and a passing unit test do not replace installed runtime acceptance.
+
 1. Merge the reviewed release change to `main`. It sets the workspace version, Meson version and newest AppStream entry to the same `X.Y.Z` value, regenerates `Cargo.lock` with `cargo update --workspace` and `apps/linux/packaging/THIRD_PARTY_NOTICES.md` with `python3 scripts/update-third-party-notices.py` (preflight fails on stale notices once the version changes), and adds a `## [X.Y.Z]` section to `CHANGELOG.md`. Run `python3 scripts/check-release-version.py` and `python3 scripts/release-notes.py notes X.Y.Z`.
 2. Write that section from `changelog.d` fragments with `python3 scripts/release-notes.py release X.Y.Z YYYY-MM-DD`; it moves them into `CHANGELOG.md` and deletes them ([ADR 0053](decisions/0053-changelog-fragments.md)). Only the release pull request edits `CHANGELOG.md`. The release workflow reads the committed section with `release-notes.py notes <version>` and fails when it is missing or empty. A wrong or missing fragment is fixed with a normal commit before the release is cut.
 3. Confirm the merge commit is on `main` and required checks apply to its exact revision.
+
+## Candidate runtime and benchmark baseline
+
+Use one immutable source revision and checksum-identified package for a candidate pass. Record the source, package, toolchain, engine versions, fixture sizes, platform/session and commands in private verification records. Keep clean and dirty source runs separate. If a fix changes the candidate, re-run the affected acceptance layers and start a new measurement record.
+
+Follow the [release qualification rules](validation-playbook.md#release-qualification), [manual checklist](manual-verification-0.2-features.md) and [testing and profiling procedures](testing.md#real-driver-integration-tests). Verify connect, browse, edit/save, query/cancel, import/export, session switching and close on disposable data before interpreting performance results. Run the relevant driver and release layers; an Xvfb pass does not certify native Wayland, focus or accessibility.
+
+Measure cold and warm startup, first-page latency, large-catalog search, wide/large-cell results and repeated run/pin/export/close retention separately. Report median and tail latency, process RSS/peak and decoded-payload estimates as distinct quantities. Use the same source, dataset, engine settings and run count for comparisons. Driver-only or headless measurements do not establish GUI responsiveness. Source-pinned CI passes remain required; benchmarks do not replace correctness checks.
 
 ## Build and publish
 

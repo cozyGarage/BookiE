@@ -24,7 +24,15 @@ Grid headers use the public ColumnView title and header-menu APIs. The name prec
 
 One preferences dialog presents Scope before Format. Table page and loaded query result are explicit request contexts; table context is preserved for grid-menu exports as well as the bottom toolbar. A table page is already filtered and sorted by its browse request. Query output retains result columns, including joined and computed values.
 
-Choosing all matching table rows displays the snapshot refusal and disables Export. Choosing current page restores it. Existing all-table entry points and the writer still refuse unqualified snapshot export ([ADR 0014](../../docs/decisions/0014-full-table-export-snapshot.md)). A guarded query rerun is separately labeled and may see changed data. Existing format-specific options, NULL markers, spreadsheet safety, column-fetch checks and cursor cleanup remain in force.
+On PostgreSQL, all matching table rows use one guarded repeatable-read snapshot with the browse filter and sort. When a qualified snapshot source is unavailable, choosing that scope displays the refusal and disables Export; current page remains available ([ADR 0014](../../docs/decisions/0014-full-table-export-snapshot.md)). Exporting a saved result reads its captured pages without rerunning SQL. Existing format-specific options, NULL markers, spreadsheet safety, column-fetch checks and cursor cleanup remain in force.
+
+The optional maximum-row input accepts an empty value or a positive whole number. Invalid input disables Export. Loaded and paged sources stop at that cap and report omitted rows; the cap never enables an unsupported snapshot scope. One request targets one table or result. JSON Lines file and clipboard output preserve exact-source JSON as text and parsed JSON as nested values. CSV import and export accept validated custom delimiters of 1 to 8 characters without quotes or line breaks.
+
+## Grid choices and session catalogs
+
+Single-column foreign keys load up to 100 candidate values through controlled guarded reads and reuse the cell choice popover. Composite foreign keys are skipped. Scalar enum/set choices, foreign-key navigation and tab-separated paste use the normal staged-edit path. Unfiltered PostgreSQL, MySQL/MariaDB and SQL Server browse counts prefer engine estimates; unavailable estimates and active filters use exact counts. The pager distinguishes estimates from exact totals.
+
+PostgreSQL and SQLite editor sessions expose their own temporary tables in the sidebar. Selecting a temporary table reads rows through its owning editor session. Switching the active session changes the visible group; session close removes it. Session-aware Structure editing and other-engine support remain outside the implemented slice.
 
 ## Validation
 
@@ -36,6 +44,6 @@ The existing vertical editor/result split has a persistent Results toggle, a res
 
 Errors reflect the latest accepted outcomes, including streamed failure and timeout. Positioned query failures retain their numeric server position through materialized and streamed outcomes. The result and Errors views offer Go to error when the sent SQL matches the original statement. The action restores a maximized editor and checks the originating buffer revision, execution generation and physical connection identity before moving the caret. Missing, invalid or rewritten positions retain readable, copyable error text. Error controls remain above scrollable error text in the result view.
 
-Existing terminal status and result rendering remain authoritative. Server NOTICE/PRINT delivery and a shell terminal remain separate work. A longer-timeout rerun has no source anchor and does not offer error navigation.
+Existing terminal status and result rendering remain authoritative. Supported buffered statements deliver bounded server messages as described in [known limitations](../../docs/known-limitations.md#interface); streamed/session delivery remains separate work. A shell terminal is not part of this panel. A longer-timeout rerun has no source anchor and does not offer error navigation.
 
 For known SQL grammars, gutter marks use the planner's source ranges too, so matching SQL inside comments is not mistaken for an executed statement. Engines without a script grammar retain their existing gutter fallback.

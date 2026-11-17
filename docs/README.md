@@ -29,6 +29,8 @@ Rules for contributors are in [AGENTS.md](../AGENTS.md). Accepted ADRs define ar
 
 Run-specific evidence, profiling output, research notes and review records are maintained outside the public source tree. Keep reproducible tests, fixtures, test commands, stable product behavior and architecture decisions here. Do not commit machine-specific paths, credentials, customer data or raw run output.
 
+Current-source documentation can describe changes newer than the latest published package. Release artifacts and notes identify what shipped; an accepted ADR or merged implementation does not by itself prove runtime acceptance. For 0.2.8, start with [finishing work](backlog.md#finishing-028) and qualify one immutable candidate.
+
 ## Adding documentation
 
 - Update the existing owner document when possible; add a new file only for a distinct audience or concern.
@@ -36,3 +38,4 @@ Run-specific evidence, profiling output, research notes and review records are m
 - Keep public testing instructions generic and reproducible. Store machine-specific results outside this repository and refer to the owning issue when public acceptance status matters.
 - When a document becomes obsolete, remove or replace it and update its links. `scripts/check-doc-links.py` checks local links.
 - Keep public file paths stable when scripts or workflows depend on them.
+- When behavior changes, check the feature list, user guide, known limitations and owning capability spec together. Describe partial support by engine, session or scope instead of marking the whole feature absent or complete. Keep issue status in the tracker and historical ADRs in their original context.

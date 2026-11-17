@@ -53,10 +53,10 @@ BookiE is a free, open-source database client focused on Linux first, built for 
 ## Highlights and capabilities
 
 - **Spreadsheet-grade data grid**: Fast keyset pagination, customizable page sizes (1–5,000 rows), browse auto-refresh (15s toggle), and page load duration display. Select columns (`Ctrl+Space`), stage multi-cell values (`Set Cells to Value`), enjoy right-aligned numeric data and sticky row-number gutters.
-- **Deep value inspection & editing**: Decoded previews in **View Value** for MessagePack, schema-less Protobuf, and binary image formats (PNG, JPEG, GIF, WebP) alongside full hex dumps and semantic JSON editing up to 1 MiB.
+- **Deep value inspection & editing**: **View Value** shows up to 64 KiB rendered text or 16 KiB hex, with decoded previews for supported MessagePack, schema-less Protobuf and image values. **Copy Value** retains complete values; eligible text and JSON edits accept up to 1 MiB.
 - **Governed SQL editor**: Side-by-side split view, syntax folding, line bookmarks (`Ctrl+F2`), query history in Open Quickly (`Ctrl+P`), and saved queries organized by folders and search keywords.
-- **Server messages & notices**: Real-time display for PostgreSQL notices/warnings (`RAISE`), SQL Server `PRINT` messages, and MySQL/MariaDB warnings right next to statement results with copyable details.
-- **Progressive streaming & comparison**: Progressive streaming within an estimated 64 MiB row window and 256 MiB shared page budget, spooled to encrypted local cache. Background search across all rows, and side-by-side result diffing (**Compare…**) with cell change highlighting.
+- **Server messages & notices**: Bounded PostgreSQL notices/warnings (`RAISE`), SQL Server `PRINT` messages, and MySQL/MariaDB warnings alongside supported statement results. See the [delivery limits](docs/known-limitations.md#interface) for streamed results and scripts.
+- **Progressive streaming & comparison**: Supported PostgreSQL SELECTs stream within an estimated 64 MiB row window and 256 MiB shared page budget, spooled to encrypted local cache. Completed saved results support background search and side-by-side comparison with cell change highlighting.
 - **Multi-connection workspace**: Open and switch between multiple database connections in a single window with independent per-tab connection routing, environment ribbons (Local, Dev, Staging, Prod), and automatic session restoration.
 - **Enterprise SSH tunneling**: Multi-hop SSH bastion chains with up to 8 jump hosts, individual keyring secrets per hop, custom local port binding, and strict TLS verification.
 - **Multi-file import with upsert**: Process up to 20 CSV, TSV, or Excel `.xlsx` files in one run, with row updating for existing primary keys on supported engines.
@@ -90,7 +90,7 @@ Open source makes this project possible. BookiE is an independent database clien
 
 ## Status
 
-See the [release page](https://github.com/cozyGarage/BookiE/releases) for published artifacts. [Project #3](https://github.com/users/cozyGarage/projects/3) lists selected work. Use the [driver maturity table](docs/adding-drivers.md#driver-maturity), [platform guide](docs/platforms.md), and [known limitations](docs/known-limitations.md) for current engine support, installation requirements, and behavior limits.
+The documentation describes current source behavior; a merged change may not be in a published package yet. See the [release page](https://github.com/cozyGarage/BookiE/releases) for published artifacts and [release finishing work](docs/backlog.md) for the path to 0.2.8. [Project #3](https://github.com/users/cozyGarage/projects/3) lists selected work. Use the [driver maturity table](docs/adding-drivers.md#driver-maturity), [platform guide](docs/platforms.md), and [known limitations](docs/known-limitations.md) for current engine support, installation requirements, and behavior limits.
 
 ## Supported platforms
 
@@ -218,7 +218,7 @@ Read [`CONTRIBUTING.md`](CONTRIBUTING.md) and the rules in [`AGENTS.md`](AGENTS.
 
 ## Changelog
 
-Release notes and unreleased changes are in [`CHANGELOG.md`](CHANGELOG.md).
+Published release notes are in [`CHANGELOG.md`](CHANGELOG.md). Unreleased user-facing changes have fragments under [`changelog.d/`](changelog.d/), assembled at the release cut ([ADR 0053](docs/decisions/0053-changelog-fragments.md)).
 
 ## License
 

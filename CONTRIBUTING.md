@@ -1,6 +1,6 @@
 # Contributing to BookiE
 
-BookiE is a Linux-only Rust and GTK database client. Current development happens on the `main` branch. Pull requests target `main` in [`cozyGarage/BookiE`](https://github.com/cozyGarage/BookiE).
+BookiE is a Linux-first native database client. GTK is the shipped Linux application; the parallel GPUI frontend follows [ADR 0052](docs/decisions/0052-gpui-is-the-cross-platform-frontend.md). Current development happens on the `main` branch. Pull requests target `main` in [`cozyGarage/BookiE`](https://github.com/cozyGarage/BookiE).
 
 ## Start here
 

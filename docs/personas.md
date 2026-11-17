@@ -22,12 +22,12 @@ flowchart TD
 ---
 
 ### 1. Database Operator & DBA
-- **Environment**: Wayland / X11 on Arch, Fedora, Debian, or Ubuntu.
+- **Environment**: A Linux Wayland or X11 desktop using a supported install path from [platforms](platforms.md). Distribution names alone do not establish toolkit compatibility.
 - **Workflow**: Manages PostgreSQL, MySQL, ClickHouse, or SQL Server instances over SSH bastions and TLS. Relies heavily on visual environment flags (`[Production]` red header tint) to prevent accidental data destruction.
 - **Critical Requirements**:
   - Destructive statements (`DELETE` without `WHERE`, `DROP TABLE`, `TRUNCATE`) must prompt for human approval.
-  - Server-side cancellation must reliably propagate to the engine on Escape.
-  - Audit journal must record every write and failed attempt locally.
+  - Escape requests cancellation; the result distinguishes confirmed server cancellation from an unknown outcome, and uncertain connections are retired.
+  - Required audit persistence must succeed before dispatch. The documented Local/Dev human-write exception and its unrecorded-write risk remain explicit in [PRODUCT.md](../PRODUCT.md).
 
 ### 2. AI Agent & MCP Operator
 - **Environment**: Local CLI, Claude Desktop, Cursor, or autonomous agent runners.
@@ -46,11 +46,11 @@ flowchart TD
   - Side-by-side SQL query editor with code folding and autocompletion.
 
 ### 4. Linux Package Maintainer
-- **Environment**: Arch PKGBUILD, Debian package tooling, Flatpak runtimes (GNOME 51 SDK), and Meson build systems.
+- **Environment**: Arch PKGBUILD, AppImage staging and Meson builds. Debian tooling remains an internal staging/validation input; Debian and Flatpak packages are historical delivery paths (ADRs 0031 and 0032).
 - **Workflow**: Builds reproducible binaries from source tags, packages application metadata, icons, and shell completions.
 - **Critical Requirements**:
   - Adherence to XDG Base Directory specification (`$XDG_CONFIG_HOME`, `$XDG_DATA_HOME`).
-  - No bundled proprietary libraries; all drivers statically linked at Cargo compile time.
+  - Driver crates are registered at compile time, with declared native dependencies and dependency notices.
   - Safe upgrades and rollbacks without breaking desktop keyring credentials.
 
 ---
