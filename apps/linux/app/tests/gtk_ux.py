@@ -2271,12 +2271,12 @@ GLib.MainLoop().run()
         while visible is None and time.monotonic() < deadline:
             visible = next((
                 node for node in ui.descendants(ui.application_node())
-                if ui.node_name(node) == "1" and ui.node_role(node) == pyatspi.ROLE_LABEL
+                if ui.node_name(node) == first_run_marker and ui.node_role(node) == pyatspi.ROLE_LABEL
                 and node.getState().contains(pyatspi.STATE_SHOWING)
             ), None)
             if visible is None:
                 time.sleep(ui.POLL_SECONDS)
-        assert visible is not None, "continuous grid did not display its first row"
+        assert visible is not None, "continuous grid did not display its first row marker"
         extents = visible.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
         x11_click(extents.x + min(extents.width, 40) // 2, extents.y + extents.height // 2, button=1)
         ui.press_x11_key("End", ("Control_L",))
