@@ -26,10 +26,28 @@ impl GridView {
         check
             .into_iter()
             .chain(listen)
+            .chain(self.csv_delimiter_actions())
             .chain(self.grid_actions())
             .chain(self.activity_actions())
             .chain(self.chrome_actions())
             .collect()
+    }
+
+    fn csv_delimiter_actions(&self) -> Vec<Action> {
+        let typed = self.palette_delimiter.as_ref().map(|(text, parsed)| Action {
+            id: "set-csv-delimiter",
+            label: match parsed {
+                Ok(_) => format!("CSV delimiter {text}: use it for CSV export and copy"),
+                Err(error) => format!("CSV delimiter {text}: {}", bookie_gpui::csv_delimiter::error_label(*error)),
+            },
+            enabled: true,
+        });
+        let reset = self.csv_delimiter.as_ref().map(|delimiter| Action {
+            id: "reset-csv-delimiter",
+            label: format!("CSV delimiter: back to the comma (now {})", delimiter.as_str()),
+            enabled: true,
+        });
+        typed.into_iter().chain(reset).collect()
     }
 
     fn grid_actions(&self) -> Vec<Action> {
@@ -325,6 +343,8 @@ impl GridView {
             "copy" => self.copy_selection(false, cx),
             "copy-csv" => self.copy_selection_as(CopyFormat::Csv, cx),
             "export-csv" => self.export_selection_or_page(cx),
+            "set-csv-delimiter" => self.set_csv_delimiter(),
+            "reset-csv-delimiter" => self.set_csv_delimiter_to(None),
             "copy-json" => self.copy_selection_as(CopyFormat::Json, cx),
             "copy-markdown" => self.copy_selection_as(CopyFormat::Markdown, cx),
             "copy-in-list" => self.copy_selection_as(CopyFormat::InList, cx),

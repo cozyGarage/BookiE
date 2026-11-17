@@ -1242,6 +1242,44 @@ fn export_selection_or_page_copies_csv_to_clipboard(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn the_csv_delimiter_command_changes_exports_until_it_is_reset(cx: &mut TestAppContext) {
+    let (view, cx) = open_live(cx);
+
+    view.update(cx, |view, _| {
+        view.palette_delimiter = bookie_gpui::csv_delimiter::parse_command("csv delimiter ||");
+        let actions = view.palette_actions();
+        let set = actions.iter().find(|action| action.id == "set-csv-delimiter").expect("set action");
+        assert!(set.enabled && set.label.starts_with("CSV delimiter ||"));
+        assert!(bookie_gpui::palette::fuzzy_score("csv delimiter ||", &set.label) > 0);
+        assert!(actions.iter().all(|action| action.id != "reset-csv-delimiter"));
+        view.set_csv_delimiter();
+        assert_eq!(view.status, "CSV delimiter set to \"||\"");
+    });
+    cx.update(|_, cx| view.update(cx, |view, cx| view.export_selection_or_page(cx)));
+    view.read_with(cx, |view, cx| {
+        let text = cx.read_from_clipboard().expect("clipboard text").text().expect("text");
+        assert!(text.lines().next().is_some_and(|header| header.starts_with("id||customer||")), "{text}");
+        assert!(view.palette_actions().iter().any(|action| action.id == "reset-csv-delimiter"));
+    });
+
+    view.update(cx, |view, _| {
+        view.palette_delimiter = bookie_gpui::csv_delimiter::parse_command("csv delimiter 'x");
+        let actions = view.palette_actions();
+        let bad = actions.iter().find(|action| action.id == "set-csv-delimiter").expect("refusal row");
+        assert!(bad.enabled && bad.label.ends_with("no quote characters"));
+        view.set_csv_delimiter();
+        assert_eq!(view.status, "CSV delimiter refused: no quote characters");
+        view.set_csv_delimiter_to(None);
+        assert_eq!(view.status, "CSV delimiter reset to the comma");
+    });
+    cx.update(|_, cx| view.update(cx, |view, cx| view.export_selection_or_page(cx)));
+    view.read_with(cx, |_, cx| {
+        let text = cx.read_from_clipboard().expect("clipboard text").text().expect("text");
+        assert!(text.lines().next().is_some_and(|header| header.starts_with("id,customer,")));
+    });
+}
+
+#[gpui::test]
 fn header_collapse_all_and_feedback_actions(cx: &mut TestAppContext) {
     let (view, cx) = open_live(cx);
 
