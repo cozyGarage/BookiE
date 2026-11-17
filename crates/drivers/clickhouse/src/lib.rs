@@ -1174,7 +1174,15 @@ fn escape_bind_markers(sql: &str) -> String {
 /// 497 ACCESS_DENIED, 516 AUTHENTICATION_FAILED.
 const AUTH_CODES: [&str; 5] = ["code: 192", "code: 193", "code: 194", "code: 497", "code: 516"];
 
+fn answered_without_tls(err: &clickhouse::error::Error) -> bool {
+    let chain = error_chain_text(err).to_ascii_lowercase();
+    chain.contains("invalidcontenttype") || chain.contains("corrupt message of type invalidcontent")
+}
+
 fn map_clickhouse_connect_error(err: clickhouse::error::Error, verifies_cert: bool) -> DriverError {
+    if answered_without_tls(&err) {
+        return DriverError::Tls("the server does not use TLS; it answered in plain text".into());
+    }
     let is_ambiguous_network_disconnect = matches!(&err, clickhouse::error::Error::Network(_));
     match map_clickhouse_error_in_context(err, true) {
         DriverError::Disconnected if verifies_cert && is_ambiguous_network_disconnect => {
