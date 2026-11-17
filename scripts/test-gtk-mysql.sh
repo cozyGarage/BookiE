@@ -51,7 +51,7 @@ chmod 0777 "$socket_directory"
 
 cleanup() {
   if [[ -n "${container:-}" ]]; then
-    docker rm --force "$container" >/dev/null 2>&1 || true
+    docker rm --force --volumes "$container" >/dev/null 2>&1 || true
   fi
   rm -rf -- "$socket_parent"
 }

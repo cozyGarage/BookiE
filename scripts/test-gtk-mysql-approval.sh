@@ -49,7 +49,7 @@ container="$(docker run --rm --detach --label "com.bookie.test-run=${BOOKIE_TEST
   --env MYSQL_DATABASE=bookie_test \
   mysql:8.0 --default-authentication-plugin=mysql_native_password)"
 cleanup() {
-  docker rm --force "$container" >/dev/null 2>&1 || true
+  docker rm --force --volumes "$container" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
