@@ -26,7 +26,7 @@ def scenarios(ui):
         ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
         ui.run_sql("SELECT public.bookie_gtk_notice() AS notice_result")
         ui.wait_for_node_containing("bookie GTK server message")
-        ui.wait_for_node(name="Rows 1-1")
+        ui.wait_for_paginator("Rows 1-1")
         ui.wait_for_node(name="42")
         ui.invoke(ui.wait_for_node(name="Copy messages", role=pyatspi.ROLE_PUSH_BUTTON))
         copied = clipboard_text(ui)
