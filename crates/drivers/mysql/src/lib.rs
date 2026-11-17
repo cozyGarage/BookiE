@@ -943,13 +943,7 @@ async fn request_cancellation(pool: &Pool<MySql>, connection_id: u64) -> Result<
 /// `ER_QUERY_INTERRUPTED` is the only outcome that proves the server
 /// aborted the statement rather than the client giving up on it.
 fn confirms_cancellation(error: &DriverError) -> bool {
-    matches!(
-        error,
-        DriverError::Query {
-            sqlstate: Some(sqlstate),
-            ..
-        } if sqlstate == "70100"
-    )
+    error.has_sqlstate("70100")
 }
 
 async fn retire_if_uncertain(connection: PoolConnection<MySql>, error: DriverError) -> DriverError {

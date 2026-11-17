@@ -958,13 +958,7 @@ async fn controlled_execute(
 }
 
 fn confirms_cancellation(error: &DriverError) -> bool {
-    matches!(
-        error,
-        DriverError::Query {
-            sqlstate: Some(sqlstate),
-            ..
-        } if sqlstate == "57014"
-    )
+    error.has_sqlstate("57014")
 }
 
 fn sequence_sync_query(schema: Option<&str>, table: &str, column: &str) -> (String, Vec<Value>) {
