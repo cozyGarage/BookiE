@@ -16,6 +16,7 @@ ignore = [
     # No fixed release. rsa 0.10.0-rc.18 via russh, ssh-key, and sqlx-mysql.
     # Local desktop use; remote timing against our RSA private-key path is limited.
     { id = "RUSTSEC-2023-0071", reason = "rsa Marvin Attack: no fixed upgrade; transitive via russh, ssh-key, and sqlx-mysql" },
+    { id = "RUSTSEC-2026-0543", reason = "chrono is unmaintained with no safe upgrade; used by every driver crate and by sqlx, arrow, duckdb and bson; migrating to jiff or time is tracked separately" },
 ]
 
 [licenses]
