@@ -128,7 +128,9 @@ pub fn present(
                         let rendered = render_result(&cols, &result.rows);
                         let n = result.rows.len();
                         text_buf.set_text(&rendered);
-                        status_l.set_text(&bookie_app_services::trn!("{n} row", "{n} rows", n).replace("{n}", &n.to_string()));
+                        status_l.set_text(
+                            &bookie_app_services::trn!("{n} row", "{n} rows", n).replace("{n}", &n.to_string()),
+                        );
                     }
                     Err(e) => {
                         if token.is_cancelled() {
@@ -330,8 +332,16 @@ mod tests {
     fn render_result_aligns_columns_with_headers_and_separator() {
         let cols = vec!["pid".to_string(), "query".to_string(), "state".to_string()];
         let rows = vec![
-            vec![Value::Int(1234), Value::Text("SELECT 1".to_string()), Value::Text("active".to_string())],
-            vec![Value::Int(56), Value::Text("idle in transaction".to_string()), Value::Text("idle".to_string())],
+            vec![
+                Value::Int(1234),
+                Value::Text("SELECT 1".to_string()),
+                Value::Text("active".to_string()),
+            ],
+            vec![
+                Value::Int(56),
+                Value::Text("idle in transaction".to_string()),
+                Value::Text("idle".to_string()),
+            ],
         ];
         let rendered = render_result(&cols, &rows);
         let lines: Vec<&str> = rendered.lines().collect();
