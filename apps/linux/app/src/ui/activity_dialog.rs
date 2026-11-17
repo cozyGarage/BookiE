@@ -196,8 +196,10 @@ fn spawn_kill_session(
         let _flight = flight;
         let control = crate::services::operation_control::bounded_with(timeout_secs, token);
         match conn.execute_controlled(&sql, &control).await {
-            Ok(r) => {
-                text_buf.set_text(&format!("Kill issued; rows_affected={}", r.rows_affected));
+            Ok(_) => {
+                text_buf.set_text(&tr!(
+                    "Kill request sent. The server ends the session if it still exists; run Sessions again to confirm."
+                ));
                 status_l.set_text(&tr!("Done"));
             }
             Err(e) => {
