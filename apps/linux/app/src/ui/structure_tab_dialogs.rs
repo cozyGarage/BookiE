@@ -154,28 +154,15 @@ pub(super) fn present_index_dialog(
     dialog.present(Some(parent));
 }
 
-pub(super) fn present_fk_dialog(
-    parent: &gtk::Widget,
-    columns: &[DraftColumn],
-    driver_id: &str,
-    sender: ComponentSender<StructureTab>,
+fn build_fk_reference_group(
+    fk_actions: &[&str],
+) -> (
+    adw::PreferencesGroup,
+    adw::EntryRow,
+    adw::EntryRow,
+    adw::ComboRow,
+    adw::ComboRow,
 ) {
-    let fk_actions = bookie_core::sql_ddl::supported_fk_actions(driver_id);
-    let (dialog, body, submit_btn) = build_form_dialog(
-        &bookie_app_services::tr!("Add Foreign Key"),
-        &bookie_app_services::tr!("Add"),
-    );
-
-    let name_group = adw::PreferencesGroup::builder().build();
-    let name_row = adw::EntryRow::builder().title(bookie_app_services::tr!("Name")).build();
-    name_group.add(&name_row);
-    body.append(&name_group);
-
-    body.append(&section_label(&bookie_app_services::tr!("Source columns")));
-    let (columns_list, column_checks) = build_column_checklist(columns);
-    body.append(&columns_list);
-
-    // Reference columns stay free-text; resolving them requires an asynchronous catalog read.
     let ref_group = adw::PreferencesGroup::builder()
         .title(bookie_app_services::tr!("References"))
         .build();
@@ -197,6 +184,83 @@ pub(super) fn present_fk_dialog(
         .model(&gtk::StringList::new(fk_actions))
         .build();
     ref_group.add(&on_update_row);
+    (ref_group, ref_table_row, ref_cols_row, on_delete_row, on_update_row)
+}
+
+fn parse_fk_submission(
+    name: String,
+    ref_table: String,
+    column_checks: &Rc<RefCell<Vec<(String, gtk::CheckButton)>>>,
+    ref_cols_text: &str,
+    fk_actions: &[&'static str],
+    on_delete_idx: u32,
+    on_update_idx: u32,
+) -> Result<ForeignKeyInfo, String> {
+    if name.trim().is_empty() {
+        return Err(bookie_app_services::tr!("Foreign key name is required."));
+    }
+    if ref_table.trim().is_empty() {
+        return Err(bookie_app_services::tr!("Reference table is required."));
+    }
+    let cols: Vec<String> = column_checks
+        .borrow()
+        .iter()
+        .filter_map(|(n, c)| if c.is_active() { Some(n.clone()) } else { None })
+        .collect();
+    if cols.is_empty() {
+        return Err(bookie_app_services::tr!("Select at least one source column."));
+    }
+    let ref_cols: Vec<String> = ref_cols_text
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+    if ref_cols.is_empty() {
+        return Err(bookie_app_services::tr!("Reference columns are required."));
+    }
+    if ref_cols.len() != cols.len() {
+        return Err(bookie_app_services::tr!(
+            "Source and reference column counts must match."
+        ));
+    }
+    let (ref_schema, ref_table_only) = match ref_table.split_once('.') {
+        Some((s, t)) => (Some(s.trim().to_string()), t.trim().to_string()),
+        None => (None, ref_table),
+    };
+    let action_at = |idx: u32| -> Option<String> { fk_actions.get(idx as usize).map(|s| (*s).to_string()) };
+    Ok(ForeignKeyInfo {
+        name,
+        columns: cols,
+        ref_schema,
+        ref_table: ref_table_only,
+        ref_columns: ref_cols,
+        on_delete: action_at(on_delete_idx),
+        on_update: action_at(on_update_idx),
+    })
+}
+
+pub(super) fn present_fk_dialog(
+    parent: &gtk::Widget,
+    columns: &[DraftColumn],
+    driver_id: &str,
+    sender: ComponentSender<StructureTab>,
+) {
+    let fk_actions = bookie_core::sql_ddl::supported_fk_actions(driver_id);
+    let (dialog, body, submit_btn) = build_form_dialog(
+        &bookie_app_services::tr!("Add Foreign Key"),
+        &bookie_app_services::tr!("Add"),
+    );
+
+    let name_group = adw::PreferencesGroup::builder().build();
+    let name_row = adw::EntryRow::builder().title(bookie_app_services::tr!("Name")).build();
+    name_group.add(&name_row);
+    body.append(&name_group);
+
+    body.append(&section_label(&bookie_app_services::tr!("Source columns")));
+    let (columns_list, column_checks) = build_column_checklist(columns);
+    body.append(&columns_list);
+
+    let (ref_group, ref_table_row, ref_cols_row, on_delete_row, on_update_row) = build_fk_reference_group(fk_actions);
     body.append(&ref_group);
 
     let column_checks_for_resp = column_checks.clone();
@@ -206,65 +270,23 @@ pub(super) fn present_fk_dialog(
         let Some(dialog_for_submit) = dialog_for_submit.upgrade() else {
             return;
         };
-        let name = name_row.text().to_string();
-        let ref_table = ref_table_row.text().to_string();
-        if name.trim().is_empty() {
-            let _ = sender_for_resp.output(StructureTabOutput::ShowToast(bookie_app_services::tr!(
-                "Foreign key name is required."
-            )));
-            return;
+        match parse_fk_submission(
+            name_row.text().to_string(),
+            ref_table_row.text().to_string(),
+            &column_checks_for_resp,
+            &ref_cols_row.text(),
+            fk_actions,
+            on_delete_row.selected(),
+            on_update_row.selected(),
+        ) {
+            Ok(fk_info) => {
+                sender_for_resp.input(StructureTabInput::AddForeignKey(fk_info));
+                dialog_for_submit.close();
+            }
+            Err(err) => {
+                let _ = sender_for_resp.output(StructureTabOutput::ShowToast(err));
+            }
         }
-        if ref_table.trim().is_empty() {
-            let _ = sender_for_resp.output(StructureTabOutput::ShowToast(bookie_app_services::tr!(
-                "Reference table is required."
-            )));
-            return;
-        }
-        let cols: Vec<String> = column_checks_for_resp
-            .borrow()
-            .iter()
-            .filter_map(|(n, c)| if c.is_active() { Some(n.clone()) } else { None })
-            .collect();
-        if cols.is_empty() {
-            let _ = sender_for_resp.output(StructureTabOutput::ShowToast(bookie_app_services::tr!(
-                "Select at least one source column."
-            )));
-            return;
-        }
-        let ref_cols: Vec<String> = ref_cols_row
-            .text()
-            .split(',')
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect();
-        if ref_cols.is_empty() {
-            let _ = sender_for_resp.output(StructureTabOutput::ShowToast(bookie_app_services::tr!(
-                "Reference columns are required."
-            )));
-            return;
-        }
-        if ref_cols.len() != cols.len() {
-            let _ = sender_for_resp.output(StructureTabOutput::ShowToast(bookie_app_services::tr!(
-                "Source and reference column counts must match."
-            )));
-            return;
-        }
-        let (ref_schema, ref_table_only) = match ref_table.split_once('.') {
-            Some((s, t)) => (Some(s.trim().to_string()), t.trim().to_string()),
-            None => (None, ref_table),
-        };
-        // Keep an explicit NO ACTION distinct from a driver-unknown action.
-        let action_at = |idx: u32| -> Option<String> { fk_actions.get(idx as usize).map(|s| (*s).to_string()) };
-        sender_for_resp.input(StructureTabInput::AddForeignKey(ForeignKeyInfo {
-            name,
-            columns: cols,
-            ref_schema,
-            ref_table: ref_table_only,
-            ref_columns: ref_cols,
-            on_delete: action_at(on_delete_row.selected()),
-            on_update: action_at(on_update_row.selected()),
-        }));
-        dialog_for_submit.close();
     });
 
     dialog.present(Some(parent));

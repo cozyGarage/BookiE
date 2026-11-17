@@ -51,6 +51,65 @@ pub enum SshSecretToStore {
     None,
 }
 
+fn build_endpoint_rows() -> (adw::EntryRow, adw::SpinRow, adw::SpinRow, adw::EntryRow) {
+    let host = adw::EntryRow::builder().title(bookie_app_services::tr!("Host")).build();
+    let port = adw::SpinRow::with_range(1.0, 65535.0, 1.0);
+    port.set_title(&bookie_app_services::tr!("Port"));
+    port.set_value(22.0);
+    let local_port = adw::SpinRow::with_range(0.0, 65535.0, 1.0);
+    local_port.set_title(&bookie_app_services::tr!("Local port"));
+    local_port.set_subtitle(&bookie_app_services::tr!("0 picks a free port"));
+    let user = adw::EntryRow::builder()
+        .title(bookie_app_services::tr!("Username"))
+        .build();
+    (host, port, local_port, user)
+}
+
+fn build_auth_rows() -> (
+    adw::ComboRow,
+    adw::PasswordEntryRow,
+    adw::EntryRow,
+    adw::EntryRow,
+    adw::PasswordEntryRow,
+) {
+    let auth_pwd = bookie_app_services::tr!("Password");
+    let auth_key = bookie_app_services::tr!("Private key");
+    let auth_agent = bookie_app_services::tr!("SSH agent");
+    let auth_model = gtk::StringList::new(&[auth_pwd.as_str(), auth_key.as_str(), auth_agent.as_str()]);
+    let auth_combo = adw::ComboRow::builder()
+        .title(bookie_app_services::tr!("Authentication"))
+        .model(&auth_model)
+        .selected(SSH_AUTH_PASSWORD)
+        .build();
+
+    let password = adw::PasswordEntryRow::builder()
+        .title(bookie_app_services::tr!("Password"))
+        .build();
+    let key_path = adw::EntryRow::builder()
+        .title(bookie_app_services::tr!("Private key path"))
+        .text(default_ssh_key_path())
+        .build();
+    attach_key_browse_button(
+        &key_path,
+        &bookie_app_services::tr!("Browse for private key"),
+        &bookie_app_services::tr!("Select SSH private key"),
+        &["id_*", "*.pem", "*.key"],
+    );
+    let agent_key = adw::EntryRow::builder()
+        .title(bookie_app_services::tr!("Agent key file (optional)"))
+        .build();
+    attach_key_browse_button(
+        &agent_key,
+        &bookie_app_services::tr!("Browse for public key"),
+        &bookie_app_services::tr!("Select SSH public key"),
+        &["*.pub"],
+    );
+    let passphrase = adw::PasswordEntryRow::builder()
+        .title(bookie_app_services::tr!("Passphrase"))
+        .build();
+    (auth_combo, password, key_path, agent_key, passphrase)
+}
+
 impl SshSection {
     pub fn build() -> Self {
         let group = adw::PreferencesGroup::builder()
@@ -65,52 +124,8 @@ impl SshSection {
             .build();
         group.add(&expander);
 
-        let host = adw::EntryRow::builder().title(bookie_app_services::tr!("Host")).build();
-        let port = adw::SpinRow::with_range(1.0, 65535.0, 1.0);
-        port.set_title(&bookie_app_services::tr!("Port"));
-        port.set_value(22.0);
-        let local_port = adw::SpinRow::with_range(0.0, 65535.0, 1.0);
-        local_port.set_title(&bookie_app_services::tr!("Local port"));
-        local_port.set_subtitle(&bookie_app_services::tr!("0 picks a free port"));
-        let user = adw::EntryRow::builder()
-            .title(bookie_app_services::tr!("Username"))
-            .build();
-
-        let auth_pwd = bookie_app_services::tr!("Password");
-        let auth_key = bookie_app_services::tr!("Private key");
-        let auth_agent = bookie_app_services::tr!("SSH agent");
-        let auth_model = gtk::StringList::new(&[auth_pwd.as_str(), auth_key.as_str(), auth_agent.as_str()]);
-        let auth_combo = adw::ComboRow::builder()
-            .title(bookie_app_services::tr!("Authentication"))
-            .model(&auth_model)
-            .selected(SSH_AUTH_PASSWORD)
-            .build();
-
-        let password = adw::PasswordEntryRow::builder()
-            .title(bookie_app_services::tr!("Password"))
-            .build();
-        let key_path = adw::EntryRow::builder()
-            .title(bookie_app_services::tr!("Private key path"))
-            .text(default_ssh_key_path())
-            .build();
-        attach_key_browse_button(
-            &key_path,
-            &bookie_app_services::tr!("Browse for private key"),
-            &bookie_app_services::tr!("Select SSH private key"),
-            &["id_*", "*.pem", "*.key"],
-        );
-        let agent_key = adw::EntryRow::builder()
-            .title(bookie_app_services::tr!("Agent key file (optional)"))
-            .build();
-        attach_key_browse_button(
-            &agent_key,
-            &bookie_app_services::tr!("Browse for public key"),
-            &bookie_app_services::tr!("Select SSH public key"),
-            &["*.pub"],
-        );
-        let passphrase = adw::PasswordEntryRow::builder()
-            .title(bookie_app_services::tr!("Passphrase"))
-            .build();
+        let (host, port, local_port, user) = build_endpoint_rows();
+        let (auth_combo, password, key_path, agent_key, passphrase) = build_auth_rows();
         let system_client = system_client_row();
         let jumps = SshJumps::build(&expander);
 

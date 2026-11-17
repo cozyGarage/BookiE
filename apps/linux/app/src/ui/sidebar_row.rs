@@ -396,30 +396,7 @@ impl FactoryComponent for SidebarRow {
         sender: FactorySender<Self>,
     ) -> Self::Widgets {
         let widgets = view_output!();
-        let narrow = adw::Breakpoint::new(adw::BreakpointCondition::new_length(
-            adw::BreakpointConditionLengthType::MaxWidth,
-            260.0,
-            adw::LengthUnit::Px,
-        ));
-        if let Some(row_layout) = widgets.row_layout.child().and_downcast::<gtk::Box>() {
-            narrow.add_setter(&row_layout, "orientation", Some(&gtk::Orientation::Vertical.into()));
-        }
-        widgets.row_layout.add_breakpoint(narrow);
-        if self.group.is_none() && self.kind != SidebarObjectKind::TemporaryTable {
-            self.columns.install(&root, &widgets.actions_row, &sender);
-        }
-        if let Some(button) = &self.new_table_button {
-            widgets.actions_row.append(button);
-        }
-        if let Some(button) = &self.csv_button {
-            widgets.actions_row.append(button);
-        }
-        if let Some(button) = &self.new_schema_button {
-            widgets.actions_row.append(button);
-        }
-        if let Some(button) = &self.open_button {
-            widgets.actions_row.append(button);
-        }
+        self.setup_row_layout(&root, &widgets, &sender);
         if self.group.is_some() {
             self.describe_group(&root);
             self.wire_group_buttons(&sender);
@@ -440,111 +417,8 @@ impl FactoryComponent for SidebarRow {
         };
         root.set_tooltip_text(Some(&tooltip));
 
-        // Claim Ctrl+click before row activation so the parent opens a new tab.
-        let click_gesture = gtk::GestureClick::builder().button(1).build();
-        let sender_for_ctrl = sender.clone();
-        click_gesture.connect_pressed(move |gesture, _, _, _| {
-            let state = gesture.current_event_state();
-            if state.contains(gdk::ModifierType::CONTROL_MASK) {
-                gesture.set_state(gtk::EventSequenceState::Claimed);
-                sender_for_ctrl.input(SidebarRowMsg::OpenInNewTab);
-            }
-        });
-        root.add_controller(click_gesture);
-
-        // The popover resolves actions through its row parent.
-        let group = gtk::gio::SimpleActionGroup::new();
-        let sender_open = sender.clone();
-        let open_action = gtk::gio::ActionEntry::builder("open-in-new-tab")
-            .activate(move |_, _, _| sender_open.input(SidebarRowMsg::OpenInNewTab))
-            .build();
-        let sender_edit = sender.clone();
-        let edit_action = gtk::gio::ActionEntry::builder("edit-structure")
-            .activate(move |_, _, _| sender_edit.input(SidebarRowMsg::EditStructure))
-            .build();
-        let sender_show = sender.clone();
-        let show_create_action = gtk::gio::ActionEntry::builder("show-create-table")
-            .activate(move |_, _, _| sender_show.input(SidebarRowMsg::ShowCreateTable))
-            .build();
-        let sender_join = sender.clone();
-        let join_action = gtk::gio::ActionEntry::builder("join-referenced")
-            .activate(move |_, _, _| sender_join.input(SidebarRowMsg::JoinReferenced))
-            .build();
-        let sender_diagram = sender.clone();
-        let diagram_action = gtk::gio::ActionEntry::builder("show-diagram")
-            .activate(move |_, _, _| sender_diagram.input(SidebarRowMsg::ShowDiagram))
-            .build();
-        let sender_drop = sender.clone();
-        let sender_import = sender.clone();
-        let import_action = gtk::gio::ActionEntry::builder("import-csv")
-            .activate(move |_, _, _| sender_import.input(SidebarRowMsg::ImportCsv))
-            .build();
-        let sender_rename = sender.clone();
-        let rename_action = gtk::gio::ActionEntry::builder("rename-table")
-            .activate(move |_, _, _| sender_rename.input(SidebarRowMsg::RenameTable))
-            .build();
-        let sender_truncate = sender.clone();
-        let truncate_action = gtk::gio::ActionEntry::builder("truncate-table")
-            .activate(move |_, _, _| sender_truncate.input(SidebarRowMsg::TruncateTable))
-            .build();
-        let drop_action = gtk::gio::ActionEntry::builder("drop-table")
-            .activate(move |_, _, _| sender_drop.input(SidebarRowMsg::DropTable))
-            .build();
-        group.add_action_entries([
-            open_action,
-            edit_action,
-            show_create_action,
-            join_action,
-            diagram_action,
-            import_action,
-            rename_action,
-            truncate_action,
-            drop_action,
-        ]);
-        root.insert_action_group("sidebar-row", Some(&group));
-
-        // Pop down before row removal so GTK cannot finalize an open popover.
-        let popover_for_unmap = self.popover.clone();
-        root.connect_unmap(move |_| {
-            if let Some(popover) = popover_for_unmap.borrow().as_ref() {
-                popover.popdown();
-            }
-        });
-
-        let right_click = gtk::GestureClick::builder().button(3).build();
-        let popover_for_right = self.popover.clone();
-        let root_for_right = root.downgrade();
-        let kind_for_right = self.kind;
-        right_click.connect_pressed(move |g, _, x, y| {
-            g.set_state(gtk::EventSequenceState::Claimed);
-            let Some(root) = root_for_right.upgrade() else {
-                return;
-            };
-            let popover = context_popover(&popover_for_right, &root, kind_for_right);
-            crate::ui::context_menu::popup_at(&popover, Some(gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
-        });
-        root.add_controller(right_click);
-
-        // The Menu key anchors to the row center because no pointer position exists.
-        let popover_for_menu = self.popover.clone();
-        let root_for_menu = root.downgrade();
-        let kind_for_menu = self.kind;
-        let menu_shortcut = gtk::Shortcut::builder()
-            .trigger(&crate::ui::shortcut::parse("Menu"))
-            .action(&gtk::CallbackAction::new(move |_, _| {
-                if let Some(root) = root_for_menu.upgrade() {
-                    let popover = context_popover(&popover_for_menu, &root, kind_for_menu);
-                    let pointing = root.compute_bounds(&root).map(|bounds| {
-                        gdk::Rectangle::new((bounds.width() / 2.0) as i32, (bounds.height() / 2.0) as i32, 1, 1)
-                    });
-                    crate::ui::context_menu::popup_at(&popover, pointing);
-                }
-                glib::Propagation::Stop
-            }))
-            .build();
-        let shortcut_controller = gtk::ShortcutController::new();
-        shortcut_controller.add_shortcut(menu_shortcut);
-        root.add_controller(shortcut_controller);
+        Self::register_table_actions(&root, &sender);
+        self.attach_row_controllers(&root, &sender);
 
         widgets
     }
@@ -594,6 +468,139 @@ impl FactoryComponent for SidebarRow {
 }
 
 impl SidebarRow {
+    fn setup_row_layout(&mut self, root: &gtk::ListBoxRow, widgets: &SidebarRowWidgets, sender: &FactorySender<Self>) {
+        let narrow = adw::Breakpoint::new(adw::BreakpointCondition::new_length(
+            adw::BreakpointConditionLengthType::MaxWidth,
+            260.0,
+            adw::LengthUnit::Px,
+        ));
+        if let Some(row_layout) = widgets.row_layout.child().and_downcast::<gtk::Box>() {
+            narrow.add_setter(&row_layout, "orientation", Some(&gtk::Orientation::Vertical.into()));
+        }
+        widgets.row_layout.add_breakpoint(narrow);
+        if self.group.is_none() && self.kind != SidebarObjectKind::TemporaryTable {
+            self.columns.install(root, &widgets.actions_row, sender);
+        }
+        if let Some(button) = &self.new_table_button {
+            widgets.actions_row.append(button);
+        }
+        if let Some(button) = &self.csv_button {
+            widgets.actions_row.append(button);
+        }
+        if let Some(button) = &self.new_schema_button {
+            widgets.actions_row.append(button);
+        }
+        if let Some(button) = &self.open_button {
+            widgets.actions_row.append(button);
+        }
+    }
+
+    fn register_table_actions(root: &gtk::ListBoxRow, sender: &FactorySender<Self>) {
+        let group = gtk::gio::SimpleActionGroup::new();
+        let sender_open = sender.clone();
+        let open_action = gtk::gio::ActionEntry::builder("open-in-new-tab")
+            .activate(move |_, _, _| sender_open.input(SidebarRowMsg::OpenInNewTab))
+            .build();
+        let sender_edit = sender.clone();
+        let edit_action = gtk::gio::ActionEntry::builder("edit-structure")
+            .activate(move |_, _, _| sender_edit.input(SidebarRowMsg::EditStructure))
+            .build();
+        let sender_show = sender.clone();
+        let show_create_action = gtk::gio::ActionEntry::builder("show-create-table")
+            .activate(move |_, _, _| sender_show.input(SidebarRowMsg::ShowCreateTable))
+            .build();
+        let sender_join = sender.clone();
+        let join_action = gtk::gio::ActionEntry::builder("join-referenced")
+            .activate(move |_, _, _| sender_join.input(SidebarRowMsg::JoinReferenced))
+            .build();
+        let sender_diagram = sender.clone();
+        let diagram_action = gtk::gio::ActionEntry::builder("show-diagram")
+            .activate(move |_, _, _| sender_diagram.input(SidebarRowMsg::ShowDiagram))
+            .build();
+        let sender_drop = sender.clone();
+        let sender_import = sender.clone();
+        let import_action = gtk::gio::ActionEntry::builder("import-csv")
+            .activate(move |_, _, _| sender_import.input(SidebarRowMsg::ImportCsv))
+            .build();
+        let sender_rename = sender.clone();
+        let rename_action = gtk::gio::ActionEntry::builder("rename-table")
+            .activate(move |_, _, _| sender_rename.input(SidebarRowMsg::RenameTable))
+            .build();
+        let sender_truncate = sender.clone();
+        let truncate_action = gtk::gio::ActionEntry::builder("truncate-table")
+            .activate(move |_, _, _| sender_truncate.input(SidebarRowMsg::TruncateTable))
+            .build();
+        let drop_action = gtk::gio::ActionEntry::builder("drop-table")
+            .activate(move |_, _, _| sender_drop.input(SidebarRowMsg::DropTable))
+            .build();
+        group.add_action_entries([
+            open_action,
+            edit_action,
+            show_create_action,
+            join_action,
+            diagram_action,
+            import_action,
+            rename_action,
+            truncate_action,
+            drop_action,
+        ]);
+        root.insert_action_group("sidebar-row", Some(&group));
+    }
+
+    fn attach_row_controllers(&self, root: &gtk::ListBoxRow, sender: &FactorySender<Self>) {
+        let click_gesture = gtk::GestureClick::builder().button(1).build();
+        let sender_for_ctrl = sender.clone();
+        click_gesture.connect_pressed(move |gesture, _, _, _| {
+            let state = gesture.current_event_state();
+            if state.contains(gdk::ModifierType::CONTROL_MASK) {
+                gesture.set_state(gtk::EventSequenceState::Claimed);
+                sender_for_ctrl.input(SidebarRowMsg::OpenInNewTab);
+            }
+        });
+        root.add_controller(click_gesture);
+
+        let popover_for_unmap = self.popover.clone();
+        root.connect_unmap(move |_| {
+            if let Some(popover) = popover_for_unmap.borrow().as_ref() {
+                popover.popdown();
+            }
+        });
+
+        let right_click = gtk::GestureClick::builder().button(3).build();
+        let popover_for_right = self.popover.clone();
+        let root_for_right = root.downgrade();
+        let kind_for_right = self.kind;
+        right_click.connect_pressed(move |g, _, x, y| {
+            g.set_state(gtk::EventSequenceState::Claimed);
+            let Some(root) = root_for_right.upgrade() else {
+                return;
+            };
+            let popover = context_popover(&popover_for_right, &root, kind_for_right);
+            crate::ui::context_menu::popup_at(&popover, Some(gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
+        });
+        root.add_controller(right_click);
+
+        let popover_for_menu = self.popover.clone();
+        let root_for_menu = root.downgrade();
+        let kind_for_menu = self.kind;
+        let menu_shortcut = gtk::Shortcut::builder()
+            .trigger(&crate::ui::shortcut::parse("Menu"))
+            .action(&gtk::CallbackAction::new(move |_, _| {
+                if let Some(root) = root_for_menu.upgrade() {
+                    let popover = context_popover(&popover_for_menu, &root, kind_for_menu);
+                    let pointing = root.compute_bounds(&root).map(|bounds| {
+                        gdk::Rectangle::new((bounds.width() / 2.0) as i32, (bounds.height() / 2.0) as i32, 1, 1)
+                    });
+                    crate::ui::context_menu::popup_at(&popover, pointing);
+                }
+                glib::Propagation::Stop
+            }))
+            .build();
+        let shortcut_controller = gtk::ShortcutController::new();
+        shortcut_controller.add_shortcut(menu_shortcut);
+        root.add_controller(shortcut_controller);
+    }
+
     fn apply_collapse(&self, collapsed: bool) {
         self.chevron.set_icon_name(Some(chevron_icon(collapsed)));
         if let Some(row) = &self.row {

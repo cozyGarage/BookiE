@@ -65,6 +65,125 @@ pub struct WelcomeViewInit {
     pub registry: Arc<DriverRegistry>,
 }
 
+fn build_welcome_scroller(child: &impl IsA<gtk::Widget>) -> gtk::ScrolledWindow {
+    let clamp = adw::Clamp::builder().maximum_size(560).child(child).build();
+    gtk::ScrolledWindow::builder()
+        .hexpand(true)
+        .vexpand(true)
+        .hscrollbar_policy(gtk::PolicyType::Never)
+        .child(&clamp)
+        .build()
+}
+
+fn build_welcome_header() -> (gtk::Label, gtk::Label) {
+    let heading = gtk::Label::builder()
+        .label(bookie_app_services::tr!("Welcome to BookiE"))
+        .xalign(0.0)
+        .wrap(true)
+        .css_classes(["title-1"])
+        .build();
+    let introduction = gtk::Label::builder()
+        .label(bookie_app_services::tr!(
+            "Choose a saved connection or add a database to get started."
+        ))
+        .xalign(0.0)
+        .wrap(true)
+        .css_classes(["dim-label"])
+        .build();
+    (heading, introduction)
+}
+
+fn build_filter_widgets(sender: &ComponentSender<WelcomeView>) -> (gtk::SearchEntry, adw::StatusPage) {
+    let search = gtk::SearchEntry::builder()
+        .placeholder_text(bookie_app_services::tr!("Filter by name, group, tag or driver"))
+        .hexpand(true)
+        .visible(false)
+        .build();
+    let s_search = sender.clone();
+    search.connect_search_changed(move |entry| {
+        s_search.input(WelcomeViewInput::FilterChanged(entry.text().to_string()));
+    });
+    let empty_filter_page = adw::StatusPage::builder()
+        .icon_name("system-search-symbolic")
+        .title(bookie_app_services::tr!("No matches"))
+        .description(bookie_app_services::tr!("No saved connection matches this filter."))
+        .visible(false)
+        .build();
+    empty_filter_page.add_css_class("compact");
+    (search, empty_filter_page)
+}
+
+fn build_recent_section() -> (adw::PreferencesGroup, gtk::FlowBox) {
+    let recent_items = gtk::FlowBox::builder()
+        .selection_mode(gtk::SelectionMode::None)
+        .max_children_per_line(3)
+        .homogeneous(true)
+        .row_spacing(8)
+        .column_spacing(8)
+        .build();
+    let recent_group = adw::PreferencesGroup::builder()
+        .title(bookie_app_services::tr!("Recently opened"))
+        .visible(false)
+        .build();
+    recent_group.add(&recent_items);
+    (recent_group, recent_items)
+}
+
+fn build_header_actions(root: &gtk::Stack, sender: &ComponentSender<WelcomeView>) -> gtk::Box {
+    let header_btn = gtk::Button::builder()
+        .icon_name("list-add-symbolic")
+        .tooltip_text(bookie_app_services::tr!("Add Connection"))
+        .valign(gtk::Align::Center)
+        .build();
+    header_btn.add_css_class("flat");
+    let s_header = sender.clone();
+    header_btn.connect_clicked(move |_| s_header.input(WelcomeViewInput::OpenConnect));
+    let import_btn = gtk::Button::builder()
+        .icon_name("insert-link-symbolic")
+        .tooltip_text(bookie_app_services::tr!("Import from URL"))
+        .valign(gtk::Align::Center)
+        .build();
+    import_btn.add_css_class("flat");
+    let s_import = sender.clone();
+    import_btn.connect_clicked(move |_| s_import.input(WelcomeViewInput::ImportUrl));
+    let header_actions = gtk::Box::builder()
+        .orientation(gtk::Orientation::Horizontal)
+        .spacing(6)
+        .build();
+    let bundle_btn = gtk::MenuButton::builder()
+        .icon_name("document-send-symbolic")
+        .tooltip_text(bookie_app_services::tr!("Export or import connections"))
+        .valign(gtk::Align::Center)
+        .build();
+    bundle_btn.add_css_class("flat");
+    let bundle_menu = gtk::gio::Menu::new();
+    bundle_menu.append(
+        Some(&bookie_app_services::tr!("Export connections…")),
+        Some("welcome.export-bundle"),
+    );
+    bundle_menu.append(
+        Some(&bookie_app_services::tr!("Import connections…")),
+        Some("welcome.import-bundle"),
+    );
+    bundle_btn.set_menu_model(Some(&bundle_menu));
+
+    let actions = gtk::gio::SimpleActionGroup::new();
+    let export_action = gtk::gio::SimpleAction::new("export-bundle", None);
+    let s_export = sender.clone();
+    export_action.connect_activate(move |_, _| s_export.input(WelcomeViewInput::ExportBundle));
+    actions.add_action(&export_action);
+    let import_action = gtk::gio::SimpleAction::new("import-bundle", None);
+    let s_bundle_import = sender.clone();
+    import_action.connect_activate(move |_, _| s_bundle_import.input(WelcomeViewInput::ImportBundle));
+    actions.add_action(&import_action);
+    root.insert_action_group("welcome", Some(&actions));
+
+    header_actions.append(&import_btn);
+    header_actions.append(&bundle_btn);
+    header_actions.append(&header_btn);
+    header_actions
+}
+
 impl SimpleComponent for WelcomeView {
     type Init = WelcomeViewInit;
     type Input = WelcomeViewInput;
@@ -80,12 +199,6 @@ impl SimpleComponent for WelcomeView {
         let empty_page = empty_page(&sender);
         root.add_named(&empty_page, Some("empty"));
 
-        let scroller = gtk::ScrolledWindow::builder()
-            .hexpand(true)
-            .vexpand(true)
-            .hscrollbar_policy(gtk::PolicyType::Never)
-            .build();
-        let clamp = adw::Clamp::builder().maximum_size(560).build();
         let outer = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
             .spacing(12)
@@ -95,120 +208,30 @@ impl SimpleComponent for WelcomeView {
             .margin_end(12)
             .build();
 
-        let heading = gtk::Label::builder()
-            .label(bookie_app_services::tr!("Welcome to BookiE"))
-            .xalign(0.0)
-            .wrap(true)
-            .css_classes(["title-1"])
-            .build();
-        let introduction = gtk::Label::builder()
-            .label(bookie_app_services::tr!(
-                "Choose a saved connection or add a database to get started."
-            ))
-            .xalign(0.0)
-            .wrap(true)
-            .css_classes(["dim-label"])
-            .build();
-        outer.append(&heading);
-        outer.append(&introduction);
-        let recent_items = gtk::FlowBox::builder()
-            .selection_mode(gtk::SelectionMode::None)
-            .max_children_per_line(3)
-            .homogeneous(true)
-            .row_spacing(8)
-            .column_spacing(8)
-            .build();
-        let recent_group = adw::PreferencesGroup::builder()
-            .title(bookie_app_services::tr!("Recently opened"))
-            .visible(false)
-            .build();
-        recent_group.add(&recent_items);
-        outer.append(&recent_group);
+        let (heading, introduction) = build_welcome_header();
+        let (recent_group, recent_items) = build_recent_section();
+        let (search, empty_filter_page) = build_filter_widgets(&sender);
+        let header_actions = build_header_actions(&root, &sender);
 
         let group = adw::PreferencesGroup::builder()
             .title(bookie_app_services::tr!("Saved connections"))
             .build();
-        let header_btn = gtk::Button::builder()
-            .icon_name("list-add-symbolic")
-            .tooltip_text(bookie_app_services::tr!("Add Connection"))
-            .valign(gtk::Align::Center)
-            .build();
-        header_btn.add_css_class("flat");
-        let s_header = sender.clone();
-        header_btn.connect_clicked(move |_| s_header.input(WelcomeViewInput::OpenConnect));
-        let import_btn = gtk::Button::builder()
-            .icon_name("insert-link-symbolic")
-            .tooltip_text(bookie_app_services::tr!("Import from URL"))
-            .valign(gtk::Align::Center)
-            .build();
-        import_btn.add_css_class("flat");
-        let s_import = sender.clone();
-        import_btn.connect_clicked(move |_| s_import.input(WelcomeViewInput::ImportUrl));
-        let header_actions = gtk::Box::builder()
-            .orientation(gtk::Orientation::Horizontal)
-            .spacing(6)
-            .build();
-        let bundle_btn = gtk::MenuButton::builder()
-            .icon_name("document-send-symbolic")
-            .tooltip_text(bookie_app_services::tr!("Export or import connections"))
-            .valign(gtk::Align::Center)
-            .build();
-        bundle_btn.add_css_class("flat");
-        let bundle_menu = gtk::gio::Menu::new();
-        bundle_menu.append(
-            Some(&bookie_app_services::tr!("Export connections…")),
-            Some("welcome.export-bundle"),
-        );
-        bundle_menu.append(
-            Some(&bookie_app_services::tr!("Import connections…")),
-            Some("welcome.import-bundle"),
-        );
-        bundle_btn.set_menu_model(Some(&bundle_menu));
-
-        let actions = gtk::gio::SimpleActionGroup::new();
-        let export_action = gtk::gio::SimpleAction::new("export-bundle", None);
-        let s_export = sender.clone();
-        export_action.connect_activate(move |_, _| s_export.input(WelcomeViewInput::ExportBundle));
-        actions.add_action(&export_action);
-        let import_action = gtk::gio::SimpleAction::new("import-bundle", None);
-        let s_bundle_import = sender.clone();
-        import_action.connect_activate(move |_, _| s_bundle_import.input(WelcomeViewInput::ImportBundle));
-        actions.add_action(&import_action);
-        root.insert_action_group("welcome", Some(&actions));
-
-        header_actions.append(&import_btn);
-        header_actions.append(&bundle_btn);
-        header_actions.append(&header_btn);
         group.set_header_suffix(Some(&header_actions));
 
-        let search = gtk::SearchEntry::builder()
-            .placeholder_text(bookie_app_services::tr!("Filter by name, group, tag or driver"))
-            .hexpand(true)
-            .visible(false)
-            .build();
-        let s_search = sender.clone();
-        search.connect_search_changed(move |entry| {
-            s_search.input(WelcomeViewInput::FilterChanged(entry.text().to_string()));
-        });
-        outer.append(&search);
-        outer.append(&group);
         let sections_box = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
             .spacing(12)
             .build();
+
+        outer.append(&heading);
+        outer.append(&introduction);
+        outer.append(&recent_group);
+        outer.append(&search);
+        outer.append(&group);
         outer.append(&sections_box);
-
-        let empty_filter_page = adw::StatusPage::builder()
-            .icon_name("system-search-symbolic")
-            .title(bookie_app_services::tr!("No matches"))
-            .description(bookie_app_services::tr!("No saved connection matches this filter."))
-            .visible(false)
-            .build();
-        empty_filter_page.add_css_class("compact");
         outer.append(&empty_filter_page);
-        clamp.set_child(Some(&outer));
 
-        scroller.set_child(Some(&clamp));
+        let scroller = build_welcome_scroller(&outer);
         root.add_named(&scroller, Some("populated"));
         root.set_visible_child_name("empty");
 

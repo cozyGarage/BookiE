@@ -64,6 +64,107 @@ async fn a_session_keeps_user_variables_on_its_backend_across_use() {
     assert!(matches!(&after.rows[0][1], bookie_core::Value::Text(value) if value == "session-owned"));
 }
 
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_session_keeps_system_variables_across_use_and_does_not_leak_them_to_the_next_session() {
+    let (_container, opts) = start_mysql().await;
+    let connection = connect(opts).await;
+    connection.execute("CREATE DATABASE other_db").await.unwrap();
+    let control = bookie_core::OperationControl::with_timeout(std::time::Duration::from_secs(5));
+    let probe = "SELECT @@session.sql_mode, @@session.time_zone, @bookie_leak_marker, DATABASE()";
+
+    let mut first = connection.open_session().await.unwrap();
+    let default_state = first.query_params_controlled(probe, &[], &control).await.unwrap();
+    for statement in [
+        "SET SESSION sql_mode = 'ANSI_QUOTES,NO_BACKSLASH_ESCAPES'",
+        "SET SESSION time_zone = '+05:00'",
+        "SET @bookie_leak_marker = 'first-session'",
+        "USE other_db",
+    ] {
+        let r = first.query_params_controlled(statement, &[], &control).await;
+        eprintln!(
+            "DBG {statement}: {:?}",
+            r.as_ref()
+                .map(|x| (x.rows.len(), x.columns.len()))
+                .map_err(|e| e.to_string())
+        );
+    }
+    let after_use = first.query_params_controlled(probe, &[], &control).await.unwrap();
+    assert_eq!(
+        after_use.rows[0],
+        vec![
+            bookie_core::Value::Text("ANSI_QUOTES,NO_BACKSLASH_ESCAPES".into()),
+            bookie_core::Value::Text("+05:00".into()),
+            bookie_core::Value::Text("first-session".into()),
+            bookie_core::Value::Text("other_db".into()),
+        ]
+    );
+    first.close().await.unwrap();
+
+    let mut second = connection.open_session().await.unwrap();
+    let fresh = second.query_params_controlled(probe, &[], &control).await.unwrap();
+    assert_eq!(fresh.rows[0][0..3], default_state.rows[0][0..3]);
+    assert_eq!(fresh.rows[0][3], default_state.rows[0][3]);
+    assert!(matches!(fresh.rows[0][2], bookie_core::Value::Null));
+    second.close().await.unwrap();
+}
+
+async fn first_value(
+    session: &mut Box<dyn bookie_core::Session>,
+    sql: &str,
+    control: &bookie_core::OperationControl,
+) -> bookie_core::Value {
+    let result = session.query_params_controlled(sql, &[], control).await.unwrap();
+    result
+        .rows
+        .first()
+        .map_or(bookie_core::Value::Null, |row| row[0].clone())
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_session_reads_the_new_database_after_use_even_for_identical_sql() {
+    let (_container, opts) = start_mysql().await;
+    let connection = connect(opts).await;
+    connection.execute("CREATE DATABASE other_db").await.unwrap();
+    connection.execute("CREATE TABLE t (v VARCHAR(5))").await.unwrap();
+    connection.execute("INSERT INTO t VALUES ('home')").await.unwrap();
+    connection
+        .execute("CREATE TABLE other_db.t (v VARCHAR(5))")
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO other_db.t VALUES ('away')")
+        .await
+        .unwrap();
+    let mut session = connection.open_session().await.unwrap();
+    let control = bookie_core::OperationControl::with_timeout(std::time::Duration::from_secs(5));
+    let text = |value: &str| bookie_core::Value::Text(value.into());
+
+    assert_eq!(
+        first_value(&mut session, "SELECT v FROM t", &control).await,
+        text("home")
+    );
+    assert_eq!(
+        first_value(&mut session, "SELECT DATABASE()", &control).await,
+        text("test")
+    );
+    first_value(&mut session, "USE other_db", &control).await;
+    assert_eq!(
+        first_value(&mut session, "SELECT v FROM t", &control).await,
+        text("away")
+    );
+    assert_eq!(
+        first_value(&mut session, "SELECT DATABASE()", &control).await,
+        text("other_db")
+    );
+    first_value(&mut session, "USE test", &control).await;
+    assert_eq!(
+        first_value(&mut session, "SELECT v FROM t", &control).await,
+        text("home")
+    );
+}
+
 #[path = "../../../shared/pool_saturation.rs"]
 mod contract;
 

@@ -61,6 +61,9 @@ mod imp {
                 .as_ref()
                 .and_then(|pages| pages.get(page))
                 .and_then(|(result, _lease)| RowObject::from_shared(result, offset, None));
+            if let Some(row) = &row {
+                row.set_display_base((position as usize).saturating_sub(offset));
+            }
             Some(row.unwrap_or_else(|| RowObject::unloaded(self.width.get())).upcast())
         }
     }

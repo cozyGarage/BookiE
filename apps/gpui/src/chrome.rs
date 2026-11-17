@@ -382,6 +382,69 @@ impl GridView {
         div().flex().flex_col().px_2().children(tree).children(empty)
     }
 
+    fn sidebar_import_export_button(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
+        div()
+            .id("import-export-menu")
+            .flex_1()
+            .min_w_0()
+            .flex()
+            .flex_wrap()
+            .items_center()
+            .gap_1()
+            .cursor_pointer()
+            .child(icon("arrow-down-up", theme.muted_foreground).flex_none())
+            .children(
+                (self.sidebar_width >= 320.0)
+                    .then(|| div().flex_1().min_w_0().child("Import / Export")),
+            )
+            .on_click(cx.listener(|this, _, _, cx| {
+                this.import_menu_open = !this.import_menu_open;
+                cx.notify();
+            }))
+    }
+
+    fn sidebar_header_action_icons(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+        div()
+            .flex_none()
+            .flex()
+            .items_center()
+            .gap_1()
+            .child(
+                header_icon("header-collapse-all", "chevrons-down-up", theme).on_click(cx.listener(
+                    |this, _, _, cx| {
+                        let collapse = this.connection_open || this.database_open;
+                        this.connection_open = !collapse;
+                        this.database_open = !collapse;
+                        cx.notify();
+                    },
+                )),
+            )
+            .child(
+                header_icon("header-new-folder", "folder-plus", theme).on_click(cx.listener(
+                    |this, _, _, cx| {
+                        this.status = "Folder organization is coming soon".into();
+                        cx.notify();
+                    },
+                )),
+            )
+            .child(
+                header_icon("header-refresh", "refresh-cw", theme).on_click(cx.listener(
+                    |this, _, _, cx| {
+                        this.status = "Refreshed catalog schema".into();
+                        cx.notify();
+                    },
+                )),
+            )
+            .child(
+                header_icon("collapse-sidebar", "chevrons-left", theme).on_click(cx.listener(
+                    |this, _, _, cx| {
+                        this.sidebar_open = false;
+                        cx.notify();
+                    },
+                )),
+            )
+    }
+
     fn sidebar_header(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
         div()
             .flex()
@@ -393,44 +456,8 @@ impl GridView {
             .border_b_1()
             .border_color(rgb(theme.border))
             .text_color(rgb(theme.muted_foreground))
-            .child(
-                div()
-                    .id("import-export-menu")
-                    .flex_1()
-                    .min_w_0()
-                    .flex()
-                    .flex_wrap()
-                    .items_center()
-                    .gap_1()
-                    .cursor_pointer()
-                    .child(icon("arrow-down-up", theme.muted_foreground).flex_none())
-                    .children(
-                        (self.sidebar_width >= 320.0)
-                            .then(|| div().flex_1().min_w_0().child("Import / Export")),
-                    )
-                    .on_click(cx.listener(|this, _, _, cx| {
-                        this.import_menu_open = !this.import_menu_open;
-                        cx.notify();
-                    })),
-            )
-            .child(
-                div()
-                    .flex_none()
-                    .flex()
-                    .items_center()
-                    .gap_1()
-                    .child(header_icon("header-collapse-all", "chevrons-down-up", theme))
-                    .child(header_icon("header-new-folder", "folder-plus", theme))
-                    .child(header_icon("header-refresh", "refresh-cw", theme))
-                    .child(
-                        header_icon("collapse-sidebar", "chevrons-left", theme).on_click(cx.listener(
-                            |this, _, _, cx| {
-                                this.sidebar_open = false;
-                                cx.notify();
-                            },
-                        )),
-                    ),
-            )
+            .child(self.sidebar_import_export_button(theme, cx))
+            .child(self.sidebar_header_action_icons(theme, cx))
     }
 
     fn sidebar_search_bar(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
@@ -867,13 +894,19 @@ impl GridView {
                             .on_click(cx.listener(|this, _, window, cx| {
                                 this.tabs.open_query();
                                 this.sync_grid_owner();
-                                window.focus(&this.focus, cx);
+                                if this.live.is_some() {
+                                    this.focus_editor = true;
+                                } else {
+                                    window.focus(&this.focus, cx);
+                                }
+                                cx.notify();
                             })),
                     )
                     .child(
                         home_shortcut("s-status", "play", "Connection Status", theme)
-                            .on_click(cx.listener(|this, _, _, _| {
+                            .on_click(cx.listener(|this, _, _, cx| {
                                 this.show_status();
+                                cx.notify();
                             })),
                     )
                     .child(

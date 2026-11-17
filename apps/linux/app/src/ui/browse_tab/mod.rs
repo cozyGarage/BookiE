@@ -249,7 +249,287 @@ pub(crate) use value_parse::hooks_for;
 pub(in crate::ui) use value_parse::parse_grid_cell_input;
 use value_parse::*;
 
+struct GridCellEdit {
+    row_position: u32,
+    col_index: usize,
+    new_value: String,
+    value: Option<Value>,
+    row_key: Vec<Value>,
+    draft_id: Option<u64>,
+}
+
 impl BrowseTab {
+    fn on_edits_flushed(&mut self, revision: u64, reply: tokio::sync::oneshot::Sender<Result<(), String>>) {
+        let result = if self.rejected_edit_revision.get() == revision {
+            Ok(())
+        } else {
+            Err(bookie_app_services::tr!(
+                "Finish or cancel the current cell edit and try again."
+            ))
+        };
+        let _ = reply.send(result);
+    }
+
+    fn on_rows_loaded(
+        &mut self,
+        request: BrowsePageRequest,
+        result: QueryResult,
+        projected_columns: Option<Vec<usize>>,
+        elapsed: std::time::Duration,
+        sender: ComponentSender<Self>,
+    ) {
+        if !self.page_requests.accepts(request, self.current_offset) {
+            return;
+        }
+        self.auto_refresh_status_label.set_text("");
+        self.auto_refresh_status_label.set_tooltip_text(None);
+        self.auto_refresh_in_flight.set(false);
+        self.last_page_elapsed = Some(elapsed);
+        // Driver fallback: every shipping driver derives the
+        // `QueryResult.columns` list from the FIRST returned
+        // row, so a zero-row page comes back with an empty
+        // columns vector. The grid factory iterates that vector
+        // to build column-view columns, which left the empty
+        // table rendering as a column-less dark rectangle.
+        // information_schema (via ColumnsLoaded) already gave
+        // us the authoritative column list — substitute it in
+        // so the headers render even when the page is empty.
+        let projected_columns = projection_for_loaded_page(&result, projected_columns);
+        let mut result = result;
+        merge_table_columns(&mut result, &self.current_columns);
+        self.current_columns = columns_for_browse_page(&self.driver_id, &self.current_columns, Some(&result));
+        self.keyset_cursor = extract_keyset_cursor(&self.current_columns, &result, projected_columns.as_deref());
+        self.keyset_first_cursor =
+            extract_first_keyset_cursor(&self.current_columns, &result, projected_columns.as_deref());
+        self.keyset_before_cursor = None;
+        self.reverse_page = false;
+        self.last_page = false;
+        self.current_projection = projected_columns;
+        self.current_result = Some(std::sync::Arc::new(result));
+        // Defer rendering until columns are also loaded — the
+        // QueryResult's ColumnInfo lacks `primary_key` /
+        // `is_generated` / `is_auto_increment`, so rendering
+        // before the schema fetch would let the user edit cells
+        // (PK, generated columns) that the DB will reject on
+        // save. Waiting also avoids a wasted full rebuild when
+        // ColumnsLoaded fires next and triggers a re-render.
+        self.render_grid_if_ready(sender);
+    }
+
+    fn on_columns_loaded(&mut self, columns: Vec<ColumnInfo>, sender: ComponentSender<Self>) {
+        let columns = columns_for_browse_page(&self.driver_id, &columns, self.current_result.as_deref());
+        let words: Vec<String> = columns.iter().map(|c| c.name.clone()).collect();
+        self.current_columns = columns.clone();
+        self.refresh_member_choices();
+        // Late-arriving columns: if RowsLoaded already cached a
+        // zero-row result with an empty `columns` vector (the
+        // driver derives it from the first row), refill it now
+        // so the upcoming `render_grid_if_ready` builds headers
+        // against the real schema instead of an empty list.
+        if let Some(result) = self.current_result.as_mut().map(std::sync::Arc::make_mut) {
+            merge_table_columns(result, &self.current_columns);
+        }
+        self.refresh_crud_buttons();
+        // Filter strip rebuilds against the new schema —
+        // operator allowlists narrow per type, so a column
+        // that switched from text to int needs its operator
+        // dropdown refreshed.
+        if let Some(strip) = self.filter_strip.as_ref() {
+            strip.update_columns(columns);
+        }
+        let _ = sender.output(BrowseTabOutput::SchemaWordsChanged(words));
+        self.emit_fetch_page_and_count(&sender);
+        self.render_grid_if_ready(sender);
+    }
+
+    fn on_row_count_loaded(&mut self, request: BrowseRowCountRequest, count: u64, sender: ComponentSender<Self>) {
+        if !self.row_count_requests.accepts(request) {
+            return;
+        }
+        self.current_total_rows = Some(count);
+        // If the saved offset is now past the end, clamp it back to
+        // the last full page and refetch — guards against stale
+        // persistence after rows were deleted in another session.
+        if self.current_offset > 0 && count > 0 && self.current_offset >= count {
+            let last_page_offset = count.saturating_sub(1) / self.page_size * self.page_size;
+            if last_page_offset != self.current_offset {
+                self.current_offset = last_page_offset;
+                self.emit_fetch_page(&sender);
+                let _ = sender.output(BrowseTabOutput::StateChanged);
+            }
+        }
+        self.update_next_page_sensitivity();
+        self.update_paginator_label();
+    }
+
+    fn on_show_error(&mut self, message: String, sender: ComponentSender<Self>) {
+        // Clear any cached page state so a follow-up refresh
+        // doesn't render against the stale snapshot before
+        // RowsLoaded arrives. Paginator label is left empty
+        // until next RowCountLoaded.
+        self.current_result = None;
+        self.last_page_elapsed = None;
+        self.current_total_rows = None;
+        self.set_paginator_text("");
+        self.first_button.set_sensitive(false);
+        self.prev_button.set_sensitive(false);
+        self.next_button.set_sensitive(false);
+        self.last_button.set_sensitive(false);
+        self.show_error_inner(&message, &sender);
+        self.inner_stack.set_visible_child_name("error");
+    }
+
+    fn on_refresh(&mut self, sender: ComponentSender<Self>) {
+        self.auto_refresh_status_label.set_text("");
+        self.auto_refresh_status_label.set_tooltip_text(None);
+        self.capture_focus_for_restore();
+        self.show_loading_inner(
+            &bookie_app_services::tr!("Loading…"),
+            &bookie_app_services::tr!("Fetching rows from {table}").replace("{table}", &self.table_label()),
+        );
+        self.emit_fetch_page_and_count(&sender);
+    }
+
+    fn on_clear_selection(&mut self) {
+        let Some(sel) = self.current_selection.as_ref() else {
+            return;
+        };
+        // Only clear when we have a true multi-row selection.
+        // Without this guard, every Esc on a single-focus row
+        // would re-trigger the "0 selected" path through GTK's
+        // re-focus logic and strand the focus indicator.
+        if sel.selection().size() < 2 {
+            return;
+        }
+        sel.unselect_all();
+    }
+
+    fn on_prev_page(&mut self, sender: ComponentSender<Self>) {
+        if let Some(previous_offset) = previous_page_offset(self.current_offset, self.page_size) {
+            self.current_offset = previous_offset;
+            self.reverse_page = self.current_offset >= bookie_core::KEYSET_OFFSET_THRESHOLD
+                && self.current_sort.is_none()
+                && self.keyset_first_cursor.is_some();
+            self.last_page = false;
+            self.keyset_before_cursor = if self.reverse_page {
+                self.keyset_first_cursor.clone()
+            } else {
+                None
+            };
+            if !self.reverse_page {
+                self.keyset_cursor = None;
+            }
+            self.emit_fetch_page(&sender);
+            let _ = sender.output(BrowseTabOutput::StateChanged);
+        }
+    }
+
+    fn on_next_page(&mut self, sender: ComponentSender<Self>) {
+        let Some(next_offset) = next_page_offset(
+            self.current_offset,
+            self.page_size,
+            self.current_total_rows,
+            self.current_result.as_deref(),
+        ) else {
+            return;
+        };
+        self.current_offset = next_offset;
+        self.keyset_before_cursor = None;
+        self.reverse_page = false;
+        self.last_page = false;
+        self.emit_fetch_page(&sender);
+        let _ = sender.output(BrowseTabOutput::StateChanged);
+    }
+
+    fn on_last_page(&mut self, sender: ComponentSender<Self>) {
+        let Some(total) = self.current_total_rows else {
+            return;
+        };
+        if total == 0 {
+            return;
+        }
+        let last_page_offset = (total - 1) / self.page_size * self.page_size;
+        if self.current_offset != last_page_offset {
+            self.current_offset = last_page_offset;
+            self.reset_keyset_navigation();
+            self.last_page = last_page_offset >= bookie_core::KEYSET_OFFSET_THRESHOLD
+                && self.current_sort.is_none()
+                && self.current_columns.iter().any(|column| column.primary_key);
+            self.emit_fetch_page(&sender);
+            let _ = sender.output(BrowseTabOutput::StateChanged);
+        }
+    }
+
+    fn on_sort_changed(&mut self, keys: Vec<(usize, bool)>, sender: ComponentSender<Self>) {
+        let next_primary = keys.first().copied();
+        let primary_changed = self.current_sort != next_primary;
+        let keys_changed = self.current_sort_keys != keys;
+        if !primary_changed && !keys_changed {
+            return;
+        }
+        self.current_sort_keys = keys;
+        self.current_sort = next_primary;
+        if primary_changed {
+            self.current_offset = 0;
+            self.reset_keyset_navigation();
+            self.capture_focus_for_restore();
+            self.emit_fetch_page(&sender);
+            let _ = sender.output(BrowseTabOutput::StateChanged);
+        } else {
+            self.apply_local_sort_keys();
+            self.update_sort_status_label();
+        }
+    }
+
+    fn on_clear_sort(&mut self, sender: ComponentSender<Self>) {
+        if self.current_sort.is_none() && self.current_sort_keys.is_empty() {
+            return;
+        }
+        self.current_sort = None;
+        self.current_sort_keys.clear();
+        if let Some(view) = self.current_column_view.as_ref() {
+            view.sort_by_column(None::<&gtk::ColumnViewColumn>, gtk::SortType::Ascending);
+        }
+        self.current_offset = 0;
+        self.reset_keyset_navigation();
+        self.capture_focus_for_restore();
+        self.emit_fetch_page(&sender);
+        self.update_sort_status_label();
+        let _ = sender.output(BrowseTabOutput::StateChanged);
+    }
+
+    fn on_page_size_changed(&mut self, size: u64, sender: ComponentSender<Self>) {
+        let size = bounded_page_size(size);
+        if self.page_size == size {
+            return;
+        }
+        self.page_size = size;
+        self.current_offset = 0;
+        self.reset_keyset_navigation();
+        self.emit_fetch_page(&sender);
+        let _ = sender.output(BrowseTabOutput::StateChanged);
+    }
+
+    fn on_grid_cell_edited(&mut self, edit: GridCellEdit, sender: ComponentSender<Self>) {
+        let GridCellEdit {
+            row_position,
+            col_index,
+            new_value,
+            value,
+            row_key,
+            draft_id,
+        } = edit;
+        let accepted = match value {
+            Some(_) if self.row_object_at(row_position).and_then(|row| row.draft_id()) != draft_id => false,
+            Some(value) => self.handle_grid_cell_value_edited(row_position, col_index, value, row_key, sender),
+            None => self.handle_grid_cell_edited(row_position, col_index, new_value, row_key, sender),
+        };
+        if !accepted {
+            self.rejected_edit_revision
+                .set(self.rejected_edit_revision.get().wrapping_add(1));
+        }
+    }
+
     fn reset_keyset_navigation(&mut self) {
         self.keyset_cursor = None;
         self.keyset_first_cursor = None;
@@ -755,88 +1035,17 @@ impl SimpleComponent for BrowseTab {
             return;
         };
         match msg {
-            BrowseTabInput::EditsFlushed { revision, reply } => {
-                let result = if self.rejected_edit_revision.get() == revision {
-                    Ok(())
-                } else {
-                    Err(bookie_app_services::tr!(
-                        "Finish or cancel the current cell edit and try again."
-                    ))
-                };
-                let _ = reply.send(result);
-            }
+            BrowseTabInput::EditsFlushed { revision, reply } => self.on_edits_flushed(revision, reply),
             BrowseTabInput::RowsLoaded {
                 request,
                 result,
                 projected_columns,
                 elapsed,
-            } => {
-                if !self.page_requests.accepts(request, self.current_offset) {
-                    return;
-                }
-                self.auto_refresh_status_label.set_text("");
-                self.auto_refresh_status_label.set_tooltip_text(None);
-                self.auto_refresh_in_flight.set(false);
-                self.last_page_elapsed = Some(elapsed);
-                // Driver fallback: every shipping driver derives the
-                // `QueryResult.columns` list from the FIRST returned
-                // row, so a zero-row page comes back with an empty
-                // columns vector. The grid factory iterates that vector
-                // to build column-view columns, which left the empty
-                // table rendering as a column-less dark rectangle.
-                // information_schema (via ColumnsLoaded) already gave
-                // us the authoritative column list — substitute it in
-                // so the headers render even when the page is empty.
-                let projected_columns = projection_for_loaded_page(&result, projected_columns);
-                let mut result = result;
-                merge_table_columns(&mut result, &self.current_columns);
-                self.current_columns = columns_for_browse_page(&self.driver_id, &self.current_columns, Some(&result));
-                self.keyset_cursor =
-                    extract_keyset_cursor(&self.current_columns, &result, projected_columns.as_deref());
-                self.keyset_first_cursor =
-                    extract_first_keyset_cursor(&self.current_columns, &result, projected_columns.as_deref());
-                self.keyset_before_cursor = None;
-                self.reverse_page = false;
-                self.last_page = false;
-                self.current_projection = projected_columns;
-                self.current_result = Some(std::sync::Arc::new(result));
-                // Defer rendering until columns are also loaded — the
-                // QueryResult's ColumnInfo lacks `primary_key` /
-                // `is_generated` / `is_auto_increment`, so rendering
-                // before the schema fetch would let the user edit cells
-                // (PK, generated columns) that the DB will reject on
-                // save. Waiting also avoids a wasted full rebuild when
-                // ColumnsLoaded fires next and triggers a re-render.
-                self.render_grid_if_ready(sender);
-            }
+            } => self.on_rows_loaded(request, result, projected_columns, elapsed, sender),
             BrowseTabInput::ViewRestriction(restriction) => {
                 self.view_restriction = restriction;
             }
-            BrowseTabInput::ColumnsLoaded(columns) => {
-                let columns = columns_for_browse_page(&self.driver_id, &columns, self.current_result.as_deref());
-                let words: Vec<String> = columns.iter().map(|c| c.name.clone()).collect();
-                self.current_columns = columns.clone();
-                self.refresh_member_choices();
-                // Late-arriving columns: if RowsLoaded already cached a
-                // zero-row result with an empty `columns` vector (the
-                // driver derives it from the first row), refill it now
-                // so the upcoming `render_grid_if_ready` builds headers
-                // against the real schema instead of an empty list.
-                if let Some(result) = self.current_result.as_mut().map(std::sync::Arc::make_mut) {
-                    merge_table_columns(result, &self.current_columns);
-                }
-                self.refresh_crud_buttons();
-                // Filter strip rebuilds against the new schema —
-                // operator allowlists narrow per type, so a column
-                // that switched from text to int needs its operator
-                // dropdown refreshed.
-                if let Some(strip) = self.filter_strip.as_ref() {
-                    strip.update_columns(columns);
-                }
-                let _ = sender.output(BrowseTabOutput::SchemaWordsChanged(words));
-                self.emit_fetch_page_and_count(&sender);
-                self.render_grid_if_ready(sender);
-            }
+            BrowseTabInput::ColumnsLoaded(columns) => self.on_columns_loaded(columns, sender),
             BrowseTabInput::EnumLabelsLoaded(labels) => self.apply_enum_labels(labels),
             BrowseTabInput::ForeignKeysLoaded(foreign_keys) => {
                 if self.foreign_keys != foreign_keys {
@@ -852,25 +1061,7 @@ impl SimpleComponent for BrowseTab {
                     self.render_grid_if_ready(sender);
                 }
             }
-            BrowseTabInput::RowCountLoaded { request, count } => {
-                if !self.row_count_requests.accepts(request) {
-                    return;
-                }
-                self.current_total_rows = Some(count);
-                // If the saved offset is now past the end, clamp it back to
-                // the last full page and refetch — guards against stale
-                // persistence after rows were deleted in another session.
-                if self.current_offset > 0 && count > 0 && self.current_offset >= count {
-                    let last_page_offset = count.saturating_sub(1) / self.page_size * self.page_size;
-                    if last_page_offset != self.current_offset {
-                        self.current_offset = last_page_offset;
-                        self.emit_fetch_page(&sender);
-                        let _ = sender.output(BrowseTabOutput::StateChanged);
-                    }
-                }
-                self.update_next_page_sensitivity();
-                self.update_paginator_label();
-            }
+            BrowseTabInput::RowCountLoaded { request, count } => self.on_row_count_loaded(request, count, sender),
             BrowseTabInput::RowCountFailed(request) => {
                 if !self.row_count_requests.accepts(request) {
                     return;
@@ -880,32 +1071,8 @@ impl SimpleComponent for BrowseTab {
                 self.update_next_page_sensitivity();
                 self.update_paginator_label();
             }
-            BrowseTabInput::ShowError(message) => {
-                // Clear any cached page state so a follow-up refresh
-                // doesn't render against the stale snapshot before
-                // RowsLoaded arrives. Paginator label is left empty
-                // until next RowCountLoaded.
-                self.current_result = None;
-                self.last_page_elapsed = None;
-                self.current_total_rows = None;
-                self.set_paginator_text("");
-                self.first_button.set_sensitive(false);
-                self.prev_button.set_sensitive(false);
-                self.next_button.set_sensitive(false);
-                self.last_button.set_sensitive(false);
-                self.show_error_inner(&message, &sender);
-                self.inner_stack.set_visible_child_name("error");
-            }
-            BrowseTabInput::Refresh => {
-                self.auto_refresh_status_label.set_text("");
-                self.auto_refresh_status_label.set_tooltip_text(None);
-                self.capture_focus_for_restore();
-                self.show_loading_inner(
-                    &bookie_app_services::tr!("Loading…"),
-                    &bookie_app_services::tr!("Fetching rows from {table}").replace("{table}", &self.table_label()),
-                );
-                self.emit_fetch_page_and_count(&sender);
-            }
+            BrowseTabInput::ShowError(message) => self.on_show_error(message, sender),
+            BrowseTabInput::Refresh => self.on_refresh(sender),
             BrowseTabInput::AutoRefreshToggled(enabled) => self.set_auto_refresh(enabled, sender),
             BrowseTabInput::AutoRefreshTick => self.auto_refresh_tick(&sender),
             BrowseTabInput::AutoRefreshFlushFinished(flushed) => self.auto_refresh_after_flush(flushed, &sender),
@@ -923,19 +1090,7 @@ impl SimpleComponent for BrowseTab {
                 self.handle_set_cells_confirmed(request, value, sender)
             }
             BrowseTabInput::SetCellsPlanned(planned) => self.handle_set_cells_planned(planned, sender),
-            BrowseTabInput::ClearSelection => {
-                let Some(sel) = self.current_selection.as_ref() else {
-                    return;
-                };
-                // Only clear when we have a true multi-row selection.
-                // Without this guard, every Esc on a single-focus row
-                // would re-trigger the "0 selected" path through GTK's
-                // re-focus logic and strand the focus indicator.
-                if sel.selection().size() < 2 {
-                    return;
-                }
-                sel.unselect_all();
-            }
+            BrowseTabInput::ClearSelection => self.on_clear_selection(),
             BrowseTabInput::FilterByValue { column, value, exclude } => {
                 self.filter_by_value(&column, &value, exclude, &sender)
             }
@@ -959,106 +1114,12 @@ impl SimpleComponent for BrowseTab {
                     let _ = sender.output(BrowseTabOutput::StateChanged);
                 }
             }
-            BrowseTabInput::PrevPage => {
-                if let Some(previous_offset) = previous_page_offset(self.current_offset, self.page_size) {
-                    self.current_offset = previous_offset;
-                    self.reverse_page = self.current_offset >= bookie_core::KEYSET_OFFSET_THRESHOLD
-                        && self.current_sort.is_none()
-                        && self.keyset_first_cursor.is_some();
-                    self.last_page = false;
-                    self.keyset_before_cursor = if self.reverse_page {
-                        self.keyset_first_cursor.clone()
-                    } else {
-                        None
-                    };
-                    if !self.reverse_page {
-                        self.keyset_cursor = None;
-                    }
-                    self.emit_fetch_page(&sender);
-                    let _ = sender.output(BrowseTabOutput::StateChanged);
-                }
-            }
-            BrowseTabInput::NextPage => {
-                let Some(next_offset) = next_page_offset(
-                    self.current_offset,
-                    self.page_size,
-                    self.current_total_rows,
-                    self.current_result.as_deref(),
-                ) else {
-                    return;
-                };
-                self.current_offset = next_offset;
-                self.keyset_before_cursor = None;
-                self.reverse_page = false;
-                self.last_page = false;
-                self.emit_fetch_page(&sender);
-                let _ = sender.output(BrowseTabOutput::StateChanged);
-            }
-            BrowseTabInput::LastPage => {
-                let Some(total) = self.current_total_rows else {
-                    return;
-                };
-                if total == 0 {
-                    return;
-                }
-                let last_page_offset = (total - 1) / self.page_size * self.page_size;
-                if self.current_offset != last_page_offset {
-                    self.current_offset = last_page_offset;
-                    self.reset_keyset_navigation();
-                    self.last_page = last_page_offset >= bookie_core::KEYSET_OFFSET_THRESHOLD
-                        && self.current_sort.is_none()
-                        && self.current_columns.iter().any(|column| column.primary_key);
-                    self.emit_fetch_page(&sender);
-                    let _ = sender.output(BrowseTabOutput::StateChanged);
-                }
-            }
-            BrowseTabInput::SortChanged { keys } => {
-                let next_primary = keys.first().copied();
-                let primary_changed = self.current_sort != next_primary;
-                let keys_changed = self.current_sort_keys != keys;
-                if !primary_changed && !keys_changed {
-                    return;
-                }
-                self.current_sort_keys = keys;
-                self.current_sort = next_primary;
-                if primary_changed {
-                    self.current_offset = 0;
-                    self.reset_keyset_navigation();
-                    self.capture_focus_for_restore();
-                    self.emit_fetch_page(&sender);
-                    let _ = sender.output(BrowseTabOutput::StateChanged);
-                } else {
-                    self.apply_local_sort_keys();
-                    self.update_sort_status_label();
-                }
-            }
-            BrowseTabInput::ClearSort => {
-                if self.current_sort.is_none() && self.current_sort_keys.is_empty() {
-                    return;
-                }
-                self.current_sort = None;
-                self.current_sort_keys.clear();
-                if let Some(view) = self.current_column_view.as_ref() {
-                    view.sort_by_column(None::<&gtk::ColumnViewColumn>, gtk::SortType::Ascending);
-                }
-                self.current_offset = 0;
-                self.reset_keyset_navigation();
-                self.capture_focus_for_restore();
-                self.emit_fetch_page(&sender);
-                self.update_sort_status_label();
-                let _ = sender.output(BrowseTabOutput::StateChanged);
-            }
-            BrowseTabInput::PageSizeChanged(size) => {
-                let size = bounded_page_size(size);
-                if self.page_size == size {
-                    return;
-                }
-                self.page_size = size;
-                self.current_offset = 0;
-                self.reset_keyset_navigation();
-                self.emit_fetch_page(&sender);
-                let _ = sender.output(BrowseTabOutput::StateChanged);
-            }
+            BrowseTabInput::PrevPage => self.on_prev_page(sender),
+            BrowseTabInput::NextPage => self.on_next_page(sender),
+            BrowseTabInput::LastPage => self.on_last_page(sender),
+            BrowseTabInput::SortChanged { keys } => self.on_sort_changed(keys, sender),
+            BrowseTabInput::ClearSort => self.on_clear_sort(sender),
+            BrowseTabInput::PageSizeChanged(size) => self.on_page_size_changed(size, sender),
             BrowseTabInput::GridDuplicateRow {
                 row_position,
                 row_key,
@@ -1075,17 +1136,17 @@ impl SimpleComponent for BrowseTab {
                 value,
                 row_key,
                 draft_id,
-            } => {
-                let accepted = match value {
-                    Some(_) if self.row_object_at(row_position).and_then(|row| row.draft_id()) != draft_id => false,
-                    Some(value) => self.handle_grid_cell_value_edited(row_position, col_index, value, row_key, sender),
-                    None => self.handle_grid_cell_edited(row_position, col_index, new_value, row_key, sender),
-                };
-                if !accepted {
-                    self.rejected_edit_revision
-                        .set(self.rejected_edit_revision.get().wrapping_add(1));
-                }
-            }
+            } => self.on_grid_cell_edited(
+                GridCellEdit {
+                    row_position,
+                    col_index,
+                    new_value,
+                    value,
+                    row_key,
+                    draft_id,
+                },
+                sender,
+            ),
             BrowseTabInput::GridReplaceBatch {
                 report,
                 generation,

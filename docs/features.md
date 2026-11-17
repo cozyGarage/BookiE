@@ -160,6 +160,6 @@ BookiE can let an AI assistant use saved connections through the Model Context P
 - No account, hosted service or paid tier.
 - No browser interface and no runtime driver plugins.
 - No database snapshots. [ADR 0015](decisions/0015-database-snapshots.md) records the accepted design; snapshots are not available in the current application.
-- Shipped packages are Linux only ([platforms](platforms.md)). GPUI is the chosen cross-platform frontend and is not packaged yet ([ADR 0052](decisions/0052-gpui-is-the-cross-platform-frontend.md)).
+- Shipped packages are currently focused on Linux first ([platforms](platforms.md)). Cross-platform desktop support is actively underway with the GPUI frontend ([ADR 0052](decisions/0052-gpui-is-the-cross-platform-frontend.md)).
 
 Detailed behavior, keyboard shortcuts, and limits are documented in the [user guide](user-guide.md) and [known limitations](known-limitations.md).

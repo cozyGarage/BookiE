@@ -591,6 +591,7 @@ jobs:
           BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          rm -rf target/gtk-safety floor-artifact "$DEB_OUT"
           bash scripts/build-deb.sh
           python3 scripts/ci-gtk-artifact.py create --profile dist target/dist/bookie-app target/gtk-safety "$BOOKIE_SOURCE_COMMIT"
           package=$(find "$DEB_OUT" -maxdepth 1 -name '*.deb' -print -quit)
