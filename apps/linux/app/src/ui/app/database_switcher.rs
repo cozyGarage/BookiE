@@ -236,6 +236,7 @@ impl App {
     pub(super) fn on_switch_database(&mut self, name: String, sender: ComponentSender<Self>) {
         self.databases_button.popdown();
         let Some(id) = self.connection_id else {
+            tracing::info!(database = %name, "database switch ignored: no connection is active");
             return;
         };
         let Some(mut saved) = self.saved_connections.iter().find(|saved| saved.id == id).cloned() else {
@@ -245,12 +246,12 @@ impl App {
             return;
         };
         if saved.database == name {
+            tracing::info!(database = %name, "database switch ignored: already the saved database");
             return;
         }
         saved.database = name.clone();
         if !stage_database_switch(&mut self.pending_database_switch, self.switch.transition, id, name) {
-            self.on_open_saved(saved, sender);
-            return;
+            tracing::info!("database switch opens without being saved: a connection change is in progress");
         }
         self.on_open_saved(saved, sender);
     }
