@@ -16,6 +16,10 @@ class KeyboardPathRegistryTests(unittest.TestCase):
         self.assertEqual(keyboard_paths.malformed(keyboard_paths.SQL_EDITOR), [])
         self.assertEqual(keyboard_paths.malformed({"Run": "press it"}), ["Run"])
 
+    def test_sidebar_row_accessible_name_has_a_keyboard_path(self):
+        name = "safety_items Show columns Open safety_items"
+        self.assertEqual(keyboard_paths.unregistered([name], keyboard_paths.SQL_EDITOR), [])
+
 
 if __name__ == "__main__":
     unittest.main()
