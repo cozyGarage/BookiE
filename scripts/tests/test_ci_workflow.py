@@ -1491,6 +1491,13 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertNotIn("bookie-driver-tests", ledger)
         self.assertNotIn("bookie-driver-src", ledger)
 
+    def test_value_search_postgres_runs_in_every_consumer_gate(self):
+        command = "-p bookie-app-services --test value_search_postgres -- --include-ignored --test-threads=1"
+        for path in ("scripts/ci-local.sh", ".github/workflows/build-linux.yml", ".forgejo/workflows/ci.yml"):
+            self.assertIn(command, (ROOT / path).read_text(), path)
+        groups = json.loads((ROOT / "scripts/ci-test-bundle-groups.json").read_text())["groups"]
+        self.assertIn("bookie-app-services", groups["consumers"]["test"])
+
     def test_mysql_preview_tests_are_in_the_source_pinned_consumer_gate(self):
         bundle_groups = json.loads((ROOT / "scripts/ci-test-bundle-groups.json").read_text())["groups"]
         self.assertTrue({"bookie-app-services", "bookie-mcp"} <= set(bundle_groups["consumers"]["test"]))
