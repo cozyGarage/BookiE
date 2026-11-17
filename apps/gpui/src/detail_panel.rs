@@ -32,41 +32,7 @@ impl GridView {
             ),
             Some((name, detail)) => {
                 let header = div().text_color(rgb(theme.muted_foreground)).child(name);
-                let body = match detail {
-                    Detail::Null => div().child("NULL").italic().text_color(rgb(theme.muted_foreground)),
-                    Detail::Text(text) => div().child(text),
-                    Detail::Json { pretty } => div().font_family(MONO).child(pretty),
-                    Detail::Hex {
-                        lines,
-                        total,
-                        shown,
-                        decoded,
-                    } => div()
-                        .font_family(MONO)
-                        .flex()
-                        .flex_col()
-                        .children(
-                            lines
-                                .into_iter()
-                                .map(|line| div().child(format!("{:08x}  {:<47}  {}", line.offset, line.hex, line.ascii))),
-                        )
-                        .when_some(decoded, |panel, (label, decoded)| {
-                            panel.child(
-                                div()
-                                    .mt_2()
-                                    .child(div().text_color(rgb(theme.muted_foreground)).child(label))
-                                    .child(decoded),
-                            )
-                        })
-                        .when(shown < total, |panel| {
-                            panel.child(
-                                div()
-                                    .text_color(rgb(theme.muted_foreground))
-                                    .child(format!("showing {shown} of {total} bytes")),
-                            )
-                        }),
-                };
-                (header, body)
+                (header, detail_body(detail, theme))
             }
         };
         Some(
@@ -82,5 +48,42 @@ impl GridView {
                 .child(header)
                 .child(body),
         )
+    }
+}
+
+fn detail_body(detail: Detail, theme: Theme) -> Div {
+    match detail {
+        Detail::Null => div().child("NULL").italic().text_color(rgb(theme.muted_foreground)),
+        Detail::Text(text) => div().child(text),
+        Detail::Json { pretty } => div().font_family(MONO).child(pretty),
+        Detail::Hex {
+            lines,
+            total,
+            shown,
+            decoded,
+        } => div()
+            .font_family(MONO)
+            .flex()
+            .flex_col()
+            .children(
+                lines
+                    .into_iter()
+                    .map(|line| div().child(format!("{:08x}  {:<47}  {}", line.offset, line.hex, line.ascii))),
+            )
+            .when_some(decoded, |panel, (label, decoded)| {
+                panel.child(
+                    div()
+                        .mt_2()
+                        .child(div().text_color(rgb(theme.muted_foreground)).child(label))
+                        .child(decoded),
+                )
+            })
+            .when(shown < total, |panel| {
+                panel.child(
+                    div()
+                        .text_color(rgb(theme.muted_foreground))
+                        .child(format!("showing {shown} of {total} bytes")),
+                )
+            }),
     }
 }
