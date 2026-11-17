@@ -675,15 +675,20 @@ fn build_outcome_content(
         StatementOutcomeKind::Rows(result_sets) if result_sets.len() > 1 => {
             build_multi_result_widget(o, result_sets, grid_sender, connection_id, database, settings_store)
         }
-        StatementOutcomeKind::Rows(result_sets) if let Some(result) = result_sets.first() => build_result_set_widget(
-            result,
-            grid_sender,
-            connection_id,
-            database,
-            settings_store,
-            result_view_key(o.identity, 0),
-            false,
-        ),
+        StatementOutcomeKind::Rows(result_sets)
+            if let Some(result) = result_sets.first()
+                && has_columns(result) =>
+        {
+            build_result_set_widget(
+                result,
+                grid_sender,
+                connection_id,
+                database,
+                settings_store,
+                result_view_key(o.identity, 0),
+                false,
+            )
+        }
         StatementOutcomeKind::Rows(_) => {
             let number = (o.identity.statement_index + 1).to_string();
             adw::StatusPage::builder()
@@ -709,6 +714,10 @@ fn build_outcome_content(
             .build()
             .upcast(),
     }
+}
+
+fn has_columns(result: &bookie_core::QueryResult) -> bool {
+    !result.columns.is_empty()
 }
 
 fn no_result_description(outcome: &StatementOutcome) -> String {
