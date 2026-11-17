@@ -340,6 +340,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::grid::row_number_tests::a_shared_base_handle_renumbers_rows_that_are_bound_again"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::sidebar_tree_model::tests::large_catalog_domain_nodes_do_not_become_list_rows_until_their_groups_expand"
     ],
     [
