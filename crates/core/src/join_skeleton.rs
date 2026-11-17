@@ -1,5 +1,5 @@
 use crate::query::ForeignKeyInfo;
-use crate::sql_dialect::quote_ident;
+use crate::sql_dialect::{qualified_table, quote_ident};
 
 pub const MAX_JOINS: usize = 20;
 const PREVIEW_LIMIT: u32 = 100;
@@ -41,7 +41,7 @@ pub fn join_skeleton(
         .join(", ");
     Ok(format!(
         "SELECT {selected}\nFROM {} AS t0\n{}\nLIMIT {PREVIEW_LIMIT};",
-        qualified(driver_id, schema, table),
+        qualified_table(driver_id, schema, table),
         joins.join("\n")
     ))
 }
@@ -73,15 +73,8 @@ fn join_clause(driver_id: &str, key: &ForeignKeyInfo, alias: usize) -> Result<St
         .join(" AND ");
     Ok(format!(
         "LEFT JOIN {} AS t{alias} ON {conditions}",
-        qualified(driver_id, key.ref_schema.as_deref(), &key.ref_table)
+        qualified_table(driver_id, key.ref_schema.as_deref(), &key.ref_table)
     ))
-}
-
-fn qualified(driver_id: &str, schema: Option<&str>, table: &str) -> String {
-    match schema {
-        Some(schema) => format!("{}.{}", quote_ident(driver_id, schema), quote_ident(driver_id, table)),
-        None => quote_ident(driver_id, table),
-    }
 }
 
 #[cfg(test)]
