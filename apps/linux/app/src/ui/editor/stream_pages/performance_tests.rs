@@ -126,6 +126,58 @@ fn independent_pinned_streams_release_pages_and_keep_spools_until_unpin() {
 }
 
 #[test]
+fn repeated_binary_and_json_pins_stay_within_the_shared_budget_and_release_on_unpin() {
+    let limit = 64 * 1024 * 1024;
+    let budget = bookie_results::stream_page_budget::StreamPageBudget::new(limit);
+    let mut pins = PinnedResults::default();
+    let mut pages = Vec::new();
+    let mut high_water = 0;
+
+    for index in 0_usize..8 {
+        let page = if index % 2 == 0 {
+            byte_page(8 * 1024 * 1024)
+        } else {
+            json_page(8 * 1024 * 1024)
+        };
+        pages.push(Arc::downgrade(&page));
+        let mut cache = StreamPageCache::with_budget(budget.clone());
+        cache.append(0, page).expect("append synthetic page");
+        high_water = high_water.max(budget.used_bytes());
+
+        let outcome = StatementOutcome {
+            identity: StatementIdentity::default(),
+            sql_preview: "SELECT payload FROM items".into(),
+            sql: "SELECT payload FROM items".into(),
+            elapsed_ms: 0,
+            kind: StatementOutcomeKind::Streamed(Box::new(cache.snapshot(StreamTerminal::Complete, None))),
+            pinned: false,
+            detail: Default::default(),
+        };
+        drop(pins.show(vec![outcome]));
+        assert_eq!(pins.pin_last(), (index + 1).min(super::super::pinned::MAX_PINNED));
+
+        let retained = pages.iter().filter_map(Weak::upgrade).collect::<Vec<_>>();
+        assert_eq!(retained.len(), (index + 1).min(super::super::pinned::MAX_PINNED));
+        assert_eq!(budget.used_pages(), retained.len());
+        assert_eq!(budget.used_cells(), retained.len());
+        assert_eq!(
+            budget.used_bytes(),
+            retained.iter().map(|page| page.estimated_row_bytes()).sum::<usize>()
+        );
+        assert!(budget.used_bytes() <= limit);
+    }
+
+    assert!(high_water > 32 * 1024 * 1024);
+    drop(pins.unpin_all());
+    assert_eq!(budget.used_pages(), 1);
+    drop(pins.show(Vec::new()));
+    assert_eq!(budget.used_bytes(), 0);
+    assert_eq!(budget.used_cells(), 0);
+    assert_eq!(budget.used_pages(), 0);
+    assert!(pages.iter().all(|page| page.upgrade().is_none()));
+}
+
+#[test]
 fn pin_eviction_and_unpin_release_unspooled_result_pages() {
     let mut pins = PinnedResults::default();
     let mut pages = Vec::new();

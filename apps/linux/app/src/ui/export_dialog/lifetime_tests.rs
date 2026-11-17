@@ -13,17 +13,24 @@ fn dismissing_export_setup_releases_its_dialog() {
     let toast = adw::ToastOverlay::new();
     window.set_content(Some(&toast));
     window.present();
+    let result = std::sync::Arc::new(QueryResult {
+        columns: Vec::new(),
+        rows: vec![vec![bookie_core::Value::Bytes(vec![7; 8 * 1024 * 1024])]].into(),
+        truncated: false,
+    });
+    let budget = bookie_results::stream_page_budget::StreamPageBudget::new(16 * 1024 * 1024);
+    let lease = budget.retain(&result).unwrap();
     present(
         &window,
         &toast,
         ExportRequest {
             scope: ExportScope::TablePage { filtered: false },
             paged: None,
-            result: std::sync::Arc::new(QueryResult {
-                columns: Vec::new(),
-                rows: vec![vec![bookie_core::Value::Bytes(vec![7; 8 * 1024 * 1024])]].into(),
-                truncated: false,
+            retained_page: Some(StreamExportPage {
+                result: result.clone(),
+                _lease: lease,
             }),
+            result,
             suggested_name: "synthetic".into(),
             driver_id: "sqlite".into(),
         },
@@ -31,6 +38,7 @@ fn dismissing_export_setup_releases_its_dialog() {
     );
     let context = glib::MainContext::default();
     while context.iteration(false) {}
+    assert_eq!(budget.used_pages(), 1);
     let dialog = window.visible_dialog().unwrap();
     let retired = dialog.downgrade();
     let button = export_button(dialog.upcast_ref()).unwrap().downgrade();
@@ -44,6 +52,8 @@ fn dismissing_export_setup_releases_its_dialog() {
     assert!(window.visible_dialog().is_none());
     assert!(retired.upgrade().is_none(), "closed export setup is still retained");
     assert!(button.upgrade().is_none(), "export callback still retains its result");
+    assert_eq!(budget.used_pages(), 0);
+    assert_eq!(budget.used_bytes(), 0);
     window.close();
 }
 

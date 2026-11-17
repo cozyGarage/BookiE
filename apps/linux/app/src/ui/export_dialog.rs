@@ -85,6 +85,7 @@ pub(crate) struct ExportRequest {
     pub(crate) scope: ExportScope,
     pub(crate) paged: Option<PagedExport>,
     pub(crate) result: std::sync::Arc<QueryResult>,
+    pub(crate) retained_page: Option<StreamExportPage>,
     pub(crate) suggested_name: String,
     pub(crate) driver_id: String,
 }
@@ -509,6 +510,7 @@ struct ExportActionParams {
     suggested_name: String,
     driver_id: String,
     result: std::sync::Arc<QueryResult>,
+    retained_page: Option<StreamExportPage>,
 }
 
 fn attach_export_action(
@@ -546,7 +548,10 @@ fn attach_export_action(
                 retained_page: if all_rows {
                     None
                 } else {
-                    params.full_export.as_ref().and_then(|p| p.retained_page.clone())
+                    params
+                        .retained_page
+                        .clone()
+                        .or_else(|| params.full_export.as_ref().and_then(|p| p.retained_page.clone()))
                 },
                 include_header,
                 sanitize_formulas: params.safe_csv.is_active(),
@@ -598,6 +603,7 @@ fn present_export(
         scope,
         paged,
         result,
+        retained_page,
         suggested_name,
         driver_id,
     } = request;
@@ -642,6 +648,7 @@ fn present_export(
         suggested_name,
         driver_id,
         result,
+        retained_page,
     };
     attach_export_action(&export_button, &dialog, parent, toast_overlay, action_params);
 
@@ -850,6 +857,7 @@ mod scope_presentation_tests {
             ExportRequest {
                 scope: ExportScope::QueryResult,
                 paged: None,
+                retained_page: None,
                 result: std::sync::Arc::new(QueryResult {
                     columns: Vec::new(),
                     rows: Vec::new().into(),
@@ -873,6 +881,7 @@ mod scope_presentation_tests {
             ExportRequest {
                 scope: ExportScope::TablePage { filtered: true },
                 paged: None,
+                retained_page: None,
                 result: std::sync::Arc::new(QueryResult {
                     columns: Vec::new(),
                     rows: Vec::new().into(),

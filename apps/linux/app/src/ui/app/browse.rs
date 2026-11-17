@@ -667,7 +667,11 @@ impl App {
             match tabs.get(&id) {
                 Some(super::WorkspaceTab::Table(_)) => FrontExport::Browse,
                 Some(super::WorkspaceTab::Editor(slot)) => match slot.controller.model().export_shown_result() {
-                    Some((result, name)) => FrontExport::Editor { result, name },
+                    Some((result, retained_page, name)) => FrontExport::Editor {
+                        result,
+                        retained_page,
+                        name,
+                    },
                     None => FrontExport::Empty,
                 },
                 Some(super::WorkspaceTab::Structure(_)) | None => FrontExport::Empty,
@@ -686,7 +690,11 @@ impl App {
                     &self.preferences,
                 );
             }
-            FrontExport::Editor { result, name } => {
+            FrontExport::Editor {
+                result,
+                retained_page,
+                name,
+            } => {
                 let Some(driver_id) = self.tab_driver_id(id) else {
                     self.show_toast(&bookie_app_services::tr!("Nothing to export"));
                     return;
@@ -698,6 +706,7 @@ impl App {
                         scope: crate::ui::export_dialog::ExportScope::QueryResult,
                         paged: None,
                         result,
+                        retained_page,
                         suggested_name: name,
                         driver_id,
                     },
@@ -755,6 +764,7 @@ impl App {
             scope: crate::ui::export_dialog::ExportScope::TablePage { filtered },
             paged: self.snapshot_export(active_id),
             result: std::sync::Arc::new(result),
+            retained_page: None,
             suggested_name: table_label,
             driver_id,
         })
@@ -797,6 +807,7 @@ impl App {
                     retained_page: current_page,
                 }),
                 result,
+                retained_page: None,
                 suggested_name: request.query.suggested_name,
                 driver_id: request.query.driver_id,
             },
@@ -892,6 +903,7 @@ impl App {
                     retained_page: None,
                 })),
                 result: std::sync::Arc::new(columns_only),
+                retained_page: None,
                 suggested_name: label,
                 driver_id,
             },
@@ -1001,6 +1013,7 @@ enum FrontExport {
     Browse,
     Editor {
         result: std::sync::Arc<QueryResult>,
+        retained_page: Option<crate::ui::export_dialog::StreamExportPage>,
         name: String,
     },
     Empty,

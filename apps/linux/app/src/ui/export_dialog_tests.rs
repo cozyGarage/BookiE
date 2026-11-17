@@ -46,6 +46,7 @@ fn a_full_export_shows_a_refusal_without_opening_its_source() {
                 PageFetcher::new(|| Ok(None), || Ok(()))
             }),
         }),
+        retained_page: None,
         result: std::sync::Arc::new(QueryResult {
             columns: Vec::new(),
             rows: Vec::new().into(),

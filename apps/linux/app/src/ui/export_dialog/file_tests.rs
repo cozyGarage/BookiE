@@ -146,9 +146,11 @@ fn a_loaded_result_still_exports_successfully() {
 }
 
 #[test]
-fn a_guarded_query_export_finishes_its_source_after_writing() {
+fn a_guarded_query_export_finishes_its_source_before_publishing() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("query.csv");
+    std::fs::write(&path, "previous export").unwrap();
+    let destination = path.clone();
     let finished = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let finished_source = finished.clone();
     let source = JobSource::Paged {
@@ -170,6 +172,7 @@ fn a_guarded_query_export_finishes_its_source_after_writing() {
         open: Arc::new(move |_| {
             let mut sent = false;
             let finished = finished_source.clone();
+            let destination = destination.clone();
             super::super::PageFetcher::new(
                 move || {
                     if sent {
@@ -179,6 +182,7 @@ fn a_guarded_query_export_finishes_its_source_after_writing() {
                     Ok(Some(vec![vec![bookie_core::Value::Int(42)]]))
                 },
                 move || {
+                    assert_eq!(std::fs::read_to_string(destination).unwrap(), "previous export");
                     finished.store(true, Ordering::SeqCst);
                     Ok(())
                 },
@@ -195,6 +199,55 @@ fn a_guarded_query_export_finishes_its_source_after_writing() {
 
     assert!(finished.load(Ordering::SeqCst));
     assert_eq!(std::fs::read_to_string(path).unwrap(), "id\n42\n");
+}
+
+#[test]
+fn cleanup_failure_keeps_the_previous_export_for_query_and_snapshot_sources() {
+    use super::super::PagedExportMode::{SnapshotTable, StoredQuery};
+
+    for (mode, limit) in [
+        (StoredQuery, None),
+        (StoredQuery, Some(1)),
+        (SnapshotTable, None),
+        (SnapshotTable, Some(0)),
+        (SnapshotTable, Some(1)),
+    ] {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("query.csv");
+        std::fs::write(&path, "previous export").unwrap();
+        let finishes = Arc::new(AtomicUsize::new(0));
+        let source_finishes = finishes.clone();
+        let source = JobSource::Paged {
+            mode,
+            columns: numbered_result(1).columns.clone(),
+            total: Some(1),
+            open: Arc::new(move |_| {
+                let mut sent = false;
+                let finishes = source_finishes.clone();
+                super::super::PageFetcher::new(
+                    move || {
+                        if sent {
+                            return Ok(None);
+                        }
+                        sent = true;
+                        Ok(Some(vec![vec![bookie_core::Value::Int(42)]]))
+                    },
+                    move || {
+                        finishes.fetch_add(1, Ordering::SeqCst);
+                        Err(ExportError::Source("cleanup failed".into()))
+                    },
+                )
+            }),
+        };
+        let mut export = job(path.clone(), source);
+        export.row_limit = limit;
+
+        let result = write_export(export, &CancellationToken::new(), &AtomicUsize::new(0));
+        assert!(matches!(result, Err(ExportError::Source(_))));
+        assert_eq!(finishes.load(Ordering::SeqCst), 1);
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "previous export");
+        assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 1);
+    }
 }
 
 #[test]

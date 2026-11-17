@@ -64,24 +64,24 @@ fn write_export(job: ExportJob, cancel: &CancellationToken, completed: &AtomicUs
             open,
         } => {
             let mut pages = open(cancel.clone());
+            let mut finish = pages.finish.take();
             let capped = Arc::new(AtomicBool::new(false));
-            let total = match job.row_limit {
-                Some(limit) => total.map_or(limit, |total| total.min(limit)),
-                None => total.unwrap_or(0),
-            };
-            let mut next: Box<dyn FnMut() -> Result<Option<bookie_core::export::RowPage>, ExportError>> =
-                match job.row_limit {
-                    Some(limit) => Box::new(bookie_core::export::cap_pages(
-                        || pages.next_page(),
-                        limit,
-                        capped.clone(),
-                    )),
-                    None => Box::new(|| pages.next_page()),
-                };
+            let total = job
+                .row_limit
+                .map_or(total.unwrap_or(0), |limit| total.unwrap_or(limit).min(limit));
+            let mut next = capped_pages(&mut pages, job.row_limit, capped.clone());
+            let next_and_finish = || finish_on_end(&mut next, &mut finish);
             let result = bookie_core::export::write_paged_file(
-                &job.path, &columns, total, &export, &mut next, cancelled, progress,
+                &job.path,
+                &columns,
+                total,
+                &export,
+                next_and_finish,
+                cancelled,
+                progress,
             );
             drop(next);
+            pages.finish = finish;
             finish_pages(result, pages.finish())?;
             Ok(capped.load(Ordering::SeqCst))
         }
@@ -90,6 +90,28 @@ fn write_export(job: ExportJob, cancel: &CancellationToken, completed: &AtomicUs
             ..
         } => Err(ExportError::Source(snapshot_refusal_message())),
     }
+}
+
+fn capped_pages(
+    pages: &mut super::PageFetcher,
+    limit: Option<usize>,
+    capped: Arc<AtomicBool>,
+) -> Box<dyn FnMut() -> Result<Option<bookie_core::export::RowPage>, ExportError> + '_> {
+    match limit {
+        Some(limit) => Box::new(bookie_core::export::cap_pages(|| pages.next_page(), limit, capped)),
+        None => Box::new(|| pages.next_page()),
+    }
+}
+
+fn finish_on_end(
+    next: &mut dyn FnMut() -> Result<Option<bookie_core::export::RowPage>, ExportError>,
+    finish: &mut Option<super::FinishPages>,
+) -> Result<Option<bookie_core::export::RowPage>, ExportError> {
+    let page = next()?;
+    if page.is_none() {
+        finish.take().map_or(Ok(()), |finish| finish())?;
+    }
+    Ok(page)
 }
 
 fn limited_result(

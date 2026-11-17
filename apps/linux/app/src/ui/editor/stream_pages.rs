@@ -126,6 +126,7 @@ impl ResidentPageStore {
         }
     }
 
+    #[cfg(test)]
     pub(super) fn get(&self, index: u64) -> Option<Arc<QueryResult>> {
         self.0
             .lock()
