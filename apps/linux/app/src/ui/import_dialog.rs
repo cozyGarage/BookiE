@@ -17,8 +17,6 @@ use tokio_util::sync::CancellationToken;
 mod preview_queue;
 mod write_mode;
 
-/// Whether the rows go into a table that is already there, or into one
-/// the import creates first.
 pub(crate) enum ImportMode {
     ExistingTable {
         capabilities: DriverCapabilities,
@@ -33,7 +31,6 @@ pub(crate) enum ImportMode {
     },
 }
 
-/// What the app read from the file before it asked the user anything.
 pub(crate) struct ImportRequest {
     pub schema: Option<String>,
     pub path: PathBuf,
@@ -887,8 +884,6 @@ impl NewColumns {
     }
 }
 
-/// A column the import is about to create: what the table will hold once
-/// the CREATE has run, which is what the INSERT binds against.
 fn draft_to_info(draft: &DraftColumn) -> ColumnInfo {
     ColumnInfo {
         name: draft.name.clone(),
