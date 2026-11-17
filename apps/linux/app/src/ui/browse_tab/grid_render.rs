@@ -179,9 +179,13 @@ impl BrowseTab {
         if self.column_view_matches_current_columns()
             && let Some(store) = self.list_store()
         {
+            self.row_number_base.set(self.current_offset);
             if !self.refresh_grid_data(&result, &store) {
                 self.show_projection_error(&sender);
                 return;
+            }
+            if let Some(view) = self.current_column_view.as_ref() {
+                crate::ui::grid::refit_row_numbers(view, self.current_offset);
             }
             self.refresh_grid_chrome();
             self.restore_focused_row();
@@ -233,6 +237,7 @@ impl BrowseTab {
             choices: self.choice_labels.clone(),
             ambiguous_keys: self.ambiguous_keys.clone(),
             row_number_base: self.current_offset,
+            row_number_base_handle: Some(self.row_number_base.clone()),
             column_selection: self.column_selection.clone(),
             set_cells_enabled: self.allows_keyed_row_mutations(),
             column_selection_chrome: None,

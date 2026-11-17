@@ -34,6 +34,13 @@ fn column(name: &str) -> ColumnInfo {
 }
 
 fn wide_grid(base: u64) -> (gtk4::ColumnView, gtk4::MultiSelection, gtk4::Window) {
+    wide_grid_with_handle(base, None)
+}
+
+fn wide_grid_with_handle(
+    base: u64,
+    handle: Option<std::rc::Rc<std::cell::Cell<u64>>>,
+) -> (gtk4::ColumnView, gtk4::MultiSelection, gtk4::Window) {
     let columns = vec![column("first"), column("second"), column("third"), column("fourth")];
     let result = Arc::new(QueryResult {
         columns: columns.clone(),
@@ -68,6 +75,7 @@ fn wide_grid(base: u64) -> (gtk4::ColumnView, gtk4::MultiSelection, gtk4::Window
             connection_id: None,
             tab_ctx: TabGridContext {
                 row_number_base: base,
+                row_number_base_handle: handle,
                 ..Default::default()
             },
             column_widths: None,
@@ -161,6 +169,22 @@ fn browse_offset_shifts_the_leading_row_numbers() {
     gtk4::init().unwrap();
     let (view, _, window) = wide_grid(100);
     assert_eq!(number_labels(&view), vec!["101".to_owned(), "102".to_owned()]);
+    window.close();
+    settle();
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn a_shared_base_handle_renumbers_rows_that_are_bound_again() {
+    gtk4::init().unwrap();
+    let handle = std::rc::Rc::new(std::cell::Cell::new(0));
+    let (view, selection, window) = wide_grid_with_handle(0, Some(handle.clone()));
+    assert_eq!(number_labels(&view), vec!["1".to_owned(), "2".to_owned()]);
+    handle.set(200);
+    view.set_model(None::<&gtk4::SelectionModel>);
+    view.set_model(Some(&selection));
+    settle();
+    assert_eq!(number_labels(&view), vec!["201".to_owned(), "202".to_owned()]);
     window.close();
     settle();
 }

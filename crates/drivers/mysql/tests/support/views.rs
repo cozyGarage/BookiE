@@ -1,5 +1,57 @@
 use super::{connect, start_mariadb, start_mysql};
-use bookie_core::Connection;
+use bookie_core::{Connection, ViewEditability};
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn mysql_identifies_view_keys_and_read_only_columns() {
+    let (_container, opts) = start_mysql().await;
+    assert_view_editability(connect(opts).await.as_ref()).await;
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn mariadb_identifies_view_keys_and_read_only_columns() {
+    let (_container, opts) = start_mariadb().await;
+    assert_view_editability(connect(opts).await.as_ref()).await;
+}
+
+async fn assert_view_editability(conn: &dyn Connection) {
+    for sql in [
+        "CREATE TABLE editable_base (id INT NOT NULL, part INT NOT NULL, name VARCHAR(50), PRIMARY KEY (id, part))",
+        "CREATE VIEW editable_full AS SELECT id AS item_id, part, name, UPPER(name) AS upper_name FROM editable_base",
+        "CREATE VIEW editable_partial AS SELECT id, name FROM editable_base",
+        "CREATE VIEW editable_spoof AS SELECT id + 0 AS id, part, name FROM editable_base",
+        "CREATE VIEW editable_aggregate AS SELECT name, COUNT(*) AS total FROM editable_base GROUP BY name",
+    ] {
+        conn.execute(sql).await.unwrap();
+    }
+    assert_eq!(
+        conn.fetch_view_editability(None, "editable_base").await.unwrap(),
+        ViewEditability::NotApplicable
+    );
+    let ViewEditability::Editable {
+        key_columns,
+        read_only_columns,
+        ..
+    } = conn.fetch_view_editability(None, "editable_full").await.unwrap()
+    else {
+        panic!("a view exposing the complete primary key must be editable");
+    };
+    assert_eq!(key_columns, ["item_id", "part"]);
+    assert_eq!(read_only_columns, ["upper_name"]);
+    assert_eq!(
+        conn.fetch_view_editability(None, "editable_partial").await.unwrap(),
+        ViewEditability::KeyNotExposed
+    );
+    assert_eq!(
+        conn.fetch_view_editability(None, "editable_spoof").await.unwrap(),
+        ViewEditability::KeyNotExposed
+    );
+    assert_eq!(
+        conn.fetch_view_editability(None, "editable_aggregate").await.unwrap(),
+        ViewEditability::NotUpdatable
+    );
+}
 
 #[tokio::test]
 #[ignore = "requires docker"]
