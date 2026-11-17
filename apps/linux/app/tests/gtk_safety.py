@@ -2295,8 +2295,8 @@ def restart_restores_active_editor_and_connection(database, base, restart):
     restart()
     window = wait_for_frame_containing(f"{CONNECTION_B_NAME} — BookiE")
     wait_within(window, name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
-    wait_within(window, name="kept_items", role=pyatspi.ROLE_PAGE_TAB)
-    wait_within(window, name="safety_items", role=pyatspi.ROLE_PAGE_TAB, present=False)
+    wait_for_node_containing("kept_items", role=pyatspi.ROLE_PAGE_TAB)
+    wait_for_node_containing("safety_items", role=pyatspi.ROLE_PAGE_TAB, present=False)
     texts = []
     for node in descendants(window):
         if node_role(node) == pyatspi.ROLE_TEXT:
