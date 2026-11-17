@@ -39,7 +39,7 @@ def assert_workbook(cells):
     for cell, expected in {"D3": "1", "E3": "0.5", "F3": "1.5", "G3": "1.25"}.items():
         assert cells[cell][0] == "n" and Decimal(cells[cell][1]) == Decimal(expected), (cell, cells[cell])
     for column in "BCDEFG":
-        assert f"{column}4" not in cells, (column, "NULL did not remain blank")
+        assert cells.get(f"{column}4", ("n", "")) == ("n", ""), (column, "NULL did not remain blank")
 
 
 def seed_workbook(database):
