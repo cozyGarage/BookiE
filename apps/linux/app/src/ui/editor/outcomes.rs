@@ -1217,6 +1217,10 @@ fn result_view_keys(outcomes: &[StatementOutcome]) -> std::collections::HashSet<
 #[cfg(test)]
 #[path = "outcomes/affected_rows_tests.rs"]
 mod affected_rows_tests;
+
+#[cfg(test)]
+#[path = "outcomes/audit_button_tests.rs"]
+mod audit_button_tests;
 #[cfg(test)]
 #[path = "outcomes/lexing_tests.rs"]
 mod lexing_tests;
