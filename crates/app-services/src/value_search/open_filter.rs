@@ -2,13 +2,10 @@ use bookie_core::{Combinator, FilterOp, FilterRule, FilterSet, FilterValue, Sear
 
 use super::TableOutcome;
 
-const WILDCARD_CHARACTERS: [char; 4] = ['%', '_', '\\', '['];
-
 pub fn open_filter(outcome: &TableOutcome, term: &str, mode: SearchMode) -> FilterSet {
     let (op, value) = match mode {
         SearchMode::Exact => (FilterOp::Eq, term.to_owned()),
-        SearchMode::Contains if term.contains(WILDCARD_CHARACTERS) => (FilterOp::Contains, term.to_owned()),
-        SearchMode::Contains => (FilterOp::Ilike, format!("%{term}%")),
+        SearchMode::Contains => (FilterOp::IContains, term.to_owned()),
     };
     let rules = outcome
         .matched_columns
