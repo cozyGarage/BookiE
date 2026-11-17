@@ -13,6 +13,10 @@ pub(super) async fn fetch(
     let Some(source_schema) = view_schema(connection, &mut client, schema, view).await? else {
         return Ok(ViewEditability::NotApplicable);
     };
+    let definition = view_definition(connection, &mut client, &source_schema, view).await?;
+    if !definition.as_deref().is_some_and(definition_allows_updates) {
+        return Ok(ViewEditability::NotUpdatable);
+    }
     let columns = describe_view(connection, &mut client, &source_schema, view).await?;
     if columns.is_empty() || !columns.iter().any(|column| column.updateable) {
         return Ok(ViewEditability::NotUpdatable);
@@ -59,6 +63,120 @@ async fn view_schema(
         .first()
         .and_then(|row| row.first())
         .and_then(|value| as_text(Some(value))))
+}
+
+async fn view_definition(
+    connection: &MssqlConnection,
+    client: &mut crate::MssqlClient,
+    schema: &str,
+    view: &str,
+) -> Result<Option<String>, DriverError> {
+    let result = connection
+        .query_result(
+            client,
+            "SELECT m.definition FROM sys.sql_modules m \
+             JOIN sys.views v ON v.object_id = m.object_id \
+             JOIN sys.schemas s ON s.schema_id = v.schema_id \
+             WHERE v.name = @P1 AND s.name = @P2",
+            &[text_param(view), text_param(schema)],
+            1,
+        )
+        .await?;
+    Ok(result
+        .rows
+        .first()
+        .and_then(|row| row.first())
+        .and_then(|value| as_text(Some(value))))
+}
+
+const BLOCKING_WORDS: [&str; 15] = [
+    "GROUP",
+    "DISTINCT",
+    "UNION",
+    "INTERSECT",
+    "EXCEPT",
+    "HAVING",
+    "TOP",
+    "OVER",
+    "PIVOT",
+    "UNPIVOT",
+    "APPLY",
+    "OFFSET",
+    "TABLESAMPLE",
+    "FETCH",
+    "WITHIN",
+];
+
+const AGGREGATE_FUNCTIONS: [&str; 14] = [
+    "COUNT",
+    "COUNT_BIG",
+    "SUM",
+    "AVG",
+    "MIN",
+    "MAX",
+    "STDEV",
+    "STDEVP",
+    "VAR",
+    "VARP",
+    "STRING_AGG",
+    "CHECKSUM_AGG",
+    "GROUPING",
+    "GROUPING_ID",
+];
+
+fn definition_allows_updates(definition: &str) -> bool {
+    let words = sql_words(definition);
+    !words.iter().enumerate().any(|(index, word)| {
+        BLOCKING_WORDS.contains(&word.as_str())
+            || (AGGREGATE_FUNCTIONS.contains(&word.as_str()) && words.get(index + 1).is_some_and(|next| next == "("))
+    })
+}
+
+fn sql_words(sql: &str) -> Vec<String> {
+    let chars: Vec<char> = sql.chars().collect();
+    let mut words = Vec::new();
+    let mut index = 0;
+    while index < chars.len() {
+        let current = chars[index];
+        let next = chars.get(index + 1).copied();
+        if current == '-' && next == Some('-') {
+            while index < chars.len() && chars[index] != '\n' {
+                index += 1;
+            }
+        } else if current == '/' && next == Some('*') {
+            index += 2;
+            while index + 1 < chars.len() && !(chars[index] == '*' && chars[index + 1] == '/') {
+                index += 1;
+            }
+            index += 2;
+        } else if matches!(current, '\'' | '"' | '[') {
+            let close = if current == '[' { ']' } else { current };
+            index += 1;
+            while index < chars.len() {
+                if chars[index] == close {
+                    if chars.get(index + 1) == Some(&close) {
+                        index += 2;
+                        continue;
+                    }
+                    break;
+                }
+                index += 1;
+            }
+            index += 1;
+        } else if current.is_alphanumeric() || current == '_' {
+            let start = index;
+            while index < chars.len() && (chars[index].is_alphanumeric() || chars[index] == '_') {
+                index += 1;
+            }
+            words.push(chars[start..index].iter().collect::<String>().to_uppercase());
+        } else {
+            if current == '(' {
+                words.push("(".into());
+            }
+            index += 1;
+        }
+    }
+    words
 }
 
 async fn describe_view(
@@ -158,4 +276,36 @@ fn is_true(value: Option<&Value>) -> bool {
 
 fn quote_identifier(identifier: &str) -> String {
     format!("[{}]", identifier.replace(']', "]]"))
+}
+
+#[cfg(test)]
+mod definition_tests {
+    use super::definition_allows_updates;
+
+    #[test]
+    fn plain_projections_stay_editable() {
+        for sql in [
+            "CREATE VIEW v AS SELECT id AS item_id, part, name, UPPER(name) AS upper_name FROM dbo.t",
+            "CREATE VIEW v AS SELECT id, name FROM dbo.t WHERE name <> 'GROUP BY' -- DISTINCT",
+            "CREATE VIEW v AS SELECT [count], \"top\" FROM dbo.t /* UNION */",
+            "CREATE VIEW v AS SELECT id, name FROM dbo.t WITH CHECK OPTION",
+        ] {
+            assert!(definition_allows_updates(sql), "{sql}");
+        }
+    }
+
+    #[test]
+    fn shapes_sql_server_will_not_update_through_are_refused() {
+        for sql in [
+            "CREATE VIEW v AS SELECT id, COUNT(*) AS total FROM dbo.t GROUP BY id",
+            "CREATE VIEW v AS SELECT DISTINCT id FROM dbo.t",
+            "CREATE VIEW v AS SELECT id FROM dbo.a UNION ALL SELECT id FROM dbo.b",
+            "CREATE VIEW v AS SELECT TOP 10 id FROM dbo.t",
+            "CREATE VIEW v AS SELECT id, ROW_NUMBER() OVER (ORDER BY id) AS n FROM dbo.t",
+            "CREATE VIEW v AS SELECT id, max (name) FROM dbo.t",
+            "CREATE VIEW v AS SELECT t.id FROM dbo.t CROSS APPLY dbo.f(t.id) AS x",
+        ] {
+            assert!(!definition_allows_updates(sql), "{sql}");
+        }
+    }
 }
