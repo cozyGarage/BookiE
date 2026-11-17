@@ -18,6 +18,7 @@ async fn mariadb_identifies_view_keys_and_read_only_columns() {
 async fn assert_view_editability(conn: &dyn Connection) {
     for sql in [
         "CREATE TABLE editable_base (id INT NOT NULL, part INT NOT NULL, name VARCHAR(50), PRIMARY KEY (id, part))",
+        "INSERT INTO editable_base VALUES (1, 2, 'before')",
         "CREATE VIEW editable_full AS SELECT id AS item_id, part, name, UPPER(name) AS upper_name FROM editable_base",
         "CREATE VIEW editable_partial AS SELECT id, name FROM editable_base",
         "CREATE VIEW editable_spoof AS SELECT id + 0 AS id, part, name FROM editable_base",
@@ -29,16 +30,27 @@ async fn assert_view_editability(conn: &dyn Connection) {
         conn.fetch_view_editability(None, "editable_base").await.unwrap(),
         ViewEditability::NotApplicable
     );
+    let editability = conn.fetch_view_editability(None, "editable_full").await.unwrap();
     let ViewEditability::Editable {
         key_columns,
         read_only_columns,
         ..
-    } = conn.fetch_view_editability(None, "editable_full").await.unwrap()
+    } = editability
     else {
-        panic!("a view exposing the complete primary key must be editable");
+        panic!("a view exposing the complete primary key must be editable: {editability:?}");
     };
     assert_eq!(key_columns, ["item_id", "part"]);
     assert_eq!(read_only_columns, ["upper_name"]);
+    conn.execute("UPDATE editable_full SET name = 'after' WHERE item_id = 1 AND part = 2")
+        .await
+        .unwrap();
+    assert_eq!(
+        conn.query("SELECT name FROM editable_base WHERE id = 1 AND part = 2")
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![bookie_core::Value::Text("after".into())]]
+    );
     assert_eq!(
         conn.fetch_view_editability(None, "editable_partial").await.unwrap(),
         ViewEditability::KeyNotExposed

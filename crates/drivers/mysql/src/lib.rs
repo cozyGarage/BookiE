@@ -299,6 +299,19 @@ impl Connection for MysqlConnection {
         view_editability::fetch(&mut connection, schema, table).await
     }
 
+    async fn fetch_view_editability_controlled(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        control: &OperationControl,
+    ) -> Result<bookie_core::ViewEditability, DriverError> {
+        stoppable!(self, control, |connection| view_editability::fetch(
+            &mut connection,
+            schema,
+            table
+        ))
+    }
+
     async fn fetch_columns_controlled(
         &self,
         schema: Option<&str>,
