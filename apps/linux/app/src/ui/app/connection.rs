@@ -221,6 +221,7 @@ impl App {
 
     pub(super) fn finish_disconnect(&mut self, sender: ComponentSender<Self>) {
         crate::services::request_generation::replace_in_flight(&self.catalog_dialog_cancel);
+        self.pending_database_switch = None;
         self.switch.prepared = None;
         self.switch.saves_pending.clear();
         self.switch.cancel_audit_was_disabled = None;
@@ -547,6 +548,7 @@ impl App {
                     .is_some_and(|id| self.database.governed_writes_disabled(id))
             {
                 self.switch.prepared = None;
+                self.pending_database_switch = None;
                 self.switch.saves_pending.clear();
                 self.switch.transition = ConnectionTransition::Idle;
                 self.show_toast(&bookie_app_services::tr!(
@@ -619,6 +621,7 @@ impl App {
         match decision {
             SwitchDecision::Stay => {
                 self.switch.prepared = None;
+                self.pending_database_switch = None;
                 self.switch.saves_pending.clear();
                 self.switch.cancel_audit_was_disabled = None;
                 self.switch.transition = ConnectionTransition::Idle;
@@ -689,7 +692,11 @@ impl App {
         };
         let target_id = prepared.id();
         let additive = super::multi_session::opens_additional_session(self.connected, self.connection_id, target_id);
-        if self.multi.sessions.is_working(target_id) {
+        if reuse_working_session(
+            self.multi.sessions.is_working(target_id),
+            self.pending_database_switch.as_ref(),
+            target_id,
+        ) {
             self.switch.transition = ConnectionTransition::Idle;
             self.switch.saves_pending.clear();
             self.switch.cancel_audit_was_disabled = None;
@@ -758,6 +765,7 @@ impl App {
         }
         self.switch.saves_pending.clear();
         self.switch.prepared = None;
+        self.pending_database_switch = None;
         self.switch.cancel_audit_was_disabled = None;
         self.switch.transition = ConnectionTransition::Idle;
         self.show_toast(&bookie_app_services::tr!(
@@ -938,6 +946,10 @@ fn execute_delete_connection(
     });
 }
 
+fn reuse_working_session(working: bool, pending: Option<&(Uuid, String)>, target: Uuid) -> bool {
+    working && !pending.is_some_and(|(id, _)| *id == target)
+}
+
 fn touch_last_opened(connection_id: Uuid, sender: ComponentSender<App>) {
     relm4::spawn(async move {
         let result = bookie_storage::touch_last_opened(connection_id).await;
@@ -953,8 +965,22 @@ fn touch_last_opened(connection_id: Uuid, sender: ComponentSender<App>) {
 
 #[cfg(test)]
 mod tests {
-    use super::{duplicate_connection_message, duplicate_connection_prompt_eligible, prompt_for_stored_password};
+    use super::{
+        duplicate_connection_message, duplicate_connection_prompt_eligible, prompt_for_stored_password,
+        reuse_working_session,
+    };
     use secrecy::SecretString;
+
+    #[test]
+    fn switching_databases_replaces_the_working_session_instead_of_refocusing_it() {
+        let id = uuid::Uuid::new_v4();
+        let other = uuid::Uuid::new_v4();
+        let pending = (id, "other_database".to_string());
+        assert!(!reuse_working_session(true, Some(&pending), id));
+        assert!(reuse_working_session(true, Some(&pending), other));
+        assert!(reuse_working_session(true, None, id));
+        assert!(!reuse_working_session(false, None, id));
+    }
 
     #[test]
     fn the_duplicate_toast_says_the_copy_has_no_saved_password() {

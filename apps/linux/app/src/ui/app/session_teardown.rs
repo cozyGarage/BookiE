@@ -126,6 +126,7 @@ impl App {
                 SessionTeardownAction::ConnectionSwitch => {
                     self.switch.transition = super::ConnectionTransition::Idle;
                     self.switch.prepared = None;
+                    self.pending_database_switch = None;
                     self.switch.saves_pending.clear();
                     self.switch.cancel_audit_was_disabled = None;
                 }
