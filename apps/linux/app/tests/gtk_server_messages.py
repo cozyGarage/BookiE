@@ -1,6 +1,7 @@
 import os
 import subprocess
 import sys
+import time
 
 import pyatspi
 
@@ -18,6 +19,15 @@ def clipboard_text(ui):
     return result.stdout.decode()
 
 
+def clipboard_text_containing(ui, needle):
+    deadline = time.monotonic() + ui.WAIT_SECONDS
+    text = clipboard_text(ui)
+    while needle not in text and time.monotonic() < deadline:
+        time.sleep(ui.POLL_SECONDS)
+        text = clipboard_text(ui)
+    return text
+
+
 def scenarios(ui):
     def postgres_server_notice_output_keeps_rows_and_clears_on_rerun(_database, _base):
         ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
@@ -28,8 +38,8 @@ def scenarios(ui):
         ui.wait_for_node_containing("bookie GTK server message")
         ui.wait_for_node(name="42")
         ui.invoke(ui.wait_for_node(name="Copy messages", role=pyatspi.ROLE_PUSH_BUTTON))
-        copied = clipboard_text(ui)
-        assert "bookie GTK server message" in copied, copied
+        copied = clipboard_text_containing(ui, "bookie GTK server message")
+        assert "bookie GTK server message" in copied, f"clipboard text after Copy messages: {copied!r}"
         assert "SELECT public.bookie_gtk_notice()" not in copied, copied
         assert "42" not in copied, copied
         ui.wait_for_node(name="42")
