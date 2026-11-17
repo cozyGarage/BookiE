@@ -32,6 +32,7 @@ impl CsvDelimiter {
 pub const MAX_CUSTOM_DELIMITER_CHARS: usize = 8;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(try_from = "String")]
 pub struct CustomDelimiter(String);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
@@ -65,6 +66,14 @@ impl CustomDelimiter {
 
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+}
+
+impl TryFrom<String> for CustomDelimiter {
+    type Error = CustomDelimiterError;
+
+    fn try_from(text: String) -> Result<Self, Self::Error> {
+        Self::new(&text)
     }
 }
 
@@ -147,6 +156,15 @@ impl Default for CsvOptions {
 }
 
 impl CsvOptions {
+    fn cell_needs_quotes_for_delimiter(&self, text: &str) -> bool {
+        let delimiter = self.delimiter_text();
+        text.contains(delimiter)
+            || delimiter
+                .char_indices()
+                .skip(1)
+                .any(|(end, _)| text.ends_with(&delimiter[..end]))
+    }
+
     pub fn delimiter_text(&self) -> &str {
         self.custom_delimiter
             .as_ref()
@@ -355,7 +373,7 @@ fn write_csv_text_field<W: Write + ?Sized>(
         CsvQuote::Always => true,
         CsvQuote::Never => false,
         CsvQuote::IfNeeded => {
-            text.contains(options.delimiter_text())
+            options.cell_needs_quotes_for_delimiter(text)
                 || text.contains(['"', '\n', '\r', '\t'])
                 || had_line_breaks
                 || decimal_delimiter_conflict
@@ -480,7 +498,7 @@ fn escape_csv_field(value: &str, options: &CsvOptions, had_line_breaks: bool) ->
         CsvQuote::Always => quote_field(&value),
         CsvQuote::Never => value,
         CsvQuote::IfNeeded => {
-            if value.contains(options.delimiter_text())
+            if options.cell_needs_quotes_for_delimiter(&value)
                 || value.contains(['"', '\n', '\r', '\t'])
                 || had_line_breaks
                 || neutralized

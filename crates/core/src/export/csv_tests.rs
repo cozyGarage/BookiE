@@ -714,3 +714,85 @@ fn the_single_byte_delimiters_still_ignore_an_unset_custom_delimiter() {
         assert_eq!(csv, format!("a{0}b\n1{0}2\n", delimiter.as_str()));
     }
 }
+
+#[test]
+fn a_cell_ending_with_part_of_the_delimiter_is_quoted_and_survives() {
+    let columns = [column("a"), column("b")];
+    for (delimiter, first, second) in [
+        ("||", "a|", "b"),
+        ("::", ":", ""),
+        ("abc", "xab", "y"),
+        ("abc", "xa", ""),
+    ] {
+        let rows = vec![vec![Value::Text(first.into()), Value::Text(second.into())]];
+        let csv = render_csv(&columns, &rows, &custom_options(delimiter));
+        let options = crate::import::CsvImportOptions {
+            custom_delimiter: Some(CustomDelimiter::new(delimiter).unwrap()),
+            ..Default::default()
+        };
+        let sheet = crate::import::read_csv(csv.as_bytes(), &options, None).unwrap();
+        assert_eq!(sheet.rows, [[first, second]], "{delimiter:?} {first:?}");
+    }
+}
+
+#[test]
+fn every_short_cell_pair_round_trips_through_each_delimiter() {
+    let alphabet = ['|', ':', '"', '\n', 'a'];
+    let mut cells = vec![String::new()];
+    for length in 1..=2 {
+        let mut next = Vec::new();
+        for cell in cells.iter().filter(|cell| cell.chars().count() == length - 1) {
+            for letter in alphabet {
+                next.push(format!("{cell}{letter}"));
+            }
+        }
+        cells.extend(next);
+    }
+    let columns = [column("a"), column("b")];
+    for delimiter in ["||", "::", "|:", "aa"] {
+        let options = crate::import::CsvImportOptions {
+            custom_delimiter: Some(CustomDelimiter::new(delimiter).unwrap()),
+            ..Default::default()
+        };
+        for first in &cells {
+            for second in &cells {
+                let rows = vec![vec![Value::Text(first.clone()), Value::Text(second.clone())]];
+                let csv = render_csv(&columns, &rows, &custom_options(delimiter));
+                let sheet = crate::import::read_csv(csv.as_bytes(), &options, None).unwrap();
+                assert_eq!(
+                    sheet.rows,
+                    [[first.clone(), second.clone()]],
+                    "{delimiter:?} {first:?} {second:?}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn a_delimiter_read_from_settings_is_checked_like_one_made_in_code() {
+    use serde::de::IntoDeserializer;
+    use serde::de::value::{Error, StrDeserializer};
+    let read = |text: &'static str| {
+        let deserializer: StrDeserializer<'_, Error> = text.into_deserializer();
+        <CustomDelimiter as serde::Deserialize>::deserialize(deserializer)
+    };
+    assert!(read("").is_err());
+    assert!(read("a\nb").is_err());
+    assert!(read("\"|").is_err());
+    assert_eq!(read("||").unwrap().as_str(), "||");
+}
+
+#[test]
+fn column_names_ending_with_part_of_the_delimiter_survive_in_the_header() {
+    let columns = [column("a|"), column("b")];
+    let rows = vec![vec![Value::Int(1), Value::Int(2)]];
+    let csv = render_csv(&columns, &rows, &custom_options("||"));
+    let options = crate::import::CsvImportOptions {
+        custom_delimiter: Some(CustomDelimiter::new("||").unwrap()),
+        ..Default::default()
+    };
+    let sheet = crate::import::read_csv(csv.as_bytes(), &options, None).unwrap();
+    assert_eq!(sheet.headers, ["a|", "b"]);
+    assert_eq!(sheet.rows, [["1", "2"]]);
+}
