@@ -693,6 +693,41 @@ impl App {
         }
     }
 
+    fn activate_remembering_dial(
+        &mut self,
+        prepared: bookie_app_services::connection_service::PreparedConnection,
+    ) -> Option<bookie_app_services::connection_service::ActivatedConnection> {
+        let dial = prepared.dial_identity().cloned();
+        let activated = prepared.activate(&self.database)?;
+        if let Some(dial) = dial {
+            self.multi.dial.insert(activated.id, dial);
+        }
+        Some(activated)
+    }
+
+    fn focus_saved_session(
+        &mut self,
+        target_id: Uuid,
+        prepared: &bookie_app_services::connection_service::PreparedConnection,
+        sender: ComponentSender<Self>,
+    ) {
+        let notice = self.live_session_notice(target_id, prepared);
+        self.focus_working_session(target_id, sender);
+        if let Some(notice) = notice {
+            self.show_toast(&notice);
+        }
+    }
+
+    fn live_session_notice(
+        &self,
+        target_id: Uuid,
+        prepared: &bookie_app_services::connection_service::PreparedConnection,
+    ) -> Option<String> {
+        let live = self.multi.dial.get(&target_id)?;
+        let next = prepared.dial_identity()?;
+        bookie_app_services::dial_identity::reconnect_notice(&live.changed_settings(next))
+    }
+
     pub(super) fn finish_activate_prepared_connection(&mut self, sender: ComponentSender<Self>) {
         let Some(prepared) = self.switch.prepared.take() else {
             return;
@@ -707,7 +742,7 @@ impl App {
             self.switch.transition = ConnectionTransition::Idle;
             self.switch.saves_pending.clear();
             self.switch.cancel_audit_was_disabled = None;
-            self.focus_working_session(target_id, sender);
+            self.focus_saved_session(target_id, &prepared, sender);
             return;
         }
         if self.connection_id != Some(target_id) && self.database.is_active(target_id) {
@@ -731,7 +766,7 @@ impl App {
                 self.release_connection_resources(previous);
             }
         }
-        let Some(activated) = prepared.activate(&self.database) else {
+        let Some(activated) = self.activate_remembering_dial(prepared) else {
             self.switch.transition = ConnectionTransition::Idle;
             self.switch.saves_pending.clear();
             self.switch.cancel_audit_was_disabled = None;
