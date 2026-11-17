@@ -183,6 +183,34 @@ impl ResultWriter for JsonWriter {
     }
 }
 
+pub(crate) struct JsonLinesWriter {
+    names: Vec<String>,
+}
+
+impl JsonLinesWriter {
+    pub(crate) fn new() -> Self {
+        Self { names: Vec::new() }
+    }
+}
+
+impl ResultWriter for JsonLinesWriter {
+    fn begin(&mut self, _output: &mut dyn Write, columns: &[ColumnInfo]) -> Result<(), ExportError> {
+        self.names = json_field_names(columns);
+        Ok(())
+    }
+
+    fn write_row(&mut self, output: &mut dyn Write, _index: usize, row: &[Value]) -> Result<(), ExportError> {
+        let object = raw_json_object(&self.names, row).map_err(io::Error::from)?;
+        serde_json::to_writer(&mut *output, &object).map_err(io::Error::from)?;
+        output.write_all(b"\n")?;
+        Ok(())
+    }
+
+    fn finish(&mut self, _output: &mut dyn Write) -> Result<(), ExportError> {
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 #[path = "json_tests.rs"]
 mod tests;
