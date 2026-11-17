@@ -99,6 +99,10 @@ impl DatabaseDriver for MssqlDriver {
         true
     }
 
+    fn supports_updatable_views(&self) -> bool {
+        true
+    }
+
     fn supports_index_metadata(&self) -> bool {
         true
     }
