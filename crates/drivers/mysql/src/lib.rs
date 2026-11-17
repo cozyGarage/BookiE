@@ -22,7 +22,7 @@ mod session;
 mod text_protocol;
 mod transaction;
 mod warnings;
-pub(crate) use text_protocol::{is_call_statement, text_protocol};
+pub(crate) use text_protocol::{contains_use_statement, is_call_statement, text_protocol};
 use text_protocol::{mysql_row_payload_bytes, statement_columns};
 mod temporal;
 mod view_editability;
@@ -764,8 +764,18 @@ async fn restore_database(connection: &mut sqlx::MySqlConnection, database: &str
     }
     let statement = format!("USE `{}`", database.replace('`', "``"));
     sqlx::raw_sql(sqlx::AssertSqlSafe(statement))
-        .execute(connection)
+        .execute(&mut *connection)
         .await?;
+    connection.clear_cached_statements().await
+}
+
+pub(crate) async fn forget_statements_after_use(
+    connection: &mut sqlx::MySqlConnection,
+    sql: &str,
+) -> Result<(), sqlx::Error> {
+    if contains_use_statement(sql) {
+        connection.clear_cached_statements().await?;
+    }
     Ok(())
 }
 
@@ -873,6 +883,10 @@ async fn params_into_result(
         }
         rows.push_row(&mut decoded);
     }
+    drop(stream);
+    forget_statements_after_use(&mut *connection, sql)
+        .await
+        .map_err(map_sqlx_error)?;
     Ok(QueryResult {
         columns,
         rows,

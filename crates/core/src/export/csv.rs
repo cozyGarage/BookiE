@@ -29,6 +29,54 @@ impl CsvDelimiter {
     }
 }
 
+pub const MAX_CUSTOM_DELIMITER_CHARS: usize = 8;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(try_from = "String")]
+pub struct CustomDelimiter(String);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum CustomDelimiterError {
+    #[error("the delimiter is empty")]
+    Empty,
+    #[error("the delimiter is longer than {MAX_CUSTOM_DELIMITER_CHARS} characters")]
+    TooLong,
+    #[error("the delimiter cannot contain a line break")]
+    LineBreak,
+    #[error("the delimiter cannot contain a quote character")]
+    Quote,
+}
+
+impl CustomDelimiter {
+    pub fn new(text: &str) -> Result<Self, CustomDelimiterError> {
+        if text.is_empty() {
+            return Err(CustomDelimiterError::Empty);
+        }
+        if text.chars().count() > MAX_CUSTOM_DELIMITER_CHARS {
+            return Err(CustomDelimiterError::TooLong);
+        }
+        if text.contains(['\n', '\r']) {
+            return Err(CustomDelimiterError::LineBreak);
+        }
+        if text.contains(['"', '\'']) {
+            return Err(CustomDelimiterError::Quote);
+        }
+        Ok(Self(text.to_string()))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl TryFrom<String> for CustomDelimiter {
+    type Error = CustomDelimiterError;
+
+    fn try_from(text: String) -> Result<Self, Self::Error> {
+        Self::new(&text)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CsvQuote {
     Always,
@@ -82,6 +130,7 @@ pub struct CsvOptions {
     /// metadata is unavailable. Enable only for SQLite result exports.
     pub preserve_sqlite_result_types: bool,
     pub delimiter: CsvDelimiter,
+    pub custom_delimiter: Option<CustomDelimiter>,
     pub quote: CsvQuote,
     pub line_break: CsvLineBreak,
     pub decimal: CsvDecimal,
@@ -98,10 +147,28 @@ impl Default for CsvOptions {
             spare_plain_numbers: false,
             preserve_sqlite_result_types: false,
             delimiter: CsvDelimiter::Comma,
+            custom_delimiter: None,
             quote: CsvQuote::IfNeeded,
             line_break: CsvLineBreak::Lf,
             decimal: CsvDecimal::Period,
         }
+    }
+}
+
+impl CsvOptions {
+    fn cell_needs_quotes_for_delimiter(&self, text: &str) -> bool {
+        let delimiter = self.delimiter_text();
+        text.contains(delimiter)
+            || delimiter
+                .char_indices()
+                .skip(1)
+                .any(|(end, _)| text.ends_with(&delimiter[..end]))
+    }
+
+    pub fn delimiter_text(&self) -> &str {
+        self.custom_delimiter
+            .as_ref()
+            .map_or(self.delimiter.as_str(), CustomDelimiter::as_str)
     }
 }
 
@@ -138,7 +205,7 @@ pub(crate) fn csv_header_line(columns: &[ColumnInfo], options: &CsvOptions) -> S
         .iter()
         .map(|column| escape_csv_field(&column.name, options, false))
         .collect::<Vec<_>>()
-        .join(options.delimiter.as_str())
+        .join(options.delimiter_text())
 }
 
 fn csv_row_line_for_columns(row: &[Value], columns: &[ColumnInfo], options: &CsvOptions) -> String {
@@ -164,7 +231,7 @@ fn csv_row_line_with_any_columns(row: &[Value], any_columns: &[bool], options: &
             format_csv_cell(value, options)
         })
         .collect::<Vec<_>>()
-        .join(options.delimiter.as_str())
+        .join(options.delimiter_text())
 }
 
 pub fn render_tsv<R: QueryRowSet + ?Sized>(columns: &[ColumnInfo], rows: &R, with_headers: bool) -> String {
@@ -257,7 +324,7 @@ fn write_csv_row_inner<W: Write + ?Sized>(
 ) -> io::Result<()> {
     for (index, value) in row.iter().enumerate() {
         if index > 0 {
-            writer.write_all(options.delimiter.as_str().as_bytes())?;
+            writer.write_all(options.delimiter_text().as_bytes())?;
         }
         if let Some(encoded) = encode_any(index, value) {
             write_csv_text_field(writer, &encoded, options, true, true)?;
@@ -301,12 +368,12 @@ fn write_csv_text_field<W: Write + ?Sized>(
         && !(transform_value && options.line_break_to_space && text.starts_with('\r'))
         && !(options.spare_plain_numbers && !replace_decimal && is_plain_number(text));
     let had_line_breaks = transform_value && text.contains(['\n', '\r']);
-    let decimal_delimiter_conflict = replace_decimal && options.delimiter == CsvDelimiter::Comma;
+    let decimal_delimiter_conflict = replace_decimal && options.delimiter_text().contains(',');
     let quote = match options.quote {
         CsvQuote::Always => true,
         CsvQuote::Never => false,
         CsvQuote::IfNeeded => {
-            text.contains(options.delimiter.as_str())
+            options.cell_needs_quotes_for_delimiter(text)
                 || text.contains(['"', '\n', '\r', '\t'])
                 || had_line_breaks
                 || decimal_delimiter_conflict
@@ -431,7 +498,7 @@ fn escape_csv_field(value: &str, options: &CsvOptions, had_line_breaks: bool) ->
         CsvQuote::Always => quote_field(&value),
         CsvQuote::Never => value,
         CsvQuote::IfNeeded => {
-            if value.contains(options.delimiter.as_str())
+            if options.cell_needs_quotes_for_delimiter(&value)
                 || value.contains(['"', '\n', '\r', '\t'])
                 || had_line_breaks
                 || neutralized

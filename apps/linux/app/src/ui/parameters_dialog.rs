@@ -13,6 +13,7 @@ const RUN_RESPONSE: &str = "run";
 const CANCEL_RESPONSE: &str = "cancel";
 
 type ValueSink = Rc<dyn Fn(HashMap<String, Value>)>;
+type ParameterRow = (String, adw::EntryRow, gtk::DropDown);
 
 pub(crate) fn error_message(error: QueryParameterError) -> String {
     match error {
@@ -31,24 +32,14 @@ where
     present_form(&window, names.to_vec(), Rc::new(on_values), None);
 }
 
-fn present_form(window: &gtk::Window, names: Vec<String>, on_values: ValueSink, error: Option<String>) {
-    let dialog = adw::AlertDialog::new(
-        Some(&tr!("Query parameters")),
-        Some(&tr!("Values are bound by the driver, never pasted into the statement.")),
-    );
-    dialog.add_response(CANCEL_RESPONSE, &tr!("Cancel"));
-    dialog.add_response(RUN_RESPONSE, &tr!("Run with values"));
-    dialog.set_response_appearance(RUN_RESPONSE, adw::ResponseAppearance::Suggested);
-    dialog.set_default_response(Some(RUN_RESPONSE));
-    dialog.set_close_response(CANCEL_RESPONSE);
-
+fn build_parameter_rows(names: &[String]) -> (gtk::ListBox, Vec<ParameterRow>) {
     let kind_labels: Vec<&str> = ParameterKind::ALL.iter().map(|kind| kind.label()).collect();
     let list = gtk::ListBox::builder()
         .selection_mode(gtk::SelectionMode::None)
         .css_classes(["boxed-list"])
         .build();
     let mut rows = Vec::with_capacity(names.len());
-    for name in &names {
+    for name in names {
         let entry = adw::EntryRow::builder()
             .use_markup(false)
             .title(format!(":{name}"))
@@ -60,24 +51,16 @@ fn present_form(window: &gtk::Window, names: Vec<String>, on_values: ValueSink, 
         list.append(&entry);
         rows.push((name.clone(), entry, kinds));
     }
+    (list, rows)
+}
 
-    let content = gtk::Box::builder()
-        .orientation(gtk::Orientation::Vertical)
-        .spacing(12)
-        .build();
-    content.append(&list);
-    if let Some(reason) = &error {
-        let label = gtk::Label::builder()
-            .label(reason)
-            .wrap(true)
-            .xalign(0.0)
-            .css_classes(["error"])
-            .build();
-        content.append(&label);
-    }
-    dialog.set_extra_child(Some(&content));
-
-    let first_entry = rows.first().map(|(_, entry, _)| entry.clone());
+fn connect_form_response(
+    dialog: &adw::AlertDialog,
+    window: &gtk::Window,
+    names: Vec<String>,
+    rows: Vec<ParameterRow>,
+    on_values: ValueSink,
+) {
     let window_for_retry = window.clone();
     dialog.connect_response(None, move |_, response| {
         if response != RUN_RESPONSE {
@@ -103,6 +86,38 @@ fn present_form(window: &gtk::Window, names: Vec<String>, on_values: ValueSink, 
             ),
         }
     });
+}
+
+fn present_form(window: &gtk::Window, names: Vec<String>, on_values: ValueSink, error: Option<String>) {
+    let dialog = adw::AlertDialog::new(
+        Some(&tr!("Query parameters")),
+        Some(&tr!("Values are bound by the driver, never pasted into the statement.")),
+    );
+    dialog.add_response(CANCEL_RESPONSE, &tr!("Cancel"));
+    dialog.add_response(RUN_RESPONSE, &tr!("Run with values"));
+    dialog.set_response_appearance(RUN_RESPONSE, adw::ResponseAppearance::Suggested);
+    dialog.set_default_response(Some(RUN_RESPONSE));
+    dialog.set_close_response(CANCEL_RESPONSE);
+
+    let (list, rows) = build_parameter_rows(&names);
+    let content = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(12)
+        .build();
+    content.append(&list);
+    if let Some(reason) = &error {
+        let label = gtk::Label::builder()
+            .label(reason)
+            .wrap(true)
+            .xalign(0.0)
+            .css_classes(["error"])
+            .build();
+        content.append(&label);
+    }
+    dialog.set_extra_child(Some(&content));
+
+    let first_entry = rows.first().map(|(_, entry, _)| entry.clone());
+    connect_form_response(&dialog, window, names, rows, on_values);
 
     dialog.present(Some(window));
     if let Some(entry) = first_entry {

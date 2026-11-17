@@ -216,3 +216,23 @@ fn the_driver_declares_how_an_import_updates_existing_rows() {
 fn the_driver_declares_value_search() {
     assert!(MysqlDriver.capabilities().supports_value_search);
 }
+
+#[test]
+fn use_statements_are_recognized_alone_and_inside_batches() {
+    for sql in [
+        "USE other_db",
+        "use `other_db`",
+        "  USE other_db;",
+        "SELECT 1; USE other_db",
+    ] {
+        assert!(contains_use_statement(sql), "{sql}");
+    }
+    for sql in [
+        "SELECT 1",
+        "SELECT 'use x'",
+        "CALL use_it()",
+        "INSERT INTO used VALUES (1)",
+    ] {
+        assert!(!contains_use_statement(sql), "{sql}");
+    }
+}

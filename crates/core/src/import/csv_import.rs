@@ -5,7 +5,7 @@ use std::path::Path;
 
 use thiserror::Error;
 
-use crate::export::CsvDelimiter;
+use crate::export::{CsvDelimiter, CustomDelimiter};
 use crate::query::ColumnInfo;
 
 /// Largest file the import will read into memory. A delimited file is
@@ -49,6 +49,9 @@ pub enum ImportError {
 
     #[error("line {line} could not be read as delimited text")]
     Malformed { line: u64 },
+
+    #[error("every character the reader could use to stand in for the delimiter already appears in the file")]
+    NoFreeSeparator,
 
     #[error("the file has no columns in it")]
     NoColumns,
@@ -106,6 +109,7 @@ impl CsvImportEncoding {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CsvImportOptions {
     pub delimiter: CsvDelimiter,
+    pub custom_delimiter: Option<CustomDelimiter>,
     pub quote: CsvImportQuote,
     pub backslash_escape: bool,
     pub encoding: CsvImportEncoding,
@@ -120,6 +124,7 @@ impl Default for CsvImportOptions {
     fn default() -> Self {
         Self {
             delimiter: CsvDelimiter::Comma,
+            custom_delimiter: None,
             quote: CsvImportQuote::default(),
             backslash_escape: false,
             encoding: CsvImportEncoding::default(),
@@ -202,7 +207,14 @@ fn check_file_size(size: u64) -> Result<(), ImportError> {
 pub fn read_csv(bytes: &[u8], options: &CsvImportOptions, limit: Option<usize>) -> Result<CsvSheet, ImportError> {
     check_file_size(bytes.len() as u64)?;
     let decoded = decode_text(bytes, options.encoding)?;
-    let mut reader = reader_for(decoded.as_bytes(), options);
+    let (decoded, delimiter) = match &options.custom_delimiter {
+        Some(custom) => {
+            let (text, separator) = with_single_byte_delimiter(&decoded, custom.as_str(), options)?;
+            (std::borrow::Cow::Owned(text), separator)
+        }
+        None => (decoded, delimiter_byte(options.delimiter)),
+    };
+    let mut reader = reader_for(decoded.as_bytes(), options, delimiter);
     let headers = match options.has_header {
         true => record_strings(reader.headers().map_err(malformed)?, 1)?,
         false => Vec::new(),
@@ -231,10 +243,10 @@ fn decode_text(bytes: &[u8], encoding: CsvImportEncoding) -> Result<std::borrow:
         .ok_or(ImportError::NotDecodable { encoding: codec.name() })
 }
 
-fn reader_for<'a>(bytes: &'a [u8], options: &CsvImportOptions) -> csv::Reader<&'a [u8]> {
+fn reader_for<'a>(bytes: &'a [u8], options: &CsvImportOptions, delimiter: u8) -> csv::Reader<&'a [u8]> {
     let mut builder = csv::ReaderBuilder::new();
     builder
-        .delimiter(delimiter_byte(options.delimiter))
+        .delimiter(delimiter)
         .has_headers(options.has_header)
         .flexible(true);
     match options.quote {
@@ -487,6 +499,70 @@ pub fn suggest_mapping(headers: &[String], columns: &[ColumnInfo]) -> Vec<Option
     }
 
     mapping
+}
+
+const SEPARATOR_CANDIDATES: [u8; 28] = [
+    0x1F, 0x1E, 0x1D, 0x1C, 0x1B, 0x1A, 0x19, 0x18, 0x17, 0x16, 0x15, 0x14, 0x13, 0x12, 0x11, 0x10, 0x0F, 0x0E, 0x0C,
+    0x0B, 0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01,
+];
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum FieldState {
+    Start,
+    Unquoted,
+    Quoted,
+}
+
+fn with_single_byte_delimiter(
+    text: &str,
+    delimiter: &str,
+    options: &CsvImportOptions,
+) -> Result<(String, u8), ImportError> {
+    let separator = SEPARATOR_CANDIDATES
+        .into_iter()
+        .find(|candidate| !text.as_bytes().contains(candidate))
+        .ok_or(ImportError::NoFreeSeparator)?;
+    let quote = match options.quote {
+        CsvImportQuote::Double => Some('"'),
+        CsvImportQuote::Single => Some('\''),
+        CsvImportQuote::None => None,
+    };
+    let mut output = String::with_capacity(text.len());
+    let mut state = FieldState::Start;
+    let mut rest = text;
+    while let Some(next) = rest.chars().next() {
+        if state != FieldState::Quoted && rest.starts_with(delimiter) {
+            output.push(char::from(separator));
+            rest = &rest[delimiter.len()..];
+            state = FieldState::Start;
+            continue;
+        }
+        output.push(next);
+        rest = &rest[next.len_utf8()..];
+        state = match (state, next) {
+            (_, '\n' | '\r') if state != FieldState::Quoted => FieldState::Start,
+            (FieldState::Start, c) if Some(c) == quote => FieldState::Quoted,
+            (FieldState::Start, _) => FieldState::Unquoted,
+            (FieldState::Quoted, '\\') if options.backslash_escape => {
+                if let Some(escaped) = rest.chars().next() {
+                    output.push(escaped);
+                    rest = &rest[escaped.len_utf8()..];
+                }
+                FieldState::Quoted
+            }
+            (FieldState::Quoted, c) if Some(c) == quote => {
+                if rest.starts_with(c) {
+                    output.push(c);
+                    rest = &rest[c.len_utf8()..];
+                    FieldState::Quoted
+                } else {
+                    FieldState::Unquoted
+                }
+            }
+            (current, _) => current,
+        };
+    }
+    Ok((output, separator))
 }
 
 fn delimiter_byte(delimiter: CsvDelimiter) -> u8 {

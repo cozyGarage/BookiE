@@ -672,7 +672,12 @@ fn streamed_result_pages(
         Default::default(),
         None,
     );
-    widget.last_child().unwrap().downcast().unwrap()
+    widget
+        .last_child()
+        .and_then(|footer| footer.prev_sibling())
+        .unwrap()
+        .downcast()
+        .unwrap()
 }
 
 fn streamed_page_title(pages: &gtk::Stack, index: u32) -> String {

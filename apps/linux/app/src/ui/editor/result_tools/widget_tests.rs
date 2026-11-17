@@ -292,8 +292,9 @@ fn header_window(width: i32) -> (gtk::Window, relm4::adw::WrapBox, gtk::Box) {
     let progress = gtk::Label::new(Some(
         "Complete · Received 1,000,000 rows · 200 pages\nEarlier pages can be loaded from temporary storage.",
     ));
-    let header = crate::ui::editor::stream_view::build_header(&progress);
-    header.append(&crate::ui::editor::stream_view::build_pager(&pages));
+    let header = crate::ui::editor::stream_view::build_header();
+    let pager = crate::ui::editor::stream_view::build_pager(&pages);
+    let footer = crate::ui::editor::stream_view::build_footer(&progress, &pager);
     let holder = gtk::Box::new(gtk::Orientation::Vertical, 0);
     holder.append(&header);
     let (sender, _receiver) = relm4::channel();
@@ -310,6 +311,7 @@ fn header_window(width: i32) -> (gtk::Window, relm4::adw::WrapBox, gtk::Box) {
     let grid = gtk::Box::new(gtk::Orientation::Vertical, 0);
     grid.set_vexpand(true);
     holder.append(&grid);
+    holder.append(&footer);
     let window = gtk::Window::builder()
         .default_width(width)
         .default_height(500)
@@ -346,7 +348,7 @@ fn overlaps(a: &gtk::graphene::Rect, b: &gtk::graphene::Rect) -> bool {
 fn assert_header_layout(width: i32) {
     let (window, header, grid) = header_window(width);
     let bounds = child_bounds(&header);
-    assert!(bounds.len() >= 6, "{bounds:?}");
+    assert!(bounds.len() >= 4, "{bounds:?}");
     for (index, (name, rect)) in bounds.iter().enumerate() {
         assert!(rect.x() >= -0.5, "{name} starts left of the header");
         assert!(

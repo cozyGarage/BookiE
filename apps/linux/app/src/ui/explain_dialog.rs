@@ -6,13 +6,12 @@ use crate::services::database_service::DatabaseService;
 use crate::services::preferences::PreferencesStore;
 use bookie_app_services::tr;
 
-pub fn present(
+fn resolve_explain_sql(
     parent: &impl IsA<gtk::Window>,
-    connection_id: Option<uuid::Uuid>,
     sql: &str,
+    connection_id: Option<uuid::Uuid>,
     database: &DatabaseService,
-    preferences: &PreferencesStore,
-) {
+) -> Option<String> {
     let trimmed = sql.trim();
     if trimmed.is_empty() {
         let toast_parent = parent.clone().upcast::<gtk::Window>();
@@ -23,25 +22,19 @@ pub fn present(
         dialog.add_response("close", &tr!("Close"));
         dialog.set_close_response("close");
         dialog.present(Some(&toast_parent));
-        return;
+        return None;
     }
-
-    let Some(connection_id) = connection_id else {
-        return;
-    };
-    let Some(conn) = database.get(connection_id) else {
-        return;
-    };
-
+    let connection_id = connection_id?;
+    database.get(connection_id)?;
     let driver_id = database
         .metadata(connection_id)
         .map(|metadata| metadata.driver_id)
         .unwrap_or_default();
-    let explain_sql = if trimmed.to_ascii_uppercase().starts_with("EXPLAIN") {
-        trimmed.to_string()
+    if trimmed.to_ascii_uppercase().starts_with("EXPLAIN") {
+        Some(trimmed.to_string())
     } else {
         match bookie_core::sql_dialect::explain_statement(&driver_id, trimmed) {
-            Some(statement) => statement,
+            Some(statement) => Some(statement),
             None => {
                 let toast_parent = parent.clone().upcast::<gtk::Window>();
                 let dialog = adw::AlertDialog::new(
@@ -51,11 +44,21 @@ pub fn present(
                 dialog.add_response("close", &tr!("Close"));
                 dialog.set_close_response("close");
                 dialog.present(Some(&toast_parent));
-                return;
+                None
             }
         }
-    };
+    }
+}
 
+fn build_explain_window(
+    parent: &impl IsA<gtk::Window>,
+) -> (
+    adw::Window,
+    adw::ViewStack,
+    adw::ViewStackPage,
+    gtk::ScrolledWindow,
+    gtk::TextView,
+) {
     let window = adw::Window::builder()
         .title(tr!("Explain plan"))
         .transient_for(parent)
@@ -102,6 +105,26 @@ pub fn present(
         glib::Propagation::Proceed
     });
     window.add_controller(escape);
+    (window, stack, tree_page, tree_scrolled, view)
+}
+
+pub fn present(
+    parent: &impl IsA<gtk::Window>,
+    connection_id: Option<uuid::Uuid>,
+    sql: &str,
+    database: &DatabaseService,
+    preferences: &PreferencesStore,
+) {
+    let Some(explain_sql) = resolve_explain_sql(parent, sql, connection_id, database) else {
+        return;
+    };
+    let Some(connection_id) = connection_id else {
+        return;
+    };
+    let Some(conn) = database.get(connection_id) else {
+        return;
+    };
+    let (window, stack, tree_page, tree_scrolled, view) = build_explain_window(parent);
     let cancel = cancelled_on_close(&window);
     window.present();
 

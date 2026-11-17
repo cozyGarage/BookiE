@@ -37,6 +37,31 @@ fn result_model_maps_global_positions_without_allocating_rows() {
 }
 
 #[test]
+fn rows_on_later_pages_report_their_global_display_index() {
+    let model = PagedModel::new(&[2, 2], 1);
+    let page = |value| {
+        std::sync::Arc::new(bookie_core::QueryResult {
+            columns: Vec::new(),
+            rows: vec![
+                vec![bookie_core::Value::Int(value)],
+                vec![bookie_core::Value::Int(value + 1)],
+            ]
+            .into(),
+            truncated: false,
+        })
+    };
+    model.show(0, 4);
+    assert_eq!(model.next_request(), Some(0));
+    assert!(model.install(0, page(10)));
+    assert_eq!(model.next_request(), Some(1));
+    assert!(model.install(1, page(20)));
+    for position in 0..4_u32 {
+        let row = model.item(position).unwrap().downcast::<RowObject>().unwrap();
+        assert_eq!(row.display_index(), Some(position as usize));
+    }
+}
+
+#[test]
 fn result_model_reads_loaded_pages_and_refuses_wrong_page_lengths() {
     let model = PagedModel::new(&[2, 1], 1);
     let page = std::sync::Arc::new(bookie_core::QueryResult {

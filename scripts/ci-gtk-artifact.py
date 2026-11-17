@@ -92,9 +92,8 @@ def create(binary, output, expected_sha, *, package=False, profile="ci"):
     schemas = output / "schemas"
     if schemas.exists() or schemas.is_symlink():
         schema_files = list(schemas.iterdir()) if schemas.is_dir() and not schemas.is_symlink() else []
-        if (schemas.is_symlink() or not schemas.is_dir() or len(schema_files) != 1
-                or schema_files[0].name != "gschemas.compiled" or schema_files[0].is_symlink()
-                or not schema_files[0].is_file()):
+        if (schemas.is_symlink() or not schemas.is_dir() or len(schema_files) > 1
+                or any(f.name != "gschemas.compiled" or f.is_symlink() or not f.is_file() for f in schema_files)):
             raise ValueError("Build artifact output contains an unexpected schema directory")
         if package:
             shutil.rmtree(schemas)

@@ -407,6 +407,7 @@ impl FileOptions {
     fn options(&self) -> CsvImportOptions {
         CsvImportOptions {
             delimiter: selected_delimiter(self.delimiter.selected()),
+            custom_delimiter: None,
             quote: CsvImportQuote::ALL
                 .get(self.quote.selected() as usize)
                 .copied()

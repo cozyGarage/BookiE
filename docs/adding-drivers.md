@@ -10,7 +10,8 @@ flowchart LR
     B --> C["Implement Connection & Session"]
     C --> D["Wrap in PolicyGuard"]
     D --> E["Register in Composition Roots"]
-    E --> F["bookie-app (GUI)"]
+    E --> F["bookie-app (GTK GUI)"]
+    E --> H["bookie-gpui (GPUI Frontend)"]
     E --> G["bookie-agentd (MCP)"]
 ```
 

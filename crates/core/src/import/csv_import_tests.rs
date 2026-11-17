@@ -1,4 +1,5 @@
 use super::*;
+use crate::export::CustomDelimiterError;
 use std::io::Write;
 
 fn options() -> CsvImportOptions {
@@ -408,4 +409,91 @@ fn a_single_column_export_keeps_its_null_and_empty_rows_through_import() {
     assert_eq!(windows.rows, vec![vec![""], vec!["a"], vec![""]]);
     let preview = read_csv(b"note\n\n\na\n", &options(), Some(2)).unwrap();
     assert_eq!((preview.rows.len(), preview.truncated), (2, true));
+}
+
+fn custom(text: &str) -> CsvImportOptions {
+    CsvImportOptions {
+        custom_delimiter: Some(CustomDelimiter::new(text).unwrap()),
+        ..options()
+    }
+}
+
+fn read_custom(text: &str, delimiter: &str) -> CsvSheet {
+    read_csv(text.as_bytes(), &custom(delimiter), None).unwrap()
+}
+
+#[test]
+fn a_multi_character_delimiter_gives_the_same_cells_as_a_hand_split_file() {
+    let sheet = read_custom("id||name||note\n1||Ada||first\n2||Linus||second\n", "||");
+    assert_eq!(sheet.headers, ["id", "name", "note"]);
+    assert_eq!(sheet.rows, [["1", "Ada", "first"], ["2", "Linus", "second"]]);
+}
+
+#[test]
+fn a_quoted_field_keeps_the_delimiter_it_contains() {
+    let sheet = read_custom("a::b\n\"x::y\"::z\n", "::");
+    assert_eq!(sheet.rows, [["x::y", "z"]]);
+}
+
+#[test]
+fn doubled_quotes_do_not_end_a_quoted_field_early() {
+    let sheet = read_custom("a||b\n\"say \"\"hi||there\"\"\"||z\n", "||");
+    assert_eq!(sheet.rows, [["say \"hi||there\"", "z"]]);
+}
+
+#[test]
+fn a_line_break_inside_a_quoted_field_stays_in_the_field() {
+    let sheet = read_custom("a||b\n\"one\ntwo||three\"||z\n", "||");
+    assert_eq!(sheet.rows, [["one\ntwo||three", "z"]]);
+}
+
+#[test]
+fn a_backslash_escaped_quote_does_not_end_the_field_when_escapes_are_on() {
+    let options = CsvImportOptions {
+        backslash_escape: true,
+        ..custom("||")
+    };
+    let sheet = read_csv(b"a||b\n\"q\\\"||r\"||z\n", &options, None).unwrap();
+    assert_eq!(sheet.rows, [["q\"||r", "z"]]);
+}
+
+#[test]
+fn a_non_ascii_delimiter_works() {
+    let sheet = read_custom("a→→b\n1→→2\n", "→→");
+    assert_eq!(sheet.headers, ["a", "b"]);
+    assert_eq!(sheet.rows, [["1", "2"]]);
+}
+
+#[test]
+fn the_reader_picks_a_stand_in_byte_the_file_does_not_contain() {
+    let sheet = read_custom("a||b\n1\u{1f}x||2\n", "||");
+    assert_eq!(sheet.rows, [["1\u{1f}x", "2"]]);
+}
+
+#[test]
+fn a_file_using_every_stand_in_byte_is_refused() {
+    let every: String = SEPARATOR_CANDIDATES.iter().map(|byte| char::from(*byte)).collect();
+    let text = format!("a||b\n{every}||2\n");
+    assert!(matches!(
+        read_csv(text.as_bytes(), &custom("||"), None),
+        Err(ImportError::NoFreeSeparator)
+    ));
+}
+
+#[test]
+fn delimiters_that_break_quoting_or_length_are_refused() {
+    assert_eq!(CustomDelimiter::new(""), Err(CustomDelimiterError::Empty));
+    assert_eq!(CustomDelimiter::new("123456789"), Err(CustomDelimiterError::TooLong));
+    assert_eq!(CustomDelimiter::new("|\n"), Err(CustomDelimiterError::LineBreak));
+    assert_eq!(CustomDelimiter::new("|\""), Err(CustomDelimiterError::Quote));
+    assert_eq!(CustomDelimiter::new("'|"), Err(CustomDelimiterError::Quote));
+    assert!(CustomDelimiter::new("12345678").is_ok());
+}
+
+#[test]
+fn a_single_byte_file_reads_the_same_with_and_without_the_custom_path() {
+    let text = "a,b\n1,\"x,y\"\n";
+    let plain = read_csv(text.as_bytes(), &options(), None).unwrap();
+    let through_custom = read_custom(text, ",");
+    assert_eq!(plain, through_custom);
 }

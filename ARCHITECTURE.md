@@ -49,7 +49,8 @@ This page is the one-page map. Accepted [ADRs](docs/decisions/README.md) constra
 
 | Mode | Process | Notes |
 |---|---|---|
-| Desktop | `bookie` (`bookie-app`) | GTK on the GLib main context; DB work on Tokio via Relm4 commands |
+| Desktop (Linux flagship) | `bookie` (`bookie-app`) | GTK on the GLib main context; DB work on Tokio via Relm4 commands |
+| Desktop (Cross-platform) | `bookie-gpui` (`apps/gpui`) | High-performance GPUI frontend on Linux and macOS ([ADR 0052](docs/decisions/0052-gpui-is-the-cross-platform-frontend.md)) |
 | Headless MCP | `bookie-agentd` (`bookie-agentd`) | Same static drivers and `PolicyGuard` path; no GTK |
 | Development profile | Either binary with `BOOKIE_PROFILE=development` | Uses `bookie-devel` XDG paths and a separate keyring schema |
 | Validation | Scripts under `scripts/` | Local checks and required CI checks ([playbook](docs/validation-playbook.md#ci-tiers)) |
@@ -58,25 +59,30 @@ The native library floor (GTK 4.24, libadwaita 1.10, GtkSourceView 5.22) is in [
 
 ## System context
 
-One actor: the person at a Linux desktop (or an MCP client they run). BookiE stays on their machine. Outbound traffic is only to databases and SSH bastions they configure. There is no BookiE cloud account.
+One actor: the person at their desktop (focused on Linux first, with cross-platform desktop underway via GPUI) or an MCP client they run. BookiE stays on their machine. Outbound traffic is only to databases and SSH bastions they configure. There is no BookiE cloud account.
 
 ```mermaid
 flowchart LR
     user["Local user<br/>DBA / developer"]
     mcpClient["MCP client<br/>agent / IDE"]
-    bookie["bookie<br/>GTK4 / Relm4"]
+    bookie["bookie<br/>GTK4 / Libadwaita"]
+    gpui["bookie-gpui<br/>GPUI (cross-platform)"]
     agentd["bookie-agentd<br/>MCP host"]
-    keyring["Secret Service"]
+    keyring["Secret Service / Keyring"]
     bastion["SSH bastion"]
     db["Database engines"]
 
     user --> bookie
+    user --> gpui
     mcpClient --> agentd
     bookie --> keyring
+    gpui --> keyring
     agentd --> keyring
     bookie --> bastion
+    gpui --> bastion
     agentd --> bastion
     bookie --> db
+    gpui --> db
     agentd --> db
     bastion --> db
 ```
@@ -85,21 +91,26 @@ Both processes register the same static drivers and must obtain a `PolicyGuard` 
 
 ## Containers (crates)
 
-Production dependencies point downward. `bookie-core` is the contract layer and depends on no other workspace crate. UI code reaches engines only through the driver registry; in production, only the two composition roots (`app` and `agentd`) depend on driver crates. Crate tests also use selected drivers to verify real engine behavior.
+Production dependencies point downward. `bookie-core` is the contract layer and depends on no other workspace crate. UI code reaches engines only through the driver registry; in production, only the composition roots (`app`, `gpui`, and `agentd`) depend on driver crates. Crate tests also use selected drivers to verify real engine behavior.
 
 ```mermaid
 flowchart TB
     subgraph roots["Composition roots"]
-        app["bookie-app<br/>bookie"]
-        agentd["bookie-agentd<br/>bookie-agentd"]
+        app["bookie-app<br/>bookie (GTK4)"]
+        gpui["bookie-gpui<br/>apps/gpui (GPUI)"]
+        agentd["bookie-agentd<br/>bookie-agentd (MCP)"]
     end
 
     subgraph surfaces["Surfaces"]
         mcp["bookie-mcp<br/>scopes, allowlists, tools"]
     end
 
-    subgraph app_logic["GTK-free application logic"]
+    subgraph app_logic["UI-agnostic application logic"]
         app_services["bookie-app-services<br/>state and service logic"]
+        results["bookie-results<br/>pure result logic, diff & spool"]
+        checks["bookie-checks<br/>TCP reachability history"]
+        pg_sessions["bookie-pg-sessions<br/>activity session types"]
+        kafka["bookie-kafka-browser<br/>read-only Kafka topics"]
     end
 
     subgraph governance["Governance"]
@@ -120,8 +131,9 @@ flowchart TB
         core["bookie-core<br/>DatabaseDriver, Connection,<br/>Value, OperationControl"]
     end
 
-    subgraph drivers["Static drivers"]
-        drv["postgres · mysql · sqlite · mssql<br/>clickhouse · redis · mongodb<br/>duckdb"]
+    subgraph drivers["Drivers & Registry"]
+        registry["bookie-driver-registry<br/>unified static drivers"]
+        drv["10 static drivers:<br/>postgres · mysql · sqlite · mssql<br/>clickhouse · redis · mongodb · duckdb<br/>cassandra · oracle"]
     end
 
     app --> mcp
@@ -131,11 +143,22 @@ flowchart TB
     app --> policy
     app --> storage
     app --> ssh
+    gpui --> app_services
+    gpui --> registry
+    gpui --> core
+    app_services --> results
+    app_services --> checks
+    app_services --> pg_sessions
+    app_services --> kafka
     app_services --> storage
     app_services --> core
     app_services --> policy
     app_services --> transport
     app_services --> dump
+    results --> core
+    checks --> core
+    pg_sessions --> core
+    kafka --> core
     app --> transport
     agentd --> core
     agentd --> policy
@@ -152,14 +175,16 @@ flowchart TB
     dump --> core
     storage --> policy
     storage --> core
+    registry --> drv
     drv --> core
-    app --> drv
-    agentd --> drv
+    app --> registry
+    agentd --> registry
 ```
 
 | Crate | Role |
 |---|---|
 | `bookie-app` | GTK composition root. Cargo binary `bookie-app`; installed as `bookie`. |
+| `bookie-gpui` | Cross-platform GPUI composition root (`apps/gpui`). |
 | `bookie-agentd` | Headless MCP composition root. Cargo binary `bookie-agentd`; installed as `bookie-agentd`. |
 | `bookie-core` | Domain types, driver traits, values, filters, transactions, registry. No workspace dependency. |
 | `bookie-policy` | Classify, rules, approval, masking, blast radius, audit types, `PolicyGuard`. Production dependency: `core`. |

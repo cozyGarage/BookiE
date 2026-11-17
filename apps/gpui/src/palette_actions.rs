@@ -89,6 +89,7 @@ impl GridView {
         vec![
             action("copy", "Copy selected rows", self.selection.is_some()),
             action("copy-csv", "Copy selected rows as CSV", self.selection.is_some()),
+            action("export-csv", "Export current page or selection as CSV", true),
             action("copy-json", "Copy selected rows as JSON", self.selection.is_some()),
             action(
                 "copy-markdown",
@@ -323,6 +324,7 @@ impl GridView {
             }
             "copy" => self.copy_selection(false, cx),
             "copy-csv" => self.copy_selection_as(CopyFormat::Csv, cx),
+            "export-csv" => self.export_selection_or_page(cx),
             "copy-json" => self.copy_selection_as(CopyFormat::Json, cx),
             "copy-markdown" => self.copy_selection_as(CopyFormat::Markdown, cx),
             "copy-in-list" => self.copy_selection_as(CopyFormat::InList, cx),
