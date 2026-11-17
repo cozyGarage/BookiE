@@ -66,29 +66,23 @@ pub(crate) async fn read_list_databases(connection: &mut sqlx::PgConnection) -> 
     Ok(rows.into_iter().map(|row| row.get::<String, _>(0)).collect())
 }
 
-pub(crate) async fn read_fetch_columns(
-    connection: &mut sqlx::PgConnection,
-    schema: Option<&str>,
-    table: &str,
-) -> Result<Vec<ColumnInfo>, DriverError> {
-    // Source schema metadata from pg_catalog rather than
-    // information_schema:
-    //   - pg_attribute.attgenerated ('s' for STORED, '' otherwise)
-    //     is the canonical generated-column flag. The
-    //     information_schema.is_generated text column is brittle
-    //     across PG versions.
-    //   - pg_attribute.attidentity ('a' / 'd' for ALWAYS / BY
-    //     DEFAULT identity, '' otherwise) authoritatively flags
-    //     identity columns.
-    //   - format_type() returns the user-facing type name including
-    //     length / precision (e.g. "character varying(255)") which
-    //     matches what the user wrote in CREATE TABLE.
-    //   - pg_get_expr() returns the default expression text.
-    //   - col_description() is the column-level comment accessor;
-    //     obj_description() answers for the relation, so using it
-    //     here would give every column the table's comment.
-    let rows = sqlx::query(
-        "SELECT
+// Source schema metadata from pg_catalog rather than
+// information_schema:
+//   - pg_attribute.attgenerated ('s' for STORED, '' otherwise)
+//     is the canonical generated-column flag. The
+//     information_schema.is_generated text column is brittle
+//     across PG versions.
+//   - pg_attribute.attidentity ('a' / 'd' for ALWAYS / BY
+//     DEFAULT identity, '' otherwise) authoritatively flags
+//     identity columns.
+//   - format_type() returns the user-facing type name including
+//     length / precision (e.g. "character varying(255)") which
+//     matches what the user wrote in CREATE TABLE.
+//   - pg_get_expr() returns the default expression text.
+//   - col_description() is the column-level comment accessor;
+//     obj_description() answers for the relation, so using it
+//     here would give every column the table's comment.
+const COLUMN_CATALOG_SQL: &str = "SELECT
             a.attname,
             pg_catalog.format_type(a.atttypid, a.atttypmod) AS data_type,
             NOT a.attnotnull AS nullable,
@@ -152,60 +146,69 @@ pub(crate) async fn read_fetch_columns(
            AND NOT a.attisdropped
            AND pg_catalog.has_schema_privilege(n.oid, 'USAGE')
            AND pg_catalog.has_column_privilege(t.oid, a.attnum, 'SELECT,INSERT,UPDATE,REFERENCES')
-         ORDER BY a.attnum",
-    )
-    .bind(table)
-    .bind(schema)
-    .fetch_all(&mut *connection)
-    .await
-    .map_err(map_sqlx_error)?;
-    rows.into_iter()
-        .map(|r| {
-            let raw_default: Option<String> = r.try_get::<Option<String>, _>(4).unwrap_or(None);
-            let is_identity = r.try_get::<bool, _>(5).unwrap_or(false);
-            let is_generated = r.try_get::<bool, _>(6).unwrap_or(false);
-            // SERIAL / BIGSERIAL columns aren't IDENTITY in PG's
-            // catalog terms but have a `nextval(...)` default; treat
-            // them as auto-increment for the inline-insert UI.
-            let is_serial = raw_default
-                .as_deref()
-                .map(|d| d.starts_with("nextval("))
-                .unwrap_or(false);
-            // For identity / serial columns the default expression
-            // is internal sequence machinery — suppress so the UI
-            // doesn't leak implementation details. Otherwise
-            // normalise the expression for display.
-            let default_value = if is_identity || is_serial {
-                None
-            } else {
-                raw_default.map(normalize_pg_default)
-            };
-            let enum_schema = r.try_get::<Option<String>, _>(9).map_err(map_sqlx_error)?;
-            let enum_name = r.try_get::<Option<String>, _>(10).map_err(map_sqlx_error)?;
-            let domain_schema = r.try_get::<Option<String>, _>(11).map_err(map_sqlx_error)?;
-            let domain_name = r.try_get::<Option<String>, _>(12).map_err(map_sqlx_error)?;
-            Ok(ColumnInfo {
-                name: r.get::<String, _>(0),
-                data_type: r.get::<String, _>(1),
-                nullable: r.get::<bool, _>(2),
-                primary_key: r.get::<bool, _>(3),
-                is_auto_increment: is_identity || is_serial,
-                default_value,
-                is_generated,
-                comment: r
-                    .try_get::<Option<String>, _>(7)
-                    .unwrap_or(None)
-                    .filter(|c| !c.is_empty()),
-                collation: r.try_get::<Option<String>, _>(8).unwrap_or(None),
-                enum_type: enum_schema
-                    .zip(enum_name)
-                    .map(|(schema, name)| QualifiedTypeName { schema, name }),
-                domain_type: domain_schema
-                    .zip(domain_name)
-                    .map(|(schema, name)| QualifiedTypeName { schema, name }),
-            })
-        })
-        .collect::<Result<Vec<_>, DriverError>>()
+         ORDER BY a.attnum";
+
+pub(crate) async fn read_fetch_columns(
+    connection: &mut sqlx::PgConnection,
+    schema: Option<&str>,
+    table: &str,
+) -> Result<Vec<ColumnInfo>, DriverError> {
+    let rows = sqlx::query(COLUMN_CATALOG_SQL)
+        .bind(table)
+        .bind(schema)
+        .fetch_all(&mut *connection)
+        .await
+        .map_err(map_sqlx_error)?;
+    rows.iter().map(column_from_row).collect()
+}
+
+pub(crate) fn auto_increment_and_default(raw_default: Option<String>, is_identity: bool) -> (bool, Option<String>) {
+    // SERIAL / BIGSERIAL columns aren't IDENTITY in PG's
+    // catalog terms but have a `nextval(...)` default; treat
+    // them as auto-increment for the inline-insert UI.
+    let is_serial = raw_default.as_deref().is_some_and(|d| d.starts_with("nextval("));
+    let is_auto_increment = is_identity || is_serial;
+    // For identity / serial columns the default expression
+    // is internal sequence machinery — suppress so the UI
+    // doesn't leak implementation details. Otherwise
+    // normalise the expression for display.
+    let default_value = if is_auto_increment {
+        None
+    } else {
+        raw_default.map(normalize_pg_default)
+    };
+    (is_auto_increment, default_value)
+}
+
+fn column_from_row(r: &sqlx::postgres::PgRow) -> Result<ColumnInfo, DriverError> {
+    let raw_default: Option<String> = r.try_get::<Option<String>, _>(4).unwrap_or(None);
+    let is_identity = r.try_get::<bool, _>(5).unwrap_or(false);
+    let is_generated = r.try_get::<bool, _>(6).unwrap_or(false);
+    let (is_auto_increment, default_value) = auto_increment_and_default(raw_default, is_identity);
+    let enum_schema = r.try_get::<Option<String>, _>(9).map_err(map_sqlx_error)?;
+    let enum_name = r.try_get::<Option<String>, _>(10).map_err(map_sqlx_error)?;
+    let domain_schema = r.try_get::<Option<String>, _>(11).map_err(map_sqlx_error)?;
+    let domain_name = r.try_get::<Option<String>, _>(12).map_err(map_sqlx_error)?;
+    Ok(ColumnInfo {
+        name: r.get::<String, _>(0),
+        data_type: r.get::<String, _>(1),
+        nullable: r.get::<bool, _>(2),
+        primary_key: r.get::<bool, _>(3),
+        is_auto_increment,
+        default_value,
+        is_generated,
+        comment: r
+            .try_get::<Option<String>, _>(7)
+            .unwrap_or(None)
+            .filter(|c| !c.is_empty()),
+        collation: r.try_get::<Option<String>, _>(8).unwrap_or(None),
+        enum_type: enum_schema
+            .zip(enum_name)
+            .map(|(schema, name)| QualifiedTypeName { schema, name }),
+        domain_type: domain_schema
+            .zip(domain_name)
+            .map(|(schema, name)| QualifiedTypeName { schema, name }),
+    })
 }
 
 pub(crate) async fn read_fetch_indexes(

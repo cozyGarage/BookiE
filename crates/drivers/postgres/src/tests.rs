@@ -436,3 +436,26 @@ fn postgres_offers_a_socket_directory() {
     assert!(PgDriver.supports_local_socket());
     assert!(PgDriver.supports_local_socket_directory());
 }
+
+#[test]
+fn a_serial_default_marks_the_column_auto_increment_and_is_hidden() {
+    assert_eq!(
+        auto_increment_and_default(Some("nextval('people_id_seq'::regclass)".into()), false),
+        (true, None)
+    );
+}
+
+#[test]
+fn an_identity_column_hides_its_default_even_without_nextval() {
+    assert_eq!(auto_increment_and_default(Some("1".into()), true), (true, None));
+    assert_eq!(auto_increment_and_default(None, true), (true, None));
+}
+
+#[test]
+fn an_ordinary_default_is_kept_and_normalised() {
+    assert_eq!(
+        auto_increment_and_default(Some("'hi'::text".into()), false),
+        (false, Some("'hi'".into()))
+    );
+    assert_eq!(auto_increment_and_default(None, false), (false, None));
+}
