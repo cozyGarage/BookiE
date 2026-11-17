@@ -25,7 +25,8 @@ BookiE is a free, open-source database client focused on Linux first, built for 
 
 <p align="center">
   <img src="docs/brand/badges/postgres.svg" alt="PostgreSQL">
-  <img src="docs/brand/badges/mysql.svg" alt="MySQL / MariaDB">
+  <img src="docs/brand/badges/mysql.svg" alt="MySQL">
+  <img src="docs/brand/badges/mariadb.svg" alt="MariaDB">
   <img src="docs/brand/badges/sqlite.svg" alt="SQLite">
   <img src="docs/brand/badges/mssql.svg" alt="SQL Server">
   <img src="docs/brand/badges/clickhouse.svg" alt="ClickHouse">

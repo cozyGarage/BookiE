@@ -48,7 +48,7 @@ container="$(docker run --rm --detach --label "com.bookie.test-run=${BOOKIE_TEST
   --env CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1 \
   clickhouse/clickhouse-server:24.8)"
 cleanup() {
-  docker rm --force "$container" >/dev/null 2>&1 || true
+  docker rm --force --volumes "$container" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 

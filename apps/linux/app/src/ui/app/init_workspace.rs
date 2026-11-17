@@ -55,6 +55,14 @@ pub(super) fn build_workspace_chrome(widgets: &AppWidgets, sender: &ComponentSen
     widgets.connections_popover.set_child(Some(&popover_content));
     keep_inside_window(&widgets.connections_popover, &widgets.saved_connections_button);
 
+    let workspace_outer_stack = build_empty_workspace_stack();
+    WorkspaceChromeParts {
+        connections_factory,
+        outer_stack: workspace_outer_stack,
+    }
+}
+
+fn build_empty_workspace_stack() -> gtk::Stack {
     let workspace_outer_stack = gtk::Stack::builder()
         .transition_type(gtk::StackTransitionType::Crossfade)
         .build();
@@ -76,10 +84,7 @@ pub(super) fn build_workspace_chrome(widgets: &AppWidgets, sender: &ComponentSen
         .build();
     workspace_outer_stack.add_named(&workspace_empty_page, Some("empty"));
     workspace_outer_stack.set_visible_child_name("empty");
-    WorkspaceChromeParts {
-        connections_factory,
-        outer_stack: workspace_outer_stack,
-    }
+    workspace_outer_stack
 }
 
 #[cfg(test)]

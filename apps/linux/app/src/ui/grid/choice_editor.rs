@@ -89,14 +89,62 @@ fn enum_choice_list(labels: &[String], current: &str) -> gtk::ListBox {
     list
 }
 
-fn enum_content(picker: Picker, labels: Vec<String>, current: &str) -> gtk::Widget {
-    let list = enum_choice_list(&labels, current);
-    list.connect_row_activated(move |_, row| {
-        if let Some(label) = labels.get(row.index() as usize) {
-            picker.commit(enum_commit_text(label));
+fn wire_enum_search(list: &gtk::ListBox, labels: &[String], picker: &Picker) -> (gtk::SearchEntry, gtk::Box) {
+    let search = gtk::SearchEntry::builder()
+        .placeholder_text(bookie_app_services::tr!("Filter values…"))
+        .margin_start(4)
+        .margin_end(4)
+        .margin_top(4)
+        .margin_bottom(4)
+        .build();
+    let query_entry = search.clone();
+    let filter_labels = labels.to_vec();
+    list.set_filter_func(move |row| {
+        let text = query_entry.text().to_lowercase();
+        if text.is_empty() {
+            return true;
+        }
+        let idx = row.index() as usize;
+        filter_labels
+            .get(idx)
+            .map(|l| l.to_lowercase().contains(&text))
+            .unwrap_or(true)
+    });
+    let list_for_search = list.clone();
+    search.connect_search_changed(move |_| {
+        list_for_search.invalidate_filter();
+    });
+    let picker_for_enter = picker.clone();
+    search.connect_activate(move |entry| {
+        let text = entry.text().to_string();
+        if !text.is_empty() {
+            picker_for_enter.commit(enum_commit_text(&text));
         }
     });
-    list.upcast()
+    let box_container = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(4)
+        .build();
+    box_container.append(&search);
+    box_container.append(list);
+    (search, box_container)
+}
+
+fn enum_content(picker: Picker, labels: Vec<String>, current: &str) -> gtk::Widget {
+    let list = enum_choice_list(&labels, current);
+    let row_labels = labels.clone();
+    let picker_clone = picker.clone();
+    list.connect_row_activated(move |_, row| {
+        let idx = row.index() as usize;
+        if let Some(label) = row_labels.get(idx) {
+            picker_clone.commit(enum_commit_text(label));
+        }
+    });
+    if labels.len() <= 6 {
+        return list.upcast();
+    }
+    let (_, container) = wire_enum_search(&list, &labels, &picker);
+    container.upcast()
 }
 
 fn set_content(picker: Picker, labels: Vec<String>, current: &str) -> gtk::Widget {

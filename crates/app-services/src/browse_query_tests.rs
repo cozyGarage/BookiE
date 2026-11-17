@@ -314,3 +314,93 @@ fn ordinary_marker_shaped_text_is_preserved() {
     mark_partial_cells(&mut result, &[]);
     assert_eq!(result.rows[0][0], stored);
 }
+
+#[test]
+fn postgres_estimated_count_uses_pg_class_reltuples() {
+    let columns = vec![column("id", true)];
+    let filter = FilterSet::default();
+    let target = BrowseTarget {
+        driver_id: "postgres",
+        schema: Some("sales"),
+        table: "orders",
+        columns: &columns,
+        filter: &filter,
+        hidden_columns: None,
+        long_text_preview: false,
+        supports_reverse_keyset: false,
+    };
+    let est = target.estimated_count().unwrap();
+    assert!(est.sql.contains("reltuples::bigint"));
+    assert_eq!(
+        est.params,
+        vec![Value::Text("sales".into()), Value::Text("orders".into())]
+    );
+}
+
+#[test]
+fn mysql_estimated_count_uses_information_schema() {
+    let columns = vec![column("id", true)];
+    let filter = FilterSet::default();
+    let target = BrowseTarget {
+        driver_id: "mysql",
+        schema: None,
+        table: "customers",
+        columns: &columns,
+        filter: &filter,
+        hidden_columns: None,
+        long_text_preview: false,
+        supports_reverse_keyset: false,
+    };
+    let est = target.estimated_count().unwrap();
+    assert!(est.sql.contains("information_schema.tables"));
+    assert_eq!(est.params, vec![Value::Text("customers".into())]);
+}
+
+#[test]
+fn active_filter_disables_estimated_count() {
+    let columns = vec![column("id", true)];
+    let filter = FilterSet {
+        rules: vec![FilterRule {
+            column: "id".into(),
+            op: FilterOp::Eq,
+            value: Some(FilterValue::Single("1".into())),
+        }],
+        ..Default::default()
+    };
+    let target = BrowseTarget {
+        driver_id: "postgres",
+        schema: None,
+        table: "orders",
+        columns: &columns,
+        filter: &filter,
+        hidden_columns: None,
+        long_text_preview: false,
+        supports_reverse_keyset: false,
+    };
+    assert!(target.estimated_count().is_none());
+}
+
+#[test]
+fn foreign_key_candidate_query_generates_distinct_ordered_select() {
+    let query_pg = foreign_key_candidates_query("postgres", Some("sales"), "customers", "id", 100);
+    assert_eq!(
+        query_pg.sql,
+        "SELECT DISTINCT \"id\" FROM \"sales\".\"customers\" WHERE \"id\" IS NOT NULL ORDER BY \"id\" LIMIT 100"
+    );
+
+    let query_mssql = foreign_key_candidates_query("mssql", Some("dbo"), "customers", "id", 50);
+    assert_eq!(
+        query_mssql.sql,
+        "SELECT DISTINCT TOP (50) [id] FROM [dbo].[customers] WHERE [id] IS NOT NULL ORDER BY [id]"
+    );
+}
+
+#[test]
+fn candidate_values_format_to_text() {
+    assert_eq!(format_candidate_value(&Value::Int(42)), Some("42".into()));
+    assert_eq!(
+        format_candidate_value(&Value::Text("admin".into())),
+        Some("admin".into())
+    );
+    assert_eq!(format_candidate_value(&Value::Null), None);
+}

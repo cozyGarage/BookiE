@@ -398,6 +398,7 @@ fn assert_deep_last_page_selection<T: ComponentController<BrowseTab>>(
         .send(BrowseTabInput::RowCountLoaded {
             request: count_request,
             count: 30_000,
+            is_estimated: false,
         })
         .unwrap();
     spin_until(context, || controller.model().current_total_rows == Some(30_000));
@@ -458,6 +459,7 @@ fn browse_next_page_is_disabled_when_known_total_matches_page_end() {
         .send(BrowseTabInput::RowCountLoaded {
             request: count_request,
             count: 2,
+            is_estimated: false,
         })
         .unwrap();
     spin_until(&context, || controller.model().current_total_rows == Some(2));

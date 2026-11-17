@@ -559,62 +559,69 @@ impl App {
         }
 
         if self.any_editor_running() {
-            self.switch.transition = ConnectionTransition::AwaitingDecision;
-            let dialog = adw::AlertDialog::new(
-                Some(&bookie_app_services::tr!("Cancel running queries and switch?")),
-                Some(&bookie_app_services::tr!(
-                    "BookiE will wait for every running query to report cancellation before changing connections."
-                )),
-            );
-            dialog.add_response("stay", &bookie_app_services::tr!("Stay"));
-            dialog.add_response("cancel-runs", &bookie_app_services::tr!("Cancel queries and switch"));
-            dialog.set_response_appearance("cancel-runs", adw::ResponseAppearance::Destructive);
-            dialog.set_default_response(Some("stay"));
-            dialog.set_close_response("stay");
-            let response_sender = sender.clone();
-            dialog.connect_response(None, move |_, response| {
-                response_sender.input(AppMsg::Connection(ConnectionMessage::SwitchDecision(
-                    if response == "cancel-runs" {
-                        SwitchDecision::CancelRuns
-                    } else {
-                        SwitchDecision::Stay
-                    },
-                )));
-            });
-            dialog.present(Some(&self.window));
+            self.show_cancel_runs_switch_dialog(sender);
             return;
         }
 
-        let has_pending = self.window_has_pending();
-        if has_pending {
-            self.switch.transition = ConnectionTransition::AwaitingDecision;
-            let dialog = adw::AlertDialog::new(
-                Some(&bookie_app_services::tr!("Save changes before switching?")),
-                Some(&bookie_app_services::tr!(
-                    "Pending row and structure changes belong to the current connection."
-                )),
-            );
-            dialog.add_response("stay", &bookie_app_services::tr!("Stay"));
-            dialog.add_response("discard", &bookie_app_services::tr!("Discard and switch"));
-            dialog.add_response("save", &bookie_app_services::tr!("Save and switch"));
-            dialog.set_response_appearance("discard", adw::ResponseAppearance::Destructive);
-            dialog.set_response_appearance("save", adw::ResponseAppearance::Suggested);
-            dialog.set_default_response(Some("save"));
-            dialog.set_close_response("stay");
-            let response_sender = sender.clone();
-            dialog.connect_response(None, move |_, response| {
-                let decision = match response {
-                    "discard" => SwitchDecision::DiscardChanges,
-                    "save" => SwitchDecision::SaveChanges,
-                    _ => SwitchDecision::Stay,
-                };
-                response_sender.input(AppMsg::Connection(ConnectionMessage::SwitchDecision(decision)));
-            });
-            dialog.present(Some(&self.window));
+        if self.window_has_pending() {
+            self.show_save_changes_switch_dialog(sender);
             return;
         }
 
         self.activate_prepared_connection(sender);
+    }
+
+    fn show_cancel_runs_switch_dialog(&mut self, sender: ComponentSender<Self>) {
+        self.switch.transition = ConnectionTransition::AwaitingDecision;
+        let dialog = adw::AlertDialog::new(
+            Some(&bookie_app_services::tr!("Cancel running queries and switch?")),
+            Some(&bookie_app_services::tr!(
+                "BookiE will wait for every running query to report cancellation before changing connections."
+            )),
+        );
+        dialog.add_response("stay", &bookie_app_services::tr!("Stay"));
+        dialog.add_response("cancel-runs", &bookie_app_services::tr!("Cancel queries and switch"));
+        dialog.set_response_appearance("cancel-runs", adw::ResponseAppearance::Destructive);
+        dialog.set_default_response(Some("stay"));
+        dialog.set_close_response("stay");
+        let response_sender = sender;
+        dialog.connect_response(None, move |_, response| {
+            response_sender.input(AppMsg::Connection(ConnectionMessage::SwitchDecision(
+                if response == "cancel-runs" {
+                    SwitchDecision::CancelRuns
+                } else {
+                    SwitchDecision::Stay
+                },
+            )));
+        });
+        dialog.present(Some(&self.window));
+    }
+
+    fn show_save_changes_switch_dialog(&mut self, sender: ComponentSender<Self>) {
+        self.switch.transition = ConnectionTransition::AwaitingDecision;
+        let dialog = adw::AlertDialog::new(
+            Some(&bookie_app_services::tr!("Save changes before switching?")),
+            Some(&bookie_app_services::tr!(
+                "Pending row and structure changes belong to the current connection."
+            )),
+        );
+        dialog.add_response("stay", &bookie_app_services::tr!("Stay"));
+        dialog.add_response("discard", &bookie_app_services::tr!("Discard and switch"));
+        dialog.add_response("save", &bookie_app_services::tr!("Save and switch"));
+        dialog.set_response_appearance("discard", adw::ResponseAppearance::Destructive);
+        dialog.set_response_appearance("save", adw::ResponseAppearance::Suggested);
+        dialog.set_default_response(Some("save"));
+        dialog.set_close_response("stay");
+        let response_sender = sender;
+        dialog.connect_response(None, move |_, response| {
+            let decision = match response {
+                "discard" => SwitchDecision::DiscardChanges,
+                "save" => SwitchDecision::SaveChanges,
+                _ => SwitchDecision::Stay,
+            };
+            response_sender.input(AppMsg::Connection(ConnectionMessage::SwitchDecision(decision)));
+        });
+        dialog.present(Some(&self.window));
     }
 
     pub(super) fn on_connection_switch_decision(&mut self, decision: SwitchDecision, sender: ComponentSender<Self>) {

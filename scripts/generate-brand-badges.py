@@ -11,15 +11,16 @@ os.makedirs(BADGES_DIR, exist_ok=True)
 
 ENGINES = [
     ("postgres", "PostgreSQL", "STABLE", "#336791", "#1F4F48", "#9EAE9A"),
-    ("mysql", "MySQL / MariaDB", "STABLE", "#00758F", "#1F4F48", "#9EAE9A"),
+    ("mysql", "MySQL", "STABLE", "#00758F", "#1F4F48", "#9EAE9A"),
+    ("mariadb", "MariaDB", "STABLE", "#C09853", "#1F4F48", "#9EAE9A"),
     ("sqlite", "SQLite", "STABLE", "#003B57", "#1F4F48", "#9EAE9A"),
     ("mssql", "SQL Server", "STABLE", "#CC292B", "#1F4F48", "#9EAE9A"),
     ("clickhouse", "ClickHouse", "STABLE", "#FFCC01", "#1F4F48", "#9EAE9A"),
     ("duckdb", "DuckDB", "EXPERIMENTAL", "#FFF000", "#163D38", "#C9A24B"),
     ("redis", "Redis", "EXPERIMENTAL", "#D82C20", "#163D38", "#C9A24B"),
     ("mongodb", "MongoDB", "EXPERIMENTAL", "#47A248", "#163D38", "#C9A24B"),
-    ("cassandra", "Cassandra", "READ-ONLY", "#1470AF", "#163D38", "#C9A24B"),
-    ("oracle", "Oracle DB", "READ-ONLY", "#F80000", "#163D38", "#C9A24B"),
+    ("cassandra", "Cassandra / ScyllaDB", "READ-ONLY", "#1470AF", "#163D38", "#C9A24B"),
+    ("oracle", "Oracle Database", "READ-ONLY", "#F80000", "#163D38", "#C9A24B"),
 ]
 
 def make_engine_badge(slug, name, status, icon_accent, status_bg, status_text_color):

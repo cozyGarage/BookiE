@@ -45,7 +45,7 @@ source "$ROOT/scripts/gtk-fixture-host.sh"
 
 container="$(docker run --rm --detach --label "com.bookie.test-run=${BOOKIE_TEST_RUN_ID:-local-$$}" --publish "$fixture_bind_address::27017" mongo:7 --bind_ip_all)"
 cleanup() {
-  docker rm --force "$container" >/dev/null 2>&1 || true
+  docker rm --force --volumes "$container" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 

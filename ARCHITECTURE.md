@@ -1,6 +1,6 @@
 # Architecture
 
-**BookiE** is an independent, native Linux database client. Two composition roots (the GTK app and the headless MCP daemon) share one governed path: resolve credentials → open a tunnel if needed → wrap the driver in `PolicyGuard` → classify and evaluate → approve when required → write required audit intent → execute → mask eligible returned results → write terminal audit → return bounded results. There is no browser UI, no runtime driver plugin ABI, and no remote entitlement gate.
+**BookiE** is an independent native database client focused on Linux first, with cross-platform desktop underway via GPUI ([ADR 0052](docs/decisions/0052-gpui-is-the-cross-platform-frontend.md)). Frontends (the flagship GTK desktop app, cross-platform GPUI, and the headless MCP daemon) share one governed path: resolve credentials → open a tunnel if needed → wrap the driver in `PolicyGuard` → classify and evaluate → approve when required → write required audit intent → execute → mask eligible returned results → write terminal audit → return bounded results. There is no browser UI, no runtime driver plugin ABI, and no remote entitlement gate.
 
 The product repository is [`cozyGarage/BookiE`](https://github.com/cozyGarage/BookiE). BookiE is a fully autonomous project with its own architecture, development lifecycle, and product roadmap.
 
@@ -491,7 +491,7 @@ Workspace Clippy and unit checks include the DuckDB driver like every other crat
 |---|---|
 | Shipped surface is Linux GTK | The shipped product is the GTK/libadwaita Linux client and its packaging. [ADR 0052](docs/decisions/0052-gpui-is-the-cross-platform-frontend.md) chooses GPUI as the cross-platform frontend and keeps GTK in parallel; GPUI is not packaged or released until that ADR's accessibility, packaging and security conditions hold. UI-free crates serve both frontends, the headless daemon and tests. |
 | Static drivers | Compile-time registration; no plugin ABI. |
-| No embedded browser | Native GTK widgets only. |
+| No embedded browser | Native widgets only (GTK and GPUI). |
 | No in-process user scripting | Reduces attack surface beside SQL policy. |
 | Redis topology | Single endpoint; unsupported topologies and release status are in [known limitations](docs/known-limitations.md#editing-and-connections). |
 | Packaging | Current GitHub releases provide an Arch package and an AppImage; 0.2.4 also has Debian and Flatpak (ADRs 0031 and 0032). Native package requirements, OpenSSL sonames and AppImage toolkit notes are in [platforms](docs/platforms.md). |

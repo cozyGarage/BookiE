@@ -249,7 +249,6 @@ impl FilterStrip {
         let opening = !self.is_revealed();
         self.set_revealed(opening);
         if opening {
-            // Focus the primary SQL field when the strip opens.
             self.raw_entry.grab_focus();
         }
     }

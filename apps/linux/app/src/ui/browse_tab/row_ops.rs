@@ -145,66 +145,16 @@ impl BrowseTab {
             .filter(|(_, c)| c.primary_key)
             .map(|(i, _)| i)
             .collect();
-        // Partition the selection into persisted rows (need a
-        // PK to build a RowKey) and drafts (in-memory only,
-        // discarded by id). We resolve through the selection
-        // model rather than `result.rows[pos]` directly
-        // because `pos` is in selection-model space, which
-        // includes prepended drafts. A pure-draft selection
-        // is valid (the user can bulk-discard pending
-        // inserts before saving).
         let Some(model) = selection.model() else {
             return;
         };
-        let mut snapshot: Vec<(crate::services::change_tracker::RowKey, Vec<Value>)> = Vec::new();
-        let mut draft_ids: Vec<u64> = Vec::new();
-        let mut had_persisted_row = false;
-        let mut unreadable_key_rows = 0usize;
-        for pos in &positions {
-            let Some(item) = model.item(*pos) else { continue };
-            let Ok(row_obj) = item.downcast::<crate::ui::row_object::RowObject>() else {
-                continue;
-            };
-            if let Some(draft_id) = row_obj.draft_id() {
-                draft_ids.push(draft_id);
-                continue;
-            }
-            had_persisted_row = true;
-            let cells = row_obj.cells_clone();
-            if row_key_is_unreadable(&cells, &pk_indices) {
-                unreadable_key_rows += 1;
-                continue;
-            }
-            if let Some(pair) = build_persisted_row_key(cells, &pk_indices) {
-                snapshot.push(pair);
-            }
-        }
-        // A row whose key the driver could not decode cannot be named in
-        // a WHERE clause, so refuse the whole selection rather than
-        // deleting part of it without saying so.
-        if unreadable_key_rows > 0 {
-            let _ = sender.output(BrowseTabOutput::ShowSelectionAlert {
-                title: bookie_app_services::tr!("Cannot delete"),
-                body: bookie_app_services::tr!(
-                    "Some selected rows have a key value this driver could not read, so they cannot be identified. Reload the table, or delete those rows from a SQL editor."
-                ),
-            });
+        let items = collect_delete_selection_items(&model, &positions, &pk_indices);
+        if !validate_delete_preconditions(&sender, &items, self.read_only, &pk_indices) {
             return;
         }
-        if self.read_only && had_persisted_row {
-            let _ = sender.output(BrowseTabOutput::ShowSelectionAlert {
-                title: bookie_app_services::tr!("Cannot delete"),
-                body: bookie_app_services::tr!("This connection is read-only."),
-            });
-            return;
-        }
-        if had_persisted_row && pk_indices.is_empty() {
-            let _ = sender.output(BrowseTabOutput::ShowSelectionAlert {
-                title: bookie_app_services::tr!("Cannot delete"),
-                body: bookie_app_services::tr!("This table has no primary key — editing is disabled."),
-            });
-            return;
-        }
+        let DeleteSelectionItems {
+            snapshot, draft_ids, ..
+        } = items;
         if snapshot.is_empty() && draft_ids.is_empty() {
             return;
         }
@@ -224,41 +174,10 @@ impl BrowseTab {
                 }
             });
             remove_draft_rows(store_for_commit.as_ref(), &draft_ids);
-            // Clear the multi-row selection so the
-            // "{n} selected" badge disappears and the Delete
-            // button tooltip resets. Without this the bitset
-            // still contains the now-strikethrough rows
-            // (they remain in the model until Save). Spreadsheet
-            // convention: a bulk action ends the selection it
-            // operated on.
             selection_for_commit.unselect_all();
         };
         if count >= BULK_DELETE_CONFIRM_THRESHOLD {
-            // Dialog parent is any descendant of the toplevel
-            // window — adw::AlertDialog walks up to find the
-            // window. The inner_stack is always parented to
-            // the BrowseTab's root toolbar, so it resolves
-            // correctly while the tab is visible.
-            let title = bookie_app_services::trn!("Delete {n} row?", "Delete {n} rows?", count)
-                .replace("{n}", &count.to_string());
-            let body = bookie_app_services::tr!(
-                "These rows will be marked for deletion. They aren't removed until you click Save."
-            );
-            let dialog = adw::AlertDialog::new(Some(&title), Some(&body));
-            dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
-            dialog.add_response("delete", &bookie_app_services::tr!("Delete"));
-            dialog.set_response_appearance("delete", adw::ResponseAppearance::Destructive);
-            dialog.set_default_response(Some("cancel"));
-            dialog.set_close_response("cancel");
-            let pending = std::cell::RefCell::new(Some((snapshot, draft_ids)));
-            dialog.connect_response(None, move |_, response| {
-                if response == "delete"
-                    && let Some((s, d)) = pending.borrow_mut().take()
-                {
-                    commit_delete(s, d);
-                }
-            });
-            dialog.present(Some(&self.inner_stack));
+            prompt_bulk_delete_dialog(&self.inner_stack, count, snapshot, draft_ids, commit_delete);
         } else {
             commit_delete(snapshot, draft_ids);
         }
@@ -943,6 +862,111 @@ impl BrowseTab {
             UndoOp::Delete { .. } => {}
         }
     }
+}
+
+struct DeleteSelectionItems {
+    snapshot: Vec<(crate::services::change_tracker::RowKey, Vec<Value>)>,
+    draft_ids: Vec<u64>,
+    had_persisted_row: bool,
+    unreadable_key_rows: usize,
+}
+
+fn collect_delete_selection_items(
+    model: &gtk::gio::ListModel,
+    positions: &[u32],
+    pk_indices: &[usize],
+) -> DeleteSelectionItems {
+    let mut snapshot = Vec::new();
+    let mut draft_ids = Vec::new();
+    let mut had_persisted_row = false;
+    let mut unreadable_key_rows = 0usize;
+    for pos in positions {
+        let Some(item) = model.item(*pos) else { continue };
+        let Ok(row_obj) = item.downcast::<crate::ui::row_object::RowObject>() else {
+            continue;
+        };
+        if let Some(draft_id) = row_obj.draft_id() {
+            draft_ids.push(draft_id);
+            continue;
+        }
+        had_persisted_row = true;
+        let cells = row_obj.cells_clone();
+        if row_key_is_unreadable(&cells, pk_indices) {
+            unreadable_key_rows += 1;
+            continue;
+        }
+        if let Some(pair) = build_persisted_row_key(cells, pk_indices) {
+            snapshot.push(pair);
+        }
+    }
+    DeleteSelectionItems {
+        snapshot,
+        draft_ids,
+        had_persisted_row,
+        unreadable_key_rows,
+    }
+}
+
+fn validate_delete_preconditions(
+    sender: &ComponentSender<BrowseTab>,
+    items: &DeleteSelectionItems,
+    read_only: bool,
+    pk_indices: &[usize],
+) -> bool {
+    if items.unreadable_key_rows > 0 {
+        let _ = sender.output(BrowseTabOutput::ShowSelectionAlert {
+            title: bookie_app_services::tr!("Cannot delete"),
+            body: bookie_app_services::tr!(
+                "Some selected rows have a key value this driver could not read, so they cannot be identified. Reload the table, or delete those rows from a SQL editor."
+            ),
+        });
+        return false;
+    }
+    if read_only && items.had_persisted_row {
+        let _ = sender.output(BrowseTabOutput::ShowSelectionAlert {
+            title: bookie_app_services::tr!("Cannot delete"),
+            body: bookie_app_services::tr!("This connection is read-only."),
+        });
+        return false;
+    }
+    if items.had_persisted_row && pk_indices.is_empty() {
+        let _ = sender.output(BrowseTabOutput::ShowSelectionAlert {
+            title: bookie_app_services::tr!("Cannot delete"),
+            body: bookie_app_services::tr!("This table has no primary key — editing is disabled."),
+        });
+        return false;
+    }
+    true
+}
+
+fn prompt_bulk_delete_dialog(
+    parent: &impl glib::object::IsA<gtk::Widget>,
+    count: usize,
+    snapshot: Vec<(crate::services::change_tracker::RowKey, Vec<Value>)>,
+    draft_ids: Vec<u64>,
+    commit_delete: impl FnOnce(Vec<(crate::services::change_tracker::RowKey, Vec<Value>)>, Vec<u64>) + 'static,
+) {
+    let title =
+        bookie_app_services::trn!("Delete {n} row?", "Delete {n} rows?", count).replace("{n}", &count.to_string());
+    let body =
+        bookie_app_services::tr!("These rows will be marked for deletion. They aren't removed until you click Save.");
+    let dialog = adw::AlertDialog::new(Some(&title), Some(&body));
+    dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
+    dialog.add_response("delete", &bookie_app_services::tr!("Delete"));
+    dialog.set_response_appearance("delete", adw::ResponseAppearance::Destructive);
+    dialog.set_default_response(Some("cancel"));
+    dialog.set_close_response("cancel");
+    let commit_delete = std::cell::RefCell::new(Some(commit_delete));
+    let pending = std::cell::RefCell::new(Some((snapshot, draft_ids)));
+    dialog.connect_response(None, move |_, response| {
+        if response == "delete"
+            && let Some((s, d)) = pending.borrow_mut().take()
+            && let Some(commit) = commit_delete.borrow_mut().take()
+        {
+            commit(s, d);
+        }
+    });
+    dialog.present(Some(parent));
 }
 
 fn is_row_mutation_input(input: &BrowseTabInput) -> bool {
