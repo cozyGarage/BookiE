@@ -44,7 +44,7 @@ fn operators_for(column: &ColumnInfo) -> &'static [OpEntry] {
     }
 }
 
-const OPS_TEXT: [OpEntry; 14] = [
+const OPS_TEXT: [OpEntry; 15] = [
     OpEntry {
         op: FilterOp::Eq,
         label: "equals",
@@ -58,6 +58,11 @@ const OPS_TEXT: [OpEntry; 14] = [
     OpEntry {
         op: FilterOp::Contains,
         label: "contains",
+        shape: ValueShape::Single,
+    },
+    OpEntry {
+        op: FilterOp::IContains,
+        label: "contains (case-insensitive)",
         shape: ValueShape::Single,
     },
     OpEntry {
