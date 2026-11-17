@@ -64,10 +64,6 @@ pub fn create_database_file_message(
     }
 }
 
-pub fn transport_message(error: bookie_transport::TransportError) -> String {
-    open_failure_message(&bookie_app_services::open_failure::OpenFailure::from(error))
-}
-
 #[cfg(test)]
 #[path = "error_text_tests.rs"]
 mod tests;

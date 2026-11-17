@@ -30,7 +30,24 @@ pub(super) fn remedy_label(remedy: TlsRemedy) -> String {
     match remedy {
         TlsRemedy::ChooseCertificateAuthority => bookie_app_services::tr!("Choose certificate authority"),
         TlsRemedy::CheckServerName => bookie_app_services::tr!("Check host name"),
+        TlsRemedy::DisableTls => bookie_app_services::tr!("Set TLS to Disabled"),
     }
+}
+
+pub(super) fn remedy_applies_to_host(remedy: TlsRemedy, host: &str) -> bool {
+    remedy != TlsRemedy::DisableTls || is_loopback_host(host)
+}
+
+fn is_loopback_host(host: &str) -> bool {
+    let trimmed = host.trim();
+    let bare = trimmed
+        .strip_prefix('[')
+        .and_then(|inner| inner.strip_suffix(']'))
+        .unwrap_or(trimmed);
+    bare.eq_ignore_ascii_case("localhost")
+        || bare
+            .parse::<std::net::IpAddr>()
+            .is_ok_and(|address| address.is_loopback())
 }
 
 #[cfg(test)]
@@ -54,6 +71,28 @@ mod tests {
             "certificate verify failed: hostname mismatch".into(),
         )));
         assert_eq!(failure.tls_remedy, Some(TlsRemedy::CheckServerName));
+    }
+
+    #[test]
+    fn a_server_without_tls_offers_to_disable_it_only_for_loopback_hosts() {
+        let failure = ConnectFailure::from_transport(TransportError::Driver(DriverError::Tls(
+            "server does not support TLS".into(),
+        )));
+        let remedy = failure.tls_remedy.expect("a remedy");
+        assert_eq!(remedy, TlsRemedy::DisableTls);
+        for host in ["localhost", "LOCALHOST", "127.0.0.1", "127.9.9.9", "::1", "[::1]"] {
+            assert!(remedy_applies_to_host(remedy, host), "{host}");
+        }
+        for host in [
+            "db.example.com",
+            "10.0.0.5",
+            "192.168.1.10",
+            "",
+            "localhost.example.com",
+        ] {
+            assert!(!remedy_applies_to_host(remedy, host), "{host}");
+        }
+        assert!(remedy_applies_to_host(TlsRemedy::CheckServerName, "db.example.com"));
     }
 
     #[test]

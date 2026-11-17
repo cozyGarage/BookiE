@@ -15,6 +15,7 @@ pub enum TlsFailureKind {
 pub enum TlsRemedy {
     ChooseCertificateAuthority,
     CheckServerName,
+    DisableTls,
 }
 
 impl TlsFailureKind {
@@ -22,7 +23,8 @@ impl TlsFailureKind {
         match self {
             Self::UnknownIssuer => Some(TlsRemedy::ChooseCertificateAuthority),
             Self::NameMismatch => Some(TlsRemedy::CheckServerName),
-            Self::Expired | Self::NotYetValid | Self::Revoked | Self::ServerRefusedTls | Self::Other => None,
+            Self::ServerRefusedTls => Some(TlsRemedy::DisableTls),
+            Self::Expired | Self::NotYetValid | Self::Revoked | Self::Other => None,
         }
     }
 
@@ -228,10 +230,11 @@ mod tests {
     }
 
     #[test]
-    fn only_trust_and_name_failures_offer_a_form_remedy() {
+    fn only_trust_name_and_refused_failures_offer_a_form_remedy() {
         assert_eq!(UnknownIssuer.remedy(), Some(TlsRemedy::ChooseCertificateAuthority));
         assert_eq!(NameMismatch.remedy(), Some(TlsRemedy::CheckServerName));
-        for kind in [Expired, NotYetValid, Revoked, ServerRefusedTls, Other] {
+        assert_eq!(ServerRefusedTls.remedy(), Some(TlsRemedy::DisableTls));
+        for kind in [Expired, NotYetValid, Revoked, Other] {
             assert_eq!(kind.remedy(), None);
         }
     }
