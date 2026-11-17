@@ -594,6 +594,7 @@ async fn value_contract_domain_over_enum_file_formats_preserve_values_and_refuse
             }
             bookie_core::export::ResultFormat::Csv
             | bookie_core::export::ResultFormat::Json
+            | bookie_core::export::ResultFormat::JsonLines
             | bookie_core::export::ResultFormat::Sql
             | bookie_core::export::ResultFormat::Xlsx => {}
         }

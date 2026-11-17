@@ -470,6 +470,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::browse_tab::chrome_tests::an_estimated_row_count_updates_the_paginator_with_tilde"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::browse_tab::chrome_tests::active_save_completion_clears_submitted_edits"
     ],
     [

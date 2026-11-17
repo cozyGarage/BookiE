@@ -489,6 +489,7 @@ fn every_format_stops_at_the_first_cancelled_row_without_touching_the_destinatio
     for format in [
         ResultFormat::Csv,
         ResultFormat::Json,
+        ResultFormat::JsonLines,
         ResultFormat::Markdown,
         ResultFormat::Html,
         ResultFormat::Xml,
