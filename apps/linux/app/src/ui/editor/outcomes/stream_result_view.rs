@@ -29,7 +29,7 @@ pub(in crate::ui::editor) fn build_streamed_result_widget(
     } else {
         page_switcher.set_widget_name(&super::super::stream_view::completed_page_stack_name(result.generation));
     }
-    let header = super::super::stream_view::build_header(&progress);
+    let header = super::super::stream_view::build_header();
     holder.append(&header);
     if let Some(notice) = stream_terminal_notice(result) {
         let banner = adw::Banner::new(&notice);
@@ -39,13 +39,13 @@ pub(in crate::ui::editor) fn build_streamed_result_widget(
         holder.append(&banner);
     }
     let pager = super::super::stream_view::build_pager(&page_switcher);
-    header.append(&pager);
     append_result_tools(&holder, &header, &page_switcher, outcome, result, sender);
     append_stream_export(&header, &page_switcher, result, grid_sender);
     if matches!(result.terminal, StreamTerminal::Complete) && sender.is_some() {
         super::super::stream_view::install_continuous(&holder, &header, &pager, &page_switcher, result, &target);
     }
     holder.append(&page_switcher);
+    holder.append(&super::super::stream_view::build_footer(&progress, &pager));
     holder.upcast()
 }
 
