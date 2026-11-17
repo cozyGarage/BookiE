@@ -950,13 +950,17 @@ async fn run_connect(
         server_version,
         query_timeout_secs: saved.query_timeout_secs,
     };
-    Ok(Some(connection_service::PreparedConnection::new(
-        tables,
-        views,
-        saved.driver_id.clone(),
-        metadata,
-        conn,
-        tunnel,
-        params,
-    )))
+    let dial = bookie_app_services::dial_identity::DialIdentity::new(&saved, &stored_password);
+    Ok(Some(
+        connection_service::PreparedConnection::new(
+            tables,
+            views,
+            saved.driver_id.clone(),
+            metadata,
+            conn,
+            tunnel,
+            params,
+        )
+        .with_dial_identity(dial),
+    ))
 }

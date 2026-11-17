@@ -23,6 +23,7 @@ pub struct PreparedConnection {
     tunnel: Option<Tunnel>,
     read_only: bool,
     params: ReconnectParams,
+    dial: Option<crate::dial_identity::DialIdentity>,
 }
 
 impl std::fmt::Debug for PreparedConnection {
@@ -72,7 +73,17 @@ impl PreparedConnection {
             connection,
             tunnel,
             params,
+            dial: None,
         }
+    }
+
+    pub fn with_dial_identity(mut self, dial: crate::dial_identity::DialIdentity) -> Self {
+        self.dial = Some(dial);
+        self
+    }
+
+    pub fn dial_identity(&self) -> Option<&crate::dial_identity::DialIdentity> {
+        self.dial.as_ref()
     }
 
     /// Returns `None` without changing anything when `id` is already active
@@ -175,21 +186,17 @@ pub async fn open_saved(
         server_version,
         ..metadata
     };
+    let dial = crate::dial_identity::DialIdentity::new(&saved, &opts.password);
     let params = ReconnectParams {
         driver,
         opts,
         ssh: ssh_hops,
         environment: ssh_environment,
     };
-    Ok(PreparedConnection::new(
-        tables,
-        views,
-        saved.driver_id,
-        metadata,
-        connection,
-        tunnel,
-        params,
-    ))
+    Ok(
+        PreparedConnection::new(tables, views, saved.driver_id, metadata, connection, tunnel, params)
+            .with_dial_identity(dial),
+    )
 }
 
 pub struct EstablishFailure {

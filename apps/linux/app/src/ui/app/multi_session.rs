@@ -22,6 +22,7 @@ pub(super) struct MultiSessionState {
     pub sessions: WindowSessions,
     pub guards: GuardedSessionMap,
     pub catalogs: HashMap<Uuid, SessionCatalog>,
+    pub dial: HashMap<Uuid, bookie_app_services::dial_identity::DialIdentity>,
     pub restore_queue: VecDeque<Uuid>,
 }
 
@@ -178,6 +179,7 @@ impl App {
     pub(super) fn release_connection_resources(&mut self, connection_id: Uuid) {
         self.multi.guards.remove(connection_id);
         self.multi.catalogs.remove(&connection_id);
+        self.multi.dial.remove(&connection_id);
         self.database.close(connection_id);
         crate::services::approval_grants::shared().revoke_connection(connection_id);
         crate::services::window_registry::unregister(connection_id);
