@@ -25,6 +25,7 @@ mod warnings;
 pub(crate) use text_protocol::{contains_use_statement, is_call_statement, text_protocol};
 use text_protocol::{mysql_row_payload_bytes, statement_columns};
 mod temporal;
+mod view_definition;
 mod view_editability;
 
 use bookie_core::sql_syntax::script::LexicalSettings;
@@ -297,6 +298,19 @@ impl Connection for MysqlConnection {
     ) -> Result<bookie_core::ViewEditability, DriverError> {
         let mut connection = self.pool.acquire().await.map_err(map_sqlx_error)?;
         view_editability::fetch(&mut connection, schema, table).await
+    }
+
+    async fn fetch_view_editability_controlled(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        control: &OperationControl,
+    ) -> Result<bookie_core::ViewEditability, DriverError> {
+        stoppable!(self, control, |connection| view_editability::fetch(
+            &mut connection,
+            schema,
+            table
+        ))
     }
 
     async fn fetch_columns_controlled(

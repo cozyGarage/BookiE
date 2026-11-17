@@ -1,50 +1,58 @@
-use std::collections::HashSet;
-
 use bookie_core::{DriverError, ViewEditability};
-use sqlx::{AssertSqlSafe, Column, Executor, MySqlConnection, Row, SqlSafeStr, Statement};
+use sqlx::{MySqlConnection, Row};
 
-use crate::map_sqlx_error;
+use crate::{map_sqlx_error, view_definition};
 
 pub(super) async fn fetch(
     connection: &mut MySqlConnection,
     schema: Option<&str>,
     view: &str,
 ) -> Result<ViewEditability, DriverError> {
-    let Some((schema, updatable)) = view_info(connection, schema, view).await? else {
+    let Some(info) = view_info(connection, schema, view).await? else {
         return Ok(ViewEditability::NotApplicable);
     };
-    if !updatable {
+    if !info.updatable {
         return Ok(ViewEditability::NotUpdatable);
     }
-    let description = describe_view(connection, &schema, view).await?;
-    let Some(base_table) = single_base_table(&description.origins) else {
+    let Some(parsed) = view_definition::parse(&info.definition) else {
         return Ok(ViewEditability::NotUpdatable);
     };
-    let Some((base_schema, base_name)) = base_table.rsplit_once('.') else {
+    if parsed.base_schema.as_deref().is_some_and(|base| base != info.schema) {
         return Ok(ViewEditability::NotUpdatable);
-    };
-    let primary_key = primary_key(connection, base_schema, base_name).await?;
+    }
+    let primary_key = primary_key(connection, &info.schema, &parsed.base_table).await?;
     if primary_key.is_empty() {
         return Ok(ViewEditability::KeyNotExposed);
     }
-    let Some(key_columns) = exposed_keys(&description.origins, base_table, &primary_key) else {
+    let Some(key_columns) = exposed_keys(&parsed, &primary_key) else {
         return Ok(ViewEditability::KeyNotExposed);
     };
-
+    let read_only_columns = parsed
+        .columns
+        .iter()
+        .filter(|column| column.origin.is_none())
+        .map(|column| column.alias.clone())
+        .collect();
     Ok(ViewEditability::Editable {
         key_columns,
-        read_only_columns: description.read_only_columns,
+        read_only_columns,
         insertable: false,
     })
+}
+
+struct ViewInfo {
+    schema: String,
+    updatable: bool,
+    definition: String,
 }
 
 async fn view_info(
     connection: &mut MySqlConnection,
     schema: Option<&str>,
     view: &str,
-) -> Result<Option<(String, bool)>, DriverError> {
+) -> Result<Option<ViewInfo>, DriverError> {
     Ok(sqlx::query(
-        "SELECT CAST(table_schema AS CHAR), is_updatable
+        "SELECT CAST(table_schema AS CHAR), is_updatable, CAST(view_definition AS CHAR)
          FROM information_schema.views
          WHERE table_schema = COALESCE(?, DATABASE()) AND table_name = ?",
     )
@@ -53,44 +61,11 @@ async fn view_info(
     .fetch_optional(&mut *connection)
     .await
     .map_err(map_sqlx_error)?
-    .map(|row| (row.get::<String, _>(0), row.get::<String, _>(1) == "YES")))
-}
-
-async fn describe_view(connection: &mut MySqlConnection, schema: &str, view: &str) -> Result<ViewColumns, DriverError> {
-    let sql = format!(
-        "SELECT * FROM `{}`.`{}` LIMIT 0",
-        schema.replace('`', "``"),
-        view.replace('`', "``")
-    );
-    let description = connection
-        .prepare_with(AssertSqlSafe(sql.as_str()).into_sql_str(), &[])
-        .await
-        .map_err(map_sqlx_error)?;
-    let mut metadata = ViewColumns::default();
-    for column in description.columns() {
-        if let Some(origin) = column.origin().table_column() {
-            metadata.origins.push(Origin {
-                name: column.name().to_owned(),
-                table: origin.table.to_string(),
-                column: origin.name.to_string(),
-            });
-        } else {
-            metadata.read_only_columns.push(column.name().to_owned());
-        }
-    }
-    Ok(metadata)
-}
-
-fn single_base_table(origins: &[Origin]) -> Option<&str> {
-    let tables = origins
-        .iter()
-        .map(|origin| origin.table.as_str())
-        .collect::<HashSet<_>>();
-    if tables.len() == 1 {
-        tables.iter().next().copied()
-    } else {
-        None
-    }
+    .map(|row| ViewInfo {
+        schema: row.get::<String, _>(0),
+        updatable: row.get::<String, _>(1) == "YES",
+        definition: row.get::<String, _>(2),
+    }))
 }
 
 async fn primary_key(connection: &mut MySqlConnection, schema: &str, table: &str) -> Result<Vec<String>, DriverError> {
@@ -110,26 +85,20 @@ async fn primary_key(connection: &mut MySqlConnection, schema: &str, table: &str
     .collect())
 }
 
-fn exposed_keys(origins: &[Origin], base_table: &str, primary_key: &[String]) -> Option<Vec<String>> {
+fn exposed_keys(parsed: &view_definition::ParsedView, primary_key: &[String]) -> Option<Vec<String>> {
     primary_key
         .iter()
         .map(|key| {
-            origins
+            parsed
+                .columns
                 .iter()
-                .find(|origin| origin.table == base_table && origin.column == *key)
-                .map(|origin| origin.name.clone())
+                .find(|column| {
+                    column
+                        .origin
+                        .as_ref()
+                        .is_some_and(|(table, name)| *table == parsed.base_table && name == key)
+                })
+                .map(|column| column.alias.clone())
         })
         .collect()
-}
-
-#[derive(Default)]
-struct ViewColumns {
-    origins: Vec<Origin>,
-    read_only_columns: Vec<String>,
-}
-
-struct Origin {
-    name: String,
-    table: String,
-    column: String,
 }
