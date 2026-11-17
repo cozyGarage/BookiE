@@ -4,7 +4,7 @@ use std::path::Path;
 use super::csv::{CsvOptions, CsvWriter};
 use super::error::ExportError;
 use super::html::HtmlWriter;
-use super::json::JsonWriter;
+use super::json::{JsonLinesWriter, JsonWriter};
 use super::markdown::MarkdownWriter;
 use super::sql::SqlWriter;
 use super::write_atomically_checked;
@@ -17,6 +17,7 @@ use crate::query::{ColumnInfo, Value};
 pub enum ResultFormat {
     Csv,
     Json,
+    JsonLines,
     Markdown,
     Html,
     Xml,
@@ -48,6 +49,7 @@ pub(super) fn writer_for(export: &ResultExport<'_>, row_count: usize) -> Result<
     Ok(match export.format {
         ResultFormat::Csv => Box::new(CsvWriter::new(export.csv)),
         ResultFormat::Json => Box::new(JsonWriter::new()),
+        ResultFormat::JsonLines => Box::new(JsonLinesWriter::new()),
         ResultFormat::Markdown => Box::new(MarkdownWriter::new()),
         ResultFormat::Html => Box::new(HtmlWriter),
         ResultFormat::Xml => Box::new(XmlWriter::new()),

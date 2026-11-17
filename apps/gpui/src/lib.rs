@@ -1,5 +1,6 @@
 #![recursion_limit = "256"]
 pub mod core_bridge;
+pub mod csv_delimiter;
 pub mod detail;
 pub mod edit;
 pub mod font_settings;

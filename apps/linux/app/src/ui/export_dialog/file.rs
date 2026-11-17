@@ -100,6 +100,7 @@ fn result_format(format: super::ExportFormat) -> ResultFormat {
     match format {
         super::ExportFormat::Csv => ResultFormat::Csv,
         super::ExportFormat::Json => ResultFormat::Json,
+        super::ExportFormat::JsonLines => ResultFormat::JsonLines,
         super::ExportFormat::Markdown => ResultFormat::Markdown,
         super::ExportFormat::Html => ResultFormat::Html,
         super::ExportFormat::Xml => ResultFormat::Xml,

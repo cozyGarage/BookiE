@@ -65,4 +65,5 @@ Limits of the GPUI frontend after the DataTable change. It is the chosen cross-p
 
 - **Cell selection:** a cell is always selected while rows are shown (the top-left cell at first), so the cursor is always visible.
 - **Sidebar:** the narrow header label clips when the pane is narrow; connection import and export menu entries report that they are not available yet.
+- **CSV delimiter:** the GPUI frontend has no CSV import and no export dialog; Export and Copy as CSV write to the clipboard. The palette command `csv delimiter <text>` (1 to 8 characters, no quote or line break) sets a multi-character delimiter for those copies until the app closes, and "CSV delimiter: back to the comma" resets it ([#3096](https://github.com/cozyGarage/BookiE/issues/3096)).
 - **Settings:** one switch (Dark theme); the palette opens the page.

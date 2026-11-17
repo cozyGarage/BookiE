@@ -112,10 +112,11 @@ fn the_csv_options_group_belongs_to_csv_alone() {
 fn the_selected_row_maps_to_the_format_offered_at_that_position() {
     let formats = available_formats("mongodb", None);
     assert_eq!(selected_format(&formats, 0), ExportFormat::Csv);
-    assert_eq!(selected_format(&formats, 5), ExportFormat::Xlsx);
+    assert_eq!(selected_format(&formats, 2), ExportFormat::JsonLines);
+    assert_eq!(selected_format(&formats, 6), ExportFormat::Xlsx);
     assert_eq!(selected_format(&formats, 99), ExportFormat::Csv);
     assert_eq!(
-        selected_format(&available_formats("postgres", None), 5),
+        selected_format(&available_formats("postgres", None), 6),
         ExportFormat::Sql
     );
 }

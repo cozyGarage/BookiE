@@ -502,3 +502,32 @@ fn every_format_stops_at_the_first_cancelled_row_without_touching_the_destinatio
         assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 0, "{format:?}");
     }
 }
+
+#[test]
+fn json_lines_files_hold_one_object_per_line_with_the_same_values_as_json() {
+    let data = QueryResult {
+        columns: ["id", "name"].map(column).to_vec(),
+        rows: vec![
+            vec![Value::Int(1), Value::Text("a\nb".into())],
+            vec![Value::Int(2), Value::Null],
+        ]
+        .into(),
+        truncated: false,
+    };
+    let lines = String::from_utf8(exported_result(&data, ResultFormat::JsonLines)).unwrap();
+    assert!(lines.ends_with('\n'));
+    let parsed: Vec<serde_json::Value> = lines.lines().map(|line| serde_json::from_str(line).unwrap()).collect();
+    let array: serde_json::Value = serde_json::from_slice(&exported_result(&data, ResultFormat::Json)).unwrap();
+    assert_eq!(serde_json::Value::Array(parsed), array);
+    assert_eq!(lines.lines().count(), 2);
+}
+
+#[test]
+fn json_lines_of_an_empty_result_is_an_empty_file() {
+    let data = QueryResult {
+        columns: ["id"].map(column).to_vec(),
+        rows: Vec::new().into(),
+        truncated: false,
+    };
+    assert!(exported_result(&data, ResultFormat::JsonLines).is_empty());
+}

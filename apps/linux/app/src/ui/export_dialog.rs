@@ -92,6 +92,7 @@ pub(crate) struct ExportRequest {
 enum ExportFormat {
     Csv,
     Json,
+    JsonLines,
     Markdown,
     Html,
     Xml,
@@ -107,7 +108,7 @@ struct FormatSpec {
     csv_options: bool,
 }
 
-const FORMATS: [FormatSpec; 7] = [
+const FORMATS: [FormatSpec; 8] = [
     FormatSpec {
         format: ExportFormat::Csv,
         label: "CSV",
@@ -120,6 +121,13 @@ const FORMATS: [FormatSpec; 7] = [
         label: "JSON",
         extension: "json",
         mime_type: "application/json",
+        csv_options: false,
+    },
+    FormatSpec {
+        format: ExportFormat::JsonLines,
+        label: "JSON Lines",
+        extension: "jsonl",
+        mime_type: "application/x-ndjson",
         csv_options: false,
     },
     FormatSpec {
