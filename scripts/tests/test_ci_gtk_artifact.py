@@ -188,6 +188,12 @@ class GtkArtifactTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "schema digest"):
             self.verify()
 
+    def test_pre_existing_empty_schema_dir_is_accepted_and_populated(self):
+        (self.output / "schemas").mkdir(parents=True)
+        self.create()
+        self.assertEqual(self.verify().read_bytes(), self.binary.read_bytes())
+        self.assertTrue((self.output / "schemas/gschemas.compiled").is_file())
+
     def test_feature_identity_reads_default_features_from_the_app_manifest(self):
         self.assertEqual(artifact.feature_identity(), FEATURES)
 

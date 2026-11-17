@@ -198,6 +198,225 @@ pub enum StructureTabOutput {
 }
 
 impl StructureTab {
+    fn on_table_collation_edited(&self, collation: Option<String>, sender: &ComponentSender<Self>) {
+        if *self.default_collation.borrow() == collation {
+            return;
+        }
+        *self.default_collation.borrow_mut() = collation;
+        self.recompute_dirty_state(sender);
+    }
+
+    fn on_table_name_edited(&self, text: String, sender: &ComponentSender<Self>) {
+        let prev = self.table_name.borrow().clone();
+        if prev == text {
+            return;
+        }
+        *self.table_name.borrow_mut() = text;
+        self.recompute_dirty_state(sender);
+    }
+
+    fn remove_entry<T>(&self, list: &RefCell<Vec<T>>, position: usize, sender: &ComponentSender<Self>) {
+        {
+            let mut entries = list.borrow_mut();
+            if position >= entries.len() {
+                return;
+            }
+            entries.remove(position);
+        }
+        self.recompute_dirty_state(sender);
+        sender.input(StructureTabInput::Refresh);
+    }
+
+    fn add_entry<T>(&self, list: &RefCell<Vec<T>>, entry: T, sender: &ComponentSender<Self>) {
+        list.borrow_mut().push(entry);
+        self.recompute_dirty_state(sender);
+        sender.input(StructureTabInput::Refresh);
+    }
+
+    fn on_structure_loaded(
+        &mut self,
+        columns: Vec<ColumnInfo>,
+        metadata: StructureMetadata,
+        sender: &ComponentSender<Self>,
+    ) {
+        *self.original_columns.borrow_mut() = columns.clone();
+        *self.columns.borrow_mut() = columns.into_iter().map(DraftColumn::from_info).collect();
+        *self.indexes.borrow_mut() = metadata.indexes.clone();
+        *self.original_indexes.borrow_mut() = metadata.indexes;
+        *self.foreign_keys.borrow_mut() = metadata.foreign_keys.clone();
+        *self.original_fks.borrow_mut() = metadata.foreign_keys;
+        self.supports_index_metadata = metadata.indexes_supported;
+        self.supports_foreign_key_metadata = metadata.foreign_keys_supported;
+        self.collations = metadata.collations.iter().map(|item| item.name.clone()).collect();
+        self.inner_stack.set_visible_child_name("editor");
+        self.refetching.set(false);
+        self.recompute_dirty_state(sender);
+        sender.input(StructureTabInput::Refresh);
+    }
+
+    fn on_column_edited(&mut self, index: usize, field: ColumnField, sender: &ComponentSender<Self>) {
+        let mut cols = self.columns.borrow_mut();
+        let Some(col) = cols.get_mut(index) else {
+            return;
+        };
+        let prev = col.clone();
+        match field {
+            ColumnField::Name(s) => col.name = s,
+            ColumnField::Type(s) => col.data_type = s,
+            ColumnField::Nullable(b) => col.nullable = b,
+            ColumnField::PrimaryKey(b) => {
+                col.primary_key = b;
+                // Auto-increment requires PK in every supported
+                // driver (MySQL rejects, Postgres SERIAL implies
+                // PK). When PK toggles off, the bound `sensitive`
+                // greys out the Auto checkbox visually but its
+                // `active` stays true — the model would then
+                // emit AUTO_INCREMENT in an invalid context.
+                // Coerce off here so model + tracker stay in
+                // sync with what the driver will accept.
+                if !b {
+                    col.auto_increment = false;
+                }
+            }
+            ColumnField::AutoIncrement(b) => col.auto_increment = b,
+            ColumnField::Default(s) => col.default_value = s,
+            ColumnField::Comment(s) => col.comment = s,
+            ColumnField::Collation(s) => col.collation = s,
+        }
+        let new_col = col.clone();
+        drop(cols);
+        // Echo guard — connect_changed / connect_toggled fire
+        // on programmatic widget set during rebuild, with the
+        // value already matching the model. Skipping the
+        // recompute saves a no-op diff pass.
+        if prev == new_col {
+            return;
+        }
+        self.recompute_dirty_state(sender);
+    }
+
+    fn on_add_column(&mut self, sender: &ComponentSender<Self>) {
+        let new_col = DraftColumn {
+            original: None,
+            name: {
+                let mut seq = self.next_column_seq.borrow_mut();
+                let name = format!("column_{}", *seq);
+                *seq += 1;
+                name
+            },
+            data_type: default_type_for(&self.driver_id),
+            nullable: true,
+            primary_key: false,
+            auto_increment: false,
+            default_value: None,
+            comment: None,
+            collation: None,
+        };
+        self.columns.borrow_mut().push(new_col);
+        self.recompute_dirty_state(sender);
+        sender.input(StructureTabInput::Refresh);
+    }
+
+    fn on_save(&mut self, sender: &ComponentSender<Self>) {
+        let table = self.table_name.borrow().clone();
+        let mode = *self.mode.borrow();
+        let columns = self.columns.borrow().clone();
+        let indexes = self.indexes.borrow().clone();
+        let draft = SaveDraft {
+            table_name: &table,
+            columns: &columns,
+            indexes: &indexes,
+            mode,
+            driver_id: &self.driver_id,
+        };
+        if let Err(message) = validate_save(&draft) {
+            let _ = sender.output(StructureTabOutput::ShowToast(message));
+            return;
+        }
+        let ops = self.current_diff_ops();
+        match materialize_ops(&ops, &self.driver_id) {
+            Ok(statements) if !statements.is_empty() => {
+                self.save_button.set_sensitive(false);
+                self.discard_button.set_sensitive(false);
+                let _ = sender.output(StructureTabOutput::ExecuteTransaction { statements });
+            }
+            Ok(_) => {
+                let _ = sender.output(StructureTabOutput::ShowToast(bookie_app_services::tr!(
+                    "Nothing to save."
+                )));
+            }
+            Err(BuildDdlError::SqliteNotSupported(detail)) => {
+                let _ = sender.output(StructureTabOutput::ShowAlert {
+                    title: bookie_app_services::tr!("Cannot save"),
+                    body: bookie_app_services::tr!("SQLite doesn't support: {detail}").replace("{detail}", detail),
+                });
+            }
+            Err(e) => {
+                let _ = sender.output(StructureTabOutput::ShowAlert {
+                    title: bookie_app_services::tr!("Cannot save"),
+                    body: format!("{e}"),
+                });
+            }
+        }
+    }
+
+    fn on_discard(&mut self, sender: &ComponentSender<Self>) {
+        let mode = *self.mode.borrow();
+        if matches!(mode, StructureMode::New) {
+            self.columns.borrow_mut().clear();
+            self.indexes.borrow_mut().clear();
+            self.foreign_keys.borrow_mut().clear();
+        } else {
+            *self.table_name.borrow_mut() = self.original_table_name.borrow().clone();
+            *self.columns.borrow_mut() = self
+                .original_columns
+                .borrow()
+                .iter()
+                .cloned()
+                .map(DraftColumn::from_info)
+                .collect();
+            *self.indexes.borrow_mut() = self.original_indexes.borrow().clone();
+            *self.foreign_keys.borrow_mut() = self.original_fks.borrow().clone();
+        }
+        self.recompute_dirty_state(sender);
+        sender.input(StructureTabInput::Refresh);
+    }
+
+    fn on_save_completed(&mut self, new_table_name: Option<String>, sender: &ComponentSender<Self>) {
+        if let Some(name) = new_table_name {
+            *self.mode.borrow_mut() = StructureMode::Edit;
+            *self.table_name.borrow_mut() = name.clone();
+            *self.original_table_name.borrow_mut() = name.clone();
+            self.name_entry.set_text(&name);
+            self.drop_button.set_visible(true);
+            self.name_row.set_visible(false);
+        }
+        if matches!(*self.mode.borrow(), StructureMode::Edit) {
+            // Eagerly zero the dirty state before the async refetch
+            // round-trip. Without this, recompute_dirty_state would
+            // diff the live model against the pre-save snapshot for
+            // the entire FetchStructure window, producing phantom
+            // pending ops for changes that were just committed —
+            // and the close-with-pending dialog would surface them
+            // if the user closed the tab during the refetch. The
+            // SQL preview is also reset to "no pending changes" so
+            // a New→Edit promotion doesn't leave a stale CREATE
+            // TABLE statement visible in the preview pane until
+            // StructureLoaded arrives.
+            self.structure_trackers.with_tab(self.tab_id, |t| t.clear());
+            self.refresh_buttons(0);
+            self.regenerate_sql_preview_from(&[]);
+            let mut last = self.last_dirty.borrow_mut();
+            if *last {
+                *last = false;
+                let _ = sender.output(StructureTabOutput::DirtyChanged(false));
+            }
+            drop(last);
+            self.refetching.set(true);
+            let _ = sender.output(StructureTabOutput::FetchStructure);
+        }
+    }
+
     fn show_table_default_collation(&self, collations: &[String], supported: bool) {
         let visible = supported && !collations.is_empty() && matches!(*self.mode.borrow(), StructureMode::New);
         self.table_collation_row.set_visible(visible);
@@ -765,19 +984,7 @@ impl SimpleComponent for StructureTab {
     fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>) {
         match msg {
             StructureTabInput::StructureLoaded { columns, metadata } => {
-                *self.original_columns.borrow_mut() = columns.clone();
-                *self.columns.borrow_mut() = columns.into_iter().map(DraftColumn::from_info).collect();
-                *self.indexes.borrow_mut() = metadata.indexes.clone();
-                *self.original_indexes.borrow_mut() = metadata.indexes;
-                *self.foreign_keys.borrow_mut() = metadata.foreign_keys.clone();
-                *self.original_fks.borrow_mut() = metadata.foreign_keys;
-                self.supports_index_metadata = metadata.indexes_supported;
-                self.supports_foreign_key_metadata = metadata.foreign_keys_supported;
-                self.collations = metadata.collations.iter().map(|item| item.name.clone()).collect();
-                self.inner_stack.set_visible_child_name("editor");
-                self.refetching.set(false);
-                self.recompute_dirty_state(&sender);
-                sender.input(StructureTabInput::Refresh);
+                self.on_structure_loaded(columns, metadata, &sender)
             }
             StructureTabInput::CollationsLoaded {
                 collations,
@@ -787,13 +994,7 @@ impl SimpleComponent for StructureTab {
                 self.collations = Rc::from(collations);
                 sender.input(StructureTabInput::Refresh);
             }
-            StructureTabInput::TableCollationEdited(collation) => {
-                if *self.default_collation.borrow() == collation {
-                    return;
-                }
-                *self.default_collation.borrow_mut() = collation;
-                self.recompute_dirty_state(&sender);
-            }
+            StructureTabInput::TableCollationEdited(collation) => self.on_table_collation_edited(collation, &sender),
             StructureTabInput::LoadFailed(message) => {
                 self.error_status
                     .set_description(Some(&crate::ui::plain_text::escape_markup(&message)));
@@ -806,222 +1007,23 @@ impl SimpleComponent for StructureTab {
                 self.rebuild_fks_view(sender.clone());
                 self.regenerate_sql_preview_from(&self.current_diff_ops());
             }
-            StructureTabInput::TableNameEdited(text) => {
-                let prev = self.table_name.borrow().clone();
-                if prev == text {
-                    return;
-                }
-                *self.table_name.borrow_mut() = text;
-                self.recompute_dirty_state(&sender);
-            }
-            StructureTabInput::ColumnEdited { index, field } => {
-                let mut cols = self.columns.borrow_mut();
-                let Some(col) = cols.get_mut(index) else {
-                    return;
-                };
-                let prev = col.clone();
-                match field {
-                    ColumnField::Name(s) => col.name = s,
-                    ColumnField::Type(s) => col.data_type = s,
-                    ColumnField::Nullable(b) => col.nullable = b,
-                    ColumnField::PrimaryKey(b) => {
-                        col.primary_key = b;
-                        // Auto-increment requires PK in every supported
-                        // driver (MySQL rejects, Postgres SERIAL implies
-                        // PK). When PK toggles off, the bound `sensitive`
-                        // greys out the Auto checkbox visually but its
-                        // `active` stays true — the model would then
-                        // emit AUTO_INCREMENT in an invalid context.
-                        // Coerce off here so model + tracker stay in
-                        // sync with what the driver will accept.
-                        if !b {
-                            col.auto_increment = false;
-                        }
-                    }
-                    ColumnField::AutoIncrement(b) => col.auto_increment = b,
-                    ColumnField::Default(s) => col.default_value = s,
-                    ColumnField::Comment(s) => col.comment = s,
-                    ColumnField::Collation(s) => col.collation = s,
-                }
-                let new_col = col.clone();
-                drop(cols);
-                // Echo guard — connect_changed / connect_toggled fire
-                // on programmatic widget set during rebuild, with the
-                // value already matching the model. Skipping the
-                // recompute saves a no-op diff pass.
-                if prev == new_col {
-                    return;
-                }
-                self.recompute_dirty_state(&sender);
-            }
-            StructureTabInput::AddColumn => {
-                let new_col = DraftColumn {
-                    original: None,
-                    name: {
-                        let mut seq = self.next_column_seq.borrow_mut();
-                        let name = format!("column_{}", *seq);
-                        *seq += 1;
-                        name
-                    },
-                    data_type: default_type_for(&self.driver_id),
-                    nullable: true,
-                    primary_key: false,
-                    auto_increment: false,
-                    default_value: None,
-                    comment: None,
-                    collation: None,
-                };
-                self.columns.borrow_mut().push(new_col);
-                self.recompute_dirty_state(&sender);
-                sender.input(StructureTabInput::Refresh);
-            }
-            StructureTabInput::RemoveColumn(index) => {
-                {
-                    let mut cols = self.columns.borrow_mut();
-                    if index >= cols.len() {
-                        return;
-                    }
-                    cols.remove(index);
-                }
-                self.recompute_dirty_state(&sender);
-                sender.input(StructureTabInput::Refresh);
-            }
-            StructureTabInput::AddIndex(index) => {
-                self.indexes.borrow_mut().push(index);
-                self.recompute_dirty_state(&sender);
-                sender.input(StructureTabInput::Refresh);
-            }
-            StructureTabInput::RemoveIndex(idx_pos) => {
-                {
-                    let mut idxs = self.indexes.borrow_mut();
-                    if idx_pos >= idxs.len() {
-                        return;
-                    }
-                    idxs.remove(idx_pos);
-                }
-                self.recompute_dirty_state(&sender);
-                sender.input(StructureTabInput::Refresh);
-            }
-            StructureTabInput::AddForeignKey(fk) => {
-                self.foreign_keys.borrow_mut().push(fk);
-                self.recompute_dirty_state(&sender);
-                sender.input(StructureTabInput::Refresh);
-            }
-            StructureTabInput::RemoveForeignKey(idx_pos) => {
-                {
-                    let mut fks = self.foreign_keys.borrow_mut();
-                    if idx_pos >= fks.len() {
-                        return;
-                    }
-                    fks.remove(idx_pos);
-                }
-                self.recompute_dirty_state(&sender);
-                sender.input(StructureTabInput::Refresh);
-            }
-            StructureTabInput::Save => {
-                let table = self.table_name.borrow().clone();
-                let mode = *self.mode.borrow();
-                let columns = self.columns.borrow().clone();
-                let indexes = self.indexes.borrow().clone();
-                let draft = SaveDraft {
-                    table_name: &table,
-                    columns: &columns,
-                    indexes: &indexes,
-                    mode,
-                    driver_id: &self.driver_id,
-                };
-                if let Err(message) = validate_save(&draft) {
-                    let _ = sender.output(StructureTabOutput::ShowToast(message));
-                    return;
-                }
-                let ops = self.current_diff_ops();
-                match materialize_ops(&ops, &self.driver_id) {
-                    Ok(statements) if !statements.is_empty() => {
-                        self.save_button.set_sensitive(false);
-                        self.discard_button.set_sensitive(false);
-                        let _ = sender.output(StructureTabOutput::ExecuteTransaction { statements });
-                    }
-                    Ok(_) => {
-                        let _ = sender.output(StructureTabOutput::ShowToast(bookie_app_services::tr!(
-                            "Nothing to save."
-                        )));
-                    }
-                    Err(BuildDdlError::SqliteNotSupported(detail)) => {
-                        let _ = sender.output(StructureTabOutput::ShowAlert {
-                            title: bookie_app_services::tr!("Cannot save"),
-                            body: bookie_app_services::tr!("SQLite doesn't support: {detail}")
-                                .replace("{detail}", detail),
-                        });
-                    }
-                    Err(e) => {
-                        let _ = sender.output(StructureTabOutput::ShowAlert {
-                            title: bookie_app_services::tr!("Cannot save"),
-                            body: format!("{e}"),
-                        });
-                    }
-                }
-            }
-            StructureTabInput::Discard => {
-                let mode = *self.mode.borrow();
-                if matches!(mode, StructureMode::New) {
-                    self.columns.borrow_mut().clear();
-                    self.indexes.borrow_mut().clear();
-                    self.foreign_keys.borrow_mut().clear();
-                } else {
-                    *self.table_name.borrow_mut() = self.original_table_name.borrow().clone();
-                    *self.columns.borrow_mut() = self
-                        .original_columns
-                        .borrow()
-                        .iter()
-                        .cloned()
-                        .map(DraftColumn::from_info)
-                        .collect();
-                    *self.indexes.borrow_mut() = self.original_indexes.borrow().clone();
-                    *self.foreign_keys.borrow_mut() = self.original_fks.borrow().clone();
-                }
-                self.recompute_dirty_state(&sender);
-                sender.input(StructureTabInput::Refresh);
-            }
+            StructureTabInput::TableNameEdited(text) => self.on_table_name_edited(text, &sender),
+            StructureTabInput::ColumnEdited { index, field } => self.on_column_edited(index, field, &sender),
+            StructureTabInput::AddColumn => self.on_add_column(&sender),
+            StructureTabInput::RemoveColumn(index) => self.remove_entry(&self.columns, index, &sender),
+            StructureTabInput::AddIndex(index) => self.add_entry(&self.indexes, index, &sender),
+            StructureTabInput::RemoveIndex(idx_pos) => self.remove_entry(&self.indexes, idx_pos, &sender),
+            StructureTabInput::AddForeignKey(fk) => self.add_entry(&self.foreign_keys, fk, &sender),
+            StructureTabInput::RemoveForeignKey(idx_pos) => self.remove_entry(&self.foreign_keys, idx_pos, &sender),
+            StructureTabInput::Save => self.on_save(&sender),
+            StructureTabInput::Discard => self.on_discard(&sender),
             StructureTabInput::DropTableRequested => {
                 let _ = sender.output(StructureTabOutput::DropTableRequested {
                     schema: self.schema.clone(),
                     table: self.table_name.borrow().clone(),
                 });
             }
-            StructureTabInput::SaveCompleted { new_table_name } => {
-                if let Some(name) = new_table_name {
-                    *self.mode.borrow_mut() = StructureMode::Edit;
-                    *self.table_name.borrow_mut() = name.clone();
-                    *self.original_table_name.borrow_mut() = name.clone();
-                    self.name_entry.set_text(&name);
-                    self.drop_button.set_visible(true);
-                    self.name_row.set_visible(false);
-                }
-                if matches!(*self.mode.borrow(), StructureMode::Edit) {
-                    // Eagerly zero the dirty state before the async refetch
-                    // round-trip. Without this, recompute_dirty_state would
-                    // diff the live model against the pre-save snapshot for
-                    // the entire FetchStructure window, producing phantom
-                    // pending ops for changes that were just committed —
-                    // and the close-with-pending dialog would surface them
-                    // if the user closed the tab during the refetch. The
-                    // SQL preview is also reset to "no pending changes" so
-                    // a New→Edit promotion doesn't leave a stale CREATE
-                    // TABLE statement visible in the preview pane until
-                    // StructureLoaded arrives.
-                    self.structure_trackers.with_tab(self.tab_id, |t| t.clear());
-                    self.refresh_buttons(0);
-                    self.regenerate_sql_preview_from(&[]);
-                    let mut last = self.last_dirty.borrow_mut();
-                    if *last {
-                        *last = false;
-                        let _ = sender.output(StructureTabOutput::DirtyChanged(false));
-                    }
-                    drop(last);
-                    self.refetching.set(true);
-                    let _ = sender.output(StructureTabOutput::FetchStructure);
-                }
-            }
+            StructureTabInput::SaveCompleted { new_table_name } => self.on_save_completed(new_table_name, &sender),
             StructureTabInput::SaveFailed(message) => {
                 self.recompute_dirty_state(&sender);
                 let _ = sender.output(StructureTabOutput::ShowAlert {

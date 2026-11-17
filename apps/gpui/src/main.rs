@@ -198,8 +198,15 @@ impl GridView {
         Self::with_source(std::sync::Arc::new(Synthetic::new(total)), started, window, cx)
     }
 
-    fn with_source(source: Source, started: Instant, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let total = source.total();
+    fn init_query_inputs(
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> (
+        Entity<TextInput>,
+        Entity<TextInput>,
+        Entity<TextInput>,
+        Entity<EditorState>,
+    ) {
         let find = cx.new(|cx| TextInput::new("Find", cx));
         let filter = cx.new(|cx| TextInput::new("label contains 7", cx));
         cx.subscribe(&find, |this, _, event: &InputEvent, cx| match event {
@@ -229,10 +236,6 @@ impl GridView {
             this.on_editor_event(event, window, cx);
         })
         .detach();
-        let mut font_names = cx.text_system().all_font_names();
-        font_names.sort();
-        font_names.dedup();
-        let sidebar_search = cx.new(|cx| TextInput::new("Search tables", cx));
         let sql_input = cx.new(|cx| {
             EditorState::new(window, cx)
                 .language("sql")
@@ -250,6 +253,14 @@ impl GridView {
             },
         )
         .detach();
+        (find, filter, editor, sql_input)
+    }
+
+    fn init_chrome_inputs(
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> (Entity<TextInput>, Entity<TextInput>) {
+        let sidebar_search = cx.new(|cx| TextInput::new("Search tables", cx));
         cx.subscribe(&sidebar_search, |_, _, _: &InputEvent, cx| cx.notify())
             .detach();
         let palette_input = cx.new(|cx| TextInput::new("Type a command", cx));
@@ -273,6 +284,17 @@ impl GridView {
             },
         )
         .detach();
+        (sidebar_search, palette_input)
+    }
+
+    fn init_grid_table(
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> (
+        Entity<gpui_kit::component::table::TableState<grid_table::GridDelegate>>,
+        FocusHandle,
+        gpui::Subscription,
+    ) {
         let table = cx.new(|cx| {
             gpui_kit::component::table::TableState::new(grid_table::GridDelegate::default(), window, cx)
                 .cell_selectable(true)
@@ -302,85 +324,55 @@ impl GridView {
                 _ => {}
             },
         );
+        (table, table_focus, table_events)
+    }
+
+    fn with_source(source: Source, started: Instant, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let total = source.total();
+        let (find, filter, editor, sql_input) = Self::init_query_inputs(window, cx);
+        let (sidebar_search, palette_input) = Self::init_chrome_inputs(window, cx);
+        let (table, table_focus, table_events) = Self::init_grid_table(window, cx);
+        let mut font_names = cx.text_system().all_font_names();
+        font_names.sort();
+        font_names.dedup();
         GridView {
             fonts: font_settings::load(),
             table,
             _table_events: table_events,
-            keystroke_hook: None,
-            focus_editor: false,
+            focus: table_focus,
             table_source: source.clone(),
             source,
             mode: Mode::All,
             pager: Pager::new(total),
-            continuous: false,
             find,
             filter,
-            filter_visible: false,
             editor,
-            editing: None,
-            edits: Default::default(),
-            table_edits: Default::default(),
-            grid_is_query: false,
-            find_reset: false,
-            cell_cursor: None,
-            viewport_rows: 10,
-            palette_input,
-            palette_open: false,
-            detail_open: false,
-            catalog: Catalog::synthetic(),
-            live: None,
-            connections: Vec::new(),
-            keymap: Keymap::default(),
-            palette_index: 0,
-            dark_mode: Theme::current(cx).dark,
-            tabs: Tabs::default(),
-            tab_scroll: ScrollHandle::new(),
-            runs: vec![Run {
-                number: 1,
-                rows: total,
-                elapsed_ms: None,
-            }],
-            run_edits: vec![grid_edit::Edits::new()],
-            run_sources: vec![None],
             sql_input,
-            active_run: 0,
-            run_scroll: ScrollHandle::new(),
-            next_run_number: 2,
-            result_view: ResultView::Table,
-            messages: MessageLog::default(),
-            result_ratio: DEFAULT_RESULT_RATIO,
-            result_open: true,
-            resizing_split: false,
-            font: default_font(&font_names).into(),
-            font_names,
-            palette_fonts: false,
-            palette_address: None,
-            palette_pattern: None,
-            check_histories: Vec::new(),
-            sidebar_open: true,
-            import_menu_open: false,
-            sidebar_regex: false,
-            sidebar_active_only: false,
-            sidebar_width: 340.0,
-            resizing_sidebar: false,
-            connection_open: true,
-            database_open: true,
             sidebar_search,
-            cursor: MatchCursor::default(),
-            find_capped: false,
-            loads: Ticket::new(),
-            scans: Ticket::new(),
-            compare: None,
-            status: String::new(),
-            selection: None,
-            scroll: UniformListScrollHandle::new(),
-            focus: table_focus,
-            started,
-            first_frame_reported: false,
-            last_frame: None,
-            frame_intervals: Vec::new(),
-            measuring: false,
-            pace: None,
+            palette_input,
+            keystroke_hook: None, editing: None, cell_cursor: None,
+            palette_address: None, palette_pattern: None, compare: None,
+            selection: None, pace: None, last_frame: None,
+            focus_editor: false, continuous: false, filter_visible: false,
+            grid_is_query: false, find_reset: false, palette_open: false,
+            detail_open: false, palette_fonts: false, import_menu_open: false,
+            sidebar_regex: false, sidebar_active_only: false, find_capped: false,
+            measuring: false, first_frame_reported: false,
+            sidebar_open: true, connection_open: true, database_open: true, result_open: true,
+            resizing_split: false, resizing_sidebar: false,
+            edits: Default::default(), table_edits: Default::default(),
+            catalog: Catalog::synthetic(), live: None, keymap: Keymap::default(),
+            tabs: Tabs::default(), tab_scroll: ScrollHandle::new(), run_scroll: ScrollHandle::new(),
+            messages: MessageLog::default(), scroll: UniformListScrollHandle::new(),
+            runs: vec![Run { number: 1, rows: total, elapsed_ms: None }],
+            run_edits: vec![grid_edit::Edits::new()], run_sources: vec![None],
+            active_run: 0, next_run_number: 2, palette_index: 0, viewport_rows: 10,
+            dark_mode: Theme::current(cx).dark, result_view: ResultView::Table,
+            result_ratio: DEFAULT_RESULT_RATIO, sidebar_width: 340.0,
+            font: default_font(&font_names).into(), font_names,
+            connections: Vec::new(), check_histories: Vec::new(), frame_intervals: Vec::new(),
+            cursor: MatchCursor::default(), loads: Ticket::new(), scans: Ticket::new(),
+            status: String::new(), started,
         }
     }
 

@@ -111,6 +111,7 @@ impl TextInput {
         }
     }
 
+    #[allow(dead_code)]
     pub fn text_align(&self) -> gpui::TextAlign {
         self.text_align
     }
@@ -520,69 +521,14 @@ impl Element for TextElement {
             (content, style.color)
         };
 
-        let run = TextRun {
-            len: display_text.len(),
-            font: style.font(),
-            color: text_color,
-            background_color: None,
-            underline: None,
-            strikethrough: None,
-        };
-        let runs = if let Some(marked_range) = input.marked_range.as_ref() {
-            vec![
-                TextRun {
-                    len: marked_range.start,
-                    ..run.clone()
-                },
-                TextRun {
-                    len: marked_range.end - marked_range.start,
-                    underline: Some(UnderlineStyle {
-                        color: Some(run.color),
-                        thickness: px(1.0),
-                        wavy: false,
-                    }),
-                    ..run.clone()
-                },
-                TextRun {
-                    len: display_text.len() - marked_range.end,
-                    ..run
-                },
-            ]
-            .into_iter()
-            .filter(|run| run.len > 0)
-            .collect()
-        } else {
-            vec![run]
-        };
-
+        let runs = build_text_runs(display_text.len(), input.marked_range.as_ref(), style.font(), text_color);
         let font_size = style.font_size.to_pixels(window.rem_size());
         let line = window.text_system().shape_line(display_text, font_size, &runs, None);
 
         let x_offset = compute_x_offset(input.text_align, bounds, line.width);
-        let cursor_pos = line.x_for_index(cursor);
-        let (selection, cursor) = if selected_range.is_empty() {
-            (
-                None,
-                Some(fill(
-                    Bounds::new(
-                        point(bounds.left() + x_offset + cursor_pos, bounds.top()),
-                        size(px(2.), bounds.bottom() - bounds.top()),
-                    ),
-                    rgb(bookie_gpui::theme::Theme::current(cx).foreground),
-                )),
-            )
-        } else {
-            (
-                Some(fill(
-                    Bounds::from_corners(
-                        point(bounds.left() + x_offset + line.x_for_index(selected_range.start), bounds.top()),
-                        point(bounds.left() + x_offset + line.x_for_index(selected_range.end), bounds.bottom()),
-                    ),
-                    rgba(0x5b8cff55),
-                )),
-                None,
-            )
-        };
+        let theme_fg = bookie_gpui::theme::Theme::current(cx).foreground;
+        let (selection, cursor) =
+            compute_selection_and_cursor(&selected_range, cursor, bounds, x_offset, &line, theme_fg);
         PrepaintState {
             line: Some(line),
             cursor,
@@ -679,6 +625,82 @@ impl Render for TextInput {
 impl Focusable for TextInput {
     fn focus_handle(&self, _: &App) -> FocusHandle {
         self.focus_handle.clone()
+    }
+}
+
+fn build_text_runs(
+    display_text_len: usize,
+    marked_range: Option<&Range<usize>>,
+    font: gpui::Font,
+    color: gpui::Hsla,
+) -> Vec<TextRun> {
+    let run = TextRun {
+        len: display_text_len,
+        font,
+        color,
+        background_color: None,
+        underline: None,
+        strikethrough: None,
+    };
+    if let Some(marked_range) = marked_range {
+        vec![
+            TextRun {
+                len: marked_range.start,
+                ..run.clone()
+            },
+            TextRun {
+                len: marked_range.end - marked_range.start,
+                underline: Some(UnderlineStyle {
+                    color: Some(run.color),
+                    thickness: px(1.0),
+                    wavy: false,
+                }),
+                ..run.clone()
+            },
+            TextRun {
+                len: display_text_len - marked_range.end,
+                ..run
+            },
+        ]
+        .into_iter()
+        .filter(|run| run.len > 0)
+        .collect()
+    } else {
+        vec![run]
+    }
+}
+
+fn compute_selection_and_cursor(
+    selected_range: &Range<usize>,
+    cursor: usize,
+    bounds: Bounds<Pixels>,
+    x_offset: Pixels,
+    line: &ShapedLine,
+    theme_fg: u32,
+) -> (Option<PaintQuad>, Option<PaintQuad>) {
+    if selected_range.is_empty() {
+        let cursor_pos = line.x_for_index(cursor);
+        (
+            None,
+            Some(fill(
+                Bounds::new(
+                    point(bounds.left() + x_offset + cursor_pos, bounds.top()),
+                    size(px(2.), bounds.bottom() - bounds.top()),
+                ),
+                rgb(theme_fg),
+            )),
+        )
+    } else {
+        (
+            Some(fill(
+                Bounds::from_corners(
+                    point(bounds.left() + x_offset + line.x_for_index(selected_range.start), bounds.top()),
+                    point(bounds.left() + x_offset + line.x_for_index(selected_range.end), bounds.bottom()),
+                ),
+                rgba(0x5b8cff55),
+            )),
+            None,
+        )
     }
 }
 

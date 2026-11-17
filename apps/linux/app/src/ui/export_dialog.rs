@@ -297,46 +297,36 @@ pub(crate) fn present_with_format(
     present_export(parent, toast_overlay, request, json, preferences);
 }
 
-fn present_export(
-    parent: &adw::ApplicationWindow,
-    toast_overlay: &adw::ToastOverlay,
-    request: ExportRequest,
+fn build_format_group(
+    formats: &[ExportFormat],
+    result: &QueryResult,
+    paged: Option<&PagedExport>,
     json: bool,
-    preferences: &PreferencesStore,
-) {
-    let ExportRequest {
-        scope,
-        paged,
-        result,
-        suggested_name,
-        driver_id,
-    } = request;
-    let (paged, full_export) = split_full_export(scope, paged);
-    let null_marker = if paged.is_some() {
-        "\\N".to_string()
-    } else {
-        bookie_core::export::unique_csv_null_marker(&result.rows)
-    };
-    let page = adw::PreferencesPage::new();
-
-    let (scope_group, scope_choice) = scope::build(scope, &result, paged.as_ref(), full_export.is_some());
-    page.add(&scope_group);
+) -> (adw::PreferencesGroup, adw::ComboRow) {
     let format_group = adw::PreferencesGroup::builder()
         .title(bookie_app_services::tr!("Format"))
         .build();
-    let formats = available_formats(&driver_id, paged.as_ref());
     let labels: Vec<&str> = formats.iter().map(|format| format.label()).collect();
     let format_row = adw::ComboRow::builder()
         .use_markup(false)
         .title(bookie_app_services::tr!("Format"))
-        .subtitle(format_subtitle(&result, paged.as_ref()))
+        .subtitle(format_subtitle(result, paged))
         .model(&gtk::StringList::new(&labels))
         .build();
     format_row.set_selected(u32::from(json));
     format_group.add(&format_row);
-    page.add(&format_group);
+    (format_group, format_row)
+}
 
-    let csv_group = adw::PreferencesGroup::builder()
+struct CsvControls {
+    group: adw::PreferencesGroup,
+    include_header: adw::SwitchRow,
+    safe_csv: adw::SwitchRow,
+    spare_numbers: adw::SwitchRow,
+}
+
+fn build_csv_group(preferences: &PreferencesStore, null_marker: &str, json: bool) -> CsvControls {
+    let group = adw::PreferencesGroup::builder()
         .title(bookie_app_services::tr!("CSV options"))
         .build();
     let include_header = adw::SwitchRow::builder()
@@ -344,7 +334,7 @@ fn present_export(
         .subtitle(bookie_app_services::tr!("Write column names in the first row"))
         .build();
     include_header.set_active(preferences.load().csv_include_header);
-    csv_group.add(&include_header);
+    group.add(&include_header);
     let safe_csv = adw::SwitchRow::builder()
         .title(bookie_app_services::tr!("Spreadsheet-safe text"))
         .subtitle(bookie_app_services::tr!(
@@ -352,7 +342,7 @@ fn present_export(
         ))
         .active(true)
         .build();
-    csv_group.add(&safe_csv);
+    group.add(&safe_csv);
     let spare_numbers = adw::SwitchRow::builder()
         .title(bookie_app_services::tr!("Keep plain numbers as they are"))
         .subtitle(bookie_app_services::tr!(
@@ -363,36 +353,27 @@ fn present_export(
         .bind_property("active", &spare_numbers, "sensitive")
         .sync_create()
         .build();
-    csv_group.add(&spare_numbers);
+    group.add(&spare_numbers);
     let null_marker_row = adw::EntryRow::builder()
         .title(bookie_app_services::tr!("Text that means NULL"))
         .build();
-    null_marker_row.set_text(&null_marker);
+    null_marker_row.set_text(null_marker);
     null_marker_row.set_editable(false);
-    csv_group.add(&null_marker_row);
-    csv_group.set_visible(!json);
-    page.add(&csv_group);
+    group.add(&null_marker_row);
+    group.set_visible(!json);
+    CsvControls {
+        group,
+        include_header,
+        safe_csv,
+        spare_numbers,
+    }
+}
 
-    let (sql_group, sql_target) = build_sql_group(&suggested_name);
-    sql_group.set_visible(false);
-    page.add(&sql_group);
-
-    let preferences_for_toggle = preferences.clone();
-    include_header.connect_active_notify(move |row| {
-        if let Err(error) = preferences_for_toggle.update(|prefs| prefs.csv_include_header = row.is_active()) {
-            tracing::warn!(%error, "preferences: update rejected");
-        }
-    });
-
-    let csv_group_for_format = csv_group.clone();
-    let sql_group_for_format = sql_group.clone();
-    let formats_for_visibility = formats.clone();
-    format_row.connect_selected_notify(move |row| {
-        let format = selected_format(&formats_for_visibility, row.selected());
-        csv_group_for_format.set_visible(format.shows_csv_options());
-        sql_group_for_format.set_visible(format == ExportFormat::Sql);
-    });
-
+fn build_footer(
+    include_header: &adw::SwitchRow,
+    safe_csv: &adw::SwitchRow,
+    spare_numbers: &adw::SwitchRow,
+) -> (gtk::Box, gtk::Button) {
     let reset_button = gtk::Button::builder()
         .label(bookie_app_services::tr!("Reset to Defaults"))
         .build();
@@ -410,15 +391,6 @@ fn present_export(
         .label(bookie_app_services::tr!("Export\u{2026}"))
         .build();
     export_button.add_css_class("suggested-action");
-    let full_export_available = full_export.is_some();
-    if let Some(choice) = scope_choice.as_ref() {
-        let export_button = export_button.downgrade();
-        choice.connect_selected_notify(move |choice| {
-            if let Some(export_button) = export_button.upgrade() {
-                export_button.set_sensitive(choice.selected() == 0 || full_export_available);
-            }
-        });
-    }
 
     let footer = gtk::Box::builder()
         .orientation(gtk::Orientation::Horizontal)
@@ -430,61 +402,191 @@ fn present_export(
     footer.append(&reset_button);
     footer.append(&gtk::Box::builder().hexpand(true).build());
     footer.append(&export_button);
+    (footer, export_button)
+}
 
+fn wire_export_signals(
+    preferences: &PreferencesStore,
+    csv: &CsvControls,
+    sql_group: &adw::PreferencesGroup,
+    formats: &[ExportFormat],
+    format_row: &adw::ComboRow,
+) {
+    let preferences_for_toggle = preferences.clone();
+    csv.include_header.connect_active_notify(move |row| {
+        if let Err(error) = preferences_for_toggle.update(|prefs| prefs.csv_include_header = row.is_active()) {
+            tracing::warn!(%error, "preferences: update rejected");
+        }
+    });
+
+    let csv_group_for_format = csv.group.clone();
+    let sql_group_for_format = sql_group.clone();
+    let formats_for_visibility = formats.to_vec();
+    format_row.connect_selected_notify(move |row| {
+        let format = selected_format(&formats_for_visibility, row.selected());
+        csv_group_for_format.set_visible(format.shows_csv_options());
+        sql_group_for_format.set_visible(format == ExportFormat::Sql);
+    });
+}
+
+fn wire_scope_sensitivity(
+    scope_choice: &Option<adw::ComboRow>,
+    full_export_available: bool,
+    export_button: &gtk::Button,
+) {
+    if let Some(choice) = scope_choice.as_ref() {
+        let export_button = export_button.downgrade();
+        choice.connect_selected_notify(move |choice| {
+            if let Some(export_button) = export_button.upgrade() {
+                export_button.set_sensitive(choice.selected() == 0 || full_export_available);
+            }
+        });
+    }
+}
+
+struct ExportActionParams {
+    scope_choice: Option<adw::ComboRow>,
+    full_export: Option<PagedExport>,
+    paged: Option<PagedExport>,
+    formats: Vec<ExportFormat>,
+    format_row: adw::ComboRow,
+    include_header: adw::SwitchRow,
+    safe_csv: adw::SwitchRow,
+    spare_numbers: adw::SwitchRow,
+    null_marker: String,
+    sql_target: adw::EntryRow,
+    suggested_name: String,
+    driver_id: String,
+    result: std::sync::Arc<QueryResult>,
+}
+
+fn attach_export_action(
+    export_button: &gtk::Button,
+    dialog: &adw::Dialog,
+    parent: &adw::ApplicationWindow,
+    toast_overlay: &adw::ToastOverlay,
+    params: ExportActionParams,
+) {
+    let parent = parent.clone();
+    let toast = toast_overlay.clone();
+    let dialog = dialog.downgrade();
+    export_button.connect_clicked(move |_| {
+        let Some(dialog) = dialog.upgrade() else { return };
+        let all_rows = params.scope_choice.as_ref().is_some_and(|c| c.selected() != 0);
+        if all_rows && params.full_export.is_none() {
+            return;
+        }
+        let format = selected_format(&params.formats, params.format_row.selected());
+        let include_header = params.include_header.is_active();
+        dialog.close();
+        save_with_file_dialog(
+            &parent,
+            &toast,
+            SaveRequest {
+                format,
+                suggested_name: params.suggested_name.clone(),
+                driver_id: params.driver_id.clone(),
+                result: params.result.clone(),
+                paged: if all_rows {
+                    params.full_export.clone()
+                } else {
+                    params.paged.clone()
+                },
+                retained_page: if all_rows {
+                    None
+                } else {
+                    params.full_export.as_ref().and_then(|p| p.retained_page.clone())
+                },
+                include_header,
+                sanitize_formulas: params.safe_csv.is_active(),
+                spare_plain_numbers: params.spare_numbers.is_active(),
+                null_marker: if all_rows {
+                    "\\N".to_string()
+                } else {
+                    params.null_marker.clone()
+                },
+                sql_target: params.sql_target.text().to_string(),
+            },
+        );
+    });
+}
+
+fn build_export_dialog(page: &adw::PreferencesPage, footer: &gtk::Box, export_button: &gtk::Button) -> adw::Dialog {
     let toolbar = adw::ToolbarView::new();
     toolbar.add_top_bar(&adw::HeaderBar::new());
-    toolbar.set_content(Some(&page));
-    toolbar.add_bottom_bar(&footer);
+    toolbar.set_content(Some(page));
+    toolbar.add_bottom_bar(footer);
 
     let dialog = adw::Dialog::builder()
         .title(bookie_app_services::tr!("Export Results"))
         .content_width(480)
         .child(&toolbar)
         .build();
-    dialog.set_default_widget(Some(&export_button));
+    dialog.set_default_widget(Some(export_button));
+    dialog
+}
 
-    let parent_for_export = parent.clone();
-    let toast_overlay_for_export = toast_overlay.clone();
-    let dialog_for_export = dialog.downgrade();
-    let include_header_for_export = include_header.clone();
-    let null_marker_for_export = null_marker.clone();
-    export_button.connect_clicked(move |_| {
-        let Some(dialog_for_export) = dialog_for_export.upgrade() else {
-            return;
-        };
-        let all_rows = scope_choice.as_ref().is_some_and(|choice| choice.selected() != 0);
-        if all_rows && full_export.is_none() {
-            return;
-        }
-        let format = selected_format(&formats, format_row.selected());
-        let include_header = include_header_for_export.is_active();
-        dialog_for_export.close();
-        save_with_file_dialog(
-            &parent_for_export,
-            &toast_overlay_for_export,
-            SaveRequest {
-                format,
-                suggested_name: suggested_name.clone(),
-                driver_id: driver_id.clone(),
-                result: result.clone(),
-                paged: if all_rows { full_export.clone() } else { paged.clone() },
-                retained_page: if all_rows {
-                    None
-                } else {
-                    full_export.as_ref().and_then(|paged| paged.retained_page.clone())
-                },
-                include_header,
-                sanitize_formulas: safe_csv.is_active(),
-                spare_plain_numbers: spare_numbers.is_active(),
-                null_marker: if all_rows {
-                    "\\N".to_string()
-                } else {
-                    null_marker_for_export.clone()
-                },
-                sql_target: sql_target.text().to_string(),
-            },
-        );
-    });
+fn determine_null_marker(paged: bool, result: &QueryResult) -> String {
+    if paged {
+        "\\N".to_string()
+    } else {
+        bookie_core::export::unique_csv_null_marker(&result.rows)
+    }
+}
+
+fn present_export(
+    parent: &adw::ApplicationWindow,
+    toast_overlay: &adw::ToastOverlay,
+    request: ExportRequest,
+    json: bool,
+    preferences: &PreferencesStore,
+) {
+    let ExportRequest {
+        scope,
+        paged,
+        result,
+        suggested_name,
+        driver_id,
+    } = request;
+    let (paged, full_export) = split_full_export(scope, paged);
+    let null_marker = determine_null_marker(paged.is_some(), &result);
+    let page = adw::PreferencesPage::new();
+
+    let (scope_group, scope_choice) = scope::build(scope, &result, paged.as_ref(), full_export.is_some());
+    page.add(&scope_group);
+    let formats = available_formats(&driver_id, paged.as_ref());
+    let (format_group, format_row) = build_format_group(&formats, &result, paged.as_ref(), json);
+    page.add(&format_group);
+
+    let csv = build_csv_group(preferences, &null_marker, json);
+    page.add(&csv.group);
+
+    let (sql_group, sql_target) = build_sql_group(&suggested_name);
+    sql_group.set_visible(false);
+    page.add(&sql_group);
+
+    wire_export_signals(preferences, &csv, &sql_group, &formats, &format_row);
+
+    let (footer, export_button) = build_footer(&csv.include_header, &csv.safe_csv, &csv.spare_numbers);
+    wire_scope_sensitivity(&scope_choice, full_export.is_some(), &export_button);
+    let dialog = build_export_dialog(&page, &footer, &export_button);
+
+    let action_params = ExportActionParams {
+        scope_choice,
+        full_export,
+        paged,
+        formats,
+        format_row,
+        include_header: csv.include_header,
+        safe_csv: csv.safe_csv,
+        spare_numbers: csv.spare_numbers,
+        null_marker,
+        sql_target,
+        suggested_name,
+        driver_id,
+        result,
+    };
+    attach_export_action(&export_button, &dialog, parent, toast_overlay, action_params);
 
     crate::ui::leak_probe::present_tracked("export", &dialog, parent);
 }

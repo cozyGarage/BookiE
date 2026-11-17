@@ -1138,3 +1138,129 @@ fn the_sql_editor_edits_at_several_carets_and_ctrl_enter_still_runs_the_whole_bu
         assert_eq!(view.source.total(), 3, "the whole buffer ran, not one caret's line");
     });
 }
+
+#[gpui::test]
+fn activity_palette_queries_reflect_driver_capabilities(cx: &mut TestAppContext) {
+    let (view, cx) = open_live(cx);
+
+    view.update(cx, |view, _| {
+        let session = view.live.as_ref().unwrap().with_driver_id("postgres");
+        view.live = Some(session);
+    });
+    view.read_with(cx, |view, _| {
+        let actions = view.palette_actions();
+        for id in ["sessions", "blocking-locks", "long-running", "replication-lag", "server-variables", "server-status"] {
+            let action = actions.iter().find(|a| a.id == id).expect(id);
+            assert!(action.enabled, "PostgreSQL should enable activity query {id}");
+        }
+    });
+
+    view.update(cx, |view, _| {
+        let session = view.live.as_ref().unwrap().with_driver_id("mysql");
+        view.live = Some(session);
+    });
+    view.read_with(cx, |view, _| {
+        let actions = view.palette_actions();
+        for id in ["sessions", "long-running", "server-variables", "server-status"] {
+            let action = actions.iter().find(|a| a.id == id).expect(id);
+            assert!(action.enabled, "MySQL should enable activity query {id}");
+        }
+        for id in ["blocking-locks", "replication-lag"] {
+            let action = actions.iter().find(|a| a.id == id).expect(id);
+            assert!(!action.enabled, "MySQL should disable activity query {id}");
+        }
+    });
+
+    view.update(cx, |view, _| {
+        let session = view.live.as_ref().unwrap().with_driver_id("sqlite");
+        view.live = Some(session);
+    });
+    view.read_with(cx, |view, _| {
+        let actions = view.palette_actions();
+        for id in ["sessions", "blocking-locks", "long-running", "replication-lag", "server-variables", "server-status"] {
+            let action = actions.iter().find(|a| a.id == id).expect(id);
+            assert!(!action.enabled, "SQLite should disable activity query {id}");
+        }
+    });
+}
+
+#[gpui::test]
+fn activity_query_execution_sets_sql_and_switches_tab(cx: &mut TestAppContext) {
+    let (view, cx) = open_live(cx);
+    view.update(cx, |view, _| {
+        let session = view.live.as_ref().unwrap().with_driver_id("postgres");
+        view.live = Some(session);
+    });
+
+    for kind in [
+        bookie_core::ActivityQuery::BlockingLocks,
+        bookie_core::ActivityQuery::LongRunning,
+        bookie_core::ActivityQuery::ReplicationLag,
+        bookie_core::ActivityQuery::ServerVariables,
+        bookie_core::ActivityQuery::ServerStatus,
+    ] {
+        cx.update(|window, cx| view.update(cx, |view, cx| view.show_activity(kind, window, cx)));
+        view.read_with(cx, |view, cx| {
+            let expected_sql = bookie_core::activity_sql("postgres", kind, None).unwrap();
+            assert_eq!(view.sql_input.read(cx).value(), expected_sql);
+            assert!(matches!(view.tabs.current(), crate::Tab::Query));
+        });
+    }
+}
+
+#[gpui::test]
+fn export_selection_or_page_copies_csv_to_clipboard(cx: &mut TestAppContext) {
+    let (view, cx) = open_live(cx);
+
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.export_selection_or_page(cx);
+        });
+    });
+    view.read_with(cx, |view, cx| {
+        assert_eq!(view.status, "Exported 6 rows as CSV to clipboard");
+        let clipboard = cx.read_from_clipboard().expect("clipboard text");
+        let text = clipboard.text().expect("text");
+        let lines: Vec<&str> = text.lines().collect();
+        assert_eq!(lines.len(), 7, "1 header line + 6 data rows");
+        assert!(lines[0].starts_with("id,customer,"));
+    });
+
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.selection = Some(crate::Selection { anchor: 0, focus: 1 });
+            view.export_selection_or_page(cx);
+        });
+    });
+    view.read_with(cx, |view, cx| {
+        assert_eq!(view.status, "Exported 2 rows as CSV to clipboard");
+        let clipboard = cx.read_from_clipboard().expect("clipboard text");
+        let text = clipboard.text().expect("text");
+        let lines: Vec<&str> = text.lines().collect();
+        assert_eq!(lines.len(), 3, "1 header line + 2 data rows");
+    });
+}
+
+#[gpui::test]
+fn header_collapse_all_and_feedback_actions(cx: &mut TestAppContext) {
+    let (view, cx) = open_live(cx);
+
+    view.update(cx, |view, _| {
+        assert!(view.connection_open && view.database_open);
+        let collapse = view.connection_open || view.database_open;
+        view.connection_open = !collapse;
+        view.database_open = !collapse;
+        assert!(!view.connection_open && !view.database_open);
+
+        let collapse = view.connection_open || view.database_open;
+        view.connection_open = !collapse;
+        view.database_open = !collapse;
+        assert!(view.connection_open && view.database_open);
+    });
+
+    view.update(cx, |view, _| {
+        view.live = None;
+        view.show_status();
+        assert_eq!(view.status, "No active database connection.");
+    });
+}
