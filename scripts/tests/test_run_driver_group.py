@@ -1,6 +1,8 @@
 from pathlib import Path
 import re
+import shutil
 import subprocess
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -43,6 +45,49 @@ class RunDriverGroupTests(unittest.TestCase):
         result = subprocess.run(["bash", str(SCRIPT)], cwd=ROOT, capture_output=True, text=True, check=False)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("DRIVER", result.stderr)
+
+
+class ConformanceTargetTests(unittest.TestCase):
+    def run_in_scratch_tree(self, driver, with_conformance):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "scripts").mkdir()
+            shutil.copy(SCRIPT, root / "scripts" / "run-driver-group.sh")
+            log = root / "commands.log"
+            (root / "scripts" / "prepull-test-images.sh").write_text("#!/usr/bin/env bash\nexit 0\n")
+            (root / "scripts" / "cleanup-testcontainers.py").write_text("")
+            (root / "scripts" / "run-rust-tests.sh").write_text(
+                f'#!/usr/bin/env bash\necho "$@" >> "{log}"\n'
+            )
+            tests = root / "crates" / "drivers" / driver / "tests"
+            tests.mkdir(parents=True)
+            if with_conformance:
+                (tests / "conformance.rs").write_text("")
+            result = subprocess.run(
+                ["bash", "scripts/run-driver-group.sh", driver], cwd=root, capture_output=True, text=True, check=False
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            return log.read_text().splitlines()
+
+    def test_a_driver_with_a_conformance_file_runs_its_conformance_target(self):
+        for driver in ("postgres", "mysql", "mssql", "clickhouse"):
+            commands = self.run_in_scratch_tree(driver, with_conformance=True)
+            self.assertEqual(len(commands), 1, commands)
+            self.assertIn(f"-p bookie-driver-{driver} --test integration --test conformance -- ", commands[0])
+
+    def test_a_driver_without_a_conformance_file_runs_only_its_integration_target(self):
+        for driver in ("mongodb", "cassandra", "oracle"):
+            commands = self.run_in_scratch_tree(driver, with_conformance=False)
+            self.assertIn(f"-p bookie-driver-{driver} --test integration -- ", commands[0])
+            self.assertNotIn("conformance", " ".join(commands))
+
+    def test_every_network_driver_conformance_file_is_reachable_through_a_group(self):
+        grouped = {driver for drivers in group_arms().values() for driver in drivers}
+        for path in (ROOT / "crates" / "drivers").glob("*/tests/conformance.rs"):
+            name = path.parts[-3]
+            if name in {"shared", "sqlite", "duckdb"}:
+                continue
+            self.assertIn(name, grouped, f"{path} is not run by any driver group")
 
 
 if __name__ == "__main__":
