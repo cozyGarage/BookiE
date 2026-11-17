@@ -447,6 +447,7 @@ impl BrowseTab {
             result,
             self.current_offset,
             self.current_total_rows,
+            self.is_count_estimated,
             self.last_page_elapsed,
         ));
         self.update_sort_status_label();
@@ -553,6 +554,7 @@ fn paginator_summary(
     result: &QueryResult,
     offset: u64,
     total: Option<u64>,
+    is_estimated: bool,
     elapsed: Option<std::time::Duration>,
 ) -> String {
     let n_rows = result.rows.len();
@@ -569,15 +571,20 @@ fn paginator_summary(
             (false, true) => bookie_app_services::tr!("Rows {start} – {end} (result truncated)"),
             (false, false) => bookie_app_services::tr!("Rows {start} – {end}"),
         };
+        let formatted_total = total
+            .map(|count| {
+                let formatted = format_thousands(u128::from(count));
+                if is_estimated {
+                    format!("~{formatted}")
+                } else {
+                    formatted
+                }
+            })
+            .unwrap_or_default();
         template
             .replace("{start}", &format_thousands(u128::from(offset + 1)))
             .replace("{end}", &format_thousands(u128::from(offset + n_rows as u64)))
-            .replace(
-                "{total}",
-                &total
-                    .map(|count| format_thousands(u128::from(count)))
-                    .unwrap_or_default(),
-            )
+            .replace("{total}", &formatted_total)
     };
     match elapsed {
         Some(elapsed) => bookie_app_services::tr!("{range} · {time}")
@@ -798,11 +805,11 @@ mod tests {
     #[test]
     fn truncated_browse_pages_disclose_the_result_limit() {
         assert_eq!(
-            paginator_summary(&page(37, true), 1_000, Some(5_000), None),
+            paginator_summary(&page(37, true), 1_000, Some(5_000), false, None),
             "Rows 1,001 – 1,037 of 5,000 (result truncated)"
         );
         assert_eq!(
-            paginator_summary(&page(37, true), 0, None, None),
+            paginator_summary(&page(37, true), 0, None, false, None),
             "Rows 1 – 37 (result truncated)"
         );
     }
@@ -810,7 +817,7 @@ mod tests {
     #[test]
     fn a_truncated_browse_page_without_rows_still_discloses_the_result_limit() {
         assert_eq!(
-            paginator_summary(&page(0, true), 0, Some(5_000), None),
+            paginator_summary(&page(0, true), 0, Some(5_000), false, None),
             "No rows on this page (result truncated)"
         );
     }
@@ -818,13 +825,20 @@ mod tests {
     #[test]
     fn untruncated_browse_pages_have_no_result_limit_suffix() {
         assert_eq!(
-            paginator_summary(&page(100, false), 1_000, Some(5_000), None),
+            paginator_summary(&page(100, false), 1_000, Some(5_000), false, None),
             "Rows 1,001 – 1,100 of 5,000"
         );
-        assert_eq!(paginator_summary(&page(100, false), 0, None, None), "Rows 1 – 100");
         assert_eq!(
-            paginator_summary(&page(0, false), 0, Some(5_000), None),
+            paginator_summary(&page(100, false), 0, None, false, None),
+            "Rows 1 – 100"
+        );
+        assert_eq!(
+            paginator_summary(&page(0, false), 0, Some(5_000), false, None),
             "No rows on this page"
+        );
+        assert_eq!(
+            paginator_summary(&page(50, false), 0, Some(5_000), true, None),
+            "Rows 1 – 50 of ~5,000"
         );
     }
 
@@ -839,11 +853,11 @@ mod tests {
         assert_eq!(page_elapsed_text(Duration::from_secs(60)), "1m 0s");
         assert_eq!(page_elapsed_text(Duration::from_secs(125)), "2m 5s");
         assert_eq!(
-            paginator_summary(&page(2, false), 0, Some(2), Some(Duration::from_millis(5))),
+            paginator_summary(&page(2, false), 0, Some(2), false, Some(Duration::from_millis(5))),
             "Rows 1 – 2 of 2 · 5 ms"
         );
         assert_eq!(
-            paginator_summary(&page(0, false), 0, Some(0), Some(Duration::from_millis(5))),
+            paginator_summary(&page(0, false), 0, Some(0), false, Some(Duration::from_millis(5))),
             "No rows on this page · 5 ms"
         );
     }

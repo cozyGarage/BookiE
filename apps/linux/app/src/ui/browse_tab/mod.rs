@@ -118,6 +118,7 @@ pub struct BrowseTab {
     last_page: bool,
     current_selection: Option<gtk::MultiSelection>,
     current_total_rows: Option<u64>,
+    is_count_estimated: bool,
     page_requests: PageRequestTracker,
     row_count_requests: RowCountRequestTracker,
     cell_value_requests: CellValueRequestTracker,
@@ -343,11 +344,18 @@ impl BrowseTab {
         self.render_grid_if_ready(sender);
     }
 
-    fn on_row_count_loaded(&mut self, request: BrowseRowCountRequest, count: u64, sender: ComponentSender<Self>) {
+    fn on_row_count_loaded(
+        &mut self,
+        request: BrowseRowCountRequest,
+        count: u64,
+        is_estimated: bool,
+        sender: ComponentSender<Self>,
+    ) {
         if !self.row_count_requests.accepts(request) {
             return;
         }
         self.current_total_rows = Some(count);
+        self.is_count_estimated = is_estimated;
         // If the saved offset is now past the end, clamp it back to
         // the last full page and refetch — guards against stale
         // persistence after rows were deleted in another session.
@@ -371,6 +379,7 @@ impl BrowseTab {
         self.current_result = None;
         self.last_page_elapsed = None;
         self.current_total_rows = None;
+        self.is_count_estimated = false;
         self.set_paginator_text("");
         self.first_button.set_sensitive(false);
         self.prev_button.set_sensitive(false);
@@ -956,6 +965,7 @@ impl SimpleComponent for BrowseTab {
             last_page: false,
             current_selection: None,
             current_total_rows: None,
+            is_count_estimated: false,
             page_requests: PageRequestTracker::default(),
             row_count_requests: RowCountRequestTracker::default(),
             cell_value_requests: CellValueRequestTracker::default(),
@@ -1063,12 +1073,22 @@ impl SimpleComponent for BrowseTab {
                     self.render_grid_if_ready(sender);
                 }
             }
-            BrowseTabInput::RowCountLoaded { request, count } => self.on_row_count_loaded(request, count, sender),
+            BrowseTabInput::ForeignKeyCandidatesLoaded { column, candidates } => {
+                if !candidates.is_empty() {
+                    self.choice_labels.borrow_mut().insert(column, (false, candidates));
+                }
+            }
+            BrowseTabInput::RowCountLoaded {
+                request,
+                count,
+                is_estimated,
+            } => self.on_row_count_loaded(request, count, is_estimated, sender),
             BrowseTabInput::RowCountFailed(request) => {
                 if !self.row_count_requests.accepts(request) {
                     return;
                 }
                 self.current_total_rows = None;
+                self.is_count_estimated = false;
                 self.last_button.set_sensitive(false);
                 self.update_next_page_sensitivity();
                 self.update_paginator_label();

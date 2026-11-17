@@ -371,13 +371,17 @@ impl App {
     }
 
     pub(super) fn fetch_browse_foreign_keys(&self, tab_id: Uuid, sender: ComponentSender<Self>) {
-        let (schema, table) = {
+        let (schema, table, driver_id) = {
             let tabs = self.workspace_tabs.borrow();
             let Some(controller) = tabs.get(&tab_id).and_then(|t| t.browse_controller()) else {
                 return;
             };
             let model = controller.model();
-            (model.schema().map(str::to_owned), model.table().to_string())
+            (
+                model.schema().map(str::to_owned),
+                model.table().to_string(),
+                model.driver_id().to_string(),
+            )
         };
 
         let Some(conn) = self.tab_connection(tab_id) else {
@@ -390,14 +394,21 @@ impl App {
             shutdown
                 .register(async move {
                     let control = crate::services::operation_control::bounded_with(timeout_secs, token);
-                    // Foreign keys are used only to offer a value picker on
-                    // the referencing cell -- a failed or unsupported read
-                    // just means no picker, not a load failure for the tab.
                     if let Ok(foreign_keys) = conn
                         .fetch_foreign_keys_controlled(schema.as_deref(), &table, &control)
                         .await
                         && !control.cancellation_token().is_cancelled()
                     {
+                        fetch_and_dispatch_foreign_key_candidates(
+                            conn.clone(),
+                            tab_id,
+                            &driver_id,
+                            schema.as_deref(),
+                            &foreign_keys,
+                            &control,
+                            &sender_clone,
+                        )
+                        .await;
                         sender_clone.input(AppMsg::ForeignKeysLoaded(tab_id, foreign_keys));
                     }
                     if let Ok(inbound) = conn
@@ -443,6 +454,7 @@ impl App {
             long_text_preview: false,
             supports_reverse_keyset: false,
         };
+        let estimated_query = target.estimated_count();
         let query = match target.count() {
             Ok(query) => query,
             Err(error) => {
@@ -459,15 +471,12 @@ impl App {
             shutdown
                 .register(async move {
                     let control = crate::services::operation_control::bounded_with(timeout_secs, token);
-                    let qr_result = run_browse_count(conn, query, &control).await;
-                    let count = qr_result.ok().and_then(|qr| row_count_from_result(&qr));
-                    match count {
+                    let outcome = execute_browse_count(conn, estimated_query, query, &control).await;
+                    match outcome {
                         None if control.cancellation_token().is_cancelled() => {}
-                        Some(count) => sender_clone.input(AppMsg::RowCountLoaded(tab_id, request, count)),
-                        // A stale total left on screen after a failed
-                        // recount can enable Last Page past the real
-                        // end of the table -- clear it instead of
-                        // leaving the last successful count displayed.
+                        Some((count, is_estimated)) => {
+                            sender_clone.input(AppMsg::RowCountLoaded(tab_id, request, count, is_estimated));
+                        }
                         None => sender_clone.input(AppMsg::RowCountFailed(tab_id, request)),
                     }
                 })
@@ -557,8 +566,33 @@ impl App {
         );
     }
 
-    pub(super) fn on_browse_row_count_loaded(&self, tab_id: Uuid, request: BrowseRowCountRequest, count: u64) {
-        self.dispatch_to_tab(tab_id, BrowseTabInput::RowCountLoaded { request, count });
+    pub(super) fn on_browse_row_count_loaded(
+        &self,
+        tab_id: Uuid,
+        request: BrowseRowCountRequest,
+        count: u64,
+        is_estimated: bool,
+    ) {
+        self.dispatch_to_tab(
+            tab_id,
+            BrowseTabInput::RowCountLoaded {
+                request,
+                count,
+                is_estimated,
+            },
+        );
+    }
+
+    pub(super) fn on_browse_foreign_key_candidates_loaded(
+        &self,
+        tab_id: Uuid,
+        column: String,
+        candidates: Vec<String>,
+    ) {
+        self.dispatch_to_tab(
+            tab_id,
+            BrowseTabInput::ForeignKeyCandidatesLoaded { column, candidates },
+        );
     }
 
     pub(super) fn on_browse_row_count_failed(&self, tab_id: Uuid, request: BrowseRowCountRequest) {
@@ -1042,6 +1076,64 @@ async fn run_browse_count(
         connection
             .query_params_controlled(&query.sql, &query.params, control)
             .await
+    }
+}
+
+async fn execute_browse_count(
+    conn: std::sync::Arc<dyn bookie_core::Connection>,
+    estimated_query: Option<crate::services::browse_query::BoundQuery>,
+    query: crate::services::browse_query::BoundQuery,
+    control: &bookie_core::OperationControl,
+) -> Option<(u64, bool)> {
+    if let Some(est) = estimated_query {
+        if let Ok(qr) = run_browse_count(conn.clone(), est, control).await
+            && let Some(count) = row_count_from_result(&qr)
+        {
+            return Some((count, true));
+        }
+    }
+    let qr = run_browse_count(conn, query, control).await.ok()?;
+    row_count_from_result(&qr).map(|count| (count, false))
+}
+
+async fn fetch_and_dispatch_foreign_key_candidates(
+    conn: std::sync::Arc<dyn bookie_core::Connection>,
+    tab_id: Uuid,
+    driver_id: &str,
+    own_schema: Option<&str>,
+    foreign_keys: &[bookie_core::ForeignKeyInfo],
+    control: &bookie_core::OperationControl,
+    sender: &ComponentSender<super::App>,
+) {
+    for fk in foreign_keys {
+        if fk.columns.len() != 1 || fk.ref_columns.len() != 1 {
+            continue;
+        }
+        if control.cancellation_token().is_cancelled() {
+            break;
+        }
+        let local_col = fk.columns[0].clone();
+        let ref_schema = fk.ref_schema.as_deref().or(own_schema);
+        let query = crate::services::browse_query::foreign_key_candidates_query(
+            driver_id,
+            ref_schema,
+            &fk.ref_table,
+            &fk.ref_columns[0],
+            100,
+        );
+        if let Ok(qr) = conn.query_controlled(&query.sql, control).await {
+            let candidates: Vec<String> = qr
+                .rows
+                .iter()
+                .filter_map(|row| {
+                    row.first()
+                        .and_then(crate::services::browse_query::format_candidate_value)
+                })
+                .collect();
+            if !candidates.is_empty() && !control.cancellation_token().is_cancelled() {
+                sender.input(AppMsg::ForeignKeyCandidatesLoaded(tab_id, local_col, candidates));
+            }
+        }
     }
 }
 

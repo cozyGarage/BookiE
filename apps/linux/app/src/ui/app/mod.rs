@@ -793,6 +793,9 @@ impl SimpleComponent for App {
                 self.dispatch_to_tab(tab_id, crate::ui::browse_tab::BrowseTabInput::EnumLabelsLoaded(labels))
             }
             AppMsg::ForeignKeysLoaded(tab_id, foreign_keys) => self.on_browse_foreign_keys_loaded(tab_id, foreign_keys),
+            AppMsg::ForeignKeyCandidatesLoaded(tab_id, column, candidates) => {
+                self.on_browse_foreign_key_candidates_loaded(tab_id, column, candidates)
+            }
             AppMsg::InboundForeignKeysLoaded(tab_id, inbound) => {
                 self.on_browse_inbound_foreign_keys_loaded(tab_id, inbound)
             }
@@ -800,7 +803,9 @@ impl SimpleComponent for App {
                 self.on_browse_rows_loaded(tab_id, request, result, projected_columns, elapsed)
             }
             AppMsg::LoadFailed(tab_id, msg) => self.on_browse_load_failed(tab_id, msg),
-            AppMsg::RowCountLoaded(tab_id, request, count) => self.on_browse_row_count_loaded(tab_id, request, count),
+            AppMsg::RowCountLoaded(tab_id, request, count, is_estimated) => {
+                self.on_browse_row_count_loaded(tab_id, request, count, is_estimated)
+            }
             AppMsg::RowCountFailed(tab_id, request) => self.on_browse_row_count_failed(tab_id, request),
             AppMsg::FetchBrowsePage(tab_id, auto_refresh) => self.fetch_browse_page(tab_id, auto_refresh, sender),
             AppMsg::AutoRefreshFailed(tab_id, request, message) => {

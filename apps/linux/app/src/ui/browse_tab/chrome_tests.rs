@@ -113,6 +113,7 @@ fn a_row_count_queued_before_refresh_is_not_shown() {
         .send(BrowseTabInput::RowCountLoaded {
             request: stale,
             count: 7,
+            is_estimated: false,
         })
         .unwrap();
     pump(&outputs);
@@ -315,4 +316,24 @@ fn focus_grid_targets_the_current_browse_view() {
     let focused = gtk::prelude::RootExt::focus(&window).unwrap();
     assert!(focused == *view.upcast_ref::<gtk::Widget>() || focused.is_ancestor(&view));
     window.destroy();
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
+fn an_estimated_row_count_updates_the_paginator_with_tilde() {
+    let (controller, outputs) = launch_tab(false);
+    load_two_rows(&controller, &outputs);
+    let count_request = controller.model().row_count_requests.begin();
+    controller
+        .sender()
+        .send(BrowseTabInput::RowCountLoaded {
+            request: count_request,
+            count: 10_000,
+            is_estimated: true,
+        })
+        .unwrap();
+    pump(&outputs);
+    assert_eq!(controller.model().current_total_rows, Some(10_000));
+    assert!(controller.model().is_count_estimated);
+    assert!(controller.model().paginator_label.label().contains("~10,000"));
 }
