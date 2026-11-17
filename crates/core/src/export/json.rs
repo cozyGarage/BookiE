@@ -64,7 +64,7 @@ pub fn render_json_lines<R: QueryRowSet + ?Sized>(columns: &[ColumnInfo], rows: 
         let Some(row) = rows.row(index) else {
             continue;
         };
-        if let Ok(object) = raw_json_object(&names, row)
+        if let Ok(object) = raw_json_line_object(&names, row)
             && let Ok(line) = serde_json::to_string(&object)
         {
             out.push_str(&line);
@@ -119,6 +119,16 @@ fn raw_json_object(names: &[String], row: &[Value]) -> Result<RawJsonObject, ser
         object.push((name.clone(), encoded));
     }
     Ok(RawJsonObject(object))
+}
+
+fn raw_json_line_object(names: &[String], row: &[Value]) -> Result<RawJsonObject, serde_json::Error> {
+    let mut object = raw_json_object(names, row)?;
+    for ((_, value), source) in object.0.iter_mut().zip(row) {
+        if let Value::JsonText(source) = source {
+            *value = JsonExportValue::Value(serde_json::Value::String(source.clone()));
+        }
+    }
+    Ok(object)
 }
 
 pub(crate) fn row_to_json_object(names: &[String], row: &[Value]) -> serde_json::Value {
@@ -200,7 +210,7 @@ impl ResultWriter for JsonLinesWriter {
     }
 
     fn write_row(&mut self, output: &mut dyn Write, _index: usize, row: &[Value]) -> Result<(), ExportError> {
-        let object = raw_json_object(&self.names, row).map_err(io::Error::from)?;
+        let object = raw_json_line_object(&self.names, row).map_err(io::Error::from)?;
         serde_json::to_writer(&mut *output, &object).map_err(io::Error::from)?;
         output.write_all(b"\n")?;
         Ok(())

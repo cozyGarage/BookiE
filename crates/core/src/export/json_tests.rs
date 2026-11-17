@@ -238,3 +238,21 @@ fn json_lines_renders_one_json_object_per_row() {
     assert_eq!(lines[1], r#"{"id":2,"name":"Bob","active":false}"#);
     assert_eq!(render_json_lines(&columns, &[]), "");
 }
+
+#[test]
+fn json_lines_preserves_raw_json_as_exact_source_text() {
+    let columns = vec![column("payload")];
+    let source = "{\n\t\"same\": 1,\r\n\"same\": 2,\n\"nested\": [ true, null, { \"number\": 1.0000000000000000000000000000000000000001 } ],\n\"text\": \"東京  space \\t \\n \\\"quoted\\\" \\\\ tail\"\n}";
+    let expected = serde_json::json!({"payload": source});
+    let rows = vec![vec![Value::JsonText(source.into())]];
+    let rendered = render_json_lines(&columns, &rows);
+    assert_eq!(rendered, format!("{expected}\n"));
+    let mut writer = JsonLinesWriter::new();
+    let mut bytes = Vec::new();
+    writer.begin(&mut bytes, &columns).unwrap();
+    writer.write_row(&mut bytes, 0, &rows[0]).unwrap();
+    writer.finish(&mut bytes).unwrap();
+    assert_eq!(bytes, rendered.as_bytes());
+    assert_eq!(rendered.lines().count(), 1);
+    assert!(render_json(&columns, &rows).contains(source));
+}

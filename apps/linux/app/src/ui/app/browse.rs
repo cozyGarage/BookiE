@@ -1085,12 +1085,11 @@ async fn execute_browse_count(
     query: crate::services::browse_query::BoundQuery,
     control: &bookie_core::OperationControl,
 ) -> Option<(u64, bool)> {
-    if let Some(est) = estimated_query {
-        if let Ok(qr) = run_browse_count(conn.clone(), est, control).await
-            && let Some(count) = row_count_from_result(&qr)
-        {
-            return Some((count, true));
-        }
+    if let Some(est) = estimated_query
+        && let Ok(qr) = run_browse_count(conn.clone(), est, control).await
+        && let Some(count) = row_count_from_result(&qr)
+    {
+        return Some((count, true));
     }
     let qr = run_browse_count(conn, query, control).await.ok()?;
     row_count_from_result(&qr).map(|count| (count, false))

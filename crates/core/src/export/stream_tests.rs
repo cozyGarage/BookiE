@@ -55,6 +55,7 @@ fn value_contract_text_exports_retry_interruptions_and_complete_short_writes() {
     for format in [
         ResultFormat::Csv,
         ResultFormat::Json,
+        ResultFormat::JsonLines,
         ResultFormat::Markdown,
         ResultFormat::Html,
         ResultFormat::Xml,
@@ -117,6 +118,7 @@ fn value_contract_every_export_propagates_destination_write_failure() {
     for format in [
         ResultFormat::Csv,
         ResultFormat::Json,
+        ResultFormat::JsonLines,
         ResultFormat::Markdown,
         ResultFormat::Html,
         ResultFormat::Xml,
@@ -167,6 +169,7 @@ fn value_contract_every_export_keeps_undecodable_distinct_from_null() {
     for format in [
         ResultFormat::Csv,
         ResultFormat::Json,
+        ResultFormat::JsonLines,
         ResultFormat::Markdown,
         ResultFormat::Html,
         ResultFormat::Xml,
