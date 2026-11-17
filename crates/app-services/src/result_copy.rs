@@ -24,11 +24,20 @@ pub struct Copied {
 }
 
 pub fn render(format: CopyFormat, context: &CopyContext<'_>, rows: &[Vec<Value>]) -> Result<Copied, String> {
+    render_with(format, context, rows, &CsvOptions::default())
+}
+
+pub fn render_with(
+    format: CopyFormat,
+    context: &CopyContext<'_>,
+    rows: &[Vec<Value>],
+    csv: &CsvOptions,
+) -> Result<Copied, String> {
     let infos = context.columns;
     let values = QueryRows::from_rows(rows.to_vec());
     let plain = |text: String| Copied { text, note: None };
     match format {
-        CopyFormat::Csv => Ok(plain(render_csv(infos, &values, &CsvOptions::default()))),
+        CopyFormat::Csv => Ok(plain(render_csv(infos, &values, csv))),
         CopyFormat::Json => Ok(plain(render_json(infos, &values))),
         CopyFormat::Markdown => Ok(plain(render_markdown(infos, &values))),
         CopyFormat::InList => {

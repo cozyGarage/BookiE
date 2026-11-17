@@ -55,7 +55,7 @@ impl GridView {
             target: (!self.grid_is_query).then(|| self.catalog.grid_table.clone()),
             column: self.cell_cursor.map_or(0, |cursor| cursor.column),
         };
-        match result_copy::render(format, &context, &rows) {
+        match result_copy::render_with(format, &context, &rows, &self.csv_options()) {
             Ok(copied) => {
                 cx.write_to_clipboard(ClipboardItem::new_string(copied.text));
                 let noun = if selection.count() == 1 { "row" } else { "rows" };
@@ -66,6 +66,31 @@ impl GridView {
             }
             Err(message) => self.status = message,
         }
+    }
+
+    fn csv_options(&self) -> bookie_core::export::CsvOptions {
+        bookie_core::export::CsvOptions {
+            custom_delimiter: self.csv_delimiter.clone(),
+            ..Default::default()
+        }
+    }
+
+    pub(crate) fn set_csv_delimiter(&mut self) {
+        match self.palette_delimiter.clone() {
+            Some((_, Ok(delimiter))) => self.set_csv_delimiter_to(Some(delimiter)),
+            Some((_, Err(error))) => {
+                self.status = format!("CSV delimiter refused: {}", bookie_gpui::csv_delimiter::error_label(error));
+            }
+            None => {}
+        }
+    }
+
+    pub(crate) fn set_csv_delimiter_to(&mut self, delimiter: Option<bookie_core::export::CustomDelimiter>) {
+        self.status = match &delimiter {
+            Some(delimiter) => format!("CSV delimiter set to \"{}\"", delimiter.as_str()),
+            None => "CSV delimiter reset to the comma".into(),
+        };
+        self.csv_delimiter = delimiter;
     }
 
     pub(crate) fn export_selection_or_page(&mut self, cx: &mut Context<Self>) {
@@ -107,7 +132,7 @@ impl GridView {
             target: (!self.grid_is_query).then(|| self.catalog.grid_table.clone()),
             column: self.cell_cursor.map_or(0, |cursor| cursor.column),
         };
-        match result_copy::render(CopyFormat::Csv, &context, &rows) {
+        match result_copy::render_with(CopyFormat::Csv, &context, &rows, &self.csv_options()) {
             Ok(copied) => {
                 cx.write_to_clipboard(ClipboardItem::new_string(copied.text));
                 let noun = if count == 1 { "row" } else { "rows" };
