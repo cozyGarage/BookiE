@@ -76,16 +76,16 @@ pub fn present(
     let driver_id = meta.driver_id.clone();
     let in_flight = Rc::new(RefCell::new(CancellationToken::new()));
     let actions = [
-        ("Sessions", ActivityQuery::Sessions),
-        ("Blocking locks", ActivityQuery::BlockingLocks),
-        ("Long-running", ActivityQuery::LongRunning),
-        ("Replication lag", ActivityQuery::ReplicationLag),
-        ("Server variables", ActivityQuery::ServerVariables),
-        ("Server status", ActivityQuery::ServerStatus),
+        (tr!("Sessions"), ActivityQuery::Sessions),
+        (tr!("Blocking locks"), ActivityQuery::BlockingLocks),
+        (tr!("Long-running"), ActivityQuery::LongRunning),
+        (tr!("Replication lag"), ActivityQuery::ReplicationLag),
+        (tr!("Server variables"), ActivityQuery::ServerVariables),
+        (tr!("Server status"), ActivityQuery::ServerStatus),
     ];
     let supported = activity_kinds(&driver_id);
     for (label, kind) in actions {
-        let btn = gtk::Button::with_label(label);
+        let btn = gtk::Button::with_label(&label);
         let text_buf = text.buffer();
         let status_l = status.clone();
         let driver = driver_id.clone();
@@ -128,7 +128,7 @@ pub fn present(
                         let rendered = render_result(&cols, &result.rows);
                         let n = result.rows.len();
                         text_buf.set_text(&rendered);
-                        status_l.set_text(&format!("{n} rows"));
+                        status_l.set_text(&bookie_app_services::trn!("{n} row", "{n} rows", n).replace("{n}", &n.to_string()));
                     }
                     Err(e) => {
                         if token.is_cancelled() {
@@ -241,13 +241,56 @@ fn unsupported_text(driver_id: &str) -> String {
 }
 
 fn render_result<R: QueryRowSet + ?Sized>(columns: &[String], rows: &R) -> String {
-    let mut out = String::new();
-    out.push_str(&columns.join("\t"));
-    out.push('\n');
-    for row_index in 0..rows.row_count() {
+    if columns.is_empty() {
+        return String::new();
+    }
+    let row_count = rows.row_count();
+    let mut string_rows = Vec::with_capacity(row_count);
+    let mut widths: Vec<usize> = columns.iter().map(|c| c.chars().count()).collect();
+
+    for row_index in 0..row_count {
         let Some(row) = rows.row(row_index) else { continue };
         let cells: Vec<String> = row.iter().map(value_to_string).collect();
-        out.push_str(&cells.join("\t"));
+        for (i, cell) in cells.iter().enumerate() {
+            if i < widths.len() {
+                widths[i] = widths[i].max(cell.chars().count());
+            }
+        }
+        string_rows.push(cells);
+    }
+
+    let mut out = String::new();
+    for (i, col) in columns.iter().enumerate() {
+        if i > 0 {
+            out.push_str("  ");
+        }
+        let w = widths.get(i).copied().unwrap_or(col.chars().count());
+        out.push_str(col);
+        if col.chars().count() < w {
+            out.push_str(&" ".repeat(w - col.chars().count()));
+        }
+    }
+    out.push('\n');
+
+    for (i, w) in widths.iter().enumerate() {
+        if i > 0 {
+            out.push_str("  ");
+        }
+        out.push_str(&"-".repeat(*w));
+    }
+    out.push('\n');
+
+    for row in string_rows {
+        for (i, cell) in row.iter().enumerate() {
+            if i > 0 {
+                out.push_str("  ");
+            }
+            let w = widths.get(i).copied().unwrap_or(cell.chars().count());
+            out.push_str(&cell);
+            if cell.chars().count() < w {
+                out.push_str(&" ".repeat(w - cell.chars().count()));
+            }
+        }
         out.push('\n');
     }
     out
@@ -281,5 +324,21 @@ mod tests {
     fn a_binary_cell_reads_as_its_byte_count_not_a_hex_escape() {
         assert_eq!(value_to_string(&Value::Bytes(vec![0xAB; 16])), "<16 bytes>");
         assert_eq!(value_to_string(&Value::Bytes(Vec::new())), "<0 bytes>");
+    }
+
+    #[test]
+    fn render_result_aligns_columns_with_headers_and_separator() {
+        let cols = vec!["pid".to_string(), "query".to_string(), "state".to_string()];
+        let rows = vec![
+            vec![Value::Int(1234), Value::Text("SELECT 1".to_string()), Value::Text("active".to_string())],
+            vec![Value::Int(56), Value::Text("idle in transaction".to_string()), Value::Text("idle".to_string())],
+        ];
+        let rendered = render_result(&cols, &rows);
+        let lines: Vec<&str> = rendered.lines().collect();
+        assert_eq!(lines.len(), 4);
+        assert_eq!(lines[0], "pid   query                state ");
+        assert_eq!(lines[1], "----  -------------------  ------");
+        assert_eq!(lines[2], "1234  SELECT 1             active");
+        assert_eq!(lines[3], "56    idle in transaction  idle  ");
     }
 }

@@ -23,40 +23,51 @@ impl GridView {
         if !self.detail_open {
             return None;
         }
-        let (name, detail) = self.detail_target().unwrap_or_else(|| (String::new(), Detail::Null));
-        let body = match detail {
-            Detail::Null => div().child("NULL").italic().text_color(rgb(theme.muted_foreground)),
-            Detail::Text(text) => div().child(text),
-            Detail::Json { pretty } => div().font_family(MONO).child(pretty),
-            Detail::Hex {
-                lines,
-                total,
-                shown,
-                decoded,
-            } => div()
-                .font_family(MONO)
-                .flex()
-                .flex_col()
-                .children(
-                    lines
-                        .into_iter()
-                        .map(|line| div().child(format!("{:08x}  {:<47}  {}", line.offset, line.hex, line.ascii))),
-                )
-                .when_some(decoded, |panel, (label, decoded)| {
-                    panel.child(
-                        div()
-                            .mt_2()
-                            .child(div().text_color(rgb(theme.muted_foreground)).child(label))
-                            .child(decoded),
-                    )
-                })
-                .when(shown < total, |panel| {
-                    panel.child(
-                        div()
-                            .text_color(rgb(theme.muted_foreground))
-                            .child(format!("showing {shown} of {total} bytes")),
-                    )
-                }),
+        let (header, body) = match self.detail_target() {
+            None => (
+                div().text_color(rgb(theme.muted_foreground)).child("No cell selected"),
+                div()
+                    .text_color(rgb(theme.muted_foreground))
+                    .child("Select a cell to view its contents."),
+            ),
+            Some((name, detail)) => {
+                let header = div().text_color(rgb(theme.muted_foreground)).child(name);
+                let body = match detail {
+                    Detail::Null => div().child("NULL").italic().text_color(rgb(theme.muted_foreground)),
+                    Detail::Text(text) => div().child(text),
+                    Detail::Json { pretty } => div().font_family(MONO).child(pretty),
+                    Detail::Hex {
+                        lines,
+                        total,
+                        shown,
+                        decoded,
+                    } => div()
+                        .font_family(MONO)
+                        .flex()
+                        .flex_col()
+                        .children(
+                            lines
+                                .into_iter()
+                                .map(|line| div().child(format!("{:08x}  {:<47}  {}", line.offset, line.hex, line.ascii))),
+                        )
+                        .when_some(decoded, |panel, (label, decoded)| {
+                            panel.child(
+                                div()
+                                    .mt_2()
+                                    .child(div().text_color(rgb(theme.muted_foreground)).child(label))
+                                    .child(decoded),
+                            )
+                        })
+                        .when(shown < total, |panel| {
+                            panel.child(
+                                div()
+                                    .text_color(rgb(theme.muted_foreground))
+                                    .child(format!("showing {shown} of {total} bytes")),
+                            )
+                        }),
+                };
+                (header, body)
+            }
         };
         Some(
             div()
@@ -68,7 +79,7 @@ impl GridView {
                 .border_color(rgb(theme.border))
                 .bg(rgb(theme.muted))
                 .overflow_y_scroll()
-                .child(div().text_color(rgb(theme.muted_foreground)).child(name))
+                .child(header)
                 .child(body),
         )
     }

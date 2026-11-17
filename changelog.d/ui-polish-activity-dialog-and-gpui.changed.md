@@ -1,0 +1,1 @@
+Activity dialog formats query results into padded monospace tables and translates action labels; GPUI detail panel and status bar clarify empty selections and status messages; refreshed documentation and diagrams to highlight Linux-first and cross-platform desktop development.
