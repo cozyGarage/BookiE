@@ -923,8 +923,8 @@ mod tests {
                 FilterOp::Contains,
                 Some(FilterValue::Single(String::new())),
             ),
-            (&text[..], "name", 8, FilterOp::IsNull, None),
-            (&text[..], "name", 10, FilterOp::In, Some(FilterValue::List(Vec::new()))),
+            (&text[..], "name", 9, FilterOp::IsNull, None),
+            (&text[..], "name", 11, FilterOp::In, Some(FilterValue::List(Vec::new()))),
             (
                 &number[..],
                 "age",
