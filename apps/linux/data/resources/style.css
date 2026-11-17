@@ -239,3 +239,15 @@ columnview > header .tp-column-header-selected {
   padding-left: 4px;
   padding-right: 4px;
 }
+
+list.tp-sidebar-item,
+list.tp-sidebar-item > row,
+list.tp-sidebar-item > row:hover,
+list.tp-sidebar-item > row:active,
+list.tp-sidebar-item > row:selected {
+  background: none;
+  box-shadow: none;
+  padding-left: 0;
+  padding-right: 0;
+  margin: 0;
+}
