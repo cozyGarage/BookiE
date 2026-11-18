@@ -35,6 +35,35 @@ pub async fn recent(limit: usize) -> Result<Vec<RecentStatement>, String> {
     recent_in(&store, limit).await
 }
 
+const DEFAULT_RETENTION_DAYS: u32 = 30;
+
+pub fn retention_days() -> u32 {
+    let Ok(path) = bookie_storage::config_path("preferences.json") else {
+        return DEFAULT_RETENTION_DAYS;
+    };
+    std::fs::read(path)
+        .ok()
+        .and_then(|bytes| retention_from_json(&bytes))
+        .unwrap_or(DEFAULT_RETENTION_DAYS)
+}
+
+fn retention_from_json(bytes: &[u8]) -> Option<u32> {
+    let value: serde_json::Value = serde_json::from_slice(bytes).ok()?;
+    u32::try_from(value.get("history_retention_days")?.as_u64()?).ok()
+}
+
+pub async fn prune() -> Result<usize, String> {
+    let store = HistoryStore::open_default().await.map_err(|error| error.to_string())?;
+    prune_in(&store, retention_days()).await
+}
+
+pub async fn prune_in(store: &HistoryStore, retention_days: u32) -> Result<usize, String> {
+    store
+        .prune_older_than(retention_days)
+        .await
+        .map_err(|error| error.to_string())
+}
+
 pub async fn record_in(store: &HistoryStore, statement: Statement) -> Result<(), String> {
     let outcome = match (statement.cancelled, statement.error) {
         (true, _) => Outcome::Cancelled,
@@ -96,6 +125,24 @@ mod tests {
             cancelled: false,
             source: Source::Editor,
         }
+    }
+
+    #[test]
+    fn the_retention_comes_from_the_preferences_mirror() {
+        assert_eq!(retention_from_json(br#"{"history_retention_days": 7}"#), Some(7));
+        assert_eq!(retention_from_json(br#"{"other": 1}"#), None);
+        assert_eq!(retention_from_json(b"not json"), None);
+    }
+
+    #[tokio::test]
+    async fn pruning_keeps_recent_statements() {
+        let path = std::env::temp_dir().join(format!("bookie-history-prune-{}.db", Uuid::new_v4()));
+        let store = HistoryStore::open(path.clone()).await.unwrap();
+        record_in(&store, statement("SELECT 1", None)).await.unwrap();
+        prune_in(&store, 30).await.unwrap();
+        assert_eq!(recent_in(&store, 10).await.unwrap().len(), 1);
+        drop(store);
+        let _ = std::fs::remove_file(path);
     }
 
     #[tokio::test]

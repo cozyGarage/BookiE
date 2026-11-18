@@ -80,7 +80,8 @@ pub fn run() {
                 Ok(store) => {
                     let pruning = store.clone();
                     tokio::spawn(async move {
-                        if let Err(e) = pruning.prune_older_than(retention_days).await {
+                        if let Err(e) = bookie_app_services::statement_history::prune_in(&pruning, retention_days).await
+                        {
                             tracing::warn!(error = %e, "history prune failed");
                         }
                     });

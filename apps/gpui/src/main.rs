@@ -21,6 +21,7 @@ mod runs;
 mod scroll_pace;
 mod services;
 mod sidebar_catalog;
+mod ssh_form;
 mod sidebar_fields;
 mod sidebar_state;
 mod text_input;

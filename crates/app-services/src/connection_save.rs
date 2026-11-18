@@ -6,15 +6,33 @@ use bookie_storage::{
 };
 
 use crate::connection_form::LocalSocketPathKind;
+use crate::ssh_chain_form::{ChainPlan, JumpAuth, JumpHopForm, plan_chain};
 use secrecy::{ExposeSecret, SecretString};
 use uuid::Uuid;
 
-pub struct SshDraft {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SshAuthKind {
+    Password,
+    KeyFile,
+    Agent,
+}
+
+pub struct SshHopDraft {
+    pub hop_id: Option<Uuid>,
     pub host: String,
     pub port: u16,
     pub username: String,
+    pub auth: SshAuthKind,
     pub key_path: String,
+    pub agent_identity: String,
     pub secret: SecretString,
+    pub stored_secret: bool,
+}
+
+pub struct SshDraft {
+    pub head: SshHopDraft,
+    pub openssh: bool,
+    pub jumps: Vec<SshHopDraft>,
 }
 
 pub struct ConnectionDraft {
@@ -37,7 +55,6 @@ pub struct ConnectionDraft {
     pub read_only: bool,
     pub environment: Environment,
     pub keep_stored_password: bool,
-    pub keep_saved_ssh: bool,
 }
 
 fn path_text(path: Option<&std::path::PathBuf>) -> String {
@@ -59,10 +76,6 @@ pub async fn load_draft(id: Uuid) -> Result<Option<ConnectionDraft>, String> {
 }
 
 fn draft_from_saved(saved: &SavedConnection) -> ConnectionDraft {
-    let single_hop = saved
-        .ssh
-        .as_ref()
-        .filter(|ssh| ssh.jump.is_none() && !ssh.agent && ssh.client == bookie_storage::SshClient::Builtin);
     let (socket_kind, socket_endpoint) = match (&saved.socket_dir, &saved.socket_path) {
         (Some(directory), _) => (Some(LocalSocketPathKind::Directory), path_text(Some(directory))),
         (None, Some(path)) => (Some(LocalSocketPathKind::File), path_text(Some(path))),
@@ -84,20 +97,44 @@ fn draft_from_saved(saved: &SavedConnection) -> ConnectionDraft {
         tls_client_key: path_text(saved.tls_client_key.as_ref()),
         socket_kind,
         socket_endpoint,
-        ssh: single_hop.map(|ssh| SshDraft {
-            host: ssh.host.clone(),
-            port: ssh.port,
-            username: ssh.username.clone(),
-            key_path: match &ssh.auth {
-                bookie_storage::SavedSshAuth::PrivateKey { path, .. } => path.display().to_string(),
-                bookie_storage::SavedSshAuth::Password => String::new(),
-            },
-            secret: SecretString::from(String::new()),
-        }),
+        ssh: saved.ssh.as_ref().map(ssh_draft_from_saved),
         read_only: saved.read_only,
         environment: saved.environment,
         keep_stored_password: true,
-        keep_saved_ssh: saved.ssh.is_some() && single_hop.is_none(),
+    }
+}
+
+fn hop_draft_from_saved(hop: &SavedSshConfig) -> SshHopDraft {
+    let (auth, key_path, stored_secret) = match (&hop.auth, hop.agent) {
+        (SavedSshAuth::PrivateKey { path, .. }, true) => (SshAuthKind::Agent, path.display().to_string(), false),
+        (SavedSshAuth::PrivateKey { path, has_passphrase }, false) => {
+            (SshAuthKind::KeyFile, path.display().to_string(), *has_passphrase)
+        }
+        (SavedSshAuth::Password, _) => (SshAuthKind::Password, String::new(), true),
+    };
+    SshHopDraft {
+        hop_id: Some(hop.hop_id),
+        host: hop.host.clone(),
+        port: hop.port,
+        username: hop.username.clone(),
+        auth,
+        key_path,
+        agent_identity: path_text(hop.agent_identity.as_ref()),
+        secret: SecretString::from(String::new()),
+        stored_secret,
+    }
+}
+
+fn ssh_draft_from_saved(ssh: &SavedSshConfig) -> SshDraft {
+    SshDraft {
+        head: hop_draft_from_saved(ssh),
+        openssh: ssh.client == bookie_storage::SshClient::OpenSsh,
+        jumps: ssh
+            .flatten_hops()
+            .into_iter()
+            .skip(1)
+            .map(hop_draft_from_saved)
+            .collect(),
     }
 }
 
@@ -140,11 +177,20 @@ fn validate_ssh(ssh: Option<&SshDraft>) -> Result<(), String> {
     let Some(ssh) = ssh else {
         return Ok(());
     };
-    if ssh.host.trim().is_empty() || ssh.username.trim().is_empty() {
-        return Err("Enter the SSH host and user.".into());
-    }
-    if ssh.port == 0 {
-        return Err("Enter an SSH port from 1 to 65535.".into());
+    for (index, hop) in std::iter::once(&ssh.head).chain(ssh.jumps.iter()).enumerate() {
+        if hop.host.trim().is_empty() || hop.username.trim().is_empty() {
+            return Err(if index == 0 {
+                "Enter the SSH host and user.".into()
+            } else {
+                format!("Enter the host and user of jump host {index}.")
+            });
+        }
+        if hop.port == 0 {
+            return Err("Enter an SSH port from 1 to 65535.".into());
+        }
+        if hop.auth == SshAuthKind::KeyFile && hop.key_path.trim().is_empty() {
+            return Err("Enter the private key file.".into());
+        }
     }
     Ok(())
 }
@@ -180,7 +226,7 @@ pub fn saved_from_draft(draft: &ConnectionDraft, id: Uuid) -> SavedConnection {
         auth_mode: draft.auth_mode,
         read_only: draft.read_only,
         environment: draft.environment,
-        ssh: draft.ssh.as_ref().map(|ssh| ssh_config(ssh)),
+        ssh: draft.ssh.as_ref().map(|ssh| head_config(ssh, None)),
         last_opened_at: None,
         connect_timeout_secs: None,
         query_timeout_secs: None,
@@ -189,25 +235,93 @@ pub fn saved_from_draft(draft: &ConnectionDraft, id: Uuid) -> SavedConnection {
     }
 }
 
-fn ssh_config(ssh: &SshDraft) -> SavedSshConfig {
+fn head_config(ssh: &SshDraft, previous: Option<&SavedSshConfig>) -> SavedSshConfig {
+    let hop = &ssh.head;
+    let agent = hop.auth == SshAuthKind::Agent;
+    let identity = hop.agent_identity.trim();
     SavedSshConfig {
-        hop_id: Uuid::new_v4(),
-        credential_revision: 0,
-        host: ssh.host.trim().to_owned(),
-        port: ssh.port,
-        username: ssh.username.trim().to_owned(),
-        auth: match optional_path(&ssh.key_path) {
-            Some(path) => SavedSshAuth::PrivateKey {
-                path,
-                has_passphrase: !ssh.secret.expose_secret().is_empty(),
+        hop_id: hop
+            .hop_id
+            .or(previous.map(|old| old.hop_id))
+            .unwrap_or_else(Uuid::new_v4),
+        credential_revision: previous.map_or(0, |old| old.credential_revision),
+        host: hop.host.trim().to_owned(),
+        port: hop.port,
+        username: hop.username.trim().to_owned(),
+        auth: match hop.auth {
+            SshAuthKind::Password => SavedSshAuth::Password,
+            SshAuthKind::KeyFile => SavedSshAuth::PrivateKey {
+                path: PathBuf::from(hop.key_path.trim()),
+                has_passphrase: !hop.secret.expose_secret().is_empty() || hop.stored_secret,
             },
-            None => SavedSshAuth::Password,
+            SshAuthKind::Agent => SavedSshAuth::PrivateKey {
+                path: PathBuf::from(hop.key_path.trim()),
+                has_passphrase: false,
+            },
         },
         jump: None,
-        client: bookie_storage::SshClient::Builtin,
-        agent: false,
-        agent_identity: None,
+        client: if ssh.openssh {
+            bookie_storage::SshClient::OpenSsh
+        } else {
+            bookie_storage::SshClient::Builtin
+        },
+        agent,
+        agent_identity: (agent && !identity.is_empty()).then(|| PathBuf::from(identity)),
         local_port: None,
+    }
+}
+
+fn jump_forms(ssh: &SshDraft) -> Vec<JumpHopForm> {
+    ssh.jumps
+        .iter()
+        .map(|hop| {
+            let entered = (!hop.secret.expose_secret().is_empty())
+                .then(|| SecretString::from(hop.secret.expose_secret().to_owned()));
+            JumpHopForm {
+                hop_id: hop.hop_id,
+                host: hop.host.clone(),
+                port: hop.port,
+                username: hop.username.clone(),
+                auth: match hop.auth {
+                    SshAuthKind::Password => JumpAuth::Password,
+                    SshAuthKind::KeyFile => JumpAuth::PrivateKey,
+                    SshAuthKind::Agent => JumpAuth::Agent,
+                },
+                key_path: hop.key_path.clone(),
+                agent_identity: hop.agent_identity.clone(),
+                password: if hop.auth == SshAuthKind::Password {
+                    entered.clone()
+                } else {
+                    None
+                },
+                passphrase: if hop.auth == SshAuthKind::KeyFile {
+                    entered
+                } else {
+                    None
+                },
+                stored_password: hop.auth == SshAuthKind::Password && hop.stored_secret,
+                stored_passphrase: hop.auth == SshAuthKind::KeyFile && hop.stored_secret,
+            }
+        })
+        .collect()
+}
+
+pub enum HeadSecret {
+    None,
+    Password(SecretString),
+    Passphrase(SecretString),
+}
+
+fn head_secret(ssh: &SshDraft) -> HeadSecret {
+    let secret = ssh.head.secret.expose_secret();
+    if secret.is_empty() {
+        return HeadSecret::None;
+    }
+    let copy = SecretString::from(secret.to_owned());
+    match ssh.head.auth {
+        SshAuthKind::Password => HeadSecret::Password(copy),
+        SshAuthKind::KeyFile => HeadSecret::Passphrase(copy),
+        SshAuthKind::Agent => HeadSecret::None,
     }
 }
 
@@ -224,27 +338,26 @@ pub async fn save(draft: ConnectionDraft) -> Result<SavedConnection, String> {
     };
     let mut saved = saved_from_draft(&draft, draft.id.unwrap_or_else(Uuid::new_v4));
     if let Some(previous) = &existing {
-        carry_over(&mut saved, previous, &draft);
+        carry_over(&mut saved, previous);
     }
+    let plan = match &draft.ssh {
+        Some(ssh) => {
+            let previous = existing.as_ref().and_then(|saved| saved.ssh.as_ref());
+            let plan = plan_chain(head_config(ssh, previous), &jump_forms(ssh), previous)
+                .map_err(|error| error.to_string())?;
+            saved.ssh = Some(plan.head.clone());
+            Some((plan, head_secret(ssh)))
+        }
+        None => None,
+    };
     let keep_password = draft.keep_stored_password && draft.password.expose_secret().is_empty() && existing.is_some();
-    if keep_password {
-        save_connections(std::slice::from_ref(&saved))
-            .await
-            .map_err(|error| format!("save: {error}"))?;
-    } else {
-        persist_with_password(&saved, existing.as_ref(), &draft.password, &saved.name).await?;
-    }
-    store_ssh_secret(&saved, draft.ssh.as_ref()).await?;
+    let password = (!keep_password).then_some(&draft.password);
+    let ssh = plan.as_ref().map(|(plan, secret)| (plan, secret));
+    persist_connection(&saved, existing.as_ref(), password, &saved.name, ssh).await?;
     Ok(saved)
 }
 
-fn carry_over(saved: &mut SavedConnection, previous: &SavedConnection, draft: &ConnectionDraft) {
-    if draft.keep_saved_ssh {
-        saved.ssh = previous.ssh.clone();
-    } else if let (Some(new), Some(old)) = (saved.ssh.as_mut(), previous.ssh.as_ref()) {
-        new.hop_id = old.hop_id;
-        new.credential_revision = old.credential_revision;
-    }
+fn carry_over(saved: &mut SavedConnection, previous: &SavedConnection) {
     saved.auth_source = previous.auth_source.clone();
     saved.connect_timeout_secs = previous.connect_timeout_secs;
     saved.query_timeout_secs = previous.query_timeout_secs;
@@ -253,20 +366,51 @@ fn carry_over(saved: &mut SavedConnection, previous: &SavedConnection, draft: &C
     saved.last_opened_at = previous.last_opened_at;
 }
 
-async fn store_ssh_secret(saved: &SavedConnection, ssh: Option<&SshDraft>) -> Result<(), String> {
-    let (Some(config), Some(draft)) = (&saved.ssh, ssh) else {
-        return Ok(());
+pub async fn persist_connection(
+    saved: &SavedConnection,
+    existing: Option<&SavedConnection>,
+    password: Option<&SecretString>,
+    label: &str,
+    ssh: Option<(&ChainPlan, &HeadSecret)>,
+) -> Result<(), String> {
+    let committed = match ssh {
+        Some((plan, _)) => Some(
+            crate::ssh_chain_secrets::commit_hop_secrets(saved.id, plan, label)
+                .await
+                .map_err(|error| format!("The SSH jump host secrets were not saved: {error}"))?,
+        ),
+        None => None,
     };
-    let secret = draft.secret.expose_secret();
-    if secret.is_empty() {
-        return Ok(());
+    let stored = match password {
+        Some(password) => persist_with_password(saved, existing, password, label).await,
+        None => save_connections(std::slice::from_ref(saved))
+            .await
+            .map_err(|error| format!("save: {error}")),
+    };
+    if let Err(error) = stored {
+        if let Some(committed) = &committed
+            && let Err(rollback) = crate::ssh_chain_secrets::rollback_hop_secrets(saved.id, committed).await
+        {
+            tracing::warn!(%rollback, "jump host secrets from a failed save could not be removed");
+        }
+        return Err(error);
     }
-    let label = &saved.name;
-    match &config.auth {
-        SavedSshAuth::Password => bookie_storage::store_ssh_password(saved.id, secret, label)
+    if let Some((plan, secret)) = ssh {
+        store_head_secret(saved.id, secret, label).await?;
+        if let Err(error) = crate::ssh_chain_secrets::delete_obsolete_hop_secrets(saved.id, plan).await {
+            tracing::warn!(%error, "replaced jump host secrets could not be removed");
+        }
+    }
+    Ok(())
+}
+
+async fn store_head_secret(id: Uuid, secret: &HeadSecret, label: &str) -> Result<(), String> {
+    match secret {
+        HeadSecret::None => Ok(()),
+        HeadSecret::Password(password) => bookie_storage::store_ssh_password(id, password.expose_secret(), label)
             .await
             .map_err(|error| format!("Connection settings were saved, but the SSH password was not saved: {error}. Re-enter the SSH password and connect again.")),
-        SavedSshAuth::PrivateKey { .. } => bookie_storage::store_ssh_passphrase(saved.id, secret, label)
+        HeadSecret::Passphrase(passphrase) => bookie_storage::store_ssh_passphrase(id, passphrase.expose_secret(), label)
             .await
             .map_err(|error| format!("Connection settings were saved, but the SSH key passphrase was not saved: {error}. Re-enter the passphrase and connect again.")),
     }
@@ -309,6 +453,7 @@ pub async fn test(
     registry: &bookie_core::DriverRegistry,
     draft: &ConnectionDraft,
     cancellation: tokio_util::sync::CancellationToken,
+    audit: Option<&bookie_transport::TransportAuditFactory>,
 ) -> Result<String, String> {
     validate(draft)?;
     if draft.ssh.is_some() && draft.id.is_none() {
@@ -328,7 +473,16 @@ pub async fn test(
         opts.password = SecretString::from(draft.password.expose_secret().to_owned());
     }
     opts.application_name = Some("BookiE".into());
-    let environment = bookie_transport::SshEnvironment::builtin(bookie_ssh::UnknownHostKey::Refuse);
+    let mut environment = bookie_transport::SshEnvironment::builtin(bookie_ssh::UnknownHostKey::Refuse);
+    if let Some(audit) = audit {
+        environment = environment.with_audit(audit.context(
+            bookie_policy::Principal::human_gui(),
+            saved.id,
+            saved.name.clone(),
+            saved.environment,
+            saved.driver_id.clone(),
+        ));
+    }
     let (connection, _tunnel) =
         bookie_transport::establish_with_cancellation(&*driver, opts, hops, &environment, cancellation.clone())
             .await
@@ -396,6 +550,24 @@ async fn rollback_saved_connection(
 mod tests {
     use super::*;
 
+    fn hop(host: &str, auth: SshAuthKind) -> SshHopDraft {
+        SshHopDraft {
+            hop_id: None,
+            host: host.into(),
+            port: 22,
+            username: "ada".into(),
+            auth,
+            key_path: if auth == SshAuthKind::KeyFile {
+                "/home/ada/.ssh/id".into()
+            } else {
+                String::new()
+            },
+            agent_identity: String::new(),
+            secret: SecretString::from(String::new()),
+            stored_secret: false,
+        }
+    }
+
     fn draft() -> ConnectionDraft {
         ConnectionDraft {
             id: None,
@@ -417,7 +589,6 @@ mod tests {
             read_only: true,
             environment: Environment::Local,
             keep_stored_password: false,
-            keep_saved_ssh: false,
         }
     }
 
@@ -474,12 +645,12 @@ mod tests {
         full.socket_kind = Some(LocalSocketPathKind::Directory);
         full.socket_endpoint = "/run/postgresql".into();
         full.auth_mode = AuthMode::Kerberos;
+        let mut head = hop("jump.example", SshAuthKind::KeyFile);
+        head.secret = SecretString::from("S3cr3t-xyz".to_owned());
         full.ssh = Some(SshDraft {
-            host: "jump.example".into(),
-            port: 22,
-            username: "ada".into(),
-            key_path: "/home/ada/.ssh/id".into(),
-            secret: SecretString::from("S3cr3t-xyz".to_owned()),
+            head,
+            openssh: false,
+            jumps: Vec::new(),
         });
         let saved = saved_from_draft(&full, Uuid::nil());
         assert_eq!(
@@ -512,29 +683,43 @@ mod tests {
         assert!(validate(&relative).unwrap_err().contains("absolute"));
         let mut blank = draft();
         blank.ssh = Some(SshDraft {
-            host: " ".into(),
-            port: 22,
-            username: "u".into(),
-            key_path: String::new(),
-            secret: SecretString::from(String::new()),
+            head: hop(" ", SshAuthKind::Password),
+            openssh: false,
+            jumps: Vec::new(),
         });
         assert!(validate(&blank).unwrap_err().contains("SSH host"));
+        let mut jump = draft();
+        jump.ssh = Some(SshDraft {
+            head: hop("a", SshAuthKind::Password),
+            openssh: false,
+            jumps: vec![hop(" ", SshAuthKind::Agent)],
+        });
+        assert!(validate(&jump).unwrap_err().contains("jump host 1"));
     }
 
     #[test]
-    fn a_multi_hop_or_agent_chain_is_kept_not_flattened_on_edit() {
-        let mut saved = saved_from_draft(&draft(), Uuid::nil());
-        let mut chain = ssh_config(&SshDraft {
-            host: "a".into(),
-            port: 22,
-            username: "u".into(),
-            key_path: String::new(),
-            secret: SecretString::from(String::new()),
+    fn a_jump_chain_an_agent_and_the_openssh_client_round_trip_through_the_saved_record() {
+        let mut chain = draft();
+        chain.ssh = Some(SshDraft {
+            head: hop("db-gate", SshAuthKind::Agent),
+            openssh: false,
+            jumps: vec![hop("bastion", SshAuthKind::KeyFile), hop("edge", SshAuthKind::Password)],
         });
-        chain.jump = Some(Box::new(chain.clone()));
-        saved.ssh = Some(chain);
-        let edited = draft_from_saved(&saved);
-        assert!(edited.ssh.is_none() && edited.keep_saved_ssh);
+        chain.ssh.as_mut().unwrap().jumps[1].secret = SecretString::from("pw".to_owned());
+        let ssh = chain.ssh.as_ref().unwrap();
+        let plan = plan_chain(head_config(ssh, None), &jump_forms(ssh), None).unwrap();
+        let mut saved = saved_from_draft(&chain, Uuid::nil());
+        saved.ssh = Some(plan.head);
+        let back = draft_from_saved(&saved).ssh.unwrap();
+        assert_eq!(back.head.auth, SshAuthKind::Agent);
+        assert_eq!(back.jumps.len(), 2);
+        assert_eq!(back.jumps[0].host, "bastion");
+        assert_eq!(back.jumps[0].auth, SshAuthKind::KeyFile);
+        assert_eq!(back.jumps[1].auth, SshAuthKind::Password);
+        let mut openssh = chain.ssh.take().unwrap();
+        openssh.openssh = true;
+        let refused = plan_chain(head_config(&openssh, None), &jump_forms(&openssh), None);
+        assert!(refused.is_err());
     }
 
     #[tokio::test]
@@ -544,28 +729,27 @@ mod tests {
         std::fs::File::create(&path).unwrap();
         let mut registry = bookie_core::DriverRegistry::new();
         registry.register(std::sync::Arc::new(drivers_sqlite::SqliteDriver));
+        let cancel = || tokio_util::sync::CancellationToken::new();
         let mut file = draft();
         file.driver_id = "sqlite".into();
         file.database = path.display().to_string();
-        let outcome = test(&registry, &file, tokio_util::sync::CancellationToken::new()).await;
-        assert!(outcome.unwrap().starts_with("Connected"));
+        assert!(
+            test(&registry, &file, cancel(), None)
+                .await
+                .unwrap()
+                .starts_with("Connected")
+        );
         let mut bad = draft();
         bad.driver_id = "nonesuch".into();
-        assert!(
-            test(&registry, &bad, tokio_util::sync::CancellationToken::new())
-                .await
-                .is_err()
-        );
+        assert!(test(&registry, &bad, cancel(), None).await.is_err());
         let mut ssh = draft();
         ssh.ssh = Some(SshDraft {
-            host: "h".into(),
-            port: 22,
-            username: "u".into(),
-            key_path: String::new(),
-            secret: SecretString::from(String::new()),
+            head: hop("h", SshAuthKind::Password),
+            openssh: false,
+            jumps: Vec::new(),
         });
         assert!(
-            test(&registry, &ssh, tokio_util::sync::CancellationToken::new())
+            test(&registry, &ssh, cancel(), None)
                 .await
                 .unwrap_err()
                 .contains("Save the connection first")
