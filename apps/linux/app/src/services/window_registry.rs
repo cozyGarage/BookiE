@@ -8,9 +8,7 @@ thread_local! {
     static OWNERS: RefCell<HashMap<Uuid, gtk::Window>> = RefCell::new(HashMap::new());
 }
 
-/// Record which window owns a connection, so an approval dialog for a
-/// statement on that connection can be parented to the window that
-/// actually triggered it instead of whichever window last had focus.
+/// Keeps approval dialogs tied to the window whose connection triggered them.
 pub fn register(connection_id: Uuid, window: gtk::Window) {
     OWNERS.with(|owners| owners.borrow_mut().insert(connection_id, window));
 }
