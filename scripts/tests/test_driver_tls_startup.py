@@ -93,6 +93,52 @@ if any(action in args for action in ["ps", "inspect", "logs"]):
         self.assertIn(" down ", commands[-1])
         self.assertTrue(any(" logs " in command for command in commands))
 
+    def test_redis_tests_use_the_port_published_by_compose(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.prepare_fixture(root)
+            binary = root / "bin"
+            binary.mkdir()
+            commands = root / "commands"
+            docker = binary / "docker"
+            docker.write_text(r"""#!/usr/bin/env python3
+import os, sys
+args = sys.argv[1:]
+with open(os.environ["TLS_COMMAND_LOG"], "a") as stream:
+    stream.write(" ".join(args) + "\n")
+if args[-3:] == ["port", "redis", "6379"]:
+    print("0.0.0.0:46123")
+""")
+            cargo = binary / "cargo"
+            cargo.write_text(
+                "#!/usr/bin/env python3\n"
+                "import os\n"
+                "with open(os.environ['TLS_REDIS_PORTS'], 'a') as stream:\n"
+                "    stream.write(os.environ.get('BOOKIE_DRIVER_TLS_REDIS_PORT', '') + '\\n')\n",
+                encoding="utf-8",
+            )
+            docker.chmod(0o755)
+            cargo.chmod(0o755)
+            result = subprocess.run(
+                ["bash", str(root / "scripts/test-driver-tls.sh")],
+                env=clean_test_environment(
+                    PATH=f"{binary}:{os.environ['PATH']}",
+                    TLS_COMMAND_LOG=str(commands),
+                    TLS_REDIS_PORTS=str(root / "redis-ports"),
+                    BOOKIE_FIXTURE_KEEP_UP="0",
+                ),
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("port redis 6379", commands.read_text(encoding="utf-8"))
+            self.assertEqual(
+                (root / "redis-ports").read_text(encoding="utf-8").splitlines(),
+                ["46123", "46123"],
+            )
+
     def test_private_runner_umask_keeps_seeds_readable_and_certificate_material_private(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -108,6 +154,8 @@ if any(action in args for action in ["ps", "inspect", "logs"]):
             docker.write_text(r"""#!/usr/bin/env python3
 import os, sys
 from pathlib import Path
+if sys.argv[-3:] == ["port", "redis", "6379"]:
+    print("0.0.0.0:46123")
 if "up" in sys.argv:
     seed = Path(os.environ["TLS_FIXTURE_ROOT"]) / "seed"
     if seed.stat().st_mode & 0o005 != 0o005 or not (seed / "01-seed.js").stat().st_mode & 0o004:

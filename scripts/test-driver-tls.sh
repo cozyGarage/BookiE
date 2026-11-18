@@ -15,6 +15,8 @@ if ! docker compose version >/dev/null 2>&1; then
   echo "docker compose is required" >&2
   exit 1
 fi
+BOOKIE_DRIVER_TLS_REDIS_PORT="${BOOKIE_DRIVER_TLS_REDIS_PORT:-0}"
+export BOOKIE_DRIVER_TLS_REDIS_PORT
 
 KEEP_UP="${BOOKIE_FIXTURE_KEEP_UP:-0}"
 if [[ "${BOOKIE_DRIVER_TLS_HOST:-}" == "host.docker.internal" && -z "${BOOKIE_DRIVER_TLS_WRONG_IDENTITY_HOST:-}" ]]; then
@@ -58,6 +60,15 @@ else
   compose logs --no-color --tail 50 || true
   exit "$startup_status"
 fi
+if [[ "$BOOKIE_DRIVER_TLS_REDIS_PORT" == 0 ]]; then
+  redis_binding="$(compose port redis 6379)"
+  BOOKIE_DRIVER_TLS_REDIS_PORT="${redis_binding##*:}"
+fi
+if [[ ! "$BOOKIE_DRIVER_TLS_REDIS_PORT" =~ ^[1-9][0-9]{0,4}$ ]]; then
+  echo "Docker did not publish the driver TLS Redis port: $BOOKIE_DRIVER_TLS_REDIS_PORT" >&2
+  exit 1
+fi
+export BOOKIE_DRIVER_TLS_REDIS_PORT
 
 export BOOKIE_FIXTURE_DRIVER_TLS=1
 export BOOKIE_DRIVER_TLS_MATERIALS="$FIXTURE/materials"

@@ -83,7 +83,7 @@ services:
       timeout: 5s
       retries: 40
     ports:
-      - "${BOOKIE_FIXTURE_BIND_ADDRESS:-127.0.0.1}:6380:6379"
+      - "${BOOKIE_FIXTURE_BIND_ADDRESS:-127.0.0.1}:${BOOKIE_DRIVER_TLS_REDIS_PORT:-6380}:6379"
     networks:
       fixture:
         aliases:
