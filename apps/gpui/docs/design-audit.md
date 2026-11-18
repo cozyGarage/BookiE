@@ -58,7 +58,7 @@ Same SQLite table, light, 2026-11-18, GTK on a private display and GPUI on a rea
 
 Both findings 9 and 14 need behaviour that today lives in GTK code or is written straight to storage by the GTK app. A frontend must not repeat it (ADR 0041), so the next step is two app-services commands used by both apps:
 
-- `ConnectionCommands`: `validate`, `save`, `load_draft` and password and SSH-secret persistence exist in `connection_save`. Still to move out of the GTK dialog: `test(draft)`, `delete(id)`, multi-hop chains, the SSH agent and the OpenSSH client, and the audit record, with typed errors the frontends only render.
+- `ConnectionCommands`: `validate`, `save`, `load_draft` and password and SSH-secret persistence exist in `connection_save`. `test` and `delete` now exist there too (GTK's delete calls the same `delete`; GPUI's Test and two-step Delete were checked on screen: SQLite answered `Connected · SQLite 3.54.0`, and a deleted record left the file). Still to move out of the GTK dialog: multi-hop chains, the SSH agent and the OpenSSH client, and the audit record, with typed errors the frontends only render.
 - `HistoryCommands`: `record` and `recent` now exist in `statement_history`; the GTK recorder now calls `record_in`; search with filters, pinning and the retention setting still have to move onto it.
 
 The GTK connection dialog and `record_history` move onto them in the same pull request, then GPUI builds its form and history list on the same calls.

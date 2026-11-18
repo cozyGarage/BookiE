@@ -272,6 +272,74 @@ async fn store_ssh_secret(saved: &SavedConnection, ssh: Option<&SshDraft>) -> Re
     }
 }
 
+pub struct Deleted {
+    pub credential_failure: bool,
+}
+
+pub async fn delete(id: Uuid) -> Result<Deleted, String> {
+    let _turn = crate::connection_save_turn::take().await;
+    let chain = bookie_storage::load_connections()
+        .await
+        .ok()
+        .and_then(|all| all.into_iter().find(|saved| saved.id == id))
+        .and_then(|saved| saved.ssh);
+    bookie_storage::delete_connection(id)
+        .await
+        .map_err(|error| format!("The connection could not be deleted: {error}"))?;
+    let mut credential_failure = false;
+    let results = [
+        bookie_storage::delete_password(id).await.err(),
+        bookie_storage::delete_ssh_password(id).await.err(),
+        bookie_storage::delete_ssh_passphrase(id).await.err(),
+    ];
+    for error in results.into_iter().flatten() {
+        credential_failure = true;
+        tracing::warn!(%error, "deleting connection credentials failed");
+    }
+    if let Some(chain) = &chain
+        && let Err(error) = crate::ssh_chain_secrets::delete_chain_secrets(id, chain).await
+    {
+        credential_failure = true;
+        tracing::warn!(%error, "deleting jump host credentials failed");
+    }
+    Ok(Deleted { credential_failure })
+}
+
+pub async fn test(
+    registry: &bookie_core::DriverRegistry,
+    draft: &ConnectionDraft,
+    cancellation: tokio_util::sync::CancellationToken,
+) -> Result<String, String> {
+    validate(draft)?;
+    if draft.ssh.is_some() && draft.id.is_none() {
+        return Err("Save the connection first to test it through SSH.".into());
+    }
+    let driver = registry
+        .get(&draft.driver_id)
+        .ok_or_else(|| format!("driver {} is not available", draft.driver_id))?;
+    let saved = saved_from_draft(draft, draft.id.unwrap_or_else(Uuid::new_v4));
+    let hops = bookie_transport::saved_ssh_route(&saved)
+        .await
+        .map_err(|error| error.to_string())?;
+    let mut opts = bookie_transport::connect_options_for(&saved)
+        .await
+        .map_err(|error| error.to_string())?;
+    if !draft.password.expose_secret().is_empty() {
+        opts.password = SecretString::from(draft.password.expose_secret().to_owned());
+    }
+    opts.application_name = Some("BookiE".into());
+    let environment = bookie_transport::SshEnvironment::builtin(bookie_ssh::UnknownHostKey::Refuse);
+    let (connection, _tunnel) =
+        bookie_transport::establish_with_cancellation(&*driver, opts, hops, &environment, cancellation.clone())
+            .await
+            .map_err(|error| error.to_string())?;
+    let control = crate::operation_control::bounded_with(15, cancellation);
+    match connection.server_version_controlled(&control).await {
+        Ok(Some(version)) => Ok(format!("Connected · {version}")),
+        _ => Ok("Connected".into()),
+    }
+}
+
 pub async fn persist_with_password(
     saved: &SavedConnection,
     existing: Option<&SavedConnection>,
@@ -467,6 +535,41 @@ mod tests {
         saved.ssh = Some(chain);
         let edited = draft_from_saved(&saved);
         assert!(edited.ssh.is_none() && edited.keep_saved_ssh);
+    }
+
+    #[tokio::test]
+    async fn a_file_database_tests_as_connected_without_being_saved() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("t.db");
+        std::fs::File::create(&path).unwrap();
+        let mut registry = bookie_core::DriverRegistry::new();
+        registry.register(std::sync::Arc::new(drivers_sqlite::SqliteDriver));
+        let mut file = draft();
+        file.driver_id = "sqlite".into();
+        file.database = path.display().to_string();
+        let outcome = test(&registry, &file, tokio_util::sync::CancellationToken::new()).await;
+        assert!(outcome.unwrap().starts_with("Connected"));
+        let mut bad = draft();
+        bad.driver_id = "nonesuch".into();
+        assert!(
+            test(&registry, &bad, tokio_util::sync::CancellationToken::new())
+                .await
+                .is_err()
+        );
+        let mut ssh = draft();
+        ssh.ssh = Some(SshDraft {
+            host: "h".into(),
+            port: 22,
+            username: "u".into(),
+            key_path: String::new(),
+            secret: SecretString::from(String::new()),
+        });
+        assert!(
+            test(&registry, &ssh, tokio_util::sync::CancellationToken::new())
+                .await
+                .unwrap_err()
+                .contains("Save the connection first")
+        );
     }
 
     #[test]

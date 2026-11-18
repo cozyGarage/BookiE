@@ -25,6 +25,8 @@ pub(crate) struct ConnectionForm {
     pub read_only: bool,
     pub status: String,
     pub saving: bool,
+    pub testing: bool,
+    pub confirm_delete: bool,
     pub editing: Option<uuid::Uuid>,
     pub kerberos: bool,
     pub tls: u32,
@@ -71,6 +73,8 @@ impl ConnectionForm {
             read_only: true,
             status: String::new(),
             saving: false,
+            testing: false,
+            confirm_delete: false,
             editing: None,
             kerberos: false,
             tls: TlsMode::default().index(),
@@ -152,6 +156,20 @@ fn field(theme: Theme, label: &'static str, input: &Entity<TextInput>) -> Div {
         .child(div().flex_1().h(px(size::FORM_CONTROL)).child(input.clone()))
 }
 
+fn outline_button(id: &'static str, label: &'static str, theme: Theme) -> Stateful<Div> {
+    div()
+        .id(id)
+        .flex()
+        .items_center()
+        .h(px(size::SMALL_CONTROL))
+        .px_3()
+        .rounded(px(theme.radius))
+        .border_1()
+        .border_color(rgb(theme.border))
+        .cursor_pointer()
+        .child(label)
+}
+
 fn note(theme: Theme, text: &str) -> Div {
     div().text_color(rgb(theme.muted_foreground)).child(text.to_string())
 }
@@ -226,6 +244,8 @@ impl GridView {
                                 .items_center()
                                 .gap_2()
                                 .child(self.save_button(theme, cx))
+                                .child(self.test_button(theme, cx))
+                                .children(form.editing.map(|_| self.delete_button(theme, cx)))
                                 .child(self.read_only_toggle(theme, cx))
                                 .child(div().text_color(rgb(theme.muted_foreground)).child(form.status.clone())),
                         ),
@@ -357,6 +377,19 @@ impl GridView {
             }))
     }
 
+    fn test_button(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
+        let busy = self.connection_form.testing;
+        outline_button("test-connection", if busy { "Testing…" } else { "Test" }, theme)
+            .on_click(cx.listener(|this, _, _, cx| this.test_connection(cx)))
+    }
+
+    fn delete_button(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
+        let confirm = self.connection_form.confirm_delete;
+        outline_button("delete-connection", if confirm { "Confirm delete" } else { "Delete" }, theme)
+            .text_color(rgb(theme.destructive))
+            .on_click(cx.listener(|this, _, _, cx| this.delete_connection(cx)))
+    }
+
     fn read_only_toggle(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
         let on = self.connection_form.read_only;
         div()
@@ -438,6 +471,85 @@ impl GridView {
             (&form.ssh_secret, ""),
         ] {
             input.update(cx, |input, cx| input.set_content(text, cx));
+        }
+    }
+
+    pub(crate) fn test_connection(&mut self, cx: &mut Context<Self>) {
+        if self.connection_form.testing {
+            return;
+        }
+        let draft = self.connection_form.draft(cx);
+        self.connection_form.testing = true;
+        self.connection_form.status = "Testing…".into();
+        cx.notify();
+        cx.spawn(async move |this, cx| {
+            let outcome = cx
+                .background_executor()
+                .spawn(async move {
+                    let runtime = tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()
+                        .map_err(|error| error.to_string())?;
+                    let registry = drivers_registry::default_registry();
+                    runtime.block_on(connection_save::test(
+                        &registry,
+                        &draft,
+                        tokio_util::sync::CancellationToken::new(),
+                    ))
+                })
+                .await;
+            let _ = this.update(cx, |this, cx| {
+                this.connection_form.testing = false;
+                this.connection_form.status = outcome.unwrap_or_else(|message| message);
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
+    pub(crate) fn delete_connection(&mut self, cx: &mut Context<Self>) {
+        let Some(id) = self.connection_form.editing else {
+            return;
+        };
+        if !std::mem::replace(&mut self.connection_form.confirm_delete, true) {
+            self.connection_form.status = "Click Delete again to remove this connection and its stored passwords.".into();
+            cx.notify();
+            return;
+        }
+        cx.spawn(async move |this, cx| {
+            let outcome = cx
+                .background_executor()
+                .spawn(async move {
+                    let runtime = tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()
+                        .map_err(|error| error.to_string())?;
+                    runtime.block_on(connection_save::delete(id))
+                })
+                .await;
+            let _ = this.update(cx, |this, cx| {
+                this.finish_delete(outcome);
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
+    fn finish_delete(&mut self, outcome: Result<connection_save::Deleted, String>) {
+        self.connection_form.confirm_delete = false;
+        match outcome {
+            Ok(deleted) => {
+                self.connection_form.editing = None;
+                self.connection_form.status = if deleted.credential_failure {
+                    "Deleted; some stored credentials could not be removed.".into()
+                } else {
+                    "Deleted.".into()
+                };
+                if let Ok(list) = bookie_gpui::live::saved_connections() {
+                    self.connections = list;
+                }
+            }
+            Err(message) => self.connection_form.status = message,
         }
     }
 
