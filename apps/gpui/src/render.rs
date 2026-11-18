@@ -283,6 +283,7 @@ impl Render for GridView {
         let content = match self.tabs.current().clone() {
             Tab::Home => self.home_page(theme, cx),
             Tab::Settings => self.settings_page(theme, cx),
+            Tab::NewConnection => self.connection_page(theme, cx),
             Tab::Query => self.query_page(theme, grid, cx),
             Tab::Table(name) if name == self.catalog.grid_table => grid,
             Tab::Table(table) => self.placeholder_page(&table_label(&table), theme),

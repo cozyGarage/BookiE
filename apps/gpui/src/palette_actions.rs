@@ -251,6 +251,7 @@ impl GridView {
                 matches!(self.tabs.current(), Tab::Query),
             ),
             action("home", "Open Home", true),
+            action("new-connection", "New connection", true),
             action("settings", "Open settings", true),
             action(
                 "table",
@@ -424,6 +425,10 @@ impl GridView {
     fn execute_workspace_palette_action(&mut self, id: &'static str, window: &mut Window, cx: &mut Context<Self>) {
         match id {
             "sidebar" => self.sidebar.open = !self.sidebar.open,
+            "new-connection" => {
+                self.tabs.open_new_connection();
+                self.sync_grid_owner();
+            }
             "settings" => {
                 self.tabs.open_settings();
                 self.sync_grid_owner();

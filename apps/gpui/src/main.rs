@@ -2,6 +2,7 @@ use std::time::{Duration, Instant};
 
 mod assets;
 mod catalog_nav;
+mod connection_form;
 mod chrome;
 mod copy_selection;
 mod detail_panel;
@@ -120,6 +121,7 @@ struct GridView {
     palette: palette_state::PaletteState,
     sidebar: sidebar_state::SidebarState,
     row_menu: Option<menus::RowMenu>,
+    connection_form: connection_form::ConnectionForm,
     panel: panel_state::PanelState,
     fonts: panel_state::FontState,
     export: panel_state::ExportState,
@@ -347,6 +349,7 @@ impl GridView {
             palette: palette_state::PaletteState::new(palette_input),
             sidebar: sidebar_state::SidebarState::new(sidebar_search),
             row_menu: None,
+            connection_form: connection_form::ConnectionForm::new(cx),
             panel: panel_state::PanelState::new(DEFAULT_RESULT_RATIO),
             fonts: panel_state::FontState::new(font_settings::load(), default_font(&font_names).into(), font_names),
             export: panel_state::ExportState::default(),

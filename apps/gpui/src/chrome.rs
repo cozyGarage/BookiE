@@ -633,6 +633,7 @@ fn tab_icon_name(tab: &Tab) -> &'static str {
     match tab {
         Tab::Home => "house",
         Tab::Settings => "settings",
+        Tab::NewConnection => "database",
         Tab::Query => "play",
         Tab::Table(_) => "table",
     }

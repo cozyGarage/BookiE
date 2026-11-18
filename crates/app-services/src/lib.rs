@@ -25,6 +25,7 @@ pub mod config_io;
 pub mod connection_form;
 pub mod connection_identity;
 pub mod connection_monitor;
+pub mod connection_save;
 pub mod connection_save_turn;
 pub mod connection_service;
 pub mod data_dictionary;
