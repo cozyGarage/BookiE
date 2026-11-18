@@ -89,3 +89,21 @@ impl CellEditState {
         }
     }
 }
+
+pub(crate) struct RunTabs {
+    pub slots: Vec<crate::runs::RunSlot>,
+    pub active: usize,
+    pub scroll: gpui::ScrollHandle,
+    pub next_number: usize,
+}
+
+impl RunTabs {
+    pub fn new(first: crate::runs::RunSlot) -> Self {
+        Self {
+            slots: vec![first],
+            active: 0,
+            scroll: gpui::ScrollHandle::new(),
+            next_number: 2,
+        }
+    }
+}

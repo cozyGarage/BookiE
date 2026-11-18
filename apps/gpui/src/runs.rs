@@ -69,7 +69,7 @@ impl GridView {
                         let (rows, truncated) = (bookie_gpui::source::ResultSource::total(&table), table.truncated);
                         this.panel.messages.statement_ok(&sql, rows, truncated, elapsed);
                         this.add_run(Some(std::sync::Arc::new(table)));
-                        if let Some(slot) = this.runs.last_mut() {
+                        if let Some(slot) = this.run_tabs.slots.last_mut() {
                             slot.run.elapsed_ms = Some(u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX));
                         }
                     }
@@ -86,13 +86,13 @@ impl GridView {
     }
 
     pub(crate) fn add_run(&mut self, source: Option<Source>) {
-        let mut run = next_run(self.next_run_number);
+        let mut run = next_run(self.run_tabs.next_number);
         if let Some(source) = &source {
             run.rows = source.total();
         }
-        self.next_run_number += 1;
-        self.runs.push(RunSlot::new(run, source));
-        self.activate_run(self.runs.len() - 1);
+        self.run_tabs.next_number += 1;
+        self.run_tabs.slots.push(RunSlot::new(run, source));
+        self.activate_run(self.run_tabs.slots.len() - 1);
     }
 
     pub(crate) fn close_tab(&mut self, index: usize) {
@@ -115,14 +115,14 @@ impl GridView {
             self.search.cursor = MatchCursor::default();
             self.set_mode(Mode::All);
         }
-        self.runs.clear();
-        self.active_run = 0;
-        self.next_run_number = 1;
+        self.run_tabs.slots.clear();
+        self.run_tabs.active = 0;
+        self.run_tabs.next_number = 1;
     }
 
     pub(crate) fn query_has_view_edits(&self) -> bool {
         (self.grid_is_query && (self.cell_edit.active.is_some() || !self.cell_edit.edits.is_empty()))
-            || self.runs.iter().any(|slot| !slot.edits.is_empty())
+            || self.run_tabs.slots.iter().any(|slot| !slot.edits.is_empty())
     }
 
     pub(crate) fn sync_grid_owner(&mut self) {
@@ -157,14 +157,14 @@ impl GridView {
         self.search.reset = true;
         if query {
             self.cell_edit.table = std::mem::take(&mut self.cell_edit.edits);
-            if let Some(run) = self.runs.get(self.active_run).map(|slot| slot.run) {
-                self.show_run(self.active_run, run);
+            if let Some(run) = self.run_tabs.slots.get(self.run_tabs.active).map(|slot| slot.run) {
+                self.show_run(self.run_tabs.active, run);
             } else {
                 self.source = self.table_source.clone();
                 self.set_mode(Mode::All);
             }
         } else {
-            if let Some(slot) = self.runs.get_mut(self.active_run) {
+            if let Some(slot) = self.run_tabs.slots.get_mut(self.run_tabs.active) {
                 slot.edits = std::mem::take(&mut self.cell_edit.edits);
             }
             self.cell_edit.edits = std::mem::take(&mut self.cell_edit.table);
@@ -175,33 +175,33 @@ impl GridView {
     }
 
     pub(crate) fn activate_run(&mut self, index: usize) {
-        let Some(run) = self.runs.get(index).map(|slot| slot.run) else {
+        let Some(run) = self.run_tabs.slots.get(index).map(|slot| slot.run) else {
             return;
         };
-        if index != self.active_run && self.cell_edit.active.is_some() {
+        if index != self.run_tabs.active && self.cell_edit.active.is_some() {
             self.status = "Finish or discard the active cell edit using Commands before switching results.".into();
             return;
         }
         self.invalidate_background();
-        if let Some(previous) = self.runs.get_mut(self.active_run) {
+        if let Some(previous) = self.run_tabs.slots.get_mut(self.run_tabs.active) {
             previous.edits = std::mem::take(&mut self.cell_edit.edits);
         }
         self.show_run(index, run);
     }
 
     pub(crate) fn select_run(&mut self, index: usize) {
-        if index != self.active_run {
+        if index != self.run_tabs.active {
             self.activate_run(index);
         }
     }
 
     pub(crate) fn show_run(&mut self, index: usize, run: Run) {
-        self.run_scroll.scroll_to_item(index);
-        self.cell_edit.edits = std::mem::take(&mut self.runs[index].edits);
+        self.run_tabs.scroll.scroll_to_item(index);
+        self.cell_edit.edits = std::mem::take(&mut self.run_tabs.slots[index].edits);
         self.cell_edit.active = None;
-        self.active_run = index;
+        self.run_tabs.active = index;
         self.source = self
-            .runs
+            .run_tabs.slots
             .get(index)
             .and_then(|slot| slot.source.clone())
             .unwrap_or_else(|| std::sync::Arc::new(Synthetic::new(run.rows)));
@@ -212,25 +212,25 @@ impl GridView {
     }
 
     pub(crate) fn close_run(&mut self, index: usize) {
-        if index >= self.runs.len() {
+        if index >= self.run_tabs.slots.len() {
             return;
         }
-        let drops_edits = !self.runs[index].edits.is_empty()
-            || (index == self.active_run && (self.cell_edit.active.is_some() || !self.cell_edit.edits.is_empty()));
+        let drops_edits = !self.run_tabs.slots[index].edits.is_empty()
+            || (index == self.run_tabs.active && (self.cell_edit.active.is_some() || !self.cell_edit.edits.is_empty()));
         if drops_edits && self.reject_view_edits() {
             return;
         }
-        self.runs.remove(index);
-        if index < self.active_run {
-            self.active_run -= 1;
+        self.run_tabs.slots.remove(index);
+        if index < self.run_tabs.active {
+            self.run_tabs.active -= 1;
             return;
         }
-        if index != self.active_run {
+        if index != self.run_tabs.active {
             return;
         }
         self.invalidate_background();
         self.cell_edit.edits.clear();
-        if self.runs.is_empty() {
+        if self.run_tabs.slots.is_empty() {
             self.source = self.table_source.clone();
             self.cell_edit.active = None;
             self.compare = None;
@@ -239,7 +239,7 @@ impl GridView {
             self.status = "No results".into();
             return;
         }
-        let next = index.min(self.runs.len() - 1);
-        self.show_run(next, self.runs[next].run);
+        let next = index.min(self.run_tabs.slots.len() - 1);
+        self.show_run(next, self.run_tabs.slots[next].run);
     }
 }

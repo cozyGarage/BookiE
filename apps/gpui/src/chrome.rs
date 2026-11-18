@@ -135,7 +135,7 @@ fn header_icon(id: &'static str, name: &'static str, theme: Theme) -> Stateful<D
         .child(icon(name, theme.muted_foreground))
 }
 
-fn window_button(id: &'static str, glyph: &'static str, label: &'static str, theme: Theme) -> Stateful<Div> {
+fn window_button(id: &'static str, name: &'static str, label: &'static str, theme: Theme) -> Stateful<Div> {
     div()
         .id(id)
         .tooltip(tip(label))
@@ -147,7 +147,7 @@ fn window_button(id: &'static str, glyph: &'static str, label: &'static str, the
         .cursor_pointer()
         .text_color(rgb(theme.foreground))
         .hover(move |style| style.bg(rgb(theme.accent)))
-        .child(glyph)
+        .child(icon(name, theme.foreground))
 }
 
 pub(crate) fn ghost_icon(id: impl Into<gpui::ElementId>, name: &'static str, label: &'static str, theme: Theme) -> Stateful<Div> {
@@ -325,17 +325,17 @@ impl GridView {
                 })),
             )
             .child(
-                window_button("win-min", "\u{2013}", "Minimize", theme).on_click(cx.listener(|_, _, window, _| {
+                window_button("win-min", "minus", "Minimize", theme).on_click(cx.listener(|_, _, window, _| {
                     window.minimize_window();
                 })),
             )
             .child(
-                window_button("win-max", "\u{25a1}", "Maximize", theme).on_click(cx.listener(|_, _, window, _| {
+                window_button("win-max", "square", "Maximize", theme).on_click(cx.listener(|_, _, window, _| {
                     window.zoom_window();
                 })),
             )
             .child(
-                window_button("win-close", "\u{00d7}", "Close", theme).on_click(cx.listener(|_, _, window, _| {
+                window_button("win-close", "x", "Close", theme).on_click(cx.listener(|_, _, window, _| {
                     window.remove_window();
                 })),
             )
@@ -841,6 +841,7 @@ impl GridView {
         if let Err(error) = font_settings::save(&self.fonts.settings) {
             self.status = format!("Could not save font settings: {error}");
         }
+        crate::ui_theme::apply_editor_size(self.fonts.settings.editor_size, cx);
         cx.notify();
     }
 
@@ -1132,6 +1133,15 @@ impl GridView {
             .min_h_0()
             .when(self.panel.open, |pane| pane.h(gpui::relative(1.0 - self.panel.ratio)))
             .when(!self.panel.open, |pane| pane.flex_1())
+            .on_scroll(cx.listener(|this, event: &gpui::ScrollEvent, _, cx| {
+                if !event.modifiers.control {
+                    return;
+                }
+                let lines = event.delta.pixel_delta(px(size::EDITOR_LINE)).y;
+                let delta = if lines > px(0.0) { 1 } else { -1 };
+                this.zoom_editor(Some(delta), cx);
+                cx.stop_propagation();
+            }))
             .child(self.query_editor_toolbar(theme, cx))
             .child(
                 div()
@@ -1285,10 +1295,10 @@ impl GridView {
 
     fn result_header(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
         let run_tabs = self
-            .runs
+            .run_tabs.slots
             .iter()
             .enumerate()
-            .map(|(index, slot)| self.result_tab_item(index, &slot.run, index == self.active_run, theme, cx));
+            .map(|(index, slot)| self.result_tab_item(index, &slot.run, index == self.run_tabs.active, theme, cx));
         div()
             .flex()
             .items_center()
@@ -1309,7 +1319,7 @@ impl GridView {
                     .min_w_0()
                     .gap_1()
                     .overflow_x_scroll()
-                    .track_scroll(&self.run_scroll)
+                    .track_scroll(&self.run_tabs.scroll)
                     .children(run_tabs),
             )
             .child(self.result_view_switch("view-table", "Table Data", ResultView::Table, theme, cx))
@@ -1388,12 +1398,12 @@ impl GridView {
         if self.panel.view == ResultView::Messages {
             self.result_messages_body(theme)
         } else if let Some(slot) = self
-            .runs
-            .get(self.active_run)
+            .run_tabs.slots
+            .get(self.run_tabs.active)
             .filter(|_| self.panel.view == ResultView::Summary)
         {
             self.result_summary_body(&slot.run)
-        } else if self.runs.is_empty() {
+        } else if self.run_tabs.slots.is_empty() {
             div().flex_1().p_4().child("No results")
         } else {
             grid

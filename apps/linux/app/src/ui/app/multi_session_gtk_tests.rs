@@ -245,6 +245,18 @@ fn a_save_from_a_background_tab_reaches_its_own_connection_and_not_the_front_one
 fn reconnecting_changed_saved_settings_replaces_only_the_target_session() {
     let sessions = two_sessions();
     let _entered = sessions.runtime.enter();
+    let original_target = sessions
+        .controller
+        .model()
+        .database
+        .identity(sessions.first)
+        .expect("first connection identity");
+    let other_identity = sessions
+        .controller
+        .model()
+        .database
+        .identity(sessions.second)
+        .expect("second connection identity");
     let replacement = prepared_notes_connection(
         &sessions._directory.path().join("first-reconnected.sqlite"),
         "first updated",
@@ -275,6 +287,8 @@ fn reconnecting_changed_saved_settings_replaces_only_the_target_session() {
     assert!(model.multi.sessions.is_working(sessions.first));
     assert!(model.multi.sessions.is_working(sessions.second));
     assert!(model.database.is_active(sessions.second));
+    assert_ne!(model.database.identity(sessions.first).as_ref(), Some(&original_target));
+    assert_eq!(model.database.identity(sessions.second).as_ref(), Some(&other_identity));
     drop(model);
     assert!(is_empty(&titles(
         &sessions.controller,
