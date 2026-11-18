@@ -2,6 +2,7 @@ use std::time::{Duration, Instant};
 
 mod assets;
 mod catalog_nav;
+mod connection_form;
 mod chrome;
 mod copy_selection;
 mod detail_panel;
@@ -9,13 +10,16 @@ mod find_filter;
 mod grid_edit;
 mod grid_table;
 mod keys;
+mod measure;
 mod menus;
 mod palette_actions;
 mod palette_state;
+mod panel_state;
 mod render;
 mod runs;
 mod scroll_pace;
 mod services;
+mod sidebar_state;
 mod text_input;
 mod ui_theme;
 
@@ -23,7 +27,7 @@ use bookie_app_services::result_copy::{self, CopyContext, CopyFormat};
 use bookie_gpui::core_bridge::column_infos_for;
 use bookie_gpui::font_settings;
 use bookie_gpui::keymap::Keymap;
-use bookie_gpui::messages::{MessageKind, MessageLog};
+use bookie_gpui::messages::MessageKind;
 use bookie_gpui::model::*;
 use bookie_gpui::palette::{Action, matches as palette_matches, step as palette_step};
 use bookie_gpui::selection::Selection;
@@ -113,27 +117,15 @@ struct GridView {
     active_run: usize,
     run_scroll: ScrollHandle,
     next_run_number: usize,
-    result_view: ResultView,
-    messages: MessageLog,
-    result_ratio: f32,
-    result_open: bool,
-    resizing_split: bool,
-    font: gpui::SharedString,
-    fonts: font_settings::FontSettings,
-    font_names: Vec<String>,
-    csv_delimiter: Option<bookie_core::export::CustomDelimiter>,
-    export_limit: Option<usize>,
     check_histories: Vec<(String, bookie_app_services::checks::History)>,
-    sidebar_open: bool,
-    import_menu_open: bool,
     palette: palette_state::PaletteState,
-    sidebar_regex: bool,
-    sidebar_active_only: bool,
-    sidebar_width: f32,
-    resizing_sidebar: bool,
-    connection_open: bool,
-    database_open: bool,
-    sidebar_search: Entity<TextInput>,
+    sidebar: sidebar_state::SidebarState,
+    row_menu: Option<menus::RowMenu>,
+    connection_form: connection_form::ConnectionForm,
+    panel: panel_state::PanelState,
+    fonts: panel_state::FontState,
+    export: panel_state::ExportState,
+    measure: measure::Measure,
     cursor: MatchCursor,
     find_capped: bool,
     loads: Ticket,
@@ -143,15 +135,9 @@ struct GridView {
     selection: Option<Selection>,
     scroll: UniformListScrollHandle,
     focus: FocusHandle,
-    started: Instant,
-    first_frame_reported: bool,
-    last_frame: Option<Instant>,
-    frame_intervals: Vec<Duration>,
-    measuring: bool,
-    pace: Option<Pace>,
 }
 
-struct Pace {
+pub(crate) struct Pace {
     step: u32,
     steps: u32,
     begun: Instant,
@@ -169,12 +155,37 @@ fn thousands(value: u64) -> String {
     out
 }
 
+const UI_FONTS: [&str; 7] = [
+    "Inter",
+    "SF Pro Text",
+    "Segoe UI",
+    "Adwaita Sans",
+    "Roboto",
+    "Noto Sans",
+    "Fira Sans",
+];
+
+fn installed_font_names(cx: &App) -> Vec<String> {
+    let mut names = cx.text_system().all_font_names();
+    names.sort();
+    names.dedup();
+    names
+}
+
+fn first_run(total: u64) -> Run {
+    Run {
+        number: 1,
+        rows: total,
+        elapsed_ms: None,
+    }
+}
+
 fn default_font(installed: &[String]) -> String {
     let wanted = std::env::var("BOOKIE_PROTOTYPE_FONT").ok();
     wanted
         .iter()
         .map(String::as_str)
-        .chain(["Fira Sans", "Fira Code"])
+        .chain(UI_FONTS)
         .find(|name| installed.iter().any(|font| font == name))
         .unwrap_or_default()
         .to_string()
@@ -296,8 +307,6 @@ impl GridView {
                 .cell_selectable(true)
                 .row_header(false)
         });
-        let owner = cx.entity().downgrade();
-        table.update(cx, |table, _| table.delegate_mut().owner = Some(owner));
         let table_focus = gpui::Focusable::focus_handle(table.read(cx), cx);
         let table_events = cx.subscribe_in(
             &table,
@@ -316,6 +325,13 @@ impl GridView {
                     };
                     cx.notify();
                 }
+                gpui_kit::component::table::TableEvent::RightClickedCell(row, _) => {
+                    let dataset = this.base() + *row as u64;
+                    if !this.selection.is_some_and(|selection| selection.contains(dataset)) {
+                        this.click_row(dataset, false);
+                    }
+                    this.open_cell_menu(window, cx);
+                }
                 gpui_kit::component::table::TableEvent::DoubleClickedRow(row) => {
                     this.edit_clicked_row(*row, window, cx);
                 }
@@ -330,11 +346,8 @@ impl GridView {
         let (find, filter, editor, sql_input) = Self::init_query_inputs(window, cx);
         let (sidebar_search, palette_input) = Self::init_chrome_inputs(window, cx);
         let (table, table_focus, table_events) = Self::init_grid_table(window, cx);
-        let mut font_names = cx.text_system().all_font_names();
-        font_names.sort();
-        font_names.dedup();
+        let font_names = installed_font_names(cx);
         GridView {
-            fonts: font_settings::load(),
             table,
             _table_events: table_events,
             focus: table_focus,
@@ -346,35 +359,26 @@ impl GridView {
             filter,
             editor,
             sql_input,
-            sidebar_search,
             palette: palette_state::PaletteState::new(palette_input),
+            sidebar: sidebar_state::SidebarState::new(sidebar_search),
+            row_menu: None,
+            connection_form: connection_form::ConnectionForm::new(cx),
+            panel: panel_state::PanelState::new(DEFAULT_RESULT_RATIO),
+            fonts: panel_state::FontState::new(font_settings::load(), default_font(&font_names).into(), font_names),
+            export: panel_state::ExportState::default(),
+            measure: measure::Measure::new(started),
             keystroke_hook: None,
             editing: None,
             cell_cursor: None,
-            csv_delimiter: None,
-            export_limit: None,
             compare: None,
             selection: None,
-            pace: None,
-            last_frame: None,
             focus_editor: false,
             continuous: false,
             filter_visible: false,
             grid_is_query: false,
             find_reset: false,
             detail_open: false,
-            import_menu_open: false,
-            sidebar_regex: false,
-            sidebar_active_only: false,
             find_capped: false,
-            measuring: false,
-            first_frame_reported: false,
-            sidebar_open: true,
-            connection_open: true,
-            database_open: true,
-            result_open: true,
-            resizing_split: false,
-            resizing_sidebar: false,
             edits: Default::default(),
             table_edits: Default::default(),
             catalog: Catalog::synthetic(),
@@ -383,33 +387,18 @@ impl GridView {
             tabs: Tabs::default(),
             tab_scroll: ScrollHandle::new(),
             run_scroll: ScrollHandle::new(),
-            messages: MessageLog::default(),
             scroll: UniformListScrollHandle::new(),
-            runs: vec![runs::RunSlot::new(
-                Run {
-                    number: 1,
-                    rows: total,
-                    elapsed_ms: None,
-                },
-                None,
-            )],
+            runs: vec![runs::RunSlot::new(first_run(total), None)],
             active_run: 0,
             next_run_number: 2,
             viewport_rows: 10,
             dark_mode: Theme::current(cx).dark,
-            result_view: ResultView::Table,
-            result_ratio: DEFAULT_RESULT_RATIO,
-            sidebar_width: 340.0,
-            font: default_font(&font_names).into(),
-            font_names,
             connections: Vec::new(),
             check_histories: Vec::new(),
-            frame_intervals: Vec::new(),
             cursor: MatchCursor::default(),
             loads: Ticket::new(),
             scans: Ticket::new(),
             status: String::new(),
-            started,
         }
     }
 
@@ -472,14 +461,17 @@ impl GridView {
 
     fn note_frame(&mut self) {
         let now = Instant::now();
-        if !self.first_frame_reported {
-            self.first_frame_reported = true;
-            println!("PROTOTYPE_FIRST_FRAME ms={}", self.started.elapsed().as_millis());
+        if !self.measure.first_frame_reported {
+            self.measure.first_frame_reported = true;
+            println!(
+                "PROTOTYPE_FIRST_FRAME ms={}",
+                self.measure.started.elapsed().as_millis()
+            );
         }
-        if let (true, Some(last)) = (self.measuring, self.last_frame) {
-            self.frame_intervals.push(now - last);
+        if let (true, Some(last)) = (self.measure.measuring, self.measure.last_frame) {
+            self.measure.frame_intervals.push(now - last);
         }
-        self.last_frame = Some(now);
+        self.measure.last_frame = Some(now);
     }
 
     fn begin_background<T: Send + 'static>(
@@ -558,6 +550,29 @@ impl GridView {
     fn column_names(&self) -> Vec<String> {
         self.source.columns().iter().map(|column| column.name.clone()).collect()
     }
+}
+
+fn icon_button(id: &'static str, name: &'static str, tip: &'static str, active: bool, theme: Theme) -> Stateful<Div> {
+    div()
+        .id(id)
+        .tooltip(chrome::tip(tip))
+        .flex()
+        .items_center()
+        .justify_center()
+        .w(px(size::COMPACT_CONTROL))
+        .h(px(size::COMPACT_CONTROL))
+        .rounded(px(size::CONTROL_RADIUS))
+        .cursor_pointer()
+        .when(active, |style| style.bg(rgb(theme.accent)))
+        .hover(move |style| style.bg(rgb(theme.accent)))
+        .child(assets::icon(
+            name,
+            if active {
+                theme.foreground
+            } else {
+                theme.muted_foreground
+            },
+        ))
 }
 
 fn button(id: &'static str, label: impl Into<String>, theme: Theme) -> Stateful<Div> {

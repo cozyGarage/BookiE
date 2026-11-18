@@ -80,8 +80,8 @@ impl GridView {
         }
         self.set_mode(Mode::All);
         self.tabs.active = 1;
-        self.connection_open = true;
-        self.database_open = true;
+        self.sidebar.connection_open = true;
+        self.sidebar.database_open = true;
         self.status = "Connected".into();
     }
 

@@ -132,7 +132,7 @@ impl GridView {
             Command::CopyCells if self.focus.is_focused(window) => self.copy_selection(false, cx),
             Command::CopyCellsWithHeaders if self.focus.is_focused(window) => self.copy_selection(true, cx),
             Command::CopyCells | Command::CopyCellsWithHeaders => {}
-            Command::ToggleSidebar => self.sidebar_open = !self.sidebar_open,
+            Command::ToggleSidebar => self.sidebar.open = !self.sidebar.open,
             Command::NewQuery => {
                 self.tabs.open_query();
                 self.sync_grid_owner();

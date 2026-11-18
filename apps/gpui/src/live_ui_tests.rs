@@ -43,13 +43,13 @@ fn a_rebound_shortcut_replaces_the_default_one(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     let keymap = bookie_gpui::keymap::Keymap::from_overrides(r#"{"toggle-sidebar":"alt-b"}"#).expect("keymap");
     view.update(cx, |view, _| view.keymap = keymap);
-    let before = view.read_with(cx, |view, _| view.sidebar_open);
+    let before = view.read_with(cx, |view, _| view.sidebar.open);
     cx.simulate_keystrokes("ctrl-b");
     view.read_with(cx, |view, _| {
-        assert_eq!(view.sidebar_open, before, "the old chord is free")
+        assert_eq!(view.sidebar.open, before, "the old chord is free")
     });
     cx.simulate_keystrokes("alt-b");
-    view.read_with(cx, |view, _| assert_eq!(view.sidebar_open, !before));
+    view.read_with(cx, |view, _| assert_eq!(view.sidebar.open, !before));
 }
 
 #[gpui::test]
@@ -356,8 +356,8 @@ fn every_statement_is_logged_and_a_refused_one_opens_the_messages_view(cx: &mut 
     };
     run(cx, "SELECT id\n  FROM orders");
     view.read_with(cx, |view, _| {
-        assert_eq!(view.result_view, ResultView::Table, "a good run keeps the table view");
-        let entries = view.messages.entries();
+        assert_eq!(view.panel.view, ResultView::Table, "a good run keeps the table view");
+        let entries = view.panel.messages.entries();
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].kind, MessageKind::Success);
         assert!(
@@ -368,8 +368,8 @@ fn every_statement_is_logged_and_a_refused_one_opens_the_messages_view(cx: &mut 
     });
     run(cx, "DELETE FROM orders");
     view.read_with(cx, |view, _| {
-        assert_eq!(view.result_view, ResultView::Messages, "a refused statement shows why");
-        let entries = view.messages.entries();
+        assert_eq!(view.panel.view, ResultView::Messages, "a refused statement shows why");
+        let entries = view.panel.messages.entries();
         assert_eq!(entries.len(), 2);
         assert_eq!(entries[1].kind, MessageKind::Error);
         assert!(
@@ -970,7 +970,7 @@ fn a_typed_host_and_port_offers_a_tcp_check_that_lands_in_messages(cx: &mut Test
     cx.executor().advance_clock(std::time::Duration::from_secs(1));
     cx.run_until_parked();
     view.read_with(cx, |view, _| {
-        let entries = view.messages.entries();
+        let entries = view.panel.messages.entries();
         assert_eq!(entries.len(), 1, "{}", view.status);
         assert_eq!(entries[0].kind, bookie_gpui::messages::MessageKind::Success);
         assert!(
@@ -1021,7 +1021,7 @@ fn the_status_command_reports_a_healthy_direct_connection_in_messages(cx: &mut T
     });
     cx.update(|_, cx| view.update(cx, |view, _| view.show_status()));
     view.read_with(cx, |view, _| {
-        let entries = view.messages.entries();
+        let entries = view.panel.messages.entries();
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].kind, bookie_gpui::messages::MessageKind::Success);
         assert!(
@@ -1065,11 +1065,11 @@ fn a_new_query_tab_focuses_its_editor_so_typing_lands_there(cx: &mut TestAppCont
     });
     cx.simulate_keystrokes("ctrl-b");
     view.read_with(cx, |view, _| {
-        assert!(!view.sidebar_open, "the sidebar shortcut still works in the editor");
+        assert!(!view.sidebar.open, "the sidebar shortcut still works in the editor");
     });
     cx.simulate_keystrokes("ctrl-b");
     view.read_with(cx, |view, _| {
-        assert!(view.sidebar_open, "the sidebar shortcut still reopens the sidebar");
+        assert!(view.sidebar.open, "the sidebar shortcut still reopens the sidebar");
     });
     cx.simulate_input(" + 1");
     view.read_with(cx, |view, cx| {
@@ -1394,16 +1394,16 @@ fn header_collapse_all_and_feedback_actions(cx: &mut TestAppContext) {
     let (view, cx) = open_live(cx);
 
     view.update(cx, |view, _| {
-        assert!(view.connection_open && view.database_open);
-        let collapse = view.connection_open || view.database_open;
-        view.connection_open = !collapse;
-        view.database_open = !collapse;
-        assert!(!view.connection_open && !view.database_open);
+        assert!(view.sidebar.connection_open && view.sidebar.database_open);
+        let collapse = view.sidebar.connection_open || view.sidebar.database_open;
+        view.sidebar.connection_open = !collapse;
+        view.sidebar.database_open = !collapse;
+        assert!(!view.sidebar.connection_open && !view.sidebar.database_open);
 
-        let collapse = view.connection_open || view.database_open;
-        view.connection_open = !collapse;
-        view.database_open = !collapse;
-        assert!(view.connection_open && view.database_open);
+        let collapse = view.sidebar.connection_open || view.sidebar.database_open;
+        view.sidebar.connection_open = !collapse;
+        view.sidebar.database_open = !collapse;
+        assert!(view.sidebar.connection_open && view.sidebar.database_open);
     });
 
     view.update(cx, |view, _| {

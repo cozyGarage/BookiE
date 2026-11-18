@@ -22,12 +22,12 @@ impl GridView {
         self.note_frame();
         self.pace_frame(window);
         self.viewport_rows = self.viewport_rows_for(window);
-        let sidebar_width = if self.sidebar_open { self.sidebar_width } else { 0.0 };
+        let sidebar_width = if self.sidebar.open { self.sidebar.width } else { 0.0 };
         let grid_width = (f32::from(window.viewport_size().width) - sidebar_width).max(0.0);
         self.sync_table(grid_width, cx);
     }
 
-    fn grid_pager_buttons(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+    fn pager_labels(&self) -> (String, String) {
         let (first, last) = self.pager.range();
         let title = match &self.mode {
             Mode::Filtered { label, .. } => format!("{label} · "),
@@ -46,37 +46,59 @@ impl GridView {
         } else {
             format!("Rows {}-{}", thousands(first), thousands(last))
         };
+        (progress, range_label)
+    }
+
+    fn row_menu_overlay(&self) -> Option<impl IntoElement> {
+        self.row_menu.as_ref().map(|row_menu| {
+            gpui::deferred(
+                gpui::anchored()
+                    .position(row_menu.position)
+                    .snap_to_window_with_margin(px(size::SM))
+                    .child(row_menu.menu.clone()),
+            )
+        })
+    }
+
+    fn page_size_button(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
+        button("page-size", format!("{} rows", self.pager.rows), theme).on_click(cx.listener(|this, _, _, cx| {
+            let index = PAGE_SIZES.iter().position(|size| *size == this.pager.rows).unwrap_or(0);
+            this.pager = this.pager.resized(PAGE_SIZES[(index + 1) % PAGE_SIZES.len()]);
+            cx.notify();
+        }))
+    }
+
+    fn grid_pager_buttons(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+        let (progress, range_label) = self.pager_labels();
         let pager = div().flex().items_center().gap_1().child(div().child(progress));
         if self.continuous {
             return pager.child(div().child(range_label));
         }
         pager
-            .child(button("first", "|‹", theme).on_click(cx.listener(|this, _, _, cx| {
-                this.pager.first();
-                cx.notify();
-            })))
-            .child(button("prev", "‹", theme).on_click(cx.listener(|this, _, _, cx| {
-                this.pager.previous();
-                cx.notify();
-            })))
-            .child(div().child(range_label))
             .child(
-                button("page-size", format!("{} rows", self.pager.rows), theme).on_click(cx.listener(
+                icon_button("first", "chevrons-left", "First page", false, theme).on_click(cx.listener(
                     |this, _, _, cx| {
-                        let index = PAGE_SIZES.iter().position(|size| *size == this.pager.rows).unwrap_or(0);
-                        this.pager = this.pager.resized(PAGE_SIZES[(index + 1) % PAGE_SIZES.len()]);
+                        this.pager.first();
                         cx.notify();
                     },
                 )),
             )
             .child(
-                button(
-                    "load-more",
-                    if self.pager.append {
-                        "Load more ✓"
-                    } else {
-                        "Load more"
+                icon_button("prev", "chevron-left", "Previous page", false, theme).on_click(cx.listener(
+                    |this, _, _, cx| {
+                        this.pager.previous();
+                        cx.notify();
                     },
+                )),
+            )
+            .child(div().child(range_label))
+            .child(self.page_size_button(theme, cx))
+            .child(
+                icon_button(
+                    "load-more",
+                    "arrow-down-up",
+                    "Append the next page instead of replacing the current one",
+                    self.pager.append,
                     theme,
                 )
                 .on_click(cx.listener(|this, _, _, cx| {
@@ -84,14 +106,22 @@ impl GridView {
                     cx.notify();
                 })),
             )
-            .child(button("next", "›", theme).on_click(cx.listener(|this, _, _, cx| {
-                this.pager.next();
-                cx.notify();
-            })))
-            .child(button("last", "›|", theme).on_click(cx.listener(|this, _, _, cx| {
-                this.pager.last();
-                cx.notify();
-            })))
+            .child(
+                icon_button("next", "chevron-right", "Next page", false, theme).on_click(cx.listener(
+                    |this, _, _, cx| {
+                        this.pager.next();
+                        cx.notify();
+                    },
+                )),
+            )
+            .child(
+                icon_button("last", "chevrons-right", "Last page", false, theme).on_click(cx.listener(
+                    |this, _, _, cx| {
+                        this.pager.last();
+                        cx.notify();
+                    },
+                )),
+            )
     }
 
     fn grid_action_buttons(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
@@ -100,29 +130,45 @@ impl GridView {
             .items_center()
             .gap_1()
             .child(div().w(px(size::FIND_WIDTH)).flex_none().child(self.find.clone()))
-            .child(button("find-prev", "↑", theme).on_click(cx.listener(|this, _, _, cx| this.run_find(false, cx))))
-            .child(button("find-next", "↓", theme).on_click(cx.listener(|this, _, _, cx| this.run_find(true, cx))))
             .child(
-                button("show", "Matches only", theme).on_click(cx.listener(|this, _, _, cx| {
-                    this.show_matching(cx);
-                    cx.notify();
-                })),
+                icon_button("find-prev", "chevron-up", "Previous match", false, theme)
+                    .on_click(cx.listener(|this, _, _, cx| this.run_find(false, cx))),
             )
-            .child(button("compare", "Compare", theme).on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))))
             .child(
-                button("export", "Export…", theme).on_click(cx.listener(|this, _, _, cx| {
+                icon_button("find-next", "chevron-down", "Next match", false, theme)
+                    .on_click(cx.listener(|this, _, _, cx| this.run_find(true, cx))),
+            )
+            .child(
+                icon_button("show", "sliders-horizontal", "Show matching rows only", false, theme).on_click(
+                    cx.listener(|this, _, _, cx| {
+                        this.show_matching(cx);
+                        cx.notify();
+                    }),
+                ),
+            )
+            .child(
+                icon_button("compare", "arrow-left-right", "Compare", false, theme)
+                    .on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))),
+            )
+            .child(
+                icon_button(
+                    "export",
+                    "download",
+                    "Export current page or selection as CSV",
+                    false,
+                    theme,
+                )
+                .on_click(cx.listener(|this, _, _, cx| {
                     this.export_selection_or_page(cx);
                     cx.notify();
                 })),
             )
             .child(
-                button(
+                icon_button(
                     "continuous",
-                    if self.continuous {
-                        "Continuous ✓"
-                    } else {
-                        "Continuous"
-                    },
+                    "chevrons-down-up",
+                    "Scroll continuously",
+                    self.continuous,
                     theme,
                 )
                 .on_click(cx.listener(|this, _, _, cx| {
@@ -253,11 +299,12 @@ impl Render for GridView {
         let content = match self.tabs.current().clone() {
             Tab::Home => self.home_page(theme, cx),
             Tab::Settings => self.settings_page(theme, cx),
+            Tab::NewConnection => self.connection_page(theme, cx),
             Tab::Query => self.query_page(theme, grid, cx),
             Tab::Table(name) if name == self.catalog.grid_table => grid,
             Tab::Table(table) => self.placeholder_page(&table_label(&table), theme),
         };
-        let sidebar = self.sidebar_open.then(|| self.sidebar(theme, cx));
+        let sidebar = self.sidebar.open.then(|| self.sidebar(theme, cx));
         let toolbar = self.toolbar(theme, cx);
         let tab_row = self.tab_bar(theme, cx);
         div()
@@ -267,22 +314,22 @@ impl Render for GridView {
             .flex_col()
             .bg(rgb(theme.background))
             .text_color(rgb(theme.foreground))
-            .text_size(px(self.fonts.ui_size))
-            .when(!self.font.is_empty(), |root| root.font_family(self.font.clone()))
-            .when(!self.fonts.ui_family.is_empty(), |root| {
-                root.font_family(self.fonts.ui_family.clone())
+            .text_size(px(self.fonts.settings.ui_size))
+            .when(!self.fonts.current.is_empty(), |root| root.font_family(self.fonts.current.clone()))
+            .when(!self.fonts.settings.ui_family.is_empty(), |root| {
+                root.font_family(self.fonts.settings.ui_family.clone())
             })
             .track_focus(&self.focus)
             .on_key_down(cx.listener(Self::key_down))
             .on_mouse_move(cx.listener(|this, event: &gpui::MouseMoveEvent, window, cx| {
-                if this.resizing_sidebar {
-                    this.sidebar_width = f32::from(event.position.x).clamp(260.0, 480.0);
+                if this.sidebar.resizing {
+                    this.sidebar.width = f32::from(event.position.x).clamp(260.0, 480.0);
                     cx.notify();
                 }
-                if this.resizing_split {
+                if this.panel.resizing {
                     let top_offset = TOOLBAR_HEIGHT + TAB_HEIGHT;
                     let height = f32::from(window.viewport_size().height) - top_offset - STATUS_HEIGHT;
-                    this.result_ratio = result_ratio_from_drag(f32::from(event.position.y), top_offset, height);
+                    this.panel.ratio = result_ratio_from_drag(f32::from(event.position.y), top_offset, height);
                     cx.notify();
                 }
             }))
@@ -290,7 +337,7 @@ impl Render for GridView {
                 MouseButton::Left,
                 cx.listener(|this, _: &gpui::MouseUpEvent, _, cx| {
                     let was_resizing =
-                        std::mem::take(&mut this.resizing_sidebar) | std::mem::take(&mut this.resizing_split);
+                        std::mem::take(&mut this.sidebar.resizing) | std::mem::take(&mut this.panel.resizing);
                     if was_resizing {
                         cx.notify();
                     }
@@ -298,6 +345,7 @@ impl Render for GridView {
             )
             .child(toolbar)
             .child(self.main_layout(sidebar, tab_row, content))
+            .children(self.row_menu_overlay())
             .child(self.status_bar(theme))
             .children(palette)
     }

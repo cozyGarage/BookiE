@@ -4,7 +4,7 @@ impl GridView {
     pub(crate) fn palette_actions(&self) -> Vec<Action> {
         if self.palette.fonts {
             return self
-                .font_names
+                .fonts.names
                 .iter()
                 .map(|name| Action {
                     id: "font-choice",
@@ -43,7 +43,7 @@ impl GridView {
             },
             enabled: true,
         });
-        let reset = self.export_limit.map(|limit| Action {
+        let reset = self.export.limit.map(|limit| Action {
             id: "reset-export-limit",
             label: format!("Export limit: remove (now {limit} rows)"),
             enabled: true,
@@ -63,7 +63,7 @@ impl GridView {
             },
             enabled: true,
         });
-        let reset = self.csv_delimiter.as_ref().map(|delimiter| Action {
+        let reset = self.export.csv_delimiter.as_ref().map(|delimiter| Action {
             id: "reset-csv-delimiter",
             label: format!("CSV delimiter: back to the comma (now {})", delimiter.as_str()),
             enabled: true,
@@ -222,6 +222,11 @@ impl GridView {
             action("query", "New query tab", true),
             action("run", "Run the query", matches!(self.tabs.current(), Tab::Query)),
             action(
+                "explain",
+                "Explain the query",
+                matches!(self.tabs.current(), Tab::Query) && self.live.is_some(),
+            ),
+            action(
                 "previous-run",
                 "Previous result",
                 matches!(self.tabs.current(), Tab::Query) && !self.runs.is_empty() && self.active_run > 0,
@@ -238,7 +243,7 @@ impl GridView {
             ),
             action(
                 "results",
-                if self.result_open {
+                if self.panel.open {
                     "Hide the results pane"
                 } else {
                     "Show the results pane"
@@ -246,6 +251,7 @@ impl GridView {
                 matches!(self.tabs.current(), Tab::Query),
             ),
             action("home", "Open Home", true),
+            action("new-connection", "New connection", true),
             action("settings", "Open settings", true),
             action(
                 "table",
@@ -264,7 +270,7 @@ impl GridView {
         vec![
             action(
                 "sidebar",
-                if self.sidebar_open {
+                if self.sidebar.open {
                     "Hide the sidebar"
                 } else {
                     "Show the sidebar"
@@ -322,7 +328,7 @@ impl GridView {
             return;
         }
         if id == "font-choice" {
-            self.font = actions[index].label.clone().into();
+            self.fonts.current = actions[index].label.clone().into();
             self.close_palette(window, cx);
             return;
         }
@@ -418,7 +424,11 @@ impl GridView {
 
     fn execute_workspace_palette_action(&mut self, id: &'static str, window: &mut Window, cx: &mut Context<Self>) {
         match id {
-            "sidebar" => self.sidebar_open = !self.sidebar_open,
+            "sidebar" => self.sidebar.open = !self.sidebar.open,
+            "new-connection" => {
+                self.tabs.open_new_connection();
+                self.sync_grid_owner();
+            }
             "settings" => {
                 self.tabs.open_settings();
                 self.sync_grid_owner();
@@ -433,10 +443,11 @@ impl GridView {
                 window.focus(&self.focus, cx);
             }
             "run" => self.run_query(cx),
+            "explain" => self.explain_query(cx),
             "previous-run" => self.activate_run(self.active_run - 1),
             "next-run" => self.activate_run(self.active_run + 1),
             "close-run" => self.close_run(self.active_run),
-            "results" => self.result_open = !self.result_open,
+            "results" => self.panel.open = !self.panel.open,
             "table" => {
                 let name = self.catalog.grid_table.clone();
                 self.open_table_named(&name, window, cx);

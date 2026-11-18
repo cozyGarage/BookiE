@@ -380,11 +380,11 @@ fn the_palette_switches_between_the_light_and_dark_theme(cx: &mut TestAppContext
 #[gpui::test]
 fn ctrl_b_hides_and_shows_the_sidebar(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
-    view.read_with(cx, |view, _| assert!(view.sidebar_open));
+    view.read_with(cx, |view, _| assert!(view.sidebar.open));
     cx.simulate_keystrokes("ctrl-b");
-    view.read_with(cx, |view, _| assert!(!view.sidebar_open));
+    view.read_with(cx, |view, _| assert!(!view.sidebar.open));
     cx.simulate_keystrokes("ctrl-b");
-    view.read_with(cx, |view, _| assert!(view.sidebar_open));
+    view.read_with(cx, |view, _| assert!(view.sidebar.open));
 }
 
 #[gpui::test]
@@ -409,12 +409,12 @@ fn the_home_tab_has_no_grid_so_arrow_keys_do_nothing_until_the_table_tab_is_back
 fn the_sidebar_search_takes_typed_text_and_filters_the_tree(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.update(|window, cx| {
-        let handle = view.read(cx).sidebar_search.read(cx).focus_handle_for_tests();
+        let handle = view.read(cx).sidebar.search.read(cx).focus_handle_for_tests();
         window.focus(&handle, cx);
     });
     cx.simulate_input("aud");
     view.read_with(cx, |view, cx| {
-        assert_eq!(view.sidebar_search.read(cx).content(), "aud");
+        assert_eq!(view.sidebar.search.read(cx).content(), "aud");
         let rows = bookie_gpui::shell::tree_rows("aud", true, true);
         assert_eq!(rows.len(), 3, "connection, database and the one matching table");
     });
@@ -425,14 +425,15 @@ fn the_sidebar_locate_regex_and_active_only_controls_filter_the_tree(cx: &mut Te
     let (view, cx) = open(cx);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
-            view.sidebar_open = false;
+            view.sidebar.open = false;
             view.locate_active_table(cx);
-            assert!(view.sidebar_open);
-            assert_eq!(view.sidebar_search.read(cx).content(), "synthetic_rows");
+            assert!(view.sidebar.open);
+            assert_eq!(view.sidebar.search.read(cx).content(), "synthetic_rows");
             assert!(view.status.starts_with("Located "));
             view.toggle_sidebar_regex(cx);
-            assert!(view.sidebar_regex);
-            view.sidebar_search
+            assert!(view.sidebar.regex);
+            view.sidebar
+                .search
                 .update(cx, |input, cx| input.set_content(r"^cust", cx));
             let rows = bookie_gpui::shell::tree_rows_in(
                 &view.catalog,
@@ -450,7 +451,7 @@ fn the_sidebar_locate_regex_and_active_only_controls_filter_the_tree(cx: &mut Te
                     .count(),
                 1
             );
-            view.sidebar_active_only = true;
+            view.sidebar.active_only = true;
             let active = bookie_gpui::shell::tree_rows_in(
                 &view.catalog,
                 "",
@@ -480,7 +481,7 @@ fn the_palette_lists_installed_fonts_and_the_chosen_one_becomes_the_ui_font(cx: 
     let (view, cx) = open(cx);
     cx.update(|_, cx| {
         view.update(cx, |view, _| {
-            view.font_names = vec!["Foo Sans".into(), "Bar Mono".into()]
+            view.fonts.names = vec!["Foo Sans".into(), "Bar Mono".into()]
         })
     });
     cx.simulate_keystrokes("ctrl-shift-p");
@@ -501,7 +502,7 @@ fn the_palette_lists_installed_fonts_and_the_chosen_one_becomes_the_ui_font(cx: 
     cx.simulate_input("bar");
     cx.simulate_keystrokes("enter");
     view.read_with(cx, |view, _| {
-        assert_eq!(view.font.as_ref(), "Bar Mono");
+        assert_eq!(view.fonts.current.as_ref(), "Bar Mono");
         assert!(!view.palette.open && !view.palette.fonts);
     });
 }
@@ -529,11 +530,34 @@ fn the_overflow_menu_lists_commands_by_group_and_runs_them(cx: &mut TestAppConte
         .iter()
         .map(|group| group.iter().map(|(id, _, _)| *id).collect())
         .collect();
-    assert_eq!(ids[0], ["query", "run"]);
+    assert_eq!(ids[0], ["query", "run", "explain"]);
     assert!(ids.iter().flatten().any(|id| *id == "settings"));
-    let open_before = view.read_with(cx, |view, _| view.sidebar_open);
+    let open_before = view.read_with(cx, |view, _| view.sidebar.open);
     cx.update(|window, cx| view.update(cx, |view, cx| view.run_palette_id("sidebar", window, cx)));
-    assert_ne!(view.read_with(cx, |view, _| view.sidebar_open), open_before);
+    assert_ne!(view.read_with(cx, |view, _| view.sidebar.open), open_before);
+}
+
+#[gpui::test]
+fn the_palette_opens_one_new_connection_tab_with_the_default_port(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    for _ in 0..2 {
+        cx.simulate_keystrokes("ctrl-shift-p");
+        cx.simulate_input("new connection");
+        cx.simulate_keystrokes("enter");
+    }
+    view.read_with(cx, |view, cx| {
+        let tabs = view
+            .tabs
+            .items
+            .iter()
+            .filter(|tab| **tab == bookie_gpui::shell::Tab::NewConnection)
+            .count();
+        assert_eq!(tabs, 1);
+        assert_eq!(view.tabs.current(), &bookie_gpui::shell::Tab::NewConnection);
+        let draft = view.connection_form.draft(cx);
+        assert_eq!((draft.driver_id.as_str(), draft.port), ("postgres", 5432));
+        assert!(draft.read_only);
+    });
 }
 
 struct Tiny;
@@ -1268,11 +1292,11 @@ fn the_results_pane_can_be_hidden_and_the_summary_view_shows_the_run(cx: &mut Te
     cx.simulate_keystrokes("ctrl-shift-p");
     cx.simulate_input("hide the results");
     cx.simulate_keystrokes("enter");
-    view.read_with(cx, |view, _| assert!(!view.result_open));
+    view.read_with(cx, |view, _| assert!(!view.panel.open));
     cx.simulate_keystrokes("ctrl-shift-p");
     cx.simulate_input("show the results");
     cx.simulate_keystrokes("enter");
-    view.read_with(cx, |view, _| assert!(view.result_open));
+    view.read_with(cx, |view, _| assert!(view.panel.open));
 }
 
 fn test_columns() -> &'static [bookie_gpui::model::ColumnMeta] {

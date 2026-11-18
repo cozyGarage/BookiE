@@ -1,7 +1,4 @@
-use bookie_core::AuthMode;
-use bookie_storage::{
-    SavedConnection, delete_password, save_connections, store_password, store_ssh_passphrase, store_ssh_password,
-};
+use bookie_storage::{SavedConnection, store_ssh_passphrase, store_ssh_password};
 use secrecy::{ExposeSecret, SecretString};
 use uuid::Uuid;
 
@@ -51,38 +48,9 @@ async fn save_and_store_password(
     stored_password: &SecretString,
     label: &str,
 ) -> Result<(), ConnectFailure> {
-    save_one(saved).await.map_err(|e| format!("save: {e}"))?;
-    match saved.auth_mode {
-        AuthMode::Password if stored_password.expose_secret().is_empty() => {
-            if let Err(error) = delete_password(saved.id).await {
-                return Err(rollback_failure(existing, saved.id, "delete obsolete stored password", error).await);
-            }
-        }
-        AuthMode::Password => {
-            if let Err(error) = store_password(saved.id, stored_password.expose_secret(), label).await {
-                return Err(rollback_failure(existing, saved.id, "store password", error).await);
-            }
-        }
-        AuthMode::Kerberos if existing.is_some_and(|connection| connection.auth_mode == AuthMode::Password) => {
-            if let Err(error) = delete_password(saved.id).await {
-                return Err(rollback_failure(existing, saved.id, "delete stored password", error).await);
-            }
-        }
-        AuthMode::Kerberos => {}
-    }
-    Ok(())
-}
-
-async fn rollback_failure(
-    existing: Option<&SavedConnection>,
-    id: Uuid,
-    action: &str,
-    error: bookie_storage::StorageError,
-) -> ConnectFailure {
-    match rollback_saved_connection(existing, id).await {
-        Ok(()) => format!("{action}: {error}").into(),
-        Err(rollback_error) => format!("{action}: {error}; restore saved connection: {rollback_error}").into(),
-    }
+    bookie_app_services::connection_save::persist_with_password(saved, existing, stored_password, label)
+        .await
+        .map_err(ConnectFailure::from)
 }
 
 async fn store_head_secret(id: Uuid, inputs: &SshInputs, label: &str) -> Result<(), ConnectFailure> {
@@ -111,19 +79,5 @@ async fn discard_hop_secrets(id: Uuid, committed: &bookie_app_services::ssh_chai
 async fn forget_obsolete_hop_secrets(id: Uuid, inputs: &SshInputs) {
     if let Err(error) = bookie_app_services::ssh_chain_secrets::delete_obsolete_hop_secrets(id, &inputs.chain).await {
         tracing::warn!(%error, "replaced jump host secrets could not be removed");
-    }
-}
-
-pub(super) async fn save_one(connection: &SavedConnection) -> Result<(), bookie_storage::StorageError> {
-    save_connections(std::slice::from_ref(connection)).await
-}
-
-async fn rollback_saved_connection(
-    previous: Option<&SavedConnection>,
-    id: Uuid,
-) -> Result<(), bookie_storage::StorageError> {
-    match previous {
-        Some(connection) => save_one(connection).await,
-        None => bookie_storage::delete_connection(id).await,
     }
 }

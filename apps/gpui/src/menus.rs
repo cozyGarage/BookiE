@@ -1,4 +1,4 @@
-use gpui::{Context, WeakEntity, Window};
+use gpui::{Context, DismissEvent, Entity, Pixels, Point, Subscription, WeakEntity, Window};
 use gpui_component::menu::{PopupMenu, PopupMenuItem};
 
 use crate::GridView;
@@ -6,9 +6,9 @@ use crate::GridView;
 type Group = Vec<(&'static str, String, bool)>;
 
 pub(crate) const OVERFLOW_GROUPS: &[&[&str]] = &[
-    &["query", "run"],
+    &["query", "run", "explain"],
     &["sidebar", "results"],
-    &["home", "settings", "font", "theme"],
+    &["new-connection", "home", "settings", "font", "theme"],
     &["status", "server-status"],
 ];
 
@@ -65,4 +65,29 @@ pub(crate) fn command_menu(
     groups: Vec<Group>,
 ) -> impl Fn(PopupMenu, &mut Window, &mut Context<PopupMenu>) -> PopupMenu + 'static {
     move |menu, _, _| fill(menu, &view, &groups)
+}
+
+pub(crate) struct RowMenu {
+    pub position: Point<Pixels>,
+    pub menu: Entity<PopupMenu>,
+    _dismiss: Subscription,
+}
+
+impl GridView {
+    pub(crate) fn open_cell_menu(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let groups = command_groups(self, ROW_GROUPS);
+        let owner = cx.entity().downgrade();
+        let menu = PopupMenu::build(window, cx, move |menu, _, _| fill(menu, &owner, &groups));
+        let dismiss = cx.subscribe(&menu, |this, _, _: &DismissEvent, cx| {
+            this.row_menu = None;
+            cx.notify();
+        });
+        window.focus(&gpui::Focusable::focus_handle(menu.read(cx), cx), cx);
+        self.row_menu = Some(RowMenu {
+            position: window.mouse_position(),
+            menu,
+            _dismiss: dismiss,
+        });
+        cx.notify();
+    }
 }
