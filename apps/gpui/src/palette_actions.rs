@@ -253,6 +253,7 @@ impl GridView {
             ),
             action("home", "Open Home", true),
             action("new-connection", "New connection", true),
+            action("history", "Open history", true),
             action("settings", "Open settings", true),
             action(
                 "table",
@@ -429,6 +430,11 @@ impl GridView {
             "new-connection" => {
                 self.connection_form.editing = None;
                 self.tabs.open_new_connection();
+                self.sync_grid_owner();
+            }
+            "history" => {
+                self.tabs.open_history();
+                self.reload_history_page(cx);
                 self.sync_grid_owner();
             }
             "settings" => {

@@ -122,6 +122,7 @@ pub enum Tab {
     Query,
     Settings,
     NewConnection,
+    History,
 }
 
 impl Tab {
@@ -132,6 +133,7 @@ impl Tab {
             Tab::Query => "Query 1".into(),
             Tab::Settings => "Settings".into(),
             Tab::NewConnection => "New connection".into(),
+            Tab::History => "History".into(),
         }
     }
 }
@@ -182,6 +184,16 @@ impl Tabs {
             Some(index) => index,
             None => {
                 self.items.push(Tab::Settings);
+                self.items.len() - 1
+            }
+        };
+    }
+
+    pub fn open_history(&mut self) {
+        self.active = match self.items.iter().position(|item| *item == Tab::History) {
+            Some(index) => index,
+            None => {
+                self.items.push(Tab::History);
                 self.items.len() - 1
             }
         };

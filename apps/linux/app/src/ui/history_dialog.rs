@@ -289,7 +289,7 @@ impl HistoryDialog {
             if trimmed.is_empty() {
                 None
             } else {
-                Some(fts5_query(&trimmed))
+                Some(bookie_app_services::statement_history::fts5_query(&trimmed))
             }
         };
         let connection_id = if self.filter_connection.selected() == 0 {
@@ -599,21 +599,6 @@ impl HistoryDialog {
     fn is_pinned(&self, id: i64) -> bool {
         self.entries.iter().any(|e| e.id == id && e.pinned)
     }
-}
-
-fn fts5_query(input: &str) -> String {
-    // Tokenise on whitespace and quote each token. FTS5 then ANDs them by
-    // default ("SELECT users" → match rows containing both terms anywhere),
-    // matching what users expect from a search box. Quoting protects each
-    // token from FTS5's own operator chars (parens, AND, OR, NEAR, *).
-    input
-        .split_whitespace()
-        .map(|tok| {
-            let escaped = tok.replace('"', "\"\"");
-            format!("\"{escaped}\"")
-        })
-        .collect::<Vec<_>>()
-        .join(" ")
 }
 
 fn preview_title(query: &str) -> String {

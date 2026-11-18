@@ -35,6 +35,7 @@ Read `theme.rs`, `chrome.rs`, `render.rs`, `main.rs`, `text_input.rs` and `palet
 | 17 | Hover and selection in the grid were pale blue from the component library's theme | screenshot | Fixed in `ui_theme::map_component_colors` |
 | 14 | Query history was the session's message log; the persistent history database was not read or written | `home_query_history_card` read `panel.messages` | Fixed for saved connections: `app-services::statement_history` records and lists statements with the connection identity; GPUI records every run and Home lists the latest 8 from the shared database, failures in the warning colour. A database opened from a file gets a stable identity from its path (a version 5 UUID of its file URL, named by the path), so its statements are recorded and can be filtered. The GTK recorder and the retention prune (GPUI prunes once per session) now call the same service |
 | 15 | Explain was missing | no command | Fixed: toolbar button, overflow item and palette command run the core `explain_statement` for the driver through the read-only session |
+| 18 | GPUI had no history page: only the latest eight statements on Home, no search, no pinning, no way to reuse one | `history_view.rs` read `recent(8)` | Fixed: a History tab (overflow menu or palette) with text search, an All, Succeeded and Failed filter, pinned statements first, pin and delete buttons and a click that puts the statement in the query editor without running it. It uses `statement_history::{search, set_pinned, delete}`, which also hold the full-text query quoting that the GTK dialog had; GTK now calls the same `fts5_query`. Checked on a private display: search, filter, pin and reuse against a live SQLite connection |
 
 ## Feature gap against the GTK app
 
@@ -59,7 +60,7 @@ Same SQLite table, light, 2026-11-18, GTK on a private display and GPUI on a rea
 Both findings 9 and 14 need behaviour that today lives in GTK code or is written straight to storage by the GTK app. A frontend must not repeat it (ADR 0041), so the next step is two app-services commands used by both apps:
 
 - `ConnectionCommands`: `validate`, `save`, `load_draft` and password and SSH-secret persistence exist in `connection_save`. `test` and `delete` now exist there too (GTK's delete calls the same `delete`; GPUI's Test and two-step Delete were checked on screen: SQLite answered `Connected · SQLite 3.54.0`, and a deleted record left the file). Multi-hop chains, the SSH agent and the OpenSSH client are in the service (GTK's secret persistence calls `persist_connection`), and `test` takes the transport audit factory. The GTK dialog records no separate audit entry for a connection change (only the SSH transport audit, which `test` now takes), so nothing is left to move. Test with a two-hop agent chain was checked on screen and reached the SSH connect step.
-- `HistoryCommands`: `record` and `recent` now exist in `statement_history`; the GTK recorder now calls `record_in`; `prune` applies the retention setting; search with filters and pinning still have to move onto it.
+- `HistoryCommands`: `record` and `recent` now exist in `statement_history`; the GTK recorder now calls `record_in`; `prune` applies the retention setting; `search`, `set_pinned` and `delete` serve GPUI's History page. GTK's history dialog still queries the store directly except for the shared `fts5_query`, and its connection, time and source filters are not in the service yet.
 
 The GTK connection dialog and `record_history` move onto them in the same pull request, then GPUI builds its form and history list on the same calls.
 
@@ -67,6 +68,6 @@ The GTK connection dialog and `record_history` move onto them in the same pull r
 
 1. Done in this change: tokens (4), one look (5), menus (8), first part of the `GridView` split (7).
 2. A connection write command in app-services shared by GTK and GPUI, then the GPUI connection form (9).
-3. Move history search, filters and pinning onto `statement_history` (Explain, the Home list, the recorder and retention are done).
+3. Move the GTK history dialog's connection, time and source filters onto `statement_history` (the GPUI page, search, pinning, Explain, the Home list, the recorder and retention are done).
 4. Finish splitting `GridView` (sidebar, find, export, editor groups) before adding more features.
 5. Visual comparison on a real display, light and dark, after each step.

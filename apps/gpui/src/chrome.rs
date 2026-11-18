@@ -150,7 +150,7 @@ fn window_button(id: &'static str, glyph: &'static str, label: &'static str, the
         .child(glyph)
 }
 
-fn ghost_icon(id: impl Into<gpui::ElementId>, name: &'static str, label: &'static str, theme: Theme) -> Stateful<Div> {
+pub(crate) fn ghost_icon(id: impl Into<gpui::ElementId>, name: &'static str, label: &'static str, theme: Theme) -> Stateful<Div> {
     div()
         .id(id)
         .tooltip(tip(label))
@@ -664,7 +664,7 @@ impl GridView {
     }
 }
 
-fn one_line(sql: &str) -> String {
+pub(crate) fn one_line(sql: &str) -> String {
     let flat: String = sql.split_whitespace().collect::<Vec<_>>().join(" ");
     match flat.char_indices().nth(120) {
         Some((end, _)) => format!("{}…", &flat[..end]),
@@ -677,6 +677,7 @@ fn tab_icon_name(tab: &Tab) -> &'static str {
         Tab::Home => "house",
         Tab::Settings => "settings",
         Tab::NewConnection => "database",
+        Tab::History => "clock",
         Tab::Query => "play",
         Tab::Table(_) => "table",
     }
