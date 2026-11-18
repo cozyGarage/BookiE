@@ -987,6 +987,52 @@ impl App {
             self.dispatch_to_tab(tab_id, BrowseTabInput::AutoRefreshFailed(message));
         }
     }
+
+    pub(super) fn handle_browse_response_message(&mut self, msg: AppMsg, sender: ComponentSender<Self>) {
+        match msg {
+            AppMsg::ColumnsLoaded(tab_id, columns, request) => {
+                self.on_browse_columns_loaded(tab_id, columns, request, sender);
+            }
+            AppMsg::EnumLabelsLoaded(tab_id, labels) => {
+                self.dispatch_to_tab(tab_id, BrowseTabInput::EnumLabelsLoaded(labels));
+            }
+            AppMsg::ForeignKeysLoaded(tab_id, foreign_keys) => {
+                self.on_browse_foreign_keys_loaded(tab_id, foreign_keys);
+            }
+            AppMsg::ForeignKeyCandidatesLoaded(tab_id, column, candidates) => {
+                self.on_browse_foreign_key_candidates_loaded(tab_id, column, candidates);
+            }
+            AppMsg::InboundForeignKeysLoaded(tab_id, inbound) => {
+                self.on_browse_inbound_foreign_keys_loaded(tab_id, inbound);
+            }
+            AppMsg::RowsLoaded(tab_id, request, result, projected_columns, elapsed) => {
+                self.on_browse_rows_loaded(tab_id, request, result, projected_columns, elapsed);
+            }
+            AppMsg::LoadFailed(tab_id, failure) => self.on_browse_load_failed(tab_id, failure),
+            AppMsg::RowCountLoaded(tab_id, request, count, is_estimated) => {
+                self.on_browse_row_count_loaded(tab_id, request, count, is_estimated);
+            }
+            AppMsg::RowCountFailed(tab_id, request) => self.on_browse_row_count_failed(tab_id, request),
+            AppMsg::AutoRefreshFailed(tab_id, request, message) => {
+                self.on_auto_refresh_failed(tab_id, request, message);
+            }
+            AppMsg::BrowseCellValueLoaded(tab_id, request, col_index, column_name, result) => {
+                self.dispatch_to_tab(
+                    tab_id,
+                    match result {
+                        Ok(value) => BrowseTabInput::CellValueLoaded {
+                            request,
+                            col_index,
+                            column_name,
+                            value,
+                        },
+                        Err(message) => BrowseTabInput::CellValueFailed(request, message),
+                    },
+                );
+            }
+            _ => {}
+        }
+    }
 }
 
 fn dispatch_page_load_failure(
