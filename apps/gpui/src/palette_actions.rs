@@ -4,7 +4,8 @@ impl GridView {
     pub(crate) fn palette_actions(&self) -> Vec<Action> {
         if self.palette.fonts {
             return self
-                .fonts.names
+                .fonts
+                .names
                 .iter()
                 .map(|name| Action {
                     id: "font-choice",

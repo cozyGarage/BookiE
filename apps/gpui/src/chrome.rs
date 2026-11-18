@@ -425,9 +425,16 @@ impl GridView {
                 TreeRow::Table(table) => Some(table.clone()),
                 _ => None,
             };
-            tree.push(self.sidebar_tree_row(index, depth, row, &open_table, theme, cx).into_any_element());
+            tree.push(
+                self.sidebar_tree_row(index, depth, row, &open_table, theme, cx)
+                    .into_any_element(),
+            );
             if let Some(table) = table {
-                tree.extend(self.field_rows(&table, depth, theme).into_iter().map(IntoElement::into_any_element));
+                tree.extend(
+                    self.field_rows(&table, depth, theme)
+                        .into_iter()
+                        .map(IntoElement::into_any_element),
+                );
             }
         }
         if search.trim().is_empty() {
@@ -923,10 +930,15 @@ impl GridView {
                             ),
                         )
                         .child(
-                            ghost_icon(("edit-connection", index), "sliders-horizontal", "Edit connection", theme)
-                                .on_click(cx.listener(move |this, _, _, cx| {
-                                    this.edit_connection(id, cx);
-                                })),
+                            ghost_icon(
+                                ("edit-connection", index),
+                                "sliders-horizontal",
+                                "Edit connection",
+                                theme,
+                            )
+                            .on_click(cx.listener(move |this, _, _, cx| {
+                                this.edit_connection(id, cx);
+                            })),
                         )
                 }))
                 .when(!self.catalog.tables.is_empty(), |section| {
@@ -1001,7 +1013,12 @@ impl GridView {
         } else {
             self.history
                 .iter()
-                .map(|row| (format!("{} · {}", row.connection_name, one_line(&row.query)), row.succeeded))
+                .map(|row| {
+                    (
+                        format!("{} · {}", row.connection_name, one_line(&row.query)),
+                        row.succeeded,
+                    )
+                })
                 .collect()
         };
         let content = if rows.is_empty() {
@@ -1010,16 +1027,21 @@ impl GridView {
                 .text_color(rgb(theme.muted_foreground))
                 .child("No recent statements executed yet")
         } else {
-            div().p_2().flex().flex_col().gap_1().children(rows.into_iter().map(|(text, ok)| {
-                div()
-                    .px_2()
-                    .py_1()
-                    .rounded(px(theme.radius))
-                    .text_size(px(size::TEXT_SMALL))
-                    .font_family("monospace")
-                    .text_color(rgb(if ok { theme.foreground } else { theme.warning }))
-                    .child(text)
-            }))
+            div()
+                .p_2()
+                .flex()
+                .flex_col()
+                .gap_1()
+                .children(rows.into_iter().map(|(text, ok)| {
+                    div()
+                        .px_2()
+                        .py_1()
+                        .rounded(px(theme.radius))
+                        .text_size(px(size::TEXT_SMALL))
+                        .font_family("monospace")
+                        .text_color(rgb(if ok { theme.foreground } else { theme.warning }))
+                        .child(text)
+                }))
         };
         card(theme).child(card_title("Query History", theme)).child(content)
     }
@@ -1322,7 +1344,8 @@ impl GridView {
                 .children(if self.panel.messages.entries().is_empty() {
                     vec![div().text_color(rgb(theme.muted_foreground)).child("No messages yet")]
                 } else {
-                    self.panel.messages
+                    self.panel
+                        .messages
                         .entries()
                         .iter()
                         .rev()

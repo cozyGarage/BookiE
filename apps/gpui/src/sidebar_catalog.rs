@@ -55,60 +55,109 @@ impl GridView {
         if kinds.is_empty() {
             return Vec::new();
         }
-        let line = |id: gpui::ElementId, depth: f32, label: String, detail: String, chevron: Option<bool>| -> Stateful<Div> {
-            div()
-                .id(id)
-                .flex()
-                .items_center()
-                .h(px(size::TREE_ROW))
-                .pl(px(size::SM + size::LG * depth))
-                .pr(px(size::SM))
-                .gap_1()
-                .rounded(px(theme.radius))
-                .cursor_pointer()
-                .hover(move |style| style.bg(rgb(theme.accent)))
-                .child(div().w(px(size::CHEVRON)).flex_none().children(chevron.map(|open| {
-                    icon(if open { "chevron-down" } else { "chevron-right" }, theme.muted_foreground)
-                })))
-                .child(div().flex_1().min_w_0().overflow_hidden().whitespace_nowrap().text_ellipsis().child(label))
-                .child(div().text_size(px(size::TEXT_SMALL)).text_color(rgb(theme.muted_foreground)).child(detail))
-        };
         let mut rows = vec![
-            line("catalog".into(), 0.0, "Catalog".into(), kinds.len().to_string(), Some(self.sidebar.catalog_open))
-                .font_weight(gpui::FontWeight::MEDIUM)
-                .on_click(cx.listener(|this, _, _, cx| {
-                    this.sidebar.catalog_open = !this.sidebar.catalog_open;
-                    cx.notify();
-                }))
-                .into_any_element(),
+            tree_line(
+                theme,
+                "catalog".into(),
+                0.0,
+                "Catalog".into(),
+                kinds.len().to_string(),
+                Some(self.sidebar.catalog_open),
+            )
+            .font_weight(gpui::FontWeight::MEDIUM)
+            .on_click(cx.listener(|this, _, _, cx| {
+                this.sidebar.catalog_open = !this.sidebar.catalog_open;
+                cx.notify();
+            }))
+            .into_any_element(),
         ];
         if !self.sidebar.catalog_open {
             return rows;
         }
         for (index, kind) in kinds.iter().copied().enumerate() {
-            let state = self.sidebar.catalog.iter().find(|(open, _)| *open == kind).map(|(_, state)| state);
+            let state = self
+                .sidebar
+                .catalog
+                .iter()
+                .find(|(open, _)| *open == kind)
+                .map(|(_, state)| state);
             let count = match state {
                 Some(ObjectState::Loaded(objects)) => objects.len().to_string(),
                 _ => String::new(),
             };
             rows.push(
-                line(("catalog-kind", index).into(), 1.0, kind_label(kind).into(), count, Some(state.is_some()))
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.toggle_catalog_kind(kind, cx);
-                        cx.notify();
-                    }))
-                    .into_any_element(),
+                tree_line(
+                    theme,
+                    ("catalog-kind", index).into(),
+                    1.0,
+                    kind_label(kind).into(),
+                    count,
+                    Some(state.is_some()),
+                )
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    this.toggle_catalog_kind(kind, cx);
+                    cx.notify();
+                }))
+                .into_any_element(),
             );
-            match state {
-                Some(ObjectState::Loading) => rows.push(note("Loading…", theme)),
-                Some(ObjectState::Failed(message)) => rows.push(note(message, theme)),
-                Some(ObjectState::Loaded(objects)) if objects.is_empty() => rows.push(note("Nothing of this kind was found.", theme)),
-                Some(ObjectState::Loaded(objects)) => rows.extend(objects.iter().map(|object| object_row(object, theme))),
-                None => {}
-            }
+            rows.extend(state_rows(state, theme));
         }
         rows
     }
+}
+
+fn state_rows(state: Option<&ObjectState>, theme: Theme) -> Vec<gpui::AnyElement> {
+    match state {
+        Some(ObjectState::Loading) => vec![note("Loading…", theme)],
+        Some(ObjectState::Failed(message)) => vec![note(message, theme)],
+        Some(ObjectState::Loaded(objects)) if objects.is_empty() => {
+            vec![note("Nothing of this kind was found.", theme)]
+        }
+        Some(ObjectState::Loaded(objects)) => objects.iter().map(|object| object_row(object, theme)).collect(),
+        None => Vec::new(),
+    }
+}
+
+fn tree_line(
+    theme: Theme,
+    id: gpui::ElementId,
+    depth: f32,
+    label: String,
+    detail: String,
+    chevron: Option<bool>,
+) -> Stateful<Div> {
+    div()
+        .id(id)
+        .flex()
+        .items_center()
+        .h(px(size::TREE_ROW))
+        .pl(px(size::SM + size::LG * depth))
+        .pr(px(size::SM))
+        .gap_1()
+        .rounded(px(theme.radius))
+        .cursor_pointer()
+        .hover(move |style| style.bg(rgb(theme.accent)))
+        .child(div().w(px(size::CHEVRON)).flex_none().children(chevron.map(|open| {
+            icon(
+                if open { "chevron-down" } else { "chevron-right" },
+                theme.muted_foreground,
+            )
+        })))
+        .child(
+            div()
+                .flex_1()
+                .min_w_0()
+                .overflow_hidden()
+                .whitespace_nowrap()
+                .text_ellipsis()
+                .child(label),
+        )
+        .child(
+            div()
+                .text_size(px(size::TEXT_SMALL))
+                .text_color(rgb(theme.muted_foreground))
+                .child(detail),
+        )
 }
 
 fn object_row(object: &bookie_core::CatalogObject, theme: Theme) -> gpui::AnyElement {
@@ -123,8 +172,20 @@ fn object_row(object: &bookie_core::CatalogObject, theme: Theme) -> gpui::AnyEle
         .pl(px(size::SM + size::LG * 2.0 + size::CHEVRON))
         .pr(px(size::SM))
         .text_size(px(size::TEXT_SMALL))
-        .child(div().flex_1().min_w_0().overflow_hidden().whitespace_nowrap().text_ellipsis().child(name))
-        .child(div().text_color(rgb(theme.muted_foreground)).child(object.detail.clone().unwrap_or_default()))
+        .child(
+            div()
+                .flex_1()
+                .min_w_0()
+                .overflow_hidden()
+                .whitespace_nowrap()
+                .text_ellipsis()
+                .child(name),
+        )
+        .child(
+            div()
+                .text_color(rgb(theme.muted_foreground))
+                .child(object.detail.clone().unwrap_or_default()),
+        )
         .into_any_element()
 }
 

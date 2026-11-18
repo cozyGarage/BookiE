@@ -49,6 +49,19 @@ impl GridView {
         (progress, range_label)
     }
 
+    fn drag_resize(&mut self, event: &gpui::MouseMoveEvent, window: &mut Window, cx: &mut Context<Self>) {
+        if self.sidebar.resizing {
+            self.sidebar.width = f32::from(event.position.x).clamp(260.0, 480.0);
+            cx.notify();
+        }
+        if self.panel.resizing {
+            let top_offset = TOOLBAR_HEIGHT + TAB_HEIGHT;
+            let height = f32::from(window.viewport_size().height) - top_offset - STATUS_HEIGHT;
+            self.panel.ratio = result_ratio_from_drag(f32::from(event.position.y), top_offset, height);
+            cx.notify();
+        }
+    }
+
     fn row_menu_overlay(&self) -> Option<impl IntoElement> {
         self.row_menu.as_ref().map(|row_menu| {
             gpui::deferred(
@@ -315,24 +328,15 @@ impl Render for GridView {
             .bg(rgb(theme.background))
             .text_color(rgb(theme.foreground))
             .text_size(px(self.fonts.settings.ui_size))
-            .when(!self.fonts.current.is_empty(), |root| root.font_family(self.fonts.current.clone()))
+            .when(!self.fonts.current.is_empty(), |root| {
+                root.font_family(self.fonts.current.clone())
+            })
             .when(!self.fonts.settings.ui_family.is_empty(), |root| {
                 root.font_family(self.fonts.settings.ui_family.clone())
             })
             .track_focus(&self.focus)
             .on_key_down(cx.listener(Self::key_down))
-            .on_mouse_move(cx.listener(|this, event: &gpui::MouseMoveEvent, window, cx| {
-                if this.sidebar.resizing {
-                    this.sidebar.width = f32::from(event.position.x).clamp(260.0, 480.0);
-                    cx.notify();
-                }
-                if this.panel.resizing {
-                    let top_offset = TOOLBAR_HEIGHT + TAB_HEIGHT;
-                    let height = f32::from(window.viewport_size().height) - top_offset - STATUS_HEIGHT;
-                    this.panel.ratio = result_ratio_from_drag(f32::from(event.position.y), top_offset, height);
-                    cx.notify();
-                }
-            }))
+            .on_mouse_move(cx.listener(Self::drag_resize))
             .on_mouse_up(
                 MouseButton::Left,
                 cx.listener(|this, _: &gpui::MouseUpEvent, _, cx| {

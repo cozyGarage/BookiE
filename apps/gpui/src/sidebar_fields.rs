@@ -63,8 +63,21 @@ impl GridView {
                 .gap_1()
                 .text_size(px(size::TEXT_SMALL))
                 .text_color(rgb(if dim { theme.muted_foreground } else { theme.foreground }))
-                .child(div().w(px(size::CHEVRON)).flex_none().children(marker.map(|name| icon(name, theme.muted_foreground))))
-                .child(div().flex_1().min_w_0().overflow_hidden().whitespace_nowrap().text_ellipsis().child(name))
+                .child(
+                    div()
+                        .w(px(size::CHEVRON))
+                        .flex_none()
+                        .children(marker.map(|name| icon(name, theme.muted_foreground))),
+                )
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .overflow_hidden()
+                        .whitespace_nowrap()
+                        .text_ellipsis()
+                        .child(name),
+                )
                 .child(div().text_color(rgb(theme.muted_foreground)).child(detail))
         };
         match state {

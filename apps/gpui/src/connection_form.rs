@@ -1,5 +1,5 @@
-use bookie_app_services::connection_save::{self, ConnectionDraft};
-use bookie_core::{Environment, TlsMode};
+use bookie_app_services::connection_save::{self, ConnectionDraft, SshDraft};
+use bookie_core::{AuthMode, Environment, TlsMode};
 use gpui::{Context, Div, Entity, Stateful, div, prelude::*, px, rgb};
 use secrecy::SecretString;
 
@@ -26,6 +26,19 @@ pub(crate) struct ConnectionForm {
     pub status: String,
     pub saving: bool,
     pub editing: Option<uuid::Uuid>,
+    pub kerberos: bool,
+    pub tls: u32,
+    pub tls_root: Entity<TextInput>,
+    pub tls_cert: Entity<TextInput>,
+    pub tls_key: Entity<TextInput>,
+    pub socket: Entity<TextInput>,
+    pub ssh_on: bool,
+    pub keep_ssh: bool,
+    pub ssh_host: Entity<TextInput>,
+    pub ssh_port: Entity<TextInput>,
+    pub ssh_user: Entity<TextInput>,
+    pub ssh_key: Entity<TextInput>,
+    pub ssh_secret: Entity<TextInput>,
 }
 
 impl ConnectionForm {
@@ -59,11 +72,29 @@ impl ConnectionForm {
             status: String::new(),
             saving: false,
             editing: None,
+            kerberos: false,
+            tls: TlsMode::default().index(),
+            tls_root: input("CA certificate file (optional)", cx),
+            tls_cert: input("Client certificate file (optional)", cx),
+            tls_key: input("Client key file (optional)", cx),
+            socket: input("Socket directory or file (optional)", cx),
+            ssh_on: false,
+            keep_ssh: false,
+            ssh_host: input("SSH host", cx),
+            ssh_port: input("22", cx),
+            ssh_user: input("SSH user", cx),
+            ssh_key: input("Private key file (empty for a password)", cx),
+            ssh_secret: cx.new(|cx| TextInput::new("SSH password or key passphrase", cx).masked()),
         }
     }
 
     pub fn selected(&self) -> Option<&DriverChoice> {
         self.drivers.get(self.driver)
+    }
+
+    fn socket_kind(&self) -> Option<bookie_app_services::connection_form::LocalSocketPathKind> {
+        let driver = drivers_registry::default_registry().get(self.selected()?.id)?;
+        bookie_app_services::connection_form::local_socket_path_kind(driver.capabilities())
     }
 
     pub fn draft(&self, cx: &gpui::App) -> ConnectionDraft {
@@ -81,85 +112,230 @@ impl ConnectionForm {
             database: text(&self.database),
             username: text(&self.username),
             password: SecretString::from(text(&self.password)),
-            tls_mode: TlsMode::default(),
+            auth_mode: if self.kerberos {
+                AuthMode::Kerberos
+            } else {
+                AuthMode::Password
+            },
+            tls_mode: TlsMode::from_index(self.tls),
+            tls_root_cert: text(&self.tls_root),
+            tls_client_cert: text(&self.tls_cert),
+            tls_client_key: text(&self.tls_key),
+            socket_kind: self.socket_kind(),
+            socket_endpoint: text(&self.socket),
+            ssh: self.ssh_on.then(|| SshDraft {
+                host: text(&self.ssh_host),
+                port: text(&self.ssh_port).trim().parse().unwrap_or(22),
+                username: text(&self.ssh_user),
+                key_path: text(&self.ssh_key),
+                secret: SecretString::from(text(&self.ssh_secret)),
+            }),
             read_only: self.read_only,
             environment: Environment::default(),
             keep_stored_password: self.editing.is_some(),
+            keep_saved_ssh: self.keep_ssh,
         }
     }
+}
+
+fn field(theme: Theme, label: &'static str, input: &Entity<TextInput>) -> Div {
+    div()
+        .flex()
+        .items_center()
+        .gap_2()
+        .child(
+            div()
+                .w(px(size::SIDE_PANEL_WIDTH / 2.0))
+                .text_color(rgb(theme.muted_foreground))
+                .child(label),
+        )
+        .child(div().flex_1().h(px(size::FORM_CONTROL)).child(input.clone()))
+}
+
+fn note(theme: Theme, text: &str) -> Div {
+    div().text_color(rgb(theme.muted_foreground)).child(text.to_string())
+}
+
+fn choice_chip(id: impl Into<gpui::ElementId>, label: &'static str, selected: bool, theme: Theme) -> Stateful<Div> {
+    div()
+        .id(id)
+        .flex()
+        .items_center()
+        .h(px(size::SMALL_CONTROL))
+        .px_2()
+        .rounded(px(theme.radius))
+        .cursor_pointer()
+        .border_1()
+        .border_color(rgb(if selected { theme.foreground } else { theme.border }))
+        .when(selected, |chip| chip.bg(rgb(theme.accent)))
+        .child(label)
+}
+
+fn choice_row(theme: Theme, label: &'static str, chips: impl IntoIterator<Item = Stateful<Div>>) -> Div {
+    div()
+        .flex()
+        .items_center()
+        .gap_2()
+        .child(
+            div()
+                .w(px(size::SIDE_PANEL_WIDTH / 2.0))
+                .text_color(rgb(theme.muted_foreground))
+                .child(label),
+        )
+        .child(div().flex().flex_wrap().gap_1().children(chips))
 }
 
 impl GridView {
     pub(crate) fn connection_page(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
         let form = &self.connection_form;
-        let field = |label: &'static str, input: &Entity<TextInput>| {
-            div()
-                .flex()
-                .items_center()
-                .gap_2()
-                .child(div().w(px(size::SIDE_PANEL_WIDTH / 2.0)).text_color(rgb(theme.muted_foreground)).child(label))
-                .child(
-                    div().flex_1().h(px(size::FORM_CONTROL)).child(input.clone()),
-                )
+        let file_based = form
+            .selected()
+            .is_some_and(|driver| matches!(driver.id, "sqlite" | "duckdb"));
+        let title = if form.editing.is_some() {
+            "Edit connection"
+        } else {
+            "New connection"
         };
-        let chips = self.driver_chips(theme, cx);
-        let file_based = form.selected().is_some_and(|driver| matches!(driver.id, "sqlite" | "duckdb"));
-        div().flex_1().min_h_0().p_4().child(
+        div().flex_1().min_h_0().flex().flex_col().child(
             div()
-                .w(px(size::HOME_WIDTH / 2.0))
-                .flex()
-                .flex_col()
-                .gap_3()
-                .child(div().font_weight(gpui::FontWeight::SEMIBOLD).child(if form.editing.is_some() {
-                    "Edit connection"
-                } else {
-                    "New connection"
-                }))
-                .child(div().flex().flex_wrap().gap_1().children(chips))
-                .child(field("Name", &form.name))
-                .when(!file_based, |page| {
-                    page.child(field("Host", &form.host))
-                        .child(field("Port", &form.port))
-                        .child(field("User", &form.username))
-                        .child(field("Password", &form.password))
-                })
-                .child(field(if file_based { "File" } else { "Database" }, &form.database))
+                .id("connection-page")
+                .flex_1()
+                .min_h_0()
+                .overflow_y_scroll()
+                .p_4()
                 .child(
                     div()
+                        .w(px(size::HOME_WIDTH / 2.0))
                         .flex()
-                        .items_center()
-                        .gap_2()
-                        .child(self.save_button(theme, cx))
-                        .child(self.read_only_toggle(theme, cx))
-                        .child(div().text_color(rgb(theme.muted_foreground)).child(form.status.clone())),
+                        .flex_col()
+                        .gap_3()
+                        .child(div().font_weight(gpui::FontWeight::SEMIBOLD).child(title))
+                        .child(div().flex().flex_wrap().gap_1().children(self.driver_chips(theme, cx)))
+                        .child(field(theme, "Name", &form.name))
+                        .when(!file_based, |page| page.children(self.network_fields(theme, cx)))
+                        .child(field(
+                            theme,
+                            if file_based { "File" } else { "Database" },
+                            &form.database,
+                        ))
+                        .when(!file_based, |page| page.children(self.security_fields(theme, cx)))
+                        .when(!file_based, |page| page.children(self.ssh_fields(theme, cx)))
+                        .child(
+                            div()
+                                .flex()
+                                .items_center()
+                                .gap_2()
+                                .child(self.save_button(theme, cx))
+                                .child(self.read_only_toggle(theme, cx))
+                                .child(div().text_color(rgb(theme.muted_foreground)).child(form.status.clone())),
+                        ),
                 ),
         )
     }
 
-    fn driver_chips(&self, theme: Theme, cx: &mut Context<Self>) -> Vec<Stateful<Div>> {
+    fn network_fields(&self, theme: Theme, _cx: &mut Context<Self>) -> Vec<Div> {
         let form = &self.connection_form;
-        form.drivers.iter().enumerate().map(|(index, driver)| {
-            let selected = index == form.driver;
-            let port = driver.port;
-            div()
-                .id(("driver", index))
-                .flex()
-                .items_center()
-                .h(px(size::SMALL_CONTROL))
-                .px_2()
-                .rounded(px(theme.radius))
-                .cursor_pointer()
-                .border_1()
-                .border_color(rgb(if selected { theme.foreground } else { theme.border }))
-                .when(selected, |chip| chip.bg(rgb(theme.accent)))
-                .child(driver.label)
+        let mut rows = vec![
+            field(theme, "Host", &form.host),
+            field(theme, "Port", &form.port),
+            field(theme, "User", &form.username),
+        ];
+        if !form.kerberos {
+            rows.push(field(theme, "Password", &form.password));
+        }
+        rows
+    }
+
+    fn security_fields(&self, theme: Theme, cx: &mut Context<Self>) -> Vec<Div> {
+        let form = &self.connection_form;
+        let auth = choice_row(
+            theme,
+            "Sign in",
+            [("Password", !form.kerberos), ("Kerberos", form.kerberos)]
+                .into_iter()
+                .enumerate()
+                .map(|(index, (label, selected))| {
+                    choice_chip(("auth", index), label, selected, theme).on_click(cx.listener(move |this, _, _, cx| {
+                        this.connection_form.kerberos = index == 1;
+                        cx.notify();
+                    }))
+                }),
+        );
+        let tls = choice_row(
+            theme,
+            "TLS",
+            TlsMode::ALL.into_iter().map(|mode| {
+                choice_chip(
+                    ("tls", mode.index() as usize),
+                    mode.label(),
+                    form.tls == mode.index(),
+                    theme,
+                )
                 .on_click(cx.listener(move |this, _, _, cx| {
-                    this.connection_form.driver = index;
-                    let port_text = if port == 0 { String::new() } else { port.to_string() };
-                    this.connection_form.port.update(cx, |input, cx| input.set_content(&port_text, cx));
+                    this.connection_form.tls = mode.index();
                     cx.notify();
                 }))
-        })
+            }),
+        );
+        let mut rows = vec![auth, tls];
+        if TlsMode::from_index(form.tls) != TlsMode::Disabled {
+            rows.push(field(theme, "CA file", &form.tls_root));
+            rows.push(field(theme, "Client cert", &form.tls_cert));
+            rows.push(field(theme, "Client key", &form.tls_key));
+        }
+        if form.socket_kind().is_some() {
+            rows.push(field(theme, "Socket", &form.socket));
+        }
+        rows
+    }
+
+    fn ssh_fields(&self, theme: Theme, cx: &mut Context<Self>) -> Vec<Div> {
+        let form = &self.connection_form;
+        let toggle = choice_row(
+            theme,
+            "SSH tunnel",
+            [
+                choice_chip("ssh-on", if form.ssh_on { "On" } else { "Off" }, form.ssh_on, theme).on_click(
+                    cx.listener(|this, _, _, cx| {
+                        this.connection_form.ssh_on = !this.connection_form.ssh_on;
+                        this.connection_form.keep_ssh = false;
+                        cx.notify();
+                    }),
+                ),
+            ],
+        );
+        let mut rows = vec![toggle];
+        if form.keep_ssh && !form.ssh_on {
+            rows.push(note(theme, "A jump chain or agent is saved and kept as it is."));
+        }
+        if form.ssh_on {
+            rows.push(field(theme, "SSH host", &form.ssh_host));
+            rows.push(field(theme, "SSH port", &form.ssh_port));
+            rows.push(field(theme, "SSH user", &form.ssh_user));
+            rows.push(field(theme, "Key file", &form.ssh_key));
+            rows.push(field(theme, "Secret", &form.ssh_secret));
+        }
+        rows
+    }
+
+    fn driver_chips(&self, theme: Theme, cx: &mut Context<Self>) -> Vec<Stateful<Div>> {
+        let form = &self.connection_form;
+        form.drivers
+            .iter()
+            .enumerate()
+            .map(|(index, driver)| {
+                let port = driver.port;
+                choice_chip(("driver", index), driver.label, index == form.driver, theme).on_click(cx.listener(
+                    move |this, _, _, cx| {
+                        this.connection_form.driver = index;
+                        let port_text = if port == 0 { String::new() } else { port.to_string() };
+                        this.connection_form
+                            .port
+                            .update(cx, |input, cx| input.set_content(&port_text, cx));
+                        cx.notify();
+                    },
+                ))
+            })
             .collect()
     }
 
@@ -230,9 +406,19 @@ impl GridView {
     fn fill_connection_form(&mut self, draft: ConnectionDraft, cx: &mut Context<Self>) {
         let form = &mut self.connection_form;
         form.editing = draft.id;
-        form.driver = form.drivers.iter().position(|driver| driver.id == draft.driver_id).unwrap_or(form.driver);
+        form.driver = form
+            .drivers
+            .iter()
+            .position(|driver| driver.id == draft.driver_id)
+            .unwrap_or(form.driver);
         form.read_only = draft.read_only;
         form.status = String::new();
+        form.kerberos = draft.auth_mode == AuthMode::Kerberos;
+        form.tls = draft.tls_mode.index();
+        form.keep_ssh = draft.keep_saved_ssh;
+        form.ssh_on = draft.ssh.is_some();
+        let ssh = draft.ssh.as_ref();
+        let ssh_port = ssh.map_or_else(String::new, |ssh| ssh.port.to_string());
         let port = draft.port.to_string();
         for (input, text) in [
             (&form.name, draft.name.as_str()),
@@ -241,6 +427,15 @@ impl GridView {
             (&form.database, draft.database.as_str()),
             (&form.username, draft.username.as_str()),
             (&form.password, ""),
+            (&form.tls_root, draft.tls_root_cert.as_str()),
+            (&form.tls_cert, draft.tls_client_cert.as_str()),
+            (&form.tls_key, draft.tls_client_key.as_str()),
+            (&form.socket, draft.socket_endpoint.as_str()),
+            (&form.ssh_host, ssh.map_or("", |ssh| ssh.host.as_str())),
+            (&form.ssh_port, ssh_port.as_str()),
+            (&form.ssh_user, ssh.map_or("", |ssh| ssh.username.as_str())),
+            (&form.ssh_key, ssh.map_or("", |ssh| ssh.key_path.as_str())),
+            (&form.ssh_secret, ""),
         ] {
             input.update(cx, |input, cx| input.set_content(text, cx));
         }
@@ -275,7 +470,9 @@ impl GridView {
                 match result {
                     Ok(saved) => {
                         this.connection_form.status = format!("Saved {}", saved.name);
-                        this.connection_form.password.update(cx, |input, cx| input.set_content("", cx));
+                        this.connection_form
+                            .password
+                            .update(cx, |input, cx| input.set_content("", cx));
                         if let Ok(list) = bookie_gpui::live::saved_connections() {
                             this.connections = list;
                         }

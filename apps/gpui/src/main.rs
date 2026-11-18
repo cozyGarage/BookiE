@@ -2,8 +2,8 @@ use std::time::{Duration, Instant};
 
 mod assets;
 mod catalog_nav;
-mod connection_form;
 mod chrome;
+mod connection_form;
 mod copy_selection;
 mod detail_panel;
 mod find_filter;
