@@ -49,6 +49,7 @@ pub struct ConnectionDraft {
     pub tls_root_cert: String,
     pub tls_client_cert: String,
     pub tls_client_key: String,
+    pub file_based: bool,
     pub socket_kind: Option<LocalSocketPathKind>,
     pub socket_endpoint: String,
     pub ssh: Option<SshDraft>,
@@ -95,6 +96,7 @@ fn draft_from_saved(saved: &SavedConnection) -> ConnectionDraft {
         tls_root_cert: path_text(saved.tls_root_cert.as_ref()),
         tls_client_cert: path_text(saved.tls_client_cert.as_ref()),
         tls_client_key: path_text(saved.tls_client_key.as_ref()),
+        file_based: false,
         socket_kind,
         socket_endpoint,
         ssh: saved.ssh.as_ref().map(ssh_draft_from_saved),
@@ -138,15 +140,15 @@ fn ssh_draft_from_saved(ssh: &SavedSshConfig) -> SshDraft {
     }
 }
 
-pub fn derived_name(driver_id: &str, host: &str, username: &str, database: &str) -> String {
-    if driver_id == "sqlite" || driver_id == "duckdb" {
+pub fn derived_name(file_based: bool, host: &str, username: &str, database: &str) -> String {
+    if file_based {
         return database.to_owned();
     }
     format!("{username}@{host}")
 }
 
 pub fn validate(draft: &ConnectionDraft) -> Result<(), String> {
-    let file_based = matches!(draft.driver_id.as_str(), "sqlite" | "duckdb");
+    let file_based = draft.file_based;
     if draft.driver_id.trim().is_empty() {
         return Err("Choose a database type.".into());
     }
@@ -198,7 +200,7 @@ fn validate_ssh(ssh: Option<&SshDraft>) -> Result<(), String> {
 pub fn saved_from_draft(draft: &ConnectionDraft, id: Uuid) -> SavedConnection {
     let name = match draft.name.trim() {
         "" => derived_name(
-            &draft.driver_id,
+            draft.file_based,
             draft.host.trim(),
             draft.username.trim(),
             draft.database.trim(),
@@ -583,6 +585,7 @@ mod tests {
             tls_root_cert: String::new(),
             tls_client_cert: String::new(),
             tls_client_key: String::new(),
+            file_based: false,
             socket_kind: None,
             socket_endpoint: String::new(),
             ssh: None,
@@ -607,6 +610,7 @@ mod tests {
     fn a_file_database_is_named_after_its_file() {
         let mut file = draft();
         file.driver_id = "sqlite".into();
+        file.file_based = true;
         file.database = "/tmp/a.sqlite".into();
         assert_eq!(saved_from_draft(&file, Uuid::nil()).name, "/tmp/a.sqlite");
     }
@@ -621,6 +625,7 @@ mod tests {
         assert!(validate(&missing).unwrap_err().contains("port"));
         let mut file = draft();
         file.driver_id = "sqlite".into();
+        file.file_based = true;
         file.database.clear();
         assert_eq!(validate(&file).unwrap_err(), "Enter the database file.");
         assert!(validate(&draft()).is_ok());
@@ -741,6 +746,7 @@ mod tests {
         let cancel = || tokio_util::sync::CancellationToken::new();
         let mut file = draft();
         file.driver_id = "sqlite".into();
+        file.file_based = true;
         file.database = path.display().to_string();
         assert!(
             test(&registry, &file, cancel(), None)
