@@ -265,6 +265,23 @@ impl ReadSession {
             .map_err(|error| classify(&error))
     }
 
+    pub async fn read_data_dictionary(
+        &self,
+        capabilities: bookie_core::DriverCapabilities,
+        control: &OperationControl,
+    ) -> Result<QueryResult, DriverFailurePresentation> {
+        let guard = self
+            .database
+            .guard_for_generation(self.id, self.generation, Principal::human_gui())
+            .ok_or(DriverFailurePresentation::Disconnected)?;
+        let tables = crate::catalog::list_tables_excluding(&guard, &[], control)
+            .await
+            .map_err(|error| classify(&error))?;
+        crate::data_dictionary::load(&guard, None, &tables, capabilities, control)
+            .await
+            .map_err(|error| classify(&error))
+    }
+
     pub async fn open_table_cursor(
         &self,
         table: &TableInfo,

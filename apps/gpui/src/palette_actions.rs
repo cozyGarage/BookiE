@@ -227,6 +227,7 @@ impl GridView {
                 "Explain the query",
                 matches!(self.tabs.current(), Tab::Query) && self.live.is_some(),
             ),
+            action("data-dictionary", "Show the data dictionary", self.live.is_some()),
             action(
                 "previous-run",
                 "Previous result",
@@ -254,6 +255,7 @@ impl GridView {
             action("home", "Open Home", true),
             action("new-connection", "New connection", true),
             action("history", "Open history", true),
+            action("audit", "Open audit log", true),
             action("settings", "Open settings", true),
             action(
                 "table",
@@ -432,6 +434,11 @@ impl GridView {
                 self.tabs.open_new_connection();
                 self.sync_grid_owner();
             }
+            "audit" => {
+                self.tabs.open_audit_log();
+                self.reload_audit_page(cx);
+                self.sync_grid_owner();
+            }
             "history" => {
                 self.tabs.open_history();
                 self.reload_history_page(cx);
@@ -453,6 +460,7 @@ impl GridView {
             }
             "run" => self.run_query(cx),
             "explain" => self.explain_query(cx),
+            "data-dictionary" => self.show_data_dictionary(cx),
             "previous-run" => self.activate_run(self.run_tabs.active - 1),
             "next-run" => self.activate_run(self.run_tabs.active + 1),
             "close-run" => self.close_run(self.run_tabs.active),

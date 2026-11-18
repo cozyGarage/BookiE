@@ -542,6 +542,43 @@ async fn a_catalog_command_answers_with_its_epoch_for_a_supported_kind() {
 }
 
 #[tokio::test]
+async fn a_data_dictionary_command_describes_the_tables_with_its_epoch() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("session.db");
+    seeded(&path).await;
+    let (sessions, session_id) = stored_session(&path).await;
+    let (sender, mut receiver) = tokio::sync::mpsc::channel(1);
+    let sink = ChannelEventSink::new(sender);
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(5));
+    let capabilities = bookie_core::DatabaseDriver::capabilities(&drivers_sqlite::SqliteDriver);
+
+    dispatch(
+        DispatchContext::Sessions(&sessions),
+        Command::ReadDataDictionary {
+            epoch: Epoch(48),
+            session_id,
+            capabilities,
+        },
+        &control,
+        &sink,
+    )
+    .await
+    .unwrap();
+
+    let Event::DataDictionaryRead { epoch, outcome } = receiver.try_recv().unwrap() else {
+        panic!("data dictionary command returned a different event");
+    };
+    assert_eq!(epoch, Epoch(48));
+    let result = outcome.unwrap();
+    assert!(
+        result
+            .rows
+            .iter()
+            .any(|row| row.iter().any(|value| *value == Value::Text("items".into())))
+    );
+}
+
+#[tokio::test]
 async fn a_status_command_returns_the_active_connection_with_its_epoch() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("session.db");

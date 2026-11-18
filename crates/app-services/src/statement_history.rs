@@ -31,13 +31,57 @@ pub enum StatusFilter {
     All,
     Succeeded,
     Failed,
+    Cancelled,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TimeWindow {
+    #[default]
+    Any,
+    Day,
+    Week,
+    Month,
+}
+
+impl TimeWindow {
+    pub fn since(self, now: SystemTime) -> Option<SystemTime> {
+        let days = match self {
+            TimeWindow::Any => return None,
+            TimeWindow::Day => 1,
+            TimeWindow::Week => 7,
+            TimeWindow::Month => 30,
+        };
+        now.checked_sub(std::time::Duration::from_secs(days * 24 * 3600))
+    }
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct HistoryQuery {
     pub text: String,
     pub status: StatusFilter,
+    pub window: TimeWindow,
+    pub connection_id: Option<Uuid>,
+    pub source: Option<Source>,
     pub limit: usize,
+}
+
+pub fn search_filter(query: &HistoryQuery, now: SystemTime) -> SearchFilter {
+    let text = query.text.trim();
+    let (success_only, exclude_cancelled) = match query.status {
+        StatusFilter::All => (None, None),
+        StatusFilter::Succeeded => (Some(true), Some(true)),
+        StatusFilter::Failed => (Some(false), Some(true)),
+        StatusFilter::Cancelled => (None, Some(false)),
+    };
+    SearchFilter {
+        needle: (!text.is_empty()).then(|| fts5_query(text)),
+        connection_id: query.connection_id,
+        success_only,
+        exclude_cancelled,
+        min_executed_at: query.window.since(now),
+        source: query.source,
+        limit: query.limit,
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -75,17 +119,7 @@ pub async fn delete(id: i64) -> Result<(), String> {
 }
 
 pub async fn search_in(store: &HistoryStore, query: HistoryQuery) -> Result<Vec<HistoryRow>, String> {
-    let text = query.text.trim();
-    let filter = SearchFilter {
-        needle: (!text.is_empty()).then(|| fts5_query(text)),
-        success_only: match query.status {
-            StatusFilter::All => None,
-            StatusFilter::Succeeded => Some(true),
-            StatusFilter::Failed => Some(false),
-        },
-        limit: query.limit,
-        ..SearchFilter::default()
-    };
+    let filter = search_filter(&query, SystemTime::now());
     let entries = store.search(filter).await.map_err(|error| error.to_string())?;
     Ok(entries.into_iter().map(history_row).collect())
 }
@@ -251,6 +285,7 @@ mod tests {
             text: text.into(),
             status,
             limit: 10,
+            ..HistoryQuery::default()
         };
         let found = search_in(&store, text("nope", StatusFilter::All)).await.unwrap();
         assert_eq!(found.len(), 1);
@@ -273,5 +308,59 @@ mod tests {
     fn a_search_box_text_is_quoted_so_operators_stay_literal() {
         assert_eq!(fts5_query("select  users"), "\"select\" \"users\"");
         assert_eq!(fts5_query("a\"b AND"), "\"a\"\"b\" \"AND\"");
+    }
+
+    #[test]
+    fn the_filter_mirrors_the_dialog_choices() {
+        let now = SystemTime::now();
+        let query = |status, window| HistoryQuery {
+            status,
+            window,
+            limit: 5,
+            ..HistoryQuery::default()
+        };
+        let failed = search_filter(&query(StatusFilter::Failed, TimeWindow::Week), now);
+        assert_eq!(
+            (failed.success_only, failed.exclude_cancelled),
+            (Some(false), Some(true))
+        );
+        assert_eq!(
+            failed.min_executed_at,
+            now.checked_sub(std::time::Duration::from_secs(7 * 24 * 3600))
+        );
+        let cancelled = search_filter(&query(StatusFilter::Cancelled, TimeWindow::Any), now);
+        assert_eq!(
+            (cancelled.success_only, cancelled.exclude_cancelled),
+            (None, Some(false))
+        );
+        assert!(cancelled.min_executed_at.is_none());
+        assert_eq!(search_filter(&query(StatusFilter::All, TimeWindow::Day), now).limit, 5);
+    }
+
+    #[tokio::test]
+    async fn a_cancelled_statement_is_found_by_the_cancelled_filter_only() {
+        let path = std::env::temp_dir().join(format!("bookie-history-cancel-{}.db", Uuid::new_v4()));
+        let store = HistoryStore::open(path.clone()).await.unwrap();
+        let mut cancelled = statement("SELECT sleep", None);
+        cancelled.cancelled = true;
+        record_in(&store, cancelled).await.unwrap();
+        record_in(&store, statement("SELECT 1", None)).await.unwrap();
+        let query = |status| HistoryQuery {
+            status,
+            limit: 10,
+            ..HistoryQuery::default()
+        };
+        let found = search_in(&store, query(StatusFilter::Cancelled)).await.unwrap();
+        assert_eq!(
+            found.iter().map(|row| row.query.as_str()).collect::<Vec<_>>(),
+            vec!["SELECT sleep"]
+        );
+        let ok = search_in(&store, query(StatusFilter::Succeeded)).await.unwrap();
+        assert_eq!(
+            ok.iter().map(|row| row.query.as_str()).collect::<Vec<_>>(),
+            vec!["SELECT 1"]
+        );
+        drop(store);
+        let _ = std::fs::remove_file(path);
     }
 }

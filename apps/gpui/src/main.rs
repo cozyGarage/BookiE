@@ -9,6 +9,7 @@ mod detail_panel;
 mod find_filter;
 mod grid_edit;
 mod grid_table;
+mod audit_page;
 mod history_view;
 mod keys;
 mod measure;
@@ -119,6 +120,7 @@ struct GridView {
     connection_form: connection_form::ConnectionForm,
     history: Vec<bookie_app_services::statement_history::RecentStatement>,
     history_page: history_view::HistoryPage,
+    audit_page: audit_page::AuditPage,
     panel: panel_state::PanelState,
     fonts: panel_state::FontState,
     export: panel_state::ExportState,
@@ -357,6 +359,7 @@ impl GridView {
             connection_form: connection_form::ConnectionForm::new(cx),
             history: Vec::new(),
             history_page: history_view::HistoryPage::new(cx),
+            audit_page: audit_page::AuditPage::new(cx),
             panel: panel_state::PanelState::new(DEFAULT_RESULT_RATIO),
             fonts: panel_state::FontState::new(font_settings::load(), default_font(&font_names).into(), font_names),
             export: panel_state::ExportState::default(),

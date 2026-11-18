@@ -314,6 +314,7 @@ impl Render for GridView {
             Tab::Settings => self.settings_page(theme, cx),
             Tab::NewConnection => self.connection_page(theme, cx),
             Tab::History => self.history_page(theme, cx),
+            Tab::AuditLog => self.audit_page(theme, cx),
             Tab::Query => self.query_page(theme, grid, cx),
             Tab::Table(name) if name == self.catalog.grid_table => grid,
             Tab::Table(table) => self.placeholder_page(&table_label(&table), theme),

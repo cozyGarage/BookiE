@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 
 use relm4::adw::prelude::*;
 use relm4::gtk::{gio, glib};
@@ -283,44 +283,34 @@ impl HistoryDialog {
     }
 
     fn build_filter(&self) -> SearchFilter {
-        let needle = {
-            let text = self.search.text().to_string();
-            let trimmed = text.trim().to_string();
-            if trimmed.is_empty() {
-                None
-            } else {
-                Some(bookie_app_services::statement_history::fts5_query(&trimmed))
-            }
+        use bookie_app_services::statement_history::{HistoryQuery, StatusFilter, TimeWindow};
+        let connection_id = match self.filter_connection.selected() {
+            0 => None,
+            selected => self.connections.get((selected - 1) as usize).map(|m| m.id),
         };
-        let connection_id = if self.filter_connection.selected() == 0 {
-            None
-        } else {
-            self.connections
-                .get((self.filter_connection.selected() - 1) as usize)
-                .map(|m| m.id)
+        let status = match self.filter_status.selected() {
+            1 => StatusFilter::Succeeded,
+            2 => StatusFilter::Failed,
+            3 => StatusFilter::Cancelled,
+            _ => StatusFilter::All,
         };
-        let (success_only, exclude_cancelled) = match self.filter_status.selected() {
-            0 => (None, None),
-            1 => (Some(true), Some(true)),
-            2 => (Some(false), Some(true)),
-            3 => (None, Some(false)),
-            _ => (None, None),
+        let window = match self.filter_window.selected() {
+            1 => TimeWindow::Day,
+            2 => TimeWindow::Week,
+            3 => TimeWindow::Month,
+            _ => TimeWindow::Any,
         };
-        let min_executed_at = match self.filter_window.selected() {
-            1 => Some(SystemTime::now() - Duration::from_secs(24 * 3600)),
-            2 => Some(SystemTime::now() - Duration::from_secs(7 * 24 * 3600)),
-            3 => Some(SystemTime::now() - Duration::from_secs(30 * 24 * 3600)),
-            _ => None,
-        };
-        SearchFilter {
-            needle,
-            connection_id,
-            success_only,
-            exclude_cancelled,
-            min_executed_at,
-            source: source_for_index(self.filter_source.selected()),
-            limit: 200,
-        }
+        bookie_app_services::statement_history::search_filter(
+            &HistoryQuery {
+                text: self.search.text().to_string(),
+                status,
+                window,
+                connection_id,
+                source: source_for_index(self.filter_source.selected()),
+                limit: 200,
+            },
+            SystemTime::now(),
+        )
     }
 
     fn has_narrowing_search(&self) -> bool {

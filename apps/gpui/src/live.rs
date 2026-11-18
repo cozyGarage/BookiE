@@ -159,6 +159,31 @@ impl LiveSession {
         })
     }
 
+    pub fn data_dictionary_controlled(
+        self: &Arc<Self>,
+        capabilities: bookie_core::DriverCapabilities,
+        cancellation: &CancellationToken,
+    ) -> Result<LiveTable, String> {
+        let epoch = self.next_epoch();
+        let (columns, rows, scan, truncated) = self.runtime.block_on(dictionary_pages(
+            &self.sessions,
+            self.session_id,
+            capabilities,
+            cancellation,
+            epoch,
+            &self.epoch,
+        ))?;
+        Ok(LiveTable {
+            session: self.clone(),
+            columns,
+            rows,
+            scan,
+            truncated,
+            snapshot_consistent: false,
+            table: None,
+        })
+    }
+
     pub fn overview(&self) -> Result<Vec<ConnectionOverview>, String> {
         let epoch = Epoch(self.epoch.load(Ordering::Relaxed));
         let control = OperationControl::with_timeout(Duration::from_secs(5));
@@ -575,7 +600,39 @@ async fn query_pages(
     current_epoch: &AtomicU64,
 ) -> Result<Pages, String> {
     let control = OperationControl::new(cancellation.clone(), Some(tokio::time::Instant::now() + PAGE_TIMEOUT));
-    let mut result = bridge_query(sessions, session_id, sql, &control, epoch, current_epoch).await?;
+    let result = bridge_query(sessions, session_id, sql, &control, epoch, current_epoch).await?;
+    spooled_pages(result, max_rows, cancellation).await
+}
+
+async fn dictionary_pages(
+    sessions: &ReadSessionStore,
+    session_id: SessionId,
+    capabilities: bookie_core::DriverCapabilities,
+    cancellation: &CancellationToken,
+    epoch: Epoch,
+    current_epoch: &AtomicU64,
+) -> Result<Pages, String> {
+    let control = OperationControl::new(cancellation.clone(), Some(tokio::time::Instant::now() + PAGE_TIMEOUT));
+    let event = dispatch_read(
+        DispatchContext::Sessions(sessions),
+        Command::ReadDataDictionary {
+            epoch,
+            session_id,
+            capabilities,
+        },
+        &control,
+        epoch,
+        current_epoch,
+    )
+    .await?;
+    let Event::DataDictionaryRead { outcome, .. } = event else {
+        return Err("The command bridge returned an unexpected event.".into());
+    };
+    let result = outcome.map_err(|failure| driver_failure_message(&failure))?;
+    spooled_pages(result, ROW_CAP, cancellation).await
+}
+
+async fn spooled_pages(mut result: QueryResult, max_rows: u64, cancellation: &CancellationToken) -> Result<Pages, String> {
     if cancellation.is_cancelled() {
         return Err("The operation was cancelled.".into());
     }

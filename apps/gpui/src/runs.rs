@@ -85,6 +85,39 @@ impl GridView {
         self.add_run(None);
     }
 
+    pub(crate) fn show_data_dictionary(&mut self, cx: &mut Context<Self>) {
+        let Some(session) = self.live.clone() else {
+            self.status = "Connect to a database to read its data dictionary".into();
+            return;
+        };
+        let Some(driver) = drivers_registry::default_registry().get(&session.driver_id) else {
+            self.status = "This database has no data dictionary".into();
+            return;
+        };
+        let capabilities = driver.capabilities();
+        self.tabs.open_query();
+        self.sync_grid_owner();
+        self.status = "Reading the data dictionary…".into();
+        self.begin_background(
+            Work::Load,
+            cx,
+            move |cancel| {
+                let started = Instant::now();
+                let result = session.data_dictionary_controlled(capabilities, &cancel);
+                (started.elapsed(), result)
+            },
+            |this, (elapsed, result)| match result {
+                Ok(table) => {
+                    this.add_run(Some(std::sync::Arc::new(table)));
+                    if let Some(slot) = this.run_tabs.slots.last_mut() {
+                        slot.run.elapsed_ms = Some(u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX));
+                    }
+                }
+                Err(message) => this.status = message,
+            },
+        );
+    }
+
     pub(crate) fn add_run(&mut self, source: Option<Source>) {
         let mut run = next_run(self.run_tabs.next_number);
         if let Some(source) = &source {
