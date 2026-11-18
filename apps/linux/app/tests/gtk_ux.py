@@ -957,7 +957,7 @@ GLib.MainLoop().run()
                 assert len(row) == 10 and int(row[0]) == count
                 assert all(value == "y" * 13 for value in row[1:-1])
                 assert len(row[-1].encode("utf-8")) == expected_payload_bytes
-        assert count == expected_rows
+        assert count == expected_rows, f"profile export had {count} rows, expected {expected_rows}"
 
     def profile_streamed_pin_retention(database, base):
         trim_result = os.environ.get("BOOKIE_PROFILE_MALLOC_TRIM_RESULT")
@@ -984,14 +984,6 @@ GLib.MainLoop().run()
                 key=lambda item: item["private_kib"],
                 reverse=True,
             )[:8]
-
-        def wait_for_completion(status, timeout=180):
-            deadline = time.monotonic() + timeout
-            while time.monotonic() < deadline:
-                if "Complete · Received" in ui.node_name(status):
-                    return
-                time.sleep(ui.POLL_SECONDS)
-            raise AssertionError(f"active editor did not complete: {ui.node_name(status)!r}")
 
         def trim_allocator():
             result = Path(trim_result)
@@ -1037,10 +1029,9 @@ GLib.MainLoop().run()
             )
             ui.set_editor_text(query)
             ui.invoke(ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON))
-            status = ui.wait_for_node_containing(
-                f"Received {result_rows:,} rows", role=pyatspi.ROLE_LABEL, timeout=180
+            ui.wait_for_node_containing(
+                f"Complete · Received {result_rows:,} rows", role=pyatspi.ROLE_LABEL, timeout=180
             )
-            wait_for_completion(status)
             elapsed_seconds = round(time.monotonic() - started, 2)
             samples.append({
                 "stage": f"after_streamed_editor_{index + 1}_before_pin",
@@ -1143,10 +1134,24 @@ GLib.MainLoop().run()
             f"SELECT value AS id, {columns}, repeat('x', {payload_bytes}) AS payload "
             f"FROM generate_series(1, {rows}) AS value"
         )
-        ui.wait_for_node_containing(f"Received {rows:,} rows", timeout=180)
+        ui.wait_for_node_containing(
+            f"Complete · Received {rows:,} rows", role=pyatspi.ROLE_LABEL, timeout=180
+        )
         query_seconds = round(time.monotonic() - query_started, 2)
         ui.invoke(ui.wait_for_node(name="Export rows…", role=pyatspi.ROLE_PUSH_BUTTON))
         ui.wait_for_node(name="Export Results", role=pyatspi.ROLE_DIALOG)
+        scope = ui.wait_for_node(name="Rows to export", role=pyatspi.ROLE_COMBO_BOX)
+        for _ in range(20):
+            if scope.getState().contains(pyatspi.STATE_FOCUSED):
+                break
+            ui.press_x11_key("Tab")
+            time.sleep(ui.POLL_SECONDS)
+        assert scope.getState().contains(pyatspi.STATE_FOCUSED), "export scope is not keyboard reachable"
+        ui.press_x11_key("space")
+        ui.wait_for_node(name="All rows from this query result")
+        ui.press_x11_key("Down")
+        ui.press_x11_key("Return")
+        ui.wait_for_node_containing("Every row in the completed query result, read from saved query data")
         ui.invoke(ui.wait_for_node(name="Export…", role=pyatspi.ROLE_PUSH_BUTTON))
         chooser = ui.wait_for_node(name="Export Results", role=ui.FILE_CHOOSER_ROLES)
         path = base / "home" / f"stream-export-{repetition}.csv"
