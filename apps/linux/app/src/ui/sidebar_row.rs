@@ -55,6 +55,12 @@ fn chevron_icon(collapsed: bool) -> &'static str {
     }
 }
 
+pub(super) fn text_indent(depth: u8) -> i32 {
+    4 + 12 * i32::from(depth) + ICON_SIZE + 8
+}
+
+const ICON_SIZE: i32 = 14;
+
 fn sidebar_icon(kind: SidebarObjectKind) -> &'static str {
     match kind {
         SidebarObjectKind::Table => "view-list-symbolic",
@@ -270,20 +276,17 @@ impl FactoryComponent for SidebarRow {
                 set_orientation: gtk::Orientation::Vertical,
 
                 #[name = "row_layout"]
-                adw::BreakpointBin {
+                adw::WrapBox {
                     set_width_request: 180,
-                    set_height_request: 36,
-                    #[wrap(Some)]
-                    set_child = &gtk::Box {
-                set_orientation: gtk::Orientation::Horizontal,
-                set_spacing: 8,
-                set_margin_start: 4 + 12 * i32::from(self.depth),
-                set_margin_end: 8,
-                set_margin_top: 6,
-                set_margin_bottom: 6,
+                    set_child_spacing: 8,
+                    set_line_spacing: 0,
+                    set_margin_start: 4 + 12 * i32::from(self.depth),
+                    set_margin_end: 8,
+                    set_margin_top: 2,
+                    set_margin_bottom: 2,
 
                         #[name = "title_row"]
-                        gtk::Box {
+                        append = &gtk::Box {
                             set_orientation: gtk::Orientation::Horizontal,
                             set_spacing: 8,
                             set_hexpand: true,
@@ -292,7 +295,7 @@ impl FactoryComponent for SidebarRow {
 
                             gtk::Image {
                                 set_icon_name: Some(sidebar_icon(self.kind)),
-                                set_pixel_size: 14,
+                                set_pixel_size: ICON_SIZE,
                                 set_visible: self.group.as_ref().is_none_or(|group| group.entry),
                             },
 
@@ -312,12 +315,11 @@ impl FactoryComponent for SidebarRow {
                         },
 
                         #[name = "actions_row"]
-                        gtk::Box {
+                        append = &gtk::Box {
                             set_orientation: gtk::Orientation::Horizontal,
                             set_spacing: 4,
                             set_halign: gtk::Align::End,
                         },
-                },
                     },
             },
         }
@@ -399,6 +401,7 @@ impl FactoryComponent for SidebarRow {
         let widgets = view_output!();
         self.setup_row_layout(&root, &widgets, &sender);
         if self.group.is_some() {
+            root.set_tooltip_text(Some(&self.title()));
             self.describe_group(&root);
             self.wire_group_buttons(&sender);
             if self.kind == SidebarObjectKind::Schema {
@@ -470,17 +473,9 @@ impl FactoryComponent for SidebarRow {
 
 impl SidebarRow {
     fn setup_row_layout(&mut self, root: &gtk::ListBoxRow, widgets: &SidebarRowWidgets, sender: &FactorySender<Self>) {
-        let narrow = adw::Breakpoint::new(adw::BreakpointCondition::new_length(
-            adw::BreakpointConditionLengthType::MaxWidth,
-            260.0,
-            adw::LengthUnit::Px,
-        ));
-        if let Some(row_layout) = widgets.row_layout.child().and_downcast::<gtk::Box>() {
-            narrow.add_setter(&row_layout, "orientation", Some(&gtk::Orientation::Vertical.into()));
-        }
-        widgets.row_layout.add_breakpoint(narrow);
         if self.group.is_none() && self.kind != SidebarObjectKind::TemporaryTable {
-            self.columns.install(root, &widgets.actions_row, sender);
+            self.columns
+                .install(root, &widgets.actions_row, sender, text_indent(self.depth));
         }
         if let Some(button) = &self.new_table_button {
             widgets.actions_row.append(button);
@@ -922,29 +917,25 @@ mod responsive_layout_tests {
 
     #[test]
     #[ignore = "requires an isolated GTK display"]
-    fn row_actions_reflow_at_supported_sidebar_widths_with_names_and_focus_order() {
-        for (width, orientation) in [(220, gtk::Orientation::Vertical), (280, gtk::Orientation::Horizontal)] {
+    fn row_actions_wrap_below_a_name_that_does_not_fit_and_keep_names_and_focus_order() {
+        for (width, wraps) in [(220, true), (520, false)] {
             let (window, _factory, row) = row_at_width(width);
             let body = row.child().and_downcast::<gtk::Box>().unwrap();
-            let breakpoint = body.first_child().and_downcast::<relm4::adw::BreakpointBin>().unwrap();
-            let row_content = breakpoint.child().and_downcast::<gtk::Box>().unwrap();
-            assert_eq!(
-                row_content.orientation(),
-                orientation,
-                "requested={width}, window={}, row={}, breakpoint={}, active={}",
-                window.width(),
-                row.width(),
-                breakpoint.width(),
-                breakpoint.current_breakpoint().is_some()
-            );
+            let row_content = body.first_child().and_downcast::<relm4::adw::WrapBox>().unwrap();
             let title = row_content.first_child().and_downcast::<gtk::Box>().unwrap();
             let actions = title.next_sibling().and_downcast::<gtk::Box>().unwrap();
             let title_y = title.compute_bounds(&row_content).unwrap().y();
             let actions_y = actions.compute_bounds(&row_content).unwrap().y();
             assert_eq!(
                 actions_y > title_y,
-                width <= 260,
+                wraps,
                 "requested={width}, title_y={title_y}, actions_y={actions_y}"
+            );
+            let row_bottom = row.height() as f32;
+            let actions_bottom = actions.compute_bounds(&row).unwrap().y() + actions.height() as f32;
+            assert!(
+                actions_bottom <= row_bottom,
+                "actions are clipped: {actions_bottom} > {row_bottom}"
             );
             let columns = actions.first_child().and_downcast::<gtk::ToggleButton>().unwrap();
             let open = columns.next_sibling().and_downcast::<gtk::Button>().unwrap();

@@ -1,3 +1,4 @@
+use std::cell::Cell;
 use std::sync::Arc;
 
 use bookie_core::{ColumnInfo, TableInfo};
@@ -126,6 +127,7 @@ pub(super) struct SidebarColumns {
     cancel: CancellationToken,
     serial: u64,
     retained: Option<OwnedSemaphorePermit>,
+    indent: Cell<i32>,
 }
 
 impl std::fmt::Debug for SidebarColumns {
@@ -147,10 +149,18 @@ impl SidebarColumns {
             cancel: CancellationToken::new(),
             serial: 0,
             retained: None,
+            indent: Cell::new(0),
         }
     }
 
-    pub(super) fn install(&self, row: &gtk::ListBoxRow, actions: &gtk::Box, sender: &FactorySender<SidebarRow>) {
+    pub(super) fn install(
+        &self,
+        row: &gtk::ListBoxRow,
+        actions: &gtk::Box,
+        sender: &FactorySender<SidebarRow>,
+        indent: i32,
+    ) {
+        self.indent.set(indent);
         let Some(body) = row.child().and_downcast::<gtk::Box>() else {
             return;
         };
@@ -247,7 +257,7 @@ impl SidebarColumns {
         let content = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
             .spacing(4)
-            .margin_start(26)
+            .margin_start(self.indent.get())
             .margin_bottom(8)
             .build();
         self.reveal.set_child(Some(&content));
@@ -270,6 +280,7 @@ fn structure_button() -> gtk::Button {
     gtk::Button::builder()
         .label(bookie_app_services::tr!("Structure…"))
         .action_name("sidebar-row.edit-structure")
+        .halign(gtk::Align::Start)
         .css_classes(["flat"])
         .build()
 }
@@ -284,9 +295,11 @@ fn bounded(text: &str, limit: usize) -> String {
 
 fn field_row(column: &FieldPreview) -> gtk::Box {
     let row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    let marker = gtk::Image::builder().pixel_size(14).build();
     if column.primary_key {
-        row.append(&gtk::Image::from_icon_name("dialog-password-symbolic"));
+        marker.set_icon_name(Some("dialog-password-symbolic"));
     }
+    row.append(&marker);
     let name = gtk::Label::builder()
         .label(bounded(&column.name, 256))
         .xalign(0.0)

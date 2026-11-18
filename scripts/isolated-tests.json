@@ -2100,7 +2100,7 @@
     [
       "bookie-app",
       "--lib",
-      "ui::sidebar_row::responsive_layout_tests::row_actions_reflow_at_supported_sidebar_widths_with_names_and_focus_order"
+      "ui::sidebar_row::responsive_layout_tests::row_actions_wrap_below_a_name_that_does_not_fit_and_keep_names_and_focus_order"
     ],
     [
       "bookie-app",
