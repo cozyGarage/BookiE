@@ -870,6 +870,14 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("prune", builder)
         self.assertIn("--discover-references", builder)
         self.assertIn("BOOKIE_FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}", builder)
+        prune_step = re.search(
+            r"(?ms)^      - name: Remove expired test bundles with reference protection\n(.*?)(?=^      - name:|\Z)",
+            builder,
+        ).group(0)
+        self.assertLess(builder.index("Remove expired test bundles"), builder.index("Build the default test bundle"))
+        self.assertLess(builder.index("Remove expired test bundles"), builder.index("Publish source-pinned test bundles"))
+        self.assertNotIn("if:", prune_step)
+        self.assertIn("--retention-days 1 --delete --discover-references", prune_step)
         gpui_builder = re.search(r"(?ms)^  gpui-build:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
         self.assertIn("src/scripts/ci-bundle-registry.py publish test-bundles/gpui", gpui_builder)
         self.assertNotIn("actions/upload-artifact", gpui_builder)

@@ -383,6 +383,15 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
           path: src
+      - name: Remove expired test bundles with reference protection
+        env:
+          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
+          BOOKIE_REGISTRY_API_URL: ${{ github.server_url }}/api/v1/packages/trung
+          BOOKIE_FORGEJO_API_URL: ${{ github.server_url }}/api/v1/repos/${{ github.repository }}
+          BOOKIE_FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
+        run: |
+          cd src
+          python3 scripts/ci-bundle-registry.py prune "${{ needs.pin-revision.outputs.revision }}" --retention-days 1 --delete --discover-references
       - name: Install the GPUI linker dependency
         run: |
           apt-get update -qq
@@ -403,16 +412,6 @@ jobs:
           for group in "${groups[@]}"; do
             python3 src/scripts/ci-bundle-registry.py publish "test-bundles/$group" "${{ needs.pin-revision.outputs.revision }}" "$group"
           done
-      - name: Remove expired test bundles with reference protection
-        if: github.event_name == 'push' || github.event_name == 'schedule'
-        env:
-          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_REGISTRY_API_URL: ${{ github.server_url }}/api/v1/packages/trung
-          BOOKIE_FORGEJO_API_URL: ${{ github.server_url }}/api/v1/repos/${{ github.repository }}
-          BOOKIE_FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
-        run: |
-          cd src
-          python3 scripts/ci-bundle-registry.py prune "${{ needs.pin-revision.outputs.revision }}" --retention-days 14 --delete --discover-references
       - name: Check the no-default-features layer
         run: |
           exec 9>>/target/.bookie-build-cache.lock
