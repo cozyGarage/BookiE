@@ -271,11 +271,10 @@ fn set_error_count(button: &gtk::ToggleButton, count: usize) {
         .child()
         .and_downcast::<gtk::Box>()
         .and_then(|content| content.last_child())
+        && let Some(label) = label.downcast_ref::<gtk::Label>()
     {
-        if let Some(label) = label.downcast_ref::<gtk::Label>() {
-            label.set_label(&if count == 0 { String::new() } else { count.to_string() });
-            label.set_visible(count > 0);
-        }
+        label.set_label(&if count == 0 { String::new() } else { count.to_string() });
+        label.set_visible(count > 0);
     }
     button.update_property(&[gtk::accessible::Property::Label(&name)]);
 }
