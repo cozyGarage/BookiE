@@ -70,7 +70,7 @@ impl GridView {
 
     fn csv_options(&self) -> bookie_core::export::CsvOptions {
         bookie_core::export::CsvOptions {
-            custom_delimiter: self.csv_delimiter.clone(),
+            custom_delimiter: self.export.csv_delimiter.clone(),
             ..Default::default()
         }
     }
@@ -90,7 +90,7 @@ impl GridView {
             Some(delimiter) => format!("CSV delimiter set to \"{}\"", delimiter.as_str()),
             None => "CSV delimiter reset to the comma".into(),
         };
-        self.csv_delimiter = delimiter;
+        self.export.csv_delimiter = delimiter;
     }
 
     pub(crate) fn set_export_limit(&mut self) {
@@ -108,7 +108,7 @@ impl GridView {
             Some(limit) => format!("Export limit set to {limit} rows"),
             None => "Export limit removed".into(),
         };
-        self.export_limit = limit;
+        self.export.limit = limit;
     }
 
     pub(crate) fn export_selection_or_page(&mut self, cx: &mut Context<Self>) {
@@ -139,8 +139,8 @@ impl GridView {
             let count = rows.len() as u64;
             (rows, count)
         };
-        let cut = self.export_limit.is_some_and(|limit| rows.len() > limit);
-        if let Some(limit) = self.export_limit {
+        let cut = self.export.limit.is_some_and(|limit| rows.len() > limit);
+        if let Some(limit) = self.export.limit {
             rows.truncate(limit);
         }
         let count = if cut { rows.len() as u64 } else { count };
