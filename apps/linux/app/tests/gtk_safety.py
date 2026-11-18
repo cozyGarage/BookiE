@@ -1835,8 +1835,10 @@ sidebar_tables_group_collapses_and_expands.environment = "local"
 def expanding_a_sidebar_table_loads_its_columns(database, _base):
     wait_for_node_showing("safety_items", True)
     row = wait_for_node(name="safety_items", role=pyatspi.ROLE_LIST_ITEM)
-    toggle = wait_for_node(name="safety_items", role=pyatspi.ROLE_PUSH_BUTTON)
-    invoke(toggle)
+    label = find_within(row, name="safety_items", role=pyatspi.ROLE_LABEL)
+    assert label is not None, f"table row has no label:\n{accessible_snapshot()}"
+    bounds = label.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+    gtk_ux.x11_click(bounds.x + bounds.width // 2, bounds.y + bounds.height // 2, button=1)
     wait_within(row, name="id")
     wait_within(row, name="note")
 
