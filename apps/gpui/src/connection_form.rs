@@ -1,5 +1,5 @@
 use bookie_app_services::connection_save::{self, ConnectionDraft};
-use bookie_core::{AuthMode, Environment, TlsMode};
+use bookie_core::{AuthMode, DriverCapabilities, Environment, TlsMode};
 use gpui::{Context, Div, Entity, Stateful, div, prelude::*, px, rgb};
 use secrecy::SecretString;
 
@@ -11,7 +11,7 @@ pub(crate) struct DriverChoice {
     pub id: &'static str,
     pub label: &'static str,
     pub port: u16,
-    pub file_based: bool,
+    pub capabilities: DriverCapabilities,
 }
 
 pub(crate) struct ConnectionForm {
@@ -47,7 +47,7 @@ impl ConnectionForm {
                 id: driver.id(),
                 label: driver.display_name(),
                 port: driver.default_port(),
-                file_based: driver.capabilities().is_file_based,
+                capabilities: driver.capabilities(),
             })
             .collect();
         drivers.sort_by_key(|driver| driver.label);
@@ -98,7 +98,7 @@ impl ConnectionForm {
             id: self.editing,
             name: text(&self.name),
             driver_id: driver.map(|driver| driver.id.to_string()).unwrap_or_default(),
-            file_based: driver.is_some_and(|driver| driver.file_based),
+            capabilities: driver.map_or_else(DriverCapabilities::default, |driver| driver.capabilities),
             host: text(&self.host),
             port: text(&self.port)
                 .trim()
@@ -194,7 +194,9 @@ pub(crate) fn choice_row(
 impl GridView {
     pub(crate) fn connection_page(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
         let form = &self.connection_form;
-        let file_based = form.selected().is_some_and(|driver| driver.file_based);
+        let file_based = form
+            .selected()
+            .is_some_and(|driver| driver.capabilities.is_file_based);
         let title = if form.editing.is_some() {
             "Edit connection"
         } else {

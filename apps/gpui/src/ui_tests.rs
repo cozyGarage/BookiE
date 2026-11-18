@@ -556,7 +556,19 @@ fn the_palette_opens_one_new_connection_tab_with_the_default_port(cx: &mut TestA
         assert_eq!(view.tabs.current(), &bookie_gpui::shell::Tab::NewConnection);
         let draft = view.connection_form.draft(cx);
         assert_eq!((draft.driver_id.as_str(), draft.port), ("postgres", 5432));
+        assert!(!draft.capabilities.is_file_based);
         assert!(draft.read_only);
+    });
+    let sqlite = view.read_with(cx, |view, _| {
+        view.connection_form
+            .drivers
+            .iter()
+            .position(|driver| driver.id == "sqlite")
+            .expect("SQLite is registered")
+    });
+    view.update(cx, |view, cx| {
+        view.connection_form.driver = sqlite;
+        assert!(view.connection_form.draft(cx).capabilities.is_file_based);
     });
 }
 

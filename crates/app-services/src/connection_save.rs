@@ -1,4 +1,4 @@
-use bookie_core::{AuthMode, DriverRegistry, Environment, TlsMode};
+use bookie_core::{AuthMode, DriverCapabilities, DriverRegistry, Environment, TlsMode};
 use std::path::PathBuf;
 
 use bookie_storage::{
@@ -39,6 +39,7 @@ pub struct ConnectionDraft {
     pub id: Option<Uuid>,
     pub name: String,
     pub driver_id: String,
+    pub capabilities: DriverCapabilities,
     pub host: String,
     pub port: u16,
     pub database: String,
@@ -49,7 +50,6 @@ pub struct ConnectionDraft {
     pub tls_root_cert: String,
     pub tls_client_cert: String,
     pub tls_client_key: String,
-    pub file_based: bool,
     pub socket_kind: Option<LocalSocketPathKind>,
     pub socket_endpoint: String,
     pub ssh: Option<SshDraft>,
@@ -86,6 +86,9 @@ fn draft_from_saved(saved: &SavedConnection, registry: &DriverRegistry) -> Conne
         id: Some(saved.id),
         name: saved.name.clone(),
         driver_id: saved.driver_id.clone(),
+        capabilities: registry
+            .get(&saved.driver_id)
+            .map_or_else(DriverCapabilities::default, |driver| driver.capabilities()),
         host: saved.host.clone(),
         port: saved.port,
         database: saved.database.clone(),
@@ -96,9 +99,6 @@ fn draft_from_saved(saved: &SavedConnection, registry: &DriverRegistry) -> Conne
         tls_root_cert: path_text(saved.tls_root_cert.as_ref()),
         tls_client_cert: path_text(saved.tls_client_cert.as_ref()),
         tls_client_key: path_text(saved.tls_client_key.as_ref()),
-        file_based: registry
-            .get(&saved.driver_id)
-            .is_some_and(|driver| driver.capabilities().is_file_based),
         socket_kind,
         socket_endpoint,
         ssh: saved.ssh.as_ref().map(ssh_draft_from_saved),
@@ -142,18 +142,19 @@ fn ssh_draft_from_saved(ssh: &SavedSshConfig) -> SshDraft {
     }
 }
 
-pub fn derived_name(file_based: bool, host: &str, username: &str, database: &str) -> String {
-    if file_based {
+pub fn derived_name(capabilities: DriverCapabilities, host: &str, username: &str, database: &str) -> String {
+    if capabilities.is_file_based {
         return database.to_owned();
     }
     format!("{username}@{host}")
 }
 
 pub fn validate(draft: &ConnectionDraft) -> Result<(), String> {
+    let file_based = draft.capabilities.is_file_based;
     if draft.driver_id.trim().is_empty() {
         return Err("Choose a database type.".into());
     }
-    if draft.file_based {
+    if file_based {
         return if draft.database.trim().is_empty() {
             Err("Enter the database file.".into())
         } else {
@@ -201,7 +202,7 @@ fn validate_ssh(ssh: Option<&SshDraft>) -> Result<(), String> {
 pub fn saved_from_draft(draft: &ConnectionDraft, id: Uuid) -> SavedConnection {
     let name = match draft.name.trim() {
         "" => derived_name(
-            draft.file_based,
+            draft.capabilities,
             draft.host.trim(),
             draft.username.trim(),
             draft.database.trim(),
@@ -609,6 +610,7 @@ mod tests {
             id: None,
             name: String::new(),
             driver_id: "postgres".into(),
+            capabilities: DriverCapabilities::default(),
             host: " db.example ".into(),
             port: 5432,
             database: "app".into(),
@@ -619,7 +621,6 @@ mod tests {
             tls_root_cert: String::new(),
             tls_client_cert: String::new(),
             tls_client_key: String::new(),
-            file_based: false,
             socket_kind: None,
             socket_endpoint: String::new(),
             ssh: None,
@@ -644,7 +645,7 @@ mod tests {
     fn a_file_based_database_is_named_after_its_file() {
         let mut file = draft();
         file.driver_id = "future-file-database".into();
-        file.file_based = true;
+        file.capabilities.is_file_based = true;
         file.database = "/tmp/a.sqlite".into();
         file.host.clear();
         file.port = 0;
@@ -655,14 +656,14 @@ mod tests {
             id: "future-file-database",
             file_based: true,
         }));
-        assert!(draft_from_saved(&saved, &registry).file_based);
+        assert!(draft_from_saved(&saved, &registry).capabilities.is_file_based);
         assert!(validate(&file).is_ok());
 
         let mut network = draft();
         network.host.clear();
         network.port = 0;
         let saved = saved_from_draft(&network, Uuid::nil());
-        assert!(!draft_from_saved(&saved, &registry).file_based);
+        assert!(!draft_from_saved(&saved, &registry).capabilities.is_file_based);
     }
 
     #[test]
@@ -675,10 +676,19 @@ mod tests {
         assert!(validate(&missing).unwrap_err().contains("port"));
         let mut file = draft();
         file.driver_id = "sqlite".into();
-        file.file_based = true;
+        file.capabilities.is_file_based = true;
         file.database.clear();
         assert_eq!(validate(&file).unwrap_err(), "Enter the database file.");
         assert!(validate(&draft()).is_ok());
+    }
+
+    #[test]
+    fn network_capabilities_override_a_file_driver_name() {
+        let mut network = draft();
+        network.driver_id = "sqlite".into();
+        network.database.clear();
+        assert!(validate(&network).is_ok());
+        assert_eq!(saved_from_draft(&network, Uuid::nil()).name, "ada@db.example");
     }
 
     #[test]
@@ -796,7 +806,7 @@ mod tests {
         let cancel = || tokio_util::sync::CancellationToken::new();
         let mut file = draft();
         file.driver_id = "sqlite".into();
-        file.file_based = true;
+        file.capabilities.is_file_based = true;
         file.database = path.display().to_string();
         assert!(
             test(&registry, &file, cancel(), None)
