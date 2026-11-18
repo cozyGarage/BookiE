@@ -84,6 +84,12 @@ impl ConnectionForm {
         self.drivers.get(self.driver)
     }
 
+    fn file_based(&self) -> bool {
+        self.selected()
+            .and_then(|driver| drivers_registry::default_registry().get(driver.id))
+            .is_some_and(|driver| driver.capabilities().is_file_based)
+    }
+
     fn socket_kind(&self) -> Option<bookie_app_services::connection_form::LocalSocketPathKind> {
         let driver = drivers_registry::default_registry().get(self.selected()?.id)?;
         bookie_app_services::connection_form::local_socket_path_kind(driver.capabilities())
@@ -113,6 +119,7 @@ impl ConnectionForm {
             tls_root_cert: text(&self.tls_root),
             tls_client_cert: text(&self.tls_cert),
             tls_client_key: text(&self.tls_key),
+            file_based: self.file_based(),
             socket_kind: self.socket_kind(),
             socket_endpoint: text(&self.socket),
             ssh: self.ssh.draft(cx),
