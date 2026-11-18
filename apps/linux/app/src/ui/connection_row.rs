@@ -6,9 +6,6 @@ use uuid::Uuid;
 use bookie_core::{AuthMode, DriverRegistry, Environment};
 use bookie_storage::{ConnectionOrganization, SavedConnection};
 
-/// What a row needs to render: the saved record plus its organisation
-/// entry. The two live in different files on disk, so the parent hands
-/// them down together rather than the row reaching for either.
 #[derive(Debug, Clone)]
 pub struct ConnectionRowInit {
     pub saved: SavedConnection,
@@ -47,9 +44,6 @@ pub enum ConnectionRowMsg {
     Organize,
     Edit,
     Duplicate,
-    /// Trash button pressed. Triggers a confirmation dialog before
-    /// any actual delete is dispatched — saved connections include
-    /// credentials and SSH config and a misclick is unrecoverable.
     RequestDelete,
 }
 
@@ -230,8 +224,6 @@ fn connection_actions(sender: FactorySender<ConnectionRow>) -> gtk::MenuButton {
     button
 }
 
-/// The palette class for a row's colour tag, or `None` when it has no
-/// colour or one outside the palette.
 fn color_css_class(organization: &ConnectionOrganization) -> Option<&'static str> {
     organization
         .color
