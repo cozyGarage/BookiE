@@ -115,14 +115,18 @@ fn estimated_sidebar_catalog_bytes<'a>(
 }
 
 fn estimated_session_catalog_bytes(catalog: &super::multi_session::SessionCatalog) -> usize {
-    catalog
-        .tables
-        .iter()
-        .chain(&catalog.views)
-        .map(|table| {
-            std::mem::size_of::<TableInfo>() + table.name.capacity() + table.schema.as_ref().map_or(0, String::capacity)
-        })
-        .sum()
+    std::mem::size_of_val(catalog)
+        + catalog.database.capacity()
+        + catalog
+            .tables
+            .iter()
+            .chain(&catalog.views)
+            .map(|table| {
+                std::mem::size_of::<TableInfo>()
+                    + table.name.capacity()
+                    + table.schema.as_ref().map_or(0, String::capacity)
+            })
+            .sum::<usize>()
 }
 
 impl App {
@@ -809,11 +813,18 @@ mod catalog_estimate_tests {
                 > estimated_sidebar_catalog_bytes(&[], &[], &[], &[], [&object].into_iter())
         );
 
-        let session = |tables| super::super::multi_session::SessionCatalog {
+        let session = |tables, database| super::super::multi_session::SessionCatalog {
             tables,
             views: Vec::new(),
-            database: String::new(),
+            database,
         };
-        assert!(estimated_session_catalog_bytes(&session(long)) > estimated_session_catalog_bytes(&session(short)));
+        assert!(
+            estimated_session_catalog_bytes(&session(long, String::new()))
+                > estimated_session_catalog_bytes(&session(short.clone(), String::new()))
+        );
+        assert!(
+            estimated_session_catalog_bytes(&session(short.clone(), "db".into()))
+                > estimated_session_catalog_bytes(&session(short, String::new()))
+        );
     }
 }
