@@ -98,16 +98,7 @@ pub(super) fn section(value: &Value) -> Option<gtk::Box> {
         .margin_end(12)
         .build();
     title.add_css_class("heading");
-    let view = gtk::TextView::builder()
-        .editable(false)
-        .cursor_visible(false)
-        .monospace(true)
-        .wrap_mode(gtk::WrapMode::None)
-        .top_margin(8)
-        .bottom_margin(8)
-        .left_margin(12)
-        .right_margin(12)
-        .build();
+    let view = crate::ui::output_text_view::compact(gtk::WrapMode::None);
     view.buffer().set_text(&preview.text);
     view.update_property(&[gtk::accessible::Property::Label(&heading(preview.format))]);
     let scroller = gtk::ScrolledWindow::builder()

@@ -59,11 +59,7 @@ fn build_activity_dialog() -> (adw::Dialog, adw::WrapBox, gtk::TextView, gtk::La
         .build();
 
     let scrolled = gtk::ScrolledWindow::builder().vexpand(true).hexpand(true).build();
-    let text = gtk::TextView::builder()
-        .editable(false)
-        .monospace(true)
-        .wrap_mode(gtk::WrapMode::None)
-        .build();
+    let text = crate::ui::output_text_view::compact(gtk::WrapMode::None);
     scrolled.set_child(Some(&text));
 
     let status = gtk::Label::builder()
