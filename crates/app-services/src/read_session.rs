@@ -251,6 +251,20 @@ impl ReadSession {
             .map_err(|error| classify(&error))
     }
 
+    pub async fn read_catalog(
+        &self,
+        kind: bookie_core::CatalogObjectKind,
+        control: &OperationControl,
+    ) -> Result<Vec<bookie_core::CatalogObject>, DriverFailurePresentation> {
+        let guard = self
+            .database
+            .guard_for_generation(self.id, self.generation, Principal::human_gui())
+            .ok_or(DriverFailurePresentation::Disconnected)?;
+        crate::catalog::list_objects_excluding(&guard, kind, None, &[], control)
+            .await
+            .map_err(|error| classify(&error))
+    }
+
     pub async fn open_table_cursor(
         &self,
         table: &TableInfo,

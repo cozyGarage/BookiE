@@ -74,7 +74,7 @@ impl GridView {
                 .iter()
                 .map(|field| {
                     line(
-                        field.primary_key.then_some("crosshair"),
+                        field.primary_key.then_some("key-round"),
                         field.name.clone(),
                         field.data_type.clone(),
                         false,

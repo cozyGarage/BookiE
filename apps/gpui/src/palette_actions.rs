@@ -426,6 +426,7 @@ impl GridView {
         match id {
             "sidebar" => self.sidebar.open = !self.sidebar.open,
             "new-connection" => {
+                self.connection_form.editing = None;
                 self.tabs.open_new_connection();
                 self.sync_grid_owner();
             }

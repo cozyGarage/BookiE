@@ -25,6 +25,7 @@ pub(crate) struct ConnectionForm {
     pub read_only: bool,
     pub status: String,
     pub saving: bool,
+    pub editing: Option<uuid::Uuid>,
 }
 
 impl ConnectionForm {
@@ -57,6 +58,7 @@ impl ConnectionForm {
             read_only: true,
             status: String::new(),
             saving: false,
+            editing: None,
         }
     }
 
@@ -68,7 +70,7 @@ impl ConnectionForm {
         let text = |input: &Entity<TextInput>| input.read(cx).content().to_string();
         let driver = self.selected();
         ConnectionDraft {
-            id: None,
+            id: self.editing,
             name: text(&self.name),
             driver_id: driver.map(|driver| driver.id.to_string()).unwrap_or_default(),
             host: text(&self.host),
@@ -82,6 +84,7 @@ impl ConnectionForm {
             tls_mode: TlsMode::default(),
             read_only: self.read_only,
             environment: Environment::default(),
+            keep_stored_password: self.editing.is_some(),
         }
     }
 }
@@ -99,7 +102,43 @@ impl GridView {
                     div().flex_1().h(px(size::FORM_CONTROL)).child(input.clone()),
                 )
         };
-        let chips = form.drivers.iter().enumerate().map(|(index, driver)| {
+        let chips = self.driver_chips(theme, cx);
+        let file_based = form.selected().is_some_and(|driver| matches!(driver.id, "sqlite" | "duckdb"));
+        div().flex_1().min_h_0().p_4().child(
+            div()
+                .w(px(size::HOME_WIDTH / 2.0))
+                .flex()
+                .flex_col()
+                .gap_3()
+                .child(div().font_weight(gpui::FontWeight::SEMIBOLD).child(if form.editing.is_some() {
+                    "Edit connection"
+                } else {
+                    "New connection"
+                }))
+                .child(div().flex().flex_wrap().gap_1().children(chips))
+                .child(field("Name", &form.name))
+                .when(!file_based, |page| {
+                    page.child(field("Host", &form.host))
+                        .child(field("Port", &form.port))
+                        .child(field("User", &form.username))
+                        .child(field("Password", &form.password))
+                })
+                .child(field(if file_based { "File" } else { "Database" }, &form.database))
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap_2()
+                        .child(self.save_button(theme, cx))
+                        .child(self.read_only_toggle(theme, cx))
+                        .child(div().text_color(rgb(theme.muted_foreground)).child(form.status.clone())),
+                ),
+        )
+    }
+
+    fn driver_chips(&self, theme: Theme, cx: &mut Context<Self>) -> Vec<Stateful<Div>> {
+        let form = &self.connection_form;
+        form.drivers.iter().enumerate().map(|(index, driver)| {
             let selected = index == form.driver;
             let port = driver.port;
             div()
@@ -120,34 +159,8 @@ impl GridView {
                     this.connection_form.port.update(cx, |input, cx| input.set_content(&port_text, cx));
                     cx.notify();
                 }))
-        });
-        let file_based = form.selected().is_some_and(|driver| matches!(driver.id, "sqlite" | "duckdb"));
-        div().flex_1().min_h_0().p_4().child(
-            div()
-                .w(px(size::HOME_WIDTH / 2.0))
-                .flex()
-                .flex_col()
-                .gap_3()
-                .child(div().font_weight(gpui::FontWeight::SEMIBOLD).child("New connection"))
-                .child(div().flex().flex_wrap().gap_1().children(chips))
-                .child(field("Name", &form.name))
-                .when(!file_based, |page| {
-                    page.child(field("Host", &form.host))
-                        .child(field("Port", &form.port))
-                        .child(field("User", &form.username))
-                        .child(field("Password", &form.password))
-                })
-                .child(field(if file_based { "File" } else { "Database" }, &form.database))
-                .child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .gap_2()
-                        .child(self.save_button(theme, cx))
-                        .child(self.read_only_toggle(theme, cx))
-                        .child(div().text_color(rgb(theme.muted_foreground)).child(form.status.clone())),
-                ),
-        )
+        })
+            .collect()
     }
 
     fn save_button(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
@@ -186,6 +199,51 @@ impl GridView {
                 this.connection_form.read_only = !this.connection_form.read_only;
                 cx.notify();
             }))
+    }
+
+    pub(crate) fn edit_connection(&mut self, id: uuid::Uuid, cx: &mut Context<Self>) {
+        cx.spawn(async move |this, cx| {
+            let draft = cx
+                .background_executor()
+                .spawn(async move {
+                    let runtime = tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()
+                        .map_err(|error| error.to_string())?;
+                    runtime.block_on(connection_save::load_draft(id))
+                })
+                .await;
+            let _ = this.update(cx, |this, cx| {
+                match draft {
+                    Ok(Some(draft)) => this.fill_connection_form(draft, cx),
+                    Ok(None) => this.connection_form.status = "That connection no longer exists.".into(),
+                    Err(message) => this.connection_form.status = message,
+                }
+                this.tabs.open_new_connection();
+                this.sync_grid_owner();
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
+    fn fill_connection_form(&mut self, draft: ConnectionDraft, cx: &mut Context<Self>) {
+        let form = &mut self.connection_form;
+        form.editing = draft.id;
+        form.driver = form.drivers.iter().position(|driver| driver.id == draft.driver_id).unwrap_or(form.driver);
+        form.read_only = draft.read_only;
+        form.status = String::new();
+        let port = draft.port.to_string();
+        for (input, text) in [
+            (&form.name, draft.name.as_str()),
+            (&form.host, draft.host.as_str()),
+            (&form.port, port.as_str()),
+            (&form.database, draft.database.as_str()),
+            (&form.username, draft.username.as_str()),
+            (&form.password, ""),
+        ] {
+            input.update(cx, |input, cx| input.set_content(text, cx));
+        }
     }
 
     pub(crate) fn save_connection(&mut self, cx: &mut Context<Self>) {

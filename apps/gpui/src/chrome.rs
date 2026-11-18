@@ -150,7 +150,7 @@ fn window_button(id: &'static str, glyph: &'static str, label: &'static str, the
         .child(glyph)
 }
 
-fn ghost_icon(id: &'static str, name: &'static str, label: &'static str, theme: Theme) -> Stateful<Div> {
+fn ghost_icon(id: impl Into<gpui::ElementId>, name: &'static str, label: &'static str, theme: Theme) -> Stateful<Div> {
     div()
         .id(id)
         .tooltip(tip(label))
@@ -429,6 +429,9 @@ impl GridView {
             if let Some(table) = table {
                 tree.extend(self.field_rows(&table, depth, theme).into_iter().map(IntoElement::into_any_element));
             }
+        }
+        if search.trim().is_empty() {
+            tree.extend(self.catalog_rows(theme, cx));
         }
         let empty = (!search.trim().is_empty() && self.sidebar_matches(search) == 0).then(|| {
             div()
@@ -902,16 +905,29 @@ impl GridView {
                 .flex()
                 .flex_col()
                 .children(self.connections.iter().enumerate().map(|(index, saved)| {
-                    let name = saved.name.clone();
-                    ghost(
-                        ("saved-connection", index),
-                        format!("{} · {}", saved.name, saved.driver_id),
-                        theme,
-                    )
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.connect(bookie_gpui::live::Origin::Saved(name.clone()), cx);
-                        cx.notify();
-                    }))
+                    let (name, id) = (saved.name.clone(), saved.id);
+                    div()
+                        .flex()
+                        .items_center()
+                        .child(
+                            div().flex_1().child(
+                                ghost(
+                                    ("saved-connection", index),
+                                    format!("{} · {}", saved.name, saved.driver_id),
+                                    theme,
+                                )
+                                .on_click(cx.listener(move |this, _, _, cx| {
+                                    this.connect(bookie_gpui::live::Origin::Saved(name.clone()), cx);
+                                    cx.notify();
+                                })),
+                            ),
+                        )
+                        .child(
+                            ghost_icon(("edit-connection", index), "sliders-horizontal", "Edit connection", theme)
+                                .on_click(cx.listener(move |this, _, _, cx| {
+                                    this.edit_connection(id, cx);
+                                })),
+                        )
                 }))
                 .when(!self.catalog.tables.is_empty(), |section| {
                     section.child(

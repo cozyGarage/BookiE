@@ -198,6 +198,35 @@ impl LiveSession {
         outcome.map_err(|failure| driver_failure_message(&failure))
     }
 
+    pub fn catalog_kinds(&self) -> &'static [bookie_core::CatalogObjectKind] {
+        drivers_registry::default_registry()
+            .get(&self.driver_id)
+            .map_or(&[][..], |driver| driver.capabilities().catalog_object_kinds)
+    }
+
+    pub fn catalog_objects(
+        &self,
+        kind: bookie_core::CatalogObjectKind,
+    ) -> Result<Vec<bookie_core::CatalogObject>, String> {
+        let epoch = self.next_epoch();
+        let control = OperationControl::with_timeout(Duration::from_secs(10));
+        let event = self.runtime.block_on(dispatch_read(
+            DispatchContext::Sessions(&self.sessions),
+            Command::ReadCatalog {
+                epoch,
+                session_id: self.session_id,
+                kind,
+            },
+            &control,
+            epoch,
+            &self.epoch,
+        ))?;
+        let Event::CatalogRead { outcome, .. } = event else {
+            return Err("The command bridge returned an unexpected event.".into());
+        };
+        outcome.map_err(|failure| driver_failure_message(&failure))
+    }
+
     pub fn sample_pubsub(
         &self,
         patterns: &[String],

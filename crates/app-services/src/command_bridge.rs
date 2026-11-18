@@ -1,4 +1,4 @@
-use bookie_core::{ColumnInfo, OperationControl, QueryResult, TableInfo};
+use bookie_core::{CatalogObject, CatalogObjectKind, ColumnInfo, OperationControl, QueryResult, TableInfo};
 use std::future::Future;
 use std::path::PathBuf;
 use std::pin::Pin;
@@ -46,6 +46,11 @@ pub enum Command {
         session_id: SessionId,
         table: TableInfo,
     },
+    ReadCatalog {
+        epoch: Epoch,
+        session_id: SessionId,
+        kind: CatalogObjectKind,
+    },
     ReadConnectionStatus {
         epoch: Epoch,
         session_id: SessionId,
@@ -83,6 +88,10 @@ pub enum Event {
         epoch: Epoch,
         outcome: Result<Vec<ColumnInfo>, DriverFailurePresentation>,
     },
+    CatalogRead {
+        epoch: Epoch,
+        outcome: Result<Vec<CatalogObject>, DriverFailurePresentation>,
+    },
     ConnectionStatusRead {
         epoch: Epoch,
         outcome: Vec<ConnectionOverview>,
@@ -102,6 +111,7 @@ impl Event {
             | Self::QueryCompleted { epoch, .. }
             | Self::PageRead { epoch, .. }
             | Self::ColumnsRead { epoch, .. }
+            | Self::CatalogRead { epoch, .. }
             | Self::ConnectionStatusRead { epoch, .. }
             | Self::SubscriptionSampled { epoch, .. } => *epoch,
         }
@@ -223,11 +233,14 @@ async fn dispatch_session_command(
             session_id,
             table,
         } => {
-            let outcome = match sessions.get(session_id) {
-                Some(session) => session.read_columns(&table, control).await,
-                None => Err(DriverFailurePresentation::Disconnected),
-            };
-            sink.try_emit(Event::ColumnsRead { epoch, outcome })?;
+            dispatch_columns(sessions, epoch, session_id, table, control, sink).await?;
+        }
+        Command::ReadCatalog {
+            epoch,
+            session_id,
+            kind,
+        } => {
+            dispatch_catalog(sessions, epoch, session_id, kind, control, sink).await?;
         }
         Command::ReadConnectionStatus { epoch, session_id } => {
             let outcome = sessions
@@ -245,6 +258,38 @@ async fn dispatch_session_command(
         }
         Command::ListSavedConnections { .. } => return Err(DispatchError::InvalidContext),
     }
+    Ok(())
+}
+
+async fn dispatch_columns(
+    sessions: &ReadSessionStore,
+    epoch: Epoch,
+    session_id: SessionId,
+    table: TableInfo,
+    control: &OperationControl,
+    sink: &dyn EventSink,
+) -> Result<(), DispatchError> {
+    let outcome = match sessions.get(session_id) {
+        Some(session) => session.read_columns(&table, control).await,
+        None => Err(DriverFailurePresentation::Disconnected),
+    };
+    sink.try_emit(Event::ColumnsRead { epoch, outcome })?;
+    Ok(())
+}
+
+async fn dispatch_catalog(
+    sessions: &ReadSessionStore,
+    epoch: Epoch,
+    session_id: SessionId,
+    kind: CatalogObjectKind,
+    control: &OperationControl,
+    sink: &dyn EventSink,
+) -> Result<(), DispatchError> {
+    let outcome = match sessions.get(session_id) {
+        Some(session) => session.read_catalog(kind, control).await,
+        None => Err(DriverFailurePresentation::Disconnected),
+    };
+    sink.try_emit(Event::CatalogRead { epoch, outcome })?;
     Ok(())
 }
 
