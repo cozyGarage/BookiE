@@ -431,6 +431,17 @@ def invoke_named_action_within(anchor_name, action_name):
     )
 
 
+def open_sidebar_table(name, root=None):
+    row = wait_for_node(name=name, role=pyatspi.ROLE_LIST_ITEM) if root is None else wait_within(
+        root, name=name, role=pyatspi.ROLE_LIST_ITEM
+    )
+    label = find_within(row, name=name.rsplit(".", 1)[-1], role=pyatspi.ROLE_LABEL)
+    assert label is not None, f"table row {name!r} has no visible label:\n{accessible_snapshot()}"
+    bounds = label.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+    assert bounds.width > 0 and bounds.height > 0, f"table label {name!r} is not visible"
+    gtk_ux.x11_click(bounds.x + bounds.width // 2, bounds.y + bounds.height // 2, button=1, clicks=2)
+
+
 def open_table_in_new_tab(name):
     table = wait_for_node(name=name, role=pyatspi.ROLE_LIST_ITEM)
     actions = table.queryAction()
@@ -2197,7 +2208,7 @@ def current_page_csv_export_is_pk_ordered(database, base):
             ((identifier, awkward.get(identifier)) for identifier in range(150, 0, -1)),
         )
 
-    invoke_named_action_within("safety_items", "Open safety_items")
+    open_sidebar_table("safety_items")
     # The total comes from COUNT(*). SQLite used to decode that column as
     # NULL, so the label silently dropped the "of 150" half; asserting the
     # full label keeps that from regressing.
@@ -2254,7 +2265,7 @@ def current_page_json_export_preserves_values(database, base):
             "INSERT INTO safety_items(id, note, payload) VALUES (?, ?, ?)",
             ((i, notes.get(i), blobs.get(i)) for i in range(150, 0, -1)),
         )
-    invoke_named_action_within("safety_items", "Open safety_items")
+    open_sidebar_table("safety_items")
     wait_for_paginator("Rows 1 – 100 of 150")
     invoke_accessible_action("win.export-json")
     invoke(wait_for_node(name="Export…", role=pyatspi.ROLE_PUSH_BUTTON))
@@ -2284,7 +2295,7 @@ def restart_restores_active_editor_and_connection(database, base, restart):
     open_saved_connection(CONNECTION_B_NAME)
     wait_for_frame_containing(f"{CONNECTION_B_NAME} — BookiE")
     open_table_in_new_tab("kept_items")
-    invoke_named_action_within("safety_items", "Open safety_items")
+    open_sidebar_table("safety_items")
     wait_for_paginator("Rows 1 – 3 of 3")
     invoke_accessible_action("win.open-editor")
     wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
@@ -2310,7 +2321,7 @@ def restart_restores_active_editor_and_connection(database, base, restart):
     wait_for_database_count(database_b, 4)
     assert database_ids(database_b) == [1, 2, 3, 901]
     assert database_ids(database) == [], "restored editor wrote to the other connection"
-    invoke_named_action_within("safety_items", "Open safety_items")
+    open_sidebar_table("safety_items")
     wait_for_paginator("Rows 1 – 4 of 4")
 
 
@@ -2371,7 +2382,7 @@ first_keyboard_input_after_restore_targets_selected_editor.needs_restart = True
 def restart_with_a_deleted_connection_opens_the_welcome_list(database, base, restart):
     open_saved_connection(CONNECTION_B_NAME)
     wait_for_frame_containing(f"{CONNECTION_B_NAME} — BookiE")
-    invoke_named_action_within("safety_items", "Open safety_items")
+    open_sidebar_table("safety_items")
     wait_for_node_containing("Rows")
     config_path = base / "config" / storage_dir_name() / "connections.json"
 
@@ -2449,7 +2460,7 @@ a_bundle_from_one_profile_imports_unchanged_into_an_empty_second_profile.needs_r
 
 
 def pending_edits_survive_opening_another_connection(database, base):
-    invoke_named_action_within("safety_items", "Open safety_items")
+    open_sidebar_table("safety_items")
     wait_for_paginator("No rows on this page")
     invoke(wait_for_node(name="Insert row", role=pyatspi.ROLE_PUSH_BUTTON))
     wait_for_node(name="1 unsaved change")
@@ -2476,7 +2487,7 @@ pending_edits_survive_opening_another_connection.environment = "local"
 
 
 def preview_sql_shows_the_pending_statement_without_saving(database, _base):
-    invoke_named_action_within("safety_items", "Open safety_items")
+    open_sidebar_table("safety_items")
     wait_for_paginator("No rows on this page")
     invoke(wait_for_node(name="Insert row", role=pyatspi.ROLE_PUSH_BUTTON))
     wait_for_node(name="1 unsaved change")
@@ -2517,7 +2528,7 @@ def browse_tabs_read_their_own_connections(database, base):
             ((identifier,) for identifier in range(1, 4)),
         )
 
-    invoke_named_action_within("safety_items", "Open safety_items")
+    open_sidebar_table("safety_items")
     wait_for_node_containing("Rows 1 – 7")
 
     open_saved_connection(CONNECTION_B_NAME)
@@ -2569,9 +2580,9 @@ def replacing_a_preview_tab_removes_the_old_page(database, base):
         connection.execute("INSERT INTO other_items(id) VALUES (1)")
     open_saved_connection(CONNECTION_B_NAME)
     wait_for_frame_containing(f"{CONNECTION_B_NAME} — BookiE")
-    invoke_named_action_within("safety_items", "Open safety_items")
+    open_sidebar_table("safety_items")
     wait_for_node(name="safety_items", role=pyatspi.ROLE_PAGE_TAB)
-    invoke_named_action_within("other_items", "Open other_items")
+    open_sidebar_table("other_items")
     wait_for_node(name="other_items", role=pyatspi.ROLE_PAGE_TAB)
     wait_for_node(name="safety_items", role=pyatspi.ROLE_PAGE_TAB, present=False)
 
@@ -2842,7 +2853,7 @@ def switched_connection_keeps_workspace_tabs_after_debounce(database, _base):
             ((identifier,) for identifier in range(1, 6)),
         )
 
-    invoke_named_action_within("safety_items", "Open safety_items")
+    open_sidebar_table("safety_items", root=second_window)
     wait_for_node_containing("Rows 1 – 5")
 
     open_saved_connection(CONNECTION_B_NAME)
@@ -2913,7 +2924,7 @@ def switching_one_window_leaves_the_other_windows_edits(database, base):
     invoke_named_action_within_node(second_window, CONNECTION_B_NAME, "Open connection")
     second_window = wait_for_frame_containing(f"{CONNECTION_B_NAME} — BookiE")
 
-    invoke_named_action_within_node(second_window, "safety_items", "Open safety_items")
+    open_sidebar_table("safety_items", root=second_window)
     wait_for_paginator("No rows on this page", root=second_window)
     invoke(wait_within(second_window, name="Insert row", role=pyatspi.ROLE_PUSH_BUTTON))
     wait_within(second_window, name="1 unsaved change")

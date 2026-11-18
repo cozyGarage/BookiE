@@ -20,7 +20,7 @@ def rows(database):
 
 
 def save_xml(ui, base, name):
-    ui.invoke_named_action_within("safety_items", "Open safety_items")
+    ui.open_sidebar_table("safety_items")
     ui.wait_for_paginator("Rows 1 – 3 of 3")
     ui.choose_export_format("XML", ["End", "Up", "Up"])
     export = base / "home" / name

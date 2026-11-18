@@ -85,9 +85,9 @@ def scenarios(ui):
             connection.executemany(
                 "INSERT INTO other_items(id, note) VALUES (?, ?)", [(1, "x"), (2, "y")]
             )
-        ui.invoke_named_action_within("safety_items", "Open safety_items")
+        ui.open_sidebar_table("safety_items")
         ui.wait_for_node(name="alpha", role=ui.pyatspi.ROLE_LABEL)
-        ui.invoke_named_action_within("other_items", "Open other_items")
+        ui.open_sidebar_table("other_items")
         ui.wait_for_node_containing("other_items", role=ui.pyatspi.ROLE_PAGE_TAB)
         other_cell = ui.wait_for_node(name="x", role=ui.pyatspi.ROLE_LABEL)
         bounds = other_cell.queryComponent().getExtents(ui.pyatspi.WINDOW_COORDS)
@@ -108,9 +108,9 @@ def scenarios(ui):
 
         ui.wait_for_node_containing("Imported 2 rows", role=ui.pyatspi.ROLE_LABEL)
         ui.wait_for_node(name="Discard pending changes?", present=False)
-        ui.invoke_named_action_within("safety_items", "Open safety_items")
+        ui.open_sidebar_table("safety_items")
         ui.wait_for_node(name="gamma", role=ui.pyatspi.ROLE_LABEL)
-        ui.invoke_named_action_within("other_items", "Open other_items")
+        ui.open_sidebar_table("other_items")
         ui.wait_for_node(name="1 unsaved change")
         assert ui.find_node(name="Discard pending changes?") is None, "the import prompted to discard an unrelated edit"
 
@@ -129,7 +129,7 @@ def scenarios(ui):
         time.sleep(3)
         assert ui.find_node(name="Discard pending changes?") is None, "the failed import prompted to discard an unrelated edit"
         assert notes(database) == [(1, "alpha"), (2, "beta")], "a failed import changed committed rows"
-        ui.invoke_named_action_within("other_items", "Open other_items")
+        ui.open_sidebar_table("other_items")
         ui.wait_for_node(name="1 unsaved change")
         assert ui.find_node(name="Discard pending changes?") is None, "the failed import prompted to discard an unrelated edit"
 
@@ -157,7 +157,7 @@ def scenarios(ui):
             connection.executemany(
                 "INSERT INTO safety_items(id, note) VALUES (?, ?)", [(1, "alpha"), (2, "beta")]
             )
-        ui.invoke_named_action_within("safety_items", "Open safety_items")
+        ui.open_sidebar_table("safety_items")
         ui.wait_for_node(name="alpha", role=ui.pyatspi.ROLE_LABEL)
         ui.open_table_in_new_tab("safety_items")
         ui.wait_for_node(name="alpha", role=ui.pyatspi.ROLE_LABEL)

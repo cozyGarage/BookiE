@@ -119,7 +119,7 @@ def scenarios(ui):
 
     def open_table():
         if ui.find_node(name="safety_items", role=ui.pyatspi.ROLE_PAGE_TAB) is None:
-            ui.invoke_named_action_within("safety_items", "Open safety_items")
+            ui.open_sidebar_table("safety_items")
             ui.wait_for_node(name="safety_items", role=ui.pyatspi.ROLE_PAGE_TAB)
 
     def open_structure_form(add_button):

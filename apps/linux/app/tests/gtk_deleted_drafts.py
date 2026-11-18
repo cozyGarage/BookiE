@@ -24,7 +24,7 @@ def scenarios(ui):
         )
         ui.open_saved_connection(ui.CONNECTION_B_NAME)
         ui.wait_for_frame_containing(f"{ui.CONNECTION_B_NAME} — BookiE")
-        ui.invoke_named_action_within("safety_items", "Open safety_items")
+        ui.open_sidebar_table("safety_items")
         ui.wait_for_node_containing("Rows")
         remove_through_the_gui(ui.CONNECTION_B_NAME)
         restart(lambda _environment: None)

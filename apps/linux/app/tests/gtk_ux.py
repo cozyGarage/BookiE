@@ -315,7 +315,7 @@ def scenarios(ui):
         import sqlite3
         with sqlite3.connect(database) as connection:
             connection.execute("INSERT INTO safety_items(id, note) VALUES (1, 'alpha')")
-        ui.invoke_named_action_within("safety_items", "Open safety_items")
+        ui.open_sidebar_table("safety_items")
         ui.wait_for_node(name="alpha", role=pyatspi.ROLE_LABEL)
         cell = ui.wait_for_node(name="alpha", role=pyatspi.ROLE_LABEL)
         extents = cell.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
@@ -404,7 +404,7 @@ def scenarios(ui):
         import sqlite3
         with sqlite3.connect(database) as connection:
             connection.executemany("INSERT INTO safety_items(id, note) VALUES (?, ?)", [(1, "alpha"), (2, "beta")])
-        ui.invoke_named_action_within("safety_items", "Open safety_items")
+        ui.open_sidebar_table("safety_items")
         ui.wait_for_node(name="alpha", role=pyatspi.ROLE_LABEL)
         click_cell("alpha", count=2)
         for key in "gamma":
@@ -561,7 +561,7 @@ def scenarios(ui):
             connection.executemany(
                 "INSERT INTO safety_items(id, note) VALUES (?, ?)", [(1, "alpha"), (2, "beta"), (3, "sibling")]
             )
-        ui.invoke_named_action_within("safety_items", "Open safety_items")
+        ui.open_sidebar_table("safety_items")
         click_cell("alpha")
         clipboard_text = '"line1\nline2"\n"line3\r\nline4"'
         clipboard_code = """import sys, gi
@@ -1202,7 +1202,7 @@ GLib.MainLoop().run()
         ui.wait_for_node(name="profile_cells")
         cpu_started = ui.owned_application().cpu_seconds()
         started = time.monotonic()
-        ui.invoke_named_action_within("profile_cells", "Open profile_cells")
+        ui.open_sidebar_table("profile_cells")
         time.sleep(3)
         observation_seconds = time.monotonic() - started
         observation_cpu_seconds = ui.owned_application().cpu_seconds() - cpu_started
@@ -1342,7 +1342,7 @@ GLib.MainLoop().run()
         ui.wait_for_node(name="profile_wide", timeout=120)
         before_rss, _ = app_memory_kb()
         started = time.monotonic()
-        ui.invoke_named_action_within("profile_wide", "Open profile_wide")
+        ui.open_sidebar_table("profile_wide")
         open_action_seconds = time.monotonic() - started
         observation_seconds = int(os.environ.get("BOOKIE_PROFILE_OBSERVATION_SECONDS", "15"))
         time.sleep(observation_seconds)
@@ -2059,7 +2059,7 @@ GLib.MainLoop().run()
         import sqlite3
         with sqlite3.connect(database) as connection:
             connection.executemany("INSERT INTO safety_items(id, note) VALUES (?, ?)", [(1, "alpha"), (2, "beta")])
-        ui.invoke_named_action_within("safety_items", "Open safety_items")
+        ui.open_sidebar_table("safety_items")
         ui.wait_for_node(name="alpha", role=pyatspi.ROLE_LABEL)
         ui.invoke(ui.wait_for_node(name="Row inspector", role=pyatspi.ROLE_TOGGLE_BUTTON))
         ui.wait_for_node(name="No row selected")
@@ -2079,7 +2079,7 @@ GLib.MainLoop().run()
         import sqlite3
         with sqlite3.connect(database) as connection:
             connection.executemany("INSERT INTO safety_items(id, note) VALUES (?, ?)", [(1, "alpha"), (2, "beta")])
-        ui.invoke_named_action_within("safety_items", "Open safety_items")
+        ui.open_sidebar_table("safety_items")
         ui.wait_for_node(name="alpha", role=pyatspi.ROLE_LABEL)
         click_cell("alpha")
         ui.press_x11_key("f", ("Control_L", "Alt_L"))
@@ -2391,7 +2391,7 @@ GLib.MainLoop().run()
     def postgres_hidden_projection_refresh_and_edit_preserve_hidden_value(database, base):
         ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
         ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
-        ui.invoke_named_action_within("public.people", "Open people")
+        ui.open_sidebar_table("public.people")
         ui.wait_for_node(name="Ada Lovelace", role=pyatspi.ROLE_LABEL)
         toggle_table_column("Ada Lovelace", "profile")
         wait_for_result_column("profile", present=False)
@@ -2755,7 +2755,7 @@ GLib.MainLoop().run()
     def grid_edit_and_delete_commit_to_the_server(connection_name, table_anchor, oracle):
         ui.open_saved_connection(connection_name)
         ui.wait_for_frame_containing(f"{connection_name} — BookiE")
-        ui.invoke_named_action_within(table_anchor, "Open people")
+        ui.open_sidebar_table(table_anchor)
         ui.wait_for_node(name="Grace Hopper", role=pyatspi.ROLE_LABEL)
         click_cell("Grace Hopper", count=2)
         for key in "gracey":
@@ -2834,7 +2834,7 @@ GLib.MainLoop().run()
         name = ui.MONGODB_CONNECTION_NAME
         ui.open_saved_connection(name)
         ui.wait_for_frame_containing(f"{name} — BookiE")
-        ui.invoke_named_action_within("bookie_test.people", "Open people")
+        ui.open_sidebar_table("bookie_test.people")
         ui.wait_for_node(name="Grace Hopper", role=pyatspi.ROLE_LABEL)
 
         assert mongodb_name() == "Grace Hopper"
@@ -2868,7 +2868,7 @@ GLib.MainLoop().run()
     def clickhouse_enum_grid_displays_native_labels_without_unique_row_identity(database, base):
         ui.open_saved_connection(ui.CLICKHOUSE_CONNECTION_NAME)
         ui.wait_for_frame_containing(f"{ui.CLICKHOUSE_CONNECTION_NAME} — BookiE")
-        ui.invoke_named_action_within("default.enum_grid", "Open enum_grid")
+        ui.open_sidebar_table("default.enum_grid")
         for label in ("low8", "low16", "NULL", "high8", "high16"):
             ui.wait_for_node(name=label, role=pyatspi.ROLE_LABEL)
         click_cell("low8", count=2)
@@ -2901,7 +2901,7 @@ GLib.MainLoop().run()
     def postgres_enum_grid_edit_preserves_native_label_and_siblings(database, base):
         ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
         ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
-        ui.invoke_named_action_within("public.enum_grid", "Open enum_grid")
+        ui.open_sidebar_table("public.enum_grid")
         ui.wait_for_node(name="ready", role=pyatspi.ROLE_LABEL)
         click_cell("ready", count=2)
         time.sleep(1.0)
@@ -2943,7 +2943,7 @@ GLib.MainLoop().run()
     def mysql_enum_set_grid_edit_preserves_native_values_and_siblings(database, base):
         ui.open_saved_connection(ui.MYSQL_CONNECTION_NAME)
         ui.wait_for_frame_containing(f"{ui.MYSQL_CONNECTION_NAME} — BookiE")
-        ui.invoke_named_action_within("bookie_test.enum_grid", "Open enum_grid")
+        ui.open_sidebar_table("bookie_test.enum_grid")
         ui.wait_for_node(name="ready", role=pyatspi.ROLE_LABEL)
         click_cell("ready", count=2)
         time.sleep(1.0)
@@ -3079,7 +3079,7 @@ GLib.MainLoop().run()
             connection.executemany(
                 "INSERT INTO safety_items(id, note) VALUES (?, ?)", [(1, "alpha"), (2, "beta"), (3, "alpha")]
             )
-        ui.invoke_named_action_within("safety_items", "Open safety_items")
+        ui.open_sidebar_table("safety_items")
         ui.wait_for_node(name="alpha", role=pyatspi.ROLE_LABEL)
         open_cell_menu("beta")
         invoke_menu_item(5)
@@ -3092,7 +3092,7 @@ GLib.MainLoop().run()
             connection.executemany(
                 "INSERT INTO safety_items(id, note) VALUES (?, ?)", [(2, "alpha"), (4, "beta"), (9, "gamma")]
             )
-        ui.invoke_named_action_within("safety_items", "Open safety_items")
+        ui.open_sidebar_table("safety_items")
         click_cell("alpha")
         ui.press_x11_key("Down", ("Shift_L",), presses=2)
         badge = ui.wait_for_node_containing("3 selected", role=pyatspi.ROLE_PUSH_BUTTON)
@@ -3104,7 +3104,7 @@ GLib.MainLoop().run()
         import sqlite3
         with sqlite3.connect(database) as connection:
             connection.executemany("INSERT INTO safety_items(id, note) VALUES (?, ?)", [(1, "alpha"), (2, "beta")])
-        ui.invoke_named_action_within("safety_items", "Open safety_items")
+        ui.open_sidebar_table("safety_items")
         click_cell("beta")
         owner = own_clipboard("one\ntwo")
         try:
