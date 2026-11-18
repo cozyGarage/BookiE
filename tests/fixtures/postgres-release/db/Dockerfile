@@ -4,7 +4,7 @@ COPY materials/server.crt /certs/server.crt
 COPY materials/server.key /certs/server.key
 COPY materials/ca.crt /certs/ca.crt
 COPY db/pg_hba.conf /certs/pg_hba.conf
-COPY seed/ /docker-entrypoint-initdb.d/
+COPY seed/01-seed.sql /docker-entrypoint-initdb.d/01-seed.sql
 
 RUN chown -R postgres:postgres /certs \
     && chmod 600 /certs/server.key \
