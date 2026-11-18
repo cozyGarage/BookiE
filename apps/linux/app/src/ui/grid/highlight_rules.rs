@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
@@ -241,11 +242,11 @@ fn build_shell() -> (
     status.set_visible(false);
     let body = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
-        .spacing(12)
-        .margin_top(12)
-        .margin_bottom(12)
-        .margin_start(12)
-        .margin_end(12)
+        .spacing(spacing::MD)
+        .margin_top(spacing::MD)
+        .margin_bottom(spacing::MD)
+        .margin_start(spacing::MD)
+        .margin_end(spacing::MD)
         .build();
     body.append(&description);
     body.append(&status);
@@ -537,7 +538,7 @@ fn pair_value_box(
             }
         });
     }
-    let pair = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    let pair = gtk::Box::new(gtk::Orientation::Horizontal, spacing::SM);
     pair.append(&lo);
     pair.append(&hi);
     pair

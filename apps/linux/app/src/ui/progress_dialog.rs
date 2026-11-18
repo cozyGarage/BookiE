@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use relm4::adw::prelude::*;
 use relm4::{adw, gtk};
 use tokio_util::sync::CancellationToken;
@@ -18,11 +19,11 @@ impl CancellableDialog {
         let stop = gtk::Button::with_label(&bookie_app_services::tr!("Cancel"));
         let content = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
-            .spacing(12)
-            .margin_top(24)
-            .margin_bottom(24)
-            .margin_start(24)
-            .margin_end(24)
+            .spacing(spacing::MD)
+            .margin_top(spacing::XL)
+            .margin_bottom(spacing::XL)
+            .margin_start(spacing::XL)
+            .margin_end(spacing::XL)
             .build();
         content.update_property(&[gtk::accessible::Property::Label(title)]);
         let heading = gtk::Label::builder()

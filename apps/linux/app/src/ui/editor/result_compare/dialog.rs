@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -36,7 +37,7 @@ fn dropdown(labels: &[String], selected: u32, name: &str) -> gtk::DropDown {
 }
 
 fn labelled(title: &str, widget: &impl IsA<gtk::Widget>) -> gtk::Box {
-    let row = gtk::Box::new(gtk::Orientation::Vertical, 4);
+    let row = gtk::Box::new(gtk::Orientation::Vertical, spacing::XS);
     let label = gtk::Label::new(Some(title));
     label.set_xalign(0.0);
     label.add_css_class("heading");
@@ -59,20 +60,21 @@ pub(in crate::ui::editor) fn present(
     sender: relm4::Sender<SqlEditorInput>,
 ) {
     let labels: Vec<String> = candidates.iter().map(|candidate| candidate.label.clone()).collect();
-    let content = gtk::Box::new(gtk::Orientation::Vertical, 12);
-    content.set_margin_top(18);
-    content.set_margin_bottom(18);
-    content.set_margin_start(18);
-    content.set_margin_end(18);
+    let content = gtk::Box::new(gtk::Orientation::Vertical, spacing::MD);
+    content.set_margin_top(spacing::LG);
+    content.set_margin_bottom(spacing::LG);
+    content.set_margin_start(spacing::LG);
+    content.set_margin_end(spacing::LG);
     let scroller = gtk::ScrolledWindow::builder()
         .hscrollbar_policy(gtk::PolicyType::Never)
         .vexpand(true)
+        .propagate_natural_height(true)
         .child(&content)
         .build();
     let dialog = adw::Dialog::builder()
         .title(bookie_app_services::tr!("Compare results"))
         .content_width(520)
-        .content_height(520)
+        .follows_content_size(true)
         .child(&scroller)
         .build();
     let form = Rc::new(Form {
@@ -115,7 +117,7 @@ fn assemble(form: &Rc<Form>, content: &gtk::Box) {
     )));
     content.append(&form.note);
     content.append(&form.progress);
-    let buttons = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    let buttons = gtk::Box::new(gtk::Orientation::Horizontal, spacing::SM);
     buttons.set_halign(gtk::Align::End);
     form.compare.add_css_class("suggested-action");
     buttons.append(&form.cancel);
@@ -135,9 +137,9 @@ fn refresh_keys(form: &Rc<Form>) {
             form.note.set_label("");
             for name in names {
                 let check = gtk::CheckButton::with_label(&name);
-                check.set_margin_start(8);
-                check.set_margin_top(4);
-                check.set_margin_bottom(4);
+                check.set_margin_start(spacing::SM);
+                check.set_margin_top(spacing::XS);
+                check.set_margin_bottom(spacing::XS);
                 form.keys.append(&check);
             }
         }

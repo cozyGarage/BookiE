@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
@@ -86,8 +87,8 @@ fn flat_toggle(label: &str, tooltip: &str) -> gtk::ToggleButton {
 fn search_entry() -> gtk::SearchEntry {
     let search = gtk::SearchEntry::builder()
         .placeholder_text(bookie_app_services::tr!("Search the loaded rows"))
-        .margin_start(12)
-        .margin_end(12)
+        .margin_start(spacing::MD)
+        .margin_end(spacing::MD)
         .hexpand(true)
         .build();
     search.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!(
@@ -99,24 +100,24 @@ fn search_entry() -> gtk::SearchEntry {
 fn dim_status_label() -> gtk::Label {
     let status = gtk::Label::builder()
         .xalign(0.0)
-        .margin_start(12)
-        .margin_end(12)
+        .margin_start(spacing::MD)
+        .margin_end(spacing::MD)
         .build();
     status.add_css_class("dim-label");
     status
 }
 
 fn build_widgets(names: &[String], can_replace: bool) -> FindWidgets {
-    let content = gtk::Box::new(gtk::Orientation::Vertical, 8);
+    let content = gtk::Box::new(gtk::Orientation::Vertical, spacing::SM);
     content.append(&adw::HeaderBar::new());
     let search = search_entry();
     let match_case = flat_toggle("Aa", &bookie_app_services::tr!("Match case"));
     let whole_words = flat_toggle("W", &bookie_app_services::tr!("Whole words"));
     let regex = flat_toggle(".*", &bookie_app_services::tr!("Regular expression"));
     let columns = column_dropdown(names);
-    let find_row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-    find_row.set_margin_start(12);
-    find_row.set_margin_end(12);
+    let find_row = gtk::Box::new(gtk::Orientation::Horizontal, spacing::SM);
+    find_row.set_margin_start(spacing::MD);
+    find_row.set_margin_end(spacing::MD);
     find_row.append(&search);
     find_row.append(&match_case);
     find_row.append(&whole_words);
@@ -136,9 +137,9 @@ fn build_widgets(names: &[String], can_replace: bool) -> FindWidgets {
         &gtk::ScrolledWindow::builder()
             .child(&list)
             .vexpand(true)
-            .margin_start(12)
-            .margin_end(12)
-            .margin_bottom(12)
+            .margin_start(spacing::MD)
+            .margin_end(spacing::MD)
+            .margin_bottom(spacing::MD)
             .build(),
     );
     FindWidgets {
@@ -167,9 +168,9 @@ fn column_dropdown(names: &[String]) -> gtk::DropDown {
 }
 
 fn replace_controls(visible: bool) -> (gtk::Box, gtk::Entry, gtk::Button, gtk::Button, gtk::Button) {
-    let row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-    row.set_margin_start(12);
-    row.set_margin_end(12);
+    let row = gtk::Box::new(gtk::Orientation::Horizontal, spacing::SM);
+    row.set_margin_start(spacing::MD);
+    row.set_margin_end(spacing::MD);
     row.set_visible(visible);
     let entry = gtk::Entry::builder()
         .placeholder_text(bookie_app_services::tr!("Replace"))
@@ -196,10 +197,10 @@ fn result_row(label: &str) -> gtk::ListBoxRow {
         &gtk::Label::builder()
             .label(label)
             .xalign(0.0)
-            .margin_start(12)
-            .margin_end(12)
-            .margin_top(8)
-            .margin_bottom(8)
+            .margin_start(spacing::MD)
+            .margin_end(spacing::MD)
+            .margin_top(spacing::SM)
+            .margin_bottom(spacing::SM)
             .build(),
     ));
     row.update_property(&[gtk::accessible::Property::Label(label)]);

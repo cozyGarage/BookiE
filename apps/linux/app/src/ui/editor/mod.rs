@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use bookie_app_services::{completion, completion_identifiers, completion_proposals};
 mod bookmark_menu;
 mod bookmarks;
@@ -193,15 +194,15 @@ impl SimpleComponent for SqlEditor {
             set_child = &adw::ToolbarView {
                 add_top_bar = &gtk::Box {
                     set_orientation: gtk::Orientation::Horizontal,
-                    set_spacing: 8,
-                    set_margin_top: 8,
-                    set_margin_bottom: 8,
-                    set_margin_start: 8,
-                    set_margin_end: 8,
+                    set_spacing: spacing::SM,
+                    set_margin_top: spacing::SM,
+                    set_margin_bottom: spacing::SM,
+                    set_margin_start: spacing::SM,
+                    set_margin_end: spacing::SM,
 
                     gtk::Box {
                         set_orientation: gtk::Orientation::Horizontal,
-                        set_spacing: 8,
+                        set_spacing: spacing::SM,
                         set_hexpand: true,
 
                         #[name = "cursor_info"]
@@ -236,8 +237,8 @@ impl SimpleComponent for SqlEditor {
 
                     adw::WrapBox {
                         set_halign: gtk::Align::End,
-                        set_child_spacing: 6,
-                        set_line_spacing: 6,
+                        set_child_spacing: spacing::SM,
+                        set_line_spacing: spacing::SM,
                         add_css_class: "tp-editor-toolbar",
 
                         #[name = "warnings_button"]
@@ -328,8 +329,8 @@ impl SimpleComponent for SqlEditor {
                         set_visible: false,
                         set_can_shrink: true,
                         set_halign: gtk::Align::End,
-                        set_margin_end: 8,
-                        set_margin_bottom: 8,
+                        set_margin_end: spacing::SM,
+                        set_margin_bottom: spacing::SM,
                         set_tooltip_text: Some(bookie_app_services::tr!("Runs the same query again. The saved query timeout does not change.").as_str()),
                         add_css_class: "flat",
                         connect_clicked => SqlEditorInput::Run(RunMessage::RunWithLongerTimeout),

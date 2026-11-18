@@ -83,6 +83,7 @@ pub(super) fn install_window_lifecycle(
     let close_state_pending_for_close = window_close_state_pending.clone();
     let structure_trackers = structure_trackers.clone();
     let change_trackers = change_trackers.clone();
+    super::super::combo_wrap::watch(&window);
     window.connect_close_request(move |w| {
         if !busy_quit_confirmed.get() && busy_quit::needed(w) {
             busy_quit::confirm(w, busy_quit_confirmed.clone());

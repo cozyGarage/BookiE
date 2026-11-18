@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use std::cell::{Cell, RefCell};
 use std::rc::{Rc, Weak};
 use std::sync::Arc;
@@ -166,9 +167,9 @@ fn search_toggles() -> (gtk::ToggleButton, gtk::ToggleButton, gtk::ToggleButton)
 }
 
 fn build_widgets(column_names: &[String]) -> Widgets {
-    let find = gtk::Box::new(gtk::Orientation::Horizontal, 4);
+    let find = gtk::Box::new(gtk::Orientation::Horizontal, spacing::XS);
     find.set_widget_name("tp-result-tools");
-    let actions = gtk::Box::new(gtk::Orientation::Horizontal, 4);
+    let actions = gtk::Box::new(gtk::Orientation::Horizontal, spacing::XS);
     actions.set_widget_name("tp-result-actions");
     let entry = find_entry();
     let previous = labelled_button(

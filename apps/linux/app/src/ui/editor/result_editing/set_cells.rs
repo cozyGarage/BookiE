@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use bookie_app_services::set_cells::{
     MAX_SET_CELLS, SetCellTarget, SetCellsError, SetCellsPlan, SetCellsRequest as PlanRequest, SetCellsValue,
     plan_set_cells,
@@ -59,7 +60,7 @@ fn present_set_cells_dialog(
     null_check.connect_toggled(move |check| entry_for_toggle.set_sensitive(!check.is_active()));
     let extra = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
-        .spacing(8)
+        .spacing(spacing::SM)
         .build();
     extra.append(&entry);
     extra.append(&null_check);

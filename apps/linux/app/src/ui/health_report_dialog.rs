@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -69,9 +70,9 @@ pub(crate) fn present(parent: &gtk::Window, source: HealthReportSource) {
             ))
             .xalign(0.0)
             .wrap(true)
-            .margin_start(12)
-            .margin_end(12)
-            .margin_bottom(8)
+            .margin_start(spacing::MD)
+            .margin_end(spacing::MD)
+            .margin_bottom(spacing::SM)
             .build(),
         in_flight: RefCell::new(CancellationToken::new()),
     });
@@ -86,11 +87,11 @@ pub(crate) fn present(parent: &gtk::Window, source: HealthReportSource) {
 
 fn content(panel: &Rc<Panel>) -> gtk::Box {
     let buttons = gtk::Box::builder()
-        .spacing(8)
-        .margin_start(12)
-        .margin_end(12)
-        .margin_top(8)
-        .margin_bottom(8)
+        .spacing(spacing::SM)
+        .margin_start(spacing::MD)
+        .margin_end(spacing::MD)
+        .margin_top(spacing::SM)
+        .margin_bottom(spacing::SM)
         .build();
     for report in HealthReport::ALL {
         let button = gtk::Button::with_label(&report_label(report));
@@ -102,8 +103,8 @@ fn content(panel: &Rc<Panel>) -> gtk::Box {
     let scroller = gtk::ScrolledWindow::builder()
         .vexpand(true)
         .hexpand(true)
-        .margin_start(12)
-        .margin_end(12)
+        .margin_start(spacing::MD)
+        .margin_end(spacing::MD)
         .child(&panel.list)
         .build();
     let body = gtk::Box::new(gtk::Orientation::Vertical, 0);

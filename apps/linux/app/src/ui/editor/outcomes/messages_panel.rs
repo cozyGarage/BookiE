@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use bookie_app_services::server_messages_view::{MessageRow, MessagesView};
 use bookie_core::{MessageSeverity, ServerMessages};
 use relm4::gtk;
@@ -20,13 +21,13 @@ fn build_panel(view: &MessagesView) -> gtk::Expander {
     let expander = gtk::Expander::builder()
         .label(view.title())
         .expanded(true)
-        .margin_start(12)
-        .margin_end(12)
-        .margin_top(6)
-        .margin_bottom(6)
+        .margin_start(spacing::MD)
+        .margin_end(spacing::MD)
+        .margin_top(spacing::SM)
+        .margin_bottom(spacing::SM)
         .build();
     expander.add_css_class("server-messages");
-    let body = gtk::Box::new(gtk::Orientation::Vertical, 4);
+    let body = gtk::Box::new(gtk::Orientation::Vertical, spacing::XS);
     body.append(&copy_button(view));
     body.append(&scrolled_rows(view));
     expander.set_child(Some(&body));
@@ -47,7 +48,7 @@ fn copy_button(view: &MessagesView) -> gtk::Button {
 }
 
 fn scrolled_rows(view: &MessagesView) -> gtk::ScrolledWindow {
-    let rows = gtk::Box::new(gtk::Orientation::Vertical, 2);
+    let rows = gtk::Box::new(gtk::Orientation::Vertical, spacing::OPTICAL);
     for row in view.rows() {
         rows.append(&row_widget(row));
     }
@@ -66,7 +67,7 @@ fn scrolled_rows(view: &MessagesView) -> gtk::ScrolledWindow {
 }
 
 fn row_widget(row: &MessageRow) -> gtk::Box {
-    let line = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    let line = gtk::Box::new(gtk::Orientation::Horizontal, spacing::SM);
     let severity = gtk::Label::builder()
         .label(&row.severity_label)
         .halign(gtk::Align::Start)
