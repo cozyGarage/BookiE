@@ -1,6 +1,6 @@
 # UI design
 
-Read this before changing any widget, dialog, toolbar or colour in the GTK or GPUI app. It is short on purpose. Decision: [ADR 0054](decisions/0054-one-visual-language.md).
+Read this before changing any widget, dialog, toolbar or colour in the GTK or GPUI app. It is short on purpose. Decision: [ADR 0054](decisions/0054-one-visual-language.md). Values: [DESIGN.md](../DESIGN.md). Review lists: [ui-review-checklist.md](ui-review-checklist.md).
 
 ## The look and the language
 
@@ -11,11 +11,11 @@ The look is dbx: near-monochrome neutrals, thin borders, 4 px control radius, 6 
 | Toolbar | Icons with tooltips. A text label only for the one primary action (Run) or where an icon would be ambiguous. Secondary actions go in one overflow (⋮) menu. |
 | Buttons | One filled button per surface (the primary action). Everything else is flat. Destructive actions are red text and sit last in a menu. |
 | Mode switches | A segmented control (Data / Structure, Tree / Text), never two separate buttons. |
-| Dropdowns | A popover menu: icon, short label, shortcut on the right, a check for the current choice, separators between groups, at most seven items per group. |
-| Colour | Semantic tokens only: background, surface, border, text, muted text, one accent, success, warning, destructive. The accent is for the primary button, selection and focus. No other blue, no raw hex in widget code. |
+| Dropdowns | A popover menu: icon, short label, shortcut on the right, a check for the current choice, separators between groups, at most seven items per group (a BookiE rule; GNOME allows 3 to 12 per menu). |
+| Colour | Semantic tokens only: background, surface, border, text, muted text, info, success, warning, destructive. The filled button is neutral, as in dbx; the system accent is for focus and selection only. No other blue, no raw hex in widget code. |
 | Text | Sentence case, one to two words on a control, the explanation goes in the tooltip. An error says what happened and what to do next. |
 | Badges | Small, one per fact (the environment, read-only). |
-| Density | Control height 24 px, icon 14 px, body text one step below the system size, table rows compact by default. |
+| Density | Two scales: 32 px form controls, 24 px compact toolbars, tabs and menus with 14 px icons. One scale per surface. Table rows compact by default. |
 | Zoom | Result views zoom (Ctrl+scroll, Ctrl+plus, Ctrl+minus, Ctrl+0). Chrome does not. |
 
 GTK uses libadwaita widgets restyled to these tokens in `apps/linux/data/resources/style.css`. GPUI takes the tokens from its theme and follows `gpui-component`'s design and coding guides.
