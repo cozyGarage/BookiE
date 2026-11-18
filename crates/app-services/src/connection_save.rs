@@ -7,6 +7,7 @@ pub struct ConnectionDraft {
     pub id: Option<Uuid>,
     pub name: String,
     pub driver_id: String,
+    pub file_based: bool,
     pub host: String,
     pub port: u16,
     pub database: String,
@@ -17,19 +18,18 @@ pub struct ConnectionDraft {
     pub environment: Environment,
 }
 
-pub fn derived_name(driver_id: &str, host: &str, username: &str, database: &str) -> String {
-    if driver_id == "sqlite" || driver_id == "duckdb" {
+pub fn derived_name(file_based: bool, host: &str, username: &str, database: &str) -> String {
+    if file_based {
         return database.to_owned();
     }
     format!("{username}@{host}")
 }
 
 pub fn validate(draft: &ConnectionDraft) -> Result<(), String> {
-    let file_based = matches!(draft.driver_id.as_str(), "sqlite" | "duckdb");
     if draft.driver_id.trim().is_empty() {
         return Err("Choose a database type.".into());
     }
-    if file_based {
+    if draft.file_based {
         return if draft.database.trim().is_empty() {
             Err("Enter the database file.".into())
         } else {
@@ -48,7 +48,7 @@ pub fn validate(draft: &ConnectionDraft) -> Result<(), String> {
 pub fn saved_from_draft(draft: &ConnectionDraft, id: Uuid) -> SavedConnection {
     let name = match draft.name.trim() {
         "" => derived_name(
-            &draft.driver_id,
+            draft.file_based,
             draft.host.trim(),
             draft.username.trim(),
             draft.database.trim(),
@@ -160,6 +160,7 @@ mod tests {
             id: None,
             name: String::new(),
             driver_id: "postgres".into(),
+            file_based: false,
             host: " db.example ".into(),
             port: 5432,
             database: "app".into(),
@@ -183,11 +184,15 @@ mod tests {
     }
 
     #[test]
-    fn a_file_database_is_named_after_its_file() {
+    fn a_file_based_database_is_named_after_its_file() {
         let mut file = draft();
-        file.driver_id = "sqlite".into();
+        file.driver_id = "future-file-database".into();
+        file.file_based = true;
         file.database = "/tmp/a.sqlite".into();
+        file.host.clear();
+        file.port = 0;
         assert_eq!(saved_from_draft(&file, Uuid::nil()).name, "/tmp/a.sqlite");
+        assert!(validate(&file).is_ok());
     }
 
     #[test]
@@ -200,6 +205,7 @@ mod tests {
         assert!(validate(&missing).unwrap_err().contains("port"));
         let mut file = draft();
         file.driver_id = "sqlite".into();
+        file.file_based = true;
         file.database.clear();
         assert_eq!(validate(&file).unwrap_err(), "Enter the database file.");
         assert!(validate(&draft()).is_ok());

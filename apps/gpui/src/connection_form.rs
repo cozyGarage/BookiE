@@ -11,6 +11,7 @@ pub(crate) struct DriverChoice {
     pub id: &'static str,
     pub label: &'static str,
     pub port: u16,
+    pub file_based: bool,
 }
 
 pub(crate) struct ConnectionForm {
@@ -36,6 +37,7 @@ impl ConnectionForm {
                 id: driver.id(),
                 label: driver.display_name(),
                 port: driver.default_port(),
+                file_based: driver.capabilities().is_file_based,
             })
             .collect();
         drivers.sort_by_key(|driver| driver.label);
@@ -71,6 +73,7 @@ impl ConnectionForm {
             id: None,
             name: text(&self.name),
             driver_id: driver.map(|driver| driver.id.to_string()).unwrap_or_default(),
+            file_based: driver.is_some_and(|driver| driver.file_based),
             host: text(&self.host),
             port: text(&self.port)
                 .trim()
@@ -121,7 +124,7 @@ impl GridView {
                     cx.notify();
                 }))
         });
-        let file_based = form.selected().is_some_and(|driver| matches!(driver.id, "sqlite" | "duckdb"));
+        let file_based = form.selected().is_some_and(|driver| driver.file_based);
         div().flex_1().min_h_0().p_4().child(
             div()
                 .w(px(size::HOME_WIDTH / 2.0))
