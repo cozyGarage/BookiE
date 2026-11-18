@@ -9,7 +9,9 @@ mod find_filter;
 mod grid_edit;
 mod grid_table;
 mod keys;
+mod menus;
 mod palette_actions;
+mod palette_state;
 mod render;
 mod runs;
 mod scroll_pace;
@@ -29,7 +31,7 @@ use bookie_gpui::shell::{
     Catalog, DEFAULT_RESULT_RATIO, ResultView, Run, Tab, Tabs, next_run, result_ratio_from_drag, table_label,
 };
 use bookie_gpui::source::{Source, Synthetic};
-use bookie_gpui::theme::{Style, Theme, size};
+use bookie_gpui::theme::{Theme, size};
 use bookie_results::grid_cursor::Cursor;
 use gpui::{
     App, Bounds, ClipboardItem, Context, Div, Entity, FocusHandle, Focusable, MouseButton, ScrollHandle,
@@ -98,20 +100,15 @@ struct GridView {
     find_reset: bool,
     cell_cursor: Option<Cursor>,
     viewport_rows: usize,
-    palette_input: Entity<TextInput>,
-    palette_open: bool,
     detail_open: bool,
     catalog: Catalog,
     live: Option<std::sync::Arc<bookie_gpui::live::LiveSession>>,
     connections: Vec<bookie_app_services::read_session::ConnectionSummary>,
     keymap: Keymap,
-    palette_index: usize,
     dark_mode: bool,
     tabs: Tabs,
     tab_scroll: ScrollHandle,
-    runs: Vec<Run>,
-    run_edits: Vec<grid_edit::Edits>,
-    run_sources: Vec<Option<Source>>,
+    runs: Vec<runs::RunSlot>,
     sql_input: Entity<EditorState>,
     active_run: usize,
     run_scroll: ScrollHandle,
@@ -124,16 +121,12 @@ struct GridView {
     font: gpui::SharedString,
     fonts: font_settings::FontSettings,
     font_names: Vec<String>,
-    palette_fonts: bool,
-    palette_address: Option<String>,
-    palette_pattern: Option<String>,
-    palette_delimiter: Option<bookie_gpui::csv_delimiter::Parsed>,
     csv_delimiter: Option<bookie_core::export::CustomDelimiter>,
-    palette_limit: Option<bookie_gpui::export_limit::Parsed>,
     export_limit: Option<usize>,
     check_histories: Vec<(String, bookie_app_services::checks::History)>,
     sidebar_open: bool,
     import_menu_open: bool,
+    palette: palette_state::PaletteState,
     sidebar_regex: bool,
     sidebar_active_only: bool,
     sidebar_width: f32,
@@ -260,10 +253,7 @@ impl GridView {
         (find, filter, editor, sql_input)
     }
 
-    fn init_chrome_inputs(
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> (Entity<TextInput>, Entity<TextInput>) {
+    fn init_chrome_inputs(window: &mut Window, cx: &mut Context<Self>) -> (Entity<TextInput>, Entity<TextInput>) {
         let sidebar_search = cx.new(|cx| TextInput::new("Search tables", cx));
         cx.subscribe(&sidebar_search, |_, _, _: &InputEvent, cx| cx.notify())
             .detach();
@@ -273,12 +263,12 @@ impl GridView {
             window,
             |this, _, event: &InputEvent, window, cx| match event {
                 InputEvent::Changed => {
-                    this.palette_index = 0;
-                    let typed = this.palette_input.read(cx).content().to_string();
-                    this.palette_address = bookie_gpui::net_check::parse_address(&typed);
-                    this.palette_delimiter = bookie_gpui::csv_delimiter::parse_command(&typed);
-                    this.palette_limit = bookie_gpui::export_limit::parse_command(&typed);
-                    this.palette_pattern = this
+                    this.palette.index = 0;
+                    let typed = this.palette.input.read(cx).content().to_string();
+                    this.palette.address = bookie_gpui::net_check::parse_address(&typed);
+                    this.palette.delimiter = bookie_gpui::csv_delimiter::parse_command(&typed);
+                    this.palette.limit = bookie_gpui::export_limit::parse_command(&typed);
+                    this.palette.pattern = this
                         .live
                         .as_ref()
                         .filter(|live| live.driver_id == "redis")
@@ -306,6 +296,8 @@ impl GridView {
                 .cell_selectable(true)
                 .row_header(false)
         });
+        let owner = cx.entity().downgrade();
+        table.update(cx, |table, _| table.delegate_mut().owner = Some(owner));
         let table_focus = gpui::Focusable::focus_handle(table.read(cx), cx);
         let table_events = cx.subscribe_in(
             &table,
@@ -355,30 +347,69 @@ impl GridView {
             editor,
             sql_input,
             sidebar_search,
-            palette_input,
-            keystroke_hook: None, editing: None, cell_cursor: None,
-            palette_address: None, palette_pattern: None, palette_delimiter: None, csv_delimiter: None, palette_limit: None, export_limit: None, compare: None,
-            selection: None, pace: None, last_frame: None,
-            focus_editor: false, continuous: false, filter_visible: false,
-            grid_is_query: false, find_reset: false, palette_open: false,
-            detail_open: false, palette_fonts: false, import_menu_open: false,
-            sidebar_regex: false, sidebar_active_only: false, find_capped: false,
-            measuring: false, first_frame_reported: false,
-            sidebar_open: true, connection_open: true, database_open: true, result_open: true,
-            resizing_split: false, resizing_sidebar: false,
-            edits: Default::default(), table_edits: Default::default(),
-            catalog: Catalog::synthetic(), live: None, keymap: Keymap::default(),
-            tabs: Tabs::default(), tab_scroll: ScrollHandle::new(), run_scroll: ScrollHandle::new(),
-            messages: MessageLog::default(), scroll: UniformListScrollHandle::new(),
-            runs: vec![Run { number: 1, rows: total, elapsed_ms: None }],
-            run_edits: vec![grid_edit::Edits::new()], run_sources: vec![None],
-            active_run: 0, next_run_number: 2, palette_index: 0, viewport_rows: 10,
-            dark_mode: Theme::current(cx).dark, result_view: ResultView::Table,
-            result_ratio: DEFAULT_RESULT_RATIO, sidebar_width: 340.0,
-            font: default_font(&font_names).into(), font_names,
-            connections: Vec::new(), check_histories: Vec::new(), frame_intervals: Vec::new(),
-            cursor: MatchCursor::default(), loads: Ticket::new(), scans: Ticket::new(),
-            status: String::new(), started,
+            palette: palette_state::PaletteState::new(palette_input),
+            keystroke_hook: None,
+            editing: None,
+            cell_cursor: None,
+            csv_delimiter: None,
+            export_limit: None,
+            compare: None,
+            selection: None,
+            pace: None,
+            last_frame: None,
+            focus_editor: false,
+            continuous: false,
+            filter_visible: false,
+            grid_is_query: false,
+            find_reset: false,
+            detail_open: false,
+            import_menu_open: false,
+            sidebar_regex: false,
+            sidebar_active_only: false,
+            find_capped: false,
+            measuring: false,
+            first_frame_reported: false,
+            sidebar_open: true,
+            connection_open: true,
+            database_open: true,
+            result_open: true,
+            resizing_split: false,
+            resizing_sidebar: false,
+            edits: Default::default(),
+            table_edits: Default::default(),
+            catalog: Catalog::synthetic(),
+            live: None,
+            keymap: Keymap::default(),
+            tabs: Tabs::default(),
+            tab_scroll: ScrollHandle::new(),
+            run_scroll: ScrollHandle::new(),
+            messages: MessageLog::default(),
+            scroll: UniformListScrollHandle::new(),
+            runs: vec![runs::RunSlot::new(
+                Run {
+                    number: 1,
+                    rows: total,
+                    elapsed_ms: None,
+                },
+                None,
+            )],
+            active_run: 0,
+            next_run_number: 2,
+            viewport_rows: 10,
+            dark_mode: Theme::current(cx).dark,
+            result_view: ResultView::Table,
+            result_ratio: DEFAULT_RESULT_RATIO,
+            sidebar_width: 340.0,
+            font: default_font(&font_names).into(),
+            font_names,
+            connections: Vec::new(),
+            check_histories: Vec::new(),
+            frame_intervals: Vec::new(),
+            cursor: MatchCursor::default(),
+            loads: Ticket::new(),
+            scans: Ticket::new(),
+            status: String::new(),
+            started,
         }
     }
 

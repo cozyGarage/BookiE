@@ -321,7 +321,7 @@ fn enter_on_the_active_cell_opens_the_editor_and_an_uneditable_cell_says_so(cx: 
 fn the_palette_filters_runs_and_closes_on_escape(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.simulate_keystrokes("ctrl-shift-p");
-    view.read_with(cx, |view, _| assert!(view.palette_open));
+    view.read_with(cx, |view, _| assert!(view.palette.open));
     cx.simulate_input("last page");
     view.read_with(cx, |view, cx| {
         let labels: Vec<_> = view
@@ -333,11 +333,11 @@ fn the_palette_filters_runs_and_closes_on_escape(cx: &mut TestAppContext) {
     });
     cx.simulate_keystrokes("enter");
     view.read_with(cx, |view, _| {
-        assert!(!view.palette_open);
+        assert!(!view.palette.open);
         assert_eq!(view.pager.page, 29);
     });
     cx.simulate_keystrokes("ctrl-shift-p escape");
-    view.read_with(cx, |view, _| assert!(!view.palette_open));
+    view.read_with(cx, |view, _| assert!(!view.palette.open));
 }
 
 #[gpui::test]
@@ -355,10 +355,10 @@ fn the_palette_hides_actions_that_do_not_apply_and_arrows_pick_the_next_one(cx: 
         assert!(ids.contains(&"last"));
     });
     cx.simulate_keystrokes("down");
-    view.read_with(cx, |view, _| assert_eq!(view.palette_index, 1));
+    view.read_with(cx, |view, _| assert_eq!(view.palette.index, 1));
     cx.simulate_keystrokes("up up");
     view.read_with(cx, |view, cx| {
-        assert_eq!(view.palette_index, view.palette_shown(cx).len() - 1)
+        assert_eq!(view.palette.index, view.palette_shown(cx).len() - 1)
     });
 }
 
@@ -488,7 +488,7 @@ fn the_palette_lists_installed_fonts_and_the_chosen_one_becomes_the_ui_font(cx: 
     cx.simulate_keystrokes("enter");
     view.read_with(cx, |view, cx| {
         assert!(
-            view.palette_open && view.palette_fonts,
+            view.palette.open && view.palette.fonts,
             "the palette stays open on the font list"
         );
         let labels: Vec<_> = view
@@ -502,25 +502,38 @@ fn the_palette_lists_installed_fonts_and_the_chosen_one_becomes_the_ui_font(cx: 
     cx.simulate_keystrokes("enter");
     view.read_with(cx, |view, _| {
         assert_eq!(view.font.as_ref(), "Bar Mono");
-        assert!(!view.palette_open && !view.palette_fonts);
+        assert!(!view.palette.open && !view.palette.fonts);
     });
 }
 
 #[gpui::test]
-fn the_palette_switches_the_theme_style_and_light_dark_keeps_it(cx: &mut TestAppContext) {
-    use bookie_gpui::theme::Style;
+fn the_palette_switches_between_light_and_dark(cx: &mut TestAppContext) {
     let (_view, cx) = open(cx);
-    cx.simulate_keystrokes("ctrl-shift-p");
-    cx.simulate_input("adwaita");
-    cx.simulate_keystrokes("enter");
-    cx.update(|_, cx| assert_eq!(bookie_gpui::theme::Theme::current(cx).style, Style::Adwaita));
     cx.simulate_keystrokes("ctrl-shift-p");
     cx.simulate_input("dark theme");
     cx.simulate_keystrokes("enter");
-    cx.update(|_, cx| {
-        let theme = bookie_gpui::theme::Theme::current(cx);
-        assert_eq!((theme.style, theme.dark), (Style::Adwaita, true));
+    cx.update(|_, cx| assert!(bookie_gpui::theme::Theme::current(cx).dark));
+    cx.simulate_keystrokes("ctrl-shift-p");
+    cx.simulate_input("light theme");
+    cx.simulate_keystrokes("enter");
+    cx.update(|_, cx| assert!(!bookie_gpui::theme::Theme::current(cx).dark));
+}
+
+#[gpui::test]
+fn the_overflow_menu_lists_commands_by_group_and_runs_them(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    let groups = view.read_with(cx, |view, _| {
+        crate::menus::command_groups(view, crate::menus::OVERFLOW_GROUPS)
     });
+    let ids: Vec<Vec<&str>> = groups
+        .iter()
+        .map(|group| group.iter().map(|(id, _, _)| *id).collect())
+        .collect();
+    assert_eq!(ids[0], ["query", "run"]);
+    assert!(ids.iter().flatten().any(|id| *id == "settings"));
+    let open_before = view.read_with(cx, |view, _| view.sidebar_open);
+    cx.update(|window, cx| view.update(cx, |view, cx| view.run_palette_id("sidebar", window, cx)));
+    assert_ne!(view.read_with(cx, |view, _| view.sidebar_open), open_before);
 }
 
 struct Tiny;
@@ -942,7 +955,7 @@ fn closing_runs_releases_edits_and_allows_a_new_run_after_the_last_close(cx: &mu
             assert!(view.edits.is_empty());
             assert_eq!(view.dataset_count(), 0);
             view.add_run(None);
-            assert_eq!(view.runs[0].number, 3);
+            assert_eq!(view.runs[0].run.number, 3);
             assert!(view.edits.is_empty());
         });
     });
@@ -1042,7 +1055,7 @@ fn closing_query_tab_releases_its_runs_and_keeps_table_edits(cx: &mut TestAppCon
             let index = view.tabs.active;
             view.close_tab(index);
             assert!(view.runs.is_empty());
-            assert!(view.run_edits.is_empty());
+            assert!(view.runs.is_empty());
             assert_eq!(view.cell_at(1, 1), Cell::Text("table".into()));
             view.tabs.open_query();
             view.sync_grid_owner();

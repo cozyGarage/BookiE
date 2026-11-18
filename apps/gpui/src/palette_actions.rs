@@ -2,7 +2,7 @@ use super::*;
 
 impl GridView {
     pub(crate) fn palette_actions(&self) -> Vec<Action> {
-        if self.palette_fonts {
+        if self.palette.fonts {
             return self
                 .font_names
                 .iter()
@@ -13,12 +13,12 @@ impl GridView {
                 })
                 .collect();
         }
-        let check = self.palette_address.as_ref().map(|address| Action {
+        let check = self.palette.address.as_ref().map(|address| Action {
             id: "check-tcp",
             label: format!("Check TCP port {address}"),
             enabled: true,
         });
-        let listen = self.palette_pattern.as_ref().map(|pattern| Action {
+        let listen = self.palette.pattern.as_ref().map(|pattern| Action {
             id: "sample-pubsub",
             label: format!("Listen to Redis channels {pattern}"),
             enabled: true,
@@ -35,7 +35,7 @@ impl GridView {
     }
 
     fn export_limit_actions(&self) -> Vec<Action> {
-        let typed = self.palette_limit.as_ref().map(|(text, parsed)| Action {
+        let typed = self.palette.limit.as_ref().map(|(text, parsed)| Action {
             id: "set-export-limit",
             label: match parsed {
                 Ok(_) => format!("Export limit {text}: stop CSV export after {text} rows"),
@@ -52,11 +52,14 @@ impl GridView {
     }
 
     fn csv_delimiter_actions(&self) -> Vec<Action> {
-        let typed = self.palette_delimiter.as_ref().map(|(text, parsed)| Action {
+        let typed = self.palette.delimiter.as_ref().map(|(text, parsed)| Action {
             id: "set-csv-delimiter",
             label: match parsed {
                 Ok(_) => format!("CSV delimiter {text}: use it for CSV export and copy"),
-                Err(error) => format!("CSV delimiter {text}: {}", bookie_gpui::csv_delimiter::error_label(*error)),
+                Err(error) => format!(
+                    "CSV delimiter {text}: {}",
+                    bookie_gpui::csv_delimiter::error_label(*error)
+                ),
             },
             enabled: true,
         });
@@ -269,8 +272,6 @@ impl GridView {
                 true,
             ),
             action("font", "Choose font…", true),
-            action("theme-dbx", "Theme: DBX style", true),
-            action("theme-adwaita", "Theme: Adwaita style (our GTK app)", true),
             action(
                 "theme",
                 if self.dark_mode {
@@ -284,39 +285,39 @@ impl GridView {
     }
 
     pub(crate) fn palette_shown(&self, cx: &App) -> Vec<usize> {
-        palette_matches(self.palette_input.read(cx).content(), &self.palette_actions())
+        palette_matches(self.palette.input.read(cx).content(), &self.palette_actions())
     }
 
     pub(crate) fn open_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.palette_open = true;
-        self.palette_fonts = false;
-        self.palette_index = 0;
-        self.palette_input.update(cx, |input, cx| input.set_content("", cx));
-        window.focus(&self.palette_input.read(cx).focus_handle(cx), cx);
+        self.palette.open = true;
+        self.palette.fonts = false;
+        self.palette.index = 0;
+        self.palette.input.update(cx, |input, cx| input.set_content("", cx));
+        window.focus(&self.palette.input.read(cx).focus_handle(cx), cx);
         cx.notify();
     }
 
     pub(crate) fn close_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.palette_open = false;
-        self.palette_fonts = false;
+        self.palette.open = false;
+        self.palette.fonts = false;
         window.focus(&self.focus, cx);
         cx.notify();
     }
 
     pub(crate) fn run_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let actions = self.palette_actions();
-        let shown = palette_matches(self.palette_input.read(cx).content(), &actions);
+        let shown = palette_matches(self.palette.input.read(cx).content(), &actions);
         let Some(index) = shown
-            .get(self.palette_index.min(shown.len().saturating_sub(1)))
+            .get(self.palette.index.min(shown.len().saturating_sub(1)))
             .copied()
         else {
             return;
         };
         let id = actions[index].id;
         if id == "font" {
-            self.palette_fonts = true;
-            self.palette_index = 0;
-            self.palette_input.update(cx, |input, cx| input.set_content("", cx));
+            self.palette.fonts = true;
+            self.palette.index = 0;
+            self.palette.input.update(cx, |input, cx| input.set_content("", cx));
             cx.notify();
             return;
         }
@@ -328,6 +329,10 @@ impl GridView {
         self.close_palette(window, cx);
         self.execute_palette_action(id, window, cx);
         cx.notify();
+    }
+
+    pub(crate) fn run_palette_id(&mut self, id: &'static str, window: &mut Window, cx: &mut Context<Self>) {
+        self.execute_palette_action(id, window, cx);
     }
 
     fn execute_palette_action(&mut self, id: &'static str, window: &mut Window, cx: &mut Context<Self>) {
@@ -377,7 +382,12 @@ impl GridView {
         true
     }
 
-    fn execute_activity_palette_action(&mut self, id: &'static str, window: &mut Window, cx: &mut Context<Self>) -> bool {
+    fn execute_activity_palette_action(
+        &mut self,
+        id: &'static str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
         match id {
             "sessions" => self.show_sessions(window, cx),
             "blocking-locks" => self.show_activity(bookie_core::ActivityQuery::BlockingLocks, window, cx),
@@ -386,18 +396,18 @@ impl GridView {
             "server-variables" => self.show_activity(bookie_core::ActivityQuery::ServerVariables, window, cx),
             "server-status" => self.show_activity(bookie_core::ActivityQuery::ServerStatus, window, cx),
             "kafka-topics" => {
-                if let Some(broker) = self.palette_address.clone() {
+                if let Some(broker) = self.palette.address.clone() {
                     self.kafka_topics(broker, cx);
                 }
             }
             "status" => self.show_status(),
             "sample-pubsub" => {
-                if let Some(pattern) = self.palette_pattern.clone() {
+                if let Some(pattern) = self.palette.pattern.clone() {
                     self.sample_pubsub(pattern, cx);
                 }
             }
             "check-tcp" => {
-                if let Some(address) = self.palette_address.clone() {
+                if let Some(address) = self.palette.address.clone() {
                     self.check_tcp(address, cx);
                 }
             }
@@ -430,11 +440,6 @@ impl GridView {
             "table" => {
                 let name = self.catalog.grid_table.clone();
                 self.open_table_named(&name, window, cx);
-            }
-            "theme-dbx" | "theme-adwaita" => {
-                let style = if id == "theme-dbx" { Style::Dbx } else { Style::Adwaita };
-                Theme::current(cx).with_style(style).install(cx);
-                window.refresh();
             }
             "theme" => {
                 self.dark_mode = !self.dark_mode;

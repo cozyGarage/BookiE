@@ -30,7 +30,7 @@ impl GridView {
             && self.editing.is_none()
             && self.compare.is_none()
             && !self.continuous
-            && !self.palette_open
+            && !self.palette.open
             && self.tabs.shows_grid()
     }
 
@@ -86,11 +86,11 @@ impl GridView {
         let stroke = &event.keystroke;
         let modifiers = stroke.modifiers;
         let key = stroke.key.as_str();
-        if self.palette_open {
+        if self.palette.open {
             match key {
                 "down" | "up" => {
                     let count = self.palette_shown(cx).len();
-                    self.palette_index = palette_step(self.palette_index, count, key == "down");
+                    self.palette.index = palette_step(self.palette.index, count, key == "down");
                     cx.notify();
                 }
                 "escape" => self.close_palette(window, cx),

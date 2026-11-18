@@ -76,7 +76,7 @@ impl GridView {
     }
 
     pub(crate) fn set_csv_delimiter(&mut self) {
-        match self.palette_delimiter.clone() {
+        match self.palette.delimiter.clone() {
             Some((_, Ok(delimiter))) => self.set_csv_delimiter_to(Some(delimiter)),
             Some((_, Err(error))) => {
                 self.status = format!("CSV delimiter refused: {}", bookie_gpui::csv_delimiter::error_label(error));
@@ -94,7 +94,7 @@ impl GridView {
     }
 
     pub(crate) fn set_export_limit(&mut self) {
-        match self.palette_limit.clone() {
+        match self.palette.limit.clone() {
             Some((_, Ok(limit))) => self.set_export_limit_to(Some(limit)),
             Some((_, Err(()))) => {
                 self.status = format!("Export limit refused: {}", bookie_gpui::export_limit::error_label());

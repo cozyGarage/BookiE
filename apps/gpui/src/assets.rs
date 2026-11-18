@@ -11,6 +11,7 @@ macro_rules! icons {
 }
 
 icons!(
+    "ellipsis",
     "arrow-left-right",
     "chevron-down",
     "chevron-right",

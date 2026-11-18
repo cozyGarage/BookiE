@@ -33,7 +33,12 @@ impl GridView {
             Mode::Filtered { label, .. } => format!("{label} · "),
             Mode::All => String::new(),
         };
-        let progress = progress_text(&title, self.dataset_count(), self.source.is_partial(), self.pager.pages());
+        let progress = progress_text(
+            &title,
+            self.dataset_count(),
+            self.source.is_partial(),
+            self.pager.pages(),
+        );
         let range_label = if self.dataset_count() == 0 {
             "Rows 0".to_string()
         } else if self.continuous {
@@ -41,11 +46,7 @@ impl GridView {
         } else {
             format!("Rows {}-{}", thousands(first), thousands(last))
         };
-        let pager = div()
-            .flex()
-            .items_center()
-            .gap_1()
-            .child(div().child(progress));
+        let pager = div().flex().items_center().gap_1().child(div().child(progress));
         if self.continuous {
             return pager.child(div().child(range_label));
         }
@@ -59,19 +60,30 @@ impl GridView {
                 cx.notify();
             })))
             .child(div().child(range_label))
-            .child(button("page-size", format!("{} rows", self.pager.rows), theme).on_click(cx.listener(
-                |this, _, _, cx| {
-                    let index = PAGE_SIZES.iter().position(|size| *size == this.pager.rows).unwrap_or(0);
-                    this.pager = this.pager.resized(PAGE_SIZES[(index + 1) % PAGE_SIZES.len()]);
-                    cx.notify();
-                },
-            )))
-            .child(button("load-more", if self.pager.append { "Load more ✓" } else { "Load more" }, theme).on_click(
-                cx.listener(|this, _, _, cx| {
+            .child(
+                button("page-size", format!("{} rows", self.pager.rows), theme).on_click(cx.listener(
+                    |this, _, _, cx| {
+                        let index = PAGE_SIZES.iter().position(|size| *size == this.pager.rows).unwrap_or(0);
+                        this.pager = this.pager.resized(PAGE_SIZES[(index + 1) % PAGE_SIZES.len()]);
+                        cx.notify();
+                    },
+                )),
+            )
+            .child(
+                button(
+                    "load-more",
+                    if self.pager.append {
+                        "Load more ✓"
+                    } else {
+                        "Load more"
+                    },
+                    theme,
+                )
+                .on_click(cx.listener(|this, _, _, cx| {
                     this.pager.append = !this.pager.append;
                     cx.notify();
-                }),
-            ))
+                })),
+            )
             .child(button("next", "›", theme).on_click(cx.listener(|this, _, _, cx| {
                 this.pager.next();
                 cx.notify();
@@ -90,22 +102,35 @@ impl GridView {
             .child(div().w(px(size::FIND_WIDTH)).flex_none().child(self.find.clone()))
             .child(button("find-prev", "↑", theme).on_click(cx.listener(|this, _, _, cx| this.run_find(false, cx))))
             .child(button("find-next", "↓", theme).on_click(cx.listener(|this, _, _, cx| this.run_find(true, cx))))
-            .child(button("show", "Matches only", theme).on_click(cx.listener(|this, _, _, cx| {
-                this.show_matching(cx);
-                cx.notify();
-            })))
+            .child(
+                button("show", "Matches only", theme).on_click(cx.listener(|this, _, _, cx| {
+                    this.show_matching(cx);
+                    cx.notify();
+                })),
+            )
             .child(button("compare", "Compare", theme).on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))))
-            .child(button("export", "Export…", theme).on_click(cx.listener(|this, _, _, cx| {
-                this.export_selection_or_page(cx);
-                cx.notify();
-            })))
-            .child(button("continuous", if self.continuous { "Continuous ✓" } else { "Continuous" }, theme).on_click(
-                cx.listener(|this, _, _, cx| {
+            .child(
+                button("export", "Export…", theme).on_click(cx.listener(|this, _, _, cx| {
+                    this.export_selection_or_page(cx);
+                    cx.notify();
+                })),
+            )
+            .child(
+                button(
+                    "continuous",
+                    if self.continuous {
+                        "Continuous ✓"
+                    } else {
+                        "Continuous"
+                    },
+                    theme,
+                )
+                .on_click(cx.listener(|this, _, _, cx| {
                     this.continuous = !this.continuous;
                     this.scroll.scroll_to_item_strict(0, ScrollStrategy::Top);
                     cx.notify();
-                }),
-            ))
+                })),
+            )
     }
 
     fn grid_control_strip(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
@@ -193,13 +218,7 @@ impl GridView {
         })
     }
 
-    fn grid_pane(
-        &self,
-        theme: Theme,
-        strip: Div,
-        filter_row: Option<Div>,
-        compare_bar: Option<Div>,
-    ) -> Div {
+    fn grid_pane(&self, theme: Theme, strip: Div, filter_row: Option<Div>, compare_bar: Option<Div>) -> Div {
         div()
             .flex_1()
             .flex()
@@ -212,12 +231,7 @@ impl GridView {
             .children(self.detail_panel(theme))
     }
 
-    fn main_layout(
-        &self,
-        sidebar: Option<Div>,
-        tab_row: Stateful<Div>,
-        content: Div,
-    ) -> Div {
+    fn main_layout(&self, sidebar: Option<Div>, tab_row: Stateful<Div>, content: Div) -> Div {
         div()
             .flex_1()
             .flex()
@@ -234,7 +248,7 @@ impl Render for GridView {
         let strip = self.grid_control_strip(theme, cx);
         let filter_row = self.grid_filter_row(theme, cx);
         let compare_bar = self.grid_compare_bar(theme, cx);
-        let palette = self.palette_open.then(|| self.palette_overlay(cx));
+        let palette = self.palette.open.then(|| self.palette_overlay(cx));
         let grid = self.grid_pane(theme, strip, filter_row, compare_bar);
         let content = match self.tabs.current().clone() {
             Tab::Home => self.home_page(theme, cx),
@@ -303,8 +317,8 @@ impl GridView {
     fn palette_overlay(&self, cx: &mut Context<Self>) -> Div {
         let theme = Theme::current(cx);
         let actions = self.palette_actions();
-        let shown = palette_matches(self.palette_input.read(cx).content(), &actions);
-        let selected = self.palette_index.min(shown.len().saturating_sub(1));
+        let shown = palette_matches(self.palette.input.read(cx).content(), &actions);
+        let selected = self.palette.index.min(shown.len().saturating_sub(1));
         let list = shown.iter().enumerate().map(|(position, index)| {
             let row = div().px_2().py_1().rounded_md().child(actions[*index].label.clone());
             if position == selected {
@@ -319,21 +333,27 @@ impl GridView {
                 .text_color(rgb(theme.muted_foreground))
                 .child("No matching command")
         });
-        div().absolute().top(px(size::PALETTE_TOP)).w_full().flex().justify_center().child(
-            div()
-                .w(px(size::PALETTE_WIDTH))
-                .p_2()
-                .gap_1()
-                .flex()
-                .flex_col()
-                .rounded(px(size::SURFACE_RADIUS))
-                .border_1()
-                .border_color(rgb(theme.border))
-                .bg(rgb(theme.background))
-                .shadow_lg()
-                .child(self.palette_input.clone())
-                .children(list)
-                .children(empty),
-        )
+        div()
+            .absolute()
+            .top(px(size::PALETTE_TOP))
+            .w_full()
+            .flex()
+            .justify_center()
+            .child(
+                div()
+                    .w(px(size::PALETTE_WIDTH))
+                    .p_2()
+                    .gap_1()
+                    .flex()
+                    .flex_col()
+                    .rounded(px(size::SURFACE_RADIUS))
+                    .border_1()
+                    .border_color(rgb(theme.border))
+                    .bg(rgb(theme.background))
+                    .shadow_lg()
+                    .child(self.palette.input.clone())
+                    .children(list)
+                    .children(empty),
+            )
     }
 }
