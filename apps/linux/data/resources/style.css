@@ -354,3 +354,7 @@ tabbar tab {
   padding: 0 6px;
   border-radius: var(--bookie-radius-control);
 }
+
+list.tp-sidebar-item {
+  font-size: 0.93em;
+}

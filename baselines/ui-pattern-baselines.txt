@@ -41,7 +41,6 @@ apps/linux/app/src/ui/leak_probe.rs thread_local 1
 apps/linux/app/src/ui/quick_switcher_dialog.rs hand-built-toolbar 1
 apps/linux/app/src/ui/saved_queries_dialog.rs hand-built-toolbar 1
 apps/linux/app/src/ui/saved_queries_dialog.rs off-scale-spacing 3
-apps/linux/app/src/ui/sidebar_columns.rs off-scale-spacing 1
 apps/linux/app/src/ui/structure_tab/mod.rs off-scale-spacing 8
 apps/linux/app/src/ui/structure_tab/mod.rs hand-built-toolbar 1
 apps/linux/app/src/ui/structure_tab_dialogs.rs off-scale-spacing 5
