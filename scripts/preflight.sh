@@ -69,6 +69,7 @@ python3 scripts/check-crate-boundaries.py
 
 echo "==> driver id branches"
 python3 scripts/check-driver-id-branches.py
+python3 scripts/check-ui-patterns.py
 
 echo "==> function sizes"
 python3 scripts/check-function-size.py

@@ -599,6 +599,7 @@ class CiWorkflowTests(unittest.TestCase):
         for command in (
             "python3 scripts/check-crate-boundaries.py",
             "python3 scripts/check-driver-id-branches.py",
+            "python3 scripts/check-ui-patterns.py",
             "python3 scripts/release-notes.py fragments",
         ):
             with self.subTest(command=command):
