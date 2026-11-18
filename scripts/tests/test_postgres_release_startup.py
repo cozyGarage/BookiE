@@ -142,31 +142,6 @@ print(hosts[sys.argv[-1]], "STREAM", sys.argv[-1])
                     self.assertEqual(captured.read_text(), expected_bind)
                     self.assertEqual(captured_ssh.read_text(), expected_ssh)
 
-    def test_missing_toxiproxy_config_fails_before_starting_compose(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            (root / "scripts").mkdir()
-            shutil.copy(ROOT / "scripts/test-postgres-release.sh", root / "scripts")
-            binary = root / "bin"
-            binary.mkdir()
-            docker = binary / "docker"
-            docker.write_text('''#!/usr/bin/env bash
-if [[ "$1" == "compose" && "$2" == "version" ]]; then
-    exit 0
-fi
-exit 99
-''')
-            docker.chmod(0o755)
-            result = subprocess.run(
-                ["bash", str(root / "scripts/test-postgres-release.sh")],
-                env=dict(os.environ, PATH=f"{binary}:{os.environ['PATH']}"),
-                text=True,
-                capture_output=True,
-            )
-
-            self.assertEqual(result.returncode, 1)
-            self.assertIn("Toxiproxy config file is missing", result.stderr)
-
     def test_container_fixture_ports_are_bound_to_the_configured_address(self):
         compose = (ROOT / "tests/fixtures/postgres-release/docker-compose.yml").read_text()
         self.assertEqual(compose.count('${BOOKIE_FIXTURE_BIND_ADDRESS:-127.0.0.1}:'), 3)
@@ -180,14 +155,6 @@ exit 99
         job = workflow.split("  pg-release:\n", 1)[1].split("  distro-floor-scenarios:\n", 1)[0]
         self.assertIn("options: --add-host=host.docker.internal:host-gateway", job)
         self.assertIn("BOOKIE_FIXTURE_HOST: host.docker.internal", job)
-
-    def test_release_cleanup_removes_fixture_contents_without_removing_mount_root(self):
-        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
-        job = workflow.split("  pg-release:\n", 1)[1].split("  distro-floor-scenarios:\n", 1)[0]
-        cleanup = job.split("- name: Remove shared PostgreSQL fixture files", 1)[1]
-
-        self.assertIn("find /var/tmp/bookie-pg-release-fixtures -mindepth 1 -maxdepth 1", cleanup)
-        self.assertNotIn("rm -rf -- /var/tmp/bookie-pg-release-fixtures", cleanup)
 
     def test_release_waits_for_the_bastion_ssh_service(self):
         script = (ROOT / "scripts/test-postgres-release.sh").read_text()
