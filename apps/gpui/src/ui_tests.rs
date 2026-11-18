@@ -432,7 +432,8 @@ fn the_sidebar_locate_regex_and_active_only_controls_filter_the_tree(cx: &mut Te
             assert!(view.status.starts_with("Located "));
             view.toggle_sidebar_regex(cx);
             assert!(view.sidebar.regex);
-            view.sidebar.search
+            view.sidebar
+                .search
                 .update(cx, |input, cx| input.set_content(r"^cust", cx));
             let rows = bookie_gpui::shell::tree_rows_in(
                 &view.catalog,
@@ -529,7 +530,7 @@ fn the_overflow_menu_lists_commands_by_group_and_runs_them(cx: &mut TestAppConte
         .iter()
         .map(|group| group.iter().map(|(id, _, _)| *id).collect())
         .collect();
-    assert_eq!(ids[0], ["query", "run"]);
+    assert_eq!(ids[0], ["query", "run", "explain"]);
     assert!(ids.iter().flatten().any(|id| *id == "settings"));
     let open_before = view.read_with(cx, |view, _| view.sidebar.open);
     cx.update(|window, cx| view.update(cx, |view, cx| view.run_palette_id("sidebar", window, cx)));

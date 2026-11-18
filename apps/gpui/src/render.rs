@@ -51,14 +51,22 @@ impl GridView {
             return pager.child(div().child(range_label));
         }
         pager
-            .child(icon_button("first", "chevrons-left", "First page", false, theme).on_click(cx.listener(|this, _, _, cx| {
-                this.pager.first();
-                cx.notify();
-            })))
-            .child(icon_button("prev", "chevron-left", "Previous page", false, theme).on_click(cx.listener(|this, _, _, cx| {
-                this.pager.previous();
-                cx.notify();
-            })))
+            .child(
+                icon_button("first", "chevrons-left", "First page", false, theme).on_click(cx.listener(
+                    |this, _, _, cx| {
+                        this.pager.first();
+                        cx.notify();
+                    },
+                )),
+            )
+            .child(
+                icon_button("prev", "chevron-left", "Previous page", false, theme).on_click(cx.listener(
+                    |this, _, _, cx| {
+                        this.pager.previous();
+                        cx.notify();
+                    },
+                )),
+            )
             .child(div().child(range_label))
             .child(
                 button("page-size", format!("{} rows", self.pager.rows), theme).on_click(cx.listener(
@@ -82,14 +90,22 @@ impl GridView {
                     cx.notify();
                 })),
             )
-            .child(icon_button("next", "chevron-right", "Next page", false, theme).on_click(cx.listener(|this, _, _, cx| {
-                this.pager.next();
-                cx.notify();
-            })))
-            .child(icon_button("last", "chevrons-right", "Last page", false, theme).on_click(cx.listener(|this, _, _, cx| {
-                this.pager.last();
-                cx.notify();
-            })))
+            .child(
+                icon_button("next", "chevron-right", "Next page", false, theme).on_click(cx.listener(
+                    |this, _, _, cx| {
+                        this.pager.next();
+                        cx.notify();
+                    },
+                )),
+            )
+            .child(
+                icon_button("last", "chevrons-right", "Last page", false, theme).on_click(cx.listener(
+                    |this, _, _, cx| {
+                        this.pager.last();
+                        cx.notify();
+                    },
+                )),
+            )
     }
 
     fn grid_action_buttons(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
@@ -98,17 +114,35 @@ impl GridView {
             .items_center()
             .gap_1()
             .child(div().w(px(size::FIND_WIDTH)).flex_none().child(self.find.clone()))
-            .child(icon_button("find-prev", "chevron-up", "Previous match", false, theme).on_click(cx.listener(|this, _, _, cx| this.run_find(false, cx))))
-            .child(icon_button("find-next", "chevron-down", "Next match", false, theme).on_click(cx.listener(|this, _, _, cx| this.run_find(true, cx))))
             .child(
-                icon_button("show", "sliders-horizontal", "Show matching rows only", false, theme).on_click(cx.listener(|this, _, _, cx| {
-                    this.show_matching(cx);
-                    cx.notify();
-                })),
+                icon_button("find-prev", "chevron-up", "Previous match", false, theme)
+                    .on_click(cx.listener(|this, _, _, cx| this.run_find(false, cx))),
             )
-            .child(icon_button("compare", "arrow-left-right", "Compare", false, theme).on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))))
             .child(
-                icon_button("export", "download", "Export current page or selection as CSV", false, theme).on_click(cx.listener(|this, _, _, cx| {
+                icon_button("find-next", "chevron-down", "Next match", false, theme)
+                    .on_click(cx.listener(|this, _, _, cx| this.run_find(true, cx))),
+            )
+            .child(
+                icon_button("show", "sliders-horizontal", "Show matching rows only", false, theme).on_click(
+                    cx.listener(|this, _, _, cx| {
+                        this.show_matching(cx);
+                        cx.notify();
+                    }),
+                ),
+            )
+            .child(
+                icon_button("compare", "arrow-left-right", "Compare", false, theme)
+                    .on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))),
+            )
+            .child(
+                icon_button(
+                    "export",
+                    "download",
+                    "Export current page or selection as CSV",
+                    false,
+                    theme,
+                )
+                .on_click(cx.listener(|this, _, _, cx| {
                     this.export_selection_or_page(cx);
                     cx.notify();
                 })),

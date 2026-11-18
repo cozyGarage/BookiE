@@ -19,7 +19,12 @@ impl GridView {
     }
 
     pub(crate) fn report_scroll(&self, steps: u32, elapsed: u128, with_frames: bool) {
-        let mut sorted: Vec<f64> = self.measure.frame_intervals.iter().map(|d| d.as_secs_f64() * 1000.0).collect();
+        let mut sorted: Vec<f64> = self
+            .measure
+            .frame_intervals
+            .iter()
+            .map(|d| d.as_secs_f64() * 1000.0)
+            .collect();
         sorted.sort_by(f64::total_cmp);
         let pick = |q: f64| {
             sorted

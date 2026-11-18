@@ -18,12 +18,32 @@ impl RunSlot {
 
 impl GridView {
     pub(crate) fn run_query(&mut self, cx: &mut Context<Self>) {
+        let sql = self.sql_input.read(cx).value().to_string();
+        if self.live.is_some() && sql.trim().is_empty() {
+            self.status = "Type a statement first".into();
+            return;
+        }
+        self.run_sql(sql, cx);
+    }
+
+    pub(crate) fn explain_query(&mut self, cx: &mut Context<Self>) {
+        let Some(session) = self.live.clone() else {
+            self.status = "Connect to a database to explain a query".into();
+            return;
+        };
+        let sql = self.sql_input.read(cx).value().to_string();
+        if sql.trim().is_empty() {
+            self.status = "Type a statement first".into();
+            return;
+        }
+        match bookie_core::sql_dialect::explain_statement(&session.driver_id, &sql) {
+            Some(statement) => self.run_sql(statement, cx),
+            None => self.status = "This database cannot explain a query".into(),
+        }
+    }
+
+    fn run_sql(&mut self, sql: String, cx: &mut Context<Self>) {
         if let Some(session) = self.live.clone() {
-            let sql = self.sql_input.read(cx).value().to_string();
-            if sql.trim().is_empty() {
-                self.status = "Type a statement first".into();
-                return;
-            }
             self.status = "Running…".into();
             self.begin_background(
                 Work::Load,

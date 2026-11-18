@@ -392,7 +392,13 @@ impl GridView {
             regex: self.sidebar.regex,
             active_only: self.sidebar.active_only,
         };
-        let rows = tree_rows_in(&self.catalog, search, self.sidebar.connection_open, self.sidebar.database_open, filter);
+        let rows = tree_rows_in(
+            &self.catalog,
+            search,
+            self.sidebar.connection_open,
+            self.sidebar.database_open,
+            filter,
+        );
         let open_table = self.tabs.current().clone();
         let tree: Vec<_> = rows
             .into_iter()
@@ -1019,6 +1025,14 @@ impl GridView {
                 ghost_icon("run-query", "play", "Run query (Ctrl+Enter)", theme).on_click(cx.listener(
                     |this, _, _, cx| {
                         this.run_query(cx);
+                        cx.notify();
+                    },
+                )),
+            )
+            .child(
+                ghost_icon("explain-query", "info", "Explain the query", theme).on_click(cx.listener(
+                    |this, _, _, cx| {
+                        this.explain_query(cx);
                         cx.notify();
                     },
                 )),

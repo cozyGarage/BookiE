@@ -16,8 +16,8 @@ mod palette_state;
 mod render;
 mod runs;
 mod scroll_pace;
-mod sidebar_state;
 mod services;
+mod sidebar_state;
 mod text_input;
 mod ui_theme;
 
@@ -158,7 +158,15 @@ fn thousands(value: u64) -> String {
     out
 }
 
-const UI_FONTS: [&str; 7] = ["Inter", "SF Pro Text", "Segoe UI", "Adwaita Sans", "Roboto", "Noto Sans", "Fira Sans"];
+const UI_FONTS: [&str; 7] = [
+    "Inter",
+    "SF Pro Text",
+    "Segoe UI",
+    "Adwaita Sans",
+    "Roboto",
+    "Noto Sans",
+    "Fira Sans",
+];
 
 fn default_font(installed: &[String]) -> String {
     let wanted = std::env::var("BOOKIE_PROTOTYPE_FONT").ok();
@@ -452,7 +460,10 @@ impl GridView {
         let now = Instant::now();
         if !self.measure.first_frame_reported {
             self.measure.first_frame_reported = true;
-            println!("PROTOTYPE_FIRST_FRAME ms={}", self.measure.started.elapsed().as_millis());
+            println!(
+                "PROTOTYPE_FIRST_FRAME ms={}",
+                self.measure.started.elapsed().as_millis()
+            );
         }
         if let (true, Some(last)) = (self.measure.measuring, self.measure.last_frame) {
             self.measure.frame_intervals.push(now - last);
@@ -551,7 +562,14 @@ fn icon_button(id: &'static str, name: &'static str, tip: &'static str, active: 
         .cursor_pointer()
         .when(active, |style| style.bg(rgb(theme.accent)))
         .hover(move |style| style.bg(rgb(theme.accent)))
-        .child(assets::icon(name, if active { theme.foreground } else { theme.muted_foreground }))
+        .child(assets::icon(
+            name,
+            if active {
+                theme.foreground
+            } else {
+                theme.muted_foreground
+            },
+        ))
 }
 
 fn button(id: &'static str, label: impl Into<String>, theme: Theme) -> Stateful<Div> {
