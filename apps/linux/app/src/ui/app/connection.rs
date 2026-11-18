@@ -589,7 +589,15 @@ impl App {
         };
         let id = prepared.id();
         let notice = self.live_session_notice(id, prepared);
-        if !reconnect_prompt_needed(self.multi.sessions.is_working(id), notice.is_some()) {
+        let explicit_database_switch = self
+            .pending_database_switch
+            .as_ref()
+            .is_some_and(|(pending_id, _)| *pending_id == id);
+        if !reconnect_prompt_needed(
+            self.multi.sessions.is_working(id),
+            notice.is_some(),
+            explicit_database_switch,
+        ) {
             return false;
         }
         let Some(notice) = notice else {
@@ -1184,8 +1192,8 @@ fn reuse_working_session(working: bool, pending: Option<&(Uuid, String)>, target
     working && !pending.is_some_and(|(id, _)| *id == target)
 }
 
-fn reconnect_prompt_needed(working: bool, changed_settings: bool) -> bool {
-    working && changed_settings
+fn reconnect_prompt_needed(working: bool, changed_settings: bool, explicit_database_switch: bool) -> bool {
+    working && changed_settings && !explicit_database_switch
 }
 
 fn touch_last_opened(connection_id: Uuid, sender: ComponentSender<App>) {
@@ -1222,9 +1230,14 @@ mod tests {
 
     #[test]
     fn changed_saved_settings_prompt_only_for_a_live_connection() {
-        assert!(reconnect_prompt_needed(true, true));
-        assert!(!reconnect_prompt_needed(true, false));
-        assert!(!reconnect_prompt_needed(false, true));
+        assert!(reconnect_prompt_needed(true, true, false));
+        assert!(!reconnect_prompt_needed(true, false, false));
+        assert!(!reconnect_prompt_needed(false, true, false));
+    }
+
+    #[test]
+    fn an_explicit_database_switch_does_not_prompt_to_apply_the_selected_database() {
+        assert!(!reconnect_prompt_needed(true, true, true));
     }
 
     #[test]

@@ -717,13 +717,22 @@ class CiWorkflowTests(unittest.TestCase):
 
     def test_driver_tls_and_postgres_release_fixtures_reach_the_docker_host(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        forgejo_workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         driver_tls = re.search(r"(?ms)^  driver-tls:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
+        forgejo_driver_tls = re.search(
+            r"(?ms)^  driver-tls:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", forgejo_workflow
+        ).group(1)
         pg_release = re.search(r"(?ms)^  pg-release:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
         tls_compose = (ROOT / "tests/fixtures/driver-tls/docker-compose.yml").read_text()
         release_compose = (ROOT / "tests/fixtures/postgres-release/docker-compose.yml").read_text()
         tls_fixture_script = (ROOT / "scripts/test-driver-tls.sh").read_text()
         tls_test_helpers = (ROOT / "tests/driver-tls/src/lib.rs").read_text()
 
+        self.assertIn("BOOKIE_DRIVER_TLS_MYSQL_PORT: 13307", forgejo_driver_tls)
+        self.assertIn(
+            '"${BOOKIE_FIXTURE_BIND_ADDRESS:-127.0.0.1}:${BOOKIE_DRIVER_TLS_MYSQL_PORT:-3307}:3306"',
+            tls_compose,
+        )
         self.assertIn("options: --add-host=host.docker.internal:host-gateway", driver_tls)
         self.assertIn("BOOKIE_DRIVER_TLS_HOST: host.docker.internal", driver_tls)
         self.assertIn("BOOKIE_DRIVER_TLS_SSH_HOST: host.docker.internal", driver_tls)
@@ -731,7 +740,12 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("BOOKIE_FIXTURE_BIND_ADDRESS: 0.0.0.0", driver_tls)
         self.assertEqual(
             len(re.findall(r"(?m)^    ports:$", tls_compose)),
-            len(re.findall(r'(?m)^\s+- "\$\{BOOKIE_FIXTURE_BIND_ADDRESS:-127\.0\.0\.1\}:\d+:\d+"$', tls_compose)),
+            len(
+                re.findall(
+                    r'(?m)^\s+- "\$\{BOOKIE_FIXTURE_BIND_ADDRESS:-127\.0\.0\.1\}:(?:\d+|\$\{BOOKIE_DRIVER_TLS_MYSQL_PORT:-3307\}):\d+"$',
+                    tls_compose,
+                )
+            ),
         )
         self.assertIn('getent ahostsv4 "$BOOKIE_DRIVER_TLS_HOST"', tls_fixture_script)
         self.assertIn("BOOKIE_DRIVER_TLS_WRONG_IDENTITY_HOST", tls_test_helpers)

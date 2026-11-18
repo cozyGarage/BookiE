@@ -1,4 +1,4 @@
-use bookie_core::{AuthMode, DriverCapabilities, Environment, TlsMode};
+use bookie_core::{AuthMode, DriverCapabilities, DriverRegistry, Environment, TlsMode};
 use std::path::PathBuf;
 
 use bookie_storage::{
@@ -67,16 +67,16 @@ fn optional_path(text: &str) -> Option<PathBuf> {
     (!text.is_empty()).then(|| PathBuf::from(text))
 }
 
-pub async fn load_draft(id: Uuid) -> Result<Option<ConnectionDraft>, String> {
+pub async fn load_draft(registry: &DriverRegistry, id: Uuid) -> Result<Option<ConnectionDraft>, String> {
     let saved = bookie_storage::load_connections()
         .await
         .map_err(|error| error.to_string())?
         .into_iter()
         .find(|saved| saved.id == id);
-    Ok(saved.map(|saved| draft_from_saved(&saved)))
+    Ok(saved.map(|saved| draft_from_saved(&saved, registry)))
 }
 
-fn draft_from_saved(saved: &SavedConnection) -> ConnectionDraft {
+fn draft_from_saved(saved: &SavedConnection, registry: &DriverRegistry) -> ConnectionDraft {
     let (socket_kind, socket_endpoint) = match (&saved.socket_dir, &saved.socket_path) {
         (Some(directory), _) => (Some(LocalSocketPathKind::Directory), path_text(Some(directory))),
         (None, Some(path)) => (Some(LocalSocketPathKind::File), path_text(Some(path))),
@@ -86,7 +86,9 @@ fn draft_from_saved(saved: &SavedConnection) -> ConnectionDraft {
         id: Some(saved.id),
         name: saved.name.clone(),
         driver_id: saved.driver_id.clone(),
-        capabilities: DriverCapabilities::default(),
+        capabilities: registry
+            .get(&saved.driver_id)
+            .map_or_else(DriverCapabilities::default, |driver| driver.capabilities()),
         host: saved.host.clone(),
         port: saved.port,
         database: saved.database.clone(),
@@ -551,6 +553,39 @@ async fn rollback_saved_connection(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use async_trait::async_trait;
+    use std::sync::Arc;
+
+    struct TestDriver {
+        id: &'static str,
+        file_based: bool,
+    }
+
+    #[async_trait]
+    impl bookie_core::DatabaseDriver for TestDriver {
+        fn id(&self) -> &'static str {
+            self.id
+        }
+
+        fn display_name(&self) -> &'static str {
+            self.id
+        }
+
+        fn default_port(&self) -> u16 {
+            0
+        }
+
+        fn is_file_based(&self) -> bool {
+            self.file_based
+        }
+
+        async fn connect(
+            &self,
+            _options: bookie_core::ConnectOptions,
+        ) -> Result<Box<dyn bookie_core::Connection>, bookie_core::DriverError> {
+            Err(bookie_core::DriverError::Unsupported("test driver".into()))
+        }
+    }
 
     fn hop(host: &str, auth: SshAuthKind) -> SshHopDraft {
         SshHopDraft {
@@ -607,12 +642,28 @@ mod tests {
     }
 
     #[test]
-    fn a_file_database_is_named_after_its_file() {
+    fn a_file_based_database_is_named_after_its_file() {
         let mut file = draft();
-        file.driver_id = "sqlite".into();
+        file.driver_id = "future-file-database".into();
         file.capabilities.is_file_based = true;
         file.database = "/tmp/a.sqlite".into();
-        assert_eq!(saved_from_draft(&file, Uuid::nil()).name, "/tmp/a.sqlite");
+        file.host.clear();
+        file.port = 0;
+        let saved = saved_from_draft(&file, Uuid::nil());
+        assert_eq!(saved.name, "/tmp/a.sqlite");
+        let mut registry = DriverRegistry::new();
+        registry.register(Arc::new(TestDriver {
+            id: "future-file-database",
+            file_based: true,
+        }));
+        assert!(draft_from_saved(&saved, &registry).capabilities.is_file_based);
+        assert!(validate(&file).is_ok());
+
+        let mut network = draft();
+        network.host.clear();
+        network.port = 0;
+        let saved = saved_from_draft(&network, Uuid::nil());
+        assert!(!draft_from_saved(&saved, &registry).capabilities.is_file_based);
     }
 
     #[test]
@@ -733,7 +784,7 @@ mod tests {
         let plan = plan_chain(head_config(ssh, None), &jump_forms(ssh), None).unwrap();
         let mut saved = saved_from_draft(&chain, Uuid::nil());
         saved.ssh = Some(plan.head);
-        let back = draft_from_saved(&saved).ssh.unwrap();
+        let back = draft_from_saved(&saved, &DriverRegistry::new()).ssh.unwrap();
         assert_eq!(back.head.auth, SshAuthKind::Agent);
         assert_eq!(back.jumps.len(), 2);
         assert_eq!(back.jumps[0].host, "bastion");

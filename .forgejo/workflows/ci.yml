@@ -1388,6 +1388,7 @@ jobs:
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/driver-tls
       BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-driver-tls
+      BOOKIE_DRIVER_TLS_MYSQL_PORT: 13307
     steps:
       - name: Prepare runner workspace
         run: |
