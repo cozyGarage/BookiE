@@ -223,7 +223,7 @@ async fn dispatch_session_command(
             })?;
         }
         Command::RunQuery { epoch, session_id, sql } => {
-            dispatch_query(sessions, epoch, session_id, sql, control, sink).await?;
+            Box::pin(dispatch_query(sessions, epoch, session_id, sql, control, sink)).await?;
         }
         Command::ReadPage {
             epoch,
