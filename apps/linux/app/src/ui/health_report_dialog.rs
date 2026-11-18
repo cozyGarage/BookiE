@@ -59,9 +59,7 @@ fn report_hint(report: HealthReport) -> String {
 }
 
 pub(crate) fn present(parent: &gtk::Window, source: HealthReportSource) {
-    let dialog = adw::Dialog::builder().title(tr!("Table and Index Health")).build();
-    dialog.set_content_width(900);
-    dialog.set_content_height(600);
+    let (dialog, toolbar) = super::dialog_shell::new(&tr!("Table and Index Health"), 900, 600);
     let panel = Rc::new(Panel {
         source,
         list: gtk::ListBox::builder().selection_mode(gtk::SelectionMode::None).build(),
@@ -79,11 +77,8 @@ pub(crate) fn present(parent: &gtk::Window, source: HealthReportSource) {
     });
     panel.list.add_css_class("boxed-list");
     panel.status.add_css_class("dim-label");
-    let toolbar = adw::ToolbarView::new();
-    toolbar.add_top_bar(&adw::HeaderBar::new());
     toolbar.set_content(Some(&content(&panel)));
     crate::ui::dialog_zoom::install(&toolbar, &[panel.list.clone().upcast()]);
-    dialog.set_child(Some(&toolbar));
     let closing = panel.clone();
     dialog.connect_closed(move |_| closing.in_flight.borrow().cancel());
     dialog.present(Some(parent));

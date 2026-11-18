@@ -40,13 +40,7 @@ fn validate_active_connection(
 }
 
 fn build_activity_dialog() -> (adw::Dialog, adw::WrapBox, gtk::TextView, gtk::Label) {
-    let dialog = adw::Dialog::builder().title(tr!("Server Activity")).build();
-    dialog.set_content_width(900);
-    dialog.set_content_height(560);
-
-    let toolbar = adw::ToolbarView::new();
-    let header = adw::HeaderBar::new();
-    toolbar.add_top_bar(&header);
+    let (dialog, toolbar) = super::dialog_shell::new(&tr!("Server Activity"), 900, 560);
 
     let box_ = gtk::Box::new(gtk::Orientation::Vertical, 0);
     let button_row = adw::WrapBox::builder()
@@ -76,7 +70,6 @@ fn build_activity_dialog() -> (adw::Dialog, adw::WrapBox, gtk::TextView, gtk::La
     box_.append(&status);
     toolbar.set_content(Some(&box_));
     crate::ui::dialog_zoom::install(&toolbar, &[scrolled.clone().upcast()]);
-    dialog.set_child(Some(&toolbar));
     (dialog, button_row, text, status)
 }
 

@@ -23,12 +23,7 @@ pub fn present_for_operation(parent: &gtk::Window, database: &Arc<DatabaseServic
 }
 
 fn present_with_operation(parent: &gtk::Window, database: &Arc<DatabaseService>, operation_id: Option<uuid::Uuid>) {
-    let dialog = adw::Dialog::builder().title(tr!("Audit Log")).build();
-    dialog.set_content_width(900);
-    dialog.set_content_height(620);
-
-    let toolbar = adw::ToolbarView::new();
-    toolbar.add_top_bar(&adw::HeaderBar::new());
+    let (dialog, toolbar) = super::dialog_shell::new(&tr!("Audit Log"), 900, 620);
     let search = gtk::SearchEntry::builder()
         .placeholder_text(tr!("Filter by operation id, connection, principal, kind or outcome"))
         .margin_start(12)
@@ -63,7 +58,6 @@ fn present_with_operation(parent: &gtk::Window, database: &Arc<DatabaseService>,
     stack.add_named(&scrolled, Some("list"));
     toolbar.set_content(Some(&stack));
     crate::ui::dialog_zoom::install(&toolbar, &[list.clone().upcast()]);
-    dialog.set_child(Some(&toolbar));
     crate::ui::leak_probe::track("audit", &dialog);
     dialog.present(Some(parent));
 

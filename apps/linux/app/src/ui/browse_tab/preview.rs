@@ -1,5 +1,5 @@
 use gtk4 as gtk;
-use libadwaita::{self as adw, prelude::*};
+use libadwaita::prelude::*;
 
 pub(super) use bookie_app_services::edit_preview::preview_text;
 
@@ -12,15 +12,8 @@ fn preview_view(text: &str) -> gtk::TextView {
 pub(super) fn present(parent: &impl IsA<gtk::Widget>, text: &str) {
     let view = preview_view(text);
     let scrolled = gtk::ScrolledWindow::builder().vexpand(true).child(&view).build();
-    let toolbar = adw::ToolbarView::new();
-    toolbar.add_top_bar(&adw::HeaderBar::new());
+    let (dialog, toolbar) = crate::ui::dialog_shell::new(&bookie_app_services::tr!("Pending SQL"), 640, 420);
     toolbar.set_content(Some(&scrolled));
-    let dialog = adw::Dialog::builder()
-        .title(bookie_app_services::tr!("Pending SQL"))
-        .content_width(640)
-        .content_height(420)
-        .child(&toolbar)
-        .build();
     crate::ui::leak_probe::present_tracked("pending_sql", &dialog, parent);
 }
 

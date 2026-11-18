@@ -48,11 +48,7 @@ fn present(
     names: Rc<Vec<String>>,
     persist: Rc<Option<Persist>>,
 ) {
-    let dialog = adw::Dialog::builder()
-        .title(bookie_app_services::tr!("Columns"))
-        .content_width(380)
-        .content_height(460)
-        .build();
+    let (dialog, toolbar) = crate::ui::dialog_shell::new(&bookie_app_services::tr!("Columns"), 380, 460);
     let group = adw::PreferencesGroup::builder()
         .description(bookie_app_services::tr!("At least one column stays visible."))
         .build();
@@ -92,10 +88,7 @@ fn present(
     let page = adw::PreferencesPage::new();
     page.add(&group);
     page.add(&widths);
-    let toolbar = adw::ToolbarView::new();
-    toolbar.add_top_bar(&adw::HeaderBar::new());
     toolbar.set_content(Some(&page));
-    dialog.set_child(Some(&toolbar));
     crate::ui::leak_probe::present_tracked("column_visibility", &dialog, view);
 }
 
