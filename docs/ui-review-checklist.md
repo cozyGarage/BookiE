@@ -2,7 +2,7 @@
 
 Use it on every pull request that touches a widget, in GTK or GPUI. A reviewer ticks what applies; an unchecked item needs a reason in the pull request. Tokens: [DESIGN.md](../DESIGN.md). Rules: [ui-design.md](ui-design.md).
 
-Sources are TablePro (`linux/AGENTS.md`, `linux/docs/state-management.md`), gpui-component (`website/docs/design-guides.md`), dbx, the GNOME HIG, the libadwaita docs and Apple's HIG, restated in our words.
+Sources are TablePro ([AGENTS.md](../AGENTS.md), [state-management.md](state-management.md)), gpui-component (`website/docs/design-guides.md`), dbx, the GNOME HIG, the libadwaita docs and Apple's HIG, restated in our words.
 
 ## Every view
 
