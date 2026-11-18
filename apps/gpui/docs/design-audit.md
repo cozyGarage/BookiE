@@ -27,7 +27,7 @@ Read `theme.rs`, `chrome.rs`, `render.rs`, `main.rs`, `text_input.rs` and `palet
 | 6 | Window controls are text glyphs (`–`, `□`, `×`) | `chrome.rs` `window_button` | Open: use icons; platform buttons on macOS and Windows |
 | 7 | `GridView` is a god object: 70 fields, with parallel vectors (`runs`, `run_edits`, `run_sources`) and eight palette fields | `main.rs:80` | Partly fixed: one `RunSlot` per result, and `PaletteState`, `SidebarState` and `Measure` groups; the struct is down from 70 to 49 fields (`PanelState`, `FontState`, `ExportState` added). Find, filter and editor state are the next groups |
 | 8 | No dropdown or context menu existed | `rg "PopupMenu\|ContextMenu"` found nothing | Fixed and checked on a real display: a toolbar overflow menu (ellipsis) and a cell context menu (right click selects the row, then copies, edits, clears), both built from the command palette's own labels (`menus.rs`), so a command has one name everywhere. The table swallows right clicks on cells, so the menu opens from its `RightClickedCell` event |
-| 9 | Saved connections can be opened from Home, but none can be created or edited | `chrome.rs` Home Quick Start | Open, blocked: saving needs validation, the keyring and policy checks that live in the GTK dialog; ADR 0041 says services decide, so first move them into an app-services command, then build the form |
+| 9 | Saved connections could be opened from Home, but none created | `chrome.rs` Home Quick Start | Partly fixed: `app-services::connection_save` (validate, build the record, save with the keyring password and rollback) is shared by GPUI's New connection form and the GTK dialog's password persistence. The form covers password connections; SSH, certificates, Kerberos, socket paths and editing an existing connection are still GTK-only |
 | 10 | The toolbar carries window-title controls but no query actions (run only appears inside the query tab) | `chrome.rs` | Open |
 | 11 | Zoom for result views is a font setting only, not Ctrl+scroll | `font_settings.rs` | Open |
 | 12 | Find filters only after Enter | `find_filter.rs` | Open (known) |
@@ -42,7 +42,7 @@ GPUI has: result grid with Find, filter, compare, export and row copy; SQL edito
 
 Both findings 9 and 14 need behaviour that today lives in GTK code or is written straight to storage by the GTK app. A frontend must not repeat it (ADR 0041), so the next step is two app-services commands used by both apps:
 
-- `ConnectionCommands`: `validate(draft)`, `test(draft)`, `save(draft)` and `delete(id)`, owning the keyring write, the policy checks and the audit record, with typed errors the frontends only render.
+- `ConnectionCommands`: `validate`, `save` and password persistence now exist in `connection_save`; `test(draft)`, `delete(id)`, editing and the SSH, certificate and Kerberos fields still have to move out of the GTK dialog, with the policy checks and the audit record, and typed errors the frontends only render.
 - `HistoryCommands`: `record(session, statement, outcome)` and `search(filter)`, owning the connection identity, redaction and the retention setting.
 
 The GTK connection dialog and `record_history` move onto them in the same pull request, then GPUI builds its form and history list on the same calls.

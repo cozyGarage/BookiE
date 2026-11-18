@@ -537,6 +537,29 @@ fn the_overflow_menu_lists_commands_by_group_and_runs_them(cx: &mut TestAppConte
     assert_ne!(view.read_with(cx, |view, _| view.sidebar.open), open_before);
 }
 
+#[gpui::test]
+fn the_palette_opens_one_new_connection_tab_with_the_default_port(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    for _ in 0..2 {
+        cx.simulate_keystrokes("ctrl-shift-p");
+        cx.simulate_input("new connection");
+        cx.simulate_keystrokes("enter");
+    }
+    view.read_with(cx, |view, cx| {
+        let tabs = view
+            .tabs
+            .items
+            .iter()
+            .filter(|tab| **tab == bookie_gpui::shell::Tab::NewConnection)
+            .count();
+        assert_eq!(tabs, 1);
+        assert_eq!(view.tabs.current(), &bookie_gpui::shell::Tab::NewConnection);
+        let draft = view.connection_form.draft(cx);
+        assert_eq!((draft.driver_id.as_str(), draft.port), ("postgres", 5432));
+        assert!(draft.read_only);
+    });
+}
+
 struct Tiny;
 
 struct CountingSource(std::sync::Arc<std::sync::atomic::AtomicUsize>);

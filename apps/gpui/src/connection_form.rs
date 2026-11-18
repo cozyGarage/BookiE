@@ -40,10 +40,15 @@ impl ConnectionForm {
             .collect();
         drivers.sort_by_key(|driver| driver.label);
         let driver = drivers.iter().position(|driver| driver.id == "postgres").unwrap_or(0);
+        let port = input("Port", cx);
+        if let Some(driver) = drivers.get(driver).filter(|driver| driver.port != 0) {
+            let text = driver.port.to_string();
+            port.update(cx, |input, cx| input.set_content(&text, cx));
+        }
         Self {
             name: input("Name (optional)", cx),
             host: input("Host", cx),
-            port: input("Port", cx),
+            port,
             database: input("Database or file", cx),
             username: input("User", cx),
             password: cx.new(|cx| TextInput::new("Password", cx).masked()),
@@ -91,14 +96,7 @@ impl GridView {
                 .gap_2()
                 .child(div().w(px(size::SIDE_PANEL_WIDTH / 2.0)).text_color(rgb(theme.muted_foreground)).child(label))
                 .child(
-                    div()
-                        .flex_1()
-                        .h(px(size::FORM_CONTROL))
-                        .px_2()
-                        .rounded(px(theme.radius))
-                        .border_1()
-                        .border_color(rgb(theme.border))
-                        .child(input.clone()),
+                    div().flex_1().h(px(size::FORM_CONTROL)).child(input.clone()),
                 )
         };
         let chips = form.drivers.iter().enumerate().map(|(index, driver)| {

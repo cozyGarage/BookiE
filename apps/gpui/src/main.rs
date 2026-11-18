@@ -165,6 +165,21 @@ const UI_FONTS: [&str; 7] = [
     "Fira Sans",
 ];
 
+fn installed_font_names(cx: &App) -> Vec<String> {
+    let mut names = cx.text_system().all_font_names();
+    names.sort();
+    names.dedup();
+    names
+}
+
+fn first_run(total: u64) -> Run {
+    Run {
+        number: 1,
+        rows: total,
+        elapsed_ms: None,
+    }
+}
+
 fn default_font(installed: &[String]) -> String {
     let wanted = std::env::var("BOOKIE_PROTOTYPE_FONT").ok();
     wanted
@@ -331,9 +346,7 @@ impl GridView {
         let (find, filter, editor, sql_input) = Self::init_query_inputs(window, cx);
         let (sidebar_search, palette_input) = Self::init_chrome_inputs(window, cx);
         let (table, table_focus, table_events) = Self::init_grid_table(window, cx);
-        let mut font_names = cx.text_system().all_font_names();
-        font_names.sort();
-        font_names.dedup();
+        let font_names = installed_font_names(cx);
         GridView {
             table,
             _table_events: table_events,
@@ -375,14 +388,7 @@ impl GridView {
             tab_scroll: ScrollHandle::new(),
             run_scroll: ScrollHandle::new(),
             scroll: UniformListScrollHandle::new(),
-            runs: vec![runs::RunSlot::new(
-                Run {
-                    number: 1,
-                    rows: total,
-                    elapsed_ms: None,
-                },
-                None,
-            )],
+            runs: vec![runs::RunSlot::new(first_run(total), None)],
             active_run: 0,
             next_run_number: 2,
             viewport_rows: 10,

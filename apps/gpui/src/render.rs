@@ -27,7 +27,7 @@ impl GridView {
         self.sync_table(grid_width, cx);
     }
 
-    fn grid_pager_buttons(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+    fn pager_labels(&self) -> (String, String) {
         let (first, last) = self.pager.range();
         let title = match &self.mode {
             Mode::Filtered { label, .. } => format!("{label} · "),
@@ -46,6 +46,30 @@ impl GridView {
         } else {
             format!("Rows {}-{}", thousands(first), thousands(last))
         };
+        (progress, range_label)
+    }
+
+    fn row_menu_overlay(&self) -> Option<impl IntoElement> {
+        self.row_menu.as_ref().map(|row_menu| {
+            gpui::deferred(
+                gpui::anchored()
+                    .position(row_menu.position)
+                    .snap_to_window_with_margin(px(size::SM))
+                    .child(row_menu.menu.clone()),
+            )
+        })
+    }
+
+    fn page_size_button(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
+        button("page-size", format!("{} rows", self.pager.rows), theme).on_click(cx.listener(|this, _, _, cx| {
+            let index = PAGE_SIZES.iter().position(|size| *size == this.pager.rows).unwrap_or(0);
+            this.pager = this.pager.resized(PAGE_SIZES[(index + 1) % PAGE_SIZES.len()]);
+            cx.notify();
+        }))
+    }
+
+    fn grid_pager_buttons(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+        let (progress, range_label) = self.pager_labels();
         let pager = div().flex().items_center().gap_1().child(div().child(progress));
         if self.continuous {
             return pager.child(div().child(range_label));
@@ -68,15 +92,7 @@ impl GridView {
                 )),
             )
             .child(div().child(range_label))
-            .child(
-                button("page-size", format!("{} rows", self.pager.rows), theme).on_click(cx.listener(
-                    |this, _, _, cx| {
-                        let index = PAGE_SIZES.iter().position(|size| *size == this.pager.rows).unwrap_or(0);
-                        this.pager = this.pager.resized(PAGE_SIZES[(index + 1) % PAGE_SIZES.len()]);
-                        cx.notify();
-                    },
-                )),
-            )
+            .child(self.page_size_button(theme, cx))
             .child(
                 icon_button(
                     "load-more",
@@ -329,14 +345,7 @@ impl Render for GridView {
             )
             .child(toolbar)
             .child(self.main_layout(sidebar, tab_row, content))
-            .children(self.row_menu.as_ref().map(|row_menu| {
-                gpui::deferred(
-                    gpui::anchored()
-                        .position(row_menu.position)
-                        .snap_to_window_with_margin(px(size::SM))
-                        .child(row_menu.menu.clone()),
-                )
-            }))
+            .children(self.row_menu_overlay())
             .child(self.status_bar(theme))
             .children(palette)
     }
