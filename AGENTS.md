@@ -98,7 +98,7 @@ Dependencies point toward `core`. Domain and driver crates never import GTK or R
 
 ## UI and async rules
 
-- Before changing UI, read [docs/ui-design.md](docs/ui-design.md). Write a UI pattern twice if needed; the third copy becomes one shared part in the same pull request. Spacing comes from the scale and UI state is passed in, never read from a global.
+- Before changing UI, read [docs/ui-design.md](docs/ui-design.md), and check the change against [docs/ui-review-checklist.md](docs/ui-review-checklist.md) and [DESIGN.md](DESIGN.md). Write a UI pattern twice if needed; the third copy becomes one shared part in the same pull request. Spacing comes from the scale and UI state is passed in, never read from a global.
 - GTK widgets belong to the glib main context. Database and blocking work never run on the GTK thread.
 - Relm4 messages drive state transitions; component-scoped commands own work whose lifetime belongs to a component. Async outcomes return to the update loop before touching widgets. Keep logic out of widget construction so it can be unit-tested.
 - Production GTK UI code does not wait synchronously with `std::thread::sleep` or `block_on`; `scripts/check-gtk-blocking.py` checks this boundary and excludes `#[cfg(test)]` code.
