@@ -50,6 +50,22 @@ fn show_sidebar(split_view: &adw::OverlaySplitView, generation: &std::rc::Rc<std
     split_view.set_show_sidebar(true);
 }
 
+pub(super) fn apply_temporary_tables_refresh(
+    by_tab: &mut std::collections::HashMap<uuid::Uuid, Vec<TableInfo>>,
+    tab_id: uuid::Uuid,
+    result: Result<Vec<TableInfo>, String>,
+) -> bool {
+    let Ok(tables) = result else {
+        return false;
+    };
+    if tables.is_empty() {
+        by_tab.remove(&tab_id);
+    } else {
+        by_tab.insert(tab_id, tables);
+    }
+    true
+}
+
 pub(super) fn hide_sidebar(split_view: &adw::OverlaySplitView, generation: &std::rc::Rc<std::cell::Cell<u32>>) {
     generation.set(generation.get().wrapping_add(1));
     split_view.set_show_sidebar(false);
@@ -514,6 +530,40 @@ mod tests {
             split_view.shows_sidebar(),
             "widening while connected docks the sidebar again"
         );
+    }
+
+    #[test]
+    fn a_failed_temporary_table_refresh_preserves_the_last_known_tables() {
+        let tab_id = uuid::Uuid::new_v4();
+        let table = TableInfo {
+            schema: Some("pg_temp_3".into()),
+            name: "scratch".into(),
+        };
+        let mut by_tab = std::collections::HashMap::from([(tab_id, vec![table.clone()])]);
+
+        assert!(!apply_temporary_tables_refresh(
+            &mut by_tab,
+            tab_id,
+            Err("metadata query failed".into())
+        ));
+
+        assert_eq!(by_tab.get(&tab_id), Some(&vec![table]));
+    }
+
+    #[test]
+    fn an_empty_temporary_table_refresh_clears_the_last_known_tables() {
+        let tab_id = uuid::Uuid::new_v4();
+        let mut by_tab = std::collections::HashMap::from([(
+            tab_id,
+            vec![TableInfo {
+                schema: Some("pg_temp_3".into()),
+                name: "scratch".into(),
+            }],
+        )]);
+
+        assert!(apply_temporary_tables_refresh(&mut by_tab, tab_id, Ok(Vec::new())));
+
+        assert!(!by_tab.contains_key(&tab_id));
     }
 }
 

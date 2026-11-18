@@ -851,7 +851,7 @@ impl SqlEditor {
 
     pub(super) fn end_session(&mut self, sender: &ComponentSender<Self>) {
         if self.session.is_some() {
-            let _ = sender.output(super::SqlEditorOutput::TemporaryTablesChanged(Vec::new()));
+            let _ = sender.output(super::SqlEditorOutput::TemporaryTablesChanged(Ok(Vec::new())));
         }
         self.clear_catalog_changes();
         self.opening_session_id = None;
@@ -1039,13 +1039,15 @@ impl SqlEditor {
         }
         match result {
             Ok(tables) => {
-                let _ = sender.output(super::SqlEditorOutput::TemporaryTablesChanged(tables));
+                let _ = sender.output(super::SqlEditorOutput::TemporaryTablesChanged(Ok(tables)));
             }
             Err(body) => {
-                let _ = sender.output(super::SqlEditorOutput::TemporaryTablesChanged(Vec::new()));
+                let _ = sender.output(super::SqlEditorOutput::TemporaryTablesChanged(Err(body.clone())));
+                let notice =
+                    bookie_app_services::tr!("The last successfully loaded list remains visible and may be outdated.");
                 let _ = sender.output(super::SqlEditorOutput::ShowAlert {
                     title: bookie_app_services::tr!("Temporary table refresh failed").to_string(),
-                    body,
+                    body: format!("{notice}\n\n{body}"),
                 });
             }
         }

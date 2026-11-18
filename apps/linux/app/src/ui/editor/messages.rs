@@ -174,7 +174,7 @@ pub enum SqlEditorInput {
 #[derive(Debug)]
 pub enum SqlEditorOutput {
     CatalogChanged(crate::services::catalog::CatalogOrigin),
-    TemporaryTablesChanged(Vec<bookie_core::TableInfo>),
+    TemporaryTablesChanged(Result<Vec<bookie_core::TableInfo>, String>),
     RunStateChanged(bool),
     QueryChanged(String),
     CopyToClipboard(String),
