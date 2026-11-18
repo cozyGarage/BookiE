@@ -39,7 +39,7 @@ impl HistoryPage {
     }
 }
 
-fn block_on_history<T: Send + 'static>(
+pub(crate) fn block_on_history<T: Send + 'static>(
     work: impl std::future::Future<Output = Result<T, String>> + Send + 'static,
 ) -> Result<T, String> {
     let runtime = tokio::runtime::Builder::new_current_thread()

@@ -22,6 +22,18 @@ pub struct OperationRow {
     pub duration_ms: Option<u64>,
 }
 
+pub async fn recent_operations(limit: usize) -> Result<Vec<OperationRow>, String> {
+    let service = crate::database_service::DatabaseService::new();
+    recent_operations_in(&service, limit).await
+}
+
+pub async fn recent_operations_in(
+    service: &crate::database_service::DatabaseService,
+    limit: usize,
+) -> Result<Vec<OperationRow>, String> {
+    service.recent_audit(limit).await.map(operations)
+}
+
 pub fn operations(events: Vec<AuditEvent>) -> Vec<OperationRow> {
     let mut rows: Vec<(OperationRow, usize)> = Vec::new();
     let mut by_operation: HashMap<Uuid, usize> = HashMap::new();
@@ -268,5 +280,11 @@ mod tests {
         assert!(!contains_operation(&rows, Uuid::new_v4()));
         assert!(row_matches(&rows[1], &other.to_string()));
         assert!(!row_matches(&rows[1], &requested.to_string()));
+    }
+
+    #[tokio::test]
+    async fn an_isolated_journal_with_no_events_lists_no_operations() {
+        let service = crate::database_service::DatabaseService::new_isolated();
+        assert!(recent_operations_in(&service, 10).await.unwrap().is_empty());
     }
 }

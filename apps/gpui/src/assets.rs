@@ -52,6 +52,7 @@ icons!(
     "trash-2",
     "minus",
     "square",
+    "shield",
 );
 
 pub struct Assets;

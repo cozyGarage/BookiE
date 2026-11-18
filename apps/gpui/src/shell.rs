@@ -123,6 +123,7 @@ pub enum Tab {
     Settings,
     NewConnection,
     History,
+    AuditLog,
 }
 
 impl Tab {
@@ -134,6 +135,7 @@ impl Tab {
             Tab::Settings => "Settings".into(),
             Tab::NewConnection => "New connection".into(),
             Tab::History => "History".into(),
+            Tab::AuditLog => "Audit log".into(),
         }
     }
 }
@@ -194,6 +196,16 @@ impl Tabs {
             Some(index) => index,
             None => {
                 self.items.push(Tab::History);
+                self.items.len() - 1
+            }
+        };
+    }
+
+    pub fn open_audit_log(&mut self) {
+        self.active = match self.items.iter().position(|item| *item == Tab::AuditLog) {
+            Some(index) => index,
+            None => {
+                self.items.push(Tab::AuditLog);
                 self.items.len() - 1
             }
         };
