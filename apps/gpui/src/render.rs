@@ -22,7 +22,7 @@ impl GridView {
         self.note_frame();
         self.pace_frame(window);
         self.viewport_rows = self.viewport_rows_for(window);
-        let sidebar_width = if self.sidebar_open { self.sidebar_width } else { 0.0 };
+        let sidebar_width = if self.sidebar.open { self.sidebar.width } else { 0.0 };
         let grid_width = (f32::from(window.viewport_size().width) - sidebar_width).max(0.0);
         self.sync_table(grid_width, cx);
     }
@@ -51,11 +51,11 @@ impl GridView {
             return pager.child(div().child(range_label));
         }
         pager
-            .child(button("first", "|‹", theme).on_click(cx.listener(|this, _, _, cx| {
+            .child(icon_button("first", "chevrons-left", "First page", false, theme).on_click(cx.listener(|this, _, _, cx| {
                 this.pager.first();
                 cx.notify();
             })))
-            .child(button("prev", "‹", theme).on_click(cx.listener(|this, _, _, cx| {
+            .child(icon_button("prev", "chevron-left", "Previous page", false, theme).on_click(cx.listener(|this, _, _, cx| {
                 this.pager.previous();
                 cx.notify();
             })))
@@ -70,13 +70,11 @@ impl GridView {
                 )),
             )
             .child(
-                button(
+                icon_button(
                     "load-more",
-                    if self.pager.append {
-                        "Load more ✓"
-                    } else {
-                        "Load more"
-                    },
+                    "arrow-down-up",
+                    "Append the next page instead of replacing the current one",
+                    self.pager.append,
                     theme,
                 )
                 .on_click(cx.listener(|this, _, _, cx| {
@@ -84,11 +82,11 @@ impl GridView {
                     cx.notify();
                 })),
             )
-            .child(button("next", "›", theme).on_click(cx.listener(|this, _, _, cx| {
+            .child(icon_button("next", "chevron-right", "Next page", false, theme).on_click(cx.listener(|this, _, _, cx| {
                 this.pager.next();
                 cx.notify();
             })))
-            .child(button("last", "›|", theme).on_click(cx.listener(|this, _, _, cx| {
+            .child(icon_button("last", "chevrons-right", "Last page", false, theme).on_click(cx.listener(|this, _, _, cx| {
                 this.pager.last();
                 cx.notify();
             })))
@@ -100,29 +98,27 @@ impl GridView {
             .items_center()
             .gap_1()
             .child(div().w(px(size::FIND_WIDTH)).flex_none().child(self.find.clone()))
-            .child(button("find-prev", "↑", theme).on_click(cx.listener(|this, _, _, cx| this.run_find(false, cx))))
-            .child(button("find-next", "↓", theme).on_click(cx.listener(|this, _, _, cx| this.run_find(true, cx))))
+            .child(icon_button("find-prev", "chevron-up", "Previous match", false, theme).on_click(cx.listener(|this, _, _, cx| this.run_find(false, cx))))
+            .child(icon_button("find-next", "chevron-down", "Next match", false, theme).on_click(cx.listener(|this, _, _, cx| this.run_find(true, cx))))
             .child(
-                button("show", "Matches only", theme).on_click(cx.listener(|this, _, _, cx| {
+                icon_button("show", "sliders-horizontal", "Show matching rows only", false, theme).on_click(cx.listener(|this, _, _, cx| {
                     this.show_matching(cx);
                     cx.notify();
                 })),
             )
-            .child(button("compare", "Compare", theme).on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))))
+            .child(icon_button("compare", "arrow-left-right", "Compare", false, theme).on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))))
             .child(
-                button("export", "Export…", theme).on_click(cx.listener(|this, _, _, cx| {
+                icon_button("export", "download", "Export current page or selection as CSV", false, theme).on_click(cx.listener(|this, _, _, cx| {
                     this.export_selection_or_page(cx);
                     cx.notify();
                 })),
             )
             .child(
-                button(
+                icon_button(
                     "continuous",
-                    if self.continuous {
-                        "Continuous ✓"
-                    } else {
-                        "Continuous"
-                    },
+                    "chevrons-down-up",
+                    "Scroll continuously",
+                    self.continuous,
                     theme,
                 )
                 .on_click(cx.listener(|this, _, _, cx| {
@@ -257,7 +253,7 @@ impl Render for GridView {
             Tab::Table(name) if name == self.catalog.grid_table => grid,
             Tab::Table(table) => self.placeholder_page(&table_label(&table), theme),
         };
-        let sidebar = self.sidebar_open.then(|| self.sidebar(theme, cx));
+        let sidebar = self.sidebar.open.then(|| self.sidebar(theme, cx));
         let toolbar = self.toolbar(theme, cx);
         let tab_row = self.tab_bar(theme, cx);
         div()
@@ -275,8 +271,8 @@ impl Render for GridView {
             .track_focus(&self.focus)
             .on_key_down(cx.listener(Self::key_down))
             .on_mouse_move(cx.listener(|this, event: &gpui::MouseMoveEvent, window, cx| {
-                if this.resizing_sidebar {
-                    this.sidebar_width = f32::from(event.position.x).clamp(260.0, 480.0);
+                if this.sidebar.resizing {
+                    this.sidebar.width = f32::from(event.position.x).clamp(260.0, 480.0);
                     cx.notify();
                 }
                 if this.resizing_split {
@@ -290,7 +286,7 @@ impl Render for GridView {
                 MouseButton::Left,
                 cx.listener(|this, _: &gpui::MouseUpEvent, _, cx| {
                     let was_resizing =
-                        std::mem::take(&mut this.resizing_sidebar) | std::mem::take(&mut this.resizing_split);
+                        std::mem::take(&mut this.sidebar.resizing) | std::mem::take(&mut this.resizing_split);
                     if was_resizing {
                         cx.notify();
                     }

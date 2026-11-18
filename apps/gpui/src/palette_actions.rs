@@ -264,7 +264,7 @@ impl GridView {
         vec![
             action(
                 "sidebar",
-                if self.sidebar_open {
+                if self.sidebar.open {
                     "Hide the sidebar"
                 } else {
                     "Show the sidebar"
@@ -418,7 +418,7 @@ impl GridView {
 
     fn execute_workspace_palette_action(&mut self, id: &'static str, window: &mut Window, cx: &mut Context<Self>) {
         match id {
-            "sidebar" => self.sidebar_open = !self.sidebar_open,
+            "sidebar" => self.sidebar.open = !self.sidebar.open,
             "settings" => {
                 self.tabs.open_settings();
                 self.sync_grid_owner();

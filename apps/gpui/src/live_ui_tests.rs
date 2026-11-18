@@ -43,13 +43,13 @@ fn a_rebound_shortcut_replaces_the_default_one(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     let keymap = bookie_gpui::keymap::Keymap::from_overrides(r#"{"toggle-sidebar":"alt-b"}"#).expect("keymap");
     view.update(cx, |view, _| view.keymap = keymap);
-    let before = view.read_with(cx, |view, _| view.sidebar_open);
+    let before = view.read_with(cx, |view, _| view.sidebar.open);
     cx.simulate_keystrokes("ctrl-b");
     view.read_with(cx, |view, _| {
-        assert_eq!(view.sidebar_open, before, "the old chord is free")
+        assert_eq!(view.sidebar.open, before, "the old chord is free")
     });
     cx.simulate_keystrokes("alt-b");
-    view.read_with(cx, |view, _| assert_eq!(view.sidebar_open, !before));
+    view.read_with(cx, |view, _| assert_eq!(view.sidebar.open, !before));
 }
 
 #[gpui::test]
@@ -1065,11 +1065,11 @@ fn a_new_query_tab_focuses_its_editor_so_typing_lands_there(cx: &mut TestAppCont
     });
     cx.simulate_keystrokes("ctrl-b");
     view.read_with(cx, |view, _| {
-        assert!(!view.sidebar_open, "the sidebar shortcut still works in the editor");
+        assert!(!view.sidebar.open, "the sidebar shortcut still works in the editor");
     });
     cx.simulate_keystrokes("ctrl-b");
     view.read_with(cx, |view, _| {
-        assert!(view.sidebar_open, "the sidebar shortcut still reopens the sidebar");
+        assert!(view.sidebar.open, "the sidebar shortcut still reopens the sidebar");
     });
     cx.simulate_input(" + 1");
     view.read_with(cx, |view, cx| {
@@ -1394,16 +1394,16 @@ fn header_collapse_all_and_feedback_actions(cx: &mut TestAppContext) {
     let (view, cx) = open_live(cx);
 
     view.update(cx, |view, _| {
-        assert!(view.connection_open && view.database_open);
-        let collapse = view.connection_open || view.database_open;
-        view.connection_open = !collapse;
-        view.database_open = !collapse;
-        assert!(!view.connection_open && !view.database_open);
+        assert!(view.sidebar.connection_open && view.sidebar.database_open);
+        let collapse = view.sidebar.connection_open || view.sidebar.database_open;
+        view.sidebar.connection_open = !collapse;
+        view.sidebar.database_open = !collapse;
+        assert!(!view.sidebar.connection_open && !view.sidebar.database_open);
 
-        let collapse = view.connection_open || view.database_open;
-        view.connection_open = !collapse;
-        view.database_open = !collapse;
-        assert!(view.connection_open && view.database_open);
+        let collapse = view.sidebar.connection_open || view.sidebar.database_open;
+        view.sidebar.connection_open = !collapse;
+        view.sidebar.database_open = !collapse;
+        assert!(view.sidebar.connection_open && view.sidebar.database_open);
     });
 
     view.update(cx, |view, _| {

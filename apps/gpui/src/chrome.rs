@@ -31,7 +31,7 @@ fn ghost(id: impl Into<gpui::ElementId>, label: impl Into<String>, theme: Theme)
         .child(label.into())
 }
 
-fn tip(label: &'static str) -> impl Fn(&mut gpui::Window, &mut gpui::App) -> gpui::AnyView + 'static {
+pub(crate) fn tip(label: &'static str) -> impl Fn(&mut gpui::Window, &mut gpui::App) -> gpui::AnyView + 'static {
     move |window, cx| gpui_component::tooltip::Tooltip::new(label).build(window, cx)
 }
 
@@ -48,7 +48,7 @@ fn expand_sidebar_button(theme: Theme, cx: &mut Context<GridView>) -> Stateful<D
         .hover(move |style| style.bg(rgb(theme.accent)))
         .child(icon("chevrons-right", theme.muted_foreground))
         .on_click(cx.listener(|this, _, _, cx| {
-            this.sidebar_open = true;
+            this.sidebar.open = true;
             cx.notify();
         }))
 }
@@ -64,7 +64,7 @@ fn import_menu(theme: Theme, cx: &mut Context<GridView>) -> Div {
             .hover(move |style| style.bg(rgb(theme.accent)))
             .child(label)
             .on_click(cx.listener(move |this, _, _, cx| {
-                this.import_menu_open = false;
+                this.sidebar.import_menu_open = false;
                 this.status = format!("{label} is not available in this prototype yet.");
                 cx.notify();
             }))
@@ -241,7 +241,7 @@ impl GridView {
                     .flex()
                     .items_center()
                     .gap_1()
-                    .children((!self.sidebar_open).then(|| expand_sidebar_button(theme, cx)))
+                    .children((!self.sidebar.open).then(|| expand_sidebar_button(theme, cx)))
                     .child(
                         toolbar_icon("new-connection", "database", "Connections", theme).on_click(cx.listener(
                             |this, _, _, cx| {
@@ -379,8 +379,8 @@ impl GridView {
         };
         line.on_click(cx.listener(move |this, _, window, cx| {
             match &row {
-                TreeRow::Connection { .. } => this.connection_open = !this.connection_open,
-                TreeRow::Database { .. } => this.database_open = !this.database_open,
+                TreeRow::Connection { .. } => this.sidebar.connection_open = !this.sidebar.connection_open,
+                TreeRow::Database { .. } => this.sidebar.database_open = !this.sidebar.database_open,
                 TreeRow::Table(table) => this.open_table_named(table, window, cx),
             }
             cx.notify();
@@ -389,10 +389,10 @@ impl GridView {
 
     fn sidebar_tree_view(&self, theme: Theme, search: &str, cx: &mut Context<Self>) -> Div {
         let filter = SidebarFilter {
-            regex: self.sidebar_regex,
-            active_only: self.sidebar_active_only,
+            regex: self.sidebar.regex,
+            active_only: self.sidebar.active_only,
         };
-        let rows = tree_rows_in(&self.catalog, search, self.connection_open, self.database_open, filter);
+        let rows = tree_rows_in(&self.catalog, search, self.sidebar.connection_open, self.sidebar.database_open, filter);
         let open_table = self.tabs.current().clone();
         let tree: Vec<_> = rows
             .into_iter()
@@ -419,9 +419,9 @@ impl GridView {
             .gap_1()
             .cursor_pointer()
             .child(icon("arrow-down-up", theme.muted_foreground).flex_none())
-            .children((self.sidebar_width >= 320.0).then(|| div().flex_1().min_w_0().child("Import / Export")))
+            .children((self.sidebar.width >= 320.0).then(|| div().flex_1().min_w_0().child("Import / Export")))
             .on_click(cx.listener(|this, _, _, cx| {
-                this.import_menu_open = !this.import_menu_open;
+                this.sidebar.import_menu_open = !this.sidebar.import_menu_open;
                 cx.notify();
             }))
     }
@@ -435,9 +435,9 @@ impl GridView {
             .child(
                 header_icon("header-collapse-all", "chevrons-down-up", theme).on_click(cx.listener(
                     |this, _, _, cx| {
-                        let collapse = this.connection_open || this.database_open;
-                        this.connection_open = !collapse;
-                        this.database_open = !collapse;
+                        let collapse = this.sidebar.connection_open || this.sidebar.database_open;
+                        this.sidebar.connection_open = !collapse;
+                        this.sidebar.database_open = !collapse;
                         cx.notify();
                     },
                 )),
@@ -456,7 +456,7 @@ impl GridView {
             )
             .child(
                 header_icon("collapse-sidebar", "chevrons-left", theme).on_click(cx.listener(|this, _, _, cx| {
-                    this.sidebar_open = false;
+                    this.sidebar.open = false;
                     cx.notify();
                 })),
             )
@@ -483,7 +483,7 @@ impl GridView {
             .flex()
             .items_center()
             .gap_1()
-            .child(div().flex_1().min_w_0().child(self.sidebar_search.clone()))
+            .child(div().flex_1().min_w_0().child(self.sidebar.search.clone()))
             .child(toggle_icon(
                 "sidebar-locate",
                 "crosshair",
@@ -495,7 +495,7 @@ impl GridView {
             .child(toggle_icon(
                 "sidebar-filter",
                 "sliders-horizontal",
-                self.sidebar_regex,
+                self.sidebar.regex,
                 theme,
                 cx,
                 |this, cx| this.toggle_sidebar_regex(cx),
@@ -503,12 +503,12 @@ impl GridView {
             .child(toggle_icon(
                 "sidebar-active-only",
                 "circle",
-                self.sidebar_active_only,
+                self.sidebar.active_only,
                 theme,
                 cx,
                 |this, _| {
-                    this.sidebar_active_only = !this.sidebar_active_only;
-                    this.status = if this.sidebar_active_only {
+                    this.sidebar.active_only = !this.sidebar.active_only;
+                    this.status = if this.sidebar.active_only {
                         "Showing only the active table.".into()
                     } else {
                         "Showing every table.".into()
@@ -530,7 +530,7 @@ impl GridView {
             .on_mouse_down(
                 gpui::MouseButton::Left,
                 cx.listener(|this, _: &MouseDownEvent, _, cx| {
-                    this.resizing_sidebar = true;
+                    this.sidebar.resizing = true;
                     cx.stop_propagation();
                     cx.notify();
                 }),
@@ -538,19 +538,19 @@ impl GridView {
     }
 
     pub fn sidebar(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
-        let search = self.sidebar_search.read(cx).content().to_string();
+        let search = self.sidebar.search.read(cx).content().to_string();
         div()
             .relative()
             .flex()
             .flex_col()
             .flex_none()
-            .w(px(self.sidebar_width))
+            .w(px(self.sidebar.width))
             .h_full()
             .bg(rgb(theme.sidebar))
             .border_r_1()
             .border_color(rgb(theme.border))
             .child(self.sidebar_header(theme, cx))
-            .children(self.import_menu_open.then(|| import_menu(theme, cx)))
+            .children(self.sidebar.import_menu_open.then(|| import_menu(theme, cx)))
             .child(self.sidebar_search_bar(theme, cx))
             .child(self.sidebar_tree_view(theme, &search, cx))
             .child(self.sidebar_resize_handle(theme, cx))
@@ -563,8 +563,8 @@ impl GridView {
             true,
             true,
             SidebarFilter {
-                regex: self.sidebar_regex,
-                active_only: self.sidebar_active_only,
+                regex: self.sidebar.regex,
+                active_only: self.sidebar.active_only,
             },
         )
         .iter()
@@ -573,13 +573,13 @@ impl GridView {
     }
 
     pub(crate) fn toggle_sidebar_regex(&mut self, cx: &mut Context<Self>) {
-        let search = self.sidebar_search.read(cx).content().to_string();
-        if !self.sidebar_regex && !bookie_gpui::shell::sidebar_regex_ok(&search) {
+        let search = self.sidebar.search.read(cx).content().to_string();
+        if !self.sidebar.regex && !bookie_gpui::shell::sidebar_regex_ok(&search) {
             self.status = "That search is not a valid regular expression.".into();
             return;
         }
-        self.sidebar_regex = !self.sidebar_regex;
-        self.status = if self.sidebar_regex {
+        self.sidebar.regex = !self.sidebar.regex;
+        self.status = if self.sidebar.regex {
             "Sidebar search uses a regular expression.".into()
         } else {
             "Sidebar search matches plain text.".into()
@@ -587,14 +587,14 @@ impl GridView {
     }
 
     pub(crate) fn locate_active_table(&mut self, cx: &mut Context<Self>) {
-        self.sidebar_open = true;
-        self.connection_open = true;
-        self.database_open = true;
-        self.sidebar_active_only = false;
-        self.sidebar_regex = false;
+        self.sidebar.open = true;
+        self.sidebar.connection_open = true;
+        self.sidebar.database_open = true;
+        self.sidebar.active_only = false;
+        self.sidebar.regex = false;
         let name = self.catalog.grid_table.name.clone();
         let label = table_label(&self.catalog.grid_table);
-        self.sidebar_search.update(cx, |input, cx| input.set_content(&name, cx));
+        self.sidebar.search.update(cx, |input, cx| input.set_content(&name, cx));
         self.status = format!("Located {label}");
     }
 

@@ -380,11 +380,11 @@ fn the_palette_switches_between_the_light_and_dark_theme(cx: &mut TestAppContext
 #[gpui::test]
 fn ctrl_b_hides_and_shows_the_sidebar(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
-    view.read_with(cx, |view, _| assert!(view.sidebar_open));
+    view.read_with(cx, |view, _| assert!(view.sidebar.open));
     cx.simulate_keystrokes("ctrl-b");
-    view.read_with(cx, |view, _| assert!(!view.sidebar_open));
+    view.read_with(cx, |view, _| assert!(!view.sidebar.open));
     cx.simulate_keystrokes("ctrl-b");
-    view.read_with(cx, |view, _| assert!(view.sidebar_open));
+    view.read_with(cx, |view, _| assert!(view.sidebar.open));
 }
 
 #[gpui::test]
@@ -409,12 +409,12 @@ fn the_home_tab_has_no_grid_so_arrow_keys_do_nothing_until_the_table_tab_is_back
 fn the_sidebar_search_takes_typed_text_and_filters_the_tree(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.update(|window, cx| {
-        let handle = view.read(cx).sidebar_search.read(cx).focus_handle_for_tests();
+        let handle = view.read(cx).sidebar.search.read(cx).focus_handle_for_tests();
         window.focus(&handle, cx);
     });
     cx.simulate_input("aud");
     view.read_with(cx, |view, cx| {
-        assert_eq!(view.sidebar_search.read(cx).content(), "aud");
+        assert_eq!(view.sidebar.search.read(cx).content(), "aud");
         let rows = bookie_gpui::shell::tree_rows("aud", true, true);
         assert_eq!(rows.len(), 3, "connection, database and the one matching table");
     });
@@ -425,14 +425,14 @@ fn the_sidebar_locate_regex_and_active_only_controls_filter_the_tree(cx: &mut Te
     let (view, cx) = open(cx);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
-            view.sidebar_open = false;
+            view.sidebar.open = false;
             view.locate_active_table(cx);
-            assert!(view.sidebar_open);
-            assert_eq!(view.sidebar_search.read(cx).content(), "synthetic_rows");
+            assert!(view.sidebar.open);
+            assert_eq!(view.sidebar.search.read(cx).content(), "synthetic_rows");
             assert!(view.status.starts_with("Located "));
             view.toggle_sidebar_regex(cx);
-            assert!(view.sidebar_regex);
-            view.sidebar_search
+            assert!(view.sidebar.regex);
+            view.sidebar.search
                 .update(cx, |input, cx| input.set_content(r"^cust", cx));
             let rows = bookie_gpui::shell::tree_rows_in(
                 &view.catalog,
@@ -450,7 +450,7 @@ fn the_sidebar_locate_regex_and_active_only_controls_filter_the_tree(cx: &mut Te
                     .count(),
                 1
             );
-            view.sidebar_active_only = true;
+            view.sidebar.active_only = true;
             let active = bookie_gpui::shell::tree_rows_in(
                 &view.catalog,
                 "",
@@ -531,9 +531,9 @@ fn the_overflow_menu_lists_commands_by_group_and_runs_them(cx: &mut TestAppConte
         .collect();
     assert_eq!(ids[0], ["query", "run"]);
     assert!(ids.iter().flatten().any(|id| *id == "settings"));
-    let open_before = view.read_with(cx, |view, _| view.sidebar_open);
+    let open_before = view.read_with(cx, |view, _| view.sidebar.open);
     cx.update(|window, cx| view.update(cx, |view, cx| view.run_palette_id("sidebar", window, cx)));
-    assert_ne!(view.read_with(cx, |view, _| view.sidebar_open), open_before);
+    assert_ne!(view.read_with(cx, |view, _| view.sidebar.open), open_before);
 }
 
 struct Tiny;
