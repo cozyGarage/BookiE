@@ -747,7 +747,11 @@ GLib.MainLoop().run()
                 text.setCaretOffset(offset)
                 ui.press_x11_key("Left")
                 ui.press_x11_key("Right")
-                assert text.caretOffset == offset, (position, text.caretOffset, offset)
+                deadline = time.monotonic() + ui.WAIT_SECONDS
+                while text.caretOffset != offset and time.monotonic() < deadline:
+                    time.sleep(ui.POLL_SECONDS)
+                actual_offset = text.caretOffset
+                assert actual_offset == offset, (position, actual_offset, offset)
                 started = time.monotonic()
                 ui.press_x11_key("period")
                 wait_for_candidate("alpha_only")

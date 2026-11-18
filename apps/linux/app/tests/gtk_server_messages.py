@@ -38,6 +38,7 @@ def scenarios(ui):
         ui.wait_for_node_containing("bookie GTK server message")
         ui.wait_for_node(name="42")
         copy = ui.wait_for_node(name="Copy messages", role=pyatspi.ROLE_PUSH_BUTTON)
+        ui.invoke_accessible_action("win.focus-grid")
         deadline = time.monotonic() + ui.WAIT_SECONDS
         while not copy.getState().contains(pyatspi.STATE_FOCUSED) and time.monotonic() < deadline:
             ui.press_x11_key("Tab")
