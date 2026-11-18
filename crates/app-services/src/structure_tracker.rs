@@ -1,18 +1,5 @@
-//! Passive per-tab DDL ops cache for the Structure workspace tab.
-//!
-//! StructureTab now owns the canonical source of truth for pending
-//! changes — it computes them on every edit by diffing the loaded
-//! snapshot against the live model (`sql_ddl::diff_to_ops`). On each
-//! recompute the tab overwrites this cache so
-//! out-of-band callers (close-with-pending dialog, save-by-id, the
-//! window-close prompt) can ask whether a tab is dirty and emit its
-//! current SQL without coupling to the tab's UI internals.
-//!
-//! There is no undo / redo machinery here — DDL undo is a session
-//! concept (Discard reverts the model to the snapshot). Per-keystroke
-//! op history is the wrong granularity for schema editing and was
-//! removed in the Structure-Refactor batch.
-//!
+//! Per-tab cache of pending operations, recomputed by StructureTab from
+//! its loaded snapshot and live model for GTK-independent close and save flows.
 
 use std::collections::HashMap;
 
@@ -20,10 +7,7 @@ use uuid::Uuid;
 
 use bookie_core::sql_ddl::{BuildDdlError, StructureOp, materialize_ops};
 
-/// Per-tab cache. Holds the current pending-op list emitted by the
-/// tab's diff. `materialize` re-runs SQL emission on demand; the
-/// cache means out-of-band callers don't have to re-derive ops from
-/// the tab's model.
+/// Cached operations from the tab's latest model diff.
 #[derive(Debug, Default)]
 pub struct StructureChangeTracker {
     ops: Vec<StructureOp>,
@@ -38,9 +22,7 @@ impl StructureChangeTracker {
         &self.ops
     }
 
-    /// Replace the cached op list. Called by StructureTab on every
-    /// model mutation; the tab is the source of truth for what ops
-    /// the diff currently produces.
+    /// Store the latest diff emitted by StructureTab.
     pub fn set_ops(&mut self, ops: Vec<StructureOp>) {
         self.ops = ops;
     }
