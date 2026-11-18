@@ -224,7 +224,7 @@ BOOKIE_SIDEBAR_PROFILE_OUTPUT="$PWD/target/quality/sidebar-search-50000.jsonl" \
 
 It runs 101 samples for a specific match, a schema-prefix match, and a broad match. The output includes the number of visible nodes and median/p95 time in nanoseconds. It measures the tree algorithm only; use the GTK profile below to measure GTK model readiness, created list-item objects and accessibility.
 
-The opt-in GTK scenario `postgres_sidebar_catalog_profile` measures connected-window availability, sidebar model readiness, search-filter accessibility, tree-model construction time, created `GtkListView` item objects, UI-thread stalls, and app process memory before and after loading a synthetic catalog. It enables the existing 16 ms UI-stall monitor and samples the model and item-object metrics before the search measurement. Start a disposable PostgreSQL database containing the named target table, then run:
+The opt-in GTK scenario `postgres_sidebar_catalog_profile` measures connected-window availability, sidebar model readiness, search-filter accessibility, tree-model construction time, created `GtkListView` item objects, UI-thread stalls, and app process memory before and after loading a synthetic catalog. Its JSON also reports estimated active-sidebar and session-catalog payload bytes separately from RSS/PSS, using metadata struct sizes and string capacities; these estimates omit collection allocations, GTK objects and allocator overhead. It enables the existing 16 ms UI-stall monitor and samples the model and item-object metrics before the search measurement. Start a disposable PostgreSQL database containing the named target table, then run:
 
 ```bash
 BOOKIE_GTK_POSTGRES_PORT=15432 \
