@@ -250,8 +250,7 @@ impl SimpleComponent for SqlEditor {
 
                         #[name = "pin_button"]
                         append = &gtk::Button {
-                            set_label: &bookie_app_services::tr!("Pin results"),
-                            set_can_shrink: true,
+                            set_icon_name: "view-pin-symbolic",
                             set_tooltip_text: Some(bookie_app_services::tr!("Keep these results above the results of the next run").as_str()),
                             set_sensitive: false,
                             add_css_class: "flat",
@@ -270,8 +269,7 @@ impl SimpleComponent for SqlEditor {
 
                         #[name = "explain_button"]
                         append = &gtk::Button {
-                            set_label: &bookie_app_services::tr!("Explain"),
-                            set_can_shrink: true,
+                            set_icon_name: "dialog-information-symbolic",
                             set_tooltip_text: Some(bookie_app_services::tr!("Explain query plan").as_str()),
                             add_css_class: "flat",
                             connect_clicked => SqlEditorInput::Run(RunMessage::Explain),
@@ -279,8 +277,7 @@ impl SimpleComponent for SqlEditor {
 
                         #[name = "split_button"]
                         append = &gtk::ToggleButton {
-                            set_label: &bookie_app_services::tr!("Split"),
-                            set_can_shrink: true,
+                            set_icon_name: "view-dual-symbolic",
                             set_tooltip_text: Some(bookie_app_services::tr!("Show or hide a second SQL editor pane").as_str()),
                             add_css_class: "flat",
                             connect_toggled[sender] => move |button| {

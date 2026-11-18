@@ -19,6 +19,30 @@ struct Surface {
     warning_color: Option<&'static str>,
 }
 
+const BOOKIE_LIGHT: Surface = Surface {
+    window_bg: "#ffffff",
+    window_fg: "#0a0a0a",
+    view_bg: "#ffffff",
+    chrome_bg: "#f5f5f5",
+    card_bg: "#ffffff",
+    accent_bg: "#171717",
+    accent_fg: "#fafafa",
+    accent_text: "#404040",
+    warning_color: None,
+};
+
+const BOOKIE_DARK: Surface = Surface {
+    window_bg: "#131416",
+    window_fg: "#d7d7db",
+    view_bg: "#131416",
+    chrome_bg: "#1b1b1e",
+    card_bg: "#1b1b1e",
+    accent_bg: "#d0d0d6",
+    accent_fg: "#131416",
+    accent_text: "#d0d0d6",
+    warning_color: None,
+};
+
 const LEDGER_DARK: Surface = Surface {
     window_bg: "#0e2421",
     window_fg: "#f3ead6",
@@ -117,7 +141,8 @@ const GRUVBOX_LIGHT: Surface = Surface {
 
 fn surface(theme: ThemePref, dark: bool) -> Option<&'static Surface> {
     Some(match (theme, dark) {
-        (ThemePref::Default, _) => return None,
+        (ThemePref::Default, true) => &BOOKIE_DARK,
+        (ThemePref::Default, false) => &BOOKIE_LIGHT,
         (ThemePref::Ledger, true) => &LEDGER_DARK,
         (ThemePref::Ledger, false) => &LEDGER_LIGHT,
         (ThemePref::Catppuccin, true) => &CATPPUCCIN_DARK,
@@ -399,9 +424,8 @@ mod tests {
     }
 
     #[test]
-    fn the_default_theme_adds_no_overrides_and_others_define_every_surface() {
-        assert!(surface(ThemePref::Default, true).is_none() && surface(ThemePref::Default, false).is_none());
-        let sheet = css(surface(ThemePref::Ledger, true).unwrap(), true);
+    fn every_theme_defines_every_surface() {
+        let sheet = css(surface(ThemePref::Default, true).unwrap(), true);
         for name in [
             "window_bg_color",
             "view_bg_color",
