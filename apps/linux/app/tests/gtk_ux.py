@@ -758,9 +758,20 @@ GLib.MainLoop().run()
                 wait_for_candidate("alpha_only")
                 elapsed_ms = (time.monotonic() - started) * 1000
                 print(f"completion position={position} source_bytes={source_bytes} popup_ms={elapsed_ms:.1f}")
+                assert text.getText(offset, offset + 1) == ".", position
                 ui.press_x11_key("Escape")
                 wait_for_candidate("alpha_only", present=False)
+                ui.invoke_accessible_action("win.focus-editor")
+                text.setCaretOffset(offset + 1)
+                deadline = time.monotonic() + ui.WAIT_SECONDS
+                while text.caretOffset != offset + 1 and time.monotonic() < deadline:
+                    time.sleep(ui.POLL_SECONDS)
+                assert text.caretOffset == offset + 1, (position, text.caretOffset)
                 ui.press_x11_key("BackSpace")
+                deadline = time.monotonic() + ui.WAIT_SECONDS
+                while text.getText(offset, offset + 1) != " " and time.monotonic() < deadline:
+                    time.sleep(ui.POLL_SECONDS)
+                assert text.getText(offset, offset + 1) == " ", position
             set_active_editor("SELECT 1")
 
         try:
