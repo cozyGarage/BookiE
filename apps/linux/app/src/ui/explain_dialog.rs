@@ -82,18 +82,11 @@ fn build_explain_window(
         .policy(adw::ViewSwitcherPolicy::Wide)
         .build();
     header.set_title_widget(Some(&switcher));
-    let view = gtk::TextView::builder()
-        .editable(false)
-        .monospace(true)
-        .wrap_mode(gtk::WrapMode::WordChar)
-        .left_margin(12)
-        .right_margin(12)
-        .top_margin(12)
-        .bottom_margin(12)
-        .build();
+    let view = crate::ui::output_text_view::roomy(gtk::WrapMode::WordChar);
     view.buffer().set_text(&tr!("Running EXPLAIN…"));
     scrolled.set_child(Some(&view));
     toolbar.set_content(Some(&stack));
+    crate::ui::dialog_zoom::install(&toolbar, &[scrolled.clone().upcast(), tree_scrolled.clone().upcast()]);
     window.set_content(Some(&toolbar));
     let window_for_escape = window.clone();
     let escape = gtk::EventControllerKey::new();

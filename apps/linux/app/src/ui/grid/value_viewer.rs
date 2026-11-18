@@ -134,16 +134,7 @@ impl Write for PreviewWriter {
 }
 
 pub(super) fn build_text_view(text: &str) -> gtk::TextView {
-    let view = gtk::TextView::builder()
-        .editable(false)
-        .cursor_visible(false)
-        .monospace(true)
-        .wrap_mode(wrap_mode(text))
-        .top_margin(8)
-        .bottom_margin(8)
-        .left_margin(12)
-        .right_margin(12)
-        .build();
+    let view = crate::ui::output_text_view::compact(wrap_mode(text));
     let buffer = view.buffer();
     buffer.set_text(text);
     let no_hyphens = gtk::TextTag::builder()

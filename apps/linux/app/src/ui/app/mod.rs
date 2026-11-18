@@ -392,6 +392,7 @@ impl SimpleComponent for App {
                     set_sidebar = &adw::ToolbarView {
                         #[name = "sidebar_header"]
                         add_top_bar = &adw::HeaderBar {
+                            add_css_class: "tp-sidebar-header",
                             set_show_start_title_buttons: false,
                             set_show_end_title_buttons: false,
 

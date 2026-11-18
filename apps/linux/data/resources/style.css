@@ -218,26 +218,53 @@ columnview > header .tp-column-header-selected {
   min-width: 28px;
 }
 
+/* Zoom levels for dialogs: Ctrl+scroll, Ctrl+plus, Ctrl+minus, Ctrl+0 */
+.tp-zoom-m1 { font-size: 90%; }
+.tp-zoom-m2 { font-size: 80%; }
+.tp-zoom-m3 { font-size: 70%; }
+.tp-zoom-p1 { font-size: 110%; }
+.tp-zoom-p2 { font-size: 120%; }
+.tp-zoom-p3 { font-size: 130%; }
+.tp-zoom-p4 { font-size: 140%; }
+.tp-zoom-p5 { font-size: 150%; }
+.tp-zoom-p6 { font-size: 160%; }
+.tp-zoom-p7 { font-size: 170%; }
+.tp-zoom-p8 { font-size: 180%; }
+
+.tp-zoom-m1 textview,
+.tp-zoom-m2 textview,
+.tp-zoom-m3 textview,
+.tp-zoom-p1 textview,
+.tp-zoom-p2 textview,
+.tp-zoom-p3 textview,
+.tp-zoom-p4 textview,
+.tp-zoom-p5 textview,
+.tp-zoom-p6 textview,
+.tp-zoom-p7 textview,
+.tp-zoom-p8 textview {
+  font-size: 100%;
+}
+
 /* Compact SQL editor toolbar matching DBX and TablePro */
-.tp-editor-toolbar button {
-  padding-left: 6px;
-  padding-right: 6px;
+.tp-editor-toolbar button,
+.tp-editor-toolbar menubutton > button {
+  min-height: 24px;
+  padding: 0 6px;
+  -gtk-icon-size: 14px;
 }
 
-/* Link Run button and Run Options dropdown in editor toolbar */
-.tp-editor-toolbar button.suggested-action {
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
-  margin-right: 0;
+.tp-editor-toolbar {
+  font-size: 0.92em;
 }
 
-.tp-editor-toolbar menubutton.suggested-action > button {
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
-  border-left: 1px solid color-mix(in srgb, white 25%, transparent);
-  margin-left: 0;
-  padding-left: 4px;
-  padding-right: 4px;
+.tp-editor-toolbar .linked > button.suggested-action,
+.tp-editor-toolbar .linked > menubutton.suggested-action > button {
+  min-height: 24px;
+}
+
+.tp-editor-toolbar .linked > menubutton.suggested-action > button {
+  padding-left: 3px;
+  padding-right: 3px;
 }
 
 list.tp-sidebar-item,
@@ -250,4 +277,17 @@ list.tp-sidebar-item > row:selected {
   padding-left: 0;
   padding-right: 0;
   margin: 0;
+}
+
+.tp-sidebar-header button {
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
+  -gtk-icon-size: 14px;
+}
+
+.tp-sidebar-header menubutton > button {
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
 }

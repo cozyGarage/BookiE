@@ -292,7 +292,7 @@ impl FactoryComponent for SidebarRow {
 
                             gtk::Image {
                                 set_icon_name: Some(sidebar_icon(self.kind)),
-                                set_pixel_size: 16,
+                                set_pixel_size: 14,
                                 set_visible: self.group.as_ref().is_none_or(|group| group.entry),
                             },
 
@@ -361,6 +361,7 @@ impl FactoryComponent for SidebarRow {
         });
         let collapsed = init.group.as_ref().is_some_and(|group| group.collapsed);
         let chevron = gtk::Image::from_icon_name(chevron_icon(collapsed));
+        chevron.set_pixel_size(12);
         chevron.set_visible(init.group.as_ref().is_some_and(|group| !group.entry));
         Self {
             info: init.info,

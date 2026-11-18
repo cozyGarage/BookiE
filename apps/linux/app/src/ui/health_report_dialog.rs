@@ -82,6 +82,7 @@ pub(crate) fn present(parent: &gtk::Window, source: HealthReportSource) {
     let toolbar = adw::ToolbarView::new();
     toolbar.add_top_bar(&adw::HeaderBar::new());
     toolbar.set_content(Some(&content(&panel)));
+    crate::ui::dialog_zoom::install(&toolbar, &[panel.list.clone().upcast()]);
     dialog.set_child(Some(&toolbar));
     let closing = panel.clone();
     dialog.connect_closed(move |_| closing.in_flight.borrow().cancel());

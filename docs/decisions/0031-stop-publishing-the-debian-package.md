@@ -1,6 +1,6 @@
 # 0031: Stop publishing the Debian package
 
-- **Status**: Accepted (2026-11-04)
+- **Status**: Accepted (2026-11-04); the Flatpak as the install path on Debian-family systems is superseded by [0032](0032-stop-publishing-the-flatpak.md)
 - **Date**: 2026-11-04
 
 ## Context

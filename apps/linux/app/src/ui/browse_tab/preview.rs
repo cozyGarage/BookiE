@@ -4,19 +4,9 @@ use libadwaita::{self as adw, prelude::*};
 pub(super) use bookie_app_services::edit_preview::preview_text;
 
 fn preview_view(text: &str) -> gtk::TextView {
-    let buffer = gtk::TextBuffer::new(Some(&gtk::TextTagTable::new()));
-    buffer.set_text(text);
-    gtk::TextView::builder()
-        .buffer(&buffer)
-        .editable(false)
-        .cursor_visible(false)
-        .monospace(true)
-        .wrap_mode(gtk::WrapMode::WordChar)
-        .top_margin(12)
-        .bottom_margin(12)
-        .left_margin(12)
-        .right_margin(12)
-        .build()
+    let view = crate::ui::output_text_view::roomy(gtk::WrapMode::WordChar);
+    view.buffer().set_text(text);
+    view
 }
 
 pub(super) fn present(parent: &impl IsA<gtk::Widget>, text: &str) {
