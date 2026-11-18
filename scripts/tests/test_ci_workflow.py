@@ -2545,11 +2545,11 @@ class NightlyWorkflowContractTests(unittest.TestCase):
         body = self.workflow.split("\njobs:\n", 1)[1]
         self.jobs = dict(re.findall(r"(?ms)^  ([a-z][a-z0-9-]*):\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", body))
 
-    def test_nightly_has_no_schedule_trigger(self):
+    def test_nightly_runs_once_a_night_and_can_still_be_dispatched(self):
         code = "\n".join(line for line in self.workflow.splitlines() if not line.startswith("#"))
         triggers = code.split("\njobs:\n", 1)[0]
-        self.assertNotIn("schedule:", triggers)
-        self.assertNotIn("cron:", code)
+        self.assertEqual(code.count("cron:"), 1)
+        self.assertIn('  schedule:\n    - cron: "0 23 * * *"\n', triggers)
         self.assertIn("  workflow_dispatch:\n", triggers)
 
     def test_dispatch_offers_full_and_plan_only_booleans(self):
@@ -2642,9 +2642,9 @@ class NightlyWorkflowContractTests(unittest.TestCase):
                 self.assertIn("    runs-on: ${{ vars.NIGHTLY_LABEL || 'any-host' }}\n", block)
         self.assertNotIn("runs-on: build-host", self.workflow)
 
-    def test_the_workflow_header_tells_the_operator_how_to_enable_it(self):
+    def test_the_workflow_header_tells_the_operator_how_to_reserve_runners(self):
         header = self.workflow.split("\nname: nightly\n", 1)[0]
-        for text in ("7 of the 15 runners", "NIGHTLY_LABEL=nightly", "schedule:"):
+        for text in ("7 of the 15 runners", "NIGHTLY_LABEL=nightly", "The schedule is on"):
             self.assertIn(text, header)
 
     def test_the_planner_never_receives_a_printed_token(self):
