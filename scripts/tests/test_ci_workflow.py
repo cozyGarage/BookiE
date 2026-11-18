@@ -748,16 +748,26 @@ class CiWorkflowTests(unittest.TestCase):
 
     def test_mongo_fixture_health_checks_wait_for_seeded_rows(self):
         compose = (ROOT / "tests/fixtures/driver-tls/docker-compose.yml").read_text()
+        dockerfiles = {
+            "mongo": "mongo/Dockerfile",
+            "mongo-plain": "mongo-plain/Dockerfile",
+        }
         for service, host in (("mongo", "mongo.bookie.test"), ("mongo-plain", "mongo-plain")):
             with self.subTest(service=service):
                 block = re.search(rf"(?ms)^  {service}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", compose).group(1)
                 self.assertIn(f"- {host}", block)
                 self.assertIn("countDocuments() !== 3", block)
+                self.assertNotIn("./seed:/docker-entrypoint-initdb.d:ro", block)
+                dockerfile = (ROOT / "tests/fixtures/driver-tls" / dockerfiles[service]).read_text()
+                self.assertIn("COPY seed/01-seed.js /docker-entrypoint-initdb.d/01-seed.js", dockerfile)
 
-    def test_postgres_release_health_check_allows_database_initialization(self):
+    def test_postgres_release_database_image_contains_seed_data(self):
         compose = (ROOT / "tests/fixtures/postgres-release/docker-compose.yml").read_text()
+        db_dockerfile = (ROOT / "tests/fixtures/postgres-release/db/Dockerfile").read_text()
         db = re.search(r"(?ms)^  db:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", compose).group(1)
-        self.assertIn("start_period: 90s", db)
+        self.assertNotIn("./seed:/docker-entrypoint-initdb.d:ro", db)
+        self.assertIn("COPY seed/01-seed.sql /docker-entrypoint-initdb.d/01-seed.sql", db_dockerfile)
+        self.assertIn("to_regclass('public.release_items')", db)
 
     def test_gtk_server_jobs_retry_prepulling_their_fixture_image(self):
         for path in (".github/workflows/build-linux.yml", ".forgejo/workflows/ci.yml"):

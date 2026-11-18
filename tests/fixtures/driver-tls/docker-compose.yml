@@ -10,8 +10,6 @@ services:
       MONGO_INITDB_ROOT_USERNAME: bookie
       MONGO_INITDB_ROOT_PASSWORD: bookie
       MONGO_INITDB_DATABASE: bookie
-    volumes:
-      - ./seed:/docker-entrypoint-initdb.d:ro
     command:
       - mongod
       - --tlsMode
@@ -92,14 +90,14 @@ services:
           - redis.bookie.test
 
   mongo-plain:
-    image: mongo:7
+    build:
+      context: .
+      dockerfile: mongo-plain/Dockerfile
     restart: on-failure:3
     environment:
       MONGO_INITDB_ROOT_USERNAME: bookie
       MONGO_INITDB_ROOT_PASSWORD: bookie
       MONGO_INITDB_DATABASE: bookie
-    volumes:
-      - ./seed:/docker-entrypoint-initdb.d:ro
     command: ["mongod", "--bind_ip_all"]
     healthcheck:
       test:
