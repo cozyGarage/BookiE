@@ -751,6 +751,17 @@ impl SimpleComponent for App {
             return;
         }
         match msg {
+            msg @ (AppMsg::ColumnsLoaded(..)
+            | AppMsg::EnumLabelsLoaded(..)
+            | AppMsg::ForeignKeysLoaded(..)
+            | AppMsg::ForeignKeyCandidatesLoaded(..)
+            | AppMsg::InboundForeignKeysLoaded(..)
+            | AppMsg::RowsLoaded(..)
+            | AppMsg::LoadFailed(..)
+            | AppMsg::RowCountLoaded(..)
+            | AppMsg::RowCountFailed(..)
+            | AppMsg::AutoRefreshFailed(..)
+            | AppMsg::BrowseCellValueLoaded(..)) => self.handle_browse_response_message(msg, sender),
             AppMsg::FlushWindowEdits => lifecycle_messages::flush_window_edits(self),
             AppMsg::GridEditsPrepared { intent, ticket, result } => {
                 self.grid_edits_prepared(intent, ticket, result, sender)
@@ -789,49 +800,11 @@ impl SimpleComponent for App {
             AppMsg::BrowseViewRestriction(tab_id, restriction) => {
                 self.dispatch_to_tab(tab_id, BrowseTabInput::ViewRestriction(restriction));
             }
-            AppMsg::ColumnsLoaded(tab_id, columns, request) => {
-                self.on_browse_columns_loaded(tab_id, columns, request, sender)
-            }
             AppMsg::FetchBrowseForeignKeys(tab_id) => self.fetch_browse_foreign_keys(tab_id, sender),
             AppMsg::FetchBrowseEnumLabels(tab_id, targets) => self.fetch_browse_enum_labels(tab_id, targets, sender),
-            AppMsg::EnumLabelsLoaded(tab_id, labels) => {
-                self.dispatch_to_tab(tab_id, crate::ui::browse_tab::BrowseTabInput::EnumLabelsLoaded(labels))
-            }
-            AppMsg::ForeignKeysLoaded(tab_id, foreign_keys) => self.on_browse_foreign_keys_loaded(tab_id, foreign_keys),
-            AppMsg::ForeignKeyCandidatesLoaded(tab_id, column, candidates) => {
-                self.on_browse_foreign_key_candidates_loaded(tab_id, column, candidates)
-            }
-            AppMsg::InboundForeignKeysLoaded(tab_id, inbound) => {
-                self.on_browse_inbound_foreign_keys_loaded(tab_id, inbound)
-            }
-            AppMsg::RowsLoaded(tab_id, request, result, projected_columns, elapsed) => {
-                self.on_browse_rows_loaded(tab_id, request, result, projected_columns, elapsed)
-            }
-            AppMsg::LoadFailed(tab_id, msg) => self.on_browse_load_failed(tab_id, msg),
-            AppMsg::RowCountLoaded(tab_id, request, count, is_estimated) => {
-                self.on_browse_row_count_loaded(tab_id, request, count, is_estimated)
-            }
-            AppMsg::RowCountFailed(tab_id, request) => self.on_browse_row_count_failed(tab_id, request),
             AppMsg::FetchBrowsePage(tab_id, auto_refresh) => self.fetch_browse_page(tab_id, auto_refresh, sender),
-            AppMsg::AutoRefreshFailed(tab_id, request, message) => {
-                self.on_auto_refresh_failed(tab_id, request, message)
-            }
             AppMsg::FetchBrowseCellValue(tab_id, request, col_index, column_name, row_key) => {
                 self.fetch_browse_cell_value(tab_id, request, col_index, column_name, row_key, sender)
-            }
-            AppMsg::BrowseCellValueLoaded(tab_id, request, col_index, column_name, result) => {
-                self.dispatch_to_tab(
-                    tab_id,
-                    match result {
-                        Ok(value) => BrowseTabInput::CellValueLoaded {
-                            request,
-                            col_index,
-                            column_name,
-                            value,
-                        },
-                        Err(message) => BrowseTabInput::CellValueFailed(request, message),
-                    },
-                );
             }
             AppMsg::FetchBrowseColumns(tab_id) => self.fetch_browse_columns(tab_id, sender),
             AppMsg::FetchBrowseRowCount(tab_id) => self.fetch_browse_row_count(tab_id, sender),
