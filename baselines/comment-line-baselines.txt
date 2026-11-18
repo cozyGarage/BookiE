@@ -32,7 +32,6 @@ apps/linux/app/src/ui/browse_tab/selection.rs 3
 apps/linux/app/src/ui/browse_tab/tests.rs 2
 apps/linux/app/src/ui/browse_tab/value_parse.rs 3
 apps/linux/app/src/ui/cell_editor.rs 6
-apps/linux/app/src/ui/connect_dialog/identity.rs 6
 apps/linux/app/src/ui/connect_dialog/mod.rs 16
 apps/linux/app/src/ui/connection_bundle/export.rs 3
 apps/linux/app/src/ui/connection_bundle/import.rs 7

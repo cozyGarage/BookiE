@@ -4,9 +4,6 @@ use uuid::Uuid;
 
 use crate::ui::ssh_section::SshInputs;
 
-/// Which saved record the dialog is about to write. `bound_id` is set
-/// when the dialog was opened against a known connection; it decides on
-/// its own and endpoint matching is not consulted.
 pub(super) struct ConnectionIdentity<'a> {
     pub bound_id: Option<Uuid>,
     pub driver_id: &'a str,
@@ -15,9 +12,6 @@ pub(super) struct ConnectionIdentity<'a> {
     pub ssh: Option<&'a SshInputs>,
 }
 
-/// The name a saved record gets. A name the user typed wins; blank
-/// falls back to the endpoint-derived label, which is what every
-/// connection saved before naming shipped already carries.
 pub(super) fn saved_connection_name(entered: &str, driver_id: &str, opts: &ConnectOptions) -> String {
     let entered = entered.trim();
     if !entered.is_empty() {
