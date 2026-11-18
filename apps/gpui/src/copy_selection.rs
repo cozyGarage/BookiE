@@ -7,7 +7,7 @@ impl GridView {
                 let source = self.source_row(index);
                 let mut row = self.source.row(source);
                 for (column, cell) in row.iter_mut().enumerate() {
-                    if let Some(edited) = self.edits.get(&(source, column)) {
+                    if let Some(edited) = self.cell_edit.edits.get(&(source, column)) {
                         *cell = edited.clone();
                     }
                 }
@@ -129,7 +129,7 @@ impl GridView {
                     let source = self.source_row(idx);
                     let mut row = self.source.row(source);
                     for (col, cell) in row.iter_mut().enumerate() {
-                        if let Some(edited) = self.edits.get(&(source, col)) {
+                        if let Some(edited) = self.cell_edit.edits.get(&(source, col)) {
                             *cell = edited.clone();
                         }
                     }

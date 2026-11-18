@@ -517,15 +517,15 @@ fn connecting_does_not_discard_an_active_cell_editor(cx: &mut TestAppContext) {
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
             view.start_edit(0, 1, window, cx);
-            view.editor
+            view.cell_edit.editor
                 .update(cx, |editor, cx| editor.set_content("draft text", cx));
             view.connect(bookie_gpui::live::Origin::File("/missing/bookie.db".into()), cx);
         });
     });
     view.read_with(cx, |view, cx| {
         assert!(view.live.is_none());
-        assert!(view.editing.is_some());
-        assert_eq!(view.editor.read(cx).content(), "draft text");
+        assert!(view.cell_edit.active.is_some());
+        assert_eq!(view.cell_edit.editor.read(cx).content(), "draft text");
         assert!(view.status.contains("view-only edits"));
     });
 }
@@ -539,7 +539,7 @@ fn a_late_connection_does_not_replace_a_cell_editor(cx: &mut TestAppContext) {
         view.update(cx, |view, cx| {
             view.connect(origin, cx);
             view.start_edit(0, 1, window, cx);
-            view.editor
+            view.cell_edit.editor
                 .update(cx, |editor, cx| editor.set_content("late draft", cx));
         });
     });
@@ -547,8 +547,8 @@ fn a_late_connection_does_not_replace_a_cell_editor(cx: &mut TestAppContext) {
     cx.run_until_parked();
     view.read_with(cx, |view, cx| {
         assert!(view.live.is_none());
-        assert!(view.editing.is_some());
-        assert_eq!(view.editor.read(cx).content(), "late draft");
+        assert!(view.cell_edit.active.is_some());
+        assert_eq!(view.cell_edit.editor.read(cx).content(), "late draft");
         assert!(view.status.contains("view-only edits"));
     });
 }
@@ -560,9 +560,9 @@ fn connecting_keeps_view_edits_until_the_user_discards_them(cx: &mut TestAppCont
     let origin = bookie_gpui::live::Origin::File(fixture.0.clone());
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
-            view.edits
+            view.cell_edit.edits
                 .insert((0, 1), bookie_gpui::model::Cell::Text("active".into()));
-            view.table_edits
+            view.cell_edit.table
                 .insert((1, 1), bookie_gpui::model::Cell::Text("table".into()));
             view.runs[0]
                 .edits
@@ -575,7 +575,7 @@ fn connecting_keeps_view_edits_until_the_user_discards_them(cx: &mut TestAppCont
     view.read_with(cx, |view, _| {
         assert!(view.live.is_none());
         assert_eq!(
-            (view.edits.len(), view.table_edits.len(), view.runs[0].edits.len()),
+            (view.cell_edit.edits.len(), view.cell_edit.table.len(), view.runs[0].edits.len()),
             (1, 1, 1)
         );
         assert!(view.status.contains("Discard all view-only edits"));
@@ -584,7 +584,7 @@ fn connecting_keeps_view_edits_until_the_user_discards_them(cx: &mut TestAppCont
     cx.simulate_input("Discard all view-only edits");
     cx.simulate_keystrokes("enter");
     view.read_with(cx, |view, _| {
-        assert!(view.edits.is_empty() && view.table_edits.is_empty());
+        assert!(view.cell_edit.edits.is_empty() && view.cell_edit.table.is_empty());
         assert!(view.runs.iter().all(|slot| slot.edits.is_empty()));
     });
     cx.update(|_, cx| view.update(cx, |view, cx| view.connect(origin, cx)));
@@ -601,7 +601,7 @@ fn a_late_connection_does_not_discard_a_new_view_edit(cx: &mut TestAppContext) {
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
             view.connect(origin, cx);
-            view.edits
+            view.cell_edit.edits
                 .insert((0, 1), bookie_gpui::model::Cell::Text("late edit".into()));
         });
     });
@@ -610,7 +610,7 @@ fn a_late_connection_does_not_discard_a_new_view_edit(cx: &mut TestAppContext) {
     view.read_with(cx, |view, _| {
         assert!(view.live.is_none());
         assert_eq!(
-            view.edits.get(&(0, 1)),
+            view.cell_edit.edits.get(&(0, 1)),
             Some(&bookie_gpui::model::Cell::Text("late edit".into()))
         );
         assert!(view.status.contains("view-only edits"));
@@ -631,9 +631,9 @@ fn switching_tables_keeps_all_view_edits_until_the_user_discards_them(cx: &mut T
     cx.run_until_parked();
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
-            view.edits
+            view.cell_edit.edits
                 .insert((0, 1), bookie_gpui::model::Cell::Text("table draft".into()));
-            view.table_edits
+            view.cell_edit.table
                 .insert((1, 1), bookie_gpui::model::Cell::Text("saved table draft".into()));
             view.runs.push(crate::runs::RunSlot::new(
                 bookie_gpui::shell::Run {
@@ -653,8 +653,8 @@ fn switching_tables_keeps_all_view_edits_until_the_user_discards_them(cx: &mut T
     cx.run_until_parked();
     view.read_with(cx, |view, _| {
         assert_eq!(view.catalog.grid_table, table_info("alpha"));
-        assert_eq!(view.edits.len(), 1);
-        assert_eq!(view.table_edits.len(), 1);
+        assert_eq!(view.cell_edit.edits.len(), 1);
+        assert_eq!(view.cell_edit.table.len(), 1);
         assert_eq!(view.runs[0].edits.len(), 1);
         assert!(view.status.contains("Discard all view-only edits"));
     });
@@ -675,7 +675,7 @@ fn a_late_table_load_does_not_discard_a_new_view_edit(cx: &mut TestAppContext) {
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
             view.open_table_named(&table_info("beta"), window, cx);
-            view.edits
+            view.cell_edit.edits
                 .insert((0, 1), bookie_gpui::model::Cell::Text("late table draft".into()));
         });
     });
@@ -684,7 +684,7 @@ fn a_late_table_load_does_not_discard_a_new_view_edit(cx: &mut TestAppContext) {
     view.read_with(cx, |view, _| {
         assert_eq!(view.catalog.grid_table, table_info("alpha"));
         assert_eq!(
-            view.edits.get(&(0, 1)),
+            view.cell_edit.edits.get(&(0, 1)),
             Some(&bookie_gpui::model::Cell::Text("late table draft".into()))
         );
     });
@@ -775,13 +775,13 @@ fn closing_a_result_with_pending_edits_requires_explicit_discard(cx: &mut TestAp
         view.tabs.open_query();
         view.sync_grid_owner();
         view.add_run(None);
-        view.edits
+        view.cell_edit.edits
             .insert((0, 1), bookie_gpui::model::Cell::Text("result draft".into()));
         view.close_run(view.active_run);
     });
     view.read_with(cx, |view, _| {
         assert_eq!(view.runs.len(), 2);
-        assert_eq!(view.edits.len(), 1);
+        assert_eq!(view.cell_edit.edits.len(), 1);
         assert!(view.status.contains("Discard all view-only edits"));
     });
 }

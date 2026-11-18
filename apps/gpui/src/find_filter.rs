@@ -5,7 +5,7 @@ impl GridView {
         if self.dataset_count() == 0 || self.find_text(cx).is_empty() {
             return;
         }
-        if !self.cursor.matches.is_empty() && self.cursor.status(false) != "No match" {
+        if !self.search.cursor.matches.is_empty() && self.search.cursor.status(false) != "No match" {
             self.step_match(forward);
             return;
         }
@@ -17,8 +17,8 @@ impl GridView {
             move |cancel| source.find(&query, MAX_FIND_MATCHES, &cancel),
             move |this, found| match found {
                 Ok(found) => {
-                    this.find_capped = found.capped;
-                    this.cursor.set(found.matches);
+                    this.search.capped = found.capped;
+                    this.search.cursor.set(found.matches);
                     this.step_match(forward);
                 }
                 Err(message) => this.status = message.into(),
@@ -27,7 +27,7 @@ impl GridView {
     }
 
     pub(crate) fn step_match(&mut self, forward: bool) {
-        if let Some(row) = self.cursor.step(forward) {
+        if let Some(row) = self.search.cursor.step(forward) {
             let Some(at) = self.dataset_index_of(row) else {
                 self.status = "Match is outside the filtered rows".into();
                 return;
@@ -39,18 +39,18 @@ impl GridView {
             let local = at.saturating_sub(self.base()) as usize;
             self.scroll.scroll_to_item_strict(local, ScrollStrategy::Center);
         }
-        self.status = self.cursor.status(self.find_capped);
+        self.status = self.search.cursor.status(self.search.capped);
     }
 
     pub(crate) fn find_text(&self, cx: &App) -> String {
-        self.find.read(cx).content().to_string()
+        self.search.find.read(cx).content().to_string()
     }
 
     pub(crate) fn show_matching(&mut self, cx: &App) {
-        if self.cursor.matches.is_empty() {
+        if self.search.cursor.matches.is_empty() {
             return;
         }
-        let kept = self.cursor.matches.iter().map(|row| *row as u32).collect();
+        let kept = self.search.cursor.matches.iter().map(|row| *row as u32).collect();
         let label = format!("FILTER {}", self.find_text(cx));
         self.set_mode(Mode::Filtered {
             kept: std::sync::Arc::new(kept),
@@ -63,7 +63,7 @@ impl GridView {
         if matches!(self.tabs.current(), Tab::Query) && self.runs.is_empty() {
             return;
         }
-        let predicate = match parse_predicate(self.filter.read(cx).content(), self.source.columns()) {
+        let predicate = match parse_predicate(self.search.filter.read(cx).content(), self.source.columns()) {
             Ok(predicate) => predicate,
             Err(message) => {
                 self.status = message.into();
@@ -71,7 +71,7 @@ impl GridView {
             }
         };
         let source = self.source.clone();
-        let label = format!("WHERE {}", self.filter.read(cx).content());
+        let label = format!("WHERE {}", self.search.filter.read(cx).content());
         self.status = "Filtering…".into();
         self.begin_background(
             Work::Scan,
@@ -96,7 +96,7 @@ impl GridView {
 
     pub(crate) fn clear_filter(&mut self) {
         self.invalidate_scans();
-        self.cursor = MatchCursor::default();
+        self.search.cursor = MatchCursor::default();
         self.set_mode(Mode::All);
         self.status.clear();
     }

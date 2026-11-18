@@ -27,7 +27,7 @@ impl GridView {
     fn grid_key_ready(&self, window: &Window, blocked: bool) -> bool {
         !blocked
             && self.focus.is_focused(window)
-            && self.editing.is_none()
+            && self.cell_edit.active.is_none()
             && self.compare.is_none()
             && !self.continuous
             && !self.palette.open
@@ -117,7 +117,7 @@ impl GridView {
             cx.notify();
             return;
         }
-        if self.focus.is_focused(window) && self.editing.is_none() && self.compare.is_none() && self.tabs.shows_grid() {
+        if self.focus.is_focused(window) && self.cell_edit.active.is_none() && self.compare.is_none() && self.tabs.shows_grid() {
             self.grid_key(key, modifiers.shift, modifiers.control, window, cx);
         }
     }
@@ -126,8 +126,8 @@ impl GridView {
         match command {
             Command::Palette => self.open_palette(window, cx),
             Command::Filter => {
-                self.filter_visible = true;
-                window.focus(&self.filter.read(cx).focus_handle(cx), cx);
+                self.search.filter_visible = true;
+                window.focus(&self.search.filter.read(cx).focus_handle(cx), cx);
             }
             Command::CopyCells if self.focus.is_focused(window) => self.copy_selection(false, cx),
             Command::CopyCellsWithHeaders if self.focus.is_focused(window) => self.copy_selection(true, cx),

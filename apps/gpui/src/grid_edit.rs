@@ -25,8 +25,8 @@ impl GridView {
     }
 
     fn stop_edit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.editing = None;
-        self.editor.update(cx, |editor, cx| {
+        self.cell_edit.active = None;
+        self.cell_edit.editor.update(cx, |editor, cx| {
             editor.set_text_align(gpui::TextAlign::Left, cx);
         });
         window.focus(&self.focus, cx);
@@ -34,12 +34,12 @@ impl GridView {
     }
 
     fn commit_edit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(editing) = self.editing.as_ref() else { return };
-        let text = self.editor.read(cx).content().to_string();
+        let Some(editing) = self.cell_edit.active.as_ref() else { return };
+        let text = self.cell_edit.editor.read(cx).content().to_string();
         match parse_edit(editing.kind, &text) {
             Ok(cell) => {
-                self.edits.insert((editing.row, editing.column), cell);
-                self.status = format!("{} edited in this view only; nothing is saved.", self.edits.len());
+                self.cell_edit.edits.insert((editing.row, editing.column), cell);
+                self.status = format!("{} edited in this view only; nothing is saved.", self.cell_edit.edits.len());
                 self.stop_edit(window, cx);
             }
             Err(reason) => {
@@ -70,24 +70,24 @@ impl GridView {
             self.source.columns().get(column).map_or(false, |c| c.numeric),
             &cell,
         );
-        self.editing = Some(Editing {
+        self.cell_edit.active = Some(Editing {
             row,
             column,
             kind: cell.kind(),
         });
-        self.editor.update(cx, |editor, cx| {
+        self.cell_edit.editor.update(cx, |editor, cx| {
             editor.set_text_align(
                 if is_numeric { gpui::TextAlign::Right } else { gpui::TextAlign::Left },
                 cx,
             );
             editor.set_content(&text, cx);
         });
-        window.focus(&self.editor.read(cx).focus_handle(cx), cx);
+        window.focus(&self.cell_edit.editor.read(cx).focus_handle(cx), cx);
         cx.notify();
     }
 
     pub fn cell_at(&self, row: u64, column: usize) -> Cell {
-        self.edits
+        self.cell_edit.edits
             .get(&(row, column))
             .cloned()
             .unwrap_or_else(|| self.source.row(row).swap_remove(column))
