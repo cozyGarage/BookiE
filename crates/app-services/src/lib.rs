@@ -1,3 +1,5 @@
+#![recursion_limit = "256"]
+
 pub use bookie_checks as checks;
 pub use bookie_kafka_browser as kafka_browser;
 pub use bookie_pg_sessions as pg_sessions;

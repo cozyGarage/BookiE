@@ -185,7 +185,7 @@ impl GridView {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bookie_policy::{AuditApprovalOutcome, AuditOperationClass, AuditTerminalStatus};
+    use bookie_app_services::audit_view::{AuditApprovalOutcome, AuditOperationClass, AuditTerminalStatus};
 
     fn row(sql: &str, status: AuditTerminalStatus) -> OperationRow {
         OperationRow {
