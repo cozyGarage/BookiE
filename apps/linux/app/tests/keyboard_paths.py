@@ -10,7 +10,7 @@ PATH_KINDS = ("shortcut:", "menu:", "tab-stop", "gap:")
 
 SQL_EDITOR = {
     "Run": "shortcut: Ctrl+Enter",
-    "Explain": "menu: Main menu > Explain query",
+    "Explain query plan": "menu: Main menu > Explain query",
     "Fold SQL blocks": "tab-stop",
     "Fold block": "shortcut: Ctrl+Shift+[",
     "Unfold all": "shortcut: Ctrl+Shift+]",
@@ -20,9 +20,9 @@ SQL_EDITOR = {
     "Previous bookmark": "shortcut: Ctrl+Shift+Up",
     "Clear bookmarks": "tab-stop",
     "Session": "tab-stop",
-    "Pin results": "tab-stop",
+    "Keep these results above the results of the next run": "tab-stop",
     "Compare\u2026": "tab-stop",
-    "Split": "tab-stop",
+    "Show or hide a second SQL editor pane": "tab-stop",
     "New query (Ctrl+E)": "shortcut: Ctrl+E",
     "Close Tab": "shortcut: Ctrl+W",
     "New connection": "tab-stop",
@@ -36,6 +36,7 @@ SQL_EDITOR = {
     "Tables sidebar": "tab-stop",
     "Run options": "tab-stop",
     "Show columns": "tab-stop",
+    "safety_items": "tab-stop (Enter on the sidebar row)",
     "Show columns safety_items Open safety_items": "tab-stop (Enter on the sidebar row)",
     "safety_items Show columns Open safety_items": "tab-stop (Enter on the sidebar row)",
     "Tables": "tab-stop (Enter on the sidebar row)",

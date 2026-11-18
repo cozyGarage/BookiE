@@ -1047,7 +1047,7 @@ GLib.MainLoop().run()
                 **app_memory_profile_kb(),
                 "private_maps": app_private_maps(),
             })
-            ui.invoke(ui.wait_for_sensitive_node("Pin results", role=pyatspi.ROLE_PUSH_BUTTON))
+            ui.invoke(ui.wait_for_sensitive_node("Keep these results above the results of the next run", role=pyatspi.ROLE_PUSH_BUTTON))
             ui.wait_for_node_containing("Unpin results (1)", role=pyatspi.ROLE_PUSH_BUTTON)
             if trim_result is not None and os.environ.get("BOOKIE_PROFILE_MALLOC_TRIM_EACH_RESULT"):
                 trim_allocator()
@@ -1072,7 +1072,7 @@ GLib.MainLoop().run()
             marker = run["marker"]
             unpin = ui.wait_for_node_containing("Unpin results (1)", role=pyatspi.ROLE_PUSH_BUTTON)
             ui.invoke(unpin)
-            ui.wait_for_node_containing("Pin results", role=pyatspi.ROLE_PUSH_BUTTON)
+            ui.wait_for_node_containing("Keep these results above the results of the next run", role=pyatspi.ROLE_PUSH_BUTTON)
             teardown_samples.append({
                 "stage": f"after_unpin_{marker}",
                 **app_memory_profile_kb(),
@@ -1650,7 +1650,7 @@ GLib.MainLoop().run()
 
     def explain_plan_window_closes_on_escape(_database, _base):
         ui.run_sql("SELECT 1 AS value")
-        ui.invoke(ui.wait_for_node(name="Explain", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.invoke(ui.wait_for_node(name="Explain query plan", role=pyatspi.ROLE_PUSH_BUTTON))
         ui.wait_for_frame_containing("Explain plan")
         ui.press_x11_key("Escape")
         ui.wait_for_frame_containing("Explain plan", present=False)
@@ -1902,7 +1902,7 @@ GLib.MainLoop().run()
     def narrow_window_keeps_main_and_editor_toolbar_actions_reachable(database, base):
         ui.open_saved_connection(ui.CONNECTION_NAME)
         window = ui.wait_for_frame_containing(" — BookiE")
-        ui.wait_for_node(name="Split", role=pyatspi.ROLE_TOGGLE_BUTTON)
+        ui.wait_for_node(name="Show or hide a second SQL editor pane", role=pyatspi.ROLE_TOGGLE_BUTTON)
         for width in (928, 847, 802):
             x11_resize_window(width, 760)
             time.sleep(0.5)
@@ -1916,7 +1916,7 @@ GLib.MainLoop().run()
             )
             for name, role in (
                 ("Main menu", pyatspi.ROLE_TOGGLE_BUTTON),
-                ("Split", pyatspi.ROLE_TOGGLE_BUTTON),
+                ("Show or hide a second SQL editor pane", pyatspi.ROLE_TOGGLE_BUTTON),
                 ("Close", pyatspi.ROLE_PUSH_BUTTON),
             ):
                 control = ui.wait_for_node(name=name, role=role)
@@ -2012,7 +2012,7 @@ GLib.MainLoop().run()
     def compare_button_opens_by_keyboard_and_reports_the_difference(database, base):
         ui.run_sql("SELECT 1 AS alpha UNION ALL SELECT 2")
         wait_for_result_column("alpha")
-        ui.invoke(ui.wait_for_sensitive_node("Pin results", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.invoke(ui.wait_for_sensitive_node("Keep these results above the results of the next run", role=pyatspi.ROLE_PUSH_BUTTON))
         ui.run_sql("SELECT 1 AS alpha UNION ALL SELECT 3")
         wait_for_result_column("alpha")
         compare = ui.wait_for_sensitive_node("Compare\u2026", role=pyatspi.ROLE_PUSH_BUTTON)
@@ -3036,7 +3036,7 @@ GLib.MainLoop().run()
     def pinned_results_stay_ahead_of_the_next_run(_database, _base):
         ui.run_sql("SELECT 1 AS one;\nSELECT 2 AS two;")
         wait_until(lambda: sum("SELECT (1)" in name for name in page_tab_names()) == 2, "two results did not appear")
-        ui.invoke(ui.wait_for_node(name="Pin results", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.invoke(ui.wait_for_node(name="Keep these results above the results of the next run", role=pyatspi.ROLE_PUSH_BUTTON))
         ui.run_sql("SELECT 3 AS three;")
         pinned = lambda: [name for name in page_tab_names() if "\U0001F4CC" in name]
         wait_until(lambda: len(pinned()) == 2 and len(page_tab_names()) >= 4, "pinned results did not stay")
@@ -3053,7 +3053,7 @@ GLib.MainLoop().run()
             "SELECT 'red' AS colour UNION ALL SELECT 'blue';"
         )
         wait_until(lambda: len(page_tab_names()) >= 2, "two result sets did not appear")
-        ui.invoke(ui.wait_for_node(name="Pin results", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.invoke(ui.wait_for_node(name="Keep these results above the results of the next run", role=pyatspi.ROLE_PUSH_BUTTON))
         open_cell_menu("pear")
         invoke_menu_item(3)
         ui.wait_for_node_containing("Showing 1 of 3 loaded rows", role=pyatspi.ROLE_LABEL)
