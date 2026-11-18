@@ -353,8 +353,8 @@ impl GridView {
         let (label, chevron) = match &row {
             TreeRow::Connection { open } => (self.catalog.connection.clone(), Some(*open)),
             TreeRow::Database { open } => (self.catalog.database.clone(), Some(*open)),
-            TreeRow::Schema { name, open } => (name.clone(), Some(*open)),
-            TreeRow::Table(table) if table.schema.is_some() => (table.name.clone(), None),
+            TreeRow::Schema { name, open, .. } => (name.clone(), Some(*open)),
+            TreeRow::Table(table) if depth >= 3 => (table.name.clone(), None),
             TreeRow::Table(table) => (table_label(table), None),
         };
         let current = matches!(&row, TreeRow::Table(table) if open_table == &Tab::Table(table.clone()));
@@ -406,11 +406,7 @@ impl GridView {
         match row {
             TreeRow::Connection { .. } => this.sidebar.connection_open = !this.sidebar.connection_open,
             TreeRow::Database { .. } => this.sidebar.database_open = !this.sidebar.database_open,
-            TreeRow::Schema { name, .. } => {
-                if !this.sidebar.collapsed_schemas.remove(name) {
-                    this.sidebar.collapsed_schemas.insert(name.clone());
-                }
-            }
+            TreeRow::Schema { key, .. } => this.sidebar.collapsed_schemas.toggle(key),
             TreeRow::Table(table) if click_count >= 2 || this.live.is_none() => {
                 this.open_table_named(table, window, cx)
             }

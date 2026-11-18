@@ -38,7 +38,7 @@ impl Catalog {
 pub enum TreeRow {
     Connection { open: bool },
     Database { open: bool },
-    Schema { name: String, open: bool },
+    Schema { name: String, key: String, open: bool },
     Table(TableInfo),
 }
 
@@ -58,42 +58,47 @@ pub fn tree_rows_grouped(
     connection_open: bool,
     database_open: bool,
     filter: SidebarFilter,
-    collapsed: &HashSet<String>,
+    collapsed: &CollapseState,
 ) -> Vec<(usize, TreeRow)> {
-    let mut flat = tree_rows_in(catalog, search, connection_open, database_open, filter);
-    let first = flat
-        .iter()
-        .position(|(_, row)| matches!(row, TreeRow::Table(_)))
-        .unwrap_or(flat.len());
-    flat[first..].sort_by(|(_, a), (_, b)| match (a, b) {
-        (TreeRow::Table(a), TreeRow::Table(b)) => a.schema.cmp(&b.schema),
-        _ => std::cmp::Ordering::Equal,
-    });
+    let flat = tree_rows_in(catalog, search, connection_open, database_open, filter);
     let searching = filter.active_only || !search.trim().is_empty();
-    let mut rows = Vec::with_capacity(flat.len());
-    let mut current: Option<String> = None;
-    for (depth, row) in flat {
-        let TreeRow::Table(table) = &row else {
-            rows.push((depth, row));
-            continue;
-        };
-        let Some(schema) = table.schema.clone() else {
-            rows.push((depth, row));
-            continue;
-        };
-        if current.as_deref() != Some(schema.as_str()) {
-            let open = searching || !collapsed.contains(&schema);
-            rows.push((
-                depth,
+    let Some(first) = flat.iter().position(|(_, row)| matches!(row, TreeRow::Table(_))) else {
+        return flat;
+    };
+    let tables: Vec<TableInfo> = flat[first..]
+        .iter()
+        .filter_map(|(_, row)| match row {
+            TreeRow::Table(table) => Some(table.clone()),
+            _ => None,
+        })
+        .collect();
+    let nodes = build_nodes(&tables, &[]);
+    let grouped = nodes.iter().any(|node| node.kind == NodeKind::Schema);
+    let open_state = if searching {
+        CollapseState::default()
+    } else {
+        collapsed.clone()
+    };
+    let mut rows = flat[..first].to_vec();
+    for index in visible_nodes_with_hidden_schemas(&nodes, &open_state, "", &HashSet::new()) {
+        let node = &nodes[index];
+        match &node.kind {
+            NodeKind::Schema => rows.push((
+                2,
                 TreeRow::Schema {
-                    name: schema.clone(),
-                    open,
+                    name: node.schema.clone().unwrap_or_default(),
+                    key: node.key.clone(),
+                    open: !open_state.is_collapsed(&node.key),
                 },
-            ));
-            current = Some(schema.clone());
-        }
-        if searching || !collapsed.contains(&schema) {
-            rows.push((depth + 1, row));
+            )),
+            NodeKind::Table { schema, name } => rows.push((
+                if grouped { 3 } else { 2 },
+                TreeRow::Table(TableInfo {
+                    schema: schema.clone(),
+                    name: name.clone(),
+                }),
+            )),
+            _ => {}
         }
     }
     rows
@@ -390,7 +395,7 @@ mod tests {
     }
 
     #[test]
-    fn schemas_group_their_tables_and_collapse() {
+    fn several_schemas_group_their_tables_and_collapse() {
         let table = |schema: &str, name: &str| TableInfo {
             schema: Some(schema.into()),
             name: name.into(),
@@ -401,25 +406,39 @@ mod tests {
             tables: vec![table("sales", "orders"), table("hr", "staff"), table("sales", "items")],
             grid_table: table("sales", "orders"),
         };
-        let none = HashSet::new();
-        let rows = tree_rows_grouped(&catalog, "", true, true, SidebarFilter::default(), &none);
-        assert_eq!(
-            labels(&rows),
-            [
-                "0:conn",
-                "1:db",
-                "2:schema hr",
-                "3:hr.staff",
-                "2:schema sales",
-                "3:sales.orders",
-                "3:sales.items"
-            ]
-        );
-        let collapsed = HashSet::from(["sales".to_string()]);
+        let open = CollapseState::default();
+        let rows = tree_rows_grouped(&catalog, "", true, true, SidebarFilter::default(), &open);
+        let names = labels(&rows);
+        assert_eq!(names[..4], ["0:conn", "1:db", "2:schema hr", "3:hr.staff"]);
+        assert_eq!(names.iter().filter(|name| name.starts_with("3:sales.")).count(), 2);
+        let mut collapsed = CollapseState::default();
+        collapsed.toggle("schema:sales");
         let rows = tree_rows_grouped(&catalog, "", true, true, SidebarFilter::default(), &collapsed);
         assert_eq!(labels(&rows).len(), 5);
         let rows = tree_rows_grouped(&catalog, "items", true, true, SidebarFilter::default(), &collapsed);
-        assert!(labels(&rows).contains(&"3:sales.items".to_string()));
+        assert!(labels(&rows).contains(&"2:sales.items".to_string()));
+    }
+
+    #[test]
+    fn one_schema_keeps_its_tables_directly_under_the_database() {
+        let catalog = Catalog {
+            connection: "pg".into(),
+            database: "db".into(),
+            tables: vec![TableInfo {
+                schema: Some("public".into()),
+                name: "orders".into(),
+            }],
+            grid_table: table_info("orders"),
+        };
+        let rows = tree_rows_grouped(
+            &catalog,
+            "",
+            true,
+            true,
+            SidebarFilter::default(),
+            &CollapseState::default(),
+        );
+        assert_eq!(labels(&rows), ["0:conn", "1:db", "2:public.orders"]);
     }
 
     #[test]

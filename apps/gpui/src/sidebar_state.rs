@@ -33,7 +33,7 @@ pub(crate) struct SidebarState {
     pub import_menu_open: bool,
     pub connection_open: bool,
     pub database_open: bool,
-    pub collapsed_schemas: std::collections::HashSet<String>,
+    pub collapsed_schemas: bookie_results::sidebar_tree::CollapseState,
 }
 
 impl SidebarState {
