@@ -351,7 +351,7 @@
       ]
     },
     "app-server": {
-      "purpose": "App parser, grid edit, MCP preview, and large MySQL text contracts",
+      "purpose": "App parser, grid edit, MCP preview, and database metadata export contracts",
       "prerequisites": "Rust 1.98; GTK 4.24 development stack; Docker; source-pinned consumers test bundle",
       "hosted_gate": "Build Linux / consumers; lab-ci / consumers",
       "steps": [
@@ -396,6 +396,22 @@
           ],
           "timeout_seconds": 900,
           "evidence": "rust-tests"
+      },
+      {
+        "argv": [
+          "bash",
+          "scripts/run-rust-tests.sh",
+          "--locked",
+          "-p",
+          "bookie-app-services",
+          "--test",
+          "data_dictionary_postgres",
+          "--",
+          "--include-ignored",
+          "--test-threads=1"
+        ],
+        "timeout_seconds": 900,
+        "evidence": "rust-tests"
         }
       ]
     },

@@ -40,6 +40,7 @@ impl App {
             crate::ui::diagram::DiagramRequest {
                 schema,
                 connection_id: self.connection_id,
+                driver_id: self.driver_id().to_string(),
                 capabilities: crate::ui::structure_tab::driver_capabilities_for(&self.registry, self.driver_id()),
                 scope: self.catalog_dialog_cancel.borrow().clone(),
                 hidden_schemas: self.hidden_schema_names(),

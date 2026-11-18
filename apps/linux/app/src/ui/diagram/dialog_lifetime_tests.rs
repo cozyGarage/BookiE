@@ -13,7 +13,7 @@ fn the_zoom_refresh_tick_does_not_retain_its_dialog_owner() {
     gtk::init().unwrap();
     adw::init().unwrap();
     let token = CancellationToken::new();
-    let ui = Rc::new(build("Tables", &token));
+    let ui = Rc::new(build("Tables", &token, None));
     let weak_ui = Rc::downgrade(&ui);
 
     schedule_zoom_update(&ui);

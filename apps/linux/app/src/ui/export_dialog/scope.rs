@@ -11,6 +11,7 @@ pub(crate) enum ExportScope {
     QueryPage { filtered: bool },
     QueryResult,
     QueryStored,
+    DataDictionary,
 }
 
 pub(super) fn build(
@@ -33,11 +34,16 @@ pub(super) fn build(
     }
     let title = match scope {
         ExportScope::QueryStored => bookie_app_services::tr!("All rows from this query result"),
+        ExportScope::DataDictionary => bookie_app_services::tr!("Current database metadata"),
         ExportScope::QueryPage { .. } => bookie_app_services::tr!("Current query page"),
         ExportScope::TableSnapshot { .. } => bookie_app_services::tr!("All matching table rows"),
         _ => bookie_app_services::tr!("Loaded query result"),
     };
-    let subtitle = super::format_subtitle(result, paged);
+    let subtitle = if scope == ExportScope::DataDictionary {
+        bookie_app_services::tr!("{n} complete metadata rows").replace("{n}", &result.rows.len().to_string())
+    } else {
+        super::format_subtitle(result, paged)
+    };
     group.add(
         &adw::ActionRow::builder()
             .use_markup(false)

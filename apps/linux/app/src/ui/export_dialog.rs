@@ -213,7 +213,10 @@ fn format_subtitle(result: &QueryResult, paged: Option<&PagedExport>) -> String 
     }
 }
 
-fn available_formats(driver_id: &str, paged: Option<&PagedExport>) -> Vec<ExportFormat> {
+fn available_formats(scope: ExportScope, driver_id: &str, paged: Option<&PagedExport>) -> Vec<ExportFormat> {
+    if scope == ExportScope::DataDictionary {
+        return vec![ExportFormat::Csv, ExportFormat::Markdown];
+    }
     let statements = bookie_core::export::supports_sql_literals(driver_id);
     let workbook_fits = paged.is_none_or(|paged| paged.total_rows.is_some());
     FORMATS
@@ -569,14 +572,24 @@ fn attach_export_action(
     });
 }
 
-fn build_export_dialog(page: &adw::PreferencesPage, footer: &gtk::Box, export_button: &gtk::Button) -> adw::Dialog {
+fn build_export_dialog(
+    scope: ExportScope,
+    page: &adw::PreferencesPage,
+    footer: &gtk::Box,
+    export_button: &gtk::Button,
+) -> adw::Dialog {
     let toolbar = adw::ToolbarView::new();
     toolbar.add_top_bar(&adw::HeaderBar::new());
     toolbar.set_content(Some(page));
     toolbar.add_bottom_bar(footer);
 
+    let title = if scope == ExportScope::DataDictionary {
+        bookie_app_services::tr!("Export Data Dictionary")
+    } else {
+        bookie_app_services::tr!("Export Results")
+    };
     let dialog = adw::Dialog::builder()
-        .title(bookie_app_services::tr!("Export Results"))
+        .title(&title)
         .content_width(480)
         .child(&toolbar)
         .build();
@@ -613,7 +626,7 @@ fn present_export(
 
     let (scope_group, scope_choice) = scope::build(scope, &result, paged.as_ref(), full_export.is_some());
     page.add(&scope_group);
-    let formats = available_formats(&driver_id, paged.as_ref());
+    let formats = available_formats(scope, &driver_id, paged.as_ref());
     let (format_group, format_row) = build_format_group(&formats, &result, paged.as_ref(), json);
     let row_limit = row_limit::build();
     format_group.add(&row_limit);
@@ -630,7 +643,7 @@ fn present_export(
 
     let (footer, export_button) = build_footer(&csv);
     wire_export_sensitivity(&scope_choice, full_export.is_some(), &csv, &row_limit, &export_button);
-    let dialog = build_export_dialog(&page, &footer, &export_button);
+    let dialog = build_export_dialog(scope, &page, &footer, &export_button);
 
     let action_params = ExportActionParams {
         scope_choice,

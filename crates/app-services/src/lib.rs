@@ -27,6 +27,7 @@ pub mod connection_identity;
 pub mod connection_monitor;
 pub mod connection_save_turn;
 pub mod connection_service;
+pub mod data_dictionary;
 pub mod database_backup;
 pub mod database_file;
 pub mod database_service;
