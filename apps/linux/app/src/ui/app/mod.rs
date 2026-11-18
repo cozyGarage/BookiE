@@ -732,7 +732,7 @@ impl SimpleComponent for App {
             let history = history.clone();
             relm4::spawn(async move {
                 if let Some(history) = history
-                    && let Err(e) = history.prune_older_than(retention).await
+                    && let Err(e) = bookie_app_services::statement_history::prune_in(&history, retention).await
                 {
                     tracing::warn!(error = %e, "history prune failed");
                 }

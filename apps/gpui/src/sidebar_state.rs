@@ -2,7 +2,28 @@ use gpui::Entity;
 
 use crate::text_input::TextInput;
 
+pub(crate) struct FieldRow {
+    pub name: String,
+    pub data_type: String,
+    pub primary_key: bool,
+}
+
+pub(crate) enum FieldState {
+    Loading,
+    Loaded(Vec<FieldRow>),
+    Failed(String),
+}
+
+pub(crate) enum ObjectState {
+    Loading,
+    Loaded(Vec<bookie_core::CatalogObject>),
+    Failed(String),
+}
+
 pub(crate) struct SidebarState {
+    pub catalog_open: bool,
+    pub catalog: Vec<(bookie_core::CatalogObjectKind, ObjectState)>,
+    pub fields: Vec<(bookie_core::TableInfo, FieldState)>,
     pub open: bool,
     pub width: f32,
     pub resizing: bool,
@@ -19,6 +40,9 @@ impl SidebarState {
 
     pub fn new(search: Entity<TextInput>) -> Self {
         Self {
+            catalog_open: true,
+            catalog: Vec::new(),
+            fields: Vec::new(),
             open: true,
             width: Self::DEFAULT_WIDTH,
             resizing: false,

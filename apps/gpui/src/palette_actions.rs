@@ -4,7 +4,8 @@ impl GridView {
     pub(crate) fn palette_actions(&self) -> Vec<Action> {
         if self.palette.fonts {
             return self
-                .fonts.names
+                .fonts
+                .names
                 .iter()
                 .map(|name| Action {
                     id: "font-choice",
@@ -426,6 +427,7 @@ impl GridView {
         match id {
             "sidebar" => self.sidebar.open = !self.sidebar.open,
             "new-connection" => {
+                self.connection_form.editing = None;
                 self.tabs.open_new_connection();
                 self.sync_grid_owner();
             }
@@ -435,6 +437,7 @@ impl GridView {
             }
             "home" => {
                 self.tabs.open_home();
+                self.reload_history(cx);
                 self.sync_grid_owner();
             }
             "query" => {

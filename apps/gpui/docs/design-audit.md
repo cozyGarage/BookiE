@@ -27,23 +27,39 @@ Read `theme.rs`, `chrome.rs`, `render.rs`, `main.rs`, `text_input.rs` and `palet
 | 6 | Window controls are text glyphs (`–`, `□`, `×`) | `chrome.rs` `window_button` | Open: use icons; platform buttons on macOS and Windows |
 | 7 | `GridView` is a god object: 70 fields, with parallel vectors (`runs`, `run_edits`, `run_sources`) and eight palette fields | `main.rs:80` | Partly fixed: one `RunSlot` per result, and `PaletteState`, `SidebarState` and `Measure` groups; the struct is down from 70 to 49 fields (`PanelState`, `FontState`, `ExportState` added). Find, filter and editor state are the next groups |
 | 8 | No dropdown or context menu existed | `rg "PopupMenu\|ContextMenu"` found nothing | Fixed and checked on a real display: a toolbar overflow menu (ellipsis) and a cell context menu (right click selects the row, then copies, edits, clears), both built from the command palette's own labels (`menus.rs`), so a command has one name everywhere. The table swallows right clicks on cells, so the menu opens from its `RightClickedCell` event |
-| 9 | Saved connections could be opened from Home, but none created | `chrome.rs` Home Quick Start | Partly fixed: `app-services::connection_save` (validate, build the record, save with the keyring password and rollback) is shared by GPUI's New connection form and the GTK dialog's password persistence. The form covers password connections; SSH, certificates, Kerberos, socket paths and editing an existing connection are still GTK-only |
+| 9 | Saved connections could be opened from Home, but none created | `chrome.rs` Home Quick Start | Fixed: `app-services::connection_save` (validate, build the record, save with the keyring password and rollback, SSH secret) is shared by GPUI's New and Edit connection form and the GTK dialog's password persistence. The form sets password or Kerberos sign-in, TLS mode with CA, client certificate and key, a local socket, and an SSH tunnel with any number of jump hosts, each signing in by password, key file or agent, and the OpenSSH client choice. Verified on screen by saving an agent head with one agent jump host and reading the nested `jump` record |
 | 10 | The toolbar carries window-title controls but no query actions (run only appears inside the query tab) | `chrome.rs` | Open |
 | 11 | Zoom for result views is a font setting only, not Ctrl+scroll | `font_settings.rs` | Open |
 | 12 | Find filters only after Enter | `find_filter.rs` | Open (known) |
-| 14 | Query history is the current session's message log; the persistent history database the GTK app writes is not read or written | `home_query_history_card` reads `panel.messages`; `LiveSession` has no connection id, which `HistoryStore::record` requires | Open, blocked with finding 9: needs a service that records and searches with the connection identity and the retention setting |
+| 16 | Grid rows were 32 px while the scrolling maths assumed 26 | `grid_table.rs` used the table's default size | Fixed: `.xsmall()` (26 px) |
+| 17 | Hover and selection in the grid were pale blue from the component library's theme | screenshot | Fixed in `ui_theme::map_component_colors` |
+| 14 | Query history was the session's message log; the persistent history database was not read or written | `home_query_history_card` read `panel.messages` | Fixed for saved connections: `app-services::statement_history` records and lists statements with the connection identity; GPUI records every run and Home lists the latest 8 from the shared database, failures in the warning colour. A database opened from a file gets a stable identity from its path (a version 5 UUID of its file URL, named by the path), so its statements are recorded and can be filtered. The GTK recorder and the retention prune (GPUI prunes once per session) now call the same service |
 | 15 | Explain was missing | no command | Fixed: toolbar button, overflow item and palette command run the core `explain_statement` for the driver through the read-only session |
 
 ## Feature gap against the GTK app
 
 GPUI has: result grid with Find, filter, compare, export and row copy; SQL editor with several carets; tabs; sidebar tree with search and regex; command palette; settings (appearance, fonts); server status views (sessions, locks, replication, variables). GTK also has, and GPUI lacks: connection manager and forms, SSH, structure editor, import, backup and restore, ER diagram, query history and saved queries, audit log view, catalog dialogs, Explain, session mode and transactions, schema compare, data dictionary export, preferences beyond appearance, approvals UI.
 
+## Side by side with the GTK app
+
+Same SQLite table, light, 2026-11-18, GTK on a private display and GPUI on a real one.
+
+| Area | GTK | GPUI | Action |
+| --- | --- | --- | --- |
+| Toolbar language | Icons for Pin, Explain, Split; text kept for Compare…, Session, Run | Icons in the pager strip; Run is the one filled, labelled button | GTK: give Compare… and Session icons. GPUI: matches |
+| Grid row height | compact rows | was 32 px (the table's default tier) against a 26 px constant used for scrolling maths | Fixed: the table uses its 26 px tier (finding 16) |
+| Selection colour | neutral grey fill | was blue from gpui-component's own theme | Fixed (finding 17): the component theme's table, list, selection, ring and primary colours are set from our tokens when a theme is installed |
+| Sidebar | grouped Tables and Catalog, fields expand in place, 265 px | connection, schema and tables tree, 340 px; a click shows the fields (new `ReadColumns` command), a double click opens | Fixed: fields on a click, and a Catalog group (new `ReadCatalog` command) with the driver's kinds, checked against Postgres 17 |
+| Result tabs | Results and Errors as icons under the editor | result header with run tabs | Open: decide whether both use the same strip |
+| UI font | Adwaita Sans | Inter or Adwaita Sans, proportional | Matches |
+| Menus | popover menus with grouped items | grouped overflow and cell menus built from palette labels | Matches |
+
 ## Shared services the GPUI form and history need
 
 Both findings 9 and 14 need behaviour that today lives in GTK code or is written straight to storage by the GTK app. A frontend must not repeat it (ADR 0041), so the next step is two app-services commands used by both apps:
 
-- `ConnectionCommands`: `validate`, `save` and password persistence now exist in `connection_save`; `test(draft)`, `delete(id)`, editing and the SSH, certificate and Kerberos fields still have to move out of the GTK dialog, with the policy checks and the audit record, and typed errors the frontends only render.
-- `HistoryCommands`: `record(session, statement, outcome)` and `search(filter)`, owning the connection identity, redaction and the retention setting.
+- `ConnectionCommands`: `validate`, `save`, `load_draft` and password and SSH-secret persistence exist in `connection_save`. `test` and `delete` now exist there too (GTK's delete calls the same `delete`; GPUI's Test and two-step Delete were checked on screen: SQLite answered `Connected · SQLite 3.54.0`, and a deleted record left the file). Multi-hop chains, the SSH agent and the OpenSSH client are in the service (GTK's secret persistence calls `persist_connection`), and `test` takes the transport audit factory. The GTK dialog records no separate audit entry for a connection change (only the SSH transport audit, which `test` now takes), so nothing is left to move. Test with a two-hop agent chain was checked on screen and reached the SSH connect step.
+- `HistoryCommands`: `record` and `recent` now exist in `statement_history`; the GTK recorder now calls `record_in`; `prune` applies the retention setting; search with filters and pinning still have to move onto it.
 
 The GTK connection dialog and `record_history` move onto them in the same pull request, then GPUI builds its form and history list on the same calls.
 
@@ -51,6 +67,6 @@ The GTK connection dialog and `record_history` move onto them in the same pull r
 
 1. Done in this change: tokens (4), one look (5), menus (8), first part of the `GridView` split (7).
 2. A connection write command in app-services shared by GTK and GPUI, then the GPUI connection form (9).
-3. History on `HistoryCommands` (Explain is done).
+3. Move history search, filters and pinning onto `statement_history` (Explain, the Home list, the recorder and retention are done).
 4. Finish splitting `GridView` (sidebar, find, export, editor groups) before adding more features.
 5. Visual comparison on a real display, light and dark, after each step.

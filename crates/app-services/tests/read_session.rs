@@ -479,6 +479,69 @@ async fn a_page_command_returns_the_requested_rows_with_its_epoch() {
 }
 
 #[tokio::test]
+async fn a_columns_command_lists_the_table_fields_with_its_epoch() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("session.db");
+    seeded(&path).await;
+    let (sessions, session_id) = stored_session(&path).await;
+    let table = TableInfo {
+        schema: None,
+        name: "items".into(),
+    };
+    let (sender, mut receiver) = tokio::sync::mpsc::channel(1);
+    let sink = ChannelEventSink::new(sender);
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(5));
+
+    dispatch(
+        DispatchContext::Sessions(&sessions),
+        Command::ReadColumns {
+            epoch: Epoch(46),
+            session_id,
+            table,
+        },
+        &control,
+        &sink,
+    )
+    .await
+    .unwrap();
+
+    let Event::ColumnsRead { epoch, outcome } = receiver.try_recv().unwrap() else {
+        panic!("columns command returned a different event");
+    };
+    assert_eq!(epoch, Epoch(46));
+    assert!(!outcome.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn a_catalog_command_answers_with_its_epoch_for_a_supported_kind() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("session.db");
+    seeded(&path).await;
+    let (sessions, session_id) = stored_session(&path).await;
+    let (sender, mut receiver) = tokio::sync::mpsc::channel(1);
+    let sink = ChannelEventSink::new(sender);
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(5));
+
+    dispatch(
+        DispatchContext::Sessions(&sessions),
+        Command::ReadCatalog {
+            epoch: Epoch(47),
+            session_id,
+            kind: bookie_core::CatalogObjectKind::Trigger,
+        },
+        &control,
+        &sink,
+    )
+    .await
+    .unwrap();
+
+    let Event::CatalogRead { epoch, .. } = receiver.try_recv().unwrap() else {
+        panic!("catalog command returned a different event");
+    };
+    assert_eq!(epoch, Epoch(47));
+}
+
+#[tokio::test]
 async fn a_status_command_returns_the_active_connection_with_its_epoch() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("session.db");
