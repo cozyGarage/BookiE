@@ -40,12 +40,13 @@ pub(super) fn window_state_persisted_for_close(app: &mut App, result: Result<(),
 pub(super) fn cancel_session_teardown(app: &mut App, action: SessionTeardownAction) {
     match action {
         SessionTeardownAction::WindowClose => app.session_teardown_pending.set(false),
-        SessionTeardownAction::ConnectionSwitch => {
+        SessionTeardownAction::ConnectionSwitch | SessionTeardownAction::ReconnectConnection(_) => {
             app.switch.transition = ConnectionTransition::Idle;
             app.switch.prepared = None;
             app.pending_database_switch = None;
             app.switch.saves_pending.clear();
             app.switch.cancel_audit_was_disabled = None;
+            app.switch.reconnect_connection = None;
         }
         SessionTeardownAction::CloseTab(_) | SessionTeardownAction::Disconnect => {}
     }

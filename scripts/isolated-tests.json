@@ -265,6 +265,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::app::multi_session::gtk_tests::reconnecting_changed_saved_settings_replaces_only_the_target_session"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::app::multi_session::gtk_tests::a_save_from_a_background_tab_reaches_its_own_connection_and_not_the_front_one"
     ],
     [

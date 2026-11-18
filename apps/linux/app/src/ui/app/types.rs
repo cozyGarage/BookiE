@@ -156,8 +156,10 @@ pub(super) enum ConnectionTransition {
     Idle,
     Connecting,
     AwaitingDecision,
+    AwaitingReconnect,
     WaitingForRuns,
     WaitingForSaves,
+    PreparingReconnect,
 }
 
 pub(super) struct ConnectionSwitch {
@@ -165,6 +167,7 @@ pub(super) struct ConnectionSwitch {
     pub(super) prepared: Option<crate::services::connection_service::PreparedConnection>,
     pub(super) saves_pending: std::collections::HashMap<Uuid, u32>,
     pub(super) cancel_audit_was_disabled: Option<bool>,
+    pub(super) reconnect_connection: Option<uuid::Uuid>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

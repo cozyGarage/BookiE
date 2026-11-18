@@ -6,9 +6,10 @@ use uuid::Uuid;
 use crate::services::connection_service;
 use crate::services::database_service::{ConnectionHealth, ConnectionMetadata};
 use crate::ui::connect_dialog::{ConnectDialog, ConnectDialogInit, ConnectDialogOutput};
+use crate::ui::editor::{RunMessage, SqlEditorInput};
 
 use super::SessionTeardownAction;
-use super::{App, AppMsg, ConnectionMessage, ConnectionTransition, SwitchDecision};
+use super::{App, AppMsg, ConnectionMessage, ConnectionTransition, SwitchDecision, WorkspaceTab};
 
 impl App {
     pub(super) fn on_connection_message(&mut self, message: ConnectionMessage, sender: ComponentSender<Self>) {
@@ -384,6 +385,7 @@ impl App {
         }
         self.connections_popover.popdown();
         self.switch.transition = ConnectionTransition::Connecting;
+        self.switch.reconnect_connection = None;
         self.set_loading_page(
             &bookie_app_services::tr!("Connecting…"),
             &bookie_app_services::tr!("Opening {name}").replace("{name}", &saved.name),
@@ -445,6 +447,7 @@ impl App {
         self.stop_session_restore();
         self.connect_cancel = None;
         self.pending_database_switch = None;
+        self.switch.reconnect_connection = None;
         if self.switch.transition != ConnectionTransition::Connecting || self.switch.prepared.is_some() {
             return;
         }
@@ -494,6 +497,7 @@ impl App {
         self.switch.transition = ConnectionTransition::Idle;
         self.switch.prepared = None;
         self.switch.cancel_audit_was_disabled = None;
+        self.switch.reconnect_connection = None;
         self.dismiss_loading_page();
         tracing::warn!(error = %message, "candidate connection failed");
         sender.input(AppMsg::ContinueSessionRestore);
@@ -530,60 +534,211 @@ impl App {
         if self.switch.prepared.is_none() {
             return;
         }
-        if self.switch.prepared.as_ref().is_some_and(|prepared| {
-            super::multi_session::opens_additional_session(self.connected, self.connection_id, prepared.id())
-        }) {
+        if matches!(
+            self.switch.transition,
+            ConnectionTransition::AwaitingReconnect | ConnectionTransition::PreparingReconnect
+        ) {
+            return;
+        }
+        if self.prompt_for_saved_reconnect(sender.clone()) {
+            return;
+        }
+        if self.switch.reconnect_connection.is_none()
+            && self.switch.prepared.as_ref().is_some_and(|prepared| {
+                super::multi_session::opens_additional_session(self.connected, self.connection_id, prepared.id())
+            })
+        {
             self.activate_prepared_connection(sender);
             return;
         }
         match self.switch.transition {
-            ConnectionTransition::WaitingForRuns if self.any_editor_running() => return,
+            ConnectionTransition::WaitingForRuns if self.connection_transition_has_running_editor() => return,
             ConnectionTransition::WaitingForSaves if !self.switch.saves_pending.is_empty() => return,
             ConnectionTransition::Connecting | ConnectionTransition::Idle => return,
             _ => {}
         }
 
-        if self.switch.transition == ConnectionTransition::WaitingForRuns {
-            let was_disabled = self.switch.cancel_audit_was_disabled.take().unwrap_or(false);
-            if !was_disabled
-                && self
-                    .connection_id
-                    .is_some_and(|id| self.database.governed_writes_disabled(id))
-            {
-                self.switch.prepared = None;
-                self.pending_database_switch = None;
-                self.switch.saves_pending.clear();
-                self.switch.transition = ConnectionTransition::Idle;
-                self.show_toast(&bookie_app_services::tr!(
-                    "Connection switch stopped because a running operation has an unknown outcome."
-                ));
-                return;
-            }
+        if self.stop_after_unknown_outcome() {
+            return;
         }
 
-        if self.any_editor_running() {
+        if self.connection_transition_has_running_editor() {
             self.show_cancel_runs_switch_dialog(sender);
             return;
         }
 
-        if self.window_has_pending() {
+        if self.connection_transition_has_pending_changes() {
             self.show_save_changes_switch_dialog(sender);
+            return;
+        }
+
+        if let Some(connection_id) = self.switch.reconnect_connection {
+            self.begin_reconnect(connection_id, sender);
             return;
         }
 
         self.activate_prepared_connection(sender);
     }
 
+    fn prompt_for_saved_reconnect(&mut self, sender: ComponentSender<Self>) -> bool {
+        if self.switch.reconnect_connection.is_some() {
+            return false;
+        }
+        let Some(prepared) = self.switch.prepared.as_ref() else {
+            return false;
+        };
+        let id = prepared.id();
+        let notice = self.live_session_notice(id, prepared);
+        if !reconnect_prompt_needed(self.multi.sessions.is_working(id), notice.is_some()) {
+            return false;
+        }
+        let Some(notice) = notice else {
+            return false;
+        };
+        self.show_reconnect_saved_connection_dialog(&notice, sender);
+        true
+    }
+
+    fn stop_after_unknown_outcome(&mut self) -> bool {
+        if self.switch.transition != ConnectionTransition::WaitingForRuns {
+            return false;
+        }
+        let was_disabled = self.switch.cancel_audit_was_disabled.take().unwrap_or(false);
+        let connection_id = self.switch.reconnect_connection.or(self.connection_id);
+        if was_disabled || !connection_id.is_some_and(|id| self.database.governed_writes_disabled(id)) {
+            return false;
+        }
+        let reconnecting = self.switch.reconnect_connection.is_some();
+        self.switch.prepared = None;
+        self.pending_database_switch = None;
+        self.switch.saves_pending.clear();
+        self.switch.transition = ConnectionTransition::Idle;
+        self.switch.reconnect_connection = None;
+        let message = if reconnecting {
+            bookie_app_services::tr!("Reconnect stopped because a running operation has an unknown outcome.")
+        } else {
+            bookie_app_services::tr!("Connection switch stopped because a running operation has an unknown outcome.")
+        };
+        self.show_toast(&message);
+        true
+    }
+
+    fn begin_reconnect(&mut self, connection_id: Uuid, sender: ComponentSender<Self>) {
+        let action = SessionTeardownAction::ReconnectConnection(connection_id);
+        self.switch.transition = ConnectionTransition::PreparingReconnect;
+        if !self.confirm_session_teardown(
+            sender.clone(),
+            action,
+            &bookie_app_services::tr!("Reconnect with an open transaction?"),
+            &bookie_app_services::tr!(
+                "The open transaction for this connection will be rolled back before it reconnects."
+            ),
+            &bookie_app_services::tr!("Roll Back and Reconnect"),
+        ) {
+            self.prepare_editor_sessions(action, sender);
+        }
+    }
+
+    fn show_reconnect_saved_connection_dialog(&mut self, notice: &str, sender: ComponentSender<Self>) {
+        self.switch.transition = ConnectionTransition::AwaitingReconnect;
+        let body = bookie_app_services::tr!(
+            "{notice}\n\nReconnecting closes this connection's tabs, cancels its running queries, and rolls back its open transactions. Save or discard its pending edits first. Other open connections stay active."
+        )
+        .replace("{notice}", notice);
+        let dialog = adw::AlertDialog::new(
+            Some(&bookie_app_services::tr!(
+                "Apply saved settings to this open connection?"
+            )),
+            Some(&body),
+        );
+        dialog.add_response("keep", &bookie_app_services::tr!("Keep Current Session"));
+        dialog.add_response("reconnect", &bookie_app_services::tr!("Reconnect"));
+        dialog.set_response_appearance("reconnect", adw::ResponseAppearance::Destructive);
+        dialog.set_default_response(Some("keep"));
+        dialog.set_close_response("keep");
+        dialog.connect_response(None, move |_, response| {
+            sender.input(AppMsg::ReconnectSavedConnection(response == "reconnect"));
+        });
+        dialog.present(Some(&self.window));
+    }
+
+    pub(super) fn on_reconnect_saved_connection(&mut self, reconnect: bool, sender: ComponentSender<Self>) {
+        let Some(prepared) = self.switch.prepared.take() else {
+            self.switch.transition = ConnectionTransition::Idle;
+            self.switch.reconnect_connection = None;
+            return;
+        };
+        let connection_id = prepared.id();
+        if reconnect && self.multi.sessions.is_working(connection_id) {
+            self.switch.prepared = Some(prepared);
+            self.switch.reconnect_connection = Some(connection_id);
+            self.switch.transition = ConnectionTransition::AwaitingDecision;
+            self.continue_connection_switch(sender);
+            return;
+        }
+        self.switch.transition = ConnectionTransition::Idle;
+        self.switch.saves_pending.clear();
+        self.switch.cancel_audit_was_disabled = None;
+        self.switch.reconnect_connection = None;
+        self.pending_database_switch = None;
+        if self.multi.sessions.is_working(connection_id) {
+            self.focus_saved_session(connection_id, &prepared, sender);
+        }
+    }
+
+    fn connection_transition_has_running_editor(&self) -> bool {
+        let scope = self.connection_transition_tabs();
+        self.workspace_tabs
+            .borrow()
+            .iter()
+            .any(|(id, tab)| scope.contains(id) && matches!(tab, WorkspaceTab::Editor(slot) if slot.running))
+    }
+
+    fn cancel_connection_transition_runs(&self) {
+        let scope = self.connection_transition_tabs();
+        for id in scope {
+            if let Some(WorkspaceTab::Editor(slot)) = self.workspace_tabs.borrow().get(&id) {
+                let _ = slot.controller.sender().send(SqlEditorInput::Run(RunMessage::Cancel));
+            }
+        }
+    }
+
+    fn connection_transition_has_pending_changes(&self) -> bool {
+        let scope = self.connection_transition_tabs();
+        self.change_trackers.any_pending_in(scope.iter().copied()) || self.structure_trackers.any_pending_in(scope)
+    }
+
+    fn connection_transition_pending_browse_tabs(&self) -> Vec<Uuid> {
+        self.change_trackers.pending_among(self.connection_transition_tabs())
+    }
+
+    fn connection_transition_pending_structure_tabs(&self) -> Vec<Uuid> {
+        self.structure_trackers.pending_among(self.connection_transition_tabs())
+    }
+
     fn show_cancel_runs_switch_dialog(&mut self, sender: ComponentSender<Self>) {
         self.switch.transition = ConnectionTransition::AwaitingDecision;
-        let dialog = adw::AlertDialog::new(
-            Some(&bookie_app_services::tr!("Cancel running queries and switch?")),
-            Some(&bookie_app_services::tr!(
-                "BookiE will wait for every running query to report cancellation before changing connections."
-            )),
-        );
+        let reconnecting = self.switch.reconnect_connection.is_some();
+        let (title, body, action) = if reconnecting {
+            (
+                bookie_app_services::tr!("Cancel running queries and reconnect?"),
+                bookie_app_services::tr!(
+                    "BookiE will wait for every running query on this connection to report cancellation before reconnecting it."
+                ),
+                bookie_app_services::tr!("Cancel queries and reconnect"),
+            )
+        } else {
+            (
+                bookie_app_services::tr!("Cancel running queries and switch?"),
+                bookie_app_services::tr!(
+                    "BookiE will wait for every running query to report cancellation before changing connections."
+                ),
+                bookie_app_services::tr!("Cancel queries and switch"),
+            )
+        };
+        let dialog = adw::AlertDialog::new(Some(&title), Some(&body));
         dialog.add_response("stay", &bookie_app_services::tr!("Stay"));
-        dialog.add_response("cancel-runs", &bookie_app_services::tr!("Cancel queries and switch"));
+        dialog.add_response("cancel-runs", &action);
         dialog.set_response_appearance("cancel-runs", adw::ResponseAppearance::Destructive);
         dialog.set_default_response(Some("stay"));
         dialog.set_close_response("stay");
@@ -602,15 +757,26 @@ impl App {
 
     fn show_save_changes_switch_dialog(&mut self, sender: ComponentSender<Self>) {
         self.switch.transition = ConnectionTransition::AwaitingDecision;
-        let dialog = adw::AlertDialog::new(
-            Some(&bookie_app_services::tr!("Save changes before switching?")),
-            Some(&bookie_app_services::tr!(
-                "Pending row and structure changes belong to the current connection."
-            )),
-        );
+        let reconnecting = self.switch.reconnect_connection.is_some();
+        let (title, body, discard, save) = if reconnecting {
+            (
+                bookie_app_services::tr!("Save changes before reconnecting?"),
+                bookie_app_services::tr!("Pending row and structure changes belong to this connection."),
+                bookie_app_services::tr!("Discard and reconnect"),
+                bookie_app_services::tr!("Save and reconnect"),
+            )
+        } else {
+            (
+                bookie_app_services::tr!("Save changes before switching?"),
+                bookie_app_services::tr!("Pending row and structure changes belong to the current connection."),
+                bookie_app_services::tr!("Discard and switch"),
+                bookie_app_services::tr!("Save and switch"),
+            )
+        };
+        let dialog = adw::AlertDialog::new(Some(&title), Some(&body));
         dialog.add_response("stay", &bookie_app_services::tr!("Stay"));
-        dialog.add_response("discard", &bookie_app_services::tr!("Discard and switch"));
-        dialog.add_response("save", &bookie_app_services::tr!("Save and switch"));
+        dialog.add_response("discard", &discard);
+        dialog.add_response("save", &save);
         dialog.set_response_appearance("discard", adw::ResponseAppearance::Destructive);
         dialog.set_response_appearance("save", adw::ResponseAppearance::Suggested);
         dialog.set_default_response(Some("save"));
@@ -630,34 +796,42 @@ impl App {
     pub(super) fn on_connection_switch_decision(&mut self, decision: SwitchDecision, sender: ComponentSender<Self>) {
         match decision {
             SwitchDecision::Stay => {
-                self.switch.prepared = None;
+                let reconnecting = self.switch.reconnect_connection.is_some();
+                let connection_id = self.switch.reconnect_connection.take();
+                let prepared = self.switch.prepared.take();
                 self.pending_database_switch = None;
                 self.switch.saves_pending.clear();
                 self.switch.cancel_audit_was_disabled = None;
                 self.switch.transition = ConnectionTransition::Idle;
-                self.show_toast(&bookie_app_services::tr!("Connection switch cancelled."));
+                if reconnecting
+                    && let (Some(connection_id), Some(prepared)) = (connection_id, prepared)
+                    && self.multi.sessions.is_working(connection_id)
+                {
+                    self.focus_saved_session(connection_id, &prepared, sender);
+                } else {
+                    self.show_toast(&bookie_app_services::tr!("Connection switch cancelled."));
+                }
             }
             SwitchDecision::CancelRuns => {
-                self.switch.cancel_audit_was_disabled = Some(
-                    self.connection_id
-                        .is_some_and(|id| self.database.governed_writes_disabled(id)),
-                );
+                let connection_id = self.switch.reconnect_connection.or(self.connection_id);
+                self.switch.cancel_audit_was_disabled =
+                    Some(connection_id.is_some_and(|id| self.database.governed_writes_disabled(id)));
                 self.switch.transition = ConnectionTransition::WaitingForRuns;
-                self.cancel_all_editor_runs();
+                self.cancel_connection_transition_runs();
                 self.continue_connection_switch(sender);
             }
             SwitchDecision::DiscardChanges => {
-                for id in self.window_pending_browse_tabs() {
+                for id in self.connection_transition_pending_browse_tabs() {
                     self.change_trackers.with_tab(id, |tracker| tracker.clear());
                 }
-                for id in self.window_pending_structure_tabs() {
+                for id in self.connection_transition_pending_structure_tabs() {
                     self.structure_trackers.with_tab(id, |tracker| tracker.clear());
                 }
-                self.activate_prepared_connection(sender);
+                self.continue_connection_switch(sender);
             }
             SwitchDecision::SaveChanges => {
-                let browse = self.window_pending_browse_tabs();
-                let structure = self.window_pending_structure_tabs();
+                let browse = self.connection_transition_pending_browse_tabs();
+                let structure = self.connection_transition_pending_structure_tabs();
                 self.switch.saves_pending.clear();
                 for id in browse.iter().copied() {
                     *self.switch.saves_pending.entry(id).or_insert(0) += 1;
@@ -706,6 +880,44 @@ impl App {
             self.multi.dial.insert(activated.id, dial);
         }
         Some(activated)
+    }
+
+    pub(super) fn finish_reconnect_saved_connection(&mut self, connection_id: Uuid, sender: ComponentSender<Self>) {
+        let Some(prepared) = self.switch.prepared.take() else {
+            self.switch.transition = ConnectionTransition::Idle;
+            self.switch.reconnect_connection = None;
+            return;
+        };
+        if prepared.id() != connection_id || !self.multi.sessions.is_working(connection_id) {
+            self.switch.transition = ConnectionTransition::Idle;
+            self.switch.saves_pending.clear();
+            self.switch.cancel_audit_was_disabled = None;
+            self.switch.reconnect_connection = None;
+            self.pending_database_switch = None;
+            self.show_toast(&bookie_app_services::tr!(
+                "The connection changed before it could reconnect. Open it again to retry."
+            ));
+            return;
+        }
+
+        self.drop_working_session(connection_id, sender.clone());
+        let Some(activated) = self.activate_remembering_dial(prepared) else {
+            self.switch.transition = ConnectionTransition::Idle;
+            self.switch.saves_pending.clear();
+            self.switch.cancel_audit_was_disabled = None;
+            self.switch.reconnect_connection = None;
+            self.pending_database_switch = None;
+            self.show_toast(&bookie_app_services::tr!(
+                "The previous session closed, but the saved connection could not be activated. Open it again to retry."
+            ));
+            sender.input(AppMsg::ReloadConnections);
+            return;
+        };
+        self.switch.transition = ConnectionTransition::Idle;
+        self.switch.saves_pending.clear();
+        self.switch.cancel_audit_was_disabled = None;
+        self.switch.reconnect_connection = None;
+        self.on_connected(activated, sender);
     }
 
     fn focus_saved_session(
@@ -995,6 +1207,10 @@ fn reuse_working_session(working: bool, pending: Option<&(Uuid, String)>, target
     working && !pending.is_some_and(|(id, _)| *id == target)
 }
 
+fn reconnect_prompt_needed(working: bool, changed_settings: bool) -> bool {
+    working && changed_settings
+}
+
 fn touch_last_opened(connection_id: Uuid, sender: ComponentSender<App>) {
     relm4::spawn(async move {
         let result = bookie_storage::touch_last_opened(connection_id).await;
@@ -1012,7 +1228,7 @@ fn touch_last_opened(connection_id: Uuid, sender: ComponentSender<App>) {
 mod tests {
     use super::{
         duplicate_connection_message, duplicate_connection_prompt_eligible, prompt_for_stored_password,
-        reuse_working_session,
+        reconnect_prompt_needed, reuse_working_session,
     };
     use secrecy::SecretString;
 
@@ -1025,6 +1241,13 @@ mod tests {
         assert!(reuse_working_session(true, Some(&pending), other));
         assert!(reuse_working_session(true, None, id));
         assert!(!reuse_working_session(false, None, id));
+    }
+
+    #[test]
+    fn changed_saved_settings_prompt_only_for_a_live_connection() {
+        assert!(reconnect_prompt_needed(true, true));
+        assert!(!reconnect_prompt_needed(true, false));
+        assert!(!reconnect_prompt_needed(false, true));
     }
 
     #[test]
