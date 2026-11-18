@@ -6,7 +6,7 @@ These rules apply to every coding agent and every contributor. `CLAUDE.md` point
 
 **BookiE** is a Linux-first native database client. GTK is the shipped Linux application; GPUI is the parallel cross-platform frontend under ADR 0052. The product repository is [`cozyGarage/BookiE`](https://github.com/cozyGarage/BookiE). Work happens on the `main` branch in the Rust 1.98 Cargo workspace at the repository root (`crates/`, `apps/linux/`, `tests/`, `scripts/`, `docs/`).
 
-The Forgejo mirror may retain a separate `linux` branch until that service is migrated. Specify the remote and branch explicitly for mirror operations; GitHub PRs and canonical development use `main`.
+Forgejo `main` equals GitHub `main`, and Forgejo's runners are the required check for code changes ([ADR 0056](docs/decisions/0056-forgejo-validates-first.md)). Pull requests still open on GitHub until ADR 0056 stage 2. Specify the remote and branch explicitly for mirror operations; canonical development uses `main`.
 
 - The rename is complete ([ADR 0027](docs/decisions/0027-complete-bookie-rename.md)): Cargo packages, binaries, crates, environment variables, application ID, paths and keyring schema are `bookie-*` / `BOOKIE_*` / `com.bookie.linux`. Legacy `tablepro` names appear only for upstream attribution and for reading old state. Do not reintroduce `tablepro` identifiers.
 - The UI uses GTK4, libadwaita, GtkSourceView and Relm4. Database drivers are static workspace crates registered at compile time. The GPUI app in `apps/gpui` is the chosen cross-platform frontend and GTK is maintained in parallel ([ADR 0052](docs/decisions/0052-gpui-is-the-cross-platform-frontend.md)).
@@ -48,7 +48,7 @@ The [`fix-issue` skill](.claude/skills/fix-issue/SKILL.md) runs these steps in o
 1. Write the failing test first, then the fix, in one commit.
 2. Run the checks in [Validation](#validation) locally. Run each script directly; piping `bash scripts/preflight.sh` through `tail` reports `tail`'s status, not the script's.
 3. Merge the latest BookiE `main` branch from GitHub `cozyGarage/BookiE` into the branch (do not rebase a shared branch). Resolve generated files such as `Cargo.lock` by regenerating them.
-4. **Required checks.** Every pull request must pass the required checks for its exact source revision. Missing, skipped, cancelled or failed checks are not passes; maintainers confirm acceptance before merging.
+4. **Required checks.** Every pull request must pass the required checks for its exact source revision. Missing, skipped, cancelled or failed checks are not passes; maintainers confirm acceptance before merging. For a change to code, workflows or packages, the Forgejo run started by `bash scripts/forgejo-gate.sh <branch>` for the exact head is one of them and is not replaced by a green GitHub run; put its run link and result in the pull request.
 5. **Pull requests and merge.** Open pull requests against `main`. Merge only after required checks and lane review pass for the reviewed source.
 6. **Documentation-only changes.** Run `python3 scripts/check-doc-links.py`, `check-known-issues.py` and `inventory-ignored-tests.py --check`. Changes to code, workflows or packages require the applicable full validation.
 
@@ -188,7 +188,7 @@ bash scripts/preflight.sh            # size, panic, bounded-operation and crate-
 bash scripts/test-gtk-widgets.sh     # when GTK code changed
 python3 scripts/check-known-issues.py && python3 scripts/check-doc-links.py   # when docs changed
 cargo deny check                           # from the repository root, when dependencies changed
-bash scripts/forgejo-gate.sh <branch>      # when the change requires Forgejo acceptance
+bash scripts/forgejo-gate.sh <branch>      # code, workflow or package changes: the required Forgejo run
 ```
 
 Driver integration tests need Docker. If a prerequisite is missing, say which check could not run and why.

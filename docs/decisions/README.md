@@ -103,6 +103,7 @@ Other options and why they were rejected.
 | [0053](0053-changelog-fragments.md) | Release notes come from changelog fragments | Accepted | One `changelog.d` file per user-facing change replaces the `Release-Note:` trailer; the release is cut locally. |
 | [0054](0054-one-visual-language.md) | One visual language for both apps | Accepted (2026-11-18) | dbx look and TablePro/macOS language for GTK and GPUI; shared parts at the third copy |
 | [0055](0055-postgresql-routine-debugging-scope.md) | Scope PostgreSQL routine debugging before implementation | Proposed | Limit the first debugger slice to policy-governed PL/pgSQL routines on explicitly provisioned development connections. |
+| [0056](0056-forgejo-validates-first.md) | Forgejo validates first, then becomes the main remote | Accepted for stage 1 (2026-11-19) | Forgejo's runners are the required check for code changes now; pull requests and issues move in two later stages. |
 
 Three records use "snapshot" for different things: ADR 0011 a read-only snapshot session, ADR 0014 the read snapshot a full export holds, and ADR 0015 a saved copy of a database.
 

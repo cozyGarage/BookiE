@@ -97,7 +97,7 @@ Use an available, authorized independent reviewer for the full diff. Check that 
 1. Stage explicit paths only, never `git add -A` or `.`, and compare `git diff --cached --stat` with the plan.
 2. Commit with a single-line Conventional Commit subject (`AGENTS.md`, Changelog and commits).
 3. Merge the latest GitHub `main` into the branch; never rebase. Regenerate `Cargo.lock` on conflict.
-4. Push the branch to GitHub and verify all required checks for the exact pull request head. Missing, skipped, cancelled or failed checks are not passes.
+4. Push the branch to GitHub and verify all required checks for the exact pull request head. Missing, skipped, cancelled or failed checks are not passes. For code, workflow or package changes run `bash scripts/forgejo-gate.sh <branch>` as well; its result for the exact head is required (ADR 0056).
 5. Open the pull request against `main` with `.github/pull_request_template.md`. State the lane that owns its review and merge.
 
 ## Phase 7: Report
