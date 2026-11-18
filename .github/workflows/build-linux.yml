@@ -885,11 +885,13 @@ jobs:
     needs: [pin-revision, ensure-ci-gtk-image, guards, linux-build, gtk-server]
     container:
       image: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}
+      options: --add-host=host.docker.internal:host-gateway
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
       volumes:
         - /var/run/docker.sock:/var/run/docker.sock
+        - /var/tmp/bookie-gtk-fixtures:/var/tmp/bookie-gtk-fixtures
       env:
         DEBIAN_FRONTEND: noninteractive
         DOCKER_CONFIG: /github/home/.docker
@@ -900,6 +902,8 @@ jobs:
       BOOKIE_GTK_SCENARIO_RETRIES: "0"
       BOOKIE_TEST_RUN_ID: github-${{ github.run_id }}-${{ github.run_attempt }}-gtk-server-${{ matrix.server }}
       BOOKIE_GTK_SERVER_IMAGE_GROUP: ${{ matrix.server == 'mysql-approval' && 'mysql' || matrix.server }}
+      BOOKIE_GTK_FIXTURE_HOST: host.docker.internal
+      BOOKIE_GTK_FIXTURE_SHARED_DIR: /var/tmp/bookie-gtk-fixtures
     strategy:
       fail-fast: false
       matrix:
@@ -960,11 +964,13 @@ jobs:
     needs: [pin-revision, ensure-ci-gtk-image, guards, linux-build, gtk-server-followup]
     container:
       image: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}
+      options: --add-host=host.docker.internal:host-gateway
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
       volumes:
         - /var/run/docker.sock:/var/run/docker.sock
+        - /var/tmp/bookie-gtk-fixtures:/var/tmp/bookie-gtk-fixtures
       env:
         DEBIAN_FRONTEND: noninteractive
         DOCKER_CONFIG: /github/home/.docker
@@ -975,6 +981,8 @@ jobs:
       BOOKIE_GTK_SCENARIO_RETRIES: "0"
       BOOKIE_TEST_RUN_ID: github-${{ github.run_id }}-${{ github.run_attempt }}-gtk-server-${{ matrix.server }}
       BOOKIE_GTK_SERVER_IMAGE_GROUP: ${{ matrix.server == 'mysql-approval' && 'mysql' || matrix.server }}
+      BOOKIE_GTK_FIXTURE_HOST: host.docker.internal
+      BOOKIE_GTK_FIXTURE_SHARED_DIR: /var/tmp/bookie-gtk-fixtures
     strategy:
       fail-fast: false
       matrix:
@@ -1478,12 +1486,12 @@ jobs:
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
           name: floor-package-${{ github.run_id }}-${{ github.run_attempt }}
-          path: floor-artifact/
+          path: ${{ runner.temp }}/floor-artifact
       - name: Verify the package under test
         env:
           BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
         run: |
-          package=$(python3 scripts/ci-gtk-artifact.py verify --package floor-artifact "$BOOKIE_SOURCE_COMMIT")
+          package=$(python3 scripts/ci-gtk-artifact.py verify --package "$RUNNER_TEMP/floor-artifact" "$BOOKIE_SOURCE_COMMIT")
           printf 'DISTRO_FLOOR_PACKAGE=%s\n' "$package" >> "$GITHUB_ENV"
       - name: Log in to Docker Hub
         uses: ./.github/actions/dockerhub-login

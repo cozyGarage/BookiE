@@ -37,7 +37,7 @@ services:
         - --authenticationDatabase
         - admin
         - --eval
-        - "db.adminCommand('ping')"
+        - "if (db.getSiblingDB('bookie').release_items.countDocuments() !== 3) quit(1)"
       interval: 3s
       timeout: 5s
       retries: 40
@@ -90,14 +90,14 @@ services:
           - redis.bookie.test
 
   mongo-plain:
-    image: mongo:7
+    build:
+      context: .
+      dockerfile: mongo-plain/Dockerfile
     restart: on-failure:3
     environment:
       MONGO_INITDB_ROOT_USERNAME: bookie
       MONGO_INITDB_ROOT_PASSWORD: bookie
       MONGO_INITDB_DATABASE: bookie
-    volumes:
-      - ./seed:/docker-entrypoint-initdb.d:ro
     command: ["mongod", "--bind_ip_all"]
     healthcheck:
       test:
@@ -105,7 +105,7 @@ services:
         - mongosh
         - --quiet
         - --host
-        - localhost
+        - mongo-plain
         - -u
         - bookie
         - -p
@@ -113,7 +113,7 @@ services:
         - --authenticationDatabase
         - admin
         - --eval
-        - "db.adminCommand('ping')"
+        - "if (db.getSiblingDB('bookie').release_items.countDocuments() !== 3) quit(1)"
       interval: 3s
       timeout: 5s
       retries: 40

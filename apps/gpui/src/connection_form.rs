@@ -1,5 +1,5 @@
 use bookie_app_services::connection_save::{self, ConnectionDraft};
-use bookie_core::{AuthMode, Environment, TlsMode};
+use bookie_core::{AuthMode, DriverCapabilities, Environment, TlsMode};
 use gpui::{Context, Div, Entity, Stateful, div, prelude::*, px, rgb};
 use secrecy::SecretString;
 
@@ -11,6 +11,7 @@ pub(crate) struct DriverChoice {
     pub id: &'static str,
     pub label: &'static str,
     pub port: u16,
+    pub capabilities: DriverCapabilities,
 }
 
 pub(crate) struct ConnectionForm {
@@ -46,6 +47,7 @@ impl ConnectionForm {
                 id: driver.id(),
                 label: driver.display_name(),
                 port: driver.default_port(),
+                capabilities: driver.capabilities(),
             })
             .collect();
         drivers.sort_by_key(|driver| driver.label);
@@ -84,12 +86,6 @@ impl ConnectionForm {
         self.drivers.get(self.driver)
     }
 
-    fn file_based(&self) -> bool {
-        self.selected()
-            .and_then(|driver| drivers_registry::default_registry().get(driver.id))
-            .is_some_and(|driver| driver.capabilities().is_file_based)
-    }
-
     fn socket_kind(&self) -> Option<bookie_app_services::connection_form::LocalSocketPathKind> {
         let driver = drivers_registry::default_registry().get(self.selected()?.id)?;
         bookie_app_services::connection_form::local_socket_path_kind(driver.capabilities())
@@ -102,6 +98,7 @@ impl ConnectionForm {
             id: self.editing,
             name: text(&self.name),
             driver_id: driver.map(|driver| driver.id.to_string()).unwrap_or_default(),
+            capabilities: driver.map_or_else(DriverCapabilities::default, |driver| driver.capabilities),
             host: text(&self.host),
             port: text(&self.port)
                 .trim()
@@ -119,7 +116,6 @@ impl ConnectionForm {
             tls_root_cert: text(&self.tls_root),
             tls_client_cert: text(&self.tls_cert),
             tls_client_key: text(&self.tls_key),
-            file_based: self.file_based(),
             socket_kind: self.socket_kind(),
             socket_endpoint: text(&self.socket),
             ssh: self.ssh.draft(cx),
@@ -200,7 +196,7 @@ impl GridView {
         let form = &self.connection_form;
         let file_based = form
             .selected()
-            .is_some_and(|driver| matches!(driver.id, "sqlite" | "duckdb"));
+            .is_some_and(|driver| driver.capabilities.is_file_based);
         let title = if form.editing.is_some() {
             "Edit connection"
         } else {
