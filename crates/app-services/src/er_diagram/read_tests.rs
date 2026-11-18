@@ -10,7 +10,7 @@ use bookie_core::{
 };
 use tokio_util::sync::CancellationToken;
 
-use super::read::{MAX_TABLES, read_schema};
+use super::read::{MAX_TABLES, read_schema, read_schema_with_limit};
 
 #[derive(Default)]
 struct Calls {
@@ -271,6 +271,29 @@ async fn a_large_schema_is_cut_at_the_table_limit_and_reports_the_total() {
     assert_eq!(read.total_tables, MAX_TABLES + 25);
     assert!(read.truncated());
     assert_eq!(calls.columns.load(Ordering::SeqCst), MAX_TABLES);
+}
+
+#[tokio::test]
+async fn metadata_over_the_byte_limit_is_not_retained_or_reported_complete() {
+    let calls = Arc::new(Calls::default());
+    let connection = catalog(&calls, Vec::new());
+
+    let read = read_schema_with_limit(
+        &connection,
+        Some("shop"),
+        &[table("items"), table("later")],
+        capabilities(true),
+        &control(&calls),
+        1,
+        |_, _| {},
+    )
+    .await
+    .unwrap();
+
+    assert!(read.reads.is_empty());
+    assert!(read.metadata_limit_reached);
+    assert!(read.truncated());
+    assert_eq!(calls.columns.load(Ordering::SeqCst), 1);
 }
 
 #[tokio::test]

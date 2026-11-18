@@ -4,8 +4,20 @@ use relm4::adw::prelude::*;
 use relm4::{adw, gtk};
 use tokio_util::sync::CancellationToken;
 
-use super::{build, connect_selection, schedule_zoom_update};
+use super::{build, connect_selection, notice_text, schedule_zoom_update};
 use crate::ui::diagram::canvas::DiagramCanvas;
+use bookie_app_services::er_diagram::read::SchemaRead;
+
+#[test]
+fn a_metadata_limited_diagram_says_that_its_contents_are_incomplete() {
+    let notice = notice_text(&SchemaRead {
+        metadata_limit_reached: true,
+        ..SchemaRead::default()
+    });
+
+    assert!(notice.contains("incomplete"));
+    assert!(notice.contains("64 MiB"));
+}
 
 #[test]
 #[ignore = "requires an isolated GTK display"]

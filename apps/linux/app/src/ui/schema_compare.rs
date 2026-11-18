@@ -185,7 +185,7 @@ pub(crate) fn tables_in(tables: &[TableInfo], schema: Option<&str>) -> Vec<Table
 pub(crate) fn both_complete(current: &SchemaRead, desired: &SchemaRead) -> Result<(), String> {
     if current.truncated() || desired.truncated() {
         return Err(tr!(
-            "One of the schemas has more tables than BookiE reads at once, so a comparison would report tables as missing that are not."
+            "One of the schemas could not be read completely within BookiE's table or metadata limits, so comparing it could report tables as missing."
         ));
     }
     let unread: Vec<&str> = current
