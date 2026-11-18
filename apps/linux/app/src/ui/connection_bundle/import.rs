@@ -8,9 +8,6 @@ use uuid::Uuid;
 
 use super::{boxed_list, checkbox_row, disposition_detail, disposition_title};
 
-/// Ask for the passphrase of an encrypted bundle. There is deliberately
-/// no "remember this passphrase" affordance: the passphrase protects a
-/// file that leaves this machine, and storing it here would undo that.
 pub(crate) fn present_import_passphrase_dialog(
     parent: &adw::ApplicationWindow,
     on_passphrase: impl Fn(String) + 'static,
@@ -70,16 +67,12 @@ fn build_plan_body(list: &gtk::ListBox, replace: &adw::SwitchRow, carries_secret
     body
 }
 
-/// What the user approved in the import preview.
 #[derive(Debug)]
 pub(crate) struct ImportChoice {
     pub accepted: Vec<Uuid>,
     pub replace_saved_passwords: bool,
 }
 
-/// Show every planned change before anything is written. Nothing in the
-/// import path deletes a local connection, so the preview only ever
-/// offers to add or update.
 pub(crate) fn present_import_plan_dialog(
     parent: &adw::ApplicationWindow,
     items: &[ImportItem],

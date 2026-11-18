@@ -13,8 +13,6 @@ pub(crate) use import::{ImportChoice, present_import_passphrase_dialog, present_
 pub(crate) const BUNDLE_EXTENSION: &str = "bookie-connections";
 pub(crate) const BUNDLE_MIME_TYPE: &str = "application/json";
 
-/// Suggested file name for an exported bundle. Dated so a user who
-/// exports twice does not silently overwrite the first file.
 pub(crate) fn suggested_bundle_name(today: &str) -> String {
     format!("bookie-connections-{today}.{BUNDLE_EXTENSION}")
 }
@@ -40,9 +38,6 @@ fn boxed_list() -> gtk::ListBox {
         .build()
 }
 
-/// What the import preview says will happen to one entry. The wording
-/// names the outcome rather than the internal disposition, because the
-/// user is deciding whether to let it happen.
 pub(crate) fn disposition_title(item: &ImportItem) -> String {
     match item.disposition {
         ImportDisposition::New => bookie_app_services::tr!("Add"),
@@ -67,8 +62,6 @@ pub(crate) fn disposition_detail(item: &ImportItem) -> String {
     }
 }
 
-/// The line shown after an import finishes. A partial import has to say
-/// so plainly, because the user has to know which half landed.
 pub(crate) fn import_outcome_message(imported: usize, planned: usize) -> String {
     if imported == planned {
         return bookie_app_services::tr!("Imported {n} connections.").replace("{n}", &imported.to_string());
@@ -78,7 +71,6 @@ pub(crate) fn import_outcome_message(imported: usize, planned: usize) -> String 
         .replace("{total}", &planned.to_string())
 }
 
-/// Connections the user ticked, in the order the list showed them.
 pub(crate) fn selected_connections(connections: &[SavedConnection], picked: &[Uuid]) -> Vec<SavedConnection> {
     connections
         .iter()
