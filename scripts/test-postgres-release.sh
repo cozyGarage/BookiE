@@ -36,7 +36,7 @@ export BOOKIE_FIXTURE_BIND_ADDRESS="$fixture_bind_address"
 export BOOKIE_FIXTURE_SSH_HOST="$fixture_ssh_host"
 
 compose() {
-  docker compose --project-directory "$FIXTURE" -f "$FIXTURE/docker-compose.yml" "$@"
+  docker compose --project-name "${BOOKIE_TEST_RUN_ID:-bookie-postgres-release}" --project-directory "$FIXTURE" -f "$FIXTURE/docker-compose.yml" "$@"
 }
 
 teardown() {

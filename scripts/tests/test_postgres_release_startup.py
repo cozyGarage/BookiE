@@ -156,6 +156,13 @@ print(hosts[sys.argv[-1]], "STREAM", sys.argv[-1])
         self.assertIn("options: --add-host=host.docker.internal:host-gateway", job)
         self.assertIn("BOOKIE_FIXTURE_HOST: host.docker.internal", job)
 
+    def test_release_compose_project_is_named_per_run(self):
+        script = (ROOT / "scripts/test-postgres-release.sh").read_text()
+        self.assertIn('--project-name "${BOOKIE_TEST_RUN_ID:-bookie-postgres-release}"', script)
+        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        job = forgejo.split("  pg-release:\n", 1)[1].split("\n  gtk-server:\n", 1)[0]
+        self.assertIn("BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-pg-release", job)
+
     def test_release_waits_for_the_bastion_ssh_service(self):
         script = (ROOT / "scripts/test-postgres-release.sh").read_text()
         self.assertIn('ssh-keyscan -T 1 -p "$port" "$host"', script)

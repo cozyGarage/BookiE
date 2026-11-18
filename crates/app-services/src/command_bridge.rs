@@ -223,7 +223,7 @@ async fn dispatch_session_command(
             })?;
         }
         Command::RunQuery { epoch, session_id, sql } => {
-            dispatch_query(sessions, epoch, session_id, sql, control, sink).await?;
+            Box::pin(dispatch_query(sessions, epoch, session_id, sql, control, sink)).await?;
         }
         Command::ReadPage {
             epoch,
@@ -232,28 +232,44 @@ async fn dispatch_session_command(
             offset,
             limit,
         } => {
-            dispatch_page(sessions, epoch, session_id, (table, offset, limit), control, sink).await?;
+            Box::pin(dispatch_page(
+                sessions,
+                epoch,
+                session_id,
+                (table, offset, limit),
+                control,
+                sink,
+            ))
+            .await?;
         }
         Command::ReadColumns {
             epoch,
             session_id,
             table,
         } => {
-            dispatch_columns(sessions, epoch, session_id, table, control, sink).await?;
+            Box::pin(dispatch_columns(sessions, epoch, session_id, table, control, sink)).await?;
         }
         Command::ReadCatalog {
             epoch,
             session_id,
             kind,
         } => {
-            dispatch_catalog(sessions, epoch, session_id, kind, control, sink).await?;
+            Box::pin(dispatch_catalog(sessions, epoch, session_id, kind, control, sink)).await?;
         }
         Command::ReadDataDictionary {
             epoch,
             session_id,
             capabilities,
         } => {
-            dispatch_data_dictionary(sessions, epoch, session_id, capabilities, control, sink).await?;
+            Box::pin(dispatch_data_dictionary(
+                sessions,
+                epoch,
+                session_id,
+                capabilities,
+                control,
+                sink,
+            ))
+            .await?;
         }
         Command::ReadConnectionStatus { epoch, session_id } => {
             dispatch_connection_status(sessions, epoch, session_id, sink)?;
@@ -263,7 +279,10 @@ async fn dispatch_session_command(
             session_id,
             request,
         } => {
-            dispatch_subscription(sessions, epoch, session_id, request, control, sink).await?;
+            Box::pin(dispatch_subscription(
+                sessions, epoch, session_id, request, control, sink,
+            ))
+            .await?;
         }
         Command::ListSavedConnections { .. } => return Err(DispatchError::InvalidContext),
     }
