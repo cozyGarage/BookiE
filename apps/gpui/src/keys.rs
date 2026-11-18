@@ -1,3 +1,4 @@
+use bookie_gpui::font_settings;
 use bookie_gpui::keymap::{Chord, Command};
 use bookie_results::grid_cursor::{Cursor, move_cursor};
 use gpui::{Context, Focusable, KeyDownEvent, KeystrokeEvent, Window};
@@ -107,6 +108,12 @@ impl GridView {
         {
             return;
         }
+        if modifiers.control && matches!(self.tabs.current(), Tab::Query) {
+            if let Some(delta) = zoom_key(key) {
+                self.zoom_editor(delta, cx);
+                return;
+            }
+        }
         let chord = Chord::new(modifiers.control, modifiers.shift, modifiers.alt, key);
         if let Some(command) = self.keymap.resolve(&chord) {
             self.run_command(command, window, cx);
@@ -193,5 +200,38 @@ impl GridView {
             }
         }
         cx.notify();
+    }
+}
+
+fn zoom_key(key: &str) -> Option<Option<i32>> {
+    match key {
+        "=" | "+" | "add" => Some(Some(1)),
+        "-" | "subtract" => Some(Some(-1)),
+        "0" => Some(None),
+        _ => None,
+    }
+}
+
+impl GridView {
+    pub(crate) fn zoom_editor(&mut self, delta: Option<i32>, cx: &mut Context<Self>) {
+        let current = self.fonts.settings.editor_size;
+        let next = delta.map_or(font_settings::DEFAULT_ZOOM_SIZE, |delta| font_settings::zoom_step(current, delta));
+        if next != current {
+            self.edit_fonts(|fonts| fonts.editor_size = next, cx);
+        }
+    }
+}
+
+#[cfg(test)]
+mod zoom_tests {
+    use super::zoom_key;
+
+    #[test]
+    fn plus_minus_and_zero_are_the_zoom_keys() {
+        assert_eq!(zoom_key("="), Some(Some(1)));
+        assert_eq!(zoom_key("+"), Some(Some(1)));
+        assert_eq!(zoom_key("-"), Some(Some(-1)));
+        assert_eq!(zoom_key("0"), Some(None));
+        assert_eq!(zoom_key("a"), None);
     }
 }

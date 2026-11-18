@@ -678,6 +678,7 @@ fn main() {
         .with_assets(assets::Assets)
         .run(move |cx: &mut App| {
             text_input::bind_keys(cx);
+            ui_theme::apply_editor_size(font_settings::load().editor_size, cx);
             Theme::named(std::env::var("BOOKIE_PROTOTYPE_THEME").ok().as_deref()).install(cx);
             let bounds = Bounds::centered(None, size(px(width), px(height)), cx);
             let opened = cx.open_window(
