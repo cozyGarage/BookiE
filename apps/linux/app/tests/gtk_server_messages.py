@@ -37,7 +37,15 @@ def scenarios(ui):
         ui.run_sql("SELECT public.bookie_gtk_notice() AS notice_result")
         ui.wait_for_node_containing("bookie GTK server message")
         ui.wait_for_node(name="42")
-        ui.invoke(ui.wait_for_node(name="Copy messages", role=pyatspi.ROLE_PUSH_BUTTON))
+        copy = ui.wait_for_node(name="Copy messages", role=pyatspi.ROLE_PUSH_BUTTON)
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        while not copy.getState().contains(pyatspi.STATE_FOCUSED) and time.monotonic() < deadline:
+            ui.press_x11_key("Tab")
+            time.sleep(ui.POLL_SECONDS)
+        assert copy.getState().contains(pyatspi.STATE_FOCUSED), (
+            f"Copy messages is not keyboard reachable:\n{ui.accessible_snapshot()}"
+        )
+        ui.press_x11_key("space")
         copied = clipboard_text_containing(ui, "bookie GTK server message")
         assert "bookie GTK server message" in copied, f"clipboard text after Copy messages: {copied!r}"
         assert "SELECT public.bookie_gtk_notice()" not in copied, copied
