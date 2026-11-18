@@ -222,6 +222,19 @@ async fn dispatch_session_command(
                 closed: sessions.close(session_id),
             })?;
         }
+        Command::ListSavedConnections { .. } => return Err(DispatchError::InvalidContext),
+        read => Box::pin(dispatch_read_command(sessions, read, control, sink)).await?,
+    }
+    Ok(())
+}
+
+async fn dispatch_read_command(
+    sessions: &ReadSessionStore,
+    command: Command,
+    control: &OperationControl,
+    sink: &dyn EventSink,
+) -> Result<(), DispatchError> {
+    match command {
         Command::RunQuery { epoch, session_id, sql } => {
             Box::pin(dispatch_query(sessions, epoch, session_id, sql, control, sink)).await?;
         }
@@ -249,6 +262,18 @@ async fn dispatch_session_command(
         } => {
             Box::pin(dispatch_columns(sessions, epoch, session_id, table, control, sink)).await?;
         }
+        other => Box::pin(dispatch_metadata_command(sessions, other, control, sink)).await?,
+    }
+    Ok(())
+}
+
+async fn dispatch_metadata_command(
+    sessions: &ReadSessionStore,
+    command: Command,
+    control: &OperationControl,
+    sink: &dyn EventSink,
+) -> Result<(), DispatchError> {
+    match command {
         Command::ReadCatalog {
             epoch,
             session_id,
@@ -284,7 +309,7 @@ async fn dispatch_session_command(
             ))
             .await?;
         }
-        Command::ListSavedConnections { .. } => return Err(DispatchError::InvalidContext),
+        _ => return Err(DispatchError::InvalidContext),
     }
     Ok(())
 }
