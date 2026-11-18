@@ -733,6 +733,10 @@ class CiWorkflowTests(unittest.TestCase):
             '"${BOOKIE_FIXTURE_BIND_ADDRESS:-127.0.0.1}:${BOOKIE_DRIVER_TLS_MYSQL_PORT:-3307}:3306"',
             tls_compose,
         )
+        self.assertIn(
+            '"${BOOKIE_FIXTURE_BIND_ADDRESS:-127.0.0.1}:${BOOKIE_DRIVER_TLS_REDIS_PORT:-6380}:6379"',
+            tls_compose,
+        )
         self.assertIn("options: --add-host=host.docker.internal:host-gateway", driver_tls)
         self.assertIn("BOOKIE_DRIVER_TLS_HOST: host.docker.internal", driver_tls)
         self.assertIn("BOOKIE_DRIVER_TLS_SSH_HOST: host.docker.internal", driver_tls)
@@ -742,7 +746,7 @@ class CiWorkflowTests(unittest.TestCase):
             len(re.findall(r"(?m)^    ports:$", tls_compose)),
             len(
                 re.findall(
-                    r'(?m)^\s+- "\$\{BOOKIE_FIXTURE_BIND_ADDRESS:-127\.0\.0\.1\}:(?:\d+|\$\{BOOKIE_DRIVER_TLS_MYSQL_PORT:-3307\}):\d+"$',
+                    r'(?m)^\s+- "\$\{BOOKIE_FIXTURE_BIND_ADDRESS:-127\.0\.0\.1\}:(?:\d+|\$\{BOOKIE_DRIVER_TLS_MYSQL_PORT:-3307\}|\$\{BOOKIE_DRIVER_TLS_REDIS_PORT:-6380\}):\d+"$',
                     tls_compose,
                 )
             ),
