@@ -1,6 +1,6 @@
 # 0033: Frozen leading columns in the result grid
 
-- **Status**: Proposed (2026-11-04)
+- **Status**: Accepted (2026-11-18)
 - **Date**: 2026-11-04
 
 ## Context
