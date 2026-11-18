@@ -9,8 +9,6 @@ services:
       POSTGRES_DB: bookie
       POSTGRES_USER: bookie
       POSTGRES_PASSWORD: bookie
-    volumes:
-      - ./seed:/docker-entrypoint-initdb.d:ro
     command:
       - postgres
       - -c

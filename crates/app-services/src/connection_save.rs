@@ -1,4 +1,4 @@
-use bookie_core::{AuthMode, Environment, TlsMode};
+use bookie_core::{AuthMode, DriverRegistry, Environment, TlsMode};
 use std::path::PathBuf;
 
 use bookie_storage::{
@@ -39,7 +39,6 @@ pub struct ConnectionDraft {
     pub id: Option<Uuid>,
     pub name: String,
     pub driver_id: String,
-    pub file_based: bool,
     pub host: String,
     pub port: u16,
     pub database: String,
@@ -50,6 +49,7 @@ pub struct ConnectionDraft {
     pub tls_root_cert: String,
     pub tls_client_cert: String,
     pub tls_client_key: String,
+    pub file_based: bool,
     pub socket_kind: Option<LocalSocketPathKind>,
     pub socket_endpoint: String,
     pub ssh: Option<SshDraft>,
@@ -67,16 +67,16 @@ fn optional_path(text: &str) -> Option<PathBuf> {
     (!text.is_empty()).then(|| PathBuf::from(text))
 }
 
-pub async fn load_draft(id: Uuid) -> Result<Option<ConnectionDraft>, String> {
+pub async fn load_draft(registry: &DriverRegistry, id: Uuid) -> Result<Option<ConnectionDraft>, String> {
     let saved = bookie_storage::load_connections()
         .await
         .map_err(|error| error.to_string())?
         .into_iter()
         .find(|saved| saved.id == id);
-    Ok(saved.map(|saved| draft_from_saved(&saved)))
+    Ok(saved.map(|saved| draft_from_saved(&saved, registry)))
 }
 
-fn draft_from_saved(saved: &SavedConnection) -> ConnectionDraft {
+fn draft_from_saved(saved: &SavedConnection, registry: &DriverRegistry) -> ConnectionDraft {
     let (socket_kind, socket_endpoint) = match (&saved.socket_dir, &saved.socket_path) {
         (Some(directory), _) => (Some(LocalSocketPathKind::Directory), path_text(Some(directory))),
         (None, Some(path)) => (Some(LocalSocketPathKind::File), path_text(Some(path))),
@@ -86,7 +86,6 @@ fn draft_from_saved(saved: &SavedConnection) -> ConnectionDraft {
         id: Some(saved.id),
         name: saved.name.clone(),
         driver_id: saved.driver_id.clone(),
-        file_based: saved.host.is_empty() && saved.port == 0,
         host: saved.host.clone(),
         port: saved.port,
         database: saved.database.clone(),
@@ -97,6 +96,9 @@ fn draft_from_saved(saved: &SavedConnection) -> ConnectionDraft {
         tls_root_cert: path_text(saved.tls_root_cert.as_ref()),
         tls_client_cert: path_text(saved.tls_client_cert.as_ref()),
         tls_client_key: path_text(saved.tls_client_key.as_ref()),
+        file_based: registry
+            .get(&saved.driver_id)
+            .is_some_and(|driver| driver.capabilities().is_file_based),
         socket_kind,
         socket_endpoint,
         ssh: saved.ssh.as_ref().map(ssh_draft_from_saved),
@@ -550,6 +552,39 @@ async fn rollback_saved_connection(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use async_trait::async_trait;
+    use std::sync::Arc;
+
+    struct TestDriver {
+        id: &'static str,
+        file_based: bool,
+    }
+
+    #[async_trait]
+    impl bookie_core::DatabaseDriver for TestDriver {
+        fn id(&self) -> &'static str {
+            self.id
+        }
+
+        fn display_name(&self) -> &'static str {
+            self.id
+        }
+
+        fn default_port(&self) -> u16 {
+            0
+        }
+
+        fn is_file_based(&self) -> bool {
+            self.file_based
+        }
+
+        async fn connect(
+            &self,
+            _options: bookie_core::ConnectOptions,
+        ) -> Result<Box<dyn bookie_core::Connection>, bookie_core::DriverError> {
+            Err(bookie_core::DriverError::Unsupported("test driver".into()))
+        }
+    }
 
     fn hop(host: &str, auth: SshAuthKind) -> SshHopDraft {
         SshHopDraft {
@@ -574,7 +609,6 @@ mod tests {
             id: None,
             name: String::new(),
             driver_id: "postgres".into(),
-            file_based: false,
             host: " db.example ".into(),
             port: 5432,
             database: "app".into(),
@@ -585,6 +619,7 @@ mod tests {
             tls_root_cert: String::new(),
             tls_client_cert: String::new(),
             tls_client_key: String::new(),
+            file_based: false,
             socket_kind: None,
             socket_endpoint: String::new(),
             ssh: None,
@@ -615,8 +650,19 @@ mod tests {
         file.port = 0;
         let saved = saved_from_draft(&file, Uuid::nil());
         assert_eq!(saved.name, "/tmp/a.sqlite");
-        assert!(draft_from_saved(&saved).file_based);
+        let mut registry = DriverRegistry::new();
+        registry.register(Arc::new(TestDriver {
+            id: "future-file-database",
+            file_based: true,
+        }));
+        assert!(draft_from_saved(&saved, &registry).file_based);
         assert!(validate(&file).is_ok());
+
+        let mut network = draft();
+        network.host.clear();
+        network.port = 0;
+        let saved = saved_from_draft(&network, Uuid::nil());
+        assert!(!draft_from_saved(&saved, &registry).file_based);
     }
 
     #[test]
@@ -728,7 +774,7 @@ mod tests {
         let plan = plan_chain(head_config(ssh, None), &jump_forms(ssh), None).unwrap();
         let mut saved = saved_from_draft(&chain, Uuid::nil());
         saved.ssh = Some(plan.head);
-        let back = draft_from_saved(&saved).ssh.unwrap();
+        let back = draft_from_saved(&saved, &DriverRegistry::new()).ssh.unwrap();
         assert_eq!(back.head.auth, SshAuthKind::Agent);
         assert_eq!(back.jumps.len(), 2);
         assert_eq!(back.jumps[0].host, "bastion");
@@ -750,6 +796,7 @@ mod tests {
         let cancel = || tokio_util::sync::CancellationToken::new();
         let mut file = draft();
         file.driver_id = "sqlite".into();
+        file.file_based = true;
         file.database = path.display().to_string();
         assert!(
             test(&registry, &file, cancel(), None)

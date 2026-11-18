@@ -376,7 +376,8 @@ impl GridView {
                         .enable_all()
                         .build()
                         .map_err(|error| error.to_string())?;
-                    runtime.block_on(connection_save::load_draft(id))
+                    let registry = drivers_registry::default_registry();
+                    runtime.block_on(connection_save::load_draft(&registry, id))
                 })
                 .await;
             let _ = this.update(cx, |this, cx| {
