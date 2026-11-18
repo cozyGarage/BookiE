@@ -1103,6 +1103,15 @@ mod tests {
     }
 
     #[test]
+    fn an_explain_statement_for_the_driver_runs_in_the_read_only_session() {
+        let session = LiveSession::open(&fixture()).expect("open");
+        let statement = bookie_core::sql_dialect::explain_statement(&session.driver_id, "SELECT id FROM orders")
+            .expect("sqlite can explain");
+        let plan = session.run_query(&statement, 100).expect("plan");
+        assert!(plan.total() >= 1);
+    }
+
+    #[test]
     fn a_query_becomes_a_grid_source_with_its_own_columns_and_cap() {
         let session = LiveSession::open(&fixture()).expect("open");
         let result = session

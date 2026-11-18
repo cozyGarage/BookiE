@@ -27,7 +27,7 @@ impl GridView {
                     this.status = headline.clone();
                 }
                 for (kind, text) in lines {
-                    this.messages.push(kind, text);
+                    this.panel.messages.push(kind, text);
                 }
             },
         );
@@ -44,7 +44,7 @@ impl GridView {
                     Ok(text) => (MessageKind::Success, text),
                     Err(error) => (MessageKind::Error, format!("Kafka · {error}")),
                 };
-                this.messages.push(kind, text.clone());
+                this.panel.messages.push(kind, text.clone());
                 this.status = text;
             },
         );
@@ -60,7 +60,7 @@ impl GridView {
             move |this, outcome| {
                 let (up, text) = bookie_gpui::net_check::record(&mut this.check_histories, &address, outcome);
                 let kind = if up { MessageKind::Success } else { MessageKind::Error };
-                this.messages.push(kind, text.clone());
+                this.panel.messages.push(kind, text.clone());
                 this.status = text;
             },
         );
@@ -76,7 +76,7 @@ impl GridView {
             Err(error) => {
                 let message = format!("Could not read connection status: {error}");
                 self.status = message.clone();
-                self.messages.push(MessageKind::Error, message);
+                self.panel.messages.push(MessageKind::Error, message);
                 return;
             }
         };
@@ -85,7 +85,7 @@ impl GridView {
             self.status = headline.clone();
         }
         for (kind, text) in lines {
-            self.messages.push(kind, text);
+            self.panel.messages.push(kind, text);
         }
     }
 

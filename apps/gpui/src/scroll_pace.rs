@@ -3,7 +3,7 @@ use super::*;
 impl GridView {
     pub(crate) fn pace_frame(&mut self, window: &mut Window) {
         let last = self.visible_count().saturating_sub(1);
-        let Some(pace) = self.pace.as_mut() else { return };
+        let Some(pace) = self.measure.pace.as_mut() else { return };
         let target = (f64::from(pace.step) / f64::from(pace.steps) * last as f64) as usize;
         self.scroll.scroll_to_item_strict(target, ScrollStrategy::Top);
         pace.step += 1;
@@ -13,13 +13,18 @@ impl GridView {
         }
         let elapsed = pace.begun.elapsed().as_millis();
         let steps = pace.steps;
-        self.pace = None;
-        self.measuring = false;
+        self.measure.pace = None;
+        self.measure.measuring = false;
         self.report_scroll(steps, elapsed, true);
     }
 
     pub(crate) fn report_scroll(&self, steps: u32, elapsed: u128, with_frames: bool) {
-        let mut sorted: Vec<f64> = self.frame_intervals.iter().map(|d| d.as_secs_f64() * 1000.0).collect();
+        let mut sorted: Vec<f64> = self
+            .measure
+            .frame_intervals
+            .iter()
+            .map(|d| d.as_secs_f64() * 1000.0)
+            .collect();
         sorted.sort_by(f64::total_cmp);
         let pick = |q: f64| {
             sorted
@@ -51,10 +56,10 @@ impl GridView {
             cx.background_executor().timer(Duration::from_millis(1500)).await;
             if frame_paced {
                 this.update(cx, |this, cx| {
-                    this.frame_intervals.clear();
-                    this.last_frame = None;
-                    this.measuring = true;
-                    this.pace = Some(Pace {
+                    this.measure.frame_intervals.clear();
+                    this.measure.last_frame = None;
+                    this.measure.measuring = true;
+                    this.measure.pace = Some(Pace {
                         step: 0,
                         steps,
                         begun: Instant::now(),

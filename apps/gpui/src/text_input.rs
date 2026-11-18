@@ -49,6 +49,7 @@ pub struct TextInput {
     last_layout: Option<ShapedLine>,
     last_bounds: Option<Bounds<Pixels>>,
     is_selecting: bool,
+    masked: bool,
 }
 
 fn compute_x_offset(align: gpui::TextAlign, bounds: Bounds<Pixels>, line_width: Pixels) -> Pixels {
@@ -102,7 +103,29 @@ impl TextInput {
             last_layout: None,
             last_bounds: None,
             is_selecting: false,
+            masked: false,
         }
+    }
+
+    pub fn masked(mut self) -> Self {
+        self.masked = true;
+        self
+    }
+
+    fn shown(&self) -> SharedString {
+        if self.masked {
+            "*".repeat(self.content.len()).into()
+        } else {
+            self.content.clone()
+        }
+    }
+
+    fn char_index(&self, index: usize) -> usize {
+        let mut index = index.min(self.content.len());
+        while !self.content.is_char_boundary(index) {
+            index -= 1;
+        }
+        index
     }
 
     pub fn set_text_align(&mut self, text_align: gpui::TextAlign, cx: &mut Context<Self>) {
@@ -221,14 +244,14 @@ impl TextInput {
     }
 
     fn copy(&mut self, _: &Copy, _: &mut Window, cx: &mut Context<Self>) {
-        if !self.selected_range.is_empty() {
+        if !self.masked && !self.selected_range.is_empty() {
             cx.write_to_clipboard(ClipboardItem::new_string(
                 self.content[self.selected_range.clone()].to_string(),
             ));
         }
     }
     fn cut(&mut self, _: &Cut, window: &mut Window, cx: &mut Context<Self>) {
-        if !self.selected_range.is_empty() {
+        if !self.masked && !self.selected_range.is_empty() {
             cx.write_to_clipboard(ClipboardItem::new_string(
                 self.content[self.selected_range.clone()].to_string(),
             ));
@@ -265,7 +288,7 @@ impl TextInput {
         }
         let x_offset = compute_x_offset(self.text_align, *bounds, line.width);
         let rel_x = (position.x - bounds.left() - x_offset).max(px(0.0));
-        line.closest_index_for_x(rel_x)
+        self.char_index(line.closest_index_for_x(rel_x))
     }
 
     fn select_to(&mut self, offset: usize, cx: &mut Context<Self>) {
@@ -457,9 +480,9 @@ impl EntityInputHandler for TextInput {
         let last_layout = self.last_layout.as_ref()?;
         let x_offset = compute_x_offset(self.text_align, last_bounds, last_layout.width);
 
-        assert_eq!(last_layout.text, self.content);
+        assert_eq!(last_layout.text, self.shown());
         let rel_x = (point.x - line_point.x - x_offset).max(px(0.0));
-        let utf8_index = last_layout.index_for_x(rel_x)?;
+        let utf8_index = self.char_index(last_layout.index_for_x(rel_x)?);
         Some(self.offset_to_utf16(utf8_index))
     }
 }
@@ -517,7 +540,7 @@ impl Element for TextElement {
         cx: &mut App,
     ) -> Self::PrepaintState {
         let input = self.input.read(cx);
-        let content = input.content.clone();
+        let content = input.shown();
         let selected_range = input.selected_range.clone();
         let cursor = input.cursor_offset();
         let style = window.text_style();
