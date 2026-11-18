@@ -8,9 +8,6 @@ use uuid::Uuid;
 
 use super::{boxed_list, bundle_file_filter, bundle_file_filters, checkbox_row, suggested_bundle_name};
 
-/// What the export dialog collected. The passphrase is the only thing
-/// that decides whether credentials travel: blank means a bundle with
-/// no credentials at all, not a bundle with weaker protection.
 pub(crate) struct ExportChoice {
     pub connections: Vec<Uuid>,
     pub passphrase: String,
