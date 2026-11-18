@@ -3,6 +3,9 @@ use std::collections::HashMap;
 use bookie_policy::{
     AuditApprovalOutcome, AuditEvent, AuditOperationClass, AuditRecordPhase, AuditTerminalStatus, Principal,
 };
+pub use bookie_policy::{
+    AuditApprovalOutcome as Approval, AuditOperationClass as OperationClass, AuditTerminalStatus as TerminalStatus,
+};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, PartialEq)]

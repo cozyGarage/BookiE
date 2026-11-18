@@ -163,11 +163,11 @@ impl GridView {
                 .text_color(rgb(theme.muted_foreground))
                 .child("No operations match")
         } else {
-            div()
-                .flex()
-                .flex_col()
-                .gap_1()
-                .children(rows.iter().enumerate().map(|(index, row)| self.audit_row(index, row, theme)))
+            div().flex().flex_col().gap_1().children(
+                rows.iter()
+                    .enumerate()
+                    .map(|(index, row)| self.audit_row(index, row, theme)),
+            )
         };
         div()
             .flex_1()
@@ -178,14 +178,23 @@ impl GridView {
             .p_6()
             .bg(rgb(theme.background))
             .child(div().h(px(size::FORM_CONTROL)).child(self.audit_page.search.clone()))
-            .child(div().id("audit-list").flex_1().min_h_0().overflow_y_scroll().child(body))
+            .child(
+                div()
+                    .id("audit-list")
+                    .flex_1()
+                    .min_h_0()
+                    .overflow_y_scroll()
+                    .child(body),
+            )
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bookie_policy::{AuditApprovalOutcome, AuditOperationClass, AuditTerminalStatus};
+    use bookie_app_services::audit_view::{
+        Approval as AuditApprovalOutcome, OperationClass as AuditOperationClass, TerminalStatus as AuditTerminalStatus,
+    };
 
     fn row(sql: &str, status: AuditTerminalStatus) -> OperationRow {
         OperationRow {
