@@ -29,7 +29,7 @@ use bookie_gpui::shell::{
     Catalog, DEFAULT_RESULT_RATIO, ResultView, Run, Tab, Tabs, next_run, result_ratio_from_drag, table_label,
 };
 use bookie_gpui::source::{Source, Synthetic};
-use bookie_gpui::theme::{Style, Theme};
+use bookie_gpui::theme::{Style, Theme, size};
 use bookie_results::grid_cursor::Cursor;
 use gpui::{
     App, Bounds, ClipboardItem, Context, Div, Entity, FocusHandle, Focusable, MouseButton, ScrollHandle,
@@ -534,9 +534,9 @@ fn button(id: &'static str, label: impl Into<String>, theme: Theme) -> Stateful<
         .id(id)
         .flex()
         .items_center()
-        .h(px(24.0))
+        .h(px(size::COMPACT_CONTROL))
         .px_2()
-        .rounded(px(4.0))
+        .rounded(px(size::CONTROL_RADIUS))
         .border_1()
         .border_color(rgb(theme.border))
         .bg(rgb(theme.background))
