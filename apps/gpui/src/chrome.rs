@@ -749,7 +749,7 @@ impl GridView {
                       set: fn(&mut font_settings::FontSettings, String)| {
             let (read, write) = (view.clone(), view.clone());
             SettingField::input(
-                move |cx| get(&read.read(cx).fonts).clone().into(),
+                move |cx| get(&read.read(cx).fonts.settings).clone().into(),
                 move |value: gpui::SharedString, cx| {
                     write.update(cx, |this, cx| {
                         this.edit_fonts(|fonts| set(fonts, value.to_string()), cx)
@@ -761,7 +761,7 @@ impl GridView {
             let (read, write) = (view.clone(), view.clone());
             SettingField::number_input(
                 size_options(),
-                move |cx| f64::from(get(&read.read(cx).fonts)),
+                move |cx| f64::from(get(&read.read(cx).fonts.settings)),
                 move |value: f64, cx| {
                     write.update(cx, |this, cx| {
                         this.edit_fonts(|fonts| set(fonts, font_settings::clamp_size(value)), cx)
@@ -789,8 +789,8 @@ impl GridView {
     }
 
     pub fn edit_fonts(&mut self, edit: impl FnOnce(&mut font_settings::FontSettings), cx: &mut Context<Self>) {
-        edit(&mut self.fonts);
-        if let Err(error) = font_settings::save(&self.fonts) {
+        edit(&mut self.fonts.settings);
+        if let Err(error) = font_settings::save(&self.fonts.settings) {
             self.status = format!("Could not save font settings: {error}");
         }
         cx.notify();
@@ -937,7 +937,7 @@ impl GridView {
     }
 
     fn home_query_history_card(&self, theme: Theme) -> Div {
-        let entries = self.messages.entries();
+        let entries = self.panel.messages.entries();
         let content = if entries.is_empty() {
             div()
                 .p_4()
@@ -1049,8 +1049,8 @@ impl GridView {
             .flex()
             .flex_col()
             .min_h_0()
-            .when(self.result_open, |pane| pane.h(gpui::relative(1.0 - self.result_ratio)))
-            .when(!self.result_open, |pane| pane.flex_1())
+            .when(self.panel.open, |pane| pane.h(gpui::relative(1.0 - self.panel.ratio)))
+            .when(!self.panel.open, |pane| pane.flex_1())
             .child(self.query_editor_toolbar(theme, cx))
             .child(
                 div()
@@ -1078,10 +1078,10 @@ impl GridView {
                     .children(self.live.is_some().then(|| {
                         div()
                             .flex_1()
-                            .when(!self.fonts.editor_family.is_empty(), |pane| {
-                                pane.font_family(self.fonts.editor_family.clone())
+                            .when(!self.fonts.settings.editor_family.is_empty(), |pane| {
+                                pane.font_family(self.fonts.settings.editor_family.clone())
                             })
-                            .text_size(px(self.fonts.editor_size))
+                            .text_size(px(self.fonts.settings.editor_size))
                             .child(gpui_kit::component::input::Editor::new(&self.sql_input).h(gpui::relative(1.0)))
                     })),
             )
@@ -1099,7 +1099,7 @@ impl GridView {
             .on_mouse_down(
                 gpui::MouseButton::Left,
                 cx.listener(|this, _: &MouseDownEvent, _, cx| {
-                    this.resizing_split = true;
+                    this.panel.resizing = true;
                     cx.stop_propagation();
                     cx.notify();
                 }),
@@ -1116,7 +1116,7 @@ impl GridView {
             .flex_col()
             .min_h_0()
             .child(editor)
-            .children(self.result_open.then_some(divider))
+            .children(self.panel.open.then_some(divider))
             .child(result)
     }
 
@@ -1181,7 +1181,7 @@ impl GridView {
         theme: Theme,
         cx: &mut Context<Self>,
     ) -> Stateful<Div> {
-        let selected = self.result_view == view;
+        let selected = self.panel.view == view;
         let button = div()
             .id(id)
             .flex()
@@ -1197,7 +1197,7 @@ impl GridView {
             button.text_color(rgb(theme.muted_foreground))
         };
         button.on_click(cx.listener(move |this, _, _, cx| {
-            this.result_view = view;
+            this.panel.view = view;
             cx.notify();
         }))
     }
@@ -1237,7 +1237,7 @@ impl GridView {
             .child(
                 ghost("toggle-results", "", theme)
                     .child(icon(
-                        if self.result_open {
+                        if self.panel.open {
                             "chevron-down"
                         } else {
                             "chevron-right"
@@ -1245,7 +1245,7 @@ impl GridView {
                         theme.muted_foreground,
                     ))
                     .on_click(cx.listener(|this, _, _, cx| {
-                        this.result_open = !this.result_open;
+                        this.panel.open = !this.panel.open;
                         cx.notify();
                     })),
             )
@@ -1261,10 +1261,10 @@ impl GridView {
                 .gap_1()
                 .p_4()
                 .overflow_y_scroll()
-                .children(if self.messages.entries().is_empty() {
+                .children(if self.panel.messages.entries().is_empty() {
                     vec![div().text_color(rgb(theme.muted_foreground)).child("No messages yet")]
                 } else {
-                    self.messages
+                    self.panel.messages
                         .entries()
                         .iter()
                         .rev()
@@ -1303,12 +1303,12 @@ impl GridView {
     }
 
     fn result_body(&self, theme: Theme, grid: Div) -> Div {
-        if self.result_view == ResultView::Messages {
+        if self.panel.view == ResultView::Messages {
             self.result_messages_body(theme)
         } else if let Some(slot) = self
             .runs
             .get(self.active_run)
-            .filter(|_| self.result_view == ResultView::Summary)
+            .filter(|_| self.panel.view == ResultView::Summary)
         {
             self.result_summary_body(&slot.run)
         } else if self.runs.is_empty() {
@@ -1325,9 +1325,9 @@ impl GridView {
             .flex()
             .flex_col()
             .min_h_0()
-            .when(self.result_open, |pane| pane.flex_1())
+            .when(self.panel.open, |pane| pane.flex_1())
             .child(header)
-            .children(self.result_open.then_some(body))
+            .children(self.panel.open.then_some(body))
     }
 
     pub fn viewport_rows_for(&self, window: &Window) -> usize {

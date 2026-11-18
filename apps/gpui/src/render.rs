@@ -297,10 +297,10 @@ impl Render for GridView {
             .flex_col()
             .bg(rgb(theme.background))
             .text_color(rgb(theme.foreground))
-            .text_size(px(self.fonts.ui_size))
-            .when(!self.font.is_empty(), |root| root.font_family(self.font.clone()))
-            .when(!self.fonts.ui_family.is_empty(), |root| {
-                root.font_family(self.fonts.ui_family.clone())
+            .text_size(px(self.fonts.settings.ui_size))
+            .when(!self.fonts.current.is_empty(), |root| root.font_family(self.fonts.current.clone()))
+            .when(!self.fonts.settings.ui_family.is_empty(), |root| {
+                root.font_family(self.fonts.settings.ui_family.clone())
             })
             .track_focus(&self.focus)
             .on_key_down(cx.listener(Self::key_down))
@@ -309,10 +309,10 @@ impl Render for GridView {
                     this.sidebar.width = f32::from(event.position.x).clamp(260.0, 480.0);
                     cx.notify();
                 }
-                if this.resizing_split {
+                if this.panel.resizing {
                     let top_offset = TOOLBAR_HEIGHT + TAB_HEIGHT;
                     let height = f32::from(window.viewport_size().height) - top_offset - STATUS_HEIGHT;
-                    this.result_ratio = result_ratio_from_drag(f32::from(event.position.y), top_offset, height);
+                    this.panel.ratio = result_ratio_from_drag(f32::from(event.position.y), top_offset, height);
                     cx.notify();
                 }
             }))
@@ -320,7 +320,7 @@ impl Render for GridView {
                 MouseButton::Left,
                 cx.listener(|this, _: &gpui::MouseUpEvent, _, cx| {
                     let was_resizing =
-                        std::mem::take(&mut this.sidebar.resizing) | std::mem::take(&mut this.resizing_split);
+                        std::mem::take(&mut this.sidebar.resizing) | std::mem::take(&mut this.panel.resizing);
                     if was_resizing {
                         cx.notify();
                     }

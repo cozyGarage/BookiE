@@ -356,8 +356,8 @@ fn every_statement_is_logged_and_a_refused_one_opens_the_messages_view(cx: &mut 
     };
     run(cx, "SELECT id\n  FROM orders");
     view.read_with(cx, |view, _| {
-        assert_eq!(view.result_view, ResultView::Table, "a good run keeps the table view");
-        let entries = view.messages.entries();
+        assert_eq!(view.panel.view, ResultView::Table, "a good run keeps the table view");
+        let entries = view.panel.messages.entries();
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].kind, MessageKind::Success);
         assert!(
@@ -368,8 +368,8 @@ fn every_statement_is_logged_and_a_refused_one_opens_the_messages_view(cx: &mut 
     });
     run(cx, "DELETE FROM orders");
     view.read_with(cx, |view, _| {
-        assert_eq!(view.result_view, ResultView::Messages, "a refused statement shows why");
-        let entries = view.messages.entries();
+        assert_eq!(view.panel.view, ResultView::Messages, "a refused statement shows why");
+        let entries = view.panel.messages.entries();
         assert_eq!(entries.len(), 2);
         assert_eq!(entries[1].kind, MessageKind::Error);
         assert!(
@@ -970,7 +970,7 @@ fn a_typed_host_and_port_offers_a_tcp_check_that_lands_in_messages(cx: &mut Test
     cx.executor().advance_clock(std::time::Duration::from_secs(1));
     cx.run_until_parked();
     view.read_with(cx, |view, _| {
-        let entries = view.messages.entries();
+        let entries = view.panel.messages.entries();
         assert_eq!(entries.len(), 1, "{}", view.status);
         assert_eq!(entries[0].kind, bookie_gpui::messages::MessageKind::Success);
         assert!(
@@ -1021,7 +1021,7 @@ fn the_status_command_reports_a_healthy_direct_connection_in_messages(cx: &mut T
     });
     cx.update(|_, cx| view.update(cx, |view, _| view.show_status()));
     view.read_with(cx, |view, _| {
-        let entries = view.messages.entries();
+        let entries = view.panel.messages.entries();
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].kind, bookie_gpui::messages::MessageKind::Success);
         assert!(

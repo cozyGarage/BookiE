@@ -59,15 +59,15 @@ impl GridView {
                 |this, (sql, elapsed, result)| match result {
                     Ok(table) => {
                         let (rows, truncated) = (bookie_gpui::source::ResultSource::total(&table), table.truncated);
-                        this.messages.statement_ok(&sql, rows, truncated, elapsed);
+                        this.panel.messages.statement_ok(&sql, rows, truncated, elapsed);
                         this.add_run(Some(std::sync::Arc::new(table)));
                         if let Some(slot) = this.runs.last_mut() {
                             slot.run.elapsed_ms = Some(u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX));
                         }
                     }
                     Err(message) => {
-                        this.messages.statement_failed(&sql, &message, elapsed);
-                        this.result_view = ResultView::Messages;
+                        this.panel.messages.statement_failed(&sql, &message, elapsed);
+                        this.panel.view = ResultView::Messages;
                         this.status = message;
                     }
                 },

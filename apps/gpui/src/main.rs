@@ -13,6 +13,7 @@ mod measure;
 mod menus;
 mod palette_actions;
 mod palette_state;
+mod panel_state;
 mod render;
 mod runs;
 mod scroll_pace;
@@ -25,7 +26,7 @@ use bookie_app_services::result_copy::{self, CopyContext, CopyFormat};
 use bookie_gpui::core_bridge::column_infos_for;
 use bookie_gpui::font_settings;
 use bookie_gpui::keymap::Keymap;
-use bookie_gpui::messages::{MessageKind, MessageLog};
+use bookie_gpui::messages::MessageKind;
 use bookie_gpui::model::*;
 use bookie_gpui::palette::{Action, matches as palette_matches, step as palette_step};
 use bookie_gpui::selection::Selection;
@@ -115,19 +116,12 @@ struct GridView {
     active_run: usize,
     run_scroll: ScrollHandle,
     next_run_number: usize,
-    result_view: ResultView,
-    messages: MessageLog,
-    result_ratio: f32,
-    result_open: bool,
-    resizing_split: bool,
-    font: gpui::SharedString,
-    fonts: font_settings::FontSettings,
-    font_names: Vec<String>,
-    csv_delimiter: Option<bookie_core::export::CustomDelimiter>,
-    export_limit: Option<usize>,
     check_histories: Vec<(String, bookie_app_services::checks::History)>,
     palette: palette_state::PaletteState,
     sidebar: sidebar_state::SidebarState,
+    panel: panel_state::PanelState,
+    fonts: panel_state::FontState,
+    export: panel_state::ExportState,
     measure: measure::Measure,
     cursor: MatchCursor,
     find_capped: bool,
@@ -333,7 +327,6 @@ impl GridView {
         font_names.sort();
         font_names.dedup();
         GridView {
-            fonts: font_settings::load(),
             table,
             _table_events: table_events,
             focus: table_focus,
@@ -347,12 +340,13 @@ impl GridView {
             sql_input,
             palette: palette_state::PaletteState::new(palette_input),
             sidebar: sidebar_state::SidebarState::new(sidebar_search),
+            panel: panel_state::PanelState::new(DEFAULT_RESULT_RATIO),
+            fonts: panel_state::FontState::new(font_settings::load(), default_font(&font_names).into(), font_names),
+            export: panel_state::ExportState::default(),
             measure: measure::Measure::new(started),
             keystroke_hook: None,
             editing: None,
             cell_cursor: None,
-            csv_delimiter: None,
-            export_limit: None,
             compare: None,
             selection: None,
             focus_editor: false,
@@ -362,8 +356,6 @@ impl GridView {
             find_reset: false,
             detail_open: false,
             find_capped: false,
-            result_open: true,
-            resizing_split: false,
             edits: Default::default(),
             table_edits: Default::default(),
             catalog: Catalog::synthetic(),
@@ -372,7 +364,6 @@ impl GridView {
             tabs: Tabs::default(),
             tab_scroll: ScrollHandle::new(),
             run_scroll: ScrollHandle::new(),
-            messages: MessageLog::default(),
             scroll: UniformListScrollHandle::new(),
             runs: vec![runs::RunSlot::new(
                 Run {
@@ -386,10 +377,6 @@ impl GridView {
             next_run_number: 2,
             viewport_rows: 10,
             dark_mode: Theme::current(cx).dark,
-            result_view: ResultView::Table,
-            result_ratio: DEFAULT_RESULT_RATIO,
-            font: default_font(&font_names).into(),
-            font_names,
             connections: Vec::new(),
             check_histories: Vec::new(),
             cursor: MatchCursor::default(),

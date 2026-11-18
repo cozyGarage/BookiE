@@ -481,7 +481,7 @@ fn the_palette_lists_installed_fonts_and_the_chosen_one_becomes_the_ui_font(cx: 
     let (view, cx) = open(cx);
     cx.update(|_, cx| {
         view.update(cx, |view, _| {
-            view.font_names = vec!["Foo Sans".into(), "Bar Mono".into()]
+            view.fonts.names = vec!["Foo Sans".into(), "Bar Mono".into()]
         })
     });
     cx.simulate_keystrokes("ctrl-shift-p");
@@ -502,7 +502,7 @@ fn the_palette_lists_installed_fonts_and_the_chosen_one_becomes_the_ui_font(cx: 
     cx.simulate_input("bar");
     cx.simulate_keystrokes("enter");
     view.read_with(cx, |view, _| {
-        assert_eq!(view.font.as_ref(), "Bar Mono");
+        assert_eq!(view.fonts.current.as_ref(), "Bar Mono");
         assert!(!view.palette.open && !view.palette.fonts);
     });
 }
@@ -1269,11 +1269,11 @@ fn the_results_pane_can_be_hidden_and_the_summary_view_shows_the_run(cx: &mut Te
     cx.simulate_keystrokes("ctrl-shift-p");
     cx.simulate_input("hide the results");
     cx.simulate_keystrokes("enter");
-    view.read_with(cx, |view, _| assert!(!view.result_open));
+    view.read_with(cx, |view, _| assert!(!view.panel.open));
     cx.simulate_keystrokes("ctrl-shift-p");
     cx.simulate_input("show the results");
     cx.simulate_keystrokes("enter");
-    view.read_with(cx, |view, _| assert!(view.result_open));
+    view.read_with(cx, |view, _| assert!(view.panel.open));
 }
 
 fn test_columns() -> &'static [bookie_gpui::model::ColumnMeta] {
