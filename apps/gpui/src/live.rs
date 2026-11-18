@@ -329,6 +329,14 @@ impl LiveTable {
     }
 }
 
+fn file_identity(path: &std::path::Path) -> (uuid::Uuid, String) {
+    let text = path.display().to_string();
+    (
+        uuid::Uuid::new_v5(&uuid::Uuid::NAMESPACE_URL, format!("file://{text}").as_bytes()),
+        text,
+    )
+}
+
 async fn open_session(
     origin: &Origin,
     cancellation: CancellationToken,
@@ -342,24 +350,26 @@ async fn open_session(
         cancellation,
         Some(tokio::time::Instant::now() + Duration::from_secs(30)),
     );
-    let mut identity = None;
-    let command = match origin {
+    let (command, identity) = match origin {
         Origin::Saved(connection) => {
             let saved = bridge_saved_connections(&control, epoch, &current_epoch).await?;
             let found = saved
                 .iter()
                 .find(|saved| saved.id.to_string() == *connection || saved.name == *connection)
                 .ok_or_else(|| format!("no saved connection named or numbered {connection}"))?;
-            identity = Some((found.id, found.name.clone()));
-            Command::OpenSavedConnection {
+            let command = Command::OpenSavedConnection {
                 epoch,
                 connection_id: found.id,
-            }
+            };
+            (command, (found.id, found.name.clone()))
         }
-        Origin::File(path) => Command::OpenConnectionFile {
-            epoch,
-            path: path.clone(),
-        },
+        Origin::File(path) => {
+            let command = Command::OpenConnectionFile {
+                epoch,
+                path: path.clone(),
+            };
+            (command, file_identity(path))
+        }
     };
     let event = dispatch_read(
         DispatchContext::Sessions(&sessions),
@@ -372,7 +382,7 @@ async fn open_session(
     let Event::SessionOpened { outcome, .. } = event else {
         return Err("The command bridge returned an unexpected event.".into());
     };
-    Ok((sessions, outcome?, identity))
+    Ok((sessions, outcome?, Some(identity)))
 }
 
 struct RegistrySubscriptionSampler;
