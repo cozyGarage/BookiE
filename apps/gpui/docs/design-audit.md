@@ -33,7 +33,7 @@ Read `theme.rs`, `chrome.rs`, `render.rs`, `main.rs`, `text_input.rs` and `palet
 | 12 | Find filters only after Enter | `find_filter.rs` | Open (known) |
 | 16 | Grid rows were 32 px while the scrolling maths assumed 26 | `grid_table.rs` used the table's default size | Fixed: `.xsmall()` (26 px) |
 | 17 | Hover and selection in the grid are pale blue from the component library's theme, not our neutral tokens | screenshot | Open |
-| 14 | Query history is the current session's message log; the persistent history database the GTK app writes is not read or written | `home_query_history_card` reads `panel.messages`; `LiveSession` has no connection id, which `HistoryStore::record` requires | Open, blocked with finding 9: needs a service that records and searches with the connection identity and the retention setting |
+| 14 | Query history was the session's message log; the persistent history database was not read or written | `home_query_history_card` read `panel.messages` | Fixed for saved connections: `app-services::statement_history` records and lists statements with the connection identity; GPUI records every run and Home lists the latest 8 from the shared database, failures in the warning colour. Connections opened from a file have no saved identity and are not recorded. Retention pruning and the GTK recorder still use their own paths |
 | 15 | Explain was missing | no command | Fixed: toolbar button, overflow item and palette command run the core `explain_statement` for the driver through the read-only session |
 
 ## Feature gap against the GTK app
@@ -59,7 +59,7 @@ Same SQLite table, light, 2026-11-18, GTK on a private display and GPUI on a rea
 Both findings 9 and 14 need behaviour that today lives in GTK code or is written straight to storage by the GTK app. A frontend must not repeat it (ADR 0041), so the next step is two app-services commands used by both apps:
 
 - `ConnectionCommands`: `validate`, `save` and password persistence now exist in `connection_save`; `test(draft)`, `delete(id)`, editing and the SSH, certificate and Kerberos fields still have to move out of the GTK dialog, with the policy checks and the audit record, and typed errors the frontends only render.
-- `HistoryCommands`: `record(session, statement, outcome)` and `search(filter)`, owning the connection identity, redaction and the retention setting.
+- `HistoryCommands`: `record` and `recent` now exist in `statement_history`; the GTK recorder, search with filters, pinning and the retention setting still have to move onto it.
 
 The GTK connection dialog and `record_history` move onto them in the same pull request, then GPUI builds its form and history list on the same calls.
 
@@ -67,6 +67,6 @@ The GTK connection dialog and `record_history` move onto them in the same pull r
 
 1. Done in this change: tokens (4), one look (5), menus (8), first part of the `GridView` split (7).
 2. A connection write command in app-services shared by GTK and GPUI, then the GPUI connection form (9).
-3. History on `HistoryCommands` (Explain is done).
+3. Move the GTK history recorder and its retention onto `statement_history` (Explain and the Home list are done).
 4. Finish splitting `GridView` (sidebar, find, export, editor groups) before adding more features.
 5. Visual comparison on a real display, light and dark, after each step.

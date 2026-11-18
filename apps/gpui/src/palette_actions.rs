@@ -435,6 +435,7 @@ impl GridView {
             }
             "home" => {
                 self.tabs.open_home();
+                self.reload_history(cx);
                 self.sync_grid_owner();
             }
             "query" => {

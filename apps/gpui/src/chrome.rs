@@ -247,6 +247,7 @@ impl GridView {
                             |this, _, _, cx| {
                                 this.tabs.open_home();
                                 this.sync_grid_owner();
+                                this.reload_history(cx);
                                 cx.notify();
                             },
                         )),
@@ -629,6 +630,14 @@ impl GridView {
     }
 }
 
+fn one_line(sql: &str) -> String {
+    let flat: String = sql.split_whitespace().collect::<Vec<_>>().join(" ");
+    match flat.char_indices().nth(120) {
+        Some((end, _)) => format!("{}…", &flat[..end]),
+        None => flat,
+    }
+}
+
 fn tab_icon_name(tab: &Tab) -> &'static str {
     match tab {
         Tab::Home => "house",
@@ -697,6 +706,9 @@ impl GridView {
         }
         item.on_click(cx.listener(move |this, _, window, cx| {
             this.tabs.active = index;
+            if index == 0 {
+                this.reload_history(cx);
+            }
             if let Tab::Table(name) = this.tabs.current().clone()
                 && this.live.is_some()
                 && name != this.catalog.grid_table
@@ -939,30 +951,35 @@ impl GridView {
 
     fn home_query_history_card(&self, theme: Theme) -> Div {
         let entries = self.panel.messages.entries();
-        let content = if entries.is_empty() {
+        let rows: Vec<(String, bool)> = if self.history.is_empty() {
+            entries
+                .iter()
+                .rev()
+                .take(5)
+                .map(|entry| (entry.text.clone(), !matches!(entry.kind, MessageKind::Error)))
+                .collect()
+        } else {
+            self.history
+                .iter()
+                .map(|row| (format!("{} · {}", row.connection_name, one_line(&row.query)), row.succeeded))
+                .collect()
+        };
+        let content = if rows.is_empty() {
             div()
                 .p_4()
                 .text_color(rgb(theme.muted_foreground))
                 .child("No recent statements executed yet")
         } else {
-            div()
-                .p_2()
-                .flex()
-                .flex_col()
-                .gap_1()
-                .children(entries.iter().rev().take(5).map(|entry| {
-                    div()
-                        .px_2()
-                        .py_1()
-                        .rounded(px(theme.radius))
-                        .text_size(px(size::TEXT_SMALL))
-                        .font_family("monospace")
-                        .text_color(rgb(match entry.kind {
-                            MessageKind::Error => theme.warning,
-                            _ => theme.foreground,
-                        }))
-                        .child(entry.text.clone())
-                }))
+            div().p_2().flex().flex_col().gap_1().children(rows.into_iter().map(|(text, ok)| {
+                div()
+                    .px_2()
+                    .py_1()
+                    .rounded(px(theme.radius))
+                    .text_size(px(size::TEXT_SMALL))
+                    .font_family("monospace")
+                    .text_color(rgb(if ok { theme.foreground } else { theme.warning }))
+                    .child(text)
+            }))
         };
         card(theme).child(card_title("Query History", theme)).child(content)
     }

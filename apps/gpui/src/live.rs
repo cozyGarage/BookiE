@@ -47,6 +47,7 @@ pub struct LiveSession {
     pub driver_id: String,
     pub label: String,
     pub tables: Vec<TableInfo>,
+    pub saved: Option<(uuid::Uuid, String)>,
     supports_snapshot_cursor: bool,
 }
 
@@ -61,7 +62,7 @@ impl LiveSession {
             .enable_all()
             .build()
             .map_err(|error| error.to_string())?;
-        let (sessions, opened) = runtime.block_on(open_session(origin, cancellation.clone()))?;
+        let (sessions, opened, saved) = runtime.block_on(open_session(origin, cancellation.clone()))?;
         Ok(Arc::new(LiveSession {
             driver_id: opened.driver_id.clone(),
             runtime,
@@ -70,8 +71,37 @@ impl LiveSession {
             epoch: AtomicU64::new(0),
             label: opened.label,
             tables: opened.tables,
+            saved,
             supports_snapshot_cursor: opened.supports_snapshot_cursor,
         }))
+    }
+
+    pub fn record_history(
+        self: &Arc<Self>,
+        sql: &str,
+        started_at: std::time::SystemTime,
+        elapsed: Duration,
+        rows: Option<i64>,
+        error: Option<String>,
+    ) {
+        let Some((connection_id, connection_name)) = self.saved.clone() else {
+            return;
+        };
+        let statement = bookie_app_services::statement_history::Statement {
+            query: sql.to_owned(),
+            driver_id: self.driver_id.clone(),
+            connection_id,
+            connection_name,
+            started_at,
+            duration_ms: i64::try_from(elapsed.as_millis()).unwrap_or(i64::MAX),
+            rows,
+            error,
+        };
+        self.runtime.spawn(async move {
+            if let Err(error) = bookie_app_services::statement_history::record(statement).await {
+                eprintln!("history record failed: {error}");
+            }
+        });
     }
 
     pub fn with_driver_id(self: &Arc<Self>, driver_id: &str) -> Arc<Self> {
@@ -88,6 +118,7 @@ impl LiveSession {
             driver_id: driver_id.to_string(),
             label: self.label.clone(),
             tables: self.tables.clone(),
+            saved: self.saved.clone(),
             supports_snapshot_cursor: self.supports_snapshot_cursor,
         })
     }
@@ -250,7 +281,7 @@ impl LiveTable {
 async fn open_session(
     origin: &Origin,
     cancellation: CancellationToken,
-) -> Result<(ReadSessionStore, OpenedSession), String> {
+) -> Result<(ReadSessionStore, OpenedSession, Option<(uuid::Uuid, String)>), String> {
     let registry = Arc::new(drivers_registry::default_registry());
     let sessions = ReadSessionStore::new(registry, Arc::new(DatabaseService::new()))
         .with_subscription_sampler(Arc::new(RegistrySubscriptionSampler));
@@ -260,15 +291,19 @@ async fn open_session(
         cancellation,
         Some(tokio::time::Instant::now() + Duration::from_secs(30)),
     );
+    let mut identity = None;
     let command = match origin {
         Origin::Saved(connection) => {
             let saved = bridge_saved_connections(&control, epoch, &current_epoch).await?;
-            let connection_id = saved
+            let found = saved
                 .iter()
                 .find(|saved| saved.id.to_string() == *connection || saved.name == *connection)
-                .map(|saved| saved.id)
                 .ok_or_else(|| format!("no saved connection named or numbered {connection}"))?;
-            Command::OpenSavedConnection { epoch, connection_id }
+            identity = Some((found.id, found.name.clone()));
+            Command::OpenSavedConnection {
+                epoch,
+                connection_id: found.id,
+            }
         }
         Origin::File(path) => Command::OpenConnectionFile {
             epoch,
@@ -286,7 +321,7 @@ async fn open_session(
     let Event::SessionOpened { outcome, .. } = event else {
         return Err("The command bridge returned an unexpected event.".into());
     };
-    Ok((sessions, outcome?))
+    Ok((sessions, outcome?, identity))
 }
 
 struct RegistrySubscriptionSampler;

@@ -1,0 +1,27 @@
+use gpui::Context;
+
+use crate::GridView;
+
+impl GridView {
+    pub(crate) fn reload_history(&mut self, cx: &mut Context<Self>) {
+        cx.spawn(async move |this, cx| {
+            let recent = cx
+                .background_executor()
+                .spawn(async move {
+                    let runtime = tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()
+                        .map_err(|error| error.to_string())?;
+                    runtime.block_on(bookie_app_services::statement_history::recent(8))
+                })
+                .await;
+            let _ = this.update(cx, |this, cx| {
+                if let Ok(recent) = recent {
+                    this.history = recent;
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
+    }
+}
