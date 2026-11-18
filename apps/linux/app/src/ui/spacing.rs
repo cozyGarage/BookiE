@@ -14,10 +14,6 @@ pub(crate) fn tree_indent(depth: u8) -> i32 {
     XS + MD * i32::from(depth)
 }
 
-pub(crate) fn tree_text_indent(depth: u8) -> i32 {
-    tree_indent(depth) + ICON + SM
-}
-
 pub(crate) fn grid(step: i32) -> u32 {
     step.unsigned_abs()
 }

@@ -3,10 +3,12 @@ use gtk4::pango;
 use libadwaita as adw;
 use libadwaita::prelude::*;
 
-pub(crate) fn wrap_dialog(dialog: &adw::Dialog) {
-    if let Some(content) = dialog.child() {
-        wrap_all(&content);
-    }
+pub(crate) fn watch(window: &adw::ApplicationWindow) {
+    window.connect_visible_dialog_notify(|window| {
+        if let Some(dialog) = window.visible_dialog() {
+            gtk::glib::idle_add_local_once(move || wrap_all(&dialog));
+        }
+    });
 }
 
 pub(crate) fn wrap_all(root: &impl IsA<gtk::Widget>) {

@@ -123,9 +123,8 @@ fn build_ui() -> (Ui, adw::Dialog) {
     stack.add_named(&form, Some("form"));
     stack.add_named(&progress, Some("progress"));
     stack.add_named(&scroller, Some("results"));
-    let (dialog, toolbar) = crate::ui::dialog_shell::new(&bookie_app_services::tr!("Search Database Values"), 520, 560);
+    let (dialog, toolbar) = crate::ui::dialog_shell::form(&bookie_app_services::tr!("Search Database Values"), 520);
     stack.set_vhomogeneous(false);
-    dialog.set_follows_content_size(true);
     toolbar.set_content(Some(&stack));
     dialog.set_default_widget(Some(&search_button));
     let ui = Ui {

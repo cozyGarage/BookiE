@@ -1023,16 +1023,9 @@ fn build_dialog(page: &adw::PreferencesPage, start_button: &gtk::Button) -> adw:
         .margin_end(spacing::MD)
         .build();
     footer.append(start_button);
-    let toolbar = adw::ToolbarView::new();
-    toolbar.add_top_bar(&adw::HeaderBar::new());
+    let (dialog, toolbar) = super::dialog_shell::new(&bookie_app_services::tr!("Import CSV"), 560, 680);
     toolbar.set_content(Some(page));
     toolbar.add_bottom_bar(&footer);
-    let dialog = adw::Dialog::builder()
-        .title(bookie_app_services::tr!("Import CSV"))
-        .content_width(560)
-        .content_height(680)
-        .child(&toolbar)
-        .build();
     dialog.set_default_widget(Some(start_button));
     dialog
 }

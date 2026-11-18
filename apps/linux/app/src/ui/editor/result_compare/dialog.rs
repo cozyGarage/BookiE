@@ -68,12 +68,13 @@ pub(in crate::ui::editor) fn present(
     let scroller = gtk::ScrolledWindow::builder()
         .hscrollbar_policy(gtk::PolicyType::Never)
         .vexpand(true)
+        .propagate_natural_height(true)
         .child(&content)
         .build();
     let dialog = adw::Dialog::builder()
         .title(bookie_app_services::tr!("Compare results"))
         .content_width(520)
-        .content_height(520)
+        .follows_content_size(true)
         .child(&scroller)
         .build();
     let form = Rc::new(Form {

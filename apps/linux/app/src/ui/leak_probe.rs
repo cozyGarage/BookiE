@@ -45,7 +45,6 @@ pub(crate) fn present_tracked(
     parent: &impl IsA<gtk::Widget>,
 ) {
     track(name, dialog);
-    super::combo_wrap::wrap_dialog(dialog.upcast_ref::<adw::Dialog>());
     dialog.present(Some(parent));
 }
 

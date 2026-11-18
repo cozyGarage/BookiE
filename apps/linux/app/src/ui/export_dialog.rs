@@ -579,21 +579,14 @@ fn build_export_dialog(
     footer: &gtk::Box,
     export_button: &gtk::Button,
 ) -> adw::Dialog {
-    let toolbar = adw::ToolbarView::new();
-    toolbar.add_top_bar(&adw::HeaderBar::new());
-    toolbar.set_content(Some(page));
-    toolbar.add_bottom_bar(footer);
-
     let title = if scope == ExportScope::DataDictionary {
         bookie_app_services::tr!("Export Data Dictionary")
     } else {
         bookie_app_services::tr!("Export Results")
     };
-    let dialog = adw::Dialog::builder()
-        .title(&title)
-        .content_width(480)
-        .child(&toolbar)
-        .build();
+    let (dialog, toolbar) = super::dialog_shell::form(&title, 480);
+    toolbar.set_content(Some(page));
+    toolbar.add_bottom_bar(footer);
     dialog.set_default_widget(Some(export_button));
     dialog
 }
