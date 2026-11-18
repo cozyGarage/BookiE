@@ -35,6 +35,7 @@ services:
       interval: 2s
       timeout: 3s
       retries: 30
+      start_period: 90s
     networks:
       fixture:
         aliases:

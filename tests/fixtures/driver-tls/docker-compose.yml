@@ -39,7 +39,7 @@ services:
         - --authenticationDatabase
         - admin
         - --eval
-        - "db.adminCommand('ping')"
+        - "if (db.getSiblingDB('bookie').release_items.countDocuments() !== 3) quit(1)"
       interval: 3s
       timeout: 5s
       retries: 40
@@ -107,7 +107,7 @@ services:
         - mongosh
         - --quiet
         - --host
-        - localhost
+        - mongo-plain
         - -u
         - bookie
         - -p
@@ -115,7 +115,7 @@ services:
         - --authenticationDatabase
         - admin
         - --eval
-        - "db.adminCommand('ping')"
+        - "if (db.getSiblingDB('bookie').release_items.countDocuments() !== 3) quit(1)"
       interval: 3s
       timeout: 5s
       retries: 40

@@ -685,13 +685,15 @@ class CiWorkflowTests(unittest.TestCase):
 
     def test_gtk_database_fixtures_from_a_container_use_the_host_gateway(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
-        job = re.search(r"(?ms)^  gtk-server:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
         host_helper = (ROOT / "scripts/gtk-fixture-host.sh").read_text()
 
-        self.assertIn("options: --add-host=host.docker.internal:host-gateway", job)
-        self.assertIn("/var/tmp/bookie-gtk-fixtures:/var/tmp/bookie-gtk-fixtures", job)
-        self.assertIn("BOOKIE_GTK_FIXTURE_HOST: host.docker.internal", job)
-        self.assertIn("BOOKIE_GTK_FIXTURE_SHARED_DIR: /var/tmp/bookie-gtk-fixtures", job)
+        for name in ("gtk-server", "gtk-server-followup", "gtk-server-final"):
+            with self.subTest(name=name):
+                job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+                self.assertIn("options: --add-host=host.docker.internal:host-gateway", job)
+                self.assertIn("/var/tmp/bookie-gtk-fixtures:/var/tmp/bookie-gtk-fixtures", job)
+                self.assertIn("BOOKIE_GTK_FIXTURE_HOST: host.docker.internal", job)
+                self.assertIn("BOOKIE_GTK_FIXTURE_SHARED_DIR: /var/tmp/bookie-gtk-fixtures", job)
         self.assertIn('fixture_host="${BOOKIE_GTK_FIXTURE_HOST:-127.0.0.1}"', host_helper)
         self.assertIn('getent ahostsv4 "$fixture_host"', host_helper)
         for script_name, port in (
@@ -743,6 +745,19 @@ class CiWorkflowTests(unittest.TestCase):
             pg_release,
         )
         self.assertIn("${BOOKIE_FIXTURE_TOXIPROXY_CONFIG:-./toxiproxy/toxiproxy.json}", release_compose)
+
+    def test_mongo_fixture_health_checks_wait_for_seeded_rows(self):
+        compose = (ROOT / "tests/fixtures/driver-tls/docker-compose.yml").read_text()
+        for service, host in (("mongo", "mongo.bookie.test"), ("mongo-plain", "mongo-plain")):
+            with self.subTest(service=service):
+                block = re.search(rf"(?ms)^  {service}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", compose).group(1)
+                self.assertIn(f"- {host}", block)
+                self.assertIn("countDocuments() !== 3", block)
+
+    def test_postgres_release_health_check_allows_database_initialization(self):
+        compose = (ROOT / "tests/fixtures/postgres-release/docker-compose.yml").read_text()
+        db = re.search(r"(?ms)^  db:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", compose).group(1)
+        self.assertIn("start_period: 90s", db)
 
     def test_gtk_server_jobs_retry_prepulling_their_fixture_image(self):
         for path in (".github/workflows/build-linux.yml", ".forgejo/workflows/ci.yml"):
@@ -987,6 +1002,14 @@ class CiWorkflowTests(unittest.TestCase):
         safe_directory = job.index('git config --global --add safe.directory "$GITHUB_WORKSPACE"')
         self.assertLess(checkout, safe_directory)
         self.assertLess(safe_directory, verify)
+
+    def test_distro_floor_package_download_stays_outside_the_checkout(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        job = re.search(r"(?ms)^  distro-floor-scenarios:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+        download = job.split("actions/download-artifact@", 1)[1].split("      - ", 1)[0]
+        verify = job.split("- name: Verify the package under test", 1)[1].split("      - ", 1)[0]
+        self.assertIn("path: ${{ runner.temp }}/floor-artifact", download)
+        self.assertIn('verify --package "$RUNNER_TEMP/floor-artifact"', verify)
 
     def test_fast_checks_fetch_the_comparison_base_before_change_contracts(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
