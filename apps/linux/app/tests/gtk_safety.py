@@ -2853,7 +2853,7 @@ def switched_connection_keeps_workspace_tabs_after_debounce(database, _base):
             ((identifier,) for identifier in range(1, 6)),
         )
 
-    open_sidebar_table("safety_items", root=second_window)
+    open_sidebar_table("safety_items")
     wait_for_node_containing("Rows 1 – 5")
 
     open_saved_connection(CONNECTION_B_NAME)
