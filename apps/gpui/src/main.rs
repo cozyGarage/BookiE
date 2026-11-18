@@ -110,11 +110,8 @@ struct GridView {
     dark_mode: bool,
     tabs: Tabs,
     tab_scroll: ScrollHandle,
-    runs: Vec<runs::RunSlot>,
     sql_input: Entity<EditorState>,
-    active_run: usize,
-    run_scroll: ScrollHandle,
-    next_run_number: usize,
+    run_tabs: panel_state::RunTabs,
     check_histories: Vec<(String, bookie_app_services::checks::History)>,
     palette: palette_state::PaletteState,
     sidebar: sidebar_state::SidebarState,
@@ -379,11 +376,8 @@ impl GridView {
             keymap: Keymap::default(),
             tabs: Tabs::default(),
             tab_scroll: ScrollHandle::new(),
-            run_scroll: ScrollHandle::new(),
             scroll: UniformListScrollHandle::new(),
-            runs: vec![runs::RunSlot::new(first_run(total), None)],
-            active_run: 0,
-            next_run_number: 2,
+            run_tabs: panel_state::RunTabs::new(runs::RunSlot::new(first_run(total), None)),
             viewport_rows: 10,
             dark_mode: Theme::current(cx).dark,
             connections: Vec::new(),
@@ -395,7 +389,7 @@ impl GridView {
     }
 
     fn dataset_count(&self) -> u64 {
-        if matches!(self.tabs.current(), Tab::Query) && self.runs.is_empty() {
+        if matches!(self.tabs.current(), Tab::Query) && self.run_tabs.slots.is_empty() {
             return 0;
         }
         match &self.mode {

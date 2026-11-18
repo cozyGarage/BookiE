@@ -29,9 +29,9 @@ impl GridView {
             grid_table: table,
         };
         self.live = Some(session);
-        self.runs.clear();
-        self.active_run = 0;
-        self.next_run_number = 1;
+        self.run_tabs.slots.clear();
+        self.run_tabs.active = 0;
+        self.run_tabs.next_number = 1;
     }
 
     pub(super) fn connect(&mut self, origin: Origin, cx: &mut Context<Self>) {
@@ -89,7 +89,7 @@ impl GridView {
         self.cell_edit.active.is_some()
             || !self.cell_edit.edits.is_empty()
             || !self.cell_edit.table.is_empty()
-            || self.runs.iter().any(|slot| !slot.edits.is_empty())
+            || self.run_tabs.slots.iter().any(|slot| !slot.edits.is_empty())
     }
 
     pub(super) fn reject_view_edits(&mut self) -> bool {
@@ -104,7 +104,7 @@ impl GridView {
         self.cell_edit.active = None;
         self.cell_edit.edits.clear();
         self.cell_edit.table.clear();
-        for slot in &mut self.runs {
+        for slot in &mut self.run_tabs.slots {
             slot.edits.clear();
         }
         self.status = "Discarded all view-only edits.".into();

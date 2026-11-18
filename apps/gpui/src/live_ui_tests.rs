@@ -145,10 +145,10 @@ fn a_live_connection_runs_typed_sql_into_a_result_tab_and_refuses_writes(cx: &mu
     };
     run(cx, "SELECT customer, total FROM orders WHERE paid = 1 ORDER BY id");
     view.read_with(cx, |view, _| {
-        assert_eq!(view.runs.len(), 1, "{}", view.status);
+        assert_eq!(view.run_tabs.slots.len(), 1, "{}", view.status);
         assert_eq!(view.source.total(), 3);
         assert!(
-            view.runs[0].run.measured().is_some(),
+            view.run_tabs.slots[0].run.measured().is_some(),
             "a run against a database records its real time"
         );
         let names: Vec<&str> = view
@@ -161,7 +161,7 @@ fn a_live_connection_runs_typed_sql_into_a_result_tab_and_refuses_writes(cx: &mu
     });
     run(cx, "DELETE FROM orders");
     view.read_with(cx, |view, _| {
-        assert_eq!(view.runs.len(), 1, "a refused write adds no result tab");
+        assert_eq!(view.run_tabs.slots.len(), 1, "a refused write adds no result tab");
         let failure = view.status.to_lowercase();
         assert!(
             failure.contains("read-only") || failure.contains("blocked by policy"),
@@ -171,7 +171,7 @@ fn a_live_connection_runs_typed_sql_into_a_result_tab_and_refuses_writes(cx: &mu
     });
     run(cx, "SELECT id FROM orders");
     view.read_with(cx, |view, _| {
-        assert_eq!(view.runs.len(), 2);
+        assert_eq!(view.run_tabs.slots.len(), 2);
         assert_eq!(view.source.total(), 6);
     });
 }
@@ -377,7 +377,7 @@ fn every_statement_is_logged_and_a_refused_one_opens_the_messages_view(cx: &mut 
             "{}",
             entries[1].text
         );
-        assert_eq!(view.runs.len(), 1, "no result tab for a refused statement");
+        assert_eq!(view.run_tabs.slots.len(), 1, "no result tab for a refused statement");
     });
 }
 
@@ -403,7 +403,7 @@ fn connecting_from_the_home_page_swaps_the_synthetic_grid_for_the_first_table(cx
             &bookie_gpui::shell::Tab::Table(table_info("customers"))
         );
         assert_eq!(view.status, "Connected");
-        assert!(view.runs.is_empty(), "the synthetic run is gone");
+        assert!(view.run_tabs.slots.is_empty(), "the synthetic run is gone");
     });
 }
 
@@ -564,7 +564,7 @@ fn connecting_keeps_view_edits_until_the_user_discards_them(cx: &mut TestAppCont
                 .insert((0, 1), bookie_gpui::model::Cell::Text("active".into()));
             view.cell_edit.table
                 .insert((1, 1), bookie_gpui::model::Cell::Text("table".into()));
-            view.runs[0]
+            view.run_tabs.slots[0]
                 .edits
                 .insert((2, 1), bookie_gpui::model::Cell::Text("run".into()));
             view.connect(origin.clone(), cx);
@@ -575,7 +575,7 @@ fn connecting_keeps_view_edits_until_the_user_discards_them(cx: &mut TestAppCont
     view.read_with(cx, |view, _| {
         assert!(view.live.is_none());
         assert_eq!(
-            (view.cell_edit.edits.len(), view.cell_edit.table.len(), view.runs[0].edits.len()),
+            (view.cell_edit.edits.len(), view.cell_edit.table.len(), view.run_tabs.slots[0].edits.len()),
             (1, 1, 1)
         );
         assert!(view.status.contains("Discard all view-only edits"));
@@ -585,7 +585,7 @@ fn connecting_keeps_view_edits_until_the_user_discards_them(cx: &mut TestAppCont
     cx.simulate_keystrokes("enter");
     view.read_with(cx, |view, _| {
         assert!(view.cell_edit.edits.is_empty() && view.cell_edit.table.is_empty());
-        assert!(view.runs.iter().all(|slot| slot.edits.is_empty()));
+        assert!(view.run_tabs.slots.iter().all(|slot| slot.edits.is_empty()));
     });
     cx.update(|_, cx| view.update(cx, |view, cx| view.connect(origin, cx)));
     cx.executor().advance_clock(std::time::Duration::from_secs(1));
@@ -635,7 +635,7 @@ fn switching_tables_keeps_all_view_edits_until_the_user_discards_them(cx: &mut T
                 .insert((0, 1), bookie_gpui::model::Cell::Text("table draft".into()));
             view.cell_edit.table
                 .insert((1, 1), bookie_gpui::model::Cell::Text("saved table draft".into()));
-            view.runs.push(crate::runs::RunSlot::new(
+            view.run_tabs.slots.push(crate::runs::RunSlot::new(
                 bookie_gpui::shell::Run {
                     number: 1,
                     rows: 0,
@@ -643,7 +643,7 @@ fn switching_tables_keeps_all_view_edits_until_the_user_discards_them(cx: &mut T
                 },
                 None,
             ));
-            view.runs[0]
+            view.run_tabs.slots[0]
                 .edits
                 .insert((2, 1), bookie_gpui::model::Cell::Text("result draft".into()));
             view.open_table_named(&table_info("beta"), window, cx);
@@ -655,7 +655,7 @@ fn switching_tables_keeps_all_view_edits_until_the_user_discards_them(cx: &mut T
         assert_eq!(view.catalog.grid_table, table_info("alpha"));
         assert_eq!(view.cell_edit.edits.len(), 1);
         assert_eq!(view.cell_edit.table.len(), 1);
-        assert_eq!(view.runs[0].edits.len(), 1);
+        assert_eq!(view.run_tabs.slots[0].edits.len(), 1);
         assert!(view.status.contains("Discard all view-only edits"));
     });
 }
@@ -751,7 +751,7 @@ fn closing_a_query_tab_with_result_edits_requires_explicit_discard(cx: &mut Test
         view.tabs.open_query();
         view.sync_grid_owner();
         view.add_run(None);
-        view.runs[view.active_run]
+        view.run_tabs.slots[view.run_tabs.active]
             .edits
             .insert((0, 1), bookie_gpui::model::Cell::Text("result draft".into()));
         view.close_tab(2);
@@ -763,7 +763,7 @@ fn closing_a_query_tab_with_result_edits_requires_explicit_discard(cx: &mut Test
                 .iter()
                 .any(|tab| matches!(tab, bookie_gpui::shell::Tab::Query))
         );
-        assert!(view.runs.iter().any(|slot| !slot.edits.is_empty()));
+        assert!(view.run_tabs.slots.iter().any(|slot| !slot.edits.is_empty()));
         assert!(view.status.contains("Discard all view-only edits"));
     });
 }
@@ -777,10 +777,10 @@ fn closing_a_result_with_pending_edits_requires_explicit_discard(cx: &mut TestAp
         view.add_run(None);
         view.cell_edit.edits
             .insert((0, 1), bookie_gpui::model::Cell::Text("result draft".into()));
-        view.close_run(view.active_run);
+        view.close_run(view.run_tabs.active);
     });
     view.read_with(cx, |view, _| {
-        assert_eq!(view.runs.len(), 2);
+        assert_eq!(view.run_tabs.slots.len(), 2);
         assert_eq!(view.cell_edit.edits.len(), 1);
         assert!(view.status.contains("Discard all view-only edits"));
     });
@@ -847,13 +847,13 @@ fn the_sql_editor_takes_several_lines_and_ctrl_enter_runs_them(cx: &mut TestAppC
             "SELECT id\nFROM orders",
             "Enter adds a line, it does not run"
         );
-        assert_eq!(view.runs.len(), 0, "nothing ran yet");
+        assert_eq!(view.run_tabs.slots.len(), 0, "nothing ran yet");
     });
     cx.simulate_keystrokes("ctrl-enter");
     cx.executor().advance_clock(std::time::Duration::from_secs(1));
     cx.run_until_parked();
     view.read_with(cx, |view, _| {
-        assert_eq!(view.runs.len(), 1, "{}", view.status);
+        assert_eq!(view.run_tabs.slots.len(), 1, "{}", view.status);
         assert_eq!(view.source.total(), 6);
     });
 }
@@ -942,7 +942,7 @@ fn running_a_query_with_ctrl_enter_does_not_add_a_line(cx: &mut TestAppContext) 
 
     view.read_with(cx, |view, cx| {
         assert_eq!(view.sql_input.read(cx).value(), "SELECT id FROM orders");
-        assert_eq!(view.runs.len(), 1, "{}", view.status);
+        assert_eq!(view.run_tabs.slots.len(), 1, "{}", view.status);
     });
 }
 
@@ -1151,7 +1151,7 @@ fn the_sql_editor_edits_at_several_carets_and_ctrl_enter_still_runs_the_whole_bu
     cx.executor().advance_clock(std::time::Duration::from_secs(1));
     cx.run_until_parked();
     view.read_with(cx, |view, _| {
-        assert_eq!(view.runs.len(), 1, "{}", view.status);
+        assert_eq!(view.run_tabs.slots.len(), 1, "{}", view.status);
         assert_eq!(view.source.total(), 3, "the whole buffer ran, not one caret's line");
     });
 }
