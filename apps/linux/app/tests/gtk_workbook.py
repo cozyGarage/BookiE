@@ -75,7 +75,7 @@ def scenarios(ui):
     def current_page_workbook_preserves_typed_values(database, base):
         seed_workbook(database)
         before = database_rows(database)
-        ui.invoke_named_action_within("safety_items", "Open safety_items")
+        ui.open_sidebar_table("safety_items")
         ui.wait_for_paginator("Rows 1 – 100 of 150")
         choose_workbook(ui)
         export = base / "home" / "typed-page.xlsx"
@@ -91,7 +91,7 @@ def scenarios(ui):
     def cancelled_workbook_export_preserves_existing_file(database, base):
         seed_workbook(database)
         before = database_rows(database)
-        ui.invoke_named_action_within("safety_items", "Open safety_items")
+        ui.open_sidebar_table("safety_items")
         ui.wait_for_paginator("Rows 1 – 100 of 150")
         export = base / "home" / "keep.xlsx"
         export.write_bytes(b"existing file must survive")
@@ -110,7 +110,7 @@ def scenarios(ui):
         with sqlite3.connect(database) as connection:
             connection.execute("UPDATE safety_items SET note='' WHERE id=4")
         before = database_rows(database)
-        ui.invoke_named_action_within("safety_items", "Open safety_items")
+        ui.open_sidebar_table("safety_items")
         ui.wait_for_paginator("Rows 1 – 100 of 150")
         choose_workbook(ui)
         export = base / "home" / "refused.xlsx"

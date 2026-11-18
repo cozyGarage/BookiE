@@ -59,7 +59,7 @@ def scenarios(ui):
             connection.executemany(
                 "INSERT INTO safety_items(id, note) VALUES (?, ?)", [(1, "alpha"), (2, None), (3, "")]
             )
-        ui.invoke_named_action_within("safety_items", "Open safety_items")
+        ui.open_sidebar_table("safety_items")
         cell = ui.wait_for_node(name="alpha", role=pyatspi.ROLE_LABEL)
         extents = cell.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
         x = extents.x + min(extents.width, 40) // 2

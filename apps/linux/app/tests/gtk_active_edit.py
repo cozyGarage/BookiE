@@ -22,7 +22,7 @@ def scenarios(ui):
             connection.executemany(
                 "INSERT INTO safety_items(id, note) VALUES (?, ?)", [(1, "alpha"), (2, "beta")]
             )
-        ui.invoke_named_action_within("safety_items", "Open safety_items")
+        ui.open_sidebar_table("safety_items")
         cell = ui.wait_for_node(name="alpha", role=ui.pyatspi.ROLE_LABEL)
         bounds = cell.queryComponent().getExtents(ui.pyatspi.WINDOW_COORDS)
         point = (bounds.x + min(bounds.width, 40) // 2, bounds.y + bounds.height // 2)
@@ -82,7 +82,7 @@ def scenarios(ui):
             connection.executemany(
                 "INSERT INTO safety_items(id, note) VALUES (?, ?)", [(1, "alpha"), (2, "beta")]
             )
-        ui.invoke_named_action_within("safety_items", "Open safety_items")
+        ui.open_sidebar_table("safety_items")
         cell = ui.wait_for_node(name="beta", role=ui.pyatspi.ROLE_LABEL)
         bounds = cell.queryComponent().getExtents(ui.pyatspi.WINDOW_COORDS)
         gtk_ux.x11_click(bounds.x + bounds.width // 2, bounds.y + bounds.height // 2, button=1)
@@ -103,7 +103,7 @@ def scenarios(ui):
             connection.executemany(
                 "INSERT INTO safety_items(id, note) VALUES (?, ?)", [(1, "alpha"), (2, "beta")]
             )
-        ui.invoke_named_action_within("safety_items", "Open safety_items")
+        ui.open_sidebar_table("safety_items")
         cell = ui.wait_for_node(name="alpha", role=ui.pyatspi.ROLE_LABEL)
         bounds = cell.queryComponent().getExtents(ui.pyatspi.WINDOW_COORDS)
         gtk_ux.x11_click(bounds.x + bounds.width // 2, bounds.y + bounds.height // 2, button=1)
@@ -222,11 +222,11 @@ def scenarios(ui):
         ui.run_sql("CREATE TABLE other_items(id INTEGER PRIMARY KEY, note TEXT)")
         ui.wait_for_node(name="other_items", role=ui.pyatspi.ROLE_LIST_ITEM)
         begin_edit(database)
-        ui.invoke_named_action_within("other_items", "Open other_items")
+        ui.open_sidebar_table("other_items")
         ui.wait_for_node_containing("other_items", role=ui.pyatspi.ROLE_PAGE_TAB)
         ui.wait_for_node_containing("safety_items", role=ui.pyatspi.ROLE_PAGE_TAB)
         assert notes(database) == [(1, "alpha"), (2, "beta")]
-        ui.invoke_named_action_within("safety_items", "Open safety_items")
+        ui.open_sidebar_table("safety_items")
         ui.wait_for_node(name="1 unsaved change")
         save_and_assert_notes(database)
 
