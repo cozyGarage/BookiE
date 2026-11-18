@@ -2100,12 +2100,12 @@
     [
       "bookie-app",
       "--lib",
-      "ui::sidebar_row::responsive_layout_tests::row_actions_wrap_below_a_name_that_does_not_fit_and_keep_names_and_focus_order"
+      "ui::sidebar_row::responsive_layout_tests::row_actions_wrap_below_a_name_that_does_not_fit_and_are_never_clipped"
     ],
     [
       "bookie-app",
       "--lib",
-      "ui::sidebar_row::columns_affordance_tests::a_table_has_a_separate_keyboard_reachable_columns_expander"
+      "ui::sidebar_row::columns_affordance_tests::a_table_row_has_no_buttons_and_a_click_message_toggles_its_columns"
     ],
     [
       "bookie-app",
