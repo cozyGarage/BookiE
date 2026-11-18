@@ -202,7 +202,7 @@ The token appears once; the dialog reports whether it was saved in the system ke
 
 Open **Audit Log** from the main menu to review persisted operation records. Each record shows its connection, principal, kind, outcome, row count and duration, and expands to its operation id, policy rule, stored statement and error. Statement text appears in the redacted form the journal keeps. A Local or Dev policy may allow a human write to continue after audit-intent failure without a persisted record; see [Safety](#safety).
 
-The Audit Log, Server Activity, Table and Index Health and Catalog windows zoom their text with Ctrl+scroll, Ctrl+plus, Ctrl+minus and Ctrl+0 (back to normal); the zoom applies to that window only and is not saved.
+The Audit Log, Server Activity, Explain plan, Table and Index Health and Catalog windows zoom their result view (not the buttons or headers) with Ctrl+scroll, Ctrl+plus, Ctrl+minus and Ctrl+0 (back to normal); the zoom applies to that window only and is not saved.
 
 MCP data responses use the versioned `bookie-tagged-v1` format. Check `value_format` and decode each cell by `$type`; values are tagged even when they fit in a JSON number. A wide integer is returned like this:
 

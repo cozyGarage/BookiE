@@ -94,6 +94,7 @@ fn build_explain_window(
     view.buffer().set_text(&tr!("Running EXPLAIN…"));
     scrolled.set_child(Some(&view));
     toolbar.set_content(Some(&stack));
+    crate::ui::dialog_zoom::install(&toolbar, &[scrolled.clone().upcast(), tree_scrolled.clone().upcast()]);
     window.set_content(Some(&toolbar));
     let window_for_escape = window.clone();
     let escape = gtk::EventControllerKey::new();
