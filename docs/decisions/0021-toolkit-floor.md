@@ -1,6 +1,6 @@
 # 0021: Support only the newest GTK toolkit
 
-- **Status**: Accepted
+- **Status**: Accepted; Debian as a primary native target ended by [0031](0031-stop-publishing-the-debian-package.md)
 - **Date**: 2026-10-23
 
 ## Context
