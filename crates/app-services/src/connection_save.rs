@@ -637,6 +637,15 @@ mod tests {
     }
 
     #[test]
+    fn an_empty_socket_field_saves_no_socket_even_when_the_driver_offers_one() {
+        let mut draft = draft();
+        draft.socket_kind = Some(LocalSocketPathKind::Directory);
+        draft.socket_endpoint = "  ".into();
+        let saved = saved_from_draft(&draft, Uuid::new_v4());
+        assert!(saved.socket_dir.is_none() && saved.socket_path.is_none());
+    }
+
+    #[test]
     fn tls_paths_socket_and_ssh_reach_the_saved_record() {
         let mut full = draft();
         full.tls_root_cert = "/etc/ca.pem".into();
