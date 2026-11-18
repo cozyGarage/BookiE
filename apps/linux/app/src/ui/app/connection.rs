@@ -1162,44 +1162,21 @@ fn execute_delete_connection(
     sender.command(move |_, shutdown| {
         shutdown
             .register(async move {
-                let _save_turn = crate::services::connection_save_turn::take().await;
-                let chain = bookie_storage::load_connections()
-                    .await
-                    .ok()
-                    .and_then(|all| all.into_iter().find(|saved| saved.id == id))
-                    .and_then(|saved| saved.ssh);
-                let result = bookie_storage::delete_connection(id).await;
-                if let Err(error) = result {
-                    tracing::warn!(error = %error, "deleting the connection file entry failed");
-                    sender_clone.input(AppMsg::ShowToast(bookie_app_services::tr!(
-                        "The connection could not be deleted."
-                    )));
-                    return;
-                }
+                let deleted = match bookie_app_services::connection_save::delete(id).await {
+                    Ok(deleted) => deleted,
+                    Err(error) => {
+                        tracing::warn!(error = %error, "deleting the connection failed");
+                        sender_clone.input(AppMsg::ShowToast(bookie_app_services::tr!(
+                            "The connection could not be deleted."
+                        )));
+                        return;
+                    }
+                };
                 workspace.forget_connection(id);
                 if let Some(Err(error)) = column_widths.as_ref().map(|store| store.forget_connection(id)) {
                     tracing::warn!(error = %error, "forgetting the connection's column settings failed");
                 }
-
-                let password = bookie_storage::delete_password(id).await;
-                let ssh_password = bookie_storage::delete_ssh_password(id).await;
-                let ssh_passphrase = bookie_storage::delete_ssh_passphrase(id).await;
-                let mut credential_failure = false;
-                if let Some(Err(error)) = match &chain {
-                    Some(chain) => Some(bookie_app_services::ssh_chain_secrets::delete_chain_secrets(id, chain).await),
-                    None => None,
-                } {
-                    credential_failure = true;
-                    tracing::warn!(error = %error, "deleting jump host credentials failed");
-                }
-                for error in [password.err(), ssh_password.err(), ssh_passphrase.err()]
-                    .into_iter()
-                    .flatten()
-                {
-                    credential_failure = true;
-                    tracing::warn!(error = %error, "deleting connection credentials failed");
-                }
-                if credential_failure {
+                if deleted.credential_failure {
                     sender_clone.input(AppMsg::ShowToast(bookie_app_services::tr!(
                         "The connection was deleted, but some stored credentials could not be removed."
                     )));

@@ -224,19 +224,25 @@ impl SqlEditor {
         let Some(history) = self.history.clone() else {
             return;
         };
-        let entry = NewEntry {
+        let (error, cancelled) = match outcome {
+            Outcome::Success => (None, false),
+            Outcome::Error(message) => (Some(message), false),
+            Outcome::Cancelled => (None, true),
+        };
+        let statement = bookie_app_services::statement_history::Statement {
             query: context.sql,
             driver_id: context.metadata.driver_id,
             connection_id: context.metadata.id,
             connection_name: context.metadata.name,
-            executed_at: context.started_at,
-            duration_ms: Some(duration_ms),
-            rows_affected,
-            outcome,
-            source: bookie_storage::query_history::Source::Editor,
+            started_at: context.started_at,
+            duration_ms,
+            rows: rows_affected,
+            error,
+            cancelled,
+            source: bookie_app_services::statement_history::Source::Editor,
         };
         relm4::spawn(async move {
-            if let Err(e) = history.record(entry).await {
+            if let Err(e) = bookie_app_services::statement_history::record_in(&history, statement).await {
                 tracing::warn!(error = %e, "history record failed");
             }
         });

@@ -51,8 +51,16 @@ impl GridView {
                 {
                     let statement = sql.clone();
                     move |cancel| {
-                        let started = Instant::now();
+                        let (started, clock) = (Instant::now(), std::time::SystemTime::now());
                         let result = session.run_query_controlled(&statement, bookie_gpui::live::ROW_CAP, &cancel);
+                        let (rows, error) = match &result {
+                            Ok(table) => (
+                                i64::try_from(bookie_gpui::source::ResultSource::total(table)).ok(),
+                                None,
+                            ),
+                            Err(message) => (None, Some(message.clone())),
+                        };
+                        session.record_history(&statement, clock, started.elapsed(), rows, error);
                         (statement, started.elapsed(), result)
                     }
                 },

@@ -2,13 +2,14 @@ use std::time::{Duration, Instant};
 
 mod assets;
 mod catalog_nav;
-mod connection_form;
 mod chrome;
+mod connection_form;
 mod copy_selection;
 mod detail_panel;
 mod find_filter;
 mod grid_edit;
 mod grid_table;
+mod history_view;
 mod keys;
 mod measure;
 mod menus;
@@ -19,6 +20,9 @@ mod render;
 mod runs;
 mod scroll_pace;
 mod services;
+mod sidebar_catalog;
+mod ssh_form;
+mod sidebar_fields;
 mod sidebar_state;
 mod text_input;
 mod ui_theme;
@@ -122,6 +126,7 @@ struct GridView {
     sidebar: sidebar_state::SidebarState,
     row_menu: Option<menus::RowMenu>,
     connection_form: connection_form::ConnectionForm,
+    history: Vec<bookie_app_services::statement_history::RecentStatement>,
     panel: panel_state::PanelState,
     fonts: panel_state::FontState,
     export: panel_state::ExportState,
@@ -363,6 +368,7 @@ impl GridView {
             sidebar: sidebar_state::SidebarState::new(sidebar_search),
             row_menu: None,
             connection_form: connection_form::ConnectionForm::new(cx),
+            history: Vec::new(),
             panel: panel_state::PanelState::new(DEFAULT_RESULT_RATIO),
             fonts: panel_state::FontState::new(font_settings::load(), default_font(&font_names).into(), font_names),
             export: panel_state::ExportState::default(),
@@ -710,7 +716,8 @@ fn main() {
                     });
                     let focus = view.read(cx).focus.clone();
                     focus.focus(window, cx);
-                    view.update(cx, |view, _| {
+                    view.update(cx, |view, cx| {
+                        view.reload_history(cx);
                         view.keymap = keymap.clone();
                         view.connections = connections.clone();
                     });

@@ -28,7 +28,11 @@ pub(crate) struct FontState {
 }
 
 impl FontState {
-    pub fn new(settings: bookie_gpui::font_settings::FontSettings, current: gpui::SharedString, names: Vec<String>) -> Self {
+    pub fn new(
+        settings: bookie_gpui::font_settings::FontSettings,
+        current: gpui::SharedString,
+        names: Vec<String>,
+    ) -> Self {
         Self {
             settings,
             current,

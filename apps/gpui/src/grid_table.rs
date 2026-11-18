@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use gpui::{App, Context, IntoElement, Window, div, prelude::*, px};
+use gpui_kit::component::Sizable;
 use gpui_kit::component::table::{Column, DataTable, TableDelegate, TableState};
 
 use crate::GridView;
@@ -224,7 +225,7 @@ impl GridView {
     }
 
     pub(crate) fn data_table(&self) -> DataTable<GridDelegate> {
-        DataTable::new(&self.table).stripe(true)
+        DataTable::new(&self.table).stripe(true).xsmall()
     }
 }
 
