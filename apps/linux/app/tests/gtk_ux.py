@@ -725,6 +725,26 @@ GLib.MainLoop().run()
                 time.sleep(ui.POLL_SECONDS)
             raise AssertionError(f"completion candidate {column!r} present={present}:\n{ui.accessible_snapshot()}")
 
+        def measure_large_script_completion():
+            prefix = "SELECT * FROM bookie_completion_target WHERE bookie_completion_target"
+            statement = f"{prefix} /*{'x' * 120}*/;\n"
+            source = statement * 18_000
+            source_bytes = len(source.encode())
+            assert 200_000 < source_bytes < 4 * 1024 * 1024, source_bytes
+            set_active_editor(source)
+            editor = visible_editor()
+            for position, statement_index in [("early", 0), ("middle", 9_000), ("end", 17_999)]:
+                editor.queryText().setCaretOffset(statement_index * len(statement) + len(prefix))
+                started = time.monotonic()
+                ui.press_x11_key("period")
+                wait_for_candidate("alpha_only")
+                elapsed_ms = (time.monotonic() - started) * 1000
+                print(f"completion position={position} source_bytes={source_bytes} popup_ms={elapsed_ms:.1f}")
+                ui.press_x11_key("Escape")
+                wait_for_candidate("alpha_only", present=False)
+                ui.press_x11_key("BackSpace")
+            set_active_editor("SELECT 1")
+
         try:
             ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
             ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
@@ -735,6 +755,7 @@ GLib.MainLoop().run()
             show_columns()
             wait_for_candidate("alpha_only")
             ui.press_x11_key("Escape")
+            measure_large_script_completion()
 
             ui.press_x11_key("t", ("Control_L",))
             time.sleep(0.3)
