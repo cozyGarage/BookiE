@@ -1,6 +1,6 @@
 use super::*;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 #[derive(Clone, Copy)]
 enum Target {

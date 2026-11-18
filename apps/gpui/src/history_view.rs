@@ -1,6 +1,6 @@
 use std::time::SystemTime;
 
-use bookie_app_services::statement_history::{self, HistoryQuery, HistoryRow, StatusFilter};
+use bookie_app_services::statement_history::{self, HistoryQuery, HistoryRow, StatusFilter, TimeWindow};
 use bookie_gpui::theme::{Theme, size};
 use gpui::{Context, Div, Entity, Stateful, Window, div, prelude::*, px, rgb};
 
@@ -17,6 +17,7 @@ const PAGE_LIMIT: usize = 200;
 pub(crate) struct HistoryPage {
     pub search: Entity<TextInput>,
     pub status: StatusFilter,
+    pub window: TimeWindow,
     pub rows: Vec<HistoryRow>,
     generation: u64,
 }
@@ -33,6 +34,7 @@ impl HistoryPage {
         Self {
             search,
             status: StatusFilter::All,
+            window: TimeWindow::Any,
             rows: Vec::new(),
             generation: 0,
         }
@@ -101,7 +103,9 @@ impl GridView {
         let query = HistoryQuery {
             text: self.history_page.search.read(cx).content().to_string(),
             status: self.history_page.status,
+            window: self.history_page.window,
             limit: PAGE_LIMIT,
+            ..HistoryQuery::default()
         };
         cx.spawn(async move |this, cx| {
             let rows = cx
@@ -151,6 +155,15 @@ impl GridView {
         choice_chip(id, label, self.history_page.status == status, theme).on_click(cx.listener(
             move |this, _, _, cx| {
                 this.history_page.status = status;
+                this.reload_history_page(cx);
+            },
+        ))
+    }
+
+    fn history_window_chip(&self, id: &'static str, label: &'static str, window: TimeWindow, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
+        choice_chip(id, label, self.history_page.window == window, theme).on_click(cx.listener(
+            move |this, _, _, cx| {
+                this.history_page.window = window;
                 this.reload_history_page(cx);
             },
         ))
@@ -227,6 +240,17 @@ impl GridView {
                 self.history_status_chip("history-all", "All", StatusFilter::All, theme, cx),
                 self.history_status_chip("history-ok", "Succeeded", StatusFilter::Succeeded, theme, cx),
                 self.history_status_chip("history-failed", "Failed", StatusFilter::Failed, theme, cx),
+                self.history_status_chip("history-cancelled", "Cancelled", StatusFilter::Cancelled, theme, cx),
+            ],
+        );
+        let windows = choice_row(
+            theme,
+            "When",
+            [
+                self.history_window_chip("history-any", "Any time", TimeWindow::Any, theme, cx),
+                self.history_window_chip("history-day", "24 hours", TimeWindow::Day, theme, cx),
+                self.history_window_chip("history-week", "7 days", TimeWindow::Week, theme, cx),
+                self.history_window_chip("history-month", "30 days", TimeWindow::Month, theme, cx),
             ],
         );
         let body = if rows.is_empty() {
@@ -247,6 +271,7 @@ impl GridView {
             .bg(rgb(theme.background))
             .child(div().h(px(size::FORM_CONTROL)).child(self.history_page.search.clone()))
             .child(filters)
+            .child(windows)
             .child(div().id("history-list").flex_1().min_h_0().overflow_y_scroll().child(body))
     }
 }

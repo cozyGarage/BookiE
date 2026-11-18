@@ -1,5 +1,6 @@
 use super::*;
 use std::sync::Arc;
+use std::time::Duration;
 
 #[test]
 #[ignore = "requires an isolated GTK display"]

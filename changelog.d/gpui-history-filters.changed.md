@@ -1,0 +1,1 @@
+The statement history filters (status, time window, connection, source and quoted text) live in one shared function that the GTK dialog and the GPUI History tab both use; GPUI gains Cancelled and time window filters.
