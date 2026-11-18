@@ -31,12 +31,28 @@ Read `theme.rs`, `chrome.rs`, `render.rs`, `main.rs`, `text_input.rs` and `palet
 | 10 | The toolbar carries window-title controls but no query actions (run only appears inside the query tab) | `chrome.rs` | Open |
 | 11 | Zoom for result views is a font setting only, not Ctrl+scroll | `font_settings.rs` | Open |
 | 12 | Find filters only after Enter | `find_filter.rs` | Open (known) |
+| 16 | Grid rows were 32 px while the scrolling maths assumed 26 | `grid_table.rs` used the table's default size | Fixed: `.xsmall()` (26 px) |
+| 17 | Hover and selection in the grid are pale blue from the component library's theme, not our neutral tokens | screenshot | Open |
 | 14 | Query history is the current session's message log; the persistent history database the GTK app writes is not read or written | `home_query_history_card` reads `panel.messages`; `LiveSession` has no connection id, which `HistoryStore::record` requires | Open, blocked with finding 9: needs a service that records and searches with the connection identity and the retention setting |
 | 15 | Explain was missing | no command | Fixed: toolbar button, overflow item and palette command run the core `explain_statement` for the driver through the read-only session |
 
 ## Feature gap against the GTK app
 
 GPUI has: result grid with Find, filter, compare, export and row copy; SQL editor with several carets; tabs; sidebar tree with search and regex; command palette; settings (appearance, fonts); server status views (sessions, locks, replication, variables). GTK also has, and GPUI lacks: connection manager and forms, SSH, structure editor, import, backup and restore, ER diagram, query history and saved queries, audit log view, catalog dialogs, Explain, session mode and transactions, schema compare, data dictionary export, preferences beyond appearance, approvals UI.
+
+## Side by side with the GTK app
+
+Same SQLite table, light, 2026-11-18, GTK on a private display and GPUI on a real one.
+
+| Area | GTK | GPUI | Action |
+| --- | --- | --- | --- |
+| Toolbar language | Icons for Pin, Explain, Split; text kept for Compare…, Session, Run | Icons only in the pager strip; Run is an icon | GTK: give Compare… and Session icons. GPUI: add a labelled Run as the one filled button |
+| Grid row height | compact rows | was 32 px (the table's default tier) against a 26 px constant used for scrolling maths | Fixed: the table uses its 26 px tier (finding 16) |
+| Selection colour | neutral grey fill | blue selection and hover from gpui-component's own theme, one pale blue row in the grid | Open (finding 17): map the component theme to our tokens; our own `active_row` is neutral now |
+| Sidebar | grouped Tables and Catalog, fields expand in place, 265 px | connection, schema and tables tree, 340 px, no field expansion | Open: field expansion and a Catalog group are missing in GPUI |
+| Result tabs | Results and Errors as icons under the editor | result header with run tabs | Open: decide whether both use the same strip |
+| UI font | Adwaita Sans | Inter or Adwaita Sans, proportional | Matches |
+| Menus | popover menus with grouped items | grouped overflow and cell menus built from palette labels | Matches |
 
 ## Shared services the GPUI form and history need
 
