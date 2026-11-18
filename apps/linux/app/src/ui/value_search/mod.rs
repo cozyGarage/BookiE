@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -111,14 +112,20 @@ fn build_ui() -> (Ui, adw::Dialog) {
     ]);
     let results = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
-        .spacing(12)
+        .spacing(spacing::MD)
         .build();
-    let scroller = gtk::ScrolledWindow::builder().vexpand(true).child(&results).build();
+    let scroller = gtk::ScrolledWindow::builder()
+        .vexpand(true)
+        .min_content_height(spacing::LIST_MIN_HEIGHT)
+        .child(&results)
+        .build();
     let stack = gtk::Stack::new();
     stack.add_named(&form, Some("form"));
     stack.add_named(&progress, Some("progress"));
     stack.add_named(&scroller, Some("results"));
     let (dialog, toolbar) = crate::ui::dialog_shell::new(&bookie_app_services::tr!("Search Database Values"), 520, 560);
+    stack.set_vhomogeneous(false);
+    dialog.set_follows_content_size(true);
     toolbar.set_content(Some(&stack));
     dialog.set_default_widget(Some(&search_button));
     let ui = Ui {
@@ -172,11 +179,11 @@ fn form_fields() -> (adw::EntryRow, adw::ComboRow, adw::SwitchRow, adw::Preferen
 fn page_box(children: &[&gtk::Widget]) -> gtk::Box {
     let page = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
-        .spacing(12)
-        .margin_top(12)
-        .margin_bottom(12)
-        .margin_start(12)
-        .margin_end(12)
+        .spacing(spacing::MD)
+        .margin_top(spacing::MD)
+        .margin_bottom(spacing::MD)
+        .margin_start(spacing::MD)
+        .margin_end(spacing::MD)
         .build();
     for child in children {
         page.append(*child);

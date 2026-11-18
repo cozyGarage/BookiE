@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -29,12 +30,12 @@ pub(super) enum Projection {
 pub(crate) fn selection_chrome() -> gtk::Box {
     let row = gtk::Box::builder()
         .orientation(gtk::Orientation::Horizontal)
-        .spacing(6)
+        .spacing(spacing::SM)
         .visible(false)
-        .margin_start(8)
-        .margin_end(8)
-        .margin_top(4)
-        .margin_bottom(4)
+        .margin_start(spacing::SM)
+        .margin_end(spacing::SM)
+        .margin_top(spacing::XS)
+        .margin_bottom(spacing::XS)
         .build();
     let status = gtk::Label::builder().hexpand(true).halign(gtk::Align::Start).build();
     status.set_accessible_role(gtk::AccessibleRole::Status);

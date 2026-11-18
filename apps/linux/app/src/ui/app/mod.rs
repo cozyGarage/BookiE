@@ -48,6 +48,7 @@ mod workspace_persist;
 mod workspace_preview;
 mod workspace_tabs;
 
+use crate::ui::spacing;
 use std::sync::Arc;
 
 use relm4::adw::prelude::*;
@@ -345,7 +346,7 @@ impl SimpleComponent for App {
                         set_visible: false,
                         set_label: &bookie_app_services::tr!("Production"),
                         set_tooltip_text: Some(bookie_app_services::tr!("This is a production connection. Changes can affect live data.").as_str()),
-                        set_margin_end: 6,
+                        set_margin_end: spacing::SM,
                         add_css_class: "error",
                         add_css_class: "caption-heading",
                     },
@@ -354,7 +355,7 @@ impl SimpleComponent for App {
                     pack_end = &gtk::Label {
                         set_visible: false,
                         set_label: &bookie_app_services::tr!("Read-only"),
-                        set_margin_end: 6,
+                        set_margin_end: spacing::SM,
                         add_css_class: "warning",
                         add_css_class: "caption-heading",
                     },
@@ -362,7 +363,7 @@ impl SimpleComponent for App {
                     #[name = "row_op_spinner"]
                     pack_end = &gtk::Spinner {
                         set_visible: false,
-                        set_margin_end: 6,
+                        set_margin_end: spacing::SM,
                         set_tooltip_text: Some(bookie_app_services::tr!("Saving…").as_str()),
                     },
 
@@ -508,11 +509,11 @@ impl SimpleComponent for App {
             ))]);
         let schema_filter_list = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
-            .spacing(6)
-            .margin_top(12)
-            .margin_bottom(12)
-            .margin_start(12)
-            .margin_end(12)
+            .spacing(spacing::SM)
+            .margin_top(spacing::MD)
+            .margin_bottom(spacing::MD)
+            .margin_start(spacing::MD)
+            .margin_end(spacing::MD)
             .build();
         widgets.schema_filter_popover.set_child(Some(&schema_filter_list));
 

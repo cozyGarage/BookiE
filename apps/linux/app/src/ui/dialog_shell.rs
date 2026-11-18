@@ -1,4 +1,5 @@
 use libadwaita as adw;
+use libadwaita::prelude::*;
 
 pub(crate) fn new(title: &str, width: i32, height: i32) -> (adw::Dialog, adw::ToolbarView) {
     let toolbar = adw::ToolbarView::new();
@@ -9,5 +10,6 @@ pub(crate) fn new(title: &str, width: i32, height: i32) -> (adw::Dialog, adw::To
         .content_height(height)
         .child(&toolbar)
         .build();
+    dialog.connect_map(super::combo_wrap::wrap_dialog);
     (dialog, toolbar)
 }

@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -30,11 +31,11 @@ fn build_form_dialog(title: &str, submit_label: &str) -> (adw::Dialog, gtk::Box,
 
     let content = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
-        .spacing(18)
-        .margin_top(18)
-        .margin_bottom(18)
-        .margin_start(18)
-        .margin_end(18)
+        .spacing(spacing::LG)
+        .margin_top(spacing::LG)
+        .margin_bottom(spacing::LG)
+        .margin_start(spacing::LG)
+        .margin_end(spacing::LG)
         .build();
     let scroller = gtk::ScrolledWindow::builder()
         .child(&content)

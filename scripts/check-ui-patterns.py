@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Ratchet three UI patterns that docs/ui-design.md says to stop growing in the GTK app.
 
-Counted per file outside test code: `thread_local!` (UI state is passed in), a margin or spacing literal off the
-4/8/12/24 scale, and a hand-built `ToolbarView::new()` (use `dialog_shell` for dialogs).
+Counted per file outside test code: `thread_local!` (UI state is passed in), a margin or spacing number written as a
+literal instead of a `ui::spacing` constant, and a hand-built `ToolbarView::new()` (use `dialog_shell` for dialogs).
 Baselines are in baselines/ui-pattern-baselines.txt; lower a count when you remove one, never raise it.
 """
 
@@ -15,11 +15,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 BASELINE = ROOT / "baselines/ui-pattern-baselines.txt"
 SCAN = "apps/linux/app/src"
-SCALE = {0, 4, 8, 12, 24}
-SPACING = re.compile(r"\b(?:margin_(?:top|bottom|start|end)|spacing)\((\d+)\)|\.(?:margin_(?:top|bottom|start|end)|spacing)\((\d+)\)")
+NAMES = r"(?:margin_top|margin_bottom|margin_start|margin_end|spacing|child_spacing|line_spacing|column_spacing|row_spacing)"
+SPACING = re.compile(rf"\b(?:set_)?{NAMES}(?:\((\d+)\)|: (\d+),)|Box::new\(gtk::Orientation::\w+, (\d+)\)")
 PATTERNS = {
     "thread_local": lambda line: "thread_local!" in line,
-    "off-scale-spacing": lambda line: any(int(a or b) not in SCALE for a, b in SPACING.findall(line)),
+    "literal-spacing": lambda line: any(int(a or b or c) != 0 for a, b, c in SPACING.findall(line)),
     "hand-built-toolbar": lambda line: "ToolbarView::new()" in line,
 }
 

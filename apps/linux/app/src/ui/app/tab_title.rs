@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use relm4::adw::prelude::*;
 use relm4::{adw, gtk};
 
@@ -238,7 +239,7 @@ pub(super) fn present_rename_dialog(
         .build();
     let fields = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
-        .spacing(8)
+        .spacing(spacing::SM)
         .build();
     fields.append(&entry);
     fields.append(&tags_entry);

@@ -5,6 +5,7 @@ mod spool;
 pub(crate) use scope::ExportScope;
 pub(crate) use spool::spool_export_factory;
 
+use crate::ui::spacing;
 use bookie_core::QueryResult;
 use bookie_core::export::{CustomDelimiter, CustomDelimiterError, ExportError, RowPage};
 use relm4::adw::prelude::*;
@@ -412,10 +413,10 @@ fn build_footer(csv: &CsvControls) -> (gtk::Box, gtk::Button) {
 
     let footer = gtk::Box::builder()
         .orientation(gtk::Orientation::Horizontal)
-        .margin_top(6)
-        .margin_bottom(12)
-        .margin_start(12)
-        .margin_end(12)
+        .margin_top(spacing::SM)
+        .margin_bottom(spacing::MD)
+        .margin_start(spacing::MD)
+        .margin_end(spacing::MD)
         .build();
     footer.append(&reset_button);
     footer.append(&gtk::Box::builder().hexpand(true).build());

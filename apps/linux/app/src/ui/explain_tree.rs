@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use relm4::{gtk, gtk::prelude::*};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -104,17 +105,17 @@ pub(crate) fn parse_plan(text: &str) -> Vec<PlanNode> {
 pub(crate) fn build_tree(nodes: &[PlanNode]) -> gtk::Widget {
     let list = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
-        .spacing(6)
-        .margin_top(12)
-        .margin_bottom(12)
-        .margin_start(12)
-        .margin_end(12)
+        .spacing(spacing::SM)
+        .margin_top(spacing::MD)
+        .margin_bottom(spacing::MD)
+        .margin_start(spacing::MD)
+        .margin_end(spacing::MD)
         .build();
     let max_cost = nodes.iter().filter_map(|node| node.cost).fold(0.0_f64, f64::max);
     for node in nodes {
         let row = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
-            .spacing(2)
+            .spacing(spacing::OPTICAL)
             .margin_start(node.depth as i32 * 18)
             .build();
         let title = gtk::Label::builder()

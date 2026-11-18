@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -52,12 +53,12 @@ fn present(
         .content_width(420)
         .content_height(420)
         .build();
-    let content = gtk::Box::new(gtk::Orientation::Vertical, 8);
+    let content = gtk::Box::new(gtk::Orientation::Vertical, spacing::SM);
     content.append(&adw::HeaderBar::new());
     let search = gtk::SearchEntry::builder()
         .placeholder_text(bookie_app_services::tr!("Search columns"))
-        .margin_start(12)
-        .margin_end(12)
+        .margin_start(spacing::MD)
+        .margin_end(spacing::MD)
         .build();
     search.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!(
         "Search columns"
@@ -72,9 +73,9 @@ fn present(
         &gtk::ScrolledWindow::builder()
             .child(&list)
             .vexpand(true)
-            .margin_start(12)
-            .margin_end(12)
-            .margin_bottom(12)
+            .margin_start(spacing::MD)
+            .margin_end(spacing::MD)
+            .margin_bottom(spacing::MD)
             .build(),
     );
 
@@ -102,10 +103,10 @@ fn build_choices_list(names: &[String]) -> (gtk::ListBox, Vec<(gtk::ListBoxRow, 
             let child = gtk::Label::builder()
                 .label(&label)
                 .xalign(0.0)
-                .margin_start(12)
-                .margin_end(12)
-                .margin_top(8)
-                .margin_bottom(8)
+                .margin_start(spacing::MD)
+                .margin_end(spacing::MD)
+                .margin_top(spacing::SM)
+                .margin_bottom(spacing::SM)
                 .build();
             row.set_child(Some(&child));
             row.update_property(&[gtk::accessible::Property::Label(&label)]);

@@ -4,6 +4,7 @@ mod audit_dialog;
 mod browse_tab;
 mod catalog_dialog;
 mod cell_editor;
+mod combo_wrap;
 mod connect_dialog;
 pub(crate) mod connection_bundle;
 mod connection_row;

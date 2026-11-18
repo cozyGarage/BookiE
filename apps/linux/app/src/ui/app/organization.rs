@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use std::cell::Cell;
 use std::rc::Rc;
 
@@ -320,11 +321,11 @@ fn color_chooser(initial: u32) -> (adw::ActionRow, Rc<Cell<u32>>) {
     let popover = gtk::Popover::new();
     let choices = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
-        .spacing(4)
-        .margin_top(6)
-        .margin_bottom(6)
-        .margin_start(6)
-        .margin_end(6)
+        .spacing(spacing::XS)
+        .margin_top(spacing::SM)
+        .margin_bottom(spacing::SM)
+        .margin_start(spacing::SM)
+        .margin_end(spacing::SM)
         .build();
     for (index, label) in labels.iter().enumerate() {
         append_color_choice(&choices, &popover, &button, &selected, index as u32, label);

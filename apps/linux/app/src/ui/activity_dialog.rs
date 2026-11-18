@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -44,12 +45,12 @@ fn build_activity_dialog() -> (adw::Dialog, adw::WrapBox, gtk::TextView, gtk::La
 
     let box_ = gtk::Box::new(gtk::Orientation::Vertical, 0);
     let button_row = adw::WrapBox::builder()
-        .child_spacing(8)
-        .line_spacing(8)
-        .margin_start(12)
-        .margin_end(12)
-        .margin_top(8)
-        .margin_bottom(8)
+        .child_spacing(spacing::SM)
+        .line_spacing(spacing::SM)
+        .margin_start(spacing::MD)
+        .margin_end(spacing::MD)
+        .margin_top(spacing::SM)
+        .margin_bottom(spacing::SM)
         .build();
 
     let scrolled = gtk::ScrolledWindow::builder().vexpand(true).hexpand(true).build();
@@ -59,9 +60,9 @@ fn build_activity_dialog() -> (adw::Dialog, adw::WrapBox, gtk::TextView, gtk::La
     let status = gtk::Label::builder()
         .label(tr!("Choose a query above."))
         .xalign(0.0)
-        .margin_start(12)
-        .margin_end(12)
-        .margin_bottom(8)
+        .margin_start(spacing::MD)
+        .margin_end(spacing::MD)
+        .margin_bottom(spacing::SM)
         .build();
     status.add_css_class("dim-label");
 

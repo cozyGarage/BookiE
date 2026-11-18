@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -102,7 +103,7 @@ fn present_form(window: &gtk::Window, names: Vec<String>, on_values: ValueSink, 
     let (list, rows) = build_parameter_rows(&names);
     let content = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
-        .spacing(12)
+        .spacing(spacing::MD)
         .build();
     content.append(&list);
     if let Some(reason) = &error {

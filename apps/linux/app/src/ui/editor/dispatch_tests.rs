@@ -1078,7 +1078,11 @@ fn the_results_panel_can_be_hidden_without_releasing_or_rerunning_its_result() {
     let toggle = descendants(fixture.controller.widget().upcast_ref())
         .into_iter()
         .filter_map(|widget| widget.downcast::<gtk::ToggleButton>().ok())
-        .find(|button| button.label().as_deref() == Some("Results"))
+        .find(|button| {
+            button
+                .tooltip_text()
+                .is_some_and(|tip| tip.starts_with("Show or hide query results"))
+        })
         .expect("the editor needs a persistent Results control");
     fixture.controller.model().run_button.emit_clicked();
     let query = fixture.next_query();

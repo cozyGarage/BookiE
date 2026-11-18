@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -105,11 +106,11 @@ fn build_switcher_widgets(parent: &impl IsA<gtk::Window>) -> (adw::Window, gtk::
 
     let content = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
-        .spacing(12)
-        .margin_top(12)
-        .margin_bottom(12)
-        .margin_start(12)
-        .margin_end(12)
+        .spacing(spacing::MD)
+        .margin_top(spacing::MD)
+        .margin_bottom(spacing::MD)
+        .margin_start(spacing::MD)
+        .margin_end(spacing::MD)
         .build();
     content.append(&search);
     content.append(&stack);

@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use relm4::factory::FactoryVecDeque;
 use relm4::gtk::prelude::*;
 use relm4::prelude::*;
@@ -36,10 +37,10 @@ pub(super) fn build_workspace_chrome(widgets: &AppWidgets, sender: &ComponentSen
     let popover_content = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
         .spacing(0)
-        .margin_top(6)
-        .margin_bottom(6)
-        .margin_start(6)
-        .margin_end(6)
+        .margin_top(spacing::SM)
+        .margin_bottom(spacing::SM)
+        .margin_start(spacing::SM)
+        .margin_end(spacing::SM)
         .width_request(320)
         .build();
 
