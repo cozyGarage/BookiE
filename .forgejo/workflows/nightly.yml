@@ -3,12 +3,13 @@
 #   plan 1 -> coverage 1 -> docker-coverage 3 -> mutation 3 -> values 1 + gtk-soak 3 + arch-package 1 = 5
 # The widest stage is 5, under the cap of 7; scripts/tests/test_ci_workflow.py sums these.
 #
-# Enable later (operator): label 7 runners `nightly` in the Forgejo runner settings, set the
-# repository variable NIGHTLY_LABEL=nightly, then add the schedule under `on:`:
-#   schedule: [{cron: "0 23 * * *"}]
-# Until NIGHTLY_LABEL is set the jobs use the `any-host` label, which every runner has.
+# The schedule is on. To confine it to a reserved subset, label 7 runners `nightly` in the
+# Forgejo runner settings and set the repository variable NIGHTLY_LABEL=nightly. Until that
+# variable is set the jobs use the `any-host` label, which every runner has.
 name: nightly
 on:
+  schedule:
+    - cron: "0 23 * * *"
   workflow_dispatch:
     inputs:
       full:

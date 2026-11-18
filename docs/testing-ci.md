@@ -8,12 +8,7 @@ CI results apply only to the source revision they tested. Keep fixtures and test
 
 ## Nightly workflow
 
-`.forgejo/workflows/nightly.yml` runs only on `workflow_dispatch`: it has no schedule. To turn the schedule on, add these two lines under `on:` and keep `workflow_dispatch:`:
-
-```yaml
-  schedule:
-    - cron: "0 23 * * *"
-```
+`.forgejo/workflows/nightly.yml` runs every night at 23:00 UTC (`schedule`) and can also be started with `workflow_dispatch`.
 
 A first `plan` job runs `scripts/ci-nightly-plan.py` and every other job reads its result. The planner looks up the last green nightly through the Forgejo API (it needs `FORGEJO_TOKEN`; without it, or when the lookup fails, the nightly runs everything planned for the weekday) and skips the run when nothing changed since then or only Markdown, `docs/` or `changelog.d/` changed. Unit-tier coverage runs every night, Docker driver coverage and mutation shards rotate by weekday, and Sunday runs everything. Mutation for a crate with a baseline in `baselines/mutants/` is limited to its changed files.
 
