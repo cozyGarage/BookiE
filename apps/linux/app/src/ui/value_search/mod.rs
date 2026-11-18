@@ -118,15 +118,8 @@ fn build_ui() -> (Ui, adw::Dialog) {
     stack.add_named(&form, Some("form"));
     stack.add_named(&progress, Some("progress"));
     stack.add_named(&scroller, Some("results"));
-    let toolbar = adw::ToolbarView::new();
-    toolbar.add_top_bar(&adw::HeaderBar::new());
+    let (dialog, toolbar) = crate::ui::dialog_shell::new(&bookie_app_services::tr!("Search Database Values"), 520, 560);
     toolbar.set_content(Some(&stack));
-    let dialog = adw::Dialog::builder()
-        .title(bookie_app_services::tr!("Search Database Values"))
-        .content_width(520)
-        .content_height(560)
-        .child(&toolbar)
-        .build();
     dialog.set_default_widget(Some(&search_button));
     let ui = Ui {
         dialog: dialog.downgrade(),

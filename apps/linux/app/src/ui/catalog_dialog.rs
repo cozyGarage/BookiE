@@ -59,11 +59,7 @@ pub fn present(
         can_restart_sequences,
         in_flight: Rc::new(RefCell::new(connection_scope.child_token())),
     });
-    let dialog = adw::Dialog::builder().title(tr!("Catalog")).build();
-    dialog.set_content_width(720);
-    dialog.set_content_height(560);
-    let toolbar = adw::ToolbarView::new();
-    toolbar.add_top_bar(&adw::HeaderBar::new());
+    let (dialog, toolbar) = super::dialog_shell::new(&tr!("Catalog"), 720, 560);
     let kinds = kind_dropdown(initial_kind);
     let schema = gtk::SearchEntry::builder()
         .placeholder_text(tr!("All schemas"))
@@ -75,7 +71,6 @@ pub fn present(
     status.add_css_class("dim-label");
     toolbar.set_content(Some(&catalog_layout(&kinds, &schema, &list, &status)));
     crate::ui::dialog_zoom::install(&toolbar, &[list.clone().upcast()]);
-    dialog.set_child(Some(&toolbar));
 
     let reload = reload_action(&source, &kinds, &schema, &list, &status);
     let on_kind = reload.clone();

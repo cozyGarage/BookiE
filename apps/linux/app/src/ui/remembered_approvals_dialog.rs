@@ -11,15 +11,8 @@ pub fn grant_title(grant: &ApprovalGrant) -> String {
 
 pub fn present(parent: &adw::ApplicationWindow) {
     let page = adw::PreferencesPage::new();
-    let toolbar = adw::ToolbarView::new();
-    toolbar.add_top_bar(&adw::HeaderBar::new());
+    let (dialog, toolbar) = super::dialog_shell::new(&bookie_app_services::tr!("Remembered Approvals"), 480, 360);
     toolbar.set_content(Some(&page));
-    let dialog = adw::Dialog::builder()
-        .title(bookie_app_services::tr!("Remembered Approvals"))
-        .content_width(480)
-        .content_height(360)
-        .child(&toolbar)
-        .build();
     rebuild(&page, &Rc::new(RefCell::new(None)));
     dialog.present(Some(parent));
 }
