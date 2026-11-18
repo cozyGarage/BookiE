@@ -45,7 +45,7 @@ async fn system_store_verify_ca_checks_the_chain_while_verify_full_checks_the_ho
     let fixture = fixture_in_system_store();
     for (driver, options) in DRIVERS {
         let mut named = options(&fixture, TlsMode::VerifyCa, Some(fixture.ca_cert.clone()));
-        named.host = "127.0.0.1".into();
+        named.host = std::env::var("BOOKIE_DRIVER_TLS_WRONG_IDENTITY_HOST").unwrap_or_else(|_| "127.0.0.1".into());
         let connection = driver
             .connect(named)
             .await
