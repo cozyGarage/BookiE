@@ -120,9 +120,7 @@ pub struct ConnectDialogInit {
     pub registry: Arc<DriverRegistry>,
     pub preferences: crate::services::preferences::PreferencesStore,
     pub workspace: crate::services::workspace_state::WorkspaceStore,
-    /// Saved connection this dialog edits. When set it decides which
-    /// record is written, so two connections to one endpoint stay
-    /// separate instead of folding into whichever matched first.
+    /// Identifies the saved record to update when endpoints are shared.
     pub bound_connection_id: Option<Uuid>,
     pub hidden_schemas: Vec<String>,
     pub prefill: Option<ConnectionPrefill>,
@@ -165,9 +163,6 @@ pub enum ConnectDialogCmd {
     TestResult(Result<usize, ConnectFailure>),
 }
 
-/// Which async operation (if any) is currently in flight. Drives
-/// the per-button busy-label rendering — only the *busy* button gets
-/// the in-progress wording, the other keeps its static label.
 #[derive(Debug, Clone, Copy)]
 enum BusyKind {
     None,
@@ -342,9 +337,6 @@ impl Component for ConnectDialog {
             entry.connect_changed(move |_| s.input(ConnectDialogInput::InputChanged));
         }
 
-        // Semantic preferences groups: Connection / Authentication /
-        // Options / SSH. AdwPreferencesPage renders them with the
-        // standard Adwaita section spacing & headers.
         let connection_group = adw::PreferencesGroup::builder()
             .title(bookie_app_services::tr!("Connection"))
             .build();
@@ -812,13 +804,7 @@ impl ConnectDialog {
         self.toast_overlay.add_toast(crate::ui::plain_text::toast(message));
     }
 
-    /// Disable Connect / Test while an async op is in flight and
-    /// switch the **busy** button's label to the in-progress wording
-    /// (the *other* button keeps its static label so the user isn't
-    /// confused about what's happening). The previous version
-    /// rewrote `submit.set_label("Testing…")` during a Test, leaving
-    /// the Connect button reading "Testing…" — a misleading label
-    /// for a button that isn't running the test.
+    /// Keeps the idle action label accurate while the other button is busy.
     fn set_busy(&self, kind: BusyKind) {
         let busy = !matches!(kind, BusyKind::None);
         self.submit.set_sensitive(!busy || matches!(kind, BusyKind::Connecting));
