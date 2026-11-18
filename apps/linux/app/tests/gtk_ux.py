@@ -752,6 +752,7 @@ GLib.MainLoop().run()
                     time.sleep(ui.POLL_SECONDS)
                 actual_offset = text.caretOffset
                 assert actual_offset == offset, (position, actual_offset, offset)
+                ui.invoke_accessible_action("win.focus-editor")
                 started = time.monotonic()
                 ui.press_x11_key("period")
                 wait_for_candidate("alpha_only")

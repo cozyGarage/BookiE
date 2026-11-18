@@ -145,6 +145,20 @@ mod tests {
     }
 
     #[test]
+    fn large_script_completion_uses_the_statement_at_the_cursor() {
+        let mut index = SchemaIndex::default();
+        index.grammar = Some(SqlGrammar::PostgreSql);
+        index.set_columns("bookie_completion_target", vec!["alpha_only".into()]);
+        let prefix = "SELECT * FROM bookie_completion_target WHERE bookie_completion_target.";
+        let statement = format!("{prefix} /*{}*/;\n", "x".repeat(120));
+        let sql = statement.repeat(18_000);
+        let plan = completion_plan(&sql, SqlGrammar::PostgreSql, None);
+        let cursor = 9_000 * statement.len() + prefix.len();
+        let candidates = candidates_with_plan(&sql, cursor, &index, None, &plan);
+        assert!(candidates.values.iter().any(|(label, _)| label == "alpha_only"));
+    }
+
+    #[test]
     fn columns_use_each_engine_delimiters_and_never_offer_unrelated_editor_words() {
         for (grammar, driver) in [
             (SqlGrammar::PostgreSql, "postgres"),
