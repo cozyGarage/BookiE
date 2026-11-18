@@ -14,18 +14,25 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 BASELINE = ROOT / "baselines/ui-pattern-baselines.txt"
-SCAN = "apps/linux/app/src"
+SCAN = ("apps/linux/app/src", "apps/gpui/src")
+GPUI_PX = re.compile(r"\bpx\((\d+(?:\.\d*)?)\)")
 NAMES = r"(?:margin_top|margin_bottom|margin_start|margin_end|spacing|child_spacing|line_spacing|column_spacing|row_spacing)"
 SPACING = re.compile(rf"\b(?:set_)?{NAMES}(?:\((\d+)\)|: (\d+),)|Box::new\(gtk::Orientation::\w+, (\d+)\)")
 PATTERNS = {
     "thread_local": lambda line: "thread_local!" in line,
     "literal-spacing": lambda line: any(int(a or b or c) != 0 for a, b, c in SPACING.findall(line)),
     "hand-built-toolbar": lambda line: "ToolbarView::new()" in line,
+    "gpui-literal-px": lambda line: any(float(number) != 0 for number in GPUI_PX.findall(line)),
 }
 
 
 def is_test_file(path: Path) -> bool:
-    return path.name.endswith("_tests.rs") or path.name == "tests.rs" or "tests" in path.parts
+    return (
+        path.name.endswith("_tests.rs")
+        or path.name == "tests.rs"
+        or "tests" in path.parts
+        or path.name == "theme.rs" and "gpui" in path.parts
+    )
 
 
 def count(path: Path) -> dict[str, int]:
@@ -41,11 +48,12 @@ def count(path: Path) -> dict[str, int]:
 
 def counts() -> dict[str, int]:
     found = {}
-    for path in sorted((ROOT / SCAN).rglob("*.rs")):
-        if is_test_file(path):
-            continue
-        for name, number in count(path).items():
-            found[f"{path.relative_to(ROOT)} {name}"] = number
+    for base in SCAN:
+        for path in sorted((ROOT / base).rglob("*.rs")):
+            if is_test_file(path):
+                continue
+            for name, number in count(path).items():
+                found[f"{path.relative_to(ROOT)} {name}"] = number
     return found
 
 

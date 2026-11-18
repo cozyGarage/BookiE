@@ -1,3 +1,35 @@
+pub mod size {
+    pub const HAIRLINE: f32 = 1.0;
+    pub const OPTICAL: f32 = 2.0;
+    pub const XS: f32 = 4.0;
+    pub const SM: f32 = 8.0;
+    pub const MD: f32 = 12.0;
+    pub const LG: f32 = 16.0;
+    pub const XL: f32 = 24.0;
+    pub const COMPACT_CONTROL: f32 = 24.0;
+    pub const SMALL_CONTROL: f32 = 28.0;
+    pub const FORM_CONTROL: f32 = 32.0;
+    pub const CONTROL_RADIUS: f32 = 4.0;
+    pub const SURFACE_RADIUS: f32 = 6.0;
+    pub const TEXT_SMALL: f32 = 12.0;
+    pub const TEXT: f32 = 13.0;
+    pub const STAT_TEXT: f32 = 22.0;
+    pub const TREE_ROW: f32 = 26.0;
+    pub const LIST_ROW: f32 = 36.0;
+    pub const EDITOR_LINE: f32 = 20.0;
+    pub const ICON: f32 = 14.0;
+    pub const CHEVRON: f32 = ICON;
+    pub const SPLITTER: f32 = 5.0;
+    pub const MENU_WIDTH: f32 = 220.0;
+    pub const SIDE_PANEL_WIDTH: f32 = 300.0;
+    pub const FIND_WIDTH: f32 = 110.0;
+    pub const FILTER_WIDTH: f32 = 420.0;
+    pub const PALETTE_WIDTH: f32 = 520.0;
+    pub const PALETTE_TOP: f32 = 90.0;
+    pub const HOME_WIDTH: f32 = 980.0;
+    pub const HOME_TOP: f32 = 96.0;
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Style {
     Dbx,

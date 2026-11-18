@@ -68,7 +68,7 @@ impl AssetSource for Assets {
 pub fn icon(name: &'static str, color: u32) -> gpui::Svg {
     gpui::svg()
         .path(SharedString::from(format!("icons/{name}.svg")))
-        .size(gpui::px(15.0))
+        .size(gpui::px(bookie_gpui::theme::size::ICON))
         .flex_none()
         .text_color(gpui::rgb(color))
 }

@@ -87,7 +87,7 @@ impl GridView {
             .flex()
             .items_center()
             .gap_1()
-            .child(div().w(px(110.0)).flex_none().child(self.find.clone()))
+            .child(div().w(px(size::FIND_WIDTH)).flex_none().child(self.find.clone()))
             .child(button("find-prev", "↑", theme).on_click(cx.listener(|this, _, _, cx| this.run_find(false, cx))))
             .child(button("find-next", "↓", theme).on_click(cx.listener(|this, _, _, cx| this.run_find(true, cx))))
             .child(button("show", "Matches only", theme).on_click(cx.listener(|this, _, _, cx| {
@@ -132,7 +132,7 @@ impl GridView {
                 .px_2()
                 .pb_2()
                 .child(div().child("WHERE"))
-                .child(div().w(px(420.0)).child(self.filter.clone()))
+                .child(div().w(px(size::FILTER_WIDTH)).child(self.filter.clone()))
                 .child(button("apply", "Apply", theme).on_click(cx.listener(|this, _, _, cx| this.apply_filter(cx))))
                 .child(
                     button("clear", "Clear all", theme).on_click(cx.listener(|this, _, _, cx| {
@@ -319,14 +319,14 @@ impl GridView {
                 .text_color(rgb(theme.muted_foreground))
                 .child("No matching command")
         });
-        div().absolute().top(px(90.0)).w_full().flex().justify_center().child(
+        div().absolute().top(px(size::PALETTE_TOP)).w_full().flex().justify_center().child(
             div()
-                .w(px(520.0))
+                .w(px(size::PALETTE_WIDTH))
                 .p_2()
                 .gap_1()
                 .flex()
                 .flex_col()
-                .rounded(px(6.0))
+                .rounded(px(size::SURFACE_RADIUS))
                 .border_1()
                 .border_color(rgb(theme.border))
                 .bg(rgb(theme.background))

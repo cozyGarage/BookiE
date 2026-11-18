@@ -1,3 +1,4 @@
+use bookie_gpui::theme::size;
 use std::borrow::Cow;
 use std::ops::Range;
 
@@ -606,15 +607,15 @@ impl Render for TextInput {
             .on_mouse_move(cx.listener(Self::on_mouse_move))
             .bg(rgb(theme.background))
             .text_color(rgb(theme.foreground))
-            .line_height(px(24.))
-            .text_size(px(13.))
+            .line_height(px(size::COMPACT_CONTROL))
+            .text_size(px(size::TEXT))
             .child(
                 div()
                     .h(px(24. + 4. * 2.))
                     .w_full()
-                    .p(px(4.))
+                    .p(px(size::XS))
                     .bg(rgb(theme.background))
-                    .rounded(px(4.))
+                    .rounded(px(size::CONTROL_RADIUS))
                     .border_1()
                     .border_color(rgb(theme.border))
                     .child(TextElement { input: cx.entity() }),
@@ -652,7 +653,7 @@ fn build_text_runs(
                 len: marked_range.end - marked_range.start,
                 underline: Some(UnderlineStyle {
                     color: Some(run.color),
-                    thickness: px(1.0),
+                    thickness: px(size::HAIRLINE),
                     wavy: false,
                 }),
                 ..run.clone()
@@ -685,7 +686,7 @@ fn compute_selection_and_cursor(
             Some(fill(
                 Bounds::new(
                     point(bounds.left() + x_offset + cursor_pos, bounds.top()),
-                    size(px(2.), bounds.bottom() - bounds.top()),
+                    size(px(size::OPTICAL), bounds.bottom() - bounds.top()),
                 ),
                 rgb(theme_fg),
             )),

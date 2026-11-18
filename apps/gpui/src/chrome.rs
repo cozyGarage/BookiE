@@ -11,7 +11,7 @@ use gpui::{Context, Div, MouseDownEvent, Stateful, Window, div, prelude::*, px, 
 use crate::assets::icon;
 use crate::ui_theme::ThemeExt;
 use crate::{GridView, thousands};
-use bookie_gpui::theme::Theme;
+use bookie_gpui::theme::{Theme, size};
 
 pub(crate) const TOOLBAR_HEIGHT: f32 = 40.0;
 pub(crate) const TAB_HEIGHT: f32 = 32.0;
@@ -22,7 +22,7 @@ fn ghost(id: impl Into<gpui::ElementId>, label: impl Into<String>, theme: Theme)
         .id(id)
         .flex()
         .items_center()
-        .h(px(28.0))
+        .h(px(size::SMALL_CONTROL))
         .px_2()
         .rounded(px(theme.radius))
         .cursor_pointer()
@@ -31,14 +31,19 @@ fn ghost(id: impl Into<gpui::ElementId>, label: impl Into<String>, theme: Theme)
         .child(label.into())
 }
 
+fn tip(label: &'static str) -> impl Fn(&mut gpui::Window, &mut gpui::App) -> gpui::AnyView + 'static {
+    move |window, cx| gpui_component::tooltip::Tooltip::new(label).build(window, cx)
+}
+
 fn expand_sidebar_button(theme: Theme, cx: &mut Context<GridView>) -> Stateful<Div> {
     div()
         .id("sidebar-open-top-left")
+        .tooltip(tip("Show sidebar"))
         .flex()
         .items_center()
         .justify_center()
-        .w(px(32.0))
-        .h(px(28.0))
+        .w(px(size::FORM_CONTROL))
+        .h(px(size::SMALL_CONTROL))
         .cursor_pointer()
         .hover(move |style| style.bg(rgb(theme.accent)))
         .child(icon("chevrons-right", theme.muted_foreground))
@@ -66,9 +71,9 @@ fn import_menu(theme: Theme, cx: &mut Context<GridView>) -> Div {
     };
     div()
         .absolute()
-        .top(px(40.0))
-        .left(px(8.0))
-        .w(px(220.0))
+        .top(px(TOOLBAR_HEIGHT))
+        .left(px(size::SM))
+        .w(px(size::MENU_WIDTH))
         .flex()
         .flex_col()
         .py_1()
@@ -108,57 +113,53 @@ fn header_icon(id: &'static str, name: &'static str, theme: Theme) -> Stateful<D
         .flex()
         .items_center()
         .justify_center()
-        .w(px(24.0))
-        .h(px(24.0))
+        .w(px(size::COMPACT_CONTROL))
+        .h(px(size::COMPACT_CONTROL))
         .cursor_pointer()
         .hover(move |style| style.bg(rgb(theme.accent)))
         .child(icon(name, theme.muted_foreground))
 }
 
-fn window_button(id: &'static str, glyph: &'static str, theme: Theme) -> Stateful<Div> {
+fn window_button(id: &'static str, glyph: &'static str, label: &'static str, theme: Theme) -> Stateful<Div> {
     div()
         .id(id)
+        .tooltip(tip(label))
         .flex()
         .items_center()
         .justify_center()
-        .w(px(32.0))
-        .h(px(28.0))
+        .w(px(size::FORM_CONTROL))
+        .h(px(size::SMALL_CONTROL))
         .cursor_pointer()
         .text_color(rgb(theme.foreground))
         .hover(move |style| style.bg(rgb(theme.accent)))
         .child(glyph)
 }
 
-fn ghost_icon(id: &'static str, name: &'static str, label: impl Into<String>, theme: Theme) -> Stateful<Div> {
+fn ghost_icon(id: &'static str, name: &'static str, label: &'static str, theme: Theme) -> Stateful<Div> {
     div()
         .id(id)
-        .group(id)
+        .tooltip(tip(label))
         .flex()
         .items_center()
-        .gap_1()
-        .h(px(28.0))
-        .px_2()
+        .justify_center()
+        .w(px(size::FORM_CONTROL))
+        .h(px(size::SMALL_CONTROL))
         .rounded(px(theme.radius))
         .cursor_pointer()
         .text_color(rgb(theme.foreground))
         .hover(move |style| style.bg(rgb(theme.accent)))
         .child(icon(name, theme.muted_foreground))
-        .child(
-            div()
-                .invisible()
-                .group_hover(id, |style| style.visible())
-                .child(label.into()),
-        )
 }
 
-fn toolbar_icon(id: &'static str, name: &'static str, theme: Theme) -> Stateful<Div> {
+fn toolbar_icon(id: &'static str, name: &'static str, label: &'static str, theme: Theme) -> Stateful<Div> {
     div()
         .id(id)
+        .tooltip(tip(label))
         .flex()
         .items_center()
         .justify_center()
-        .w(px(32.0))
-        .h(px(28.0))
+        .w(px(size::FORM_CONTROL))
+        .h(px(size::SMALL_CONTROL))
         .rounded(px(theme.radius))
         .cursor_pointer()
         .hover(move |style| style.bg(rgb(theme.accent)))
@@ -169,7 +170,7 @@ fn card(theme: Theme) -> Div {
     div()
         .flex()
         .flex_col()
-        .rounded(px(6.0))
+        .rounded(px(size::SURFACE_RADIUS))
         .border_1()
         .border_color(rgb(theme.border))
         .bg(rgb(theme.background))
@@ -201,7 +202,7 @@ fn home_stat_card(label: &str, icon_name: &'static str, value: &str, theme: Them
         )
         .child(
             div()
-                .text_size(px(22.0))
+                .text_size(px(size::STAT_TEXT))
                 .font_weight(gpui::FontWeight::SEMIBOLD)
                 .child(value.to_string()),
         )
@@ -213,7 +214,7 @@ fn home_shortcut(id: &'static str, icon_name: &'static str, label: &'static str,
         .flex()
         .items_center()
         .gap_2()
-        .h(px(28.0))
+        .h(px(size::SMALL_CONTROL))
         .px_2()
         .rounded(px(theme.radius))
         .cursor_pointer()
@@ -242,14 +243,14 @@ impl GridView {
                     .gap_1()
                     .children((!self.sidebar_open).then(|| expand_sidebar_button(theme, cx)))
                     .child(
-                        toolbar_icon("new-connection", "database", theme).on_click(cx.listener(|this, _, _, cx| {
+                        toolbar_icon("new-connection", "database", "Connections", theme).on_click(cx.listener(|this, _, _, cx| {
                             this.tabs.open_home();
                             this.sync_grid_owner();
                             cx.notify();
                         })),
                     )
                     .child(
-                        toolbar_icon("new-query", "file-plus", theme).on_click(cx.listener(|this, _, window, cx| {
+                        toolbar_icon("new-query", "file-plus", "New query", theme).on_click(cx.listener(|this, _, window, cx| {
                             this.tabs.open_query();
                             this.sync_grid_owner();
                             if this.live.is_some() {
@@ -270,11 +271,16 @@ impl GridView {
             .items_center()
             .gap_1()
             .child(
-                toolbar_icon("palette", "command", theme)
+                toolbar_icon("palette", "command", "Command palette (Ctrl+Shift+P)", theme)
                     .on_click(cx.listener(|this, _, window, cx| this.open_palette(window, cx))),
             )
             .child(
-                toolbar_icon("theme-toggle", if theme.dark { "sun" } else { "moon" }, theme).on_click(cx.listener(
+                toolbar_icon(
+                    "theme-toggle",
+                    if theme.dark { "sun" } else { "moon" },
+                    if theme.dark { "Switch to light theme" } else { "Switch to dark theme" },
+                    theme,
+                ).on_click(cx.listener(
                     |this, _, window, cx| {
                         this.dark_mode = !this.dark_mode;
                         Theme::current(cx).toggled().install(cx);
@@ -283,17 +289,17 @@ impl GridView {
                 )),
             )
             .child(
-                window_button("win-min", "\u{2013}", theme).on_click(cx.listener(|_, _, window, _| {
+                window_button("win-min", "\u{2013}", "Minimize", theme).on_click(cx.listener(|_, _, window, _| {
                     window.minimize_window();
                 })),
             )
             .child(
-                window_button("win-max", "\u{25a1}", theme).on_click(cx.listener(|_, _, window, _| {
+                window_button("win-max", "\u{25a1}", "Maximize", theme).on_click(cx.listener(|_, _, window, _| {
                     window.zoom_window();
                 })),
             )
             .child(
-                window_button("win-close", "\u{00d7}", theme).on_click(cx.listener(|_, _, window, _| {
+                window_button("win-close", "\u{00d7}", "Close", theme).on_click(cx.listener(|_, _, window, _| {
                     window.remove_window();
                 })),
             )
@@ -318,12 +324,12 @@ impl GridView {
             .id(("tree", index))
             .flex()
             .items_center()
-            .h(px(26.0))
+            .h(px(size::TREE_ROW))
             .pl(px(8.0 + 14.0 * depth as f32))
             .gap_1()
             .rounded(px(theme.radius))
             .cursor_pointer()
-            .child(div().w(px(15.0)).flex_none().children(chevron.map(|open| {
+            .child(div().w(px(size::CHEVRON)).flex_none().children(chevron.map(|open| {
                 icon(
                     if open { "chevron-down" } else { "chevron-right" },
                     theme.muted_foreground,
@@ -450,7 +456,7 @@ impl GridView {
             .flex()
             .items_center()
             .justify_between()
-            .min_h(px(36.0))
+            .min_h(px(size::LIST_ROW))
             .py_1()
             .px_2()
             .border_b_1()
@@ -507,7 +513,7 @@ impl GridView {
             .top_0()
             .right_0()
             .h_full()
-            .w(px(5.0))
+            .w(px(size::SPLITTER))
             .cursor_col_resize()
             .hover(move |style| style.bg(rgb(theme.info)))
             .on_mouse_down(
@@ -782,8 +788,8 @@ impl GridView {
             .bg(rgb(theme.background))
             .child(
                 div()
-                    .pt(px(96.0))
-                    .w(px(980.0))
+                    .pt(px(size::HOME_TOP))
+                    .w(px(size::HOME_WIDTH))
                     .max_w_full()
                     .flex()
                     .flex_col()
@@ -882,7 +888,7 @@ impl GridView {
 
     fn home_shortcuts_card(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
         card(theme)
-            .w(px(300.0))
+            .w(px(size::SIDE_PANEL_WIDTH))
             .child(card_title("Shortcuts", theme))
             .child(
                 div()
@@ -936,7 +942,7 @@ impl GridView {
                         .px_2()
                         .py_1()
                         .rounded(px(theme.radius))
-                        .text_size(px(12.0))
+                        .text_size(px(size::TEXT_SMALL))
                         .font_family("monospace")
                         .text_color(rgb(match entry.kind {
                             MessageKind::Error => theme.warning,
@@ -982,7 +988,7 @@ impl GridView {
             .bg(rgb(theme.chrome))
             .border_t_1()
             .border_color(rgb(theme.border))
-            .text_size(px(12.0))
+            .text_size(px(size::TEXT_SMALL))
             .text_color(rgb(theme.muted_foreground))
             .child(
                 div()
@@ -1003,14 +1009,14 @@ impl GridView {
             .flex()
             .items_center()
             .gap_2()
-            .h(px(32.0))
+            .h(px(size::FORM_CONTROL))
             .px_2()
             .flex_none()
             .bg(rgb(theme.chrome))
             .border_b_1()
             .border_color(rgb(theme.border))
             .child(
-                ghost_icon("run-query", "play", "Run  Ctrl+Enter", theme).on_click(cx.listener(
+                ghost_icon("run-query", "play", "Run query (Ctrl+Enter)", theme).on_click(cx.listener(
                     |this, _, _, cx| {
                         this.run_query(cx);
                         cx.notify();
@@ -1045,13 +1051,13 @@ impl GridView {
                             .flex()
                             .flex_col()
                             .text_color(rgb(theme.muted_foreground))
-                            .children((1..=SQL.len()).map(|number| div().h(px(20.0)).child(number.to_string())))
+                            .children((1..=SQL.len()).map(|number| div().h(px(size::EDITOR_LINE)).child(number.to_string())))
                     }))
                     .children(self.live.is_none().then(|| {
                         div()
                             .flex()
                             .flex_col()
-                            .children(SQL.iter().map(|line| div().h(px(20.0)).child((*line).to_string())))
+                            .children(SQL.iter().map(|line| div().h(px(size::EDITOR_LINE)).child((*line).to_string())))
                     }))
                     .children(self.live.is_some().then(|| {
                         div()
@@ -1068,7 +1074,7 @@ impl GridView {
     fn query_split_divider(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
         div()
             .id("split-divider")
-            .h(px(6.0))
+            .h(px(size::SM))
             .w_full()
             .flex_none()
             .cursor_row_resize()
@@ -1111,7 +1117,7 @@ impl GridView {
             .flex()
             .items_center()
             .flex_none()
-            .h(px(28.0))
+            .h(px(size::SMALL_CONTROL))
             .px_2()
             .rounded(px(theme.radius))
             .border_1()
@@ -1164,7 +1170,7 @@ impl GridView {
             .id(id)
             .flex()
             .items_center()
-            .h(px(24.0))
+            .h(px(size::COMPACT_CONTROL))
             .px_2()
             .rounded(px(theme.radius))
             .cursor_pointer()
@@ -1190,14 +1196,14 @@ impl GridView {
             .flex()
             .items_center()
             .gap_1()
-            .h(px(40.0))
+            .h(px(TOOLBAR_HEIGHT))
             .px_2()
             .flex_none()
             .bg(rgb(theme.chrome))
             .border_y_1()
             .border_color(rgb(theme.border))
             .child(icon("pin", theme.muted_foreground))
-            .child(div().w(px(1.0)).h(px(16.0)).bg(rgb(theme.border)))
+            .child(div().w(px(size::HAIRLINE)).h(px(size::LG)).bg(rgb(theme.border)))
             .child(
                 div()
                     .id("result-runs")
