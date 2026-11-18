@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use gtk4::prelude::*;
 use gtk4::{self as gtk};
 
@@ -73,8 +74,8 @@ fn enum_choice_list(labels: &[String], current: &str) -> gtk::ListBox {
         let row = gtk::Label::builder()
             .label(shown(label))
             .xalign(0.0)
-            .margin_top(6)
-            .margin_bottom(6)
+            .margin_top(spacing::SM)
+            .margin_bottom(spacing::SM)
             .build();
         if label == current {
             row.add_css_class("accent");
@@ -92,10 +93,10 @@ fn enum_choice_list(labels: &[String], current: &str) -> gtk::ListBox {
 fn wire_enum_search(list: &gtk::ListBox, labels: &[String], picker: &Picker) -> (gtk::SearchEntry, gtk::Box) {
     let search = gtk::SearchEntry::builder()
         .placeholder_text(bookie_app_services::tr!("Filter values…"))
-        .margin_start(4)
-        .margin_end(4)
-        .margin_top(4)
-        .margin_bottom(4)
+        .margin_start(spacing::XS)
+        .margin_end(spacing::XS)
+        .margin_top(spacing::XS)
+        .margin_bottom(spacing::XS)
         .build();
     let query_entry = search.clone();
     let filter_labels = labels.to_vec();
@@ -123,7 +124,7 @@ fn wire_enum_search(list: &gtk::ListBox, labels: &[String], picker: &Picker) -> 
     });
     let box_container = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
-        .spacing(4)
+        .spacing(spacing::XS)
         .build();
     box_container.append(&search);
     box_container.append(list);
@@ -177,7 +178,7 @@ fn set_content(picker: Picker, labels: Vec<String>, current: &str) -> gtk::Widge
     });
     let body = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
-        .spacing(8)
+        .spacing(spacing::SM)
         .build();
     body.append(&list);
     body.append(&apply);
@@ -189,10 +190,10 @@ fn choice_scroller(content: &gtk::Widget) -> gtk::ScrolledWindow {
         .max_content_height(320)
         .propagate_natural_height(true)
         .propagate_natural_width(true)
-        .margin_top(8)
-        .margin_bottom(8)
-        .margin_start(8)
-        .margin_end(8)
+        .margin_top(spacing::SM)
+        .margin_bottom(spacing::SM)
+        .margin_start(spacing::SM)
+        .margin_end(spacing::SM)
         .child(content)
         .build()
 }

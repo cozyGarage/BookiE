@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use relm4::gtk;
 use relm4::gtk::prelude::*;
 
@@ -5,7 +6,7 @@ pub(in crate::ui::editor) const FOOTER_NAME: &str = "tp-result-footer";
 const PROGRESS_MAX_CHARS: i32 = 60;
 
 pub(in crate::ui::editor) fn build(progress: &gtk::Label, pager: &gtk::Box) -> gtk::Box {
-    let footer = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+    let footer = gtk::Box::new(gtk::Orientation::Horizontal, spacing::MD);
     footer.set_widget_name(FOOTER_NAME);
     footer.add_css_class("toolbar");
     progress.set_xalign(0.0);

@@ -455,7 +455,7 @@ impl FactoryComponent for SidebarRow {
 impl SidebarRow {
     fn setup_row_layout(&mut self, root: &gtk::ListBoxRow, widgets: &SidebarRowWidgets) {
         if self.group.is_none() && self.kind != SidebarObjectKind::TemporaryTable {
-            self.columns.install(root, spacing::tree_text_indent(self.depth));
+            self.columns.install(root, spacing::tree_indent(self.depth));
         }
         if let Some(button) = &self.new_table_button {
             widgets.actions_row.append(button);

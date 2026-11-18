@@ -6,6 +6,7 @@ use relm4::adw::prelude::*;
 use relm4::{ComponentSender, adw, gtk};
 
 use super::{SqlEditor, SqlEditorInput, StatementOutcome, StatementOutcomeKind};
+use crate::ui::spacing;
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum PanelAction {
@@ -43,9 +44,9 @@ impl BottomPanel {
             .focusable(true)
             .build();
         stack.add_named(results, Some("results"));
-        let errors = gtk::Box::new(gtk::Orientation::Vertical, 8);
-        errors.set_margin_start(12);
-        errors.set_margin_end(12);
+        let errors = gtk::Box::new(gtk::Orientation::Vertical, spacing::SM);
+        errors.set_margin_start(spacing::MD);
+        errors.set_margin_end(spacing::MD);
         let scroll = gtk::ScrolledWindow::builder().child(&errors).vexpand(true).build();
         stack.add_named(&scroll, Some("errors"));
         paned.set_end_child(Some(&stack));
@@ -226,7 +227,7 @@ impl BottomPanel {
             .xalign(0.0)
             .build();
         self.errors.append(&label);
-        self.error_button.set_label(&errors_label(1));
+        set_error_count(&self.error_button, 1);
     }
 
     pub(super) fn refresh_errors(&self, outcomes: &[StatementOutcome]) {
@@ -251,7 +252,7 @@ impl BottomPanel {
                 }
             }
         }
-        self.error_button.set_label(&errors_label(count));
+        set_error_count(&self.error_button, count);
         if count == 0 {
             self.errors.append(&gtk::Label::new(Some(&bookie_app_services::tr!(
                 "No errors in the latest query run"
@@ -260,30 +261,50 @@ impl BottomPanel {
     }
 }
 
-fn errors_label(count: usize) -> String {
-    if count == 0 {
+fn set_error_count(button: &gtk::ToggleButton, count: usize) {
+    let name = if count == 0 {
         bookie_app_services::tr!("Errors")
     } else {
         bookie_app_services::tr!("Errors ({n})").replace("{n}", &count.to_string())
+    };
+    if let Some(label) = button
+        .child()
+        .and_downcast::<gtk::Box>()
+        .and_then(|content| content.last_child())
+    {
+        if let Some(label) = label.downcast_ref::<gtk::Label>() {
+            label.set_label(&if count == 0 { String::new() } else { count.to_string() });
+            label.set_visible(count > 0);
+        }
     }
+    button.update_property(&[gtk::accessible::Property::Label(&name)]);
+}
+
+fn icon_with_count(icon: &str) -> gtk::Box {
+    let content = gtk::Box::new(gtk::Orientation::Horizontal, spacing::XS);
+    content.append(&gtk::Image::from_icon_name(icon));
+    content.append(&gtk::Label::builder().css_classes(["numeric"]).visible(false).build());
+    content
 }
 
 fn controls(sender: &ComponentSender<SqlEditor>) -> (gtk::Box, gtk::ToggleButton, gtk::ToggleButton, gtk::Button) {
-    let bar = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    let bar = gtk::Box::new(gtk::Orientation::Horizontal, spacing::SM);
     bar.add_css_class("toolbar");
     let results = gtk::ToggleButton::builder()
-        .label(bookie_app_services::tr!("Results"))
+        .icon_name("view-list-symbolic")
         .active(true)
         .tooltip_text(bookie_app_services::tr!("Show or hide query results (Ctrl+J)"))
         .build();
     let sender_results = sender.clone();
     results.connect_clicked(move |_| sender_results.input(SqlEditorInput::Panel(PanelAction::ResultsButton)));
     let errors = gtk::ToggleButton::builder()
-        .label(errors_label(0))
+        .child(&icon_with_count("dialog-warning-symbolic"))
         .tooltip_text(bookie_app_services::tr!("Show the errors of the latest run"))
         .build();
     let sender_errors = sender.clone();
     errors.connect_clicked(move |_| sender_errors.input(SqlEditorInput::Panel(PanelAction::Errors)));
+    set_error_count(&errors, 0);
+    results.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!("Results"))]);
     let switcher = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     switcher.add_css_class("linked");
     switcher.append(&results);

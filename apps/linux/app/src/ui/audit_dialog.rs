@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -26,9 +27,9 @@ fn present_with_operation(parent: &gtk::Window, database: &Arc<DatabaseService>,
     let (dialog, toolbar) = super::dialog_shell::new(&tr!("Audit Log"), 900, 620);
     let search = gtk::SearchEntry::builder()
         .placeholder_text(tr!("Filter by operation id, connection, principal, kind or outcome"))
-        .margin_start(12)
-        .margin_end(12)
-        .margin_bottom(6)
+        .margin_start(spacing::MD)
+        .margin_end(spacing::MD)
+        .margin_bottom(spacing::SM)
         .build();
     if let Some(operation_id) = operation_id {
         search.set_text(&operation_id.to_string());
@@ -43,10 +44,10 @@ fn present_with_operation(parent: &gtk::Window, database: &Arc<DatabaseService>,
     let clamp = adw::Clamp::builder()
         .maximum_size(860)
         .child(&list)
-        .margin_top(6)
-        .margin_bottom(12)
-        .margin_start(12)
-        .margin_end(12)
+        .margin_top(spacing::SM)
+        .margin_bottom(spacing::MD)
+        .margin_start(spacing::MD)
+        .margin_end(spacing::MD)
         .build();
     let scrolled = gtk::ScrolledWindow::builder().vexpand(true).child(&clamp).build();
     let status = adw::StatusPage::builder()
@@ -174,11 +175,11 @@ fn detail(title: &str, value: &str, monospace: bool) -> gtk::Box {
     }
     let container = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
-        .spacing(2)
-        .margin_top(8)
-        .margin_bottom(8)
-        .margin_start(12)
-        .margin_end(12)
+        .spacing(spacing::OPTICAL)
+        .margin_top(spacing::SM)
+        .margin_bottom(spacing::SM)
+        .margin_start(spacing::MD)
+        .margin_end(spacing::MD)
         .build();
     container.append(&heading);
     container.append(&text);

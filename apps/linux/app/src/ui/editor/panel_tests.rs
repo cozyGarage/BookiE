@@ -65,6 +65,31 @@ fn maximizing_and_hiding_restore_the_split_editor_and_divider() {
     window.destroy();
 }
 
+fn switcher_name(toggle: &gtk::ToggleButton) -> Option<&'static str> {
+    let tooltip = toggle.tooltip_text()?;
+    if tooltip.starts_with("Show or hide query results") {
+        Some("Results")
+    } else if tooltip.starts_with("Show the errors") {
+        Some("Errors")
+    } else {
+        None
+    }
+}
+
+fn error_count(toggle: &gtk::ToggleButton) -> String {
+    let label = toggle
+        .child()
+        .and_downcast::<gtk::Box>()
+        .and_then(|content| content.last_child())
+        .and_downcast::<gtk::Label>()
+        .expect("the errors toggle holds a count label");
+    if label.is_visible() {
+        label.label().to_string()
+    } else {
+        String::new()
+    }
+}
+
 #[test]
 #[ignore = "requires an isolated GTK display"]
 fn the_result_switcher_groups_results_and_errors_in_one_linked_strip() {
@@ -79,7 +104,7 @@ fn the_result_switcher_groups_results_and_errors_in_one_linked_strip() {
     let switcher: Vec<gtk::ToggleButton> = widgets
         .iter()
         .filter_map(|widget| widget.clone().downcast::<gtk::ToggleButton>().ok())
-        .filter(|toggle| matches!(toggle.label().as_deref(), Some("Results" | "Errors")))
+        .filter(|toggle| matches!(switcher_name(toggle), Some("Results" | "Errors")))
         .collect();
     assert_eq!(switcher.len(), 2);
     let strip = switcher[0].parent().unwrap();
@@ -95,7 +120,7 @@ fn the_switcher_shows_the_error_count_only_when_there_are_errors_and_marks_the_a
         descendants(fixture.controller.widget().upcast_ref())
             .into_iter()
             .filter_map(|widget| widget.downcast::<gtk::ToggleButton>().ok())
-            .find(|toggle| toggle.label().as_deref() == Some(label))
+            .find(|toggle| switcher_name(toggle) == Some(label))
     };
     let errors = toggle("Errors").unwrap();
     let results = toggle("Results").unwrap();
@@ -104,7 +129,7 @@ fn the_switcher_shows_the_error_count_only_when_there_are_errors_and_marks_the_a
     fixture.controller.model().run_button.emit_clicked();
     let query = fixture.next_query();
     fixture.finish(query, Err(DriverError::Unsupported("fixture failure".into())));
-    assert_eq!(errors.label().as_deref(), Some("Errors (1)"));
+    assert_eq!(error_count(&errors), "1");
     errors.emit_clicked();
     fixture.process_inputs();
     assert!(errors.is_active());
@@ -123,7 +148,7 @@ fn the_results_button_shows_results_after_hiding_errors() {
         descendants(fixture.controller.widget().upcast_ref())
             .into_iter()
             .filter_map(|widget| widget.downcast::<gtk::ToggleButton>().ok())
-            .find(|toggle| toggle.label().as_deref() == Some(label))
+            .find(|toggle| switcher_name(toggle) == Some(label))
     };
     let errors = toggle("Errors").unwrap();
     let results = toggle("Results").unwrap();
@@ -155,7 +180,7 @@ fn the_error_view_retains_results_and_clears_failures_after_success() {
     let errors = descendants(fixture.controller.widget().upcast_ref())
         .into_iter()
         .filter_map(|widget| widget.downcast::<gtk::ToggleButton>().ok())
-        .find(|button| button.label().as_deref() == Some("Errors (1)"))
+        .find(|button| switcher_name(button) == Some("Errors"))
         .unwrap();
     let original = fixture.controller.model().results_holder.first_child().unwrap();
     errors.emit_clicked();
@@ -164,7 +189,7 @@ fn the_error_view_retains_results_and_clears_failures_after_success() {
     fixture.controller.model().run_button.emit_clicked();
     let query = fixture.next_query();
     fixture.finish(query, success());
-    assert_eq!(errors.label().as_deref(), Some("Errors"));
+    assert_eq!(error_count(&errors), "");
     assert_eq!(fixture.calls.load(Ordering::SeqCst), 2);
 }
 

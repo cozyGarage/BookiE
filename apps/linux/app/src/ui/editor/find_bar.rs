@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use relm4::gtk;
 use relm4::gtk::prelude::*;
 use sourceview5::prelude::*;
@@ -278,7 +279,7 @@ fn replace_controls() -> (gtk::Box, gtk::Entry, gtk::Button, gtk::Button) {
 }
 
 fn row_of(widgets: &[&gtk::Widget]) -> gtk::Box {
-    let row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    let row = gtk::Box::new(gtk::Orientation::Horizontal, spacing::SM);
     for widget in widgets {
         row.append(*widget);
     }
@@ -286,11 +287,11 @@ fn row_of(widgets: &[&gtk::Widget]) -> gtk::Box {
 }
 
 fn search_bar(find_row: &gtk::Box, replace_row: &gtk::Box, entry: &gtk::SearchEntry) -> gtk::SearchBar {
-    let column = gtk::Box::new(gtk::Orientation::Vertical, 6);
-    column.set_margin_top(6);
-    column.set_margin_bottom(6);
-    column.set_margin_start(8);
-    column.set_margin_end(8);
+    let column = gtk::Box::new(gtk::Orientation::Vertical, spacing::SM);
+    column.set_margin_top(spacing::SM);
+    column.set_margin_bottom(spacing::SM);
+    column.set_margin_start(spacing::SM);
+    column.set_margin_end(spacing::SM);
     column.append(find_row);
     column.append(replace_row);
     let bar = gtk::SearchBar::new();

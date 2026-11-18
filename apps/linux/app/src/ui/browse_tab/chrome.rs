@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use relm4::{ComponentSender, adw, gtk};
 
 use bookie_app_services::preferences::{MAX_PAGE_SIZE, MIN_PAGE_SIZE};
@@ -62,11 +63,11 @@ impl BrowseTab {
         let copy_selection_button = gtk::Button::with_label(&copy_label);
         let selection_details = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
-            .spacing(8)
-            .margin_top(12)
-            .margin_bottom(12)
-            .margin_start(12)
-            .margin_end(12)
+            .spacing(spacing::SM)
+            .margin_top(spacing::MD)
+            .margin_bottom(spacing::MD)
+            .margin_start(spacing::MD)
+            .margin_end(spacing::MD)
             .build();
         selection_details.append(&selection_details_label);
         selection_details.append(&copy_selection_button);
@@ -77,7 +78,7 @@ impl BrowseTab {
         selection_label.set_child(Some(&selection_count_label));
         selection_label.set_popover(Some(&selection_popover));
         selection_label.set_visible(false);
-        selection_label.set_margin_start(12);
+        selection_label.set_margin_start(spacing::MD);
         let summary_for_copy = selection_details_label.clone();
         copy_selection_button.connect_clicked(move |_| {
             if let Some(display) = gtk::gdk::Display::default() {
@@ -165,7 +166,7 @@ impl BrowseTab {
         filter_badge.add_css_class("dim-label");
         let filter_box = gtk::Box::builder()
             .orientation(gtk::Orientation::Horizontal)
-            .spacing(6)
+            .spacing(spacing::SM)
             .build();
         filter_box.append(&filter_label);
         filter_box.append(&filter_badge);

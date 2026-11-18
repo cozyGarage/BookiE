@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use std::path::PathBuf;
 
 use crate::services::csv_import_mappings::{CsvMappingScope, CsvMappingStore};
@@ -630,7 +631,7 @@ struct MappingActionsParams {
 }
 
 fn add_mapping_controls(group: &adw::PreferencesGroup, params: MappingActionsParams) {
-    let actions = gtk::Box::builder().spacing(6).build();
+    let actions = gtk::Box::builder().spacing(spacing::SM).build();
     let remember = gtk::Button::with_label(&bookie_app_services::tr!("Remember mapping"));
     let restore = gtk::Button::with_label(&bookie_app_services::tr!("Restore mapping"));
     let forget = gtk::Button::with_label(&bookie_app_services::tr!("Forget mapping"));
@@ -1016,22 +1017,15 @@ fn build_dialog(page: &adw::PreferencesPage, start_button: &gtk::Button) -> adw:
     let footer = gtk::Box::builder()
         .orientation(gtk::Orientation::Horizontal)
         .halign(gtk::Align::End)
-        .margin_top(6)
-        .margin_bottom(12)
-        .margin_start(12)
-        .margin_end(12)
+        .margin_top(spacing::SM)
+        .margin_bottom(spacing::MD)
+        .margin_start(spacing::MD)
+        .margin_end(spacing::MD)
         .build();
     footer.append(start_button);
-    let toolbar = adw::ToolbarView::new();
-    toolbar.add_top_bar(&adw::HeaderBar::new());
+    let (dialog, toolbar) = super::dialog_shell::new(&bookie_app_services::tr!("Import CSV"), 560, 680);
     toolbar.set_content(Some(page));
     toolbar.add_bottom_bar(&footer);
-    let dialog = adw::Dialog::builder()
-        .title(bookie_app_services::tr!("Import CSV"))
-        .content_width(560)
-        .content_height(680)
-        .child(&toolbar)
-        .build();
     dialog.set_default_widget(Some(start_button));
     dialog
 }

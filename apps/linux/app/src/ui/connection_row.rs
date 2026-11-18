@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use relm4::adw::prelude::*;
 use relm4::factory::{DynamicIndex, FactoryComponent, FactorySender};
 use relm4::{adw, gtk};
@@ -194,7 +195,7 @@ fn connection_actions(sender: FactorySender<ConnectionRow>) -> gtk::MenuButton {
         "Connection actions"
     ))]);
     let popover = gtk::Popover::new();
-    let content = gtk::Box::new(gtk::Orientation::Vertical, 2);
+    let content = gtk::Box::new(gtk::Orientation::Vertical, spacing::OPTICAL);
     for (label, message) in [
         (bookie_app_services::tr!("Group and tags"), ConnectionRowMsg::Organize),
         (bookie_app_services::tr!("Edit connection"), ConnectionRowMsg::Edit),

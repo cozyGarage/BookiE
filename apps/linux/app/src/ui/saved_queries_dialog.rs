@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use relm4::adw::prelude::*;
 use relm4::prelude::*;
 use relm4::{adw, gtk};
@@ -488,10 +489,10 @@ fn build_dialog_widgets(root: &adw::Dialog, sender: &ComponentSender<SavedQuerie
 fn build_search(sender: &ComponentSender<SavedQueriesDialog>) -> gtk::SearchEntry {
     let search = gtk::SearchEntry::builder()
         .placeholder_text(bookie_app_services::tr!("Search saved queries"))
-        .margin_top(12)
-        .margin_bottom(6)
-        .margin_start(12)
-        .margin_end(12)
+        .margin_top(spacing::MD)
+        .margin_bottom(spacing::SM)
+        .margin_start(spacing::MD)
+        .margin_end(spacing::MD)
         .build();
     search.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!(
         "Search saved queries"
@@ -509,16 +510,16 @@ fn build_folder_controls(sender: &ComponentSender<SavedQueriesDialog>) -> (gtk::
     folder_filter.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!(
         "Filter by folder"
     ))]);
-    folder_filter.set_margin_start(12);
-    folder_filter.set_margin_end(12);
-    folder_filter.set_margin_bottom(6);
+    folder_filter.set_margin_start(spacing::MD);
+    folder_filter.set_margin_end(spacing::MD);
+    folder_filter.set_margin_bottom(spacing::SM);
     let folder_sender = sender.clone();
     folder_filter.connect_selected_notify(move |_| folder_sender.input(SavedQueriesInput::FolderChanged));
     let folder_actions = gtk::Box::builder()
         .orientation(gtk::Orientation::Horizontal)
-        .spacing(6)
-        .margin_start(12)
-        .margin_end(12)
+        .spacing(spacing::SM)
+        .margin_start(spacing::MD)
+        .margin_end(spacing::MD)
         .build();
     append_action(
         &folder_actions,
@@ -547,10 +548,10 @@ fn build_query_list() -> (gtk::ListBox, gtk::Stack, adw::StatusPage) {
         .css_classes(["boxed-list"])
         .build();
     let group = adw::PreferencesGroup::builder()
-        .margin_top(6)
-        .margin_bottom(12)
-        .margin_start(12)
-        .margin_end(12)
+        .margin_top(spacing::SM)
+        .margin_bottom(spacing::MD)
+        .margin_start(spacing::MD)
+        .margin_end(spacing::MD)
         .build();
     group.add(&listbox);
     let status_page = adw::StatusPage::builder().icon_name("starred-symbolic").build();

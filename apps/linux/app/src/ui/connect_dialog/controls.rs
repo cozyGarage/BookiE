@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
@@ -46,7 +47,7 @@ impl AccessibleChoice {
 
 fn dropdown_button(first: Option<&str>) -> (gtk::MenuButton, gtk::Label) {
     let text = gtk::Label::new(first);
-    let content = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    let content = gtk::Box::new(gtk::Orientation::Horizontal, spacing::SM);
     content.append(&text);
     content.append(&gtk::Image::from_icon_name("pan-down-symbolic"));
     let button = gtk::MenuButton::builder().child(&content).build();
@@ -57,8 +58,8 @@ fn dropdown_button(first: Option<&str>) -> (gtk::MenuButton, gtk::Label) {
 
 pub(super) fn center_in_row(widget: &impl IsA<gtk::Widget>) {
     widget.set_valign(gtk::Align::Center);
-    widget.set_margin_top(8);
-    widget.set_margin_bottom(8);
+    widget.set_margin_top(spacing::SM);
+    widget.set_margin_bottom(spacing::SM);
 }
 
 pub(super) fn choice_row(
@@ -103,7 +104,7 @@ fn choice_item(
     selection: &AccessibleChoice,
     popover: &gtk::Popover,
 ) -> gtk::Button {
-    let content = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    let content = gtk::Box::new(gtk::Orientation::Horizontal, spacing::SM);
     let text = gtk::Label::builder().label(label).xalign(0.0).hexpand(true).build();
     content.append(&text);
     content.append(marker);

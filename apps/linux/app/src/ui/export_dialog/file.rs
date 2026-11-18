@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use adw::prelude::*;
 use bookie_core::export::{CsvOptions, ExportError, ResultExport, ResultFormat, SqlTarget};
 use relm4::{adw, gtk};
@@ -167,11 +168,11 @@ fn build_progress_dialog(cancel: &CancellationToken, paged: bool) -> (adw::Dialo
     let stop = gtk::Button::with_label(&bookie_app_services::tr!("Cancel"));
     let content = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
-        .spacing(12)
-        .margin_top(24)
-        .margin_bottom(24)
-        .margin_start(24)
-        .margin_end(24)
+        .spacing(spacing::MD)
+        .margin_top(spacing::XL)
+        .margin_bottom(spacing::XL)
+        .margin_start(spacing::XL)
+        .margin_end(spacing::XL)
         .build();
     content.append(&label);
     content.append(&progress);

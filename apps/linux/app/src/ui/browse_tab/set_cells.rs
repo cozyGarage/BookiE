@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use relm4::ComponentSender;
 use relm4::gtk::{self, glib};
 
@@ -185,7 +186,7 @@ impl BrowseTab {
         null_check.connect_toggled(move |check| entry_for_toggle.set_sensitive(!check.is_active()));
         let extra = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
-            .spacing(8)
+            .spacing(spacing::SM)
             .build();
         extra.append(&entry);
         extra.append(&null_check);

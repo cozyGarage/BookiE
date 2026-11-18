@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use std::cell::Cell;
 use std::rc::Rc;
 
@@ -19,10 +20,10 @@ impl TransactionActions {
             .selection_mode(gtk::SelectionMode::None)
             .min_children_per_line(1)
             .max_children_per_line(3)
-            .column_spacing(6)
-            .row_spacing(4)
-            .margin_start(8)
-            .margin_end(8)
+            .column_spacing(spacing::grid(spacing::SM))
+            .row_spacing(spacing::grid(spacing::XS))
+            .margin_start(spacing::SM)
+            .margin_end(spacing::SM)
             .visible(false)
             .build();
         row.set_widget_name("editor-transaction-actions");
