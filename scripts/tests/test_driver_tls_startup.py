@@ -103,10 +103,18 @@ if any(action in args for action in ["ps", "inspect", "logs"]):
             docker = binary / "docker"
             docker.write_text(r"""#!/usr/bin/env python3
 import os, sys
+from pathlib import Path
 args = sys.argv[1:]
 with open(os.environ["TLS_COMMAND_LOG"], "a") as stream:
     stream.write(" ".join(args) + "\n")
-if args[-3:] == ["port", "redis", "6379"]:
+if args[-3:] == ["ps", "--all", "--quiet"]:
+    print("fixture-owned-id")
+elif args[:1] == ["inspect"]:
+    state = Path(os.environ["TLS_STATE_FILE"])
+    count = int(state.read_text()) if state.exists() else 0
+    state.write_text(str(count + 1))
+    print("starting" if count == 0 else "healthy")
+elif args[-3:] == ["port", "redis", "6379"]:
     print("0.0.0.0:46123")
 """)
             cargo = binary / "cargo"
@@ -114,17 +122,23 @@ if args[-3:] == ["port", "redis", "6379"]:
                 "#!/usr/bin/env python3\n"
                 "import os\n"
                 "with open(os.environ['TLS_REDIS_PORTS'], 'a') as stream:\n"
-                "    stream.write(os.environ.get('BOOKIE_DRIVER_TLS_REDIS_PORT', '') + '\\n')\n",
+                "    stream.write(os.environ.get('BOOKIE_DRIVER_TLS_REDIS_PORT', '') + '\\n')\n"
+                "with open(os.environ['TLS_COMMAND_LOG'], 'a') as stream:\n"
+                "    stream.write('cargo\\n')\n",
                 encoding="utf-8",
             )
+            delay = binary / "sleep"
+            delay.write_text("#!/bin/sh\nexit 0\n")
             docker.chmod(0o755)
             cargo.chmod(0o755)
+            delay.chmod(0o755)
             result = subprocess.run(
                 ["bash", str(root / "scripts/test-driver-tls.sh")],
                 env=clean_test_environment(
                     PATH=f"{binary}:{os.environ['PATH']}",
                     TLS_COMMAND_LOG=str(commands),
                     TLS_REDIS_PORTS=str(root / "redis-ports"),
+                    TLS_STATE_FILE=str(root / "health"),
                     BOOKIE_FIXTURE_KEEP_UP="0",
                 ),
                 text=True,
@@ -138,6 +152,10 @@ if args[-3:] == ["port", "redis", "6379"]:
                 (root / "redis-ports").read_text(encoding="utf-8").splitlines(),
                 ["46123", "46123"],
             )
+            recorded = commands.read_text(encoding="utf-8").splitlines()
+            healthchecks = [i for i, line in enumerate(recorded) if "inspect --format" in line]
+            self.assertEqual(len(healthchecks), 2)
+            self.assertLess(max(healthchecks), recorded.index("cargo"))
 
     def test_private_runner_umask_keeps_seeds_readable_and_certificate_material_private(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -156,6 +174,10 @@ import os, sys
 from pathlib import Path
 if sys.argv[-3:] == ["port", "redis", "6379"]:
     print("0.0.0.0:46123")
+if sys.argv[-3:] == ["ps", "--all", "--quiet"]:
+    print("fixture-owned-id")
+if sys.argv[1:2] == ["inspect"]:
+    print("healthy")
 if "up" in sys.argv:
     seed = Path(os.environ["TLS_FIXTURE_ROOT"]) / "seed"
     if seed.stat().st_mode & 0o005 != 0o005 or not (seed / "01-seed.js").stat().st_mode & 0o004:

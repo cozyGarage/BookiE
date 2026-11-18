@@ -36,6 +36,24 @@ compose() {
     --project-directory "$FIXTURE" -f "$FIXTURE/docker-compose.yml" "$@"
 }
 
+wait_for_fixture_health() {
+  local deadline=$((SECONDS + 300))
+  local containers container status ready
+  containers="$(compose ps --all --quiet)"
+  [[ -n "$containers" ]] || return 1
+  while :; do
+    ready=1
+    while IFS= read -r container; do
+      [[ -n "$container" ]] || continue
+      status="$(docker inspect --format '{{.State.Health.Status}}' "$container" 2>/dev/null || true)"
+      [[ "$status" == healthy ]] || ready=0
+    done <<< "$containers"
+    [[ "$ready" == 1 ]] && return 0
+    (( SECONDS < deadline )) || return 1
+    sleep 2
+  done
+}
+
 teardown() {
   if [[ "$KEEP_UP" == "1" ]]; then
     echo "leaving the driver-tls fixture running (BOOKIE_FIXTURE_KEEP_UP=1)"
@@ -50,9 +68,11 @@ chmod 0755 "$FIXTURE/seed"
 chmod 0644 "$FIXTURE/seed/01-seed.js"
 compose down --volumes --remove-orphans >/dev/null 2>&1 || true
 if compose up -d --build --wait --wait-timeout 300; then
-  :
+  wait_for_fixture_health || startup_status=$?
 else
   startup_status=$?
+fi
+if [[ "${startup_status:-0}" != 0 ]]; then
   compose ps --all || true
   for container in $(compose ps --all --quiet); do
     docker inspect --format '{{json .State.Health}}' "$container" || true
