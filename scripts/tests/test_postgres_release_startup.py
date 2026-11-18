@@ -181,6 +181,14 @@ exit 99
         self.assertIn("options: --add-host=host.docker.internal:host-gateway", job)
         self.assertIn("BOOKIE_FIXTURE_HOST: host.docker.internal", job)
 
+    def test_release_cleanup_removes_fixture_contents_without_removing_mount_root(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        job = workflow.split("  pg-release:\n", 1)[1].split("  distro-floor-scenarios:\n", 1)[0]
+        cleanup = job.split("- name: Remove shared PostgreSQL fixture files", 1)[1]
+
+        self.assertIn("find /var/tmp/bookie-pg-release-fixtures -mindepth 1 -maxdepth 1", cleanup)
+        self.assertNotIn("rm -rf -- /var/tmp/bookie-pg-release-fixtures", cleanup)
+
     def test_release_waits_for_the_bastion_ssh_service(self):
         script = (ROOT / "scripts/test-postgres-release.sh").read_text()
         self.assertIn('ssh-keyscan -T 1 -p "$port" "$host"', script)
