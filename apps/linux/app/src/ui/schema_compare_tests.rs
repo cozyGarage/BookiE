@@ -41,8 +41,14 @@ fn an_incomplete_read_refuses_the_comparison_instead_of_reporting_false_drops() 
     assert!(
         both_complete(&complete, &truncated)
             .unwrap_err()
-            .contains("more tables")
+            .contains("could not be read completely")
     );
+    let metadata_limited = SchemaRead {
+        total_tables: 1,
+        metadata_limit_reached: true,
+        ..SchemaRead::default()
+    };
+    assert!(both_complete(&metadata_limited, &complete).is_err());
     let unreadable = SchemaRead {
         total_tables: 1,
         skipped: vec!["secret_table".into()],

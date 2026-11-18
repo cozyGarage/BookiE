@@ -560,7 +560,11 @@ fn connect_selection(list: &gtk::ListBox, canvas: &DiagramCanvas) {
 
 fn notice_text(read: &SchemaRead) -> String {
     let mut parts = Vec::new();
-    if read.truncated() {
+    if read.metadata_limit_reached {
+        parts.push(tr!(
+            "The diagram is incomplete because schema metadata reached the 64 MiB estimated limit."
+        ));
+    } else if read.truncated() {
         parts.push(
             tr!("Showing the first {shown} of {total} tables.")
                 .replace("{shown}", &read.reads.len().to_string())
