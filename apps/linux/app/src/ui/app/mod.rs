@@ -836,13 +836,10 @@ impl SimpleComponent for App {
             AppMsg::FetchBrowseColumns(tab_id) => self.fetch_browse_columns(tab_id, sender),
             AppMsg::FetchBrowseRowCount(tab_id) => self.fetch_browse_row_count(tab_id, sender),
             AppMsg::WorkspaceTabsChanged => self.on_workspace_tabs_changed(sender),
-            AppMsg::EditorTemporaryTablesChanged(tab_id, tables) => {
-                if tables.is_empty() {
-                    self.temporary_tables_by_tab.remove(&tab_id);
-                } else {
-                    self.temporary_tables_by_tab.insert(tab_id, tables);
+            AppMsg::EditorTemporaryTablesChanged(tab_id, result) => {
+                if sidebar_state::apply_temporary_tables_refresh(&mut self.temporary_tables_by_tab, tab_id, result) {
+                    self.sync_sidebar_temporary_tables(sender);
                 }
-                self.sync_sidebar_temporary_tables(sender);
             }
             AppMsg::FocusWorkingSession(id) => self.focus_working_session(id, sender),
             AppMsg::SwitchToRecentTab => self.on_switch_to_recent_tab(),

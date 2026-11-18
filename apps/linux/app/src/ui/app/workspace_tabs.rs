@@ -1026,7 +1026,7 @@ fn editor_output(tab_id: Uuid, output: SqlEditorOutput) -> AppMsg {
             schema: None,
             table: None,
         },
-        SqlEditorOutput::TemporaryTablesChanged(tables) => AppMsg::EditorTemporaryTablesChanged(tab_id, tables),
+        SqlEditorOutput::TemporaryTablesChanged(result) => AppMsg::EditorTemporaryTablesChanged(tab_id, result),
         SqlEditorOutput::RunStateChanged(running) => AppMsg::EditorTabRunStateChanged(tab_id, running),
         SqlEditorOutput::QueryChanged(text) => AppMsg::EditorTabQueryChanged(tab_id, text),
         SqlEditorOutput::CopyToClipboard(text) => AppMsg::CopyToClipboard(text),

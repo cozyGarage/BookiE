@@ -268,7 +268,7 @@ pub enum AppMsg {
     CloseOtherWorkspaceTabs(Uuid),
     CloseWorkspaceTabsToRight(Uuid),
     WorkspaceTabsChanged,
-    EditorTemporaryTablesChanged(Uuid, Vec<bookie_core::TableInfo>),
+    EditorTemporaryTablesChanged(Uuid, Result<Vec<bookie_core::TableInfo>, String>),
     SwitchToRecentTab,
     EndRecentTabWalk,
     ExecuteBrowseTransaction {
