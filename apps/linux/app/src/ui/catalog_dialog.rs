@@ -74,7 +74,7 @@ pub fn present(
     let status = gtk::Label::builder().xalign(0.0).build();
     status.add_css_class("dim-label");
     toolbar.set_content(Some(&catalog_layout(&kinds, &schema, &list, &status)));
-    crate::ui::dialog_zoom::install(&toolbar);
+    crate::ui::dialog_zoom::install(&toolbar, &[list.clone().upcast()]);
     dialog.set_child(Some(&toolbar));
 
     let reload = reload_action(&source, &kinds, &schema, &list, &status);

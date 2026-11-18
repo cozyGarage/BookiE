@@ -19,12 +19,14 @@ pub(crate) fn css_class(level: i32) -> Option<String> {
     }
 }
 
-fn apply(root: &gtk::Widget, from: i32, to: i32) {
-    if let Some(class) = css_class(from) {
-        root.remove_css_class(&class);
-    }
-    if let Some(class) = css_class(to) {
-        root.add_css_class(&class);
+fn apply(targets: &[gtk::Widget], from: i32, to: i32) {
+    for target in targets {
+        if let Some(class) = css_class(from) {
+            target.remove_css_class(&class);
+        }
+        if let Some(class) = css_class(to) {
+            target.add_css_class(&class);
+        }
     }
 }
 
@@ -37,18 +39,18 @@ fn key_delta(key: gdk::Key) -> Option<Option<i32>> {
     }
 }
 
-pub(crate) fn install(root: &impl IsA<gtk::Widget>) {
-    let root = root.clone().upcast::<gtk::Widget>();
+pub(crate) fn install(shortcut_root: &impl IsA<gtk::Widget>, zoomed_result_views: &[gtk::Widget]) {
+    let root = shortcut_root.clone().upcast::<gtk::Widget>();
+    let targets: Vec<gtk::Widget> = zoomed_result_views.to_vec();
     let level = Rc::new(Cell::new(0));
     let change = {
-        let root = root.clone();
         let level = level.clone();
         move |delta: Option<i32>| {
             let before = level.get();
             let after = delta.map_or(0, |delta| step(before, delta));
             if after != before {
                 level.set(after);
-                apply(&root, before, after);
+                apply(&targets, before, after);
             }
         }
     };

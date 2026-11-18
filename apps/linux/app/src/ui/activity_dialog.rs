@@ -79,7 +79,7 @@ fn build_activity_dialog() -> (adw::Dialog, adw::WrapBox, gtk::TextView, gtk::La
     box_.append(&scrolled);
     box_.append(&status);
     toolbar.set_content(Some(&box_));
-    crate::ui::dialog_zoom::install(&toolbar);
+    crate::ui::dialog_zoom::install(&toolbar, &[scrolled.clone().upcast()]);
     dialog.set_child(Some(&toolbar));
     (dialog, button_row, text, status)
 }
