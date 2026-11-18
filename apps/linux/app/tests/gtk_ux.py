@@ -33,6 +33,12 @@ ATSPI_WINDOW_Y_OFFSET = gtk_input.window_y_offset()
 ATSPI_WINDOW_X_OFFSET = gtk_input.window_x_offset()
 
 
+def postgres_ssh_audit_address():
+    host = os.environ.get("BOOKIE_GTK_POSTGRES_SSH_AUDIT_HOST", "127.0.0.1")
+    port = os.environ["BOOKIE_GTK_POSTGRES_SSH_AUDIT_PORT"]
+    return f"{host}:{port}"
+
+
 def capture_grid_navigation_artifact(_name):
     folder = os.environ.get("BOOKIE_GTK_ARTIFACT_DIR")
     scrot, imagemagick = shutil.which("scrot"), shutil.which("import")
@@ -2463,7 +2469,7 @@ GLib.MainLoop().run()
         connection_id = ui.POSTGRES_SSH_AUDIT_CONNECTION_ID
         ui.open_saved_connection(name)
         prompt = ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles)
-        ui.wait_for_node_containing("127.0.0.1:2223")
+        ui.wait_for_node_containing(postgres_ssh_audit_address())
         ui.invoke(ui.wait_within(prompt, name="Cancel", role=pyatspi.ROLE_PUSH_BUTTON))
         ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles, present=False)
         ui.wait_for_node(name="Connection failed")
@@ -2493,7 +2499,7 @@ GLib.MainLoop().run()
 
     def trust_postgres_ssh_chain():
         prompt = ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles)
-        ui.wait_for_node_containing("127.0.0.1:2223")
+        ui.wait_for_node_containing(postgres_ssh_audit_address())
         ui.invoke(ui.wait_within(prompt, name="Trust", role=pyatspi.ROLE_PUSH_BUTTON))
         ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles, present=False)
         jump_host = os.environ.get("BOOKIE_GTK_POSTGRES_SSH_AUDIT_JUMP_HOST")
@@ -2551,7 +2557,7 @@ GLib.MainLoop().run()
         name = ui.POSTGRES_SSH_AUDIT_CONNECTION_NAME
         ui.open_saved_connection(name)
         first_prompt = ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles)
-        ui.wait_for_node_containing("127.0.0.1:2223")
+        ui.wait_for_node_containing(postgres_ssh_audit_address())
         ui.invoke(ui.wait_within(first_prompt, name="Trust", role=pyatspi.ROLE_PUSH_BUTTON))
         ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles, present=False)
 
@@ -2594,7 +2600,7 @@ GLib.MainLoop().run()
 
         ui.open_saved_connection(name)
         first_prompt = ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles)
-        ui.wait_for_node_containing("127.0.0.1:2223")
+        ui.wait_for_node_containing(postgres_ssh_audit_address())
         ui.invoke(ui.wait_within(first_prompt, name="Trust", role=pyatspi.ROLE_PUSH_BUTTON))
         ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles, present=False)
         ui.wait_for_node(name="Connection failed")
