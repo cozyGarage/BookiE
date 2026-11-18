@@ -1285,10 +1285,10 @@ impl GridView {
 
     fn result_header(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
         let run_tabs = self
-            .runs
+            .run_tabs.slots
             .iter()
             .enumerate()
-            .map(|(index, slot)| self.result_tab_item(index, &slot.run, index == self.active_run, theme, cx));
+            .map(|(index, slot)| self.result_tab_item(index, &slot.run, index == self.run_tabs.active, theme, cx));
         div()
             .flex()
             .items_center()
@@ -1309,7 +1309,7 @@ impl GridView {
                     .min_w_0()
                     .gap_1()
                     .overflow_x_scroll()
-                    .track_scroll(&self.run_scroll)
+                    .track_scroll(&self.run_tabs.scroll)
                     .children(run_tabs),
             )
             .child(self.result_view_switch("view-table", "Table Data", ResultView::Table, theme, cx))
@@ -1388,12 +1388,12 @@ impl GridView {
         if self.panel.view == ResultView::Messages {
             self.result_messages_body(theme)
         } else if let Some(slot) = self
-            .runs
-            .get(self.active_run)
+            .run_tabs.slots
+            .get(self.run_tabs.active)
             .filter(|_| self.panel.view == ResultView::Summary)
         {
             self.result_summary_body(&slot.run)
-        } else if self.runs.is_empty() {
+        } else if self.run_tabs.slots.is_empty() {
             div().flex_1().p_4().child("No results")
         } else {
             grid

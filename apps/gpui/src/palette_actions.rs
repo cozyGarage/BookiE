@@ -230,17 +230,17 @@ impl GridView {
             action(
                 "previous-run",
                 "Previous result",
-                matches!(self.tabs.current(), Tab::Query) && !self.runs.is_empty() && self.active_run > 0,
+                matches!(self.tabs.current(), Tab::Query) && !self.run_tabs.slots.is_empty() && self.run_tabs.active > 0,
             ),
             action(
                 "next-run",
                 "Next result",
-                matches!(self.tabs.current(), Tab::Query) && self.active_run + 1 < self.runs.len(),
+                matches!(self.tabs.current(), Tab::Query) && self.run_tabs.active + 1 < self.run_tabs.slots.len(),
             ),
             action(
                 "close-run",
                 "Close current result",
-                matches!(self.tabs.current(), Tab::Query) && !self.runs.is_empty(),
+                matches!(self.tabs.current(), Tab::Query) && !self.run_tabs.slots.is_empty(),
             ),
             action(
                 "results",
@@ -453,9 +453,9 @@ impl GridView {
             }
             "run" => self.run_query(cx),
             "explain" => self.explain_query(cx),
-            "previous-run" => self.activate_run(self.active_run - 1),
-            "next-run" => self.activate_run(self.active_run + 1),
-            "close-run" => self.close_run(self.active_run),
+            "previous-run" => self.activate_run(self.run_tabs.active - 1),
+            "next-run" => self.activate_run(self.run_tabs.active + 1),
+            "close-run" => self.close_run(self.run_tabs.active),
             "results" => self.panel.open = !self.panel.open,
             "table" => {
                 let name = self.catalog.grid_table.clone();
