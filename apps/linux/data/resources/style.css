@@ -245,26 +245,17 @@ columnview > header .tp-column-header-selected {
   font-size: 100%;
 }
 
-/* Compact SQL editor toolbar matching DBX and TablePro */
+/* Compact SQL editor toolbar: size comes from the control tokens, with vertical padding so text never touches the edge */
 .tp-editor-toolbar button,
 .tp-editor-toolbar menubutton > button {
-  min-height: 24px;
-  padding: 0 6px;
-  -gtk-icon-size: 14px;
-}
-
-.tp-editor-toolbar {
-  font-size: 0.92em;
-}
-
-.tp-editor-toolbar .linked > button.suggested-action,
-.tp-editor-toolbar .linked > menubutton.suggested-action > button {
-  min-height: 24px;
+  min-height: calc(var(--bookie-control-height) - 2 * var(--bookie-pad-y));
+  padding: var(--bookie-pad-y) var(--bookie-pad-x);
+  -gtk-icon-size: var(--bookie-icon-size);
 }
 
 .tp-editor-toolbar .linked > menubutton.suggested-action > button {
-  padding-left: 3px;
-  padding-right: 3px;
+  padding-left: var(--bookie-pad-y);
+  padding-right: var(--bookie-pad-y);
 }
 
 list.tp-sidebar-item,
@@ -298,6 +289,8 @@ list.tp-sidebar-item > row:selected {
   --bookie-radius-surface: 6px;
   --bookie-control-height: 24px;
   --bookie-icon-size: 14px;
+  --bookie-pad-x: 8px;
+  --bookie-pad-y: 2px;
 }
 
 button,

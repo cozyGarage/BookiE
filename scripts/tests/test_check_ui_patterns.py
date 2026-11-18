@@ -16,11 +16,12 @@ class UiPatternTests(unittest.TestCase):
             path.write_text(source)
             return checker.count(path)
 
-    def test_on_scale_spacing_does_not_count(self):
-        self.assertEqual(self.counted(".margin_top(12)\n.spacing(8)"), {})
+    def test_a_spacing_constant_and_zero_do_not_count(self):
+        self.assertEqual(self.counted(".margin_top(spacing::MD)\n.spacing(0)"), {})
 
-    def test_off_scale_spacing_counts(self):
-        self.assertEqual(self.counted(".margin_top(10)\n.spacing(6)"), {"off-scale-spacing": 2})
+    def test_a_spacing_literal_counts_in_every_form(self):
+        source = ".margin_top(10)\n.spacing(6)\nset_margin_end: 8,\nBox::new(gtk::Orientation::Vertical, 4)"
+        self.assertEqual(self.counted(source), {"literal-spacing": 4})
 
     def test_thread_local_and_toolbar_count(self):
         self.assertEqual(

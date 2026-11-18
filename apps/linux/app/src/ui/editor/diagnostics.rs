@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use adw::prelude::*;
 use bookie_core::sql_diagnostics::{character_range, scan};
 use relm4::{adw, gtk};
@@ -82,7 +83,7 @@ impl Diagnostics {
                             }
                             let list = gtk::Box::builder()
                                 .orientation(gtk::Orientation::Vertical)
-                                .spacing(4)
+                                .spacing(spacing::XS)
                                 .build();
                             for warning in &warnings {
                                 let Some(range) = character_range(&sql, warning.range.clone()) else {

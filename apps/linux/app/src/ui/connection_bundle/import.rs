@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use std::rc::Rc;
 
 use relm4::adw::prelude::*;
@@ -60,7 +61,7 @@ fn build_plan_body(list: &gtk::ListBox, replace: &adw::SwitchRow, carries_secret
         .build();
     let body = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
-        .spacing(12)
+        .spacing(spacing::MD)
         .build();
     body.append(&scroller);
     body.append(&options);

@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use relm4::adw::prelude::*;
 use relm4::{ComponentSender, adw, gtk};
 use uuid::Uuid;
@@ -61,11 +62,11 @@ pub(super) fn build_database_popover(popover: &gtk::Popover, sender: &ComponentS
         .build();
     let content = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
-        .spacing(6)
-        .margin_top(6)
-        .margin_bottom(6)
-        .margin_start(6)
-        .margin_end(6)
+        .spacing(spacing::SM)
+        .margin_top(spacing::SM)
+        .margin_bottom(spacing::SM)
+        .margin_start(spacing::SM)
+        .margin_end(spacing::SM)
         .build();
     content.append(&scroll);
     let create = gtk::Button::builder()
@@ -96,8 +97,8 @@ fn clear(list: &gtk::ListBox) {
 }
 
 fn choice_row(choice: &DatabaseChoice, current: &str, driver_id: &str, sender: &ComponentSender<App>) -> gtk::Box {
-    let row = gtk::Box::new(gtk::Orientation::Horizontal, 4);
-    let content = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    let row = gtk::Box::new(gtk::Orientation::Horizontal, spacing::XS);
+    let content = gtk::Box::new(gtk::Orientation::Horizontal, spacing::SM);
     let label = gtk::Label::builder()
         .label(&choice.name)
         .xalign(0.0)

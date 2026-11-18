@@ -1,4 +1,5 @@
 use super::*;
+use crate::ui::spacing;
 
 pub(super) struct FilterRows {
     pub connection: adw::ComboRow,
@@ -81,7 +82,7 @@ fn reset_button(rows: &FilterRows) -> gtk::Button {
     let button = gtk::Button::builder()
         .label(bookie_app_services::tr!("Reset"))
         .halign(gtk::Align::End)
-        .margin_top(6)
+        .margin_top(spacing::SM)
         .build();
     button.add_css_class("flat");
     let combos = [
@@ -234,11 +235,11 @@ pub(super) fn list_area() -> ListArea {
 
     let list_box = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
-        .spacing(12)
-        .margin_top(12)
-        .margin_bottom(12)
-        .margin_start(12)
-        .margin_end(12)
+        .spacing(spacing::MD)
+        .margin_top(spacing::MD)
+        .margin_bottom(spacing::MD)
+        .margin_start(spacing::MD)
+        .margin_end(spacing::MD)
         .build();
     list_box.append(&pinned_group);
     list_box.append(&list_group);
@@ -269,7 +270,7 @@ pub(super) fn content_stack(scroll: &gtk::ScrolledWindow) -> (gtk::Stack, adw::S
     let stack = gtk::Stack::builder()
         .vhomogeneous(false)
         .vexpand(true)
-        .margin_top(12)
+        .margin_top(spacing::MD)
         .build();
     stack.add_named(scroll, Some("list"));
     stack.add_named(&status_page, Some("empty"));
@@ -302,11 +303,11 @@ pub(super) fn selection_bar(sender: &ComponentSender<HistoryDialog>) -> Selectio
 
     let inner = gtk::Box::builder()
         .orientation(gtk::Orientation::Horizontal)
-        .spacing(8)
-        .margin_top(6)
-        .margin_bottom(6)
-        .margin_start(12)
-        .margin_end(12)
+        .spacing(spacing::SM)
+        .margin_top(spacing::SM)
+        .margin_bottom(spacing::SM)
+        .margin_start(spacing::MD)
+        .margin_end(spacing::MD)
         .build();
     inner.append(&label);
     inner.append(&export_button);

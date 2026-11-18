@@ -24,7 +24,7 @@ GTK uses libadwaita widgets restyled to these tokens in `apps/linux/data/resourc
 
 1. **Write it twice, extract it the third time.** The first and second copy may be written in place. The third copy is the signal to write one shared part, in the same pull request that removes the copies. Do not build the part before the third use.
 2. **Shared parts have one home.** Dialog shell, result view (text, list, table), list row, status line. Zoom, the output font and spacing live in the part, not in each caller.
-3. **Spacing comes from the scale:** 4, 8, 12, 24. A new literal margin or spacing number needs a reason in the pull request.
+3. **Spacing comes from the scale:** `ui::spacing` holds 2, 4, 8, 12, 16, 24 as named constants. A margin or spacing is written as a constant, never a number; a new size is a new constant with a reason in the pull request.
 4. **State is passed in.** No new `thread_local!` or static in UI code. A component takes the few inputs it needs, not the application object.
 5. **One owner per visible fact.** A fix to a banner, a font or a zoom lands once, in the part that owns it.
 6. **Frontends render, services decide** ([ADR 0041](decisions/0041-frontends-render-services-decide.md)). GTK and GPUI share vocabulary and rules, not widget code.

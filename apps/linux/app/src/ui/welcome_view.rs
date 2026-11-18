@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use relm4::adw::prelude::*;
 use relm4::factory::FactoryVecDeque;
 use relm4::prelude::*;
@@ -118,8 +119,8 @@ fn build_recent_section() -> (adw::PreferencesGroup, gtk::FlowBox) {
         .selection_mode(gtk::SelectionMode::None)
         .max_children_per_line(3)
         .homogeneous(true)
-        .row_spacing(8)
-        .column_spacing(8)
+        .row_spacing(spacing::grid(spacing::SM))
+        .column_spacing(spacing::grid(spacing::SM))
         .build();
     let recent_group = adw::PreferencesGroup::builder()
         .title(bookie_app_services::tr!("Recently opened"))
@@ -148,7 +149,7 @@ fn build_header_actions(root: &gtk::Stack, sender: &ComponentSender<WelcomeView>
     import_btn.connect_clicked(move |_| s_import.input(WelcomeViewInput::ImportUrl));
     let header_actions = gtk::Box::builder()
         .orientation(gtk::Orientation::Horizontal)
-        .spacing(6)
+        .spacing(spacing::SM)
         .build();
     let bundle_btn = gtk::MenuButton::builder()
         .icon_name("document-send-symbolic")
@@ -201,11 +202,11 @@ impl SimpleComponent for WelcomeView {
 
         let outer = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
-            .spacing(12)
-            .margin_top(24)
-            .margin_bottom(24)
-            .margin_start(12)
-            .margin_end(12)
+            .spacing(spacing::MD)
+            .margin_top(spacing::XL)
+            .margin_bottom(spacing::XL)
+            .margin_start(spacing::MD)
+            .margin_end(spacing::MD)
             .build();
 
         let (heading, introduction) = build_welcome_header();
@@ -220,7 +221,7 @@ impl SimpleComponent for WelcomeView {
 
         let sections_box = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
-            .spacing(12)
+            .spacing(spacing::MD)
             .build();
 
         outer.append(&heading);
@@ -412,11 +413,11 @@ impl WelcomeView {
                 .build();
             let content = gtk::Box::builder()
                 .orientation(gtk::Orientation::Vertical)
-                .spacing(4)
-                .margin_top(8)
-                .margin_bottom(8)
-                .margin_start(8)
-                .margin_end(8)
+                .spacing(spacing::XS)
+                .margin_top(spacing::SM)
+                .margin_bottom(spacing::SM)
+                .margin_start(spacing::SM)
+                .margin_end(spacing::SM)
                 .build();
             content.append(&name);
             content.append(&detail);

@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -142,7 +143,7 @@ fn catalog_layout(
 ) -> gtk::Box {
     let filters = gtk::Box::builder()
         .orientation(gtk::Orientation::Horizontal)
-        .spacing(8)
+        .spacing(spacing::SM)
         .build();
     filters.append(kinds);
     filters.append(schema);
@@ -153,11 +154,11 @@ fn catalog_layout(
         .build();
     let content = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
-        .spacing(12)
-        .margin_start(12)
-        .margin_end(12)
-        .margin_top(12)
-        .margin_bottom(12)
+        .spacing(spacing::MD)
+        .margin_start(spacing::MD)
+        .margin_end(spacing::MD)
+        .margin_top(spacing::MD)
+        .margin_bottom(spacing::MD)
         .build();
     content.append(&filters);
     content.append(&scrolled);
