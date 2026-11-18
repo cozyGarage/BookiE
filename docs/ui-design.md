@@ -28,3 +28,5 @@ GTK uses libadwaita widgets restyled to these tokens in `apps/linux/data/resourc
 4. **State is passed in.** No new `thread_local!` or static in UI code. A component takes the few inputs it needs, not the application object.
 5. **One owner per visible fact.** A fix to a banner, a font or a zoom lands once, in the part that owns it.
 6. **Frontends render, services decide** ([ADR 0041](decisions/0041-frontends-render-services-decide.md)). GTK and GPUI share vocabulary and rules, not widget code.
+
+`scripts/check-ui-patterns.py` holds rules 3 and 4, and hand-built dialog frames, at their current counts in `baselines/ui-pattern-baselines.txt`. Lower a count when you remove one; never raise it.
