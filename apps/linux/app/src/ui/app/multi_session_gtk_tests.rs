@@ -48,6 +48,8 @@ fn launch(directory: &std::path::Path) -> relm4::Controller<App> {
 fn prepared_notes_connection(
     path: &std::path::Path,
     name: &str,
+    id: uuid::Uuid,
+    host: &str,
     runtime: &tokio::runtime::Runtime,
 ) -> crate::services::connection_service::PreparedConnection {
     use crate::services::database_service::{ConnectionMetadata, ReconnectParams};
@@ -63,12 +65,38 @@ fn prepared_notes_connection(
     runtime
         .block_on(connection.execute("CREATE TABLE notes (id INTEGER PRIMARY KEY, title TEXT)"))
         .unwrap();
+    let saved = bookie_storage::SavedConnection {
+        auth_source: None,
+        id,
+        name: name.into(),
+        driver_id: "sqlite".into(),
+        host: host.into(),
+        port: 0,
+        socket_dir: None,
+        socket_path: None,
+        database: path.to_string_lossy().into_owned(),
+        username: String::new(),
+        use_tls: false,
+        tls_mode: Some(bookie_core::TlsMode::Disabled),
+        tls_root_cert: None,
+        tls_client_cert: None,
+        tls_client_key: None,
+        read_only: false,
+        auth_mode: bookie_core::AuthMode::Password,
+        environment: bookie_core::Environment::Local,
+        ssh: None,
+        last_opened_at: None,
+        connect_timeout_secs: None,
+        query_timeout_secs: None,
+        attached_databases: Vec::new(),
+        tls_strict_encryption: false,
+    };
     crate::services::connection_service::PreparedConnection::new(
         Vec::new(),
         Vec::new(),
         "sqlite".into(),
         ConnectionMetadata {
-            id: uuid::Uuid::new_v4(),
+            id,
             name: name.into(),
             driver_id: "sqlite".into(),
             environment: bookie_core::Environment::Local,
@@ -85,6 +113,10 @@ fn prepared_notes_connection(
             environment: bookie_transport::SshEnvironment::builtin(bookie_ssh::UnknownHostKey::Learn),
         },
     )
+    .with_dial_identity(bookie_app_services::dial_identity::DialIdentity::new(
+        &saved,
+        &secrecy::SecretString::new("test-password".into()),
+    ))
 }
 
 fn open_connection(
@@ -134,8 +166,22 @@ fn two_sessions() -> TwoSessions {
     let controller = launch(directory.path());
     controller.widget().present();
     let _entered = runtime.enter();
-    let first = prepared_notes_connection(&directory.path().join("first.sqlite"), "first", &runtime);
-    let second = prepared_notes_connection(&directory.path().join("second.sqlite"), "second", &runtime);
+    let first_id = uuid::Uuid::new_v4();
+    let second_id = uuid::Uuid::new_v4();
+    let first = prepared_notes_connection(
+        &directory.path().join("first.sqlite"),
+        "first",
+        first_id,
+        "first.host",
+        &runtime,
+    );
+    let second = prepared_notes_connection(
+        &directory.path().join("second.sqlite"),
+        "second",
+        second_id,
+        "second.host",
+        &runtime,
+    );
     let first = open_connection(&controller, first);
     let second = open_connection(&controller, second);
     drop(_entered);
@@ -187,6 +233,49 @@ fn a_save_from_a_background_tab_reaches_its_own_connection_and_not_the_front_one
         titles(&sessions.controller, &sessions.runtime, sessions.first).rows
             == vec![vec![Value::Text("for-first".into())]]
     );
+    assert!(is_empty(&titles(
+        &sessions.controller,
+        &sessions.runtime,
+        sessions.second
+    )));
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn reconnecting_changed_saved_settings_replaces_only_the_target_session() {
+    let sessions = two_sessions();
+    let _entered = sessions.runtime.enter();
+    let replacement = prepared_notes_connection(
+        &sessions._directory.path().join("first-reconnected.sqlite"),
+        "first updated",
+        sessions.first,
+        "first.changed.host",
+        &sessions.runtime,
+    );
+
+    sessions.controller.emit(AppMsg::Connection(ConnectionMessage::Open));
+    spin_until(|| sessions.controller.model().switch.transition == super::super::ConnectionTransition::Connecting);
+    sessions
+        .controller
+        .emit(AppMsg::Connection(ConnectionMessage::Prepared(Box::new(replacement))));
+    spin_until(|| {
+        sessions.controller.model().switch.transition == super::super::ConnectionTransition::AwaitingReconnect
+    });
+    sessions.controller.emit(AppMsg::ReconnectSavedConnection(true));
+
+    spin_until(|| {
+        sessions
+            .controller
+            .model()
+            .database
+            .metadata(sessions.first)
+            .is_some_and(|metadata| metadata.name == "first updated")
+    });
+    let model = sessions.controller.model();
+    assert!(model.multi.sessions.is_working(sessions.first));
+    assert!(model.multi.sessions.is_working(sessions.second));
+    assert!(model.database.is_active(sessions.second));
+    drop(model);
     assert!(is_empty(&titles(
         &sessions.controller,
         &sessions.runtime,

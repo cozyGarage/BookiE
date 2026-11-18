@@ -123,12 +123,13 @@ impl App {
                     }
                 }
                 SessionTeardownAction::Disconnect => {}
-                SessionTeardownAction::ConnectionSwitch => {
+                SessionTeardownAction::ConnectionSwitch | SessionTeardownAction::ReconnectConnection(_) => {
                     self.switch.transition = super::ConnectionTransition::Idle;
                     self.switch.prepared = None;
                     self.pending_database_switch = None;
                     self.switch.saves_pending.clear();
                     self.switch.cancel_audit_was_disabled = None;
+                    self.switch.reconnect_connection = None;
                 }
                 SessionTeardownAction::WindowClose => {
                     self.session_teardown_pending.set(false);
@@ -154,6 +155,9 @@ impl App {
             }
             SessionTeardownAction::Disconnect => self.finish_disconnect(sender),
             SessionTeardownAction::ConnectionSwitch => self.finish_activate_prepared_connection(sender),
+            SessionTeardownAction::ReconnectConnection(connection_id) => {
+                self.finish_reconnect_saved_connection(connection_id, sender)
+            }
             SessionTeardownAction::WindowClose => {
                 self.session_teardown_pending.set(false);
                 self.session_teardown_ready.set(true);

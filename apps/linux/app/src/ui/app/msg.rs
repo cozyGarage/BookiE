@@ -169,6 +169,7 @@ pub enum AppMsg {
     WindowStatePersisted(Result<(), String>),
     WindowStatePersistedForClose(Result<(), String>),
     ConnectionDeleted(Uuid),
+    ReconnectSavedConnection(bool),
     ConfirmSessionTeardown(SessionTeardownAction),
     CancelSessionTeardown(SessionTeardownAction),
     SessionTeardownCompleted {

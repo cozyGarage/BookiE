@@ -341,8 +341,10 @@ mod tests {
         for transition in [
             super::super::ConnectionTransition::Connecting,
             super::super::ConnectionTransition::AwaitingDecision,
+            super::super::ConnectionTransition::AwaitingReconnect,
             super::super::ConnectionTransition::WaitingForRuns,
             super::super::ConnectionTransition::WaitingForSaves,
+            super::super::ConnectionTransition::PreparingReconnect,
         ] {
             let existing = Some((active_connection_id, "active".to_owned()));
             let mut pending = existing.clone();

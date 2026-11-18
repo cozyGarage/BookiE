@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use bookie_app_services::window_sessions::TabConnectionError;
+use bookie_app_services::window_sessions::{TabConnectionError, WindowSessions};
 use bookie_core::Connection;
 use uuid::Uuid;
 
@@ -50,9 +50,20 @@ impl App {
     pub(super) fn teardown_includes(&self, action: super::SessionTeardownAction, tab_id: Uuid) -> bool {
         match action {
             super::SessionTeardownAction::CloseTab(target) => target == tab_id,
+            super::SessionTeardownAction::ReconnectConnection(target) => {
+                self.multi.sessions.connection_for_tab(tab_id) == Some(target)
+            }
             super::SessionTeardownAction::Disconnect => self.disconnect_scope_tabs().contains(&tab_id),
             _ => true,
         }
+    }
+
+    pub(super) fn connection_transition_tabs(&self) -> Vec<Uuid> {
+        transition_scope_tabs(
+            &self.multi.sessions,
+            &self.this_window_tab_ids(),
+            self.switch.reconnect_connection,
+        )
     }
 
     pub(super) fn disconnect_scope_tabs(&self) -> Vec<Uuid> {
@@ -136,5 +147,45 @@ impl App {
                 None
             }
         }
+    }
+}
+
+pub(super) fn transition_scope_tabs(
+    sessions: &WindowSessions,
+    window_tabs: &[Uuid],
+    target: Option<Uuid>,
+) -> Vec<Uuid> {
+    window_tabs
+        .iter()
+        .copied()
+        .filter(|tab| target.is_none_or(|target| sessions.connection_for_tab(*tab) == Some(target)))
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reconnect_scope_contains_only_the_target_connections_tabs() {
+        let first = Uuid::new_v4();
+        let second = Uuid::new_v4();
+        let first_tab = Uuid::new_v4();
+        let second_tab = Uuid::new_v4();
+        let unassigned = Uuid::new_v4();
+        let mut sessions = WindowSessions::default();
+        sessions.open_working(first);
+        sessions.open_working(second);
+        sessions.attach_tab(first_tab, first).unwrap();
+        sessions.attach_tab(second_tab, second).unwrap();
+
+        assert_eq!(
+            transition_scope_tabs(&sessions, &[first_tab, second_tab, unassigned], Some(first)),
+            [first_tab]
+        );
+        assert_eq!(
+            transition_scope_tabs(&sessions, &[first_tab, second_tab, unassigned], None),
+            [first_tab, second_tab, unassigned]
+        );
     }
 }

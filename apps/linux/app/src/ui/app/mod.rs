@@ -79,6 +79,7 @@ pub(crate) enum SessionTeardownAction {
     CloseTab(Uuid),
     Disconnect,
     ConnectionSwitch,
+    ReconnectConnection(Uuid),
     WindowClose,
 }
 
@@ -670,6 +671,7 @@ impl SimpleComponent for App {
                 prepared: None,
                 saves_pending: std::collections::HashMap::new(),
                 cancel_audit_was_disabled: None,
+                reconnect_connection: None,
             },
             grid_close: grid_close::GridCloseState::new(window_handles.grid_edits_ready),
             close_after_save: window_handles.close_after_save,
@@ -768,6 +770,7 @@ impl SimpleComponent for App {
                 lifecycle_messages::window_state_persisted_for_close(self, result)
             }
             AppMsg::ConnectionDeleted(id) => self.on_connection_deleted(id, sender),
+            AppMsg::ReconnectSavedConnection(reconnect) => self.on_reconnect_saved_connection(reconnect, sender),
             AppMsg::ConfirmSessionTeardown(action) => self.prepare_editor_sessions(action, sender),
             AppMsg::CancelSessionTeardown(action) => lifecycle_messages::cancel_session_teardown(self, action),
             AppMsg::SessionTeardownCompleted { action, result } => {

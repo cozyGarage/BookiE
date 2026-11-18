@@ -744,14 +744,6 @@ impl App {
         self.change_trackers.any_pending_in(ids.iter().copied()) || self.structure_trackers.any_pending_in(ids)
     }
 
-    pub(super) fn window_pending_browse_tabs(&self) -> Vec<Uuid> {
-        self.change_trackers.pending_among(self.this_window_tab_ids())
-    }
-
-    pub(super) fn window_pending_structure_tabs(&self) -> Vec<Uuid> {
-        self.structure_trackers.pending_among(self.this_window_tab_ids())
-    }
-
     pub(super) fn teardown_workspace_tabs(&mut self) {
         self.cancel_persist_timer();
         self.do_persist_workspace_state_now();
@@ -881,13 +873,6 @@ impl App {
             slot.page.set_loading(running);
             slot.running = running;
         }
-    }
-
-    pub(super) fn any_editor_running(&self) -> bool {
-        self.workspace_tabs
-            .borrow()
-            .values()
-            .any(|tab| matches!(tab, WorkspaceTab::Editor(slot) if slot.running))
     }
 
     pub(super) fn on_replace_active_tab_query(&mut self, text: String, sender: ComponentSender<Self>) {
