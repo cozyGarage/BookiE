@@ -20,7 +20,11 @@ async fn verify_full_succeeds_against_the_certificate_hostname() {
 async fn verify_full_rejects_a_hostname_outside_the_certificate() {
     let fixture = Fixture::from_env();
     let error = PgDriver
-        .connect(fixture.direct_options("127.0.0.1", TlsMode::VerifyFull, Some(fixture.ca_cert.clone())))
+        .connect(fixture.direct_options(
+            &fixture.proxy_bind_address,
+            TlsMode::VerifyFull,
+            Some(fixture.ca_cert.clone()),
+        ))
         .await
         .err()
         .expect("verify full must reject an address that the certificate does not name");
