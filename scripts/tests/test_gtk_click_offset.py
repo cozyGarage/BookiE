@@ -124,5 +124,23 @@ class GtkArtifactNameTests(unittest.TestCase):
                     self.assertFalse(any(value in str(path) for value in values))
 
 
+class GtkPostgresSshAddressTests(unittest.TestCase):
+    def setUp(self):
+        spec = importlib.util.spec_from_file_location("gtk_ux", ROOT / "apps/linux/app/tests/gtk_ux.py")
+        self.ui = importlib.util.module_from_spec(spec)
+        with patch.dict(sys.modules, {"gtk_input": gtk_input, "keyboard_paths": Mock()}):
+            spec.loader.exec_module(self.ui)
+
+    def test_prompt_expectation_uses_the_configured_fixture_host_and_port(self):
+        with patch.dict(
+            os.environ,
+            {
+                "BOOKIE_GTK_POSTGRES_SSH_AUDIT_HOST": "host.docker.internal",
+                "BOOKIE_GTK_POSTGRES_SSH_AUDIT_PORT": "2223",
+            },
+        ):
+            self.assertEqual(self.ui.postgres_ssh_audit_address(), "host.docker.internal:2223")
+
+
 if __name__ == "__main__":
     unittest.main()
