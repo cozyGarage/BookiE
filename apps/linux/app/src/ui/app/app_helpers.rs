@@ -43,12 +43,7 @@ impl App {
         }
     }
 
-    /// The active driver id, or "postgres" if no connection is active.
-    ///
-    /// Single fallback site (was duplicated at 7 call sites). The
-    /// tracing::warn! makes the latent bug visible if anything ever
-    /// asks for the driver id without an active connection — today
-    /// that would silently corrupt SQL quoting on non-Postgres drivers.
+    /// The fallback is logged because PostgreSQL quoting can change non-PostgreSQL SQL.
     pub(super) fn driver_id(&self) -> &str {
         match self.current_driver_id.as_deref() {
             Some(id) => id,

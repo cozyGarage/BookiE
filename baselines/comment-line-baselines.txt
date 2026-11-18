@@ -8,7 +8,7 @@ apps/linux/app/src/services/preferences.rs 3
 apps/linux/app/src/services/single_instance.rs 4
 apps/linux/app/src/services/window_registry.rs 1
 apps/linux/app/src/ui/activity_dialog.rs 3
-apps/linux/app/src/ui/app/app_helpers.rs 6
+apps/linux/app/src/ui/app/app_helpers.rs 1
 apps/linux/app/src/ui/app/browse.rs 11
 apps/linux/app/src/ui/app/bundle.rs 9
 apps/linux/app/src/ui/app/connection.rs 35
