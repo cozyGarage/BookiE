@@ -359,10 +359,10 @@ impl GridView {
             "previous" => self.pager.previous(),
             "next" => self.pager.next(),
             "last" => self.pager.last(),
-            "find" => window.focus(&self.find.read(cx).focus_handle(cx), cx),
+            "find" => window.focus(&self.search.find.read(cx).focus_handle(cx), cx),
             "filter" => {
-                self.filter_visible = true;
-                window.focus(&self.filter.read(cx).focus_handle(cx), cx);
+                self.search.filter_visible = true;
+                window.focus(&self.search.filter.read(cx).focus_handle(cx), cx);
             }
             "clear-filter" => self.clear_filter(),
             "compare" => self.compare(false, cx),

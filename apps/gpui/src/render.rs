@@ -12,8 +12,8 @@ impl GridView {
         if self.pager.total != self.dataset_count() {
             self.pager = self.pager.with_total(self.dataset_count());
         }
-        if std::mem::take(&mut self.find_reset) {
-            self.find.update(cx, |find, cx| find.set_content("", cx));
+        if std::mem::take(&mut self.search.reset) {
+            self.search.find.update(cx, |find, cx| find.set_content("", cx));
         }
         if std::mem::take(&mut self.focus_editor) {
             let editor = self.sql_input.read(cx).focus_handle(cx);
@@ -142,7 +142,7 @@ impl GridView {
             .flex()
             .items_center()
             .gap_1()
-            .child(div().w(px(size::FIND_WIDTH)).flex_none().child(self.find.clone()))
+            .child(div().w(px(size::FIND_WIDTH)).flex_none().child(self.search.find.clone()))
             .child(
                 icon_button("find-prev", "chevron-up", "Previous match", false, theme)
                     .on_click(cx.listener(|this, _, _, cx| this.run_find(false, cx))),
@@ -208,7 +208,7 @@ impl GridView {
     }
 
     fn grid_filter_row(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Div> {
-        self.filter_visible.then(|| {
+        self.search.filter_visible.then(|| {
             div()
                 .flex()
                 .items_center()
@@ -216,7 +216,7 @@ impl GridView {
                 .px_2()
                 .pb_2()
                 .child(div().child("WHERE"))
-                .child(div().w(px(size::FILTER_WIDTH)).child(self.filter.clone()))
+                .child(div().w(px(size::FILTER_WIDTH)).child(self.search.filter.clone()))
                 .child(button("apply", "Apply", theme).on_click(cx.listener(|this, _, _, cx| this.apply_filter(cx))))
                 .child(
                     button("clear", "Clear all", theme).on_click(cx.listener(|this, _, _, cx| {

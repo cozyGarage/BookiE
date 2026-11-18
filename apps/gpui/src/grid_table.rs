@@ -191,13 +191,13 @@ impl GridView {
         };
         fill_last_column(&mut columns, available_width);
         let map = self.row_map();
-        let editor = self.editing.as_ref().and_then(|editing| {
+        let editor = self.cell_edit.active.as_ref().and_then(|editing| {
             let dataset = self.dataset_index_of(editing.row)?.checked_sub(map.base)?;
             (dataset < map.count as u64).then(|| {
                 (
                     dataset as usize,
                     editing.column,
-                    gpui::AnyView::from(self.editor.clone()),
+                    gpui::AnyView::from(self.cell_edit.editor.clone()),
                 )
             })
         });
@@ -211,14 +211,14 @@ impl GridView {
             }
             let delegate = table.delegate_mut();
             delegate.cached = None;
-            if !delegate.is_changed(&self.source, &columns, &numeric, &map, &self.edits, &editor) {
+            if !delegate.is_changed(&self.source, &columns, &numeric, &map, &self.cell_edit.edits, &editor) {
                 return;
             }
             delegate.columns = columns;
             delegate.numeric = numeric;
             delegate.source = Some(self.source.clone());
             delegate.map = map;
-            delegate.edits = self.edits.clone();
+            delegate.edits = self.cell_edit.edits.clone();
             delegate.editor = editor;
             table.refresh(cx);
         });

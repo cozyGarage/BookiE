@@ -107,12 +107,12 @@ impl GridView {
         }
         if self.grid_is_query {
             self.invalidate_background();
-            self.edits = std::mem::take(&mut self.table_edits);
+            self.cell_edit.edits = std::mem::take(&mut self.cell_edit.table);
             self.source = self.table_source.clone();
             self.grid_is_query = false;
-            self.editing = None;
+            self.cell_edit.active = None;
             self.compare = None;
-            self.cursor = MatchCursor::default();
+            self.search.cursor = MatchCursor::default();
             self.set_mode(Mode::All);
         }
         self.runs.clear();
@@ -121,7 +121,7 @@ impl GridView {
     }
 
     pub(crate) fn query_has_view_edits(&self) -> bool {
-        (self.grid_is_query && (self.editing.is_some() || !self.edits.is_empty()))
+        (self.grid_is_query && (self.cell_edit.active.is_some() || !self.cell_edit.edits.is_empty()))
             || self.runs.iter().any(|slot| !slot.edits.is_empty())
     }
 
@@ -138,7 +138,7 @@ impl GridView {
         if query == self.grid_is_query {
             return;
         }
-        if self.editing.is_some() {
+        if self.cell_edit.active.is_some() {
             self.status = "Finish or discard the active cell edit using Commands before switching grids.".into();
             if let Some(index) = self.tabs.items.iter().position(|tab| match (self.grid_is_query, tab) {
                 (true, Tab::Query) => true,
@@ -151,12 +151,12 @@ impl GridView {
             return;
         }
         self.invalidate_background();
-        self.editing = None;
+        self.cell_edit.active = None;
         self.compare = None;
-        self.cursor = MatchCursor::default();
-        self.find_reset = true;
+        self.search.cursor = MatchCursor::default();
+        self.search.reset = true;
         if query {
-            self.table_edits = std::mem::take(&mut self.edits);
+            self.cell_edit.table = std::mem::take(&mut self.cell_edit.edits);
             if let Some(run) = self.runs.get(self.active_run).map(|slot| slot.run) {
                 self.show_run(self.active_run, run);
             } else {
@@ -165,9 +165,9 @@ impl GridView {
             }
         } else {
             if let Some(slot) = self.runs.get_mut(self.active_run) {
-                slot.edits = std::mem::take(&mut self.edits);
+                slot.edits = std::mem::take(&mut self.cell_edit.edits);
             }
-            self.edits = std::mem::take(&mut self.table_edits);
+            self.cell_edit.edits = std::mem::take(&mut self.cell_edit.table);
             self.source = self.table_source.clone();
             self.set_mode(Mode::All);
         }
@@ -178,13 +178,13 @@ impl GridView {
         let Some(run) = self.runs.get(index).map(|slot| slot.run) else {
             return;
         };
-        if index != self.active_run && self.editing.is_some() {
+        if index != self.active_run && self.cell_edit.active.is_some() {
             self.status = "Finish or discard the active cell edit using Commands before switching results.".into();
             return;
         }
         self.invalidate_background();
         if let Some(previous) = self.runs.get_mut(self.active_run) {
-            previous.edits = std::mem::take(&mut self.edits);
+            previous.edits = std::mem::take(&mut self.cell_edit.edits);
         }
         self.show_run(index, run);
     }
@@ -197,8 +197,8 @@ impl GridView {
 
     pub(crate) fn show_run(&mut self, index: usize, run: Run) {
         self.run_scroll.scroll_to_item(index);
-        self.edits = std::mem::take(&mut self.runs[index].edits);
-        self.editing = None;
+        self.cell_edit.edits = std::mem::take(&mut self.runs[index].edits);
+        self.cell_edit.active = None;
         self.active_run = index;
         self.source = self
             .runs
@@ -206,7 +206,7 @@ impl GridView {
             .and_then(|slot| slot.source.clone())
             .unwrap_or_else(|| std::sync::Arc::new(Synthetic::new(run.rows)));
         self.compare = None;
-        self.cursor = MatchCursor::default();
+        self.search.cursor = MatchCursor::default();
         self.set_mode(Mode::All);
         self.status = format!("{} · {} rows", run.label(), thousands(run.rows));
     }
@@ -216,7 +216,7 @@ impl GridView {
             return;
         }
         let drops_edits = !self.runs[index].edits.is_empty()
-            || (index == self.active_run && (self.editing.is_some() || !self.edits.is_empty()));
+            || (index == self.active_run && (self.cell_edit.active.is_some() || !self.cell_edit.edits.is_empty()));
         if drops_edits && self.reject_view_edits() {
             return;
         }
@@ -229,12 +229,12 @@ impl GridView {
             return;
         }
         self.invalidate_background();
-        self.edits.clear();
+        self.cell_edit.edits.clear();
         if self.runs.is_empty() {
             self.source = self.table_source.clone();
-            self.editing = None;
+            self.cell_edit.active = None;
             self.compare = None;
-            self.cursor = MatchCursor::default();
+            self.search.cursor = MatchCursor::default();
             self.set_mode(Mode::All);
             self.status = "No results".into();
             return;

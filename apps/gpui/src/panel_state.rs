@@ -46,3 +46,46 @@ pub(crate) struct ExportState {
     pub csv_delimiter: Option<bookie_core::export::CustomDelimiter>,
     pub limit: Option<usize>,
 }
+
+pub(crate) struct SearchState {
+    pub find: gpui::Entity<crate::text_input::TextInput>,
+    pub filter: gpui::Entity<crate::text_input::TextInput>,
+    pub filter_visible: bool,
+    pub cursor: crate::MatchCursor,
+    pub capped: bool,
+    pub reset: bool,
+}
+
+impl SearchState {
+    pub fn new(
+        find: gpui::Entity<crate::text_input::TextInput>,
+        filter: gpui::Entity<crate::text_input::TextInput>,
+    ) -> Self {
+        Self {
+            find,
+            filter,
+            filter_visible: false,
+            cursor: crate::MatchCursor::default(),
+            capped: false,
+            reset: false,
+        }
+    }
+}
+
+pub(crate) struct CellEditState {
+    pub editor: gpui::Entity<crate::text_input::TextInput>,
+    pub active: Option<crate::grid_edit::Editing>,
+    pub edits: crate::grid_edit::Edits,
+    pub table: crate::grid_edit::Edits,
+}
+
+impl CellEditState {
+    pub fn new(editor: gpui::Entity<crate::text_input::TextInput>) -> Self {
+        Self {
+            editor,
+            active: None,
+            edits: Default::default(),
+            table: Default::default(),
+        }
+    }
+}

@@ -29,10 +29,10 @@ fn a_valid_edit_is_applied_to_the_typed_cell_and_marked(cx: &mut TestAppContext)
     cx.simulate_keystrokes("enter");
     view.read_with(cx, |view, _| {
         assert_eq!(
-            view.edits.get(&(2, 3)),
+            view.cell_edit.edits.get(&(2, 3)),
             Some(&Cell::Date("2026-02-03".parse().unwrap()))
         );
-        assert!(view.editing.is_none());
+        assert!(view.cell_edit.active.is_none());
         assert!(view.status.contains("edited in this view only"));
     });
 }
@@ -90,12 +90,12 @@ fn an_invalid_edit_is_refused_and_keeps_the_editor_open(cx: &mut TestAppContext)
     cx.simulate_input("2026-99-99");
     cx.simulate_keystrokes("enter");
     view.read_with(cx, |view, _| {
-        assert!(view.edits.is_empty());
-        assert!(view.editing.is_some());
+        assert!(view.cell_edit.edits.is_empty());
+        assert!(view.cell_edit.active.is_some());
         assert_eq!(view.status, "Not applied: not a date");
     });
     cx.simulate_keystrokes("escape");
-    view.read_with(cx, |view, _| assert!(view.editing.is_none() && view.edits.is_empty()));
+    view.read_with(cx, |view, _| assert!(view.cell_edit.active.is_none() && view.cell_edit.edits.is_empty()));
 }
 
 #[gpui::test]
@@ -103,7 +103,7 @@ fn the_undecodable_cell_cannot_be_edited(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(10, 3, window, cx)));
     view.read_with(cx, |view, _| {
-        assert!(view.editing.is_none());
+        assert!(view.cell_edit.active.is_none());
         assert_eq!(view.status, "This cell cannot be edited");
     });
 }
@@ -112,7 +112,7 @@ fn the_undecodable_cell_cannot_be_edited(cx: &mut TestAppContext) {
 fn the_find_field_takes_typed_text_and_enter_runs_the_search(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.update(|window, cx| {
-        let handle = view.read(cx).find.read(cx).focus_handle_for_tests();
+        let handle = view.read(cx).search.find.read(cx).focus_handle_for_tests();
         window.focus(&handle, cx);
     });
     cx.simulate_input("sample 149999");
@@ -120,8 +120,8 @@ fn the_find_field_takes_typed_text_and_enter_runs_the_search(cx: &mut TestAppCon
     cx.executor().advance_clock(std::time::Duration::from_secs(1));
     cx.run_until_parked();
     view.read_with(cx, |view, cx| {
-        assert_eq!(view.find.read(cx).content(), "sample 149999");
-        assert_eq!(view.cursor.matches, vec![149_999]);
+        assert_eq!(view.search.find.read(cx).content(), "sample 149999");
+        assert_eq!(view.search.cursor.matches, vec![149_999]);
     });
 }
 
@@ -130,18 +130,18 @@ fn changing_find_text_discards_a_pending_search_result(cx: &mut TestAppContext) 
     let (view, cx) = open(cx);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
-            view.find.update(cx, |input, cx| input.set_content("Sample 7", cx));
+            view.search.find.update(cx, |input, cx| input.set_content("Sample 7", cx));
             view.run_find(true, cx);
         });
     });
     let cancel = view.read_with(cx, |view, _| view.scans.cancel.clone());
     view.update(cx, |view, cx| {
-        view.find.update(cx, |input, cx| input.set_content("new search", cx))
+        view.search.find.update(cx, |input, cx| input.set_content("new search", cx))
     });
     cx.executor().advance_clock(std::time::Duration::from_secs(1));
     cx.run_until_parked();
     assert!(cancel.is_cancelled());
-    view.read_with(cx, |view, _| assert!(view.cursor.matches.is_empty()));
+    view.read_with(cx, |view, _| assert!(view.search.cursor.matches.is_empty()));
 }
 
 fn flag() -> (std::rc::Rc<std::cell::Cell<bool>>, std::rc::Rc<std::cell::Cell<bool>>) {
@@ -156,7 +156,7 @@ fn starting_a_find_does_not_discard_a_pending_load(cx: &mut TestAppContext) {
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
             view.begin_background(Work::Load, cx, |_| (), move |_, ()| mark.set(true));
-            view.find.update(cx, |input, cx| input.set_content("Sample 7", cx));
+            view.search.find.update(cx, |input, cx| input.set_content("Sample 7", cx));
             view.run_find(true, cx);
             assert!(!view.loads.cancel.is_cancelled(), "a find must not cancel the load");
         });
@@ -173,7 +173,7 @@ fn applying_a_filter_does_not_discard_a_pending_load(cx: &mut TestAppContext) {
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
             view.begin_background(Work::Load, cx, |_| (), move |_, ()| mark.set(true));
-            view.filter
+            view.search.filter
                 .update(cx, |input, cx| input.set_content("label contains 7", cx));
             view.apply_filter(cx);
             assert!(!view.loads.cancel.is_cancelled(), "a filter must not cancel the load");
@@ -206,14 +206,14 @@ fn changing_filter_text_discards_a_pending_filter(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
-            view.filter
+            view.search.filter
                 .update(cx, |input, cx| input.set_content("label contains 7", cx));
             view.apply_filter(cx);
         });
     });
     let cancel = view.read_with(cx, |view, _| view.scans.cancel.clone());
     view.update(cx, |view, cx| {
-        view.filter
+        view.search.filter
             .update(cx, |input, cx| input.set_content("label contains 8", cx))
     });
     cx.executor().advance_clock(std::time::Duration::from_secs(1));
@@ -306,13 +306,13 @@ fn enter_on_the_active_cell_opens_the_editor_and_an_uneditable_cell_says_so(cx: 
     let (view, cx) = open(cx);
     cx.simulate_keystrokes("down right enter");
     view.read_with(cx, |view, _| {
-        let editing = view.editing.as_ref().expect("the label cell opens its editor");
+        let editing = view.cell_edit.active.as_ref().expect("the label cell opens its editor");
         assert_eq!((editing.row, editing.column), (1, 1));
     });
     cx.simulate_keystrokes("escape");
     cx.simulate_keystrokes("home enter");
     view.read_with(cx, |view, _| {
-        assert!(view.editing.is_none());
+        assert!(view.cell_edit.active.is_none());
         assert_eq!(view.status, "This cell cannot be edited");
     });
 }
@@ -630,7 +630,7 @@ fn painting_a_row_reads_the_source_once_and_keeps_pending_edits_available(cx: &m
     cx.run_until_parked();
     let full = "💾".repeat(10_000);
     view.update(cx, |view, cx| {
-        view.edits.insert((1, 1), Cell::Text(full.clone()));
+        view.cell_edit.edits.insert((1, 1), Cell::Text(full.clone()));
         requests.store(0, Ordering::Relaxed);
         view.sync_table(0.0, cx);
         view.table.update(cx, |table, _| {
@@ -642,7 +642,7 @@ fn painting_a_row_reads_the_source_once_and_keeps_pending_edits_available(cx: &m
         assert_eq!(requests.load(Ordering::Relaxed), 1);
     });
     cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(1, 1, window, cx)));
-    view.read_with(cx, |view, cx| assert_eq!(view.editor.read(cx).content(), full));
+    view.read_with(cx, |view, cx| assert_eq!(view.cell_edit.editor.read(cx).content(), full));
 }
 
 #[gpui::test]
@@ -668,7 +668,7 @@ fn copying_a_filtered_row_includes_its_full_pending_edit(cx: &mut TestAppContext
                 kept: std::sync::Arc::new(vec![10, 20]),
                 label: "filtered".into(),
             });
-            view.edits.insert((20, 1), Cell::Text(value.into()));
+            view.cell_edit.edits.insert((20, 1), Cell::Text(value.into()));
             view.click_row(1, false);
             view.copy_selection(false, cx);
         });
@@ -707,9 +707,9 @@ fn rendering_oversized_pending_cells_keeps_exact_binary_json_and_edit_text(cx: &
     view.update(cx, |view, cx| {
         view.tabs
             .open_table(&bookie_gpui::shell::table_info(bookie_gpui::shell::DATA_TABLE));
-        view.edits.insert((0, 1), Cell::Text(text.clone()));
-        view.edits.insert((0, 3), Cell::Bytes(bytes.clone()));
-        view.edits.insert((1, 3), Cell::JsonText(json.clone()));
+        view.cell_edit.edits.insert((0, 1), Cell::Text(text.clone()));
+        view.cell_edit.edits.insert((0, 3), Cell::Bytes(bytes.clone()));
+        view.cell_edit.edits.insert((1, 3), Cell::JsonText(json.clone()));
         cx.notify();
     });
     cx.run_until_parked();
@@ -718,7 +718,7 @@ fn rendering_oversized_pending_cells_keeps_exact_binary_json_and_edit_text(cx: &
         assert_eq!(view.cell_at(1, 3), Cell::JsonText(json));
     });
     cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(0, 1, window, cx)));
-    view.read_with(cx, |view, cx| assert_eq!(view.editor.read(cx).content(), text));
+    view.read_with(cx, |view, cx| assert_eq!(view.cell_edit.editor.read(cx).content(), text));
 }
 
 #[gpui::test]
@@ -726,13 +726,13 @@ fn opening_a_multiline_value_preserves_it_and_reports_the_single_line_editor_lim
     let (view, cx) = open(cx);
     let value = Cell::Text("first\nsecond".into());
     view.update(cx, |view, _| {
-        view.edits.insert((0, 1), value.clone());
+        view.cell_edit.edits.insert((0, 1), value.clone());
     });
     cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(0, 1, window, cx)));
     cx.run_until_parked();
     view.read_with(cx, |view, _| {
-        assert!(view.editing.is_none());
-        assert_eq!(view.edits.get(&(0, 1)), Some(&value));
+        assert!(view.cell_edit.active.is_none());
+        assert_eq!(view.cell_edit.edits.get(&(0, 1)), Some(&value));
         assert!(!view.status.is_empty());
     });
 }
@@ -742,7 +742,7 @@ fn composed_text_selects_inside_its_replacement_after_a_unicode_prefix(cx: &mut 
     use gpui::EntityInputHandler;
     let (view, cx) = open(cx);
     cx.update(|window, cx| {
-        let input = view.read(cx).find.clone();
+        let input = view.read(cx).search.find.clone();
         input.update(cx, |input, cx| {
             input.set_content("α OLD tail", cx);
             input.replace_and_mark_text_in_range(Some(2..5), "💾é", Some(2..3), window, cx);
@@ -760,14 +760,14 @@ fn platform_input_flattens_newlines_like_single_line_paste(cx: &mut TestAppConte
     use gpui::EntityInputHandler;
     let (view, cx) = open(cx);
     cx.update(|window, cx| {
-        let focus = view.read(cx).find.read(cx).focus_handle_for_tests();
+        let focus = view.read(cx).search.find.read(cx).focus_handle_for_tests();
         window.focus(&focus, cx);
     });
     cx.simulate_input("first\nsecond");
     cx.run_until_parked();
-    view.read_with(cx, |view, cx| assert_eq!(view.find.read(cx).content(), "first second"));
+    view.read_with(cx, |view, cx| assert_eq!(view.search.find.read(cx).content(), "first second"));
     cx.update(|window, cx| {
-        let input = view.read(cx).find.clone();
+        let input = view.read(cx).search.find.clone();
         input.update(cx, |input, cx| {
             input.replace_and_mark_text_in_range(Some(0..12), "a\n💾", Some(0..4), window, cx);
             assert_eq!(input.content(), "a 💾");
@@ -840,14 +840,14 @@ fn the_view_renders_and_searches_whatever_source_it_is_given(cx: &mut TestAppCon
         assert_eq!(view.cell_at(1, 1), Cell::Text("tiny 1".into()));
     });
     cx.update(|window, cx| {
-        let handle = view.read(cx).find.read(cx).focus_handle_for_tests();
+        let handle = view.read(cx).search.find.read(cx).focus_handle_for_tests();
         window.focus(&handle, cx);
     });
     cx.simulate_input("tiny 2");
     cx.simulate_keystrokes("enter");
     cx.executor().advance_clock(std::time::Duration::from_secs(1));
     cx.run_until_parked();
-    view.read_with(cx, |view, _| assert_eq!(view.cursor.matches, vec![2]));
+    view.read_with(cx, |view, _| assert_eq!(view.search.cursor.matches, vec![2]));
 }
 
 #[gpui::test]
@@ -883,7 +883,7 @@ fn selecting_an_earlier_run_restores_its_result_and_clears_the_view_state(cx: &m
     view.read_with(cx, |view, _| {
         assert_eq!(view.dataset_count(), 150_000);
         assert_eq!(view.cell_cursor, None);
-        assert!(view.selection.is_none() && view.edits.is_empty());
+        assert!(view.selection.is_none() && view.cell_edit.edits.is_empty());
         assert!(view.status.contains("Run 1"));
     });
 }
@@ -912,9 +912,9 @@ fn switching_runs_preserves_each_runs_edits(cx: &mut TestAppContext) {
     cx.simulate_keystrokes("ctrl-t");
     cx.update(|_, cx| {
         view.update(cx, |view, _| {
-            view.edits.insert((1, 1), Cell::Text("first".into()));
+            view.cell_edit.edits.insert((1, 1), Cell::Text("first".into()));
             view.add_run(None);
-            view.edits.insert((1, 1), Cell::Text("second".into()));
+            view.cell_edit.edits.insert((1, 1), Cell::Text("second".into()));
             view.activate_run(0);
             assert_eq!(view.cell_at(1, 1), Cell::Text("first".into()));
             view.activate_run(1);
@@ -929,7 +929,7 @@ fn switching_grid_tabs_keeps_an_active_cell_editor_open(cx: &mut TestAppContext)
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
             view.start_edit(0, 1, window, cx);
-            view.editor
+            view.cell_edit.editor
                 .update(cx, |editor, cx| editor.set_content("cell draft", cx));
             view.tabs.open_query();
             view.sync_grid_owner();
@@ -941,8 +941,8 @@ fn switching_grid_tabs_keeps_an_active_cell_editor_open(cx: &mut TestAppContext)
             view.tabs.current(),
             &bookie_gpui::shell::Tab::Table(bookie_gpui::shell::table_info(bookie_gpui::shell::DATA_TABLE))
         );
-        assert!(view.editing.is_some());
-        assert_eq!(view.editor.read(cx).content(), "cell draft");
+        assert!(view.cell_edit.active.is_some());
+        assert_eq!(view.cell_edit.editor.read(cx).content(), "cell draft");
     });
 }
 
@@ -956,7 +956,7 @@ fn switching_results_keeps_an_active_cell_editor_open(cx: &mut TestAppContext) {
             view.add_run(None);
             view.add_run(None);
             view.start_edit(0, 1, window, cx);
-            view.editor
+            view.cell_edit.editor
                 .update(cx, |editor, cx| editor.set_content("result draft", cx));
             let active_run = view.active_run;
             view.select_run(0);
@@ -964,8 +964,8 @@ fn switching_results_keeps_an_active_cell_editor_open(cx: &mut TestAppContext) {
         });
     });
     view.read_with(cx, |view, cx| {
-        assert!(view.editing.is_some());
-        assert_eq!(view.editor.read(cx).content(), "result draft");
+        assert!(view.cell_edit.active.is_some());
+        assert_eq!(view.cell_edit.editor.read(cx).content(), "result draft");
     });
 }
 
@@ -975,9 +975,9 @@ fn closing_runs_releases_edits_and_allows_a_new_run_after_the_last_close(cx: &mu
     cx.simulate_keystrokes("ctrl-t");
     cx.update(|_, cx| {
         view.update(cx, |view, _| {
-            view.edits.insert((1, 1), Cell::Text("first".into()));
+            view.cell_edit.edits.insert((1, 1), Cell::Text("first".into()));
             view.add_run(None);
-            view.edits.insert((1, 1), Cell::Text("second".into()));
+            view.cell_edit.edits.insert((1, 1), Cell::Text("second".into()));
             view.close_run(0);
             assert_eq!(view.runs.len(), 2);
             assert_eq!(view.cell_at(1, 1), Cell::Text("second".into()));
@@ -988,11 +988,11 @@ fn closing_runs_releases_edits_and_allows_a_new_run_after_the_last_close(cx: &mu
             assert_eq!(view.cell_at(1, 1), Cell::Text("Sample 1".into()));
             view.close_run(0);
             assert!(view.runs.is_empty());
-            assert!(view.edits.is_empty());
+            assert!(view.cell_edit.edits.is_empty());
             assert_eq!(view.dataset_count(), 0);
             view.add_run(None);
             assert_eq!(view.runs[0].run.number, 3);
-            assert!(view.edits.is_empty());
+            assert!(view.cell_edit.edits.is_empty());
         });
     });
 }
@@ -1039,7 +1039,7 @@ fn a_new_run_after_closing_all_results_does_not_inherit_table_edits(cx: &mut Tes
             view.tabs
                 .open_table(&bookie_gpui::shell::table_info(bookie_gpui::shell::DATA_TABLE));
             view.sync_grid_owner();
-            view.edits.insert((1, 1), Cell::Text("table edit".into()));
+            view.cell_edit.edits.insert((1, 1), Cell::Text("table edit".into()));
             view.tabs.open_query();
             view.sync_grid_owner();
             view.add_run(None);
@@ -1057,14 +1057,14 @@ fn switching_between_table_and_existing_query_keeps_both_edits(cx: &mut TestAppC
     let (view, cx) = open(cx);
     cx.update(|_, cx| {
         view.update(cx, |view, _| {
-            view.edits.insert((1, 1), Cell::Text("table".into()));
+            view.cell_edit.edits.insert((1, 1), Cell::Text("table".into()));
         })
     });
     cx.simulate_keystrokes("ctrl-t");
     cx.update(|_, cx| {
         view.update(cx, |view, _| {
             assert_eq!(view.cell_at(1, 1), Cell::Text("Sample 1".into()));
-            view.edits.insert((1, 1), Cell::Text("query".into()));
+            view.cell_edit.edits.insert((1, 1), Cell::Text("query".into()));
             view.tabs
                 .open_table(&bookie_gpui::shell::table_info(bookie_gpui::shell::DATA_TABLE));
             view.sync_grid_owner();
@@ -1081,7 +1081,7 @@ fn closing_query_tab_releases_its_runs_and_keeps_table_edits(cx: &mut TestAppCon
     let (view, cx) = open(cx);
     cx.update(|_, cx| {
         view.update(cx, |view, _| {
-            view.edits.insert((1, 1), Cell::Text("table".into()));
+            view.cell_edit.edits.insert((1, 1), Cell::Text("table".into()));
         })
     });
     cx.simulate_keystrokes("ctrl-t");
@@ -1107,7 +1107,7 @@ fn closing_an_inactive_query_tab_preserves_the_table(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.update(|_, cx| {
         view.update(cx, |view, _| {
-            view.edits.insert((1, 1), Cell::Text("table".into()));
+            view.cell_edit.edits.insert((1, 1), Cell::Text("table".into()));
         })
     });
     cx.simulate_keystrokes("ctrl-t");
@@ -1129,7 +1129,7 @@ fn closing_query_from_home_restores_the_table_owner(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.update(|_, cx| {
         view.update(cx, |view, _| {
-            view.edits.insert((1, 1), Cell::Text("table".into()));
+            view.cell_edit.edits.insert((1, 1), Cell::Text("table".into()));
         })
     });
     cx.simulate_keystrokes("ctrl-t");
@@ -1199,15 +1199,15 @@ fn a_match_in_filtered_rows_uses_its_filtered_position_for_paging(cx: &mut TestA
                 kept: std::sync::Arc::new(kept),
                 label: "filtered".into(),
             });
-            view.cursor.set(vec![20_000]);
+            view.search.cursor.set(vec![20_000]);
             view.step_match(true);
             assert_eq!(view.pager.page, 0);
             assert_eq!(view.selection.map(|selection| selection.focus), Some(1_000));
-            view.cursor.set(vec![110_000]);
+            view.search.cursor.set(vec![110_000]);
             view.step_match(true);
             assert_eq!(view.pager.page, 1);
             assert_eq!(view.selection.map(|selection| selection.focus), Some(5_500));
-            view.cursor.set(vec![1]);
+            view.search.cursor.set(vec![1]);
             view.step_match(true);
             assert_eq!(view.pager.page, 1);
             assert_eq!(view.status, "Match is outside the filtered rows");
@@ -1225,7 +1225,7 @@ fn searching_after_filter_selects_the_matching_filtered_row(cx: &mut TestAppCont
                 kept: std::sync::Arc::new(kept),
                 label: "filtered".into(),
             });
-            window.focus(&view.find.read(cx).focus_handle_for_tests(), cx);
+            window.focus(&view.search.find.read(cx).focus_handle_for_tests(), cx);
         });
     });
     cx.simulate_input("Sample 20000");
@@ -1268,7 +1268,7 @@ fn closing_the_active_run_restores_the_surviving_runs_edits(cx: &mut TestAppCont
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
             view.add_run(None);
-            view.edits.insert((1, 1), Cell::Text("second".into()));
+            view.cell_edit.edits.insert((1, 1), Cell::Text("second".into()));
             view.begin_background(Work::Load, cx, |_| (), |view, ()| view.status = "stale result".into());
             view.close_run(1);
             assert_eq!(view.runs.len(), 2);
@@ -1385,7 +1385,7 @@ fn a_source_with_other_columns_sets_the_cursor_range_the_labels_and_read_only_ed
     });
     cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(0, 1, window, cx)));
     view.read_with(cx, |view, _| {
-        assert!(view.editing.is_none(), "a read-only source refuses edits");
+        assert!(view.cell_edit.active.is_none(), "a read-only source refuses edits");
         assert_eq!(view.status, "This cell cannot be edited");
     });
 }
@@ -1466,7 +1466,7 @@ fn a_search_typed_on_one_tab_is_not_left_in_the_find_box_of_the_next(cx: &mut Te
     let (view, cx) = open(cx);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
-            view.find.update(cx, |find, cx| find.set_content("Sample 99999", cx))
+            view.search.find.update(cx, |find, cx| find.set_content("Sample 99999", cx))
         })
     });
     cx.run_until_parked();
@@ -1477,7 +1477,7 @@ fn a_search_typed_on_one_tab_is_not_left_in_the_find_box_of_the_next(cx: &mut Te
     view.read_with(cx, |view, cx| {
         assert_eq!(view.tabs.current(), &bookie_gpui::shell::Tab::Query);
         assert_eq!(
-            view.find.read(cx).content(),
+            view.search.find.read(cx).content(),
             "",
             "the Query result must not inherit the table's search"
         );
@@ -1494,7 +1494,7 @@ fn a_double_click_on_a_table_row_opens_the_active_column_for_editing(cx: &mut Te
         })
     });
     view.read_with(cx, |view, _| {
-        let editing = view.editing.as_ref().expect("the double-clicked row opens its editor");
+        let editing = view.cell_edit.active.as_ref().expect("the double-clicked row opens its editor");
         assert_eq!((editing.row, editing.column), (1, 1));
     });
 }

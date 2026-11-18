@@ -55,10 +55,10 @@ impl GridView {
         if self.reject_view_edits() {
             return;
         }
-        self.edits.clear();
-        self.table_edits.clear();
+        self.cell_edit.edits.clear();
+        self.cell_edit.table.clear();
         self.compare = None;
-        self.cursor = Default::default();
+        self.search.cursor = Default::default();
         self.tabs = bookie_gpui::shell::Tabs::default();
         match opened {
             Opened::Table(table) => {
@@ -86,9 +86,9 @@ impl GridView {
     }
 
     pub(super) fn has_view_edits(&self) -> bool {
-        self.editing.is_some()
-            || !self.edits.is_empty()
-            || !self.table_edits.is_empty()
+        self.cell_edit.active.is_some()
+            || !self.cell_edit.edits.is_empty()
+            || !self.cell_edit.table.is_empty()
             || self.runs.iter().any(|slot| !slot.edits.is_empty())
     }
 
@@ -101,9 +101,9 @@ impl GridView {
     }
 
     pub(super) fn discard_view_edits(&mut self) {
-        self.editing = None;
-        self.edits.clear();
-        self.table_edits.clear();
+        self.cell_edit.active = None;
+        self.cell_edit.edits.clear();
+        self.cell_edit.table.clear();
         for slot in &mut self.runs {
             slot.edits.clear();
         }
@@ -146,10 +146,10 @@ impl GridView {
         self.catalog.grid_table = identity.clone();
         self.source = table.clone();
         self.table_source = table;
-        self.edits.clear();
-        self.table_edits.clear();
+        self.cell_edit.edits.clear();
+        self.cell_edit.table.clear();
         self.compare = None;
-        self.cursor = Default::default();
+        self.search.cursor = Default::default();
         self.set_mode(Mode::All);
         self.tabs.open_table(&identity);
         self.grid_is_query = false;
