@@ -38,6 +38,7 @@ impl Catalog {
 pub enum TreeRow {
     Connection { open: bool },
     Database { open: bool },
+    Schema { name: String, open: bool },
     Table(TableInfo),
 }
 
@@ -49,6 +50,53 @@ pub fn tree_rows(search: &str, connection_open: bool, database_open: bool) -> Ve
         database_open,
         SidebarFilter::default(),
     )
+}
+
+pub fn tree_rows_grouped(
+    catalog: &Catalog,
+    search: &str,
+    connection_open: bool,
+    database_open: bool,
+    filter: SidebarFilter,
+    collapsed: &HashSet<String>,
+) -> Vec<(usize, TreeRow)> {
+    let mut flat = tree_rows_in(catalog, search, connection_open, database_open, filter);
+    let first = flat
+        .iter()
+        .position(|(_, row)| matches!(row, TreeRow::Table(_)))
+        .unwrap_or(flat.len());
+    flat[first..].sort_by(|(_, a), (_, b)| match (a, b) {
+        (TreeRow::Table(a), TreeRow::Table(b)) => a.schema.cmp(&b.schema),
+        _ => std::cmp::Ordering::Equal,
+    });
+    let searching = filter.active_only || !search.trim().is_empty();
+    let mut rows = Vec::with_capacity(flat.len());
+    let mut current: Option<String> = None;
+    for (depth, row) in flat {
+        let TreeRow::Table(table) = &row else {
+            rows.push((depth, row));
+            continue;
+        };
+        let Some(schema) = table.schema.clone() else {
+            rows.push((depth, row));
+            continue;
+        };
+        if current.as_deref() != Some(schema.as_str()) {
+            let open = searching || !collapsed.contains(&schema);
+            rows.push((
+                depth,
+                TreeRow::Schema {
+                    name: schema.clone(),
+                    open,
+                },
+            ));
+            current = Some(schema.clone());
+        }
+        if searching || !collapsed.contains(&schema) {
+            rows.push((depth + 1, row));
+        }
+    }
+    rows
 }
 
 pub fn tree_rows_in(
@@ -333,11 +381,45 @@ mod tests {
                 let name = match row {
                     TreeRow::Connection { .. } => "conn".to_string(),
                     TreeRow::Database { .. } => "db".to_string(),
+                    TreeRow::Schema { name, .. } => format!("schema {name}"),
                     TreeRow::Table(table) => table_label(table),
                 };
                 format!("{depth}:{name}")
             })
             .collect()
+    }
+
+    #[test]
+    fn schemas_group_their_tables_and_collapse() {
+        let table = |schema: &str, name: &str| TableInfo {
+            schema: Some(schema.into()),
+            name: name.into(),
+        };
+        let catalog = Catalog {
+            connection: "pg".into(),
+            database: "db".into(),
+            tables: vec![table("sales", "orders"), table("hr", "staff"), table("sales", "items")],
+            grid_table: table("sales", "orders"),
+        };
+        let none = HashSet::new();
+        let rows = tree_rows_grouped(&catalog, "", true, true, SidebarFilter::default(), &none);
+        assert_eq!(
+            labels(&rows),
+            [
+                "0:conn",
+                "1:db",
+                "2:schema hr",
+                "3:hr.staff",
+                "2:schema sales",
+                "3:sales.orders",
+                "3:sales.items"
+            ]
+        );
+        let collapsed = HashSet::from(["sales".to_string()]);
+        let rows = tree_rows_grouped(&catalog, "", true, true, SidebarFilter::default(), &collapsed);
+        assert_eq!(labels(&rows).len(), 5);
+        let rows = tree_rows_grouped(&catalog, "items", true, true, SidebarFilter::default(), &collapsed);
+        assert!(labels(&rows).contains(&"3:sales.items".to_string()));
     }
 
     #[test]

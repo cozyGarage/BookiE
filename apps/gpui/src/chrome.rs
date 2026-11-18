@@ -1,6 +1,6 @@
 use bookie_gpui::font_settings;
 use bookie_gpui::messages::MessageKind;
-use bookie_gpui::shell::{ResultView, Run, SidebarFilter, Tab, TreeRow, table_label, tree_rows_in};
+use bookie_gpui::shell::{ResultView, Run, SidebarFilter, Tab, TreeRow, table_label, tree_rows_grouped, tree_rows_in};
 const SQL: [&str; 3] = [
     "SELECT value, label, state, typed",
     "FROM synthetic_rows",
@@ -353,6 +353,8 @@ impl GridView {
         let (label, chevron) = match &row {
             TreeRow::Connection { open } => (self.catalog.connection.clone(), Some(*open)),
             TreeRow::Database { open } => (self.catalog.database.clone(), Some(*open)),
+            TreeRow::Schema { name, open } => (name.clone(), Some(*open)),
+            TreeRow::Table(table) if table.schema.is_some() => (table.name.clone(), None),
             TreeRow::Table(table) => (table_label(table), None),
         };
         let current = matches!(&row, TreeRow::Table(table) if open_table == &Tab::Table(table.clone()));
@@ -374,7 +376,7 @@ impl GridView {
             .child(icon(
                 match &row {
                     TreeRow::Connection { .. } => "database",
-                    TreeRow::Database { .. } => "folder",
+                    TreeRow::Database { .. } | TreeRow::Schema { .. } => "folder",
                     TreeRow::Table(_) => "table",
                 },
                 theme.muted_foreground,
@@ -394,16 +396,26 @@ impl GridView {
             line.hover(move |style| style.bg(rgb(theme.accent)))
         };
         line.on_click(cx.listener(move |this, event: &gpui::ClickEvent, window, cx| {
-            match &row {
-                TreeRow::Connection { .. } => this.sidebar.connection_open = !this.sidebar.connection_open,
-                TreeRow::Database { .. } => this.sidebar.database_open = !this.sidebar.database_open,
-                TreeRow::Table(table) if event.click_count() >= 2 || this.live.is_none() => {
-                    this.open_table_named(table, window, cx)
-                }
-                TreeRow::Table(table) => this.toggle_fields(table, cx),
-            }
+            this.click_tree_row(&row, event.click_count(), window, cx);
             cx.notify();
         }))
+    }
+
+    fn click_tree_row(&mut self, row: &TreeRow, click_count: usize, window: &mut Window, cx: &mut Context<Self>) {
+        let this = self;
+        match row {
+            TreeRow::Connection { .. } => this.sidebar.connection_open = !this.sidebar.connection_open,
+            TreeRow::Database { .. } => this.sidebar.database_open = !this.sidebar.database_open,
+            TreeRow::Schema { name, .. } => {
+                if !this.sidebar.collapsed_schemas.remove(name) {
+                    this.sidebar.collapsed_schemas.insert(name.clone());
+                }
+            }
+            TreeRow::Table(table) if click_count >= 2 || this.live.is_none() => {
+                this.open_table_named(table, window, cx)
+            }
+            TreeRow::Table(table) => this.toggle_fields(table, cx),
+        }
     }
 
     fn sidebar_tree_view(&self, theme: Theme, search: &str, cx: &mut Context<Self>) -> Div {
@@ -411,12 +423,13 @@ impl GridView {
             regex: self.sidebar.regex,
             active_only: self.sidebar.active_only,
         };
-        let rows = tree_rows_in(
+        let rows = tree_rows_grouped(
             &self.catalog,
             search,
             self.sidebar.connection_open,
             self.sidebar.database_open,
             filter,
+            &self.sidebar.collapsed_schemas,
         );
         let open_table = self.tabs.current().clone();
         let mut tree: Vec<gpui::AnyElement> = Vec::new();
