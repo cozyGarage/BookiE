@@ -25,6 +25,83 @@ pub struct RecentStatement {
     pub succeeded: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum StatusFilter {
+    #[default]
+    All,
+    Succeeded,
+    Failed,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct HistoryQuery {
+    pub text: String,
+    pub status: StatusFilter,
+    pub limit: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct HistoryRow {
+    pub id: i64,
+    pub query: String,
+    pub connection_name: String,
+    pub executed_at: SystemTime,
+    pub duration_ms: Option<i64>,
+    pub succeeded: bool,
+    pub pinned: bool,
+}
+
+pub fn fts5_query(input: &str) -> String {
+    input
+        .split_whitespace()
+        .map(|token| format!("\"{}\"", token.replace('"', "\"\"")))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+pub async fn search(query: HistoryQuery) -> Result<Vec<HistoryRow>, String> {
+    let store = HistoryStore::open_default().await.map_err(|error| error.to_string())?;
+    search_in(&store, query).await
+}
+
+pub async fn set_pinned(id: i64, pinned: bool) -> Result<(), String> {
+    let store = HistoryStore::open_default().await.map_err(|error| error.to_string())?;
+    store.set_pinned(id, pinned).await.map_err(|error| error.to_string())
+}
+
+pub async fn delete(id: i64) -> Result<(), String> {
+    let store = HistoryStore::open_default().await.map_err(|error| error.to_string())?;
+    store.delete(id).await.map_err(|error| error.to_string())
+}
+
+pub async fn search_in(store: &HistoryStore, query: HistoryQuery) -> Result<Vec<HistoryRow>, String> {
+    let text = query.text.trim();
+    let filter = SearchFilter {
+        needle: (!text.is_empty()).then(|| fts5_query(text)),
+        success_only: match query.status {
+            StatusFilter::All => None,
+            StatusFilter::Succeeded => Some(true),
+            StatusFilter::Failed => Some(false),
+        },
+        limit: query.limit,
+        ..SearchFilter::default()
+    };
+    let entries = store.search(filter).await.map_err(|error| error.to_string())?;
+    Ok(entries.into_iter().map(history_row).collect())
+}
+
+fn history_row(entry: Entry) -> HistoryRow {
+    HistoryRow {
+        id: entry.id,
+        query: entry.query,
+        connection_name: entry.connection_name,
+        executed_at: entry.executed_at,
+        duration_ms: entry.duration_ms,
+        succeeded: entry.success && !entry.cancelled,
+        pinned: entry.pinned,
+    }
+}
+
 pub async fn record(statement: Statement) -> Result<(), String> {
     let store = HistoryStore::open_default().await.map_err(|error| error.to_string())?;
     record_in(&store, statement).await
@@ -160,5 +237,41 @@ mod tests {
         assert!(recent.iter().all(|row| row.connection_name == "demo"));
         drop(store);
         let _ = std::fs::remove_file(path);
+    }
+
+    #[tokio::test]
+    async fn search_filters_by_text_and_status_and_pinning_and_delete_work() {
+        let path = std::env::temp_dir().join(format!("bookie-history-search-{}.db", Uuid::new_v4()));
+        let store = HistoryStore::open(path.clone()).await.unwrap();
+        record_in(&store, statement("SELECT 1", None)).await.unwrap();
+        record_in(&store, statement("SELECT nope", Some("no such column")))
+            .await
+            .unwrap();
+        let text = |text: &str, status| HistoryQuery {
+            text: text.into(),
+            status,
+            limit: 10,
+        };
+        let found = search_in(&store, text("nope", StatusFilter::All)).await.unwrap();
+        assert_eq!(found.len(), 1);
+        assert!(!found[0].succeeded);
+        let failed = search_in(&store, text("", StatusFilter::Failed)).await.unwrap();
+        assert_eq!(failed.len(), 1);
+        let ok = search_in(&store, text("", StatusFilter::Succeeded)).await.unwrap();
+        assert_eq!(ok.len(), 1);
+        assert_eq!(ok[0].query, "SELECT 1");
+        store.set_pinned(ok[0].id, true).await.unwrap();
+        let all = search_in(&store, text("", StatusFilter::All)).await.unwrap();
+        assert!(all.iter().find(|row| row.query == "SELECT 1").unwrap().pinned);
+        store.delete(ok[0].id).await.unwrap();
+        assert_eq!(search_in(&store, text("", StatusFilter::All)).await.unwrap().len(), 1);
+        drop(store);
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn a_search_box_text_is_quoted_so_operators_stay_literal() {
+        assert_eq!(fts5_query("select  users"), "\"select\" \"users\"");
+        assert_eq!(fts5_query("a\"b AND"), "\"a\"\"b\" \"AND\"");
     }
 }

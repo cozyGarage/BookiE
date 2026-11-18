@@ -1426,6 +1426,30 @@ fn the_settings_tab_opens_and_shows_the_appearance_page(cx: &mut TestAppContext)
 }
 
 #[gpui::test]
+fn the_palette_opens_the_history_tab_and_a_status_chip_narrows_the_list(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-shift-p");
+    cx.simulate_input("open history");
+    cx.simulate_keystrokes("enter");
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.tabs.current(), &bookie_gpui::shell::Tab::History)
+    });
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.history_page.status = bookie_app_services::statement_history::StatusFilter::Failed;
+            cx.notify();
+        })
+    });
+    view.read_with(cx, |view, _| {
+        assert_eq!(
+            view.history_page.status,
+            bookie_app_services::statement_history::StatusFilter::Failed
+        )
+    });
+}
+
+#[gpui::test]
 fn the_palette_opens_the_settings_tab(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.simulate_keystrokes("ctrl-shift-p");

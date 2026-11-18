@@ -8,7 +8,7 @@ type Group = Vec<(&'static str, String, bool)>;
 pub(crate) const OVERFLOW_GROUPS: &[&[&str]] = &[
     &["query", "run", "explain"],
     &["sidebar", "results"],
-    &["new-connection", "home", "settings", "font", "theme"],
+    &["new-connection", "home", "history", "settings", "font", "theme"],
     &["status", "server-status"],
 ];
 

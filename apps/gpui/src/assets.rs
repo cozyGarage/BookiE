@@ -49,6 +49,7 @@ icons!(
     "table",
     "type",
     "x",
+    "trash-2",
 );
 
 pub struct Assets;
