@@ -28,6 +28,7 @@ fn env_port(key: &str, fallback: u16) -> u16 {
 
 pub struct Fixture {
     pub proxy_host: String,
+    pub proxy_bind_address: String,
     pub proxy_port: u16,
     pub database_hostname: String,
     pub database_port: u16,
@@ -56,6 +57,7 @@ impl Fixture {
             });
         Self {
             proxy_host: env_or("BOOKIE_FIXTURE_PROXY_HOST", "localhost"),
+            proxy_bind_address: env_or("BOOKIE_FIXTURE_BIND_ADDRESS", "127.0.0.1"),
             proxy_port: env_port("BOOKIE_FIXTURE_PROXY_PORT", 5433),
             database_hostname: env_or("BOOKIE_FIXTURE_DB_HOSTNAME", "db.bookie.test"),
             database_port: env_port("BOOKIE_FIXTURE_DB_PORT", 5432),
