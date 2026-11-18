@@ -86,6 +86,7 @@ fn draft_from_saved(saved: &SavedConnection) -> ConnectionDraft {
         id: Some(saved.id),
         name: saved.name.clone(),
         driver_id: saved.driver_id.clone(),
+        file_based: saved.host.is_empty() && saved.port == 0,
         host: saved.host.clone(),
         port: saved.port,
         database: saved.database.clone(),
@@ -612,7 +613,9 @@ mod tests {
         file.database = "/tmp/a.sqlite".into();
         file.host.clear();
         file.port = 0;
-        assert_eq!(saved_from_draft(&file, Uuid::nil()).name, "/tmp/a.sqlite");
+        let saved = saved_from_draft(&file, Uuid::nil());
+        assert_eq!(saved.name, "/tmp/a.sqlite");
+        assert!(draft_from_saved(&saved).file_based);
         assert!(validate(&file).is_ok());
     }
 
