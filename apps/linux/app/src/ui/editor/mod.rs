@@ -55,7 +55,7 @@ use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use bookie_core::QueryResult;
-use bookie_storage::query_history::{HistoryStore, NewEntry, Outcome};
+use bookie_storage::query_history::{HistoryStore, Outcome};
 use stream_pages::{StreamTerminal, StreamedResult};
 use streaming::ActiveStream;
 

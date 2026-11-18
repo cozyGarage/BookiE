@@ -20,6 +20,7 @@ mod render;
 mod runs;
 mod scroll_pace;
 mod services;
+mod sidebar_fields;
 mod sidebar_state;
 mod text_input;
 mod ui_theme;

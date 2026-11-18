@@ -31,6 +31,21 @@ fn ghost(id: impl Into<gpui::ElementId>, label: impl Into<String>, theme: Theme)
         .child(label.into())
 }
 
+fn primary_button(id: &'static str, label: &'static str, tip_text: &'static str, theme: Theme) -> Stateful<Div> {
+    div()
+        .id(id)
+        .tooltip(tip(tip_text))
+        .flex()
+        .items_center()
+        .h(px(size::SMALL_CONTROL))
+        .px_3()
+        .rounded(px(theme.radius))
+        .bg(rgb(theme.foreground))
+        .text_color(rgb(theme.background))
+        .cursor_pointer()
+        .child(label)
+}
+
 pub(crate) fn tip(label: &'static str) -> impl Fn(&mut gpui::Window, &mut gpui::App) -> gpui::AnyView + 'static {
     move |window, cx| gpui_component::tooltip::Tooltip::new(label).build(window, cx)
 }
@@ -378,11 +393,14 @@ impl GridView {
         } else {
             line.hover(move |style| style.bg(rgb(theme.accent)))
         };
-        line.on_click(cx.listener(move |this, _, window, cx| {
+        line.on_click(cx.listener(move |this, event: &gpui::ClickEvent, window, cx| {
             match &row {
                 TreeRow::Connection { .. } => this.sidebar.connection_open = !this.sidebar.connection_open,
                 TreeRow::Database { .. } => this.sidebar.database_open = !this.sidebar.database_open,
-                TreeRow::Table(table) => this.open_table_named(table, window, cx),
+                TreeRow::Table(table) if event.click_count() >= 2 || this.live.is_none() => {
+                    this.open_table_named(table, window, cx)
+                }
+                TreeRow::Table(table) => this.toggle_fields(table, cx),
             }
             cx.notify();
         }))
@@ -401,11 +419,17 @@ impl GridView {
             filter,
         );
         let open_table = self.tabs.current().clone();
-        let tree: Vec<_> = rows
-            .into_iter()
-            .enumerate()
-            .map(|(index, (depth, row))| self.sidebar_tree_row(index, depth, row, &open_table, theme, cx))
-            .collect();
+        let mut tree: Vec<gpui::AnyElement> = Vec::new();
+        for (index, (depth, row)) in rows.into_iter().enumerate() {
+            let table = match &row {
+                TreeRow::Table(table) => Some(table.clone()),
+                _ => None,
+            };
+            tree.push(self.sidebar_tree_row(index, depth, row, &open_table, theme, cx).into_any_element());
+            if let Some(table) = table {
+                tree.extend(self.field_rows(&table, depth, theme).into_iter().map(IntoElement::into_any_element));
+            }
+        }
         let empty = (!search.trim().is_empty() && self.sidebar_matches(search) == 0).then(|| {
             div()
                 .p_3()
@@ -1040,7 +1064,7 @@ impl GridView {
             .border_b_1()
             .border_color(rgb(theme.border))
             .child(
-                ghost_icon("run-query", "play", "Run query (Ctrl+Enter)", theme).on_click(cx.listener(
+                primary_button("run-query", "Run", "Run query (Ctrl+Enter)", theme).on_click(cx.listener(
                     |this, _, _, cx| {
                         this.run_query(cx);
                         cx.notify();

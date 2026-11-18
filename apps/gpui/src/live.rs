@@ -96,6 +96,8 @@ impl LiveSession {
             duration_ms: i64::try_from(elapsed.as_millis()).unwrap_or(i64::MAX),
             rows,
             error,
+            cancelled: false,
+            source: bookie_app_services::statement_history::Source::Editor,
         };
         self.runtime.spawn(async move {
             if let Err(error) = bookie_app_services::statement_history::record(statement).await {
@@ -174,6 +176,26 @@ impl LiveSession {
             return Err("The command bridge returned an unexpected event.".into());
         };
         Ok(outcome)
+    }
+
+    pub fn table_columns(&self, table: &TableInfo) -> Result<Vec<ColumnInfo>, String> {
+        let epoch = self.next_epoch();
+        let control = OperationControl::with_timeout(Duration::from_secs(10));
+        let event = self.runtime.block_on(dispatch_read(
+            DispatchContext::Sessions(&self.sessions),
+            Command::ReadColumns {
+                epoch,
+                session_id: self.session_id,
+                table: table.clone(),
+            },
+            &control,
+            epoch,
+            &self.epoch,
+        ))?;
+        let Event::ColumnsRead { outcome, .. } = event else {
+            return Err("The command bridge returned an unexpected event.".into());
+        };
+        outcome.map_err(|failure| driver_failure_message(&failure))
     }
 
     pub fn sample_pubsub(

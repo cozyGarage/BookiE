@@ -32,7 +32,7 @@ Read `theme.rs`, `chrome.rs`, `render.rs`, `main.rs`, `text_input.rs` and `palet
 | 11 | Zoom for result views is a font setting only, not Ctrl+scroll | `font_settings.rs` | Open |
 | 12 | Find filters only after Enter | `find_filter.rs` | Open (known) |
 | 16 | Grid rows were 32 px while the scrolling maths assumed 26 | `grid_table.rs` used the table's default size | Fixed: `.xsmall()` (26 px) |
-| 17 | Hover and selection in the grid are pale blue from the component library's theme, not our neutral tokens | screenshot | Open |
+| 17 | Hover and selection in the grid were pale blue from the component library's theme | screenshot | Fixed in `ui_theme::map_component_colors` |
 | 14 | Query history was the session's message log; the persistent history database was not read or written | `home_query_history_card` read `panel.messages` | Fixed for saved connections: `app-services::statement_history` records and lists statements with the connection identity; GPUI records every run and Home lists the latest 8 from the shared database, failures in the warning colour. Connections opened from a file have no saved identity and are not recorded. Retention pruning and the GTK recorder still use their own paths |
 | 15 | Explain was missing | no command | Fixed: toolbar button, overflow item and palette command run the core `explain_statement` for the driver through the read-only session |
 
@@ -46,10 +46,10 @@ Same SQLite table, light, 2026-11-18, GTK on a private display and GPUI on a rea
 
 | Area | GTK | GPUI | Action |
 | --- | --- | --- | --- |
-| Toolbar language | Icons for Pin, Explain, Split; text kept for Compare…, Session, Run | Icons only in the pager strip; Run is an icon | GTK: give Compare… and Session icons. GPUI: add a labelled Run as the one filled button |
+| Toolbar language | Icons for Pin, Explain, Split; text kept for Compare…, Session, Run | Icons in the pager strip; Run is the one filled, labelled button | GTK: give Compare… and Session icons. GPUI: matches |
 | Grid row height | compact rows | was 32 px (the table's default tier) against a 26 px constant used for scrolling maths | Fixed: the table uses its 26 px tier (finding 16) |
-| Selection colour | neutral grey fill | blue selection and hover from gpui-component's own theme, one pale blue row in the grid | Open (finding 17): map the component theme to our tokens; our own `active_row` is neutral now |
-| Sidebar | grouped Tables and Catalog, fields expand in place, 265 px | connection, schema and tables tree, 340 px, no field expansion | Open: field expansion and a Catalog group are missing in GPUI |
+| Selection colour | neutral grey fill | was blue from gpui-component's own theme | Fixed (finding 17): the component theme's table, list, selection, ring and primary colours are set from our tokens when a theme is installed |
+| Sidebar | grouped Tables and Catalog, fields expand in place, 265 px | connection, schema and tables tree, 340 px; a click shows the fields (new `ReadColumns` command), a double click opens | Fields fixed; a Catalog group is still missing in GPUI |
 | Result tabs | Results and Errors as icons under the editor | result header with run tabs | Open: decide whether both use the same strip |
 | UI font | Adwaita Sans | Inter or Adwaita Sans, proportional | Matches |
 | Menus | popover menus with grouped items | grouped overflow and cell menus built from palette labels | Matches |
@@ -59,7 +59,7 @@ Same SQLite table, light, 2026-11-18, GTK on a private display and GPUI on a rea
 Both findings 9 and 14 need behaviour that today lives in GTK code or is written straight to storage by the GTK app. A frontend must not repeat it (ADR 0041), so the next step is two app-services commands used by both apps:
 
 - `ConnectionCommands`: `validate`, `save` and password persistence now exist in `connection_save`; `test(draft)`, `delete(id)`, editing and the SSH, certificate and Kerberos fields still have to move out of the GTK dialog, with the policy checks and the audit record, and typed errors the frontends only render.
-- `HistoryCommands`: `record` and `recent` now exist in `statement_history`; the GTK recorder, search with filters, pinning and the retention setting still have to move onto it.
+- `HistoryCommands`: `record` and `recent` now exist in `statement_history`; the GTK recorder now calls `record_in`; search with filters, pinning and the retention setting still have to move onto it.
 
 The GTK connection dialog and `record_history` move onto them in the same pull request, then GPUI builds its form and history list on the same calls.
 

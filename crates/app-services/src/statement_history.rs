@@ -1,6 +1,7 @@
 use std::time::SystemTime;
 
-use bookie_storage::query_history::{Entry, HistoryStore, NewEntry, Outcome, SearchFilter, Source};
+pub use bookie_storage::query_history::Source;
+use bookie_storage::query_history::{Entry, HistoryStore, NewEntry, Outcome, SearchFilter};
 use uuid::Uuid;
 
 pub struct Statement {
@@ -12,6 +13,8 @@ pub struct Statement {
     pub duration_ms: i64,
     pub rows: Option<i64>,
     pub error: Option<String>,
+    pub cancelled: bool,
+    pub source: Source,
 }
 
 pub struct RecentStatement {
@@ -32,10 +35,11 @@ pub async fn recent(limit: usize) -> Result<Vec<RecentStatement>, String> {
     recent_in(&store, limit).await
 }
 
-pub(crate) async fn record_in(store: &HistoryStore, statement: Statement) -> Result<(), String> {
-    let outcome = match statement.error {
-        Some(message) => Outcome::Error(message),
-        None => Outcome::Success,
+pub async fn record_in(store: &HistoryStore, statement: Statement) -> Result<(), String> {
+    let outcome = match (statement.cancelled, statement.error) {
+        (true, _) => Outcome::Cancelled,
+        (false, Some(message)) => Outcome::Error(message),
+        (false, None) => Outcome::Success,
     };
     store
         .record(NewEntry {
@@ -47,7 +51,7 @@ pub(crate) async fn record_in(store: &HistoryStore, statement: Statement) -> Res
             duration_ms: Some(statement.duration_ms),
             rows_affected: statement.rows,
             outcome,
-            source: Source::Editor,
+            source: statement.source,
         })
         .await
         .map(drop)
@@ -89,6 +93,8 @@ mod tests {
             duration_ms: 3,
             rows: Some(2),
             error: error.map(str::to_owned),
+            cancelled: false,
+            source: Source::Editor,
         }
     }
 

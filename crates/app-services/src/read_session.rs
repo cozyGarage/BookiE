@@ -236,6 +236,21 @@ impl ReadSession {
             .map_err(|error| classify(&error))
     }
 
+    pub async fn read_columns(
+        &self,
+        table: &TableInfo,
+        control: &OperationControl,
+    ) -> Result<Vec<bookie_core::ColumnInfo>, DriverFailurePresentation> {
+        let guard = self
+            .database
+            .guard_for_generation(self.id, self.generation, Principal::human_gui())
+            .ok_or(DriverFailurePresentation::Disconnected)?;
+        guard
+            .fetch_columns_controlled(table.schema.as_deref(), &table.name, control)
+            .await
+            .map_err(|error| classify(&error))
+    }
+
     pub async fn open_table_cursor(
         &self,
         table: &TableInfo,

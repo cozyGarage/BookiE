@@ -1,4 +1,4 @@
-use bookie_core::{OperationControl, QueryResult, TableInfo};
+use bookie_core::{ColumnInfo, OperationControl, QueryResult, TableInfo};
 use std::future::Future;
 use std::path::PathBuf;
 use std::pin::Pin;
@@ -41,6 +41,11 @@ pub enum Command {
         offset: u64,
         limit: u64,
     },
+    ReadColumns {
+        epoch: Epoch,
+        session_id: SessionId,
+        table: TableInfo,
+    },
     ReadConnectionStatus {
         epoch: Epoch,
         session_id: SessionId,
@@ -74,6 +79,10 @@ pub enum Event {
         epoch: Epoch,
         outcome: Result<QueryResult, DriverFailurePresentation>,
     },
+    ColumnsRead {
+        epoch: Epoch,
+        outcome: Result<Vec<ColumnInfo>, DriverFailurePresentation>,
+    },
     ConnectionStatusRead {
         epoch: Epoch,
         outcome: Vec<ConnectionOverview>,
@@ -92,6 +101,7 @@ impl Event {
             | Self::SessionClosed { epoch, .. }
             | Self::QueryCompleted { epoch, .. }
             | Self::PageRead { epoch, .. }
+            | Self::ColumnsRead { epoch, .. }
             | Self::ConnectionStatusRead { epoch, .. }
             | Self::SubscriptionSampled { epoch, .. } => *epoch,
         }
@@ -207,6 +217,17 @@ async fn dispatch_session_command(
                 None => Err(DriverFailurePresentation::Disconnected),
             };
             sink.try_emit(Event::PageRead { epoch, outcome })?;
+        }
+        Command::ReadColumns {
+            epoch,
+            session_id,
+            table,
+        } => {
+            let outcome = match sessions.get(session_id) {
+                Some(session) => session.read_columns(&table, control).await,
+                None => Err(DriverFailurePresentation::Disconnected),
+            };
+            sink.try_emit(Event::ColumnsRead { epoch, outcome })?;
         }
         Command::ReadConnectionStatus { epoch, session_id } => {
             let outcome = sessions
