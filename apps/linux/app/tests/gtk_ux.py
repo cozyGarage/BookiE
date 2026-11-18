@@ -2661,9 +2661,14 @@ GLib.MainLoop().run()
     def postgres_ssh_tunnel_loss_retires_session_and_reconnects(database, base):
         import urllib.request
 
+        fixture_host = os.environ.get(
+            "BOOKIE_FIXTURE_HOST",
+            os.environ.get("BOOKIE_GTK_FIXTURE_HOST", "127.0.0.1"),
+        )
+
         def set_bastion_enabled(enabled):
             request = urllib.request.Request(
-                "http://127.0.0.1:8474/proxies/bastion",
+                f"http://{fixture_host}:8474/proxies/bastion",
                 data=json.dumps({"enabled": enabled}).encode(),
                 headers={"Content-Type": "application/json"},
                 method="POST",
