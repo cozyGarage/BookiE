@@ -29,9 +29,23 @@ struct Ui {
     exported: Rc<RefCell<SchemaDiagram>>,
 }
 
+#[derive(Clone)]
+struct DictionaryExportContext {
+    parent: glib::WeakRef<adw::ApplicationWindow>,
+    connection: Arc<dyn bookie_core::Connection>,
+    capabilities: DriverCapabilities,
+    schema: Option<String>,
+    hidden_schemas: Vec<String>,
+    driver_id: String,
+    token: CancellationToken,
+    timeout: u32,
+    preferences: PreferencesStore,
+}
+
 pub struct DiagramRequest {
     pub schema: Option<String>,
     pub connection_id: Option<uuid::Uuid>,
+    pub driver_id: String,
     pub capabilities: DriverCapabilities,
     pub scope: CancellationToken,
     pub hidden_schemas: Vec<String>,
@@ -44,18 +58,21 @@ pub fn present(
     preferences: &PreferencesStore,
 ) {
     let Some(connection) = request.connection_id.and_then(|id| database.get(id)) else {
-        let alert = adw::AlertDialog::new(
-            Some(&tr!("No active connection")),
-            Some(&tr!("Open a connection before showing its diagram.")),
-        );
-        alert.add_response("ok", &tr!("OK"));
-        alert.present(Some(parent));
+        show_no_connection(parent);
         return;
     };
     let token = request.scope.child_token();
-    let ui = Rc::new(build(&diagram_label(request.schema.as_deref()), &token));
-    ui.dialog.present(Some(parent));
     let timeout = crate::services::operation_control::timeout_for(preferences, database, request.connection_id);
+    let context = dictionary_export_context(
+        parent,
+        &request,
+        connection.clone(),
+        token.clone(),
+        timeout,
+        preferences,
+    );
+    let ui = Rc::new(build(&diagram_label(request.schema.as_deref()), &token, context));
+    ui.dialog.present(Some(parent));
     glib::spawn_future_local(async move {
         let control = crate::services::operation_control::bounded_with(timeout, token.clone());
         let listed = match request.schema.as_deref() {
@@ -99,7 +116,37 @@ pub fn present(
     });
 }
 
-fn build(title: &str, token: &CancellationToken) -> Ui {
+fn show_no_connection(parent: &gtk::Window) {
+    let alert = adw::AlertDialog::new(
+        Some(&tr!("No active connection")),
+        Some(&tr!("Open a connection before showing its diagram.")),
+    );
+    alert.add_response("ok", &tr!("OK"));
+    alert.present(Some(parent));
+}
+
+fn dictionary_export_context(
+    parent: &gtk::Window,
+    request: &DiagramRequest,
+    connection: Arc<dyn bookie_core::Connection>,
+    token: CancellationToken,
+    timeout: u32,
+    preferences: &PreferencesStore,
+) -> Option<DictionaryExportContext> {
+    Some(DictionaryExportContext {
+        parent: parent.clone().downcast::<adw::ApplicationWindow>().ok()?.downgrade(),
+        connection,
+        capabilities: request.capabilities,
+        schema: request.schema.clone(),
+        hidden_schemas: request.hidden_schemas.clone(),
+        driver_id: request.driver_id.clone(),
+        token,
+        timeout,
+        preferences: preferences.clone(),
+    })
+}
+
+fn build(title: &str, token: &CancellationToken, context: Option<DictionaryExportContext>) -> Ui {
     let dialog = adw::Dialog::builder()
         .title(title)
         .content_width(1100)
@@ -130,7 +177,7 @@ fn build(title: &str, token: &CancellationToken) -> Ui {
     let toasts = adw::ToastOverlay::new();
     toasts.set_child(Some(&stack));
     let exported = Rc::new(RefCell::new(SchemaDiagram::default()));
-    let export_button = export_button(&exported, &toasts);
+    let export_button = export_button(&exported, &toasts, context);
     let toolbar = adw::ToolbarView::new();
     toolbar.add_top_bar(&header(&canvas, &zoom_label, &export_button));
     toolbar.set_content(Some(&toasts));
@@ -230,7 +277,11 @@ fn header(canvas: &DiagramCanvas, zoom_label: &gtk::Label, export_button: &gtk::
 
 type TextFormat = (String, String, fn(&SchemaDiagram) -> String);
 
-fn export_button(exported: &Rc<RefCell<SchemaDiagram>>, toasts: &adw::ToastOverlay) -> gtk::MenuButton {
+fn export_button(
+    exported: &Rc<RefCell<SchemaDiagram>>,
+    toasts: &adw::ToastOverlay,
+    context: Option<DictionaryExportContext>,
+) -> gtk::MenuButton {
     let popover = gtk::Popover::new();
     let choices = gtk::Box::new(gtk::Orientation::Vertical, 2);
     let formats: [TextFormat; 2] = [
@@ -254,16 +305,133 @@ fn export_button(exported: &Rc<RefCell<SchemaDiagram>>, toasts: &adw::ToastOverl
         });
         choices.append(&choice);
     }
+    if let Some(context) = context {
+        append_dictionary_action(&choices, &popover, toasts, context);
+    }
     popover.set_child(Some(&choices));
-    let tooltip = tr!("Copy the diagram as text");
+    let tooltip = tr!("Export diagram or dictionary metadata");
     let button = gtk::MenuButton::builder()
-        .icon_name("edit-copy-symbolic")
+        .icon_name("document-export-symbolic")
         .tooltip_text(&tooltip)
         .popover(&popover)
         .sensitive(false)
         .build();
     button.update_property(&[gtk::accessible::Property::Label(&tooltip)]);
     button
+}
+
+fn append_dictionary_action(
+    choices: &gtk::Box,
+    popover: &gtk::Popover,
+    toasts: &adw::ToastOverlay,
+    context: DictionaryExportContext,
+) {
+    let choice = gtk::Button::with_label(&tr!("Export Data Dictionary…"));
+    choice.add_css_class("flat");
+    choice.connect_clicked({
+        let (popover, toasts, choice) = (popover.downgrade(), toasts.downgrade(), choice.downgrade());
+        move |_| {
+            if let Some(popover) = popover.upgrade() {
+                popover.popdown();
+            }
+            let Some(toast_overlay) = toasts.upgrade() else {
+                return;
+            };
+            if let Some(choice) = choice.upgrade() {
+                choice.set_sensitive(false);
+            }
+            let context = context.clone();
+            let choice = choice.clone();
+            let operation = context.token.child_token();
+            let progress = dictionary_progress_toast(&toast_overlay, &operation);
+            let toasts = toasts.clone();
+            glib::spawn_future_local(async move {
+                let result = load_dictionary(&context, &operation).await;
+                progress.dismiss();
+                if let Some(choice) = choice.upgrade() {
+                    choice.set_sensitive(true);
+                }
+                if operation.is_cancelled() {
+                    return;
+                }
+                let (Some(parent), Some(toasts)) = (context.parent.upgrade(), toasts.upgrade()) else {
+                    return;
+                };
+                let result = match result {
+                    Ok(result) => result,
+                    Err(error) => {
+                        let message = crate::services::error_text::driver_message(&error);
+                        toasts.add_toast(crate::ui::plain_text::toast(&message));
+                        return;
+                    }
+                };
+                crate::ui::export_dialog::present(
+                    &parent,
+                    &toasts,
+                    crate::ui::export_dialog::ExportRequest {
+                        scope: crate::ui::export_dialog::ExportScope::DataDictionary,
+                        paged: None,
+                        result: Arc::new(result),
+                        retained_page: None,
+                        suggested_name: "data-dictionary".into(),
+                        driver_id: context.driver_id,
+                    },
+                    &context.preferences,
+                );
+            });
+        }
+    });
+    choices.append(&choice);
+}
+
+fn dictionary_progress_toast(toasts: &adw::ToastOverlay, operation: &CancellationToken) -> adw::Toast {
+    let toast = crate::ui::plain_text::toast(&tr!("Reading database metadata…"));
+    toast.set_timeout(0);
+    toast.set_button_label(Some(&tr!("Cancel")));
+    let operation = operation.clone();
+    toast.connect_button_clicked(move |_| operation.cancel());
+    toasts.add_toast(toast.clone());
+    toast
+}
+
+async fn load_dictionary(
+    context: &DictionaryExportContext,
+    operation: &CancellationToken,
+) -> Result<bookie_core::QueryResult, DriverError> {
+    let control = crate::services::operation_control::bounded_with(context.timeout, operation.clone());
+    let tables = match context.schema.as_deref() {
+        Some(schema) => {
+            context
+                .connection
+                .list_tables_in(&[schema.to_string()], &control)
+                .await?
+        }
+        None => {
+            crate::services::catalog::list_tables_excluding(
+                context.connection.as_ref(),
+                &context.hidden_schemas,
+                &control,
+            )
+            .await?
+        }
+    };
+    let tables = tables
+        .into_iter()
+        .filter(|table| {
+            context
+                .schema
+                .as_deref()
+                .is_none_or(|schema| table.schema.as_deref() == Some(schema))
+        })
+        .collect::<Vec<_>>();
+    bookie_app_services::data_dictionary::load(
+        context.connection.as_ref(),
+        context.schema.as_deref(),
+        &tables,
+        context.capabilities,
+        &control,
+    )
+    .await
 }
 
 fn zoom_button(

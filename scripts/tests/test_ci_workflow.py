@@ -1514,6 +1514,10 @@ class CiWorkflowTests(unittest.TestCase):
                 "browse_long_text_preview_engines", "mysql_previews_a_huge_longtext_cell", "--",
                 "--include-ignored", "--test-threads=1",
             ],
+            [
+                "bash", "scripts/run-rust-tests.sh", "--locked", "-p", "bookie-app-services", "--test",
+                "data_dictionary_postgres", "--", "--include-ignored", "--test-threads=1",
+            ],
         ])
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         consumers = workflow.split("  consumers:\n", 1)[1].split("  linux-build:\n", 1)[0]

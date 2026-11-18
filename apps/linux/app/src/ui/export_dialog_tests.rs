@@ -87,13 +87,16 @@ fn a_result_with_no_source_table_offers_its_label_for_the_user_to_correct() {
 
 #[test]
 fn a_connection_without_sql_literals_is_not_offered_the_statement_format() {
-    assert!(available_formats("postgres", None).contains(&ExportFormat::Sql));
+    assert!(available_formats(ExportScope::QueryResult, "postgres", None).contains(&ExportFormat::Sql));
     for driver_id in ["mongodb", "redis"] {
         assert!(
-            !available_formats(driver_id, None).contains(&ExportFormat::Sql),
+            !available_formats(ExportScope::QueryResult, driver_id, None).contains(&ExportFormat::Sql),
             "{driver_id}"
         );
-        assert_eq!(available_formats(driver_id, None).len(), FORMATS.len() - 1);
+        assert_eq!(
+            available_formats(ExportScope::QueryResult, driver_id, None).len(),
+            FORMATS.len() - 1
+        );
     }
 }
 
@@ -111,13 +114,13 @@ fn the_csv_options_group_belongs_to_csv_alone() {
 
 #[test]
 fn the_selected_row_maps_to_the_format_offered_at_that_position() {
-    let formats = available_formats("mongodb", None);
+    let formats = available_formats(ExportScope::QueryResult, "mongodb", None);
     assert_eq!(selected_format(&formats, 0), ExportFormat::Csv);
     assert_eq!(selected_format(&formats, 2), ExportFormat::JsonLines);
     assert_eq!(selected_format(&formats, 6), ExportFormat::Xlsx);
     assert_eq!(selected_format(&formats, 99), ExportFormat::Csv);
     assert_eq!(
-        selected_format(&available_formats("postgres", None), 6),
+        selected_format(&available_formats(ExportScope::QueryResult, "postgres", None), 6),
         ExportFormat::Sql
     );
 }
@@ -139,6 +142,14 @@ fn every_offered_format_has_its_own_extension_and_media_type() {
         "customers.xlsx"
     );
     assert_eq!(suggested_file_name("customers.md", ExportFormat::Sql), "customers.sql");
+}
+
+#[test]
+fn a_data_dictionary_offers_only_csv_and_markdown() {
+    assert_eq!(
+        available_formats(ExportScope::DataDictionary, "postgres", None),
+        [ExportFormat::Csv, ExportFormat::Markdown]
+    );
 }
 
 #[test]
@@ -184,7 +195,7 @@ fn a_workbook_needs_a_known_row_count_when_rows_are_read_page_by_page() {
         retained_page: None,
         open: unknown.open.clone(),
     };
-    assert!(!available_formats("sqlite", Some(&unknown)).contains(&ExportFormat::Xlsx));
-    assert!(available_formats("sqlite", Some(&known)).contains(&ExportFormat::Xlsx));
-    assert!(available_formats("sqlite", None).contains(&ExportFormat::Xlsx));
+    assert!(!available_formats(ExportScope::QueryResult, "sqlite", Some(&unknown)).contains(&ExportFormat::Xlsx));
+    assert!(available_formats(ExportScope::QueryResult, "sqlite", Some(&known)).contains(&ExportFormat::Xlsx));
+    assert!(available_formats(ExportScope::QueryResult, "sqlite", None).contains(&ExportFormat::Xlsx));
 }
