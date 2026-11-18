@@ -10,7 +10,7 @@ fn narrow_editor_run_and_cancel_buttons_dispatch_inside_their_layout() {
         (
             model.run_button.clone(),
             model.cancel_button.clone(),
-            model.run_button.parent().unwrap(),
+            model.run_button.parent().unwrap().parent().unwrap(),
             model.longer_timeout_button.clone(),
             model.source_view.clone(),
         )

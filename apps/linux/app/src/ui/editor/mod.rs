@@ -303,20 +303,25 @@ impl SimpleComponent for SqlEditor {
                             },
                         },
 
-                        #[name = "run_button"]
-                        append = &gtk::Button {
-                            set_label: &bookie_app_services::tr!("Run"),
-                            set_can_shrink: true,
-                            set_tooltip_text: Some(bookie_app_services::tr!("Run query (Ctrl+Return)").as_str()),
-                            add_css_class: "suggested-action",
-                            connect_clicked => SqlEditorInput::Run(RunMessage::Run),
-                        },
+                        append = &gtk::Box {
+                            set_orientation: gtk::Orientation::Horizontal,
+                            add_css_class: "linked",
 
-                        #[name = "run_options"]
-                        append = &gtk::MenuButton {
-                            set_icon_name: "pan-down-symbolic",
-                            set_tooltip_text: Some(bookie_app_services::tr!("Run options").as_str()),
-                            add_css_class: "suggested-action",
+                            #[name = "run_button"]
+                            gtk::Button {
+                                set_label: &bookie_app_services::tr!("Run"),
+                                set_can_shrink: true,
+                                set_tooltip_text: Some(bookie_app_services::tr!("Run query (Ctrl+Return)").as_str()),
+                                add_css_class: "suggested-action",
+                                connect_clicked => SqlEditorInput::Run(RunMessage::Run),
+                            },
+
+                            #[name = "run_options"]
+                            gtk::MenuButton {
+                                set_icon_name: "pan-down-symbolic",
+                                set_tooltip_text: Some(bookie_app_services::tr!("Run options").as_str()),
+                                add_css_class: "suggested-action",
+                            },
                         },
                     },
                 },

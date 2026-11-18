@@ -1000,6 +1000,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::editor::dispatch_tests::panel_tests::run_and_its_options_arrow_are_one_linked_group"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::editor::dispatch_tests::panel_tests::the_error_view_retains_results_and_clears_failures_after_success"
     ],
     [

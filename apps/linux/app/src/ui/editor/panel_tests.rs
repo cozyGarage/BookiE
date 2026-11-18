@@ -212,7 +212,7 @@ fn hiding_results_falls_back_when_the_remembered_sql_split_was_closed() {
 fn the_editor_toolbar_is_one_wrapping_bar_with_folding_in_a_menu() {
     let fixture = EditorFixture::new();
     let model = fixture.controller.model();
-    let actions = model.run_button.parent().unwrap();
+    let actions = model.run_button.parent().unwrap().parent().unwrap();
     assert!(actions.is::<adw::WrapBox>());
     assert_eq!(model.pin_button.parent().as_ref(), Some(&actions));
     let fold = descendants(fixture.controller.widget().upcast_ref())
@@ -331,4 +331,14 @@ fn keyboard_shortcuts_move_focus_between_editor_and_result_grid() {
         gtk::prelude::RootExt::focus(&window).as_ref() == Some(fixture.controller.model().source_view.upcast_ref())
     });
     window.destroy();
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn run_and_its_options_arrow_are_one_linked_group() {
+    let fixture = EditorFixture::new();
+    let model = fixture.controller.model();
+    let group = model.run_button.parent().unwrap();
+    assert!(group.has_css_class("linked"));
+    assert_eq!(model.run_options.parent().as_ref(), Some(&group));
 }
