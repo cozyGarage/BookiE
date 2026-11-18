@@ -5,6 +5,15 @@ struct Active(Theme);
 
 impl Global for Active {}
 
+struct EditorSize(f32);
+
+impl Global for EditorSize {}
+
+pub fn apply_editor_size(size: f32, cx: &mut App) {
+    gpui_kit::component::theme::Theme::global_mut(cx).mono_font_size = gpui::px(size);
+    cx.set_global(EditorSize(size));
+}
+
 pub trait ThemeExt {
     fn current(cx: &App) -> Theme;
     fn install(self, cx: &mut App);
@@ -23,6 +32,10 @@ impl ThemeExt for Theme {
         };
         gpui_kit::component::theme::Theme::change(mode, None, cx);
         map_component_colors(&self, cx);
+        if let Some(EditorSize(size)) = cx.try_global::<EditorSize>() {
+            let size = *size;
+            gpui_kit::component::theme::Theme::global_mut(cx).mono_font_size = gpui::px(size);
+        }
         cx.set_global(Active(self));
     }
 }

@@ -50,6 +50,8 @@ icons!(
     "type",
     "x",
     "trash-2",
+    "minus",
+    "square",
 );
 
 pub struct Assets;

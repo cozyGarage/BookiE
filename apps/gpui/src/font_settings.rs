@@ -82,6 +82,12 @@ pub fn save(settings: &FontSettings) -> std::io::Result<()> {
     std::fs::write(path, to_json(settings))
 }
 
+pub fn zoom_step(size: f32, delta: i32) -> f32 {
+    (size + delta as f32).clamp(MIN_SIZE, MAX_SIZE)
+}
+
+pub const DEFAULT_ZOOM_SIZE: f32 = DEFAULT_SIZE;
+
 pub fn clamp_size(size: f64) -> f32 {
     (size as f32).clamp(MIN_SIZE, MAX_SIZE)
 }
@@ -101,6 +107,14 @@ mod tests {
         let settings = parse(r#"{"ui_font_size": 2, "buffer_font_size": 400}"#);
         assert_eq!(settings.ui_size, MIN_SIZE);
         assert_eq!(settings.editor_size, MAX_SIZE);
+    }
+
+    #[test]
+    fn zoom_moves_one_point_and_stops_at_the_limits() {
+        assert_eq!(zoom_step(14.0, 1), 15.0);
+        assert_eq!(zoom_step(14.0, -1), 13.0);
+        assert_eq!(zoom_step(MIN_SIZE, -1), MIN_SIZE);
+        assert_eq!(zoom_step(MAX_SIZE, 1), MAX_SIZE);
     }
 
     #[test]
