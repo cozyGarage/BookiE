@@ -732,7 +732,7 @@ fn schema_menu(compare_enabled: bool, actions: SchemaCatalogActions) -> gtk::gio
 }
 
 #[cfg(test)]
-    use super::spacing;
+mod tests {
     use super::*;
     use relm4::factory::FactoryVecDeque;
 
