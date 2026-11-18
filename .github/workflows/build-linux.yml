@@ -1443,7 +1443,10 @@ jobs:
           if-no-files-found: error
       - name: Remove shared PostgreSQL fixture files
         if: always()
-        run: rm -rf -- /var/tmp/bookie-pg-release-fixtures
+        run: |
+          if [[ -d /var/tmp/bookie-pg-release-fixtures ]]; then
+            find /var/tmp/bookie-pg-release-fixtures -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+          fi
 
   distro-floor-scenarios:
     name: Debian testing package GTK scenarios (${{ matrix.shard_group }})
