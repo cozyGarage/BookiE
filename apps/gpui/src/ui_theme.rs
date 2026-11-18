@@ -22,6 +22,22 @@ impl ThemeExt for Theme {
             gpui_kit::component::theme::ThemeMode::Light
         };
         gpui_kit::component::theme::Theme::change(mode, None, cx);
+        map_component_colors(&self, cx);
         cx.set_global(Active(self));
     }
+}
+
+fn map_component_colors(theme: &Theme, cx: &mut App) {
+    let color = |value: u32| gpui::Hsla::from(gpui::rgb(value));
+    let colors = &mut gpui_kit::component::theme::Theme::global_mut(cx).colors;
+    colors.table_active = color(theme.active_row);
+    colors.table_active_border = color(theme.focus_ring);
+    colors.table_hover = color(theme.accent);
+    colors.list_active = color(theme.active_row);
+    colors.list_active_border = color(theme.focus_ring);
+    colors.list_hover = color(theme.accent);
+    colors.selection = color(theme.active_row);
+    colors.ring = color(theme.focus_ring);
+    colors.primary = color(theme.foreground);
+    colors.primary_foreground = color(theme.background);
 }

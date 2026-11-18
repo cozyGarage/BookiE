@@ -271,6 +271,32 @@ fn large_sql_scripts_keep_completion_available_without_blocking_the_main_context
 
 #[test]
 #[ignore = "requires an isolated GTK display"]
+fn large_script_completion_popup_is_visible_for_oversized_buffer() {
+    let _application = crate::initialize_ui();
+    let padding = "x".repeat(120);
+    let statement = format!("SELECT * FROM us WHERE note = '{padding}'; ");
+    let line = format!("{}\n", statement.repeat(20));
+    let source = line.repeat(1_000);
+    assert!(source.len() > super::super::sql_text::MAX_ANALYSIS_BYTES);
+    let index = Rc::new(RefCell::new(SchemaIndex::default()));
+    index.borrow_mut().grammar = Some(SqlGrammar::PostgreSql);
+    index.borrow_mut().set_tables(vec!["users".into()]);
+    let (view, _provider, _context) = fixture(&source, "SELECT * FROM us".len(), index);
+    let window = gtk::Window::builder()
+        .default_width(802)
+        .default_height(600)
+        .child(&view)
+        .build();
+    window.present();
+    view.grab_focus();
+    completion_frame();
+    view.completion().show();
+    presented_completion(&view, true, "oversized buffer");
+    window.destroy();
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
 fn completion_resumes_after_a_large_buffer_is_replaced_with_a_small_query() {
     gtk::init().unwrap();
     let index = Rc::new(RefCell::new(SchemaIndex::default()));

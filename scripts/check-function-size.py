@@ -172,7 +172,7 @@ def source_files(root: Path = ROOT) -> list[Path]:
         path
         for directory in (root / "crates", root / "apps", root / "tests")
         for path in directory.rglob("*.rs")
-        if generated_arch_src not in path.parents
+        if generated_arch_src not in path.parents and "target" not in path.relative_to(root).parts
     )
 
 

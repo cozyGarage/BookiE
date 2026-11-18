@@ -31,6 +31,21 @@ fn ghost(id: impl Into<gpui::ElementId>, label: impl Into<String>, theme: Theme)
         .child(label.into())
 }
 
+fn primary_button(id: &'static str, label: &'static str, tip_text: &'static str, theme: Theme) -> Stateful<Div> {
+    div()
+        .id(id)
+        .tooltip(tip(tip_text))
+        .flex()
+        .items_center()
+        .h(px(size::SMALL_CONTROL))
+        .px_3()
+        .rounded(px(theme.radius))
+        .bg(rgb(theme.foreground))
+        .text_color(rgb(theme.background))
+        .cursor_pointer()
+        .child(label)
+}
+
 pub(crate) fn tip(label: &'static str) -> impl Fn(&mut gpui::Window, &mut gpui::App) -> gpui::AnyView + 'static {
     move |window, cx| gpui_component::tooltip::Tooltip::new(label).build(window, cx)
 }
@@ -135,7 +150,7 @@ fn window_button(id: &'static str, glyph: &'static str, label: &'static str, the
         .child(glyph)
 }
 
-fn ghost_icon(id: &'static str, name: &'static str, label: &'static str, theme: Theme) -> Stateful<Div> {
+fn ghost_icon(id: impl Into<gpui::ElementId>, name: &'static str, label: &'static str, theme: Theme) -> Stateful<Div> {
     div()
         .id(id)
         .tooltip(tip(label))
@@ -247,6 +262,7 @@ impl GridView {
                             |this, _, _, cx| {
                                 this.tabs.open_home();
                                 this.sync_grid_owner();
+                                this.reload_history(cx);
                                 cx.notify();
                             },
                         )),
@@ -377,11 +393,14 @@ impl GridView {
         } else {
             line.hover(move |style| style.bg(rgb(theme.accent)))
         };
-        line.on_click(cx.listener(move |this, _, window, cx| {
+        line.on_click(cx.listener(move |this, event: &gpui::ClickEvent, window, cx| {
             match &row {
                 TreeRow::Connection { .. } => this.sidebar.connection_open = !this.sidebar.connection_open,
                 TreeRow::Database { .. } => this.sidebar.database_open = !this.sidebar.database_open,
-                TreeRow::Table(table) => this.open_table_named(table, window, cx),
+                TreeRow::Table(table) if event.click_count() >= 2 || this.live.is_none() => {
+                    this.open_table_named(table, window, cx)
+                }
+                TreeRow::Table(table) => this.toggle_fields(table, cx),
             }
             cx.notify();
         }))
@@ -400,11 +419,27 @@ impl GridView {
             filter,
         );
         let open_table = self.tabs.current().clone();
-        let tree: Vec<_> = rows
-            .into_iter()
-            .enumerate()
-            .map(|(index, (depth, row))| self.sidebar_tree_row(index, depth, row, &open_table, theme, cx))
-            .collect();
+        let mut tree: Vec<gpui::AnyElement> = Vec::new();
+        for (index, (depth, row)) in rows.into_iter().enumerate() {
+            let table = match &row {
+                TreeRow::Table(table) => Some(table.clone()),
+                _ => None,
+            };
+            tree.push(
+                self.sidebar_tree_row(index, depth, row, &open_table, theme, cx)
+                    .into_any_element(),
+            );
+            if let Some(table) = table {
+                tree.extend(
+                    self.field_rows(&table, depth, theme)
+                        .into_iter()
+                        .map(IntoElement::into_any_element),
+                );
+            }
+        }
+        if search.trim().is_empty() {
+            tree.extend(self.catalog_rows(theme, cx));
+        }
         let empty = (!search.trim().is_empty() && self.sidebar_matches(search) == 0).then(|| {
             div()
                 .p_3()
@@ -629,6 +664,14 @@ impl GridView {
     }
 }
 
+fn one_line(sql: &str) -> String {
+    let flat: String = sql.split_whitespace().collect::<Vec<_>>().join(" ");
+    match flat.char_indices().nth(120) {
+        Some((end, _)) => format!("{}…", &flat[..end]),
+        None => flat,
+    }
+}
+
 fn tab_icon_name(tab: &Tab) -> &'static str {
     match tab {
         Tab::Home => "house",
@@ -697,6 +740,9 @@ impl GridView {
         }
         item.on_click(cx.listener(move |this, _, window, cx| {
             this.tabs.active = index;
+            if index == 0 {
+                this.reload_history(cx);
+            }
             if let Tab::Table(name) = this.tabs.current().clone()
                 && this.live.is_some()
                 && name != this.catalog.grid_table
@@ -866,16 +912,34 @@ impl GridView {
                 .flex()
                 .flex_col()
                 .children(self.connections.iter().enumerate().map(|(index, saved)| {
-                    let name = saved.name.clone();
-                    ghost(
-                        ("saved-connection", index),
-                        format!("{} · {}", saved.name, saved.driver_id),
-                        theme,
-                    )
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.connect(bookie_gpui::live::Origin::Saved(name.clone()), cx);
-                        cx.notify();
-                    }))
+                    let (name, id) = (saved.name.clone(), saved.id);
+                    div()
+                        .flex()
+                        .items_center()
+                        .child(
+                            div().flex_1().child(
+                                ghost(
+                                    ("saved-connection", index),
+                                    format!("{} · {}", saved.name, saved.driver_id),
+                                    theme,
+                                )
+                                .on_click(cx.listener(move |this, _, _, cx| {
+                                    this.connect(bookie_gpui::live::Origin::Saved(name.clone()), cx);
+                                    cx.notify();
+                                })),
+                            ),
+                        )
+                        .child(
+                            ghost_icon(
+                                ("edit-connection", index),
+                                "sliders-horizontal",
+                                "Edit connection",
+                                theme,
+                            )
+                            .on_click(cx.listener(move |this, _, _, cx| {
+                                this.edit_connection(id, cx);
+                            })),
+                        )
                 }))
                 .when(!self.catalog.tables.is_empty(), |section| {
                     section.child(
@@ -939,7 +1003,25 @@ impl GridView {
 
     fn home_query_history_card(&self, theme: Theme) -> Div {
         let entries = self.panel.messages.entries();
-        let content = if entries.is_empty() {
+        let rows: Vec<(String, bool)> = if self.history.is_empty() {
+            entries
+                .iter()
+                .rev()
+                .take(5)
+                .map(|entry| (entry.text.clone(), !matches!(entry.kind, MessageKind::Error)))
+                .collect()
+        } else {
+            self.history
+                .iter()
+                .map(|row| {
+                    (
+                        format!("{} · {}", row.connection_name, one_line(&row.query)),
+                        row.succeeded,
+                    )
+                })
+                .collect()
+        };
+        let content = if rows.is_empty() {
             div()
                 .p_4()
                 .text_color(rgb(theme.muted_foreground))
@@ -950,18 +1032,15 @@ impl GridView {
                 .flex()
                 .flex_col()
                 .gap_1()
-                .children(entries.iter().rev().take(5).map(|entry| {
+                .children(rows.into_iter().map(|(text, ok)| {
                     div()
                         .px_2()
                         .py_1()
                         .rounded(px(theme.radius))
                         .text_size(px(size::TEXT_SMALL))
                         .font_family("monospace")
-                        .text_color(rgb(match entry.kind {
-                            MessageKind::Error => theme.warning,
-                            _ => theme.foreground,
-                        }))
-                        .child(entry.text.clone())
+                        .text_color(rgb(if ok { theme.foreground } else { theme.warning }))
+                        .child(text)
                 }))
         };
         card(theme).child(card_title("Query History", theme)).child(content)
@@ -1023,7 +1102,7 @@ impl GridView {
             .border_b_1()
             .border_color(rgb(theme.border))
             .child(
-                ghost_icon("run-query", "play", "Run query (Ctrl+Enter)", theme).on_click(cx.listener(
+                primary_button("run-query", "Run", "Run query (Ctrl+Enter)", theme).on_click(cx.listener(
                     |this, _, _, cx| {
                         this.run_query(cx);
                         cx.notify();
@@ -1265,7 +1344,8 @@ impl GridView {
                 .children(if self.panel.messages.entries().is_empty() {
                     vec![div().text_color(rgb(theme.muted_foreground)).child("No messages yet")]
                 } else {
-                    self.panel.messages
+                    self.panel
+                        .messages
                         .entries()
                         .iter()
                         .rev()

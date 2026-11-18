@@ -99,6 +99,9 @@ pub fn local_socket_path_kind(capabilities: DriverCapabilities) -> Option<LocalS
 }
 
 pub fn local_socket_options(kind: Option<LocalSocketPathKind>, endpoint: &str) -> (Option<PathBuf>, Option<PathBuf>) {
+    if endpoint.trim().is_empty() {
+        return (None, None);
+    }
     match kind {
         Some(LocalSocketPathKind::Directory) => (Some(PathBuf::from(endpoint)), None),
         Some(LocalSocketPathKind::File) => (None, Some(PathBuf::from(endpoint))),

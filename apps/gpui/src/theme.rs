@@ -74,7 +74,7 @@ impl Theme {
             focus_ring: 0xa1a1a1,
             accent: 0xf5f5f5,
             stripe: 0xf0f0f0,
-            active_row: 0xdbeafe,
+            active_row: 0xe5e5e5,
             info: 0x2563eb,
             success: 0x16a34a,
             warning: 0xd97706,
@@ -97,7 +97,7 @@ impl Theme {
             focus_ring: 0x85868b,
             accent: 0x2e2f33,
             stripe: 0x28282b,
-            active_row: 0x1b2e46,
+            active_row: 0x3a3a3d,
             info: 0x60a5fa,
             success: 0x4ade80,
             warning: 0xfbbf24,
@@ -135,7 +135,7 @@ mod tests {
         );
         assert_eq!(
             (theme.muted_foreground, theme.stripe, theme.active_row),
-            (0x737373, 0xf0f0f0, 0xdbeafe)
+            (0x737373, 0xf0f0f0, 0xe5e5e5)
         );
         assert_eq!(theme.radius, size::CONTROL_RADIUS);
     }

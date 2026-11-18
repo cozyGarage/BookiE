@@ -73,6 +73,7 @@ pub mod ssh_chain_connect;
 pub mod ssh_chain_form;
 pub mod ssh_chain_secrets;
 pub mod state_file;
+pub mod statement_history;
 pub mod statement_timing;
 pub mod stream_page_validation;
 pub mod structure_metadata;
