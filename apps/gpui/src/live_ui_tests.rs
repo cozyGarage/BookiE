@@ -148,7 +148,7 @@ fn a_live_connection_runs_typed_sql_into_a_result_tab_and_refuses_writes(cx: &mu
         assert_eq!(view.runs.len(), 1, "{}", view.status);
         assert_eq!(view.source.total(), 3);
         assert!(
-            view.runs[0].measured().is_some(),
+            view.runs[0].run.measured().is_some(),
             "a run against a database records its real time"
         );
         let names: Vec<&str> = view
@@ -564,7 +564,9 @@ fn connecting_keeps_view_edits_until_the_user_discards_them(cx: &mut TestAppCont
                 .insert((0, 1), bookie_gpui::model::Cell::Text("active".into()));
             view.table_edits
                 .insert((1, 1), bookie_gpui::model::Cell::Text("table".into()));
-            view.run_edits[0].insert((2, 1), bookie_gpui::model::Cell::Text("run".into()));
+            view.runs[0]
+                .edits
+                .insert((2, 1), bookie_gpui::model::Cell::Text("run".into()));
             view.connect(origin.clone(), cx);
         });
     });
@@ -573,7 +575,7 @@ fn connecting_keeps_view_edits_until_the_user_discards_them(cx: &mut TestAppCont
     view.read_with(cx, |view, _| {
         assert!(view.live.is_none());
         assert_eq!(
-            (view.edits.len(), view.table_edits.len(), view.run_edits[0].len()),
+            (view.edits.len(), view.table_edits.len(), view.runs[0].edits.len()),
             (1, 1, 1)
         );
         assert!(view.status.contains("Discard all view-only edits"));
@@ -583,7 +585,7 @@ fn connecting_keeps_view_edits_until_the_user_discards_them(cx: &mut TestAppCont
     cx.simulate_keystrokes("enter");
     view.read_with(cx, |view, _| {
         assert!(view.edits.is_empty() && view.table_edits.is_empty());
-        assert!(view.run_edits.iter().all(|edits| edits.is_empty()));
+        assert!(view.runs.iter().all(|slot| slot.edits.is_empty()));
     });
     cx.update(|_, cx| view.update(cx, |view, cx| view.connect(origin, cx)));
     cx.executor().advance_clock(std::time::Duration::from_secs(1));
@@ -633,8 +635,17 @@ fn switching_tables_keeps_all_view_edits_until_the_user_discards_them(cx: &mut T
                 .insert((0, 1), bookie_gpui::model::Cell::Text("table draft".into()));
             view.table_edits
                 .insert((1, 1), bookie_gpui::model::Cell::Text("saved table draft".into()));
-            view.run_edits.push(Default::default());
-            view.run_edits[0].insert((2, 1), bookie_gpui::model::Cell::Text("result draft".into()));
+            view.runs.push(crate::runs::RunSlot::new(
+                bookie_gpui::shell::Run {
+                    number: 1,
+                    rows: 0,
+                    elapsed_ms: None,
+                },
+                None,
+            ));
+            view.runs[0]
+                .edits
+                .insert((2, 1), bookie_gpui::model::Cell::Text("result draft".into()));
             view.open_table_named(&table_info("beta"), window, cx);
         });
     });
@@ -644,7 +655,7 @@ fn switching_tables_keeps_all_view_edits_until_the_user_discards_them(cx: &mut T
         assert_eq!(view.catalog.grid_table, table_info("alpha"));
         assert_eq!(view.edits.len(), 1);
         assert_eq!(view.table_edits.len(), 1);
-        assert_eq!(view.run_edits[0].len(), 1);
+        assert_eq!(view.runs[0].edits.len(), 1);
         assert!(view.status.contains("Discard all view-only edits"));
     });
 }
@@ -740,7 +751,9 @@ fn closing_a_query_tab_with_result_edits_requires_explicit_discard(cx: &mut Test
         view.tabs.open_query();
         view.sync_grid_owner();
         view.add_run(None);
-        view.run_edits[view.active_run].insert((0, 1), bookie_gpui::model::Cell::Text("result draft".into()));
+        view.runs[view.active_run]
+            .edits
+            .insert((0, 1), bookie_gpui::model::Cell::Text("result draft".into()));
         view.close_tab(2);
     });
     view.read_with(cx, |view, _| {
@@ -750,7 +763,7 @@ fn closing_a_query_tab_with_result_edits_requires_explicit_discard(cx: &mut Test
                 .iter()
                 .any(|tab| matches!(tab, bookie_gpui::shell::Tab::Query))
         );
-        assert!(view.run_edits.iter().any(|edits| !edits.is_empty()));
+        assert!(view.runs.iter().any(|slot| !slot.edits.is_empty()));
         assert!(view.status.contains("Discard all view-only edits"));
     });
 }
@@ -877,7 +890,11 @@ fn the_sessions_command_is_hidden_and_does_nothing_off_postgres(cx: &mut TestApp
     });
     cx.update(|window, cx| view.update(cx, |view, cx| view.show_sessions(window, cx)));
     view.read_with(cx, |view, cx| {
-        assert_eq!(view.sql_input.read(cx).value(), "", "no activity query exists for SQLite");
+        assert_eq!(
+            view.sql_input.read(cx).value(),
+            "",
+            "no activity query exists for SQLite"
+        );
         assert!(!matches!(view.tabs.current(), crate::Tab::Query));
     });
 }
@@ -946,7 +963,7 @@ fn a_typed_host_and_port_offers_a_tcp_check_that_lands_in_messages(cx: &mut Test
     });
     cx.simulate_input("");
     cx.update(|_, cx| {
-        let input = view.read(cx).palette_input.clone();
+        let input = view.read(cx).palette.input.clone();
         input.update(cx, |input, cx| input.set_content(&address, cx));
     });
     cx.simulate_keystrokes("enter");
@@ -1060,7 +1077,7 @@ fn a_new_query_tab_focuses_its_editor_so_typing_lands_there(cx: &mut TestAppCont
     });
     cx.simulate_keystrokes("ctrl-shift-p");
     view.read_with(cx, |view, _| {
-        assert!(view.palette_open, "global shortcuts still work in the editor")
+        assert!(view.palette.open, "global shortcuts still work in the editor")
     });
 }
 
@@ -1149,7 +1166,14 @@ fn activity_palette_queries_reflect_driver_capabilities(cx: &mut TestAppContext)
     });
     view.read_with(cx, |view, _| {
         let actions = view.palette_actions();
-        for id in ["sessions", "blocking-locks", "long-running", "replication-lag", "server-variables", "server-status"] {
+        for id in [
+            "sessions",
+            "blocking-locks",
+            "long-running",
+            "replication-lag",
+            "server-variables",
+            "server-status",
+        ] {
             let action = actions.iter().find(|a| a.id == id).expect(id);
             assert!(action.enabled, "PostgreSQL should enable activity query {id}");
         }
@@ -1177,7 +1201,14 @@ fn activity_palette_queries_reflect_driver_capabilities(cx: &mut TestAppContext)
     });
     view.read_with(cx, |view, _| {
         let actions = view.palette_actions();
-        for id in ["sessions", "blocking-locks", "long-running", "replication-lag", "server-variables", "server-status"] {
+        for id in [
+            "sessions",
+            "blocking-locks",
+            "long-running",
+            "replication-lag",
+            "server-variables",
+            "server-status",
+        ] {
             let action = actions.iter().find(|a| a.id == id).expect(id);
             assert!(!action.enabled, "SQLite should disable activity query {id}");
         }
@@ -1246,9 +1277,12 @@ fn the_csv_delimiter_command_changes_exports_until_it_is_reset(cx: &mut TestAppC
     let (view, cx) = open_live(cx);
 
     view.update(cx, |view, _| {
-        view.palette_delimiter = bookie_gpui::csv_delimiter::parse_command("csv delimiter ||");
+        view.palette.delimiter = bookie_gpui::csv_delimiter::parse_command("csv delimiter ||");
         let actions = view.palette_actions();
-        let set = actions.iter().find(|action| action.id == "set-csv-delimiter").expect("set action");
+        let set = actions
+            .iter()
+            .find(|action| action.id == "set-csv-delimiter")
+            .expect("set action");
         assert!(set.enabled && set.label.starts_with("CSV delimiter ||"));
         assert!(bookie_gpui::palette::fuzzy_score("csv delimiter ||", &set.label) > 0);
         assert!(actions.iter().all(|action| action.id != "reset-csv-delimiter"));
@@ -1258,14 +1292,26 @@ fn the_csv_delimiter_command_changes_exports_until_it_is_reset(cx: &mut TestAppC
     cx.update(|_, cx| view.update(cx, |view, cx| view.export_selection_or_page(cx)));
     view.read_with(cx, |view, cx| {
         let text = cx.read_from_clipboard().expect("clipboard text").text().expect("text");
-        assert!(text.lines().next().is_some_and(|header| header.starts_with("id||customer||")), "{text}");
-        assert!(view.palette_actions().iter().any(|action| action.id == "reset-csv-delimiter"));
+        assert!(
+            text.lines()
+                .next()
+                .is_some_and(|header| header.starts_with("id||customer||")),
+            "{text}"
+        );
+        assert!(
+            view.palette_actions()
+                .iter()
+                .any(|action| action.id == "reset-csv-delimiter")
+        );
     });
 
     view.update(cx, |view, _| {
-        view.palette_delimiter = bookie_gpui::csv_delimiter::parse_command("csv delimiter 'x");
+        view.palette.delimiter = bookie_gpui::csv_delimiter::parse_command("csv delimiter 'x");
         let actions = view.palette_actions();
-        let bad = actions.iter().find(|action| action.id == "set-csv-delimiter").expect("refusal row");
+        let bad = actions
+            .iter()
+            .find(|action| action.id == "set-csv-delimiter")
+            .expect("refusal row");
         assert!(bad.enabled && bad.label.ends_with("no quote characters"));
         view.set_csv_delimiter();
         assert_eq!(view.status, "CSV delimiter refused: no quote characters");
@@ -1275,7 +1321,11 @@ fn the_csv_delimiter_command_changes_exports_until_it_is_reset(cx: &mut TestAppC
     cx.update(|_, cx| view.update(cx, |view, cx| view.export_selection_or_page(cx)));
     view.read_with(cx, |_, cx| {
         let text = cx.read_from_clipboard().expect("clipboard text").text().expect("text");
-        assert!(text.lines().next().is_some_and(|header| header.starts_with("id,customer,")));
+        assert!(
+            text.lines()
+                .next()
+                .is_some_and(|header| header.starts_with("id,customer,"))
+        );
     });
 }
 
@@ -1284,9 +1334,12 @@ fn the_export_limit_command_stops_the_csv_export_until_it_is_removed(cx: &mut Te
     let (view, cx) = open_live(cx);
 
     view.update(cx, |view, _| {
-        view.palette_limit = bookie_gpui::export_limit::parse_command("export limit 1");
+        view.palette.limit = bookie_gpui::export_limit::parse_command("export limit 1");
         let actions = view.palette_actions();
-        let set = actions.iter().find(|action| action.id == "set-export-limit").expect("set action");
+        let set = actions
+            .iter()
+            .find(|action| action.id == "set-export-limit")
+            .expect("set action");
         assert!(set.enabled && set.label.starts_with("Export limit 1"));
         assert!(actions.iter().all(|action| action.id != "reset-export-limit"));
         view.set_export_limit();
@@ -1297,11 +1350,15 @@ fn the_export_limit_command_stops_the_csv_export_until_it_is_removed(cx: &mut Te
         let text = cx.read_from_clipboard().expect("clipboard text").text().expect("text");
         assert_eq!(text.lines().count(), 2, "1 header line + 1 data row: {text}");
         assert!(view.status.contains("Exported the first 1 row"), "{}", view.status);
-        assert!(view.palette_actions().iter().any(|action| action.id == "reset-export-limit"));
+        assert!(
+            view.palette_actions()
+                .iter()
+                .any(|action| action.id == "reset-export-limit")
+        );
     });
 
     view.update(cx, |view, _| {
-        view.palette_limit = bookie_gpui::export_limit::parse_command("export limit 0");
+        view.palette.limit = bookie_gpui::export_limit::parse_command("export limit 0");
         view.set_export_limit();
         assert_eq!(view.status, "Export limit refused: a whole number of at least 1");
         view.set_export_limit_to(None);
@@ -1322,7 +1379,11 @@ fn exporting_the_page_writes_every_row_of_the_page_from_the_first(cx: &mut TestA
         let text = cx.read_from_clipboard().expect("clipboard text").text().expect("text");
         let lines: Vec<&str> = text.lines().collect();
         assert_eq!(lines.len(), 7, "1 header line + all 6 rows: {text}");
-        assert!(lines[1].starts_with("1,Ada,"), "the first row comes first: {}", lines[1]);
+        assert!(
+            lines[1].starts_with("1,Ada,"),
+            "the first row comes first: {}",
+            lines[1]
+        );
         assert!(lines[6].starts_with("6,"), "the last row comes last: {}", lines[6]);
         assert_eq!(view.status, "Exported 6 rows as CSV to clipboard");
     });

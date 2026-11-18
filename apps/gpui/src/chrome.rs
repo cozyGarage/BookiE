@@ -243,26 +243,42 @@ impl GridView {
                     .gap_1()
                     .children((!self.sidebar_open).then(|| expand_sidebar_button(theme, cx)))
                     .child(
-                        toolbar_icon("new-connection", "database", "Connections", theme).on_click(cx.listener(|this, _, _, cx| {
-                            this.tabs.open_home();
-                            this.sync_grid_owner();
-                            cx.notify();
-                        })),
+                        toolbar_icon("new-connection", "database", "Connections", theme).on_click(cx.listener(
+                            |this, _, _, cx| {
+                                this.tabs.open_home();
+                                this.sync_grid_owner();
+                                cx.notify();
+                            },
+                        )),
                     )
                     .child(
-                        toolbar_icon("new-query", "file-plus", "New query", theme).on_click(cx.listener(|this, _, window, cx| {
-                            this.tabs.open_query();
-                            this.sync_grid_owner();
-                            if this.live.is_some() {
-                                this.focus_editor = true;
-                            } else {
-                                window.focus(&this.focus, cx);
-                            }
-                            cx.notify();
-                        })),
+                        toolbar_icon("new-query", "file-plus", "New query", theme).on_click(cx.listener(
+                            |this, _, window, cx| {
+                                this.tabs.open_query();
+                                this.sync_grid_owner();
+                                if this.live.is_some() {
+                                    this.focus_editor = true;
+                                } else {
+                                    window.focus(&this.focus, cx);
+                                }
+                                cx.notify();
+                            },
+                        )),
                     ),
             )
             .child(self.toolbar_right(theme, cx))
+    }
+
+    fn overflow_menu(&self, theme: Theme, cx: &mut Context<Self>) -> impl IntoElement {
+        use gpui_component::button::{Button, ButtonVariants};
+        use gpui_component::menu::DropdownMenu;
+        let groups = crate::menus::command_groups(self, crate::menus::OVERFLOW_GROUPS);
+        Button::new("more")
+            .ghost()
+            .compact()
+            .tooltip("More")
+            .child(icon("ellipsis", theme.muted_foreground))
+            .dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), groups))
     }
 
     fn toolbar_right(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
@@ -270,6 +286,7 @@ impl GridView {
             .flex()
             .items_center()
             .gap_1()
+            .child(self.overflow_menu(theme, cx))
             .child(
                 toolbar_icon("palette", "command", "Command palette (Ctrl+Shift+P)", theme)
                     .on_click(cx.listener(|this, _, window, cx| this.open_palette(window, cx))),
@@ -278,15 +295,18 @@ impl GridView {
                 toolbar_icon(
                     "theme-toggle",
                     if theme.dark { "sun" } else { "moon" },
-                    if theme.dark { "Switch to light theme" } else { "Switch to dark theme" },
-                    theme,
-                ).on_click(cx.listener(
-                    |this, _, window, cx| {
-                        this.dark_mode = !this.dark_mode;
-                        Theme::current(cx).toggled().install(cx);
-                        window.refresh();
+                    if theme.dark {
+                        "Switch to light theme"
+                    } else {
+                        "Switch to dark theme"
                     },
-                )),
+                    theme,
+                )
+                .on_click(cx.listener(|this, _, window, cx| {
+                    this.dark_mode = !this.dark_mode;
+                    Theme::current(cx).toggled().install(cx);
+                    window.refresh();
+                })),
             )
             .child(
                 window_button("win-min", "\u{2013}", "Minimize", theme).on_click(cx.listener(|_, _, window, _| {
@@ -399,10 +419,7 @@ impl GridView {
             .gap_1()
             .cursor_pointer()
             .child(icon("arrow-down-up", theme.muted_foreground).flex_none())
-            .children(
-                (self.sidebar_width >= 320.0)
-                    .then(|| div().flex_1().min_w_0().child("Import / Export")),
-            )
+            .children((self.sidebar_width >= 320.0).then(|| div().flex_1().min_w_0().child("Import / Export")))
             .on_click(cx.listener(|this, _, _, cx| {
                 this.import_menu_open = !this.import_menu_open;
                 cx.notify();
@@ -426,28 +443,22 @@ impl GridView {
                 )),
             )
             .child(
-                header_icon("header-new-folder", "folder-plus", theme).on_click(cx.listener(
-                    |this, _, _, cx| {
-                        this.status = "Folder organization is coming soon".into();
-                        cx.notify();
-                    },
-                )),
+                header_icon("header-new-folder", "folder-plus", theme).on_click(cx.listener(|this, _, _, cx| {
+                    this.status = "Folder organization is coming soon".into();
+                    cx.notify();
+                })),
             )
             .child(
-                header_icon("header-refresh", "refresh-cw", theme).on_click(cx.listener(
-                    |this, _, _, cx| {
-                        this.status = "Refreshed catalog schema".into();
-                        cx.notify();
-                    },
-                )),
+                header_icon("header-refresh", "refresh-cw", theme).on_click(cx.listener(|this, _, _, cx| {
+                    this.status = "Refreshed catalog schema".into();
+                    cx.notify();
+                })),
             )
             .child(
-                header_icon("collapse-sidebar", "chevrons-left", theme).on_click(cx.listener(
-                    |this, _, _, cx| {
-                        this.sidebar_open = false;
-                        cx.notify();
-                    },
-                )),
+                header_icon("collapse-sidebar", "chevrons-left", theme).on_click(cx.listener(|this, _, _, cx| {
+                    this.sidebar_open = false;
+                    cx.notify();
+                })),
             )
     }
 
@@ -535,7 +546,7 @@ impl GridView {
             .flex_none()
             .w(px(self.sidebar_width))
             .h_full()
-            .bg(rgb(theme.chrome))
+            .bg(rgb(theme.sidebar))
             .border_r_1()
             .border_color(rgb(theme.border))
             .child(self.sidebar_header(theme, cx))
@@ -787,29 +798,26 @@ impl GridView {
             .p_6()
             .bg(rgb(theme.background))
             .child(
-                div()
-                    .pt(px(size::HOME_TOP))
-                    .w(px(size::HOME_WIDTH))
-                    .max_w_full()
-                    .flex()
-                    .flex_col()
-                    .gap_4()
-                    .child(self.home_stats_row(theme))
-                    .child(
-                        div()
-                            .flex()
-                            .gap_4()
-                            .child(self.home_quick_start_card(theme, cx))
-                            .child(self.home_shortcuts_card(theme, cx)),
-                    )
-                    .child(self.home_query_history_card(theme))
-                    .child(
-                        div()
-                            .w_full()
-                            .text_color(rgb(theme.muted_foreground))
-                            .child("BookiE desktop frontend. Connect to a database or select a table from the sidebar to browse data."),
-                    ),
-            )
+            div()
+                .pt(px(size::HOME_TOP))
+                .w(px(size::HOME_WIDTH))
+                .max_w_full()
+                .flex()
+                .flex_col()
+                .gap_4()
+                .child(self.home_stats_row(theme))
+                .child(
+                    div()
+                        .flex()
+                        .gap_4()
+                        .child(self.home_quick_start_card(theme, cx))
+                        .child(self.home_shortcuts_card(theme, cx)),
+                )
+                .child(self.home_query_history_card(theme))
+                .child(div().w_full().text_color(rgb(theme.muted_foreground)).child(
+                    "BookiE desktop frontend. Connect to a database or select a table from the sidebar to browse data.",
+                )),
+        )
     }
 
     fn home_stats_row(&self, theme: Theme) -> Div {
@@ -845,45 +853,42 @@ impl GridView {
     }
 
     fn home_quick_start_card(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
-        card(theme)
-            .flex_1()
-            .child(card_title("Quick Start", theme))
-            .child(
-                div()
-                    .p_2()
-                    .flex()
-                    .flex_col()
-                    .children(self.connections.iter().enumerate().map(|(index, saved)| {
-                        let name = saved.name.clone();
+        card(theme).flex_1().child(card_title("Quick Start", theme)).child(
+            div()
+                .p_2()
+                .flex()
+                .flex_col()
+                .children(self.connections.iter().enumerate().map(|(index, saved)| {
+                    let name = saved.name.clone();
+                    ghost(
+                        ("saved-connection", index),
+                        format!("{} · {}", saved.name, saved.driver_id),
+                        theme,
+                    )
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        this.connect(bookie_gpui::live::Origin::Saved(name.clone()), cx);
+                        cx.notify();
+                    }))
+                }))
+                .when(!self.catalog.tables.is_empty(), |section| {
+                    section.child(
                         ghost(
-                            ("saved-connection", index),
-                            format!("{} · {}", saved.name, saved.driver_id),
+                            "quick-open",
+                            format!(
+                                "{} → {}",
+                                self.catalog.connection,
+                                table_label(&self.catalog.grid_table)
+                            ),
                             theme,
                         )
-                        .on_click(cx.listener(move |this, _, _, cx| {
-                            this.connect(bookie_gpui::live::Origin::Saved(name.clone()), cx);
+                        .on_click(cx.listener(|this, _, window, cx| {
+                            let name = this.catalog.grid_table.clone();
+                            this.open_table_named(&name, window, cx);
                             cx.notify();
-                        }))
-                    }))
-                    .when(!self.catalog.tables.is_empty(), |section| {
-                        section.child(
-                            ghost(
-                                "quick-open",
-                                format!(
-                                    "{} → {}",
-                                    self.catalog.connection,
-                                    table_label(&self.catalog.grid_table)
-                                ),
-                                theme,
-                            )
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                let name = this.catalog.grid_table.clone();
-                                this.open_table_named(&name, window, cx);
-                                cx.notify();
-                            })),
-                        )
-                    }),
-            )
+                        })),
+                    )
+                }),
+        )
     }
 
     fn home_shortcuts_card(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
@@ -895,31 +900,32 @@ impl GridView {
                     .p_2()
                     .flex()
                     .flex_col()
+                    .child(home_shortcut("s-new", "plus", "New Query", theme).on_click(cx.listener(
+                        |this, _, window, cx| {
+                            this.tabs.open_query();
+                            this.sync_grid_owner();
+                            if this.live.is_some() {
+                                this.focus_editor = true;
+                            } else {
+                                window.focus(&this.focus, cx);
+                            }
+                            cx.notify();
+                        },
+                    )))
                     .child(
-                        home_shortcut("s-new", "plus", "New Query", theme)
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                this.tabs.open_query();
-                                this.sync_grid_owner();
-                                if this.live.is_some() {
-                                    this.focus_editor = true;
-                                } else {
-                                    window.focus(&this.focus, cx);
-                                }
-                                cx.notify();
-                            })),
-                    )
-                    .child(
-                        home_shortcut("s-status", "play", "Connection Status", theme)
-                            .on_click(cx.listener(|this, _, _, cx| {
+                        home_shortcut("s-status", "play", "Connection Status", theme).on_click(cx.listener(
+                            |this, _, _, cx| {
                                 this.show_status();
                                 cx.notify();
-                            })),
+                            },
+                        )),
                     )
                     .child(
-                        home_shortcut("s-palette", "command", "Command Palette", theme)
-                            .on_click(cx.listener(|this, _, window, cx| {
+                        home_shortcut("s-palette", "command", "Command Palette", theme).on_click(cx.listener(
+                            |this, _, window, cx| {
                                 this.open_palette(window, cx);
-                            })),
+                            },
+                        )),
                     ),
             )
     }
@@ -951,9 +957,7 @@ impl GridView {
                         .child(entry.text.clone())
                 }))
         };
-        card(theme)
-            .child(card_title("Query History", theme))
-            .child(content)
+        card(theme).child(card_title("Query History", theme)).child(content)
     }
 
     pub fn placeholder_page(&self, name: &str, theme: Theme) -> Div {
@@ -990,17 +994,13 @@ impl GridView {
             .border_color(rgb(theme.border))
             .text_size(px(size::TEXT_SMALL))
             .text_color(rgb(theme.muted_foreground))
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap_2()
-                    .child(self.source.origin())
-                    .when(!self.status.is_empty(), |row| {
-                        row.child(div().child("·"))
-                            .child(div().text_color(rgb(theme.foreground)).child(self.status.clone()))
-                    }),
-            )
+            .child(div().flex().items_center().gap_2().child(self.source.origin()).when(
+                !self.status.is_empty(),
+                |row| {
+                    row.child(div().child("·"))
+                        .child(div().text_color(rgb(theme.foreground)).child(self.status.clone()))
+                },
+            ))
             .child(right)
     }
 
@@ -1051,13 +1051,15 @@ impl GridView {
                             .flex()
                             .flex_col()
                             .text_color(rgb(theme.muted_foreground))
-                            .children((1..=SQL.len()).map(|number| div().h(px(size::EDITOR_LINE)).child(number.to_string())))
+                            .children(
+                                (1..=SQL.len()).map(|number| div().h(px(size::EDITOR_LINE)).child(number.to_string())),
+                            )
                     }))
                     .children(self.live.is_none().then(|| {
-                        div()
-                            .flex()
-                            .flex_col()
-                            .children(SQL.iter().map(|line| div().h(px(size::EDITOR_LINE)).child((*line).to_string())))
+                        div().flex().flex_col().children(
+                            SQL.iter()
+                                .map(|line| div().h(px(size::EDITOR_LINE)).child((*line).to_string())),
+                        )
                     }))
                     .children(self.live.is_some().then(|| {
                         div()
@@ -1191,7 +1193,7 @@ impl GridView {
             .runs
             .iter()
             .enumerate()
-            .map(|(index, run)| self.result_tab_item(index, run, index == self.active_run, theme, cx));
+            .map(|(index, slot)| self.result_tab_item(index, &slot.run, index == self.active_run, theme, cx));
         div()
             .flex()
             .items_center()
@@ -1289,12 +1291,12 @@ impl GridView {
     fn result_body(&self, theme: Theme, grid: Div) -> Div {
         if self.result_view == ResultView::Messages {
             self.result_messages_body(theme)
-        } else if let Some(run) = self
+        } else if let Some(slot) = self
             .runs
             .get(self.active_run)
             .filter(|_| self.result_view == ResultView::Summary)
         {
-            self.result_summary_body(run)
+            self.result_summary_body(&slot.run)
         } else if self.runs.is_empty() {
             div().flex_1().p_4().child("No results")
         } else {

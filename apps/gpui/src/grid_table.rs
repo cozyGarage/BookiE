@@ -53,9 +53,27 @@ pub struct GridDelegate {
     cached: Option<(usize, Vec<(String, bool)>)>,
     edits: Edits,
     editor: Option<(usize, usize, gpui::AnyView)>,
+    pub owner: Option<gpui::WeakEntity<GridView>>,
 }
 
 impl TableDelegate for GridDelegate {
+    fn context_menu(
+        &mut self,
+        _row_ix: usize,
+        menu: gpui_kit::component::menu::PopupMenu,
+        _window: &mut Window,
+        cx: &mut Context<TableState<Self>>,
+    ) -> gpui_kit::component::menu::PopupMenu {
+        let Some(owner) = self.owner.clone() else {
+            return menu;
+        };
+        let Some(view) = owner.upgrade() else {
+            return menu;
+        };
+        let groups = crate::menus::command_groups(view.read(cx), crate::menus::ROW_GROUPS);
+        crate::menus::fill(menu, &owner, &groups)
+    }
+
     fn columns_count(&self, _cx: &App) -> usize {
         self.columns.len()
     }
@@ -81,17 +99,13 @@ impl TableDelegate for GridDelegate {
         let is_numeric = self.numeric.get(col_ix).copied().unwrap_or(false);
         match &self.editor {
             Some((row, column, view)) if *row == row_ix && *column == col_ix => {
-                div()
-                    .w_full()
-                    .flex()
-                    .when(is_numeric, |el| el.justify_end())
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .when(is_numeric, |el| el.text_right())
-                            .child(view.clone()),
-                    )
+                div().w_full().flex().when(is_numeric, |el| el.justify_end()).child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .when(is_numeric, |el| el.text_right())
+                        .child(view.clone()),
+                )
             }
             _ => {
                 let (text, right) = self.label_of(row_ix, col_ix);

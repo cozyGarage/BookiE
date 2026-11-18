@@ -435,8 +435,14 @@ impl EntityInputHandler for TextInput {
         let x_offset = compute_x_offset(self.text_align, bounds, last_layout.width);
         let range = self.range_from_utf16(&range_utf16);
         Some(Bounds::from_corners(
-            point(bounds.left() + x_offset + last_layout.x_for_index(range.start), bounds.top()),
-            point(bounds.left() + x_offset + last_layout.x_for_index(range.end), bounds.bottom()),
+            point(
+                bounds.left() + x_offset + last_layout.x_for_index(range.start),
+                bounds.top(),
+            ),
+            point(
+                bounds.left() + x_offset + last_layout.x_for_index(range.end),
+                bounds.bottom(),
+            ),
         ))
     }
 
@@ -522,7 +528,12 @@ impl Element for TextElement {
             (content, style.color)
         };
 
-        let runs = build_text_runs(display_text.len(), input.marked_range.as_ref(), style.font(), text_color);
+        let runs = build_text_runs(
+            display_text.len(),
+            input.marked_range.as_ref(),
+            style.font(),
+            text_color,
+        );
         let font_size = style.font_size.to_pixels(window.rem_size());
         let line = window.text_system().shape_line(display_text, font_size, &runs, None);
 
@@ -695,8 +706,14 @@ fn compute_selection_and_cursor(
         (
             Some(fill(
                 Bounds::from_corners(
-                    point(bounds.left() + x_offset + line.x_for_index(selected_range.start), bounds.top()),
-                    point(bounds.left() + x_offset + line.x_for_index(selected_range.end), bounds.bottom()),
+                    point(
+                        bounds.left() + x_offset + line.x_for_index(selected_range.start),
+                        bounds.top(),
+                    ),
+                    point(
+                        bounds.left() + x_offset + line.x_for_index(selected_range.end),
+                        bounds.bottom(),
+                    ),
                 ),
                 rgba(0x5b8cff55),
             )),
@@ -712,17 +729,8 @@ mod tests {
     #[test]
     fn compute_x_offset_right_aligns_when_bounds_exceed_line_width() {
         let bounds = Bounds::new(point(px(10.0), px(10.0)), size(px(100.0), px(20.0)));
-        assert_eq!(
-            compute_x_offset(gpui::TextAlign::Right, bounds, px(40.0)),
-            px(60.0)
-        );
-        assert_eq!(
-            compute_x_offset(gpui::TextAlign::Right, bounds, px(120.0)),
-            px(0.0)
-        );
-        assert_eq!(
-            compute_x_offset(gpui::TextAlign::Left, bounds, px(40.0)),
-            px(0.0)
-        );
+        assert_eq!(compute_x_offset(gpui::TextAlign::Right, bounds, px(40.0)), px(60.0));
+        assert_eq!(compute_x_offset(gpui::TextAlign::Right, bounds, px(120.0)), px(0.0));
+        assert_eq!(compute_x_offset(gpui::TextAlign::Left, bounds, px(40.0)), px(0.0));
     }
 }

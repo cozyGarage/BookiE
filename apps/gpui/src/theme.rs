@@ -30,15 +30,8 @@ pub mod size {
     pub const HOME_TOP: f32 = 96.0;
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Style {
-    Dbx,
-    Adwaita,
-}
-
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Theme {
-    pub style: Style,
     pub dark: bool,
     pub radius: f32,
     pub background: u32,
@@ -46,12 +39,17 @@ pub struct Theme {
     pub muted: u32,
     pub muted_foreground: u32,
     pub chrome: u32,
+    pub sidebar: u32,
+    pub popover: u32,
     pub border: u32,
+    pub focus_ring: u32,
     pub accent: u32,
     pub stripe: u32,
     pub active_row: u32,
     pub info: u32,
+    pub success: u32,
     pub warning: u32,
+    pub destructive: u32,
 }
 
 impl Default for Theme {
@@ -62,123 +60,64 @@ impl Default for Theme {
 
 impl Theme {
     pub fn light() -> Self {
-        Self::dbx_light()
-    }
-
-    pub fn dark() -> Self {
-        Self::dbx_dark()
-    }
-
-    pub fn dbx_light() -> Self {
         Theme {
-            style: Style::Dbx,
             dark: false,
-            radius: 4.0,
+            radius: size::CONTROL_RADIUS,
             background: 0xffffff,
             foreground: 0x0a0a0a,
             muted: 0xf5f5f5,
             muted_foreground: 0x737373,
-            chrome: 0xfafafa,
+            chrome: 0xf5f5f5,
+            sidebar: 0xfafafa,
+            popover: 0xffffff,
             border: 0xe5e5e5,
+            focus_ring: 0xa1a1a1,
             accent: 0xf5f5f5,
             stripe: 0xf0f0f0,
             active_row: 0xdbeafe,
             info: 0x2563eb,
+            success: 0x16a34a,
             warning: 0xd97706,
+            destructive: 0xe7000b,
         }
     }
 
-    pub fn dbx_dark() -> Self {
+    pub fn dark() -> Self {
         Theme {
-            style: Style::Dbx,
             dark: true,
-            radius: 4.0,
+            radius: size::CONTROL_RADIUS,
             background: 0x131416,
             foreground: 0xd7d7db,
             muted: 0x2a2a2d,
             muted_foreground: 0x97989d,
-            chrome: 0x19191c,
+            chrome: 0x1b1b1e,
+            sidebar: 0x19191c,
+            popover: 0x1e1e20,
             border: 0x3a3a3d,
+            focus_ring: 0x85868b,
             accent: 0x2e2f33,
             stripe: 0x28282b,
             active_row: 0x1b2e46,
             info: 0x60a5fa,
+            success: 0x4ade80,
             warning: 0xfbbf24,
-        }
-    }
-
-    pub fn adwaita_light() -> Self {
-        Theme {
-            style: Style::Adwaita,
-            dark: false,
-            radius: 6.0,
-            background: 0xffffff,
-            foreground: 0x2e3436,
-            muted: 0xf6f5f4,
-            muted_foreground: 0x77767b,
-            chrome: 0xebebed,
-            border: 0xd8d8db,
-            accent: 0xe4e4e7,
-            stripe: 0xf9f9fa,
-            active_row: 0xd9e7fb,
-            info: 0x3584e4,
-            warning: 0xe5a50a,
-        }
-    }
-
-    pub fn adwaita_dark() -> Self {
-        Theme {
-            style: Style::Adwaita,
-            dark: true,
-            radius: 6.0,
-            background: 0x1e1e1e,
-            foreground: 0xf0f0f0,
-            muted: 0x2b2b2b,
-            muted_foreground: 0x9a9996,
-            chrome: 0x2e2e32,
-            border: 0x3d3d3d,
-            accent: 0x3a3a3f,
-            stripe: 0x242424,
-            active_row: 0x1f3a5c,
-            info: 0x78aeed,
-            warning: 0xf8e45c,
+            destructive: 0xf3625f,
         }
     }
 
     pub fn named(name: Option<&str>) -> Self {
         match name {
-            Some("dark" | "dbx-dark") => Self::dbx_dark(),
-            Some("adwaita-light") => Self::adwaita_light(),
-            Some("adwaita-dark") => Self::adwaita_dark(),
-            _ => Self::dbx_light(),
-        }
-    }
-
-    pub fn with_style(self, style: Style) -> Self {
-        match (style, self.dark) {
-            (Style::Dbx, false) => Self::dbx_light(),
-            (Style::Dbx, true) => Self::dbx_dark(),
-            (Style::Adwaita, false) => Self::adwaita_light(),
-            (Style::Adwaita, true) => Self::adwaita_dark(),
+            Some("dark" | "dbx-dark") => Self::dark(),
+            _ => Self::light(),
         }
     }
 
     pub fn toggled(self) -> Self {
-        match (self.style, self.dark) {
-            (Style::Dbx, false) => Self::dbx_dark(),
-            (Style::Dbx, true) => Self::dbx_light(),
-            (Style::Adwaita, false) => Self::adwaita_dark(),
-            (Style::Adwaita, true) => Self::adwaita_light(),
-        }
+        if self.dark { Self::light() } else { Self::dark() }
     }
 
     pub fn label(self) -> &'static str {
-        match (self.style, self.dark) {
-            (Style::Dbx, false) => "DBX light",
-            (Style::Dbx, true) => "DBX dark",
-            (Style::Adwaita, false) => "Adwaita light",
-            (Style::Adwaita, true) => "Adwaita dark",
-        }
+        if self.dark { "Dark" } else { "Light" }
     }
 }
 
@@ -187,9 +126,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn dbx_light_is_the_default_and_uses_dbx_tokens() {
+    fn light_is_the_default_and_uses_the_design_tokens() {
         let theme = Theme::named(None);
-        assert_eq!(theme, Theme::dbx_light());
+        assert_eq!(theme, Theme::light());
         assert_eq!(
             (theme.background, theme.foreground, theme.border),
             (0xffffff, 0x0a0a0a, 0xe5e5e5)
@@ -198,34 +137,32 @@ mod tests {
             (theme.muted_foreground, theme.stripe, theme.active_row),
             (0x737373, 0xf0f0f0, 0xdbeafe)
         );
-        assert_eq!(theme.radius, 4.0);
+        assert_eq!(theme.radius, size::CONTROL_RADIUS);
     }
 
     #[test]
-    fn adwaita_uses_the_gnome_accent_and_rounder_corners() {
-        let theme = Theme::adwaita_light();
-        assert_eq!((theme.info, theme.radius), (0x3584e4, 6.0));
-        assert_eq!(Theme::adwaita_dark().chrome, 0x2e2e32);
+    fn both_themes_define_the_semantic_colours_of_the_design() {
+        for theme in [Theme::light(), Theme::dark()] {
+            assert_ne!(theme.destructive, theme.success);
+            assert_ne!(theme.focus_ring, theme.border);
+            assert_ne!(theme.popover, 0);
+        }
+        assert_eq!(
+            (Theme::light().destructive, Theme::dark().success),
+            (0xe7000b, 0x4ade80)
+        );
     }
 
     #[test]
-    fn a_name_picks_the_theme_and_an_unknown_name_falls_back_to_dbx_light() {
-        assert_eq!(Theme::named(Some("dark")), Theme::dbx_dark());
-        assert_eq!(Theme::named(Some("adwaita-dark")), Theme::adwaita_dark());
-        assert_eq!(Theme::named(Some("adwaita-light")), Theme::adwaita_light());
-        assert_eq!(Theme::named(Some("solarized")), Theme::dbx_light());
+    fn a_name_picks_the_theme_and_an_unknown_name_falls_back_to_light() {
+        assert_eq!(Theme::named(Some("dark")), Theme::dark());
+        assert_eq!(Theme::named(Some("solarized")), Theme::light());
     }
 
     #[test]
-    fn toggling_keeps_the_style_and_twice_returns_to_the_start() {
-        assert_eq!(Theme::adwaita_light().toggled(), Theme::adwaita_dark());
-        assert_eq!(Theme::dbx_light().toggled().toggled(), Theme::dbx_light());
-    }
-
-    #[test]
-    fn switching_style_keeps_light_or_dark() {
-        assert_eq!(Theme::dbx_dark().with_style(Style::Adwaita), Theme::adwaita_dark());
-        assert_eq!(Theme::adwaita_light().with_style(Style::Dbx), Theme::dbx_light());
-        assert_eq!(Theme::dbx_dark().label(), "DBX dark");
+    fn toggling_twice_returns_to_the_start() {
+        assert_eq!(Theme::light().toggled(), Theme::dark());
+        assert_eq!(Theme::light().toggled().toggled(), Theme::light());
+        assert_eq!(Theme::dark().label(), "Dark");
     }
 }

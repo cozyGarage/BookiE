@@ -1,5 +1,21 @@
 use super::*;
 
+pub(crate) struct RunSlot {
+    pub run: Run,
+    pub edits: grid_edit::Edits,
+    pub source: Option<Source>,
+}
+
+impl RunSlot {
+    pub fn new(run: Run, source: Option<Source>) -> Self {
+        Self {
+            run,
+            edits: grid_edit::Edits::new(),
+            source,
+        }
+    }
+}
+
 impl GridView {
     pub(crate) fn run_query(&mut self, cx: &mut Context<Self>) {
         if let Some(session) = self.live.clone() {
@@ -25,8 +41,8 @@ impl GridView {
                         let (rows, truncated) = (bookie_gpui::source::ResultSource::total(&table), table.truncated);
                         this.messages.statement_ok(&sql, rows, truncated, elapsed);
                         this.add_run(Some(std::sync::Arc::new(table)));
-                        if let Some(run) = this.runs.last_mut() {
-                            run.elapsed_ms = Some(u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX));
+                        if let Some(slot) = this.runs.last_mut() {
+                            slot.run.elapsed_ms = Some(u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX));
                         }
                     }
                     Err(message) => {
@@ -47,9 +63,7 @@ impl GridView {
             run.rows = source.total();
         }
         self.next_run_number += 1;
-        self.runs.push(run);
-        self.run_sources.push(source);
-        self.run_edits.push(grid_edit::Edits::new());
+        self.runs.push(RunSlot::new(run, source));
         self.activate_run(self.runs.len() - 1);
     }
 
@@ -74,15 +88,13 @@ impl GridView {
             self.set_mode(Mode::All);
         }
         self.runs.clear();
-        self.run_sources.clear();
-        self.run_edits.clear();
         self.active_run = 0;
         self.next_run_number = 1;
     }
 
     pub(crate) fn query_has_view_edits(&self) -> bool {
         (self.grid_is_query && (self.editing.is_some() || !self.edits.is_empty()))
-            || self.run_edits.iter().any(|edits| !edits.is_empty())
+            || self.runs.iter().any(|slot| !slot.edits.is_empty())
     }
 
     pub(crate) fn sync_grid_owner(&mut self) {
@@ -117,15 +129,15 @@ impl GridView {
         self.find_reset = true;
         if query {
             self.table_edits = std::mem::take(&mut self.edits);
-            if let Some(run) = self.runs.get(self.active_run).copied() {
+            if let Some(run) = self.runs.get(self.active_run).map(|slot| slot.run) {
                 self.show_run(self.active_run, run);
             } else {
                 self.source = self.table_source.clone();
                 self.set_mode(Mode::All);
             }
         } else {
-            if let Some(edits) = self.run_edits.get_mut(self.active_run) {
-                *edits = std::mem::take(&mut self.edits);
+            if let Some(slot) = self.runs.get_mut(self.active_run) {
+                slot.edits = std::mem::take(&mut self.edits);
             }
             self.edits = std::mem::take(&mut self.table_edits);
             self.source = self.table_source.clone();
@@ -135,7 +147,7 @@ impl GridView {
     }
 
     pub(crate) fn activate_run(&mut self, index: usize) {
-        let Some(run) = self.runs.get(index).copied() else {
+        let Some(run) = self.runs.get(index).map(|slot| slot.run) else {
             return;
         };
         if index != self.active_run && self.editing.is_some() {
@@ -143,8 +155,8 @@ impl GridView {
             return;
         }
         self.invalidate_background();
-        if let Some(previous) = self.run_edits.get_mut(self.active_run) {
-            *previous = std::mem::take(&mut self.edits);
+        if let Some(previous) = self.runs.get_mut(self.active_run) {
+            previous.edits = std::mem::take(&mut self.edits);
         }
         self.show_run(index, run);
     }
@@ -157,14 +169,13 @@ impl GridView {
 
     pub(crate) fn show_run(&mut self, index: usize, run: Run) {
         self.run_scroll.scroll_to_item(index);
-        self.edits = std::mem::take(&mut self.run_edits[index]);
+        self.edits = std::mem::take(&mut self.runs[index].edits);
         self.editing = None;
         self.active_run = index;
         self.source = self
-            .run_sources
+            .runs
             .get(index)
-            .cloned()
-            .flatten()
+            .and_then(|slot| slot.source.clone())
             .unwrap_or_else(|| std::sync::Arc::new(Synthetic::new(run.rows)));
         self.compare = None;
         self.cursor = MatchCursor::default();
@@ -176,14 +187,12 @@ impl GridView {
         if index >= self.runs.len() {
             return;
         }
-        let drops_edits = !self.run_edits[index].is_empty()
+        let drops_edits = !self.runs[index].edits.is_empty()
             || (index == self.active_run && (self.editing.is_some() || !self.edits.is_empty()));
         if drops_edits && self.reject_view_edits() {
             return;
         }
         self.runs.remove(index);
-        self.run_sources.remove(index);
-        self.run_edits.remove(index);
         if index < self.active_run {
             self.active_run -= 1;
             return;
@@ -203,6 +212,6 @@ impl GridView {
             return;
         }
         let next = index.min(self.runs.len() - 1);
-        self.show_run(next, self.runs[next]);
+        self.show_run(next, self.runs[next].run);
     }
 }
