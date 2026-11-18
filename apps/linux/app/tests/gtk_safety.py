@@ -630,9 +630,26 @@ def application_sidebar_model_metrics(minimum_nodes):
         )
         matches = [match for match in matches if int(match[0]) >= minimum_nodes]
         if matches:
+            estimates = re.findall(
+                r"sidebar catalog retained payload estimate catalog_payload_estimated_bytes=(\d+) "
+                r"session_catalog_payload_estimated_bytes=(\d+)",
+                output,
+            )
+            if not estimates:
+                time.sleep(POLL_SECONDS)
+                continue
             count, elapsed, created = matches[-1]
+            catalog_bytes, session_bytes = estimates[-1]
             stalls = [int(value) for value in re.findall(r"UI thread stalled.*?stall_ms=(\d+)", output)]
-            return int(count), float(elapsed), int(created), len(stalls), max(stalls, default=0)
+            return (
+                int(count),
+                float(elapsed),
+                int(created),
+                int(catalog_bytes),
+                int(session_bytes),
+                len(stalls),
+                max(stalls, default=0),
+            )
         time.sleep(POLL_SECONDS)
     raise AssertionError("the app did not publish sidebar tree model metrics")
 
@@ -760,7 +777,7 @@ def seed_catalog_hidden_schemas(bookie_config):
                 "connections": {
                     POSTGRES_CONNECTION_ID: {
                         "tabs": [],
-                        "database": "bookie_test",
+                        "database": os.environ.get("BOOKIE_GTK_POSTGRES_DB", "bookie_test"),
                         "hidden_schemas": hidden_schemas,
                     }
                 }
@@ -769,6 +786,38 @@ def seed_catalog_hidden_schemas(bookie_config):
         encoding="utf-8",
     )
     path.chmod(0o600)
+
+
+def postgres_safety_connection_record(environment):
+    port = os.environ.get("BOOKIE_GTK_POSTGRES_PORT")
+    if not port:
+        return None
+    tls_root_cert = os.environ.get("BOOKIE_GTK_POSTGRES_TLS_CA")
+    tls_mode = os.environ.get("BOOKIE_GTK_POSTGRES_TLS_MODE", "verify_full" if tls_root_cert else "disabled")
+    if tls_mode not in {"disabled", "prefer", "require", "verify_ca", "verify_full"}:
+        raise ValueError("PostgreSQL TLS mode is invalid")
+    if tls_root_cert and tls_mode not in {"verify_ca", "verify_full"}:
+        raise ValueError("a PostgreSQL root certificate requires certificate verification")
+    read_only = os.environ.get("BOOKIE_GTK_POSTGRES_READ_ONLY", "false").lower()
+    if read_only not in {"true", "false"}:
+        raise ValueError("PostgreSQL read-only setting must be true or false")
+    record = {
+        "id": POSTGRES_CONNECTION_ID,
+        "name": POSTGRES_CONNECTION_NAME,
+        "driver_id": "postgres",
+        "host": os.environ.get("BOOKIE_GTK_POSTGRES_HOST", "127.0.0.1"),
+        "port": int(port),
+        "database": os.environ.get("BOOKIE_GTK_POSTGRES_DB", "bookie_test"),
+        "username": os.environ.get("BOOKIE_GTK_POSTGRES_USER", "postgres"),
+        "use_tls": tls_mode != "disabled",
+        "tls_mode": tls_mode,
+        "read_only": read_only == "true",
+        "auth_mode": "password",
+        "environment": environment,
+    }
+    if tls_root_cert:
+        record["tls_root_cert"] = tls_root_cert
+    return record
 
 
 def write_fixture(base, audit_available=True, environment="prod", mcp_token=False):
@@ -921,24 +970,31 @@ def write_fixture(base, audit_available=True, environment="prod", mcp_token=Fals
                 "environment": environment,
             }
         )
-    postgres_port = os.environ.get("BOOKIE_GTK_POSTGRES_PORT")
-    if postgres_port:
-        connections["connections"].append(
-            {
-                "id": POSTGRES_CONNECTION_ID,
-                "name": POSTGRES_CONNECTION_NAME,
-                "driver_id": "postgres",
-                "host": os.environ.get("BOOKIE_GTK_POSTGRES_HOST", "127.0.0.1"),
-                "port": int(postgres_port),
-                "database": "bookie_test",
-                "username": "postgres",
-                "use_tls": False,
-                "tls_mode": "disabled",
-                "read_only": False,
-                "auth_mode": "password",
-                "environment": environment,
-            }
-        )
+    postgres_connection = postgres_safety_connection_record(environment)
+    if postgres_connection:
+        connections["connections"].append(postgres_connection)
+        password = os.environ.get("BOOKIE_GTK_POSTGRES_PASSWORD")
+        if password:
+            secret_environment = os.environ.copy()
+            secret_environment.pop("BOOKIE_GTK_POSTGRES_PASSWORD", None)
+            subprocess.run(
+                [
+                    "secret-tool",
+                    "store",
+                    "--label=BookiE GTK PostgreSQL fixture",
+                    "xdg:schema",
+                    "com.bookie.linux.Password",
+                    "connection-id",
+                    POSTGRES_CONNECTION_ID,
+                    "kind",
+                    "db_password",
+                ],
+                input=password,
+                text=True,
+                check=True,
+                capture_output=True,
+                env=secret_environment,
+            )
     postgres_mtls_port = os.environ.get("BOOKIE_GTK_POSTGRES_MTLS_PORT")
     if postgres_mtls_port:
         connections["connections"].append(
@@ -1081,6 +1137,7 @@ def write_fixture(base, audit_available=True, environment="prod", mcp_token=Fals
     )
 
     environment = os.environ.copy()
+    environment.pop("BOOKIE_GTK_POSTGRES_PASSWORD", None)
     environment.update(
         {
             "HOME": str(home),
@@ -1872,9 +1929,15 @@ def postgres_sidebar_catalog_profile(_database, base):
     wait_for_frame_containing(f"{POSTGRES_CONNECTION_NAME} — BookiE", timeout=120)
     frame_ready = time.monotonic()
     minimum_nodes = int(os.environ.get("BOOKIE_GTK_CATALOG_MINIMUM_NODES", os.environ["BOOKIE_GTK_CATALOG_TABLES"]))
-    sidebar_nodes, tree_model_build_ms, created_list_items, ui_stall_count, ui_stall_max_ms = (
-        application_sidebar_model_metrics(minimum_nodes)
-    )
+    (
+        sidebar_nodes,
+        tree_model_build_ms,
+        created_list_items,
+        catalog_payload_estimated_bytes,
+        session_catalog_payload_estimated_bytes,
+        ui_stall_count,
+        ui_stall_max_ms,
+    ) = application_sidebar_model_metrics(minimum_nodes)
     hidden_schemas = json.loads(os.environ.get("BOOKIE_GTK_CATALOG_HIDDEN_SCHEMAS_JSON", "[]"))
     if hidden_schemas:
         wait_for_node(name=hidden_schemas[0], role=pyatspi.ROLE_LIST_ITEM, present=False)
@@ -1899,6 +1962,8 @@ def postgres_sidebar_catalog_profile(_database, base):
         "sidebar_nodes": sidebar_nodes,
         "tree_model_build_ms": tree_model_build_ms,
         "created_list_items": created_list_items,
+        "catalog_payload_estimated_bytes": catalog_payload_estimated_bytes,
+        "session_catalog_payload_estimated_bytes": session_catalog_payload_estimated_bytes,
         "ui_stall_count": ui_stall_count,
         "ui_stall_max_ms": ui_stall_max_ms,
         "memory_before_kib": before,

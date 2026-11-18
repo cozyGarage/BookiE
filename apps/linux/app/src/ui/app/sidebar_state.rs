@@ -71,6 +71,64 @@ pub(super) fn hide_sidebar(split_view: &adw::OverlaySplitView, generation: &std:
     split_view.set_show_sidebar(false);
 }
 
+fn estimated_sidebar_catalog_bytes<'a>(
+    tables: &[TableInfo],
+    views: &[TableInfo],
+    temporary_tables: &[TableInfo],
+    nodes: &[crate::services::sidebar_tree::TreeNode],
+    catalogs: impl Iterator<Item = &'a bookie_core::CatalogObject>,
+) -> usize {
+    let table_bytes = tables
+        .iter()
+        .chain(views)
+        .chain(temporary_tables)
+        .map(|table| {
+            std::mem::size_of::<TableInfo>() + table.name.capacity() + table.schema.as_ref().map_or(0, String::capacity)
+        })
+        .sum::<usize>();
+    let node_bytes = nodes
+        .iter()
+        .map(|node| {
+            std::mem::size_of_val(node)
+                + node.key.capacity()
+                + node.schema.as_ref().map_or(0, String::capacity)
+                + match &node.kind {
+                    NodeKind::Table { schema, name }
+                    | NodeKind::TemporaryTable { schema, name }
+                    | NodeKind::View { schema, name }
+                    | NodeKind::CatalogObject { schema, name, .. } => {
+                        schema.as_ref().map_or(0, String::capacity) + name.capacity()
+                    }
+                    _ => 0,
+                }
+        })
+        .sum::<usize>();
+    let catalog_bytes = catalogs
+        .map(|object| {
+            std::mem::size_of_val(object)
+                + object.name.capacity()
+                + object.schema.as_ref().map_or(0, String::capacity)
+                + object.detail.as_ref().map_or(0, String::capacity)
+        })
+        .sum::<usize>();
+    table_bytes + node_bytes + catalog_bytes
+}
+
+fn estimated_session_catalog_bytes(catalog: &super::multi_session::SessionCatalog) -> usize {
+    std::mem::size_of_val(catalog)
+        + catalog.database.capacity()
+        + catalog
+            .tables
+            .iter()
+            .chain(&catalog.views)
+            .map(|table| {
+                std::mem::size_of::<TableInfo>()
+                    + table.name.capacity()
+                    + table.schema.as_ref().map_or(0, String::capacity)
+            })
+            .sum::<usize>()
+}
+
 impl App {
     pub(super) fn hidden_schema_names(&self) -> Vec<String> {
         let mut schemas: Vec<_> = self.sidebar_hidden_schemas.borrow().iter().cloned().collect();
@@ -108,6 +166,26 @@ impl App {
         let column_source =
             crate::ui::sidebar_columns::ColumnSource::capture(self.connection_id, self.database.clone(), timeout);
         *self.sidebar_nodes.borrow_mut() = nodes;
+        let nodes = self.sidebar_nodes.borrow();
+        let catalog_payload_bytes = estimated_sidebar_catalog_bytes(
+            &self.sidebar_tables,
+            &self.sidebar_views,
+            &self.sidebar_temporary_tables,
+            &nodes,
+            self.sidebar_catalog.values().flatten(),
+        );
+        drop(nodes);
+        let session_catalog_payload_bytes = self
+            .multi
+            .catalogs
+            .values()
+            .map(estimated_session_catalog_bytes)
+            .sum::<usize>();
+        tracing::debug!(
+            catalog_payload_estimated_bytes = catalog_payload_bytes,
+            session_catalog_payload_estimated_bytes = session_catalog_payload_bytes,
+            "sidebar catalog retained payload estimate"
+        );
         let mut render_context = self.sidebar_render_context.borrow_mut();
         render_context.driver_id = self.current_driver_id.clone().unwrap_or_default();
         render_context.schema_filter_enabled = schema_filter_enabled;
@@ -690,5 +768,63 @@ mod sidebar_label_tests {
         let leaf_group = leaf_init.group.unwrap();
         assert!(leaf_group.entry);
         assert_eq!(leaf_group.label, "public.calc_tax");
+    }
+}
+
+#[cfg(test)]
+mod catalog_estimate_tests {
+    use super::*;
+
+    #[test]
+    fn catalog_estimates_grow_with_retained_metadata() {
+        let short = vec![TableInfo {
+            schema: Some("schema".into()),
+            name: "table".into(),
+        }];
+        let long = vec![TableInfo {
+            schema: Some("schema".into()),
+            name: "table_name_that_retains_more_bytes".into(),
+        }];
+        let empty = estimated_sidebar_catalog_bytes(&[], &[], &[], &[], std::iter::empty());
+        let short_table = estimated_sidebar_catalog_bytes(&short, &[], &[], &[], std::iter::empty());
+        let long_table = estimated_sidebar_catalog_bytes(&long, &[], &[], &[], std::iter::empty());
+        assert_eq!(empty, 0);
+        assert!(long_table > short_table);
+
+        let short_nodes = build_nodes_with_temporary(&short, &[], &[]);
+        let long_nodes = build_nodes_with_temporary(&long, &[], &[]);
+        assert!(
+            estimated_sidebar_catalog_bytes(&[], &[], &[], &long_nodes, std::iter::empty())
+                > estimated_sidebar_catalog_bytes(&[], &[], &[], &short_nodes, std::iter::empty())
+        );
+
+        let object = bookie_core::CatalogObject {
+            kind: bookie_core::CatalogObjectKind::Routine,
+            schema: Some("public".into()),
+            name: "function".into(),
+            detail: Some("SELECT 1".into()),
+        };
+        let larger_object = bookie_core::CatalogObject {
+            detail: Some("SELECT ".repeat(100)),
+            ..object.clone()
+        };
+        assert!(
+            estimated_sidebar_catalog_bytes(&[], &[], &[], &[], [&larger_object].into_iter())
+                > estimated_sidebar_catalog_bytes(&[], &[], &[], &[], [&object].into_iter())
+        );
+
+        let session = |tables, database| super::super::multi_session::SessionCatalog {
+            tables,
+            views: Vec::new(),
+            database,
+        };
+        assert!(
+            estimated_session_catalog_bytes(&session(long, String::new()))
+                > estimated_session_catalog_bytes(&session(short.clone(), String::new()))
+        );
+        assert!(
+            estimated_session_catalog_bytes(&session(short.clone(), "db".into()))
+                > estimated_session_catalog_bytes(&session(short, String::new()))
+        );
     }
 }
