@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
@@ -645,10 +646,10 @@ impl StructureTab {
 fn boxed_list() -> gtk::ListBox {
     let list = gtk::ListBox::builder()
         .selection_mode(gtk::SelectionMode::None)
-        .margin_start(12)
-        .margin_end(12)
-        .margin_top(6)
-        .margin_bottom(6)
+        .margin_start(spacing::MD)
+        .margin_end(spacing::MD)
+        .margin_top(spacing::SM)
+        .margin_bottom(spacing::SM)
         .build();
     list.add_css_class("boxed-list");
     list
@@ -749,9 +750,9 @@ impl SimpleComponent for StructureTab {
         });
         // CenterBox avoids the spacer allocation conflict in GTK's toolbar layout.
         let sql_toolbar = gtk::CenterBox::builder()
-            .margin_top(6)
-            .margin_start(6)
-            .margin_end(6)
+            .margin_top(spacing::SM)
+            .margin_start(spacing::SM)
+            .margin_end(spacing::SM)
             .build();
         sql_toolbar.set_end_widget(Some(&copy_sql_btn));
         let sql_page_box = gtk::Box::builder().orientation(gtk::Orientation::Vertical).build();
@@ -769,8 +770,8 @@ impl SimpleComponent for StructureTab {
             .stack(&view_stack)
             .policy(adw::ViewSwitcherPolicy::Wide)
             .halign(gtk::Align::Center)
-            .margin_top(6)
-            .margin_bottom(6)
+            .margin_top(spacing::SM)
+            .margin_bottom(spacing::SM)
             .build();
 
         let inner_stack = gtk::Stack::new();
@@ -792,7 +793,7 @@ impl SimpleComponent for StructureTab {
         loading_subtitle.add_css_class("dim-label");
         let loading_box = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
-            .spacing(12)
+            .spacing(spacing::MD)
             .halign(gtk::Align::Center)
             .valign(gtk::Align::Center)
             .vexpand(true)
@@ -810,10 +811,10 @@ impl SimpleComponent for StructureTab {
         name_entry.set_text(&init.table);
         let name_row = adw::PreferencesGroup::builder()
             .description(bookie_app_services::tr!("Add a name and at least one column to save."))
-            .margin_top(12)
-            .margin_bottom(6)
-            .margin_start(12)
-            .margin_end(12)
+            .margin_top(spacing::MD)
+            .margin_bottom(spacing::SM)
+            .margin_start(spacing::MD)
+            .margin_end(spacing::MD)
             .build();
         name_row.add(&name_entry);
         let table_collation_row = adw::ComboRow::builder()

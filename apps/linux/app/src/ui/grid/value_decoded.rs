@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use gtk4 as gtk;
 use gtk4::prelude::*;
 
@@ -43,15 +44,15 @@ pub(super) fn display_as_section(value: &Value) -> Option<gtk::Box> {
     if forms.is_empty() {
         return None;
     }
-    let container = gtk::Box::new(gtk::Orientation::Vertical, 4);
+    let container = gtk::Box::new(gtk::Orientation::Vertical, spacing::XS);
     for form in forms {
         let heading = display_kind_heading(form.kind);
         let title = gtk::Label::builder()
             .label(&heading)
             .xalign(0.0)
-            .margin_top(8)
-            .margin_start(12)
-            .margin_end(12)
+            .margin_top(spacing::SM)
+            .margin_start(spacing::MD)
+            .margin_end(spacing::MD)
             .build();
         title.add_css_class("heading");
         let text = super::value_viewer::build_text_view(&form.text);
@@ -70,10 +71,10 @@ pub(super) fn display_as_section(value: &Value) -> Option<gtk::Box> {
             "Read only. Copy value copies the stored value."
         ))
         .xalign(0.0)
-        .margin_start(12)
-        .margin_end(12)
-        .margin_top(8)
-        .margin_bottom(8)
+        .margin_start(spacing::MD)
+        .margin_end(spacing::MD)
+        .margin_top(spacing::SM)
+        .margin_bottom(spacing::SM)
         .build();
     note.add_css_class("dim-label");
     container.append(&note);
@@ -93,9 +94,9 @@ pub(super) fn section(value: &Value) -> Option<gtk::Box> {
         .label(heading(preview.format))
         .xalign(0.0)
         .wrap(true)
-        .margin_top(8)
-        .margin_start(12)
-        .margin_end(12)
+        .margin_top(spacing::SM)
+        .margin_start(spacing::MD)
+        .margin_end(spacing::MD)
         .build();
     title.add_css_class("heading");
     let view = crate::ui::output_text_view::compact(gtk::WrapMode::None);
@@ -108,9 +109,9 @@ pub(super) fn section(value: &Value) -> Option<gtk::Box> {
     let note = gtk::Label::builder()
         .label(footer(&preview))
         .xalign(0.0)
-        .margin_start(12)
-        .margin_end(12)
-        .margin_bottom(8)
+        .margin_start(spacing::MD)
+        .margin_end(spacing::MD)
+        .margin_bottom(spacing::SM)
         .build();
     note.add_css_class("dim-label");
     let container = gtk::Box::new(gtk::Orientation::Vertical, 0);

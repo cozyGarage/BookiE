@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use relm4::ComponentSender;
 use relm4::gtk;
 
@@ -19,7 +20,7 @@ pub(super) fn column_selection_details(names: &[String], loaded_rows: u32, stats
 pub(super) fn selection_buttons(sender: ComponentSender<BrowseTab>) -> gtk::Box {
     let row = gtk::Box::builder()
         .orientation(gtk::Orientation::Horizontal)
-        .spacing(6)
+        .spacing(spacing::SM)
         .build();
     let formats = [
         (bookie_app_services::tr!("Copy TSV"), SelectionCopyFormat::Tsv),

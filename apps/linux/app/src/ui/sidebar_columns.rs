@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use std::cell::Cell;
 use std::sync::Arc;
 
@@ -237,9 +238,9 @@ impl SidebarColumns {
         }
         let content = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
-            .spacing(4)
+            .spacing(spacing::XS)
             .margin_start(self.indent.get())
-            .margin_bottom(8)
+            .margin_bottom(spacing::SM)
             .build();
         self.reveal.set_child(Some(&content));
     }
@@ -275,7 +276,7 @@ fn bounded(text: &str, limit: usize) -> String {
 }
 
 fn field_row(column: &FieldPreview) -> gtk::Box {
-    let row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    let row = gtk::Box::new(gtk::Orientation::Horizontal, spacing::SM);
     let marker = gtk::Image::builder().pixel_size(super::spacing::ICON).build();
     if column.primary_key {
         marker.set_icon_name(Some("dialog-password-symbolic"));

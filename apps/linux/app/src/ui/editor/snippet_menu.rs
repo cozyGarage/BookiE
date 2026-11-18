@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use std::cell::OnceCell;
 
 use bookie_app_services::snippets::{self, Expansion, Snippet, SnippetStore};
@@ -17,11 +18,11 @@ fn store() -> Option<SnippetStore> {
 pub(super) fn build(sender: &ComponentSender<SqlEditor>) -> gtk::MenuButton {
     let content = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
-        .spacing(2)
-        .margin_top(6)
-        .margin_bottom(6)
-        .margin_start(6)
-        .margin_end(6)
+        .spacing(spacing::OPTICAL)
+        .margin_top(spacing::SM)
+        .margin_bottom(spacing::SM)
+        .margin_start(spacing::SM)
+        .margin_end(spacing::SM)
         .build();
     let popover = gtk::Popover::builder().child(&content).build();
     let menu = gtk::MenuButton::builder()
@@ -71,7 +72,7 @@ fn snippet_row(
     sender: &ComponentSender<SqlEditor>,
     popover: &gtk::glib::WeakRef<gtk::Popover>,
 ) -> gtk::Box {
-    let row = gtk::Box::new(gtk::Orientation::Horizontal, 2);
+    let row = gtk::Box::new(gtk::Orientation::Horizontal, spacing::OPTICAL);
     let insert = gtk::Button::builder()
         .label(&snippet.name)
         .tooltip_text(snippet.body.lines().next().unwrap_or_default())
@@ -140,7 +141,7 @@ fn present_editor(parent: &gtk::Button, store: &SnippetStore, existing: Option<&
         .min_content_height(140)
         .min_content_width(380)
         .build();
-    let form = gtk::Box::new(gtk::Orientation::Vertical, 8);
+    let form = gtk::Box::new(gtk::Orientation::Vertical, spacing::SM);
     form.append(&name);
     form.append(&scroller);
     form.append(

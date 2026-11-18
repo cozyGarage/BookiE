@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
@@ -87,12 +88,12 @@ impl LocalResultView {
         settings_key: ResultViewKey,
     ) -> Self {
         let controls = gtk4::Box::builder()
-            .spacing(6)
+            .spacing(spacing::SM)
             .visible(false)
-            .margin_start(8)
-            .margin_end(8)
-            .margin_top(4)
-            .margin_bottom(4)
+            .margin_start(spacing::SM)
+            .margin_end(spacing::SM)
+            .margin_top(spacing::XS)
+            .margin_bottom(spacing::XS)
             .build();
         let status = gtk4::Label::builder().hexpand(true).halign(gtk4::Align::Start).build();
         let clear = gtk4::Button::with_label(&bookie_app_services::tr!("Clear"));

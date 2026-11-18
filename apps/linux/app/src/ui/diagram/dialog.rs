@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -214,7 +215,7 @@ fn loading_page(progress: &gtk::Label, dialog: &adw::Dialog, token: &Cancellatio
     spinner.set_size_request(32, 32);
     let page = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
-        .spacing(12)
+        .spacing(spacing::MD)
         .valign(gtk::Align::Center)
         .halign(gtk::Align::Center)
         .build();
@@ -283,7 +284,7 @@ fn export_button(
     context: Option<DictionaryExportContext>,
 ) -> gtk::MenuButton {
     let popover = gtk::Popover::new();
-    let choices = gtk::Box::new(gtk::Orientation::Vertical, 2);
+    let choices = gtk::Box::new(gtk::Orientation::Vertical, spacing::OPTICAL);
     let formats: [TextFormat; 2] = [
         (tr!("Copy as Mermaid"), tr!("Mermaid text copied"), export::mermaid),
         (tr!("Copy as DBML"), tr!("DBML text copied"), export::dbml),
@@ -514,8 +515,8 @@ fn fill_list(ui: &Rc<Ui>, diagram: &SchemaDiagram) {
         let label = gtk::Label::builder()
             .label(&table.name)
             .xalign(0.0)
-            .margin_top(6)
-            .margin_bottom(6)
+            .margin_top(spacing::SM)
+            .margin_bottom(spacing::SM)
             .build();
         label.set_ellipsize(relm4::gtk::pango::EllipsizeMode::End);
         let row = gtk::ListBoxRow::new();

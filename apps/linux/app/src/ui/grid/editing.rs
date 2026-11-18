@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use chrono::Datelike;
 use gtk4::prelude::*;
 use gtk4::{self as gtk, glib};
@@ -29,8 +30,8 @@ pub(super) fn setup_editable_cell(item: &gtk::ListItem, idx: usize, sender: relm
     let label = CellEditor::new();
     label.set_hexpand(true);
     label.set_focusable(true);
-    label.set_margin_start(8);
-    label.set_margin_end(8);
+    label.set_margin_start(spacing::SM);
+    label.set_margin_end(spacing::SM);
     COLUMN_SLOT.set(&label, idx);
     item.set_child(Some(&label));
 
@@ -41,8 +42,8 @@ pub(super) fn setup_bool_cell(item: &gtk::ListItem, idx: usize, sender: relm4::S
     let checkbox = gtk::CheckButton::builder()
         .halign(gtk::Align::Start)
         .valign(gtk::Align::Center)
-        .margin_start(8)
-        .margin_end(8)
+        .margin_start(spacing::SM)
+        .margin_end(spacing::SM)
         .build();
     COLUMN_SLOT.set(&checkbox, idx);
     item.set_child(Some(&checkbox));
@@ -72,8 +73,8 @@ pub(super) fn setup_readonly_cell(item: &gtk::ListItem, idx: usize, _sender: Opt
         .selectable(true)
         .single_line_mode(true)
         .ellipsize(gtk::pango::EllipsizeMode::End)
-        .margin_start(8)
-        .margin_end(8)
+        .margin_start(spacing::SM)
+        .margin_end(spacing::SM)
         .build();
     COLUMN_SLOT.set(&label, idx);
     label.connect_map(sync_readonly_cell_focus);
@@ -440,7 +441,7 @@ fn show_json_popover(label: &CellEditor, col_index: usize, sender: &relm4::Sende
 
     let button_box = gtk::Box::builder()
         .orientation(gtk::Orientation::Horizontal)
-        .spacing(8)
+        .spacing(spacing::SM)
         .halign(gtk::Align::End)
         .build();
     button_box.append(&cancel_button);
@@ -448,11 +449,11 @@ fn show_json_popover(label: &CellEditor, col_index: usize, sender: &relm4::Sende
 
     let container = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
-        .spacing(8)
-        .margin_top(8)
-        .margin_bottom(8)
-        .margin_start(8)
-        .margin_end(8)
+        .spacing(spacing::SM)
+        .margin_top(spacing::SM)
+        .margin_bottom(spacing::SM)
+        .margin_start(spacing::SM)
+        .margin_end(spacing::SM)
         .build();
     container.append(&scrolled);
     container.append(&button_box);

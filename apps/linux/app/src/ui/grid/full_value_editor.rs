@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use std::cell::{Cell, RefCell};
 
 use bookie_core::{ColumnInfo, Value};
@@ -284,7 +285,7 @@ fn create_actions(nullable: bool, is_json: bool) -> EditorActions {
     let format = is_json.then(|| gtk::Button::with_label(&bookie_app_services::tr!("Format JSON")));
     let container = gtk::Box::builder()
         .orientation(gtk::Orientation::Horizontal)
-        .spacing(8)
+        .spacing(spacing::SM)
         .halign(gtk::Align::End)
         .build();
     let set_null = nullable.then(|| gtk::Button::with_label(&bookie_app_services::tr!("Set to NULL")));
@@ -314,11 +315,11 @@ fn create_content(view: &sourceview5::View, actions: &gtk::Box) -> (gtk::Box, gt
         .build();
     let content = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
-        .spacing(12)
-        .margin_top(12)
-        .margin_bottom(12)
-        .margin_start(12)
-        .margin_end(12)
+        .spacing(spacing::MD)
+        .margin_top(spacing::MD)
+        .margin_bottom(spacing::MD)
+        .margin_start(spacing::MD)
+        .margin_end(spacing::MD)
         .build();
     content.append(&scroller);
     let error = gtk::Label::builder().xalign(0.0).visible(false).build();

@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use relm4::gtk;
 use relm4::gtk::prelude::*;
 
@@ -10,7 +11,7 @@ struct Controls {
 }
 
 pub(in crate::ui::editor) fn build(pages: &gtk::Stack) -> gtk::Box {
-    let container = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    let container = gtk::Box::new(gtk::Orientation::Horizontal, spacing::SM);
     let controls = Controls {
         first: icon_button("go-first-symbolic", &bookie_app_services::tr!("First page")),
         previous: gtk::Button::with_label(&bookie_app_services::tr!("Previous page")),

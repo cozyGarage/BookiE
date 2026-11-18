@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use std::rc::Rc;
 
 use relm4::adw::prelude::*;
@@ -52,7 +53,7 @@ pub(crate) fn present_export_dialog(
 
     let body = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
-        .spacing(12)
+        .spacing(spacing::MD)
         .build();
     let scroller = gtk::ScrolledWindow::builder()
         .hscrollbar_policy(gtk::PolicyType::Never)

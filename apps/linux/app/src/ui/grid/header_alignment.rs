@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use std::sync::Arc;
 
 use gtk4::{self as gtk, prelude::*};
@@ -45,8 +46,8 @@ fn align_headers(view: &gtk::ColumnView, columns: &[ColumnInfo]) {
             move_sort_indicator_before_title(&label);
         }
         label.set_hexpand(true);
-        label.set_margin_start(8);
-        label.set_margin_end(8);
+        label.set_margin_start(spacing::SM);
+        label.set_margin_end(spacing::SM);
         label.set_xalign(if right_aligned { 1.0 } else { 0.0 });
         label.set_justify(if right_aligned {
             gtk::Justification::Right

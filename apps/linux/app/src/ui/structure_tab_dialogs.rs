@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -12,12 +13,6 @@ use super::structure_tab::{StructureTab, StructureTabInput, StructureTabOutput};
 type ColumnChecks = Rc<RefCell<Vec<(String, gtk::CheckButton)>>>;
 
 fn build_form_dialog(title: &str, submit_label: &str) -> (adw::Dialog, gtk::Box, gtk::Button) {
-    let dialog = adw::Dialog::builder()
-        .title(title)
-        .content_width(420)
-        .content_height(560)
-        .build();
-
     let header = adw::HeaderBar::builder()
         .show_start_title_buttons(false)
         .show_end_title_buttons(false)
@@ -30,11 +25,11 @@ fn build_form_dialog(title: &str, submit_label: &str) -> (adw::Dialog, gtk::Box,
 
     let content = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
-        .spacing(18)
-        .margin_top(18)
-        .margin_bottom(18)
-        .margin_start(18)
-        .margin_end(18)
+        .spacing(spacing::LG)
+        .margin_top(spacing::LG)
+        .margin_bottom(spacing::LG)
+        .margin_start(spacing::LG)
+        .margin_end(spacing::LG)
         .build();
     let scroller = gtk::ScrolledWindow::builder()
         .child(&content)
@@ -43,10 +38,9 @@ fn build_form_dialog(title: &str, submit_label: &str) -> (adw::Dialog, gtk::Box,
         .hexpand(true)
         .build();
 
-    let toolbar_view = adw::ToolbarView::new();
-    toolbar_view.add_top_bar(&header);
+    scroller.set_propagate_natural_height(true);
+    let (dialog, toolbar_view) = super::dialog_shell::with_header(title, &header, 420, None);
     toolbar_view.set_content(Some(&scroller));
-    dialog.set_child(Some(&toolbar_view));
     // Keep Enter in an AdwEntryRow on the default Add action.
     dialog.set_default_widget(Some(&submit_btn));
 

@@ -1,3 +1,4 @@
+use crate::ui::spacing;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
@@ -358,7 +359,7 @@ fn build_match_controls(state: &StripState) -> gtk::Revealer {
     match_suffix.add_css_class("dim-label");
     let match_row_box = gtk::Box::builder()
         .orientation(gtk::Orientation::Horizontal)
-        .spacing(6)
+        .spacing(spacing::SM)
         .build();
     match_row_box.append(&match_label);
     match_row_box.append(&combinator_dropdown);
@@ -413,7 +414,7 @@ fn build_where_row(state: &StripState, apply_btn: &gtk::Button) -> (gtk::Box, gt
     });
     let where_row = gtk::Box::builder()
         .orientation(gtk::Orientation::Horizontal)
-        .spacing(6)
+        .spacing(spacing::SM)
         .hexpand(true)
         .build();
     where_row.append(&where_label);
@@ -440,16 +441,16 @@ fn build_saved_filters_button(
 
 fn build_header(where_row: &gtk::Box, buttons: &ActionButtons, saved_filters: Option<gtk::MenuButton>) -> adw::WrapBox {
     let header = adw::WrapBox::builder()
-        .child_spacing(6)
-        .line_spacing(6)
-        .margin_top(8)
-        .margin_bottom(4)
-        .margin_start(12)
-        .margin_end(12)
+        .child_spacing(spacing::SM)
+        .line_spacing(spacing::SM)
+        .margin_top(spacing::SM)
+        .margin_bottom(spacing::XS)
+        .margin_start(spacing::MD)
+        .margin_end(spacing::MD)
         .build();
     let actions = gtk::Box::builder()
         .orientation(gtk::Orientation::Horizontal)
-        .spacing(6)
+        .spacing(spacing::SM)
         .halign(gtk::Align::End)
         .build();
     if let Some(saved) = saved_filters {
@@ -470,8 +471,8 @@ fn build_rules_section(state: &StripState, match_revealer: &gtk::Revealer) -> gt
         .build();
     let rules_body = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
-        .spacing(8)
-        .margin_top(8)
+        .spacing(spacing::SM)
+        .margin_top(spacing::SM)
         .build();
     rules_body.append(match_revealer);
     rules_expander.set_child(Some(&rules_body));
@@ -535,11 +536,11 @@ fn connect_add_rule(state: &StripState, add_rule_btn: &gtk::Button) {
 fn build_scroller(rules_expander: &gtk::Expander) -> gtk::ScrolledWindow {
     let content = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
-        .spacing(8)
-        .margin_top(6)
-        .margin_bottom(8)
-        .margin_start(12)
-        .margin_end(12)
+        .spacing(spacing::SM)
+        .margin_top(spacing::SM)
+        .margin_bottom(spacing::SM)
+        .margin_start(spacing::MD)
+        .margin_end(spacing::MD)
         .build();
     content.append(rules_expander);
     gtk::ScrolledWindow::builder()
@@ -767,7 +768,7 @@ fn pair_value_entries(index: usize, rule: &FilterRule, column: &ColumnInfo, stat
     });
     let pair_box = gtk::Box::builder()
         .orientation(gtk::Orientation::Horizontal)
-        .spacing(6)
+        .spacing(spacing::SM)
         .build();
     pair_box.append(&lo);
     pair_box.append(&hi);
