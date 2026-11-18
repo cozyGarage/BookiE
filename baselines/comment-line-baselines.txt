@@ -38,7 +38,7 @@ apps/linux/app/src/ui/filter_strip.rs 2
 apps/linux/app/src/ui/grid/display.rs 8
 apps/linux/app/src/ui/grid/mod.rs 6
 apps/linux/app/src/ui/grid/presentation.rs 2
-apps/linux/app/src/ui/history_dialog.rs 13
+apps/linux/app/src/ui/history_dialog.rs 9
 apps/linux/app/src/ui/import_dialog.rs 6
 apps/linux/app/src/ui/mcp_preferences.rs 1
 apps/linux/app/src/ui/preferences.rs 13
@@ -61,7 +61,7 @@ crates/app-services/src/database_service.rs 33
 crates/app-services/src/database_service_tests.rs 6
 crates/app-services/src/filter_settings.rs 6
 crates/app-services/src/state_file.rs 2
-crates/app-services/src/structure_tracker.rs 22
+crates/app-services/src/structure_tracker.rs 4
 crates/core/src/activity.rs 9
 crates/core/src/connection.rs 43
 crates/core/src/driver.rs 42

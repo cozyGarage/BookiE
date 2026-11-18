@@ -60,7 +60,7 @@ impl GridView {
     }
 
     pub(crate) fn apply_filter(&mut self, cx: &mut Context<Self>) {
-        if matches!(self.tabs.current(), Tab::Query) && self.runs.is_empty() {
+        if matches!(self.tabs.current(), Tab::Query) && self.run_tabs.slots.is_empty() {
             return;
         }
         let predicate = match parse_predicate(self.search.filter.read(cx).content(), self.source.columns()) {
@@ -102,7 +102,7 @@ impl GridView {
     }
 
     pub(crate) fn compare(&mut self, keyed: bool, cx: &mut Context<Self>) {
-        if matches!(self.tabs.current(), Tab::Query) && self.runs.is_empty() {
+        if matches!(self.tabs.current(), Tab::Query) && self.run_tabs.slots.is_empty() {
             return;
         }
         let source = self.source.clone();

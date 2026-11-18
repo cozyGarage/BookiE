@@ -857,12 +857,12 @@ fn ctrl_t_opens_one_query_tab_and_ctrl_enter_adds_a_run_with_its_own_result(cx: 
     cx.simulate_keystrokes("ctrl-t");
     view.read_with(cx, |view, _| {
         assert_eq!(view.tabs.current(), &Tab::Query);
-        assert_eq!(view.runs.len(), 1);
+        assert_eq!(view.run_tabs.slots.len(), 1);
         assert_eq!(view.dataset_count(), 150_000);
     });
     cx.simulate_keystrokes("ctrl-enter");
     view.read_with(cx, |view, _| {
-        assert_eq!((view.runs.len(), view.active_run), (2, 1));
+        assert_eq!((view.run_tabs.slots.len(), view.run_tabs.active), (2, 1));
         assert_eq!(view.dataset_count(), 1_000_000, "the second run has its own row count");
         assert_eq!(view.pager.page, 0);
     });
@@ -899,7 +899,7 @@ fn selecting_the_active_result_keeps_its_filter_and_selection(cx: &mut TestAppCo
                 label: "filtered".into(),
             });
             view.click_row(1, false);
-            view.select_run(view.active_run);
+            view.select_run(view.run_tabs.active);
             assert_eq!(view.dataset_count(), 2);
             assert_eq!(view.selection.map(|selection| selection.focus), Some(1));
         });
@@ -958,9 +958,9 @@ fn switching_results_keeps_an_active_cell_editor_open(cx: &mut TestAppContext) {
             view.start_edit(0, 1, window, cx);
             view.cell_edit.editor
                 .update(cx, |editor, cx| editor.set_content("result draft", cx));
-            let active_run = view.active_run;
+            let active_run = view.run_tabs.active;
             view.select_run(0);
-            assert_eq!(view.active_run, active_run);
+            assert_eq!(view.run_tabs.active, active_run);
         });
     });
     view.read_with(cx, |view, cx| {
@@ -979,19 +979,19 @@ fn closing_runs_releases_edits_and_allows_a_new_run_after_the_last_close(cx: &mu
             view.add_run(None);
             view.cell_edit.edits.insert((1, 1), Cell::Text("second".into()));
             view.close_run(0);
-            assert_eq!(view.runs.len(), 2);
+            assert_eq!(view.run_tabs.slots.len(), 2);
             assert_eq!(view.cell_at(1, 1), Cell::Text("second".into()));
             assert!(view.status.contains("Discard all view-only edits"));
             view.discard_view_edits();
             view.close_run(0);
-            assert_eq!(view.runs.len(), 1);
+            assert_eq!(view.run_tabs.slots.len(), 1);
             assert_eq!(view.cell_at(1, 1), Cell::Text("Sample 1".into()));
             view.close_run(0);
-            assert!(view.runs.is_empty());
+            assert!(view.run_tabs.slots.is_empty());
             assert!(view.cell_edit.edits.is_empty());
             assert_eq!(view.dataset_count(), 0);
             view.add_run(None);
-            assert_eq!(view.runs[0].run.number, 3);
+            assert_eq!(view.run_tabs.slots[0].run.number, 3);
             assert!(view.cell_edit.edits.is_empty());
         });
     });
@@ -1009,7 +1009,7 @@ fn closing_the_final_run_renders_an_empty_result_pane(cx: &mut TestAppContext) {
     });
     cx.run_until_parked();
     view.read_with(cx, |view, _| {
-        assert!(view.runs.is_empty());
+        assert!(view.run_tabs.slots.is_empty());
         assert_eq!(view.status, "No results");
     });
 }
@@ -1090,8 +1090,8 @@ fn closing_query_tab_releases_its_runs_and_keeps_table_edits(cx: &mut TestAppCon
             view.add_run(None);
             let index = view.tabs.active;
             view.close_tab(index);
-            assert!(view.runs.is_empty());
-            assert!(view.runs.is_empty());
+            assert!(view.run_tabs.slots.is_empty());
+            assert!(view.run_tabs.slots.is_empty());
             assert_eq!(view.cell_at(1, 1), Cell::Text("table".into()));
             view.tabs.open_query();
             view.sync_grid_owner();
@@ -1118,7 +1118,7 @@ fn closing_an_inactive_query_tab_preserves_the_table(cx: &mut TestAppContext) {
                 .open_table(&bookie_gpui::shell::table_info(bookie_gpui::shell::DATA_TABLE));
             view.sync_grid_owner();
             view.close_tab(query);
-            assert!(view.runs.is_empty());
+            assert!(view.run_tabs.slots.is_empty());
             assert_eq!(view.cell_at(1, 1), Cell::Text("table".into()));
         })
     });
@@ -1142,7 +1142,7 @@ fn closing_query_from_home_restores_the_table_owner(cx: &mut TestAppContext) {
             view.tabs
                 .open_table(&bookie_gpui::shell::table_info(bookie_gpui::shell::DATA_TABLE));
             view.sync_grid_owner();
-            assert!(view.runs.is_empty());
+            assert!(view.run_tabs.slots.is_empty());
             assert_eq!(view.cell_at(1, 1), Cell::Text("table".into()));
         })
     });
@@ -1173,7 +1173,7 @@ fn the_command_palette_can_close_the_current_result(cx: &mut TestAppContext) {
     cx.simulate_keystrokes("ctrl-t ctrl-shift-p");
     cx.simulate_input("close current result");
     cx.simulate_keystrokes("enter");
-    view.read_with(cx, |view, _| assert!(view.runs.is_empty()));
+    view.read_with(cx, |view, _| assert!(view.run_tabs.slots.is_empty()));
 }
 
 #[gpui::test]
@@ -1182,11 +1182,11 @@ fn the_command_palette_navigates_between_results(cx: &mut TestAppContext) {
     cx.simulate_keystrokes("ctrl-t ctrl-enter ctrl-shift-p");
     cx.simulate_input("previous result");
     cx.simulate_keystrokes("enter");
-    view.read_with(cx, |view, _| assert_eq!(view.active_run, 0));
+    view.read_with(cx, |view, _| assert_eq!(view.run_tabs.active, 0));
     cx.simulate_keystrokes("ctrl-shift-p");
     cx.simulate_input("next result");
     cx.simulate_keystrokes("enter");
-    view.read_with(cx, |view, _| assert_eq!(view.active_run, 1));
+    view.read_with(cx, |view, _| assert_eq!(view.run_tabs.active, 1));
 }
 
 #[gpui::test]
@@ -1251,7 +1251,7 @@ fn selecting_a_result_scrolls_its_tab_into_view(cx: &mut TestAppContext) {
         })
     });
     cx.run_until_parked();
-    view.read_with(cx, |view, _| assert!(view.run_scroll.offset().x < gpui::px(0.0)));
+    view.read_with(cx, |view, _| assert!(view.run_tabs.scroll.offset().x < gpui::px(0.0)));
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
             view.activate_run(0);
@@ -1259,7 +1259,7 @@ fn selecting_a_result_scrolls_its_tab_into_view(cx: &mut TestAppContext) {
         })
     });
     cx.run_until_parked();
-    view.read_with(cx, |view, _| assert_eq!(view.run_scroll.offset().x, gpui::px(0.0)));
+    view.read_with(cx, |view, _| assert_eq!(view.run_tabs.scroll.offset().x, gpui::px(0.0)));
 }
 
 #[gpui::test]
@@ -1271,12 +1271,12 @@ fn closing_the_active_run_restores_the_surviving_runs_edits(cx: &mut TestAppCont
             view.cell_edit.edits.insert((1, 1), Cell::Text("second".into()));
             view.begin_background(Work::Load, cx, |_| (), |view, ()| view.status = "stale result".into());
             view.close_run(1);
-            assert_eq!(view.runs.len(), 2);
+            assert_eq!(view.run_tabs.slots.len(), 2);
             assert_eq!(view.cell_at(1, 1), Cell::Text("second".into()));
             assert!(view.status.contains("Discard all view-only edits"));
             view.discard_view_edits();
             view.close_run(1);
-            assert_eq!(view.active_run, 0);
+            assert_eq!(view.run_tabs.active, 0);
             assert_eq!(view.cell_at(1, 1), Cell::Text("Sample 1".into()));
         });
     });
