@@ -1,6 +1,6 @@
 # 0054: One visual language for both apps
 
-- **Status**: Proposed (2026-11-18)
+- **Status**: Accepted (2026-11-18)
 - **Date**: 2026-11-18
 - **Supersedes**: part of 0042 (point 3, that the GTK application keeps libadwaita's look)
 

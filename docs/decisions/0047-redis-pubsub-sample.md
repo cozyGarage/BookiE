@@ -1,6 +1,6 @@
 # 0047: Redis pub/sub is read as a bounded sample
 
-- **Status**: Proposed (2026-11-10)
+- **Status**: Accepted (2026-11-18)
 - **Date**: 2026-11-10
 
 ## Context

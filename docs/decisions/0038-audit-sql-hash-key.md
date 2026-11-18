@@ -1,6 +1,6 @@
 # 0038: Key the audit journal's SQL hash
 
-- **Status**: Proposed
+- **Status**: Accepted (2026-11-18)
 - **Date**: 2026-11-04
 
 ## Context
