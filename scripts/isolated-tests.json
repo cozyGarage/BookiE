@@ -850,6 +850,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::editor::completion_provider::tests::large_script_completion_popup_is_visible_for_oversized_buffer"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::editor::completion_provider::tests::large_sql_scripts_keep_completion_available_without_blocking_the_main_context"
     ],
     [
