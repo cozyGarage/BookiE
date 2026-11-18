@@ -180,7 +180,7 @@ def scenarios(ui):
         filter_steps(total)
         gtk_ux.capture_grid_navigation_artifact(f"whole-result-{rows}-{scheme}-filtered")
         ui.invoke(ui.wait_for_node(name="Unpin results (1)", role=pyatspi.ROLE_PUSH_BUTTON))
-        ui.invoke(ui.wait_for_sensitive_node(name="Pin results", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.invoke(ui.wait_for_sensitive_node(name="Keep these results above the results of the next run", role=pyatspi.ROLE_PUSH_BUTTON))
         ui.wait_for_node(name="Unpin results (1)", role=pyatspi.ROLE_PUSH_BUTTON)
         ui.run_sql(right_sql(rows, counts["added"]))
         ui.wait_for_node_containing(f"({counts['right_rows']:,})", timeout=300)

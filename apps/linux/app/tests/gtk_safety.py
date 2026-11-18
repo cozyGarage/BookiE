@@ -1835,9 +1835,7 @@ sidebar_tables_group_collapses_and_expands.environment = "local"
 def expanding_a_sidebar_table_loads_its_columns(database, _base):
     wait_for_node_showing("safety_items", True)
     row = wait_for_node(name="safety_items", role=pyatspi.ROLE_LIST_ITEM)
-    toggle = find_within(row, role=pyatspi.ROLE_TOGGLE_BUTTON)
-    if toggle is None:
-        raise AssertionError(f"the column toggle is missing from the table row:\n{accessible_snapshot()}")
+    toggle = wait_for_node(name="safety_items", role=pyatspi.ROLE_PUSH_BUTTON)
     invoke(toggle)
     wait_within(row, name="id")
     wait_within(row, name="note")
@@ -2853,7 +2851,7 @@ def switched_connection_keeps_workspace_tabs_after_debounce(database, _base):
             ((identifier,) for identifier in range(1, 6)),
         )
 
-    open_sidebar_table("safety_items", root=second_window)
+    open_sidebar_table("safety_items")
     wait_for_node_containing("Rows 1 – 5")
 
     open_saved_connection(CONNECTION_B_NAME)
