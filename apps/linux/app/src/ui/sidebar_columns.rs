@@ -8,7 +8,7 @@ use relm4::gtk::prelude::*;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio_util::sync::CancellationToken;
 
-use super::sidebar_row::{SidebarRow, SidebarRowMsg};
+use super::sidebar_row::SidebarRow;
 use crate::services::catalog::CatalogOrigin;
 use crate::services::database_service::DatabaseService;
 
@@ -122,7 +122,7 @@ impl LoadedColumns {
 
 pub(super) struct SidebarColumns {
     source: Option<ColumnSource>,
-    toggle: gtk::ToggleButton,
+    expanded: Cell<bool>,
     reveal: gtk::Revealer,
     cancel: CancellationToken,
     serial: u64,
@@ -140,35 +140,25 @@ impl SidebarColumns {
     pub(super) fn new(source: Option<ColumnSource>) -> Self {
         Self {
             source,
-            toggle: gtk::ToggleButton::builder()
-                .icon_name("pan-end-symbolic")
-                .tooltip_text(bookie_app_services::tr!("Show columns"))
-                .css_classes(["flat"])
-                .build(),
             reveal: gtk::Revealer::new(),
             cancel: CancellationToken::new(),
             serial: 0,
             retained: None,
             indent: Cell::new(0),
+            expanded: Cell::new(false),
         }
     }
 
-    pub(super) fn install(
-        &self,
-        row: &gtk::ListBoxRow,
-        actions: &gtk::Box,
-        sender: &FactorySender<SidebarRow>,
-        indent: i32,
-    ) {
-        self.indent.set(indent);
+    pub(super) fn install(&self, row: &gtk::ListBoxRow, indent: i32) {
         let Some(body) = row.child().and_downcast::<gtk::Box>() else {
             return;
         };
-        actions.append(&self.toggle);
+        self.indent.set(indent);
         body.append(&self.reveal);
-        let sender = sender.clone();
-        self.toggle
-            .connect_toggled(move |button| sender.input(SidebarRowMsg::ToggleColumns(button.is_active())));
+    }
+
+    pub(super) fn is_expanded(&self) -> bool {
+        self.expanded.get()
     }
 
     pub(super) fn toggle(&mut self, active: bool, info: &TableInfo, sender: FactorySender<SidebarRow>) {
@@ -180,16 +170,7 @@ impl SidebarColumns {
             clear(&content);
         }
         self.reveal.set_reveal_child(active);
-        self.toggle.set_icon_name(if active {
-            "pan-down-symbolic"
-        } else {
-            "pan-end-symbolic"
-        });
-        self.toggle.set_tooltip_text(Some(&if active {
-            bookie_app_services::tr!("Hide columns")
-        } else {
-            bookie_app_services::tr!("Show columns")
-        }));
+        self.expanded.set(active);
         if !active {
             return;
         }
@@ -239,7 +220,7 @@ impl SidebarColumns {
     }
 
     fn accepts(&self, serial: u64) -> bool {
-        serial == self.serial && self.toggle.is_active()
+        serial == self.serial && self.expanded.get()
     }
 
     pub(super) fn close(&self) {
@@ -295,7 +276,7 @@ fn bounded(text: &str, limit: usize) -> String {
 
 fn field_row(column: &FieldPreview) -> gtk::Box {
     let row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-    let marker = gtk::Image::builder().pixel_size(14).build();
+    let marker = gtk::Image::builder().pixel_size(super::spacing::ICON).build();
     if column.primary_key {
         marker.set_icon_name(Some("dialog-password-symbolic"));
     }
@@ -374,7 +355,7 @@ mod tests {
         assert!(columns.reveal.child().is_none());
         columns.ensure_content();
         columns.serial = 2;
-        columns.toggle.set_active(true);
+        columns.expanded.set(true);
         columns.message("newer request");
         let budget = Arc::new(Semaphore::new(VISIBLE_FIELDS));
         let loaded = LoadedColumns::retain(vec![column()], &budget).unwrap();

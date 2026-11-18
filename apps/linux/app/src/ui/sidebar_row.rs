@@ -10,6 +10,8 @@ use std::rc::Rc;
 
 use bookie_core::TableInfo;
 
+use super::spacing;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SidebarObjectKind {
     Table,
@@ -54,12 +56,6 @@ fn chevron_icon(collapsed: bool) -> &'static str {
         "pan-down-symbolic"
     }
 }
-
-pub(super) fn text_indent(depth: u8) -> i32 {
-    4 + 12 * i32::from(depth) + ICON_SIZE + 8
-}
-
-const ICON_SIZE: i32 = 14;
 
 fn sidebar_icon(kind: SidebarObjectKind) -> &'static str {
     match kind {
@@ -152,7 +148,6 @@ pub struct SidebarRow {
     new_table_button: Option<gtk::Button>,
     csv_button: Option<gtk::Button>,
     new_schema_button: Option<gtk::Button>,
-    open_button: Option<gtk::Button>,
     schema_actions: SchemaCatalogActions,
     // Keep the parented popover so shutdown can unparent it before GTK finalizes the row.
     popover: Rc<RefCell<Option<gtk::PopoverMenu>>>,
@@ -161,7 +156,7 @@ pub struct SidebarRow {
 
 #[derive(Debug, Clone)]
 pub enum SidebarRowMsg {
-    ToggleColumns(bool),
+    FlipColumns,
     Open,
     OpenInNewTab,
     EditStructure,
@@ -277,25 +272,25 @@ impl FactoryComponent for SidebarRow {
 
                 #[name = "row_layout"]
                 adw::WrapBox {
-                    set_width_request: 180,
-                    set_child_spacing: 8,
+                    set_width_request: spacing::TREE_MIN_WIDTH,
+                    set_child_spacing: spacing::SM,
                     set_line_spacing: 0,
-                    set_margin_start: 4 + 12 * i32::from(self.depth),
-                    set_margin_end: 8,
-                    set_margin_top: 2,
-                    set_margin_bottom: 2,
+                    set_margin_start: spacing::tree_indent(self.depth),
+                    set_margin_end: spacing::SM,
+                    set_margin_top: spacing::TREE_ROW_PADDING,
+                    set_margin_bottom: spacing::TREE_ROW_PADDING,
 
                         #[name = "title_row"]
                         append = &gtk::Box {
                             set_orientation: gtk::Orientation::Horizontal,
-                            set_spacing: 8,
+                            set_spacing: spacing::SM,
                             set_hexpand: true,
 
                             append: &self.chevron,
 
                             gtk::Image {
                                 set_icon_name: Some(sidebar_icon(self.kind)),
-                                set_pixel_size: ICON_SIZE,
+                                set_pixel_size: spacing::ICON,
                                 set_visible: self.group.as_ref().is_none_or(|group| group.entry),
                             },
 
@@ -317,7 +312,7 @@ impl FactoryComponent for SidebarRow {
                         #[name = "actions_row"]
                         append = &gtk::Box {
                             set_orientation: gtk::Orientation::Horizontal,
-                            set_spacing: 4,
+                            set_spacing: spacing::XS,
                             set_halign: gtk::Align::End,
                         },
                     },
@@ -326,17 +321,6 @@ impl FactoryComponent for SidebarRow {
     }
 
     fn init_model(init: Self::Init, _index: &DynamicIndex, _sender: FactorySender<Self>) -> Self {
-        let open_button = init.group.is_none().then(|| {
-            let open_label = bookie_app_services::tr!("Open {name}").replace("{name}", &init.info.name);
-            let button = gtk::Button::builder()
-                .icon_name("go-next-symbolic")
-                .tooltip_text(&open_label)
-                .valign(gtk::Align::Center)
-                .css_classes(["flat"])
-                .build();
-            button.update_property(&[gtk::accessible::Property::Label(&open_label)]);
-            button
-        });
         let (new_table_button, csv_button) = if init.group.as_ref().is_some_and(|group| group.actions) {
             let labels = match init.info.schema.as_deref() {
                 Some(schema) => (
@@ -363,7 +347,7 @@ impl FactoryComponent for SidebarRow {
         });
         let collapsed = init.group.as_ref().is_some_and(|group| group.collapsed);
         let chevron = gtk::Image::from_icon_name(chevron_icon(collapsed));
-        chevron.set_pixel_size(12);
+        chevron.set_pixel_size(spacing::ICON_SMALL);
         chevron.set_visible(init.group.as_ref().is_some_and(|group| !group.entry));
         Self {
             info: init.info,
@@ -375,7 +359,6 @@ impl FactoryComponent for SidebarRow {
             new_table_button,
             csv_button,
             new_schema_button,
-            open_button,
             schema_actions: init.schema_actions,
             popover: Rc::new(RefCell::new(None)),
             columns: super::sidebar_columns::SidebarColumns::new(init.column_source),
@@ -399,7 +382,7 @@ impl FactoryComponent for SidebarRow {
         sender: FactorySender<Self>,
     ) -> Self::Widgets {
         let widgets = view_output!();
-        self.setup_row_layout(&root, &widgets, &sender);
+        self.setup_row_layout(&root, &widgets);
         if self.group.is_some() {
             root.set_tooltip_text(Some(&self.title()));
             self.describe_group(&root);
@@ -409,11 +392,6 @@ impl FactoryComponent for SidebarRow {
             }
             return widgets;
         }
-        if let Some(button) = &self.open_button {
-            let sender_for_open_button = sender.clone();
-            button.connect_clicked(move |_| sender_for_open_button.input(SidebarRowMsg::Open));
-        }
-
         // Qualified tooltips disambiguate schemas; plain-name tooltips keep single-schema accessibility consistent.
         let tooltip = match self.info.schema.as_deref().filter(|s| !s.is_empty()) {
             Some(schema) => format!("{schema}.{}", self.info.name),
@@ -440,7 +418,10 @@ impl FactoryComponent for SidebarRow {
         );
         let (schema, name) = (self.info.schema.clone(), self.info.name.clone());
         let output = match msg {
-            SidebarRowMsg::ToggleColumns(active) => return self.columns.toggle(active, &self.info, sender),
+            SidebarRowMsg::FlipColumns => {
+                let active = !self.columns.is_expanded();
+                return self.columns.toggle(active, &self.info, sender);
+            }
             SidebarRowMsg::SetCollapsed(collapsed) => return self.apply_collapse(collapsed),
             SidebarRowMsg::Open if self.kind == SidebarObjectKind::TemporaryTable => {
                 SidebarRowOutput::ShowTemporaryTable { schema, name }
@@ -472,10 +453,9 @@ impl FactoryComponent for SidebarRow {
 }
 
 impl SidebarRow {
-    fn setup_row_layout(&mut self, root: &gtk::ListBoxRow, widgets: &SidebarRowWidgets, sender: &FactorySender<Self>) {
+    fn setup_row_layout(&mut self, root: &gtk::ListBoxRow, widgets: &SidebarRowWidgets) {
         if self.group.is_none() && self.kind != SidebarObjectKind::TemporaryTable {
-            self.columns
-                .install(root, &widgets.actions_row, sender, text_indent(self.depth));
+            self.columns.install(root, spacing::tree_text_indent(self.depth));
         }
         if let Some(button) = &self.new_table_button {
             widgets.actions_row.append(button);
@@ -484,9 +464,6 @@ impl SidebarRow {
             widgets.actions_row.append(button);
         }
         if let Some(button) = &self.new_schema_button {
-            widgets.actions_row.append(button);
-        }
-        if let Some(button) = &self.open_button {
             widgets.actions_row.append(button);
         }
     }
@@ -546,11 +523,18 @@ impl SidebarRow {
     fn attach_row_controllers(&self, root: &gtk::ListBoxRow, sender: &FactorySender<Self>) {
         let click_gesture = gtk::GestureClick::builder().button(1).build();
         let sender_for_ctrl = sender.clone();
-        click_gesture.connect_pressed(move |gesture, _, _, _| {
+        let claims_clicks = self.kind != SidebarObjectKind::TemporaryTable;
+        click_gesture.connect_pressed(move |gesture, presses, _, _| {
             let state = gesture.current_event_state();
             if state.contains(gdk::ModifierType::CONTROL_MASK) {
                 gesture.set_state(gtk::EventSequenceState::Claimed);
                 sender_for_ctrl.input(SidebarRowMsg::OpenInNewTab);
+            } else if claims_clicks {
+                gesture.set_state(gtk::EventSequenceState::Claimed);
+                sender_for_ctrl.input(SidebarRowMsg::FlipColumns);
+                if presses == 2 {
+                    sender_for_ctrl.input(SidebarRowMsg::Open);
+                }
             }
         });
         root.add_controller(click_gesture);
@@ -891,11 +875,18 @@ mod responsive_layout_tests {
         factory.guard().push_back(SidebarRowInit {
             info: TableInfo {
                 schema: Some("public".into()),
-                name: "a_very_long_table_name_for_narrow_sidebar_testing".into(),
+                name: "a_very_long_schema_name_for_narrow_sidebar_testing".into(),
             },
-            kind: SidebarObjectKind::Table,
+            kind: SidebarObjectKind::Schema,
             depth: 1,
-            group: None,
+            group: Some(GroupInit {
+                label: "a_very_long_schema_name_for_narrow_sidebar_testing".into(),
+                count: 1,
+                collapsed: false,
+                actions: true,
+                entry: false,
+                new_schema: false,
+            }),
             column_source: None,
             schema_actions: SchemaCatalogActions::default(),
         });
@@ -917,9 +908,9 @@ mod responsive_layout_tests {
 
     #[test]
     #[ignore = "requires an isolated GTK display"]
-    fn row_actions_wrap_below_a_name_that_does_not_fit_and_keep_names_and_focus_order() {
+    fn row_actions_wrap_below_a_name_that_does_not_fit_and_are_never_clipped() {
         for (width, wraps) in [(220, true), (520, false)] {
-            let (window, _factory, row) = row_at_width(width);
+            let (_window, _factory, row) = row_at_width(width);
             let body = row.child().and_downcast::<gtk::Box>().unwrap();
             let row_content = body.first_child().and_downcast::<relm4::adw::WrapBox>().unwrap();
             let title = row_content.first_child().and_downcast::<gtk::Box>().unwrap();
@@ -937,18 +928,6 @@ mod responsive_layout_tests {
                 actions_bottom <= row_bottom,
                 "actions are clipped: {actions_bottom} > {row_bottom}"
             );
-            let columns = actions.first_child().and_downcast::<gtk::ToggleButton>().unwrap();
-            let open = columns.next_sibling().and_downcast::<gtk::Button>().unwrap();
-            assert!(columns.is_focusable());
-            assert!(open.is_focusable());
-            assert!(columns.grab_focus());
-            assert!(actions.child_focus(gtk::DirectionType::TabForward));
-            assert_eq!(gtk::prelude::GtkWindowExt::focus(&window), Some(open.clone().upcast()));
-            assert_eq!(
-                open.tooltip_text().as_deref(),
-                Some("Open a_very_long_table_name_for_narrow_sidebar_testing")
-            );
-            assert!(gtk::test_accessible_has_property(&open, gtk::AccessibleProperty::Label));
         }
     }
 }
@@ -959,7 +938,7 @@ mod columns_affordance_tests {
     use relm4::factory::FactoryVecDeque;
 
     fn action_button_count(widget: &gtk::Widget) -> usize {
-        let own = usize::from(widget.is::<gtk::Button>() && !widget.is::<gtk::ToggleButton>());
+        let own = usize::from(widget.is::<gtk::Button>());
         let mut count = own;
         let mut child = widget.first_child();
         while let Some(current) = child {
@@ -969,23 +948,9 @@ mod columns_affordance_tests {
         count
     }
 
-    fn expansion_button(widget: &gtk::Widget) -> Option<gtk::ToggleButton> {
-        if let Some(button) = widget.downcast_ref::<gtk::ToggleButton>() {
-            return Some(button.clone());
-        }
-        let mut child = widget.first_child();
-        while let Some(current) = child {
-            child = current.next_sibling();
-            if let Some(button) = expansion_button(&current) {
-                return Some(button);
-            }
-        }
-        None
-    }
-
     #[test]
     #[ignore = "requires an isolated GTK display"]
-    fn a_table_has_a_separate_keyboard_reachable_columns_expander() {
+    fn a_table_row_has_no_buttons_and_a_click_message_toggles_its_columns() {
         relm4::adw::init().unwrap();
         let list = gtk::ListBox::new();
         let mut factory = FactoryVecDeque::<SidebarRow>::builder().launch(list.clone()).detach();
@@ -1002,19 +967,15 @@ mod columns_affordance_tests {
         });
         while glib::MainContext::default().iteration(false) {}
         let row = list.row_at_index(0).unwrap();
-        assert_eq!(action_button_count(row.upcast_ref()), 1);
-        let expander =
-            expansion_button(row.upcast_ref()).expect("table columns can be expanded without opening the table");
-        assert!(expander.is_focusable());
-        assert!(!expander.is_active());
+        assert_eq!(action_button_count(row.upcast_ref()), 0);
         let body = row.child().and_downcast::<gtk::Box>().unwrap();
         let reveal = body.last_child().and_downcast::<gtk::Revealer>().unwrap();
         assert!(reveal.child().is_none());
-        expander.set_active(true);
+        factory.send(0, SidebarRowMsg::FlipColumns);
         while glib::MainContext::default().iteration(false) {}
         assert!(reveal.child().is_some());
         assert!(reveal.reveals_child());
-        expander.set_active(false);
+        factory.send(0, SidebarRowMsg::FlipColumns);
         while glib::MainContext::default().iteration(false) {}
         assert!(!reveal.reveals_child());
 
