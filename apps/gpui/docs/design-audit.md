@@ -4,7 +4,7 @@ Date: 2026-11-18. Against [DESIGN.md](../../../DESIGN.md), [docs/ui-review-check
 
 ## Method
 
-Read `theme.rs`, `chrome.rs`, `render.rs`, `main.rs`, `text_input.rs` and `palette_actions.rs`, counted patterns with grep, and ran `cargo test` for the app (244 tests, all pass). Not done: a visual comparison. GPUI needs a GPU and the private test display has none, so no screenshots were taken. Do that next on a real display.
+Read `theme.rs`, `chrome.rs`, `render.rs`, `main.rs`, `text_input.rs` and `palette_actions.rs`, counted patterns with grep, and ran `cargo test` for the app (244 tests, all pass). Visual checks were done on a real display (light, dark, the overflow menu, the cell context menu, tooltips). A side-by-side comparison with the GTK app is still to do.
 
 ## What matches
 
@@ -26,7 +26,7 @@ Read `theme.rs`, `chrome.rs`, `render.rs`, `main.rs`, `text_input.rs` and `palet
 | 13 | The pager strip was bordered text buttons (Compare, Export…, Matches only, Continuous) and the UI font fell back to monospace | `render.rs`, `default_font` | Fixed: icon buttons with tooltips; the UI font prefers Inter, Segoe UI, Adwaita Sans, Roboto or Noto Sans |
 | 6 | Window controls are text glyphs (`–`, `□`, `×`) | `chrome.rs` `window_button` | Open: use icons; platform buttons on macOS and Windows |
 | 7 | `GridView` is a god object: 70 fields, with parallel vectors (`runs`, `run_edits`, `run_sources`) and eight palette fields | `main.rs:80` | Partly fixed: one `RunSlot` per result, and `PaletteState`, `SidebarState` and `Measure` groups; the struct is down from 70 to 49 fields (`PanelState`, `FontState`, `ExportState` added). Find, filter and editor state are the next groups |
-| 8 | No dropdown or context menu existed | `rg "PopupMenu\|ContextMenu"` found nothing | Fixed: a toolbar overflow menu (ellipsis) and a row context menu, both built from the command palette's own labels (`menus.rs`), so a command has one name everywhere |
+| 8 | No dropdown or context menu existed | `rg "PopupMenu\|ContextMenu"` found nothing | Fixed and checked on a real display: a toolbar overflow menu (ellipsis) and a cell context menu (right click selects the row, then copies, edits, clears), both built from the command palette's own labels (`menus.rs`), so a command has one name everywhere. The table swallows right clicks on cells, so the menu opens from its `RightClickedCell` event |
 | 9 | Saved connections can be opened from Home, but none can be created or edited | `chrome.rs` Home Quick Start | Open, blocked: saving needs validation, the keyring and policy checks that live in the GTK dialog; ADR 0041 says services decide, so first move them into an app-services command, then build the form |
 | 10 | The toolbar carries window-title controls but no query actions (run only appears inside the query tab) | `chrome.rs` | Open |
 | 11 | Zoom for result views is a font setting only, not Ctrl+scroll | `font_settings.rs` | Open |

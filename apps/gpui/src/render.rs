@@ -328,6 +328,14 @@ impl Render for GridView {
             )
             .child(toolbar)
             .child(self.main_layout(sidebar, tab_row, content))
+            .children(self.row_menu.as_ref().map(|row_menu| {
+                gpui::deferred(
+                    gpui::anchored()
+                        .position(row_menu.position)
+                        .snap_to_window_with_margin(px(size::SM))
+                        .child(row_menu.menu.clone()),
+                )
+            }))
             .child(self.status_bar(theme))
             .children(palette)
     }

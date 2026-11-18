@@ -53,27 +53,9 @@ pub struct GridDelegate {
     cached: Option<(usize, Vec<(String, bool)>)>,
     edits: Edits,
     editor: Option<(usize, usize, gpui::AnyView)>,
-    pub owner: Option<gpui::WeakEntity<GridView>>,
 }
 
 impl TableDelegate for GridDelegate {
-    fn context_menu(
-        &mut self,
-        _row_ix: usize,
-        menu: gpui_kit::component::menu::PopupMenu,
-        _window: &mut Window,
-        cx: &mut Context<TableState<Self>>,
-    ) -> gpui_kit::component::menu::PopupMenu {
-        let Some(owner) = self.owner.clone() else {
-            return menu;
-        };
-        let Some(view) = owner.upgrade() else {
-            return menu;
-        };
-        let groups = crate::menus::command_groups(view.read(cx), crate::menus::ROW_GROUPS);
-        crate::menus::fill(menu, &owner, &groups)
-    }
-
     fn columns_count(&self, _cx: &App) -> usize {
         self.columns.len()
     }

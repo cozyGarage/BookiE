@@ -119,6 +119,7 @@ struct GridView {
     check_histories: Vec<(String, bookie_app_services::checks::History)>,
     palette: palette_state::PaletteState,
     sidebar: sidebar_state::SidebarState,
+    row_menu: Option<menus::RowMenu>,
     panel: panel_state::PanelState,
     fonts: panel_state::FontState,
     export: panel_state::ExportState,
@@ -289,8 +290,6 @@ impl GridView {
                 .cell_selectable(true)
                 .row_header(false)
         });
-        let owner = cx.entity().downgrade();
-        table.update(cx, |table, _| table.delegate_mut().owner = Some(owner));
         let table_focus = gpui::Focusable::focus_handle(table.read(cx), cx);
         let table_events = cx.subscribe_in(
             &table,
@@ -308,6 +307,13 @@ impl GridView {
                         _ => cursor.label(&this.column_names()),
                     };
                     cx.notify();
+                }
+                gpui_kit::component::table::TableEvent::RightClickedCell(row, _) => {
+                    let dataset = this.base() + *row as u64;
+                    if !this.selection.is_some_and(|selection| selection.contains(dataset)) {
+                        this.click_row(dataset, false);
+                    }
+                    this.open_cell_menu(window, cx);
                 }
                 gpui_kit::component::table::TableEvent::DoubleClickedRow(row) => {
                     this.edit_clicked_row(*row, window, cx);
@@ -340,6 +346,7 @@ impl GridView {
             sql_input,
             palette: palette_state::PaletteState::new(palette_input),
             sidebar: sidebar_state::SidebarState::new(sidebar_search),
+            row_menu: None,
             panel: panel_state::PanelState::new(DEFAULT_RESULT_RATIO),
             fonts: panel_state::FontState::new(font_settings::load(), default_font(&font_names).into(), font_names),
             export: panel_state::ExportState::default(),
