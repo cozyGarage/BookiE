@@ -291,3 +291,66 @@ list.tp-sidebar-item > row:selected {
   min-height: 24px;
   padding: 0;
 }
+
+/* Shape tokens: DESIGN.md. Colours come from the theme surface in ui/theme.rs. */
+:root {
+  --bookie-radius-control: 4px;
+  --bookie-radius-surface: 6px;
+  --bookie-control-height: 24px;
+  --bookie-icon-size: 14px;
+}
+
+button,
+entry,
+spinbutton,
+dropdown > button {
+  border-radius: var(--bookie-radius-control);
+}
+
+.toolbar button.flat:hover,
+headerbar button.flat:hover,
+.tp-sidebar-header button:hover {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+popover.menu contents {
+  padding: 4px;
+  border-radius: var(--bookie-radius-surface);
+}
+
+popover.menu modelbutton {
+  min-height: var(--bookie-control-height);
+  padding: 0 8px;
+  border-radius: var(--bookie-radius-control);
+}
+
+popover.menu separator {
+  margin: 4px 0;
+}
+
+toggle-group {
+  border-radius: var(--bookie-radius-surface);
+  padding: 2px;
+}
+
+toggle-group toggle {
+  min-height: 20px;
+  min-width: var(--bookie-control-height);
+  padding: 0 8px;
+  border-radius: var(--bookie-radius-control);
+}
+
+tabbar tabbox {
+  min-height: var(--bookie-control-height);
+}
+
+tabbar tab {
+  border-radius: var(--bookie-radius-control);
+}
+
+.navigation-sidebar > row {
+  min-height: var(--bookie-control-height);
+  margin: 0 4px 1px;
+  padding: 0 6px;
+  border-radius: var(--bookie-radius-control);
+}

@@ -100,9 +100,9 @@ impl SqlEditor {
         let label = if self.pinned.is_pinned() {
             bookie_app_services::tr!("Unpin results ({n})").replace("{n}", &self.pinned.count().to_string())
         } else {
-            bookie_app_services::tr!("Pin results")
+            bookie_app_services::tr!("Keep these results above the results of the next run")
         };
-        self.pin_button.set_label(&label);
+        self.pin_button.set_tooltip_text(Some(&label));
         self.pin_button
             .set_sensitive(self.pinned.is_pinned() || self.pinned.has_results());
         self.compare_button
