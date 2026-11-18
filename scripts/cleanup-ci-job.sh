@@ -45,6 +45,9 @@ fi
 if [[ "${GITHUB_JOB:-}" == b4-rollback && "${GITHUB_RUN_ID:-}" =~ ^[0-9]+$ && "${GITHUB_RUN_ATTEMPT:-}" =~ ^[0-9]+$ && "${TMPDIR:-}" == "/var/cache/ci/tmp/bookie-b4-rollback-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" ]]; then
   rm -rf -- "$TMPDIR" || status=$?
 fi
+if [[ "${GITHUB_JOB:-}" == pg-release && "${GITHUB_RUN_ID:-}" =~ ^[0-9]+$ && "${GITHUB_RUN_ATTEMPT:-}" =~ ^[0-9]+$ && "${BOOKIE_FIXTURE_TOXIPROXY_CONFIG:-}" == "/var/cache/ci/tmp/bookie-pg-release-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.json" ]]; then
+  rm -rf -- "$BOOKIE_FIXTURE_TOXIPROXY_CONFIG" || status=$?
+fi
 
 for entry in src gtk-artifact test-bundles floor-artifact floor-package floor-package-path; do
   rm -rf -- "$workspace/$entry" || status=$?
