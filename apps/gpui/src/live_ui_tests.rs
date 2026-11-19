@@ -899,6 +899,41 @@ fn the_sessions_command_is_hidden_and_does_nothing_off_postgres(cx: &mut TestApp
     });
 }
 
+#[gpui::test]
+fn explaining_a_query_shows_the_plan_as_a_tree_and_a_normal_run_clears_it(cx: &mut TestAppContext) {
+    use bookie_gpui::shell::ResultView;
+    let (view, cx) = open_live(cx);
+    let run = |view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext, explain: bool| {
+        cx.update(|window, cx| {
+            view.update(cx, |view, cx| {
+                view.tabs.open_query();
+                view.sync_grid_owner();
+                view.sql_input.update(cx, |input, cx| {
+                    input.set_value("SELECT customer FROM orders", window, cx)
+                });
+                if explain {
+                    view.explain_query(cx);
+                } else {
+                    view.run_query(cx);
+                }
+            })
+        });
+        cx.executor().advance_clock(std::time::Duration::from_secs(1));
+        cx.run_until_parked();
+    };
+    run(&view, cx, true);
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.panel.view, ResultView::Plan);
+        let first = view.panel.plan.first().expect("a plan node");
+        assert!(first.title.to_uppercase().contains("SCAN"), "{}", first.title);
+    });
+    run(&view, cx, false);
+    view.read_with(cx, |view, _| {
+        assert!(view.panel.plan.is_empty(), "a normal run drops the old plan");
+        assert_ne!(view.panel.view, ResultView::Plan);
+    });
+}
+
 fn open_live(cx: &mut TestAppContext) -> (gpui::Entity<GridView>, &mut gpui::VisualTestContext) {
     use bookie_gpui::live::{LiveTable, Origin};
     let origin = Origin::File(orders_fixture());

@@ -246,6 +246,10 @@ impl GridView {
             .child(self.result_view_switch("view-table", "Table Data", ResultView::Table, theme, cx))
             .child(self.result_view_switch("view-summary", "Summary", ResultView::Summary, theme, cx))
             .child(self.result_view_switch("view-messages", "Messages", ResultView::Messages, theme, cx))
+            .children(
+                (!self.panel.plan.is_empty())
+                    .then(|| self.result_view_switch("view-plan", "Plan", ResultView::Plan, theme, cx)),
+            )
             .child(
                 ghost("toggle-results", "", theme)
                     .child(icon(
@@ -318,6 +322,8 @@ impl GridView {
     pub(crate) fn result_body(&self, theme: Theme, grid: Div) -> Div {
         if self.panel.view == ResultView::Messages {
             self.result_messages_body(theme)
+        } else if self.panel.view == ResultView::Plan && !self.panel.plan.is_empty() {
+            self.plan_body(theme)
         } else if let Some(slot) = self
             .run_tabs
             .slots
