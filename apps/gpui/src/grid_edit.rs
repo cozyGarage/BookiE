@@ -66,8 +66,8 @@ impl GridView {
     }
 
     pub fn start_edit(&mut self, row: u64, column: usize, window: &mut Window, cx: &mut Context<Self>) {
-        if self.insert.open {
-            self.status = "Finish or cancel the new row before editing cells".into();
+        if self.form_open() {
+            self.status = "Finish or cancel the open form before editing cells".into();
             cx.notify();
             return;
         }

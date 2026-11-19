@@ -26,7 +26,7 @@ impl GridView {
             self.status = "Save or discard the pending edits before adding a row".into();
             return;
         }
-        if self.insert.open || self.insert.loading {
+        if self.form_open() || self.insert.loading {
             return;
         }
         let Some(live) = self.save_session() else {

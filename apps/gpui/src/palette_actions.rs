@@ -239,9 +239,14 @@ impl GridView {
                 self.can_save_edits() && !self.cell_edit.edits.is_empty(),
             ),
             action(
+                "import-csv",
+                "Import CSV file…",
+                self.can_save_edits() && self.cell_edit.edits.is_empty() && self.compare.is_none() && !self.form_open(),
+            ),
+            action(
                 "insert-row",
                 "Add a row",
-                self.can_save_edits() && self.cell_edit.edits.is_empty() && self.compare.is_none() && !self.insert.open,
+                self.can_save_edits() && self.cell_edit.edits.is_empty() && self.compare.is_none() && !self.form_open(),
             ),
             action(
                 "delete-rows",
@@ -487,6 +492,7 @@ impl GridView {
             "undo-edit" => self.undo_edit(cx),
             "redo-edit" => self.redo_edit(cx),
             "delete-rows" => self.request_delete(cx),
+            "import-csv" => self.open_import_bar(cx),
             _ => self.open_insert_form(cx),
         }
     }
@@ -499,7 +505,7 @@ impl GridView {
             "shortcuts" => self.open_picker(PaletteMode::Shortcuts, window, cx),
             "save-favorite" => self.save_favorite(cx),
             "favorites" => self.open_picker(PaletteMode::Favorites, window, cx),
-            "save-changes" | "undo-edit" | "redo-edit" | "delete-rows" | "insert-row" => {
+            "save-changes" | "undo-edit" | "redo-edit" | "delete-rows" | "insert-row" | "import-csv" => {
                 self.execute_edit_palette_action(id, cx);
             }
             "delete-favorite" => self.open_picker(PaletteMode::DeleteFavorite, window, cx),
