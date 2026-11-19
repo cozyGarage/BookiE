@@ -1586,3 +1586,19 @@ fn switching_connection_drops_the_previous_sidebar_fields(cx: &mut TestAppContex
         assert!(view.sidebar.catalog.is_empty());
     });
 }
+
+#[gpui::test]
+fn switching_connection_expands_every_sidebar_schema_again(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    connect_and_settle(&view, cx, orders_fixture());
+    view.update(cx, |view, _| view.sidebar.collapsed_schemas.toggle("main"));
+    view.read_with(cx, |view, _| assert!(view.sidebar.collapsed_schemas.is_collapsed("main")));
+    let other = sqlite_fixture(&["create table t (a integer)"]);
+    connect_and_settle(&view, cx, other.0.clone());
+    view.read_with(cx, |view, _| {
+        assert!(
+            !view.sidebar.collapsed_schemas.is_collapsed("main"),
+            "a schema collapsed on the old connection stayed collapsed on the new one"
+        );
+    });
+}
