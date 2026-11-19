@@ -11,6 +11,8 @@ pub enum Command {
     Favorites,
     SaveChanges,
     DeleteRows,
+    Undo,
+    Redo,
     Filter,
     CopyCells,
     CopyCellsWithHeaders,
@@ -21,7 +23,7 @@ pub enum Command {
 }
 
 impl Command {
-    pub const ALL: [Command; 16] = [
+    pub const ALL: [Command; 18] = [
         Command::Palette,
         Command::QuickSwitcher,
         Command::JumpColumn,
@@ -31,6 +33,8 @@ impl Command {
         Command::Favorites,
         Command::SaveChanges,
         Command::DeleteRows,
+        Command::Undo,
+        Command::Redo,
         Command::Filter,
         Command::CopyCells,
         Command::CopyCellsWithHeaders,
@@ -51,6 +55,8 @@ impl Command {
             Command::Favorites => "favorites",
             Command::SaveChanges => "save-changes",
             Command::DeleteRows => "delete-rows",
+            Command::Undo => "undo",
+            Command::Redo => "redo",
             Command::Filter => "filter",
             Command::CopyCells => "copy",
             Command::CopyCellsWithHeaders => "copy-with-headers",
@@ -72,6 +78,8 @@ impl Command {
             Command::Favorites => "Open a favorite",
             Command::SaveChanges => "Save changes",
             Command::DeleteRows => "Delete selected rows",
+            Command::Undo => "Undo edit",
+            Command::Redo => "Redo edit",
             Command::Filter => "Filter rows",
             Command::CopyCells => "Copy cells",
             Command::CopyCellsWithHeaders => "Copy cells with headers",
@@ -170,6 +178,8 @@ impl Default for Keymap {
                 (Command::Favorites, chord(true, true, "b")),
                 (Command::SaveChanges, chord(true, false, "s")),
                 (Command::DeleteRows, chord(true, false, "delete")),
+                (Command::Undo, chord(true, false, "z")),
+                (Command::Redo, chord(true, false, "y")),
                 (Command::Filter, chord(true, false, "f")),
                 (Command::CopyCells, chord(true, false, "c")),
                 (Command::CopyCellsWithHeaders, chord(true, true, "c")),

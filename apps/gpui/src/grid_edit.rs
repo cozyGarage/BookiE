@@ -47,7 +47,8 @@ impl GridView {
         }
         match parse_edit(editing.kind, &text) {
             Ok(cell) => {
-                self.cell_edit.edits.insert((editing.row, editing.column), cell);
+                let key = (editing.row, editing.column);
+                self.record_edit(key, cell);
                 self.edits_changed();
                 let count = self.cell_edit.edits.len();
                 self.status = if self.can_save_edits() {

@@ -19,6 +19,7 @@ mod measure;
 mod menus;
 mod palette_actions;
 mod palette_state;
+mod edit_history;
 mod favorites_ui;
 mod params_ui;
 mod picker;

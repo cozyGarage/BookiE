@@ -231,6 +231,8 @@ impl GridView {
                 matches!(self.tabs.current(), Tab::Query),
             ),
             action("favorites", "Open a favorite", true),
+            action("undo-edit", "Undo edit", self.can_undo_edit()),
+            action("redo-edit", "Redo edit", self.can_redo_edit()),
             action(
                 "save-changes",
                 "Save changes",
@@ -483,6 +485,8 @@ impl GridView {
             "save-favorite" => self.save_favorite(cx),
             "favorites" => self.open_picker(PaletteMode::Favorites, window, cx),
             "save-changes" => self.request_save(cx),
+            "undo-edit" => self.undo_edit(cx),
+            "redo-edit" => self.redo_edit(cx),
             "delete-rows" => self.request_delete(cx),
             "delete-favorite" => self.open_picker(PaletteMode::DeleteFavorite, window, cx),
             "reveal-sidebar" => self.reveal_in_sidebar(cx),
