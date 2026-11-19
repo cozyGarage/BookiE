@@ -223,8 +223,37 @@ async fn dispatch_session_command(
             })?;
         }
         Command::RunQuery { epoch, session_id, sql } => {
-            dispatch_query(sessions, epoch, session_id, sql, control, sink).await?;
+            Box::pin(dispatch_query(sessions, epoch, session_id, sql, control, sink)).await?;
         }
+        command @ (Command::ReadPage { .. }
+        | Command::ReadColumns { .. }
+        | Command::ReadCatalog { .. }
+        | Command::ReadDataDictionary { .. }
+        | Command::ReadConnectionStatus { .. }) => {
+            Box::pin(dispatch_read_command(sessions, command, control, sink)).await?;
+        }
+        Command::SampleSubscription {
+            epoch,
+            session_id,
+            request,
+        } => {
+            Box::pin(dispatch_subscription(
+                sessions, epoch, session_id, request, control, sink,
+            ))
+            .await?;
+        }
+        Command::ListSavedConnections { .. } => return Err(DispatchError::InvalidContext),
+    }
+    Ok(())
+}
+
+async fn dispatch_read_command(
+    sessions: &ReadSessionStore,
+    command: Command,
+    control: &OperationControl,
+    sink: &dyn EventSink,
+) -> Result<(), DispatchError> {
+    match command {
         Command::ReadPage {
             epoch,
             session_id,
@@ -232,40 +261,45 @@ async fn dispatch_session_command(
             offset,
             limit,
         } => {
-            dispatch_page(sessions, epoch, session_id, (table, offset, limit), control, sink).await?;
+            Box::pin(dispatch_page(
+                sessions,
+                epoch,
+                session_id,
+                (table, offset, limit),
+                control,
+                sink,
+            ))
+            .await?;
         }
         Command::ReadColumns {
             epoch,
             session_id,
             table,
-        } => {
-            dispatch_columns(sessions, epoch, session_id, table, control, sink).await?;
-        }
+        } => Box::pin(dispatch_columns(sessions, epoch, session_id, table, control, sink)).await?,
         Command::ReadCatalog {
             epoch,
             session_id,
             kind,
-        } => {
-            dispatch_catalog(sessions, epoch, session_id, kind, control, sink).await?;
-        }
+        } => Box::pin(dispatch_catalog(sessions, epoch, session_id, kind, control, sink)).await?,
         Command::ReadDataDictionary {
             epoch,
             session_id,
             capabilities,
         } => {
-            dispatch_data_dictionary(sessions, epoch, session_id, capabilities, control, sink).await?;
+            Box::pin(dispatch_data_dictionary(
+                sessions,
+                epoch,
+                session_id,
+                capabilities,
+                control,
+                sink,
+            ))
+            .await?;
         }
         Command::ReadConnectionStatus { epoch, session_id } => {
             dispatch_connection_status(sessions, epoch, session_id, sink)?;
         }
-        Command::SampleSubscription {
-            epoch,
-            session_id,
-            request,
-        } => {
-            dispatch_subscription(sessions, epoch, session_id, request, control, sink).await?;
-        }
-        Command::ListSavedConnections { .. } => return Err(DispatchError::InvalidContext),
+        _ => return Err(DispatchError::InvalidContext),
     }
     Ok(())
 }
