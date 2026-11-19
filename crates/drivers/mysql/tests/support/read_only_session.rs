@@ -15,6 +15,11 @@ async fn assert_read_only_connection_refuses_writes(opts: ConnectOptions) {
         .await
         .unwrap();
     writer.execute("INSERT INTO jobs VALUES (1)").await.unwrap();
+    writer.execute("CREATE DATABASE other_db").await.unwrap();
+    writer
+        .execute("CREATE TABLE other_db.jobs (id INT PRIMARY KEY) ENGINE=InnoDB")
+        .await
+        .unwrap();
 
     let reader = connect(ConnectOptions {
         read_only: true,
@@ -51,6 +56,17 @@ async fn assert_read_only_connection_refuses_writes(opts: ConnectOptions) {
         is_read_only_refusal(&error) || error.to_string().contains("read-only"),
         "{error:?}"
     );
+    let control = bookie_core::OperationControl::with_timeout(std::time::Duration::from_secs(5));
+    session.query_params_controlled("USE other_db", &[], &control).await.unwrap();
+    let error = session
+        .query_params_controlled("INSERT INTO jobs VALUES (9)", &[], &control)
+        .await
+        .expect_err("switching databases must not enable writes");
+    assert!(
+        is_read_only_refusal(&error) || error.to_string().contains("read-only"),
+        "{error:?}"
+    );
+    assert!(writer.query("SELECT id FROM other_db.jobs").await.unwrap().rows.is_empty());
 }
 
 #[tokio::test]
