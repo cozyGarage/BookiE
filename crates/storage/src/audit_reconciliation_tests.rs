@@ -44,7 +44,7 @@ fn resolution(
         AuditConnectionContext {
             id: connection_id,
             name: "test".into(),
-            environment: Environment::Dev,
+            environment: Environment::Local,
             driver_id: "postgres".into(),
         },
         AuditReconciliation::new(
@@ -202,4 +202,132 @@ async fn a_forged_agent_record_is_refused_and_fails_chain_verification_if_writte
         journal.verify_chain().await.is_err(),
         "a record the journal would never have admitted is corruption"
     );
+}
+
+#[tokio::test]
+async fn the_environment_comes_from_the_unknown_outcome_so_a_dev_label_cannot_skip_the_prod_evidence_rule() {
+    let dir = TempDir::new().unwrap();
+    let journal = AuditJournal::open_validated(dir.path().join("audit.jsonl")).unwrap();
+    let connection_id = Uuid::new_v4();
+    let mut intent = write_intent(connection_id);
+    intent.environment = Environment::Prod;
+    journal.record(intent.clone()).await.unwrap();
+    journal
+        .record(outcome_of(&intent, AuditTerminalStatus::Unknown))
+        .await
+        .unwrap();
+
+    let mut mislabeled = resolution(
+        connection_id,
+        intent.operation_id,
+        AuditReconciliationClaim::Committed,
+        Principal::human_gui(),
+    )
+    .unwrap();
+    mislabeled.environment = Environment::Dev;
+    assert!(matches!(
+        journal.record(mislabeled).await,
+        Err(AuditError::Persistence(_))
+    ));
+    assert!(matches!(
+        journal.record(write_intent(connection_id)).await,
+        Err(AuditError::UnresolvedWrite)
+    ));
+}
+
+#[tokio::test]
+async fn a_decision_must_be_a_succeeded_administrative_outcome_with_its_own_id() {
+    let dir = TempDir::new().unwrap();
+    let (journal, connection_id, operation_id) = journal_with_unknown_write(&dir).await;
+    let good = resolution(
+        connection_id,
+        operation_id,
+        AuditReconciliationClaim::Committed,
+        Principal::human_gui(),
+    )
+    .unwrap();
+
+    let mut as_intent = good.clone();
+    as_intent.phase = AuditRecordPhase::Intent;
+    let got = journal.record(as_intent).await;
+    assert!(got.is_err(), "an intent can never carry a decision: {got:?}");
+    let mut as_mutation = good.clone();
+    as_mutation.operation_class = AuditOperationClass::Mutation;
+    assert!(matches!(
+        journal.record(as_mutation).await,
+        Err(AuditError::Persistence(_))
+    ));
+    let mut failed = good.clone();
+    failed.terminal_status = AuditTerminalStatus::Failed;
+    assert!(matches!(journal.record(failed).await, Err(AuditError::Persistence(_))));
+    let mut same_id = good.clone();
+    same_id.operation_id = operation_id;
+    assert!(matches!(journal.record(same_id).await, Err(AuditError::Persistence(_))));
+    assert!(matches!(
+        journal.record(write_intent(connection_id)).await,
+        Err(AuditError::UnresolvedWrite)
+    ));
+    journal.record(good).await.unwrap();
+}
+
+#[tokio::test]
+async fn a_later_ordinary_outcome_for_the_same_operation_does_not_lift_the_block() {
+    let dir = TempDir::new().unwrap();
+    let (journal, connection_id, operation_id) = journal_with_unknown_write(&dir).await;
+    let mut intent = write_intent(connection_id);
+    intent.operation_id = operation_id;
+    journal
+        .record(outcome_of(&intent, AuditTerminalStatus::Succeeded))
+        .await
+        .unwrap();
+    assert!(matches!(
+        journal.record(write_intent(connection_id)).await,
+        Err(AuditError::UnresolvedWrite)
+    ));
+}
+
+#[tokio::test]
+async fn two_unknown_writes_need_two_decisions() {
+    let dir = TempDir::new().unwrap();
+    let (journal, connection_id, first) = journal_with_unknown_write(&dir).await;
+    let second_intent = {
+        let mut event = write_intent(connection_id);
+        event.operation_class = AuditOperationClass::TransactionRollback;
+        event
+    };
+    let second = Uuid::new_v4();
+    let mut unknown_two = outcome_of(&write_intent(connection_id), AuditTerminalStatus::Unknown);
+    unknown_two.operation_id = second;
+    let _ = second_intent;
+    journal.record(unknown_two).await.unwrap();
+
+    journal
+        .record(
+            resolution(
+                connection_id,
+                first,
+                AuditReconciliationClaim::Committed,
+                Principal::human_gui(),
+            )
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert!(matches!(
+        journal.record(write_intent(connection_id)).await,
+        Err(AuditError::UnresolvedWrite)
+    ));
+    journal
+        .record(
+            resolution(
+                connection_id,
+                second,
+                AuditReconciliationClaim::RolledBack,
+                Principal::human_gui(),
+            )
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+    journal.record(write_intent(connection_id)).await.unwrap();
 }

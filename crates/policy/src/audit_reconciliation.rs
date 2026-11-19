@@ -12,6 +12,7 @@ use crate::audit::{
 use crate::principal::Principal;
 
 pub const MAX_RECONCILIATION_REASON_CHARS: usize = 1000;
+const MAX_OPERATOR_CHARS: usize = 256;
 const RULE: &str = "write_outcome_reconciliation";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -55,6 +56,8 @@ pub enum ReconciliationError {
     ReasonTooLong,
     #[error("the reason contains a control character")]
     ReasonHasControlCharacter,
+    #[error("the operator name is empty, too long or has unusual characters")]
+    OperatorInvalid,
     #[error("a production connection needs the evidence for a committed or rolled back claim")]
     EvidenceRequired,
 }
@@ -83,8 +86,16 @@ impl AuditReconciliation {
         if self.reason.chars().count() > MAX_RECONCILIATION_REASON_CHARS {
             return Err(ReconciliationError::ReasonTooLong);
         }
-        if self.reason.chars().any(char::is_control) {
+        if !crate::approval::sql_is_reviewable(&self.reason) || self.reason.chars().any(char::is_control) {
             return Err(ReconciliationError::ReasonHasControlCharacter);
+        }
+        let user = self.operator_os_user.trim();
+        if user.is_empty()
+            || user.chars().count() > MAX_OPERATOR_CHARS
+            || !crate::approval::sql_is_reviewable(user)
+            || user.chars().any(char::is_control)
+        {
+            return Err(ReconciliationError::OperatorInvalid);
         }
         if environment == Environment::Prod
             && self.claim.clears_the_block()
@@ -217,5 +228,28 @@ mod tests {
         assert_eq!(event.operation_class, AuditOperationClass::Administrative);
         assert_eq!(event.redacted_sql, "[NOT_APPLICABLE]");
         assert_eq!(event.connection_id, Uuid::from_u128(7));
+    }
+
+    #[test]
+    fn invisible_or_reordering_characters_and_odd_operator_names_are_refused() {
+        let hidden = claim(
+            "looks fine\u{202E}evil",
+            AuditReconciliationEvidence::ServerCheckedManually,
+        );
+        assert_eq!(
+            hidden.validate(Environment::Dev),
+            Err(ReconciliationError::ReasonHasControlCharacter)
+        );
+        let mut nameless = claim("fine", AuditReconciliationEvidence::ServerCheckedManually);
+        nameless.operator_os_user = "  ".into();
+        assert_eq!(
+            nameless.validate(Environment::Dev),
+            Err(ReconciliationError::OperatorInvalid)
+        );
+        nameless.operator_os_user = "x".repeat(257);
+        assert_eq!(
+            nameless.validate(Environment::Dev),
+            Err(ReconciliationError::OperatorInvalid)
+        );
     }
 }

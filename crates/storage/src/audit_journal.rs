@@ -106,10 +106,16 @@ impl LegacyJournalRotation {
     }
 }
 
+#[derive(Clone, Copy)]
+struct UnresolvedWrite {
+    connection_id: Uuid,
+    environment: bookie_core::Environment,
+}
+
 struct VerifiedJournal {
     tail: JournalTail,
     pending_intents: Vec<AuditEvent>,
-    unresolved_operation_connections: HashMap<Uuid, Uuid>,
+    unresolved_operation_connections: HashMap<Uuid, UnresolvedWrite>,
 }
 
 struct JournalTail {
@@ -556,7 +562,7 @@ fn scan_records(
 fn verified_journal(
     tail: JournalTail,
     pending: HashMap<Uuid, AuditEvent>,
-    unresolved: HashMap<Uuid, Uuid>,
+    unresolved: HashMap<Uuid, UnresolvedWrite>,
 ) -> VerifiedJournal {
     let mut pending_intents: Vec<_> = pending.into_values().collect();
     pending_intents.sort_by_key(|event| event.operation_id);
@@ -598,7 +604,7 @@ fn track_verified_record(
 
 fn track_operation_state(
     pending: &mut HashMap<Uuid, AuditEvent>,
-    unresolved: &mut HashMap<Uuid, Uuid>,
+    unresolved: &mut HashMap<Uuid, UnresolvedWrite>,
     event: &AuditEvent,
 ) {
     match event.phase {
@@ -616,9 +622,13 @@ fn track_operation_state(
                 pending.remove(&event.operation_id);
             }
             if event.operation_class.is_write() && event.terminal_status == AuditTerminalStatus::Unknown {
-                unresolved.insert(event.operation_id, event.connection_id);
-            } else {
-                unresolved.remove(&event.operation_id);
+                unresolved.insert(
+                    event.operation_id,
+                    UnresolvedWrite {
+                        connection_id: event.connection_id,
+                        environment: event.environment,
+                    },
+                );
             }
         }
     }
@@ -627,7 +637,7 @@ fn track_operation_state(
 fn check_reconciliation(
     event: &AuditEvent,
     pending: &HashMap<Uuid, AuditEvent>,
-    unresolved: &HashMap<Uuid, Uuid>,
+    unresolved: &HashMap<Uuid, UnresolvedWrite>,
 ) -> Result<(), StorageError> {
     let Some(reconciliation) = &event.reconciliation else {
         return Ok(());
@@ -639,13 +649,22 @@ fn check_reconciliation(
     if let Err(error) = reconciliation.validate(event.environment) {
         return refuse(&error.to_string());
     }
+    if event.phase != AuditRecordPhase::Outcome
+        || event.operation_class != AuditOperationClass::Administrative
+        || event.terminal_status != AuditTerminalStatus::Succeeded
+    {
+        return refuse("a decision must be a succeeded administrative outcome record");
+    }
     let target = reconciliation.reconciles_operation_id;
+    if event.operation_id == target {
+        return refuse("a decision needs its own operation id");
+    }
     if pending.contains_key(&target) {
         return Err(StorageError::WriteInFlight);
     }
     match unresolved.get(&target) {
-        Some(connection_id) if *connection_id == event.connection_id => Ok(()),
-        Some(_) => refuse("the record names a different connection than the unknown outcome"),
+        Some(write) if write.connection_id == event.connection_id && write.environment == event.environment => Ok(()),
+        Some(_) => refuse("the record names a different connection or environment than the unknown outcome"),
         None => refuse("that write is not an unresolved unknown outcome"),
     }
 }
@@ -653,7 +672,7 @@ fn check_reconciliation(
 fn reject_new_write_intent(
     event: &AuditEvent,
     pending: &HashMap<Uuid, AuditEvent>,
-    unresolved: &HashMap<Uuid, Uuid>,
+    unresolved: &HashMap<Uuid, UnresolvedWrite>,
 ) -> Result<(), StorageError> {
     if event.phase != AuditRecordPhase::Intent
         || !event.operation_class.is_write()
@@ -666,7 +685,7 @@ fn reject_new_write_intent(
     });
     let blocked_by_unresolved_write = unresolved
         .values()
-        .any(|connection_id| write_scope_blocks(event.connection_id, *connection_id));
+        .any(|write| write_scope_blocks(event.connection_id, write.connection_id));
     if blocked_by_unresolved_write {
         return Err(StorageError::UnresolvedWrite);
     }
@@ -685,19 +704,24 @@ fn recover_pending_intents(file: &mut File, mut verified: VerifiedJournal) -> Re
     for intent in std::mem::take(&mut verified.pending_intents) {
         let operation_id = intent.operation_id;
         let connection_id = intent.connection_id;
+        let environment = intent.environment;
         let is_write = intent.operation_class.is_write();
         tail = append_to_file(file, tail, recovery_outcome(intent), true)?;
         if is_write {
-            verified
-                .unresolved_operation_connections
-                .insert(operation_id, connection_id);
+            verified.unresolved_operation_connections.insert(
+                operation_id,
+                UnresolvedWrite {
+                    connection_id,
+                    environment,
+                },
+            );
         }
     }
     verified.tail = tail;
     Ok(verified)
 }
 
-fn sorted_operation_ids(unresolved: &HashMap<Uuid, Uuid>) -> Vec<Uuid> {
+fn sorted_operation_ids(unresolved: &HashMap<Uuid, UnresolvedWrite>) -> Vec<Uuid> {
     let mut operation_ids: Vec<_> = unresolved.keys().copied().collect();
     operation_ids.sort_unstable();
     operation_ids
@@ -707,7 +731,7 @@ fn unresolved_connection_ids(verified: &VerifiedJournal) -> Vec<Uuid> {
     let mut connection_ids: Vec<_> = verified
         .unresolved_operation_connections
         .values()
-        .copied()
+        .map(|write| write.connection_id)
         .chain(
             verified
                 .pending_intents
@@ -723,7 +747,10 @@ fn unresolved_connection_ids(verified: &VerifiedJournal) -> Vec<Uuid> {
 }
 
 fn has_unresolved_global_write(verified: &VerifiedJournal) -> bool {
-    verified.unresolved_operation_connections.values().any(Uuid::is_nil)
+    verified
+        .unresolved_operation_connections
+        .values()
+        .any(|write| write.connection_id.is_nil())
         || verified
             .pending_intents
             .iter()
@@ -744,6 +771,7 @@ fn recovery_outcome(mut intent: AuditEvent) -> AuditEvent {
     };
     intent.error_category = Some(AuditErrorCategory::Audit);
     intent.error = Some("operation outcome was unknown after audit journal recovery".into());
+    intent.reconciliation = None;
     intent.rows_affected = None;
     intent.duration_ms = None;
     intent
