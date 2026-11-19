@@ -1053,6 +1053,13 @@ fn resolving_an_outcome_is_offered_for_a_writable_connection_and_not_while_the_p
     std::fs::remove_file(&path).ok();
 }
 
+#[test]
+fn a_blocked_save_points_to_the_resolve_action_and_other_errors_are_left_alone() {
+    let blocked = "Blocked by policy: governed writes are disabled because a prior audit outcome could not be persisted";
+    assert!(crate::save_ui::with_resolve_hint(blocked).contains("Resolve unknown write outcome"));
+    assert_eq!(crate::save_ui::with_resolve_hint("duplicate key"), "duplicate key");
+}
+
 fn set_export_path(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext, path: &std::path::Path) {
     let text = path.display().to_string();
     cx.update(|_, cx| {

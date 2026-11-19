@@ -76,7 +76,7 @@ fn request<'a>(
         format: ResultFormat::Csv,
         extension: "csv",
         csv,
-        max_rows_per_table: max_rows,
+        max_rows_per_table: Some(max_rows),
         timeout_secs: 30,
     }
 }
@@ -92,7 +92,7 @@ fn file_names_are_safe_and_unique() {
 }
 
 #[test]
-fn a_request_without_a_cap_a_table_or_a_folder_is_refused_before_anything_runs() {
+fn a_request_with_a_zero_cap_no_table_or_no_folder_is_refused_before_anything_runs() {
     let fixture = fixture(&[("t", 1)]);
     let tables = targets(&fixture, &["t"]);
     let directory = tempfile::tempdir().unwrap();
@@ -116,6 +116,12 @@ fn a_request_without_a_cap_a_table_or_a_folder_is_refused_before_anything_runs()
         run(request(&[], directory.path(), &csv, 5))
             .unwrap_err()
             .contains("at least one table")
+    );
+    let too_many = vec![tables[0].clone(); MAX_TABLES_PER_EXPORT + 1];
+    assert!(
+        run(request(&too_many, directory.path(), &csv, 5))
+            .unwrap_err()
+            .contains("256")
     );
     let missing = directory.path().join("nope");
     assert!(run(request(&tables, &missing, &csv, 5)).unwrap_err().contains("folder"));

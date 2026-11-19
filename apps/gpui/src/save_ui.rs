@@ -366,7 +366,7 @@ impl GridView {
             }
             Err(failure) if failure.outcome_unknown => {
                 let text = format!(
-                    "The save may or may not have been applied ({}). The table was reloaded; check the data before saving again, then use 'Resolve unknown write outcome…' in the command palette.",
+                    "The save may or may not have been applied ({}). The table was reloaded; check the data before saving again. If writes stay blocked, use 'Resolve unknown write outcome…' in the command palette.",
                     failure.message
                 );
                 self.save.busy = false;
@@ -375,7 +375,7 @@ impl GridView {
             }
             Err(failure) => {
                 self.save.busy = false;
-                self.status = format!("Could not save: {}", failure.message);
+                self.status = format!("Could not save: {}", with_resolve_hint(&failure.message));
                 self.show_banner(self.status.clone(), true, cx);
             }
         }
@@ -395,7 +395,7 @@ impl GridView {
                 .border_b_1()
                 .border_color(rgb(theme.border))
                 .when(is_error, |row| row.text_color(rgb(theme.destructive)))
-                .child(div().flex_1().child(text))
+                .child(div().flex_1().min_w_0().child(text))
                 .child(
                     ghost("dismiss-save-banner", "Dismiss", theme).on_click(cx.listener(|this, _, _, cx| {
                         this.dismiss_save_banner(cx);
@@ -469,6 +469,16 @@ fn plan_structure(
         expect_one: Vec::new(),
         preview: plan.preview,
     })
+}
+
+pub(crate) fn with_resolve_hint(message: &str) -> String {
+    if message.contains("governed writes are disabled") {
+        format!(
+            "{message}. If a write's result is unknown, decide it with 'Resolve unknown write outcome…' in the command palette"
+        )
+    } else {
+        message.to_string()
+    }
 }
 
 fn expand_home(path: &std::path::Path) -> std::path::PathBuf {

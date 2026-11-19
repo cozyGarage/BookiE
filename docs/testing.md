@@ -240,6 +240,8 @@ bash scripts/test-gtk-safety.sh
 `BOOKIE_GTK_CATALOG_TARGET` must use the schema-qualified accessible row name. The scenario searches for this row after measuring the unfiltered model. The memory sample is the BookiE process RSS/PSS and private pages; the GTK scenario runs with AT-SPI enabled, so compare runs under the same test environment. The connected-window timing is an accessibility-observed window-title milestone, not a native presentation timestamp. This is an end-to-end GTK measurement and is separate from the driver-only catalog benchmark above.
 The app logs the sidebar node count, tree-model construction time and number of list-item objects created by the factory at debug level; the GTK scenario records these values in its JSON output.
 
+The opt-in `postgres_multi_table_export_writes_each_selected_table` scenario exercises the GTK selection, folder chooser, row limit, completion message and CSV output against PostgreSQL. Use a disposable `bookie_test` database containing exactly two public tables, `export_alpha` and `export_beta`, each with a single `value text` column. Insert two `alpha` rows into the first and two `beta` rows into the second; row order is unspecified. Supply its port and password through `BOOKIE_GTK_POSTGRES_PORT` and `BOOKIE_GTK_POSTGRES_PASSWORD`, then run with `BOOKIE_GTK_MULTI_TABLE_FIXTURE=1` and `BOOKIE_GTK_SCENARIO=postgres_multi_table_export_writes_each_selected_table`. The test exports into its isolated temporary home; do not point this fixture at a real database.
+
 ## Local PostgreSQL smoke test
 
 For a PostgreSQL server you already run:
