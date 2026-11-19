@@ -27,7 +27,7 @@ impl GridView {
                 })
                 .await;
             let _ = this.update(cx, |this, cx| {
-                if !this.live.as_ref().is_some_and(|live| std::sync::Arc::ptr_eq(live, &started_by)) {
+                if !this.is_current_session(&started_by) {
                     return;
                 }
                 let Some((_, state)) = this.sidebar.fields.iter_mut().find(|(open, _)| *open == asked) else {

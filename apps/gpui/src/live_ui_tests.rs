@@ -1465,7 +1465,10 @@ fn switching_connection_drops_the_previous_sidebar_fields(cx: &mut TestAppContex
     let other = sqlite_fixture(&["create table t (a integer)"]);
     connect_and_settle(&view, cx, other.0.clone());
     view.read_with(cx, |view, _| {
-        assert!(view.sidebar.fields.is_empty(), "fields of the old connection stayed in the sidebar");
+        assert!(
+            view.sidebar.fields.is_empty(),
+            "fields of the old connection stayed in the sidebar"
+        );
         assert!(view.sidebar.catalog.is_empty());
     });
 }
