@@ -15,6 +15,10 @@ use bookie_core::{
     run_server_cancellable, run_server_cancellable_preserving_transaction_rollback,
 };
 
+pub use notifications::{
+    MAX_SAMPLE_MESSAGES, NotificationMessage, NotificationSample, check_notification_request, sample_notifications,
+};
+
 mod array;
 mod catalog;
 mod commit_resolution;
@@ -22,6 +26,7 @@ mod decode;
 mod errors;
 mod introspection;
 mod notices;
+mod notifications;
 mod numeric;
 mod params;
 mod pool;
@@ -147,35 +152,7 @@ impl DatabaseDriver for PgDriver {
     }
 
     async fn connect(&self, opts: ConnectOptions) -> Result<Box<dyn Connection>, DriverError> {
-        use bookie_core::TlsMode;
-        let mut pg_opts = postgres_connect_options(&opts)?;
-        pg_opts = pg_opts
-            .database(&opts.database)
-            .username(&opts.username)
-            .password(opts.password.expose_secret())
-            .ssl_mode(match opts.tls.mode {
-                TlsMode::Disabled => sqlx::postgres::PgSslMode::Disable,
-                TlsMode::Prefer => sqlx::postgres::PgSslMode::Prefer,
-                TlsMode::Require => sqlx::postgres::PgSslMode::Require,
-                TlsMode::VerifyCa => sqlx::postgres::PgSslMode::VerifyCa,
-                TlsMode::VerifyFull => sqlx::postgres::PgSslMode::VerifyFull,
-            });
-        if let Some(path) = &opts.tls.root_cert {
-            pg_opts = pg_opts.ssl_root_cert(path);
-        }
-        if let Some(path) = &opts.tls.client_cert {
-            pg_opts = pg_opts.ssl_client_cert(path);
-        }
-        if let Some(path) = &opts.tls.client_key {
-            pg_opts = pg_opts.ssl_client_key(path);
-        }
-        if let Some(name) = &opts.application_name {
-            pg_opts = pg_opts.application_name(name);
-        }
-        if opts.read_only {
-            pg_opts = pg_opts.options([("default_transaction_read_only", "on")]);
-        }
-        pg_opts = pg_opts.statement_cache_capacity(0);
+        let pg_opts = full_connect_options(&opts)?;
         let session_options = pg_opts.clone();
         let pool = pool::options(opts.pool_acquire_timeout())
             .connect_with(pg_opts)
@@ -183,6 +160,40 @@ impl DatabaseDriver for PgDriver {
             .map_err(map_sqlx_connect_error)?;
         Ok(Box::new(PgConnection { pool, session_options }))
     }
+}
+
+fn full_connect_options(opts: &ConnectOptions) -> Result<PgConnectOptions, DriverError> {
+    use bookie_core::TlsMode;
+    let mut pg_opts = postgres_connect_options(opts)?;
+    pg_opts = pg_opts
+        .database(&opts.database)
+        .username(&opts.username)
+        .password(opts.password.expose_secret())
+        .ssl_mode(match opts.tls.mode {
+            TlsMode::Disabled => sqlx::postgres::PgSslMode::Disable,
+            TlsMode::Prefer => sqlx::postgres::PgSslMode::Prefer,
+            TlsMode::Require => sqlx::postgres::PgSslMode::Require,
+            TlsMode::VerifyCa => sqlx::postgres::PgSslMode::VerifyCa,
+            TlsMode::VerifyFull => sqlx::postgres::PgSslMode::VerifyFull,
+        });
+    if let Some(path) = &opts.tls.root_cert {
+        pg_opts = pg_opts.ssl_root_cert(path);
+    }
+    if let Some(path) = &opts.tls.client_cert {
+        pg_opts = pg_opts.ssl_client_cert(path);
+    }
+    if let Some(path) = &opts.tls.client_key {
+        pg_opts = pg_opts.ssl_client_key(path);
+    }
+    if let Some(name) = &opts.application_name {
+        pg_opts = pg_opts.application_name(name);
+    }
+    if opts.read_only {
+        pg_opts = pg_opts.options([("default_transaction_read_only", "on")]);
+    }
+    pg_opts = pg_opts.statement_cache_capacity(0);
+
+    Ok(pg_opts)
 }
 
 fn postgres_connect_options(opts: &ConnectOptions) -> Result<PgConnectOptions, DriverError> {

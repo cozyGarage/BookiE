@@ -291,11 +291,11 @@ impl GridView {
                     this.palette.address = bookie_gpui::net_check::parse_address(&typed);
                     this.palette.delimiter = bookie_gpui::csv_delimiter::parse_command(&typed);
                     this.palette.limit = bookie_gpui::export_limit::parse_command(&typed);
-                    this.palette.pattern = this
-                        .live
-                        .as_ref()
-                        .filter(|live| live.driver_id == "redis")
-                        .and_then(|_| bookie_gpui::pubsub_view::parse_pattern(&typed));
+                    this.palette.pattern = this.live.as_ref().and_then(|live| match live.driver_id.as_str() {
+                        "redis" => bookie_gpui::pubsub_view::parse_pattern(&typed),
+                        "postgres" => bookie_gpui::pubsub_view::parse_channel(&typed),
+                        _ => None,
+                    });
                     cx.notify();
                 }
                 InputEvent::Submit => this.run_palette(window, cx),
