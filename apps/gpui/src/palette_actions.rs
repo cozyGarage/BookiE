@@ -17,6 +17,7 @@ fn is_edit_palette_action(id: &str) -> bool {
             | "add-index"
             | "drop-index"
             | "show-structure"
+            | "resolve-outcome"
             | "add-foreign-key"
             | "rename-table"
             | "drop-foreign-key"
@@ -268,6 +269,7 @@ impl GridView {
                 "Import CSV file…",
                 self.can_save_edits() && self.cell_edit.edits.is_empty() && self.compare.is_none() && !self.form_open(),
             ),
+            action("resolve-outcome", "Resolve unknown write outcome…", self.resolve_enabled()),
             action("show-structure", "Show table structure", self.structure_info_enabled()),
             action("add-column", "Add a column…", self.structure_change_enabled()),
             action("rename-column", "Rename a column…", self.structure_change_enabled()),
@@ -528,6 +530,7 @@ impl GridView {
             "delete-rows" => self.request_delete(cx),
             "import-csv" => self.open_import_bar(cx),
             "show-structure" => self.show_structure(cx),
+            "resolve-outcome" => self.open_resolve_panel(cx),
             "add-column" => self.open_structure_bar(StructureChangeKind::AddColumn, cx),
             "rename-column" => self.open_structure_bar(StructureChangeKind::RenameColumn, cx),
             "drop-column" => self.open_structure_bar(StructureChangeKind::DropColumn, cx),

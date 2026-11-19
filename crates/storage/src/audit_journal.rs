@@ -106,10 +106,11 @@ impl LegacyJournalRotation {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct UnresolvedWrite {
     connection_id: Uuid,
     environment: bookie_core::Environment,
+    event: Box<AuditEvent>,
 }
 
 struct VerifiedJournal {
@@ -191,6 +192,27 @@ impl AuditJournal {
             let mut file = open_file(&path)?.file;
             let _lock = FileLock::exclusive(&file)?;
             let (_, events) = verify_locked_with_recent(&mut file, false, Some(limit))?;
+            Ok(events)
+        })
+        .await
+        .map_err(join_error)?
+    }
+
+    pub async fn unresolved_unknowns(&self) -> Result<Vec<AuditEvent>, StorageError> {
+        let _writer = self.writer.lock().await;
+        let path = self.path.clone();
+        tokio::task::spawn_blocking(move || {
+            let initialization_lock = open_initialization_lock(&path)?;
+            let _initialization_guard = FileLock::exclusive(&initialization_lock.file)?;
+            let mut file = open_file(&path)?.file;
+            let _lock = FileLock::exclusive(&file)?;
+            let verified = verify_locked(&mut file, false)?;
+            let mut events: Vec<AuditEvent> = verified
+                .unresolved_operation_connections
+                .into_values()
+                .map(|write| *write.event)
+                .collect();
+            events.sort_by_key(|event| event.timestamp);
             Ok(events)
         })
         .await
@@ -627,6 +649,7 @@ fn track_operation_state(
                     UnresolvedWrite {
                         connection_id: event.connection_id,
                         environment: event.environment,
+                        event: Box::new(event.clone()),
                     },
                 );
             }
@@ -706,13 +729,15 @@ fn recover_pending_intents(file: &mut File, mut verified: VerifiedJournal) -> Re
         let connection_id = intent.connection_id;
         let environment = intent.environment;
         let is_write = intent.operation_class.is_write();
-        tail = append_to_file(file, tail, recovery_outcome(intent), true)?;
+        let outcome = recovery_outcome(intent);
+        tail = append_to_file(file, tail, outcome.clone(), true)?;
         if is_write {
             verified.unresolved_operation_connections.insert(
                 operation_id,
                 UnresolvedWrite {
                     connection_id,
                     environment,
+                    event: Box::new(outcome),
                 },
             );
         }
