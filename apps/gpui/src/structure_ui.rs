@@ -8,6 +8,7 @@ use crate::save_ui::{ReviewLabels, SaveRequest};
 pub(crate) struct StructureState {
     pub open: bool,
     pub kind: Option<StructureChangeKind>,
+    pub info: Option<String>,
     pub input: Option<Entity<TextInput>>,
 }
 
@@ -53,6 +54,7 @@ impl GridView {
             input.set_content("", cx);
         });
         self.structure.kind = Some(kind);
+        self.structure.info = None;
         self.structure.open = true;
         self.status = format!("{}: {}", title(kind), kind.hint());
         cx.notify();
@@ -60,6 +62,80 @@ impl GridView {
 
     pub(crate) fn close_structure_bar(&mut self) {
         self.structure.open = false;
+        self.structure.info = None;
+    }
+
+    pub(crate) fn structure_info_enabled(&self) -> bool {
+        self.live.is_some() && !self.grid_is_query && self.compare.is_none() && self.structure.info.is_none()
+    }
+
+    pub(crate) fn show_structure(&mut self, cx: &mut Context<Self>) {
+        let Some(live) = self.live.clone().filter(|_| self.structure_info_enabled()) else {
+            return;
+        };
+        let table = self.catalog.grid_table.clone();
+        self.status = format!("Reading the structure of {}…", table.name);
+        cx.spawn(async move |this, cx| {
+            let asked = table.clone();
+            let read = cx
+                .background_executor()
+                .spawn(async move {
+                    let columns = live.table_columns(&table)?;
+                    let structure = live.table_structure(&table)?;
+                    Ok::<_, String>(bookie_app_services::structure_summary::structure_summary(
+                        &columns,
+                        &structure.indexes,
+                        &structure.foreign_keys,
+                    ))
+                })
+                .await;
+            this.update(cx, |this, cx| {
+                if this.catalog.grid_table != asked {
+                    return;
+                }
+                match read {
+                    Ok(text) => {
+                        this.structure.info = Some(text);
+                        this.status = format!("Structure of {}", asked.name);
+                    }
+                    Err(message) => this.status = format!("Could not read the structure: {message}"),
+                }
+                cx.notify();
+            })
+            .ok();
+        })
+        .detach();
+    }
+
+    pub(crate) fn structure_info_panel(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Div> {
+        let text = self.structure.info.clone()?;
+        Some(
+            div()
+                .flex()
+                .items_start()
+                .gap_3()
+                .p_2()
+                .flex_none()
+                .bg(rgb(theme.chrome))
+                .border_b_1()
+                .border_color(rgb(theme.border))
+                .child(
+                    div()
+                        .id("structure-info")
+                        .flex_1()
+                        .min_w_0()
+                        .max_h(px(size::STRUCTURE_PANEL_MAX_HEIGHT))
+                        .overflow_y_scroll()
+                        .text_size(px(size::TEXT_SMALL))
+                        .child(text),
+                )
+                .child(
+                    ghost("close-structure-info", "Close", theme).on_click(cx.listener(|this, _, _, cx| {
+                        this.structure.info = None;
+                        cx.notify();
+                    })),
+                ),
+        )
     }
 
     pub(crate) fn cancel_structure_bar(&mut self, cx: &mut Context<Self>) {
