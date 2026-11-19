@@ -63,5 +63,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Build the GPUI application
         run: cargo build --manifest-path apps/gpui/Cargo.toml --locked
+      - name: Lint the GPUI application
+        run: cargo clippy --manifest-path apps/gpui/Cargo.toml --all-targets --locked
       - name: Run GPUI tests
         run: cargo test --manifest-path apps/gpui/Cargo.toml --locked
