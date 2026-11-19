@@ -29,6 +29,7 @@ impl GridView {
         self.edits_changed();
         self.reset_edit_history();
         self.close_insert_form();
+        self.close_import_bar();
         self.catalog = Catalog {
             connection: format!("{} · {}", session.driver_id, session.label),
             database: session.label.clone(),
@@ -182,6 +183,7 @@ impl GridView {
         self.edits_changed();
         self.reset_edit_history();
         self.close_insert_form();
+        self.close_import_bar();
         self.catalog.grid_table = identity.clone();
         self.source = table.clone();
         self.table_source = table;

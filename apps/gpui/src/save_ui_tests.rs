@@ -648,7 +648,7 @@ fn a_value_that_does_not_fit_stops_the_review_keeps_the_form_and_cells_stay_lock
     cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(0, 1, window, cx)));
     view.read_with(cx, |view, _| {
         assert!(view.cell_edit.active.is_none());
-        assert_eq!(view.status, "Finish or cancel the new row before editing cells");
+        assert_eq!(view.status, "Finish or cancel the open form before editing cells");
     });
 
     cx.update(|_, cx| view.update(cx, |view, cx| view.cancel_insert_form(cx)));
@@ -723,8 +723,100 @@ fn saving_and_deleting_are_refused_while_the_new_row_form_is_open(cx: &mut TestA
         })
     });
     view.read_with(cx, |view, _| {
-        assert_eq!(view.status, "Finish or cancel the new row first");
+        assert_eq!(view.status, "Finish or cancel the open form first");
         assert!(view.save.pending.is_none());
     });
     std::fs::remove_file(&path).ok();
+}
+
+fn csv_file(name: &str, text: &str) -> std::path::PathBuf {
+    let path = std::env::temp_dir().join(format!("bookie-gpui-{name}-{}.csv", uuid::Uuid::new_v4()));
+    std::fs::write(&path, text).unwrap();
+    path
+}
+
+fn set_import_path(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext, path: &std::path::Path) {
+    let text = path.display().to_string();
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            let input = view.import.input.clone().expect("the path field exists once the bar opened");
+            input.update(cx, |input, cx| input.set_content(&text, cx));
+        })
+    });
+}
+
+#[gpui::test]
+fn a_csv_file_is_reviewed_then_imported_in_one_transaction_and_the_table_shows_the_rows(cx: &mut TestAppContext) {
+    let path = fixture_copy("import");
+    let file = csv_file("rows", "customer,total,ignored\nCsvOne,1.5,x\nCsvTwo,2.5,y\n");
+    let (view, cx) = saving_view(cx, &path);
+    let write = write_session(&path, false);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            let id = view.live.as_ref().and_then(|live| live.writable).expect("writable");
+            view.save.write = Some((id, write));
+        })
+    });
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_import_bar(cx)));
+    view.read_with(cx, |view, _| assert!(view.import.open));
+    set_import_path(&view, cx, &file);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.review_import(cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        let pending = view
+            .save
+            .pending
+            .as_ref()
+            .unwrap_or_else(|| panic!("no review: {}", view.status));
+        assert_eq!(pending.title, "Import 2 row(s) into orders?");
+        assert_eq!(pending.confirm, "Import");
+        assert!(pending.plan.preview.contains("customer, total"), "{}", pending.plan.preview);
+        assert!(pending.plan.preview.contains("ignored"), "the unmatched field is reported: {}", pending.plan.preview);
+    });
+    assert_eq!(order_count(&path), "6", "nothing is imported before the user confirms");
+
+    cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_save(cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.save.banner, Some(("Imported 2 row(s)".to_string(), false)));
+        assert!(!view.import.open, "the bar closes once the rows are saved");
+        assert_eq!(view.source.total(), 8);
+    });
+    assert_eq!(order_count(&path), "8");
+    std::fs::remove_file(&path).ok();
+    std::fs::remove_file(&file).ok();
+}
+
+#[gpui::test]
+fn a_missing_or_unmatched_file_stops_the_review_keeps_the_bar_and_locks_editing(cx: &mut TestAppContext) {
+    let path = fixture_copy("import-bad");
+    let unmatched = csv_file("unmatched", "alpha,beta\n1,2\n");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_import_bar(cx)));
+    set_import_path(&view, cx, std::path::Path::new("/no/such/file.csv"));
+    cx.update(|_, cx| view.update(cx, |view, cx| view.review_import(cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert!(view.status.starts_with("Cannot save:"), "{}", view.status);
+        assert!(view.save.pending.is_none());
+        assert!(view.import.open, "the bar stays so the path can be fixed");
+    });
+
+    set_import_path(&view, cx, &unmatched);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.review_import(cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert!(view.status.contains("no column of this table matches"), "{}", view.status);
+    });
+
+    cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(0, 1, window, cx)));
+    view.read_with(cx, |view, _| {
+        assert!(view.cell_edit.active.is_none());
+        assert_eq!(view.status, "Finish or cancel the open form before editing cells");
+    });
+    cx.update(|_, cx| view.update(cx, |view, cx| view.cancel_import_bar(cx)));
+    view.read_with(cx, |view, _| assert!(!view.import.open));
+    assert_eq!(order_count(&path), "6");
+    std::fs::remove_file(&path).ok();
+    std::fs::remove_file(&unmatched).ok();
 }

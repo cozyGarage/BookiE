@@ -106,6 +106,7 @@ pub mod result_copy;
 pub mod result_editability;
 
 pub mod csv_import_mappings;
+pub mod csv_import_plan;
 pub mod named_filter_presets;
 pub mod open_request;
 pub mod operation_control;
