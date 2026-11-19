@@ -197,7 +197,8 @@ impl GridView {
                         SaveRequest::Structure(kind, text) => {
                             let structure = match kind {
                                 bookie_app_services::structure_change_plan::StructureChangeKind::DropIndex
-                                | bookie_app_services::structure_change_plan::StructureChangeKind::DropForeignKey => {
+                                | bookie_app_services::structure_change_plan::StructureChangeKind::DropForeignKey
+                                | bookie_app_services::structure_change_plan::StructureChangeKind::DropTable => {
                                     live.table_structure(&table)?
                                 }
                                 _ => Default::default(),
