@@ -193,17 +193,28 @@ pub struct Predicate {
     pub text: String,
 }
 
-pub fn parse_predicate(input: &str, columns: &[ColumnMeta]) -> Result<Predicate, &'static str> {
+pub fn parse_predicate(input: &str, columns: &[ColumnMeta]) -> Result<Predicate, String> {
+    let first = columns.first().map_or("column", |column| column.name.as_str());
+    let example = format!("for example: {first} contains text");
     let mut parts = input.trim().splitn(3, ' ');
-    let name = parts.next().ok_or("invalid filter")?;
+    let name = parts.next().unwrap_or("");
     let column = columns
         .iter()
         .position(|column| column.name.eq_ignore_ascii_case(name))
-        .ok_or("invalid filter")?;
-    let op = parts.next().and_then(Op::parse).ok_or("invalid filter")?;
+        .ok_or_else(|| {
+            let names: Vec<&str> = columns.iter().map(|column| column.name.as_str()).collect();
+            format!("There is no column named {name}. Columns: {}", names.join(", "))
+        })?;
+    let op = parts
+        .next()
+        .and_then(Op::parse)
+        .ok_or_else(|| format!("Use contains, = or != after the column, {example}"))?;
     let text = parts.next().unwrap_or("").trim();
-    if text.is_empty() || text.len() > 256 {
-        return Err("invalid filter");
+    if text.is_empty() {
+        return Err(format!("Add the text to match after the operator, {example}"));
+    }
+    if text.len() > 256 {
+        return Err("The text to match is longer than 256 characters".into());
     }
     Ok(Predicate {
         column,

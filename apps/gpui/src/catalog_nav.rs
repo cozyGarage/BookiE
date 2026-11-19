@@ -26,6 +26,8 @@ impl GridView {
     }
 
     fn attach_session(&mut self, session: Arc<LiveSession>, table: TableInfo) {
+        self.edits_changed();
+        self.reset_edit_history();
         self.catalog = Catalog {
             connection: format!("{} · {}", session.driver_id, session.label),
             database: session.label.clone(),
@@ -108,6 +110,8 @@ impl GridView {
     }
 
     pub(super) fn discard_view_edits(&mut self) {
+        self.edits_changed();
+        self.reset_edit_history();
         self.cell_edit.active = None;
         self.cell_edit.edits.clear();
         self.cell_edit.table.clear();
@@ -146,10 +150,36 @@ impl GridView {
         );
     }
 
+    pub(crate) fn reload_after_save(&mut self, done: String, cx: &mut Context<Self>) {
+        let Some(session) = self.live.clone() else {
+            self.save.busy = false;
+            return;
+        };
+        self.cell_edit.edits.clear();
+        let wanted = self.catalog.grid_table.clone();
+        self.begin_background(
+            Work::Load,
+            cx,
+            move |cancel| load(&session, &wanted, &cancel),
+            move |this, loaded| {
+                this.save.busy = false;
+                match loaded {
+                    Ok((name, table)) => {
+                        this.show_loaded_table(name, table);
+                        this.status = done;
+                    }
+                    Err(message) => this.status = format!("{done}, but the table could not be reloaded: {message}"),
+                }
+            },
+        );
+    }
+
     fn show_loaded_table(&mut self, identity: TableInfo, table: Source) {
         if self.reject_view_edits() {
             return;
         }
+        self.edits_changed();
+        self.reset_edit_history();
         self.catalog.grid_table = identity.clone();
         self.source = table.clone();
         self.table_source = table;

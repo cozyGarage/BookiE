@@ -71,7 +71,7 @@ async fn assert_failed_batch_releases_named_lock(conn: &dyn Connection) {
     .await;
 }
 
-async fn assert_failed_batch_preserves_named_lock(conn: &dyn Connection) {
+async fn assert_failed_batch_releases_the_named_lock_with_the_retired_backend(conn: &dyn Connection) {
     const LOCK_NAME: &str = "bookie_b4_failed_batch_lock";
     conn.execute("CREATE TABLE rollback_named_lock (id INT PRIMARY KEY, lock_result INT NOT NULL) ENGINE=InnoDB")
         .await
@@ -105,8 +105,8 @@ async fn assert_failed_batch_preserves_named_lock(conn: &dyn Connection) {
     assert_query_rows(
         conn,
         &format!("SELECT IS_FREE_LOCK('{LOCK_NAME}')"),
-        vec![vec![Value::Int(0)]],
-        "the named lock survives transaction rollback",
+        vec![vec![Value::Int(1)]],
+        "the failed batch's connection is retired, so the lock it took is released",
     )
     .await;
     assert_failed_batch_releases_named_lock(conn).await;
@@ -114,10 +114,10 @@ async fn assert_failed_batch_preserves_named_lock(conn: &dyn Connection) {
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn mysql_failed_batch_preserves_named_lock_session_state() {
+async fn mysql_failed_batch_releases_the_named_lock_with_the_retired_backend() {
     let (_container, opts) = start_mysql().await;
     let conn = connect(opts.clone()).await;
-    assert_failed_batch_preserves_named_lock(conn.as_ref()).await;
+    assert_failed_batch_releases_the_named_lock_with_the_retired_backend(conn.as_ref()).await;
     conn.close().await.unwrap();
     let observer = connect(opts).await;
     assert_eq!(
@@ -133,10 +133,10 @@ async fn mysql_failed_batch_preserves_named_lock_session_state() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn mariadb_failed_batch_preserves_named_lock_session_state() {
+async fn mariadb_failed_batch_releases_the_named_lock_with_the_retired_backend() {
     let (_container, opts) = start_mariadb().await;
     let conn = connect(opts.clone()).await;
-    assert_failed_batch_preserves_named_lock(conn.as_ref()).await;
+    assert_failed_batch_releases_the_named_lock_with_the_retired_backend(conn.as_ref()).await;
     conn.close().await.unwrap();
     let observer = connect(opts).await;
     assert_eq!(

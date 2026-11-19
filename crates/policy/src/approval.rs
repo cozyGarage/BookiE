@@ -99,6 +99,26 @@ impl ApprovalSink for DenyApprovalSink {
     }
 }
 
+pub struct ReviewableApprovalSink<S> {
+    inner: S,
+}
+
+impl<S: ApprovalSink> ReviewableApprovalSink<S> {
+    pub fn new(inner: S) -> Self {
+        Self { inner }
+    }
+}
+
+#[async_trait]
+impl<S: ApprovalSink> ApprovalSink for ReviewableApprovalSink<S> {
+    async fn request(&self, req: ApprovalRequest) -> ApprovalOutcome {
+        if !sql_is_reviewable(&req.sql) {
+            return ApprovalOutcome::Deny;
+        }
+        self.inner.request(req).await
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ApprovalGrant {
     pub connection_id: Uuid,
@@ -201,6 +221,32 @@ mod tests {
             estimated_rows: None,
             cancellation: None,
         }
+    }
+
+    struct CountingSink(std::sync::Arc<std::sync::atomic::AtomicUsize>);
+
+    #[async_trait]
+    impl ApprovalSink for CountingSink {
+        async fn request(&self, _req: ApprovalRequest) -> ApprovalOutcome {
+            self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            ApprovalOutcome::AllowOnce
+        }
+    }
+
+    #[tokio::test]
+    async fn an_unreviewable_statement_never_reaches_the_inner_sink() {
+        let calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let sink = ReviewableApprovalSink::new(CountingSink(calls.clone()));
+        let mut long = request(Principal::human_gui(), Environment::Local);
+        long.sql = "x".repeat(MAX_APPROVAL_SQL_CHARS + 1);
+        let mut hidden = request(Principal::human_gui(), Environment::Local);
+        hidden.sql = "SELECT 1\u{202E}; DROP TABLE t".into();
+        assert_eq!(sink.request(long).await, ApprovalOutcome::Deny);
+        assert_eq!(sink.request(hidden).await, ApprovalOutcome::Deny);
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 0);
+        let fine = request(Principal::human_gui(), Environment::Local);
+        assert_eq!(sink.request(fine).await, ApprovalOutcome::AllowOnce);
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
     }
 
     #[test]

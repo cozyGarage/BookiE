@@ -94,6 +94,16 @@ impl ReadSessionStore {
         self.open(saved, label, control).await
     }
 
+    pub async fn saved_connection_stamp(id: Uuid) -> Result<String, String> {
+        let saved = bookie_storage::load_connections()
+            .await
+            .map_err(|error| error.to_string())?
+            .into_iter()
+            .find(|saved| saved.id == id)
+            .ok_or_else(|| format!("connection {id} not found"))?;
+        serde_json::to_string(&saved).map_err(|error| error.to_string())
+    }
+
     pub async fn open_saved_writable(&self, id: Uuid, control: &OperationControl) -> Result<OpenedSession, String> {
         let saved = bookie_storage::load_connections()
             .await
@@ -114,6 +124,20 @@ impl ReadSessionStore {
     ) -> Result<Vec<u64>, DriverFailurePresentation> {
         let session = self.get(id).ok_or(DriverFailurePresentation::Disconnected)?;
         session.apply_changes(statements, expect_one, control).await
+    }
+
+    #[cfg(any(test, feature = "test-support"))]
+    pub async fn open_file_writable_for_tests(
+        &self,
+        path: &std::path::Path,
+        read_only: bool,
+        control: &OperationControl,
+    ) -> Result<OpenedSession, String> {
+        let file = crate::open_request::classify_file(path).map_err(|error| format!("{error:?}"))?;
+        let mut saved = crate::open_request::file_connection(&file);
+        saved.read_only = read_only;
+        let label = path.display().to_string();
+        self.open_writable(saved, label, control).await
     }
 
     pub async fn open_file(&self, path: &std::path::Path, control: &OperationControl) -> Result<OpenedSession, String> {

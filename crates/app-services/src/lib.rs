@@ -9,6 +9,7 @@ pub use bookie_results::{
 #[cfg(test)]
 mod value_exact_agreement_tests;
 
+pub mod approval_prompt;
 pub mod approval_wait;
 pub mod audit_view;
 pub mod busy_jobs;
@@ -96,6 +97,7 @@ pub mod workspace_state;
 
 pub mod browse_query;
 
+pub mod cell_save_plan;
 pub mod change_tracker;
 pub mod edit_preview;
 pub mod result_copy;

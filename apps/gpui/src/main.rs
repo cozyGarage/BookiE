@@ -1,3 +1,4 @@
+use std::io::Write;
 use std::time::{Duration, Instant};
 
 mod assets;
@@ -18,9 +19,12 @@ mod measure;
 mod menus;
 mod palette_actions;
 mod palette_state;
+mod edit_history;
 mod favorites_ui;
+mod approval_ui;
 mod params_ui;
 mod picker;
+mod save_ui;
 mod plan_view;
 mod reveal;
 mod panel_state;
@@ -124,6 +128,8 @@ struct GridView {
     palette: palette_state::PaletteState,
     favorites: favorites_ui::FavoritesState,
     params: params_ui::ParamsState,
+    save: save_ui::SaveState,
+    approval: approval_ui::ApprovalUi,
     sidebar: sidebar_state::SidebarState,
     row_menu: Option<menus::RowMenu>,
     connection_form: connection_form::ConnectionForm,
@@ -356,6 +362,8 @@ impl GridView {
         let (sidebar_search, palette_input) = Self::init_chrome_inputs(window, cx);
         let (table, table_focus, table_events) = Self::init_grid_table(window, cx);
         let font_names = installed_font_names(cx);
+        let (approval, approval_inbox) = approval_ui::ApprovalUi::new();
+        Self::watch_approvals(approval_inbox, cx);
         GridView {
             table,
             _table_events: table_events,
@@ -368,6 +376,8 @@ impl GridView {
             palette: palette_state::PaletteState::new(palette_input),
             favorites: favorites_ui::FavoritesState::default(),
             params: params_ui::ParamsState::default(),
+            save: save_ui::SaveState::default(),
+            approval,
             sidebar: sidebar_state::SidebarState::new(sidebar_search),
             row_menu: None,
             connection_form: connection_form::ConnectionForm::new(cx),
@@ -466,7 +476,8 @@ impl GridView {
         let now = Instant::now();
         if !self.measure.first_frame_reported {
             self.measure.first_frame_reported = true;
-            println!(
+            let _ = writeln!(
+                std::io::stdout(),
                 "PROTOTYPE_FIRST_FRAME ms={}",
                 self.measure.started.elapsed().as_millis()
             );
@@ -675,8 +686,79 @@ fn open_requested_start_tab(view: &Entity<GridView>, name: &str, cx: &mut App) {
     });
 }
 
+const STATEMENT_LOG_TARGET: &str = "sqlx::query";
+
+fn log_filter(requested: Option<&str>) -> tracing_subscriber::EnvFilter {
+    use tracing_subscriber::EnvFilter;
+    let filter = requested
+        .and_then(|requested| EnvFilter::try_new(requested).ok())
+        .unwrap_or_else(|| EnvFilter::new("warn"));
+    if requested.is_some_and(|requested| requested.contains(STATEMENT_LOG_TARGET)) {
+        return filter;
+    }
+    match format!("{STATEMENT_LOG_TARGET}=off").parse() {
+        Ok(directive) => filter.add_directive(directive),
+        Err(_) => filter,
+    }
+}
+
+fn init_logging() {
+    tracing_subscriber::fmt()
+        .with_writer(std::io::stderr)
+        .with_env_filter(log_filter(std::env::var("RUST_LOG").ok().as_deref()))
+        .init();
+}
+
+#[cfg(test)]
+mod logging_tests {
+    use std::sync::{Arc, Mutex};
+
+    struct Capture(Arc<Mutex<Vec<u8>>>);
+
+    impl std::io::Write for Capture {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            if let Ok(mut buffer) = self.0.lock() {
+                buffer.extend_from_slice(bytes);
+            }
+            Ok(bytes.len())
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    fn emitted(requested: Option<&str>) -> String {
+        let buffer = Arc::new(Mutex::new(Vec::new()));
+        let writer = buffer.clone();
+        let subscriber = tracing_subscriber::fmt()
+            .with_writer(move || Capture(writer.clone()))
+            .with_env_filter(super::log_filter(requested))
+            .finish();
+        tracing::subscriber::with_default(subscriber, || {
+            tracing::warn!(target: "sqlx::query", "SELECT secret FROM accounts");
+            tracing::warn!(target: "bookie_gpui", "ordinary warning");
+        });
+        let bytes = buffer.lock().map(|buffer| buffer.clone()).unwrap_or_default();
+        String::from_utf8_lossy(&bytes).into_owned()
+    }
+
+    #[test]
+    fn statement_text_is_not_logged_by_default_but_other_warnings_are() {
+        let output = emitted(None);
+        assert!(!output.contains("SELECT secret"), "{output}");
+        assert!(output.contains("ordinary warning"), "{output}");
+    }
+
+    #[test]
+    fn an_explicit_statement_log_request_is_respected() {
+        assert!(emitted(Some("sqlx::query=warn")).contains("SELECT secret"));
+    }
+}
+
 fn main() {
     let started = Instant::now();
+    init_logging();
     let total = rows_from(std::env::var("BOOKIE_PROTOTYPE_ROWS").ok().as_deref());
     let live = live_source();
     let keymap = load_keymap();
@@ -684,7 +766,7 @@ fn main() {
         Vec::new()
     } else {
         bookie_gpui::live::saved_connections().unwrap_or_else(|error| {
-            eprintln!("saved connections unavailable: {error}");
+            tracing::warn!(%error, "saved connections unavailable");
             Vec::new()
         })
     };
@@ -730,7 +812,7 @@ fn main() {
                 },
             );
             if let Err(error) = opened {
-                eprintln!("could not open a window: {error}");
+                tracing::error!(%error, "could not open a window");
                 std::process::exit(2);
             }
         });
@@ -738,6 +820,8 @@ fn main() {
 
 #[cfg(test)]
 mod live_ui_tests;
+#[cfg(test)]
+mod save_ui_tests;
 #[cfg(test)]
 mod typed_value_ui_tests;
 #[cfg(test)]
@@ -751,7 +835,7 @@ fn load_keymap() -> Keymap {
         return Keymap::default();
     };
     Keymap::from_overrides(&text).unwrap_or_else(|error| {
-        eprintln!("ignoring {}: {error}", path.display());
+        tracing::warn!(%error, path = %path.display(), "ignoring file");
         Keymap::default()
     })
 }
@@ -770,7 +854,7 @@ fn live_source() -> Option<std::sync::Arc<bookie_gpui::live::LiveTable>> {
     let session = match LiveSession::open(&origin) {
         Ok(session) => session,
         Err(error) => {
-            eprintln!("could not open live source: {error}");
+            tracing::error!(%error, "could not open live source");
             std::process::exit(2);
         }
     };
@@ -779,13 +863,13 @@ fn live_source() -> Option<std::sync::Arc<bookie_gpui::live::LiveTable>> {
         .iter()
         .find(|candidate| candidate.name == table || table_label(candidate) == table)
     else {
-        eprintln!("could not find table {table}");
+        tracing::error!(%table, "could not find table");
         std::process::exit(2);
     };
     match session.load_table(target, bookie_gpui::live::ROW_CAP) {
         Ok(live) => Some(std::sync::Arc::new(live)),
         Err(error) => {
-            eprintln!("could not read {table}: {error}");
+            tracing::error!(%table, %error, "could not read table");
             std::process::exit(2);
         }
     }
