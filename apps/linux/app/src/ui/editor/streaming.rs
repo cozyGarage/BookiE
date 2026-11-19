@@ -101,6 +101,65 @@ impl std::fmt::Debug for Input {
 }
 
 impl SqlEditor {
+    #[cfg(test)]
+    pub(super) fn inject_stream_for_test(
+        &mut self,
+        page: std::sync::Arc<QueryResult>,
+        spool: bookie_app_services::stream_result_spool::StreamResultSpool,
+        sender: &ComponentSender<Self>,
+    ) {
+        let generation = self.run_generation.start_new();
+        let identity = StatementIdentity::default();
+        let sql = "SELECT streamed fixture".to_owned();
+        self.set_running(true, false, sender);
+        self.executions.insert(
+            generation,
+            super::ExecutionContext {
+                sql: sql.clone(),
+                source: None,
+                lexical: None,
+                metadata: crate::services::database_service::ConnectionMetadata {
+                    id: self.connection_id.unwrap_or_default(),
+                    name: "stream fixture".into(),
+                    driver_id: "postgres".into(),
+                    environment: bookie_core::Environment::Local,
+                    read_only: false,
+                    server_version: None,
+                    query_timeout_secs: None,
+                },
+                started_at: std::time::SystemTime::now(),
+                timeout_secs: 30,
+            },
+        );
+        let (accepted, _) = tokio::sync::oneshot::channel();
+        self.on_stream_input(
+            Input::Started(StreamStart {
+                generation,
+                identity,
+                sql_preview: sql.clone(),
+                sql,
+                export_query: None,
+                spool: spool.clone(),
+                accepted,
+            }),
+            sender,
+        );
+        let lease = spool.page_budget().retain(&page).expect("test page fits the budget");
+        let (accepted, _) = tokio::sync::oneshot::channel();
+        self.on_stream_input(
+            Input::Page(StreamPageUpdate {
+                generation,
+                sequence: 0,
+                page,
+                spooled: true,
+                lease,
+                accepted,
+            }),
+            sender,
+        );
+        self.on_stream_finished(generation, StreamTerminal::Complete, sender);
+    }
+
     pub(super) fn on_stream_input(&mut self, input: Input, sender: &ComponentSender<Self>) {
         match input {
             Input::Started(start) => self.on_stream_started(start, sender),

@@ -77,6 +77,11 @@ pub enum SqlEditorInput {
         outcomes: Vec<StatementOutcome>,
     },
     Stream(streaming::Input),
+    #[cfg(test)]
+    InjectStreamForTest {
+        page: std::sync::Arc<QueryResult>,
+        spool: bookie_app_services::stream_result_spool::StreamResultSpool,
+    },
     FilterResults(Box<result_tools::FilterRequest>),
     FilterFinished(Box<result_tools::FilterDone>),
     SetCellsPlanned {
