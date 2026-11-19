@@ -94,6 +94,16 @@ impl ReadSessionStore {
         self.open(saved, label, control).await
     }
 
+    pub async fn saved_connection_stamp(id: Uuid) -> Result<String, String> {
+        let saved = bookie_storage::load_connections()
+            .await
+            .map_err(|error| error.to_string())?
+            .into_iter()
+            .find(|saved| saved.id == id)
+            .ok_or_else(|| format!("connection {id} not found"))?;
+        serde_json::to_string(&saved).map_err(|error| error.to_string())
+    }
+
     pub async fn open_saved_writable(&self, id: Uuid, control: &OperationControl) -> Result<OpenedSession, String> {
         let saved = bookie_storage::load_connections()
             .await
