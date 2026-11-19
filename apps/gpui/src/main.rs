@@ -677,8 +677,7 @@ fn open_requested_start_tab(view: &Entity<GridView>, name: &str, cx: &mut App) {
     });
 }
 
-fn main() {
-    let started = Instant::now();
+fn init_logging() {
     tracing_subscriber::fmt()
         .with_writer(std::io::stderr)
         .with_env_filter(
@@ -686,6 +685,11 @@ fn main() {
                 .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("warn")),
         )
         .init();
+}
+
+fn main() {
+    let started = Instant::now();
+    init_logging();
     let total = rows_from(std::env::var("BOOKIE_PROTOTYPE_ROWS").ok().as_deref());
     let live = live_source();
     let keymap = load_keymap();
