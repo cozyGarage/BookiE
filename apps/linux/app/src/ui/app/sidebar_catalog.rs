@@ -6,7 +6,7 @@ use crate::services::catalog::CatalogOrigin;
 
 const MAX_SIDEBAR_CATALOG_BYTES: usize = 64 * 1024 * 1024;
 
-fn estimated_catalog_bytes(objects: &[CatalogObject]) -> usize {
+fn estimated_catalog_bytes(objects: &Vec<CatalogObject>) -> usize {
     objects
         .capacity()
         .saturating_mul(std::mem::size_of::<CatalogObject>())
@@ -21,7 +21,7 @@ fn estimated_catalog_bytes(objects: &[CatalogObject]) -> usize {
 fn sidebar_catalog_fits(
     catalogs: &std::collections::HashMap<CatalogObjectKind, Vec<CatalogObject>>,
     replacing: CatalogObjectKind,
-    incoming: &[CatalogObject],
+    incoming: &Vec<CatalogObject>,
     limit: usize,
 ) -> bool {
     let retained_bytes = catalogs
