@@ -226,6 +226,11 @@ pub enum AppMsg {
     ExportJson,
     ExportAllCsv,
     ExportAllJson,
+    ExportTables,
+    MultiTableDestination(super::multi_table_export::Selection),
+    StartMultiTableExport(super::multi_table_export::Selection, std::path::PathBuf),
+    MultiTableExportProgress(String, usize),
+    MultiTableExportFinished(Result<Vec<bookie_app_services::export_tables::TableResult>, String>),
     ExportFrontResults,
     ExportResults {
         scope: crate::ui::export_dialog::ExportScope,

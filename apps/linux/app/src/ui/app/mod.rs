@@ -19,6 +19,7 @@ mod init_workspace;
 mod lifecycle_messages;
 mod msg;
 mod multi_session;
+mod multi_table_export;
 mod open_request;
 mod organization;
 mod ran_statements;
@@ -223,6 +224,8 @@ pub struct App {
     multi: multi_session::MultiSessionState,
     csv_import_progress: Option<crate::ui::import_dialog::ImportProgress>,
     backup_progress: Option<crate::ui::progress_dialog::CancellableDialog>,
+    multi_table_progress: Option<crate::ui::progress_dialog::CancellableDialog>,
+    multi_table_progress_label: Option<gtk::Label>,
     switch: ConnectionSwitch,
     grid_close: grid_close::GridCloseState,
     close_after_save: std::rc::Rc<std::cell::RefCell<CloseAfterSave>>,
@@ -669,6 +672,8 @@ impl SimpleComponent for App {
             multi: multi_session::MultiSessionState::default(),
             csv_import_progress: None,
             backup_progress: None,
+            multi_table_progress: None,
+            multi_table_progress_label: None,
             switch: ConnectionSwitch {
                 transition: ConnectionTransition::Idle,
                 prepared: None,
@@ -1097,6 +1102,13 @@ impl SimpleComponent for App {
             AppMsg::ExportJson => self.on_export(ExportFormat::Json),
             AppMsg::ExportAllCsv => self.on_export_all(ExportFormat::Csv),
             AppMsg::ExportAllJson => self.on_export_all(ExportFormat::Json),
+            AppMsg::ExportTables => self.on_export_tables(sender),
+            AppMsg::MultiTableDestination(selection) => self.choose_multi_table_destination(selection, sender),
+            AppMsg::StartMultiTableExport(selection, directory) => {
+                self.start_multi_table_export(selection, directory, sender)
+            }
+            AppMsg::MultiTableExportProgress(table, rows) => self.update_multi_table_export_progress(&table, rows),
+            AppMsg::MultiTableExportFinished(result) => self.finish_multi_table_export(result),
             AppMsg::ExportFrontResults => self.on_export_front_results(),
             AppMsg::CopyToClipboard(text) => self.on_copy_to_clipboard(text),
             AppMsg::CopyRowAsStatement {

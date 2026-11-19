@@ -71,6 +71,9 @@ fn close_anyway_dialog(message: &str, on_close_anyway: impl Fn() + 'static) -> a
 impl App {
     pub(super) fn prepare_editor_sessions(&mut self, action: SessionTeardownAction, sender: ComponentSender<Self>) {
         if !matches!(action, SessionTeardownAction::CloseTab(_)) {
+            if let Some(progress) = &self.multi_table_progress {
+                progress.cancel_token().cancel();
+            }
             self.window.set_sensitive(false);
         }
         let mut replies = Vec::new();
