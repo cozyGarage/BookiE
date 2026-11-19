@@ -254,16 +254,16 @@ mod tests {
             })
             .await
             .unwrap();
+        let token = CancellationToken::new();
+        let control = crate::services::operation_control::bounded_with(5, token.clone());
         connection
-            .execute("CREATE TABLE orders (id INTEGER, name TEXT)")
+            .execute_controlled("CREATE TABLE orders (id INTEGER, name TEXT)", &control)
             .await
             .unwrap();
         let table = TableInfo {
             schema: None,
             name: "orders".into(),
         };
-        let token = CancellationToken::new();
-        let control = OperationControl::new(token.clone(), None);
         let targets = prepare_targets(connection.as_ref(), vec![table.clone()], &control)
             .await
             .unwrap();
