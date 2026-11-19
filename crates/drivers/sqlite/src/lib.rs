@@ -104,13 +104,24 @@ impl DatabaseDriver for SqliteDriver {
             }
             SqliteConnectOptions::new().filename(&opts.database)
         };
-        let connect_opts = base.create_if_missing(false).read_only(opts.read_only && !in_memory);
+        let connect_opts = base
+            .create_if_missing(false)
+            .read_only(opts.read_only && !in_memory)
+            .statement_cache_capacity(0);
         let session_options = (!in_memory).then(|| connect_opts.clone());
         let attached_databases = opts.attached_databases.clone();
         let attached_for_pool = attached_databases.clone();
         let pool = SqlitePoolOptions::new()
             .max_connections(4)
             .acquire_timeout(Duration::from_secs(5))
+            .before_acquire(|conn, _| {
+                Box::pin(async move {
+                    let _ = sqlx::query("SELECT count(*) FROM sqlite_master")
+                        .execute(&mut *conn)
+                        .await;
+                    Ok(true)
+                })
+            })
             .after_connect(move |conn, _| {
                 let attached = attached_for_pool.clone();
                 Box::pin(async move {

@@ -404,3 +404,42 @@ fn the_driver_declares_how_an_import_updates_existing_rows() {
 fn the_driver_declares_value_search() {
     assert!(SqliteDriver.capabilities().supports_value_search);
 }
+
+#[tokio::test]
+async fn reading_a_table_after_a_column_is_added_sees_the_new_column_on_every_pooled_connection() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("alter.db");
+    let connection = SqliteDriver
+        .connect(create_opts_for(path.to_str().unwrap()))
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE foo (id INTEGER PRIMARY KEY, name TEXT)")
+        .await
+        .unwrap();
+    connection.execute("INSERT INTO foo (name) VALUES ('a')").await.unwrap();
+    let read_everywhere = || async {
+        let sql = "SELECT * FROM foo";
+        let (a, b, c, d) = tokio::join!(
+            connection.query(sql),
+            connection.query(sql),
+            connection.query(sql),
+            connection.query(sql)
+        );
+        [a, b, c, d]
+    };
+    for result in read_everywhere().await {
+        assert_eq!(result.unwrap().columns.len(), 2);
+    }
+    connection
+        .execute("ALTER TABLE foo ADD COLUMN flag INTEGER")
+        .await
+        .unwrap();
+    for result in read_everywhere().await {
+        assert_eq!(
+            result.unwrap().columns.len(),
+            3,
+            "a stale statement must not hide the new column"
+        );
+    }
+}
