@@ -49,6 +49,7 @@ pub struct LiveSession {
     pub tables: Vec<TableInfo>,
     pub saved: Option<(uuid::Uuid, String)>,
     pub writable: Option<uuid::Uuid>,
+    pub stamp: Option<String>,
     supports_snapshot_cursor: bool,
 }
 
@@ -63,7 +64,7 @@ impl LiveSession {
             .enable_all()
             .build()
             .map_err(|error| error.to_string())?;
-        let (sessions, opened, saved, writable) = runtime.block_on(open_session(origin, cancellation.clone()))?;
+        let (sessions, opened, saved, writable, stamp) = runtime.block_on(open_session(origin, cancellation.clone()))?;
         let writable = saved.as_ref().filter(|_| writable).map(|(id, _)| *id);
         Ok(Arc::new(LiveSession {
             driver_id: opened.driver_id.clone(),
@@ -75,6 +76,7 @@ impl LiveSession {
             tables: opened.tables,
             saved,
             writable,
+            stamp,
             supports_snapshot_cursor: opened.supports_snapshot_cursor,
         }))
     }
@@ -125,6 +127,7 @@ impl LiveSession {
             tables: self.tables.clone(),
             saved: self.saved.clone(),
             writable: self.writable,
+            stamp: self.stamp.clone(),
             supports_snapshot_cursor: self.supports_snapshot_cursor,
         })
     }
@@ -376,10 +379,12 @@ fn file_identity(path: &std::path::Path) -> (uuid::Uuid, String) {
     )
 }
 
+type OpenedParts = (ReadSessionStore, OpenedSession, Option<(uuid::Uuid, String)>, bool, Option<String>);
+
 async fn open_session(
     origin: &Origin,
     cancellation: CancellationToken,
-) -> Result<(ReadSessionStore, OpenedSession, Option<(uuid::Uuid, String)>, bool), String> {
+) -> Result<OpenedParts, String> {
     let registry = Arc::new(drivers_registry::default_registry());
     let sessions = ReadSessionStore::new(registry, Arc::new(DatabaseService::new()))
         .with_subscription_sampler(Arc::new(RegistrySubscriptionSampler));
@@ -389,7 +394,7 @@ async fn open_session(
         cancellation,
         Some(tokio::time::Instant::now() + Duration::from_secs(30)),
     );
-    let (command, identity, writable) = match origin {
+    let (command, identity, writable, stamp) = match origin {
         Origin::Saved(connection) => {
             let saved = bridge_saved_connections(&control, epoch, &current_epoch).await?;
             let found = saved
@@ -400,14 +405,15 @@ async fn open_session(
                 epoch,
                 connection_id: found.id,
             };
-            (command, (found.id, found.name.clone()), !found.read_only)
+            let stamp = ReadSessionStore::saved_connection_stamp(found.id).await.ok();
+            (command, (found.id, found.name.clone()), !found.read_only, stamp)
         }
         Origin::File(path) => {
             let command = Command::OpenConnectionFile {
                 epoch,
                 path: path.clone(),
             };
-            (command, file_identity(path), false)
+            (command, file_identity(path), false, None)
         }
     };
     let event = dispatch_read(
@@ -421,7 +427,7 @@ async fn open_session(
     let Event::SessionOpened { outcome, .. } = event else {
         return Err("The command bridge returned an unexpected event.".into());
     };
-    Ok((sessions, outcome?, Some(identity), writable))
+    Ok((sessions, outcome?, Some(identity), writable, stamp))
 }
 
 pub struct SaveFailure {
@@ -436,10 +442,20 @@ pub struct WriteSession {
     profile: Option<(uuid::Uuid, String)>,
 }
 
+fn refuse_edited_connection(opened_with: Option<&str>, now: &str) -> Result<(), String> {
+    match opened_with {
+        Some(expected) if expected != now => {
+            Err("The connection was edited after this table was opened; reopen the table before saving".into())
+        }
+        _ => Ok(()),
+    }
+}
+
 impl WriteSession {
     pub fn open_saved(
         connection_id: uuid::Uuid,
         approvals: tokio::sync::mpsc::UnboundedSender<bookie_app_services::approval_prompt::PendingApproval>,
+        opened_with: Option<&str>,
     ) -> Result<WriteSession, String> {
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(1)
@@ -451,6 +467,7 @@ impl WriteSession {
         let sessions = ReadSessionStore::new(Arc::new(drivers_registry::default_registry()), database);
         let control = OperationControl::with_timeout(Duration::from_secs(30));
         let stamp = runtime.block_on(ReadSessionStore::saved_connection_stamp(connection_id))?;
+        refuse_edited_connection(opened_with, &stamp)?;
         let opened = runtime.block_on(sessions.open_saved_writable(connection_id, &control))?;
         Ok(WriteSession {
             runtime,
@@ -1062,6 +1079,13 @@ impl ResultSource for LiveTable {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_write_session_is_refused_when_the_saved_connection_changed_since_the_table_opened() {
+        assert!(super::refuse_edited_connection(Some("a"), "a").is_ok());
+        assert!(super::refuse_edited_connection(None, "b").is_ok());
+        assert!(super::refuse_edited_connection(Some("a"), "b").is_err());
+    }
+
     use super::*;
 
     #[test]
