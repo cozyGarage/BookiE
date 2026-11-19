@@ -19,6 +19,7 @@ mod menus;
 mod palette_actions;
 mod palette_state;
 mod favorites_ui;
+mod params_ui;
 mod picker;
 mod plan_view;
 mod reveal;
@@ -122,6 +123,7 @@ struct GridView {
     check_histories: Vec<(String, bookie_app_services::checks::History)>,
     palette: palette_state::PaletteState,
     favorites: favorites_ui::FavoritesState,
+    params: params_ui::ParamsState,
     sidebar: sidebar_state::SidebarState,
     row_menu: Option<menus::RowMenu>,
     connection_form: connection_form::ConnectionForm,
@@ -365,6 +367,7 @@ impl GridView {
             sql_input,
             palette: palette_state::PaletteState::new(palette_input),
             favorites: favorites_ui::FavoritesState::default(),
+            params: params_ui::ParamsState::default(),
             sidebar: sidebar_state::SidebarState::new(sidebar_search),
             row_menu: None,
             connection_form: connection_form::ConnectionForm::new(cx),
@@ -713,6 +716,7 @@ fn main() {
                     focus.focus(window, cx);
                     view.update(cx, |view, cx| {
                         view.reload_history(cx);
+                        view.refresh_favorites(cx);
                         view.keymap = keymap.clone();
                         view.connections = connections.clone();
                     });

@@ -25,11 +25,20 @@ impl GridView {
         let needle = self.palette.input.read(cx).content();
         match self.palette.mode {
             PaletteMode::Commands => Vec::new(),
-            PaletteMode::Tables => self.table_items(needle),
+            PaletteMode::Tables => self.favorite_and_table_items(needle),
             PaletteMode::Columns => self.column_items(needle),
             PaletteMode::Shortcuts => self.shortcut_items(needle),
             PaletteMode::Favorites | PaletteMode::DeleteFavorite => self.favorite_items(needle),
         }
+    }
+
+    fn favorite_and_table_items(&self, needle: &str) -> Vec<PickerItem> {
+        let mut items: Vec<PickerItem> = self
+            .favorite_items_labeled(needle, "Favorite", false)
+            .into_iter()
+            .collect();
+        items.extend(self.table_items(needle));
+        items
     }
 
     fn table_items(&self, needle: &str) -> Vec<PickerItem> {
@@ -102,6 +111,10 @@ impl GridView {
 
     fn favorite_items(&self, needle: &str) -> Vec<PickerItem> {
         let delete = self.palette.mode == PaletteMode::DeleteFavorite;
+        self.favorite_items_labeled(needle, "", delete)
+    }
+
+    fn favorite_items_labeled(&self, needle: &str, label: &str, delete: bool) -> Vec<PickerItem> {
         let mut scored: Vec<(u32, usize, PickerItem)> = self
             .favorites
             .list
@@ -115,9 +128,14 @@ impl GridView {
                     } else {
                         Pick::Favorite(favorite.sql.clone())
                     };
+                    let subtitle = if label.is_empty() {
+                        preview(&favorite.sql)
+                    } else {
+                        label.to_owned()
+                    };
                     let item = PickerItem {
                         title: favorite.name.clone(),
-                        subtitle: preview(&favorite.sql),
+                        subtitle,
                         pick,
                     };
                     (score, position, item)
@@ -138,6 +156,9 @@ impl GridView {
     pub(crate) fn open_picker(&mut self, mode: PaletteMode, window: &mut Window, cx: &mut Context<Self>) {
         self.open_palette(window, cx);
         self.palette.mode = mode;
+        self.palette
+            .input
+            .update(cx, |input, cx| input.set_placeholder(mode.placeholder(), cx));
         if matches!(mode, PaletteMode::Favorites | PaletteMode::DeleteFavorite) {
             self.refresh_favorites(cx);
         }

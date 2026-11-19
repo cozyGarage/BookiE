@@ -63,6 +63,7 @@ impl GridView {
                 cx.stop_propagation();
             }))
             .child(self.query_editor_toolbar(theme, cx))
+            .children(self.parameters_bar(theme, cx))
             .child(
                 div()
                     .flex()

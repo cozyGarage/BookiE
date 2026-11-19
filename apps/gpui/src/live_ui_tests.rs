@@ -934,6 +934,120 @@ fn explaining_a_query_shows_the_plan_as_a_tree_and_a_normal_run_clears_it(cx: &m
     });
 }
 
+#[gpui::test]
+fn a_named_parameter_asks_for_its_value_first_and_then_runs_the_query_bound(cx: &mut TestAppContext) {
+    let (view, cx) = open_live(cx);
+    let settle = |cx: &mut gpui::VisualTestContext| {
+        cx.executor().advance_clock(std::time::Duration::from_secs(1));
+        cx.run_until_parked();
+    };
+    settle(cx);
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.tabs.open_query();
+            view.sync_grid_owner();
+            view.sql_input.update(cx, |input, cx| {
+                input.set_value("SELECT id FROM orders WHERE id = :id", window, cx)
+            });
+        })
+    });
+    settle(cx);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.run_query(cx)));
+    settle(cx);
+    let before = view.read_with(cx, |view, _| view.run_tabs.slots.len());
+    view.read_with(cx, |view, _| {
+        let names: Vec<_> = view.params.rows.iter().map(|row| row.name.as_str()).collect();
+        assert_eq!(names, ["id"], "the query is waiting for its parameter");
+        assert!(view.status.contains("parameter"), "{}", view.status);
+    });
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.params.rows[0]
+                .input
+                .update(cx, |input, cx| input.set_content("2", cx));
+            view.run_query(cx);
+        })
+    });
+    settle(cx);
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.run_tabs.slots.len(), before + 1, "the bound query ran");
+        let slot = view.run_tabs.slots.last().expect("a result");
+        assert_eq!(slot.run.rows, 1);
+    });
+}
+
+#[gpui::test]
+fn a_parameter_typed_as_text_keeps_its_leading_zeros_while_auto_turns_it_into_a_number(cx: &mut TestAppContext) {
+    use bookie_core::ParameterKind;
+    use bookie_gpui::model::CellText;
+    let (view, cx) = open_live(cx);
+    let settle = |cx: &mut gpui::VisualTestContext| {
+        cx.executor().advance_clock(std::time::Duration::from_secs(1));
+        cx.run_until_parked();
+    };
+    settle(cx);
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.tabs.open_query();
+            view.sync_grid_owner();
+            view.sql_input
+                .update(cx, |input, cx| input.set_value("SELECT :v AS v", window, cx));
+        })
+    });
+    settle(cx);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.run_query(cx)));
+    settle(cx);
+    let value = |view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext| {
+        view.read_with(cx, |view, _| {
+            let slot = view.run_tabs.slots.last().expect("a result");
+            let source = slot.source.as_ref().expect("rows");
+            source.row(0)[0].display()
+        })
+    };
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.params.rows[0]
+                .input
+                .update(cx, |input, cx| input.set_content("007", cx));
+            view.run_query(cx);
+        })
+    });
+    settle(cx);
+    assert_eq!(value(&view, cx), "7", "Auto reads 007 as a number");
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.cycle_param_kind(0, cx);
+            assert_eq!(view.params.rows[0].kind, ParameterKind::Text);
+            view.run_query(cx);
+        })
+    });
+    settle(cx);
+    assert_eq!(value(&view, cx), "007", "Text keeps the value as typed");
+}
+
+#[gpui::test]
+fn explain_refuses_a_statement_with_parameters_instead_of_sending_a_literal_name(cx: &mut TestAppContext) {
+    let (view, cx) = open_live(cx);
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.tabs.open_query();
+            view.sync_grid_owner();
+            view.sql_input
+                .update(cx, |input, cx| input.set_value("SELECT :v", window, cx));
+        })
+    });
+    cx.run_until_parked();
+    cx.update(|_, cx| view.update(cx, |view, cx| view.explain_query(cx)));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(
+            view.status,
+            "Explain does not take parameters yet; put the values in the statement"
+        );
+        assert!(!view.panel.explaining);
+    });
+}
+
 fn open_live(cx: &mut TestAppContext) -> (gpui::Entity<GridView>, &mut gpui::VisualTestContext) {
     use bookie_gpui::live::{LiveTable, Origin};
     let origin = Origin::File(orders_fixture());

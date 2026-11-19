@@ -346,6 +346,7 @@ fn the_quick_switcher_lists_tables_filters_them_and_opens_the_chosen_one(cx: &mu
     let (view, cx) = open(cx);
     cx.simulate_keystrokes("ctrl-p");
     view.read_with(cx, |view, cx| {
+        assert_eq!(view.palette.input.read(cx).placeholder(), "Go to a table or favorite");
         assert!(view.palette.open && view.palette.mode == PaletteMode::Tables);
         assert_eq!(view.picker_items(cx).len(), view.catalog.tables.len());
     });
@@ -365,6 +366,39 @@ fn the_quick_switcher_lists_tables_filters_them_and_opens_the_chosen_one(cx: &mu
         assert!(
             view.palette.open && view.palette.mode == PaletteMode::Commands,
             "the command palette is separate"
+        );
+    });
+}
+
+#[gpui::test]
+fn the_quick_switcher_lists_favorites_first_and_opens_one_in_the_editor(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.favorites.list = vec![bookie_app_services::favorites::Favorite {
+                id: uuid::Uuid::new_v4(),
+                name: "Big orders".into(),
+                sql: "SELECT * FROM orders WHERE total > 100".into(),
+            }];
+        })
+    });
+    cx.simulate_keystrokes("ctrl-p");
+    view.read_with(cx, |view, cx| {
+        let rows: Vec<_> = view
+            .picker_items(cx)
+            .into_iter()
+            .map(|item| (item.title, item.subtitle))
+            .collect();
+        assert_eq!(rows[0], ("Big orders".to_string(), "Favorite".to_string()));
+        assert_eq!(rows.len(), 1 + view.catalog.tables.len());
+    });
+    cx.simulate_input("big");
+    cx.simulate_keystrokes("enter");
+    view.read_with(cx, |view, cx| {
+        assert_eq!(*view.tabs.current(), bookie_gpui::shell::Tab::Query);
+        assert_eq!(
+            view.sql_input.read(cx).value(),
+            "SELECT * FROM orders WHERE total > 100"
         );
     });
 }

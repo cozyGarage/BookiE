@@ -135,6 +135,16 @@ impl LiveSession {
         max_rows: u64,
         cancellation: &CancellationToken,
     ) -> Result<LiveTable, String> {
+        self.run_query_bound(sql, &[], max_rows, cancellation)
+    }
+
+    pub fn run_query_bound(
+        self: &Arc<Self>,
+        sql: &str,
+        params: &[bookie_core::Value],
+        max_rows: u64,
+        cancellation: &CancellationToken,
+    ) -> Result<LiveTable, String> {
         if max_rows == 0 || max_rows > ROW_CAP {
             return Err(format!("Row limit must be between 1 and {ROW_CAP}."));
         }
@@ -142,7 +152,7 @@ impl LiveSession {
         let (columns, rows, scan, truncated) = self.runtime.block_on(query_pages(
             &self.sessions,
             self.session_id,
-            sql,
+            (sql, params),
             max_rows,
             cancellation,
             epoch,
@@ -593,14 +603,14 @@ async fn next_result_page(
 async fn query_pages(
     sessions: &ReadSessionStore,
     session_id: SessionId,
-    sql: &str,
+    (sql, params): (&str, &[bookie_core::Value]),
     max_rows: u64,
     cancellation: &CancellationToken,
     epoch: Epoch,
     current_epoch: &AtomicU64,
 ) -> Result<Pages, String> {
     let control = OperationControl::new(cancellation.clone(), Some(tokio::time::Instant::now() + PAGE_TIMEOUT));
-    let result = bridge_query(sessions, session_id, sql, &control, epoch, current_epoch).await?;
+    let result = bridge_query(sessions, session_id, (sql, params), &control, epoch, current_epoch).await?;
     spooled_pages(result, max_rows, cancellation).await
 }
 
@@ -675,7 +685,7 @@ async fn spooled_pages(
 async fn bridge_query(
     sessions: &ReadSessionStore,
     session_id: SessionId,
-    sql: &str,
+    (sql, params): (&str, &[bookie_core::Value]),
     control: &OperationControl,
     epoch: Epoch,
     current_epoch: &AtomicU64,
@@ -686,6 +696,7 @@ async fn bridge_query(
             epoch,
             session_id,
             sql: sql.to_owned(),
+            params: params.to_vec(),
         },
         control,
         epoch,
@@ -1159,6 +1170,28 @@ mod tests {
         let file = FixtureFile(path);
         let live = LiveSession::open(&Origin::File(file.0.clone())).unwrap();
         assert!(live.run_query("DELETE FROM orders", 100).is_err());
+        assert_eq!(live.run_query("SELECT id FROM orders", 100).unwrap().total(), 6);
+    }
+
+    #[test]
+    fn a_bound_query_returns_the_matching_row_and_a_bound_write_is_refused() {
+        let Origin::File(source) = fixture() else {
+            panic!("the fixture is a file")
+        };
+        let path = std::env::temp_dir().join(format!("bookie-gpui-bound-{}.sqlite", uuid::Uuid::new_v4()));
+        std::fs::copy(source, &path).unwrap();
+        let file = FixtureFile(path);
+        let live = LiveSession::open(&Origin::File(file.0.clone())).unwrap();
+        let cancel = CancellationToken::new();
+        let params = [bookie_core::Value::Int(2)];
+        let found = live
+            .run_query_bound("SELECT id FROM orders WHERE id = ?", &params, 100, &cancel)
+            .unwrap();
+        assert_eq!(found.total(), 1);
+        assert!(
+            live.run_query_bound("DELETE FROM orders WHERE id = ?", &params, 100, &cancel)
+                .is_err()
+        );
         assert_eq!(live.run_query("SELECT id FROM orders", 100).unwrap().total(), 6);
     }
 
