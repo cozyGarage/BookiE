@@ -1,1 +1,0 @@
-GPUI now shows an approval prompt for writes that need approval (Deny or Approve once), and re-checks the saved connection before every save or delete so a connection changed to read-only or production elsewhere is not written through. An approval is refused when the statement is too long or contains invisible characters.
