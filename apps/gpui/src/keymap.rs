@@ -6,6 +6,7 @@ pub enum Command {
     QuickSwitcher,
     JumpColumn,
     RevealInSidebar,
+    Shortcuts,
     Filter,
     CopyCells,
     CopyCellsWithHeaders,
@@ -16,11 +17,12 @@ pub enum Command {
 }
 
 impl Command {
-    pub const ALL: [Command; 11] = [
+    pub const ALL: [Command; 12] = [
         Command::Palette,
         Command::QuickSwitcher,
         Command::JumpColumn,
         Command::RevealInSidebar,
+        Command::Shortcuts,
         Command::Filter,
         Command::CopyCells,
         Command::CopyCellsWithHeaders,
@@ -36,6 +38,7 @@ impl Command {
             Command::QuickSwitcher => "quick-switcher",
             Command::JumpColumn => "jump-column",
             Command::RevealInSidebar => "reveal-in-sidebar",
+            Command::Shortcuts => "shortcuts",
             Command::Filter => "filter",
             Command::CopyCells => "copy",
             Command::CopyCellsWithHeaders => "copy-with-headers",
@@ -43,6 +46,23 @@ impl Command {
             Command::NewQuery => "new-query",
             Command::RunQuery => "run-query",
             Command::ToggleDetail => "toggle-detail",
+        }
+    }
+
+    pub fn title(self) -> &'static str {
+        match self {
+            Command::Palette => "Command palette",
+            Command::QuickSwitcher => "Go to table",
+            Command::JumpColumn => "Jump to column",
+            Command::RevealInSidebar => "Reveal table in sidebar",
+            Command::Shortcuts => "Keyboard shortcuts",
+            Command::Filter => "Filter rows",
+            Command::CopyCells => "Copy cells",
+            Command::CopyCellsWithHeaders => "Copy cells with headers",
+            Command::ToggleSidebar => "Show or hide the sidebar",
+            Command::NewQuery => "New query tab",
+            Command::RunQuery => "Run the query",
+            Command::ToggleDetail => "Show or hide the detail panel",
         }
     }
 
@@ -129,6 +149,7 @@ impl Default for Keymap {
                 (Command::QuickSwitcher, chord(true, false, "p")),
                 (Command::JumpColumn, chord(true, true, "j")),
                 (Command::RevealInSidebar, chord(true, true, "l")),
+                (Command::Shortcuts, chord(false, false, "f1")),
                 (Command::Filter, chord(true, false, "f")),
                 (Command::CopyCells, chord(true, false, "c")),
                 (Command::CopyCellsWithHeaders, chord(true, true, "c")),

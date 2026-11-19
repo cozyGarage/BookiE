@@ -223,6 +223,7 @@ impl GridView {
         vec![
             action("quick-switcher", "Go to table", !self.catalog.tables.is_empty()),
             action("jump-column", "Jump to column", self.tabs.shows_grid()),
+            action("shortcuts", "Keyboard shortcuts", true),
             action(
                 "reveal-sidebar",
                 "Reveal table in sidebar",
@@ -444,6 +445,7 @@ impl GridView {
             "sidebar" => self.sidebar.open = !self.sidebar.open,
             "quick-switcher" => self.open_picker(PaletteMode::Tables, window, cx),
             "jump-column" => self.open_picker(PaletteMode::Columns, window, cx),
+            "shortcuts" => self.open_picker(PaletteMode::Shortcuts, window, cx),
             "reveal-sidebar" => self.reveal_in_sidebar(cx),
             "new-connection" => {
                 self.connection_form.editing = None;

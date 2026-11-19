@@ -1,5 +1,6 @@
 use bookie_app_services::quick_switcher::{QuickTarget, filter as quick_filter, relation_items};
 use bookie_core::TableInfo;
+use bookie_gpui::keymap::{Chord, Command};
 use bookie_results::grid_cursor::Cursor;
 
 use super::*;
@@ -14,6 +15,7 @@ pub(crate) struct PickerItem {
 pub(crate) enum Pick {
     Table(TableInfo),
     Column(usize),
+    Command(Command),
 }
 
 impl GridView {
@@ -23,6 +25,7 @@ impl GridView {
             PaletteMode::Commands => Vec::new(),
             PaletteMode::Tables => self.table_items(needle),
             PaletteMode::Columns => self.column_items(needle),
+            PaletteMode::Shortcuts => self.shortcut_items(needle),
         }
     }
 
@@ -70,6 +73,30 @@ impl GridView {
         scored.into_iter().map(|(_, _, item)| item).collect()
     }
 
+    fn shortcut_items(&self, needle: &str) -> Vec<PickerItem> {
+        let mut scored: Vec<(u32, usize, PickerItem)> = Command::ALL
+            .into_iter()
+            .enumerate()
+            .filter_map(|(position, command)| {
+                let score = bookie_gpui::palette::fuzzy_score(needle, command.title());
+                (score > 0).then(|| {
+                    let keys = self
+                        .keymap
+                        .binding(command)
+                        .map_or_else(|| "unbound".into(), Chord::label);
+                    let item = PickerItem {
+                        title: command.title().into(),
+                        subtitle: keys,
+                        pick: Pick::Command(command),
+                    };
+                    (score, position, item)
+                })
+            })
+            .collect();
+        scored.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)));
+        scored.into_iter().map(|(_, _, item)| item).collect()
+    }
+
     pub(crate) fn palette_len(&self, cx: &App) -> usize {
         match self.palette.mode {
             PaletteMode::Commands => self.palette_shown(cx).len(),
@@ -92,6 +119,7 @@ impl GridView {
         self.close_palette(window, cx);
         match item.pick {
             Pick::Table(table) => self.open_table_named(&table, window, cx),
+            Pick::Command(command) => self.run_command(command, window, cx),
             Pick::Column(column) => {
                 let row = self.cell_cursor.map_or(0, |cursor| cursor.row);
                 self.place_cursor(Some(Cursor { row, column }));

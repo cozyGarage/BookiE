@@ -438,6 +438,7 @@ impl GridView {
             PaletteMode::Commands => (self.command_rows(&theme, cx), "No matching command"),
             PaletteMode::Tables => (self.picker_rows(&theme, cx), "No matching table"),
             PaletteMode::Columns => (self.picker_rows(&theme, cx), "No matching column"),
+            PaletteMode::Shortcuts => (self.picker_rows(&theme, cx), "No matching command"),
         };
         let empty = rows
             .is_empty()
