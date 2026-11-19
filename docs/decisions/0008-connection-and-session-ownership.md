@@ -22,7 +22,7 @@ The GUI must ask before accepting an unknown SSH host key on every hop, for buil
 
 ### Uncertainty scope
 
-An unknown write outcome blocks governed writes for that connection. Recovery uses the approved connection restart path. Journal-wide failure and unresolved durable recovery obligations stay fail-closed. Reconnect cannot erase an audit intent or prove whether the server committed a write. Old-generation callbacks cannot clear or poison a replacement's state. Each live connection owns its audit generation; a shared generation across connections is not this contract.
+An unknown write outcome blocks governed writes for that connection. Recovery uses the approved connection restart path. Journal-wide failure and unresolved durable recovery obligations stay fail-closed. Reconnect cannot erase an audit intent or prove whether the server committed a write. An operator may record the outcome through the audited resolve path in [ADR 0056](0056-audited-reconciliation-of-unknown-write-outcomes.md); nothing else clears it. Old-generation callbacks cannot clear or poison a replacement's state. Each live connection owns its audit generation; a shared generation across connections is not this contract.
 
 
 ## Rationale
