@@ -4,7 +4,7 @@ use super::csv::CsvOptions;
 use super::error::ExportError;
 use super::file::{ResultExport, ResultFormat, validate_row_width, writer_for};
 use super::value_to_text;
-use super::write_atomically_checked;
+use super::write_atomically_with_mode;
 use crate::query::{ColumnInfo, Value};
 
 pub type RowPage = Vec<Vec<Value>>;
@@ -27,6 +27,38 @@ pub fn write_paged_file(
     columns: &[ColumnInfo],
     row_count: usize,
     export: &ResultExport<'_>,
+    next_page: impl FnMut() -> Result<Option<RowPage>, ExportError>,
+    cancelled: impl Fn() -> bool,
+    progress: impl Fn(usize),
+) -> Result<(), ExportError> {
+    write_paged_file_with_mode(
+        path,
+        columns,
+        row_count,
+        (export, false),
+        next_page,
+        cancelled,
+        progress,
+    )
+}
+
+pub fn write_paged_file_no_replace(
+    path: &Path,
+    columns: &[ColumnInfo],
+    row_count: usize,
+    export: &ResultExport<'_>,
+    next_page: impl FnMut() -> Result<Option<RowPage>, ExportError>,
+    cancelled: impl Fn() -> bool,
+    progress: impl Fn(usize),
+) -> Result<(), ExportError> {
+    write_paged_file_with_mode(path, columns, row_count, (export, true), next_page, cancelled, progress)
+}
+
+fn write_paged_file_with_mode(
+    path: &Path,
+    columns: &[ColumnInfo],
+    row_count: usize,
+    (export, no_replace): (&ResultExport<'_>, bool),
     mut next_page: impl FnMut() -> Result<Option<RowPage>, ExportError>,
     cancelled: impl Fn() -> bool,
     progress: impl Fn(usize),
@@ -41,7 +73,7 @@ pub fn write_paged_file(
     check()?;
     let mut writer = writer_for(export, row_count)?;
     let csv_marker = matches!(export.format, ResultFormat::Csv);
-    write_atomically_checked(
+    write_atomically_with_mode(
         path,
         |output| {
             writer.begin(output, columns)?;
@@ -61,6 +93,7 @@ pub fn write_paged_file(
             writer.finish(output)
         },
         check,
+        no_replace,
     )
 }
 
@@ -69,6 +102,34 @@ mod tests {
     use super::*;
     use crate::export::test_support::column;
     use std::cell::Cell;
+
+    #[test]
+    fn no_replace_preserves_a_file_created_during_export() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("result.csv");
+        let options = CsvOptions::default();
+        let export = csv_export(&options);
+        let mut emitted = false;
+        let result = write_paged_file_no_replace(
+            &path,
+            &[column("id"), column("label")],
+            1,
+            &export,
+            || {
+                if emitted {
+                    Ok(None)
+                } else {
+                    emitted = true;
+                    std::fs::write(&path, "other writer").unwrap();
+                    Ok(Some(page(1..2)))
+                }
+            },
+            || false,
+            |_| {},
+        );
+        assert!(result.is_err());
+        assert_eq!(std::fs::read_to_string(path).unwrap(), "other writer");
+    }
 
     fn page(range: std::ops::Range<i64>) -> RowPage {
         range

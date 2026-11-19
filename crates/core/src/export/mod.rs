@@ -32,7 +32,7 @@ pub use file::{ResultExport, ResultFormat, SqlTarget, write_result_file};
 pub use in_clause::{InClause, render_in_clause, render_value_list};
 pub use json::{json_field_names, render_json, render_json_lines, render_row_json, row_to_json};
 pub use markdown::render_markdown;
-pub use paged::{RowPage, write_paged_file};
+pub use paged::{RowPage, write_paged_file, write_paged_file_no_replace};
 pub use row_limit::{cap_pages, limit_result};
 pub use text_table::render_text_table;
 pub use xlsx::MAX_WORKBOOK_ROWS;
@@ -97,6 +97,19 @@ where
     E: From<io::Error>,
     F: FnOnce(&mut dyn Write) -> Result<(), E>,
 {
+    write_atomically_with_mode(path, fill, before_publish, false)
+}
+
+pub(crate) fn write_atomically_with_mode<E, F>(
+    path: &Path,
+    fill: F,
+    before_publish: impl FnOnce() -> Result<(), E>,
+    no_replace: bool,
+) -> Result<(), E>
+where
+    E: From<io::Error>,
+    F: FnOnce(&mut dyn Write) -> Result<(), E>,
+{
     let directory = match path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
         Some(parent) => parent,
         None => Path::new("."),
@@ -111,7 +124,11 @@ where
     }
     temporary.as_file().sync_all()?;
     before_publish()?;
-    temporary.persist(path).map_err(|error| error.error)?;
+    if no_replace {
+        temporary.persist_noclobber(path).map_err(|error| error.error)?;
+    } else {
+        temporary.persist(path).map_err(|error| error.error)?;
+    }
     Ok(())
 }
 
