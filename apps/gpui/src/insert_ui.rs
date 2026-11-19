@@ -48,7 +48,7 @@ impl GridView {
                     this.catalog.grid_table.clone(),
                     this.live.as_ref().and_then(|live| live.writable),
                 );
-                if now != asked || this.import.open {
+                if now != asked || this.import.open || this.structure.open {
                     this.status.clear();
                     cx.notify();
                     return;
