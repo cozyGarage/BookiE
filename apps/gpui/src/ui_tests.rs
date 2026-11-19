@@ -341,6 +341,34 @@ fn the_palette_filters_runs_and_closes_on_escape(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn the_quick_switcher_lists_tables_filters_them_and_opens_the_chosen_one(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-p");
+    view.read_with(cx, |view, cx| {
+        assert!(view.palette.open && view.palette.quick);
+        assert_eq!(view.quick_shown(cx).len(), view.catalog.tables.len());
+    });
+    cx.simulate_input("cust");
+    view.read_with(cx, |view, cx| {
+        let titles: Vec<_> = view.quick_shown(cx).into_iter().map(|item| item.title).collect();
+        assert_eq!(titles, ["customers"]);
+    });
+    cx.simulate_keystrokes("enter");
+    view.read_with(cx, |view, _| {
+        assert!(!view.palette.open && !view.palette.quick);
+        let customers = bookie_gpui::shell::table_info("customers");
+        assert_eq!(*view.tabs.current(), bookie_gpui::shell::Tab::Table(customers));
+    });
+    cx.simulate_keystrokes("ctrl-shift-p");
+    view.read_with(cx, |view, _| {
+        assert!(
+            view.palette.open && !view.palette.quick,
+            "the command palette is separate"
+        );
+    });
+}
+
+#[gpui::test]
 fn the_palette_hides_actions_that_do_not_apply_and_arrows_pick_the_next_one(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.simulate_keystrokes("ctrl-shift-p");

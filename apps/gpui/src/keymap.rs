@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Command {
     Palette,
+    QuickSwitcher,
     Filter,
     CopyCells,
     CopyCellsWithHeaders,
@@ -13,8 +14,9 @@ pub enum Command {
 }
 
 impl Command {
-    pub const ALL: [Command; 8] = [
+    pub const ALL: [Command; 9] = [
         Command::Palette,
+        Command::QuickSwitcher,
         Command::Filter,
         Command::CopyCells,
         Command::CopyCellsWithHeaders,
@@ -27,6 +29,7 @@ impl Command {
     pub fn name(self) -> &'static str {
         match self {
             Command::Palette => "palette",
+            Command::QuickSwitcher => "quick-switcher",
             Command::Filter => "filter",
             Command::CopyCells => "copy",
             Command::CopyCellsWithHeaders => "copy-with-headers",
@@ -117,6 +120,7 @@ impl Default for Keymap {
         Keymap {
             bindings: BTreeMap::from([
                 (Command::Palette, chord(true, true, "p")),
+                (Command::QuickSwitcher, chord(true, false, "p")),
                 (Command::Filter, chord(true, false, "f")),
                 (Command::CopyCells, chord(true, false, "c")),
                 (Command::CopyCellsWithHeaders, chord(true, true, "c")),
