@@ -50,6 +50,7 @@ impl FontState {
 pub(crate) struct ExportState {
     pub csv_delimiter: Option<bookie_core::export::CustomDelimiter>,
     pub limit: Option<usize>,
+    pub file: crate::export_file_ui::ExportFileState,
 }
 
 pub(crate) struct SearchState {
