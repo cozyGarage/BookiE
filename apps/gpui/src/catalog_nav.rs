@@ -37,6 +37,7 @@ impl GridView {
         self.live = Some(session);
         self.sidebar.catalog.clear();
         self.sidebar.fields.clear();
+        self.sidebar.collapsed_schemas = Default::default();
         self.run_tabs.slots.clear();
         self.run_tabs.active = 0;
         self.run_tabs.next_number = 1;

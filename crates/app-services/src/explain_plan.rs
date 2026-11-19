@@ -51,7 +51,7 @@ fn parse_postgres(text: &str) -> Vec<PlanNode> {
 }
 
 fn parse_sqlite(text: &str) -> Vec<PlanNode> {
-    let mut depths: Vec<(u64, usize)> = Vec::new();
+    let mut depths: std::collections::HashMap<u64, usize> = std::collections::HashMap::new();
     let mut nodes = Vec::new();
     for line in text.lines() {
         if line.trim().is_empty() {
@@ -70,11 +70,8 @@ fn parse_sqlite(text: &str) -> Vec<PlanNode> {
             }
             return Vec::new();
         };
-        let depth = depths
-            .iter()
-            .find(|(known, _)| *known == parent)
-            .map_or(0, |(_, depth)| depth + 1);
-        depths.push((id, depth));
+        let depth = depths.get(&parent).map_or(0, |depth| depth + 1);
+        depths.entry(id).or_insert(depth);
         nodes.push(PlanNode {
             depth,
             title: detail.trim().to_string(),
@@ -180,5 +177,25 @@ mod tests {
         );
         assert_eq!(many, "id | parent | notused | detail\n2 | 0 | 0 | SCAN orders");
         assert_eq!(plan_text(&[], &[]), "(empty plan)");
+    }
+
+    #[test]
+    fn multibyte_titles_and_indentation_do_not_break_the_parsers() {
+        let postgres = "Seq Scan on 顧客  (cost=0.00..12.50 rows=3 width=4)\n\u{00A0}\u{00A0}Filter: (名前 = 'é')";
+        let nodes = parse_plan(postgres);
+        assert_eq!(nodes.len(), 1);
+        assert_eq!(nodes[0].title, "Seq Scan on 顧客");
+        assert_eq!(nodes[0].cost, Some(12.5));
+        assert_eq!(nodes[0].details, ["Filter: (名前 = 'é')"]);
+        let sqlite = "2 | 0 | 0 | SCAN 顧客\n3 | 2 | 0 | SEARCH é USING INDEX";
+        let nodes = parse_plan(sqlite);
+        assert_eq!(nodes.iter().map(|node| node.depth).collect::<Vec<_>>(), [0, 1]);
+    }
+
+    #[test]
+    fn a_repeated_sqlite_id_keeps_the_first_depth_for_its_children() {
+        let plan = "1 | 0 | 0 | A\n2 | 1 | 0 | B\n2 | 0 | 0 | C\n3 | 2 | 0 | D";
+        let depths: Vec<usize> = parse_plan(plan).iter().map(|node| node.depth).collect();
+        assert_eq!(depths, [0, 1, 0, 2]);
     }
 }
