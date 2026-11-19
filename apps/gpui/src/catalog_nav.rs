@@ -29,6 +29,8 @@ impl GridView {
             grid_table: table,
         };
         self.live = Some(session);
+        self.sidebar.catalog.clear();
+        self.sidebar.fields.clear();
         self.run_tabs.slots.clear();
         self.run_tabs.active = 0;
         self.run_tabs.next_number = 1;

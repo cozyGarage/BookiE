@@ -1447,3 +1447,25 @@ fn header_collapse_all_and_feedback_actions(cx: &mut TestAppContext) {
         assert_eq!(view.status, "No active database connection.");
     });
 }
+
+fn connect_and_settle(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext, path: std::path::PathBuf) {
+    cx.update(|_, cx| view.update(cx, |view, cx| view.connect(bookie_gpui::live::Origin::File(path), cx)));
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+}
+
+#[gpui::test]
+fn switching_connection_drops_the_previous_sidebar_fields(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    connect_and_settle(&view, cx, orders_fixture());
+    let customers = table_info("customers");
+    cx.update(|_, cx| view.update(cx, |view, cx| view.toggle_fields(&customers, cx)));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert_eq!(view.sidebar.fields.len(), 1));
+    let other = sqlite_fixture(&["create table t (a integer)"]);
+    connect_and_settle(&view, cx, other.0.clone());
+    view.read_with(cx, |view, _| {
+        assert!(view.sidebar.fields.is_empty(), "fields of the old connection stayed in the sidebar");
+        assert!(view.sidebar.catalog.is_empty());
+    });
+}
