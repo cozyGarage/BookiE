@@ -11,6 +11,7 @@ members = [
     "tests/release",
     "crates/mcp",
     "crates/agentd",
+    "crates/audit",
     "crates/ssh",
     "crates/checks",
     "crates/pg-sessions",

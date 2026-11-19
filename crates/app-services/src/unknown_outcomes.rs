@@ -29,6 +29,25 @@ pub async fn list_unknown_outcomes(connection_id: Option<Uuid>) -> Result<Vec<Un
     list_in(&journal, connection_id).await
 }
 
+pub async fn list_unknown_outcomes_at(
+    journal_path: std::path::PathBuf,
+    connection_id: Option<Uuid>,
+) -> Result<Vec<UnknownOutcome>, String> {
+    let journal = AuditJournal::open_validated(journal_path).map_err(|error| error.to_string())?;
+    list_in(&journal, connection_id).await
+}
+
+pub async fn resolve_unknown_outcome_at(
+    journal_path: std::path::PathBuf,
+    operation_id: Uuid,
+    decision: OutcomeDecision,
+    reason: &str,
+    checked_myself: bool,
+) -> Result<(), String> {
+    let journal = AuditJournal::open_validated(journal_path).map_err(|error| error.to_string())?;
+    resolve_in(&journal, operation_id, decision, reason, checked_myself).await
+}
+
 pub async fn resolve_unknown_outcome(
     operation_id: Uuid,
     decision: OutcomeDecision,

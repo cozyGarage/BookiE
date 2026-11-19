@@ -23,7 +23,7 @@ DuckDB is a built-in driver. The diagrams below give the detail.
 
 | Path | Holds |
 | --- | --- |
-| `crates/` | GTK-free workspace crates: `core`, `policy`, `storage`, `ssh`, `transport`, `results`, `app-services`, `dump`, `mcp`, `agentd`, `registry`, `checks`, `pg-sessions`, `kafka-browser`, `avro-container` and `drivers/*`. None depends on GTK. |
+| `crates/` | GTK-free workspace crates: `core`, `policy`, `storage`, `ssh`, `transport`, `results`, `app-services`, `dump`, `mcp`, `agentd`, `audit`, `registry`, `checks`, `pg-sessions`, `kafka-browser`, `avro-container` and `drivers/*`. None depends on GTK. |
 | `apps/linux/` | The shipped GTK application (`app/`) and what only it needs: `data/`, `po/`, `flatpak/`, `packaging/`. |
 | `apps/gpui/` | The chosen cross-platform GPUI frontend ([ADR 0052](docs/decisions/0052-gpui-is-the-cross-platform-frontend.md)); own lockfile, not packaged until that ADR's shipping conditions hold. |
 | `tests/` | Cross-crate test crates (`release/`, `driver-tls/`), fixtures and shared test data (`data/`). Unit tests stay beside their code; per-crate integration tests stay in `crates/<name>/tests`. |
@@ -186,6 +186,7 @@ flowchart TB
 | `bookie-app` | GTK composition root. Cargo binary `bookie-app`; installed as `bookie`. |
 | `bookie-gpui` | Cross-platform GPUI composition root (`apps/gpui`). |
 | `bookie-agentd` | Headless MCP composition root. Cargo binary `bookie-agentd`; installed as `bookie-agentd`. |
+| `bookie-audit` | Local, non-MCP command that lists unknown write outcomes in the audit journal and records a person's decision on one ([ADR 0056](docs/decisions/0056-audited-reconciliation-of-unknown-write-outcomes.md)). It is the only route for a global (all-connection) block when no GUI is running. Depends on `app-services`; starts no server. |
 | `bookie-core` | Domain types, driver traits, values, filters, transactions, registry. No workspace dependency. |
 | `bookie-policy` | Classify, rules, approval, masking, blast radius, audit types, `PolicyGuard`. Production dependency: `core`. |
 | `bookie-results` | Pure result logic (compare, filter, find, predicate, scan, spool, exact values, sidebar tree). Depends only on `core` ([ADR 0037](docs/decisions/0037-results-crate-split.md)). |
