@@ -27,6 +27,7 @@ pub(crate) mod icons;
 mod import_dialog;
 mod leak_probe;
 mod mcp_preferences;
+mod multi_table_export;
 mod output_text_view;
 mod parameters_dialog;
 mod plain_text;

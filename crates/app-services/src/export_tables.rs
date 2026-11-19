@@ -15,6 +15,7 @@ use crate::export_pages::{PagePlan, PageRunner};
 use crate::snapshot_export::SnapshotPages;
 
 const MAX_FILE_STEM_CHARS: usize = 120;
+pub const MAX_TABLES_PER_EXPORT: usize = 256;
 
 #[derive(Clone)]
 pub struct TableTarget {
@@ -30,7 +31,7 @@ pub struct TableExportRequest<'a> {
     pub format: ResultFormat,
     pub extension: &'a str,
     pub csv: &'a CsvOptions,
-    pub max_rows_per_table: usize,
+    pub max_rows_per_table: Option<usize>,
     pub timeout_secs: u32,
 }
 
@@ -83,7 +84,10 @@ fn check_request(request: &TableExportRequest<'_>) -> Result<(), String> {
     if request.tables.is_empty() {
         return Err("choose at least one table".into());
     }
-    if request.max_rows_per_table == 0 {
+    if request.tables.len() > MAX_TABLES_PER_EXPORT {
+        return Err("choose at most 256 tables per export".into());
+    }
+    if request.max_rows_per_table == Some(0) {
         return Err("a row limit of at least 1 is required for a multi-table export".into());
     }
     if !request.directory.is_dir() {
@@ -149,13 +153,13 @@ fn export_one(
                 .ok_or_else(|| ExportError::Source("snapshot is closed".into()))?
                 .next_page()
         },
-        request.max_rows_per_table,
+        request.max_rows_per_table.unwrap_or(usize::MAX),
         capped.clone(),
     );
     let result = write_paged_file_no_replace(
         path,
         &target.columns,
-        request.max_rows_per_table,
+        request.max_rows_per_table.unwrap_or(0),
         &export,
         || match next()? {
             Some(page) => Ok(Some(page)),
