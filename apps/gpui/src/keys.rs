@@ -130,12 +130,13 @@ impl GridView {
         }
     }
 
-    fn run_command(&mut self, command: Command, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn run_command(&mut self, command: Command, window: &mut Window, cx: &mut Context<Self>) {
         match command {
             Command::Palette => self.open_palette(window, cx),
             Command::QuickSwitcher => self.open_picker(PaletteMode::Tables, window, cx),
             Command::JumpColumn => self.open_picker(PaletteMode::Columns, window, cx),
             Command::RevealInSidebar => self.reveal_in_sidebar(cx),
+            Command::Shortcuts => self.open_picker(PaletteMode::Shortcuts, window, cx),
             Command::Filter => {
                 self.search.filter_visible = true;
                 window.focus(&self.search.filter.read(cx).focus_handle(cx), cx);

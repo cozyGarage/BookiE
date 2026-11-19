@@ -431,6 +431,29 @@ fn reveal_in_sidebar_opens_the_sidebar_clears_the_search_and_expands_the_tables_
 }
 
 #[gpui::test]
+fn the_shortcut_list_shows_every_command_with_its_keys_and_runs_the_chosen_one(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("f1");
+    view.read_with(cx, |view, cx| {
+        assert_eq!(view.palette.mode, PaletteMode::Shortcuts);
+        assert_eq!(view.picker_items(cx).len(), bookie_gpui::keymap::Command::ALL.len());
+    });
+    cx.simulate_input("column");
+    view.read_with(cx, |view, cx| {
+        let rows: Vec<_> = view
+            .picker_items(cx)
+            .into_iter()
+            .map(|item| (item.title, item.subtitle))
+            .collect();
+        assert_eq!(rows, [("Jump to column".to_string(), "ctrl-shift-j".to_string())]);
+    });
+    cx.simulate_keystrokes("enter");
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.palette.mode, PaletteMode::Columns, "the chosen command ran");
+    });
+}
+
+#[gpui::test]
 fn the_palette_hides_actions_that_do_not_apply_and_arrows_pick_the_next_one(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.simulate_keystrokes("ctrl-shift-p");

@@ -7,6 +7,7 @@ pub(crate) enum PaletteMode {
     Commands,
     Tables,
     Columns,
+    Shortcuts,
 }
 
 pub(crate) struct PaletteState {
