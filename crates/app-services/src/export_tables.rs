@@ -5,12 +5,14 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use bookie_core::export::{
-    CsvOptions, ExportError, ResultExport, ResultFormat, SqlTarget, cap_pages, write_paged_file,
+    CsvOptions, ExportError, ResultExport, ResultFormat, SqlTarget, cap_pages, write_paged_file_no_replace,
 };
-use bookie_core::{ColumnInfo, Connection, FilterSet};
+use bookie_core::{ColumnInfo, DatabaseDriver, FilterSet};
+use bookie_policy::PolicyGuard;
 use tokio_util::sync::CancellationToken;
 
-use crate::export_pages::{PagePlan, PageRunner, page_fetcher};
+use crate::export_pages::{PagePlan, PageRunner};
+use crate::snapshot_export::SnapshotPages;
 
 const MAX_FILE_STEM_CHARS: usize = 120;
 
@@ -87,11 +89,27 @@ fn check_request(request: &TableExportRequest<'_>) -> Result<(), String> {
     if !request.directory.is_dir() {
         return Err("the export folder does not exist".into());
     }
+    if request.extension.is_empty() || !request.extension.bytes().all(|byte| byte.is_ascii_alphanumeric()) {
+        return Err("the export extension is invalid".into());
+    }
     Ok(())
 }
 
+fn page_plan(request: &TableExportRequest<'_>, target: &TableTarget) -> PagePlan {
+    PagePlan {
+        driver_id: request.driver_id.to_string(),
+        schema: target.schema.clone(),
+        table: target.table.clone(),
+        columns: target.columns.clone(),
+        filter: FilterSet::default(),
+        sort: None,
+        row_id_order: false,
+        timeout_secs: request.timeout_secs,
+    }
+}
+
 fn export_one(
-    conn: &Arc<dyn Connection>,
+    guard: &Arc<PolicyGuard>,
     request: &TableExportRequest<'_>,
     target: &TableTarget,
     path: &Path,
@@ -105,19 +123,14 @@ fn export_one(
             path.display()
         )));
     }
-    let plan = PagePlan {
-        driver_id: request.driver_id.to_string(),
-        schema: target.schema.clone(),
-        table: target.table.clone(),
-        columns: target.columns.clone(),
-        filter: FilterSet::default(),
-        sort: None,
-        row_id_order: false,
-        timeout_secs: request.timeout_secs,
-    };
+    let plan = page_plan(request, target);
     let capped = Arc::new(AtomicBool::new(false));
-    let fetch = page_fetcher(conn.clone(), plan, run.clone(), cancel.clone());
-    let next = cap_pages(fetch, request.max_rows_per_table, capped.clone());
+    let pages = std::cell::RefCell::new(Some(SnapshotPages::new(
+        guard.clone(),
+        plan,
+        run.clone(),
+        cancel.clone(),
+    )));
     let export = ResultExport {
         format: request.format,
         csv: request.csv,
@@ -128,29 +141,59 @@ fn export_one(
         }),
     };
     let rows = Cell::new(0usize);
-    write_paged_file(
+    let mut next = cap_pages(
+        || {
+            pages
+                .borrow_mut()
+                .as_mut()
+                .ok_or_else(|| ExportError::Source("snapshot is closed".into()))?
+                .next_page()
+        },
+        request.max_rows_per_table,
+        capped.clone(),
+    );
+    let result = write_paged_file_no_replace(
         path,
         &target.columns,
         request.max_rows_per_table,
         &export,
-        next,
+        || match next()? {
+            Some(page) => Ok(Some(page)),
+            None => {
+                if let Some(pages) = pages.borrow_mut().take() {
+                    pages.finish()?;
+                }
+                Ok(None)
+            }
+        },
         || cancel.is_cancelled(),
         |written| {
             rows.set(written);
             progress(written);
         },
-    )?;
+    );
+    drop(next);
+    let finish = pages.into_inner().map_or(Ok(()), SnapshotPages::finish);
+    result?;
+    finish?;
     Ok((rows.get(), capped.load(Ordering::SeqCst)))
 }
 
 pub fn export_tables(
-    conn: Arc<dyn Connection>,
+    guard: Arc<PolicyGuard>,
+    driver: &dyn DatabaseDriver,
     request: &TableExportRequest<'_>,
     run: &PageRunner,
     cancel: &CancellationToken,
     progress: impl Fn(usize, usize),
 ) -> Result<Vec<TableResult>, String> {
     check_request(request)?;
+    if driver.id() != request.driver_id
+        || guard.context().driver_id != request.driver_id
+        || !driver.capabilities().supports_snapshot_export
+    {
+        return Err("multi-table export requires a supported snapshot for the active driver".into());
+    }
     let mut used = HashSet::new();
     let mut results = Vec::with_capacity(request.tables.len());
     for (index, target) in request.tables.iter().enumerate() {
@@ -165,7 +208,7 @@ pub fn export_tables(
             });
             continue;
         }
-        let outcome = match export_one(&conn, request, target, &path, run, cancel, &|rows| {
+        let outcome = match export_one(&guard, request, target, &path, run, cancel, &|rows| {
             progress(index, rows)
         }) {
             Ok((rows, capped)) => TableOutcome::Written { rows, capped },

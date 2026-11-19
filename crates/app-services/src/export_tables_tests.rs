@@ -82,104 +82,6 @@ fn request<'a>(
 }
 
 #[test]
-fn each_table_stops_at_the_cap_and_reports_whether_it_was_cut() {
-    let fixture = fixture(&[("big", 5), ("small", 3), ("empty", 0)]);
-    let tables = targets(&fixture, &["big", "small", "empty"]);
-    let directory = tempfile::tempdir().unwrap();
-    let csv = CsvOptions::default();
-    let results = export_tables(
-        fixture.conn.clone(),
-        &request(&tables, directory.path(), &csv, 4),
-        &fixture.run,
-        &CancellationToken::new(),
-        |_, _| {},
-    )
-    .unwrap();
-    let outcomes: Vec<_> = results.iter().map(|result| &result.outcome).collect();
-    assert_eq!(
-        outcomes,
-        [
-            &TableOutcome::Written { rows: 4, capped: true },
-            &TableOutcome::Written { rows: 3, capped: false },
-            &TableOutcome::Written { rows: 0, capped: false },
-        ]
-    );
-    let big = std::fs::read_to_string(directory.path().join("big.csv")).unwrap();
-    assert_eq!(big.lines().count(), 5, "a header and four rows: {big}");
-    assert!(big.contains("row 4") && !big.contains("row 5"));
-}
-
-#[test]
-fn cancelling_stops_the_remaining_tables_and_leaves_no_partial_file() {
-    let fixture = fixture(&[("one", 3), ("two", 3), ("three", 3)]);
-    let tables = targets(&fixture, &["one", "two", "three"]);
-    let directory = tempfile::tempdir().unwrap();
-    let csv = CsvOptions::default();
-    let cancel = CancellationToken::new();
-    let results = export_tables(
-        fixture.conn.clone(),
-        &request(&tables, directory.path(), &csv, 100),
-        &fixture.run,
-        &cancel,
-        |index, rows| {
-            if index == 1 && rows == 1 {
-                cancel.cancel();
-            }
-        },
-    )
-    .unwrap();
-    assert!(matches!(results[0].outcome, TableOutcome::Written { rows: 3, .. }));
-    assert!(
-        matches!(results[1].outcome, TableOutcome::Failed(_)),
-        "{:?}",
-        results[1]
-    );
-    assert_eq!(results[2].outcome, TableOutcome::NotStarted);
-    assert!(directory.path().join("one.csv").exists());
-    assert!(
-        !directory.path().join("two.csv").exists(),
-        "a cancelled table leaves no file"
-    );
-    assert!(!directory.path().join("three.csv").exists());
-}
-
-#[test]
-fn an_existing_file_is_never_replaced_and_a_missing_table_does_not_stop_the_rest() {
-    let fixture = fixture(&[("keep", 2), ("other", 2)]);
-    let mut tables = targets(&fixture, &["keep", "other"]);
-    tables.insert(
-        1,
-        TableTarget {
-            schema: None,
-            table: "no_such_table".into(),
-            columns: tables[0].columns.clone(),
-        },
-    );
-    let directory = tempfile::tempdir().unwrap();
-    std::fs::write(directory.path().join("keep.csv"), "precious").unwrap();
-    let csv = CsvOptions::default();
-    let results = export_tables(
-        fixture.conn.clone(),
-        &request(&tables, directory.path(), &csv, 10),
-        &fixture.run,
-        &CancellationToken::new(),
-        |_, _| {},
-    )
-    .unwrap();
-    assert!(matches!(&results[0].outcome, TableOutcome::Failed(message) if message.contains("already exists")));
-    assert!(matches!(results[1].outcome, TableOutcome::Failed(_)));
-    assert!(matches!(results[2].outcome, TableOutcome::Written { rows: 2, .. }));
-    assert_eq!(
-        std::fs::read_to_string(directory.path().join("keep.csv")).unwrap(),
-        "precious"
-    );
-    assert!(
-        !directory.path().join("no_such_table.csv").exists(),
-        "a failed read writes no file"
-    );
-}
-
-#[test]
 fn file_names_are_safe_and_unique() {
     let mut used = HashSet::new();
     assert_eq!(file_stem("public.orders", &mut used), "public.orders");
@@ -197,7 +99,8 @@ fn a_request_without_a_cap_a_table_or_a_folder_is_refused_before_anything_runs()
     let csv = CsvOptions::default();
     let run = |request: TableExportRequest<'_>| {
         export_tables(
-            fixture.conn.clone(),
+            test_guard(fixture.conn.clone()),
+            &drivers_sqlite::SqliteDriver,
             &request,
             &fixture.run,
             &CancellationToken::new(),
@@ -216,4 +119,44 @@ fn a_request_without_a_cap_a_table_or_a_folder_is_refused_before_anything_runs()
     );
     let missing = directory.path().join("nope");
     assert!(run(request(&tables, &missing, &csv, 5)).unwrap_err().contains("folder"));
+    let mut invalid = request(&tables, directory.path(), &csv, 5);
+    invalid.extension = "../escaped";
+    assert!(run(invalid).unwrap_err().contains("extension"));
+}
+
+#[test]
+fn a_driver_without_snapshot_support_does_not_publish_any_files() {
+    let fixture = fixture(&[("items", 3)]);
+    let tables = targets(&fixture, &["items"]);
+    let directory = tempfile::tempdir().unwrap();
+    let csv = CsvOptions::default();
+    let error = export_tables(
+        test_guard(fixture.conn.clone()),
+        &drivers_sqlite::SqliteDriver,
+        &request(&tables, directory.path(), &csv, 10),
+        &fixture.run,
+        &CancellationToken::new(),
+        |_, _| {},
+    )
+    .expect_err("an unsupported snapshot must be refused");
+    assert!(error.to_lowercase().contains("snapshot"), "{error}");
+    assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 0);
+}
+
+fn test_guard(conn: Arc<dyn Connection>) -> Arc<bookie_policy::PolicyGuard> {
+    Arc::new(bookie_policy::PolicyGuard::new(
+        conn,
+        bookie_policy::GuardContext {
+            connection_id: uuid::Uuid::nil(),
+            connection_name: "test".into(),
+            driver_id: "sqlite".into(),
+            environment: bookie_core::Environment::Local,
+            read_only: false,
+            principal: bookie_policy::Principal::human_gui(),
+            policy: Arc::new(bookie_policy::PolicyConfig::default()),
+            approval: Arc::new(bookie_policy::AutoApproveSink),
+            audit: Arc::new(bookie_policy::NullAuditSink),
+            audit_state: Arc::new(bookie_policy::AuditState::new()),
+        },
+    ))
 }

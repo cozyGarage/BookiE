@@ -1563,6 +1563,10 @@ class CiWorkflowTests(unittest.TestCase):
             ],
             [
                 "bash", "scripts/run-rust-tests.sh", "--locked", "-p", "bookie-app-services", "--test",
+                "snapshot_export_postgres", "--", "--include-ignored", "--test-threads=1",
+            ],
+            [
+                "bash", "scripts/run-rust-tests.sh", "--locked", "-p", "bookie-app-services", "--test",
                 "browse_long_text_preview_engines", "mysql_previews_a_huge_longtext_cell", "--",
                 "--include-ignored", "--test-threads=1",
             ],

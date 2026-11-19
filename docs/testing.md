@@ -48,6 +48,8 @@ A proxy fault checks BookiE's response to a broken network path; it does not tes
 
 Value tests cover the path from the native driver through each relevant consumer, such as result display, grid editing, parameter binding, and export. Driver decoding alone cannot show that later code preserves the value. JSON or formatted text can display a value while hiding distinctions such as BSON integer width, exact decimal precision, or SQL `NULL` versus an empty value. A correct-looking display alone does not establish round-trip fidelity.
 
+The PostgreSQL snapshot export fixture runs in the consumers layer. It checks concurrent changes, cancellation, per-table limits and publication without replacing a file created during export. Drivers without a verified snapshot path are refused by multi-table export.
+
 [ADR 0007](decisions/0007-type-and-value-preservation.md) defines the outcomes: exact typed support, exact text fallback, explicit refusal, or untested. This is a data-correctness contract, not a requirement for one universal cross-engine type system. Use the selected case and its concrete consumer to decide what must be proven.
 
 ## Test runner
