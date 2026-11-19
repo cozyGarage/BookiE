@@ -1,6 +1,6 @@
 # 0056: Audited reconciliation of unknown write outcomes
 
-- **Status**: Proposed
+- **Status**: Accepted
 - **Date**: 2026-11-19
 
 ## Context
@@ -25,7 +25,7 @@ Threat model, for honesty: the journal chain is unkeyed SHA-256 over previous ha
 3. **Who may resolve.** Only a `Principal::Human` acting through a local interactive entry point (below). There is no MCP tool, no agentd RPC, and no agent-token path. The journal API refuses a reconciliation whose principal is an agent, and chain verification treats such a record as corruption. MCP scope tokens (ADR 0016's first check) do not gain a scope for this; the capability is absent, not gated.
 4. **Entry points (intent only).**
    - GUI: where the UI already shows that a connection is write-blocked by an unresolved outcome, offer "Resolve outcome". It shows the original record (time, operation class, redacted SQL, error, token if the driver recorded one per ADR 0051), asks for one of the three outcomes and a reason, and requires explicit confirmation. It states that the choice is the operator's claim, not proof, and that BookiE will not replay or re-check the write.
-   - Headless CLI: a local, non-MCP command (name to be chosen at implementation) that lists unresolved operations and resolves one by `operation_id`. It is the only route for a global (nil connection) unresolved outcome, because `bookie-agentd` refuses to start in that state and the GUI may not be running. It opens the journal directly under the existing file locks and never starts a server or an MCP listener.
+   - Headless CLI: a local, non-MCP command in a new binary, `bookie-audit` (own crate; not part of `bookie-agentd` and not an MCP surface), that lists unresolved operations and resolves one by `operation_id`. It is the only route for a global (nil connection) unresolved outcome, because `bookie-agentd` refuses to start in that state and the GUI may not be running. It opens the journal directly under the existing file locks and never starts a server or an MCP listener.
 5. **Record schema.** The existing `AuditEvent` gains one optional, additive field, following the precedent of `transport_attempt` and `administrative_action`:
 
    ```text
@@ -33,7 +33,8 @@ Threat model, for honesty: the journal chain is unkeyed SHA-256 over previous ha
      reconciles_operation_id: Uuid     // the Unknown operation being decided
      claim: committed | rolled_back | still_unknown
      reason: String                    // required, trimmed, 1..=1000 chars, control chars rejected
-     evidence: none | commit_token_checked | server_checked_manually   // operator-declared, optional
+     evidence: none | commit_token_checked | server_checked_manually   // operator-declared; required (not none) for committed or rolled_back when the connection environment is prod
+     operator_os_user: String          // OS user name of the local process, recorded alongside the principal's session label
    ```
 
    The carrying event is a single `Outcome` record with a fresh `operation_id`, `operation_class: Administrative`, `terminal_status: Succeeded` (the reconciliation itself succeeded, which also keeps older readers from treating it as a new Unknown), the original's `connection_id`, `connection_name`, `environment` and `driver_id`, the resolving human principal, and `redacted_sql: "[NOT_APPLICABLE]"`. It is appended durably (fsynced) like intents and administrative actions. It is one record, not an intent/outcome pair: there is no external side effect, and the record is the effect.
@@ -87,9 +88,10 @@ The journal's job is to preserve what BookiE knew when it was uncertain. An oper
 - **Time-based expiry of the block.** Rejected: time does not establish the outcome.
 - **Resolve only through the GUI.** Rejected: a global unresolved outcome keeps agentd from starting and a headless host may have no GUI.
 
-## Open questions
+## Decisions made at acceptance
 
-- Operator identity: `Principal::Human` carries only a session label. Whether to also record the OS user name needs a privacy and usefulness decision.
-- Whether global (nil connection) outcomes should be resolvable at all in the first slice, or CLI-only as drafted.
-- Whether `committed`/`rolled_back` should require an `evidence` value in `prod` environments, or a second confirmation.
-- CLI name and home (new binary, `bookie-agentd` subcommand, or app-services entry).
+- **Operator identity:** record the OS user name (`operator_os_user`) in addition to the principal's session label. It is local audit data and stays in the journal.
+- **Global outcomes:** a global (nil connection) unresolved outcome is resolvable in the first slice, through the `bookie-audit` command only.
+- **Production connections:** `committed` and `rolled_back` require an `evidence` value other than `none`, and a second explicit confirmation step in the GUI and the command. `still_unknown` needs neither.
+- **CLI home:** a new binary, `bookie-audit`, in its own crate. The name is a working choice and may change at implementation without a new ADR.
+
