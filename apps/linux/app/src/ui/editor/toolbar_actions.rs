@@ -180,7 +180,8 @@ impl SqlEditor {
 
     pub(super) fn sync_session_controls(&self) {
         let id = self.toolbar_transaction_id();
-        let label = self.transaction_clock.label_at(std::time::Instant::now());
+        let clock = self.transaction_clock.label_at(std::time::Instant::now());
+        let label = self.sync_schema_entry(&clock);
         self.session_button.set_label(&label);
         self.session_button
             .update_property(&[gtk::accessible::Property::Label(&label)]);
