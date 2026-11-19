@@ -273,8 +273,8 @@ impl GridView {
             action("drop-column", "Drop a column…", self.structure_change_enabled()),
             action("add-index", "Create an index…", self.structure_change_enabled()),
             action("drop-index", "Drop an index…", self.structure_change_enabled()),
-            action("add-foreign-key", "Add a foreign key…", self.structure_change_enabled()),
-            action("drop-foreign-key", "Drop a foreign key…", self.structure_change_enabled()),
+            action("add-foreign-key", "Add a foreign key…", self.foreign_key_change_enabled()),
+            action("drop-foreign-key", "Drop a foreign key…", self.foreign_key_change_enabled()),
             action(
                 "insert-row",
                 "Add a row",

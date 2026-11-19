@@ -50,10 +50,19 @@ pub fn plan_structure_change(
     text: &str,
     structure: &TableStructure,
 ) -> Result<StructureChangePlan, StructureChangeError> {
+    if matches!(
+        kind,
+        StructureChangeKind::AddForeignKey | StructureChangeKind::DropForeignKey
+    ) && !bookie_core::sql_dialect::alters_foreign_keys(target.driver_id)
+    {
+        return Err(StructureChangeError::Input(
+            "This database cannot add or drop a foreign key on an existing table".into(),
+        ));
+    }
     let op = build_op(&target, kind, text, structure)?;
     let op_name = match &op {
         StructureOp::DropIndex { index_name, .. } => Some(format!("Index {index_name}")),
-        StructureOp::DropForeignKey { fk_name, .. } => Some(format!("Foreign key {fk_name}")),
+        StructureOp::DropForeignKey { fk_name, .. } => Some(foreign_key_label(&structure.foreign_keys, fk_name)),
         _ => None,
     };
     let sql = materialize_ops(&[op], target.driver_id).map_err(describe)?;
@@ -351,6 +360,18 @@ fn drop_foreign_key(
     }
 }
 
+fn foreign_key_label(keys: &[ForeignKeyInfo], name: &str) -> String {
+    match keys.iter().find(|key| key.name == name) {
+        Some(key) => format!(
+            "Foreign key {name} ({}) → {} ({})",
+            key.columns.join(", "),
+            key.ref_table,
+            key.ref_columns.join(", ")
+        ),
+        None => format!("Foreign key {name}"),
+    }
+}
+
 fn refuse_duplicate(columns: &[ColumnInfo], name: &str) -> Result<(), StructureChangeError> {
     match find(columns, name) {
         Some(_) => Err(StructureChangeError::Input(format!(
@@ -428,9 +449,17 @@ mod tests {
     }
 
     fn plan(kind: StructureChangeKind, text: &str) -> Result<StructureChangePlan, StructureChangeError> {
+        plan_for_driver("sqlite", kind, text)
+    }
+
+    fn plan_for_driver(
+        driver_id: &str,
+        kind: StructureChangeKind,
+        text: &str,
+    ) -> Result<StructureChangePlan, StructureChangeError> {
         let columns = [column("id"), column("note")];
         let target = SaveTarget {
-            driver_id: "sqlite",
+            driver_id,
             schema: None,
             table: "orders",
             columns: &columns,

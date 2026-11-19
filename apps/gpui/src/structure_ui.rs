@@ -67,6 +67,14 @@ impl GridView {
         self.structure.info = None;
     }
 
+    pub(crate) fn foreign_key_change_enabled(&self) -> bool {
+        self.structure_change_enabled()
+            && self
+                .live
+                .as_ref()
+                .is_some_and(|live| bookie_core::sql_dialect::alters_foreign_keys(&live.driver_id))
+    }
+
     pub(crate) fn structure_info_enabled(&self) -> bool {
         self.live.is_some() && !self.grid_is_query && self.compare.is_none() && self.structure.info.is_none()
     }
@@ -172,10 +180,14 @@ impl GridView {
             done: format!("{confirm} {name}: done"),
             review: "Review the change, then apply or cancel".into(),
             confirm,
-            note: Some(
+            note: Some(if kind == StructureChangeKind::AddForeignKey {
+                "This checks every existing row and can block writes to both tables while it runs. Deleting or \
+                 changing a referenced row will fail afterwards. Most databases cannot undo it, and a connection \
+                 that needs approval will ask before it runs."
+            } else {
                 "This changes the table's structure for everyone using the database, and most databases cannot \
-                 undo it. A connection that needs approval will ask before it runs.",
-            ),
+                 undo it. A connection that needs approval will ask before it runs."
+            }),
         };
         self.prepare(live, SaveRequest::Structure(kind, text), labels, cx);
     }
