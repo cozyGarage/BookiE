@@ -18,9 +18,3 @@ A first `plan` job runs `scripts/ci-nightly-plan.py` and every other job reads i
 - Runner use: the nightly may hold at most 7 of the 15 runners (50%) at once. Its jobs use `runs-on: ${{ vars.NIGHTLY_LABEL || 'any-host' }}`, so they run on any `any-host` runner until the variable is set. The widest stage is 5 jobs, and a contract test fails if the stages sum to more than 7.
 - To confine the nightly to a reserved set: label 7 runners `nightly` in the Forgejo runner settings, then set the repository variable `NIGHTLY_LABEL` to `nightly`. Set the variable only after the runners carry the label, because a job that asks for a label no runner has waits and is cancelled.
 - Dispatch with `full` to run everything, or with `plan_only` to print the plan in the `plan` job log and start nothing else.
-
-## Forgejo is the validating remote
-
-[ADR 0056](decisions/0056-forgejo-validates-first.md) makes the Forgejo run the required check for code, workflow and package changes. Start it with `bash scripts/forgejo-gate.sh <branch>`: it pushes a `ci/` branch to the `forgejo` remote, dispatches `ci.yml` and waits for the result. Match a run to a pull request by the branch name and commit it reports, not by the run number alone.
-
-Before blaming product code for a red Forgejo job, check the runner: the free-space reserve, other fixtures sharing the Docker host (the PostgreSQL release fixture names its compose project after the run), and memory pressure when many database containers start together.
