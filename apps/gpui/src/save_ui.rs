@@ -19,6 +19,7 @@ pub(crate) struct SaveState {
     pub generation: u64,
     pub banner: Option<(String, bool)>,
     pub banner_serial: u64,
+    pub reconnect_after: bool,
 }
 
 pub(crate) struct PendingSave {
@@ -27,6 +28,7 @@ pub(crate) struct PendingSave {
     pub done: String,
     pub confirm: &'static str,
     pub note: Option<&'static str>,
+    pub reconnect: bool,
     pub generation: u64,
     pub table: bookie_core::TableInfo,
 }
@@ -45,6 +47,7 @@ pub(crate) struct ReviewLabels {
     pub review: String,
     pub confirm: &'static str,
     pub note: Option<&'static str>,
+    pub reconnect: bool,
 }
 
 const MAX_DELETE_ROWS: u64 = 500;
@@ -107,6 +110,7 @@ impl GridView {
             review: format!("Review {count} change(s), then save or cancel"),
             confirm: "Save",
             note: None,
+            reconnect: false,
         };
         self.prepare(live, SaveRequest::Edits(changes), labels, cx);
     }
@@ -150,6 +154,7 @@ impl GridView {
             review: format!("Review the {count} row(s) to delete, then delete or cancel"),
             confirm: "Delete",
             note: Some("Rows that depend on these (foreign keys, triggers) may be affected too."),
+            reconnect: false,
         };
         self.prepare(live, SaveRequest::Deletes(rows), labels, cx);
     }
@@ -237,6 +242,7 @@ impl GridView {
                     done: labels.done.replace("{n}", &rows),
                     confirm: labels.confirm,
                     note: labels.note,
+                    reconnect: labels.reconnect,
                     generation,
                     table,
                 });
@@ -295,6 +301,7 @@ impl GridView {
             return;
         }
         self.save.busy = true;
+        self.save.reconnect_after = pending.reconnect;
         self.status = "Saving…".into();
         let write = self
             .save
@@ -327,7 +334,17 @@ impl GridView {
         .detach();
     }
 
+    fn reload_after_save_or_reconnect(&mut self, connection_id: uuid::Uuid, text: String, reconnect: bool, cx: &mut Context<Self>) {
+        if reconnect {
+            self.status = text;
+            self.connect(bookie_gpui::live::Origin::Saved(connection_id.to_string()), cx);
+        } else {
+            self.reload_after_save(text, cx);
+        }
+    }
+
     pub(crate) fn finish_save(&mut self, connection_id: uuid::Uuid, done: String, result: SaveOutcome, cx: &mut Context<Self>) {
+        let reconnect = std::mem::take(&mut self.save.reconnect_after);
         let (write, applied) = match result {
             Ok(done) => done,
             Err(message) => {
@@ -345,7 +362,7 @@ impl GridView {
                 self.close_import_bar();
                 self.close_structure_bar();
                 self.show_banner(done.clone(), false, cx);
-                self.reload_after_save(done, cx);
+                self.reload_after_save_or_reconnect(connection_id, done, reconnect, cx);
             }
             Err(failure) if failure.outcome_unknown => {
                 let text = format!(
@@ -354,7 +371,7 @@ impl GridView {
                 );
                 self.save.busy = false;
                 self.show_banner(text.clone(), true, cx);
-                self.reload_after_save(text, cx);
+                self.reload_after_save_or_reconnect(connection_id, text, reconnect, cx);
             }
             Err(failure) => {
                 self.save.busy = false;
