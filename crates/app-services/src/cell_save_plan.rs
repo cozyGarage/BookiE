@@ -68,6 +68,39 @@ pub fn plan_cell_saves(
             tracker.track_cell_edit(row_key, table_column, original, change.new_value.clone());
         }
     }
+    finish_plan(&tracker, target)
+}
+
+pub fn plan_row_deletes(
+    target: SaveTarget<'_>,
+    grid_columns: &[String],
+    rows: &[Vec<Value>],
+) -> Result<CellSavePlan, CellSaveError> {
+    let key_positions = key_positions(target.columns, grid_columns)?;
+    let mut tracker = TabChangeTracker::new();
+    for row in rows {
+        let key_values: Vec<Value> = key_positions
+            .iter()
+            .map(|position| row.get(*position).cloned().unwrap_or(Value::Null))
+            .collect();
+        let row_key = RowKey::from_pk_values(&key_values).ok_or(CellSaveError::UnreadableKey)?;
+        let original: Vec<Value> = target
+            .columns
+            .iter()
+            .map(|column| {
+                grid_columns
+                    .iter()
+                    .position(|name| name == &column.name)
+                    .and_then(|position| row.get(position).cloned())
+                    .unwrap_or(Value::Null)
+            })
+            .collect();
+        tracker.track_delete(row_key, original);
+    }
+    finish_plan(&tracker, target)
+}
+
+fn finish_plan(tracker: &TabChangeTracker, target: SaveTarget<'_>) -> Result<CellSavePlan, CellSaveError> {
     let (statements, sources) = tracker
         .materialize(target.driver_id, target.schema, target.table, target.columns)
         .map_err(|error| match error {
@@ -268,5 +301,42 @@ mod tests {
             }],
         );
         assert_eq!(result, Err(CellSaveError::UnreadableKey));
+    }
+
+    #[test]
+    fn selected_rows_become_keyed_deletes_that_must_each_touch_one_row() {
+        let columns = orders();
+        let plan = plan_row_deletes(target(&columns), &names(), &[row(1, "ada", 1.5), row(3, "cy", 3.5)]).unwrap();
+
+        assert_eq!(plan.statements.len(), 2);
+        for (sql, _) in &plan.statements {
+            assert!(sql.starts_with("DELETE"), "{sql}");
+        }
+        let keys: Vec<&Value> = plan
+            .statements
+            .iter()
+            .filter_map(|(_, values)| values.first())
+            .collect();
+        assert!(
+            keys.contains(&&Value::Int(1)) && keys.contains(&&Value::Int(3)),
+            "{keys:?}"
+        );
+        assert_eq!(plan.expect_one, vec![0, 1]);
+        assert!(plan.preview.contains("DELETE"), "{}", plan.preview);
+    }
+
+    #[test]
+    fn the_same_row_selected_twice_is_deleted_once_and_a_keyless_table_cannot_delete() {
+        let columns = orders();
+        let twice = plan_row_deletes(target(&columns), &names(), &[row(2, "bob", 2.5), row(2, "bob", 2.5)]).unwrap();
+        assert_eq!(twice.statements.len(), 1);
+
+        let keyless = vec![column("customer", false), column("total", false)];
+        let result = plan_row_deletes(
+            target(&keyless),
+            &["customer".to_string(), "total".to_string()],
+            &[vec![Value::Text("ada".into()), Value::Float(1.5)]],
+        );
+        assert_eq!(result, Err(CellSaveError::NoPrimaryKey));
     }
 }

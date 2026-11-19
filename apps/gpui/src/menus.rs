@@ -21,7 +21,7 @@ pub(crate) const ROW_GROUPS: &[&[&str]] = &[
         "copy-insert",
         "copy-in-list",
     ],
-    &["edit", "clear-selection"],
+    &["edit", "delete-rows", "clear-selection"],
 ];
 
 pub(crate) fn command_groups(view: &GridView, ids: &[&[&str]]) -> Vec<Group> {

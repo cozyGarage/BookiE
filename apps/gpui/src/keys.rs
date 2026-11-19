@@ -140,6 +140,8 @@ impl GridView {
             Command::SaveFavorite => self.save_favorite(cx),
             Command::Favorites => self.open_picker(PaletteMode::Favorites, window, cx),
             Command::SaveChanges => self.request_save(cx),
+            Command::DeleteRows if self.focus.is_focused(window) => self.request_delete(cx),
+            Command::DeleteRows => {}
             Command::Filter => {
                 self.search.filter_visible = true;
                 window.focus(&self.search.filter.read(cx).focus_handle(cx), cx);
