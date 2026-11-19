@@ -427,6 +427,13 @@ impl GridView {
     }
 }
 
+fn expand_home(path: &std::path::Path) -> std::path::PathBuf {
+    match (path.strip_prefix("~"), std::env::var_os("HOME")) {
+        (Ok(rest), Some(home)) => std::path::PathBuf::from(home).join(rest),
+        _ => path.to_path_buf(),
+    }
+}
+
 fn plan_file_import(
     target: SaveTarget<'_>,
     driver_id: &str,
@@ -436,12 +443,24 @@ fn plan_file_import(
         .get(driver_id)
         .map(|driver| driver.capabilities())
         .unwrap_or_default();
-    let plan = plan_csv_import(target, capabilities, file, crate::import_ui::IMPORT_ROW_CAP)
+    let file = expand_home(file);
+    let plan = plan_csv_import(target, capabilities, &file, crate::import_ui::IMPORT_ROW_CAP)
         .map_err(|error| error.to_string())?;
     let cut = if plan.truncated {
         format!(" (the file has more; only the first {} are imported)", plan.rows)
     } else {
         String::new()
+    };
+    let filled = if plan.filled_by_database.is_empty() {
+        String::new()
+    } else {
+        format!("\nNot imported, the database fills them: {}", plan.filled_by_database.join(", "))
+    };
+    let too_big = if plan.approvable {
+        String::new()
+    } else {
+        "\nToo large to approve: if this connection asks for approval, it will be refused. Import fewer rows.\n"
+            .to_string()
     };
     let ignored = if plan.ignored_fields.is_empty() {
         String::new()
@@ -449,7 +468,7 @@ fn plan_file_import(
         format!("\nIgnored fields with no matching column: {}", plan.ignored_fields.join(", "))
     };
     let preview = format!(
-        "{} row(s) from the file{cut}\nColumns: {}{ignored}\n\n{}",
+        "{} row(s) from the file{cut}\nColumns: {}{ignored}{filled}{too_big}\n\n{}",
         plan.rows,
         plan.imported_columns.join(", "),
         plan.preview

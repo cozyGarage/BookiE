@@ -26,7 +26,7 @@ impl GridView {
             self.status = "Save or discard the pending edits before importing".into();
             return;
         }
-        if self.form_open() {
+        if self.form_open() || self.insert.loading {
             return;
         }
         if self.save_session().is_none() {
@@ -77,7 +77,7 @@ impl GridView {
             confirm: "Import",
             note: Some(
                 "Fields are matched to columns by name; unmatched fields are ignored. At most 1,000 rows are \
-                 imported per run, all in one transaction.",
+                 imported per run, all in one transaction; running it again repeats the first rows.",
             ),
         };
         self.prepare(live, SaveRequest::Import(PathBuf::from(text)), labels, cx);

@@ -18,7 +18,9 @@ pub struct CsvImportPlan {
     pub rows: usize,
     pub imported_columns: Vec<String>,
     pub ignored_fields: Vec<String>,
+    pub filled_by_database: Vec<String>,
     pub truncated: bool,
+    pub approvable: bool,
     pub preview: String,
 }
 
@@ -59,19 +61,17 @@ pub fn plan_csv_import(
         mapping: &mapping,
     };
     let plan = build_insert_plan(&import_target, &sheet, &options).map_err(describe)?;
-    let used: Vec<usize> = mapping.iter().flatten().copied().collect();
-    let ignored_fields = sheet
-        .headers
-        .iter()
-        .enumerate()
-        .filter(|(index, _)| !used.contains(index))
-        .map(|(_, header)| header.clone())
-        .collect();
+    let (ignored_fields, filled_by_database) = classify_fields(&sheet.headers, target.columns, &mapping, &plan.columns);
     let statements: Vec<EditStatement> = plan
         .rows
         .iter()
         .map(|row| (plan.statement.clone(), row.clone()))
         .collect();
+    let joined = statements
+        .iter()
+        .map(|(sql, _)| sql.trim().chars().count() + 3)
+        .sum::<usize>();
+    let approvable = joined <= bookie_policy::MAX_APPROVAL_SQL_CHARS + 3;
     let shown = &statements[..statements.len().min(PREVIEWED_ROWS)];
     let mut preview = preview_text(target.driver_id, shown);
     if statements.len() > shown.len() {
@@ -85,9 +85,35 @@ pub fn plan_csv_import(
         imported_columns: plan.columns.iter().map(|column| column.name.clone()).collect(),
         statements,
         ignored_fields,
+        filled_by_database,
         truncated,
+        approvable,
         preview,
     })
+}
+
+fn classify_fields(
+    headers: &[String],
+    table_columns: &[bookie_core::ColumnInfo],
+    mapping: &[Option<usize>],
+    kept: &[bookie_core::ColumnInfo],
+) -> (Vec<String>, Vec<String>) {
+    let mut used = Vec::new();
+    let mut filled = Vec::new();
+    for (column, field) in table_columns.iter().zip(mapping) {
+        let Some(field) = field else { continue };
+        used.push(*field);
+        if !kept.iter().any(|k| k.name == column.name) {
+            filled.push(headers[*field].clone());
+        }
+    }
+    let ignored = headers
+        .iter()
+        .enumerate()
+        .filter(|(index, _)| !used.contains(index))
+        .map(|(_, header)| header.clone())
+        .collect();
+    (ignored, filled)
 }
 
 fn describe(error: PlanError) -> CsvImportError {
@@ -207,5 +233,17 @@ mod tests {
 
         let missing = directory.path().join("absent.csv");
         assert!(matches!(plan(&orders(), &missing, 10), Err(CsvImportError::File(_))));
+    }
+
+    #[test]
+    fn an_import_too_long_for_one_approval_says_so() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut text = String::from("customer,total\n");
+        for row in 0..600 {
+            text.push_str(&format!("c{row},1\n"));
+        }
+        let path = write(&directory, &text);
+        assert!(!plan(&orders(), &path, 1_000).unwrap().approvable);
+        assert!(plan(&orders(), &path, 5).unwrap().approvable);
     }
 }
