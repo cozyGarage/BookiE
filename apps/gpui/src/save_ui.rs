@@ -189,7 +189,13 @@ impl GridView {
                             plan_row_insert_named(target, &named).map_err(|error| error.to_string())
                         }
                         SaveRequest::Import(file) => plan_file_import(target, &live.driver_id, &file),
-                        SaveRequest::Structure(kind, text) => plan_structure(target, kind, &text),
+                        SaveRequest::Structure(kind, text) => {
+                            let indexes = match kind {
+                                bookie_app_services::structure_change_plan::StructureChangeKind::DropIndex => live.table_structure(&table)?.indexes,
+                                _ => Vec::new(),
+                            };
+                            plan_structure(target, kind, &text, &indexes)
+                        }
                     }
                 })
                 .await;
@@ -434,8 +440,9 @@ fn plan_structure(
     target: SaveTarget<'_>,
     kind: bookie_app_services::structure_change_plan::StructureChangeKind,
     text: &str,
+    indexes: &[bookie_core::IndexInfo],
 ) -> Result<CellSavePlan, String> {
-    let plan = bookie_app_services::structure_change_plan::plan_structure_change(target, kind, text)
+    let plan = bookie_app_services::structure_change_plan::plan_structure_change(target, kind, text, indexes)
         .map_err(|error| error.to_string())?;
     Ok(CellSavePlan {
         statements: plan.statements,

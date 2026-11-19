@@ -948,8 +948,8 @@ fn orders_indexes_of(path: &std::path::Path) -> String {
 }
 
 #[gpui::test]
-fn a_unique_index_is_reviewed_as_unique_and_created_only_on_confirm(cx: &mut TestAppContext) {
-    use bookie_app_services::structure_change_plan::StructureChangeKind::AddIndex;
+fn a_unique_index_is_reviewed_created_then_dropped_by_its_live_name_only_on_confirm(cx: &mut TestAppContext) {
+    use bookie_app_services::structure_change_plan::StructureChangeKind::{AddIndex, DropIndex};
     let path = fixture_copy("indexes");
     let (view, cx) = saving_view(cx, &path);
     let write = write_session(&path, false);
@@ -972,5 +972,26 @@ fn a_unique_index_is_reviewed_as_unique_and_created_only_on_confirm(cx: &mut Tes
     cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_save(cx)));
     settle_saving(cx);
     assert_eq!(orders_indexes_of(&path), "by_customer");
+
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_structure_bar(DropIndex, cx)));
+    set_structure_text(&view, cx, "no_such_index");
+    cx.update(|_, cx| view.update(cx, |view, cx| view.review_structure(cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert!(view.save.pending.is_none());
+        assert!(view.status.contains("no index named"), "{}", view.status);
+    });
+    set_structure_text(&view, cx, "BY_CUSTOMER");
+    cx.update(|_, cx| view.update(cx, |view, cx| view.review_structure(cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        let pending = view.save.pending.as_ref().unwrap_or_else(|| panic!("no review: {}", view.status));
+        assert_eq!(pending.title, "Drop index BY_CUSTOMER on orders?");
+        assert!(pending.plan.preview.contains("by_customer"), "{}", pending.plan.preview);
+    });
+    assert_eq!(orders_indexes_of(&path), "by_customer", "nothing is dropped before the user confirms");
+    cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_save(cx)));
+    settle_saving(cx);
+    assert_eq!(orders_indexes_of(&path), "");
     std::fs::remove_file(&path).ok();
 }
