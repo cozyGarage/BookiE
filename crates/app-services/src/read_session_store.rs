@@ -116,6 +116,20 @@ impl ReadSessionStore {
         session.apply_changes(statements, expect_one, control).await
     }
 
+    #[cfg(any(test, feature = "test-support"))]
+    pub async fn open_file_writable_for_tests(
+        &self,
+        path: &std::path::Path,
+        read_only: bool,
+        control: &OperationControl,
+    ) -> Result<OpenedSession, String> {
+        let file = crate::open_request::classify_file(path).map_err(|error| format!("{error:?}"))?;
+        let mut saved = crate::open_request::file_connection(&file);
+        saved.read_only = read_only;
+        let label = path.display().to_string();
+        self.open_writable(saved, label, control).await
+    }
+
     pub async fn open_file(&self, path: &std::path::Path, control: &OperationControl) -> Result<OpenedSession, String> {
         let file = crate::open_request::classify_file(path).map_err(|error| format!("{error:?}"))?;
         let label = path.file_name().map_or_else(

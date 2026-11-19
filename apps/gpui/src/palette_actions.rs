@@ -231,6 +231,11 @@ impl GridView {
                 matches!(self.tabs.current(), Tab::Query),
             ),
             action("favorites", "Open a favorite", true),
+            action(
+                "save-changes",
+                "Save changes",
+                self.can_save_edits() && !self.cell_edit.edits.is_empty(),
+            ),
             action("delete-favorite", "Delete a favorite", true),
             action(
                 "reveal-sidebar",
@@ -469,6 +474,7 @@ impl GridView {
             "shortcuts" => self.open_picker(PaletteMode::Shortcuts, window, cx),
             "save-favorite" => self.save_favorite(cx),
             "favorites" => self.open_picker(PaletteMode::Favorites, window, cx),
+            "save-changes" => self.request_save(cx),
             "delete-favorite" => self.open_picker(PaletteMode::DeleteFavorite, window, cx),
             "reveal-sidebar" => self.reveal_in_sidebar(cx),
             "new-connection" => {

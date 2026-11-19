@@ -24,6 +24,10 @@ impl TransactionClock {
         }
     }
 
+    pub(super) fn is_open(&self) -> bool {
+        self.0.since.get().is_some()
+    }
+
     pub(super) fn label_at(&self, now: Instant) -> String {
         match self.0.since.get() {
             None => bookie_app_services::tr!("Session"),
@@ -84,9 +88,38 @@ fn hour_label(count: u64) -> String {
     bookie_app_services::trn!("{n} hour", "{n} hours", count).replace("{n}", &count.to_string())
 }
 
+pub(super) fn retired_session_message(transaction_was_open: bool) -> String {
+    if transaction_was_open {
+        bookie_app_services::tr!(
+            "The connection was lost while a transaction was open. The server discards an uncommitted transaction when its connection ends, so uncommitted changes should not have been saved; check the data before retrying. Reopen Session before running more SQL."
+        )
+    } else {
+        bookie_app_services::tr!(
+            "This editor session was retired after a connection failure. Reopen Session before running more SQL."
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_retired_session_says_so_when_a_transaction_was_open() {
+        assert!(retired_session_message(true).contains("transaction was open"));
+        assert!(retired_session_message(true).contains("uncommitted changes should not have been saved"));
+        assert!(!retired_session_message(false).contains("transaction"));
+    }
+
+    #[test]
+    fn the_clock_knows_whether_a_transaction_is_open() {
+        let clock = TransactionClock::default();
+        assert!(!clock.is_open());
+        clock.set_open(true, Instant::now());
+        assert!(clock.is_open());
+        clock.set_open(false, Instant::now());
+        assert!(!clock.is_open());
+    }
 
     #[test]
     fn the_label_reports_how_long_a_transaction_has_been_open() {

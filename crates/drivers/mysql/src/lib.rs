@@ -464,8 +464,10 @@ impl Connection for MysqlConnection {
         expect_one: &[usize],
     ) -> Result<Vec<u64>, DriverError> {
         validate_atomic_batch(statements)?;
-        let transaction = self.pool.begin().await.map_err(map_sqlx_error)?;
-        transaction::run_checked(transaction, statements, expect_one).await
+        let mut connection = self.pool.acquire().await.map_err(map_sqlx_error)?;
+        let result = transaction::begin_and_run_checked(&mut connection, statements, expect_one).await;
+        release_after_batch(connection, &result).await;
+        result
     }
 
     async fn execute_in_transaction_controlled(
@@ -493,7 +495,7 @@ impl Connection for MysqlConnection {
             control,
         )
         .await;
-        release_connection(connection, &result).await;
+        release_after_batch(connection, &result).await;
         result
     }
 
@@ -996,6 +998,12 @@ async fn retire_if_uncertain(connection: PoolConnection<MySql>, error: DriverErr
 
 async fn release_connection<T>(connection: PoolConnection<MySql>, result: &Result<T, DriverError>) {
     if matches!(result, Err(DriverError::OperationOutcomeUnknown { .. })) {
+        let _ = connection.detach().close_hard().await;
+    }
+}
+
+async fn release_after_batch<T>(connection: PoolConnection<MySql>, result: &Result<T, DriverError>) {
+    if result.is_err() {
         let _ = connection.detach().close_hard().await;
     }
 }

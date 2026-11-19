@@ -2065,7 +2065,7 @@ Packages:
 - `constant_time_eq 0.6.1`
 - `mongodb 3.10.0`
 - `mongodb-internal-macros 3.10.0`
-- `russh 0.65.1`
+- `russh 0.65.2`
 - `russh-cryptovec 0.62.0`
 - `russh-util 0.52.0`
 - `ryu 1.0.23`
@@ -7026,7 +7026,6 @@ DEALINGS IN THE SOFTWARE.
 Packages:
 
 - `pem-rfc7468 1.0.0`
-- `pkcs1 0.8.0-rc.4`
 
 ```text
 Copyright (c) 2021-2025 The RustCrypto Project Developers
@@ -7097,12 +7096,13 @@ Packages:
 
 - `argon2 0.6.0`
 - `crypto-bigint 0.7.11`
+- `pkcs1 0.8.0`
 - `pkcs5 0.8.1`
 - `scrypt 0.12.0`
 - `sec1 0.8.1`
 - `spki 0.8.1`
 - `ssh-encoding 0.3.0`
-- `ssh-key 0.7.0-rc.11`
+- `ssh-key 0.7.0-rc.12`
 
 ```text
 Copyright (c) 2021-2026 The RustCrypto Project Developers
@@ -8078,7 +8078,7 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `libduckdb-sys 1.20000.1`
+- `libduckdb-sys 1.20000.2`
 
 ```text
 Copyright 2021-2026 Stichting DuckDB Foundation
@@ -9214,7 +9214,7 @@ Packages:
 - `clickhouse-macros 0.3.0`
 - `clickhouse-types 0.1.4`
 - `delegate 0.13.5`
-- `duckdb 1.20000.1`
+- `duckdb 1.20000.2`
 - `libgssapi 0.11.0`
 - `libgssapi-sys 0.3.4`
 - `libm 0.2.16`
@@ -9459,7 +9459,7 @@ Packages:
 - `quote 1.0.47`
 - `relm4 0.11.0`
 - `relm4-macros 0.11.0`
-- `rsa 0.10.0-rc.18`
+- `rsa 0.10.0`
 - `rustix 1.1.6`
 - `rustversion 1.0.23`
 - `semver 1.0.28`
@@ -9551,7 +9551,7 @@ Packages:
 - `gdk4-sys 0.11.5`
 - `gio 0.22.10`
 - `gio-sys 0.22.9`
-- `glib 0.22.10`
+- `glib 0.22.11`
 - `glib-macros 0.22.9`
 - `glib-sys 0.22.9`
 - `gobject-sys 0.22.9`
@@ -9566,7 +9566,7 @@ Packages:
 - `libadwaita-sys 0.9.2`
 - `pango 0.22.9`
 - `pango-sys 0.22.9`
-- `sourceview5 0.11.2`
+- `sourceview5 0.11.3`
 - `sourceview5-sys 0.11.2`
 
 ```text
