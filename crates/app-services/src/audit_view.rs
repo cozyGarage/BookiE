@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 
-use bookie_policy::{
-    AuditApprovalOutcome, AuditEvent, AuditOperationClass, AuditRecordPhase, AuditTerminalStatus, Principal,
-};
+pub use bookie_policy::{AuditApprovalOutcome, AuditOperationClass, AuditTerminalStatus};
+use bookie_policy::{AuditEvent, AuditRecordPhase, Principal};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, PartialEq)]

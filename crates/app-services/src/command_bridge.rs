@@ -222,27 +222,8 @@ async fn dispatch_session_command(
                 closed: sessions.close(session_id),
             })?;
         }
-        Command::RunQuery { epoch, session_id, sql } => {
-            Box::pin(dispatch_query(sessions, epoch, session_id, sql, control, sink)).await?;
-        }
-        command @ (Command::ReadPage { .. }
-        | Command::ReadColumns { .. }
-        | Command::ReadCatalog { .. }
-        | Command::ReadDataDictionary { .. }
-        | Command::ReadConnectionStatus { .. }) => {
-            Box::pin(dispatch_read_command(sessions, command, control, sink)).await?;
-        }
-        Command::SampleSubscription {
-            epoch,
-            session_id,
-            request,
-        } => {
-            Box::pin(dispatch_subscription(
-                sessions, epoch, session_id, request, control, sink,
-            ))
-            .await?;
-        }
         Command::ListSavedConnections { .. } => return Err(DispatchError::InvalidContext),
+        read => Box::pin(dispatch_read_command(sessions, read, control, sink)).await?,
     }
     Ok(())
 }
@@ -254,6 +235,9 @@ async fn dispatch_read_command(
     sink: &dyn EventSink,
 ) -> Result<(), DispatchError> {
     match command {
+        Command::RunQuery { epoch, session_id, sql } => {
+            Box::pin(dispatch_query(sessions, epoch, session_id, sql, control, sink)).await?;
+        }
         Command::ReadPage {
             epoch,
             session_id,
@@ -275,12 +259,28 @@ async fn dispatch_read_command(
             epoch,
             session_id,
             table,
-        } => Box::pin(dispatch_columns(sessions, epoch, session_id, table, control, sink)).await?,
+        } => {
+            Box::pin(dispatch_columns(sessions, epoch, session_id, table, control, sink)).await?;
+        }
+        other => Box::pin(dispatch_metadata_command(sessions, other, control, sink)).await?,
+    }
+    Ok(())
+}
+
+async fn dispatch_metadata_command(
+    sessions: &ReadSessionStore,
+    command: Command,
+    control: &OperationControl,
+    sink: &dyn EventSink,
+) -> Result<(), DispatchError> {
+    match command {
         Command::ReadCatalog {
             epoch,
             session_id,
             kind,
-        } => Box::pin(dispatch_catalog(sessions, epoch, session_id, kind, control, sink)).await?,
+        } => {
+            Box::pin(dispatch_catalog(sessions, epoch, session_id, kind, control, sink)).await?;
+        }
         Command::ReadDataDictionary {
             epoch,
             session_id,
@@ -298,6 +298,16 @@ async fn dispatch_read_command(
         }
         Command::ReadConnectionStatus { epoch, session_id } => {
             dispatch_connection_status(sessions, epoch, session_id, sink)?;
+        }
+        Command::SampleSubscription {
+            epoch,
+            session_id,
+            request,
+        } => {
+            Box::pin(dispatch_subscription(
+                sessions, epoch, session_id, request, control, sink,
+            ))
+            .await?;
         }
         _ => return Err(DispatchError::InvalidContext),
     }

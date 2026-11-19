@@ -1397,7 +1397,6 @@ jobs:
       options: --add-host=host.docker.internal:host-gateway
       volumes:
         - /var/run/docker.sock:/var/run/docker.sock
-        - /var/tmp/bookie-pg-release-fixtures:/var/tmp/bookie-pg-release-fixtures
       env:
         DEBIAN_FRONTEND: noninteractive
         DOCKER_CONFIG: /github/home/.docker
@@ -1430,7 +1429,6 @@ jobs:
       - name: PostgreSQL release fixture
         env:
           BOOKIE_FIXTURE_HOST: host.docker.internal
-          BOOKIE_FIXTURE_TOXIPROXY_CONFIG: /var/tmp/bookie-pg-release-fixtures/toxiproxy.json
           BOOKIE_TEST_BUNDLE: ${{ runner.temp }}/bookie-pg-release-bundle
           BOOKIE_REQUIRE_PREBUILT: "1"
           BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
@@ -1438,9 +1436,7 @@ jobs:
           CARGO_TARGET_DIR: ${{ runner.temp }}/bookie-pg-release-target
           TMPDIR: /tmp
         run: |
-          mkdir -p /var/tmp/bookie-pg-release-fixtures
           mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"
-          cp tests/fixtures/postgres-release/toxiproxy/toxiproxy.json "$BOOKIE_FIXTURE_TOXIPROXY_CONFIG"
           python3 scripts/run-test-layer.py postgres-release
       - name: Upload validation evidence
         if: always()
@@ -1449,12 +1445,6 @@ jobs:
           name: regression-pg-release-${{ github.run_id }}-${{ github.run_attempt }}
           path: target/quality/*-layers
           if-no-files-found: error
-      - name: Remove shared PostgreSQL fixture files
-        if: always()
-        run: |
-          if [[ -d /var/tmp/bookie-pg-release-fixtures ]]; then
-            find /var/tmp/bookie-pg-release-fixtures -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
-          fi
 
   distro-floor-scenarios:
     name: Debian testing package GTK scenarios (${{ matrix.shard_group }})

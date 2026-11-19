@@ -44,7 +44,7 @@ while IFS= read -r -d '' file; do
     errors=$((errors + 1))
   fi
 done < <(find "$ROOT/crates" "$ROOT/apps" "$ROOT/tests" \
-  -path "$ROOT/apps/linux/packaging/arch/src" -prune -o -type f -name '*.rs' -print0 | sort -z)
+  \( -path "$ROOT/apps/linux/packaging/arch/src" -o -name target \) -prune -o -type f -name '*.rs' -print0 | sort -z)
 
 for rel in "${!MAX_LINES[@]}"; do
   if [[ ! -f "$ROOT/$rel" ]]; then

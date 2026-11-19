@@ -49,8 +49,8 @@ The [`fix-issue` skill](.claude/skills/fix-issue/SKILL.md) runs these steps in o
 2. Run the checks in [Validation](#validation) locally. Run each script directly; piping `bash scripts/preflight.sh` through `tail` reports `tail`'s status, not the script's.
 3. Merge the latest BookiE `main` branch from GitHub `cozyGarage/BookiE` into the branch (do not rebase a shared branch). Resolve generated files such as `Cargo.lock` by regenerating them.
 4. **Required checks.** Every pull request must pass the required checks for its exact source revision. Missing, skipped, cancelled or failed checks are not passes; maintainers confirm acceptance before merging.
-5. **Pull requests and merge.** Open pull requests against `main`. Merge only after required checks and lane review pass for the reviewed source.
-6. **Documentation-only changes.** Run `python3 scripts/check-doc-links.py`, `check-known-issues.py` and `inventory-ignored-tests.py --check`. Changes to code, workflows or packages require the applicable full validation.
+5. **Pull requests and merge.** Open pull requests against `main`. Merge only after required checks and lane review pass for the reviewed source. Keep one open pull request per lane and theme: when you already have one open, push the next fix to that branch instead of opening another, and hold a fix that is not urgent for the next one. A pull request for one small change costs a full validation run, so batch related fixes into one.
+6. **Documentation-only changes.** Run `python3 scripts/check-doc-links.py`, `check-known-issues.py` and `inventory-ignored-tests.py --check`, then commit directly to `main` without a pull request. Rule changes (`AGENTS.md`, accepted ADRs) and anything that touches code, workflows or packages still go through a pull request and the applicable full validation.
 
 7. **Isolated test inputs.** Keep mutable fixtures, display sessions and build inputs isolated between test runs. Check isolation before attributing overlapping-run failures to product code.
 8. **Required check status.** Check results must apply to the exact proposed revision. Skipped checks do not pass. CodeQL and SonarCloud are reference scans, not gates.
@@ -58,6 +58,7 @@ The [`fix-issue` skill](.claude/skills/fix-issue/SKILL.md) runs these steps in o
 
 10. Never leave a background job, container or temporary resource running that you did not start, and never stop one you did not start. On shared systems, stop only resources you own.
 11. Keep the diff to the requested behaviour. No drive-by refactors, renames, formatting of untouched files, or edits to another lane's ledger/sprint/policy files.
+12. **Validate once per batch.** While developing, run only the narrow test for the code you touch. Run `scripts/preflight.sh` and any Forgejo acceptance run once, when the branch is ready for review. Every push to a pull request restarts its required checks, so keep commits local until the batch is complete, and merge `main` into the branch only when it conflicts or just before that final run.
 
 ## Reuse before building
 
