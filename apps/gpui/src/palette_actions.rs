@@ -329,6 +329,9 @@ impl GridView {
         self.palette.open = true;
         self.palette.fonts = false;
         self.palette.mode = PaletteMode::Commands;
+        self.palette
+            .input
+            .update(cx, |input, cx| input.set_placeholder(PaletteMode::Commands.placeholder(), cx));
         self.palette.index = 0;
         self.palette.input.update(cx, |input, cx| input.set_content("", cx));
         window.focus(&self.palette.input.read(cx).focus_handle(cx), cx);

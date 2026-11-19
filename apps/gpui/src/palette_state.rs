@@ -12,6 +12,19 @@ pub(crate) enum PaletteMode {
     DeleteFavorite,
 }
 
+impl PaletteMode {
+    pub fn placeholder(self) -> &'static str {
+        match self {
+            PaletteMode::Commands => "Type a command",
+            PaletteMode::Tables => "Go to a table or favorite",
+            PaletteMode::Columns => "Jump to a column",
+            PaletteMode::Shortcuts => "Search keyboard shortcuts",
+            PaletteMode::Favorites => "Open a favorite",
+            PaletteMode::DeleteFavorite => "Delete a favorite",
+        }
+    }
+}
+
 pub(crate) struct PaletteState {
     pub input: Entity<TextInput>,
     pub open: bool,

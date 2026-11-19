@@ -713,6 +713,7 @@ fn main() {
                     focus.focus(window, cx);
                     view.update(cx, |view, cx| {
                         view.reload_history(cx);
+                        view.refresh_favorites(cx);
                         view.keymap = keymap.clone();
                         view.connections = connections.clone();
                     });

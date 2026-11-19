@@ -91,6 +91,16 @@ pub fn bind_keys(cx: &mut App) {
 }
 
 impl TextInput {
+    #[cfg(test)]
+    pub fn placeholder(&self) -> &str {
+        &self.placeholder
+    }
+
+    pub fn set_placeholder(&mut self, placeholder: &str, cx: &mut Context<Self>) {
+        self.placeholder = placeholder.to_string().into();
+        cx.notify();
+    }
+
     pub fn new(placeholder: &str, cx: &mut Context<Self>) -> Self {
         TextInput {
             focus_handle: cx.focus_handle(),
