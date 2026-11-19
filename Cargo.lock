@@ -1070,6 +1070,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "bookie-audit"
+version = "0.2.7"
+dependencies = [
+ "bookie-app-services",
+ "bookie-policy",
+ "bookie-storage",
+ "tempfile",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "bookie-avro-container"
 version = "0.2.7"
 dependencies = [

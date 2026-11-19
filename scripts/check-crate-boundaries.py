@@ -48,6 +48,7 @@ ALLOWED = {
         "bookie-core", "bookie-policy", "bookie-ssh", "bookie-storage", "bookie-transport",
         "bookie-mcp", "bookie-driver-registry", *DRIVERS,
     },
+    "bookie-audit": {"bookie-app-services"},
     "bookie-driver-registry": {"bookie-core", *DRIVERS},
     **{driver: {"bookie-core"} for driver in DRIVERS},
 }
