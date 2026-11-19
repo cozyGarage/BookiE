@@ -1,6 +1,6 @@
 use super::*;
 
-async fn assert_failed_batch_keeps_user_variable_side_effect(connection: Box<dyn Connection>) {
+async fn assert_failed_batch_drops_user_variable_side_effect(connection: Box<dyn Connection>) {
     connection
         .execute(
             "CREATE TABLE user_variable_rollback (
@@ -61,21 +61,21 @@ async fn assert_failed_batch_keeps_user_variable_side_effect(connection: Box<dyn
         }
     }
     assert_eq!(
-        kept, 1,
-        "exactly one pooled session retains the variable set inside the failed batch"
+        kept, 0,
+        "the connection that ran the failed batch is retired, so no pooled session keeps its variable"
     );
 }
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn mysql_failed_batch_keeps_user_variable_side_effect() {
+async fn mysql_failed_batch_drops_user_variable_side_effect() {
     let (_container, opts) = start_mysql().await;
-    assert_failed_batch_keeps_user_variable_side_effect(connect(opts).await).await;
+    assert_failed_batch_drops_user_variable_side_effect(connect(opts).await).await;
 }
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn mariadb_failed_batch_keeps_user_variable_side_effect() {
+async fn mariadb_failed_batch_drops_user_variable_side_effect() {
     let (_container, opts) = start_mariadb().await;
-    assert_failed_batch_keeps_user_variable_side_effect(connect(opts).await).await;
+    assert_failed_batch_drops_user_variable_side_effect(connect(opts).await).await;
 }
