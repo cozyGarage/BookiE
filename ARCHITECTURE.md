@@ -23,7 +23,7 @@ DuckDB is a built-in driver. The diagrams below give the detail.
 
 | Path | Holds |
 | --- | --- |
-| `crates/` | GTK-free workspace crates: `core`, `policy`, `storage`, `ssh`, `transport`, `results`, `app-services`, `dump`, `mcp`, `agentd`, and `drivers/*`. None depends on GTK. |
+| `crates/` | GTK-free workspace crates: `core`, `policy`, `storage`, `ssh`, `transport`, `results`, `app-services`, `dump`, `mcp`, `agentd`, `registry`, `checks`, `pg-sessions`, `kafka-browser`, `avro-container` and `drivers/*`. None depends on GTK. |
 | `apps/linux/` | The shipped GTK application (`app/`) and what only it needs: `data/`, `po/`, `flatpak/`, `packaging/`. |
 | `apps/gpui/` | The chosen cross-platform GPUI frontend ([ADR 0052](docs/decisions/0052-gpui-is-the-cross-platform-frontend.md)); own lockfile, not packaged until that ADR's shipping conditions hold. |
 | `tests/` | Cross-crate test crates (`release/`, `driver-tls/`), fixtures and shared test data (`data/`). Unit tests stay beside their code; per-crate integration tests stay in `crates/<name>/tests`. |
