@@ -317,7 +317,7 @@ impl GridView {
         .detach();
     }
 
-    fn finish_save(&mut self, connection_id: uuid::Uuid, done: String, result: SaveOutcome, cx: &mut Context<Self>) {
+    pub(crate) fn finish_save(&mut self, connection_id: uuid::Uuid, done: String, result: SaveOutcome, cx: &mut Context<Self>) {
         let (write, applied) = match result {
             Ok(done) => done,
             Err(message) => {
@@ -330,6 +330,7 @@ impl GridView {
         self.save.write = applied.is_ok().then(|| (connection_id, write));
         match applied {
             Ok(_) => {
+                self.save.busy = false;
                 self.close_insert_form();
                 self.close_import_bar();
                 self.close_structure_bar();
@@ -341,6 +342,7 @@ impl GridView {
                     "The save may or may not have been applied ({}). The table was reloaded; check the data before saving again.",
                     failure.message
                 );
+                self.save.busy = false;
                 self.show_banner(text.clone(), true, cx);
                 self.reload_after_save(text, cx);
             }

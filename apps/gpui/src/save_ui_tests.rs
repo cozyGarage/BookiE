@@ -904,3 +904,38 @@ fn a_bad_structure_request_is_refused_before_any_review_and_keeps_the_bar(cx: &m
     });
     std::fs::remove_file(&path).ok();
 }
+
+#[gpui::test]
+fn a_save_that_finishes_after_the_reload_was_cancelled_still_frees_every_write_feature(cx: &mut TestAppContext) {
+    let path = fixture_copy("busy");
+    let (view, cx) = saving_view(cx, &path);
+    let write = write_session(&path, false);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            let id = view.live.as_ref().and_then(|live| live.writable).expect("writable");
+            view.save.busy = true;
+            view.finish_save(id, "Saved".into(), Ok((write, Ok(vec![1]))), cx);
+            view.invalidate_background();
+        })
+    });
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert!(!view.save.busy, "the write is done, so the save is no longer running: {}", view.status);
+    });
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn opening_a_table_or_running_a_query_is_refused_while_a_save_is_writing(cx: &mut TestAppContext) {
+    let path = fixture_copy("busy-refuse");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.save.busy = true;
+            assert!(view.reject_view_edits());
+            view.run_sql("SELECT 1".into(), cx);
+            assert!(view.status.contains("A save is running"), "{}", view.status);
+        })
+    });
+    std::fs::remove_file(&path).ok();
+}
