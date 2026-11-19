@@ -867,12 +867,12 @@ impl SqlEditor {
             let Some(session) = self.session.take() else {
                 return;
             };
+            let transaction_was_open = self.transaction_clock.is_open();
             self.retired_session_connection_id = Some((session.connection_id, session.id));
             self.clear_catalog_changes();
             self.close_session_for_teardown(session.shared, sender);
-            self.status.set_label(&bookie_app_services::tr!(
-                "This editor session was retired after a connection failure. Reopen Session before running more SQL."
-            ));
+            self.status
+                .set_label(&super::session_age::retired_session_message(transaction_was_open));
             return;
         }
         self.transaction_clock

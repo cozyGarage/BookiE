@@ -229,7 +229,7 @@ impl GridView {
                 .gap_2()
                 .px_2()
                 .pb_2()
-                .child(div().child("WHERE"))
+                .child(div().child("Filter"))
                 .child(div().w(px(size::FILTER_WIDTH)).child(self.search.filter.clone()))
                 .child(button("apply", "Apply", theme).on_click(cx.listener(|this, _, _, cx| this.apply_filter(cx))))
                 .child(
@@ -291,7 +291,8 @@ impl GridView {
         })
     }
 
-    fn grid_pane(&self, theme: Theme, strip: Div, filter_row: Option<Div>, compare_bar: Option<Div>) -> Div {
+    fn grid_pane(&self, theme: Theme, strip: Div, bars: (Option<Div>, Option<Div>, Option<Div>, Option<Div>)) -> Div {
+        let (filter_row, compare_bar, save_bar, banner) = bars;
         div()
             .flex_1()
             .flex()
@@ -300,6 +301,8 @@ impl GridView {
             .child(strip)
             .children(filter_row)
             .children(compare_bar)
+            .children(save_bar)
+            .children(banner)
             .child(self.data_table())
             .children(self.detail_panel(theme))
     }
@@ -322,7 +325,9 @@ impl Render for GridView {
         let filter_row = self.grid_filter_row(theme, cx);
         let compare_bar = self.grid_compare_bar(theme, cx);
         let palette = self.palette.open.then(|| self.palette_overlay(cx));
-        let grid = self.grid_pane(theme, strip, filter_row, compare_bar);
+        let save_bar = self.save_bar(theme, cx);
+        let banner = self.save_banner(theme, cx);
+        let grid = self.grid_pane(theme, strip, (filter_row, compare_bar, save_bar, banner));
         let content = match self.tabs.current().clone() {
             Tab::Home => self.home_page(theme, cx),
             Tab::Settings => self.settings_page(theme, cx),

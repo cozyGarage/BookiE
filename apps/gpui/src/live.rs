@@ -48,6 +48,7 @@ pub struct LiveSession {
     pub label: String,
     pub tables: Vec<TableInfo>,
     pub saved: Option<(uuid::Uuid, String)>,
+    pub writable: Option<uuid::Uuid>,
     supports_snapshot_cursor: bool,
 }
 
@@ -62,7 +63,8 @@ impl LiveSession {
             .enable_all()
             .build()
             .map_err(|error| error.to_string())?;
-        let (sessions, opened, saved) = runtime.block_on(open_session(origin, cancellation.clone()))?;
+        let (sessions, opened, saved, writable) = runtime.block_on(open_session(origin, cancellation.clone()))?;
+        let writable = saved.as_ref().filter(|_| writable).map(|(id, _)| *id);
         Ok(Arc::new(LiveSession {
             driver_id: opened.driver_id.clone(),
             runtime,
@@ -72,6 +74,7 @@ impl LiveSession {
             label: opened.label,
             tables: opened.tables,
             saved,
+            writable,
             supports_snapshot_cursor: opened.supports_snapshot_cursor,
         }))
     }
@@ -101,7 +104,7 @@ impl LiveSession {
         };
         self.runtime.spawn(async move {
             if let Err(error) = bookie_app_services::statement_history::record(statement).await {
-                eprintln!("history record failed: {error}");
+                tracing::warn!(%error, "history record failed");
             }
         });
     }
@@ -121,6 +124,7 @@ impl LiveSession {
             label: self.label.clone(),
             tables: self.tables.clone(),
             saved: self.saved.clone(),
+            writable: self.writable,
             supports_snapshot_cursor: self.supports_snapshot_cursor,
         })
     }
@@ -375,7 +379,7 @@ fn file_identity(path: &std::path::Path) -> (uuid::Uuid, String) {
 async fn open_session(
     origin: &Origin,
     cancellation: CancellationToken,
-) -> Result<(ReadSessionStore, OpenedSession, Option<(uuid::Uuid, String)>), String> {
+) -> Result<(ReadSessionStore, OpenedSession, Option<(uuid::Uuid, String)>, bool), String> {
     let registry = Arc::new(drivers_registry::default_registry());
     let sessions = ReadSessionStore::new(registry, Arc::new(DatabaseService::new()))
         .with_subscription_sampler(Arc::new(RegistrySubscriptionSampler));
@@ -385,7 +389,7 @@ async fn open_session(
         cancellation,
         Some(tokio::time::Instant::now() + Duration::from_secs(30)),
     );
-    let (command, identity) = match origin {
+    let (command, identity, writable) = match origin {
         Origin::Saved(connection) => {
             let saved = bridge_saved_connections(&control, epoch, &current_epoch).await?;
             let found = saved
@@ -396,14 +400,14 @@ async fn open_session(
                 epoch,
                 connection_id: found.id,
             };
-            (command, (found.id, found.name.clone()))
+            (command, (found.id, found.name.clone()), !found.read_only)
         }
         Origin::File(path) => {
             let command = Command::OpenConnectionFile {
                 epoch,
                 path: path.clone(),
             };
-            (command, file_identity(path))
+            (command, file_identity(path), false)
         }
     };
     let event = dispatch_read(
@@ -417,7 +421,73 @@ async fn open_session(
     let Event::SessionOpened { outcome, .. } = event else {
         return Err("The command bridge returned an unexpected event.".into());
     };
-    Ok((sessions, outcome?, Some(identity)))
+    Ok((sessions, outcome?, Some(identity), writable))
+}
+
+pub struct SaveFailure {
+    pub message: String,
+    pub outcome_unknown: bool,
+}
+
+pub struct WriteSession {
+    runtime: tokio::runtime::Runtime,
+    sessions: ReadSessionStore,
+    session_id: SessionId,
+}
+
+impl WriteSession {
+    pub fn open_saved(connection_id: uuid::Uuid) -> Result<WriteSession, String> {
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            .enable_all()
+            .build()
+            .map_err(|error| error.to_string())?;
+        let sessions = ReadSessionStore::new(
+            Arc::new(drivers_registry::default_registry()),
+            Arc::new(DatabaseService::new()),
+        );
+        let control = OperationControl::with_timeout(Duration::from_secs(30));
+        let opened = runtime.block_on(sessions.open_saved_writable(connection_id, &control))?;
+        Ok(WriteSession {
+            runtime,
+            sessions,
+            session_id: opened.session_id,
+        })
+    }
+
+    #[doc(hidden)]
+    pub fn from_parts(runtime: tokio::runtime::Runtime, sessions: ReadSessionStore, session_id: SessionId) -> WriteSession {
+        WriteSession {
+            runtime,
+            sessions,
+            session_id,
+        }
+    }
+
+    pub fn apply(
+        &self,
+        statements: &[(String, Vec<bookie_core::Value>)],
+        expect_one: &[usize],
+        cancellation: &CancellationToken,
+    ) -> Result<Vec<u64>, SaveFailure> {
+        let control = OperationControl::new(
+            cancellation.clone(),
+            Some(tokio::time::Instant::now() + Duration::from_secs(60)),
+        );
+        self.runtime
+            .block_on(
+                self.sessions
+                    .apply_changes(self.session_id, statements, expect_one, &control),
+            )
+            .map_err(|failure| SaveFailure {
+                message: driver_failure_message(&failure),
+                outcome_unknown: matches!(
+                    failure,
+                    bookie_app_services::driver_error_presentation::DriverFailurePresentation::OperationOutcomeUnknown(_)
+                        | bookie_app_services::driver_error_presentation::DriverFailurePresentation::TimedOut
+                ),
+            })
+    }
 }
 
 struct RegistrySubscriptionSampler;
@@ -881,6 +951,10 @@ impl ResultSource for LiveTable {
         &self.columns
     }
 
+    fn editable(&self) -> bool {
+        self.table.is_some() && self.session.writable.is_some()
+    }
+
     fn is_partial(&self) -> bool {
         self.truncated
     }
@@ -903,7 +977,8 @@ impl ResultSource for LiveTable {
                 " · concurrent changes may skip or repeat rows"
             }
         });
-        format!("{} · {} · read-only{consistency}{cap}", self.session.driver_id, table)
+        let access = if self.editable() { "editable" } else { "read-only" };
+        format!("{} · {} · {access}{consistency}{cap}", self.session.driver_id, table)
     }
 
     fn total(&self) -> u64 {

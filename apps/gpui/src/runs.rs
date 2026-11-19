@@ -184,8 +184,13 @@ impl GridView {
         if query == self.grid_is_query {
             return;
         }
-        if self.cell_edit.active.is_some() {
-            self.status = "Finish or discard the active cell edit using Commands before switching grids.".into();
+        let saving = self.save.busy || self.save.pending.is_some();
+        if saving || self.cell_edit.active.is_some() {
+            self.status = if saving {
+                "Finish or cancel the save before switching grids.".into()
+            } else {
+                "Finish or discard the active cell edit using Commands before switching grids.".into()
+            };
             if let Some(index) = self.tabs.items.iter().position(|tab| match (self.grid_is_query, tab) {
                 (true, Tab::Query) => true,
                 (false, Tab::Table(name)) => name == &self.catalog.grid_table,

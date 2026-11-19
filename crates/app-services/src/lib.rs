@@ -96,6 +96,7 @@ pub mod workspace_state;
 
 pub mod browse_query;
 
+pub mod cell_save_plan;
 pub mod change_tracker;
 pub mod edit_preview;
 pub mod result_copy;

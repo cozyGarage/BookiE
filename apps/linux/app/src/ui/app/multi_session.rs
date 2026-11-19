@@ -1,4 +1,5 @@
 use std::collections::{HashMap, VecDeque};
+use std::sync::Arc;
 
 use bookie_app_services::window_sessions::{GuardedSessionMap, WindowSessions};
 use bookie_core::TableInfo;
@@ -12,8 +13,8 @@ use super::{App, AppMsg};
 
 #[derive(Clone)]
 pub(super) struct SessionCatalog {
-    pub tables: Vec<TableInfo>,
-    pub views: Vec<TableInfo>,
+    pub tables: Arc<[TableInfo]>,
+    pub views: Arc<[TableInfo]>,
     pub database: String,
 }
 
@@ -56,8 +57,8 @@ impl App {
         self.multi.catalogs.insert(
             id,
             SessionCatalog {
-                tables,
-                views,
+                tables: Arc::from(tables),
+                views: Arc::from(views),
                 database,
             },
         );
@@ -92,7 +93,7 @@ impl App {
         self.connected_database = catalog.as_ref().map(|catalog| catalog.database.clone());
         self.restore_sidebar_state();
         if let Some(catalog) = catalog {
-            self.sidebar_views = catalog.views;
+            self.sidebar_views = catalog.views.to_vec();
             self.reset_sidebar_catalog();
             self.repopulate_sidebar(&catalog.tables, sender.clone());
             self.rebuild_schema_filter_popover(&sender);
@@ -316,5 +317,24 @@ mod tests {
         assert_eq!(create_tab(), Some(first));
         front.set(Some(second));
         assert_eq!(create_tab(), Some(second));
+    }
+
+    #[test]
+    fn cloning_a_session_catalog_shares_table_metadata_storage() {
+        let catalog = SessionCatalog {
+            tables: Arc::from(vec![TableInfo {
+                schema: Some("schema".into()),
+                name: "table".into(),
+            }]),
+            views: Arc::from(vec![TableInfo {
+                schema: Some("schema".into()),
+                name: "view".into(),
+            }]),
+            database: "database".into(),
+        };
+        let clone = catalog.clone();
+
+        assert_eq!(catalog.tables.as_ptr(), clone.tables.as_ptr());
+        assert_eq!(catalog.views.as_ptr(), clone.views.as_ptr());
     }
 }

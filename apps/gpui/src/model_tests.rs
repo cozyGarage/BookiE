@@ -350,3 +350,20 @@ fn resizing_keeps_the_first_row_in_view() {
     assert_eq!(resized.window(), (5_000, 6_000));
     assert_eq!(resized.with_total(3_000).page, 0);
 }
+
+#[test]
+fn a_filter_that_cannot_be_read_says_what_is_wrong_and_shows_an_example() {
+    let columns = synthetic_columns();
+    let first = columns[0].name.clone();
+
+    let unknown_column = parse_predicate("nope contains 1", &columns).unwrap_err();
+    assert!(unknown_column.contains("no column named nope"), "{unknown_column}");
+    assert!(unknown_column.contains(&first), "it lists the real columns: {unknown_column}");
+
+    let unknown_operator = parse_predicate(&format!("{first} > 5"), &columns).unwrap_err();
+    assert!(unknown_operator.contains("contains") && unknown_operator.contains("!="), "{unknown_operator}");
+    assert!(unknown_operator.contains(&format!("{first} contains")), "it shows an example: {unknown_operator}");
+
+    let missing_text = parse_predicate(&format!("{first} contains"), &columns).unwrap_err();
+    assert!(missing_text.contains("text to match"), "{missing_text}");
+}
