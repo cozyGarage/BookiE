@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use bookie_app_services::csv_import_plan::plan_csv_import;
 use bookie_app_services::cell_save_plan::{
     CellChange, CellSavePlan, SaveTarget, plan_cell_saves, plan_row_deletes, plan_row_insert_named,
 };
@@ -34,6 +35,7 @@ pub(crate) enum SaveRequest {
     Edits(Vec<CellChange>),
     Deletes(Vec<Vec<bookie_core::Value>>),
     Insert(Vec<(String, String)>),
+    Import(std::path::PathBuf),
 }
 
 pub(crate) struct ReviewLabels {
@@ -85,8 +87,8 @@ impl GridView {
     }
 
     pub(crate) fn request_save(&mut self, cx: &mut Context<Self>) {
-        if self.insert.open {
-            self.status = "Finish or cancel the new row first".into();
+        if self.form_open() {
+            self.status = "Finish or cancel the open form first".into();
             return;
         }
         if self.cell_edit.edits.is_empty() && self.live.as_ref().is_some_and(|live| live.writable.is_some()) {
@@ -109,8 +111,8 @@ impl GridView {
     }
 
     pub(crate) fn request_delete(&mut self, cx: &mut Context<Self>) {
-        if self.insert.open {
-            self.status = "Finish or cancel the new row first".into();
+        if self.form_open() {
+            self.status = "Finish or cancel the open form first".into();
             return;
         }
         if self.compare.is_some() {
@@ -146,10 +148,7 @@ impl GridView {
             done: format!("Deleted {count} row(s)"),
             review: format!("Review the {count} row(s) to delete, then delete or cancel"),
             confirm: "Delete",
-            note: Some(
-                "Rows that depend on these (foreign keys, triggers) may be affected too. \
-                 A connection that needs approval will refuse this until approval is available here.",
-            ),
+            note: Some("Rows that depend on these (foreign keys, triggers) may be affected too."),
         };
         self.prepare(live, SaveRequest::Deletes(rows), labels, cx);
     }
@@ -179,11 +178,17 @@ impl GridView {
                         columns: &columns,
                     };
                     match request {
-                        SaveRequest::Edits(changes) => plan_cell_saves(target, &grid_columns, &changes),
-                        SaveRequest::Deletes(rows) => plan_row_deletes(target, &grid_columns, &rows),
-                        SaveRequest::Insert(named) => plan_row_insert_named(target, &named),
+                        SaveRequest::Edits(changes) => {
+                            plan_cell_saves(target, &grid_columns, &changes).map_err(|error| error.to_string())
+                        }
+                        SaveRequest::Deletes(rows) => {
+                            plan_row_deletes(target, &grid_columns, &rows).map_err(|error| error.to_string())
+                        }
+                        SaveRequest::Insert(named) => {
+                            plan_row_insert_named(target, &named).map_err(|error| error.to_string())
+                        }
+                        SaveRequest::Import(file) => plan_file_import(target, &live.driver_id, &file),
                     }
-                    .map_err(|error| error.to_string())
                 })
                 .await;
             this.update(cx, |this, cx| {
@@ -213,11 +218,12 @@ impl GridView {
                 self.status = "Nothing changed, so there is nothing to save".into();
             }
             Ok(plan) => {
+                let rows = plan.statements.len().to_string();
                 self.status = labels.review;
                 self.save.pending = Some(PendingSave {
                     plan,
-                    title: labels.title,
-                    done: labels.done,
+                    title: labels.title.replace("{n}", &rows),
+                    done: labels.done.replace("{n}", &rows),
                     confirm: labels.confirm,
                     note: labels.note,
                     generation,
@@ -323,6 +329,7 @@ impl GridView {
         match applied {
             Ok(_) => {
                 self.close_insert_form();
+                self.close_import_bar();
                 self.show_banner(done.clone(), false, cx);
                 self.reload_after_save(done, cx);
             }
@@ -416,3 +423,57 @@ impl GridView {
         )
     }
 }
+
+fn expand_home(path: &std::path::Path) -> std::path::PathBuf {
+    match (path.strip_prefix("~"), std::env::var_os("HOME")) {
+        (Ok(rest), Some(home)) => std::path::PathBuf::from(home).join(rest),
+        _ => path.to_path_buf(),
+    }
+}
+
+fn plan_file_import(
+    target: SaveTarget<'_>,
+    driver_id: &str,
+    file: &std::path::Path,
+) -> Result<CellSavePlan, String> {
+    let capabilities = drivers_registry::default_registry()
+        .get(driver_id)
+        .map(|driver| driver.capabilities())
+        .unwrap_or_default();
+    let file = expand_home(file);
+    let plan = plan_csv_import(target, capabilities, &file, crate::import_ui::IMPORT_ROW_CAP)
+        .map_err(|error| error.to_string())?;
+    let cut = if plan.truncated {
+        format!(" (the file has more; only the first {} are imported)", plan.rows)
+    } else {
+        String::new()
+    };
+    let filled = if plan.filled_by_database.is_empty() {
+        String::new()
+    } else {
+        format!("\nNot imported, the database fills them: {}", plan.filled_by_database.join(", "))
+    };
+    let too_big = if plan.approvable {
+        String::new()
+    } else {
+        "\nToo large to approve: if this connection asks for approval, it will be refused. Import fewer rows.\n"
+            .to_string()
+    };
+    let ignored = if plan.ignored_fields.is_empty() {
+        String::new()
+    } else {
+        format!("\nIgnored fields with no matching column: {}", plan.ignored_fields.join(", "))
+    };
+    let preview = format!(
+        "{} row(s) from the file{cut}\nColumns: {}{ignored}{filled}{too_big}\n\n{}",
+        plan.rows,
+        plan.imported_columns.join(", "),
+        plan.preview
+    );
+    Ok(CellSavePlan {
+        statements: plan.statements,
+        expect_one: Vec::new(),
+        preview,
+    })
+}
+

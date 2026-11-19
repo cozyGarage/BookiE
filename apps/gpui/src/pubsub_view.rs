@@ -11,6 +11,16 @@ pub fn parse_pattern(text: &str) -> Option<String> {
     (!text.is_empty() && text.chars().count() <= 256 && !text.contains(char::is_whitespace)).then(|| text.to_string())
 }
 
+pub fn parse_channel(text: &str) -> Option<String> {
+    let text = text.trim();
+    let name = text
+        .get(..7)
+        .filter(|prefix| prefix.eq_ignore_ascii_case("listen "))
+        .and_then(|_| text.get(7..))?
+        .trim();
+    (!name.is_empty() && name.len() <= 63 && !name.contains(char::is_whitespace)).then(|| name.to_string())
+}
+
 pub fn describe(pattern: &str, outcome: Result<SubscriptionSample, String>) -> Vec<(MessageKind, String)> {
     let sample = match outcome {
         Ok(sample) => sample,
@@ -47,6 +57,25 @@ mod tests {
             pattern: Some("news.*".into()),
             payload: payload.into(),
             payload_bytes: bytes,
+        }
+    }
+
+    #[test]
+    fn a_postgres_channel_needs_the_listen_word_and_one_short_name() {
+        assert_eq!(parse_channel("listen jobs"), Some("jobs".into()));
+        assert_eq!(
+            parse_channel("  LISTEN   orders_changed "),
+            Some("orders_changed".into())
+        );
+        for bad in [
+            "jobs",
+            "listen",
+            "listen ",
+            "listen two words",
+            "unlisten jobs",
+            &format!("listen {}", "x".repeat(64)),
+        ] {
+            assert_eq!(parse_channel(bad), None, "{bad}");
         }
     }
 

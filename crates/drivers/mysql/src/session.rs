@@ -15,6 +15,11 @@ use crate::{
 
 const SESSION_SETUP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
+const TEMPORARY_TABLES_SQL: &str = "SELECT CAST(TABLE_SCHEMA AS CHAR), CAST(TABLE_NAME AS CHAR)
+    FROM information_schema.TABLES
+    WHERE TABLE_TYPE = 'TEMPORARY'
+    ORDER BY TABLE_SCHEMA, TABLE_NAME";
+
 pub(crate) struct MysqlSession {
     connection: Option<PoolConnection<MySql>>,
     pool: Pool<MySql>,
@@ -105,6 +110,26 @@ async fn run_statement(
 
 #[async_trait]
 impl bookie_core::Session for MysqlSession {
+    async fn list_temporary_tables_controlled(
+        &mut self,
+        control: &OperationControl,
+    ) -> Result<Vec<bookie_core::TableInfo>, DriverError> {
+        let result = self.run(TEMPORARY_TABLES_SQL, &[], control).await?.into_first();
+        result
+            .rows
+            .iter()
+            .map(|row| match row {
+                [Value::Text(schema), Value::Text(name)] => Ok(bookie_core::TableInfo {
+                    schema: Some(schema.clone()),
+                    name: name.clone(),
+                }),
+                _ => Err(DriverError::Internal(
+                    "the server returned invalid temporary table metadata".into(),
+                )),
+            })
+            .collect()
+    }
+
     async fn query_params_controlled(
         &mut self,
         sql: &str,

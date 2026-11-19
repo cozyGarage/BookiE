@@ -237,3 +237,34 @@ fn a_word_ending_in_e_before_a_quote_is_not_an_escape_string() {
     );
     assert_eq!(split_statements("SELECT E'a\\';b'; SELECT 2", "postgres").len(), 2);
 }
+
+#[test]
+fn a_postgres_copy_from_stdin_block_is_one_statement_with_its_data() {
+    let dump = "COPY accounts (id, note) FROM STDIN;\n1\tpaid; DROP TABLE accounts\n2\tok\n\\.\nSELECT 1;";
+    assert_eq!(
+        split_statements(dump, "postgres"),
+        vec![
+            "COPY accounts (id, note) FROM STDIN;\n1\tpaid; DROP TABLE accounts\n2\tok\n\\.",
+            "SELECT 1"
+        ]
+    );
+}
+
+#[test]
+fn a_copy_block_without_its_terminator_swallows_the_rest_instead_of_running_data_as_sql() {
+    let dump = "COPY t FROM STDIN;\n1\tx;DROP TABLE t\n";
+    assert_eq!(split_statements(dump, "postgres"), vec![dump.trim()]);
+}
+
+#[test]
+fn copy_forms_that_do_not_read_stdin_still_split_normally() {
+    assert_eq!(
+        split_statements("COPY t TO STDOUT; SELECT 1; COPY (SELECT 1) TO STDOUT", "postgres"),
+        vec!["COPY t TO STDOUT", "SELECT 1", "COPY (SELECT 1) TO STDOUT"]
+    );
+    assert_eq!(
+        split_statements("COPY t FROM STDIN; SELECT 1", "mysql"),
+        vec!["COPY t FROM STDIN", "SELECT 1"],
+        "only PostgreSQL has the COPY data protocol"
+    );
+}

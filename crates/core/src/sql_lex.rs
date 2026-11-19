@@ -118,6 +118,55 @@ fn dollar_quote_length(rest: &str, driver_id: &str) -> Option<usize> {
     }
 }
 
+pub fn is_copy_from_stdin(head: &str, driver_id: &str) -> bool {
+    let mut words: Vec<String> = Vec::new();
+    let mut word = String::new();
+    let mut index = 0usize;
+    while index < head.len() {
+        if let Some(length) = skip_span_at(head, index, driver_id).filter(|length| *length > 0) {
+            if !word.is_empty() {
+                words.push(std::mem::take(&mut word));
+            }
+            let quoted = head
+                .get(index..index + length)
+                .is_some_and(|span| !span.starts_with("--") && !span.starts_with("/*"));
+            if quoted {
+                words.push("\"".into());
+            }
+            index += length;
+            continue;
+        }
+        let Some(character) = head[index..].chars().next() else {
+            break;
+        };
+        if character.is_alphanumeric() || character == '_' {
+            word.push(character.to_ascii_lowercase());
+        } else if !word.is_empty() {
+            words.push(std::mem::take(&mut word));
+        }
+        index += character.len_utf8();
+    }
+    if !word.is_empty() {
+        words.push(word);
+    }
+    words.first().is_some_and(|first| first == "copy")
+        && words.windows(2).any(|pair| pair[0] == "from" && pair[1] == "stdin")
+}
+
+fn copy_data_end(sql: &str, after_semicolon: usize) -> usize {
+    let mut position = sql[after_semicolon..]
+        .find('\n')
+        .map_or(sql.len(), |offset| after_semicolon + offset + 1);
+    while position < sql.len() {
+        let line_end = sql[position..].find('\n').map_or(sql.len(), |offset| position + offset);
+        if sql[position..line_end].trim_end_matches('\r') == "\\." {
+            return line_end;
+        }
+        position = (line_end + 1).min(sql.len());
+    }
+    sql.len()
+}
+
 fn statement_spans(sql: &str, driver_id: &str) -> Vec<(usize, usize)> {
     let mut spans: Vec<(usize, usize)> = Vec::new();
     let bytes = sql.as_bytes();
@@ -130,6 +179,13 @@ fn statement_spans(sql: &str, driver_id: &str) -> Vec<(usize, usize)> {
             continue;
         }
         if bytes[index] == b';' {
+            if driver_id == "postgres" && is_copy_from_stdin(&sql[start..index], driver_id) {
+                let end = copy_data_end(sql, index + 1);
+                spans.push((start, end));
+                index = end;
+                start = end;
+                continue;
+            }
             spans.push((start, index));
             index += 1;
             start = index;

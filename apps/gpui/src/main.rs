@@ -22,6 +22,7 @@ mod palette_state;
 mod edit_history;
 mod favorites_ui;
 mod approval_ui;
+mod import_ui;
 mod insert_ui;
 mod params_ui;
 mod picker;
@@ -132,6 +133,7 @@ struct GridView {
     save: save_ui::SaveState,
     approval: approval_ui::ApprovalUi,
     insert: insert_ui::InsertState,
+    import: import_ui::ImportState,
     sidebar: sidebar_state::SidebarState,
     row_menu: Option<menus::RowMenu>,
     connection_form: connection_form::ConnectionForm,
@@ -293,11 +295,11 @@ impl GridView {
                     this.palette.address = bookie_gpui::net_check::parse_address(&typed);
                     this.palette.delimiter = bookie_gpui::csv_delimiter::parse_command(&typed);
                     this.palette.limit = bookie_gpui::export_limit::parse_command(&typed);
-                    this.palette.pattern = this
-                        .live
-                        .as_ref()
-                        .filter(|live| live.driver_id == "redis")
-                        .and_then(|_| bookie_gpui::pubsub_view::parse_pattern(&typed));
+                    this.palette.pattern = this.live.as_ref().and_then(|live| match live.driver_id.as_str() {
+                        "redis" => bookie_gpui::pubsub_view::parse_pattern(&typed),
+                        "postgres" => bookie_gpui::pubsub_view::parse_channel(&typed),
+                        _ => None,
+                    });
                     cx.notify();
                 }
                 InputEvent::Submit => this.run_palette(window, cx),
@@ -381,6 +383,7 @@ impl GridView {
             save: save_ui::SaveState::default(),
             approval,
             insert: insert_ui::InsertState::default(),
+            import: import_ui::ImportState::default(),
             sidebar: sidebar_state::SidebarState::new(sidebar_search),
             row_menu: None,
             connection_form: connection_form::ConnectionForm::new(cx),

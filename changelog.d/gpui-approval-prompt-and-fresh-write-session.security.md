@@ -1,0 +1,1 @@
+GPUI asks for approval in the window before a write that needs it, and re-checks the saved connection before every save or delete so a connection made read-only or production elsewhere is not written through.
