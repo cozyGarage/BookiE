@@ -101,7 +101,7 @@ impl LiveSession {
         };
         self.runtime.spawn(async move {
             if let Err(error) = bookie_app_services::statement_history::record(statement).await {
-                eprintln!("history record failed: {error}");
+                tracing::warn!(%error, "history record failed");
             }
         });
     }
