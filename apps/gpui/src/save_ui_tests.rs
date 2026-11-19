@@ -234,6 +234,11 @@ fn selected_rows_are_reviewed_then_deleted_and_the_table_reloads_without_them(cx
             .unwrap_or_else(|| panic!("no review: {}", view.status));
         assert_eq!(pending.title, "Delete 1 row(s) from orders?");
         assert_eq!(pending.confirm, "Delete", "the button says what it will do");
+        assert_eq!(
+            pending.note,
+            Some("Rows that depend on these (foreign keys, triggers) may be affected too."),
+            "the note must not claim approvals are unavailable now that the prompt exists"
+        );
         assert!(pending.plan.preview.contains("DELETE"), "{}", pending.plan.preview);
     });
     assert_eq!(order_count(&path), "6", "nothing is deleted before the user confirms");
