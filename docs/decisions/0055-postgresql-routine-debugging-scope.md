@@ -34,3 +34,20 @@ This scope keeps the first slice tied to one server protocol and one routine inv
 - The debugger target may write. Its invocation and each control operation require explicit policy and audit semantics, and lost acknowledgements preserve unknown outcomes without replay.
 - Masking, numeric bounds and terminal states must be part of the shared contract and regression tests before UI work.
 - The proposal does not authorize debugger execution or change an accepted decision. Implementation requires the relevant Policy and Data lane handoffs and maintainer acceptance of this ADR.
+
+## Feasibility and first step
+
+Added on 2026-11-19 from a feasibility review of issue #3099. The facts below come from the pgAdmin and pldebugger documentation and the PostgreSQL manual. Nothing here was exercised in a BookiE fixture; managed-service availability and the `plpgsql_check` licence are unverified.
+
+- No core PostgreSQL feature gives a client breakpoints, stepping or local-variable inspection. Each route to them needs a debugger extension (`pldebugger`) that an administrator preloads with a server restart, installs per database, and that may need elevated privileges. A client cannot detect this before connecting and cannot set it up without server configuration.
+- Observation without an extension is possible and needs no new operation class: routine source (exists), `RAISE` notices the driver already drains, the `CONTEXT` and `PG_CONTEXT` line numbers of a normal execution, `track_functions` counters in `pg_stat_user_functions` when enabled, and `plpgsql_check` only if it is already installed. None of it gives breakpoints or locals.
+- Proposed order: ship the observe-only step first, and keep decisions 1 to 6 for a later, separately accepted slice on provisioned development connections. A running routine can write, so the later slice also needs the teardown accounting of decision 6, including the idle-transaction behaviour measured on issue #1750.
+- Approval for debugger control follows the environment policy in `crates/policy/src/config.rs`; this record does not add an approval rule of its own.
+
+### Open questions for the maintainer
+
+1. Observe-only first, the debugger now, or both in sequence?
+2. Must a debugger work on managed PostgreSQL services? If so it is not feasible, and the answer is to drop it.
+3. May a debugger ever run on a connection tagged production? The default here is refuse.
+4. Is a server-extension prerequisite acceptable product positioning, given `PRODUCT.md`?
+5. Which lane owns the first slice, and which PostgreSQL and `pldebugger` versions qualify the fixture?
