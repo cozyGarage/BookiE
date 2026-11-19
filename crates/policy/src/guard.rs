@@ -696,6 +696,7 @@ impl PolicyGuard {
                 duration_ms,
                 transport_attempt: None,
                 administrative_action: None,
+                reconciliation: None,
             })
             .await
     }

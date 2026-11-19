@@ -17,6 +17,9 @@ pub enum StorageError {
     #[error("another write is still in flight for this connection")]
     WriteInFlight,
 
+    #[error("this write outcome cannot be resolved: {0}")]
+    ReconciliationRefused(String),
+
     #[error("database error: {0}")]
     Database(#[from] sqlx::Error),
 

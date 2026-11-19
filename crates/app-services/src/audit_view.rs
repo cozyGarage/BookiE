@@ -187,6 +187,7 @@ mod tests {
             duration_ms: (phase == AuditRecordPhase::Outcome).then_some(12),
             transport_attempt: None,
             administrative_action: None,
+            reconciliation: None,
         }
     }
 
