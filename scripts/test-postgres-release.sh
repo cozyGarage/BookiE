@@ -19,7 +19,6 @@ KEEP_UP="${BOOKIE_FIXTURE_KEEP_UP:-0}"
 fixture_host="${BOOKIE_FIXTURE_HOST:-localhost}"
 fixture_bind_address="${BOOKIE_FIXTURE_BIND_ADDRESS:-$fixture_host}"
 fixture_ssh_host="${BOOKIE_FIXTURE_SSH_HOST:-$fixture_host}"
-fixture_toxiproxy_config="${BOOKIE_FIXTURE_TOXIPROXY_CONFIG:-$FIXTURE/toxiproxy/toxiproxy.json}"
 
 if [[ -z "${BOOKIE_FIXTURE_SSH_HOST:-}" && "$fixture_ssh_host" == localhost ]]; then
   fixture_ssh_host=127.0.0.1
@@ -33,16 +32,11 @@ if [[ -z "$fixture_bind_address" ]]; then
   echo "could not resolve the Docker fixture host address: $fixture_host" >&2
   exit 1
 fi
-if [[ ! -f "$fixture_toxiproxy_config" ]]; then
-  echo "Toxiproxy config file is missing: $fixture_toxiproxy_config" >&2
-  exit 1
-fi
 export BOOKIE_FIXTURE_BIND_ADDRESS="$fixture_bind_address"
 export BOOKIE_FIXTURE_SSH_HOST="$fixture_ssh_host"
-export BOOKIE_FIXTURE_TOXIPROXY_CONFIG="$fixture_toxiproxy_config"
 
 compose() {
-  docker compose --project-directory "$FIXTURE" -f "$FIXTURE/docker-compose.yml" "$@"
+  docker compose --project-name "${BOOKIE_TEST_RUN_ID:-bookie-postgres-release}" --project-directory "$FIXTURE" -f "$FIXTURE/docker-compose.yml" "$@"
 }
 
 teardown() {

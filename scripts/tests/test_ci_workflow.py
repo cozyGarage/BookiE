@@ -753,16 +753,9 @@ class CiWorkflowTests(unittest.TestCase):
         )
         self.assertIn('getent ahostsv4 "$BOOKIE_DRIVER_TLS_HOST"', tls_fixture_script)
         self.assertIn("BOOKIE_DRIVER_TLS_WRONG_IDENTITY_HOST", tls_test_helpers)
-        self.assertIn("/var/tmp/bookie-pg-release-fixtures:/var/tmp/bookie-pg-release-fixtures", pg_release)
-        self.assertIn(
-            "BOOKIE_FIXTURE_TOXIPROXY_CONFIG: /var/tmp/bookie-pg-release-fixtures/toxiproxy.json",
-            pg_release,
-        )
-        self.assertIn(
-            'cp tests/fixtures/postgres-release/toxiproxy/toxiproxy.json "$BOOKIE_FIXTURE_TOXIPROXY_CONFIG"',
-            pg_release,
-        )
-        self.assertIn("${BOOKIE_FIXTURE_TOXIPROXY_CONFIG:-./toxiproxy/toxiproxy.json}", release_compose)
+        self.assertNotIn("TOXIPROXY_CONFIG", release_compose)
+        self.assertNotIn("bookie-pg-release-fixtures", pg_release)
+        self.assertIn("toxiproxy/Dockerfile", release_compose)
 
     def test_mongo_fixture_health_checks_wait_for_seeded_rows(self):
         compose = (ROOT / "tests/fixtures/driver-tls/docker-compose.yml").read_text()

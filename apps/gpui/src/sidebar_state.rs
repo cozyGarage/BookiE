@@ -33,6 +33,7 @@ pub(crate) struct SidebarState {
     pub import_menu_open: bool,
     pub connection_open: bool,
     pub database_open: bool,
+    pub collapsed_schemas: bookie_results::sidebar_tree::CollapseState,
 }
 
 impl SidebarState {
@@ -52,6 +53,7 @@ impl SidebarState {
             import_menu_open: false,
             connection_open: true,
             database_open: true,
+            collapsed_schemas: Default::default(),
         }
     }
 }
