@@ -34,10 +34,11 @@ pub struct SubscriptionSample {
 }
 
 pub trait SubscriptionSampler: Send + Sync {
-    fn validate(&self, request: &SubscriptionRequest) -> Result<(), DriverError>;
+    fn validate(&self, driver_id: &str, request: &SubscriptionRequest) -> Result<(), DriverError>;
 
     fn sample(
         &self,
+        driver_id: &str,
         options: ConnectOptions,
         request: SubscriptionRequest,
     ) -> Pin<Box<dyn Future<Output = Result<SubscriptionSample, DriverError>> + Send + '_>>;
@@ -207,11 +208,14 @@ impl ReadSessionStore {
             .subscription_sampler
             .as_ref()
             .ok_or_else(|| DriverFailurePresentation::Unsupported("subscription sampling is unavailable".into()))?;
+        let driver_id = session.driver_id.clone();
         sampler
-            .validate(&request)
+            .validate(&driver_id, &request)
             .map_err(|error| crate::driver_error_presentation::classify(&error))?;
         session
-            .with_subscription(&self.registry, control, |options| sampler.sample(options, request))
+            .with_subscription(&self.registry, control, |options| {
+                sampler.sample(&driver_id, options, request)
+            })
             .await
     }
 

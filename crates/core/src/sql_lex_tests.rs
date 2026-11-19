@@ -282,10 +282,7 @@ fn a_copy_unit_splits_into_its_command_and_its_data() {
         })
     );
     let open = copy_in_parts("COPY t FROM STDIN;\n1\t2\n", "postgres").unwrap();
-    assert_eq!(
-        (open.command, open.data, open.terminated),
-        ("COPY t FROM STDIN", "1\t2", false)
-    );
+    assert_eq!((open.command, open.data, open.terminated), ("COPY t FROM STDIN", "1\t2", false));
     let empty = copy_in_parts("COPY t FROM STDIN;\n\\.", "postgres").unwrap();
     assert_eq!((empty.data, empty.terminated), ("", true));
     assert_eq!(copy_in_parts("COPY t TO STDOUT", "postgres"), None);
