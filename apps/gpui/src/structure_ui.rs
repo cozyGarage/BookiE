@@ -19,6 +19,8 @@ fn title(kind: StructureChangeKind) -> &'static str {
         StructureChangeKind::DropColumn => "Drop column",
         StructureChangeKind::AddIndex => "Create index",
         StructureChangeKind::DropIndex => "Drop index",
+        StructureChangeKind::AddForeignKey => "Add foreign key",
+        StructureChangeKind::DropForeignKey => "Drop foreign key",
     }
 }
 

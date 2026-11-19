@@ -830,16 +830,17 @@ fn set_structure_text(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestCo
     });
 }
 
-fn scalar_text(path: &std::path::Path, sql: &str) -> String {
-    use bookie_gpui::live::{LiveSession, Origin};
+fn scalar_text(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext, sql: &str) -> String {
     use bookie_gpui::model::CellText;
     use bookie_gpui::source::ResultSource;
-    let live = LiveSession::open(&Origin::File(path.to_path_buf())).expect("open");
-    live.run_query(sql, 10).expect("query").row(0)[0].display()
+    view.read_with(cx, |view, _| {
+        let live = view.live.as_ref().expect("a live session");
+        live.run_query(sql, 10).expect("query").row(0)[0].display()
+    })
 }
 
-fn table_columns_of(path: &std::path::Path) -> String {
-    scalar_text(path, "SELECT COALESCE(group_concat(name), '') FROM pragma_table_info('orders')")
+fn table_columns_of(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext) -> String {
+    scalar_text(view, cx, "SELECT COALESCE(group_concat(name), '') FROM pragma_table_info('orders')")
 }
 
 #[gpui::test]
@@ -854,7 +855,7 @@ fn a_column_is_added_renamed_and_dropped_only_after_each_change_is_reviewed(cx: 
             view.save.write = Some((id, write));
         })
     });
-    let before = table_columns_of(&path);
+    let before = table_columns_of(&view, cx);
     let mut prior = before.clone();
     for (kind, text, expected) in [
         (AddColumn, "flag INTEGER", "flag"),
@@ -872,14 +873,14 @@ fn a_column_is_added_renamed_and_dropped_only_after_each_change_is_reviewed(cx: 
             assert_ne!(pending.confirm, "Apply", "the button says what it does");
             assert!(pending.plan.preview.contains("ALTER TABLE"), "{}", pending.plan.preview);
         });
-        assert_eq!(table_columns_of(&path), prior, "nothing changes before the user confirms");
+        assert_eq!(table_columns_of(&view, cx), prior, "nothing changes before the user confirms");
         cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_save(cx)));
         settle_saving(cx);
         view.read_with(cx, |view, _| {
             assert!(!view.structure.open, "the bar closes once applied");
             assert!(view.save.banner.as_ref().is_some_and(|(_, error)| !error), "{:?}", view.save.banner);
         });
-        let columns = table_columns_of(&path);
+        let columns = table_columns_of(&view, cx);
         prior = columns.clone();
         if expected.is_empty() {
             assert_eq!(columns, before);
@@ -943,8 +944,12 @@ fn opening_a_table_or_running_a_query_is_refused_while_a_save_is_writing(cx: &mu
     std::fs::remove_file(&path).ok();
 }
 
-fn orders_indexes_of(path: &std::path::Path) -> String {
-    scalar_text(path, "SELECT COALESCE(group_concat(name), '') FROM pragma_index_list('orders') WHERE origin = 'c'")
+fn orders_indexes_of(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext) -> String {
+    scalar_text(
+        view,
+        cx,
+        "SELECT COALESCE(group_concat(name), '') FROM pragma_index_list('orders') WHERE origin = 'c'",
+    )
 }
 
 #[gpui::test]
@@ -968,10 +973,10 @@ fn a_unique_index_is_reviewed_created_then_dropped_by_its_live_name_only_on_conf
         assert_eq!(pending.title, "Create unique index by_customer on orders?");
         assert!(pending.plan.preview.contains("CREATE UNIQUE INDEX"), "{}", pending.plan.preview);
     });
-    assert_eq!(orders_indexes_of(&path), "", "nothing is created before the user confirms");
+    assert_eq!(orders_indexes_of(&view, cx), "", "nothing is created before the user confirms");
     cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_save(cx)));
     settle_saving(cx);
-    assert_eq!(orders_indexes_of(&path), "by_customer");
+    assert_eq!(orders_indexes_of(&view, cx), "by_customer");
 
     cx.update(|_, cx| view.update(cx, |view, cx| view.open_structure_bar(DropIndex, cx)));
     set_structure_text(&view, cx, "no_such_index");
@@ -989,10 +994,10 @@ fn a_unique_index_is_reviewed_created_then_dropped_by_its_live_name_only_on_conf
         assert_eq!(pending.title, "Drop index BY_CUSTOMER on orders?");
         assert!(pending.plan.preview.contains("by_customer"), "{}", pending.plan.preview);
     });
-    assert_eq!(orders_indexes_of(&path), "by_customer", "nothing is dropped before the user confirms");
+    assert_eq!(orders_indexes_of(&view, cx), "by_customer", "nothing is dropped before the user confirms");
     cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_save(cx)));
     settle_saving(cx);
-    assert_eq!(orders_indexes_of(&path), "");
+    assert_eq!(orders_indexes_of(&view, cx), "");
     std::fs::remove_file(&path).ok();
 }
 
