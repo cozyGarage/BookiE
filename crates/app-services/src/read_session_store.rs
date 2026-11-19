@@ -252,4 +252,57 @@ mod tests {
             Some(&bookie_core::Value::Int(1))
         );
     }
+
+    #[tokio::test]
+    async fn a_bound_query_returns_rows_and_a_bound_write_is_refused() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("bound.db");
+        std::fs::File::create(&path).unwrap();
+        let writer = drivers_sqlite::SqliteDriver
+            .connect(ConnectOptions {
+                database: path.to_string_lossy().into_owned(),
+                ..ConnectOptions::default()
+            })
+            .await
+            .unwrap();
+        writer
+            .execute("CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)")
+            .await
+            .unwrap();
+        writer
+            .execute("INSERT INTO items VALUES (1, 'a'), (2, 'b')")
+            .await
+            .unwrap();
+        let saved = crate::open_request::file_connection(&crate::open_request::classify_file(&path).unwrap());
+        let mut registry = DriverRegistry::new();
+        registry.register(Arc::new(drivers_sqlite::SqliteDriver));
+        let store = ReadSessionStore::new(Arc::new(registry), Arc::new(DatabaseService::new_isolated()));
+        let control = OperationControl::with_timeout(Duration::from_secs(5));
+        let opened = store.open(saved, "bound".into(), &control).await.unwrap();
+        let session = store.get(opened.session_id).unwrap();
+
+        let found = session
+            .run_query_params(
+                "SELECT name FROM items WHERE id = ?",
+                &[bookie_core::Value::Int(2)],
+                &control,
+            )
+            .await
+            .unwrap();
+        assert_eq!(found.rows, vec![vec![bookie_core::Value::Text("b".into())]]);
+
+        let refused = session
+            .run_query_params(
+                "DELETE FROM items WHERE id = ?",
+                &[bookie_core::Value::Int(1)],
+                &control,
+            )
+            .await;
+        assert!(refused.is_err(), "a bound write must not bypass the read-only guard");
+        let rows = writer.query("SELECT COUNT(*) FROM items").await.unwrap();
+        assert_eq!(
+            rows.rows.first().and_then(|row| row.first()),
+            Some(&bookie_core::Value::Int(2))
+        );
+    }
 }

@@ -318,6 +318,22 @@ impl ReadSession {
             .await
             .map_err(|error| classify(&error))
     }
+
+    pub async fn run_query_params(
+        &self,
+        sql: &str,
+        params: &[bookie_core::Value],
+        control: &OperationControl,
+    ) -> Result<QueryResult, DriverFailurePresentation> {
+        let guard = self
+            .database
+            .guard_for_generation(self.id, self.generation, Principal::human_gui())
+            .ok_or(DriverFailurePresentation::Disconnected)?;
+        guard
+            .query_params_controlled(sql, params, control)
+            .await
+            .map_err(|error| classify(&error))
+    }
 }
 
 impl ReadSession {
