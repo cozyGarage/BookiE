@@ -135,11 +135,6 @@ impl TextInput {
         }
     }
 
-    #[allow(dead_code)]
-    pub fn text_align(&self) -> gpui::TextAlign {
-        self.text_align
-    }
-
     #[cfg(test)]
     pub fn focus_handle_for_tests(&self) -> FocusHandle {
         self.focus_handle.clone()

@@ -931,7 +931,7 @@ mod tests {
     #[test]
     fn a_stale_open_event_closes_its_session() {
         let Origin::File(source) = fixture() else {
-            unreachable!()
+            panic!("the fixture is a file")
         };
         let file = FixtureFile(std::env::temp_dir().join(format!("bookie-gpui-stale-{}.sqlite", uuid::Uuid::new_v4())));
         std::fs::copy(source, &file.0).unwrap();
@@ -1152,7 +1152,7 @@ mod tests {
     #[test]
     fn a_database_file_cannot_write_from_the_query_editor() {
         let Origin::File(source) = fixture() else {
-            unreachable!()
+            panic!("the fixture is a file")
         };
         let path = std::env::temp_dir().join(format!("bookie-gpui-read-only-{}.sqlite", uuid::Uuid::new_v4()));
         std::fs::copy(source, &path).unwrap();
