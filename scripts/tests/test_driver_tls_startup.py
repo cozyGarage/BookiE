@@ -100,6 +100,62 @@ if any(action in args for action in ["ps", "inspect", "logs"]):
         self.assertIn("attempt 1 of 2", result.stderr)
         self.assertIn("attempt 2 of 2", result.stderr)
 
+    def test_a_second_startup_attempt_that_succeeds_lets_the_tests_run(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.prepare_fixture(root)
+            binary = root / "bin"
+            binary.mkdir()
+            commands = root / "commands"
+            docker = binary / "docker"
+            docker.write_text(r"""#!/usr/bin/env python3
+import os, sys
+from pathlib import Path
+args = sys.argv[1:]
+with open(os.environ["TLS_COMMAND_LOG"], "a") as stream:
+    stream.write(" ".join(args) + "\n")
+if "up" in args:
+    state = Path(os.environ["TLS_UP_STATE"])
+    count = int(state.read_text()) if state.exists() else 0
+    state.write_text(str(count + 1))
+    sys.exit(42 if count == 0 else 0)
+if args[-3:] == ["ps", "--all", "--quiet"]:
+    print("fixture-owned-id")
+elif args[:1] == ["inspect"]:
+    print("healthy")
+elif args[-3:] == ["port", "redis", "6379"]:
+    print("0.0.0.0:46123")
+""")
+            cargo = binary / "cargo"
+            cargo.write_text(
+                "#!/usr/bin/env python3\n"
+                "with open(__import__('os').environ['TLS_COMMAND_LOG'], 'a') as stream:\n"
+                "    stream.write('cargo\\n')\n",
+                encoding="utf-8",
+            )
+            delay = binary / "sleep"
+            delay.write_text("#!/bin/sh\nexit 0\n")
+            for tool in (docker, cargo, delay):
+                tool.chmod(0o755)
+            result = subprocess.run(
+                ["bash", str(root / "scripts/test-driver-tls.sh")],
+                env=clean_test_environment(
+                    PATH=f"{binary}:{os.environ['PATH']}",
+                    TLS_COMMAND_LOG=str(commands),
+                    TLS_UP_STATE=str(root / "up-count"),
+                    BOOKIE_FIXTURE_KEEP_UP="0",
+                ),
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            recorded = commands.read_text(encoding="utf-8").splitlines()
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("attempt 1 of 2", result.stderr)
+            self.assertNotIn("attempt 2 of 2", result.stderr)
+            self.assertEqual(len([line for line in recorded if " up " in line]), 2)
+            self.assertIn("cargo", recorded)
+
     def test_redis_tests_use_the_port_published_by_compose(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

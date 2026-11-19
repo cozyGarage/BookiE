@@ -23,6 +23,7 @@ mod open_request;
 mod organization;
 mod ran_statements;
 mod referenced_row;
+mod reload_sequence;
 mod render;
 mod row_ops;
 mod schema_index;
@@ -206,7 +207,7 @@ pub struct App {
     /// Per-tab page size lives on each BrowseTab.
     default_page_size: u64,
     saved_connections: Vec<SavedConnection>,
-    connections_reload_seq: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    connections_reload_seq: reload_sequence::ReloadSequence,
     /// Groups, tags and favourite flags for the saved connections,
     /// loaded from the sidecar file beside `connections.json`. Held in
     /// the model so the welcome view can be re-arranged without another

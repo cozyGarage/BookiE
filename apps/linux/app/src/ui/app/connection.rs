@@ -274,12 +274,12 @@ impl App {
         let sender_clone = sender.clone();
         let workspace = self.workspace.clone();
         let latest = self.connections_reload_seq.clone();
-        let sequence = latest.fetch_add(1, std::sync::atomic::Ordering::AcqRel) + 1;
+        let sequence = latest.begin();
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
                     if let Ok(connections) = bookie_storage::load_connections().await {
-                        if latest.load(std::sync::atomic::Ordering::Acquire) != sequence {
+                        if !latest.is_latest(sequence) {
                             return;
                         }
                         let ids = connections.iter().map(|connection| connection.id).collect::<Vec<_>>();
