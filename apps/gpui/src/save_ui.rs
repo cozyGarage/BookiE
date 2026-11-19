@@ -146,10 +146,7 @@ impl GridView {
             done: format!("Deleted {count} row(s)"),
             review: format!("Review the {count} row(s) to delete, then delete or cancel"),
             confirm: "Delete",
-            note: Some(
-                "Rows that depend on these (foreign keys, triggers) may be affected too. \
-                 A connection that needs approval will refuse this until approval is available here.",
-            ),
+            note: Some("Rows that depend on these (foreign keys, triggers) may be affected too."),
         };
         self.prepare(live, SaveRequest::Deletes(rows), labels, cx);
     }
