@@ -586,6 +586,42 @@ fn session_end_dialog(button: &gtk::ToggleButton, on_end: impl Fn(bool) + 'stati
 }
 
 impl SqlEditor {
+    pub(super) fn on_session_message(&mut self, msg: SqlEditorInput, sender: &ComponentSender<Self>) {
+        match msg {
+            SqlEditorInput::SessionToggled(enabled) => self.on_session_toggle(enabled, sender),
+            SqlEditorInput::SessionOpened {
+                connection_id,
+                connection_identity,
+                session_id,
+                result,
+            } => self.on_session_opened(connection_id, connection_identity, session_id, result, sender),
+            SqlEditorInput::ConnectionIdentityChanged => self.on_connection_identity_notification(sender),
+            SqlEditorInput::SessionState {
+                session_id,
+                transaction_open,
+                usable,
+            } => self.on_session_state(session_id, transaction_open, usable, sender),
+            SqlEditorInput::SessionEnd { session_id, commit } if commit => self.commit_and_end(session_id, sender),
+            SqlEditorInput::SessionEnd { session_id, .. } => {
+                if session_callback_matches(session_id, self.session.as_ref().map(|session| session.id)) {
+                    self.rollback_and_end(session_id, sender);
+                }
+            }
+            SqlEditorInput::SessionCommitFinished { session_id, result } => {
+                self.on_session_commit_finished(session_id, result, sender);
+            }
+            SqlEditorInput::SessionRollbackFinished { session_id, result } => {
+                self.on_session_rollback_finished(session_id, result);
+            }
+            SqlEditorInput::TemporaryTablesLoaded { session_id, result } => {
+                self.on_temporary_tables_loaded(session_id, result, sender);
+            }
+            SqlEditorInput::PrepareForTeardown(reply) => self.prepare_for_teardown(reply, sender),
+            SqlEditorInput::SessionTeardownFinished(result) => self.finish_session_teardown(result),
+            _ => {}
+        }
+    }
+
     pub(super) fn statement_target(
         &self,
         pooled: Arc<dyn Connection>,
