@@ -83,7 +83,13 @@ impl GridView {
 
     fn grid_pager_buttons(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
         let (progress, range_label) = self.pager_labels();
-        let pager = div().flex().items_center().gap_1().child(div().child(progress));
+        let pager = div()
+            .flex()
+            .flex_wrap()
+            .max_w_full()
+            .items_center()
+            .gap_1()
+            .child(div().child(progress));
         if self.continuous {
             return pager.child(div().child(range_label));
         }
@@ -142,7 +148,12 @@ impl GridView {
             .flex()
             .items_center()
             .gap_1()
-            .child(div().w(px(size::FIND_WIDTH)).flex_none().child(self.search.find.clone()))
+            .child(
+                div()
+                    .w(px(size::FIND_WIDTH))
+                    .flex_none()
+                    .child(self.search.find.clone()),
+            )
             .child(
                 icon_button("find-prev", "chevron-up", "Previous match", false, theme)
                     .on_click(cx.listener(|this, _, _, cx| this.run_find(false, cx))),
