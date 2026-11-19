@@ -104,6 +104,7 @@ Other options and why they were rejected.
 | [0054](0054-one-visual-language.md) | One visual language for both apps | Accepted (2026-11-18) | dbx look and TablePro/macOS language for GTK and GPUI; shared parts at the third copy |
 | [0055](0055-postgresql-routine-debugging-scope.md) | Scope PostgreSQL routine debugging before implementation | Proposed | Limit the first debugger slice to policy-governed PL/pgSQL routines on explicitly provisioned development connections. |
 | [0056](0056-audited-reconciliation-of-unknown-write-outcomes.md) | Audited reconciliation of unknown write outcomes | Accepted | A human operator records committed, rolled back or still unknown with a reason as an appended, hash-chained record; the original Unknown stays and nothing clears it implicitly. |
+| [0057](0057-routine-debugger-feasibility-and-first-step.md) | Routine debugger feasibility and the first step | Proposed | No core PostgreSQL feature gives a client breakpoints; recommend observing routines (notices, context, stats) first and gate any `pldebugger` slice by security, teardown and capability rules. |
 
 Three records use "snapshot" for different things: ADR 0011 a read-only snapshot session, ADR 0014 the read snapshot a full export holds, and ADR 0015 a saved copy of a database.
 
