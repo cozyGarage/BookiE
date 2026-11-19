@@ -1327,13 +1327,13 @@ class CiWorkflowTests(unittest.TestCase):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         jobs = dict(re.findall(r"(?ms)^  ([a-z][a-z0-9-]*):\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow))
         self.assertNotIn("ci-pilot", workflow)
-        for name in ("linux-build", "clippy", "test-build", "supply-chain"):
+        for name in ("linux-build", "clippy", "test-build"):
             with self.subTest(job=name):
                 self.assertIn("runs-on: build-host", jobs[name])
         for name in (
             "guards", "unit", "sandbox", "widgets", "distro-floor-scenarios", "driver",
             "consumers", "gtk", "pg-release", "gtk-server",
-            "driver-tls", "keyring",
+            "driver-tls", "keyring", "supply-chain",
         ):
             with self.subTest(job=name):
                 self.assertIn("runs-on: any-host", jobs[name])
