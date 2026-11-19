@@ -41,6 +41,10 @@ impl GridView {
             return;
         }
         let text = self.cell_edit.editor.read(cx).content().to_string();
+        if editing.kind == "null" && text.is_empty() {
+            self.stop_edit(window, cx);
+            return;
+        }
         match parse_edit(editing.kind, &text) {
             Ok(cell) => {
                 self.cell_edit.edits.insert((editing.row, editing.column), cell);
