@@ -6,9 +6,11 @@ use gpui_kit::component::table::{Column, DataTable, TableDelegate, TableState};
 
 use crate::GridView;
 use crate::grid_edit::Edits;
+use crate::ui_theme::ThemeExt;
 use bookie_gpui::model::{Cell, Diff};
 use bookie_gpui::preview::cell_preview;
 use bookie_gpui::source::Source;
+use bookie_gpui::theme::Theme;
 
 #[derive(Default)]
 pub struct RowMap {
@@ -57,6 +59,16 @@ pub struct GridDelegate {
 }
 
 impl TableDelegate for GridDelegate {
+    fn render_empty(&mut self, _window: &mut Window, cx: &mut Context<TableState<Self>>) -> impl IntoElement {
+        div()
+            .size_full()
+            .flex()
+            .justify_center()
+            .pt_6()
+            .text_color(gpui::rgb(Theme::current(cx).muted_foreground))
+            .child(empty_message(&self.map))
+    }
+
     fn columns_count(&self, _cx: &App) -> usize {
         self.columns.len()
     }
@@ -281,6 +293,14 @@ fn compare_labels(diff: &Diff, row: usize, numeric: &[bool]) -> Vec<(String, boo
         .collect()
 }
 
+fn empty_message(map: &RowMap) -> &'static str {
+    if map.kept.is_some() {
+        "No rows match the filter"
+    } else {
+        "No rows"
+    }
+}
+
 pub fn table_cell(cursor: Option<bookie_results::grid_cursor::Cursor>) -> Option<(usize, usize)> {
     cursor.map(|cursor| (cursor.row, cursor.column))
 }
@@ -298,6 +318,16 @@ mod tests {
     use bookie_gpui::model::Cell;
     use bookie_gpui::source::{ResultSource, Synthetic};
     use bookie_results::grid_cursor::Cursor;
+
+    #[test]
+    fn an_empty_grid_says_whether_a_filter_or_the_table_is_empty() {
+        assert_eq!(empty_message(&RowMap::default()), "No rows");
+        let filtered = RowMap {
+            kept: Some(Arc::new(Vec::new())),
+            ..RowMap::default()
+        };
+        assert_eq!(empty_message(&filtered), "No rows match the filter");
+    }
 
     #[test]
     fn a_cell_reads_the_source_row_it_maps_to_and_keeps_that_row_cached() {
