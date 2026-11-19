@@ -191,6 +191,7 @@ impl GridView {
         match planned {
             Ok(plan) if plan.statements.is_empty() => {
                 self.cell_edit.edits.clear();
+                self.reset_edit_history();
                 self.status = "Nothing changed, so there is nothing to save".into();
             }
             Ok(plan) => {

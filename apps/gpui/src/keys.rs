@@ -142,6 +142,9 @@ impl GridView {
             Command::SaveChanges => self.request_save(cx),
             Command::DeleteRows if self.focus.is_focused(window) => self.request_delete(cx),
             Command::DeleteRows => {}
+            Command::Undo if self.focus.is_focused(window) => self.undo_edit(cx),
+            Command::Redo if self.focus.is_focused(window) => self.redo_edit(cx),
+            Command::Undo | Command::Redo => {}
             Command::Filter => {
                 self.search.filter_visible = true;
                 window.focus(&self.search.filter.read(cx).focus_handle(cx), cx);

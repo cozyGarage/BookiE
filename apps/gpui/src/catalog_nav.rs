@@ -27,6 +27,7 @@ impl GridView {
 
     fn attach_session(&mut self, session: Arc<LiveSession>, table: TableInfo) {
         self.edits_changed();
+        self.reset_edit_history();
         self.catalog = Catalog {
             connection: format!("{} · {}", session.driver_id, session.label),
             database: session.label.clone(),
@@ -109,6 +110,7 @@ impl GridView {
 
     pub(super) fn discard_view_edits(&mut self) {
         self.edits_changed();
+        self.reset_edit_history();
         self.cell_edit.active = None;
         self.cell_edit.edits.clear();
         self.cell_edit.table.clear();
@@ -176,6 +178,7 @@ impl GridView {
             return;
         }
         self.edits_changed();
+        self.reset_edit_history();
         self.catalog.grid_table = identity.clone();
         self.source = table.clone();
         self.table_source = table;
