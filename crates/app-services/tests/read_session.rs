@@ -516,6 +516,57 @@ async fn a_columns_command_lists_the_table_fields_with_its_epoch() {
 }
 
 #[tokio::test]
+async fn a_structure_command_lists_the_tables_own_indexes_with_its_epoch() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("session.db");
+    seeded(&path).await;
+    let writer = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: path.to_string_lossy().into_owned(),
+            ..ConnectOptions::default()
+        })
+        .await
+        .unwrap();
+    writer.execute("CREATE INDEX by_name ON items (name)").await.unwrap();
+    drop(writer);
+    let (sessions, session_id) = stored_session(&path).await;
+    let (sender, mut receiver) = tokio::sync::mpsc::channel(1);
+    let sink = ChannelEventSink::new(sender);
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(5));
+
+    dispatch(
+        DispatchContext::Sessions(&sessions),
+        Command::ReadStructure {
+            epoch: Epoch(52),
+            session_id,
+            table: TableInfo {
+                schema: None,
+                name: "items".into(),
+            },
+            capabilities: bookie_core::DatabaseDriver::capabilities(&drivers_sqlite::SqliteDriver),
+        },
+        &control,
+        &sink,
+    )
+    .await
+    .unwrap();
+
+    let Event::StructureRead { epoch, outcome } = receiver.try_recv().unwrap() else {
+        panic!("structure command returned a different event");
+    };
+    assert_eq!(epoch, Epoch(52));
+    let structure = outcome.unwrap();
+    assert!(
+        structure
+            .indexes
+            .iter()
+            .any(|index| index.name == "by_name" && index.columns == ["name"]),
+        "{:?}",
+        structure.indexes
+    );
+}
+
+#[tokio::test]
 async fn a_catalog_command_answers_with_its_epoch_for_a_supported_kind() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("session.db");

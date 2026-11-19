@@ -10,6 +10,7 @@ pub enum StructureChangeKind {
     RenameColumn,
     DropColumn,
     AddIndex,
+    DropIndex,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -32,6 +33,7 @@ impl StructureChangeKind {
             Self::AddColumn => "name type, for example: note TEXT",
             Self::RenameColumn => "old_name new_name",
             Self::DropColumn => "name of the column to drop",
+            Self::DropIndex => "name of the index to drop",
             Self::AddIndex => "[unique] index_name column[, column…], for example: unique by_name customer",
         }
     }
@@ -41,8 +43,9 @@ pub fn plan_structure_change(
     target: SaveTarget<'_>,
     kind: StructureChangeKind,
     text: &str,
+    indexes: &[IndexInfo],
 ) -> Result<StructureChangePlan, StructureChangeError> {
-    let op = build_op(&target, kind, text)?;
+    let op = build_op(&target, kind, text, indexes)?;
     let sql = materialize_ops(&[op], target.driver_id).map_err(describe)?;
     let preview = sql.join("\n");
     Ok(StructureChangePlan {
@@ -55,6 +58,7 @@ fn build_op(
     target: &SaveTarget<'_>,
     kind: StructureChangeKind,
     text: &str,
+    indexes: &[IndexInfo],
 ) -> Result<StructureOp, StructureChangeError> {
     let schema = target.schema.map(str::to_string);
     let table = target.table.to_string();
@@ -62,6 +66,7 @@ fn build_op(
         StructureChangeKind::AddColumn => add_column(target.columns, schema, table, text),
         StructureChangeKind::RenameColumn => rename_column(target.columns, schema, table, text),
         StructureChangeKind::AddIndex => add_index(target.columns, schema, table, text),
+        StructureChangeKind::DropIndex => drop_index(indexes, schema, table, text),
         StructureChangeKind::DropColumn => {
             let column = existing(target.columns, text.trim())?;
             Ok(StructureOp::DropColumn {
@@ -209,6 +214,32 @@ fn add_index(
     })
 }
 
+fn drop_index(
+    indexes: &[IndexInfo],
+    schema: Option<String>,
+    table: String,
+    text: &str,
+) -> Result<StructureOp, StructureChangeError> {
+    let name = text.trim();
+    let index = indexes
+        .iter()
+        .find(|index| index.name == name)
+        .or_else(|| indexes.iter().find(|index| index.name.eq_ignore_ascii_case(name)))
+        .ok_or_else(|| StructureChangeError::Input(format!("The table has no index named {name}")))?;
+    if index.primary || index.constraint.is_some() {
+        return Err(StructureChangeError::Input(format!(
+            "{} belongs to a key or constraint; drop the constraint instead",
+            index.name
+        )));
+    }
+    Ok(StructureOp::DropIndex {
+        schema,
+        table,
+        index_name: index.name.clone(),
+        constraint: None,
+    })
+}
+
 fn refuse_duplicate(columns: &[ColumnInfo], name: &str) -> Result<(), StructureChangeError> {
     match find(columns, name) {
         Some(_) => Err(StructureChangeError::Input(format!(
@@ -253,6 +284,26 @@ mod tests {
         }
     }
 
+    fn stored_index(name: &str) -> IndexInfo {
+        IndexInfo {
+            name: name.into(),
+            columns: vec!["note".into()],
+            unique: false,
+            primary: false,
+            predicate: None,
+            constraint: None,
+            has_expression_key: false,
+            using_clause: None,
+        }
+    }
+
+    fn key_index() -> IndexInfo {
+        IndexInfo {
+            primary: true,
+            ..stored_index("PRIMARY")
+        }
+    }
+
     fn plan(kind: StructureChangeKind, text: &str) -> Result<StructureChangePlan, StructureChangeError> {
         let columns = [column("id"), column("note")];
         let target = SaveTarget {
@@ -261,7 +312,7 @@ mod tests {
             table: "orders",
             columns: &columns,
         };
-        plan_structure_change(target, kind, text)
+        plan_structure_change(target, kind, text, &[stored_index("by_note"), key_index()])
     }
 
     #[test]
@@ -275,6 +326,13 @@ mod tests {
         let index = plan(StructureChangeKind::AddIndex, "unique by_note NOTE, id").unwrap();
         assert!(index.preview.contains("CREATE UNIQUE INDEX"), "{}", index.preview);
         assert!(index.preview.contains("\"note\""), "{}", index.preview);
+        let gone = plan(StructureChangeKind::DropIndex, "BY_NOTE").unwrap();
+        assert!(gone.preview.contains("DROP INDEX"), "{}", gone.preview);
+        assert!(
+            gone.preview.contains("by_note"),
+            "the live spelling is used: {}",
+            gone.preview
+        );
         assert!(add.statements.iter().all(|(_, values)| values.is_empty()));
     }
 
@@ -293,6 +351,8 @@ mod tests {
             (StructureChangeKind::DropColumn, "ghost"),
             (StructureChangeKind::AddIndex, "by_x"),
             (StructureChangeKind::AddIndex, "by_x ghost"),
+            (StructureChangeKind::DropIndex, "ghost"),
+            (StructureChangeKind::DropIndex, "primary"),
         ] {
             assert!(
                 matches!(plan(kind, text), Err(StructureChangeError::Input(_))),

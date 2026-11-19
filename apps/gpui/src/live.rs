@@ -240,6 +240,34 @@ impl LiveSession {
         outcome.map_err(|failure| driver_failure_message(&failure))
     }
 
+    pub fn table_structure(
+        &self,
+        table: &TableInfo,
+    ) -> Result<bookie_app_services::read_session::TableStructure, String> {
+        let capabilities = drivers_registry::default_registry()
+            .get(&self.driver_id)
+            .map(|driver| driver.capabilities())
+            .unwrap_or_default();
+        let epoch = self.next_epoch();
+        let control = OperationControl::with_timeout(Duration::from_secs(10));
+        let event = self.runtime.block_on(dispatch_read(
+            DispatchContext::Sessions(&self.sessions),
+            Command::ReadStructure {
+                epoch,
+                session_id: self.session_id,
+                table: table.clone(),
+                capabilities,
+            },
+            &control,
+            epoch,
+            &self.epoch,
+        ))?;
+        let Event::StructureRead { outcome, .. } = event else {
+            return Err("The command bridge returned an unexpected event.".into());
+        };
+        outcome.map_err(|failure| driver_failure_message(&failure))
+    }
+
     pub fn catalog_kinds(&self) -> &'static [bookie_core::CatalogObjectKind] {
         drivers_registry::default_registry()
             .get(&self.driver_id)
