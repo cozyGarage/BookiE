@@ -221,6 +221,13 @@ impl GridView {
             enabled,
         };
         vec![
+            action("quick-switcher", "Go to table", !self.catalog.tables.is_empty()),
+            action("jump-column", "Jump to column", self.tabs.shows_grid()),
+            action(
+                "reveal-sidebar",
+                "Reveal table in sidebar",
+                matches!(self.tabs.current(), Tab::Table(_)),
+            ),
             action("query", "New query tab", true),
             action("run", "Run the query", matches!(self.tabs.current(), Tab::Query)),
             action(
@@ -435,6 +442,9 @@ impl GridView {
     fn execute_workspace_palette_action(&mut self, id: &'static str, window: &mut Window, cx: &mut Context<Self>) {
         match id {
             "sidebar" => self.sidebar.open = !self.sidebar.open,
+            "quick-switcher" => self.open_picker(PaletteMode::Tables, window, cx),
+            "jump-column" => self.open_picker(PaletteMode::Columns, window, cx),
+            "reveal-sidebar" => self.reveal_in_sidebar(cx),
             "new-connection" => {
                 self.connection_form.editing = None;
                 self.tabs.open_new_connection();

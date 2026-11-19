@@ -5,6 +5,7 @@ pub enum Command {
     Palette,
     QuickSwitcher,
     JumpColumn,
+    RevealInSidebar,
     Filter,
     CopyCells,
     CopyCellsWithHeaders,
@@ -15,10 +16,11 @@ pub enum Command {
 }
 
 impl Command {
-    pub const ALL: [Command; 10] = [
+    pub const ALL: [Command; 11] = [
         Command::Palette,
         Command::QuickSwitcher,
         Command::JumpColumn,
+        Command::RevealInSidebar,
         Command::Filter,
         Command::CopyCells,
         Command::CopyCellsWithHeaders,
@@ -33,6 +35,7 @@ impl Command {
             Command::Palette => "palette",
             Command::QuickSwitcher => "quick-switcher",
             Command::JumpColumn => "jump-column",
+            Command::RevealInSidebar => "reveal-in-sidebar",
             Command::Filter => "filter",
             Command::CopyCells => "copy",
             Command::CopyCellsWithHeaders => "copy-with-headers",
@@ -125,6 +128,7 @@ impl Default for Keymap {
                 (Command::Palette, chord(true, true, "p")),
                 (Command::QuickSwitcher, chord(true, false, "p")),
                 (Command::JumpColumn, chord(true, true, "j")),
+                (Command::RevealInSidebar, chord(true, true, "l")),
                 (Command::Filter, chord(true, false, "f")),
                 (Command::CopyCells, chord(true, false, "c")),
                 (Command::CopyCellsWithHeaders, chord(true, true, "c")),
