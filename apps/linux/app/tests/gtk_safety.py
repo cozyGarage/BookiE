@@ -374,9 +374,13 @@ def dismiss_release_notes():
 def wait_for_sensitive_node(name, role=None, timeout=WAIT_SECONDS):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        node = find_node(name=name, role=role)
-        if node is not None and node.getState().contains(pyatspi.STATE_SENSITIVE):
-            return node
+        for application in desktop_applications():
+            for node in descendants(application):
+                if node_name(node) != name or not role_matches(node, role):
+                    continue
+                state = node.getState()
+                if state.contains(pyatspi.STATE_SHOWING) and state.contains(pyatspi.STATE_SENSITIVE):
+                    return node
         time.sleep(POLL_SECONDS)
     raise AssertionError(f"expected accessible node {name!r} to become sensitive:\n{accessible_snapshot()}")
 

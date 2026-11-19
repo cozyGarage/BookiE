@@ -832,7 +832,7 @@ GLib.MainLoop().run()
             psql("DROP SCHEMA IF EXISTS " + ", ".join(schemas) + " CASCADE")
 
     def show_temp_table(table, marker):
-        row = ui.wait_for_node(name=table, role=pyatspi.ROLE_LIST_ITEM)
+        row = ui.wait_for_node_containing(table, role=pyatspi.ROLE_LIST_ITEM)
         actions = row.queryAction()
         index = next(i for i in range(actions.nActions) if actions.getName(i) == "sidebar-row.open-in-new-tab")
         assert actions.doAction(index), f"could not open {table}"
@@ -877,7 +877,7 @@ GLib.MainLoop().run()
         def create_temp_table(table, marker):
             ui.invoke(visible_control("Session", pyatspi.ROLE_TOGGLE_BUTTON))
             run_session_sql(f"CREATE TEMP TABLE {table} (value text); INSERT INTO {table} VALUES ('{marker}')")
-            ui.wait_for_node(name=table, role=pyatspi.ROLE_LIST_ITEM)
+            ui.wait_for_node_containing(table, role=pyatspi.ROLE_LIST_ITEM)
 
         ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
         ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
@@ -886,18 +886,18 @@ GLib.MainLoop().run()
 
         ui.invoke_accessible_action("win.open-editor")
         create_temp_table("bookie_session_temp_b", "session-b-marker")
-        ui.wait_for_node(name="bookie_session_temp_a", role=pyatspi.ROLE_LIST_ITEM, present=False)
+        ui.wait_for_node_containing("bookie_session_temp_a", role=pyatspi.ROLE_LIST_ITEM, present=False)
 
         ui.press_x11_key("Tab", ("Control_L",))
-        ui.wait_for_node(name="bookie_session_temp_a", role=pyatspi.ROLE_LIST_ITEM)
-        ui.wait_for_node(name="bookie_session_temp_b", role=pyatspi.ROLE_LIST_ITEM, present=False)
+        ui.wait_for_node_containing("bookie_session_temp_a", role=pyatspi.ROLE_LIST_ITEM)
+        ui.wait_for_node_containing("bookie_session_temp_b", role=pyatspi.ROLE_LIST_ITEM, present=False)
         show_temp_table("bookie_session_temp_a", "session-a-marker")
 
         ui.press_x11_key("Tab", ("Control_L",))
-        ui.wait_for_node(name="bookie_session_temp_b", role=pyatspi.ROLE_LIST_ITEM)
+        ui.wait_for_node_containing("bookie_session_temp_b", role=pyatspi.ROLE_LIST_ITEM)
         show_temp_table("bookie_session_temp_b", "session-b-marker")
         run_session_sql("DROP TABLE bookie_session_temp_b")
-        ui.wait_for_node(name="bookie_session_temp_b", role=pyatspi.ROLE_LIST_ITEM, present=False)
+        ui.wait_for_node_containing("bookie_session_temp_b", role=pyatspi.ROLE_LIST_ITEM, present=False)
 
     def check_saved_connection_removal(database, base, welcome):
         before = saved_connections(base)
