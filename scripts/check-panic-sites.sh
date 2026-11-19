@@ -95,7 +95,7 @@ while IFS= read -r -d '' file; do
     [[ -n "$path" ]] && TEST_ONLY["$path"]=1
   done < <(declared_module_files "$file" 1)
 done < <(find "$ROOT/crates" "$ROOT/apps" "$ROOT/tests" \
-  -path "$ROOT/apps/linux/packaging/arch/src" -prune -o -type f -name '*.rs' -print0)
+  \( -path "$ROOT/apps/linux/packaging/arch/src" -o -name target \) -prune -o -type f -name '*.rs' -print0)
 
 # A test-only file's own `mod` declarations are test-only too, however
 # deep the chain goes. `guard_tests.rs` declares its two halves without
@@ -180,7 +180,7 @@ while IFS= read -r -d '' file; do
 
   [[ -n "${MAX_SITES[$rel]:-}" ]] && listed_seen+=("$rel")
 done < <(find "$ROOT/crates" "$ROOT/apps" "$ROOT/tests" \
-  -path "$ROOT/apps/linux/packaging/arch/src" -prune -o -type f -name '*.rs' -print0 | sort -z)
+  \( -path "$ROOT/apps/linux/packaging/arch/src" -o -name target \) -prune -o -type f -name '*.rs' -print0 | sort -z)
 
 for rel in "${!MAX_SITES[@]}"; do
   found=0
