@@ -115,7 +115,7 @@ pub async fn touch_favorite(id: Uuid) -> Result<(), StorageError> {
     touch_favorite_from(&favorites_path()?, id).await
 }
 
-async fn save_favorite_to(path: &Path, favorite: SavedQuery) -> Result<Vec<SavedQuery>, StorageError> {
+pub async fn save_favorite_to(path: &Path, favorite: SavedQuery) -> Result<Vec<SavedQuery>, StorageError> {
     validate_favorite(&favorite)?;
     let _guard = lock_path(path).await?;
     let (mut library, stored) = load_document(path).await?;
@@ -125,7 +125,7 @@ async fn save_favorite_to(path: &Path, favorite: SavedQuery) -> Result<Vec<Saved
     Ok(library.favorites)
 }
 
-async fn delete_favorite_from(path: &Path, id: Uuid) -> Result<Vec<SavedQuery>, StorageError> {
+pub async fn delete_favorite_from(path: &Path, id: Uuid) -> Result<Vec<SavedQuery>, StorageError> {
     let _guard = lock_path(path).await?;
     let (mut library, stored) = load_document(path).await?;
     library.favorites.retain(|favorite| favorite.id != id);
@@ -365,7 +365,7 @@ pub fn matches_filter(favorite: &SavedQuery, filter: &str) -> bool {
             .any(|keyword| keyword.to_lowercase().contains(&needle))
 }
 
-pub(crate) async fn load_from(path: &Path) -> Result<Vec<SavedQuery>, StorageError> {
+pub async fn load_from(path: &Path) -> Result<Vec<SavedQuery>, StorageError> {
     load_document(path).await.map(|(library, _)| library.favorites)
 }
 

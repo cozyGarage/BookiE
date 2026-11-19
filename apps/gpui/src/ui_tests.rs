@@ -487,6 +487,61 @@ fn a_long_sidebar_scrolls_and_reveal_brings_the_open_table_into_view(cx: &mut Te
 }
 
 #[gpui::test]
+fn favorites_are_saved_from_the_editor_listed_loaded_and_deleted(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    let file = std::env::temp_dir().join(format!("bookie-gpui-favorites-{}.json", uuid::Uuid::new_v4()));
+    let settle = |cx: &mut gpui::VisualTestContext| {
+        cx.executor().advance_clock(std::time::Duration::from_secs(1));
+        cx.run_until_parked();
+    };
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.favorites.path = Some(file.clone());
+            view.tabs.open_query();
+            view.sync_grid_owner();
+            view.sql_input
+                .update(cx, |input, cx| input.set_value("SELECT 1", window, cx));
+        })
+    });
+    cx.simulate_keystrokes("ctrl-d");
+    settle(cx);
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.status, "Saved favorite \u{201c}SELECT 1\u{201d}");
+        assert_eq!(view.favorites.list.len(), 1);
+    });
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.sql_input.update(cx, |input, cx| input.set_value("", window, cx));
+        })
+    });
+    cx.simulate_keystrokes("ctrl-shift-b");
+    settle(cx);
+    view.read_with(cx, |view, cx| {
+        assert_eq!(view.palette.mode, PaletteMode::Favorites);
+        let titles: Vec<_> = view.picker_items(cx).into_iter().map(|item| item.title).collect();
+        assert_eq!(titles, ["SELECT 1"]);
+    });
+    cx.simulate_keystrokes("enter");
+    view.read_with(cx, |view, cx| {
+        assert_eq!(
+            view.sql_input.read(cx).value(),
+            "SELECT 1",
+            "the favorite fills the editor"
+        );
+    });
+    cx.update(|window, cx| view.update(cx, |view, cx| view.run_palette_id("delete-favorite", window, cx)));
+    settle(cx);
+    view.read_with(cx, |view, _| assert_eq!(view.palette.mode, PaletteMode::DeleteFavorite));
+    cx.simulate_keystrokes("enter");
+    settle(cx);
+    view.read_with(cx, |view, _| {
+        assert!(view.favorites.list.is_empty(), "the favorite is gone");
+        assert!(view.status.starts_with("Deleted favorite"), "{}", view.status);
+    });
+    std::fs::remove_file(&file).ok();
+}
+
+#[gpui::test]
 fn the_palette_hides_actions_that_do_not_apply_and_arrows_pick_the_next_one(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.simulate_keystrokes("ctrl-shift-p");

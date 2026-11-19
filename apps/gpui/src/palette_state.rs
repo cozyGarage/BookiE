@@ -8,6 +8,8 @@ pub(crate) enum PaletteMode {
     Tables,
     Columns,
     Shortcuts,
+    Favorites,
+    DeleteFavorite,
 }
 
 pub(crate) struct PaletteState {

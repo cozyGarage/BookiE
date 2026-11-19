@@ -209,12 +209,13 @@ impl GridView {
     }
 
     fn chrome_actions(&self) -> Vec<Action> {
-        let mut actions = self.workspace_actions();
+        let mut actions = self.picker_actions();
+        actions.extend(self.workspace_actions());
         actions.extend(self.style_actions());
         actions
     }
 
-    fn workspace_actions(&self) -> Vec<Action> {
+    fn picker_actions(&self) -> Vec<Action> {
         let action = |id, label: &str, enabled| Action {
             id,
             label: label.to_string(),
@@ -225,10 +226,27 @@ impl GridView {
             action("jump-column", "Jump to column", self.tabs.shows_grid()),
             action("shortcuts", "Keyboard shortcuts", true),
             action(
+                "save-favorite",
+                "Save query as favorite",
+                matches!(self.tabs.current(), Tab::Query),
+            ),
+            action("favorites", "Open a favorite", true),
+            action("delete-favorite", "Delete a favorite", true),
+            action(
                 "reveal-sidebar",
                 "Reveal table in sidebar",
                 matches!(self.tabs.current(), Tab::Table(_)),
             ),
+        ]
+    }
+
+    fn workspace_actions(&self) -> Vec<Action> {
+        let action = |id, label: &str, enabled| Action {
+            id,
+            label: label.to_string(),
+            enabled,
+        };
+        vec![
             action("query", "New query tab", true),
             action("run", "Run the query", matches!(self.tabs.current(), Tab::Query)),
             action(
@@ -446,6 +464,9 @@ impl GridView {
             "quick-switcher" => self.open_picker(PaletteMode::Tables, window, cx),
             "jump-column" => self.open_picker(PaletteMode::Columns, window, cx),
             "shortcuts" => self.open_picker(PaletteMode::Shortcuts, window, cx),
+            "save-favorite" => self.save_favorite(cx),
+            "favorites" => self.open_picker(PaletteMode::Favorites, window, cx),
+            "delete-favorite" => self.open_picker(PaletteMode::DeleteFavorite, window, cx),
             "reveal-sidebar" => self.reveal_in_sidebar(cx),
             "new-connection" => {
                 self.connection_form.editing = None;
