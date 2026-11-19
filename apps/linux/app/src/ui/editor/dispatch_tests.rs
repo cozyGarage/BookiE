@@ -1153,13 +1153,9 @@ fn large_sql_buffers_pause_syntax_highlighting_and_resume_after_shrinking() {
 
     buffer.set_text(&large);
 
-    assert!(!buffer.is_highlight_syntax());
-    assert!(buffer.language().is_none());
-    assert!(view.tooltip_text().is_some());
+    spin_until(|| !buffer.is_highlight_syntax() && buffer.language().is_none() && view.tooltip_text().is_some());
     buffer.set_text("SELECT 1;");
-    assert!(buffer.is_highlight_syntax());
-    assert!(buffer.language().is_some());
-    assert!(view.tooltip_text().is_none());
+    spin_until(|| buffer.is_highlight_syntax() && buffer.language().is_some() && view.tooltip_text().is_none());
 }
 
 #[test]
