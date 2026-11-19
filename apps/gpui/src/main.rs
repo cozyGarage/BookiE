@@ -22,6 +22,7 @@ mod palette_state;
 mod favorites_ui;
 mod params_ui;
 mod picker;
+mod save_ui;
 mod plan_view;
 mod reveal;
 mod panel_state;
@@ -125,6 +126,7 @@ struct GridView {
     palette: palette_state::PaletteState,
     favorites: favorites_ui::FavoritesState,
     params: params_ui::ParamsState,
+    save: save_ui::SaveState,
     sidebar: sidebar_state::SidebarState,
     row_menu: Option<menus::RowMenu>,
     connection_form: connection_form::ConnectionForm,
@@ -369,6 +371,7 @@ impl GridView {
             palette: palette_state::PaletteState::new(palette_input),
             favorites: favorites_ui::FavoritesState::default(),
             params: params_ui::ParamsState::default(),
+            save: save_ui::SaveState::default(),
             sidebar: sidebar_state::SidebarState::new(sidebar_search),
             row_menu: None,
             connection_form: connection_form::ConnectionForm::new(cx),

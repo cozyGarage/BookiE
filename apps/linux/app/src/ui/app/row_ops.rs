@@ -6,7 +6,7 @@ use bookie_core::{DriverError, Value};
 use bookie_storage::query_history::{Outcome, Source};
 use uuid::Uuid;
 
-use crate::services::change_tracker::StatementSource;
+use crate::services::change_tracker::{StatementSource, checked_write_indexes};
 use crate::services::error_text;
 
 use super::ran_statements::{finish_if_recorded, sql_without_parameters};
@@ -319,19 +319,6 @@ mod save_completion_tests {
         assert!(take_save_id(&mut active, tab_id, new_save));
         assert!(!take_save_id(&mut active, tab_id, new_save));
     }
-}
-
-fn checked_write_indexes(driver_id: Option<&str>, sources: &[StatementSource]) -> Vec<usize> {
-    if !driver_id.is_some_and(bookie_app_services::change_tracker::keyed_writes_are_checked) {
-        return Vec::new();
-    }
-    sources
-        .iter()
-        .enumerate()
-        .filter_map(|(index, source)| {
-            matches!(source, StatementSource::Update { .. } | StatementSource::Delete { .. }).then_some(index)
-        })
-        .collect()
 }
 
 #[cfg(test)]

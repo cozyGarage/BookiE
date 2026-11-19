@@ -139,6 +139,7 @@ impl GridView {
             Command::Shortcuts => self.open_picker(PaletteMode::Shortcuts, window, cx),
             Command::SaveFavorite => self.save_favorite(cx),
             Command::Favorites => self.open_picker(PaletteMode::Favorites, window, cx),
+            Command::SaveChanges => self.request_save(cx),
             Command::Filter => {
                 self.search.filter_visible = true;
                 window.focus(&self.search.filter.read(cx).focus_handle(cx), cx);
