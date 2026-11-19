@@ -186,10 +186,10 @@ async fn resolve(
         Ok(request) => request,
         Err(message) => return fail(err, &format!("{message}\n{USAGE}"), 2),
     };
-    if request.decision != OutcomeDecision::StillUnknown {
-        if let Err(code) = confirm_clearing(&request, &journal, terminal, out, err).await {
-            return code;
-        }
+    if request.decision != OutcomeDecision::StillUnknown
+        && let Err(code) = confirm_clearing(&request, &journal, terminal, out, err).await
+    {
+        return code;
     }
     let decided = match journal {
         Some(path) => {
