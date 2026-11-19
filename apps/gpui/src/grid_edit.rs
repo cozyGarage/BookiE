@@ -93,11 +93,17 @@ impl GridView {
             .unwrap_or_else(|| self.source.row(row).swap_remove(column))
     }
 
-    pub(crate) fn edit_clicked_row(&mut self, row: usize, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn edit_clicked_row(
+        &mut self,
+        row: usize,
+        clicked_column: Option<usize>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         if self.compare.is_some() || row >= self.visible_count() {
             return;
         }
-        let column = self.cell_cursor.map_or(0, |cursor| cursor.column);
+        let column = clicked_column.unwrap_or_else(|| self.cell_cursor.map_or(0, |cursor| cursor.column));
         let source = self.source_row(self.base() + row as u64);
         self.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row, column });
         self.start_edit(source, column, window, cx);
