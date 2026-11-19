@@ -995,3 +995,21 @@ fn a_unique_index_is_reviewed_created_then_dropped_by_its_live_name_only_on_conf
     assert_eq!(orders_indexes_of(&path), "");
     std::fs::remove_file(&path).ok();
 }
+
+#[gpui::test]
+fn the_structure_panel_lists_columns_indexes_and_keys_of_the_open_table_and_closes_on_request(cx: &mut TestAppContext) {
+    let path = fixture_copy("structure-info");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.show_structure(cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        let text = view.structure.info.as_deref().unwrap_or_else(|| panic!("no panel: {}", view.status));
+        assert!(text.starts_with("Columns ("), "{text}");
+        assert!(text.contains("customer"), "{text}");
+        assert!(text.contains("Indexes (") && text.contains("Foreign keys ("), "{text}");
+        assert!(!view.structure_info_enabled(), "one panel at a time");
+    });
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_structure_bar(bookie_app_services::structure_change_plan::StructureChangeKind::AddColumn, cx)));
+    view.read_with(cx, |view, _| assert!(view.structure.info.is_none(), "a change bar replaces the panel"));
+    std::fs::remove_file(&path).ok();
+}

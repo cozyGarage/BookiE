@@ -13,6 +13,7 @@ pub mod size {
     pub const SURFACE_RADIUS: f32 = 6.0;
     pub const TEXT_SMALL: f32 = 12.0;
     pub const SAVE_PREVIEW_MAX_HEIGHT: f32 = 160.0;
+    pub const STRUCTURE_PANEL_MAX_HEIGHT: f32 = 280.0;
     pub const TEXT: f32 = 13.0;
     pub const STAT_TEXT: f32 = 22.0;
     pub const TREE_ROW: f32 = 26.0;

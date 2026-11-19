@@ -117,6 +117,7 @@ pub mod quick_switcher;
 pub mod reconnect;
 pub mod sql_text;
 pub mod structure_change_plan;
+pub mod structure_summary;
 pub mod value_display;
 
 pub mod grid_replace;

@@ -2,6 +2,24 @@ use super::*;
 use bookie_app_services::structure_change_plan::StructureChangeKind;
 use crate::palette_state::PaletteMode;
 
+fn is_edit_palette_action(id: &str) -> bool {
+    matches!(
+        id,
+        "save-changes"
+            | "undo-edit"
+            | "redo-edit"
+            | "delete-rows"
+            | "insert-row"
+            | "import-csv"
+            | "add-column"
+            | "rename-column"
+            | "drop-column"
+            | "add-index"
+            | "drop-index"
+            | "show-structure"
+    )
+}
+
 impl GridView {
     pub(crate) fn palette_actions(&self) -> Vec<Action> {
         if self.palette.fonts {
@@ -247,6 +265,7 @@ impl GridView {
                 "Import CSV file…",
                 self.can_save_edits() && self.cell_edit.edits.is_empty() && self.compare.is_none() && !self.form_open(),
             ),
+            action("show-structure", "Show table structure", self.structure_info_enabled()),
             action("add-column", "Add a column…", self.structure_change_enabled()),
             action("rename-column", "Rename a column…", self.structure_change_enabled()),
             action("drop-column", "Drop a column…", self.structure_change_enabled()),
@@ -502,6 +521,7 @@ impl GridView {
             "redo-edit" => self.redo_edit(cx),
             "delete-rows" => self.request_delete(cx),
             "import-csv" => self.open_import_bar(cx),
+            "show-structure" => self.show_structure(cx),
             "add-column" => self.open_structure_bar(StructureChangeKind::AddColumn, cx),
             "rename-column" => self.open_structure_bar(StructureChangeKind::RenameColumn, cx),
             "drop-column" => self.open_structure_bar(StructureChangeKind::DropColumn, cx),
@@ -519,10 +539,7 @@ impl GridView {
             "shortcuts" => self.open_picker(PaletteMode::Shortcuts, window, cx),
             "save-favorite" => self.save_favorite(cx),
             "favorites" => self.open_picker(PaletteMode::Favorites, window, cx),
-            "save-changes" | "undo-edit" | "redo-edit" | "delete-rows" | "insert-row" | "import-csv" | "add-column"
-            | "rename-column" | "drop-column" | "add-index" | "drop-index" => {
-                self.execute_edit_palette_action(id, cx);
-            }
+            _ if is_edit_palette_action(id) => self.execute_edit_palette_action(id, cx),
             "delete-favorite" => self.open_picker(PaletteMode::DeleteFavorite, window, cx),
             "reveal-sidebar" => self.reveal_in_sidebar(cx),
             "new-connection" => {
