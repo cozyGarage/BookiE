@@ -1,11 +1,60 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use bookie_core::{MAX_SERVER_MESSAGES, MessageSeverity, OperationControl, Value};
+use secrecy::ExposeSecret;
+use sqlx::Connection as _;
 
 use crate::{connect, start_mariadb, start_mysql};
 
 fn control() -> OperationControl {
     OperationControl::with_timeout(std::time::Duration::from_secs(60))
+}
+
+async fn assert_multi_statement_warning_limit(opts: bookie_core::ConnectOptions) {
+    let raw_options = sqlx::mysql::MySqlConnectOptions::new()
+        .host(&opts.host)
+        .port(opts.port)
+        .database(&opts.database)
+        .username(&opts.username)
+        .password(opts.password.expose_secret())
+        .ssl_mode(sqlx::mysql::MySqlSslMode::Disabled);
+    let mut raw = sqlx::MySqlConnection::connect_with(&raw_options).await.unwrap();
+    sqlx::raw_sql("CREATE PROCEDURE warning_test() BEGIN SELECT CAST('first_bad' AS SIGNED); SELECT CAST('second_bad' AS SIGNED); END")
+        .execute(&mut raw)
+        .await
+        .unwrap();
+    raw.close().await.unwrap();
+    let conn = connect(opts).await;
+    let batch = conn
+        .query_result_sets_controlled("CALL warning_test()", &[], &control())
+        .await
+        .unwrap();
+    assert!(
+        batch
+            .messages
+            .iter()
+            .any(|message| message.text.contains("warning details may be incomplete"))
+    );
+    assert_eq!(batch.result_sets.len(), 2);
+    let next = conn
+        .query_result_sets_controlled("SELECT 1", &[], &control())
+        .await
+        .unwrap();
+    assert!(next.messages.is_empty(), "the notice must not leak into the next query");
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn mysql_multi_statement_warnings_are_accounted_for() {
+    let (_db, opts) = start_mysql().await;
+    assert_multi_statement_warning_limit(opts).await;
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn mariadb_multi_statement_warnings_are_accounted_for() {
+    let (_db, opts) = start_mariadb().await;
+    assert_multi_statement_warning_limit(opts).await;
 }
 
 #[tokio::test]

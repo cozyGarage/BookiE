@@ -67,7 +67,16 @@ pub(crate) async fn query_with_text_fallback(
 ) -> Result<QueryResultBatch, DriverError> {
     crate::warnings::discard(connection);
     let batch = run_statement(connection, cancellation_pool, connection_id, sql, params, control).await?;
-    let messages = crate::warnings::collect(connection).await;
+    let warnings = crate::warnings::collect(connection).await;
+    let mut messages = bookie_core::ServerMessages::default();
+    if crate::is_call_statement(sql) {
+        messages.push(bookie_core::ServerMessage::new(
+            bookie_core::MessageSeverity::Info,
+            None,
+            "BookiE: stored procedure warning details may be incomplete; earlier statements may have produced additional warnings.",
+        ));
+    }
+    messages.extend(warnings);
     Ok(batch.with_messages(messages))
 }
 
