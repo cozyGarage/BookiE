@@ -14,7 +14,7 @@ pub(crate) struct ImportState {
 
 impl GridView {
     pub(crate) fn form_open(&self) -> bool {
-        self.insert.open || self.import.open
+        self.insert.open || self.import.open || self.structure.open
     }
 
     pub(crate) fn open_import_bar(&mut self, cx: &mut Context<Self>) {

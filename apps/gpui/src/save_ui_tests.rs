@@ -820,3 +820,86 @@ fn a_missing_or_unmatched_file_stops_the_review_keeps_the_bar_and_locks_editing(
     std::fs::remove_file(&path).ok();
     std::fs::remove_file(&unmatched).ok();
 }
+
+fn set_structure_text(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext, text: &str) {
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            let input = view.structure.input.clone().expect("the structure bar has an input");
+            input.update(cx, |input, cx| input.set_content(text, cx));
+        })
+    });
+}
+
+fn table_columns_of(path: &std::path::Path) -> String {
+    let out = std::process::Command::new("sqlite3")
+        .arg(path)
+        .arg("select group_concat(name) from pragma_table_info('orders')")
+        .output()
+        .expect("sqlite3 runs");
+    String::from_utf8_lossy(&out.stdout).trim().to_string()
+}
+
+#[gpui::test]
+fn a_column_is_added_renamed_and_dropped_only_after_each_change_is_reviewed(cx: &mut TestAppContext) {
+    use bookie_app_services::structure_change_plan::StructureChangeKind::{AddColumn, DropColumn, RenameColumn};
+    let path = fixture_copy("structure");
+    let (view, cx) = saving_view(cx, &path);
+    let write = write_session(&path, false);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            let id = view.live.as_ref().and_then(|live| live.writable).expect("writable");
+            view.save.write = Some((id, write));
+        })
+    });
+    let before = table_columns_of(&path);
+    let mut prior = before.clone();
+    for (kind, text, expected) in [
+        (AddColumn, "flag INTEGER", "flag"),
+        (RenameColumn, "flag marker", "marker"),
+        (DropColumn, "marker", ""),
+    ] {
+        cx.update(|_, cx| view.update(cx, |view, cx| view.open_structure_bar(kind, cx)));
+        view.read_with(cx, |view, _| assert!(view.structure.open));
+        set_structure_text(&view, cx, text);
+        cx.update(|_, cx| view.update(cx, |view, cx| view.review_structure(cx)));
+        settle_saving(cx);
+        view.read_with(cx, |view, _| {
+            let pending = view.save.pending.as_ref().unwrap_or_else(|| panic!("no review: {}", view.status));
+            assert_eq!(pending.confirm, "Apply");
+            assert!(pending.plan.preview.contains("ALTER TABLE"), "{}", pending.plan.preview);
+        });
+        assert_eq!(table_columns_of(&path), prior, "nothing changes before the user confirms");
+        cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_save(cx)));
+        settle_saving(cx);
+        view.read_with(cx, |view, _| {
+            assert!(!view.structure.open, "the bar closes once applied");
+            assert!(view.save.banner.as_ref().is_some_and(|(_, error)| !error), "{:?}", view.save.banner);
+        });
+        let columns = table_columns_of(&path);
+        prior = columns.clone();
+        if expected.is_empty() {
+            assert_eq!(columns, before);
+        } else {
+            assert!(columns.contains(expected), "{columns}");
+        }
+    }
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn a_bad_structure_request_is_refused_before_any_review_and_keeps_the_bar(cx: &mut TestAppContext) {
+    use bookie_app_services::structure_change_plan::StructureChangeKind::DropColumn;
+    let path = fixture_copy("structure-bad");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_structure_bar(DropColumn, cx)));
+    set_structure_text(&view, cx, "no_such_column");
+    cx.update(|_, cx| view.update(cx, |view, cx| view.review_structure(cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert!(view.save.pending.is_none());
+        assert!(view.structure.open);
+        assert!(view.status.contains("no column named"), "{}", view.status);
+        assert!(view.form_open(), "editing stays locked while the bar is open");
+    });
+    std::fs::remove_file(&path).ok();
+}
