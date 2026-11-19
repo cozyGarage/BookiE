@@ -509,16 +509,50 @@ impl WriteSession {
 struct RegistrySubscriptionSampler;
 
 impl SubscriptionSampler for RegistrySubscriptionSampler {
-    fn validate(&self, request: &SubscriptionRequest) -> Result<(), bookie_core::DriverError> {
-        drivers_registry::validate_pubsub_request(&request.patterns, request.max_messages, request.window)
+    fn validate(&self, driver_id: &str, request: &SubscriptionRequest) -> Result<(), bookie_core::DriverError> {
+        match driver_id {
+            "redis" => {
+                drivers_registry::validate_pubsub_request(&request.patterns, request.max_messages, request.window)
+            }
+            "postgres" => {
+                drivers_registry::check_notification_request(&request.patterns, request.max_messages, request.window)
+            }
+            other => Err(bookie_core::DriverError::Unsupported(format!(
+                "{other} has no live messages to listen to"
+            ))),
+        }
     }
 
     fn sample(
         &self,
+        driver_id: &str,
         options: bookie_core::ConnectOptions,
         request: SubscriptionRequest,
     ) -> Pin<Box<dyn Future<Output = Result<SubscriptionSample, bookie_core::DriverError>> + Send + '_>> {
+        let postgres = driver_id == "postgres";
         Box::pin(async move {
+            if postgres {
+                let sample = drivers_registry::sample_notifications(
+                    options,
+                    &request.patterns,
+                    request.max_messages,
+                    request.window,
+                )
+                .await?;
+                return Ok(SubscriptionSample {
+                    messages: sample
+                        .messages
+                        .into_iter()
+                        .map(|message| bookie_app_services::read_session_store::SubscriptionMessage {
+                            channel: message.channel,
+                            pattern: None,
+                            payload: message.payload,
+                            payload_bytes: message.payload_bytes,
+                        })
+                        .collect(),
+                    reached_limit: sample.reached_limit,
+                });
+            }
             let sample =
                 drivers_registry::sample_pubsub(options, &request.patterns, request.max_messages, request.window)
                     .await?;

@@ -22,7 +22,10 @@ impl GridView {
         });
         let listen = self.palette.pattern.as_ref().map(|pattern| Action {
             id: "sample-pubsub",
-            label: format!("Listen to Redis channels {pattern}"),
+            label: match self.live.as_ref().map(|live| live.driver_id.as_str()) {
+                Some("postgres") => format!("Listen to PostgreSQL notifications on {pattern}"),
+                _ => format!("Listen to Redis channels {pattern}"),
+            },
             enabled: true,
         });
         check

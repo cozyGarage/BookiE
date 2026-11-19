@@ -18,12 +18,13 @@ use uuid::Uuid;
 struct FixedSampler;
 
 impl SubscriptionSampler for FixedSampler {
-    fn validate(&self, _: &SubscriptionRequest) -> Result<(), DriverError> {
+    fn validate(&self, _: &str, _: &SubscriptionRequest) -> Result<(), DriverError> {
         Ok(())
     }
 
     fn sample<'a>(
         &'a self,
+        _: &str,
         _: ConnectOptions,
         request: SubscriptionRequest,
     ) -> Pin<Box<dyn Future<Output = Result<SubscriptionSample, DriverError>> + Send + 'a>> {
