@@ -28,6 +28,7 @@ impl GridView {
     fn attach_session(&mut self, session: Arc<LiveSession>, table: TableInfo) {
         self.edits_changed();
         self.reset_edit_history();
+        self.close_insert_form();
         self.catalog = Catalog {
             connection: format!("{} · {}", session.driver_id, session.label),
             database: session.label.clone(),
@@ -180,6 +181,7 @@ impl GridView {
         }
         self.edits_changed();
         self.reset_edit_history();
+        self.close_insert_form();
         self.catalog.grid_table = identity.clone();
         self.source = table.clone();
         self.table_source = table;

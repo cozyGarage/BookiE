@@ -184,7 +184,7 @@ impl GridView {
         if query == self.grid_is_query {
             return;
         }
-        let saving = self.save.busy || self.save.pending.is_some();
+        let saving = self.save.busy || self.save.pending.is_some() || self.insert.open;
         if saving || self.cell_edit.active.is_some() {
             self.status = if saving {
                 "Finish or cancel the save before switching grids.".into()

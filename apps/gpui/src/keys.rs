@@ -142,6 +142,8 @@ impl GridView {
             Command::SaveChanges => self.request_save(cx),
             Command::DeleteRows if self.focus.is_focused(window) => self.request_delete(cx),
             Command::DeleteRows => {}
+            Command::InsertRow if self.focus.is_focused(window) => self.open_insert_form(cx),
+            Command::InsertRow => {}
             Command::Undo if self.focus.is_focused(window) => self.undo_edit(cx),
             Command::Redo if self.focus.is_focused(window) => self.redo_edit(cx),
             Command::Undo | Command::Redo => {}

@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
-use bookie_app_services::cell_save_plan::{CellChange, CellSavePlan, SaveTarget, plan_cell_saves, plan_row_deletes};
+use bookie_app_services::cell_save_plan::{
+    CellChange, CellSavePlan, SaveTarget, plan_cell_saves, plan_row_deletes, plan_row_insert_named,
+};
 use bookie_gpui::live::{LiveSession, SaveFailure, WriteSession};
 
 use super::*;
@@ -28,17 +30,18 @@ pub(crate) struct PendingSave {
     pub table: bookie_core::TableInfo,
 }
 
-enum SaveRequest {
+pub(crate) enum SaveRequest {
     Edits(Vec<CellChange>),
     Deletes(Vec<Vec<bookie_core::Value>>),
+    Insert(Vec<(String, String)>),
 }
 
-struct ReviewLabels {
-    title: String,
-    done: String,
-    review: String,
-    confirm: &'static str,
-    note: Option<&'static str>,
+pub(crate) struct ReviewLabels {
+    pub title: String,
+    pub done: String,
+    pub review: String,
+    pub confirm: &'static str,
+    pub note: Option<&'static str>,
 }
 
 const MAX_DELETE_ROWS: u64 = 500;
@@ -65,7 +68,7 @@ impl GridView {
             .collect()
     }
 
-    fn save_session(&mut self) -> Option<Arc<LiveSession>> {
+    pub(crate) fn save_session(&mut self) -> Option<Arc<LiveSession>> {
         let Some(live) = self.live.clone().filter(|_| self.can_save_edits()) else {
             self.status = "Saving needs a table from a saved connection that is not read-only".into();
             return None;
@@ -82,6 +85,10 @@ impl GridView {
     }
 
     pub(crate) fn request_save(&mut self, cx: &mut Context<Self>) {
+        if self.insert.open {
+            self.status = "Finish or cancel the new row first".into();
+            return;
+        }
         if self.cell_edit.edits.is_empty() && self.live.as_ref().is_some_and(|live| live.writable.is_some()) {
             self.status = "No changes to save".into();
             return;
@@ -102,6 +109,10 @@ impl GridView {
     }
 
     pub(crate) fn request_delete(&mut self, cx: &mut Context<Self>) {
+        if self.insert.open {
+            self.status = "Finish or cancel the new row first".into();
+            return;
+        }
         if self.compare.is_some() {
             self.status = "Leave compare mode before deleting rows".into();
             return;
@@ -143,7 +154,13 @@ impl GridView {
         self.prepare(live, SaveRequest::Deletes(rows), labels, cx);
     }
 
-    fn prepare(&mut self, live: Arc<LiveSession>, request: SaveRequest, labels: ReviewLabels, cx: &mut Context<Self>) {
+    pub(crate) fn prepare(
+        &mut self,
+        live: Arc<LiveSession>,
+        request: SaveRequest,
+        labels: ReviewLabels,
+        cx: &mut Context<Self>,
+    ) {
         self.save.busy = true;
         let generation = self.save.generation;
         let table = self.catalog.grid_table.clone();
@@ -164,6 +181,7 @@ impl GridView {
                     match request {
                         SaveRequest::Edits(changes) => plan_cell_saves(target, &grid_columns, &changes),
                         SaveRequest::Deletes(rows) => plan_row_deletes(target, &grid_columns, &rows),
+                        SaveRequest::Insert(named) => plan_row_insert_named(target, &named),
                     }
                     .map_err(|error| error.to_string())
                 })
@@ -304,6 +322,7 @@ impl GridView {
         self.save.write = applied.is_ok().then(|| (connection_id, write));
         match applied {
             Ok(_) => {
+                self.close_insert_form();
                 self.show_banner(done.clone(), false, cx);
                 self.reload_after_save(done, cx);
             }

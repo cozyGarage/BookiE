@@ -128,7 +128,10 @@ fn a_write_the_guard_denies_leaves_the_database_unchanged_and_keeps_the_edit(cx:
         let (text, is_error) = view.save.banner.clone().expect("an error banner");
         assert!(is_error && text.starts_with("Could not save"), "{text}");
         assert_eq!(view.cell_edit.edits.len(), 1, "the edit is kept so it can be retried");
-        assert!(view.save.write.is_none(), "a failed save drops the cached write session");
+        assert!(
+            view.save.write.is_none(),
+            "a failed save drops the cached write session"
+        );
     });
     assert_eq!(saved_customer(&path, 1), "Ada", "the denied statement did not run");
     std::fs::remove_file(&path).ok();
@@ -553,4 +556,170 @@ fn remaining_ids(path: &std::path::Path) -> String {
         .expect("ids")
         .row(0)[0]
         .display()
+}
+
+fn fill_insert_field(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext, name: &str, text: &str) {
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            let field = view
+                .insert
+                .fields
+                .iter()
+                .find(|field| field.name == name)
+                .unwrap_or_else(|| panic!("no field named {name}"));
+            field.input.update(cx, |input, cx| input.set_content(text, cx));
+        })
+    });
+}
+
+#[gpui::test]
+fn a_new_row_is_filled_in_reviewed_then_inserted_and_the_table_shows_it(cx: &mut TestAppContext) {
+    let path = fixture_copy("insert");
+    let (view, cx) = saving_view(cx, &path);
+    let write = write_session(&path, false);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            let id = view.live.as_ref().and_then(|live| live.writable).expect("writable");
+            view.save.write = Some((id, write));
+        })
+    });
+    cx.simulate_keystrokes("ctrl-n");
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        let names: Vec<&str> = view.insert.fields.iter().map(|field| field.name.as_str()).collect();
+        assert_eq!(
+            names,
+            ["customer", "total", "paid", "note"],
+            "the key the database assigns is not asked for"
+        );
+        assert!(view.insert.open);
+    });
+
+    fill_insert_field(&view, cx, "customer", "Zed");
+    fill_insert_field(&view, cx, "total", "4.5");
+    fill_insert_field(&view, cx, "paid", "1");
+    cx.update(|_, cx| view.update(cx, |view, cx| view.review_insert(cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        let pending = view
+            .save
+            .pending
+            .as_ref()
+            .unwrap_or_else(|| panic!("no review: {}", view.status));
+        assert_eq!(pending.title, "Insert 1 row into orders?");
+        assert_eq!(pending.confirm, "Insert");
+        assert!(pending.plan.preview.contains("INSERT"), "{}", pending.plan.preview);
+        assert!(pending.plan.preview.contains("'Zed'"), "{}", pending.plan.preview);
+    });
+    assert_eq!(order_count(&path), "6", "nothing is inserted before the user confirms");
+
+    cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_save(cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.save.banner, Some(("Inserted 1 row".to_string(), false)));
+        assert!(!view.insert.open, "the form closes once the row is saved");
+        assert_eq!(view.source.total(), 7, "the grid reloaded with the new row");
+    });
+    assert_eq!(order_count(&path), "7");
+    assert_eq!(saved_customer(&path, 7), "Zed");
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn a_value_that_does_not_fit_stops_the_review_keeps_the_form_and_cells_stay_locked(cx: &mut TestAppContext) {
+    let path = fixture_copy("insert-invalid");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_insert_form(cx)));
+    settle_saving(cx);
+    fill_insert_field(&view, cx, "total", "not a number");
+    cx.update(|_, cx| view.update(cx, |view, cx| view.review_insert(cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert!(view.status.starts_with("Cannot save: total"), "{}", view.status);
+        assert!(view.save.pending.is_none());
+        assert!(view.insert.open, "the form stays so the value can be fixed");
+    });
+
+    cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(0, 1, window, cx)));
+    view.read_with(cx, |view, _| {
+        assert!(view.cell_edit.active.is_none());
+        assert_eq!(view.status, "Finish or cancel the new row before editing cells");
+    });
+
+    cx.update(|_, cx| view.update(cx, |view, cx| view.cancel_insert_form(cx)));
+    view.read_with(cx, |view, _| {
+        assert!(!view.insert.open && view.insert.fields.is_empty())
+    });
+    assert_eq!(order_count(&path), "6");
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn a_column_read_that_finishes_after_the_table_changed_does_not_open_a_form_for_the_old_table(cx: &mut TestAppContext) {
+    let path = fixture_copy("insert-race");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_insert_form(cx)));
+    cx.update(|_, cx| view.update(cx, |view, _| view.edits_changed()));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert!(!view.insert.open, "a form for a table the user has left is never shown");
+        assert!(!view.insert.loading);
+    });
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn a_denied_insert_keeps_the_form_and_what_was_typed_and_leaves_the_table_alone(cx: &mut TestAppContext) {
+    let path = fixture_copy("insert-denied");
+    let (view, cx) = saving_view(cx, &path);
+    let write = write_session(&path, true);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            let id = view.live.as_ref().and_then(|live| live.writable).expect("writable");
+            view.save.write = Some((id, write));
+        })
+    });
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_insert_form(cx)));
+    settle_saving(cx);
+    fill_insert_field(&view, cx, "customer", "Denied");
+    cx.update(|_, cx| view.update(cx, |view, cx| view.review_insert(cx)));
+    settle_saving(cx);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_save(cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, cx| {
+        assert!(
+            view.status.starts_with("Could not save") && view.status.contains("read-only"),
+            "{}",
+            view.status
+        );
+        assert!(view.insert.open, "the form stays so the user can try again");
+        let typed = view
+            .insert
+            .fields
+            .iter()
+            .find(|field| field.name == "customer")
+            .expect("field");
+        assert_eq!(typed.input.read(cx).content(), "Denied", "what was typed is kept");
+    });
+    assert_eq!(order_count(&path), "6");
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn saving_and_deleting_are_refused_while_the_new_row_form_is_open(cx: &mut TestAppContext) {
+    let path = fixture_copy("insert-locks");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_insert_form(cx)));
+    settle_saving(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.click_row(0, false);
+            view.request_delete(cx);
+        })
+    });
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.status, "Finish or cancel the new row first");
+        assert!(view.save.pending.is_none());
+    });
+    std::fs::remove_file(&path).ok();
 }
