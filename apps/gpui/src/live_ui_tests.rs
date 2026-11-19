@@ -1164,6 +1164,7 @@ fn a_write_the_guard_denies_leaves_the_database_unchanged_and_keeps_the_edit(cx:
         let (text, is_error) = view.save.banner.clone().expect("an error banner");
         assert!(is_error && text.starts_with("Could not save"), "{text}");
         assert_eq!(view.cell_edit.edits.len(), 1, "the edit is kept so it can be retried");
+        assert!(view.save.write.is_none(), "a failed save drops the cached write session");
     });
     assert_eq!(saved_customer(&path, 1), "Ada", "the denied statement did not run");
     std::fs::remove_file(&path).ok();
@@ -1943,5 +1944,48 @@ fn switching_connection_drops_the_previous_sidebar_fields(cx: &mut TestAppContex
             "fields of the old connection stayed in the sidebar"
         );
         assert!(view.sidebar.catalog.is_empty());
+    });
+}
+
+#[gpui::test]
+fn an_approval_request_shows_a_prompt_and_the_answer_reaches_the_sink(cx: &mut TestAppContext) {
+    use bookie_app_services::approval_prompt::{ApprovalOutcome, PendingApproval, sample_request};
+    let (view, cx) = open(cx);
+    let (respond, mut answer) = tokio::sync::oneshot::channel();
+    let tx = view.read_with(cx, |view, _| view.approval.tx.clone());
+    assert!(tx
+        .send(PendingApproval {
+            request: sample_request("UPDATE customers SET name = 'x' WHERE id = 1"),
+            respond,
+        })
+        .is_ok());
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert!(view.approval.current.is_some(), "the prompt is shown"));
+    cx.update(|_, cx| view.update(cx, |view, cx| view.answer_approval(ApprovalOutcome::AllowOnce, cx)));
+    assert_eq!(answer.try_recv().ok(), Some(ApprovalOutcome::AllowOnce));
+    view.read_with(cx, |view, _| assert!(view.approval.current.is_none()));
+}
+
+#[gpui::test]
+fn a_prompt_the_sink_gave_up_on_disappears_and_the_next_one_is_shown(cx: &mut TestAppContext) {
+    use bookie_app_services::approval_prompt::{PendingApproval, sample_request};
+    let (view, cx) = open(cx);
+    let tx = view.read_with(cx, |view, _| view.approval.tx.clone());
+    let (first, first_answer) = tokio::sync::oneshot::channel();
+    let (second, _second_answer) = tokio::sync::oneshot::channel();
+    for (respond, sql) in [(first, "DELETE FROM a"), (second, "DELETE FROM b")] {
+        assert!(tx.send(PendingApproval { request: sample_request(sql), respond }).is_ok());
+    }
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        let shown = view.approval.current.as_ref().map(|open| open.request.sql.clone());
+        assert_eq!(shown.as_deref(), Some("DELETE FROM a"));
+    });
+    drop(first_answer);
+    cx.executor().advance_clock(std::time::Duration::from_secs(2));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        let shown = view.approval.current.as_ref().map(|open| open.request.sql.clone());
+        assert_eq!(shown.as_deref(), Some("DELETE FROM b"), "the abandoned question gave way to the next");
     });
 }

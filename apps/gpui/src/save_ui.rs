@@ -179,15 +179,16 @@ impl GridView {
             .as_ref()
             .filter(|(id, _)| *id == connection_id)
             .map(|(_, write)| write.clone());
+        let approvals = self.approval.tx.clone();
         let count = pending.changes;
         let (statements, expect_one) = (pending.plan.statements, pending.plan.expect_one);
         cx.spawn(async move |this, cx| {
             let result = cx
                 .background_executor()
                 .spawn(async move {
-                    let write = match write {
+                    let write = match write.filter(|write| write.is_current().unwrap_or(false)) {
                         Some(write) => write,
-                        None => Arc::new(WriteSession::open_saved(connection_id)?),
+                        None => Arc::new(WriteSession::open_saved(connection_id, approvals)?),
                     };
                     let applied = write.apply(&statements, &expect_one, &tokio_util::sync::CancellationToken::new());
                     Ok::<_, String>((write, applied))
@@ -212,7 +213,7 @@ impl GridView {
                 return;
             }
         };
-        self.save.write = Some((connection_id, write));
+        self.save.write = applied.is_ok().then(|| (connection_id, write));
         match applied {
             Ok(_) => {
                 self.show_banner(format!("Saved {count} change(s)"), false, cx);

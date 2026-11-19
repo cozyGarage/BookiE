@@ -20,6 +20,7 @@ mod menus;
 mod palette_actions;
 mod palette_state;
 mod favorites_ui;
+mod approval_ui;
 mod params_ui;
 mod picker;
 mod save_ui;
@@ -127,6 +128,7 @@ struct GridView {
     favorites: favorites_ui::FavoritesState,
     params: params_ui::ParamsState,
     save: save_ui::SaveState,
+    approval: approval_ui::ApprovalUi,
     sidebar: sidebar_state::SidebarState,
     row_menu: Option<menus::RowMenu>,
     connection_form: connection_form::ConnectionForm,
@@ -359,6 +361,8 @@ impl GridView {
         let (sidebar_search, palette_input) = Self::init_chrome_inputs(window, cx);
         let (table, table_focus, table_events) = Self::init_grid_table(window, cx);
         let font_names = installed_font_names(cx);
+        let (approval, approval_inbox) = approval_ui::ApprovalUi::new();
+        Self::watch_approvals(approval_inbox, cx);
         GridView {
             table,
             _table_events: table_events,
@@ -372,6 +376,7 @@ impl GridView {
             favorites: favorites_ui::FavoritesState::default(),
             params: params_ui::ParamsState::default(),
             save: save_ui::SaveState::default(),
+            approval,
             sidebar: sidebar_state::SidebarState::new(sidebar_search),
             row_menu: None,
             connection_form: connection_form::ConnectionForm::new(cx),
