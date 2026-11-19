@@ -1636,3 +1636,19 @@ fn a_prompt_the_sink_gave_up_on_disappears_and_the_next_one_is_shown(cx: &mut Te
         assert_eq!(shown.as_deref(), Some("DELETE FROM b"), "the abandoned question gave way to the next");
     });
 }
+
+#[gpui::test]
+fn switching_connection_expands_every_sidebar_schema_again(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    connect_and_settle(&view, cx, orders_fixture());
+    view.update(cx, |view, _| view.sidebar.collapsed_schemas.toggle("main"));
+    view.read_with(cx, |view, _| assert!(view.sidebar.collapsed_schemas.is_collapsed("main")));
+    let other = sqlite_fixture(&["create table t (a integer)"]);
+    connect_and_settle(&view, cx, other.0.clone());
+    view.read_with(cx, |view, _| {
+        assert!(
+            !view.sidebar.collapsed_schemas.is_collapsed("main"),
+            "a schema collapsed on the old connection stayed collapsed on the new one"
+        );
+    });
+}

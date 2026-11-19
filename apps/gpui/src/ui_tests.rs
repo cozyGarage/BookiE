@@ -85,6 +85,79 @@ fn undo_and_redo_step_through_the_staged_edits_of_a_cell(cx: &mut TestAppContext
 }
 
 #[gpui::test]
+fn closing_a_run_forgets_the_undo_history_so_redo_cannot_stage_an_edit_in_another_grid(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.tabs.open_query();
+            view.sync_grid_owner();
+            view.add_run(None);
+        })
+    });
+    cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(2, 3, window, cx)));
+    cx.simulate_keystrokes("ctrl-a");
+    cx.simulate_input("2026-02-03");
+    cx.simulate_keystrokes("enter");
+    cx.simulate_keystrokes("ctrl-z");
+    view.read_with(cx, |view, _| {
+        assert!(view.cell_edit.edits.is_empty());
+        assert_eq!(view.cell_edit.redo.len(), 1, "the undone edit waits to be redone");
+    });
+
+    cx.update(|_, cx| view.update(cx, |view, _| view.close_run(1)));
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.run_tabs.slots.len(), 1, "the active run closed: {}", view.status)
+    });
+    cx.simulate_keystrokes("ctrl-y");
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.status, "Nothing to redo", "the old grid's history is gone");
+        assert!(
+            view.cell_edit.edits.is_empty(),
+            "no value from the closed result was staged"
+        );
+    });
+}
+
+#[gpui::test]
+fn the_undo_history_is_bounded_by_count_and_by_size(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            for n in 0..300 {
+                view.record_edit((1, 1), Cell::Text(format!("edit {n}")));
+            }
+        })
+    });
+    view.read_with(cx, |view, _| {
+        assert_eq!(
+            view.cell_edit.undo.len(),
+            200,
+            "only the latest 200 edits can be undone"
+        );
+        assert_eq!(
+            view.cell_edit.edits.get(&(1, 1)),
+            Some(&Cell::Text("edit 299".into())),
+            "trimming the history never changes the staged value"
+        );
+    });
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.reset_edit_history();
+            for _ in 0..3 {
+                view.record_edit((2, 1), Cell::Text("x".repeat(3 * 1024 * 1024)));
+            }
+        })
+    });
+    view.read_with(cx, |view, _| {
+        assert_eq!(
+            view.cell_edit.undo.len(),
+            1,
+            "large values cannot pile up: only the latest edit is kept"
+        );
+    });
+}
+
+#[gpui::test]
 fn confirming_an_untouched_null_cell_keeps_it_null(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     let row = view
