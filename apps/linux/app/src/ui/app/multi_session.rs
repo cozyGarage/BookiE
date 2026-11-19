@@ -79,6 +79,11 @@ impl App {
         if !self.multi.sessions.focus_working(connection_id) {
             return;
         }
+        if self.connection_id != Some(connection_id)
+            && let Some(progress) = &self.multi_table_progress
+        {
+            progress.cancel_token().cancel();
+        }
         self.do_persist_workspace_state_now();
         self.connection_id = Some(connection_id);
         self.set_last_connection_id(Some(connection_id), sender.clone());

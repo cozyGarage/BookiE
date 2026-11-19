@@ -1245,7 +1245,7 @@ fn snapshot_fetcher_factory(
     })
 }
 
-fn page_runner() -> crate::services::export_pages::PageRunner {
+pub(super) fn page_runner() -> crate::services::export_pages::PageRunner {
     std::sync::Arc::new(|future| {
         let (reply, answer) = async_channel::bounded(1);
         relm4::spawn(async move {

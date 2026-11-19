@@ -51,6 +51,10 @@ pub(super) fn primary_menu_model() -> gio::Menu {
         Some(&bookie_app_services::tr!("Search Database Values…")),
         Some("win.search-database-values"),
     );
+    connection_section.append(
+        Some(&bookie_app_services::tr!("Export Tables as CSV…")),
+        Some("win.export-tables"),
+    );
     menu.append_section(None, &connection_section);
     let query_section = gio::Menu::new();
     query_section.append(
@@ -181,6 +185,7 @@ fn add_workspace_input_actions(group: &gio::SimpleActionGroup, sender: Component
         input_action!("export-json", AppMsg::ExportJson),
         input_action!("export-all-csv", AppMsg::ExportAllCsv),
         input_action!("export-all-json", AppMsg::ExportAllJson),
+        input_action!("export-tables", AppMsg::ExportTables),
         input_action!("save-changes", AppMsg::SaveActiveBrowseTab),
         input_action!("undo-change", AppMsg::UndoActiveBrowseTab),
         input_action!("redo-change", AppMsg::RedoActiveBrowseTab),

@@ -1,5 +1,5 @@
 mod file;
-mod row_limit;
+pub(crate) mod row_limit;
 mod scope;
 mod spool;
 pub(crate) use scope::ExportScope;
