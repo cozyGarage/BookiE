@@ -331,3 +331,57 @@ async fn two_unknown_writes_need_two_decisions() {
         .unwrap();
     journal.record(write_intent(connection_id)).await.unwrap();
 }
+
+#[tokio::test]
+async fn the_unresolved_read_returns_only_the_open_unknowns_including_one_from_crash_recovery() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("audit.jsonl");
+    let (journal, connection_id, resolved) = journal_with_unknown_write(&dir).await;
+    let still_open = {
+        let intent = write_intent(connection_id);
+        journal
+            .record(outcome_of(&intent, AuditTerminalStatus::Unknown))
+            .await
+            .unwrap();
+        intent.operation_id
+    };
+    let in_flight = write_intent(Uuid::new_v4());
+    journal.record(in_flight.clone()).await.unwrap();
+    assert_eq!(journal.unresolved_unknowns().await.unwrap().len(), 2);
+
+    journal
+        .record(
+            resolution(
+                connection_id,
+                resolved,
+                AuditReconciliationClaim::Committed,
+                Principal::human_gui(),
+            )
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+    let open: Vec<Uuid> = journal
+        .unresolved_unknowns()
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|event| event.operation_id)
+        .collect();
+    assert_eq!(open, vec![still_open]);
+
+    drop(journal);
+    let reopened = AuditJournal::open_validated(path).unwrap();
+    let after_restart: Vec<Uuid> = reopened
+        .unresolved_unknowns()
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|event| event.operation_id)
+        .collect();
+    assert!(after_restart.contains(&still_open));
+    assert!(
+        after_restart.contains(&in_flight.operation_id),
+        "a write that was in flight at a crash becomes an unknown outcome to decide"
+    );
+}

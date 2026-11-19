@@ -1,6 +1,6 @@
 use bookie_policy::{
     AuditConnectionContext, AuditEvent, AuditReconciliation, AuditReconciliationClaim, AuditReconciliationEvidence,
-    AuditRecordPhase, AuditSink, AuditTerminalStatus, Principal,
+    AuditSink, Principal,
 };
 use bookie_storage::AuditJournal;
 use uuid::Uuid;
@@ -59,25 +59,9 @@ pub async fn resolve_unknown_outcome(
 }
 
 async fn unresolved_events(journal: &AuditJournal) -> Result<Vec<AuditEvent>, String> {
-    let events = journal.recent(usize::MAX).await.map_err(|error| error.to_string())?;
-    let mut open: Vec<AuditEvent> = Vec::new();
-    for event in events {
-        if let Some(reconciliation) = &event.reconciliation {
-            if reconciliation.claim.clears_the_block() {
-                open.retain(|unknown| unknown.operation_id != reconciliation.reconciles_operation_id);
-            }
-            continue;
-        }
-        if event.phase == AuditRecordPhase::Outcome
-            && event.operation_class.is_write()
-            && event.terminal_status == AuditTerminalStatus::Unknown
-        {
-            open.retain(|unknown| unknown.operation_id != event.operation_id);
-            open.push(event);
-        }
-    }
-    open.reverse();
-    Ok(open)
+    let mut events = journal.unresolved_unknowns().await.map_err(|error| error.to_string())?;
+    events.reverse();
+    Ok(events)
 }
 
 async fn list_in(journal: &AuditJournal, connection_id: Option<Uuid>) -> Result<Vec<UnknownOutcome>, String> {
@@ -137,15 +121,38 @@ async fn resolve_in(
 }
 
 fn operator_name() -> String {
-    std::env::var("USER")
-        .or_else(|_| std::env::var("LOGNAME"))
-        .unwrap_or_else(|_| "unknown".into())
+    let uid = std::fs::read_to_string("/proc/self/status")
+        .ok()
+        .and_then(|status| process_uid(&status));
+    let passwd = std::fs::read_to_string("/etc/passwd").ok();
+    match (uid, passwd) {
+        (Some(uid), Some(passwd)) => name_for_uid(&passwd, uid).unwrap_or_else(|| format!("uid {uid}")),
+        (Some(uid), None) => format!("uid {uid}"),
+        _ => "unknown".into(),
+    }
+}
+
+fn process_uid(status: &str) -> Option<u32> {
+    status
+        .lines()
+        .find_map(|line| line.strip_prefix("Uid:"))
+        .and_then(|rest| rest.split_whitespace().nth(1))
+        .and_then(|effective| effective.parse().ok())
+}
+
+fn name_for_uid(passwd: &str, uid: u32) -> Option<String> {
+    passwd.lines().find_map(|line| {
+        let mut fields = line.split(':');
+        let name = fields.next()?;
+        let _password = fields.next()?;
+        (fields.next()?.parse::<u32>().ok()? == uid).then(|| name.to_string())
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bookie_policy::AuditOperationClass;
+    use bookie_policy::{AuditOperationClass, AuditRecordPhase, AuditTerminalStatus};
 
     fn write(connection_id: Uuid, phase: AuditRecordPhase, status: AuditTerminalStatus) -> AuditEvent {
         let mut event = bookie_storage::sample_event(Principal::human_gui());
@@ -246,5 +253,16 @@ mod tests {
             .unwrap();
         let recorded = journal.recent(1).await.unwrap().remove(0).reconciliation.unwrap();
         assert_eq!(recorded.evidence, AuditReconciliationEvidence::ServerCheckedManually);
+    }
+
+    #[test]
+    fn the_operator_is_the_effective_os_user_and_not_an_environment_value() {
+        let status = "Name:\tbookie\nUid:\t1000\t1001\t1001\t1001\n";
+        assert_eq!(process_uid(status), Some(1001));
+        assert_eq!(process_uid("Name:\tx\n"), None);
+        let passwd = "root:x:0:0:root:/root:/bin/bash\ntrung:x:1001:1001::/home/trung:/bin/zsh\n";
+        assert_eq!(name_for_uid(passwd, 1001).as_deref(), Some("trung"));
+        assert_eq!(name_for_uid(passwd, 7), None);
+        assert!(!operator_name().is_empty());
     }
 }
