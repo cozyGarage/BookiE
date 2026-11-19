@@ -116,9 +116,9 @@ impl DatabaseDriver for SqliteDriver {
             .acquire_timeout(Duration::from_secs(5))
             .before_acquire(|conn, _| {
                 Box::pin(async move {
-                    sqlx::query("SELECT count(*) FROM sqlite_master")
+                    let _ = sqlx::query("SELECT count(*) FROM sqlite_master")
                         .execute(&mut *conn)
-                        .await?;
+                        .await;
                     Ok(true)
                 })
             })

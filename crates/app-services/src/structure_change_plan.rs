@@ -84,6 +84,7 @@ fn add_column(
         .filter(|(name, rest)| !name.is_empty() && !rest.is_empty())
         .ok_or_else(|| StructureChangeError::Input("Type the new column's name and type".into()))?;
     refuse_duplicate(columns, name)?;
+    refuse_unplain_type(data_type)?;
     Ok(StructureOp::AddColumn {
         schema,
         table,
@@ -107,23 +108,64 @@ fn rename_column(
     table: String,
     text: &str,
 ) -> Result<StructureOp, StructureChangeError> {
-    let words: Vec<&str> = text
-        .split_whitespace()
-        .filter(|word| !word.eq_ignore_ascii_case("to"))
-        .collect();
+    let mut words: Vec<&str> = text.split_whitespace().collect();
+    if words.len() == 3 && words[1].eq_ignore_ascii_case("to") {
+        words.remove(1);
+    }
     let [old_name, new_name] = words[..] else {
         return Err(StructureChangeError::Input(
             "Type the current name and the new name".into(),
         ));
     };
-    existing(columns, old_name)?;
+    let old_name = existing(columns, old_name)?.name.clone();
     refuse_duplicate(columns, new_name)?;
     Ok(StructureOp::RenameColumn {
         schema,
         table,
-        old_name: old_name.to_string(),
+        old_name,
         new_name: new_name.to_string(),
     })
+}
+
+const CLAUSE_WORDS: [&str; 16] = [
+    "CHECK",
+    "REFERENCES",
+    "GENERATED",
+    "COLLATE",
+    "DEFAULT",
+    "PRIMARY",
+    "UNIQUE",
+    "AS",
+    "NOT",
+    "NULL",
+    "CONSTRAINT",
+    "KEY",
+    "AUTOINCREMENT",
+    "AUTO_INCREMENT",
+    "ON",
+    "COMMENT",
+];
+
+fn refuse_unplain_type(data_type: &str) -> Result<(), StructureChangeError> {
+    let plain = data_type
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | ' ' | '(' | ')' | ',' | '.'));
+    let mut depth = 0i32;
+    let mut balanced = true;
+    for c in data_type.chars() {
+        depth += i32::from(c == '(') - i32::from(c == ')');
+        balanced &= depth >= 0;
+    }
+    let clause = data_type
+        .split(|c: char| !c.is_ascii_alphanumeric() && c != '_')
+        .any(|word| CLAUSE_WORDS.iter().any(|reserved| word.eq_ignore_ascii_case(reserved)));
+    if plain && balanced && depth == 0 && !clause {
+        return Ok(());
+    }
+    Err(StructureChangeError::Input(
+        "Give only a column type such as TEXT, INTEGER or VARCHAR(40); constraints and defaults are not supported here"
+            .into(),
+    ))
 }
 
 fn refuse_duplicate(columns: &[ColumnInfo], name: &str) -> Result<(), StructureChangeError> {
@@ -136,7 +178,10 @@ fn refuse_duplicate(columns: &[ColumnInfo], name: &str) -> Result<(), StructureC
 }
 
 fn find<'a>(columns: &'a [ColumnInfo], name: &str) -> Option<&'a ColumnInfo> {
-    columns.iter().find(|column| column.name == name)
+    columns
+        .iter()
+        .find(|column| column.name == name)
+        .or_else(|| columns.iter().find(|column| column.name.eq_ignore_ascii_case(name)))
 }
 
 fn existing<'a>(columns: &'a [ColumnInfo], name: &str) -> Result<&'a ColumnInfo, StructureChangeError> {
@@ -194,6 +239,11 @@ mod tests {
         for (kind, text) in [
             (StructureChangeKind::AddColumn, "note TEXT"),
             (StructureChangeKind::AddColumn, "justaname"),
+            (StructureChangeKind::AddColumn, "Note TEXT"),
+            (StructureChangeKind::AddColumn, "x TEXT DEFAULT 'a'"),
+            (StructureChangeKind::AddColumn, "x TEXT CHECK (1)"),
+            (StructureChangeKind::AddColumn, "x TEXT REFERENCES orders"),
+            (StructureChangeKind::AddColumn, "x TEXT DEFAULT 'a\\'' , DROP COLUMN id"),
             (StructureChangeKind::RenameColumn, "ghost memo"),
             (StructureChangeKind::RenameColumn, "note id"),
             (StructureChangeKind::DropColumn, "ghost"),

@@ -77,11 +77,17 @@ impl GridView {
         let Some(live) = self.save_session() else {
             return;
         };
+        let name = text.split_whitespace().next().unwrap_or_default().to_string();
+        let (verb, confirm) = match kind {
+            StructureChangeKind::AddColumn => ("Add", "Add column"),
+            StructureChangeKind::RenameColumn => ("Rename", "Rename"),
+            StructureChangeKind::DropColumn => ("Drop", "Drop column"),
+        };
         let labels = ReviewLabels {
-            title: format!("{} on {}?", title(kind), self.catalog.grid_table.name),
-            done: format!("{} applied", title(kind)),
+            title: format!("{verb} column {name} on {}?", self.catalog.grid_table.name),
+            done: format!("{verb} column {name}: done"),
             review: "Review the change, then apply or cancel".into(),
-            confirm: "Apply",
+            confirm,
             note: Some(
                 "This changes the table's structure for everyone using the database, and most databases cannot \
                  undo it. A connection that needs approval will ask before it runs.",

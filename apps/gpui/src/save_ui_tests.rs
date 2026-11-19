@@ -865,7 +865,8 @@ fn a_column_is_added_renamed_and_dropped_only_after_each_change_is_reviewed(cx: 
         settle_saving(cx);
         view.read_with(cx, |view, _| {
             let pending = view.save.pending.as_ref().unwrap_or_else(|| panic!("no review: {}", view.status));
-            assert_eq!(pending.confirm, "Apply");
+            assert!(pending.title.contains(text.split_whitespace().next().unwrap()), "{}", pending.title);
+            assert_ne!(pending.confirm, "Apply", "the button says what it does");
             assert!(pending.plan.preview.contains("ALTER TABLE"), "{}", pending.plan.preview);
         });
         assert_eq!(table_columns_of(&path), prior, "nothing changes before the user confirms");
