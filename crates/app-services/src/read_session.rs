@@ -44,6 +44,7 @@ pub struct ReadSession {
     id: Uuid,
     generation: Uuid,
     supports_snapshot_cursor: bool,
+    writable: bool,
     pub driver_id: String,
     pub tables: Vec<TableInfo>,
 }
@@ -176,13 +177,34 @@ impl ReadSession {
     }
 
     pub async fn open_controlled(
-        mut saved: SavedConnection,
+        saved: SavedConnection,
         registry: Arc<DriverRegistry>,
         database: Arc<DatabaseService>,
         cancellation: CancellationToken,
     ) -> Result<Self, OpenFailure> {
+        Self::open_with_access(saved, registry, database, cancellation, false).await
+    }
+
+    pub async fn open_writable_controlled(
+        saved: SavedConnection,
+        registry: Arc<DriverRegistry>,
+        database: Arc<DatabaseService>,
+        cancellation: CancellationToken,
+    ) -> Result<Self, OpenFailure> {
+        Self::open_with_access(saved, registry, database, cancellation, true).await
+    }
+
+    async fn open_with_access(
+        mut saved: SavedConnection,
+        registry: Arc<DriverRegistry>,
+        database: Arc<DatabaseService>,
+        cancellation: CancellationToken,
+        writable: bool,
+    ) -> Result<Self, OpenFailure> {
         check_open_cancellation(&cancellation)?;
-        saved.read_only = true;
+        if !writable {
+            saved.read_only = true;
+        }
         let supports_snapshot_cursor = registry
             .get(&saved.driver_id)
             .is_some_and(|driver| driver.capabilities().supports_snapshot_export);
@@ -208,6 +230,7 @@ impl ReadSession {
             id,
             generation,
             supports_snapshot_cursor,
+            writable,
             driver_id: activated.driver_id,
             tables,
         })
@@ -304,11 +327,51 @@ fn check_open_cancellation(cancellation: &CancellationToken) -> Result<(), OpenF
 }
 
 impl ReadSession {
+    fn refuse_free_form_on_a_writable_session(&self) -> Result<(), DriverFailurePresentation> {
+        if self.writable {
+            return Err(DriverFailurePresentation::Unsupported(
+                "a session opened for saving changes does not run free-form statements".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    pub async fn apply_changes(
+        &self,
+        statements: &[(String, Vec<bookie_core::Value>)],
+        expect_one: &[usize],
+        control: &OperationControl,
+    ) -> Result<Vec<u64>, DriverFailurePresentation> {
+        if !self.writable {
+            return Err(DriverFailurePresentation::Unsupported(
+                "this session was opened for reading and cannot save changes".into(),
+            ));
+        }
+        if let Some(index) = statements
+            .iter()
+            .position(|(sql, _)| bookie_core::sql_lex::split_statements(sql, &self.driver_id).len() != 1)
+        {
+            return Err(DriverFailurePresentation::Unsupported(format!(
+                "change {} is not a single statement",
+                index + 1
+            )));
+        }
+        let guard = self
+            .database
+            .guard_for_generation(self.id, self.generation, Principal::human_gui())
+            .ok_or(DriverFailurePresentation::Disconnected)?;
+        guard
+            .execute_in_transaction_checked_controlled(statements, expect_one, control)
+            .await
+            .map_err(|error| classify(&error))
+    }
+
     pub async fn run_query(
         &self,
         sql: &str,
         control: &OperationControl,
     ) -> Result<QueryResult, DriverFailurePresentation> {
+        self.refuse_free_form_on_a_writable_session()?;
         let guard = self
             .database
             .guard_for_generation(self.id, self.generation, Principal::human_gui())
@@ -325,6 +388,7 @@ impl ReadSession {
         params: &[bookie_core::Value],
         control: &OperationControl,
     ) -> Result<QueryResult, DriverFailurePresentation> {
+        self.refuse_free_form_on_a_writable_session()?;
         let guard = self
             .database
             .guard_for_generation(self.id, self.generation, Principal::human_gui())
