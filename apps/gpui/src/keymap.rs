@@ -9,6 +9,7 @@ pub enum Command {
     Shortcuts,
     SaveFavorite,
     Favorites,
+    SaveChanges,
     Filter,
     CopyCells,
     CopyCellsWithHeaders,
@@ -19,7 +20,7 @@ pub enum Command {
 }
 
 impl Command {
-    pub const ALL: [Command; 14] = [
+    pub const ALL: [Command; 15] = [
         Command::Palette,
         Command::QuickSwitcher,
         Command::JumpColumn,
@@ -27,6 +28,7 @@ impl Command {
         Command::Shortcuts,
         Command::SaveFavorite,
         Command::Favorites,
+        Command::SaveChanges,
         Command::Filter,
         Command::CopyCells,
         Command::CopyCellsWithHeaders,
@@ -45,6 +47,7 @@ impl Command {
             Command::Shortcuts => "shortcuts",
             Command::SaveFavorite => "save-favorite",
             Command::Favorites => "favorites",
+            Command::SaveChanges => "save-changes",
             Command::Filter => "filter",
             Command::CopyCells => "copy",
             Command::CopyCellsWithHeaders => "copy-with-headers",
@@ -64,6 +67,7 @@ impl Command {
             Command::Shortcuts => "Keyboard shortcuts",
             Command::SaveFavorite => "Save query as favorite",
             Command::Favorites => "Open a favorite",
+            Command::SaveChanges => "Save changes",
             Command::Filter => "Filter rows",
             Command::CopyCells => "Copy cells",
             Command::CopyCellsWithHeaders => "Copy cells with headers",
@@ -160,6 +164,7 @@ impl Default for Keymap {
                 (Command::Shortcuts, chord(false, false, "f1")),
                 (Command::SaveFavorite, chord(true, false, "d")),
                 (Command::Favorites, chord(true, true, "b")),
+                (Command::SaveChanges, chord(true, false, "s")),
                 (Command::Filter, chord(true, false, "f")),
                 (Command::CopyCells, chord(true, false, "c")),
                 (Command::CopyCellsWithHeaders, chord(true, true, "c")),

@@ -656,6 +656,19 @@ mod materialize_tests;
 #[cfg(test)]
 mod tests;
 
+pub fn checked_write_indexes(driver_id: Option<&str>, sources: &[StatementSource]) -> Vec<usize> {
+    if !driver_id.is_some_and(keyed_writes_are_checked) {
+        return Vec::new();
+    }
+    sources
+        .iter()
+        .enumerate()
+        .filter_map(|(index, source)| {
+            matches!(source, StatementSource::Update { .. } | StatementSource::Delete { .. }).then_some(index)
+        })
+        .collect()
+}
+
 pub fn keyed_writes_are_checked(driver_id: &str) -> bool {
     matches!(driver_id, "postgres" | "mysql" | "mssql" | "sqlite" | "duckdb")
 }
