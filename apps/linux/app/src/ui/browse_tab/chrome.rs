@@ -466,8 +466,10 @@ impl BrowseTab {
         };
         self.sort_status_label.set_label(&summary);
         self.sort_status_label.set_visible(false);
-        self.clear_sort_button
-            .set_tooltip_text(Some(&format!("{summary}. {}", bookie_app_services::tr!("Clear column sort"))));
+        self.clear_sort_button.set_tooltip_text(Some(&format!(
+            "{summary}. {}",
+            bookie_app_services::tr!("Clear column sort")
+        )));
         self.clear_sort_button.set_visible(true);
     }
 
