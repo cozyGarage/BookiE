@@ -13,7 +13,7 @@ apps/linux/app/src/ui/app/browse.rs 11
 apps/linux/app/src/ui/app/bundle.rs 9
 apps/linux/app/src/ui/app/connection.rs 35
 apps/linux/app/src/ui/app/import.rs 10
-apps/linux/app/src/ui/app/init_css.rs 5
+apps/linux/app/src/ui/app/init_css.rs 1
 apps/linux/app/src/ui/app/init_window.rs 9
 apps/linux/app/src/ui/app/init_workspace.rs 3
 apps/linux/app/src/ui/app/mod.rs 98
