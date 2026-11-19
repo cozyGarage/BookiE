@@ -328,6 +328,7 @@ pub enum ResultView {
     Table,
     Summary,
     Messages,
+    Plan,
 }
 
 pub const MIN_RESULT_RATIO: f32 = 0.2;

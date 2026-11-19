@@ -1,9 +1,12 @@
+use bookie_app_services::explain_plan::PlanNode;
 use bookie_gpui::messages::MessageLog;
 use bookie_gpui::shell::ResultView;
 
 pub(crate) struct PanelState {
     pub view: ResultView,
     pub messages: MessageLog,
+    pub plan: Vec<PlanNode>,
+    pub explaining: bool,
     pub ratio: f32,
     pub open: bool,
     pub resizing: bool,
@@ -14,6 +17,8 @@ impl PanelState {
         Self {
             view: ResultView::Table,
             messages: MessageLog::default(),
+            plan: Vec::new(),
+            explaining: false,
             ratio,
             open: true,
             resizing: false,

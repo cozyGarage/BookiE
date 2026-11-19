@@ -132,7 +132,7 @@ pub fn present(
         if cancel.is_cancelled() {
             return;
         }
-        let nodes = super::explain_tree::parse_plan(&text);
+        let nodes = bookie_app_services::explain_plan::parse_plan(&text);
         if !nodes.is_empty() {
             tree_scrolled.set_child(Some(&super::explain_tree::build_tree(&nodes)));
             tree_page.set_visible(true);
@@ -165,30 +165,13 @@ fn add_explain_pages(
 }
 
 fn format_explain_result(result: &bookie_core::QueryResult) -> String {
-    if result.rows.is_empty() {
-        return String::from("(empty plan)");
-    }
-    let tabular = result.columns.len() > 1 || result.rows.iter().any(|row| row.len() > 1);
-    let mut lines = Vec::with_capacity(result.rows.len() + usize::from(tabular));
-    if tabular && !result.columns.is_empty() {
-        lines.push(
-            result
-                .columns
-                .iter()
-                .map(|column| column.name.as_str())
-                .collect::<Vec<_>>()
-                .join(" | "),
-        );
-    }
-    for row in &result.rows {
-        let cells: Vec<String> = row.iter().map(crate::ui::grid::value_to_display_text).collect();
-        if cells.len() == 1 {
-            lines.push(cells.into_iter().next().unwrap_or_default());
-        } else {
-            lines.push(cells.join(" | "));
-        }
-    }
-    lines.join("\n")
+    let columns: Vec<String> = result.columns.iter().map(|column| column.name.clone()).collect();
+    let rows: Vec<Vec<String>> = result
+        .rows
+        .iter()
+        .map(|row| row.iter().map(crate::ui::grid::value_to_display_text).collect())
+        .collect();
+    bookie_app_services::explain_plan::plan_text(&columns, &rows)
 }
 
 #[cfg(test)]

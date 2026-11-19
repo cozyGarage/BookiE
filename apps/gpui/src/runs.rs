@@ -37,7 +37,10 @@ impl GridView {
             return;
         }
         match bookie_core::sql_dialect::explain_statement(&session.driver_id, &sql) {
-            Some(statement) => self.run_sql(statement, cx),
+            Some(statement) => {
+                self.panel.explaining = true;
+                self.run_sql(statement, cx)
+            }
             None => self.status = "This database cannot explain a query".into(),
         }
     }
@@ -68,12 +71,14 @@ impl GridView {
                     Ok(table) => {
                         let (rows, truncated) = (bookie_gpui::source::ResultSource::total(&table), table.truncated);
                         this.panel.messages.statement_ok(&sql, rows, truncated, elapsed);
+                        this.show_plan_of(&table);
                         this.add_run(Some(std::sync::Arc::new(table)));
                         if let Some(slot) = this.run_tabs.slots.last_mut() {
                             slot.run.elapsed_ms = Some(u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX));
                         }
                     }
                     Err(message) => {
+                        this.panel.explaining = false;
                         this.panel.messages.statement_failed(&sql, &message, elapsed);
                         this.panel.view = ResultView::Messages;
                         this.status = message;

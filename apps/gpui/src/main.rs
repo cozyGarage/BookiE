@@ -19,6 +19,7 @@ mod menus;
 mod palette_actions;
 mod palette_state;
 mod picker;
+mod plan_view;
 mod reveal;
 mod panel_state;
 mod render;
