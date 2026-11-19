@@ -34,7 +34,7 @@ mod verdict;
 
 pub use approval::{
     ApprovalGrant, ApprovalGrants, ApprovalOutcome, ApprovalRequest, ApprovalSink, AutoApproveSink, DenyApprovalSink,
-    RememberingApprovalSink,
+    MAX_APPROVAL_SQL_CHARS, RememberingApprovalSink, sql_is_reviewable,
 };
 pub use audit::{
     AuditAdministrativeAction, AuditAdministrativeMetadata, AuditApprovalOutcome, AuditConnectionContext,

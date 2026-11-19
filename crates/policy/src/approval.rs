@@ -9,7 +9,7 @@ use tokio_util::sync::CancellationToken;
 
 pub const MAX_APPROVAL_SQL_CHARS: usize = 16_384;
 
-pub(crate) fn sql_is_reviewable(sql: &str) -> bool {
+pub fn sql_is_reviewable(sql: &str) -> bool {
     sql.chars().count() <= MAX_APPROVAL_SQL_CHARS && !sql.chars().any(is_unreviewable_character)
 }
 
