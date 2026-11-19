@@ -79,7 +79,7 @@ impl GridView {
                 "Fields are matched to columns by name; unmatched fields are ignored. At most 1,000 rows are \
                  imported per run, all in one transaction; running it again repeats the first rows.",
             ),
-            reconnect: false,
+            reconnect: None,
         };
         self.prepare(live, SaveRequest::Import(PathBuf::from(text)), labels, cx);
     }

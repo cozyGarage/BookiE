@@ -189,7 +189,10 @@ impl GridView {
                 "This changes the table's structure for everyone using the database, and most databases cannot \
                  undo it. A connection that needs approval will ask before it runs."
             }),
-            reconnect: kind == StructureChangeKind::RenameTable,
+            reconnect: (kind == StructureChangeKind::RenameTable).then(|| bookie_core::TableInfo {
+                schema: self.catalog.grid_table.schema.clone(),
+                name: name.clone(),
+            }),
         };
         self.prepare(live, SaveRequest::Structure(kind, text), labels, cx);
     }

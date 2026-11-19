@@ -19,7 +19,7 @@ pub(crate) struct SaveState {
     pub generation: u64,
     pub banner: Option<(String, bool)>,
     pub banner_serial: u64,
-    pub reconnect_after: bool,
+    pub reconnect_after: Option<bookie_core::TableInfo>,
 }
 
 pub(crate) struct PendingSave {
@@ -28,7 +28,7 @@ pub(crate) struct PendingSave {
     pub done: String,
     pub confirm: &'static str,
     pub note: Option<&'static str>,
-    pub reconnect: bool,
+    pub reconnect: Option<bookie_core::TableInfo>,
     pub generation: u64,
     pub table: bookie_core::TableInfo,
 }
@@ -47,7 +47,7 @@ pub(crate) struct ReviewLabels {
     pub review: String,
     pub confirm: &'static str,
     pub note: Option<&'static str>,
-    pub reconnect: bool,
+    pub reconnect: Option<bookie_core::TableInfo>,
 }
 
 const MAX_DELETE_ROWS: u64 = 500;
@@ -110,7 +110,7 @@ impl GridView {
             review: format!("Review {count} change(s), then save or cancel"),
             confirm: "Save",
             note: None,
-            reconnect: false,
+            reconnect: None,
         };
         self.prepare(live, SaveRequest::Edits(changes), labels, cx);
     }
@@ -154,7 +154,7 @@ impl GridView {
             review: format!("Review the {count} row(s) to delete, then delete or cancel"),
             confirm: "Delete",
             note: Some("Rows that depend on these (foreign keys, triggers) may be affected too."),
-            reconnect: false,
+            reconnect: None,
         };
         self.prepare(live, SaveRequest::Deletes(rows), labels, cx);
     }
@@ -301,7 +301,7 @@ impl GridView {
             return;
         }
         self.save.busy = true;
-        self.save.reconnect_after = pending.reconnect;
+        self.save.reconnect_after = pending.reconnect.clone();
         self.status = "Saving…".into();
         let write = self
             .save
@@ -334,17 +334,17 @@ impl GridView {
         .detach();
     }
 
-    fn reload_after_save_or_reconnect(&mut self, connection_id: uuid::Uuid, text: String, reconnect: bool, cx: &mut Context<Self>) {
-        if reconnect {
+    fn reload_after_save_or_reconnect(&mut self, connection_id: uuid::Uuid, text: String, reconnect: Option<bookie_core::TableInfo>, cx: &mut Context<Self>) {
+        if let Some(table) = reconnect {
             self.status = text;
-            self.connect(bookie_gpui::live::Origin::Saved(connection_id.to_string()), cx);
+            self.connect_preferring(bookie_gpui::live::Origin::Saved(connection_id.to_string()), Some(table), cx);
         } else {
             self.reload_after_save(text, cx);
         }
     }
 
     pub(crate) fn finish_save(&mut self, connection_id: uuid::Uuid, done: String, result: SaveOutcome, cx: &mut Context<Self>) {
-        let reconnect = std::mem::take(&mut self.save.reconnect_after);
+        let reconnect = self.save.reconnect_after.take();
         let (write, applied) = match result {
             Ok(done) => done,
             Err(message) => {
