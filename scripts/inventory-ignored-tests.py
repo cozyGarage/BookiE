@@ -134,6 +134,8 @@ for path in sorted(
             tier, enable = "Smoke", "VISIBILITY_PG_* env against a disposable PostgreSQL superuser (see the test's module comment)"
         elif "smoke_local" in relative:
             tier, enable = "Smoke", "scripts/smoke-postgres.sh against disposable DB"
+        elif "SMOKE_" in reason:
+            tier, enable = "Smoke", "SMOKE_* env against disposable database servers (see the test's module comment)"
         elif "Secret Service" in reason or "secret" in relative:
             if name not in mapped:
                 raise RuntimeError(f"unmapped keyring test: {name}")

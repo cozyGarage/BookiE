@@ -96,6 +96,27 @@ class InventoryIgnoredTestsTests(unittest.TestCase):
             result.stdout,
         )
 
+    def test_smoke_database_tests_are_mapped(self):
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT)], cwd=ROOT, capture_output=True, text=True, timeout=120
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(
+            "| [postgres_creates_objects_in_the_chosen_schema_including_an_awkward_name]"
+            "(../crates/app-services/tests/schema_context_servers.rs) | Smoke |",
+            result.stdout,
+        )
+        self.assertIn(
+            "| [mysql_and_mariadb_create_objects_in_the_chosen_database]"
+            "(../crates/app-services/tests/schema_context_servers.rs) | Smoke |",
+            result.stdout,
+        )
+        self.assertIn(
+            "| [a_session_lists_its_own_temporary_tables_where_the_server_exposes_them]"
+            "(../crates/drivers/mysql/tests/temp_tables_local.rs) | Smoke |",
+            result.stdout,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
