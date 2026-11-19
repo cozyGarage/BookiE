@@ -579,8 +579,7 @@ impl App {
                         ));
                         return;
                     };
-                    execute_structure_statements(
-                        conn,
+                    let save = StructureSave {
                         statements,
                         ddl_is_transactional,
                         timeout_secs,
@@ -588,9 +587,8 @@ impl App {
                         tab_id,
                         origin,
                         new_table_name,
-                        sender_for_cmd,
-                    )
-                    .await;
+                    };
+                    execute_structure_statements(conn, save, sender_for_cmd).await;
                 })
                 .drop_on_shutdown()
         });
@@ -841,17 +839,15 @@ impl App {
                         });
                         return;
                     };
-                    execute_fetch_structure_data(
-                        conn.as_ref(),
+                    let fetch = StructureFetch {
                         tab_id,
                         schema,
                         table,
                         capabilities,
                         timeout_secs,
                         token,
-                        sender_for_cmd,
-                    )
-                    .await;
+                    };
+                    execute_fetch_structure_data(conn.as_ref(), fetch, sender_for_cmd).await;
                 })
                 .drop_on_shutdown()
         });
@@ -1059,18 +1055,30 @@ impl App {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-async fn execute_structure_statements(
-    conn: std::sync::Arc<dyn bookie_core::Connection>,
+struct StructureSave {
     statements: Vec<String>,
     ddl_is_transactional: bool,
     timeout_secs: u32,
-    mut recorded: Option<crate::ui::app::ran_statements::RanStatements>,
+    recorded: Option<crate::ui::app::ran_statements::RanStatements>,
     tab_id: Uuid,
     origin: CatalogOrigin,
     new_table_name: Option<String>,
+}
+
+async fn execute_structure_statements(
+    conn: std::sync::Arc<dyn bookie_core::Connection>,
+    save: StructureSave,
     sender: ComponentSender<App>,
 ) {
+    let StructureSave {
+        statements,
+        ddl_is_transactional,
+        timeout_secs,
+        mut recorded,
+        tab_id,
+        origin,
+        new_table_name,
+    } = save;
     let control = crate::services::operation_control::bounded(timeout_secs);
     if ddl_is_transactional {
         let batch: Vec<(String, Vec<Value>)> = statements.iter().map(|sql| (sql.clone(), Vec::new())).collect();
@@ -1146,17 +1154,28 @@ async fn fetch_create_table_op(
     })
 }
 
-#[allow(clippy::too_many_arguments)]
-async fn execute_fetch_structure_data(
-    conn: &dyn bookie_core::Connection,
+struct StructureFetch {
     tab_id: Uuid,
     schema: Option<String>,
     table: String,
     capabilities: bookie_core::DriverCapabilities,
     timeout_secs: u32,
     token: tokio_util::sync::CancellationToken,
+}
+
+async fn execute_fetch_structure_data(
+    conn: &dyn bookie_core::Connection,
+    fetch: StructureFetch,
     sender: ComponentSender<App>,
 ) {
+    let StructureFetch {
+        tab_id,
+        schema,
+        table,
+        capabilities,
+        timeout_secs,
+        token,
+    } = fetch;
     let control = crate::services::operation_control::bounded_with(timeout_secs, token);
     let fail = |message: String| {
         if !control.cancellation_token().is_cancelled() {

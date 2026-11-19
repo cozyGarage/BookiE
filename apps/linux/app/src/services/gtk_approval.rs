@@ -4,12 +4,11 @@ use std::{
 };
 
 use async_trait::async_trait;
-use bookie_policy::{ApprovalOutcome, ApprovalRequest, ApprovalSink};
+use bookie_policy::{ApprovalOutcome, ApprovalRequest, ApprovalSink, MAX_APPROVAL_SQL_CHARS, sql_is_reviewable};
 
 pub struct GtkApprovalSink;
 
 const APPROVAL_TIMEOUT: Duration = Duration::from_secs(120);
-const MAX_SQL_PREVIEW_CHARS: usize = 16_384;
 static APPROVAL_DIALOG: OnceLock<Arc<tokio::sync::Semaphore>> = OnceLock::new();
 
 pub(crate) fn has_pending() -> bool {
@@ -64,13 +63,13 @@ fn build_approval_dialog(
     dialog
 }
 
-fn truncate_sql(sql: &str) -> String {
-    let mut chars = sql.chars();
-    let preview: String = chars.by_ref().take(MAX_SQL_PREVIEW_CHARS).collect();
-    if chars.next().is_some() {
-        format!("{preview}\n\n… SQL truncated after {MAX_SQL_PREVIEW_CHARS} characters")
+fn sql_review_text(sql: &str) -> String {
+    if sql_is_reviewable(sql) {
+        sql.to_string()
     } else {
-        preview
+        format!(
+            "This statement is longer than {MAX_APPROVAL_SQL_CHARS} characters or contains invisible or direction-changing characters, so it cannot be reviewed in full and cannot be approved."
+        )
     }
 }
 
@@ -141,7 +140,8 @@ impl ApprovalSink for GtkApprovalSink {
         let body_c = body.clone();
         let tx_c = tx.clone();
         let permit_c = permit.clone();
-        let sql_c = truncate_sql(&req.sql);
+        let reviewable = sql_is_reviewable(&req.sql);
+        let sql_c = sql_review_text(&req.sql);
         let cancellation = req.cancellation.clone();
         let connection_id = req.connection_id;
         glib::MainContext::default().invoke(move || {
@@ -175,6 +175,10 @@ impl ApprovalSink for GtkApprovalSink {
                 .child(&sql_view)
                 .build();
             let dialog = build_approval_dialog(&heading_c, &body_c, &sql_scroll, can_remember);
+            if !reviewable {
+                dialog.set_response_enabled(APPROVE_ONCE_RESPONSE, false);
+                dialog.set_response_enabled(APPROVE_REMEMBER_RESPONSE, false);
+            }
 
             let timer = Arc::new(Mutex::new(None::<glib::SourceId>));
             let timer_response = timer.clone();
@@ -336,12 +340,13 @@ mod tests {
     }
 
     #[test]
-    fn approval_sql_preview_is_bounded_and_marks_truncation() {
-        let sql = "x".repeat(MAX_SQL_PREVIEW_CHARS + 5);
-        let preview = truncate_sql(&sql);
-        assert!(preview.starts_with(&"x".repeat(MAX_SQL_PREVIEW_CHARS)));
-        assert!(preview.contains("SQL truncated after 16384 characters"));
-        assert_eq!(truncate_sql("short query"), "short query");
+    fn a_statement_that_cannot_be_shown_in_full_is_not_approvable() {
+        let tail = "; DROP TABLE accounts";
+        let long = format!("{}{tail}", "x".repeat(MAX_APPROVAL_SQL_CHARS));
+        assert!(!sql_is_reviewable(&long));
+        assert!(!sql_review_text(&long).contains("DROP"));
+        assert!(sql_is_reviewable(&"x".repeat(MAX_APPROVAL_SQL_CHARS)));
+        assert_eq!(sql_review_text("short query"), "short query");
     }
 
     #[tokio::test(start_paused = true)]
