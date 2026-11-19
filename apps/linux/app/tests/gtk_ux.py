@@ -680,15 +680,20 @@ GLib.MainLoop().run()
         )
 
         def visible_editor():
-            candidates = []
-            for node in ui.descendants(ui.application_node()):
-                if ui.node_role(node) != pyatspi.ROLE_TEXT or not node.getState().contains(pyatspi.STATE_SHOWING):
-                    continue
-                try:
-                    node.queryEditableText()
-                    candidates.append(node)
-                except Exception:
-                    continue
+            deadline = time.monotonic() + ui.WAIT_SECONDS
+            while True:
+                candidates = []
+                for node in ui.descendants(ui.application_node()):
+                    if ui.node_role(node) != pyatspi.ROLE_TEXT or not node.getState().contains(pyatspi.STATE_SHOWING):
+                        continue
+                    try:
+                        node.queryEditableText()
+                        candidates.append(node)
+                    except Exception:
+                        continue
+                if candidates or time.monotonic() >= deadline:
+                    break
+                time.sleep(ui.POLL_SECONDS)
             focused = [node for node in candidates if node.getState().contains(pyatspi.STATE_FOCUSED)]
             return (focused or candidates)[-1]
 
@@ -753,6 +758,7 @@ GLib.MainLoop().run()
                 actual_offset = text.caretOffset
                 assert actual_offset == offset, (position, actual_offset, offset)
                 ui.invoke_accessible_action("win.focus-editor")
+                time.sleep(1.0)  # let the view settle after the far caret jump before typing the trigger
                 started = time.monotonic()
                 ui.press_x11_key("period")
                 wait_for_candidate("alpha_only")

@@ -34,10 +34,20 @@ pub(crate) struct SidebarState {
     pub connection_open: bool,
     pub database_open: bool,
     pub collapsed_schemas: bookie_results::sidebar_tree::CollapseState,
+    pub narrow_handled: bool,
 }
 
 impl SidebarState {
     pub const DEFAULT_WIDTH: f32 = 340.0;
+    pub const NARROW_WINDOW: f32 = 760.0;
+
+    pub fn collapse_when_narrow(&mut self, window_width: f32) {
+        let (handled, collapse) = narrow_step(window_width, self.narrow_handled);
+        self.narrow_handled = handled;
+        if collapse {
+            self.open = false;
+        }
+    }
 
     pub fn new(search: Entity<TextInput>) -> Self {
         Self {
@@ -54,6 +64,28 @@ impl SidebarState {
             connection_open: true,
             database_open: true,
             collapsed_schemas: Default::default(),
+            narrow_handled: false,
         }
+    }
+}
+
+fn narrow_step(window_width: f32, handled: bool) -> (bool, bool) {
+    if window_width >= SidebarState::NARROW_WINDOW {
+        (false, false)
+    } else {
+        (true, !handled)
+    }
+}
+
+#[cfg(test)]
+mod narrow_tests {
+    use super::narrow_step;
+
+    #[test]
+    fn a_narrow_window_collapses_once_and_a_wide_one_rearms() {
+        assert_eq!(narrow_step(700.0, false), (true, true));
+        assert_eq!(narrow_step(700.0, true), (true, false));
+        assert_eq!(narrow_step(1100.0, true), (false, false));
+        assert_eq!(narrow_step(700.0, false), (true, true));
     }
 }

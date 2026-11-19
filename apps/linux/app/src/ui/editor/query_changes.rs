@@ -56,13 +56,25 @@ pub(super) fn install(
     buffer.connect_changed(move |buffer| {
         generation.changed();
         if let Some(view) = highlight_view.upgrade() {
-            update_syntax_highlighting(buffer, &view, highlight_bytes.get(), highlight_language.as_ref());
+            update_syntax_highlighting_after_signal(buffer, view, highlight_bytes.clone(), highlight_language.clone());
         }
         if depth.get() > 0 {
             pending.set(true);
             return;
         }
         publish(buffer);
+    });
+}
+
+fn update_syntax_highlighting_after_signal(
+    buffer: &gtk::TextBuffer,
+    view: sourceview5::View,
+    bytes: Rc<Cell<usize>>,
+    language: Option<sourceview5::Language>,
+) {
+    let buffer = buffer.clone();
+    gtk::glib::idle_add_local_once(move || {
+        update_syntax_highlighting(&buffer, &view, bytes.get(), language.as_ref());
     });
 }
 

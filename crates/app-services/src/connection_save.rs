@@ -144,9 +144,16 @@ fn ssh_draft_from_saved(ssh: &SavedSshConfig) -> SshDraft {
 
 pub fn derived_name(capabilities: DriverCapabilities, host: &str, username: &str, database: &str) -> String {
     if capabilities.is_file_based {
-        return database.to_owned();
+        return file_display_name(database);
     }
     format!("{username}@{host}")
+}
+
+pub fn file_display_name(path: &str) -> String {
+    std::path::Path::new(path)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map_or_else(|| path.to_owned(), str::to_owned)
 }
 
 pub fn validate(draft: &ConnectionDraft) -> Result<(), String> {
@@ -553,6 +560,13 @@ async fn rollback_saved_connection(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_file_connection_is_named_after_its_file_not_its_path() {
+        assert_eq!(file_display_name("/home/me/data/shop.sqlite"), "shop.sqlite");
+        assert_eq!(file_display_name("shop.sqlite"), "shop.sqlite");
+        assert_eq!(file_display_name("/"), "/");
+    }
     use async_trait::async_trait;
     use std::sync::Arc;
 
@@ -650,7 +664,7 @@ mod tests {
         file.host.clear();
         file.port = 0;
         let saved = saved_from_draft(&file, Uuid::nil());
-        assert_eq!(saved.name, "/tmp/a.sqlite");
+        assert_eq!(saved.name, "a.sqlite");
         let mut registry = DriverRegistry::new();
         registry.register(Arc::new(TestDriver {
             id: "future-file-database",

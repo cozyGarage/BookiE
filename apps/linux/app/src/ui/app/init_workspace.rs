@@ -34,6 +34,14 @@ pub(super) fn build_workspace_chrome(widgets: &AppWidgets, sender: &ComponentSen
         });
 
     // A fixed content width prevents long names from hyphenating to the trigger width.
+    let empty_hint = gtk::Label::builder()
+        .label(bookie_app_services::tr!("No saved connections yet"))
+        .css_classes(["dim-label"])
+        .margin_top(spacing::LG)
+        .margin_bottom(spacing::LG)
+        .build();
+    connections_factory.widget().set_placeholder(Some(&empty_hint));
+
     let popover_content = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
         .spacing(0)

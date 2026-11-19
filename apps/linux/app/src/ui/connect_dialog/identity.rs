@@ -32,7 +32,7 @@ pub(super) fn preserve_attached_databases(
 
 fn derived_connection_name(driver_id: &str, opts: &ConnectOptions) -> String {
     if driver_id == "sqlite" {
-        return opts.database.clone();
+        return bookie_app_services::connection_save::file_display_name(&opts.database);
     }
     if let Some(directory) = &opts.local_socket_dir {
         return format!("{}@{}", opts.username, directory.display());

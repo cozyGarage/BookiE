@@ -385,6 +385,7 @@ impl SimpleComponent for SqlEditor {
         let widgets = view_output!();
 
         let lang_manager = sourceview5::LanguageManager::default();
+        let starter_query = init.initial_query.is_none();
         let initial_text = init
             .initial_query
             .unwrap_or_else(|| query_changes::DEFAULT_INITIAL_QUERY.to_string());
@@ -406,6 +407,11 @@ impl SimpleComponent for SqlEditor {
             let buffer = sourceview5::Buffer::new(None::<&gtk::TextTagTable>);
             set_initial_sql_buffer_text(&buffer, &initial_text);
             widgets.source_view.set_buffer(Some(&buffer));
+        }
+        if starter_query && !saved_draft_blocked {
+            let buffer = widgets.source_view.buffer();
+            let (start, end) = buffer.bounds();
+            buffer.select_range(&start, &end);
         }
         let split_view =
             split_view::SplitEditorView::install(&widgets.editor_holder, &widgets.source_scroll, &widgets.source_view);

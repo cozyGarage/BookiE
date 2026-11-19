@@ -177,9 +177,14 @@ fn evaluate_categorical_decisions(
     let effects = facts.effects;
     let mut decisions = Vec::new();
     if connection_read_only && (facts.writes() || effects.writes()) {
+        let message = if facts.class == StatementClass::Unparseable {
+            "connection is read-only and this statement could not be parsed (typo?), so it counts as a write"
+        } else {
+            "connection is marked read-only; statements that may write are not permitted"
+        };
         decisions.push(Decision::Deny {
             rule: "connection_read_only".into(),
-            message: "connection is marked read-only; statements that may write are not permitted".into(),
+            message: message.into(),
         });
     }
 
