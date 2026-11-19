@@ -16,6 +16,8 @@ fn title(kind: StructureChangeKind) -> &'static str {
         StructureChangeKind::AddColumn => "Add column",
         StructureChangeKind::RenameColumn => "Rename column",
         StructureChangeKind::DropColumn => "Drop column",
+        StructureChangeKind::AddIndex => "Create index",
+        StructureChangeKind::DropIndex => "Drop index",
     }
 }
 
@@ -77,15 +79,17 @@ impl GridView {
         let Some(live) = self.save_session() else {
             return;
         };
-        let name = text.split_whitespace().next().unwrap_or_default().to_string();
-        let (verb, confirm) = match kind {
-            StructureChangeKind::AddColumn => ("Add", "Add column"),
-            StructureChangeKind::RenameColumn => ("Rename", "Rename"),
-            StructureChangeKind::DropColumn => ("Drop", "Drop column"),
-        };
+        let mut words = text.split_whitespace();
+        let first = words.next().unwrap_or_default();
+        let name = match kind {
+            StructureChangeKind::AddIndex if first.eq_ignore_ascii_case("unique") => words.next().unwrap_or_default(),
+            _ => first,
+        }
+        .to_string();
+        let confirm = title(kind);
         let labels = ReviewLabels {
-            title: format!("{verb} column {name} on {}?", self.catalog.grid_table.name),
-            done: format!("{verb} column {name}: done"),
+            title: format!("{confirm} {name} on {}?", self.catalog.grid_table.name),
+            done: format!("{confirm} {name}: done"),
             review: "Review the change, then apply or cancel".into(),
             confirm,
             note: Some(

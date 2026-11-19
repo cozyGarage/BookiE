@@ -939,3 +939,43 @@ fn opening_a_table_or_running_a_query_is_refused_while_a_save_is_writing(cx: &mu
     });
     std::fs::remove_file(&path).ok();
 }
+
+fn orders_indexes_of(path: &std::path::Path) -> String {
+    let out = std::process::Command::new("sqlite3")
+        .arg(path)
+        .arg("select group_concat(name) from pragma_index_list('orders') where origin = 'c'")
+        .output()
+        .expect("sqlite3 runs");
+    String::from_utf8_lossy(&out.stdout).trim().to_string()
+}
+
+#[gpui::test]
+fn an_index_is_created_then_dropped_only_after_each_change_is_reviewed(cx: &mut TestAppContext) {
+    use bookie_app_services::structure_change_plan::StructureChangeKind::{AddIndex, DropIndex};
+    let path = fixture_copy("indexes");
+    let (view, cx) = saving_view(cx, &path);
+    let write = write_session(&path, false);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            let id = view.live.as_ref().and_then(|live| live.writable).expect("writable");
+            view.save.write = Some((id, write));
+        })
+    });
+    for (kind, text, expected) in [(AddIndex, "unique by_customer id, customer", "by_customer"), (DropIndex, "by_customer", "")] {
+        cx.update(|_, cx| view.update(cx, |view, cx| view.open_structure_bar(kind, cx)));
+        set_structure_text(&view, cx, text);
+        cx.update(|_, cx| view.update(cx, |view, cx| view.review_structure(cx)));
+        settle_saving(cx);
+        view.read_with(cx, |view, _| {
+            let pending = view.save.pending.as_ref().unwrap_or_else(|| panic!("no review: {}", view.status));
+            assert!(pending.title.contains("by_customer"), "{}", pending.title);
+        });
+        let before = orders_indexes_of(&path);
+        cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_save(cx)));
+        settle_saving(cx);
+        let after = orders_indexes_of(&path);
+        assert_ne!(before, after, "the change is applied only on confirm");
+        assert_eq!(after, expected);
+    }
+    std::fs::remove_file(&path).ok();
+}
