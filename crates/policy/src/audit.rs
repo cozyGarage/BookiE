@@ -221,6 +221,8 @@ pub struct AuditEvent {
     /// credential material.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub administrative_action: Option<AuditAdministrativeMetadata>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reconciliation: Option<crate::audit_reconciliation::AuditReconciliation>,
 }
 
 impl AuditEvent {
@@ -261,6 +263,7 @@ impl AuditEvent {
                 action,
                 affected_count: affected_count.min(u64::MAX as usize) as u64,
             }),
+            reconciliation: None,
         }
     }
 
@@ -331,6 +334,7 @@ impl AuditEvent {
             duration_ms: Some(duration_ms),
             transport_attempt: Some(AuditTransportMetadata { client, outcome }),
             administrative_action: None,
+            reconciliation: None,
         }
     }
 }

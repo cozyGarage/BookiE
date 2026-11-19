@@ -405,6 +405,7 @@ fn append_locked(
     let _lock = FileLock::exclusive(&opened.file)?;
     let mut state = resume_verified_state(&mut opened.file, cursor)?;
     reject_new_write_intent(&event, &state.pending, &state.unresolved)?;
+    check_reconciliation(&event, &state.pending, &state.unresolved)?;
     track_operation_state(&mut state.pending, &mut state.unresolved, &event);
     state.tail = append_to_file(&mut opened.file, state.tail, event, durable)?;
     sync_created_file_and_parent(&opened, path)?;
@@ -580,6 +581,8 @@ fn track_verified_record(
         raw.event.get().as_bytes(),
     )?;
     let event: AuditEvent = serde_json::from_str(raw.event.get())?;
+    check_reconciliation(&event, &state.pending, &state.unresolved)
+        .map_err(|error| StorageError::Schema(format!("audit journal is corrupt at record {}: {error}", raw.seq)))?;
     track_operation_state(&mut state.pending, &mut state.unresolved, &event);
     if let Some(limit) = recent_limit.filter(|limit| *limit > 0) {
         recent.push_back(event);
@@ -603,6 +606,12 @@ fn track_operation_state(
             pending.insert(event.operation_id, event.clone());
         }
         AuditRecordPhase::Outcome => {
+            if let Some(reconciliation) = &event.reconciliation {
+                if reconciliation.claim.clears_the_block() {
+                    unresolved.remove(&reconciliation.reconciles_operation_id);
+                }
+                return;
+            }
             if event.terminal_status != AuditTerminalStatus::Pending {
                 pending.remove(&event.operation_id);
             }
@@ -612,6 +621,32 @@ fn track_operation_state(
                 unresolved.remove(&event.operation_id);
             }
         }
+    }
+}
+
+fn check_reconciliation(
+    event: &AuditEvent,
+    pending: &HashMap<Uuid, AuditEvent>,
+    unresolved: &HashMap<Uuid, Uuid>,
+) -> Result<(), StorageError> {
+    let Some(reconciliation) = &event.reconciliation else {
+        return Ok(());
+    };
+    let refuse = |reason: &str| Err(StorageError::ReconciliationRefused(reason.into()));
+    if !matches!(event.principal, Principal::Human { .. }) {
+        return refuse("only a person can resolve an unknown write outcome");
+    }
+    if let Err(error) = reconciliation.validate(event.environment) {
+        return refuse(&error.to_string());
+    }
+    let target = reconciliation.reconciles_operation_id;
+    if pending.contains_key(&target) {
+        return Err(StorageError::WriteInFlight);
+    }
+    match unresolved.get(&target) {
+        Some(connection_id) if *connection_id == event.connection_id => Ok(()),
+        Some(_) => refuse("the record names a different connection than the unknown outcome"),
+        None => refuse("that write is not an unresolved unknown outcome"),
     }
 }
 
@@ -858,7 +893,8 @@ impl AuditSink for AuditJournal {
     async fn record(&self, event: AuditEvent) -> Result<(), AuditError> {
         let durable = event.phase == AuditRecordPhase::Intent
             || event.operation_class == AuditOperationClass::TransactionCommit
-            || event.administrative_action.is_some();
+            || event.administrative_action.is_some()
+            || event.reconciliation.is_some();
         self.append_record(event, durable).await.map_err(|error| match error {
             StorageError::UnresolvedWrite => AuditError::UnresolvedWrite,
             StorageError::WriteInFlight => AuditError::WriteInFlight,
@@ -896,9 +932,14 @@ pub fn sample_event(principal: Principal) -> AuditEvent {
         duration_ms: Some(1),
         transport_attempt: None,
         administrative_action: None,
+        reconciliation: None,
     }
 }
 
 #[cfg(test)]
 #[path = "audit_journal_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "audit_reconciliation_tests.rs"]
+mod reconciliation_tests;
