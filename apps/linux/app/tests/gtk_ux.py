@@ -747,15 +747,31 @@ GLib.MainLoop().run()
                 text.setCaretOffset(offset)
                 ui.press_x11_key("Left")
                 ui.press_x11_key("Right")
-                assert text.caretOffset == offset, (position, text.caretOffset, offset)
+                deadline = time.monotonic() + ui.WAIT_SECONDS
+                while text.caretOffset != offset and time.monotonic() < deadline:
+                    time.sleep(ui.POLL_SECONDS)
+                actual_offset = text.caretOffset
+                assert actual_offset == offset, (position, actual_offset, offset)
+                ui.invoke_accessible_action("win.focus-editor")
                 started = time.monotonic()
                 ui.press_x11_key("period")
                 wait_for_candidate("alpha_only")
                 elapsed_ms = (time.monotonic() - started) * 1000
                 print(f"completion position={position} source_bytes={source_bytes} popup_ms={elapsed_ms:.1f}")
+                assert text.getText(offset, offset + 1) == ".", position
                 ui.press_x11_key("Escape")
                 wait_for_candidate("alpha_only", present=False)
+                ui.invoke_accessible_action("win.focus-editor")
+                text.setCaretOffset(offset + 1)
+                deadline = time.monotonic() + ui.WAIT_SECONDS
+                while text.caretOffset != offset + 1 and time.monotonic() < deadline:
+                    time.sleep(ui.POLL_SECONDS)
+                assert text.caretOffset == offset + 1, (position, text.caretOffset)
                 ui.press_x11_key("BackSpace")
+                deadline = time.monotonic() + ui.WAIT_SECONDS
+                while text.getText(offset, offset + 1) != " " and time.monotonic() < deadline:
+                    time.sleep(ui.POLL_SECONDS)
+                assert text.getText(offset, offset + 1) == " ", position
             set_active_editor("SELECT 1")
 
         try:
@@ -2656,9 +2672,14 @@ GLib.MainLoop().run()
     def postgres_ssh_tunnel_loss_retires_session_and_reconnects(database, base):
         import urllib.request
 
+        fixture_host = os.environ.get(
+            "BOOKIE_FIXTURE_HOST",
+            os.environ.get("BOOKIE_GTK_FIXTURE_HOST", "127.0.0.1"),
+        )
+
         def set_bastion_enabled(enabled):
             request = urllib.request.Request(
-                "http://127.0.0.1:8474/proxies/bastion",
+                f"http://{fixture_host}:8474/proxies/bastion",
                 data=json.dumps({"enabled": enabled}).encode(),
                 headers={"Content-Type": "application/json"},
                 method="POST",

@@ -66,13 +66,13 @@ services:
       - fixture
 
   toxiproxy:
-    image: ghcr.io/shopify/toxiproxy:2.12.0
+    build:
+      context: .
+      dockerfile: toxiproxy/Dockerfile
     command: ["-host=0.0.0.0", "-config=/config/toxiproxy.json"]
     depends_on:
       bastion:
         condition: service_healthy
-    volumes:
-      - ${BOOKIE_FIXTURE_TOXIPROXY_CONFIG:-./toxiproxy/toxiproxy.json}:/config/toxiproxy.json:ro
     ports:
       - "${BOOKIE_FIXTURE_BIND_ADDRESS:-127.0.0.1}:8474:8474"
       - "${BOOKIE_FIXTURE_BIND_ADDRESS:-127.0.0.1}:5433:5432"

@@ -3,6 +3,8 @@ use std::time::{Duration, Instant};
 mod assets;
 mod catalog_nav;
 mod chrome;
+mod home_page;
+mod query_pane;
 mod connection_form;
 mod copy_selection;
 mod detail_panel;

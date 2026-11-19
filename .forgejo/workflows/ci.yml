@@ -1137,6 +1137,7 @@ jobs:
     needs: [pin-revision, guards, clippy, test-build]
     timeout-minutes: 45
     env:
+      BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-pg-release
       CARGO_TARGET_DIR: /var/cache/ci/target/pg-release
       TMPDIR: /var/cache/ci/tmp
     steps:
