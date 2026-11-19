@@ -39,6 +39,52 @@ fn a_valid_edit_is_applied_to_the_typed_cell_and_marked(cx: &mut TestAppContext)
 }
 
 #[gpui::test]
+fn undo_and_redo_step_through_the_staged_edits_of_a_cell(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    let edit = |cx: &mut gpui::VisualTestContext, text: &str| {
+        cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(2, 3, window, cx)));
+        cx.simulate_keystrokes("ctrl-a");
+        cx.simulate_input(text);
+        cx.simulate_keystrokes("enter");
+    };
+    let date = |text: &str| Some(Cell::Date(text.parse().unwrap()));
+    edit(cx, "2026-02-03");
+    edit(cx, "2026-03-04");
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.cell_edit.edits.get(&(2, 3)).cloned(), date("2026-03-04"))
+    });
+
+    cx.simulate_keystrokes("ctrl-z");
+    view.read_with(cx, |view, _| {
+        assert_eq!(
+            view.cell_edit.edits.get(&(2, 3)).cloned(),
+            date("2026-02-03"),
+            "back to the first edit"
+        );
+        assert_eq!(view.status, "Undid an edit");
+    });
+    cx.simulate_keystrokes("ctrl-z");
+    view.read_with(cx, |view, _| {
+        assert!(view.cell_edit.edits.is_empty(), "back to the original value")
+    });
+    cx.simulate_keystrokes("ctrl-z");
+    view.read_with(cx, |view, _| assert_eq!(view.status, "Nothing to undo"));
+
+    cx.simulate_keystrokes("ctrl-y ctrl-y");
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.cell_edit.edits.get(&(2, 3)).cloned(), date("2026-03-04"))
+    });
+    cx.simulate_keystrokes("ctrl-y");
+    view.read_with(cx, |view, _| assert_eq!(view.status, "Nothing to redo"));
+
+    edit(cx, "2026-05-06");
+    cx.simulate_keystrokes("ctrl-y");
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.status, "Nothing to redo", "a new edit drops the redo history");
+    });
+}
+
+#[gpui::test]
 fn confirming_an_untouched_null_cell_keeps_it_null(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     let row = view

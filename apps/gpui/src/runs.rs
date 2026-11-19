@@ -202,6 +202,7 @@ impl GridView {
             return;
         }
         self.invalidate_background();
+        self.reset_edit_history();
         self.cell_edit.active = None;
         self.compare = None;
         self.search.cursor = MatchCursor::default();

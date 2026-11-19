@@ -433,26 +433,41 @@ pub struct WriteSession {
     runtime: tokio::runtime::Runtime,
     sessions: ReadSessionStore,
     session_id: SessionId,
+    profile: Option<(uuid::Uuid, String)>,
 }
 
 impl WriteSession {
-    pub fn open_saved(connection_id: uuid::Uuid) -> Result<WriteSession, String> {
+    pub fn open_saved(
+        connection_id: uuid::Uuid,
+        approvals: tokio::sync::mpsc::UnboundedSender<bookie_app_services::approval_prompt::PendingApproval>,
+    ) -> Result<WriteSession, String> {
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(1)
             .enable_all()
             .build()
             .map_err(|error| error.to_string())?;
-        let sessions = ReadSessionStore::new(
-            Arc::new(drivers_registry::default_registry()),
-            Arc::new(DatabaseService::new()),
-        );
+        let database = Arc::new(DatabaseService::new());
+        database.set_approval_sink(bookie_app_services::approval_prompt::reviewable_prompt_sink(approvals));
+        let sessions = ReadSessionStore::new(Arc::new(drivers_registry::default_registry()), database);
         let control = OperationControl::with_timeout(Duration::from_secs(30));
+        let stamp = runtime.block_on(ReadSessionStore::saved_connection_stamp(connection_id))?;
         let opened = runtime.block_on(sessions.open_saved_writable(connection_id, &control))?;
         Ok(WriteSession {
             runtime,
             sessions,
             session_id: opened.session_id,
+            profile: Some((connection_id, stamp)),
         })
+    }
+
+    pub fn is_current(&self) -> Result<bool, String> {
+        let Some((connection_id, stamp)) = &self.profile else {
+            return Ok(true);
+        };
+        let now = self
+            .runtime
+            .block_on(ReadSessionStore::saved_connection_stamp(*connection_id))?;
+        Ok(now == *stamp)
     }
 
     #[doc(hidden)]
@@ -461,6 +476,7 @@ impl WriteSession {
             runtime,
             sessions,
             session_id,
+            profile: None,
         }
     }
 

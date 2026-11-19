@@ -82,6 +82,8 @@ pub(crate) struct CellEditState {
     pub active: Option<crate::grid_edit::Editing>,
     pub edits: crate::grid_edit::Edits,
     pub table: crate::grid_edit::Edits,
+    pub undo: Vec<crate::edit_history::EditOp>,
+    pub redo: Vec<crate::edit_history::EditOp>,
 }
 
 impl CellEditState {
@@ -91,6 +93,8 @@ impl CellEditState {
             active: None,
             edits: Default::default(),
             table: Default::default(),
+            undo: Vec::new(),
+            redo: Vec::new(),
         }
     }
 }
