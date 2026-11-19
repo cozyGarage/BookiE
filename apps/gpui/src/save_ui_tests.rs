@@ -830,13 +830,16 @@ fn set_structure_text(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestCo
     });
 }
 
+fn scalar_text(path: &std::path::Path, sql: &str) -> String {
+    use bookie_gpui::live::{LiveSession, Origin};
+    use bookie_gpui::model::CellText;
+    use bookie_gpui::source::ResultSource;
+    let live = LiveSession::open(&Origin::File(path.to_path_buf())).expect("open");
+    live.run_query(sql, 10).expect("query").row(0)[0].display()
+}
+
 fn table_columns_of(path: &std::path::Path) -> String {
-    let out = std::process::Command::new("sqlite3")
-        .arg(path)
-        .arg("select group_concat(name) from pragma_table_info('orders')")
-        .output()
-        .expect("sqlite3 runs");
-    String::from_utf8_lossy(&out.stdout).trim().to_string()
+    scalar_text(path, "SELECT COALESCE(group_concat(name), '') FROM pragma_table_info('orders')")
 }
 
 #[gpui::test]
@@ -941,17 +944,12 @@ fn opening_a_table_or_running_a_query_is_refused_while_a_save_is_writing(cx: &mu
 }
 
 fn orders_indexes_of(path: &std::path::Path) -> String {
-    let out = std::process::Command::new("sqlite3")
-        .arg(path)
-        .arg("select group_concat(name) from pragma_index_list('orders') where origin = 'c'")
-        .output()
-        .expect("sqlite3 runs");
-    String::from_utf8_lossy(&out.stdout).trim().to_string()
+    scalar_text(path, "SELECT COALESCE(group_concat(name), '') FROM pragma_index_list('orders') WHERE origin = 'c'")
 }
 
 #[gpui::test]
-fn an_index_is_created_then_dropped_only_after_each_change_is_reviewed(cx: &mut TestAppContext) {
-    use bookie_app_services::structure_change_plan::StructureChangeKind::{AddIndex, DropIndex};
+fn a_unique_index_is_reviewed_as_unique_and_created_only_on_confirm(cx: &mut TestAppContext) {
+    use bookie_app_services::structure_change_plan::StructureChangeKind::AddIndex;
     let path = fixture_copy("indexes");
     let (view, cx) = saving_view(cx, &path);
     let write = write_session(&path, false);
@@ -961,21 +959,18 @@ fn an_index_is_created_then_dropped_only_after_each_change_is_reviewed(cx: &mut 
             view.save.write = Some((id, write));
         })
     });
-    for (kind, text, expected) in [(AddIndex, "unique by_customer id, customer", "by_customer"), (DropIndex, "by_customer", "")] {
-        cx.update(|_, cx| view.update(cx, |view, cx| view.open_structure_bar(kind, cx)));
-        set_structure_text(&view, cx, text);
-        cx.update(|_, cx| view.update(cx, |view, cx| view.review_structure(cx)));
-        settle_saving(cx);
-        view.read_with(cx, |view, _| {
-            let pending = view.save.pending.as_ref().unwrap_or_else(|| panic!("no review: {}", view.status));
-            assert!(pending.title.contains("by_customer"), "{}", pending.title);
-        });
-        let before = orders_indexes_of(&path);
-        cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_save(cx)));
-        settle_saving(cx);
-        let after = orders_indexes_of(&path);
-        assert_ne!(before, after, "the change is applied only on confirm");
-        assert_eq!(after, expected);
-    }
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_structure_bar(AddIndex, cx)));
+    set_structure_text(&view, cx, "unique by_customer id, customer");
+    cx.update(|_, cx| view.update(cx, |view, cx| view.review_structure(cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        let pending = view.save.pending.as_ref().unwrap_or_else(|| panic!("no review: {}", view.status));
+        assert_eq!(pending.title, "Create unique index by_customer on orders?");
+        assert!(pending.plan.preview.contains("CREATE UNIQUE INDEX"), "{}", pending.plan.preview);
+    });
+    assert_eq!(orders_indexes_of(&path), "", "nothing is created before the user confirms");
+    cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_save(cx)));
+    settle_saving(cx);
+    assert_eq!(orders_indexes_of(&path), "by_customer");
     std::fs::remove_file(&path).ok();
 }

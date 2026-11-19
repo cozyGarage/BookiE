@@ -17,7 +17,6 @@ fn title(kind: StructureChangeKind) -> &'static str {
         StructureChangeKind::RenameColumn => "Rename column",
         StructureChangeKind::DropColumn => "Drop column",
         StructureChangeKind::AddIndex => "Create index",
-        StructureChangeKind::DropIndex => "Drop index",
     }
 }
 
@@ -81,12 +80,14 @@ impl GridView {
         };
         let mut words = text.split_whitespace();
         let first = words.next().unwrap_or_default();
-        let name = match kind {
-            StructureChangeKind::AddIndex if first.eq_ignore_ascii_case("unique") => words.next().unwrap_or_default(),
-            _ => first,
+        let unique = kind == StructureChangeKind::AddIndex && first.eq_ignore_ascii_case("unique");
+        let name = if unique {
+            words.next().unwrap_or_default()
+        } else {
+            first
         }
         .to_string();
-        let confirm = title(kind);
+        let confirm = if unique { "Create unique index" } else { title(kind) };
         let labels = ReviewLabels {
             title: format!("{confirm} {name} on {}?", self.catalog.grid_table.name),
             done: format!("{confirm} {name}: done"),

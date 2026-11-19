@@ -251,7 +251,6 @@ impl GridView {
             action("rename-column", "Rename a column…", self.structure_change_enabled()),
             action("drop-column", "Drop a column…", self.structure_change_enabled()),
             action("add-index", "Create an index…", self.structure_change_enabled()),
-            action("drop-index", "Drop an index…", self.structure_change_enabled()),
             action(
                 "insert-row",
                 "Add a row",
@@ -506,7 +505,6 @@ impl GridView {
             "rename-column" => self.open_structure_bar(StructureChangeKind::RenameColumn, cx),
             "drop-column" => self.open_structure_bar(StructureChangeKind::DropColumn, cx),
             "add-index" => self.open_structure_bar(StructureChangeKind::AddIndex, cx),
-            "drop-index" => self.open_structure_bar(StructureChangeKind::DropIndex, cx),
             _ => self.open_insert_form(cx),
         }
     }
@@ -520,7 +518,7 @@ impl GridView {
             "save-favorite" => self.save_favorite(cx),
             "favorites" => self.open_picker(PaletteMode::Favorites, window, cx),
             "save-changes" | "undo-edit" | "redo-edit" | "delete-rows" | "insert-row" | "import-csv" | "add-column"
-            | "rename-column" | "drop-column" | "add-index" | "drop-index" => {
+            | "rename-column" | "drop-column" | "add-index" => {
                 self.execute_edit_palette_action(id, cx);
             }
             "delete-favorite" => self.open_picker(PaletteMode::DeleteFavorite, window, cx),
