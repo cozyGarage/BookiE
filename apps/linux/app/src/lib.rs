@@ -106,9 +106,8 @@ pub fn run() {
         Arc::new(services::gtk_approval::GtkApprovalSink),
         Arc::new(services::gtk_approval::GtkApprovalSink),
     );
-    database.set_approval_sink(Arc::new(bookie_policy::RememberingApprovalSink::new(
-        approval_router,
-        services::approval_grants::shared(),
+    database.set_approval_sink(Arc::new(bookie_policy::ReviewableApprovalSink::new(
+        bookie_policy::RememberingApprovalSink::new(approval_router, services::approval_grants::shared()),
     )));
 
     let mcp_server = services::mcp_service::start_background(database.clone());
