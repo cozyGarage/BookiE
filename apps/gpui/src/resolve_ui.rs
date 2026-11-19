@@ -10,6 +10,8 @@ pub(crate) struct ResolveState {
     pub open: bool,
     pub busy: bool,
     pub items: Vec<UnknownOutcome>,
+    pub choice: Option<OutcomeDecision>,
+    pub checked: bool,
     pub reason: Option<Entity<TextInput>>,
 }
 
@@ -35,6 +37,8 @@ impl GridView {
     pub(crate) fn close_resolve_panel(&mut self) {
         self.resolve.open = false;
         self.resolve.items.clear();
+        self.resolve.choice = None;
+        self.resolve.checked = false;
     }
 
     pub(crate) fn open_resolve_panel(&mut self, cx: &mut Context<Self>) {
@@ -89,38 +93,119 @@ impl GridView {
         }
         self.resolve.busy = true;
         let connection_id = item.connection_id;
+        let checked = self.resolve.checked;
         cx.spawn(async move |this, cx| {
             let outcome = cx
                 .background_executor()
                 .spawn(async move {
                     blocking(async move {
-                        resolve_unknown_outcome(item.operation_id, decision, &text).await?;
-                        list_unknown_outcomes(Some(connection_id)).await
+                        let decided = resolve_unknown_outcome(item.operation_id, decision, &text, checked).await;
+                        let left = list_unknown_outcomes(Some(connection_id)).await?;
+                        Ok((decided, left))
                     })
                 })
                 .await;
             this.update(cx, |this, cx| {
                 this.resolve.busy = false;
+                this.resolve.choice = None;
+                this.resolve.checked = false;
                 match outcome {
-                    Ok(left) => {
-                        this.save.write = None;
-                        this.status = match decision {
-                            OutcomeDecision::StillUnknown => "Recorded: still unknown. Writes stay blocked".into(),
-                            _ => "Decision recorded. The connection accepts writes again once none is left".into(),
+                    Ok((decided, left)) => {
+                        let applied = decided.is_ok();
+                        this.status = match decided {
+                            Ok(()) if decision == OutcomeDecision::StillUnknown => {
+                                "Recorded: still unknown. Writes stay blocked".into()
+                            }
+                            Ok(()) => "Decision recorded. The connection accepts writes again once none is left".into(),
+                            Err(message) if message.contains("not an unresolved") => {
+                                "That write was already decided elsewhere; the list was reloaded".into()
+                            }
+                            Err(message) => format!("Could not record the decision: {message}"),
                         };
+                        if applied {
+                            this.save.write = None;
+                            if let Some(reason) = &this.resolve.reason {
+                                reason.update(cx, |input, cx| input.set_content("", cx));
+                            }
+                        }
                         this.resolve.items = left;
                         this.resolve.open = !this.resolve.items.is_empty();
-                        if let Some(reason) = &this.resolve.reason {
-                            reason.update(cx, |input, cx| input.set_content("", cx));
-                        }
                     }
-                    Err(message) => this.status = format!("Could not record the decision: {message}"),
+                    Err(message) => this.status = format!("Could not read the audit journal: {message}"),
                 }
                 cx.notify();
             })
             .ok();
         })
         .detach();
+    }
+
+    fn choose_outcome(&mut self, decision: OutcomeDecision, cx: &mut Context<Self>) {
+        let reason_given = self
+            .resolve
+            .reason
+            .as_ref()
+            .is_some_and(|reason| !reason.read(cx).content().trim().is_empty());
+        if !reason_given {
+            self.status = "Say why you decided this; the reason is recorded in the audit journal".into();
+            return;
+        }
+        self.resolve.choice = Some(decision);
+        self.resolve.checked = false;
+        cx.notify();
+    }
+
+    fn resolve_confirm(
+        &self,
+        decision: OutcomeDecision,
+        item: &UnknownOutcome,
+        theme: Theme,
+        cx: &mut Context<Self>,
+    ) -> Div {
+        let claim = match decision {
+            OutcomeDecision::Committed => "WAS applied",
+            _ => "was NOT applied",
+        };
+        let where_ = if item.connection_id.is_nil() {
+            "every connection".to_string()
+        } else {
+            format!("{} ({})", item.connection_name, item.environment)
+        };
+        let mark = if self.resolve.checked { "[x]" } else { "[ ]" };
+        div()
+            .flex()
+            .flex_col()
+            .gap_2()
+            .child(div().child(format!(
+                "You are recording that the write {claim}. This lifts the write block on {where_} and cannot be undone."
+            )))
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap_3()
+                    .child(
+                        ghost(
+                            "resolve-checked",
+                            format!("{mark} I checked the database myself"),
+                            theme,
+                        )
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.resolve.checked = !this.resolve.checked;
+                            cx.notify();
+                        })),
+                    )
+                    .child(
+                        ghost("resolve-confirm", "Confirm", theme)
+                            .on_click(cx.listener(move |this, _, _, cx| this.decide_outcome(decision, cx))),
+                    )
+                    .child(
+                        ghost("resolve-back", "Back", theme).on_click(cx.listener(|this, _, _, cx| {
+                            this.resolve.choice = None;
+                            cx.notify();
+                        })),
+                    ),
+            )
     }
 
     fn resolve_choices(&self, reason: Entity<TextInput>, theme: Theme, cx: &mut Context<Self>) -> Div {
@@ -131,11 +216,11 @@ impl GridView {
             .child(div().flex_1().min_w_0().child(reason))
             .child(
                 ghost("resolve-committed", "It was applied", theme)
-                    .on_click(cx.listener(|this, _, _, cx| this.decide_outcome(OutcomeDecision::Committed, cx))),
+                    .on_click(cx.listener(|this, _, _, cx| this.choose_outcome(OutcomeDecision::Committed, cx))),
             )
             .child(
                 ghost("resolve-rolled-back", "It was not applied", theme)
-                    .on_click(cx.listener(|this, _, _, cx| this.decide_outcome(OutcomeDecision::RolledBack, cx))),
+                    .on_click(cx.listener(|this, _, _, cx| this.choose_outcome(OutcomeDecision::RolledBack, cx))),
             )
             .child(
                 ghost("resolve-unknown", "Still unknown", theme)
@@ -147,7 +232,15 @@ impl GridView {
         let item = self.resolve.items.first().filter(|_| self.resolve.open)?;
         let reason = self.resolve.reason.clone()?;
         let record = record_text(item);
-        let heading = format!("A write's result is unknown ({} waiting)", self.resolve.items.len());
+        let scope = if item.connection_id.is_nil() {
+            "; blocks every connection"
+        } else {
+            ""
+        };
+        let heading = format!(
+            "A write's result is unknown ({} waiting{scope})",
+            self.resolve.items.len()
+        );
         Some(
             div()
                 .flex()
@@ -189,7 +282,10 @@ impl GridView {
                              BookiE will not replay or re-check the write. Do not put secrets in the reason.",
                         ),
                 )
-                .child(self.resolve_choices(reason, theme, cx)),
+                .child(match self.resolve.choice {
+                    Some(decision) => self.resolve_confirm(decision, item, theme, cx),
+                    None => self.resolve_choices(reason, theme, cx),
+                }),
         )
     }
 }

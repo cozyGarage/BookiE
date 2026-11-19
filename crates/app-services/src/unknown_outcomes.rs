@@ -33,9 +33,10 @@ pub async fn resolve_unknown_outcome(
     operation_id: Uuid,
     decision: OutcomeDecision,
     reason: &str,
+    checked_myself: bool,
 ) -> Result<(), String> {
     let journal = AuditJournal::open_default().map_err(|error| error.to_string())?;
-    resolve_in(&journal, operation_id, decision, reason).await
+    resolve_in(&journal, operation_id, decision, reason, checked_myself).await
 }
 
 async fn unresolved_events(journal: &AuditJournal) -> Result<Vec<AuditEvent>, String> {
@@ -85,25 +86,22 @@ async fn resolve_in(
     operation_id: Uuid,
     decision: OutcomeDecision,
     reason: &str,
+    checked_myself: bool,
 ) -> Result<(), String> {
     let original = unresolved_events(journal)
         .await?
         .into_iter()
         .find(|event| event.operation_id == operation_id)
         .ok_or_else(|| "that write is no longer an unresolved unknown outcome".to_string())?;
-    let (claim, evidence) = match decision {
-        OutcomeDecision::Committed => (
-            AuditReconciliationClaim::Committed,
-            AuditReconciliationEvidence::ServerCheckedManually,
-        ),
-        OutcomeDecision::RolledBack => (
-            AuditReconciliationClaim::RolledBack,
-            AuditReconciliationEvidence::ServerCheckedManually,
-        ),
-        OutcomeDecision::StillUnknown => (
-            AuditReconciliationClaim::StillUnknown,
-            AuditReconciliationEvidence::None,
-        ),
+    let evidence = if checked_myself && decision != OutcomeDecision::StillUnknown {
+        AuditReconciliationEvidence::ServerCheckedManually
+    } else {
+        AuditReconciliationEvidence::None
+    };
+    let claim = match decision {
+        OutcomeDecision::Committed => AuditReconciliationClaim::Committed,
+        OutcomeDecision::RolledBack => AuditReconciliationClaim::RolledBack,
+        OutcomeDecision::StillUnknown => AuditReconciliationClaim::StillUnknown,
     };
     let event = AuditEvent::reconciliation(
         Principal::human_gui(),
@@ -169,6 +167,7 @@ mod tests {
             operation_id,
             OutcomeDecision::Committed,
             "checked the table by hand",
+            true,
         )
         .await
         .unwrap();
@@ -189,20 +188,44 @@ mod tests {
             operation_id,
             OutcomeDecision::StillUnknown,
             "waiting for the DBA",
+            false,
         )
         .await
         .unwrap();
         assert_eq!(list_in(&journal, None).await.unwrap().len(), 1);
         assert!(
-            resolve_in(&journal, operation_id, OutcomeDecision::Committed, "  ")
+            resolve_in(&journal, operation_id, OutcomeDecision::Committed, "  ", true)
                 .await
                 .is_err()
         );
         assert!(
-            resolve_in(&journal, Uuid::new_v4(), OutcomeDecision::Committed, "x")
+            resolve_in(&journal, Uuid::new_v4(), OutcomeDecision::Committed, "x", true)
                 .await
                 .is_err()
         );
         assert_eq!(list_in(&journal, None).await.unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn production_needs_the_declaration_and_an_unchecked_decision_records_no_evidence() {
+        let dir = tempfile::tempdir().unwrap();
+        let journal = AuditJournal::open_validated(dir.path().join("audit.jsonl")).unwrap();
+        let connection_id = Uuid::new_v4();
+        let mut intent = write(connection_id, AuditRecordPhase::Intent, AuditTerminalStatus::Pending);
+        intent.environment = bookie_core::Environment::Prod;
+        journal.record(intent.clone()).await.unwrap();
+        let mut unknown = intent.clone();
+        unknown.phase = AuditRecordPhase::Outcome;
+        unknown.terminal_status = AuditTerminalStatus::Unknown;
+        journal.record(unknown).await.unwrap();
+
+        let refused = resolve_in(&journal, intent.operation_id, OutcomeDecision::Committed, "fine", false).await;
+        assert!(refused.is_err(), "a production claim needs the operator's declaration");
+        assert_eq!(list_in(&journal, None).await.unwrap().len(), 1);
+        resolve_in(&journal, intent.operation_id, OutcomeDecision::Committed, "fine", true)
+            .await
+            .unwrap();
+        let recorded = journal.recent(1).await.unwrap().remove(0).reconciliation.unwrap();
+        assert_eq!(recorded.evidence, AuditReconciliationEvidence::ServerCheckedManually);
     }
 }
