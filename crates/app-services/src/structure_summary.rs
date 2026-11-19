@@ -1,3 +1,4 @@
+use bookie_core::sql_ddl::{DraftColumn, build_create_table};
 use bookie_core::{ColumnInfo, ForeignKeyInfo, IndexInfo};
 
 pub fn structure_summary(columns: &[ColumnInfo], indexes: &[IndexInfo], foreign_keys: &[ForeignKeyInfo]) -> String {
@@ -8,6 +9,29 @@ pub fn structure_summary(columns: &[ColumnInfo], indexes: &[IndexInfo], foreign_
     lines.push(format!("Foreign keys ({})", foreign_keys.len()));
     lines.extend(foreign_keys.iter().map(foreign_key_line));
     lines.join("\n")
+}
+
+pub fn create_table_script(
+    driver_id: &str,
+    schema: Option<&str>,
+    table: &str,
+    columns: &[ColumnInfo],
+    indexes: &[IndexInfo],
+    foreign_keys: &[ForeignKeyInfo],
+) -> Result<String, String> {
+    let drafts: Vec<DraftColumn> = columns.iter().cloned().map(DraftColumn::from_info).collect();
+    let secondary: Vec<IndexInfo> = indexes
+        .iter()
+        .filter(|index| !index.primary && index.constraint.is_none())
+        .cloned()
+        .collect();
+    let statements = build_create_table(driver_id, schema, table, &drafts, &secondary, foreign_keys)
+        .map_err(|error| error.to_string())?;
+    Ok(statements
+        .into_iter()
+        .map(|statement| format!("{statement};"))
+        .collect::<Vec<_>>()
+        .join("\n"))
 }
 
 fn column_line(column: &ColumnInfo) -> String {
@@ -117,5 +141,37 @@ mod tests {
     fn a_table_without_indexes_or_keys_says_so_with_zero_counts() {
         let text = structure_summary(&[column("id", false)], &[], &[]);
         assert!(text.ends_with("Indexes (0)\nForeign keys (0)"), "{text}");
+    }
+
+    #[test]
+    fn a_create_table_script_has_the_table_its_secondary_indexes_and_skips_the_primary_key_index() {
+        let secondary = IndexInfo {
+            name: "by_owner".into(),
+            columns: vec!["owner".into()],
+            unique: false,
+            primary: false,
+            predicate: None,
+            constraint: None,
+            has_expression_key: false,
+            using_clause: None,
+        };
+        let primary = IndexInfo {
+            name: "orders_pkey".into(),
+            primary: true,
+            ..secondary.clone()
+        };
+        let script = create_table_script(
+            "postgres",
+            Some("public"),
+            "orders",
+            &[column("id", true), column("owner", false)],
+            &[primary, secondary],
+            &[],
+        )
+        .unwrap();
+        assert!(script.starts_with("CREATE TABLE \"public\".\"orders\""), "{script}");
+        assert!(script.contains("CREATE INDEX \"by_owner\""), "{script}");
+        assert!(!script.contains("orders_pkey"), "{script}");
+        assert!(create_table_script("postgres", None, "t", &[], &[], &[]).is_err());
     }
 }

@@ -43,6 +43,7 @@ pub async fn list_saved_connections() -> Result<Vec<ConnectionSummary>, String> 
 pub struct TableStructure {
     pub indexes: Vec<bookie_core::IndexInfo>,
     pub foreign_keys: Vec<bookie_core::ForeignKeyInfo>,
+    pub referenced_by: Vec<bookie_core::InboundForeignKeyInfo>,
 }
 
 pub struct ReadSession {
@@ -307,7 +308,19 @@ impl ReadSession {
         } else {
             Vec::new()
         };
-        Ok(TableStructure { indexes, foreign_keys })
+        let referenced_by = if capabilities.supports_foreign_key_metadata {
+            guard
+                .fetch_inbound_foreign_keys_controlled(schema, &table.name, control)
+                .await
+                .map_err(|error| classify(&error))?
+        } else {
+            Vec::new()
+        };
+        Ok(TableStructure {
+            indexes,
+            foreign_keys,
+            referenced_by,
+        })
     }
 
     pub async fn read_catalog(
