@@ -223,7 +223,7 @@ fn a_blank_name_falls_back_to_the_endpoint_label() {
 
     let mut file = opts("", AuthMode::Password);
     file.database = "/tmp/books.db".into();
-    assert_eq!(saved_connection_name("", "sqlite", &file), "/tmp/books.db");
+    assert_eq!(saved_connection_name("", "sqlite", &file), "books.db");
 
     let mut socket = opts("postgres", AuthMode::Password);
     socket.local_socket_dir = Some(std::path::PathBuf::from("/run/postgresql"));

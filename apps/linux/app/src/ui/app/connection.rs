@@ -273,10 +273,15 @@ impl App {
     pub(super) fn on_reload_connections(&self, sender: ComponentSender<Self>) {
         let sender_clone = sender.clone();
         let workspace = self.workspace.clone();
+        let latest = self.connections_reload_seq.clone();
+        let sequence = latest.begin();
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
                     if let Ok(connections) = bookie_storage::load_connections().await {
+                        if !latest.is_latest(sequence) {
+                            return;
+                        }
                         let ids = connections.iter().map(|connection| connection.id).collect::<Vec<_>>();
                         if workspace.prefetch_connections(&ids).is_err() {
                             sender_clone.input(AppMsg::ShowToast(bookie_app_services::tr!(

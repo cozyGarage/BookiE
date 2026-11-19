@@ -585,6 +585,7 @@ fn build_export_dialog(
         bookie_app_services::tr!("Export Results")
     };
     let (dialog, toolbar) = super::dialog_shell::form(&title, 480);
+    toolbar.set_width_request(480);
     toolbar.set_content(Some(page));
     toolbar.add_bottom_bar(footer);
     dialog.set_default_widget(Some(export_button));

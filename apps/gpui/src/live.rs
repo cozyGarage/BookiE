@@ -632,7 +632,11 @@ async fn dictionary_pages(
     spooled_pages(result, ROW_CAP, cancellation).await
 }
 
-async fn spooled_pages(mut result: QueryResult, max_rows: u64, cancellation: &CancellationToken) -> Result<Pages, String> {
+async fn spooled_pages(
+    mut result: QueryResult,
+    max_rows: u64,
+    cancellation: &CancellationToken,
+) -> Result<Pages, String> {
     if cancellation.is_cancelled() {
         return Err("The operation was cancelled.".into());
     }
@@ -815,7 +819,7 @@ fn find_table(tables: &[TableInfo], wanted: &TableInfo) -> Result<TableInfo, Str
 }
 
 fn column_meta(info: &ColumnInfo) -> ColumnMeta {
-    let measured = (info.name.chars().count() as f32 * 9.0 + 48.0).clamp(110.0, 320.0);
+    let measured = (info.name.chars().count() as f32 * 9.0 + 48.0).clamp(160.0, 320.0);
     let width = if numeric_type(&info.data_type) {
         measured.max(200.0)
     } else {

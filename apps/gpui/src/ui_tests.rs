@@ -1490,7 +1490,7 @@ fn a_double_click_on_a_table_row_opens_the_active_column_for_editing(cx: &mut Te
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
             view.place_cursor(Some(Cursor { row: 0, column: 1 }));
-            view.edit_clicked_row(1, window, cx);
+            view.edit_clicked_row(1, None, window, cx);
         })
     });
     view.read_with(cx, |view, _| {

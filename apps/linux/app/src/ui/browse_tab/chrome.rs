@@ -192,7 +192,10 @@ impl BrowseTab {
         let sort_status_label = gtk::Label::builder().visible(false).build();
         sort_status_label.add_css_class("dim-label");
         sort_status_label.add_css_class("caption");
-        let clear_sort_button = gtk::Button::with_label(&bookie_app_services::tr!("Clear sort"));
+        let clear_sort_button = gtk::Button::from_icon_name("edit-clear-symbolic");
+        clear_sort_button.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!(
+            "Clear sort"
+        ))]);
         clear_sort_button.add_css_class("flat");
         clear_sort_button.set_visible(false);
         clear_sort_button.set_tooltip_text(Some(&bookie_app_services::tr!("Clear column sort")));
@@ -462,7 +465,11 @@ impl BrowseTab {
             return;
         };
         self.sort_status_label.set_label(&summary);
-        self.sort_status_label.set_visible(true);
+        self.sort_status_label.set_visible(false);
+        self.clear_sort_button.set_tooltip_text(Some(&format!(
+            "{summary}. {}",
+            bookie_app_services::tr!("Clear column sort")
+        )));
         self.clear_sort_button.set_visible(true);
     }
 

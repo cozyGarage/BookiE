@@ -332,7 +332,10 @@ impl GridView {
                     this.open_cell_menu(window, cx);
                 }
                 gpui_kit::component::table::TableEvent::DoubleClickedRow(row) => {
-                    this.edit_clicked_row(*row, window, cx);
+                    this.edit_clicked_row(*row, None, window, cx);
+                }
+                gpui_kit::component::table::TableEvent::DoubleClickedCell(row, column) => {
+                    this.edit_clicked_row(*row, Some(*column), window, cx);
                 }
                 _ => {}
             },
