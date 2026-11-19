@@ -196,7 +196,7 @@ flowchart TB
 | `bookie-dump` | GTK-free vendor-tool supervision, private password files and PostgreSQL dump/restore requests. Application services run backup and restore through `PolicyGuard::run_administrative`. Depends on `core`; [ADR 0019](docs/decisions/0019-database-tooling-without-sidecars.md) governs the feature. |
 | `bookie-mcp` | MCP auth, scopes, connection allowlists, rate limits, tools. Never exposes a raw driver connection. |
 | `bookie-driver-*` | One static crate per engine. |
-| `bookie-driver-registry` | Registers every static driver in one `default_registry()` for the two composition roots and GPUI. |
+| `bookie-driver-registry` | Registers every static driver in one `default_registry()` for the three composition roots (`app`, `agentd`, `apps/gpui`). |
 | `bookie-checks` | TCP reachability checks and their rolling result history; re-exported by `app-services` and used by `apps/gpui`. |
 | `bookie-pg-sessions` | The PostgreSQL session list query and its row type; re-exported by `app-services` and used by `apps/gpui`. |
 | `bookie-kafka-browser` | Read-only Kafka topic listing and bounded record tail through `rskafka`; re-exported by `app-services` and used by `apps/gpui`. |
@@ -296,7 +296,7 @@ bookie-core       ──► (no workspace crate)
 
 Rules that keep this sound:
 
-1. **Two production composition roots.** `app` and `agentd` register drivers and assemble services. Domain crates do not construct GTK widgets or start Relm4. Test crates may assemble drivers to exercise their contracts against real engines.
+1. **Three production composition roots.** `app`, `agentd` and `apps/gpui` register drivers and assemble services. Domain crates do not construct GTK widgets or start Relm4. Test crates may assemble drivers to exercise their contracts against real engines.
 2. **One governance seam.** Every live database handle a consumer sees is a `PolicyGuard`. Token scopes and connection allowlists never replace it.
 3. **Static drivers.** Engines are linked at build time and registered in code. There is no plugin discovery ABI ([ADR 0001](docs/decisions/0001-no-plugin-system.md)).
 4. **Trust at the edges.** MCP input, saved connection files, imported files, environment variables and database metadata are untrusted input.
@@ -312,7 +312,7 @@ Rules that keep this sound:
 | Saved connections, keyring, history, audit journal | `crates/storage` |
 | Dial options, SSH chain, TLS service identity | `crates/transport` / `crates/ssh` |
 | Shared value, result, driver or cancel contracts | `crates/core` |
-| A database engine | New `crates/drivers/<engine>` + both composition roots ([adding drivers](docs/adding-drivers.md)) |
+| A database engine | New `crates/drivers/<engine>` + the registry (`crates/registry`) used by every composition root ([adding drivers](docs/adding-drivers.md)) |
 | Architecture or behaviour rule | An [ADR](docs/decisions/README.md); do not invent a parallel rule in a board |
 | Current capability description extracted from code | [`specs/`](specs/README.md) (draft until reviewed; ADRs and AGENTS rank above it) |
 | Open work and owner | The [ledger](docs/known-issues.md) and Project #3 |

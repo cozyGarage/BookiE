@@ -45,7 +45,7 @@ BookiE is a free, open-source database client focused on Linux first, built for 
 | Databases | **11 engines**: PostgreSQL, MySQL, MariaDB, SQLite, SQL Server, and ClickHouse (Stable). DuckDB (built in), MongoDB, and Redis (Experimental). Read-only Oracle Database and Cassandra / ScyllaDB drivers (Experimental). See the [driver maturity table](docs/adding-drivers.md#driver-maturity). |
 | Cost | Free and open source under [AGPL-3.0-or-later](LICENSE). No accounts, subscriptions, license keys, paid tiers, or remote entitlement checks. |
 | Credentials | Securely stored in the system keyring (Secret Service via `oo7`). Plaintext files never hold passwords or passphrases. |
-| Safety & Governance | Every operation passes local `PolicyGuard` checks and writes to an encrypted audit journal. Destructive actions require explicit confirmation or terminal code approval (`approve <code>`). |
+| Safety & Governance | Every operation passes local `PolicyGuard` checks and writes to a local, hash-chained audit journal. Destructive actions require explicit confirmation or terminal code approval (`approve <code>`). |
 | Interoperability | Native connection draft import from **DBX** (`dbx.db`), DBeaver, DataGrip, Navicat, RESP.app, and Another Redis Desktop Manager. |
 | AI agents | Built-in headless `bookie-agentd` server implementing the Model Context Protocol (MCP) over Unix sockets or stdio, guarded by the same safety policy. |
 | Performance | Progressive streaming for large results with disk spooling (1 GiB quota, 4,096 pages) and continuous scrolling; fast keyset seeks for table browsing. |
