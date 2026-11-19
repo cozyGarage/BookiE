@@ -291,7 +291,7 @@ async fn multi_table_export_keeps_each_snapshot_and_never_replaces_racing_files(
         format: ResultFormat::Csv,
         extension: "csv",
         csv: &csv,
-        max_rows_per_table: 11_000,
+        max_rows_per_table: Some(11_000),
         timeout_secs: 60,
     };
     let changed = std::cell::Cell::new(false);
@@ -385,7 +385,7 @@ async fn multi_table_export_stops_on_cancellation_and_keeps_completed_files() {
         format: ResultFormat::Csv,
         extension: "csv",
         csv: &csv,
-        max_rows_per_table: 4,
+        max_rows_per_table: Some(4),
         timeout_secs: 60,
     };
     let cancel = CancellationToken::new();
@@ -401,6 +401,60 @@ async fn multi_table_export_stops_on_cancellation_and_keeps_completed_files() {
     assert!(directory.path().join("public.small.csv").exists());
     assert!(!directory.path().join("public.snap.csv").exists());
     assert!(!directory.path().join("public.empty.csv").exists());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires Docker; run cargo test -p bookie-app-services --test snapshot_export_postgres -- --include-ignored"]
+async fn multi_table_export_applies_the_limit_independently_to_each_table() {
+    use bookie_app_services::export_tables::{TableExportRequest, TableOutcome, TableTarget, export_tables};
+    let fixture = fixture().await;
+    fixture
+        .admin
+        .execute("CREATE TABLE small AS SELECT * FROM snap WHERE id <= 3")
+        .await
+        .unwrap();
+    let columns = fixture.admin.fetch_columns(Some("public"), "snap").await.unwrap();
+    let tables: Vec<_> = ["small", "snap"]
+        .into_iter()
+        .map(|table| TableTarget {
+            schema: Some("public".into()),
+            table: table.into(),
+            columns: columns.clone(),
+        })
+        .collect();
+    let guard = guard(&fixture, Arc::new(CapturingAudit::default()), "postgres").await;
+    let directory = tempfile::tempdir().unwrap();
+    let csv = CsvOptions::default();
+    let request = TableExportRequest {
+        driver_id: "postgres",
+        tables: &tables,
+        directory: directory.path(),
+        format: ResultFormat::Csv,
+        extension: "csv",
+        csv: &csv,
+        max_rows_per_table: Some(2),
+        timeout_secs: 60,
+    };
+    let results = export_tables(
+        guard,
+        &PgDriver,
+        &request,
+        &runner(),
+        &CancellationToken::new(),
+        |_, _| {},
+    )
+    .unwrap();
+    assert_eq!(results.len(), 2);
+    for (result, table) in results.iter().zip(["small", "snap"]) {
+        assert_eq!(result.outcome, TableOutcome::Written { rows: 2, capped: true });
+        assert_eq!(
+            std::fs::read_to_string(directory.path().join(format!("public.{table}.csv")))
+                .unwrap()
+                .lines()
+                .count(),
+            3
+        );
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -434,7 +488,7 @@ async fn multi_table_export_reports_empty_missing_and_existing_destinations() {
         format: ResultFormat::Csv,
         extension: "csv",
         csv: &csv,
-        max_rows_per_table: 4,
+        max_rows_per_table: Some(4),
         timeout_secs: 60,
     };
     let results = export_tables(
@@ -452,6 +506,54 @@ async fn multi_table_export_reports_empty_missing_and_existing_destinations() {
     assert_eq!(std::fs::read_to_string(existing).unwrap(), "precious");
     assert!(!directory.path().join("public.missing.csv").exists());
     assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 2);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires Docker; run cargo test -p bookie-app-services --test snapshot_export_postgres -- --include-ignored"]
+async fn multi_table_export_without_a_row_limit_writes_the_full_snapshot() {
+    use bookie_app_services::export_tables::{TableExportRequest, TableOutcome, TableTarget, export_tables};
+    let fixture = fixture().await;
+    let guard = guard(&fixture, Arc::new(CapturingAudit::default()), "postgres").await;
+    let targets = vec![TableTarget {
+        schema: Some("public".into()),
+        table: "snap".into(),
+        columns: fixture.admin.fetch_columns(Some("public"), "snap").await.unwrap(),
+    }];
+    let directory = tempfile::tempdir().unwrap();
+    let csv = CsvOptions::default();
+    let request = TableExportRequest {
+        driver_id: "postgres",
+        tables: &targets,
+        directory: directory.path(),
+        format: ResultFormat::Csv,
+        extension: "csv",
+        csv: &csv,
+        max_rows_per_table: None,
+        timeout_secs: 60,
+    };
+    let results = export_tables(
+        guard,
+        &PgDriver,
+        &request,
+        &runner(),
+        &CancellationToken::new(),
+        |_, _| {},
+    )
+    .unwrap();
+    assert_eq!(
+        results[0].outcome,
+        TableOutcome::Written {
+            rows: 12_000,
+            capped: false
+        }
+    );
+    assert_eq!(
+        std::fs::read_to_string(directory.path().join("public.snap.csv"))
+            .unwrap()
+            .lines()
+            .count(),
+        12_001
+    );
 }
 
 struct UnavailableAudit;
@@ -498,7 +600,7 @@ async fn multi_table_export_does_not_publish_when_snapshot_audit_fails() {
         format: ResultFormat::Csv,
         extension: "csv",
         csv: &csv,
-        max_rows_per_table: 4,
+        max_rows_per_table: Some(4),
         timeout_secs: 60,
     };
     let results = export_tables(

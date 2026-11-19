@@ -1,6 +1,6 @@
 use relm4::adw::{self, prelude::*};
 
-pub(super) fn build() -> adw::EntryRow {
+pub(crate) fn build() -> adw::EntryRow {
     adw::EntryRow::builder()
         .title(bookie_app_services::tr!("Maximum rows (optional)"))
         .build()
@@ -20,7 +20,7 @@ pub(super) fn parse(text: &str) -> Result<Option<usize>, ()> {
     }
 }
 
-pub(super) fn choice(row: &adw::EntryRow) -> Result<Option<usize>, ()> {
+pub(crate) fn choice(row: &adw::EntryRow) -> Result<Option<usize>, ()> {
     let parsed = parse(row.text().as_str());
     if parsed.is_err() {
         row.add_css_class("error");
