@@ -1,3 +1,4 @@
+use std::io::Write;
 use std::time::{Duration, Instant};
 
 mod assets;
@@ -466,7 +467,8 @@ impl GridView {
         let now = Instant::now();
         if !self.measure.first_frame_reported {
             self.measure.first_frame_reported = true;
-            println!(
+            let _ = writeln!(
+                std::io::stdout(),
                 "PROTOTYPE_FIRST_FRAME ms={}",
                 self.measure.started.elapsed().as_millis()
             );
@@ -677,6 +679,13 @@ fn open_requested_start_tab(view: &Entity<GridView>, name: &str, cx: &mut App) {
 
 fn main() {
     let started = Instant::now();
+    tracing_subscriber::fmt()
+        .with_writer(std::io::stderr)
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("warn")),
+        )
+        .init();
     let total = rows_from(std::env::var("BOOKIE_PROTOTYPE_ROWS").ok().as_deref());
     let live = live_source();
     let keymap = load_keymap();
@@ -684,7 +693,7 @@ fn main() {
         Vec::new()
     } else {
         bookie_gpui::live::saved_connections().unwrap_or_else(|error| {
-            eprintln!("saved connections unavailable: {error}");
+            tracing::warn!(%error, "saved connections unavailable");
             Vec::new()
         })
     };
@@ -730,7 +739,7 @@ fn main() {
                 },
             );
             if let Err(error) = opened {
-                eprintln!("could not open a window: {error}");
+                tracing::error!(%error, "could not open a window");
                 std::process::exit(2);
             }
         });
@@ -751,7 +760,7 @@ fn load_keymap() -> Keymap {
         return Keymap::default();
     };
     Keymap::from_overrides(&text).unwrap_or_else(|error| {
-        eprintln!("ignoring {}: {error}", path.display());
+        tracing::warn!(%error, path = %path.display(), "ignoring file");
         Keymap::default()
     })
 }
@@ -770,7 +779,7 @@ fn live_source() -> Option<std::sync::Arc<bookie_gpui::live::LiveTable>> {
     let session = match LiveSession::open(&origin) {
         Ok(session) => session,
         Err(error) => {
-            eprintln!("could not open live source: {error}");
+            tracing::error!(%error, "could not open live source");
             std::process::exit(2);
         }
     };
@@ -779,13 +788,13 @@ fn live_source() -> Option<std::sync::Arc<bookie_gpui::live::LiveTable>> {
         .iter()
         .find(|candidate| candidate.name == table || table_label(candidate) == table)
     else {
-        eprintln!("could not find table {table}");
+        tracing::error!(%table, "could not find table");
         std::process::exit(2);
     };
     match session.load_table(target, bookie_gpui::live::ROW_CAP) {
         Ok(live) => Some(std::sync::Arc::new(live)),
         Err(error) => {
-            eprintln!("could not read {table}: {error}");
+            tracing::error!(%table, %error, "could not read table");
             std::process::exit(2);
         }
     }
