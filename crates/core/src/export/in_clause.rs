@@ -44,6 +44,8 @@ pub fn render_value_list<R: QueryRowSet + ?Sized>(driver_id: &str, columns: &[Co
                 literals.push("NULL".to_string());
             } else if let Some(lit) = in_clause_literal(driver_id, val) {
                 literals.push(lit);
+            } else if let Some(lit) = binary_literal(driver_id, val) {
+                literals.push(lit);
             } else if let Some(txt) = value_to_text(val) {
                 literals.push(format!("'{}'", txt.replace('\'', "''")));
             } else {
@@ -53,6 +55,13 @@ pub fn render_value_list<R: QueryRowSet + ?Sized>(driver_id: &str, columns: &[Co
         row_tuples.push(format!("({})", literals.join(", ")));
     }
     row_tuples.join(",\n")
+}
+
+fn binary_literal(driver_id: &str, value: &Value) -> Option<String> {
+    if !matches!(value, Value::Bytes(_)) || !supports_sql_literals(driver_id) {
+        return None;
+    }
+    crate::sql_literal::render_sql_literal(driver_id, value).ok()
 }
 
 fn in_clause_literal(driver_id: &str, value: &Value) -> Option<String> {
@@ -147,5 +156,19 @@ mod tests {
 
         let sqlite_sql = render_value_list("sqlite", &columns, &rows);
         assert_eq!(sqlite_sql, "(10, '2026-10-29', TRUE)");
+    }
+
+    #[test]
+    fn value_list_renderer_keeps_binary_as_a_binary_literal_not_text() {
+        let columns = vec![column("payload")];
+        let rows = vec![vec![Value::Bytes(vec![0xde, 0xad])]];
+        for (driver, expected) in [
+            ("postgres", "(decode('dead', 'hex'))"),
+            ("mysql", "(X'dead')"),
+            ("sqlite", "(X'dead')"),
+            ("mssql", "(0xdead)"),
+        ] {
+            assert_eq!(render_value_list(driver, &columns, &rows), expected, "{driver}");
+        }
     }
 }

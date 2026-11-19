@@ -542,4 +542,23 @@ mod tests {
             })
         );
     }
+
+    #[test]
+    fn value_honesty_mcp_json_tags_full_binary_booleans_and_zoned_time() {
+        let blob: Vec<u8> = (0..=255u8).cycle().take(70_000).collect();
+        assert_eq!(
+            value_to_json(&bookie_core::Value::Bytes(blob.clone())),
+            json!({"$type": "bytes_hex", "value": hex::encode(&blob)})
+        );
+        assert_eq!(
+            value_to_json(&bookie_core::Value::Bool(false)),
+            json!({"$type": "bool", "value": false})
+        );
+        let stamp = bookie_core::Value::TimestampTz("2026-09-27T12:34:56+05:30".parse().unwrap());
+        assert_eq!(
+            value_to_json(&stamp),
+            json!({"$type": "timestamp_tz", "value": "2026-09-27T07:04:56+00:00"})
+        );
+        assert_eq!(value_to_json(&bookie_core::Value::Null), json!({"$type": "null"}));
+    }
 }
