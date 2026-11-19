@@ -23,6 +23,7 @@ mod edit_history;
 mod favorites_ui;
 mod approval_ui;
 mod import_ui;
+mod structure_ui;
 mod insert_ui;
 mod params_ui;
 mod picker;
@@ -134,6 +135,7 @@ struct GridView {
     approval: approval_ui::ApprovalUi,
     insert: insert_ui::InsertState,
     import: import_ui::ImportState,
+    structure: structure_ui::StructureState,
     sidebar: sidebar_state::SidebarState,
     row_menu: Option<menus::RowMenu>,
     connection_form: connection_form::ConnectionForm,
@@ -384,6 +386,7 @@ impl GridView {
             approval,
             insert: insert_ui::InsertState::default(),
             import: import_ui::ImportState::default(),
+            structure: structure_ui::StructureState::default(),
             sidebar: sidebar_state::SidebarState::new(sidebar_search),
             row_menu: None,
             connection_form: connection_form::ConnectionForm::new(cx),

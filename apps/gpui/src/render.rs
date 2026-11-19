@@ -328,7 +328,8 @@ impl Render for GridView {
         let palette = self.palette.open.then(|| self.palette_overlay(cx));
         let save_bar = self.approval_bar(theme, cx).or_else(|| self.save_bar(theme, cx));
         let banner = self.save_banner(theme, cx);
-        let insert_form = self.insert_form(theme, cx).or_else(|| self.import_bar(theme, cx));
+        let insert_form = self.insert_form(theme, cx).or_else(|| self.import_bar(theme, cx))
+            .or_else(|| self.structure_bar(theme, cx));
         let grid = self.grid_pane(theme, strip, (filter_row, compare_bar, save_bar, banner, insert_form));
         let content = match self.tabs.current().clone() {
             Tab::Home => self.home_page(theme, cx),

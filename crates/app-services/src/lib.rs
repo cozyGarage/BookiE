@@ -114,6 +114,7 @@ pub mod query_parameters;
 pub mod quick_switcher;
 pub mod reconnect;
 pub mod sql_text;
+pub mod structure_change_plan;
 pub mod value_display;
 
 pub mod grid_replace;

@@ -36,6 +36,7 @@ pub(crate) enum SaveRequest {
     Deletes(Vec<Vec<bookie_core::Value>>),
     Insert(Vec<(String, String)>),
     Import(std::path::PathBuf),
+    Structure(bookie_app_services::structure_change_plan::StructureChangeKind, String),
 }
 
 pub(crate) struct ReviewLabels {
@@ -191,6 +192,7 @@ impl GridView {
                             plan_row_insert_named(target, &named).map_err(|error| error.to_string())
                         }
                         SaveRequest::Import(file) => plan_file_import(target, &live.driver_id, &file),
+                        SaveRequest::Structure(kind, text) => plan_structure(target, kind, &text),
                     }
                 })
                 .await;
@@ -333,6 +335,7 @@ impl GridView {
             Ok(_) => {
                 self.close_insert_form();
                 self.close_import_bar();
+                self.close_structure_bar();
                 self.show_banner(done.clone(), false, cx);
                 self.reload_after_save(done, cx);
             }
@@ -425,6 +428,20 @@ impl GridView {
                 ),
         )
     }
+}
+
+fn plan_structure(
+    target: SaveTarget<'_>,
+    kind: bookie_app_services::structure_change_plan::StructureChangeKind,
+    text: &str,
+) -> Result<CellSavePlan, String> {
+    let plan = bookie_app_services::structure_change_plan::plan_structure_change(target, kind, text)
+        .map_err(|error| error.to_string())?;
+    Ok(CellSavePlan {
+        statements: plan.statements,
+        expect_one: Vec::new(),
+        preview: plan.preview,
+    })
 }
 
 fn expand_home(path: &std::path::Path) -> std::path::PathBuf {
