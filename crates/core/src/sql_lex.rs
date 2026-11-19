@@ -197,6 +197,57 @@ fn statement_spans(sql: &str, driver_id: &str) -> Vec<(usize, usize)> {
     spans
 }
 
+fn first_semicolon(sql: &str, driver_id: &str) -> Option<usize> {
+    let bytes = sql.as_bytes();
+    let mut index = 0usize;
+    while index < bytes.len() {
+        if let Some(length) = skip_span_at(sql, index, driver_id).filter(|length| *length > 0) {
+            index += length;
+            continue;
+        }
+        if bytes[index] == b';' {
+            return Some(index);
+        }
+        index += sql[index..].chars().next().map_or(1, char::len_utf8);
+    }
+    None
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct CopyIn<'a> {
+    pub command: &'a str,
+    pub data: &'a str,
+    pub terminated: bool,
+}
+
+pub fn copy_in_parts<'a>(unit: &'a str, driver_id: &str) -> Option<CopyIn<'a>> {
+    if driver_id != "postgres" {
+        return None;
+    }
+    let trimmed = unit.trim();
+    let end = first_semicolon(trimmed, driver_id)?;
+    let command = trimmed.get(..end)?.trim();
+    if !is_copy_from_stdin(command, driver_id) {
+        return None;
+    }
+    let after = trimmed.get(end + 1..).unwrap_or("");
+    let body = after.split_once('\n').map_or("", |(_, rest)| rest);
+    let (data, terminated) = match body.rsplit_once('\n') {
+        Some((data, last)) if last.trim_end_matches('\r') == "\\." => (data, true),
+        _ if body.trim_end_matches('\r') == "\\." => ("", true),
+        _ => (body, false),
+    };
+    Some(CopyIn {
+        command,
+        data: if data.is_empty() {
+            data
+        } else {
+            data.trim_end_matches(['\r', '\n'])
+        },
+        terminated,
+    })
+}
+
 pub fn split_statements(sql: &str, driver_id: &str) -> Vec<String> {
     statement_spans(sql, driver_id)
         .into_iter()

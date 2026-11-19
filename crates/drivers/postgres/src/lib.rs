@@ -18,6 +18,7 @@ use bookie_core::{
 mod array;
 mod catalog;
 mod commit_resolution;
+mod copy_in;
 mod decode;
 mod errors;
 mod introspection;
@@ -443,6 +444,10 @@ impl Connection for PgConnection {
     }
 
     async fn query_controlled(&self, sql: &str, control: &OperationControl) -> Result<QueryResult, DriverError> {
+        if let Some(parts) = copy_in::parse(sql)? {
+            stoppable!(self, control, |connection| copy_in::run(&mut connection, &parts))?;
+            return Ok(copy_in::empty_result());
+        }
         let connection = acquire_controlled(&self.pool, control).await?;
         let (connection, result) = controlled_query(connection, sql, &[], true, control).await;
         drop(connection);
@@ -455,6 +460,10 @@ impl Connection for PgConnection {
         params: &[Value],
         control: &OperationControl,
     ) -> Result<QueryResultBatch, DriverError> {
+        if let Some(parts) = copy_in::parse(sql)? {
+            let copied = stoppable!(self, control, |connection| copy_in::run(&mut connection, &parts))?;
+            return Ok(QueryResultBatch::single(copy_in::empty_result()).with_rows_affected(Some(copied)));
+        }
         let connection = acquire_controlled(&self.pool, control).await?;
         let (connection, result) = controlled_query_with_messages(connection, sql, params, true, control).await;
         drop(connection);
@@ -478,6 +487,10 @@ impl Connection for PgConnection {
         params: &[Value],
         control: &OperationControl,
     ) -> Result<QueryResult, DriverError> {
+        if let Some(parts) = copy_in::parse(sql)? {
+            stoppable!(self, control, |connection| copy_in::run(&mut connection, &parts))?;
+            return Ok(copy_in::empty_result());
+        }
         let connection = acquire_controlled(&self.pool, control).await?;
         let (connection, result) = controlled_query(connection, sql, params, true, control).await;
         drop(connection);
@@ -490,6 +503,10 @@ impl Connection for PgConnection {
     }
 
     async fn execute_controlled(&self, sql: &str, control: &OperationControl) -> Result<ExecResult, DriverError> {
+        if let Some(parts) = copy_in::parse(sql)? {
+            let rows_affected = stoppable!(self, control, |connection| copy_in::run(&mut connection, &parts))?;
+            return Ok(ExecResult { rows_affected });
+        }
         let connection = acquire_controlled(&self.pool, control).await?;
         let (connection, result) = controlled_execute(connection, sql, &[], true, control).await;
         drop(connection);
