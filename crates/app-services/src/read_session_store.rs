@@ -94,6 +94,28 @@ impl ReadSessionStore {
         self.open(saved, label, control).await
     }
 
+    pub async fn open_saved_writable(&self, id: Uuid, control: &OperationControl) -> Result<OpenedSession, String> {
+        let saved = bookie_storage::load_connections()
+            .await
+            .map_err(|error| error.to_string())?
+            .into_iter()
+            .find(|saved| saved.id == id)
+            .ok_or_else(|| format!("connection {id} not found"))?;
+        let label = saved.name.clone();
+        self.open_writable(saved, label, control).await
+    }
+
+    pub async fn apply_changes(
+        &self,
+        id: SessionId,
+        statements: &[(String, Vec<bookie_core::Value>)],
+        expect_one: &[usize],
+        control: &OperationControl,
+    ) -> Result<Vec<u64>, DriverFailurePresentation> {
+        let session = self.get(id).ok_or(DriverFailurePresentation::Disconnected)?;
+        session.apply_changes(statements, expect_one, control).await
+    }
+
     pub async fn open_file(&self, path: &std::path::Path, control: &OperationControl) -> Result<OpenedSession, String> {
         let file = crate::open_request::classify_file(path).map_err(|error| format!("{error:?}"))?;
         let label = path.file_name().map_or_else(
@@ -191,6 +213,27 @@ impl ReadSessionStore {
         ))
         .await
         .map_err(|failure| open_failure_message(&failure))?;
+        Ok(self.register(session, label))
+    }
+
+    async fn open_writable(
+        &self,
+        saved: bookie_storage::SavedConnection,
+        label: String,
+        control: &OperationControl,
+    ) -> Result<OpenedSession, String> {
+        let session = Box::pin(ReadSession::open_writable_controlled(
+            saved,
+            Arc::clone(&self.registry),
+            Arc::clone(&self.database),
+            control.cancellation_token().clone(),
+        ))
+        .await
+        .map_err(|failure| open_failure_message(&failure))?;
+        Ok(self.register(session, label))
+    }
+
+    fn register(&self, session: ReadSession, label: String) -> OpenedSession {
         let summary = OpenedSession {
             session_id: SessionId::new(),
             label,
@@ -202,7 +245,7 @@ impl ReadSessionStore {
             .write()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .insert(summary.session_id, Arc::new(session));
-        Ok(summary)
+        summary
     }
 }
 
@@ -304,5 +347,195 @@ mod tests {
             rows.rows.first().and_then(|row| row.first()),
             Some(&bookie_core::Value::Int(2))
         );
+    }
+
+    async fn writable_fixture(
+        read_only: bool,
+    ) -> (tempfile::TempDir, std::path::PathBuf, ReadSessionStore, OpenedSession) {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("write.db");
+        std::fs::File::create(&path).unwrap();
+        let writer = drivers_sqlite::SqliteDriver
+            .connect(ConnectOptions {
+                database: path.to_string_lossy().into_owned(),
+                ..ConnectOptions::default()
+            })
+            .await
+            .unwrap();
+        writer
+            .execute("CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)")
+            .await
+            .unwrap();
+        writer
+            .execute("INSERT INTO items VALUES (1, 'a'), (2, 'b')")
+            .await
+            .unwrap();
+        let mut saved = crate::open_request::file_connection(&crate::open_request::classify_file(&path).unwrap());
+        saved.read_only = read_only;
+        let mut registry = DriverRegistry::new();
+        registry.register(Arc::new(drivers_sqlite::SqliteDriver));
+        let store = ReadSessionStore::new(Arc::new(registry), Arc::new(DatabaseService::new_isolated()));
+        let control = OperationControl::with_timeout(Duration::from_secs(5));
+        let opened = store.open_writable(saved, "writable".into(), &control).await.unwrap();
+        (directory, path, store, opened)
+    }
+
+    async fn name_of(path: &std::path::Path, id: i64) -> String {
+        let reader = drivers_sqlite::SqliteDriver
+            .connect(ConnectOptions {
+                database: path.to_string_lossy().into_owned(),
+                ..ConnectOptions::default()
+            })
+            .await
+            .unwrap();
+        let rows = reader
+            .query(&format!("SELECT name FROM items WHERE id = {id}"))
+            .await
+            .unwrap();
+        match rows.rows.first().and_then(|row| row.first()) {
+            Some(bookie_core::Value::Text(text)) => text.clone(),
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    fn rename(id: i64, name: &str) -> Vec<(String, Vec<bookie_core::Value>)> {
+        vec![(
+            "UPDATE items SET name = ? WHERE id = ?".to_string(),
+            vec![bookie_core::Value::Text(name.into()), bookie_core::Value::Int(id)],
+        )]
+    }
+
+    #[tokio::test]
+    async fn a_writable_session_applies_a_batch_in_one_transaction() {
+        let (_directory, path, store, opened) = writable_fixture(false).await;
+        let control = OperationControl::with_timeout(Duration::from_secs(5));
+        let affected = store
+            .apply_changes(opened.session_id, &rename(1, "changed"), &[0], &control)
+            .await
+            .expect("the write is applied");
+        assert_eq!(affected, vec![1]);
+        assert_eq!(name_of(&path, 1).await, "changed");
+        assert_eq!(name_of(&path, 2).await, "b");
+    }
+
+    #[tokio::test]
+    async fn an_overwrite_check_rolls_the_whole_batch_back() {
+        let (_directory, path, store, opened) = writable_fixture(false).await;
+        let control = OperationControl::with_timeout(Duration::from_secs(5));
+        let mut batch = rename(1, "changed");
+        batch.extend(rename(999, "ghost"));
+        let result = store.apply_changes(opened.session_id, &batch, &[0, 1], &control).await;
+        assert!(
+            format!("{result:?}").contains("RolledBack"),
+            "expected a rolled-back save, got {result:?}"
+        );
+        assert_eq!(name_of(&path, 1).await, "a", "the first update was rolled back");
+    }
+
+    #[tokio::test]
+    async fn a_read_only_saved_connection_refuses_writes_even_when_opened_writable() {
+        let (_directory, path, store, opened) = writable_fixture(true).await;
+        let control = OperationControl::with_timeout(Duration::from_secs(5));
+        let result = store
+            .apply_changes(opened.session_id, &rename(1, "changed"), &[0], &control)
+            .await;
+        assert!(
+            matches!(&result, Err(DriverFailurePresentation::PolicyDenied(message)) if message.contains("read-only")),
+            "expected the read-only policy denial, got {result:?}"
+        );
+        assert_eq!(name_of(&path, 1).await, "a");
+    }
+
+    #[tokio::test]
+    async fn the_ordinary_open_path_stays_read_only_and_refuses_a_batch() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("plain.db");
+        std::fs::File::create(&path).unwrap();
+        let writer = drivers_sqlite::SqliteDriver
+            .connect(ConnectOptions {
+                database: path.to_string_lossy().into_owned(),
+                ..ConnectOptions::default()
+            })
+            .await
+            .unwrap();
+        writer
+            .execute("CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)")
+            .await
+            .unwrap();
+        writer.execute("INSERT INTO items VALUES (1, 'a')").await.unwrap();
+        let mut saved = crate::open_request::file_connection(&crate::open_request::classify_file(&path).unwrap());
+        saved.read_only = false;
+        let mut registry = DriverRegistry::new();
+        registry.register(Arc::new(drivers_sqlite::SqliteDriver));
+        let store = ReadSessionStore::new(Arc::new(registry), Arc::new(DatabaseService::new_isolated()));
+        let control = OperationControl::with_timeout(Duration::from_secs(5));
+        let opened = store.open(saved, "plain".into(), &control).await.unwrap();
+
+        let result = store
+            .apply_changes(opened.session_id, &rename(1, "changed"), &[0], &control)
+            .await;
+
+        assert!(
+            matches!(&result, Err(DriverFailurePresentation::Unsupported(message)) if message.contains("opened for reading")),
+            "expected the read-session refusal, got {result:?}"
+        );
+        assert_eq!(name_of(&path, 1).await, "a");
+    }
+
+    #[tokio::test]
+    async fn a_writable_session_does_not_run_free_form_statements() {
+        let (_directory, path, store, opened) = writable_fixture(false).await;
+        let control = OperationControl::with_timeout(Duration::from_secs(5));
+        let session = store.get(opened.session_id).unwrap();
+
+        let write = session.run_query("UPDATE items SET name = 'x'", &control).await;
+        let read = session.run_query("SELECT 1", &control).await;
+        let bound = session
+            .run_query_params("SELECT ?", &[bookie_core::Value::Int(1)], &control)
+            .await;
+
+        for result in [write, read, bound] {
+            assert!(
+                matches!(&result, Err(DriverFailurePresentation::Unsupported(message)) if message.contains("free-form")),
+                "expected the free-form refusal, got {result:?}"
+            );
+        }
+        assert_eq!(name_of(&path, 1).await, "a");
+    }
+
+    #[tokio::test]
+    async fn a_change_that_holds_two_statements_is_refused_before_anything_runs() {
+        let (_directory, path, store, opened) = writable_fixture(false).await;
+        let control = OperationControl::with_timeout(Duration::from_secs(5));
+        let two = vec![(
+            "UPDATE items SET name = 'x' WHERE id = 1; UPDATE items SET name = 'y'".to_string(),
+            Vec::new(),
+        )];
+
+        let result = store.apply_changes(opened.session_id, &two, &[0], &control).await;
+
+        assert!(
+            matches!(&result, Err(DriverFailurePresentation::Unsupported(message)) if message.contains("single statement")),
+            "expected the single-statement refusal, got {result:?}"
+        );
+        assert_eq!(name_of(&path, 1).await, "a");
+        assert_eq!(name_of(&path, 2).await, "b");
+    }
+
+    #[tokio::test]
+    async fn a_closed_session_cannot_save() {
+        let (_directory, path, store, opened) = writable_fixture(false).await;
+        let control = OperationControl::with_timeout(Duration::from_secs(5));
+        assert!(store.close(opened.session_id));
+
+        let result = store
+            .apply_changes(opened.session_id, &rename(1, "changed"), &[0], &control)
+            .await;
+
+        assert!(
+            matches!(result, Err(DriverFailurePresentation::Disconnected)),
+            "{result:?}"
+        );
+        assert_eq!(name_of(&path, 1).await, "a");
     }
 }
