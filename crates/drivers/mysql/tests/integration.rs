@@ -24,8 +24,6 @@ mod disconnection;
 mod old_server_read_only;
 #[path = "support/pooled_database.rs"]
 mod pooled_database;
-#[path = "support/session_use_and_loss.rs"]
-mod session_use_and_loss;
 #[path = "support/read_only_session.rs"]
 mod read_only_session;
 #[path = "support/server_activity.rs"]
@@ -34,6 +32,8 @@ mod server_activity;
 mod server_messages;
 #[path = "support/server_stop_class.rs"]
 mod server_stop_class;
+#[path = "support/session_use_and_loss.rs"]
+mod session_use_and_loss;
 #[path = "support/shared_container.rs"]
 mod shared_container;
 
