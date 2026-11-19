@@ -64,6 +64,15 @@ pub fn quote_ident(driver_id: &str, name: &str) -> String {
     }
 }
 
+pub fn set_schema_statement(driver_id: &str, schema: &str) -> Option<String> {
+    let quoted = quote_ident(driver_id, schema);
+    match driver_id {
+        "postgres" => Some(format!("SET search_path TO {quoted}")),
+        "mysql" => Some(format!("USE {quoted}")),
+        _ => None,
+    }
+}
+
 pub fn placeholder_for(driver_id: &str, index: usize) -> String {
     match driver_id {
         "postgres" => format!("${}", index + 1),

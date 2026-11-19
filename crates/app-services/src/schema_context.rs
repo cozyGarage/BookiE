@@ -1,4 +1,4 @@
-use bookie_core::sql_dialect::{IdentError, quote_ident, validate_ident};
+use bookie_core::sql_dialect::{IdentError, validate_ident};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum SchemaContextError {
@@ -8,7 +8,7 @@ pub enum SchemaContextError {
 }
 
 pub fn supports_schema_context(driver_id: &str) -> bool {
-    matches!(driver_id, "postgres" | "mysql")
+    bookie_core::sql_dialect::set_schema_statement(driver_id, "x").is_some()
 }
 
 pub fn schema_context_statement(driver_id: &str, schema: &str) -> Result<String, SchemaContextError> {
@@ -16,11 +16,8 @@ pub fn schema_context_statement(driver_id: &str, schema: &str) -> Result<String,
         return Err(SchemaContextError::Unsupported(driver_id.to_string()));
     }
     validate_ident(schema).map_err(SchemaContextError::Invalid)?;
-    let quoted = quote_ident(driver_id, schema);
-    Ok(match driver_id {
-        "postgres" => format!("SET search_path TO {quoted}"),
-        _ => format!("USE {quoted}"),
-    })
+    bookie_core::sql_dialect::set_schema_statement(driver_id, schema)
+        .ok_or_else(|| SchemaContextError::Unsupported(driver_id.to_string()))
 }
 
 pub fn schema_context_for_run(
