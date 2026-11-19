@@ -366,7 +366,7 @@ impl GridView {
             }
             Err(failure) if failure.outcome_unknown => {
                 let text = format!(
-                    "The save may or may not have been applied ({}). The table was reloaded; check the data before saving again.",
+                    "The save may or may not have been applied ({}). The table was reloaded; check the data before saving again, then use 'Resolve unknown write outcome…' in the command palette.",
                     failure.message
                 );
                 self.save.busy = false;

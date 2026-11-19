@@ -1039,3 +1039,16 @@ fn only_a_table_rename_asks_for_a_reconnect_after_it_is_applied(cx: &mut TestApp
     }
     std::fs::remove_file(&path).ok();
 }
+
+#[gpui::test]
+fn resolving_an_outcome_is_offered_for_a_writable_connection_and_not_while_the_panel_is_open(cx: &mut TestAppContext) {
+    let path = fixture_copy("resolve-offer");
+    let (view, cx) = saving_view(cx, &path);
+    view.read_with(cx, |view, _| {
+        assert!(view.resolve_enabled());
+        assert!(view.resolve_panel_is_closed());
+    });
+    cx.update(|_, cx| view.update(cx, |view, _| view.resolve.open = true));
+    view.read_with(cx, |view, _| assert!(!view.resolve_enabled()));
+    std::fs::remove_file(&path).ok();
+}
