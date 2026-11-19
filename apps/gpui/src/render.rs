@@ -229,7 +229,7 @@ impl GridView {
                 .gap_2()
                 .px_2()
                 .pb_2()
-                .child(div().child("WHERE"))
+                .child(div().child("Filter"))
                 .child(div().w(px(size::FILTER_WIDTH)).child(self.search.filter.clone()))
                 .child(button("apply", "Apply", theme).on_click(cx.listener(|this, _, _, cx| this.apply_filter(cx))))
                 .child(

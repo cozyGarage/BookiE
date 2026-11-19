@@ -66,12 +66,12 @@ impl GridView {
         let predicate = match parse_predicate(self.search.filter.read(cx).content(), self.source.columns()) {
             Ok(predicate) => predicate,
             Err(message) => {
-                self.status = message.into();
+                self.status = message;
                 return;
             }
         };
         let source = self.source.clone();
-        let label = format!("WHERE {}", self.search.filter.read(cx).content());
+        let label = format!("Filter {}", self.search.filter.read(cx).content());
         self.status = "Filtering…".into();
         self.begin_background(
             Work::Scan,
