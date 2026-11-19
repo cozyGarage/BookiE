@@ -1052,3 +1052,10 @@ fn resolving_an_outcome_is_offered_for_a_writable_connection_and_not_while_the_p
     view.read_with(cx, |view, _| assert!(!view.resolve_enabled()));
     std::fs::remove_file(&path).ok();
 }
+
+#[test]
+fn a_blocked_save_points_to_the_resolve_action_and_other_errors_are_left_alone() {
+    let blocked = "Blocked by policy: governed writes are disabled because a prior audit outcome could not be persisted";
+    assert!(crate::save_ui::with_resolve_hint(blocked).contains("Resolve unknown write outcome"));
+    assert_eq!(crate::save_ui::with_resolve_hint("duplicate key"), "duplicate key");
+}
