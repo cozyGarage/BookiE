@@ -5,6 +5,7 @@ use gpui::{TestAppContext, VisualTestContext};
 
 use bookie_results::grid_cursor::Cursor;
 
+use crate::palette_state::PaletteMode;
 use crate::text_input;
 use crate::ui_theme::ThemeExt;
 use crate::{GridView, Work};
@@ -345,26 +346,48 @@ fn the_quick_switcher_lists_tables_filters_them_and_opens_the_chosen_one(cx: &mu
     let (view, cx) = open(cx);
     cx.simulate_keystrokes("ctrl-p");
     view.read_with(cx, |view, cx| {
-        assert!(view.palette.open && view.palette.quick);
-        assert_eq!(view.quick_shown(cx).len(), view.catalog.tables.len());
+        assert!(view.palette.open && view.palette.mode == PaletteMode::Tables);
+        assert_eq!(view.picker_items(cx).len(), view.catalog.tables.len());
     });
     cx.simulate_input("cust");
     view.read_with(cx, |view, cx| {
-        let titles: Vec<_> = view.quick_shown(cx).into_iter().map(|item| item.title).collect();
+        let titles: Vec<_> = view.picker_items(cx).into_iter().map(|item| item.title).collect();
         assert_eq!(titles, ["customers"]);
     });
     cx.simulate_keystrokes("enter");
     view.read_with(cx, |view, _| {
-        assert!(!view.palette.open && !view.palette.quick);
+        assert!(!view.palette.open && view.palette.mode == PaletteMode::Commands);
         let customers = bookie_gpui::shell::table_info("customers");
         assert_eq!(*view.tabs.current(), bookie_gpui::shell::Tab::Table(customers));
     });
     cx.simulate_keystrokes("ctrl-shift-p");
     view.read_with(cx, |view, _| {
         assert!(
-            view.palette.open && !view.palette.quick,
+            view.palette.open && view.palette.mode == PaletteMode::Commands,
             "the command palette is separate"
         );
+    });
+}
+
+#[gpui::test]
+fn jump_to_column_lists_the_columns_and_moves_the_cursor_to_the_chosen_one(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("down down");
+    cx.simulate_keystrokes("ctrl-shift-j");
+    view.read_with(cx, |view, cx| {
+        assert_eq!(view.palette.mode, PaletteMode::Columns);
+        assert_eq!(view.picker_items(cx).len(), view.source.columns().len());
+    });
+    cx.simulate_input("lab");
+    view.read_with(cx, |view, cx| {
+        let titles: Vec<_> = view.picker_items(cx).into_iter().map(|item| item.title).collect();
+        assert_eq!(titles, ["label"]);
+    });
+    cx.simulate_keystrokes("enter");
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.palette.mode, PaletteMode::Commands);
+        let cursor = view.cell_cursor.expect("the cursor stays on a cell");
+        assert_eq!((cursor.row, cursor.column), (2, 1), "same row, the label column");
     });
 }
 

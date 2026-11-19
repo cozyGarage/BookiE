@@ -1,5 +1,6 @@
 use super::*;
 use crate::chrome::{STATUS_HEIGHT, TAB_HEIGHT, TOOLBAR_HEIGHT};
+use crate::palette_state::PaletteMode;
 
 impl GridView {
     fn sync_render_state(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -399,8 +400,8 @@ impl GridView {
             .collect()
     }
 
-    fn quick_rows(&self, theme: &Theme, cx: &App) -> Vec<Div> {
-        let shown = self.quick_shown(cx);
+    fn picker_rows(&self, theme: &Theme, cx: &App) -> Vec<Div> {
+        let shown = self.picker_items(cx);
         let selected = self.palette.index.min(shown.len().saturating_sub(1));
         shown
             .into_iter()
@@ -433,10 +434,10 @@ impl GridView {
 
     fn palette_overlay(&self, cx: &mut Context<Self>) -> Div {
         let theme = Theme::current(cx);
-        let (rows, empty_text) = if self.palette.quick {
-            (self.quick_rows(&theme, cx), "No matching table")
-        } else {
-            (self.command_rows(&theme, cx), "No matching command")
+        let (rows, empty_text) = match self.palette.mode {
+            PaletteMode::Commands => (self.command_rows(&theme, cx), "No matching command"),
+            PaletteMode::Tables => (self.picker_rows(&theme, cx), "No matching table"),
+            PaletteMode::Columns => (self.picker_rows(&theme, cx), "No matching column"),
         };
         let empty = rows
             .is_empty()

@@ -2,12 +2,19 @@ use gpui::Entity;
 
 use crate::text_input::TextInput;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum PaletteMode {
+    Commands,
+    Tables,
+    Columns,
+}
+
 pub(crate) struct PaletteState {
     pub input: Entity<TextInput>,
     pub open: bool,
     pub index: usize,
     pub fonts: bool,
-    pub quick: bool,
+    pub mode: PaletteMode,
     pub address: Option<String>,
     pub pattern: Option<String>,
     pub delimiter: Option<bookie_gpui::csv_delimiter::Parsed>,
@@ -21,7 +28,7 @@ impl PaletteState {
             open: false,
             index: 0,
             fonts: false,
-            quick: false,
+            mode: PaletteMode::Commands,
             address: None,
             pattern: None,
             delimiter: None,
