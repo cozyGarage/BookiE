@@ -82,6 +82,7 @@ relm4 = { version = "0.11", default-features = false, features = ["macros", "lib
 sqlparser = "0.63"
 toml = "1"
 sha2 = "0.11"
+hmac = "0.13"
 argon2 = { version = "0.6", default-features = false, features = ["alloc"] }
 aws-lc-rs = { version = "1", default-features = false, features = ["aws-lc-sys"] }
 base64 = { version = "0.23", default-features = false, features = ["std"] }

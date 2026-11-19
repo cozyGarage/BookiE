@@ -2282,6 +2282,11 @@
     [
       "bookie-storage",
       "--lib",
+      "audit_journal::tests::audit_journal_keeps_sql_hash_key_and_identifies_keyed_records_after_reopen"
+    ],
+    [
+      "bookie-storage",
+      "--lib",
       "connection_bundle::tests::a_connection_with_no_stored_credentials_contributes_nothing_to_a_bundle"
     ],
     [

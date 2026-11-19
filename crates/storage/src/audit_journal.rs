@@ -8,10 +8,11 @@ use std::sync::{Arc, Mutex as StdMutex, OnceLock, Weak};
 
 use async_trait::async_trait;
 use bookie_policy::{
-    AuditError, AuditErrorCategory, AuditEvent, AuditOperationClass, AuditRecordPhase, AuditSink, AuditTerminalStatus,
-    AuditTransactionOutcome, Principal,
+    AuditError, AuditErrorCategory, AuditEvent, AuditOperationClass, AuditRecordPhase, AuditSink, AuditSqlHash,
+    AuditTerminalStatus, AuditTransactionOutcome, Principal,
 };
 use chrono::{DateTime, Utc};
+use secrecy::ExposeSecret;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tokio::sync::Mutex;
@@ -128,6 +129,7 @@ pub struct AuditJournal {
     path: PathBuf,
     writer: Writer,
     recovery: AuditJournalRecovery,
+    sql_hash_key: tokio::sync::OnceCell<crate::secrets::AuditSqlHashKey>,
     // GUI and agentd share the journal. This lease prevents another live
     // process from treating an in-flight intent as a crash during startup.
     _active_lock_file: File,
@@ -149,6 +151,7 @@ impl AuditJournal {
             writer,
             path,
             recovery,
+            sql_hash_key: tokio::sync::OnceCell::new(),
             _active_lock_file: active_lock_file,
         })
     }
@@ -943,6 +946,20 @@ fn journal_path() -> Result<PathBuf, StorageError> {
 
 #[async_trait]
 impl AuditSink for AuditJournal {
+    async fn hash_sql(&self, sql: &str) -> Result<AuditSqlHash, AuditError> {
+        let key = self
+            .sql_hash_key
+            .get_or_try_init(crate::secrets::load_or_create_audit_sql_hash_key)
+            .await
+            .map_err(|error| AuditError::Unavailable(error.to_string()))?;
+        let decoded = hex::decode(key.key.expose_secret())
+            .map_err(|_| AuditError::Unavailable("audit SQL hash key is malformed".into()))?;
+        let bytes: [u8; 32] = decoded
+            .try_into()
+            .map_err(|_| AuditError::Unavailable("audit SQL hash key is malformed".into()))?;
+        AuditSqlHash::with_key(sql, key.id, &bytes)
+    }
+
     async fn record(&self, event: AuditEvent) -> Result<(), AuditError> {
         let durable = event.phase == AuditRecordPhase::Intent
             || event.operation_class == AuditOperationClass::TransactionCommit
@@ -972,6 +989,7 @@ pub fn sample_event(principal: Principal) -> AuditEvent {
         operation_class: AuditOperationClass::Read,
         redacted_sql: "[REDACTED]".into(),
         sql_hash: hex::encode(Sha256::digest(b"SELECT 1")),
+        sql_hash_key_id: None,
         targets: Vec::new(),
         decision_rule: "read_allow".into(),
         approval_outcome: bookie_policy::AuditApprovalOutcome::NotRequired,

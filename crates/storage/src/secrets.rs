@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use oo7::Keyring;
-use secrecy::SecretString;
+use secrecy::{ExposeSecret, SecretString};
 use uuid::Uuid;
 
 use crate::error::StorageError;
@@ -12,6 +12,12 @@ const KIND_SSH_PASSPHRASE: &str = "ssh_passphrase";
 const KIND_SSH_HOP_PASSWORD: &str = "ssh_hop_password";
 const KIND_SSH_HOP_PASSPHRASE: &str = "ssh_hop_passphrase";
 const KIND_MCP_TOKEN: &str = "mcp_token";
+const KIND_AUDIT_SQL_HASH_KEY: &str = "audit_sql_hash_key";
+
+pub(crate) struct AuditSqlHashKey {
+    pub(crate) id: Uuid,
+    pub(crate) key: SecretString,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SshHopSecretKind {
@@ -160,6 +166,111 @@ pub async fn load_mcp_token(id: Uuid) -> Result<Option<SecretString>, StorageErr
 
 pub async fn delete_mcp_token(id: Uuid) -> Result<(), StorageError> {
     delete_secret(id, KIND_MCP_TOKEN).await
+}
+
+pub(crate) async fn load_or_create_audit_sql_hash_key() -> Result<AuditSqlHashKey, StorageError> {
+    let path = crate::data_path("audit-sql-hash-key")?;
+    let _lock = crate::file_access::lock_path(&path).await?;
+    let attrs = attrs_for(Uuid::nil(), KIND_AUDIT_SQL_HASH_KEY);
+    let (keyring, key) = match open_without_creating_a_keyring().await {
+        Ok(Some(keyring)) => match keyring.search_items(&attrs).await {
+            Ok(items) => {
+                let key = match items.into_iter().next() {
+                    Some(item) => {
+                        let value = read_secret(&item).await?;
+                        Some(parse_audit_sql_hash_key(value.expose_secret())?)
+                    }
+                    None => None,
+                };
+                (Some(keyring), key)
+            }
+            Err(error) if matches!(keyring_failure(&error), crate::KeyringFailure::Unavailable) => (None, None),
+            Err(error) => return Err(map_err(error)),
+        },
+        Ok(None) => (None, None),
+        Err(StorageError::Keyring(crate::KeyringFailure::Unavailable)) => (None, None),
+        Err(error) => return Err(error),
+    };
+    if let Some(key) = key {
+        return Ok(key);
+    }
+    if let Some(key) = read_audit_sql_hash_key_file(&path).await? {
+        if let Some(keyring) = keyring
+            && let Err(error) = store_audit_sql_hash_key(&keyring, &attrs, &key).await
+            && !matches!(error, StorageError::Keyring(crate::KeyringFailure::Unavailable))
+        {
+            return Err(error);
+        }
+        return Ok(key);
+    }
+    let key = new_audit_sql_hash_key();
+    if let Some(keyring) = keyring {
+        match store_audit_sql_hash_key(&keyring, &attrs, &key).await {
+            Ok(()) => return Ok(key),
+            Err(StorageError::Keyring(crate::KeyringFailure::Unavailable)) => {}
+            Err(error) => return Err(error),
+        }
+    }
+    write_audit_sql_hash_key_file(&path, &key).await?;
+    Ok(key)
+}
+
+async fn read_audit_sql_hash_key_file(path: &std::path::Path) -> Result<Option<AuditSqlHashKey>, StorageError> {
+    let Some(bytes) = crate::file_access::read_bounded(path, 128).await? else {
+        return Ok(None);
+    };
+    let value = std::str::from_utf8(&bytes)
+        .map_err(|error| StorageError::Schema(format!("audit SQL hash key is not UTF-8: {error}")))?;
+    parse_audit_sql_hash_key(value).map(Some)
+}
+
+async fn write_audit_sql_hash_key_file(path: &std::path::Path, key: &AuditSqlHashKey) -> Result<(), StorageError> {
+    crate::file_access::write_atomically(path, audit_sql_hash_key_value(key).as_bytes()).await
+}
+
+async fn store_audit_sql_hash_key(
+    keyring: &Keyring,
+    attrs: &HashMap<&'static str, String>,
+    key: &AuditSqlHashKey,
+) -> Result<(), StorageError> {
+    keyring
+        .create_item(
+            "BookiE audit SQL hash key",
+            attrs,
+            audit_sql_hash_key_value(key).as_bytes(),
+            true,
+        )
+        .await
+        .map_err(map_err)
+}
+
+fn audit_sql_hash_key_value(key: &AuditSqlHashKey) -> String {
+    format!("{}:{}", key.id, key.key.expose_secret())
+}
+
+fn parse_audit_sql_hash_key(value: &str) -> Result<AuditSqlHashKey, StorageError> {
+    let (id, key) = value
+        .split_once(':')
+        .ok_or_else(|| StorageError::Schema("audit SQL hash key is malformed".into()))?;
+    let id = Uuid::parse_str(id).map_err(|_| StorageError::Schema("audit SQL hash key ID is malformed".into()))?;
+    let bytes = hex::decode(key).map_err(|_| StorageError::Schema("audit SQL hash key is malformed".into()))?;
+    let key: [u8; 32] = bytes
+        .try_into()
+        .map_err(|_| StorageError::Schema("audit SQL hash key must be 32 bytes".into()))?;
+    Ok(AuditSqlHashKey {
+        id,
+        key: SecretString::new(hex::encode(key).into()),
+    })
+}
+
+fn new_audit_sql_hash_key() -> AuditSqlHashKey {
+    let mut key = [0; 32];
+    key[..16].copy_from_slice(Uuid::new_v4().as_bytes());
+    key[16..].copy_from_slice(Uuid::new_v4().as_bytes());
+    AuditSqlHashKey {
+        id: Uuid::new_v4(),
+        key: SecretString::new(hex::encode(key).into()),
+    }
 }
 
 async fn store_secret(id: Uuid, kind: &str, value: &str, label: &str) -> Result<(), StorageError> {
