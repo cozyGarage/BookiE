@@ -72,6 +72,12 @@ pub enum SqlEditorInput {
     NavigateError(error_navigation::ErrorTarget),
     Panel(bottom_panel::PanelAction),
     SplitToggled(bool),
+    SchemaContextEdited,
+    SchemaPrefixStopped {
+        generation: u64,
+        statement: String,
+        message: String,
+    },
     ShowOutcomes {
         generation: u64,
         outcomes: Vec<StatementOutcome>,

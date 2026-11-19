@@ -5,17 +5,41 @@ pub(crate) struct EditOp {
     pub key: (u64, usize),
     pub before: Option<Cell>,
     pub after: Option<Cell>,
+    weight: usize,
+}
+
+const MAX_UNDO_OPS: usize = 200;
+const MAX_UNDO_BYTES: usize = 4 * 1024 * 1024;
+const SMALL_CELL_BYTES: usize = 64;
+
+fn cell_weight(cell: &Cell) -> usize {
+    match cell {
+        Cell::Text(text) | Cell::JsonText(text) => text.len(),
+        Cell::Bytes(bytes) => bytes.len(),
+        Cell::Json(value) => value.to_string().len(),
+        _ => SMALL_CELL_BYTES,
+    }
 }
 
 impl GridView {
     pub(crate) fn record_edit(&mut self, key: (u64, usize), after: Cell) {
         let before = self.cell_edit.edits.insert(key, after.clone());
+        let weight = before.as_ref().map_or(0, cell_weight) + cell_weight(&after);
         self.cell_edit.undo.push(EditOp {
             key,
             before,
             after: Some(after),
+            weight,
         });
         self.cell_edit.redo.clear();
+        self.trim_undo_history();
+    }
+
+    fn trim_undo_history(&mut self) {
+        let mut bytes: usize = self.cell_edit.undo.iter().map(|op| op.weight).sum();
+        while self.cell_edit.undo.len() > 1 && (self.cell_edit.undo.len() > MAX_UNDO_OPS || bytes > MAX_UNDO_BYTES) {
+            bytes -= self.cell_edit.undo.remove(0).weight;
+        }
     }
 
     pub(crate) fn reset_edit_history(&mut self) {

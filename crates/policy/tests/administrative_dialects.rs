@@ -297,6 +297,16 @@ fn copy_through_the_client_is_a_write_but_not_administrative() {
 }
 
 #[test]
+fn a_copy_unit_with_data_is_classified_by_its_command_not_by_its_rows() {
+    let head = classify("COPY t FROM STDIN", "postgres");
+    let unit = classify("COPY t (id, note) FROM STDIN;\n1\tpaid; DROP TABLE t\n\\.", "postgres");
+    assert_eq!(unit.class, head.class);
+    assert!(unit.writes());
+    assert_ne!(unit.class, StatementClass::Administrative);
+    assert_eq!(unit.tables, vec!["t".to_string()]);
+}
+
+#[test]
 fn pg_sleep_stays_an_ordinary_read_because_timeouts_already_bound_it() {
     let facts = classify("SELECT pg_sleep(30)", "postgres");
     assert_eq!(facts.class, StatementClass::Select);

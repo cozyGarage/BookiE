@@ -291,8 +291,8 @@ impl GridView {
         })
     }
 
-    fn grid_pane(&self, theme: Theme, strip: Div, bars: (Option<Div>, Option<Div>, Option<Div>, Option<Div>)) -> Div {
-        let (filter_row, compare_bar, save_bar, banner) = bars;
+    fn grid_pane(&self, theme: Theme, strip: Div, bars: (Option<Div>, Option<Div>, Option<Div>, Option<Div>, Option<Div>)) -> Div {
+        let (filter_row, compare_bar, save_bar, banner, insert_form) = bars;
         div()
             .flex_1()
             .flex()
@@ -302,6 +302,7 @@ impl GridView {
             .children(filter_row)
             .children(compare_bar)
             .children(save_bar)
+            .children(insert_form)
             .children(banner)
             .child(self.data_table())
             .children(self.detail_panel(theme))
@@ -327,7 +328,9 @@ impl Render for GridView {
         let palette = self.palette.open.then(|| self.palette_overlay(cx));
         let save_bar = self.approval_bar(theme, cx).or_else(|| self.save_bar(theme, cx));
         let banner = self.save_banner(theme, cx);
-        let grid = self.grid_pane(theme, strip, (filter_row, compare_bar, save_bar, banner));
+        let insert_form = self.insert_form(theme, cx).or_else(|| self.import_bar(theme, cx))
+            .or_else(|| self.structure_bar(theme, cx));
+        let grid = self.grid_pane(theme, strip, (filter_row, compare_bar, save_bar, banner, insert_form));
         let content = match self.tabs.current().clone() {
             Tab::Home => self.home_page(theme, cx),
             Tab::Settings => self.settings_page(theme, cx),

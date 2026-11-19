@@ -20,6 +20,7 @@ mod folding;
 pub(crate) mod open_file;
 pub(crate) mod query_changes;
 mod run_lifecycle;
+mod script_schema;
 mod session_age;
 mod session_lexing;
 use bookie_core::sql_format as format_plan;
@@ -98,6 +99,7 @@ pub struct SqlEditor {
     transaction_actions: toolbar_actions::TransactionActions,
     folding: std::rc::Rc<std::cell::RefCell<folding::FoldController>>,
     session_button: gtk::ToggleButton,
+    schema_entry: gtk::Entry,
     transaction_clock: session_age::TransactionClock,
     session: Option<session_mode::EditorSession>,
     retired_session_connection_id: Option<(Uuid, Uuid)>,
@@ -298,6 +300,19 @@ impl SimpleComponent for SqlEditor {
                             add_css_class: "flat",
                             connect_toggled[sender] => move |button| {
                                 sender.input(SqlEditorInput::SessionToggled(button.is_active()));
+                            },
+                        },
+
+                        #[name = "schema_entry"]
+                        append = &gtk::Entry {
+                            set_placeholder_text: Some(bookie_app_services::tr!("Schema").as_str()),
+                            set_width_chars: 16,
+                            set_max_width_chars: 24,
+                            set_visible: false,
+                            set_widget_name: "editor-schema-context",
+                            set_tooltip_text: Some(bookie_app_services::tr!("Turn on Session to pin a schema. A pooled run cannot keep one").as_str()),
+                            connect_changed[sender] => move |_| {
+                                sender.input(SqlEditorInput::SchemaContextEdited);
                             },
                         },
 
@@ -555,6 +570,7 @@ impl SimpleComponent for SqlEditor {
             run_options: widgets.run_options.clone(),
             transaction_actions,
             session_button: widgets.session_button.clone(),
+            schema_entry: widgets.schema_entry.clone(),
             transaction_clock: Default::default(),
             session: None,
             retired_session_connection_id: None,
@@ -609,6 +625,7 @@ impl SimpleComponent for SqlEditor {
             }));
         }
         model.refresh_run_options(&sender);
+        model.sync_session_controls();
         ComponentParts { model, widgets }
     }
 
@@ -878,6 +895,29 @@ impl SimpleComponent for SqlEditor {
                 }
             }
 
+            SqlEditorInput::SchemaContextEdited => {}
+
+            SqlEditorInput::SchemaPrefixStopped {
+                generation,
+                statement,
+                message,
+            } => {
+                let Some((terminal, mut context)) = self.finish_run(generation, &sender) else {
+                    return;
+                };
+                context.sql = statement;
+                let elapsed = SystemTime::now()
+                    .duration_since(context.started_at)
+                    .map(|duration| duration.as_millis() as i64)
+                    .unwrap_or(0);
+                self.record_history(context, elapsed, None, Outcome::Error(message.clone()));
+                if !terminal.replace_ui {
+                    return;
+                }
+                self.cancel_token = None;
+                self.status.set_label(&message);
+            }
+
             SqlEditorInput::Format => {
                 let buffer = self.source_view.buffer();
                 let (start, end) = buffer.bounds();
@@ -918,6 +958,13 @@ impl SqlEditor {
                 .set_label(&bookie_app_services::tr!("Waiting for session to finish"));
             return;
         }
+        let schema_sql = match self.schema_prefix() {
+            Ok(statement) => statement,
+            Err(message) => {
+                self.status.set_label(&message);
+                return;
+            }
+        };
         let origin = crate::services::catalog::CatalogOrigin::capture(self.connection_id, &self.database);
         let Some(guard) = origin.as_ref().and_then(|origin| origin.guard(&self.database)) else {
             self.status.set_label(&bookie_app_services::tr!("no active connection"));
@@ -978,6 +1025,40 @@ impl SqlEditor {
             shutdown
                 .register(async move {
                     let control = crate::services::operation_control::bounded_with(timeout_secs, token);
+                    if let Some(schema_sql) = schema_sql {
+                        let prefix_sender = sender_clone.clone();
+                        let prefix_driver = driver_id.clone();
+                        let prefix_origin = origin.clone();
+                        let statement = schema_sql.clone();
+                        let prefix = script_schema::run_schema_prefix(
+                            target.clone(),
+                            schema_sql,
+                            &driver_id,
+                            &parameter_values,
+                            &control,
+                            move |sql: &str| {
+                                if let Some(origin) = &prefix_origin {
+                                    prefix_sender.input(SqlEditorInput::CatalogStatementSucceeded {
+                                        origin: origin.clone(),
+                                        driver: prefix_driver.clone(),
+                                        sql: sql.into(),
+                                    });
+                                }
+                            },
+                        )
+                        .await;
+                        if let Some(input) = script_schema::follow_prefix(prefix, generation, timeout_secs, statement) {
+                            sender_clone.input(input);
+                            if let Some((session_id, open, usable)) = target.session_state().await {
+                                sender_clone.input(SqlEditorInput::SessionState {
+                                    session_id,
+                                    transaction_open: open,
+                                    usable,
+                                });
+                            }
+                            return;
+                        }
+                    }
                     let succeeded = |sql: &str| {
                         if let Some(origin) = &origin {
                             sender_clone.input(SqlEditorInput::CatalogStatementSucceeded {

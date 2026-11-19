@@ -46,6 +46,7 @@ pub mod enum_input;
 pub mod er_diagram;
 pub mod explain_plan;
 pub mod export_pages;
+pub mod export_tables;
 pub mod favorites;
 pub mod filter_settings;
 pub mod health_report;
@@ -105,6 +106,7 @@ pub mod result_copy;
 pub mod result_editability;
 
 pub mod csv_import_mappings;
+pub mod csv_import_plan;
 pub mod named_filter_presets;
 pub mod open_request;
 pub mod operation_control;
@@ -114,6 +116,7 @@ pub mod query_parameters;
 pub mod quick_switcher;
 pub mod reconnect;
 pub mod sql_text;
+pub mod structure_change_plan;
 pub mod value_display;
 
 pub mod grid_replace;

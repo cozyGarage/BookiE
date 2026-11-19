@@ -115,3 +115,7 @@ mod tests;
 #[cfg(test)]
 #[path = "stream_tests.rs"]
 mod stream_tests;
+
+#[cfg(test)]
+#[path = "value_honesty_tests.rs"]
+mod value_honesty_tests;

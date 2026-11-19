@@ -2,6 +2,7 @@ use bookie_core::{ColumnInfo, Value};
 
 use crate::change_tracker::{EditStatement, MaterializeError, RowKey, TabChangeTracker, checked_write_indexes};
 use crate::edit_preview::preview_text;
+use crate::value_input::{ValueInputError, parse_input_for_column};
 
 #[derive(Debug, Clone, Copy)]
 pub struct SaveTarget<'a> {
@@ -35,6 +36,12 @@ pub enum CellSaveError {
     UnknownColumn(usize),
     #[error("{0} is part of the primary key, which identifies the row and cannot be edited here")]
     KeyColumnEdit(String),
+    #[error("this table has no column named {0}")]
+    UnknownColumnName(String),
+    #[error("enter a value for at least one column")]
+    NothingToInsert,
+    #[error("{column}: {reason}")]
+    InvalidValue { column: String, reason: String },
     #[error("{0}")]
     Build(String),
 }
@@ -69,6 +76,63 @@ pub fn plan_cell_saves(
         }
     }
     finish_plan(&tracker, target)
+}
+
+pub fn plan_row_insert_named(
+    target: SaveTarget<'_>,
+    named: &[(String, String)],
+) -> Result<CellSavePlan, CellSaveError> {
+    let mut values = Vec::with_capacity(named.len());
+    for (name, text) in named {
+        let at = target
+            .columns
+            .iter()
+            .position(|column| &column.name == name)
+            .ok_or_else(|| CellSaveError::UnknownColumnName(name.clone()))?;
+        values.push((at, text.clone()));
+    }
+    plan_row_insert(target, &values)
+}
+
+pub fn plan_row_insert(target: SaveTarget<'_>, values: &[(usize, String)]) -> Result<CellSavePlan, CellSaveError> {
+    let mut tracker = TabChangeTracker::new();
+    let draft = tracker.track_insert(vec![Value::Null; target.columns.len()]);
+    let RowKey::Draft(draft_id) = draft else {
+        return Err(CellSaveError::Build("a new row could not be started".into()));
+    };
+    let mut touched = 0;
+    for (column, text) in values {
+        if text.is_empty() {
+            continue;
+        }
+        let info = target
+            .columns
+            .get(*column)
+            .ok_or(CellSaveError::UnknownColumn(*column))?;
+        let value = parse_input_for_column(text, Some(info)).map_err(|error| CellSaveError::InvalidValue {
+            column: info.name.clone(),
+            reason: readable(&error),
+        })?;
+        tracker.track_draft_cell_edit(draft_id, *column, value);
+        touched += 1;
+    }
+    if touched == 0 {
+        return Err(CellSaveError::NothingToInsert);
+    }
+    finish_plan(&tracker, target)
+}
+
+fn readable(error: &ValueInputError) -> String {
+    let name = format!("{error:?}");
+    let name = name.split(['(', '{', ' ']).next().unwrap_or("");
+    let mut words = String::new();
+    for (index, character) in name.chars().enumerate() {
+        if character.is_uppercase() && index > 0 {
+            words.push(' ');
+        }
+        words.extend(character.to_lowercase());
+    }
+    words
 }
 
 pub fn plan_row_deletes(
@@ -338,5 +402,83 @@ mod tests {
             &[vec![Value::Text("ada".into()), Value::Float(1.5)]],
         );
         assert_eq!(result, Err(CellSaveError::NoPrimaryKey));
+    }
+
+    fn insertable() -> Vec<ColumnInfo> {
+        let mut id = column("id", true);
+        id.data_type = "INTEGER".into();
+        id.nullable = false;
+        id.is_auto_increment = true;
+        let mut customer = column("customer", false);
+        customer.data_type = "TEXT".into();
+        let mut total = column("total", false);
+        total.data_type = "REAL".into();
+        vec![id, customer, total]
+    }
+
+    #[test]
+    fn a_new_row_inserts_only_the_columns_that_were_filled_in() {
+        let columns = insertable();
+        let plan = plan_row_insert(
+            target(&columns),
+            &[(0, String::new()), (1, "zed".into()), (2, "4.5".into())],
+        )
+        .unwrap();
+
+        assert_eq!(plan.statements.len(), 1);
+        let (sql, values) = &plan.statements[0];
+        assert!(sql.starts_with("INSERT"), "{sql}");
+        assert!(
+            !sql.contains("\"id\""),
+            "the empty key column is left to the database: {sql}"
+        );
+        assert_eq!(values, &vec![Value::Text("zed".into()), Value::Float(4.5)]);
+        assert!(plan.expect_one.is_empty(), "an insert has no existing row to check");
+    }
+
+    #[test]
+    fn a_value_that_does_not_fit_its_column_names_the_column_and_nothing_is_planned() {
+        let columns = insertable();
+        let result = plan_row_insert(target(&columns), &[(2, "abc".into())]);
+        match result {
+            Err(CellSaveError::InvalidValue { column, reason }) => {
+                assert_eq!(column, "total");
+                assert!(!reason.is_empty());
+            }
+            other => panic!("expected an invalid value, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_row_with_no_values_is_refused() {
+        let columns = insertable();
+        let result = plan_row_insert(target(&columns), &[(1, String::new()), (2, String::new())]);
+        assert_eq!(result, Err(CellSaveError::NothingToInsert));
+    }
+
+    #[test]
+    fn a_field_for_a_column_the_table_no_longer_has_is_an_error_not_a_dropped_value() {
+        let columns = insertable();
+        let result = plan_row_insert_named(
+            target(&columns),
+            &[("customer".into(), "zed".into()), ("gone".into(), "x".into())],
+        );
+        assert_eq!(result, Err(CellSaveError::UnknownColumnName("gone".into())));
+
+        let named = plan_row_insert_named(target(&columns), &[("total".into(), "2".into())]).unwrap();
+        assert_eq!(named.statements.len(), 1);
+    }
+
+    #[test]
+    fn an_empty_field_leaves_a_column_with_a_default_out_of_the_statement() {
+        let mut columns = insertable();
+        columns[1].default_value = Some("'anonymous'".into());
+        let plan = plan_row_insert(target(&columns), &[(1, String::new()), (2, "9.5".into())]).unwrap();
+        let (sql, values) = &plan.statements[0];
+        assert!(
+            !sql.contains("\"customer\""),
+            "the column with a default is left to the database: {sql}"
+        );
+        assert_eq!(values, &vec![Value::Float(9.5)]);
     }
 }

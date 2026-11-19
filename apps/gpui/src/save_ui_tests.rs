@@ -128,7 +128,10 @@ fn a_write_the_guard_denies_leaves_the_database_unchanged_and_keeps_the_edit(cx:
         let (text, is_error) = view.save.banner.clone().expect("an error banner");
         assert!(is_error && text.starts_with("Could not save"), "{text}");
         assert_eq!(view.cell_edit.edits.len(), 1, "the edit is kept so it can be retried");
-        assert!(view.save.write.is_none(), "a failed save drops the cached write session");
+        assert!(
+            view.save.write.is_none(),
+            "a failed save drops the cached write session"
+        );
     });
     assert_eq!(saved_customer(&path, 1), "Ada", "the denied statement did not run");
     std::fs::remove_file(&path).ok();
@@ -231,6 +234,11 @@ fn selected_rows_are_reviewed_then_deleted_and_the_table_reloads_without_them(cx
             .unwrap_or_else(|| panic!("no review: {}", view.status));
         assert_eq!(pending.title, "Delete 1 row(s) from orders?");
         assert_eq!(pending.confirm, "Delete", "the button says what it will do");
+        assert_eq!(
+            pending.note,
+            Some("Rows that depend on these (foreign keys, triggers) may be affected too."),
+            "the note must not claim approvals are unavailable now that the prompt exists"
+        );
         assert!(pending.plan.preview.contains("DELETE"), "{}", pending.plan.preview);
     });
     assert_eq!(order_count(&path), "6", "nothing is deleted before the user confirms");
@@ -553,4 +561,346 @@ fn remaining_ids(path: &std::path::Path) -> String {
         .expect("ids")
         .row(0)[0]
         .display()
+}
+
+fn fill_insert_field(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext, name: &str, text: &str) {
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            let field = view
+                .insert
+                .fields
+                .iter()
+                .find(|field| field.name == name)
+                .unwrap_or_else(|| panic!("no field named {name}"));
+            field.input.update(cx, |input, cx| input.set_content(text, cx));
+        })
+    });
+}
+
+#[gpui::test]
+fn a_new_row_is_filled_in_reviewed_then_inserted_and_the_table_shows_it(cx: &mut TestAppContext) {
+    let path = fixture_copy("insert");
+    let (view, cx) = saving_view(cx, &path);
+    let write = write_session(&path, false);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            let id = view.live.as_ref().and_then(|live| live.writable).expect("writable");
+            view.save.write = Some((id, write));
+        })
+    });
+    cx.simulate_keystrokes("ctrl-n");
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        let names: Vec<&str> = view.insert.fields.iter().map(|field| field.name.as_str()).collect();
+        assert_eq!(
+            names,
+            ["customer", "total", "paid", "note"],
+            "the key the database assigns is not asked for"
+        );
+        assert!(view.insert.open);
+    });
+
+    fill_insert_field(&view, cx, "customer", "Zed");
+    fill_insert_field(&view, cx, "total", "4.5");
+    fill_insert_field(&view, cx, "paid", "1");
+    cx.update(|_, cx| view.update(cx, |view, cx| view.review_insert(cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        let pending = view
+            .save
+            .pending
+            .as_ref()
+            .unwrap_or_else(|| panic!("no review: {}", view.status));
+        assert_eq!(pending.title, "Insert 1 row into orders?");
+        assert_eq!(pending.confirm, "Insert");
+        assert!(pending.plan.preview.contains("INSERT"), "{}", pending.plan.preview);
+        assert!(pending.plan.preview.contains("'Zed'"), "{}", pending.plan.preview);
+    });
+    assert_eq!(order_count(&path), "6", "nothing is inserted before the user confirms");
+
+    cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_save(cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.save.banner, Some(("Inserted 1 row".to_string(), false)));
+        assert!(!view.insert.open, "the form closes once the row is saved");
+        assert_eq!(view.source.total(), 7, "the grid reloaded with the new row");
+    });
+    assert_eq!(order_count(&path), "7");
+    assert_eq!(saved_customer(&path, 7), "Zed");
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn a_value_that_does_not_fit_stops_the_review_keeps_the_form_and_cells_stay_locked(cx: &mut TestAppContext) {
+    let path = fixture_copy("insert-invalid");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_insert_form(cx)));
+    settle_saving(cx);
+    fill_insert_field(&view, cx, "total", "not a number");
+    cx.update(|_, cx| view.update(cx, |view, cx| view.review_insert(cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert!(view.status.starts_with("Cannot save: total"), "{}", view.status);
+        assert!(view.save.pending.is_none());
+        assert!(view.insert.open, "the form stays so the value can be fixed");
+    });
+
+    cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(0, 1, window, cx)));
+    view.read_with(cx, |view, _| {
+        assert!(view.cell_edit.active.is_none());
+        assert_eq!(view.status, "Finish or cancel the open form before editing cells");
+    });
+
+    cx.update(|_, cx| view.update(cx, |view, cx| view.cancel_insert_form(cx)));
+    view.read_with(cx, |view, _| {
+        assert!(!view.insert.open && view.insert.fields.is_empty())
+    });
+    assert_eq!(order_count(&path), "6");
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn a_column_read_that_finishes_after_the_table_changed_does_not_open_a_form_for_the_old_table(cx: &mut TestAppContext) {
+    let path = fixture_copy("insert-race");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_insert_form(cx)));
+    cx.update(|_, cx| view.update(cx, |view, _| view.edits_changed()));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert!(!view.insert.open, "a form for a table the user has left is never shown");
+        assert!(!view.insert.loading);
+    });
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn a_denied_insert_keeps_the_form_and_what_was_typed_and_leaves_the_table_alone(cx: &mut TestAppContext) {
+    let path = fixture_copy("insert-denied");
+    let (view, cx) = saving_view(cx, &path);
+    let write = write_session(&path, true);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            let id = view.live.as_ref().and_then(|live| live.writable).expect("writable");
+            view.save.write = Some((id, write));
+        })
+    });
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_insert_form(cx)));
+    settle_saving(cx);
+    fill_insert_field(&view, cx, "customer", "Denied");
+    cx.update(|_, cx| view.update(cx, |view, cx| view.review_insert(cx)));
+    settle_saving(cx);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_save(cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, cx| {
+        assert!(
+            view.status.starts_with("Could not save") && view.status.contains("read-only"),
+            "{}",
+            view.status
+        );
+        assert!(view.insert.open, "the form stays so the user can try again");
+        let typed = view
+            .insert
+            .fields
+            .iter()
+            .find(|field| field.name == "customer")
+            .expect("field");
+        assert_eq!(typed.input.read(cx).content(), "Denied", "what was typed is kept");
+    });
+    assert_eq!(order_count(&path), "6");
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn saving_and_deleting_are_refused_while_the_new_row_form_is_open(cx: &mut TestAppContext) {
+    let path = fixture_copy("insert-locks");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_insert_form(cx)));
+    settle_saving(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.click_row(0, false);
+            view.request_delete(cx);
+        })
+    });
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.status, "Finish or cancel the open form first");
+        assert!(view.save.pending.is_none());
+    });
+    std::fs::remove_file(&path).ok();
+}
+
+fn csv_file(name: &str, text: &str) -> std::path::PathBuf {
+    let path = std::env::temp_dir().join(format!("bookie-gpui-{name}-{}.csv", uuid::Uuid::new_v4()));
+    std::fs::write(&path, text).unwrap();
+    path
+}
+
+fn set_import_path(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext, path: &std::path::Path) {
+    let text = path.display().to_string();
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            let input = view.import.input.clone().expect("the path field exists once the bar opened");
+            input.update(cx, |input, cx| input.set_content(&text, cx));
+        })
+    });
+}
+
+#[gpui::test]
+fn a_csv_file_is_reviewed_then_imported_in_one_transaction_and_the_table_shows_the_rows(cx: &mut TestAppContext) {
+    let path = fixture_copy("import");
+    let file = csv_file("rows", "customer,total,ignored\nCsvOne,1.5,x\nCsvTwo,2.5,y\n");
+    let (view, cx) = saving_view(cx, &path);
+    let write = write_session(&path, false);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            let id = view.live.as_ref().and_then(|live| live.writable).expect("writable");
+            view.save.write = Some((id, write));
+        })
+    });
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_import_bar(cx)));
+    view.read_with(cx, |view, _| assert!(view.import.open));
+    set_import_path(&view, cx, &file);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.review_import(cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        let pending = view
+            .save
+            .pending
+            .as_ref()
+            .unwrap_or_else(|| panic!("no review: {}", view.status));
+        assert_eq!(pending.title, "Import 2 row(s) into orders?");
+        assert_eq!(pending.confirm, "Import");
+        assert!(pending.plan.preview.contains("customer, total"), "{}", pending.plan.preview);
+        assert!(pending.plan.preview.contains("ignored"), "the unmatched field is reported: {}", pending.plan.preview);
+    });
+    assert_eq!(order_count(&path), "6", "nothing is imported before the user confirms");
+
+    cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_save(cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.save.banner, Some(("Imported 2 row(s)".to_string(), false)));
+        assert!(!view.import.open, "the bar closes once the rows are saved");
+        assert_eq!(view.source.total(), 8);
+    });
+    assert_eq!(order_count(&path), "8");
+    std::fs::remove_file(&path).ok();
+    std::fs::remove_file(&file).ok();
+}
+
+#[gpui::test]
+fn a_missing_or_unmatched_file_stops_the_review_keeps_the_bar_and_locks_editing(cx: &mut TestAppContext) {
+    let path = fixture_copy("import-bad");
+    let unmatched = csv_file("unmatched", "alpha,beta\n1,2\n");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_import_bar(cx)));
+    set_import_path(&view, cx, std::path::Path::new("/no/such/file.csv"));
+    cx.update(|_, cx| view.update(cx, |view, cx| view.review_import(cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert!(view.status.starts_with("Cannot save:"), "{}", view.status);
+        assert!(view.save.pending.is_none());
+        assert!(view.import.open, "the bar stays so the path can be fixed");
+    });
+
+    set_import_path(&view, cx, &unmatched);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.review_import(cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert!(view.status.contains("no column of this table matches"), "{}", view.status);
+    });
+
+    cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(0, 1, window, cx)));
+    view.read_with(cx, |view, _| {
+        assert!(view.cell_edit.active.is_none());
+        assert_eq!(view.status, "Finish or cancel the open form before editing cells");
+    });
+    cx.update(|_, cx| view.update(cx, |view, cx| view.cancel_import_bar(cx)));
+    view.read_with(cx, |view, _| assert!(!view.import.open));
+    assert_eq!(order_count(&path), "6");
+    std::fs::remove_file(&path).ok();
+    std::fs::remove_file(&unmatched).ok();
+}
+
+fn set_structure_text(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext, text: &str) {
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            let input = view.structure.input.clone().expect("the structure bar has an input");
+            input.update(cx, |input, cx| input.set_content(text, cx));
+        })
+    });
+}
+
+fn table_columns_of(path: &std::path::Path) -> String {
+    let out = std::process::Command::new("sqlite3")
+        .arg(path)
+        .arg("select group_concat(name) from pragma_table_info('orders')")
+        .output()
+        .expect("sqlite3 runs");
+    String::from_utf8_lossy(&out.stdout).trim().to_string()
+}
+
+#[gpui::test]
+fn a_column_is_added_renamed_and_dropped_only_after_each_change_is_reviewed(cx: &mut TestAppContext) {
+    use bookie_app_services::structure_change_plan::StructureChangeKind::{AddColumn, DropColumn, RenameColumn};
+    let path = fixture_copy("structure");
+    let (view, cx) = saving_view(cx, &path);
+    let write = write_session(&path, false);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            let id = view.live.as_ref().and_then(|live| live.writable).expect("writable");
+            view.save.write = Some((id, write));
+        })
+    });
+    let before = table_columns_of(&path);
+    let mut prior = before.clone();
+    for (kind, text, expected) in [
+        (AddColumn, "flag INTEGER", "flag"),
+        (RenameColumn, "flag marker", "marker"),
+        (DropColumn, "marker", ""),
+    ] {
+        cx.update(|_, cx| view.update(cx, |view, cx| view.open_structure_bar(kind, cx)));
+        view.read_with(cx, |view, _| assert!(view.structure.open));
+        set_structure_text(&view, cx, text);
+        cx.update(|_, cx| view.update(cx, |view, cx| view.review_structure(cx)));
+        settle_saving(cx);
+        view.read_with(cx, |view, _| {
+            let pending = view.save.pending.as_ref().unwrap_or_else(|| panic!("no review: {}", view.status));
+            assert!(pending.title.contains(text.split_whitespace().next().unwrap()), "{}", pending.title);
+            assert_ne!(pending.confirm, "Apply", "the button says what it does");
+            assert!(pending.plan.preview.contains("ALTER TABLE"), "{}", pending.plan.preview);
+        });
+        assert_eq!(table_columns_of(&path), prior, "nothing changes before the user confirms");
+        cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_save(cx)));
+        settle_saving(cx);
+        view.read_with(cx, |view, _| {
+            assert!(!view.structure.open, "the bar closes once applied");
+            assert!(view.save.banner.as_ref().is_some_and(|(_, error)| !error), "{:?}", view.save.banner);
+        });
+        let columns = table_columns_of(&path);
+        prior = columns.clone();
+        if expected.is_empty() {
+            assert_eq!(columns, before);
+        } else {
+            assert!(columns.contains(expected), "{columns}");
+        }
+    }
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn a_bad_structure_request_is_refused_before_any_review_and_keeps_the_bar(cx: &mut TestAppContext) {
+    use bookie_app_services::structure_change_plan::StructureChangeKind::DropColumn;
+    let path = fixture_copy("structure-bad");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_structure_bar(DropColumn, cx)));
+    set_structure_text(&view, cx, "no_such_column");
+    cx.update(|_, cx| view.update(cx, |view, cx| view.review_structure(cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert!(view.save.pending.is_none());
+        assert!(view.structure.open);
+        assert!(view.status.contains("no column named"), "{}", view.status);
+        assert!(view.form_open(), "editing stays locked while the bar is open");
+    });
+    std::fs::remove_file(&path).ok();
 }

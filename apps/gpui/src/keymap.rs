@@ -11,6 +11,7 @@ pub enum Command {
     Favorites,
     SaveChanges,
     DeleteRows,
+    InsertRow,
     Undo,
     Redo,
     Filter,
@@ -23,7 +24,7 @@ pub enum Command {
 }
 
 impl Command {
-    pub const ALL: [Command; 18] = [
+    pub const ALL: [Command; 19] = [
         Command::Palette,
         Command::QuickSwitcher,
         Command::JumpColumn,
@@ -33,6 +34,7 @@ impl Command {
         Command::Favorites,
         Command::SaveChanges,
         Command::DeleteRows,
+        Command::InsertRow,
         Command::Undo,
         Command::Redo,
         Command::Filter,
@@ -55,6 +57,7 @@ impl Command {
             Command::Favorites => "favorites",
             Command::SaveChanges => "save-changes",
             Command::DeleteRows => "delete-rows",
+            Command::InsertRow => "insert-row",
             Command::Undo => "undo",
             Command::Redo => "redo",
             Command::Filter => "filter",
@@ -78,6 +81,7 @@ impl Command {
             Command::Favorites => "Open a favorite",
             Command::SaveChanges => "Save changes",
             Command::DeleteRows => "Delete selected rows",
+            Command::InsertRow => "Add a row",
             Command::Undo => "Undo edit",
             Command::Redo => "Redo edit",
             Command::Filter => "Filter rows",
@@ -178,6 +182,7 @@ impl Default for Keymap {
                 (Command::Favorites, chord(true, true, "b")),
                 (Command::SaveChanges, chord(true, false, "s")),
                 (Command::DeleteRows, chord(true, false, "delete")),
+                (Command::InsertRow, chord(true, false, "n")),
                 (Command::Undo, chord(true, false, "z")),
                 (Command::Redo, chord(true, false, "y")),
                 (Command::Filter, chord(true, false, "f")),

@@ -235,4 +235,59 @@ mod tests {
         };
         assert!(render(CopyFormat::Insert, &context, &rows()).is_err());
     }
+
+    #[test]
+    fn value_honesty_copy_formats_keep_binary_booleans_zoned_time_and_all_null_rows() {
+        let columns = ["payload", "flag", "at"].map(info).to_vec();
+        let blob: Vec<u8> = (0..=255u8).cycle().take(70_000).collect();
+        let hex = blob.iter().map(|byte| format!("{byte:02x}")).collect::<String>();
+        let rows = vec![
+            vec![
+                Value::Bytes(blob),
+                Value::Bool(true),
+                Value::TimestampTz("2026-09-27T12:34:56+05:30".parse().unwrap()),
+            ],
+            vec![Value::Null, Value::Null, Value::Null],
+        ];
+        let context = context(&columns);
+        let csv = render(CopyFormat::Csv, &context, &rows).unwrap().text;
+        assert_eq!(
+            csv,
+            format!("payload,flag,at\n\\x{hex},true,2026-09-27T07:04:56+00:00\n,,\n")
+        );
+        let json = render(CopyFormat::Json, &context, &rows).unwrap().text;
+        assert!(json.contains(&format!("\\x{hex}")), "binary lost in JSON copy");
+        assert!(
+            json.contains("true") && json.contains("2026-09-27T07:04:56+00:00"),
+            "{json}"
+        );
+        assert_eq!(json.matches("null").count(), 3);
+        let markdown = render(CopyFormat::Markdown, &context, &rows).unwrap().text;
+        assert!(
+            markdown.contains(&format!("&#92;x{hex}")),
+            "binary lost in Markdown copy"
+        );
+        assert!(markdown.contains("2026-09-27T07:04:56+00:00"), "{markdown}");
+        let insert = render(CopyFormat::Insert, &context, &rows).unwrap().text;
+        let lines: Vec<&str> = insert.lines().collect();
+        assert!(
+            lines[0].ends_with(&format!(
+                "VALUES (decode('{hex}', 'hex'), true, '2026-09-27T07:04:56+00:00');"
+            )),
+            "{}",
+            &lines[0][lines[0].len() - 80..]
+        );
+        assert!(lines[1].ends_with("VALUES (NULL, NULL, NULL);"), "{}", lines[1]);
+        let tsv = tsv(&columns, rows, false);
+        assert!(tsv.starts_with(&format!("\\x{hex}\ttrue\t2026-09-27T07:04:56+00:00\n")));
+        assert!(tsv.ends_with("\\N\t\\N\t\\N"));
+    }
+
+    #[test]
+    fn value_honesty_an_in_list_of_binary_values_says_what_it_left_out() {
+        let columns = columns();
+        let rows = vec![vec![Value::Bytes(vec![1, 2, 3]), Value::Bytes(vec![4])]];
+        let copied = render(CopyFormat::InList, &context(&columns), &rows);
+        assert!(copied.is_err());
+    }
 }

@@ -330,6 +330,40 @@ async fn implicit_transaction_mode_is_denied_before_dispatch_and_audited() {
 }
 
 #[tokio::test]
+async fn a_copy_from_stdin_unit_is_denied_before_it_reaches_the_connection() {
+    let executes = Arc::new(AtomicUsize::new(0));
+    let approvals = Arc::new(AtomicUsize::new(0));
+    let audit = Arc::new(SequenceAuditSink::new(vec![]));
+    let mut guard_context = context(
+        Principal::human_gui(),
+        Environment::Local,
+        PolicyConfig::default(),
+        Arc::new(CountingApprovalSink {
+            calls: approvals.clone(),
+        }),
+        audit.clone(),
+        Arc::new(AuditState::new()),
+    );
+    guard_context.driver_id = "postgres".into();
+    let guard = PolicyGuard::new(
+        connection(executes.clone(), Arc::new(AtomicUsize::new(0))),
+        guard_context,
+    );
+
+    guard
+        .execute("COPY t (id) FROM STDIN;\n1\n2; DROP TABLE t\n\\.")
+        .await
+        .expect_err("a COPY unit with data must be refused");
+
+    assert_eq!(executes.load(Ordering::SeqCst), 0);
+    assert_eq!(approvals.load(Ordering::SeqCst), 0);
+    let events = audit.events.lock().expect("audit events");
+    let event = events.last().expect("denial outcome");
+    assert_eq!(event.decision_rule, "copy_from_stdin_unsupported");
+    assert_eq!(event.terminal_status, AuditTerminalStatus::Denied);
+}
+
+#[tokio::test]
 async fn disabled_audit_state_cannot_be_bypassed_by_approval() {
     let queries = Arc::new(AtomicUsize::new(0));
     let approvals = Arc::new(AtomicUsize::new(0));
