@@ -1,6 +1,6 @@
 use bookie_policy::{
     AuditConnectionContext, AuditEvent, AuditReconciliation, AuditReconciliationClaim, AuditReconciliationEvidence,
-    AuditRecordPhase, AuditSink, AuditTerminalStatus, Principal,
+    AuditSink, Principal,
 };
 use bookie_storage::AuditJournal;
 use uuid::Uuid;
@@ -40,25 +40,9 @@ pub async fn resolve_unknown_outcome(
 }
 
 async fn unresolved_events(journal: &AuditJournal) -> Result<Vec<AuditEvent>, String> {
-    let events = journal.recent(usize::MAX).await.map_err(|error| error.to_string())?;
-    let mut open: Vec<AuditEvent> = Vec::new();
-    for event in events {
-        if let Some(reconciliation) = &event.reconciliation {
-            if reconciliation.claim.clears_the_block() {
-                open.retain(|unknown| unknown.operation_id != reconciliation.reconciles_operation_id);
-            }
-            continue;
-        }
-        if event.phase == AuditRecordPhase::Outcome
-            && event.operation_class.is_write()
-            && event.terminal_status == AuditTerminalStatus::Unknown
-        {
-            open.retain(|unknown| unknown.operation_id != event.operation_id);
-            open.push(event);
-        }
-    }
-    open.reverse();
-    Ok(open)
+    let mut events = journal.unresolved_unknowns().await.map_err(|error| error.to_string())?;
+    events.reverse();
+    Ok(events)
 }
 
 async fn list_in(journal: &AuditJournal, connection_id: Option<Uuid>) -> Result<Vec<UnknownOutcome>, String> {
@@ -126,7 +110,7 @@ fn operator_name() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bookie_policy::AuditOperationClass;
+    use bookie_policy::{AuditOperationClass, AuditRecordPhase, AuditTerminalStatus};
 
     fn write(connection_id: Uuid, phase: AuditRecordPhase, status: AuditTerminalStatus) -> AuditEvent {
         let mut event = bookie_storage::sample_event(Principal::human_gui());
