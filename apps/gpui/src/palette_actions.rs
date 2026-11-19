@@ -1,3 +1,5 @@
+use bookie_app_services::quick_switcher::{QuickItem, QuickTarget, filter as quick_filter, relation_items};
+
 use super::*;
 
 impl GridView {
@@ -298,9 +300,47 @@ impl GridView {
         palette_matches(self.palette.input.read(cx).content(), &self.palette_actions())
     }
 
+    pub(crate) fn quick_shown(&self, cx: &App) -> Vec<QuickItem> {
+        let items = relation_items(&self.catalog.tables, &[], "Table", "View");
+        quick_filter(&items, self.palette.input.read(cx).content())
+    }
+
+    pub(crate) fn palette_len(&self, cx: &App) -> usize {
+        if self.palette.quick {
+            self.quick_shown(cx).len()
+        } else {
+            self.palette_shown(cx).len()
+        }
+    }
+
+    pub(crate) fn open_quick_switcher(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.open_palette(window, cx);
+        self.palette.quick = true;
+    }
+
+    fn run_quick_switcher(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let shown = self.quick_shown(cx);
+        let picked = shown.get(self.palette.index.min(shown.len().saturating_sub(1)));
+        let Some(QuickTarget::Relation { schema, name }) = picked.map(|item| item.target.clone()) else {
+            return;
+        };
+        self.close_palette(window, cx);
+        if let Some(table) = self
+            .catalog
+            .tables
+            .iter()
+            .find(|t| t.schema == schema && t.name == name)
+            .cloned()
+        {
+            self.open_table_named(&table, window, cx);
+        }
+        cx.notify();
+    }
+
     pub(crate) fn open_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.palette.open = true;
         self.palette.fonts = false;
+        self.palette.quick = false;
         self.palette.index = 0;
         self.palette.input.update(cx, |input, cx| input.set_content("", cx));
         window.focus(&self.palette.input.read(cx).focus_handle(cx), cx);
@@ -310,11 +350,15 @@ impl GridView {
     pub(crate) fn close_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.palette.open = false;
         self.palette.fonts = false;
+        self.palette.quick = false;
         window.focus(&self.focus, cx);
         cx.notify();
     }
 
     pub(crate) fn run_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.palette.quick {
+            return self.run_quick_switcher(window, cx);
+        }
         let actions = self.palette_actions();
         let shown = palette_matches(self.palette.input.read(cx).content(), &actions);
         let Some(index) = shown

@@ -403,6 +403,7 @@ impl GridView {
     fn sidebar_import_export_button(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
         div()
             .id("import-export-menu")
+            .tooltip(tip("Import / Export connections"))
             .flex_1()
             .min_w_0()
             .flex()

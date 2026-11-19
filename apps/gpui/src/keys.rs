@@ -90,7 +90,7 @@ impl GridView {
         if self.palette.open {
             match key {
                 "down" | "up" => {
-                    let count = self.palette_shown(cx).len();
+                    let count = self.palette_len(cx);
                     self.palette.index = palette_step(self.palette.index, count, key == "down");
                     cx.notify();
                 }
@@ -132,6 +132,7 @@ impl GridView {
     fn run_command(&mut self, command: Command, window: &mut Window, cx: &mut Context<Self>) {
         match command {
             Command::Palette => self.open_palette(window, cx),
+            Command::QuickSwitcher => self.open_quick_switcher(window, cx),
             Command::Filter => {
                 self.search.filter_visible = true;
                 window.focus(&self.search.filter.read(cx).focus_handle(cx), cx);
