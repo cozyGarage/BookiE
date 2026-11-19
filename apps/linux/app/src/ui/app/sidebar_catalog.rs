@@ -4,6 +4,35 @@ use relm4::ComponentSender;
 use super::{App, AppMsg};
 use crate::services::catalog::CatalogOrigin;
 
+const MAX_SIDEBAR_CATALOG_BYTES: usize = 64 * 1024 * 1024;
+
+fn estimated_catalog_bytes(objects: &[CatalogObject]) -> usize {
+    objects
+        .capacity()
+        .saturating_mul(std::mem::size_of::<CatalogObject>())
+        .saturating_add(objects.iter().fold(0, |bytes, object| {
+            bytes
+                .saturating_add(object.name.capacity())
+                .saturating_add(object.schema.as_ref().map_or(0, String::capacity))
+                .saturating_add(object.detail.as_ref().map_or(0, String::capacity))
+        }))
+}
+
+fn sidebar_catalog_fits(
+    catalogs: &std::collections::HashMap<CatalogObjectKind, Vec<CatalogObject>>,
+    replacing: CatalogObjectKind,
+    incoming: &[CatalogObject],
+    limit: usize,
+) -> bool {
+    let retained_bytes = catalogs
+        .iter()
+        .filter(|(kind, _)| **kind != replacing)
+        .fold(0usize, |bytes, (_, objects)| {
+            bytes.saturating_add(estimated_catalog_bytes(objects))
+        });
+    retained_bytes.saturating_add(estimated_catalog_bytes(incoming)) <= limit
+}
+
 impl App {
     pub(super) fn reset_sidebar_catalog(&mut self) {
         self.sidebar_catalog.clear();
@@ -57,10 +86,54 @@ impl App {
                 self.show_toast(&bookie_app_services::tr!("Nothing of this kind was found."));
             }
             Ok(objects) => {
+                if !sidebar_catalog_fits(&self.sidebar_catalog, kind, &objects, MAX_SIDEBAR_CATALOG_BYTES) {
+                    self.show_toast(&bookie_app_services::tr!(
+                        "The catalog exceeds the 64 MiB sidebar limit."
+                    ));
+                    return;
+                }
                 self.sidebar_catalog.insert(kind, objects);
                 self.repopulate_sidebar(&self.sidebar_tables.clone(), sender);
             }
             Err(message) => self.show_toast(&message),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn object(detail: &str) -> CatalogObject {
+        CatalogObject {
+            kind: CatalogObjectKind::Routine,
+            schema: Some("public".into()),
+            name: "routine".into(),
+            detail: Some(detail.into()),
+        }
+    }
+
+    #[test]
+    fn catalog_budget_counts_retained_kinds_and_replaces_the_loaded_kind() {
+        let catalogs = std::collections::HashMap::from([
+            (CatalogObjectKind::Routine, vec![object("old")]),
+            (CatalogObjectKind::Trigger, vec![object("trigger")]),
+        ]);
+        let replacement = vec![object("new")];
+        let bytes_without_routine = estimated_catalog_bytes(&catalogs[&CatalogObjectKind::Trigger]);
+
+        let replacement_bytes = estimated_catalog_bytes(&replacement);
+        assert!(sidebar_catalog_fits(
+            &catalogs,
+            CatalogObjectKind::Routine,
+            &replacement,
+            bytes_without_routine + replacement_bytes,
+        ));
+        assert!(!sidebar_catalog_fits(
+            &catalogs,
+            CatalogObjectKind::Sequence,
+            &replacement,
+            bytes_without_routine + replacement_bytes - 1,
+        ));
     }
 }
