@@ -1492,8 +1492,8 @@ jobs:
       CARGO_HOME: /cargo
       RUSTC_WRAPPER: ""
       PATH: /cargo/bin:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
-      CARGO_TARGET_DIR: /target/${{ github.run_id }}/${{ github.job }}
-      TMPDIR: /target/${{ github.run_id }}/${{ github.job }}
+      CARGO_TARGET_DIR: /var/cache/ci/target/${{ github.run_id }}/${{ github.job }}
+      TMPDIR: /var/cache/ci/tmp/${{ github.run_id }}/${{ github.job }}
     steps:
       - name: Prepare runner workspace
         run: |
