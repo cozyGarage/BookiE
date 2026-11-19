@@ -325,7 +325,7 @@ impl Render for GridView {
         let filter_row = self.grid_filter_row(theme, cx);
         let compare_bar = self.grid_compare_bar(theme, cx);
         let palette = self.palette.open.then(|| self.palette_overlay(cx));
-        let save_bar = self.save_bar(theme, cx);
+        let save_bar = self.approval_bar(theme, cx).or_else(|| self.save_bar(theme, cx));
         let banner = self.save_banner(theme, cx);
         let grid = self.grid_pane(theme, strip, (filter_row, compare_bar, save_bar, banner));
         let content = match self.tabs.current().clone() {

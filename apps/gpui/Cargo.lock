@@ -1131,6 +1131,7 @@ checksum = "119771309b95163ec7aaf79810da82f7cd0599c19722d48b9c03894dca833966"
 name = "bookie-app-services"
 version = "0.2.7"
 dependencies = [
+ "async-trait",
  "bookie-checks",
  "bookie-core",
  "bookie-dump",

@@ -128,6 +128,7 @@ fn a_write_the_guard_denies_leaves_the_database_unchanged_and_keeps_the_edit(cx:
         let (text, is_error) = view.save.banner.clone().expect("an error banner");
         assert!(is_error && text.starts_with("Could not save"), "{text}");
         assert_eq!(view.cell_edit.edits.len(), 1, "the edit is kept so it can be retried");
+        assert!(view.save.write.is_none(), "a failed save drops the cached write session");
     });
     assert_eq!(saved_customer(&path, 1), "Ada", "the denied statement did not run");
     std::fs::remove_file(&path).ok();

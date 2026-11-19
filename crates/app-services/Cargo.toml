@@ -41,13 +41,13 @@ tempfile.workspace = true
 rust_decimal.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
+async-trait.workspace = true
 uuid.workspace = true
 sqlparser.workspace = true
 unicode-width.workspace = true
 
 [dev-dependencies]
 tracing-subscriber.workspace = true
-async-trait.workspace = true
 bookie-driver-postgres = { path = "../drivers/postgres" }
 bookie-driver-mysql = { path = "../drivers/mysql" }
 bookie-driver-mssql = { path = "../drivers/mssql" }
