@@ -95,7 +95,7 @@ The workspace manifest is `Cargo.toml`. [ARCHITECTURE.md](ARCHITECTURE.md) has t
 - `crates/drivers/*`: one static crate per engine, implementing `core` traits, never depending on the app.
 - `apps/linux/app`: the GTK application and composition root.
 
-Dependencies point toward `core`. Domain and driver crates never import GTK or Relm4. A new engine is a driver crate implementing the `core` contracts, added to both composition roots, with documented maturity ([adding drivers](docs/adding-drivers.md)) and tests against a real engine.
+Dependencies point toward `core`. Domain and driver crates never import GTK or Relm4. A new engine is a driver crate implementing the `core` contracts, added to `crates/registry`, with documented maturity ([adding drivers](docs/adding-drivers.md)) and tests against a real engine.
 
 ## UI and async rules
 
