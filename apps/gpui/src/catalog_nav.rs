@@ -21,6 +21,10 @@ impl GridView {
         self.attach_session(session, identity);
     }
 
+    pub(crate) fn is_current_session(&self, session: &Arc<LiveSession>) -> bool {
+        self.live.as_ref().is_some_and(|live| Arc::ptr_eq(live, session))
+    }
+
     fn attach_session(&mut self, session: Arc<LiveSession>, table: TableInfo) {
         self.catalog = Catalog {
             connection: format!("{} · {}", session.driver_id, session.label),
@@ -29,6 +33,8 @@ impl GridView {
             grid_table: table,
         };
         self.live = Some(session);
+        self.sidebar.catalog.clear();
+        self.sidebar.fields.clear();
         self.run_tabs.slots.clear();
         self.run_tabs.active = 0;
         self.run_tabs.next_number = 1;

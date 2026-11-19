@@ -28,12 +28,16 @@ impl GridView {
             return;
         };
         self.sidebar.catalog.push((kind, ObjectState::Loading));
+        let started_by = session.clone();
         cx.spawn(async move |this, cx| {
             let result = cx
                 .background_executor()
                 .spawn(async move { session.catalog_objects(kind) })
                 .await;
             let _ = this.update(cx, |this, cx| {
+                if !this.is_current_session(&started_by) {
+                    return;
+                }
                 let Some((_, state)) = this.sidebar.catalog.iter_mut().find(|(open, _)| *open == kind) else {
                     return;
                 };
