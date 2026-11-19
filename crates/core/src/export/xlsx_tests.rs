@@ -291,3 +291,43 @@ fn a_workbook_is_written_as_a_zip_container_with_one_sheet() {
     assert_eq!(&output[..2], b"PK");
     assert!(output.len() > 1000, "{}", output.len());
 }
+
+#[test]
+fn value_honesty_xlsx_round_trip_keeps_booleans_zoned_time_binary_and_all_null_rows() {
+    let mut payload = column("payload");
+    payload.data_type = "BYTEA".into();
+    let mut flag = column("flag");
+    flag.data_type = "BOOLEAN".into();
+    let mut at = column("at");
+    at.data_type = "TIMESTAMPTZ".into();
+    let columns = [payload, flag, at];
+    let rows = vec![
+        vec![
+            Value::Bytes((0..=255u8).cycle().take(8_000).collect()),
+            Value::Bool(true),
+            Value::TimestampTz("2026-09-27T12:34:56.123456789+05:30".parse().unwrap()),
+        ],
+        vec![Value::Bytes(vec![]), Value::Bool(false), Value::Null],
+        vec![Value::Null, Value::Null, Value::Null],
+    ];
+    let mut writer = XlsxWriter::new(rows.len()).unwrap();
+    let mut output = Vec::new();
+    writer.begin(&mut output, &columns).unwrap();
+    for (index, row) in rows.iter().enumerate() {
+        writer.write_row(&mut output, index, row).unwrap();
+    }
+    writer.finish(&mut output).unwrap();
+
+    let csv = crate::import::xlsx_to_csv(&output).unwrap();
+    let options = crate::import::CsvImportOptions::default();
+    let sheet = crate::import::read_csv(&csv, &options, None).unwrap();
+    let restored: Vec<Vec<Value>> = sheet
+        .rows
+        .iter()
+        .enumerate()
+        .map(|(index, row)| {
+            crate::import::row_to_values(row, &[Some(0), Some(1), Some(2)], &columns, &options, index + 2).unwrap()
+        })
+        .collect();
+    assert_eq!(restored, rows);
+}
