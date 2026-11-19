@@ -257,6 +257,7 @@ impl GridView {
             .get(index)
             .and_then(|slot| slot.source.clone())
             .unwrap_or_else(|| std::sync::Arc::new(Synthetic::new(run.rows)));
+        self.reset_edit_history();
         self.compare = None;
         self.search.cursor = MatchCursor::default();
         self.set_mode(Mode::All);
@@ -282,6 +283,7 @@ impl GridView {
         }
         self.invalidate_background();
         self.cell_edit.edits.clear();
+        self.reset_edit_history();
         if self.run_tabs.slots.is_empty() {
             self.source = self.table_source.clone();
             self.cell_edit.active = None;
