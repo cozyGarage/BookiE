@@ -5,13 +5,13 @@ use std::os::unix::fs::MetadataExt;
 use bookie_policy::AuditEvent;
 use uuid::Uuid;
 
-use super::{GENESIS_HASH, JournalTail, VerifiedJournal};
+use super::{GENESIS_HASH, JournalTail, UnresolvedWrite, VerifiedJournal};
 use crate::error::StorageError;
 
 pub(super) struct JournalState {
     pub(super) tail: JournalTail,
     pub(super) pending: HashMap<Uuid, AuditEvent>,
-    pub(super) unresolved: HashMap<Uuid, Uuid>,
+    pub(super) unresolved: HashMap<Uuid, UnresolvedWrite>,
 }
 
 impl JournalState {

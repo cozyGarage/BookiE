@@ -4,6 +4,7 @@
 mod admin_functions;
 mod approval;
 mod audit;
+mod audit_reconciliation;
 mod blast_radius;
 mod catalog_effect;
 mod classify;
@@ -41,6 +42,10 @@ pub use audit::{
     AuditConnectionIdentity, AuditError, AuditErrorCategory, AuditEvent, AuditOperationClass, AuditPreviewState,
     AuditRecordPhase, AuditSink, AuditState, AuditTerminalStatus, AuditTransactionOutcome, AuditTransportClient,
     AuditTransportMetadata, AuditTransportOutcome, NullAuditSink,
+};
+pub use audit_reconciliation::{
+    AuditReconciliation, AuditReconciliationClaim, AuditReconciliationEvidence, MAX_RECONCILIATION_REASON_CHARS,
+    ReconciliationError,
 };
 pub use blast_radius::{BlastRadiusResult, BlastRadiusRewrite};
 pub use classify::{StatementClass, StatementFacts, classify, statement_requires_write_capability};
