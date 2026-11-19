@@ -356,7 +356,7 @@ impl GridView {
         }
     }
 
-    fn sidebar_tree_view(&self, theme: Theme, search: &str, cx: &mut Context<Self>) -> Div {
+    fn sidebar_tree_view(&self, theme: Theme, search: &str, cx: &mut Context<Self>) -> Stateful<Div> {
         let filter = SidebarFilter {
             regex: self.sidebar.regex,
             active_only: self.sidebar.active_only,
@@ -370,12 +370,17 @@ impl GridView {
             &self.sidebar.collapsed_schemas,
         );
         let open_table = self.tabs.current().clone();
+        let pending = self.sidebar.reveal.borrow().clone();
         let mut tree: Vec<gpui::AnyElement> = Vec::new();
         for (index, (depth, row)) in rows.into_iter().enumerate() {
             let table = match &row {
                 TreeRow::Table(table) => Some(table.clone()),
                 _ => None,
             };
+            if table.is_some() && table == pending {
+                self.sidebar.scroll.scroll_to_item(tree.len());
+                self.sidebar.reveal.borrow_mut().take();
+            }
             tree.push(
                 self.sidebar_tree_row(index, depth, row, &open_table, theme, cx)
                     .into_any_element(),
@@ -397,7 +402,17 @@ impl GridView {
                 .text_color(rgb(theme.muted_foreground))
                 .child("No matching table")
         });
-        div().flex().flex_col().px_2().children(tree).children(empty)
+        div()
+            .id("sidebar-tree")
+            .flex_1()
+            .min_h_0()
+            .overflow_y_scroll()
+            .track_scroll(&self.sidebar.scroll)
+            .flex()
+            .flex_col()
+            .px_2()
+            .children(tree)
+            .children(empty)
     }
 
     fn sidebar_import_export_button(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {

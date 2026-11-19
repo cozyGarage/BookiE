@@ -454,6 +454,39 @@ fn the_shortcut_list_shows_every_command_with_its_keys_and_runs_the_chosen_one(c
 }
 
 #[gpui::test]
+fn a_long_sidebar_scrolls_and_reveal_brings_the_open_table_into_view(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    let tables: Vec<_> = (0..80)
+        .map(|n| bookie_gpui::shell::table_info(&format!("t{n:02}")))
+        .collect();
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.catalog.tables = tables.clone();
+            view.sidebar.open = true;
+            view.tabs.open_table(&tables[70]);
+            view.open_table_named(&tables[70], window, cx);
+            cx.notify();
+        })
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(
+            view.sidebar.scroll.max_offset().y > gpui::px(0.0),
+            "the tree overflows and can scroll"
+        );
+    });
+    cx.simulate_keystrokes("ctrl-shift-l");
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        let (top, bottom) = (view.sidebar.scroll.top_item(), view.sidebar.scroll.bottom_item());
+        assert!(
+            top <= 72 && 72 <= bottom,
+            "row 72 (t70) is visible, saw {top}..{bottom}"
+        );
+    });
+}
+
+#[gpui::test]
 fn the_palette_hides_actions_that_do_not_apply_and_arrows_pick_the_next_one(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.simulate_keystrokes("ctrl-shift-p");

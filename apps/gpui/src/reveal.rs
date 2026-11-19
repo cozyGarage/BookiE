@@ -26,6 +26,7 @@ impl GridView {
         for key in uncollapse {
             self.sidebar.collapsed_schemas.toggle(&key);
         }
+        *self.sidebar.reveal.borrow_mut() = Some(table.clone());
         self.sidebar.open = true;
         self.sidebar.connection_open = true;
         self.sidebar.database_open = true;
