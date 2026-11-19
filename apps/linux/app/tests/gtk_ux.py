@@ -817,6 +817,66 @@ GLib.MainLoop().run()
         finally:
             psql("DROP SCHEMA IF EXISTS " + ", ".join(schemas) + " CASCADE")
 
+    def postgres_temporary_tables_follow_the_active_editor_session(database, base):
+        def visible_control(name, role):
+            return next(
+                node
+                for node in ui.descendants(ui.application_node())
+                if ui.node_name(node) == name
+                and ui.node_role(node) == role
+                and node.getState().contains(pyatspi.STATE_SHOWING)
+            )
+
+        def set_active_editor(sql):
+            editors = []
+            for node in ui.descendants(ui.application_node()):
+                if ui.node_role(node) != pyatspi.ROLE_TEXT or not node.getState().contains(pyatspi.STATE_SHOWING):
+                    continue
+                try:
+                    node.queryEditableText()
+                    editors.append(node)
+                except Exception:
+                    continue
+            if not editors:
+                raise AssertionError("no visible SQL editor")
+            editor = next((node for node in editors if node.getState().contains(pyatspi.STATE_FOCUSED)), editors[-1])
+            editor.queryEditableText().setTextContents(sql)
+
+        def run_session_sql(sql):
+            ui.invoke_accessible_action("win.focus-editor")
+            set_active_editor(sql)
+            ui.invoke(visible_control("Run", pyatspi.ROLE_PUSH_BUTTON))
+            approval = ui.wait_for_node(name="Approve once", role=pyatspi.ROLE_PUSH_BUTTON)
+            ui.invoke(approval)
+            ui.wait_for_node(name="Approve once", present=False)
+            ui.wait_for_node_containing("done in")
+
+        def create_temp_table(table, marker):
+            ui.invoke(visible_control("Session", pyatspi.ROLE_TOGGLE_BUTTON))
+            run_session_sql(f"CREATE TEMP TABLE {table} (value text); INSERT INTO {table} VALUES ('{marker}')")
+            ui.wait_for_node(name=table, role=pyatspi.ROLE_LIST_ITEM)
+
+        ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
+        ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
+        ui.invoke_accessible_action("win.open-editor")
+        create_temp_table("bookie_session_temp_a", "session-a-marker")
+
+        ui.invoke_accessible_action("win.open-editor")
+        ui.wait_for_node(name="Query 2", role=pyatspi.ROLE_PAGE_TAB)
+        create_temp_table("bookie_session_temp_b", "session-b-marker")
+        ui.wait_for_node(name="bookie_session_temp_a", role=pyatspi.ROLE_LIST_ITEM, present=False)
+
+        ui.invoke(ui.wait_for_node(name="Query 1", role=pyatspi.ROLE_PAGE_TAB))
+        ui.wait_for_node(name="bookie_session_temp_a", role=pyatspi.ROLE_LIST_ITEM)
+        ui.wait_for_node(name="bookie_session_temp_b", role=pyatspi.ROLE_LIST_ITEM, present=False)
+        ui.invoke_named_action_within("bookie_session_temp_a", "sidebar-row.open-in-new-tab")
+        ui.wait_for_node(name="session-a-marker", role=pyatspi.ROLE_LABEL)
+
+        ui.invoke(ui.wait_for_node(name="Query 2", role=pyatspi.ROLE_PAGE_TAB))
+        ui.wait_for_node(name="bookie_session_temp_b", role=pyatspi.ROLE_LIST_ITEM)
+        ui.invoke_named_action_within("bookie_session_temp_b", "sidebar-row.open-in-new-tab")
+        ui.wait_for_node(name="session-b-marker", role=pyatspi.ROLE_LABEL)
+
     def check_saved_connection_removal(database, base, welcome):
         before = saved_connections(base)
         target = next(record for record in before if record["name"] == ui.CONNECTION_B_NAME)
@@ -3356,6 +3416,7 @@ GLib.MainLoop().run()
         result.append(clickhouse_enum_grid_displays_native_labels_without_unique_row_identity)
     if os.environ.get("BOOKIE_GTK_POSTGRES_PORT"):
         result.append(postgres_completion_uses_each_editor_session_search_path)
+        result.append(postgres_temporary_tables_follow_the_active_editor_session)
         result.append(postgres_session_transaction_confirmation_cancels_or_rolls_back)
         result.append(postgres_session_commit_distinguishes_aborted_rollback_from_recovered_commit)
         result.append(postgres_saved_connection_browses_rows_and_values)
