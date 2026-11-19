@@ -23,7 +23,7 @@ impl GridView {
             self.status = "Type a statement first".into();
             return;
         }
-        self.run_sql(sql, cx);
+        self.run_with_parameters(sql, cx);
     }
 
     pub(crate) fn explain_query(&mut self, cx: &mut Context<Self>) {
@@ -36,6 +36,10 @@ impl GridView {
             self.status = "Type a statement first".into();
             return;
         }
+        if !bookie_app_services::query_parameters::statement_names(&sql, &session.driver_id).is_empty() {
+            self.status = "Explain does not take parameters yet; put the values in the statement".into();
+            return;
+        }
         match bookie_core::sql_dialect::explain_statement(&session.driver_id, &sql) {
             Some(statement) => {
                 self.panel.explaining = true;
@@ -45,7 +49,11 @@ impl GridView {
         }
     }
 
-    fn run_sql(&mut self, sql: String, cx: &mut Context<Self>) {
+    pub(crate) fn run_sql(&mut self, sql: String, cx: &mut Context<Self>) {
+        self.run_sql_with(sql, Vec::new(), cx);
+    }
+
+    pub(crate) fn run_sql_with(&mut self, sql: String, params: Vec<bookie_core::Value>, cx: &mut Context<Self>) {
         if let Some(session) = self.live.clone() {
             self.status = "Running…".into();
             self.begin_background(
@@ -55,7 +63,7 @@ impl GridView {
                     let statement = sql.clone();
                     move |cancel| {
                         let (started, clock) = (Instant::now(), std::time::SystemTime::now());
-                        let result = session.run_query_controlled(&statement, bookie_gpui::live::ROW_CAP, &cancel);
+                        let result = session.run_query_bound(&statement, &params, bookie_gpui::live::ROW_CAP, &cancel);
                         let (rows, error) = match &result {
                             Ok(table) => (
                                 i64::try_from(bookie_gpui::source::ResultSource::total(table)).ok(),

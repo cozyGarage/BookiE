@@ -33,6 +33,7 @@ pub enum Command {
         epoch: Epoch,
         session_id: SessionId,
         sql: String,
+        params: Vec<bookie_core::Value>,
     },
     ReadPage {
         epoch: Epoch,
@@ -235,8 +236,21 @@ async fn dispatch_read_command(
     sink: &dyn EventSink,
 ) -> Result<(), DispatchError> {
     match command {
-        Command::RunQuery { epoch, session_id, sql } => {
-            Box::pin(dispatch_query(sessions, epoch, session_id, sql, control, sink)).await?;
+        Command::RunQuery {
+            epoch,
+            session_id,
+            sql,
+            params,
+        } => {
+            Box::pin(dispatch_query(
+                sessions,
+                epoch,
+                session_id,
+                (sql, params),
+                control,
+                sink,
+            ))
+            .await?;
         }
         Command::ReadPage {
             epoch,
@@ -452,12 +466,13 @@ async fn dispatch_query(
     sessions: &ReadSessionStore,
     epoch: Epoch,
     session_id: SessionId,
-    sql: String,
+    (sql, params): (String, Vec<bookie_core::Value>),
     control: &OperationControl,
     sink: &dyn EventSink,
 ) -> Result<(), DispatchError> {
     let outcome = match sessions.get(session_id) {
-        Some(session) => session.run_query(&sql, control).await,
+        Some(session) if params.is_empty() => session.run_query(&sql, control).await,
+        Some(session) => session.run_query_params(&sql, &params, control).await,
         None => Err(DriverFailurePresentation::Disconnected),
     };
     sink.try_emit(Event::QueryCompleted { epoch, outcome })?;
@@ -532,6 +547,7 @@ mod tests {
                 epoch: Epoch(9),
                 session_id: SessionId::new(),
                 sql: "SELECT 1".into(),
+                params: Vec::new(),
             },
             &control,
             &sink,
