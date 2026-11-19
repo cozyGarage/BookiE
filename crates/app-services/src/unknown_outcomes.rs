@@ -1,0 +1,208 @@
+use bookie_policy::{
+    AuditConnectionContext, AuditEvent, AuditReconciliation, AuditReconciliationClaim, AuditReconciliationEvidence,
+    AuditRecordPhase, AuditSink, AuditTerminalStatus, Principal,
+};
+use bookie_storage::AuditJournal;
+use uuid::Uuid;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnknownOutcome {
+    pub operation_id: Uuid,
+    pub connection_id: Uuid,
+    pub connection_name: String,
+    pub environment: String,
+    pub when: String,
+    pub class: String,
+    pub sql: String,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OutcomeDecision {
+    Committed,
+    RolledBack,
+    StillUnknown,
+}
+
+pub async fn list_unknown_outcomes(connection_id: Option<Uuid>) -> Result<Vec<UnknownOutcome>, String> {
+    let journal = AuditJournal::open_default().map_err(|error| error.to_string())?;
+    list_in(&journal, connection_id).await
+}
+
+pub async fn resolve_unknown_outcome(
+    operation_id: Uuid,
+    decision: OutcomeDecision,
+    reason: &str,
+) -> Result<(), String> {
+    let journal = AuditJournal::open_default().map_err(|error| error.to_string())?;
+    resolve_in(&journal, operation_id, decision, reason).await
+}
+
+async fn unresolved_events(journal: &AuditJournal) -> Result<Vec<AuditEvent>, String> {
+    let events = journal.recent(usize::MAX).await.map_err(|error| error.to_string())?;
+    let mut open: Vec<AuditEvent> = Vec::new();
+    for event in events {
+        if let Some(reconciliation) = &event.reconciliation {
+            if reconciliation.claim.clears_the_block() {
+                open.retain(|unknown| unknown.operation_id != reconciliation.reconciles_operation_id);
+            }
+            continue;
+        }
+        if event.phase == AuditRecordPhase::Outcome
+            && event.operation_class.is_write()
+            && event.terminal_status == AuditTerminalStatus::Unknown
+        {
+            open.retain(|unknown| unknown.operation_id != event.operation_id);
+            open.push(event);
+        }
+    }
+    open.reverse();
+    Ok(open)
+}
+
+async fn list_in(journal: &AuditJournal, connection_id: Option<Uuid>) -> Result<Vec<UnknownOutcome>, String> {
+    Ok(unresolved_events(journal)
+        .await?
+        .into_iter()
+        .filter(|event| {
+            connection_id.is_none_or(|wanted| event.connection_id == wanted || event.connection_id.is_nil())
+        })
+        .map(|event| UnknownOutcome {
+            operation_id: event.operation_id,
+            connection_id: event.connection_id,
+            connection_name: event.connection_name,
+            environment: format!("{:?}", event.environment),
+            when: event.timestamp.format("%Y-%m-%d %H:%M:%S UTC").to_string(),
+            class: format!("{:?}", event.operation_class),
+            sql: event.redacted_sql,
+            error: event.error,
+        })
+        .collect())
+}
+
+async fn resolve_in(
+    journal: &AuditJournal,
+    operation_id: Uuid,
+    decision: OutcomeDecision,
+    reason: &str,
+) -> Result<(), String> {
+    let original = unresolved_events(journal)
+        .await?
+        .into_iter()
+        .find(|event| event.operation_id == operation_id)
+        .ok_or_else(|| "that write is no longer an unresolved unknown outcome".to_string())?;
+    let (claim, evidence) = match decision {
+        OutcomeDecision::Committed => (
+            AuditReconciliationClaim::Committed,
+            AuditReconciliationEvidence::ServerCheckedManually,
+        ),
+        OutcomeDecision::RolledBack => (
+            AuditReconciliationClaim::RolledBack,
+            AuditReconciliationEvidence::ServerCheckedManually,
+        ),
+        OutcomeDecision::StillUnknown => (
+            AuditReconciliationClaim::StillUnknown,
+            AuditReconciliationEvidence::None,
+        ),
+    };
+    let event = AuditEvent::reconciliation(
+        Principal::human_gui(),
+        AuditConnectionContext {
+            id: original.connection_id,
+            name: original.connection_name,
+            environment: original.environment,
+            driver_id: original.driver_id,
+        },
+        AuditReconciliation::new(operation_id, claim, reason, evidence, operator_name()),
+    )
+    .map_err(|error| error.to_string())?;
+    journal.record(event).await.map_err(|error| error.to_string())
+}
+
+fn operator_name() -> String {
+    std::env::var("USER")
+        .or_else(|_| std::env::var("LOGNAME"))
+        .unwrap_or_else(|_| "unknown".into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bookie_policy::AuditOperationClass;
+
+    fn write(connection_id: Uuid, phase: AuditRecordPhase, status: AuditTerminalStatus) -> AuditEvent {
+        let mut event = bookie_storage::sample_event(Principal::human_gui());
+        event.connection_id = connection_id;
+        event.connection_name = "orders db".into();
+        event.operation_class = AuditOperationClass::Mutation;
+        event.phase = phase;
+        event.terminal_status = status;
+        event
+    }
+
+    async fn journal_with_unknown(dir: &tempfile::TempDir) -> (AuditJournal, Uuid, Uuid) {
+        let journal = AuditJournal::open_validated(dir.path().join("audit.jsonl")).unwrap();
+        let connection_id = Uuid::new_v4();
+        let intent = write(connection_id, AuditRecordPhase::Intent, AuditTerminalStatus::Pending);
+        journal.record(intent.clone()).await.unwrap();
+        let mut unknown = intent.clone();
+        unknown.phase = AuditRecordPhase::Outcome;
+        unknown.terminal_status = AuditTerminalStatus::Unknown;
+        unknown.error = Some("lost the acknowledgement".into());
+        journal.record(unknown).await.unwrap();
+        (journal, connection_id, intent.operation_id)
+    }
+
+    #[tokio::test]
+    async fn an_unknown_write_is_listed_with_its_record_and_gone_once_decided() {
+        let dir = tempfile::tempdir().unwrap();
+        let (journal, connection_id, operation_id) = journal_with_unknown(&dir).await;
+        let listed = list_in(&journal, Some(connection_id)).await.unwrap();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].operation_id, operation_id);
+        assert_eq!(listed[0].connection_name, "orders db");
+        assert_eq!(listed[0].error.as_deref(), Some("lost the acknowledgement"));
+        assert!(list_in(&journal, Some(Uuid::new_v4())).await.unwrap().is_empty());
+
+        resolve_in(
+            &journal,
+            operation_id,
+            OutcomeDecision::Committed,
+            "checked the table by hand",
+        )
+        .await
+        .unwrap();
+        assert!(list_in(&journal, None).await.unwrap().is_empty());
+        let intent = write(connection_id, AuditRecordPhase::Intent, AuditTerminalStatus::Pending);
+        journal
+            .record(intent)
+            .await
+            .expect("the connection accepts writes again");
+    }
+
+    #[tokio::test]
+    async fn still_unknown_keeps_it_listed_and_a_missing_reason_or_stale_id_is_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        let (journal, _connection_id, operation_id) = journal_with_unknown(&dir).await;
+        resolve_in(
+            &journal,
+            operation_id,
+            OutcomeDecision::StillUnknown,
+            "waiting for the DBA",
+        )
+        .await
+        .unwrap();
+        assert_eq!(list_in(&journal, None).await.unwrap().len(), 1);
+        assert!(
+            resolve_in(&journal, operation_id, OutcomeDecision::Committed, "  ")
+                .await
+                .is_err()
+        );
+        assert!(
+            resolve_in(&journal, Uuid::new_v4(), OutcomeDecision::Committed, "x")
+                .await
+                .is_err()
+        );
+        assert_eq!(list_in(&journal, None).await.unwrap().len(), 1);
+    }
+}
