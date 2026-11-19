@@ -684,14 +684,16 @@ impl SimpleComponent for SqlEditor {
             }
             SqlEditorInput::ResultFlashError(source) => self.handle_result_flash_error(source),
             SqlEditorInput::SplitToggled(visible) => self.split_view.set_visible(visible),
-            SqlEditorInput::SessionToggled(enabled) => self.on_session_toggle(enabled, &sender),
-            SqlEditorInput::SessionOpened {
-                connection_id,
-                connection_identity,
-                session_id,
-                result,
-            } => self.on_session_opened(connection_id, connection_identity, session_id, result, &sender),
-            SqlEditorInput::ConnectionIdentityChanged => self.on_connection_identity_notification(&sender),
+            msg @ (SqlEditorInput::SessionToggled(..)
+            | SqlEditorInput::SessionOpened { .. }
+            | SqlEditorInput::ConnectionIdentityChanged
+            | SqlEditorInput::SessionState { .. }
+            | SqlEditorInput::SessionEnd { .. }
+            | SqlEditorInput::SessionCommitFinished { .. }
+            | SqlEditorInput::SessionRollbackFinished { .. }
+            | SqlEditorInput::TemporaryTablesLoaded { .. }
+            | SqlEditorInput::PrepareForTeardown(..)
+            | SqlEditorInput::SessionTeardownFinished(..)) => self.on_session_message(msg, &sender),
             SqlEditorInput::CompletionCatalogChanged(snapshot) => self.refresh_completion_catalog(snapshot),
             SqlEditorInput::FetchCompletionColumns(tables) => self.fetch_completion_columns(tables, &sender),
             SqlEditorInput::CompletionColumnsFetched {
@@ -699,30 +701,6 @@ impl SimpleComponent for SqlEditor {
                 request,
                 columns,
             } => self.complete_completion_columns(&identity, &request, columns),
-            SqlEditorInput::SessionState {
-                session_id,
-                transaction_open,
-                usable,
-            } => self.on_session_state(session_id, transaction_open, usable, &sender),
-            SqlEditorInput::SessionEnd { session_id, commit } if commit => {
-                self.commit_and_end(session_id, &sender);
-            }
-            SqlEditorInput::SessionEnd { session_id, .. } => {
-                if session_mode::session_callback_matches(session_id, self.session.as_ref().map(|session| session.id)) {
-                    self.rollback_and_end(session_id, &sender);
-                }
-            }
-            SqlEditorInput::SessionCommitFinished { session_id, result } => {
-                self.on_session_commit_finished(session_id, result, &sender);
-            }
-            SqlEditorInput::SessionRollbackFinished { session_id, result } => {
-                self.on_session_rollback_finished(session_id, result);
-            }
-            SqlEditorInput::TemporaryTablesLoaded { session_id, result } => {
-                self.on_temporary_tables_loaded(session_id, result, &sender);
-            }
-            SqlEditorInput::PrepareForTeardown(reply) => self.prepare_for_teardown(reply, &sender),
-            SqlEditorInput::SessionTeardownFinished(result) => self.finish_session_teardown(result),
             SqlEditorInput::LexingRead {
                 source,
                 sql,
