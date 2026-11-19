@@ -46,8 +46,15 @@ pub fn plan_structure_change(
     indexes: &[IndexInfo],
 ) -> Result<StructureChangePlan, StructureChangeError> {
     let op = build_op(&target, kind, text, indexes)?;
+    let op_name = match &op {
+        StructureOp::DropIndex { index_name, .. } => Some(index_name.clone()),
+        _ => None,
+    };
     let sql = materialize_ops(&[op], target.driver_id).map_err(describe)?;
-    let preview = sql.join("\n");
+    let preview = match &op_name {
+        Some(name) => format!("Index {name}\n{}", sql.join("\n")),
+        None => sql.join("\n"),
+    };
     Ok(StructureChangePlan {
         statements: sql.into_iter().map(|statement| (statement, Vec::new())).collect(),
         preview,
@@ -221,11 +228,30 @@ fn drop_index(
     text: &str,
 ) -> Result<StructureOp, StructureChangeError> {
     let name = text.trim();
-    let index = indexes
-        .iter()
-        .find(|index| index.name == name)
-        .or_else(|| indexes.iter().find(|index| index.name.eq_ignore_ascii_case(name)))
-        .ok_or_else(|| StructureChangeError::Input(format!("The table has no index named {name}")))?;
+    let exact: Vec<&IndexInfo> = indexes.iter().filter(|index| index.name == name).collect();
+    let candidates: Vec<&IndexInfo> = if exact.is_empty() {
+        indexes
+            .iter()
+            .filter(|index| index.name.eq_ignore_ascii_case(name))
+            .collect()
+    } else {
+        exact
+    };
+    let index = match candidates[..] {
+        [one] => one,
+        [] => {
+            return Err(StructureChangeError::Input(format!(
+                "The table has no index named {name}"
+            )));
+        }
+        _ => {
+            let names: Vec<&str> = candidates.iter().map(|index| index.name.as_str()).collect();
+            return Err(StructureChangeError::Input(format!(
+                "Several indexes match {name}: {}. Type the exact name",
+                names.join(", ")
+            )));
+        }
+    };
     if index.primary || index.constraint.is_some() {
         return Err(StructureChangeError::Input(format!(
             "{} belongs to a key or constraint; drop the constraint instead",
@@ -353,6 +379,7 @@ mod tests {
             (StructureChangeKind::AddIndex, "by_x ghost"),
             (StructureChangeKind::DropIndex, "ghost"),
             (StructureChangeKind::DropIndex, "primary"),
+            (StructureChangeKind::DropIndex, "by_NOTE two"),
         ] {
             assert!(
                 matches!(plan(kind, text), Err(StructureChangeError::Input(_))),
@@ -366,5 +393,15 @@ mod tests {
         assert!(plan(StructureChangeKind::AddColumn, "x TEXT); DROP TABLE orders; --").is_err());
         let quoted = plan(StructureChangeKind::AddColumn, "we\"ird TEXT").unwrap();
         assert!(quoted.preview.contains("\"we\"\"ird\""), "{}", quoted.preview);
+    }
+
+    #[test]
+    fn two_indexes_that_differ_only_by_case_are_never_guessed() {
+        let two = [stored_index("Foo"), stored_index("foo")];
+        assert!(drop_index(&two, None, "t".into(), "FOO").is_err());
+        assert!(
+            drop_index(&two, None, "t".into(), "foo").is_ok(),
+            "the exact spelling wins"
+        );
     }
 }
