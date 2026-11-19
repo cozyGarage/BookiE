@@ -381,25 +381,66 @@ pub(crate) fn progress_text(title: &str, rows: u64, partial: bool, pages: u64) -
 }
 
 impl GridView {
-    fn palette_overlay(&self, cx: &mut Context<Self>) -> Div {
-        let theme = Theme::current(cx);
+    fn command_rows(&self, theme: &Theme, cx: &App) -> Vec<Div> {
         let actions = self.palette_actions();
         let shown = palette_matches(self.palette.input.read(cx).content(), &actions);
         let selected = self.palette.index.min(shown.len().saturating_sub(1));
-        let list = shown.iter().enumerate().map(|(position, index)| {
-            let row = div().px_2().py_1().rounded_md().child(actions[*index].label.clone());
-            if position == selected {
-                row.bg(rgb(theme.active_row))
-            } else {
-                row
-            }
-        });
-        let empty = shown.is_empty().then(|| {
-            div()
-                .px_2()
-                .text_color(rgb(theme.muted_foreground))
-                .child("No matching command")
-        });
+        shown
+            .iter()
+            .enumerate()
+            .map(|(position, index)| {
+                let row = div().px_2().py_1().rounded_md().child(actions[*index].label.clone());
+                if position == selected {
+                    row.bg(rgb(theme.active_row))
+                } else {
+                    row
+                }
+            })
+            .collect()
+    }
+
+    fn quick_rows(&self, theme: &Theme, cx: &App) -> Vec<Div> {
+        let shown = self.quick_shown(cx);
+        let selected = self.palette.index.min(shown.len().saturating_sub(1));
+        shown
+            .into_iter()
+            .enumerate()
+            .map(|(position, item)| {
+                let row = div()
+                    .px_2()
+                    .py_1()
+                    .rounded_md()
+                    .flex()
+                    .justify_between()
+                    .gap_2()
+                    .child(
+                        div()
+                            .min_w_0()
+                            .overflow_hidden()
+                            .whitespace_nowrap()
+                            .text_ellipsis()
+                            .child(item.title),
+                    )
+                    .child(div().text_color(rgb(theme.muted_foreground)).child(item.subtitle));
+                if position == selected {
+                    row.bg(rgb(theme.active_row))
+                } else {
+                    row
+                }
+            })
+            .collect()
+    }
+
+    fn palette_overlay(&self, cx: &mut Context<Self>) -> Div {
+        let theme = Theme::current(cx);
+        let (rows, empty_text) = if self.palette.quick {
+            (self.quick_rows(&theme, cx), "No matching table")
+        } else {
+            (self.command_rows(&theme, cx), "No matching command")
+        };
+        let empty = rows
+            .is_empty()
+            .then(|| div().px_2().text_color(rgb(theme.muted_foreground)).child(empty_text));
         div()
             .absolute()
             .top(px(size::PALETTE_TOP))
@@ -419,7 +460,7 @@ impl GridView {
                     .bg(rgb(theme.background))
                     .shadow_lg()
                     .child(self.palette.input.clone())
-                    .children(list)
+                    .children(rows)
                     .children(empty),
             )
     }

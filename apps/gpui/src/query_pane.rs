@@ -37,6 +37,10 @@ impl GridView {
             )
             .child(
                 div()
+                    .min_w_0()
+                    .overflow_hidden()
+                    .whitespace_nowrap()
+                    .text_ellipsis()
                     .text_color(rgb(theme.muted_foreground))
                     .child(self.catalog.connection.clone()),
             )
