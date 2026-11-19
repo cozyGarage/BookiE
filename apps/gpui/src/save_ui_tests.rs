@@ -1031,7 +1031,8 @@ fn only_a_table_rename_asks_for_a_reconnect_after_it_is_applied(cx: &mut TestApp
         settle_saving(cx);
         view.read_with(cx, |view, _| {
             let pending = view.save.pending.as_ref().unwrap_or_else(|| panic!("no review: {}", view.status));
-            assert_eq!(pending.reconnect, expected, "{}", pending.title);
+            assert_eq!(pending.reconnect.is_some(), expected, "{}", pending.title);
+            assert!(!expected || pending.reconnect.as_ref().is_some_and(|table| table.name == "invoices"));
         });
         cx.update(|_, cx| view.update(cx, |view, cx| view.cancel_save(cx)));
         cx.update(|_, cx| view.update(cx, |view, cx| view.cancel_structure_bar(cx)));

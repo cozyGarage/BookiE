@@ -125,7 +125,7 @@ impl GridView {
             review: "Review the new row, then insert or cancel".into(),
             confirm: "Insert",
             note: None,
-            reconnect: false,
+            reconnect: None,
         };
         self.prepare(live, SaveRequest::Insert(values), labels, cx);
     }
