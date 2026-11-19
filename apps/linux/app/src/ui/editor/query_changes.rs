@@ -55,21 +55,26 @@ pub(super) fn install(
     });
     buffer.connect_changed(move |buffer| {
         generation.changed();
-        // GtkSourceView still runs its own delete handler after this signal, so a language
-        // change made here corrupts its offsets after a large delete. Apply it from idle.
         if let Some(view) = highlight_view.upgrade() {
-            let buffer = buffer.clone();
-            let bytes = highlight_bytes.clone();
-            let language = highlight_language.clone();
-            gtk::glib::idle_add_local_once(move || {
-                update_syntax_highlighting(&buffer, &view, bytes.get(), language.as_ref());
-            });
+            update_syntax_highlighting_after_signal(buffer, view, highlight_bytes.clone(), highlight_language.clone());
         }
         if depth.get() > 0 {
             pending.set(true);
             return;
         }
         publish(buffer);
+    });
+}
+
+fn update_syntax_highlighting_after_signal(
+    buffer: &gtk::TextBuffer,
+    view: sourceview5::View,
+    bytes: Rc<Cell<usize>>,
+    language: Option<sourceview5::Language>,
+) {
+    let buffer = buffer.clone();
+    gtk::glib::idle_add_local_once(move || {
+        update_syntax_highlighting(&buffer, &view, bytes.get(), language.as_ref());
     });
 }
 
