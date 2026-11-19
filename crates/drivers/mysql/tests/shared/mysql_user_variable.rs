@@ -128,14 +128,22 @@ async fn assert_pooled_query_does_not_leak_user_variable(connection: &dyn Connec
             );
         }
     }
-    for _ in 0..2 {
-        let result = connection
-            .query("SELECT '雪' AS text_value, 'a' || 'b' AS joined")
-            .await
-            .unwrap();
+    connection
+        .execute("SET SESSION sql_mode = '', time_zone = '+05:00'")
+        .await
+        .unwrap();
+    let probe_defaults =
+        || connection.query("SELECT '雪' AS text_value, 'a' || 'b' AS joined, @@session.time_zone, SLEEP(0.3)");
+    let (first, second, third, fourth) =
+        tokio::join!(probe_defaults(), probe_defaults(), probe_defaults(), probe_defaults());
+    for result in [first, second, third, fourth] {
         assert_eq!(
-            result.rows,
-            vec![vec![Value::Text("雪".into()), Value::Text("ab".into())]]
+            result.unwrap().rows[0][..3],
+            [
+                Value::Text("雪".into()),
+                Value::Text("ab".into()),
+                Value::Text("+00:00".into())
+            ]
         );
     }
     let acquired = connection
