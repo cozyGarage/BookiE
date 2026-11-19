@@ -224,6 +224,10 @@ fn use_statements_are_recognized_alone_and_inside_batches() {
         "use `other_db`",
         "  USE other_db;",
         "SELECT 1; USE other_db",
+        "USE`other_db`",
+        "use\nother_db",
+        "/* switch */ USE other_db",
+        "-- switch\nUSE other_db",
     ] {
         assert!(contains_use_statement(sql), "{sql}");
     }
@@ -232,6 +236,9 @@ fn use_statements_are_recognized_alone_and_inside_batches() {
         "SELECT 'use x'",
         "CALL use_it()",
         "INSERT INTO used VALUES (1)",
+        "SELECT * FROM use_log",
+        "-- USE other_db\nSELECT 1",
+        "/* USE other_db */ SELECT 1",
     ] {
         assert!(!contains_use_statement(sql), "{sql}");
     }
