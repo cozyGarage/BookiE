@@ -38,6 +38,20 @@ fn a_valid_edit_is_applied_to_the_typed_cell_and_marked(cx: &mut TestAppContext)
     });
 }
 
+#[gpui::test]
+fn confirming_an_untouched_null_cell_keeps_it_null(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    let row = view
+        .read_with(cx, |view, _| (0..12).find(|row| matches!(view.cell_at(*row, 2), Cell::Null)))
+        .expect("the synthetic data has a NULL state");
+    cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(row, 2, window, cx)));
+    cx.simulate_keystrokes("enter");
+    view.read_with(cx, |view, _| {
+        assert!(view.cell_edit.edits.is_empty(), "Enter on an untouched NULL staged an edit");
+        assert!(view.cell_edit.active.is_none());
+    });
+}
+
 #[test]
 fn editing_a_cell_does_not_write_its_value_to_process_output() {
     let output = std::process::Command::new(std::env::current_exe().unwrap())

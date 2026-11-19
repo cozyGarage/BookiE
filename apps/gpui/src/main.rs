@@ -680,14 +680,74 @@ fn open_requested_start_tab(view: &Entity<GridView>, name: &str, cx: &mut App) {
     });
 }
 
+const STATEMENT_LOG_TARGET: &str = "sqlx::query";
+
+fn log_filter(requested: Option<&str>) -> tracing_subscriber::EnvFilter {
+    use tracing_subscriber::EnvFilter;
+    let filter = requested
+        .and_then(|requested| EnvFilter::try_new(requested).ok())
+        .unwrap_or_else(|| EnvFilter::new("warn"));
+    if requested.is_some_and(|requested| requested.contains(STATEMENT_LOG_TARGET)) {
+        return filter;
+    }
+    match format!("{STATEMENT_LOG_TARGET}=off").parse() {
+        Ok(directive) => filter.add_directive(directive),
+        Err(_) => filter,
+    }
+}
+
 fn init_logging() {
     tracing_subscriber::fmt()
         .with_writer(std::io::stderr)
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("warn")),
-        )
+        .with_env_filter(log_filter(std::env::var("RUST_LOG").ok().as_deref()))
         .init();
+}
+
+#[cfg(test)]
+mod logging_tests {
+    use std::sync::{Arc, Mutex};
+
+    struct Capture(Arc<Mutex<Vec<u8>>>);
+
+    impl std::io::Write for Capture {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            if let Ok(mut buffer) = self.0.lock() {
+                buffer.extend_from_slice(bytes);
+            }
+            Ok(bytes.len())
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    fn emitted(requested: Option<&str>) -> String {
+        let buffer = Arc::new(Mutex::new(Vec::new()));
+        let writer = buffer.clone();
+        let subscriber = tracing_subscriber::fmt()
+            .with_writer(move || Capture(writer.clone()))
+            .with_env_filter(super::log_filter(requested))
+            .finish();
+        tracing::subscriber::with_default(subscriber, || {
+            tracing::warn!(target: "sqlx::query", "SELECT secret FROM accounts");
+            tracing::warn!(target: "bookie_gpui", "ordinary warning");
+        });
+        let bytes = buffer.lock().map(|buffer| buffer.clone()).unwrap_or_default();
+        String::from_utf8_lossy(&bytes).into_owned()
+    }
+
+    #[test]
+    fn statement_text_is_not_logged_by_default_but_other_warnings_are() {
+        let output = emitted(None);
+        assert!(!output.contains("SELECT secret"), "{output}");
+        assert!(output.contains("ordinary warning"), "{output}");
+    }
+
+    #[test]
+    fn an_explicit_statement_log_request_is_respected() {
+        assert!(emitted(Some("sqlx::query=warn")).contains("SELECT secret"));
+    }
 }
 
 fn main() {
