@@ -4,11 +4,29 @@ use uuid::Uuid;
 
 use super::*;
 
-async fn run_args(args: &[&str], journal: &std::path::Path) -> (i32, String, String) {
+struct Scripted(Vec<String>, Vec<String>);
+
+impl Terminal for Scripted {
+    fn ask(&mut self, prompt: &str) -> Option<String> {
+        self.1.push(prompt.to_string());
+        (!self.0.is_empty()).then(|| self.0.remove(0))
+    }
+}
+
+async fn run_with(args: &[&str], journal: &std::path::Path, terminal: Option<&mut Scripted>) -> (i32, String, String) {
     let arguments: Vec<String> = args.iter().map(|text| text.to_string()).collect();
     let (mut out, mut err) = (Vec::new(), Vec::new());
-    let code = run(&arguments, Some(journal.to_path_buf()), &mut out, &mut err).await;
+    let terminal = terminal.map(|scripted| scripted as &mut dyn Terminal);
+    let code = run(&arguments, Some(journal.to_path_buf()), terminal, &mut out, &mut err).await;
     (code, String::from_utf8(out).unwrap(), String::from_utf8(err).unwrap())
+}
+
+async fn run_args(args: &[&str], journal: &std::path::Path) -> (i32, String, String) {
+    run_with(args, journal, None).await
+}
+
+fn code_of(operation_id: Uuid) -> String {
+    confirmation_code(operation_id)
 }
 
 async fn global_unknown(path: &std::path::Path) -> Uuid {
@@ -29,7 +47,7 @@ async fn global_unknown(path: &std::path::Path) -> Uuid {
 }
 
 #[tokio::test]
-async fn a_global_unknown_is_listed_and_lifted_by_a_stated_decision() {
+async fn a_global_unknown_is_listed_and_lifted_only_after_the_typed_confirmation() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("audit.jsonl");
     let operation_id = global_unknown(&path).await;
@@ -41,11 +59,29 @@ async fn a_global_unknown_is_listed_and_lifted_by_a_stated_decision() {
     assert!(out.contains("tunnel dropped mid-COMMIT"), "{out}");
 
     let id = operation_id.to_string();
-    let (code, _, err) = run_args(&["resolve", &id, "committed", "--reason", "checked by hand"], &path).await;
+    let args = ["resolve", &id, "committed", "--reason", "checked by hand"];
+    let (code, _, err) = run_args(&args, &path).await;
+    assert_eq!(code, 3, "a script without a terminal is refused: {err}");
+    let mut wrong = Scripted(vec!["yes\n".into()], Vec::new());
+    let (code, _, _) = run_with(&args, &path, Some(&mut wrong)).await;
+    assert_eq!(code, 1, "a wrong answer cancels");
+    let (_, out, _) = run_args(&["list"], &path).await;
+    assert!(out.contains(&id), "nothing was recorded: {out}");
+
+    let mut person = Scripted(vec![format!("{}\n", code_of(operation_id))], Vec::new());
+    let (code, out, err) = run_with(&args, &path, Some(&mut person)).await;
     assert_eq!(code, 0, "{err}");
-    assert!(err.contains("lifts the write block"), "{err}");
+    assert!(out.contains("lifts the write block"), "{out}");
+    assert!(person.1[0].contains(&code_of(operation_id)));
     let (_, out, _) = run_args(&["list"], &path).await;
     assert!(out.contains("No write outcome"), "{out}");
+    let recorded = AuditJournal::open_validated(path.clone())
+        .unwrap()
+        .recent(1)
+        .await
+        .unwrap()
+        .remove(0);
+    assert!(matches!(recorded.principal, Principal::Human { ref session } if session == "cli"));
 }
 
 #[tokio::test]
@@ -68,9 +104,20 @@ async fn bad_arguments_a_missing_reason_and_stale_ids_are_refused_without_touchi
         assert_eq!(code, 2, "{args:?}");
     }
     let stale = Uuid::new_v4().to_string();
-    let (code, _, err) = run_args(&["resolve", &stale, "committed", "--reason", "x"], &path).await;
+    let mut person = Scripted(vec!["anything\n".into()], Vec::new());
+    let (code, _, err) = run_with(
+        &["resolve", &stale, "committed", "--reason", "x"],
+        &path,
+        Some(&mut person),
+    )
+    .await;
     assert_eq!(code, 1, "{err}");
-    let (code, _, err) = run_args(&["resolve", &operation_id, "committed", "--reason", "   "], &path).await;
+    let mut person = Scripted(
+        vec![format!("{}\n", code_of(operation_id.parse().unwrap()))],
+        Vec::new(),
+    );
+    let blank = ["resolve", &operation_id, "committed", "--reason", "   "];
+    let (code, _, err) = run_with(&blank, &path, Some(&mut person)).await;
     assert_eq!(code, 1, "{err}");
     let (_, out, _) = run_args(&["list"], &path).await;
     assert!(out.contains(&operation_id), "nothing was decided: {out}");
@@ -90,4 +137,11 @@ async fn still_unknown_leaves_the_block_and_says_nothing_about_lifting_it() {
     assert!(!err.contains("lifts"), "{err}");
     let (_, out, _) = run_args(&["list"], &path).await;
     assert!(out.contains(&operation_id));
+}
+
+#[test]
+fn root_is_recognised_from_the_effective_uid() {
+    assert!(is_root("Name:\tx\nUid:\t1000\t0\t0\t0\n"));
+    assert!(!is_root("Name:\tx\nUid:\t0\t1000\t1000\t1000\n"));
+    assert!(!is_root("Name:\tx\n"));
 }

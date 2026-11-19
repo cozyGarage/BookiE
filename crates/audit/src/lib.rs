@@ -2,17 +2,43 @@ use std::io::Write;
 use std::path::PathBuf;
 
 use bookie_app_services::unknown_outcomes::{
-    OutcomeDecision, UnknownOutcome, list_unknown_outcomes, list_unknown_outcomes_at, resolve_unknown_outcome,
+    OutcomeDecision, UnknownOutcome, list_unknown_outcomes, list_unknown_outcomes_at, resolve_unknown_outcome_as,
     resolve_unknown_outcome_at,
 };
 use uuid::Uuid;
 
-const USAGE: &str = "usage:\n  bookie-audit list\n  bookie-audit resolve <operation-id> <committed|rolled-back|still-unknown> --reason <text> [--checked-the-database]\n";
+const SESSION: &str = "cli";
+const USAGE: &str = "usage:\n  bookie-audit list\n  bookie-audit resolve <operation-id> <committed|rolled-back|still-unknown> --reason <text> [--checked-the-database]\n(the reason is recorded in the audit journal and is visible in the process list while the command runs; do not put secrets in it)\n";
 
-pub async fn run(arguments: &[String], journal: Option<PathBuf>, out: &mut dyn Write, err: &mut dyn Write) -> i32 {
+pub trait Terminal {
+    fn ask(&mut self, prompt: &str) -> Option<String>;
+}
+
+pub fn is_root(proc_status: &str) -> bool {
+    proc_status
+        .lines()
+        .find_map(|line| line.strip_prefix("Uid:"))
+        .and_then(|rest| rest.split_whitespace().nth(1))
+        .is_some_and(|effective| effective == "0")
+}
+
+pub async fn run(
+    arguments: &[String],
+    journal: Option<PathBuf>,
+    terminal: Option<&mut dyn Terminal>,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> i32 {
+    if std::fs::read_to_string("/proc/self/status").is_ok_and(|status| is_root(&status)) {
+        return fail(
+            err,
+            "bookie-audit refuses to run as root; run it as the user who owns the BookiE data",
+            1,
+        );
+    }
     match arguments.first().map(String::as_str) {
         Some("list") if arguments.len() == 1 => list(journal, out, err).await,
-        Some("resolve") => resolve(&arguments[1..], journal, out, err).await,
+        Some("resolve") => resolve(&arguments[1..], journal, terminal, out, err).await,
         _ => fail(err, USAGE, 2),
     }
 }
@@ -99,26 +125,77 @@ fn parse_resolve(arguments: &[String]) -> Result<Resolve, String> {
     })
 }
 
-async fn resolve(arguments: &[String], journal: Option<PathBuf>, out: &mut dyn Write, err: &mut dyn Write) -> i32 {
+async fn find(journal: &Option<PathBuf>, operation_id: Uuid) -> Result<Option<UnknownOutcome>, String> {
+    let listed = match journal {
+        Some(path) => list_unknown_outcomes_at(path.clone(), None).await,
+        None => list_unknown_outcomes(None).await,
+    }?;
+    Ok(listed.into_iter().find(|item| item.operation_id == operation_id))
+}
+
+fn confirmation_code(operation_id: Uuid) -> String {
+    let text = operation_id.simple().to_string();
+    text[text.len() - 6..].to_string()
+}
+
+async fn confirm_clearing(
+    request: &Resolve,
+    journal: &Option<PathBuf>,
+    terminal: Option<&mut dyn Terminal>,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> Result<(), i32> {
+    let Some(terminal) = terminal else {
+        return Err(fail(
+            err,
+            "this decision lifts a write block, so it needs a person at an interactive terminal; run it from a terminal, not a script",
+            3,
+        ));
+    };
+    let item = match find(journal, request.operation_id).await {
+        Ok(Some(item)) => item,
+        Ok(None) => return Err(fail(err, "no unresolved unknown outcome has that operation id", 1)),
+        Err(message) => return Err(fail(err, &format!("cannot read the audit journal: {message}"), 1)),
+    };
+    let _ = out.write_all(describe(&item).as_bytes());
+    let claim = if request.decision == OutcomeDecision::Committed {
+        "WAS applied"
+    } else {
+        "was NOT applied"
+    };
+    let _ = writeln!(
+        out,
+        "You are recording that the write {claim}. This lifts the write block and cannot be undone; BookiE will not replay or re-check the write."
+    );
+    let code = confirmation_code(request.operation_id);
+    let prompt = format!("Type {code} to confirm, anything else to cancel: ");
+    match terminal.ask(&prompt) {
+        Some(answer) if answer.trim() == code => Ok(()),
+        _ => Err(fail(err, "cancelled; nothing was recorded", 1)),
+    }
+}
+
+async fn resolve(
+    arguments: &[String],
+    journal: Option<PathBuf>,
+    terminal: Option<&mut dyn Terminal>,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> i32 {
     let request = match parse_resolve(arguments) {
         Ok(request) => request,
         Err(message) => return fail(err, &format!("{message}\n{USAGE}"), 2),
     };
     if request.decision != OutcomeDecision::StillUnknown {
-        let _ = writeln!(
-            err,
-            "Recording your claim that the write {}. This lifts the write block; BookiE will not replay or re-check the write.",
-            if request.decision == OutcomeDecision::Committed {
-                "WAS applied"
-            } else {
-                "was NOT applied"
-            }
-        );
+        if let Err(code) = confirm_clearing(&request, &journal, terminal, out, err).await {
+            return code;
+        }
     }
     let decided = match journal {
         Some(path) => {
             resolve_unknown_outcome_at(
                 path,
+                SESSION,
                 request.operation_id,
                 request.decision,
                 &request.reason,
@@ -126,7 +203,16 @@ async fn resolve(arguments: &[String], journal: Option<PathBuf>, out: &mut dyn W
             )
             .await
         }
-        None => resolve_unknown_outcome(request.operation_id, request.decision, &request.reason, request.checked).await,
+        None => {
+            resolve_unknown_outcome_as(
+                SESSION,
+                request.operation_id,
+                request.decision,
+                &request.reason,
+                request.checked,
+            )
+            .await
+        }
     };
     match decided {
         Ok(()) => {

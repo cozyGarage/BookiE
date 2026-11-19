@@ -29,6 +29,7 @@ pub async fn list_unknown_outcomes(connection_id: Option<Uuid>) -> Result<Vec<Un
     list_in(&journal, connection_id).await
 }
 
+#[doc(hidden)]
 pub async fn list_unknown_outcomes_at(
     journal_path: std::path::PathBuf,
     connection_id: Option<Uuid>,
@@ -37,15 +38,17 @@ pub async fn list_unknown_outcomes_at(
     list_in(&journal, connection_id).await
 }
 
+#[doc(hidden)]
 pub async fn resolve_unknown_outcome_at(
     journal_path: std::path::PathBuf,
+    session: &str,
     operation_id: Uuid,
     decision: OutcomeDecision,
     reason: &str,
     checked_myself: bool,
 ) -> Result<(), String> {
     let journal = AuditJournal::open_validated(journal_path).map_err(|error| error.to_string())?;
-    resolve_in(&journal, operation_id, decision, reason, checked_myself).await
+    resolve_as(&journal, session, operation_id, decision, reason, checked_myself).await
 }
 
 pub async fn resolve_unknown_outcome(
@@ -54,8 +57,18 @@ pub async fn resolve_unknown_outcome(
     reason: &str,
     checked_myself: bool,
 ) -> Result<(), String> {
+    resolve_unknown_outcome_as("gui", operation_id, decision, reason, checked_myself).await
+}
+
+pub async fn resolve_unknown_outcome_as(
+    session: &str,
+    operation_id: Uuid,
+    decision: OutcomeDecision,
+    reason: &str,
+    checked_myself: bool,
+) -> Result<(), String> {
     let journal = AuditJournal::open_default().map_err(|error| error.to_string())?;
-    resolve_in(&journal, operation_id, decision, reason, checked_myself).await
+    resolve_as(&journal, session, operation_id, decision, reason, checked_myself).await
 }
 
 async fn unresolved_events(journal: &AuditJournal) -> Result<Vec<AuditEvent>, String> {
@@ -74,18 +87,30 @@ async fn list_in(journal: &AuditJournal, connection_id: Option<Uuid>) -> Result<
         .map(|event| UnknownOutcome {
             operation_id: event.operation_id,
             connection_id: event.connection_id,
-            connection_name: event.connection_name,
+            connection_name: plain_text(&event.connection_name, MAX_SHOWN_CHARS),
             environment: format!("{:?}", event.environment),
             when: event.timestamp.format("%Y-%m-%d %H:%M:%S UTC").to_string(),
             class: format!("{:?}", event.operation_class),
-            sql: event.redacted_sql,
-            error: event.error,
+            sql: plain_text(&event.redacted_sql, MAX_SHOWN_CHARS),
+            error: event.error.map(|error| plain_text(&error, MAX_SHOWN_CHARS)),
         })
         .collect())
 }
 
+#[cfg(test)]
 async fn resolve_in(
     journal: &AuditJournal,
+    operation_id: Uuid,
+    decision: OutcomeDecision,
+    reason: &str,
+    checked_myself: bool,
+) -> Result<(), String> {
+    resolve_as(journal, "gui", operation_id, decision, reason, checked_myself).await
+}
+
+async fn resolve_as(
+    journal: &AuditJournal,
+    session: &str,
     operation_id: Uuid,
     decision: OutcomeDecision,
     reason: &str,
@@ -107,7 +132,9 @@ async fn resolve_in(
         OutcomeDecision::StillUnknown => AuditReconciliationClaim::StillUnknown,
     };
     let event = AuditEvent::reconciliation(
-        Principal::human_gui(),
+        Principal::Human {
+            session: session.to_string(),
+        },
         AuditConnectionContext {
             id: original.connection_id,
             name: original.connection_name,
@@ -118,6 +145,30 @@ async fn resolve_in(
     )
     .map_err(|error| error.to_string())?;
     journal.record(event).await.map_err(|error| error.to_string())
+}
+
+const MAX_SHOWN_CHARS: usize = 2000;
+
+fn plain_text(text: &str, limit: usize) -> String {
+    let mut shown = String::new();
+    for (count, character) in text.chars().enumerate() {
+        if count == limit {
+            shown.push('…');
+            break;
+        }
+        match character {
+            '\n' => shown.push_str("\\n"),
+            '\r' => shown.push_str("\\r"),
+            '\t' => shown.push(' '),
+            c if c.is_control()
+                || matches!(c, '\u{200B}'..='\u{200F}' | '\u{2028}'..='\u{202E}' | '\u{2060}'..='\u{2069}' | '\u{FEFF}') =>
+            {
+                shown.push('\u{FFFD}')
+            }
+            c => shown.push(c),
+        }
+    }
+    shown
 }
 
 fn operator_name() -> String {
@@ -264,5 +315,18 @@ mod tests {
         assert_eq!(name_for_uid(passwd, 1001).as_deref(), Some("trung"));
         assert_eq!(name_for_uid(passwd, 7), None);
         assert!(!operator_name().is_empty());
+    }
+
+    #[test]
+    fn journal_text_cannot_carry_escape_sequences_forged_lines_or_hidden_characters() {
+        let hostile = "ok\u{1b}[2J\u{1b}]52;c;AAAA\u{7}\nconnection: dev (Dev)\r\u{202E}\u{200B}";
+        let shown = plain_text(hostile, 2000);
+        assert!(!shown.chars().any(|c| c.is_control()), "{shown:?}");
+        assert!(!shown.contains('\u{202E}') && !shown.contains('\u{200B}'));
+        assert!(
+            shown.contains("\\n"),
+            "a newline stays visible and cannot forge a line: {shown}"
+        );
+        assert_eq!(plain_text(&"x".repeat(3000), 2000).chars().count(), 2001);
     }
 }
