@@ -54,6 +54,10 @@ impl GridView {
     }
 
     pub(crate) fn run_sql_with(&mut self, sql: String, params: Vec<bookie_core::Value>, cx: &mut Context<Self>) {
+        if self.save.busy {
+            self.status = "A save is running; wait for it to finish first".into();
+            return;
+        }
         if let Some(session) = self.live.clone() {
             self.status = "Running…".into();
             self.begin_background(

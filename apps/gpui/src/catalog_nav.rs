@@ -104,6 +104,10 @@ impl GridView {
     }
 
     pub(super) fn reject_view_edits(&mut self) -> bool {
+        if self.save.busy {
+            self.status = "A save is running; wait for it to finish first".into();
+            return true;
+        }
         if !self.has_view_edits() {
             return false;
         }
