@@ -18,6 +18,7 @@ mod measure;
 mod menus;
 mod palette_actions;
 mod palette_state;
+mod picker;
 mod panel_state;
 mod render;
 mod runs;
