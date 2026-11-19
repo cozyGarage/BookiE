@@ -242,6 +242,11 @@ impl GridView {
                 self.can_save_edits() && !self.cell_edit.edits.is_empty(),
             ),
             action(
+                "insert-row",
+                "Add a row",
+                self.can_save_edits() && self.cell_edit.edits.is_empty() && self.compare.is_none() && !self.insert.open,
+            ),
+            action(
                 "delete-rows",
                 "Delete selected rows",
                 self.can_save_edits()
@@ -479,6 +484,16 @@ impl GridView {
         true
     }
 
+    fn execute_edit_palette_action(&mut self, id: &'static str, cx: &mut Context<Self>) {
+        match id {
+            "save-changes" => self.request_save(cx),
+            "undo-edit" => self.undo_edit(cx),
+            "redo-edit" => self.redo_edit(cx),
+            "delete-rows" => self.request_delete(cx),
+            _ => self.open_insert_form(cx),
+        }
+    }
+
     fn execute_workspace_palette_action(&mut self, id: &'static str, window: &mut Window, cx: &mut Context<Self>) {
         match id {
             "sidebar" => self.sidebar.open = !self.sidebar.open,
@@ -487,10 +502,9 @@ impl GridView {
             "shortcuts" => self.open_picker(PaletteMode::Shortcuts, window, cx),
             "save-favorite" => self.save_favorite(cx),
             "favorites" => self.open_picker(PaletteMode::Favorites, window, cx),
-            "save-changes" => self.request_save(cx),
-            "undo-edit" => self.undo_edit(cx),
-            "redo-edit" => self.redo_edit(cx),
-            "delete-rows" => self.request_delete(cx),
+            "save-changes" | "undo-edit" | "redo-edit" | "delete-rows" | "insert-row" => {
+                self.execute_edit_palette_action(id, cx);
+            }
             "delete-favorite" => self.open_picker(PaletteMode::DeleteFavorite, window, cx),
             "reveal-sidebar" => self.reveal_in_sidebar(cx),
             "new-connection" => {

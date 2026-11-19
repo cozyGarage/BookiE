@@ -796,3 +796,43 @@ fn column_names_ending_with_part_of_the_delimiter_survive_in_the_header() {
     assert_eq!(sheet.headers, ["a|", "b"]);
     assert_eq!(sheet.rows, [["1", "2"]]);
 }
+
+#[test]
+fn value_honesty_tsv_copy_keeps_full_binary_booleans_zoned_time_and_all_null_rows() {
+    let columns = vec![column("payload"), column("flag"), column("at")];
+    let blob: Vec<u8> = (0..=255u8).cycle().take(70_000).collect();
+    let stamp = Value::TimestampTz("2026-09-27T12:34:56.123456789+05:30".parse().unwrap());
+    let rows = vec![
+        vec![Value::Bytes(blob.clone()), Value::Bool(true), stamp],
+        vec![Value::Null, Value::Null, Value::Null],
+    ];
+    let expected = format!(
+        "\\x{}\ttrue\t2026-09-27T07:04:56.123456789+00:00\n\\N\t\\N\t\\N",
+        crate::export::hex_encode(&blob)
+    );
+    assert_eq!(render_tsv(&columns, &rows, false), expected);
+}
+
+#[test]
+fn value_honesty_mcp_csv_options_keep_binary_all_null_rows_and_zoned_time() {
+    let columns = vec![column("payload"), column("at")];
+    let options = CsvOptions {
+        null_to_empty: false,
+        null_marker: Some("<NULL>".into()),
+        sanitize_formulas: false,
+        ..CsvOptions::default()
+    };
+    let blob: Vec<u8> = (0..=255u8).cycle().take(70_000).collect();
+    let stamp = Value::TimestampTz("2026-09-27T12:34:56+05:30".parse().unwrap());
+    let mut output = Vec::new();
+    for row in [vec![Value::Bytes(blob.clone()), stamp], vec![Value::Null, Value::Null]] {
+        write_csv_row_with_columns_and_options(&mut output, &columns, &row, &options).unwrap();
+    }
+    assert_eq!(
+        String::from_utf8(output).unwrap(),
+        format!(
+            "\\x{},2026-09-27T07:04:56+00:00\n<NULL>,<NULL>\n",
+            crate::export::hex_encode(&blob)
+        )
+    );
+}
