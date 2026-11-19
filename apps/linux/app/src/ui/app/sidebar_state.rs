@@ -120,7 +120,7 @@ fn estimated_session_catalog_bytes(catalog: &super::multi_session::SessionCatalo
         + catalog
             .tables
             .iter()
-            .chain(&catalog.views)
+            .chain(catalog.views.iter())
             .map(|table| {
                 std::mem::size_of::<TableInfo>()
                     + table.name.capacity()
@@ -814,8 +814,8 @@ mod catalog_estimate_tests {
         );
 
         let session = |tables, database| super::super::multi_session::SessionCatalog {
-            tables,
-            views: Vec::new(),
+            tables: std::sync::Arc::from(tables),
+            views: std::sync::Arc::from([]),
             database,
         };
         assert!(
