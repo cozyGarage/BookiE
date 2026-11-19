@@ -19,3 +19,6 @@ chrono.workspace = true
 rskafka = { version = "0.6", default-features = false, features = ["compression-gzip", "compression-lz4", "compression-snappy"] }
 testcontainers-modules = { workspace = true, features = ["kafka"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
+
+[lints]
+workspace = true

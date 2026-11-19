@@ -2,7 +2,7 @@
 # scripts/check-function-size.py fails when a listed file gains another
 # over-limit function, or when an unlisted file has one at all.
 # Lower a count when you split a function. Do not raise one.
-# Empty means every function under crates/ is within the limit.
+# Entries under crates/ are grandfathered debt; the target is none.
 apps/linux/app/src/services/gtk_approval.rs 1
 apps/linux/app/src/ui/app/init_window.rs 1
 apps/linux/app/src/ui/app/mod.rs 2

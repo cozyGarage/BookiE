@@ -13,3 +13,6 @@ path = "src/lib.rs"
 [dependencies]
 apache-avro = "0.22"
 serde_json.workspace = true
+
+[lints]
+workspace = true
