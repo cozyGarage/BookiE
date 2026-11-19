@@ -46,6 +46,7 @@ pub mod enum_input;
 pub mod er_diagram;
 pub mod explain_plan;
 pub mod export_pages;
+pub mod export_tables;
 pub mod favorites;
 pub mod filter_settings;
 pub mod health_report;
