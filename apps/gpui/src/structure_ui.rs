@@ -21,6 +21,8 @@ fn title(kind: StructureChangeKind) -> &'static str {
         StructureChangeKind::DropIndex => "Drop index",
         StructureChangeKind::AddForeignKey => "Add foreign key",
         StructureChangeKind::DropForeignKey => "Drop foreign key",
+        StructureChangeKind::TruncateTable => "Empty table",
+        StructureChangeKind::DropTable => "Drop table",
         StructureChangeKind::RenameTable => "Rename table",
     }
 }
@@ -81,6 +83,14 @@ impl GridView {
     }
 
     pub(crate) fn show_structure(&mut self, cx: &mut Context<Self>) {
+        self.read_structure_panel(false, cx);
+    }
+
+    pub(crate) fn show_create_table(&mut self, cx: &mut Context<Self>) {
+        self.read_structure_panel(true, cx);
+    }
+
+    fn read_structure_panel(&mut self, as_script: bool, cx: &mut Context<Self>) {
         let Some(live) = self.live.clone().filter(|_| self.structure_info_enabled()) else {
             return;
         };
@@ -93,11 +103,22 @@ impl GridView {
                 .spawn(async move {
                     let columns = live.table_columns(&table)?;
                     let structure = live.table_structure(&table)?;
-                    Ok::<_, String>(bookie_app_services::structure_summary::structure_summary(
-                        &columns,
-                        &structure.indexes,
-                        &structure.foreign_keys,
-                    ))
+                    if as_script {
+                        bookie_app_services::structure_summary::create_table_script(
+                            &live.driver_id,
+                            table.schema.as_deref(),
+                            &table.name,
+                            &columns,
+                            &structure.indexes,
+                            &structure.foreign_keys,
+                        )
+                    } else {
+                        Ok(bookie_app_services::structure_summary::structure_summary(
+                            &columns,
+                            &structure.indexes,
+                            &structure.foreign_keys,
+                        ))
+                    }
                 })
                 .await;
             this.update(cx, |this, cx| {
@@ -181,18 +202,30 @@ impl GridView {
             done: format!("{confirm} {name}: done"),
             review: "Review the change, then apply or cancel".into(),
             confirm,
-            note: Some(if kind == StructureChangeKind::AddForeignKey {
-                "This checks every existing row and can block writes to both tables while it runs. Deleting or \
+            note: Some(
+                if matches!(
+                    kind,
+                    StructureChangeKind::TruncateTable | StructureChangeKind::DropTable
+                ) {
+                    "This permanently deletes data and cannot be undone. Rows and tables that depend on it may be \
+                 affected, and a connection that needs approval will ask before it runs."
+                } else if kind == StructureChangeKind::AddForeignKey {
+                    "This checks every existing row and can block writes to both tables while it runs. Deleting or \
                  changing a referenced row will fail afterwards. Most databases cannot undo it, and a connection \
                  that needs approval will ask before it runs."
-            } else {
-                "This changes the table's structure for everyone using the database, and most databases cannot \
+                } else {
+                    "This changes the table's structure for everyone using the database, and most databases cannot \
                  undo it. A connection that needs approval will ask before it runs."
-            }),
-            reconnect: (kind == StructureChangeKind::RenameTable).then(|| bookie_core::TableInfo {
-                schema: self.catalog.grid_table.schema.clone(),
-                name: name.clone(),
-            }),
+                },
+            ),
+            reconnect: match kind {
+                StructureChangeKind::RenameTable => Some(bookie_core::TableInfo {
+                    schema: self.catalog.grid_table.schema.clone(),
+                    name: name.clone(),
+                }),
+                StructureChangeKind::DropTable => Some(self.catalog.grid_table.clone()),
+                _ => None,
+            },
         };
         self.prepare(live, SaveRequest::Structure(kind, text), labels, cx);
     }

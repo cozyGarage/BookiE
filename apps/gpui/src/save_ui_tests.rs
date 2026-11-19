@@ -1059,3 +1059,44 @@ fn a_blocked_save_points_to_the_resolve_action_and_other_errors_are_left_alone()
     assert!(crate::save_ui::with_resolve_hint(blocked).contains("Resolve unknown write outcome"));
     assert_eq!(crate::save_ui::with_resolve_hint("duplicate key"), "duplicate key");
 }
+
+#[gpui::test]
+fn dropping_the_table_needs_its_exact_name_then_reviews_the_statement_and_reconnects(cx: &mut TestAppContext) {
+    use bookie_app_services::structure_change_plan::StructureChangeKind::DropTable;
+    let path = fixture_copy("drop-table");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_structure_bar(DropTable, cx)));
+    set_structure_text(&view, cx, "order");
+    cx.update(|_, cx| view.update(cx, |view, cx| view.review_structure(cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert!(view.save.pending.is_none());
+        assert!(view.status.contains("exactly"), "{}", view.status);
+        assert!(view.structure.open, "the bar stays so the name can be fixed");
+    });
+    set_structure_text(&view, cx, "orders");
+    cx.update(|_, cx| view.update(cx, |view, cx| view.review_structure(cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        let pending = view.save.pending.as_ref().unwrap_or_else(|| panic!("no review: {}", view.status));
+        assert_eq!(pending.confirm, "Drop table");
+        assert!(pending.plan.preview.contains("DROP TABLE"), "{}", pending.plan.preview);
+        assert!(pending.reconnect.is_some(), "the open table is gone afterwards");
+    });
+    assert_eq!(order_count(&path), "6", "nothing is dropped before the user confirms");
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn show_create_table_fills_the_panel_with_a_create_statement(cx: &mut TestAppContext) {
+    let path = fixture_copy("create-script");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.show_create_table(cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        let text = view.structure.info.as_deref().unwrap_or_else(|| panic!("no panel: {}", view.status));
+        assert!(text.starts_with("CREATE TABLE"), "{text}");
+        assert!(text.contains("customer"), "{text}");
+    });
+    std::fs::remove_file(&path).ok();
+}

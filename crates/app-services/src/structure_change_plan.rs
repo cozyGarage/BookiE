@@ -15,6 +15,8 @@ pub enum StructureChangeKind {
     AddForeignKey,
     DropForeignKey,
     RenameTable,
+    TruncateTable,
+    DropTable,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -41,6 +43,8 @@ impl StructureChangeKind {
             Self::AddForeignKey => "name column[, column…] -> other_table column[, column…]",
             Self::DropForeignKey => "name of the foreign key to drop",
             Self::RenameTable => "new table name",
+            Self::TruncateTable => "type the table name to empty it",
+            Self::DropTable => "type the table name to delete it",
             Self::AddIndex => "[unique] index_name column[, column…], for example: unique by_name customer",
         }
     }
@@ -52,6 +56,12 @@ pub fn plan_structure_change(
     text: &str,
     structure: &TableStructure,
 ) -> Result<StructureChangePlan, StructureChangeError> {
+    if matches!(
+        kind,
+        StructureChangeKind::TruncateTable | StructureChangeKind::DropTable
+    ) {
+        return plan_table_removal(&target, kind, text, structure);
+    }
     if matches!(
         kind,
         StructureChangeKind::AddForeignKey | StructureChangeKind::DropForeignKey
@@ -78,6 +88,44 @@ pub fn plan_structure_change(
     })
 }
 
+fn plan_table_removal(
+    target: &SaveTarget<'_>,
+    kind: StructureChangeKind,
+    text: &str,
+    structure: &TableStructure,
+) -> Result<StructureChangePlan, StructureChangeError> {
+    if text.trim() != target.table {
+        return Err(StructureChangeError::Input(format!(
+            "Type the table name, {}, exactly to confirm",
+            target.table
+        )));
+    }
+    let (sql, preview) = if kind == StructureChangeKind::TruncateTable {
+        let sql = bookie_core::sql_ddl::build_truncate_table(target.driver_id, target.schema, target.table)
+            .map_err(describe)?;
+        (sql.clone(), format!("Removes every row of {}\n{sql}", target.table))
+    } else {
+        let sql = bookie_core::sql_ddl::build_drop_table(target.driver_id, target.schema, target.table, false, false)
+            .map_err(describe)?;
+        let preview = match referencing_tables(&structure.referenced_by) {
+            Some(names) => format!("Referenced by: {names}\n{sql}"),
+            None => sql.clone(),
+        };
+        (sql, preview)
+    };
+    Ok(StructureChangePlan {
+        statements: vec![(sql, Vec::new())],
+        preview,
+    })
+}
+
+fn referencing_tables(keys: &[bookie_core::InboundForeignKeyInfo]) -> Option<String> {
+    let mut names: Vec<String> = keys.iter().map(|key| key.source_table.clone()).collect();
+    names.sort();
+    names.dedup();
+    (!names.is_empty()).then(|| names.join(", "))
+}
+
 fn build_op(
     target: &SaveTarget<'_>,
     kind: StructureChangeKind,
@@ -91,6 +139,9 @@ fn build_op(
         StructureChangeKind::RenameColumn => rename_column(target.columns, schema, table, text),
         StructureChangeKind::AddIndex => add_index(target.columns, schema, table, text),
         StructureChangeKind::RenameTable => rename_table(schema, table, text),
+        StructureChangeKind::TruncateTable | StructureChangeKind::DropTable => Err(StructureChangeError::Input(
+            "Emptying or dropping a table is planned separately".into(),
+        )),
         StructureChangeKind::DropIndex => drop_index(&structure.indexes, schema, table, text),
         StructureChangeKind::AddForeignKey => add_foreign_key(target.columns, schema, table, text),
         StructureChangeKind::DropForeignKey => drop_foreign_key(&structure.foreign_keys, schema, table, text),
@@ -485,6 +536,13 @@ mod tests {
         let structure = TableStructure {
             indexes: vec![stored_index("by_note"), key_index()],
             foreign_keys: vec![stored_key("fk_owner")],
+            referenced_by: vec![bookie_core::InboundForeignKeyInfo {
+                name: "fk_child".into(),
+                source_schema: None,
+                source_table: "children".into(),
+                source_columns: vec!["order_id".into()],
+                target_columns: vec!["id".into()],
+            }],
         };
         plan_structure_change(target, kind, text, &structure)
     }
@@ -532,6 +590,8 @@ mod tests {
             (StructureChangeKind::AddForeignKey, "fk note -> people id, extra"),
             (StructureChangeKind::DropForeignKey, "ghost"),
             (StructureChangeKind::RenameTable, "two words"),
+            (StructureChangeKind::DropTable, "wrong"),
+            (StructureChangeKind::TruncateTable, ""),
             (StructureChangeKind::RenameTable, "orders"),
             (StructureChangeKind::RenameTable, ""),
             (StructureChangeKind::DropIndex, "by_NOTE two"),
