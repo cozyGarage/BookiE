@@ -1,6 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use crate::{connect, start_mysql};
+use crate::{connect, start_mariadb, start_mysql};
+use bookie_core::Connection;
 
 #[tokio::test]
 #[ignore = "requires docker"]
@@ -64,11 +65,7 @@ async fn a_session_keeps_user_variables_on_its_backend_across_use() {
     assert!(matches!(&after.rows[0][1], bookie_core::Value::Text(value) if value == "session-owned"));
 }
 
-#[tokio::test]
-#[ignore = "requires docker"]
-async fn a_session_keeps_system_variables_across_use_and_does_not_leak_them_to_the_next_session() {
-    let (_container, opts) = start_mysql().await;
-    let connection = connect(opts).await;
+async fn assert_session_variables_do_not_leak(connection: Box<dyn Connection>) {
     connection.execute("CREATE DATABASE other_db").await.unwrap();
     let control = bookie_core::OperationControl::with_timeout(std::time::Duration::from_secs(5));
     let probe = "SELECT @@session.sql_mode, @@session.time_zone, @bookie_leak_marker, DATABASE()";
@@ -81,13 +78,7 @@ async fn a_session_keeps_system_variables_across_use_and_does_not_leak_them_to_t
         "SET @bookie_leak_marker = 'first-session'",
         "USE other_db",
     ] {
-        let r = first.query_params_controlled(statement, &[], &control).await;
-        eprintln!(
-            "DBG {statement}: {:?}",
-            r.as_ref()
-                .map(|x| (x.rows.len(), x.columns.len()))
-                .map_err(|e| e.to_string())
-        );
+        first.query_params_controlled(statement, &[], &control).await.unwrap();
     }
     let after_use = first.query_params_controlled(probe, &[], &control).await.unwrap();
     assert_eq!(
@@ -107,6 +98,20 @@ async fn a_session_keeps_system_variables_across_use_and_does_not_leak_them_to_t
     assert_eq!(fresh.rows[0][3], default_state.rows[0][3]);
     assert!(matches!(fresh.rows[0][2], bookie_core::Value::Null));
     second.close().await.unwrap();
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_session_keeps_system_variables_across_use_and_does_not_leak_them_to_the_next_session() {
+    let (_container, opts) = start_mysql().await;
+    assert_session_variables_do_not_leak(connect(opts).await).await;
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn mariadb_session_keeps_system_variables_across_use_without_leaking() {
+    let (_container, opts) = start_mariadb().await;
+    assert_session_variables_do_not_leak(connect(opts).await).await;
 }
 
 async fn first_value(

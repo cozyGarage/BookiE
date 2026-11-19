@@ -149,7 +149,7 @@ index ee59d03..38b6291 100755
  
      columns.clear();
 diff --git a/src/connection/mod.rs b/src/connection/mod.rs
-index 569ad32..7a6380f 100755
+index 569ad32..b478015 100755
 --- a/src/connection/mod.rs
 +++ b/src/connection/mod.rs
 @@ -45,6 +45,8 @@ pub(crate) struct MySqlConnectionInner {
@@ -161,12 +161,24 @@ index 569ad32..7a6380f 100755
      // cache by query string to the statement id and metadata
      cache_statement: StatementCache<(u32, MySqlStatementMetadata)>,
  
-@@ -52,6 +54,10 @@ pub(crate) struct MySqlConnectionInner {
+@@ -52,6 +54,22 @@ pub(crate) struct MySqlConnectionInner {
  }
  
  impl MySqlConnection {
 +    pub fn take_warning_count(&mut self) -> u32 {
 +        std::mem::take(&mut self.inner.warning_count)
++    }
++
++    /// Reset server session state and discard cached server statement IDs.
++    pub async fn reset_session(&mut self) -> Result<(), Error> {
++        self.inner.stream.wait_until_ready().await?;
++        self.inner.stream.send_packet(&[0x1f][..]).await?;
++        let response = self.inner.stream.recv_ok().await?;
++        self.inner.cache_statement.clear();
++        self.inner.transaction_depth = 0;
++        self.inner.status_flags = response.status;
++        self.inner.warning_count = 0;
++        Ok(())
 +    }
 +
      pub(crate) fn in_transaction(&self) -> bool {

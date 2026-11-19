@@ -57,9 +57,11 @@ async fn a_read_only_profile_connects_to_mysql_without_read_only_transaction_sup
         .connect(options)
         .await
         .expect("read-only profile should use PolicyGuard when MySQL lacks transaction mode support");
-    let result = connection.query("SELECT VERSION()").await.expect("read server version");
-    assert!(
-        matches!(result.rows.first().and_then(|row| row.first()), Some(Value::Text(version)) if version.starts_with("5.5"))
-    );
+    for _ in 0..6 {
+        let result = connection.query("SELECT VERSION()").await.expect("read server version");
+        assert!(
+            matches!(result.rows.first().and_then(|row| row.first()), Some(Value::Text(version)) if version.starts_with("5.5"))
+        );
+    }
     connection.close().await.expect("close connection");
 }
