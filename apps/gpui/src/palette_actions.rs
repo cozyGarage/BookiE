@@ -17,6 +17,8 @@ fn is_edit_palette_action(id: &str) -> bool {
             | "add-index"
             | "drop-index"
             | "show-structure"
+            | "add-foreign-key"
+            | "drop-foreign-key"
     )
 }
 
@@ -271,6 +273,8 @@ impl GridView {
             action("drop-column", "Drop a column…", self.structure_change_enabled()),
             action("add-index", "Create an index…", self.structure_change_enabled()),
             action("drop-index", "Drop an index…", self.structure_change_enabled()),
+            action("add-foreign-key", "Add a foreign key…", self.foreign_key_change_enabled()),
+            action("drop-foreign-key", "Drop a foreign key…", self.foreign_key_change_enabled()),
             action(
                 "insert-row",
                 "Add a row",
@@ -527,6 +531,8 @@ impl GridView {
             "drop-column" => self.open_structure_bar(StructureChangeKind::DropColumn, cx),
             "add-index" => self.open_structure_bar(StructureChangeKind::AddIndex, cx),
             "drop-index" => self.open_structure_bar(StructureChangeKind::DropIndex, cx),
+            "add-foreign-key" => self.open_structure_bar(StructureChangeKind::AddForeignKey, cx),
+            "drop-foreign-key" => self.open_structure_bar(StructureChangeKind::DropForeignKey, cx),
             _ => self.open_insert_form(cx),
         }
     }

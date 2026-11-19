@@ -73,6 +73,10 @@ pub fn set_schema_statement(driver_id: &str, schema: &str) -> Option<String> {
     }
 }
 
+pub fn alters_foreign_keys(driver_id: &str) -> bool {
+    matches!(driver_id, "postgres" | "mysql" | "mssql")
+}
+
 pub fn placeholder_for(driver_id: &str, index: usize) -> String {
     match driver_id {
         "postgres" => format!("${}", index + 1),

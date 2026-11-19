@@ -1,8 +1,9 @@
 use bookie_core::sql_ddl::{BuildDdlError, DraftColumn, StructureOp, materialize_ops};
-use bookie_core::{ColumnInfo, IndexInfo};
+use bookie_core::{ColumnInfo, ForeignKeyInfo, IndexInfo};
 
 use crate::cell_save_plan::SaveTarget;
 use crate::change_tracker::EditStatement;
+use crate::read_session::TableStructure;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StructureChangeKind {
@@ -11,6 +12,8 @@ pub enum StructureChangeKind {
     DropColumn,
     AddIndex,
     DropIndex,
+    AddForeignKey,
+    DropForeignKey,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -34,6 +37,8 @@ impl StructureChangeKind {
             Self::RenameColumn => "old_name new_name",
             Self::DropColumn => "name of the column to drop",
             Self::DropIndex => "name of the index to drop",
+            Self::AddForeignKey => "name column[, column…] -> other_table column[, column…]",
+            Self::DropForeignKey => "name of the foreign key to drop",
             Self::AddIndex => "[unique] index_name column[, column…], for example: unique by_name customer",
         }
     }
@@ -43,16 +48,26 @@ pub fn plan_structure_change(
     target: SaveTarget<'_>,
     kind: StructureChangeKind,
     text: &str,
-    indexes: &[IndexInfo],
+    structure: &TableStructure,
 ) -> Result<StructureChangePlan, StructureChangeError> {
-    let op = build_op(&target, kind, text, indexes)?;
+    if matches!(
+        kind,
+        StructureChangeKind::AddForeignKey | StructureChangeKind::DropForeignKey
+    ) && !bookie_core::sql_dialect::alters_foreign_keys(target.driver_id)
+    {
+        return Err(StructureChangeError::Input(
+            "This database cannot add or drop a foreign key on an existing table".into(),
+        ));
+    }
+    let op = build_op(&target, kind, text, structure)?;
     let op_name = match &op {
-        StructureOp::DropIndex { index_name, .. } => Some(index_name.clone()),
+        StructureOp::DropIndex { index_name, .. } => Some(format!("Index {index_name}")),
+        StructureOp::DropForeignKey { fk_name, .. } => Some(foreign_key_label(&structure.foreign_keys, fk_name)),
         _ => None,
     };
     let sql = materialize_ops(&[op], target.driver_id).map_err(describe)?;
     let preview = match &op_name {
-        Some(name) => format!("Index {name}\n{}", sql.join("\n")),
+        Some(label) => format!("{label}\n{}", sql.join("\n")),
         None => sql.join("\n"),
     };
     Ok(StructureChangePlan {
@@ -65,7 +80,7 @@ fn build_op(
     target: &SaveTarget<'_>,
     kind: StructureChangeKind,
     text: &str,
-    indexes: &[IndexInfo],
+    structure: &TableStructure,
 ) -> Result<StructureOp, StructureChangeError> {
     let schema = target.schema.map(str::to_string);
     let table = target.table.to_string();
@@ -73,7 +88,9 @@ fn build_op(
         StructureChangeKind::AddColumn => add_column(target.columns, schema, table, text),
         StructureChangeKind::RenameColumn => rename_column(target.columns, schema, table, text),
         StructureChangeKind::AddIndex => add_index(target.columns, schema, table, text),
-        StructureChangeKind::DropIndex => drop_index(indexes, schema, table, text),
+        StructureChangeKind::DropIndex => drop_index(&structure.indexes, schema, table, text),
+        StructureChangeKind::AddForeignKey => add_foreign_key(target.columns, schema, table, text),
+        StructureChangeKind::DropForeignKey => drop_foreign_key(&structure.foreign_keys, schema, table, text),
         StructureChangeKind::DropColumn => {
             let column = existing(target.columns, text.trim())?;
             Ok(StructureOp::DropColumn {
@@ -266,6 +283,95 @@ fn drop_index(
     })
 }
 
+fn add_foreign_key(
+    columns: &[ColumnInfo],
+    schema: Option<String>,
+    table: String,
+    text: &str,
+) -> Result<StructureOp, StructureChangeError> {
+    let usage = || StructureChangeError::Input("Type: name column[, column…] -> other_table column[, column…]".into());
+    let (left, right) = text.split_once("->").ok_or_else(usage)?;
+    let (name, own) = left
+        .trim()
+        .split_once(char::is_whitespace)
+        .map(|(name, own)| (name.trim(), own.trim()))
+        .filter(|(name, own)| !name.is_empty() && !own.is_empty())
+        .ok_or_else(usage)?;
+    let (target, theirs) = right
+        .trim()
+        .split_once(char::is_whitespace)
+        .map(|(target, theirs)| (target.trim(), theirs.trim()))
+        .filter(|(target, theirs)| !target.is_empty() && !theirs.is_empty())
+        .ok_or_else(usage)?;
+    let mut own_columns = Vec::new();
+    for word in own.split([',', ' ']).filter(|word| !word.is_empty()) {
+        own_columns.push(existing(columns, word)?.name.clone());
+    }
+    let ref_columns: Vec<String> = theirs
+        .split([',', ' '])
+        .filter(|word| !word.is_empty())
+        .map(str::to_string)
+        .collect();
+    if own_columns.len() != ref_columns.len() {
+        return Err(StructureChangeError::Input(
+            "The foreign key needs as many columns on the other table as on this one".into(),
+        ));
+    }
+    Ok(StructureOp::AddForeignKey {
+        schema: schema.clone(),
+        table,
+        fk: ForeignKeyInfo {
+            name: name.to_string(),
+            columns: own_columns,
+            ref_schema: schema,
+            ref_table: target.to_string(),
+            ref_columns,
+            on_delete: None,
+            on_update: None,
+        },
+    })
+}
+
+fn drop_foreign_key(
+    keys: &[ForeignKeyInfo],
+    schema: Option<String>,
+    table: String,
+    text: &str,
+) -> Result<StructureOp, StructureChangeError> {
+    let name = text.trim();
+    let exact: Vec<&ForeignKeyInfo> = keys.iter().filter(|key| key.name == name).collect();
+    let candidates: Vec<&ForeignKeyInfo> = if exact.is_empty() {
+        keys.iter().filter(|key| key.name.eq_ignore_ascii_case(name)).collect()
+    } else {
+        exact
+    };
+    match candidates[..] {
+        [one] => Ok(StructureOp::DropForeignKey {
+            schema,
+            table,
+            fk_name: one.name.clone(),
+        }),
+        [] => Err(StructureChangeError::Input(format!(
+            "The table has no foreign key named {name}"
+        ))),
+        _ => Err(StructureChangeError::Input(format!(
+            "Several foreign keys match {name}; type the exact name"
+        ))),
+    }
+}
+
+fn foreign_key_label(keys: &[ForeignKeyInfo], name: &str) -> String {
+    match keys.iter().find(|key| key.name == name) {
+        Some(key) => format!(
+            "Foreign key {name} ({}) → {} ({})",
+            key.columns.join(", "),
+            key.ref_table,
+            key.ref_columns.join(", ")
+        ),
+        None => format!("Foreign key {name}"),
+    }
+}
+
 fn refuse_duplicate(columns: &[ColumnInfo], name: &str) -> Result<(), StructureChangeError> {
     match find(columns, name) {
         Some(_) => Err(StructureChangeError::Input(format!(
@@ -323,6 +429,18 @@ mod tests {
         }
     }
 
+    fn stored_key(name: &str) -> ForeignKeyInfo {
+        ForeignKeyInfo {
+            name: name.into(),
+            columns: vec!["note".into()],
+            ref_schema: None,
+            ref_table: "people".into(),
+            ref_columns: vec!["id".into()],
+            on_delete: None,
+            on_update: None,
+        }
+    }
+
     fn key_index() -> IndexInfo {
         IndexInfo {
             primary: true,
@@ -331,14 +449,26 @@ mod tests {
     }
 
     fn plan(kind: StructureChangeKind, text: &str) -> Result<StructureChangePlan, StructureChangeError> {
+        plan_for_driver("sqlite", kind, text)
+    }
+
+    fn plan_for_driver(
+        driver_id: &str,
+        kind: StructureChangeKind,
+        text: &str,
+    ) -> Result<StructureChangePlan, StructureChangeError> {
         let columns = [column("id"), column("note")];
         let target = SaveTarget {
-            driver_id: "sqlite",
+            driver_id,
             schema: None,
             table: "orders",
             columns: &columns,
         };
-        plan_structure_change(target, kind, text, &[stored_index("by_note"), key_index()])
+        let structure = TableStructure {
+            indexes: vec![stored_index("by_note"), key_index()],
+            foreign_keys: vec![stored_key("fk_owner")],
+        };
+        plan_structure_change(target, kind, text, &structure)
     }
 
     #[test]
@@ -379,6 +509,10 @@ mod tests {
             (StructureChangeKind::AddIndex, "by_x ghost"),
             (StructureChangeKind::DropIndex, "ghost"),
             (StructureChangeKind::DropIndex, "primary"),
+            (StructureChangeKind::AddForeignKey, "fk note"),
+            (StructureChangeKind::AddForeignKey, "fk ghost -> people id"),
+            (StructureChangeKind::AddForeignKey, "fk note -> people id, extra"),
+            (StructureChangeKind::DropForeignKey, "ghost"),
             (StructureChangeKind::DropIndex, "by_NOTE two"),
         ] {
             assert!(
