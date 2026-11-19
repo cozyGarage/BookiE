@@ -392,6 +392,45 @@ fn jump_to_column_lists_the_columns_and_moves_the_cursor_to_the_chosen_one(cx: &
 }
 
 #[gpui::test]
+fn reveal_in_sidebar_opens_the_sidebar_clears_the_search_and_expands_the_tables_schema(cx: &mut TestAppContext) {
+    use bookie_results::sidebar_tree::{NodeKind, build_nodes};
+    let (view, cx) = open(cx);
+    let table = bookie_core::TableInfo {
+        schema: Some("app".into()),
+        name: "customers".into(),
+    };
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            let other = bookie_core::TableInfo {
+                schema: Some("other".into()),
+                name: "orders".into(),
+            };
+            view.catalog.tables = vec![table.clone(), other];
+            let nodes = build_nodes(&view.catalog.tables, &[]);
+            let schema = nodes
+                .iter()
+                .find(|node| node.kind == NodeKind::Schema && node.schema.as_deref() == Some("app"))
+                .expect("the app schema node");
+            view.sidebar.collapsed_schemas.toggle(&schema.key);
+            view.sidebar.open = false;
+            view.sidebar.search.update(cx, |input, cx| input.set_content("zzz", cx));
+            view.tabs.open_table(&table);
+            view.open_table_named(&table, window, cx);
+        })
+    });
+    cx.simulate_keystrokes("ctrl-shift-l");
+    view.read_with(cx, |view, cx| {
+        assert!(view.sidebar.open, "the sidebar opens");
+        assert_eq!(view.sidebar.search.read(cx).content(), "", "the search is cleared");
+        assert!(
+            view.sidebar.collapsed_schemas.keys().is_empty(),
+            "the schema is expanded"
+        );
+        assert_eq!(view.status, "Revealed app.customers in the sidebar");
+    });
+}
+
+#[gpui::test]
 fn the_palette_hides_actions_that_do_not_apply_and_arrows_pick_the_next_one(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.simulate_keystrokes("ctrl-shift-p");
