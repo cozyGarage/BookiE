@@ -72,6 +72,7 @@ sequenceDiagram
 | `connection_allowlist` | list of connection UUIDs | Empty list denies connection use. |
 | `created_at` | datetime | Issuance time. |
 | `expires_at` | optional datetime | When set, authentication fails after this instant. |
+| `tool_allowlist` | optional list of tool names | When set, the token may list and call only these tools; `None` allows every tool (`crates/mcp/src/tokens.rs`, `server.rs`, `rmcp_server.rs`). |
 | `revoked` | bool | Revoked tokens do not authenticate. |
 
 `Decision` (`crates/policy/src/verdict.rs`):
@@ -98,7 +99,7 @@ Source: `PolicyGuard` authorize family in `crates/policy/src/guard.rs`.
 2. On a shared connection, `authorize_analysis` may return early from `shared_connection_decision` before categorical rules. Session mode calls `authorize_classified`, which skips that short-circuit and goes to `authorize_with_bound`.
 3. On `Allow`, continue to execute; mask the returned result when `should_mask` applies (agent-only).
 4. On `Deny`, write audit terminal `denied` with `AuditErrorCategory::Policy`, then return `DriverError::PolicyDenied`.
-5. On `RequireApproval`, call `ApprovalSink::request` and wait. `ApprovalOutcome` is `AllowOnce` or `Deny` (`crates/policy/src/approval.rs`). `OperationControl` interrupts the wait on cancellation or deadline; the guard records the matching `cancelled` or `timed_out` audit outcome.
+5. On `RequireApproval`, call `ApprovalSink::request` and wait. `ApprovalOutcome` is `AllowOnce`, `Deny`, `AllowAndRemember` or `UsedGrant` (`crates/policy/src/approval.rs`). `OperationControl` interrupts the wait on cancellation or deadline; the guard records the matching `cancelled` or `timed_out` audit outcome.
 
 Audit intent is written before driver execution when `intent_is_required` is true. A failed required intent write returns `DriverError::PolicyDenied` mentioning that audit intent could not be persisted (`required_intent_failure_prevents_driver_execution`). Local or Dev human principals with `human_allow_unaudited_writes` may continue after a warning (`handle_intent_failure`).
 
