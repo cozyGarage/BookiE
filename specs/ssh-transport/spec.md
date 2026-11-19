@@ -58,6 +58,7 @@ LearnedNew { fingerprint }
 Changed { fingerprint, line }
 Unknown { fingerprint }
 KnownHostsIo(String)
+Revoked(String)
 ```
 
 `SshError` host-key variants (`crates/ssh/src/lib.rs`):
@@ -67,6 +68,7 @@ KnownHostsIo(String)
 | `HostKeyMismatch { host, port, new_fingerprint, line, known_hosts }` | Stored fingerprint differs. |
 | `UnknownHostKey { host, port, fingerprint, known_hosts }` | Key is absent and this connection does not add keys. |
 | `KnownHosts(String)` | The known_hosts file could not be read or updated. |
+| `HostKeyRevoked(String)` | The key is marked `@revoked` for the host; never accepted, learned or prompted for. |
 
 The OpenSSH backend forces `StrictHostKeyChecking=ask` in its private config and master argv. Prompt kinds include `HostKeyConfirmation { host, algorithm, fingerprint }`.
 
