@@ -14,6 +14,7 @@ pub enum StructureChangeKind {
     DropIndex,
     AddForeignKey,
     DropForeignKey,
+    RenameTable,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -39,6 +40,7 @@ impl StructureChangeKind {
             Self::DropIndex => "name of the index to drop",
             Self::AddForeignKey => "name column[, column…] -> other_table column[, column…]",
             Self::DropForeignKey => "name of the foreign key to drop",
+            Self::RenameTable => "new table name",
             Self::AddIndex => "[unique] index_name column[, column…], for example: unique by_name customer",
         }
     }
@@ -88,6 +90,7 @@ fn build_op(
         StructureChangeKind::AddColumn => add_column(target.columns, schema, table, text),
         StructureChangeKind::RenameColumn => rename_column(target.columns, schema, table, text),
         StructureChangeKind::AddIndex => add_index(target.columns, schema, table, text),
+        StructureChangeKind::RenameTable => rename_table(schema, table, text),
         StructureChangeKind::DropIndex => drop_index(&structure.indexes, schema, table, text),
         StructureChangeKind::AddForeignKey => add_foreign_key(target.columns, schema, table, text),
         StructureChangeKind::DropForeignKey => drop_foreign_key(&structure.foreign_keys, schema, table, text),
@@ -372,6 +375,21 @@ fn foreign_key_label(keys: &[ForeignKeyInfo], name: &str) -> String {
     }
 }
 
+fn rename_table(schema: Option<String>, table: String, text: &str) -> Result<StructureOp, StructureChangeError> {
+    let new_name = text.trim();
+    if new_name.is_empty() || new_name.contains(char::is_whitespace) {
+        return Err(StructureChangeError::Input("Type one new name for the table".into()));
+    }
+    if new_name == table {
+        return Err(StructureChangeError::Input("That is already the table's name".into()));
+    }
+    Ok(StructureOp::RenameTable {
+        schema,
+        old_name: table,
+        new_name: new_name.to_string(),
+    })
+}
+
 fn refuse_duplicate(columns: &[ColumnInfo], name: &str) -> Result<(), StructureChangeError> {
     match find(columns, name) {
         Some(_) => Err(StructureChangeError::Input(format!(
@@ -513,6 +531,9 @@ mod tests {
             (StructureChangeKind::AddForeignKey, "fk ghost -> people id"),
             (StructureChangeKind::AddForeignKey, "fk note -> people id, extra"),
             (StructureChangeKind::DropForeignKey, "ghost"),
+            (StructureChangeKind::RenameTable, "two words"),
+            (StructureChangeKind::RenameTable, "orders"),
+            (StructureChangeKind::RenameTable, ""),
             (StructureChangeKind::DropIndex, "by_NOTE two"),
         ] {
             assert!(

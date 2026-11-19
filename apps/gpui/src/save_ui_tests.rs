@@ -1018,3 +1018,23 @@ fn the_structure_panel_lists_columns_indexes_and_keys_of_the_open_table_and_clos
     view.read_with(cx, |view, _| assert!(view.structure.info.is_none(), "a change bar replaces the panel"));
     std::fs::remove_file(&path).ok();
 }
+
+#[gpui::test]
+fn only_a_table_rename_asks_for_a_reconnect_after_it_is_applied(cx: &mut TestAppContext) {
+    use bookie_app_services::structure_change_plan::StructureChangeKind::{AddColumn, RenameTable};
+    let path = fixture_copy("rename-flag");
+    let (view, cx) = saving_view(cx, &path);
+    for (kind, text, expected) in [(RenameTable, "invoices", true), (AddColumn, "flag INTEGER", false)] {
+        cx.update(|_, cx| view.update(cx, |view, cx| view.open_structure_bar(kind, cx)));
+        set_structure_text(&view, cx, text);
+        cx.update(|_, cx| view.update(cx, |view, cx| view.review_structure(cx)));
+        settle_saving(cx);
+        view.read_with(cx, |view, _| {
+            let pending = view.save.pending.as_ref().unwrap_or_else(|| panic!("no review: {}", view.status));
+            assert_eq!(pending.reconnect, expected, "{}", pending.title);
+        });
+        cx.update(|_, cx| view.update(cx, |view, cx| view.cancel_save(cx)));
+        cx.update(|_, cx| view.update(cx, |view, cx| view.cancel_structure_bar(cx)));
+    }
+    std::fs::remove_file(&path).ok();
+}
