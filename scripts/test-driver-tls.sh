@@ -66,18 +66,35 @@ teardown() {
 bash "$FIXTURE/generate-materials.sh" --force
 chmod 0755 "$FIXTURE/seed"
 chmod 0644 "$FIXTURE/seed/01-seed.js"
-compose down --volumes --remove-orphans >/dev/null 2>&1 || true
-if compose up -d --build --wait --wait-timeout 300; then
-  wait_for_fixture_health || startup_status=$?
-else
-  startup_status=$?
-fi
-if [[ "${startup_status:-0}" != 0 ]]; then
+start_fixture() {
+  local status=0
+  compose down --volumes --remove-orphans >/dev/null 2>&1 || true
+  if compose up -d --build --wait --wait-timeout 300; then
+    wait_for_fixture_health || status=$?
+  else
+    status=$?
+  fi
+  return "$status"
+}
+
+report_startup_failure() {
   compose ps --all || true
   for container in $(compose ps --all --quiet); do
     docker inspect --format '{{json .State.Health}}' "$container" || true
   done
   compose logs --no-color --tail 50 || true
+}
+
+startup_attempts="${BOOKIE_DRIVER_TLS_STARTUP_ATTEMPTS:-2}"
+startup_status=0
+for ((attempt = 1; attempt <= startup_attempts; attempt++)); do
+  startup_status=0
+  start_fixture || startup_status=$?
+  [[ "$startup_status" == 0 ]] && break
+  echo "driver-tls fixture did not become healthy (attempt $attempt of $startup_attempts)" >&2
+  report_startup_failure
+done
+if [[ "$startup_status" != 0 ]]; then
   exit "$startup_status"
 fi
 if [[ "$BOOKIE_DRIVER_TLS_REDIS_PORT" == 0 ]]; then

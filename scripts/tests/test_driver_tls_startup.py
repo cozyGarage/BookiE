@@ -93,6 +93,13 @@ if any(action in args for action in ["ps", "inspect", "logs"]):
         self.assertIn(" down ", commands[-1])
         self.assertTrue(any(" logs " in command for command in commands))
 
+    def test_a_failed_first_startup_is_retried_once_before_giving_up(self):
+        result, commands = self.run_failed_startup(0)
+        ups = [command for command in commands if " up " in command]
+        self.assertEqual(len(ups), 2, commands)
+        self.assertIn("attempt 1 of 2", result.stderr)
+        self.assertIn("attempt 2 of 2", result.stderr)
+
     def test_redis_tests_use_the_port_published_by_compose(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
