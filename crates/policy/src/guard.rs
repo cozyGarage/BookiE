@@ -227,6 +227,16 @@ impl PolicyGuard {
         self.authorize_with_bound(sql, analysis, None, control, counter).await
     }
 
+    fn refusal_before_policy(&self, sql: &str, analysis: &StatementAnalysis) -> Option<Decision> {
+        if analysis.lexical_mode_ambiguous {
+            return Some(Decision::Deny {
+                rule: "session_lexical_mode_ambiguous".into(),
+                message: "SQL token boundaries depend on the database session lexical mode".into(),
+            });
+        }
+        crate::rules::unsupported_statement_decision(sql, &self.ctx.driver_id)
+    }
+
     async fn authorize_with_bound(
         &self,
         sql: &str,
@@ -235,14 +245,7 @@ impl PolicyGuard {
         control: Option<&OperationControl>,
         counter: Option<Counter<'_>>,
     ) -> Result<Authorization, DriverError> {
-        if analysis.lexical_mode_ambiguous {
-            let decision = Decision::Deny {
-                rule: "session_lexical_mode_ambiguous".into(),
-                message: "SQL token boundaries depend on the database session lexical mode".into(),
-            };
-            return self.resolve_authorization(sql, analysis, decision, None, control).await;
-        }
-        if let Some(decision) = crate::rules::unsupported_statement_decision(sql, &self.ctx.driver_id) {
+        if let Some(decision) = self.refusal_before_policy(sql, &analysis) {
             return self.resolve_authorization(sql, analysis, decision, None, control).await;
         }
         let facts = &analysis.facts;
