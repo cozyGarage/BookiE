@@ -22,6 +22,8 @@ impl GridView {
         self.note_frame();
         self.pace_frame(window);
         self.viewport_rows = self.viewport_rows_for(window);
+        self.sidebar
+            .collapse_when_narrow(f32::from(window.viewport_size().width));
         let sidebar_width = if self.sidebar.open { self.sidebar.width } else { 0.0 };
         let grid_width = (f32::from(window.viewport_size().width) - sidebar_width).max(0.0);
         self.sync_table(grid_width, cx);
