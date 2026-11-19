@@ -6,7 +6,7 @@ use tokio::sync::mpsc;
 
 use crate::database_service::ConnectionOverview;
 use crate::driver_error_presentation::DriverFailurePresentation;
-use crate::read_session::{ConnectionSummary, list_saved_connections};
+use crate::read_session::{ConnectionSummary, TableStructure, list_saved_connections};
 use crate::read_session_store::{OpenedSession, ReadSessionStore, SessionId, SubscriptionRequest, SubscriptionSample};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -51,6 +51,12 @@ pub enum Command {
         epoch: Epoch,
         session_id: SessionId,
         kind: CatalogObjectKind,
+    },
+    ReadStructure {
+        epoch: Epoch,
+        session_id: SessionId,
+        table: TableInfo,
+        capabilities: bookie_core::DriverCapabilities,
     },
     ReadDataDictionary {
         epoch: Epoch,
@@ -98,6 +104,10 @@ pub enum Event {
         epoch: Epoch,
         outcome: Result<Vec<CatalogObject>, DriverFailurePresentation>,
     },
+    StructureRead {
+        epoch: Epoch,
+        outcome: Result<TableStructure, DriverFailurePresentation>,
+    },
     DataDictionaryRead {
         epoch: Epoch,
         outcome: Result<QueryResult, DriverFailurePresentation>,
@@ -122,6 +132,7 @@ impl Event {
             | Self::PageRead { epoch, .. }
             | Self::ColumnsRead { epoch, .. }
             | Self::CatalogRead { epoch, .. }
+            | Self::StructureRead { epoch, .. }
             | Self::DataDictionaryRead { epoch, .. }
             | Self::ConnectionStatusRead { epoch, .. }
             | Self::SubscriptionSampled { epoch, .. } => *epoch,
@@ -294,6 +305,18 @@ async fn dispatch_metadata_command(
             kind,
         } => {
             Box::pin(dispatch_catalog(sessions, epoch, session_id, kind, control, sink)).await?;
+        }
+        Command::ReadStructure {
+            epoch,
+            session_id,
+            table,
+            capabilities,
+        } => {
+            let outcome = match sessions.get(session_id) {
+                Some(session) => session.read_structure(&table, capabilities, control).await,
+                None => Err(DriverFailurePresentation::Disconnected),
+            };
+            sink.try_emit(Event::StructureRead { epoch, outcome })?;
         }
         Command::ReadDataDictionary {
             epoch,

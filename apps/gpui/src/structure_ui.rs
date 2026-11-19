@@ -17,6 +17,7 @@ fn title(kind: StructureChangeKind) -> &'static str {
         StructureChangeKind::RenameColumn => "Rename column",
         StructureChangeKind::DropColumn => "Drop column",
         StructureChangeKind::AddIndex => "Create index",
+        StructureChangeKind::DropIndex => "Drop index",
     }
 }
 
