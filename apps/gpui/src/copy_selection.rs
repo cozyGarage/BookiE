@@ -68,7 +68,7 @@ impl GridView {
         }
     }
 
-    fn csv_options(&self) -> bookie_core::export::CsvOptions {
+    pub(crate) fn csv_options(&self) -> bookie_core::export::CsvOptions {
         bookie_core::export::CsvOptions {
             custom_delimiter: self.export.csv_delimiter.clone(),
             ..Default::default()
@@ -111,18 +111,18 @@ impl GridView {
         self.export.limit = limit;
     }
 
-    pub(crate) fn export_selection_or_page(&mut self, cx: &mut Context<Self>) {
+    pub(crate) fn rows_for_export(&mut self) -> Option<(Vec<Vec<Cell>>, u64, bool)> {
         let (mut rows, count) = if let Some(selection) = self.selection {
             if !selection.copyable() {
                 self.status = selection.label();
-                return;
+                return None;
             }
             (self.selected_rows(selection), selection.count())
         } else {
             let (first, last) = self.pager.range();
             if self.dataset_count() == 0 || first > last {
                 self.status = "No rows to export".into();
-                return;
+                return None;
             }
             let rows: Vec<Vec<Cell>> = (first.saturating_sub(1)..last)
                 .map(|idx| {
@@ -144,6 +144,13 @@ impl GridView {
             rows.truncate(limit);
         }
         let count = if cut { rows.len() as u64 } else { count };
+        Some((rows, count, cut))
+    }
+
+    pub(crate) fn export_selection_or_page(&mut self, cx: &mut Context<Self>) {
+        let Some((rows, count, cut)) = self.rows_for_export() else {
+            return;
+        };
         let driver_id = self
             .live
             .as_ref()

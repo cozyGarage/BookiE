@@ -1060,6 +1060,56 @@ fn a_blocked_save_points_to_the_resolve_action_and_other_errors_are_left_alone()
     assert_eq!(crate::save_ui::with_resolve_hint("duplicate key"), "duplicate key");
 }
 
+fn set_export_path(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext, path: &std::path::Path) {
+    let text = path.display().to_string();
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            let input = view.export.file.input.clone().expect("the path field exists once the bar opened");
+            input.update(cx, |input, cx| input.set_content(&text, cx));
+        })
+    });
+}
+
+#[gpui::test]
+fn the_page_is_written_to_a_file_in_the_format_of_its_extension_and_never_over_an_existing_file(cx: &mut TestAppContext) {
+    let path = fixture_copy("export-file");
+    let (view, cx) = saving_view(cx, &path);
+    let directory = std::env::temp_dir().join(format!("bookie-export-{}", std::process::id()));
+    std::fs::create_dir_all(&directory).unwrap();
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_export_file_bar(cx)));
+    view.read_with(cx, |view, _| assert!(view.export.file.open));
+
+    let jsonl = directory.join("rows.jsonl");
+    set_export_path(&view, cx, &jsonl);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.write_export_file(cx)));
+    settle_saving(cx);
+    let written = std::fs::read_to_string(&jsonl).unwrap();
+    assert_eq!(written.lines().count(), 6, "{written}");
+    assert!(written.lines().next().unwrap().starts_with('{'), "{written}");
+    view.read_with(cx, |view, _| assert!(!view.export.file.open && view.status.starts_with("Wrote 6 row(s)")));
+
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_export_file_bar(cx)));
+    let sql = directory.join("rows.sql");
+    set_export_path(&view, cx, &sql);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.write_export_file(cx)));
+    settle_saving(cx);
+    assert!(std::fs::read_to_string(&sql).unwrap().contains("INSERT INTO"), "a table exports as SQL inserts");
+
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_export_file_bar(cx)));
+    set_export_path(&view, cx, &jsonl);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.write_export_file(cx)));
+    view.read_with(cx, |view, _| {
+        assert!(view.status.contains("already exists"), "{}", view.status);
+        assert!(view.export.file.open, "the bar stays so another name can be typed");
+    });
+    set_export_path(&view, cx, &directory.join("rows.txt"));
+    cx.update(|_, cx| view.update(cx, |view, cx| view.write_export_file(cx)));
+    view.read_with(cx, |view, _| assert!(view.status.contains("ending in"), "{}", view.status));
+    assert!(!directory.join("rows.txt").exists());
+    std::fs::remove_dir_all(&directory).ok();
+    std::fs::remove_file(&path).ok();
+}
+
 #[gpui::test]
 fn dropping_the_table_needs_its_exact_name_then_reviews_the_statement_and_reconnects(cx: &mut TestAppContext) {
     use bookie_app_services::structure_change_plan::StructureChangeKind::DropTable;
