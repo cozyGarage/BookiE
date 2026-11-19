@@ -207,6 +207,58 @@ fn insert_from_tab(sessions: &TwoSessions, tab_id: uuid::Uuid, title: &str) {
     });
 }
 
+fn inject_streamed_page(
+    sessions: &TwoSessions,
+    connection_id: uuid::Uuid,
+) -> (uuid::Uuid, bookie_results::stream_page_budget::StreamPageBudget) {
+    use crate::ui::editor::SqlEditorInput;
+
+    let controller = &sessions.controller;
+    controller.emit(AppMsg::FocusWorkingSession(connection_id));
+    spin_until(|| controller.model().connection_id == Some(connection_id));
+    let previous_tabs = controller.model().workspace_tabs.borrow().keys().count();
+    controller.emit(AppMsg::NewEditorTab);
+    spin_until(|| controller.model().workspace_tabs.borrow().keys().count() == previous_tabs + 1);
+    let tab_id = controller.model().selected_workspace_tab_id().unwrap();
+    let editor = match controller.model().workspace_tabs.borrow().get(&tab_id).unwrap() {
+        super::super::WorkspaceTab::Editor(slot) => slot.controller.sender().clone(),
+        _ => panic!("expected editor"),
+    };
+    let spool = controller
+        .model()
+        .database
+        .stream_result_spool_manager()
+        .create()
+        .unwrap();
+    let page_budget = spool.page_budget();
+    let page = Arc::new(bookie_core::QueryResult {
+        columns: vec![bookie_core::ColumnInfo {
+            name: "payload".into(),
+            data_type: "TEXT".into(),
+            nullable: true,
+            primary_key: false,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: None,
+            domain_type: None,
+        }],
+        rows: (0..1024)
+            .map(|_| vec![Value::Text("x".repeat(1024))])
+            .collect::<Vec<_>>()
+            .into(),
+        truncated: false,
+    });
+    sessions.runtime.block_on(spool.append_page(0, page.clone())).unwrap();
+    editor
+        .send(SqlEditorInput::InjectStreamForTest { page, spool })
+        .unwrap();
+    spin_until(|| page_budget.used_bytes() > 0);
+    (tab_id, page_budget)
+}
+
 #[test]
 #[ignore = "requires an isolated GTK display"]
 fn a_save_from_a_background_tab_reaches_its_own_connection_and_not_the_front_one() {
@@ -295,6 +347,55 @@ fn reconnecting_changed_saved_settings_replaces_only_the_target_session() {
         &sessions.runtime,
         sessions.second
     )));
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn reconnect_releases_only_the_target_sessions_streamed_pages() {
+    let sessions = two_sessions();
+    let _entered = sessions.runtime.enter();
+    let (target_tab, target_budget) = inject_streamed_page(&sessions, sessions.first);
+    assert!(target_budget.used_bytes() > 0);
+
+    let replacement = prepared_notes_connection(
+        &sessions._directory.path().join("first-reconnected.sqlite"),
+        "first updated",
+        sessions.first,
+        "first.changed.host",
+        &sessions.runtime,
+    );
+    sessions.controller.emit(AppMsg::Connection(ConnectionMessage::Open));
+    spin_until(|| sessions.controller.model().switch.transition == super::super::ConnectionTransition::Connecting);
+    sessions
+        .controller
+        .emit(AppMsg::Connection(ConnectionMessage::Prepared(Box::new(replacement))));
+    spin_until(|| {
+        sessions.controller.model().switch.transition == super::super::ConnectionTransition::AwaitingReconnect
+    });
+    sessions.controller.emit(AppMsg::ReconnectSavedConnection(true));
+    spin_until(|| {
+        !sessions
+            .controller
+            .model()
+            .workspace_tabs
+            .borrow()
+            .contains_key(&target_tab)
+    });
+
+    spin_until(|| target_budget.used_bytes() == 0);
+    assert!(sessions.controller.model().multi.sessions.is_working(sessions.first));
+    assert!(sessions.controller.model().multi.sessions.is_working(sessions.second));
+
+    let (other_tab, other_budget) = inject_streamed_page(&sessions, sessions.second);
+    assert!(other_budget.used_bytes() > 0);
+    assert!(
+        sessions
+            .controller
+            .model()
+            .workspace_tabs
+            .borrow()
+            .contains_key(&other_tab)
+    );
 }
 
 #[test]

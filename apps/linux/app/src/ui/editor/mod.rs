@@ -627,6 +627,8 @@ impl SimpleComponent for SqlEditor {
         }
         match msg {
             SqlEditorInput::Run(message) => self.on_run_message(message, sender),
+            #[cfg(test)]
+            SqlEditorInput::InjectStreamForTest { page, spool } => self.inject_stream_for_test(page, spool, &sender),
             SqlEditorInput::CatalogStatementSucceeded { origin, driver, sql } => {
                 if !origin.owns_window(self.connection_id, &self.database) {
                     return;
