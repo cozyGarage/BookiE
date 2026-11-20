@@ -84,6 +84,10 @@ async fn cursor_fetch_messages_reach_the_result_page_and_do_not_leak() {
     .await
     .unwrap();
     let mut session = conn.open_session().await.unwrap();
+    session
+        .query_params_controlled("BEGIN READ ONLY ISOLATION LEVEL REPEATABLE READ", &[], &control())
+        .await
+        .unwrap();
     let cursor = session
         .open_query_cursor_controlled("SELECT cursor_notice()", &[], &control())
         .await
@@ -100,6 +104,10 @@ async fn cursor_fetch_messages_reach_the_result_page_and_do_not_leak() {
         ["cursor notice"]
     );
     session.close_query_cursor_controlled(cursor, &control()).await.unwrap();
+    session
+        .query_params_controlled("ROLLBACK", &[], &control())
+        .await
+        .unwrap();
     let next = session
         .query_result_sets_params_controlled("SELECT 1", &[], &control())
         .await
