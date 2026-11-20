@@ -194,6 +194,33 @@ fn two_sessions() -> TwoSessions {
     }
 }
 
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn cancelled_sidebar_catalog_response_does_not_restore_entries() {
+    let sessions = two_sessions();
+    let _entered = sessions.runtime.enter();
+    let origin = crate::services::catalog::CatalogOrigin::capture(
+        sessions.controller.model().connection_id,
+        &sessions.controller.model().database,
+    )
+    .unwrap();
+    let request = tokio_util::sync::CancellationToken::new();
+    request.cancel();
+    sessions.controller.emit(AppMsg::SidebarCatalogLoaded {
+        origin,
+        kind: bookie_core::CatalogObjectKind::Sequence,
+        request,
+        result: Ok(vec![bookie_core::CatalogObject {
+            kind: bookie_core::CatalogObjectKind::Sequence,
+            schema: Some("public".into()),
+            name: "stale".into(),
+            detail: None,
+        }]),
+    });
+    spin_for(Duration::from_millis(100));
+    assert!(sessions.controller.model().sidebar_catalog.is_empty());
+}
+
 fn insert_from_tab(sessions: &TwoSessions, tab_id: uuid::Uuid, title: &str) {
     use crate::services::change_tracker::StatementSource;
     sessions.controller.emit(AppMsg::ExecuteBrowseTransaction {
