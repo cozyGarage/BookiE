@@ -154,12 +154,21 @@ impl TextInput {
         &self.content
     }
 
-    pub fn set_content(&mut self, text: &str, cx: &mut Context<Self>) {
+    fn replace_content(&mut self, text: &str) {
         self.content = single_line_text(text).into_owned().into();
         self.selected_range = self.content.len()..self.content.len();
         self.selection_reversed = false;
         self.marked_range = None;
+    }
+
+    pub fn set_content(&mut self, text: &str, cx: &mut Context<Self>) {
+        self.replace_content(text);
         cx.emit(InputEvent::Changed);
+        cx.notify();
+    }
+
+    pub fn set_content_quiet(&mut self, text: &str, cx: &mut Context<Self>) {
+        self.replace_content(text);
         cx.notify();
     }
 
