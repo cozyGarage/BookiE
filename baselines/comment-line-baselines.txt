@@ -73,7 +73,7 @@ crates/core/src/export/html.rs 6
 crates/core/src/export/mod.rs 10
 crates/core/src/export/xlsx.rs 2
 crates/core/src/export/xml.rs 6
-crates/core/src/filter.rs 66
+crates/core/src/filter.rs 31
 crates/core/src/filter_tests.rs 11
 crates/core/src/import/cell.rs 26
 crates/core/src/import/csv_import.rs 32
@@ -94,7 +94,7 @@ crates/core/src/sql_ddl/index_fk.rs 9
 crates/core/src/sql_ddl/mod.rs 13
 crates/core/src/sql_ddl/table.rs 14
 crates/core/src/sql_ddl/tests.rs 15
-crates/core/src/sql_ddl/types.rs 116
+crates/core/src/sql_ddl/types.rs 94
 crates/core/src/sql_diagnostics.rs 2
 crates/core/src/sql_dialect.rs 20
 crates/core/src/sql_dialect/updates.rs 3

@@ -1,23 +1,10 @@
-//! Per-table WHERE-clause builder used by the Browse-tab filter UI.
+//! Per-table WHERE-clause builder for the Browse-tab filter.
 //!
-//! The dialog (in `apps/linux/app`) constructs a `FilterSet` from the
-//! user's input and hands it to `build_filter_where`, which:
-//!
-//! 1. Looks each rule's column up in the supplied schema.
-//! 2. Coerces user-typed strings to typed `Value`s per the column's
-//!    `data_type` (so `"42"` against an int column binds as
-//!    `Value::Int(42)`, not `Value::Text("42")`).
-//! 3. Emits a parameterised SQL fragment using the per-driver
-//!    placeholder dialect (`$N` for PG, `?` for MySQL/SQLite) and a
-//!    parallel `Vec<Value>` ready for `Connection::query_params`.
-//!
-//! Rules are joined by a single top-level combinator (AND / OR).
-//! Nested groups are intentionally out of scope; users who need
-//! arbitrary boolean trees drop to the SQL editor.
-//!
-//! Identifier quoting and placeholder dialect both flow through
-//! `sql_dialect::quote_ident` / `sql_dialect::placeholder_for` so the
-//! filter builder doesn't carry its own per-driver knowledge.
+//! `build_filter_where` takes a `FilterSet`, looks each rule's column up in the schema, coerces typed
+//! text per `data_type` (`"42"` on an int column binds as `Value::Int(42)`), and emits a parameterised
+//! fragment with the driver's placeholder dialect plus a parallel `Vec<Value>`. Rules share one top-level
+//! AND / OR combinator; nested groups belong in the SQL editor. Quoting and placeholders come from
+//! `sql_dialect::quote_ident` and `sql_dialect::placeholder_for`.
 
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Timelike, Utc};
 use rust_decimal::Decimal;
@@ -28,9 +15,7 @@ use uuid::Uuid;
 use crate::query::{ColumnInfo, Value};
 use crate::sql_dialect::{placeholder_for, quote_ident, text_cast_placeholder};
 
-/// One operator in a filter rule. Operator names are user-visible in
-/// the dialog (the dropdown labels live next to this enum in the UI
-/// layer) but the SQL each one emits is locked here.
+/// One filter operator. Dropdown labels live in the UI layer; the SQL each emits is fixed here.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FilterOp {
@@ -94,14 +79,8 @@ pub struct FilterSet {
     pub combinator: Combinator,
     #[serde(default)]
     pub rules: Vec<FilterRule>,
-    /// Raw SQL fragment appended after the structured rules with the
-    /// configured combinator. Lets the user reach for expressions the
-    /// rule editor doesn't model — `LENGTH(name) > 10`,
-    /// `created_at::date = CURRENT_DATE`, JSON `@>` containment, etc.
-    /// Emitted verbatim with no quoting / parameterisation. There is
-    /// no SQL-injection boundary here: the user already has the
-    /// connection (they can drop tables via the SQL editor); raw
-    /// filter is a power feature, not an untrusted-input vector.
+    /// Raw SQL appended after the rules with the combinator, emitted verbatim without quoting or
+    /// parameters. Not an injection boundary: the user already holds the connection and can run any SQL.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub extra_sql: Option<String>,
 }
@@ -186,16 +165,8 @@ pub enum BuildFilterError {
     WrongValueShape { op: FilterOp },
 }
 
-/// Build the `WHERE` SQL fragment + bound parameters from a
-/// `FilterSet` against a column schema.
-///
-/// Returns `Ok(None)` for an empty rule list so callers can skip the
-/// `WHERE` keyword entirely. Identifiers are quoted via
-/// `sql_dialect::quote_ident`; placeholders via
-/// `sql_dialect::placeholder_for`. User-typed strings are coerced
-/// through the same parser the inline-edit path uses, so binding
-/// types are correct for the driver and never round-trip through
-/// `Value::Text`.
+/// Build the `WHERE` fragment and bound parameters for a `FilterSet`. `Ok(None)` for an empty set so
+/// callers skip `WHERE`. Strings are coerced by the inline-edit parser, so they never bind as `Value::Text`.
 pub fn build_filter_where(
     driver_id: &str,
     columns: &[ColumnInfo],
@@ -217,10 +188,7 @@ pub fn build_filter_where(
         clauses.push(clause);
     }
     if let Some(raw) = extra {
-        // Wrap in parens so the raw fragment can't accidentally
-        // re-bind operator precedence with the structured rules.
-        // The user types `a OR b`, we emit `(... AND (a OR b))` and
-        // the OR stays scoped to their fragment.
+        // Parenthesised so a raw `a OR b` stays scoped to its own fragment.
         let line_comment = raw.contains("--") || raw.contains('#');
         clauses.push(format!("({raw}{})", if line_comment { "\n" } else { "" }));
     }
@@ -556,10 +524,7 @@ pub enum FilterValueKind {
     Bytes,
 }
 
-/// Coarse type classifier. Mirrors `ui::browse_tab::classify_type`
-/// but lives here so core's filter builder doesn't reach back into
-/// the app crate. Both classifiers must stay in sync; the type-name
-/// landscape they cover is identical.
+/// Coarse type classifier mirroring `ui::browse_tab::classify_type`; keep the two in sync.
 fn classify(lower: &str) -> FilterValueKind {
     if lower == "tinyint(1)" || lower == "boolean" || lower == "bool" {
         return FilterValueKind::Bool;
