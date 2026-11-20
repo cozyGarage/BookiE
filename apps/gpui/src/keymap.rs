@@ -21,10 +21,12 @@ pub enum Command {
     NewQuery,
     RunQuery,
     ToggleDetail,
+    CloseTab,
+    ReopenTab,
 }
 
 impl Command {
-    pub const ALL: [Command; 19] = [
+    pub const ALL: [Command; 21] = [
         Command::Palette,
         Command::QuickSwitcher,
         Command::JumpColumn,
@@ -44,6 +46,8 @@ impl Command {
         Command::NewQuery,
         Command::RunQuery,
         Command::ToggleDetail,
+        Command::CloseTab,
+        Command::ReopenTab,
     ];
 
     pub fn name(self) -> &'static str {
@@ -67,6 +71,8 @@ impl Command {
             Command::NewQuery => "new-query",
             Command::RunQuery => "run-query",
             Command::ToggleDetail => "toggle-detail",
+            Command::CloseTab => "close-tab",
+            Command::ReopenTab => "reopen-tab",
         }
     }
 
@@ -91,6 +97,8 @@ impl Command {
             Command::NewQuery => "New query tab",
             Command::RunQuery => "Run the query",
             Command::ToggleDetail => "Show or hide the detail panel",
+            Command::CloseTab => "Close the current tab",
+            Command::ReopenTab => "Reopen the last closed tab",
         }
     }
 
@@ -192,6 +200,8 @@ impl Default for Keymap {
                 (Command::NewQuery, chord(true, false, "t")),
                 (Command::RunQuery, chord(true, false, "enter")),
                 (Command::ToggleDetail, chord(false, false, "f3")),
+                (Command::CloseTab, chord(true, false, "w")),
+                (Command::ReopenTab, chord(true, true, "t")),
             ]),
         }
     }
@@ -258,6 +268,18 @@ mod tests {
             keymap.resolve(&Chord::parse("f3").unwrap()),
             Some(Command::ToggleDetail)
         );
+    }
+
+    #[test]
+    fn closing_and_reopening_a_tab_use_the_same_chords_as_the_gtk_app() {
+        let keymap = Keymap::default();
+        assert_eq!(keymap.resolve(&Chord::parse("ctrl-w").unwrap()), Some(Command::CloseTab));
+        assert_eq!(
+            keymap.resolve(&Chord::parse("ctrl-shift-t").unwrap()),
+            Some(Command::ReopenTab)
+        );
+        assert_eq!(Command::CloseTab.title(), "Close the current tab");
+        assert_eq!(Command::ReopenTab.title(), "Reopen the last closed tab");
     }
 
     #[test]
