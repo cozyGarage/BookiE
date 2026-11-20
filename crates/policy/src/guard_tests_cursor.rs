@@ -261,8 +261,8 @@ async fn cursor_masks_every_page_and_keeps_one_audit_operation_id() {
         .close_query_cursor_controlled(cursor, &OperationControl::new(CancellationToken::new(), None))
         .await
         .expect("close guarded cursor");
+    let query_hash = audit.hash_sql("SELECT password FROM accounts").await.unwrap().value;
     let events = audit.events.lock().expect("audit lock");
-    let query_hash = hex::encode(Sha256::digest(b"SELECT password FROM accounts"));
     let cursor_events = events
         .iter()
         .filter(|event| event.sql_hash == query_hash)
@@ -305,8 +305,8 @@ async fn a_page_error_closes_the_cursor_and_records_failure_after_prior_pages() 
         .expect_err("second page fails");
     assert!(matches!(failure, DriverError::Query { .. }), "{failure:?}");
     assert_eq!(*script.closed.lock().expect("close lock"), 1);
+    let query_hash = audit.hash_sql("SELECT password FROM accounts").await.unwrap().value;
     let events = audit.events.lock().expect("audit lock");
-    let query_hash = hex::encode(Sha256::digest(b"SELECT password FROM accounts"));
     let outcome = events
         .iter()
         .rev()
@@ -342,9 +342,9 @@ async fn cancellation_after_a_delivered_page_closes_and_audits_the_cursor() {
 
     assert!(matches!(result, Err(DriverError::Cancelled)), "{result:?}");
     assert_eq!(*script.closed.lock().expect("close lock"), 1);
+    let query_hash = audit.hash_sql("SELECT password FROM accounts").await.unwrap().value;
     {
         let events = audit.events.lock().expect("audit lock");
-        let query_hash = hex::encode(Sha256::digest(b"SELECT password FROM accounts"));
         let outcome = events
             .iter()
             .rev()
@@ -374,8 +374,8 @@ async fn a_cursor_timeout_closes_and_audits_the_cursor() {
 
     assert!(matches!(result, Err(DriverError::TimedOut)), "{result:?}");
     assert_eq!(*script.closed.lock().expect("close lock"), 1);
+    let query_hash = audit.hash_sql("SELECT password FROM accounts").await.unwrap().value;
     let events = audit.events.lock().expect("audit lock");
-    let query_hash = hex::encode(Sha256::digest(b"SELECT password FROM accounts"));
     let outcome = events
         .iter()
         .rev()
@@ -405,8 +405,8 @@ async fn closing_a_session_closes_an_open_cursor_and_audits_cancellation() {
     assert_eq!(first.result.rows[0][0], Value::Text("***REDACTED***".into()));
 
     assert_eq!(*script.closed.lock().expect("close lock"), 1);
+    let query_hash = audit.hash_sql("SELECT password FROM accounts").await.unwrap().value;
     let events = audit.events.lock().expect("audit lock");
-    let query_hash = hex::encode(Sha256::digest(b"SELECT password FROM accounts"));
     let outcome = events
         .iter()
         .rev()
