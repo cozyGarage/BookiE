@@ -3,6 +3,7 @@ use std::time::{Duration, Instant};
 
 mod assets;
 mod catalog_nav;
+mod closed_tabs_ui;
 mod chrome;
 mod home_page;
 mod query_pane;
@@ -24,6 +25,22 @@ mod favorites_ui;
 mod approval_ui;
 mod import_ui;
 mod export_file_ui;
+mod selection_stats_ui;
+mod backup_ui;
+mod diagram_scene;
+mod diagram_ui;
+mod filter_rule_ui;
+mod health_ui;
+mod paste_ui;
+mod refresh_ui;
+mod new_window_ui;
+mod run_cursor_ui;
+mod tables_export_ui;
+mod sql_file_ui;
+mod schema_diagram_ui;
+mod set_cells_ui;
+mod update_ui;
+mod value_search_ui;
 mod fk_nav_ui;
 mod resolve_ui;
 mod structure_ui;
@@ -347,7 +364,11 @@ impl GridView {
                     };
                     cx.notify();
                 }
-                gpui_kit::component::table::TableEvent::RightClickedCell(row, _) => {
+                gpui_kit::component::table::TableEvent::RightClickedCell(row, column) => {
+                    this.cell_cursor = Some(bookie_results::grid_cursor::Cursor {
+                        row: *row,
+                        column: *column,
+                    });
                     let dataset = this.base() + *row as u64;
                     if !this.selection.is_some_and(|selection| selection.contains(dataset)) {
                         this.click_row(dataset, false);
@@ -815,6 +836,7 @@ fn main() {
                         view.refresh_favorites(cx);
                         view.keymap = keymap.clone();
                         view.connections = connections.clone();
+                        view.search.origin = launch_origin();
                     });
                     if let Ok(start_tab) = std::env::var("BOOKIE_PROTOTYPE_START") {
                         open_requested_start_tab(&view, &start_tab, cx);
@@ -852,6 +874,18 @@ fn load_keymap() -> Keymap {
         tracing::warn!(%error, path = %path.display(), "ignoring file");
         Keymap::default()
     })
+}
+
+fn launch_origin() -> Option<bookie_gpui::live::Origin> {
+    use bookie_gpui::live::Origin;
+    match (
+        std::env::var("BOOKIE_PROTOTYPE_FILE").ok(),
+        std::env::var("BOOKIE_PROTOTYPE_CONNECTION").ok(),
+    ) {
+        (Some(path), _) => Some(Origin::File(path.into())),
+        (None, Some(connection)) => Some(Origin::Saved(connection)),
+        (None, None) => None,
+    }
 }
 
 fn live_source() -> Option<std::sync::Arc<bookie_gpui::live::LiveTable>> {

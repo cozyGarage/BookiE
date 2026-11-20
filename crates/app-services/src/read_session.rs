@@ -56,6 +56,12 @@ pub struct ReadSession {
     pub tables: Vec<TableInfo>,
 }
 
+impl ReadSession {
+    pub(crate) fn backup_identity(&self) -> (Uuid, Uuid, bool) {
+        (self.id, self.generation, self.writable)
+    }
+}
+
 pub struct PostgresTableCursor {
     session: AuditedSession,
     cursor: QueryCursorId,

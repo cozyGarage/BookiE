@@ -56,6 +56,7 @@ impl GridView {
             return;
         }
         self.status = "Connecting…".into();
+        self.search.origin = Some(origin.clone());
         self.begin_background(
             Work::Load,
             cx,

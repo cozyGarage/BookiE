@@ -1,8 +1,10 @@
 use bookie_app_services::catalog::CatalogOrigin;
 use bookie_app_services::export_tables::TableTarget;
-use bookie_app_services::export_tables::{TableExportRequest, TableOutcome, TableResult, export_tables};
+use bookie_app_services::export_tables::{
+    TableExportRequest, TableOutcome, TableResult, export_tables, prepare_targets,
+};
+use bookie_core::TableInfo;
 use bookie_core::export::{CsvOptions, ResultFormat};
-use bookie_core::{Connection, DriverError, OperationControl, TableInfo};
 use relm4::adw::prelude::*;
 use relm4::gtk::gio;
 use relm4::{ComponentSender, gtk};
@@ -204,85 +206,5 @@ fn report_progress(
     {
         last.set(Some((index, now)));
         sender.input(AppMsg::MultiTableExportProgress(target_name(&targets[index]), rows));
-    }
-}
-
-async fn prepare_targets(
-    connection: &dyn Connection,
-    tables: Vec<TableInfo>,
-    control: &OperationControl,
-) -> Result<Vec<TableTarget>, String> {
-    let mut targets = Vec::with_capacity(tables.len());
-    for table in tables {
-        if control.cancellation_token().is_cancelled() {
-            return Err(crate::services::error_text::driver_message(&DriverError::Cancelled));
-        }
-        let columns = connection
-            .fetch_columns_controlled(table.schema.as_deref(), &table.name, control)
-            .await
-            .map_err(|error| {
-                let name = table
-                    .schema
-                    .as_ref()
-                    .map_or_else(|| table.name.clone(), |schema| format!("{schema}.{}", table.name));
-                format!("{name}: {}", crate::services::error_text::driver_message(&error))
-            })?;
-        if control.cancellation_token().is_cancelled() {
-            return Err(crate::services::error_text::driver_message(&DriverError::Cancelled));
-        }
-        targets.push(TableTarget {
-            schema: table.schema,
-            table: table.name,
-            columns,
-        });
-    }
-    Ok(targets)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use bookie_core::{ConnectOptions, DatabaseDriver};
-    use tokio_util::sync::CancellationToken;
-
-    #[tokio::test]
-    async fn metadata_preparation_keeps_target_identity_and_honors_cancellation() {
-        let connection = drivers_sqlite::SqliteDriver
-            .connect(ConnectOptions {
-                database: ":memory:".into(),
-                ..Default::default()
-            })
-            .await
-            .unwrap();
-        let token = CancellationToken::new();
-        let control = crate::services::operation_control::bounded_with(5, token.clone());
-        connection
-            .execute_controlled("CREATE TABLE orders (id INTEGER, name TEXT)", &control)
-            .await
-            .unwrap();
-        let table = TableInfo {
-            schema: None,
-            name: "orders".into(),
-        };
-        let targets = prepare_targets(connection.as_ref(), vec![table.clone()], &control)
-            .await
-            .unwrap();
-        assert_eq!(targets.len(), 1);
-        assert_eq!(targets[0].table, table.name);
-        assert_eq!(targets[0].schema, table.schema);
-        assert_eq!(
-            targets[0]
-                .columns
-                .iter()
-                .map(|column| column.name.as_str())
-                .collect::<Vec<_>>(),
-            ["id", "name"]
-        );
-        token.cancel();
-        assert!(
-            prepare_targets(connection.as_ref(), vec![table], &control)
-                .await
-                .is_err()
-        );
     }
 }

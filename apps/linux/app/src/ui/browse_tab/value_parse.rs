@@ -6,51 +6,7 @@ pub(super) use bookie_app_services::value_input::*;
 use bookie_core::{ColumnInfo, EnumInputStyle, Value};
 
 pub(super) fn input_error_message(error: ValueInputError) -> String {
-    use ValueInputError as Error;
-    match error {
-        Error::FieldRequired => bookie_app_services::tr!("Field is required"),
-        Error::InvalidEnumMetadata => bookie_app_services::tr!("Could not safely read ENUM or SET members"),
-        Error::UndeclaredEnumMember => bookie_app_services::tr!("Value is not a declared ENUM or SET member"),
-        Error::InvalidBoolean => bookie_app_services::tr!("Invalid boolean. Use true/false, yes/no, or 1/0."),
-        Error::InvalidInteger => bookie_app_services::tr!("Invalid integer"),
-        Error::InvalidNumber => bookie_app_services::tr!("Invalid number"),
-        Error::InvalidDecimal => bookie_app_services::tr!("Invalid decimal"),
-        Error::InvalidUuid => bookie_app_services::tr!("Invalid UUID. Expected 8-4-4-4-12 hex digits."),
-        Error::InvalidJson(error) => bookie_app_services::tr!("Invalid JSON: {error}").replace("{error}", &error),
-        Error::InvalidTimestamp => {
-            bookie_app_services::tr!("Invalid timestamp. Use ISO 8601, e.g. 2024-01-15T14:30:00Z.")
-        }
-        Error::InvalidTimestampWithTimeZone => bookie_app_services::tr!("Invalid timestamp with time zone."),
-        Error::InvalidDateTime => bookie_app_services::tr!("Invalid datetime. Use YYYY-MM-DD HH:MM:SS."),
-        Error::InvalidDateAndTime => bookie_app_services::tr!("Invalid date and time."),
-        Error::InvalidDate => bookie_app_services::tr!("Invalid date. Use YYYY-MM-DD."),
-        Error::InvalidTime => bookie_app_services::tr!("Invalid time. Use HH:MM:SS."),
-        Error::InvalidSqlServerDateTimeOffsetColumnScale => {
-            bookie_app_services::tr!("Invalid SQL Server datetimeoffset column scale")
-        }
-        Error::InvalidSqlServerDateTimeOffset => bookie_app_services::tr!("Invalid SQL Server datetimeoffset"),
-        Error::SqlServerDateTimeOffsetOutOfRange => {
-            bookie_app_services::tr!("SQL Server datetimeoffset value exceeds the column precision or offset range")
-        }
-        Error::MySqlSpatialValueNotEditable => {
-            bookie_app_services::tr!("MySQL spatial values cannot be edited losslessly")
-        }
-        Error::MySqlIntegerOutOfRange => {
-            bookie_app_services::tr!("Integer is outside the supported MySQL column range")
-        }
-        Error::MongoInt32OutOfRange => {
-            bookie_app_services::tr!("Integer is outside the supported MongoDB Int32 range")
-        }
-        Error::MongoDatePrecision => bookie_app_services::tr!("MongoDB BSON dates support millisecond precision only"),
-        Error::DuckDbTimestampTzPrecision => {
-            bookie_app_services::tr!("DuckDB TIMESTAMPTZ supports microsecond precision only")
-        }
-        Error::DuckDbTemporalPrecision { kind } => {
-            bookie_app_services::tr!("DuckDB {kind} precision cannot represent this value exactly")
-                .replace("{kind}", kind)
-        }
-        Error::BitWidthOutOfRange => bookie_app_services::tr!("Integer is outside the supported BIT range"),
-    }
+    bookie_app_services::edit_error_text::value_input_message(&error)
 }
 
 #[cfg(test)]

@@ -646,6 +646,7 @@ fn tab_icon_name(tab: &Tab) -> &'static str {
         Tab::NewConnection => "database",
         Tab::History => "clock",
         Tab::AuditLog => "shield",
+        Tab::Diagram => "database",
         Tab::Query => "play",
         Tab::Table(_) => "table",
     }
@@ -660,8 +661,9 @@ fn tab_close_button(index: usize, theme: Theme, cx: &mut Context<GridView>) -> S
         .hover(move |style| style.bg(rgb(theme.muted)))
         .on_mouse_down(
             gpui::MouseButton::Left,
-            cx.listener(move |this, _: &MouseDownEvent, _, cx| {
+            cx.listener(move |this, _: &MouseDownEvent, window, cx| {
                 this.close_tab(index);
+                this.show_current_table(window, cx);
                 cx.stop_propagation();
                 cx.notify();
             }),

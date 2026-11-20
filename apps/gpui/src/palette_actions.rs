@@ -63,6 +63,23 @@ impl GridView {
             .chain(self.export_limit_actions())
             .chain(self.grid_actions())
             .chain(self.activity_actions())
+            .chain(self.health_actions())
+            .chain(self.value_search_actions())
+            .chain(self.schema_diagram_actions())
+            .chain(self.run_cursor_actions())
+            .chain(self.paste_actions())
+            .chain(self.filter_rule_actions())
+            .chain(self.diagram_actions())
+            .chain(self.update_actions())
+            .chain(self.backup_actions())
+            .chain(self.refresh_actions())
+            .chain(self.reconnect_actions())
+            .chain(self.new_window_actions())
+            .chain(self.disconnect_actions())
+            .chain(self.sql_file_actions())
+            .chain(self.closed_tab_actions())
+            .chain(self.recent_tab_actions())
+            .chain(self.tables_export_actions())
             .chain(self.chrome_actions())
             .collect()
     }
@@ -161,6 +178,8 @@ impl GridView {
         vec![
             action("copy", "Copy selected rows", self.selection.is_some()),
             action("copy-csv", "Copy selected rows as CSV", self.selection.is_some()),
+            action("set-cells", "Set selected cells to a value…", self.set_cells_enabled()),
+            action("selection-stats", "Show statistics for the selected rows", self.selection_stats_enabled()),
             action("export-file", "Export to a file…", self.export_file_enabled()),
             action("export-csv", "Export current page or selection as CSV", true),
             action("copy-json", "Copy selected rows as JSON", self.selection.is_some()),
@@ -495,6 +514,8 @@ impl GridView {
             "copy-csv" => self.copy_selection_as(CopyFormat::Csv, cx),
             "export-csv" => self.export_selection_or_page(cx),
             "export-file" => self.open_export_file_bar(cx),
+            "set-cells" => self.open_set_cells_bar(cx),
+            "selection-stats" => self.show_selection_stats(cx),
             "set-csv-delimiter" => self.set_csv_delimiter(),
             "reset-csv-delimiter" => self.set_csv_delimiter_to(None),
             "set-export-limit" => self.set_export_limit(),
@@ -614,6 +635,7 @@ impl GridView {
             "run" => self.run_query(cx),
             "explain" => self.explain_query(cx),
             "data-dictionary" => self.show_data_dictionary(cx),
+            _ if self.execute_tool_palette_action(id, window, cx) => {}
             "previous-run" => self.activate_run(self.run_tabs.active - 1),
             "next-run" => self.activate_run(self.run_tabs.active + 1),
             "close-run" => self.close_run(self.run_tabs.active),

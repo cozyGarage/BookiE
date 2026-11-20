@@ -97,6 +97,51 @@ fn column_label(name: &str) -> String {
     }
 }
 
+pub fn report_label(report: HealthReport) -> String {
+    match report {
+        HealthReport::TableVacuum => crate::tr!("Dead rows and vacuum"),
+        HealthReport::EstimatedBloat => crate::tr!("Estimated bloat"),
+        HealthReport::UnusedIndexes => crate::tr!("Unused indexes"),
+        HealthReport::DuplicateIndexes => crate::tr!("Duplicate indexes"),
+        HealthReport::SeqScanHeavy => crate::tr!("Sequential scans"),
+    }
+}
+
+pub fn report_hint(report: HealthReport) -> String {
+    match report {
+        HealthReport::TableVacuum => {
+            crate::tr!("Tables with the most dead rows, with their size and last vacuum and analyze.")
+        }
+        HealthReport::EstimatedBloat => {
+            crate::tr!(
+                "A rough estimate from the share of dead rows in tables of 1 MiB or more. It is not a measurement."
+            )
+        }
+        HealthReport::UnusedIndexes => crate::tr!(
+            "Non-unique indexes never scanned since the statistics were last reset. Check how long the statistics have run before dropping one."
+        ),
+        HealthReport::DuplicateIndexes => {
+            crate::tr!("Indexes whose leading columns are already covered by another index on the same table.")
+        }
+        HealthReport::SeqScanHeavy => {
+            crate::tr!("Tables of 10,000 rows or more that are read by sequential scans more often than by an index.")
+        }
+    }
+}
+
+pub fn rows_status(report: HealthReport, rows: &HealthRows) -> String {
+    if rows.rows.is_empty() {
+        return crate::tr!("Nothing to report. {hint}").replace("{hint}", &report_hint(report));
+    }
+    let shown = crate::tr!("{count} rows. {hint}")
+        .replace("{count}", &rows.rows.len().to_string())
+        .replace("{hint}", &report_hint(report));
+    if rows.may_have_more {
+        return format!("{shown} {}", crate::tr!("Only the top rows are shown."));
+    }
+    shown
+}
+
 #[cfg(test)]
 #[path = "health_report_tests.rs"]
 mod tests;

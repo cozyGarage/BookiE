@@ -1,0 +1,33 @@
+use super::run_target;
+
+const SCRIPT: &str = "SELECT 1;\nSELECT 2;\nSELECT 3;";
+
+#[test]
+fn the_statement_under_the_caret_is_the_one_to_run() {
+    assert_eq!(run_target(SCRIPT, "postgres", 3, 3..3).as_deref(), Ok("SELECT 1"));
+    assert_eq!(run_target(SCRIPT, "postgres", 14, 14..14).as_deref(), Ok("SELECT 2"));
+    let end = SCRIPT.len();
+    assert_eq!(run_target(SCRIPT, "postgres", end, end..end).as_deref(), Ok("SELECT 3"));
+}
+
+#[test]
+fn a_selection_wins_over_the_caret_statement() {
+    assert_eq!(run_target(SCRIPT, "postgres", 19, 10..19).as_deref(), Ok("SELECT 2;"));
+    assert_eq!(run_target(SCRIPT, "postgres", 3, 7..9).as_deref(), Ok("1;"));
+}
+
+#[test]
+fn a_blank_selection_or_script_has_nothing_to_run() {
+    assert!(run_target("   \n  ", "postgres", 2, 2..2).is_err());
+    assert!(run_target("", "postgres", 0, 0..0).is_err());
+    assert!(
+        run_target(SCRIPT, "postgres", 0, 9..10).is_err(),
+        "a selected newline is blank"
+    );
+}
+
+#[test]
+fn an_unterminated_statement_is_refused_rather_than_guessed() {
+    let error = run_target("SELECT 'oops", "postgres", 4, 4..4).unwrap_err();
+    assert!(error.contains("complete statement"), "{error}");
+}

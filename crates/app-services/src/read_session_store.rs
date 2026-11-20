@@ -152,6 +152,98 @@ impl ReadSessionStore {
         self.open(saved, label, control).await
     }
 
+    pub async fn export_tables_to_folder(
+        &self,
+        id: SessionId,
+        tables: Vec<TableInfo>,
+        job: crate::export_tables::TablesExportJob,
+        cancel: &tokio_util::sync::CancellationToken,
+    ) -> Result<Vec<crate::export_tables::TableResult>, String> {
+        let session = self.get(id).ok_or("The connection is closed")?;
+        let (connection, generation, _) = session.backup_identity();
+        let driver_id = session.driver_id.clone();
+        let driver = self
+            .registry
+            .get(&driver_id)
+            .ok_or("The database driver is not available")?;
+        if !driver.capabilities().supports_snapshot_export {
+            return Err("This connection does not support consistent table export.".into());
+        }
+        let guard = self
+            .database
+            .guard_for_generation(connection, generation, bookie_policy::Principal::human_gui())
+            .ok_or("The connection is closed")?;
+        let control = crate::operation_control::bounded_with(job.timeout_secs, cancel.clone());
+        let targets = crate::export_tables::prepare_targets(&guard, tables, &control).await?;
+        let guard = Arc::new(guard);
+        let handle = tokio::runtime::Handle::current();
+        let cancel = cancel.clone();
+        tokio::task::spawn_blocking(move || {
+            let csv = bookie_core::export::CsvOptions::default();
+            let request = crate::export_tables::TableExportRequest {
+                driver_id: &driver_id,
+                tables: &targets,
+                directory: &job.directory,
+                format: bookie_core::export::ResultFormat::Csv,
+                extension: "csv",
+                csv: &csv,
+                max_rows_per_table: job.max_rows_per_table,
+                timeout_secs: job.timeout_secs,
+            };
+            let run: crate::export_pages::PageRunner = Arc::new(move |future| handle.block_on(future));
+            crate::export_tables::export_tables(guard, driver.as_ref(), &request, &run, &cancel, |_, _| {})
+        })
+        .await
+        .unwrap_or_else(|_| Err("The export task stopped unexpectedly.".into()))
+    }
+
+    pub async fn run_backup_job(
+        &self,
+        id: SessionId,
+        job: crate::database_backup::BackupJob,
+        runtime_dir: &std::path::Path,
+        control: &OperationControl,
+    ) -> Result<(), DriverError> {
+        let session = self.get(id).ok_or(DriverError::Disconnected)?;
+        let (connection, generation, writable) = session.backup_identity();
+        if matches!(job, crate::database_backup::BackupJob::Restore { .. }) && !writable {
+            return Err(DriverError::ReadOnly);
+        }
+        crate::database_backup::ensure_backup_supported(&session.driver_id)?;
+        let saved = bookie_storage::load_connections()
+            .await
+            .map_err(|error| DriverError::Internal(error.to_string()))?
+            .into_iter()
+            .find(|saved| saved.id == connection)
+            .ok_or_else(|| DriverError::Internal("the saved connection is no longer available".into()))?;
+        if saved.read_only && matches!(job, crate::database_backup::BackupJob::Restore { .. }) {
+            return Err(DriverError::ReadOnly);
+        }
+        let principal = bookie_policy::Principal::human_gui();
+        let guard = self
+            .database
+            .guard_for_generation(connection, generation, principal.clone())
+            .ok_or(DriverError::Disconnected)?;
+        let driver = self
+            .registry
+            .get(&saved.driver_id)
+            .ok_or_else(|| DriverError::Unsupported("the database driver is not available".into()))?;
+        let environment = self.database.ssh_environment_for_connection(&saved, principal);
+        let server_version = self
+            .database
+            .metadata(connection)
+            .and_then(|metadata| metadata.server_version);
+        let context = crate::database_backup::SavedBackupContext {
+            guard: &guard,
+            driver: driver.as_ref(),
+            saved: &saved,
+            environment: &environment,
+            server_version: server_version.as_deref(),
+            runtime_dir,
+        };
+        crate::database_backup::run_saved_backup_job(context, job, control).await
+    }
+
     pub(crate) fn get(&self, id: SessionId) -> Option<Arc<ReadSession>> {
         self.sessions
             .read()
@@ -565,5 +657,129 @@ mod tests {
             "{result:?}"
         );
         assert_eq!(name_of(&path, 1).await, "a");
+    }
+
+    async fn sqlite_store_with_session(
+        read_only: bool,
+    ) -> (ReadSessionStore, SessionId, tempfile::TempDir, std::path::PathBuf) {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("backup.db");
+        std::fs::File::create(&path).unwrap();
+        let writer = drivers_sqlite::SqliteDriver
+            .connect(ConnectOptions {
+                database: path.to_string_lossy().into_owned(),
+                ..ConnectOptions::default()
+            })
+            .await
+            .unwrap();
+        writer
+            .execute("CREATE TABLE items (id INTEGER PRIMARY KEY)")
+            .await
+            .unwrap();
+        let mut registry = DriverRegistry::new();
+        registry.register(Arc::new(drivers_sqlite::SqliteDriver));
+        let store = ReadSessionStore::new(Arc::new(registry), Arc::new(DatabaseService::new_isolated()));
+        let control = OperationControl::with_timeout(Duration::from_secs(5));
+        let opened = store
+            .open_file_writable_for_tests(&path, read_only, &control)
+            .await
+            .unwrap();
+        (store, opened.session_id, directory, path)
+    }
+
+    fn backup_job(directory: &std::path::Path) -> crate::database_backup::BackupJob {
+        crate::database_backup::BackupJob::Backup {
+            output: directory.join("out.dump"),
+        }
+    }
+
+    #[tokio::test]
+    async fn a_backup_on_a_closed_session_reports_a_disconnection() {
+        let (store, _, directory, _) = sqlite_store_with_session(false).await;
+        let control = OperationControl::with_timeout(Duration::from_secs(5));
+        let result = store
+            .run_backup_job(
+                SessionId::new(),
+                backup_job(directory.path()),
+                directory.path(),
+                &control,
+            )
+            .await;
+        assert!(matches!(result, Err(DriverError::Disconnected)), "{result:?}");
+    }
+
+    #[tokio::test]
+    async fn only_postgresql_sessions_can_be_backed_up_and_nothing_is_written_otherwise() {
+        let (store, session, directory, _) = sqlite_store_with_session(false).await;
+        let control = OperationControl::with_timeout(Duration::from_secs(5));
+        let job = backup_job(directory.path());
+        let result = store
+            .run_backup_job(session, job.clone(), directory.path(), &control)
+            .await;
+        assert!(
+            matches!(&result, Err(DriverError::Unsupported(text)) if text.contains("PostgreSQL")),
+            "{result:?}"
+        );
+        let written = matches!(&job, crate::database_backup::BackupJob::Backup { output } if output.exists());
+        assert!(!written, "a refused backup leaves no file behind");
+    }
+
+    #[tokio::test]
+    async fn a_restore_on_a_session_opened_for_reading_only_is_refused_before_anything_else() {
+        let (store, _, directory, path) = sqlite_store_with_session(false).await;
+        let control = OperationControl::with_timeout(Duration::from_secs(5));
+        let read_only = store.open_file(&path, &control).await.unwrap();
+        let job = crate::database_backup::BackupJob::Restore {
+            input: directory.path().join("in.dump"),
+        };
+        let result = store
+            .run_backup_job(read_only.session_id, job, directory.path(), &control)
+            .await;
+        assert!(matches!(result, Err(DriverError::ReadOnly)), "{result:?}");
+    }
+
+    fn export_job(directory: &std::path::Path) -> crate::export_tables::TablesExportJob {
+        crate::export_tables::TablesExportJob {
+            directory: directory.to_path_buf(),
+            max_rows_per_table: Some(10),
+            timeout_secs: 5,
+        }
+    }
+
+    #[tokio::test]
+    async fn exporting_tables_on_a_closed_session_is_refused() {
+        let (store, _, directory, _) = sqlite_store_with_session(false).await;
+        let result = store
+            .export_tables_to_folder(
+                SessionId::new(),
+                vec![TableInfo {
+                    schema: None,
+                    name: "items".into(),
+                }],
+                export_job(directory.path()),
+                &tokio_util::sync::CancellationToken::new(),
+            )
+            .await;
+        assert!(result.unwrap_err().contains("closed"));
+    }
+
+    #[tokio::test]
+    async fn a_connection_without_a_consistent_snapshot_cannot_export_tables_and_writes_nothing() {
+        let (store, session, directory, _) = sqlite_store_with_session(false).await;
+        let out = directory.path().join("export");
+        std::fs::create_dir_all(&out).unwrap();
+        let result = store
+            .export_tables_to_folder(
+                session,
+                vec![TableInfo {
+                    schema: None,
+                    name: "items".into(),
+                }],
+                export_job(&out),
+                &tokio_util::sync::CancellationToken::new(),
+            )
+            .await;
+        assert!(result.unwrap_err().contains("consistent table export"));
+        assert_eq!(std::fs::read_dir(&out).unwrap().count(), 0);
     }
 }

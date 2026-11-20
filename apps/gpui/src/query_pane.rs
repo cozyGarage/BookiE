@@ -122,11 +122,13 @@ impl GridView {
         let editor = self.query_editor_pane(theme, cx);
         let divider = self.query_split_divider(theme, cx);
         let result = self.result_pane(theme, grid, cx);
+        let tools = self.tool_bars(theme, cx);
         div()
             .flex_1()
             .flex()
             .flex_col()
             .min_h_0()
+            .children(tools)
             .child(editor)
             .children(self.panel.open.then_some(divider))
             .child(result)

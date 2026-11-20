@@ -41,7 +41,7 @@ impl SearchSource for Fake {
         &self,
         table: &TableTarget,
         _control: &OperationControl,
-    ) -> impl std::future::Future<Output = Result<Vec<ColumnInfo>, DriverError>> + Send {
+    ) -> impl std::future::Future<Output = Result<Vec<ColumnInfo>, DriverError>> {
         self.calls
             .lock()
             .expect("calls")
@@ -72,7 +72,7 @@ impl SearchSource for Fake {
         sql: &str,
         _params: &[Value],
         control: &OperationControl,
-    ) -> impl std::future::Future<Output = Result<QueryResult, DriverError>> + Send {
+    ) -> impl std::future::Future<Output = Result<QueryResult, DriverError>> {
         let table = sql.split('"').nth(1).unwrap_or_default().to_owned();
         let name = sql
             .split(" FROM ")
