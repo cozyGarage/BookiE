@@ -140,6 +140,16 @@ impl GridDelegate {
     }
 
     pub(crate) fn label_of(&mut self, row_ix: usize, col_ix: usize) -> (String, bool) {
+        if self.map.compare.is_none()
+            && let Some(index) = self.map.source_row(row_ix)
+            && let Some(cells) = self.source.as_ref().and_then(|source| source.row_ref(index))
+        {
+            return cells.get(col_ix).map_or_else(Default::default, |cell| {
+                let cell = self.edits.get(&(index, col_ix)).unwrap_or(cell);
+                let right = crate::right_aligned(self.numeric.get(col_ix).copied().unwrap_or(false), cell);
+                (cell_preview(cell), right)
+            });
+        }
         if self.cached.as_ref().is_none_or(|(row, _)| *row != row_ix) {
             let numeric = &self.numeric;
             let labels = match (&self.map.compare, &self.source) {
@@ -422,6 +432,30 @@ mod tests {
         assert!(preview.len() < 600);
         assert_eq!(source.row_copies.load(Ordering::Relaxed), 0);
         assert!(matches!(&source.cells[0], Cell::Text(value) if value.len() == 1024 * 1024));
+    }
+
+    #[test]
+    fn borrowed_wide_rows_format_only_requested_cells_and_keep_pending_edits() {
+        let source = Arc::new(BorrowedRowSource {
+            cells: vec![Cell::Int(7); 512],
+            row_copies: AtomicUsize::new(0),
+        });
+        let source_dyn: Source = source.clone();
+        let mut delegate = GridDelegate {
+            source: Some(source_dyn),
+            numeric: vec![true; 512],
+            map: RowMap {
+                count: 1,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        delegate.edits.insert((0, 511), Cell::Int(9));
+        assert_eq!(delegate.label_of(0, 0), ("7".into(), true));
+        assert_eq!(delegate.label_of(0, 511), ("9".into(), true));
+        assert_eq!(delegate.label_of(0, 512), (String::new(), false));
+        assert!(delegate.cached.is_none());
+        assert_eq!(source.row_copies.load(Ordering::Relaxed), 0);
     }
 
     #[test]
