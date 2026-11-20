@@ -707,25 +707,27 @@ GLib.MainLoop().run()
             )
 
         def set_active_editor(sql):
-            visible_editor().queryEditableText().setTextContents(sql)
+            ui.invoke_accessible_action("win.focus-editor")
+            editor = visible_editor()
+            editor.queryEditableText().setTextContents(sql)
+            text = editor.queryText()
+            actual = text.getText(0, text.characterCount)
+            assert actual == sql, (actual, sql)
 
-        def run_active_editor(sql):
+        def run_active_editor(sql, result_marker=None):
             set_active_editor(sql)
             ui.invoke(ui.wait_for_sensitive_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON))
-            try:
-                approval = ui.wait_for_node(name="Approve once", role=pyatspi.ROLE_PUSH_BUTTON, timeout=1)
-            except AssertionError:
-                approval = None
-            if approval:
-                ui.invoke(approval)
-                ui.wait_for_node(name="Approve once", present=False)
+            if result_marker:
+                ui.wait_for_node(name=result_marker, role=pyatspi.ROLE_LABEL)
+                return
+            ui.invoke(ui.wait_for_node(name="Approve once", role=pyatspi.ROLE_PUSH_BUTTON))
+            ui.wait_for_node(name="Approve once", present=False)
             ui.wait_for_node_containing("done in")
 
         def switch_schema(schema):
             marker = f"{schema}_session_ready"
             run_active_editor(f"SET search_path TO {schema}")
-            run_active_editor("SELECT current_schema() || '_session_ready'")
-            ui.wait_for_node(name=marker, role=pyatspi.ROLE_LABEL)
+            run_active_editor("SELECT current_schema() || '_session_ready'", marker)
 
         def show_columns():
             set_active_editor("SELECT * FROM bookie_completion_target WHERE bookie_completion_target")
