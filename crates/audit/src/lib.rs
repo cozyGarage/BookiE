@@ -129,7 +129,8 @@ async fn find(journal: &Option<PathBuf>, operation_id: Uuid) -> Result<Option<Un
     let listed = match journal {
         Some(path) => list_unknown_outcomes_at(path.clone(), None).await,
         None => list_unknown_outcomes(None).await,
-    }?;
+    }
+    .map_err(|error| error.to_string())?;
     Ok(listed.into_iter().find(|item| item.operation_id == operation_id))
 }
 

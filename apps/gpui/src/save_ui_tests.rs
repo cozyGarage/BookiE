@@ -1558,3 +1558,19 @@ fn disconnecting_is_refused_while_edits_are_pending_and_offered_only_when_connec
     });
     std::fs::remove_file(&path).ok();
 }
+
+#[test]
+fn a_decision_made_elsewhere_is_reported_as_such_and_other_failures_keep_their_text() {
+    use bookie_app_services::unknown_outcomes::{OutcomeDecision, UnknownOutcomeError};
+    let status = |result: Result<(), UnknownOutcomeError>, decision| crate::resolve_ui::decision_status(&result, decision);
+    assert_eq!(
+        status(Err(UnknownOutcomeError::NoLongerUnresolved), OutcomeDecision::Committed),
+        "That write was already decided elsewhere; the list was reloaded"
+    );
+    assert_eq!(
+        status(Err(UnknownOutcomeError::Rejected("a reason is required".into())), OutcomeDecision::Committed),
+        "Could not record the decision: a reason is required"
+    );
+    assert!(status(Ok(()), OutcomeDecision::StillUnknown).contains("still unknown"));
+    assert!(status(Ok(()), OutcomeDecision::RolledBack).contains("accepts writes again"));
+}
