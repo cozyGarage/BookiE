@@ -132,7 +132,7 @@ impl GridView {
                 .min_h_0()
                 .overflow_scroll()
                 .bg(rgb(theme.background))
-                .child(diagram_canvas(view, theme)),
+                .child(diagram_canvas(view, theme, cx)),
         )
     }
 }
@@ -141,7 +141,7 @@ fn fit_zoom(extent: &Rect, viewport: (f64, f64)) -> f64 {
     zoom::fit((extent.width, extent.height), viewport)
 }
 
-fn diagram_canvas(view: &DiagramView, theme: Theme) -> Div {
+fn diagram_canvas(view: &DiagramView, theme: Theme, cx: &mut Context<GridView>) -> Div {
     let (zoom, extent) = (view.zoom, view.scene.extent);
     let edges = view.scene.edges.clone();
     let color = rgb(theme.muted_foreground);
@@ -177,7 +177,9 @@ fn diagram_canvas(view: &DiagramView, theme: Theme) -> Div {
         .cards
         .iter()
         .zip(&view.diagram.tables)
-        .map(|(card, table)| table_card(card, table, (extent, zoom), theme));
+        .enumerate()
+        .map(|(index, (card, table))| table_card(card, (index, table), (extent, zoom), theme, cx))
+        .collect::<Vec<_>>();
     div()
         .relative()
         .w(px_at(extent.width * zoom))
@@ -186,43 +188,64 @@ fn diagram_canvas(view: &DiagramView, theme: Theme) -> Div {
         .children(cards)
 }
 
-fn table_card(
+fn card_rows(
     card: &bookie_app_services::er_diagram::scene::Card,
     table: &DiagramTable,
+    zoom: f64,
+    theme: Theme,
+) -> Vec<Div> {
+    table
+        .columns
+        .iter()
+        .map(|column| {
+            let marker = if column.primary_key {
+                "PK"
+            } else if column.foreign_key {
+                "FK"
+            } else {
+                ""
+            };
+            div()
+                .flex()
+                .items_center()
+                .gap_1()
+                .px_2()
+                .h(px_at(card.shape.row_height * zoom))
+                .child(
+                    div()
+                        .w(px_at(24.0 * zoom))
+                        .flex_none()
+                        .whitespace_nowrap()
+                        .text_color(rgb(theme.info))
+                        .child(marker),
+                )
+                .child(div().flex_1().child(column.name.clone()))
+                .child(
+                    div()
+                        .text_color(rgb(theme.muted_foreground))
+                        .child(column.type_name.clone()),
+                )
+        })
+        .collect()
+}
+
+fn table_card(
+    card: &bookie_app_services::er_diagram::scene::Card,
+    (index, table): (usize, &DiagramTable),
     (extent, zoom): (Rect, f64),
     theme: Theme,
-) -> Div {
+    cx: &mut Context<GridView>,
+) -> gpui::Stateful<Div> {
+    let target = bookie_core::TableInfo {
+        schema: table.schema.clone(),
+        name: table.name.clone(),
+    };
     let rect = card.rect();
-    let rows = table.columns.iter().map(|column| {
-        let marker = if column.primary_key {
-            "PK"
-        } else if column.foreign_key {
-            "FK"
-        } else {
-            ""
-        };
-        div()
-            .flex()
-            .items_center()
-            .gap_1()
-            .px_2()
-            .h(px_at(card.shape.row_height * zoom))
-            .child(
-                div()
-                    .w(px_at(24.0 * zoom))
-                    .flex_none()
-                    .whitespace_nowrap()
-                    .text_color(rgb(theme.info))
-                    .child(marker),
-            )
-            .child(div().flex_1().child(column.name.clone()))
-            .child(
-                div()
-                    .text_color(rgb(theme.muted_foreground))
-                    .child(column.type_name.clone()),
-            )
-    });
+    let rows = card_rows(card, table, zoom, theme);
     div()
+        .id(("diagram-card", index))
+        .cursor_pointer()
+        .on_click(cx.listener(move |this, _, window, cx| this.open_table_named(&target, window, cx)))
         .absolute()
         .left(px_at((rect.x - extent.x) * zoom))
         .top(px_at((rect.y - extent.y) * zoom))
