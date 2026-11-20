@@ -104,9 +104,11 @@ fn catalog_cases() -> Vec<StopCase> {
             b"information_schema.tables",
             |c, control| async move { c.list_views_excluding_controlled(&hidden(), &control).await },
         ),
-        sends("lexical_settings_controlled", b"sql_mode", |c, control| async move {
-            c.lexical_settings_controlled(&control).await
-        }),
+        sends(
+            "lexical_settings_controlled",
+            b"SELECT @@SESSION.sql_mode",
+            |c, control| async move { c.lexical_settings_controlled(&control).await },
+        ),
         sends("server_version_controlled", b"VERSION()", |c, control| async move {
             c.server_version_controlled(&control).await
         }),
