@@ -46,6 +46,7 @@ fn page(value: &str, has_next_page: bool) -> QueryCursorPage {
             truncated: false,
         },
         has_next_page,
+        messages: Default::default(),
     }
 }
 
@@ -137,6 +138,7 @@ impl bookie_core::Session for CursorSession {
             .unwrap_or(QueryCursorPage {
                 result: empty_result(),
                 has_next_page: false,
+                messages: Default::default(),
             }))
     }
 

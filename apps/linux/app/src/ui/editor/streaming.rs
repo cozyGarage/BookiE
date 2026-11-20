@@ -32,6 +32,7 @@ pub(in crate::ui) struct StreamPageUpdate {
     pub(super) generation: u64,
     pub(super) sequence: u64,
     pub(super) page: std::sync::Arc<QueryResult>,
+    pub(super) messages: bookie_core::ServerMessages,
     pub(super) spooled: bool,
     pub(super) lease: bookie_results::stream_page_budget::StreamPageLease,
     pub(super) accepted: tokio::sync::oneshot::Sender<bool>,
@@ -65,6 +66,7 @@ pub(super) struct ActiveStream {
     export_query: Option<crate::ui::export_dialog::StreamExportQuery>,
     spool: bookie_app_services::stream_result_spool::StreamResultSpool,
     cache: StreamPageCache,
+    messages: bookie_core::ServerMessages,
     error: Option<String>,
 }
 
@@ -82,7 +84,10 @@ impl ActiveStream {
                 Some(self.spool.clone()),
             ))),
             pinned: false,
-            detail: Default::default(),
+            detail: super::outcome_detail::OutcomeDetail {
+                messages: self.messages.clone(),
+                ..Default::default()
+            },
         }
     }
 }
@@ -151,6 +156,7 @@ impl SqlEditor {
                 generation,
                 sequence: 0,
                 page,
+                messages: Default::default(),
                 spooled: true,
                 lease,
                 accepted,
@@ -233,6 +239,7 @@ impl SqlEditor {
             export_query,
             spool,
             cache: StreamPageCache::with_budget(page_budget),
+            messages: Default::default(),
             error: None,
         });
         self.stream_eviction_cursor = Default::default();
@@ -248,6 +255,7 @@ impl SqlEditor {
             generation,
             sequence,
             page,
+            messages,
             spooled,
             lease,
             accepted,
@@ -261,6 +269,7 @@ impl SqlEditor {
                 let _ = accepted.send(false);
                 return;
             };
+            stream.messages.extend(messages);
             if let Err(error) = stream.cache.append_with_lease(sequence, page, spooled, lease) {
                 let message = match error {
                     stream_pages::PageAppendError::OutOfOrder => {

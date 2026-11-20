@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use bookie_core::{
     DriverError, MAX_QUERY_CURSOR_PAGE_ROWS, OperationControl, QueryCursorId, QueryCursorPage, QueryResult,
-    QueryResultBatch, Value, check_pre_dispatch, run_server_cancellable,
+    QueryResultBatch, ServerMessages, Value, check_pre_dispatch, run_server_cancellable,
 };
 use sqlx::pool::PoolConnection;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
@@ -16,6 +16,7 @@ struct ActiveCursor {
     id: QueryCursorId,
     columns: Vec<bookie_core::ColumnInfo>,
     failed: bool,
+    messages: ServerMessages,
 }
 
 pub(crate) struct PgSession {
@@ -143,10 +144,11 @@ impl bookie_core::Session for PgSession {
         }
         check_pre_dispatch(control)?;
         let statement = format!("{CURSOR_PREFIX}{sql}");
-        let connection = self
+        let mut connection = self
             .connection
             .take()
             .ok_or_else(|| DriverError::Internal("the session's connection was lost".into()))?;
+        crate::notices::discard(&mut connection);
         let (connection, result) = controlled_execute(connection, &statement, params, false, control).await;
         self.connection = connection;
         if let Err(error) = result {
@@ -160,6 +162,10 @@ impl bookie_core::Session for PgSession {
             id,
             columns: Vec::new(),
             failed: false,
+            messages: self
+                .connection
+                .as_mut()
+                .map_or_else(ServerMessages::default, crate::notices::drain),
         });
         Ok(id)
     }
@@ -176,8 +182,8 @@ impl bookie_core::Session for PgSession {
         check_pre_dispatch(control)?;
         let statement = format!("FETCH FORWARD {MAX_QUERY_CURSOR_PAGE_ROWS} FROM bookie_cursor");
         let result = self.run_cursor_query_controlled(&statement, control).await;
-        let mut page = match result {
-            Ok(page) => page,
+        let (mut page, mut messages) = match result {
+            Ok((page, messages, _)) => (page, messages),
             Err(error @ DriverError::Query { .. }) if self.connection.is_some() => {
                 if let Some(cursor) = self.active_cursor.as_mut() {
                     cursor.failed = true;
@@ -189,11 +195,15 @@ impl bookie_core::Session for PgSession {
                 return Err(error);
             }
         };
+        if let Some(cursor) = self.active_cursor.as_mut() {
+            messages.extend(std::mem::take(&mut cursor.messages));
+        }
         if page.truncated {
             self.retire_cursor_session();
             return Ok(QueryCursorPage {
                 result: page,
                 has_next_page: false,
+                messages,
             });
         }
         let cursor = self
@@ -213,6 +223,7 @@ impl bookie_core::Session for PgSession {
                 truncated: false,
             },
             has_next_page,
+            messages,
         })
     }
 
@@ -336,16 +347,12 @@ impl PgSession {
         result
     }
 
-    async fn run_cursor_query_controlled(
-        &mut self,
-        sql: &str,
-        control: &OperationControl,
-    ) -> Result<QueryResult, DriverError> {
+    async fn run_cursor_query_controlled(&mut self, sql: &str, control: &OperationControl) -> MessagedResult {
         let connection = self
             .connection
             .take()
             .ok_or_else(|| DriverError::Internal("the session's connection was lost".into()))?;
-        let (connection, result) = controlled_query(connection, sql, &[], false, control).await;
+        let (connection, result) = controlled_query_with_messages(connection, sql, &[], false, control).await;
         self.connection = connection;
         result
     }
