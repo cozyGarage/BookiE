@@ -806,7 +806,7 @@ async fn postgres_editor_keeps_cursor_server_messages_with_their_page() {
     let result = run_statements_with_stream(
         StatementRun {
             target: cursor_target(vec![Ok(page)], std::sync::Arc::new(CursorCounters::default())),
-            statements: vec!["SELECT notice_fn()".into()],
+            statements: vec!["SELECT id FROM items".into()],
             driver_id: "postgres",
             parameter_values: &Default::default(),
             control: &crate::services::operation_control::bounded(30),

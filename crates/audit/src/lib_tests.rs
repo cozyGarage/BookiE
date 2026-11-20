@@ -17,7 +17,7 @@ async fn run_with(args: &[&str], journal: &std::path::Path, terminal: Option<&mu
     let arguments: Vec<String> = args.iter().map(|text| text.to_string()).collect();
     let (mut out, mut err) = (Vec::new(), Vec::new());
     let terminal = terminal.map(|scripted| scripted as &mut dyn Terminal);
-    let code = run(&arguments, Some(journal.to_path_buf()), terminal, &mut out, &mut err).await;
+    let code = run_commands(&arguments, Some(journal.to_path_buf()), terminal, &mut out, &mut err).await;
     (code, String::from_utf8(out).unwrap(), String::from_utf8(err).unwrap())
 }
 

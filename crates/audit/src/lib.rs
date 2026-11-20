@@ -36,6 +36,16 @@ pub async fn run(
             1,
         );
     }
+    run_commands(arguments, journal, terminal, out, err).await
+}
+
+async fn run_commands(
+    arguments: &[String],
+    journal: Option<PathBuf>,
+    terminal: Option<&mut dyn Terminal>,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> i32 {
     match arguments.first().map(String::as_str) {
         Some("list") if arguments.len() == 1 => list(journal, out, err).await,
         Some("resolve") => resolve(&arguments[1..], journal, terminal, out, err).await,
