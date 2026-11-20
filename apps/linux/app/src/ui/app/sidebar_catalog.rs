@@ -94,7 +94,7 @@ impl App {
             Ok(objects) => {
                 if !sidebar_catalog_fits(&self.sidebar_catalog, kind, &objects, MAX_SIDEBAR_CATALOG_BYTES) {
                     self.show_toast(&bookie_app_services::tr!(
-                        "The catalog exceeds the 64 MiB sidebar limit."
+                        "The catalog exceeds the estimated 64 MiB sidebar limit."
                     ));
                     return;
                 }
