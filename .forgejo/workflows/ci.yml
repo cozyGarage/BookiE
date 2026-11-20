@@ -1493,9 +1493,7 @@ jobs:
       run:
         shell: bash
     env:
-      CARGO_HOME: /cargo
       RUSTC_WRAPPER: ""
-      PATH: /cargo/bin:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
       CARGO_TARGET_DIR: /target/${{ github.run_id }}/${{ github.job }}
       TMPDIR: /target/${{ github.run_id }}/${{ github.job }}
     steps:
