@@ -1443,6 +1443,7 @@ dependencies = [
  "futures",
  "glob",
  "hex",
+ "hmac 0.13.0",
  "oracledb",
  "proptest",
  "rust_decimal",

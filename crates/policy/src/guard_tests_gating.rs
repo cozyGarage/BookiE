@@ -1,5 +1,3 @@
-use sha2::Digest;
-
 use super::*;
 
 #[tokio::test]
@@ -666,8 +664,8 @@ async fn list_views_records_a_governed_read_outcome() {
     let views = guard.list_views().await.expect("list views");
     assert!(views.is_empty());
 
+    let expected_hash = audit.hash_sql("LIST VIEWS").await.unwrap().value;
     let events = audit.events.lock().expect("event lock");
-    let expected_hash = hex::encode(sha2::Sha256::digest(b"LIST VIEWS"));
     assert!(
         events
             .iter()
@@ -706,8 +704,8 @@ async fn list_databases_is_a_governed_read_with_its_own_audit_record() {
         "{controlled_error}"
     );
 
+    let expected_hash = audit.hash_sql("LIST DATABASES").await.unwrap().value;
     let events = audit.events.lock().expect("event lock");
-    let expected_hash = hex::encode(sha2::Sha256::digest(b"LIST DATABASES"));
     assert_eq!(
         events
             .iter()
@@ -754,8 +752,8 @@ async fn list_collations_is_a_governed_read_with_its_own_audit_record() {
         "{controlled_error}"
     );
 
+    let expected_hash = audit.hash_sql("LIST COLLATIONS").await.unwrap().value;
     let events = audit.events.lock().expect("event lock");
-    let expected_hash = hex::encode(sha2::Sha256::digest(b"LIST COLLATIONS"));
     assert_eq!(
         events
             .iter()
@@ -793,8 +791,8 @@ async fn list_objects_reports_an_unsupported_kind_and_audits_the_read_with_its_t
         .expect_err("the mock driver declares no catalog kinds");
     assert!(matches!(error, DriverError::Unsupported(_)), "{error:?}");
 
+    let expected_hash = audit.hash_sql("LIST OBJECTS").await.unwrap().value;
     let events = audit.events.lock().expect("event lock");
-    let expected_hash = hex::encode(sha2::Sha256::digest(b"LIST OBJECTS"));
     assert!(
         events.iter().any(|event| event.decision_rule == "metadata_read"
             && event.sql_hash == expected_hash

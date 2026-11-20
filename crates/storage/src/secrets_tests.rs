@@ -101,6 +101,32 @@ fn schema_constant_uses_reverse_dns() {
     assert!(crate::secret_schema().contains("bookie"));
 }
 
+#[tokio::test]
+async fn audit_sql_hash_key_fallback_persists_with_owner_only_permissions() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("audit-sql-hash-key");
+    let expected = new_audit_sql_hash_key();
+
+    write_audit_sql_hash_key_file(&path, &expected).await.unwrap();
+
+    let actual = read_audit_sql_hash_key_file(&path).await.unwrap().unwrap();
+    assert_eq!(actual.id, expected.id);
+    assert_eq!(actual.key.expose_secret(), expected.key.expose_secret());
+    assert_eq!(std::fs::metadata(path).unwrap().permissions().mode() & 0o777, 0o600);
+}
+
+#[tokio::test]
+async fn malformed_audit_sql_hash_key_fallback_is_rejected_without_replacement() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("audit-sql-hash-key");
+    std::fs::write(&path, b"not-a-key").unwrap();
+
+    assert!(read_audit_sql_hash_key_file(&path).await.is_err());
+    assert_eq!(std::fs::read(path).unwrap(), b"not-a-key");
+}
+
 #[test]
 fn map_err_keeps_the_underlying_message_for_an_unclassified_failure() {
     let oo7_err: oo7::Error = oo7::dbus::Error::Deleted.into();
