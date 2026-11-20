@@ -166,7 +166,7 @@ pub enum BuildFilterError {
 }
 
 /// Build the `WHERE` fragment and bound parameters for a `FilterSet`. `Ok(None)` for an empty set so
-/// callers skip `WHERE`. Strings are coerced by the inline-edit parser, so they never bind as `Value::Text`.
+/// callers skip `WHERE`. Comparison values are parsed for the column type; text and pattern values bind as text.
 pub fn build_filter_where(
     driver_id: &str,
     columns: &[ColumnInfo],
