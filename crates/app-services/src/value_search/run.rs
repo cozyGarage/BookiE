@@ -16,14 +16,14 @@ pub trait SearchSource {
         &self,
         table: &TableTarget,
         control: &OperationControl,
-    ) -> impl Future<Output = Result<Vec<ColumnInfo>, DriverError>> + Send;
+    ) -> impl Future<Output = Result<Vec<ColumnInfo>, DriverError>>;
 
     fn query(
         &self,
         sql: &str,
         params: &[Value],
         control: &OperationControl,
-    ) -> impl Future<Output = Result<QueryResult, DriverError>> + Send;
+    ) -> impl Future<Output = Result<QueryResult, DriverError>>;
 }
 
 pub struct ConnectionSource<'a>(pub &'a dyn Connection);

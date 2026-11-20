@@ -11,7 +11,10 @@ use bookie_app_services::read_session::ConnectionSummary;
 use bookie_app_services::read_session_store::{
     OpenedSession, ReadSessionStore, SessionId, SubscriptionRequest, SubscriptionSample, SubscriptionSampler,
 };
-use bookie_core::{ColumnInfo, OperationControl, QueryResult, QueryResultBudget, QueryRows, TableInfo};
+use bookie_app_services::value_search::{
+    SearchLimits, SearchOptions, SearchReport, SearchRequest, SearchSource, TableTarget, run_search,
+};
+use bookie_core::{ColumnInfo, DriverError, OperationControl, QueryResult, QueryResultBudget, QueryRows, TableInfo};
 use bookie_results::result_scan::ScanSource;
 use tokio_util::sync::CancellationToken;
 
@@ -361,6 +364,32 @@ impl LiveSession {
             snapshot_consistent: self.supports_snapshot_cursor,
             table: Some(table.clone()),
         })
+    }
+
+    pub fn search_values(
+        &self,
+        term: &str,
+        options: SearchOptions,
+        cancellation: &CancellationToken,
+    ) -> Result<SearchReport, String> {
+        let tables = self
+            .tables
+            .iter()
+            .map(|table| TableTarget {
+                schema: table.schema.clone(),
+                name: table.name.clone(),
+            })
+            .collect();
+        let request = SearchRequest {
+            driver_id: &self.driver_id,
+            tables,
+            term,
+            options,
+            limits: SearchLimits::default(),
+        };
+        self.runtime
+            .block_on(run_search(&BridgeSource(self), request, cancellation, |_| {}))
+            .map_err(|error| format!("{error:?}"))
     }
 
     fn next_epoch(&self) -> Epoch {
@@ -1554,5 +1583,56 @@ mod tests {
             )
             .is_err()
         );
+    }
+}
+
+struct BridgeSource<'a>(&'a LiveSession);
+
+impl SearchSource for BridgeSource<'_> {
+    async fn columns(&self, table: &TableTarget, control: &OperationControl) -> Result<Vec<ColumnInfo>, DriverError> {
+        let session = self.0;
+        let epoch = session.next_epoch();
+        let table = TableInfo {
+            schema: table.schema.clone(),
+            name: table.name.clone(),
+        };
+        let event = dispatch_read(
+            DispatchContext::Sessions(&session.sessions),
+            Command::ReadColumns {
+                epoch,
+                session_id: session.session_id,
+                table,
+            },
+            control,
+            epoch,
+            &session.epoch,
+        )
+        .await
+        .map_err(search_error)?;
+        let Event::ColumnsRead { outcome, .. } = event else {
+            return Err(search_error("The command bridge returned an unexpected event.".into()));
+        };
+        outcome.map_err(|failure| search_error(driver_failure_message(&failure)))
+    }
+
+    async fn query(
+        &self,
+        sql: &str,
+        params: &[bookie_core::Value],
+        control: &OperationControl,
+    ) -> Result<QueryResult, DriverError> {
+        let session = self.0;
+        let epoch = session.next_epoch();
+        bridge_query(&session.sessions, session.session_id, (sql, params), control, epoch, &session.epoch)
+            .await
+            .map_err(search_error)
+    }
+}
+
+fn search_error(message: String) -> DriverError {
+    DriverError::Query {
+        message,
+        sqlstate: None,
+        position: None,
     }
 }

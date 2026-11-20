@@ -60,6 +60,7 @@ pub(crate) struct SearchState {
     pub cursor: crate::MatchCursor,
     pub capped: bool,
     pub reset: bool,
+    pub values: crate::value_search_ui::ValueSearchState,
 }
 
 impl SearchState {
@@ -74,6 +75,7 @@ impl SearchState {
             cursor: crate::MatchCursor::default(),
             capped: false,
             reset: false,
+            values: Default::default(),
         }
     }
 }

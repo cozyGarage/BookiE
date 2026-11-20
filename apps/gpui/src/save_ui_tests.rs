@@ -1221,3 +1221,24 @@ fn health_reports_are_offered_only_on_postgres(cx: &mut TestAppContext) {
     view.read_with(cx, |view, _| assert!(view.status.contains("PostgreSQL"), "{}", view.status));
     std::fs::remove_file(&path).ok();
 }
+
+#[gpui::test]
+fn searching_every_table_for_a_value_reports_the_matching_rows_in_messages(cx: &mut TestAppContext) {
+    let path = fixture_copy("value-search");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.open_value_search_bar(cx);
+            let input = view.search.values.input.clone().expect("the field exists once the bar opened");
+            input.update(cx, |input, cx| input.set_content("Ada", cx));
+            view.run_value_search(cx);
+        })
+    });
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        let lines: Vec<&str> = view.panel.messages.entries().iter().map(|entry| entry.text.as_str()).collect();
+        assert!(lines.iter().any(|line| line.contains("orders") && line.contains("matching row(s)")), "{lines:?}");
+        assert!(!view.search.values.open);
+    });
+    std::fs::remove_file(&path).ok();
+}

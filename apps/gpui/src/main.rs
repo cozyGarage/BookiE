@@ -27,6 +27,7 @@ mod export_file_ui;
 mod selection_stats_ui;
 mod health_ui;
 mod set_cells_ui;
+mod value_search_ui;
 mod resolve_ui;
 mod structure_ui;
 mod insert_ui;
