@@ -39,8 +39,8 @@ if [ -z "$remote" ]; then
   exit 1
 fi
 
-git -C "$root" fetch --quiet "$remote" linux "$@"
-git -C "$root" reset --hard "${FORGEJO_TRAIN_BASE:-$remote/linux}" >/dev/null
+git -C "$root" fetch --quiet "$remote" main "$@"
+git -C "$root" reset --hard "${FORGEJO_TRAIN_BASE:-$remote/main}" >/dev/null
 
 merged=()
 for branch in "$@"; do

@@ -51,10 +51,10 @@ class Fixture:
         self.tmp = Path(tmp)
         self.bookie = self.tmp / remote_path
         self.bookie.mkdir(parents=True)
-        init_git_repo(self.bookie, "--quiet", "--bare", "--initial-branch=linux")
+        init_git_repo(self.bookie, "--quiet", "--bare", "--initial-branch=main")
         self.repo = self.tmp / "clone"
         self.repo.mkdir()
-        init_git_repo(self.repo, "--quiet", "--initial-branch=linux")
+        init_git_repo(self.repo, "--quiet", "--initial-branch=main")
         git(self.repo, "remote", "add", "fork", str(self.bookie))
         (self.repo / ".gitattributes").write_text("src/registry.rs merge=union\n")
         (self.repo / "src").mkdir()
@@ -66,7 +66,7 @@ class Fixture:
         gate.chmod(0o755)
         git(self.repo, "add", "-A")
         git(self.repo, "commit", "--quiet", "-m", "base")
-        git(self.repo, "push", "--quiet", "fork", "linux")
+        git(self.repo, "push", "--quiet", "fork", "main")
         self.base = git(self.repo, "rev-parse", "HEAD")
 
     def branch(self, name, line):
@@ -75,7 +75,7 @@ class Fixture:
             registry.write(line)
         git(self.repo, "commit", "--quiet", "-am", name)
         git(self.repo, "push", "--quiet", "fork", name)
-        git(self.repo, "checkout", "--quiet", "linux")
+        git(self.repo, "checkout", "--quiet", "main")
 
     def branch_file(self, name, path, content):
         git(self.repo, "checkout", "--quiet", "-b", name, self.base)
@@ -83,7 +83,7 @@ class Fixture:
         git(self.repo, "add", path)
         git(self.repo, "commit", "--quiet", "-m", name)
         git(self.repo, "push", "--quiet", "fork", name)
-        git(self.repo, "checkout", "--quiet", "linux")
+        git(self.repo, "checkout", "--quiet", "main")
 
     def run(self, *branches, fmt_changes="", fmt_exit=0, env=None):
         stub_dir = self.tmp / "bin"
