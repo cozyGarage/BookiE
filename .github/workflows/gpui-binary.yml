@@ -1,0 +1,71 @@
+name: GPUI binary
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/gpui-binary.yml"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag or commit to build; empty builds the ref the workflow is run on
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gpui-binary-${{ inputs.ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: GPUI release binary (Linux x86_64)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
+        with:
+          toolchain: "1.98"
+      # A test binary for manual verification, never a published release, so a cache is acceptable here.
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # zizmor: ignore[cache-poisoning]
+        with:
+          workspaces: apps/gpui
+          prefix-key: gpui-binary
+      - name: Install the GPUI linker dependency
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libxkbcommon-x11-dev
+      - name: Build
+        run: cargo build --release --locked --manifest-path apps/gpui/Cargo.toml
+      - name: Package
+        id: package
+        run: |
+          sha="$(git rev-parse --short=9 HEAD)"
+          name="bookie-gpui-linux-x86_64-${sha}"
+          mkdir -p "dist/${name}"
+          install -m 0755 apps/gpui/target/release/bookie-gpui "dist/${name}/bookie-gpui"
+          printf '%s\n' "$(git rev-parse HEAD)" > "dist/${name}/SOURCE_COMMIT"
+          tar -C dist -czf "dist/${name}.tar.gz" "${name}"
+          (cd dist && sha256sum "${name}.tar.gz" > "${name}.tar.gz.sha256")
+          echo "name=${name}" >> "$GITHUB_OUTPUT"
+          {
+            echo "### GPUI binary"
+            echo
+            echo "- Commit: \`$(git rev-parse HEAD)\`"
+            echo "- Artifact: \`${name}.tar.gz\` (Linux x86_64, release profile)"
+            echo "- A manual test build, not a release"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: ${{ steps.package.outputs.name }}
+          path: |
+            dist/*.tar.gz
+            dist/*.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 14
