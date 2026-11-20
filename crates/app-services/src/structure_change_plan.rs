@@ -34,6 +34,25 @@ pub enum StructureChangeError {
 }
 
 impl StructureChangeKind {
+    pub fn title(self) -> &'static str {
+        match self {
+            Self::AddColumn => "Add column",
+            Self::RenameColumn => "Rename column",
+            Self::DropColumn => "Drop column",
+            Self::AddIndex => "Create index",
+            Self::DropIndex => "Drop index",
+            Self::AddForeignKey => "Add foreign key",
+            Self::DropForeignKey => "Drop foreign key",
+            Self::RenameTable => "Rename table",
+            Self::TruncateTable => "Empty table",
+            Self::DropTable => "Drop table",
+        }
+    }
+
+    pub fn needs_structure(self) -> bool {
+        matches!(self, Self::DropIndex | Self::DropForeignKey | Self::DropTable)
+    }
+
     pub fn hint(self) -> &'static str {
         match self {
             Self::AddColumn => "name type, for example: note TEXT",
@@ -617,6 +636,35 @@ mod tests {
         assert!(
             drop_index(&two, None, "t".into(), "foo").is_ok(),
             "the exact spelling wins"
+        );
+    }
+
+    #[test]
+    fn every_kind_has_its_own_title_and_only_the_drops_that_resolve_a_name_need_the_live_structure() {
+        let all = [
+            StructureChangeKind::AddColumn,
+            StructureChangeKind::RenameColumn,
+            StructureChangeKind::DropColumn,
+            StructureChangeKind::AddIndex,
+            StructureChangeKind::DropIndex,
+            StructureChangeKind::AddForeignKey,
+            StructureChangeKind::DropForeignKey,
+            StructureChangeKind::RenameTable,
+            StructureChangeKind::TruncateTable,
+            StructureChangeKind::DropTable,
+        ];
+        let mut titles: Vec<&str> = all.iter().map(|kind| kind.title()).collect();
+        titles.sort_unstable();
+        titles.dedup();
+        assert_eq!(titles.len(), all.len(), "titles must be distinct");
+        let needing: Vec<StructureChangeKind> = all.into_iter().filter(|kind| kind.needs_structure()).collect();
+        assert_eq!(
+            needing,
+            [
+                StructureChangeKind::DropIndex,
+                StructureChangeKind::DropForeignKey,
+                StructureChangeKind::DropTable
+            ]
         );
     }
 }
