@@ -16,7 +16,7 @@ apps/linux/app/src/ui/app/import.rs 10
 apps/linux/app/src/ui/app/init_css.rs 1
 apps/linux/app/src/ui/app/init_window.rs 9
 apps/linux/app/src/ui/app/init_workspace.rs 3
-apps/linux/app/src/ui/app/mod.rs 98
+apps/linux/app/src/ui/app/mod.rs 70
 apps/linux/app/src/ui/app/msg.rs 3
 apps/linux/app/src/ui/app/organization.rs 13
 apps/linux/app/src/ui/app/row_ops.rs 9

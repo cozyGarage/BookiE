@@ -154,10 +154,7 @@ pub struct App {
     content_holder: adw::ToolbarView,
     history_paned: gtk::Paned,
     toast_overlay: adw::ToastOverlay,
-    /// Persistent "Connecting…" toast handle. Held so we can dismiss it
-    /// when the connect attempt resolves (success or failure). Native
-    /// alternative to a fire-and-forget 2 s toast that disappeared
-    /// before the connection actually completed.
+    /// Held to dismiss the "Connecting…" toast when the attempt resolves.
     connect_progress_toast: Option<adw::Toast>,
     connect_cancel: Option<tokio_util::sync::CancellationToken>,
     reconnect_banner: adw::Banner,
@@ -212,10 +209,7 @@ pub struct App {
     default_page_size: u64,
     saved_connections: Vec<SavedConnection>,
     connections_reload_seq: reload_sequence::ReloadSequence,
-    /// Groups, tags and favourite flags for the saved connections,
-    /// loaded from the sidecar file beside `connections.json`. Held in
-    /// the model so the welcome view can be re-arranged without another
-    /// disk read on every keystroke in the filter box.
+    /// Held so the welcome view can re-arrange without a disk read per filter keystroke.
     connection_organization: ConnectionOrganizationIndex,
     /// A parsed bundle waiting on the preview dialog. Nothing reaches
     /// disk until the user confirms the plan it holds.
@@ -232,47 +226,25 @@ pub struct App {
     switch: ConnectionSwitch,
     grid_close: grid_close::GridCloseState,
     close_after_save: std::rc::Rc<std::cell::RefCell<CloseAfterSave>>,
-    /// Set when the user picked "Save" on the *window*-close dialog.
-    /// While true, the last `SaveCompletedForTab` that empties
-    /// `close_after_save` triggers `window.close()`. A `SaveFailed`
-    /// while in this state aborts the window-close intent. `Rc<Cell>`
-    /// so the close-request handler closure can mutate it from outside
-    /// `App::update`.
+    /// Window-close "Save" intent: the last `SaveCompletedForTab` closes the window and
+    /// a `SaveFailed` aborts it. `Rc<Cell>` so the close-request handler can set it.
     close_window_after_save: std::rc::Rc<std::cell::Cell<bool>>,
     force_close: std::rc::Rc<std::cell::Cell<bool>>,
-    /// Count of in-flight transaction commits (a tab clicked Save
-    /// and is awaiting `execute_in_transaction`). Incremented by
-    /// `on_execute_browse_transaction` at dispatch, decremented by
-    /// `SaveCompletedForTab` and `SaveFailedForTab`. Window-close
-    /// blocks while this is > 0 so an async transaction never commits
-    /// after the tab / window has been torn down.
+    /// Transaction commits awaiting completion; window-close blocks while > 0 so a commit
+    /// never lands after teardown.
     in_flight_saves: std::rc::Rc<std::cell::Cell<usize>>,
     active_browse_saves: std::collections::HashMap<Uuid, Uuid>,
     session_teardown_ready: std::rc::Rc<std::cell::Cell<bool>>,
     session_teardown_pending: std::rc::Rc<std::cell::Cell<bool>>,
-    /// Structure tabs currently mid-DDL-transaction. A second Ctrl+S
-    /// while a Save is still in flight would dispatch a parallel
-    /// transaction and potentially commit twice; this set lets the
-    /// dispatch path short-circuit. Cleared on
-    /// `StructureSaveCompleted` / `StructureSaveFailed`.
+    /// Structure tabs mid-DDL-transaction; a second Ctrl+S must not commit twice.
     structure_saves_in_flight: std::rc::Rc<std::cell::RefCell<std::collections::HashSet<Uuid>>>,
-    /// Debounce flag for `persist_workspace_state`. Active tabs fire
-    /// `WorkspaceTabsChanged` on every selection / drag-reorder /
-    /// page-size change / state-changed event; without coalescing,
-    /// each one triggers a load-modify-write of the entire
-    /// connections JSON. This flag stays `true` while a 500ms timer
-    /// is pending; subsequent persist requests in the window no-op.
+    /// Debounce for `persist_workspace_state`: true while the 500ms timer is pending, so
+    /// bursts of tab events cause one write of the connections JSON.
     persist_pending: std::rc::Rc<std::cell::Cell<bool>>,
     persist_timeout: std::rc::Rc<std::cell::RefCell<Option<glib::SourceId>>>,
     persist_generation: std::rc::Rc<std::cell::Cell<u64>>,
-    /// LIFO stack of recently-closed tab descriptors for Ctrl+Shift+T
-    /// reopen. Capped at `CLOSED_TABS_CAPACITY`; the oldest entry is
-    /// dropped when a new one is pushed against a full stack. Cleared
-    /// on disconnect — descriptors reference the active connection's
-    /// tables, so reopening across connections would target the wrong
-    /// schema. Editor descriptors round-trip the buffer text;
-    /// dirty tabs lose their pending row/DDL edits because the
-    /// trackers have already been cleared by the close path.
+    /// Closed tabs for Ctrl+Shift+T, capped at `CLOSED_TABS_CAPACITY`. Cleared on disconnect
+    /// because descriptors name the old connection's tables; dirty tabs lose pending edits.
     closed_tabs_stack: std::rc::Rc<std::cell::RefCell<std::collections::VecDeque<(Uuid, ClosedTabDescriptor)>>>,
     /// Extra ApplicationWindows spawned via New Window. Kept alive so
     /// closing the primary window does not drop them mid-use. Removing an
