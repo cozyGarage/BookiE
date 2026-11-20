@@ -198,3 +198,51 @@ async fn a_saved_connection_that_is_not_postgres_is_refused_before_any_tool_runs
     .await;
     assert!(matches!(outcome, Err(DriverError::Unsupported(_))), "{outcome:?}");
 }
+
+#[test]
+fn a_restore_failure_from_pg_restore_omits_the_internal_driver_prefix() {
+    let detail = "pg_restore failed with exit code 1: pg_restore: error: could not execute query: ERROR:  role \"comparison_analyst\" does not exist";
+    let error = DriverError::OperationOutcomeUnknown {
+        source: Box::new(DriverError::Internal(detail.into())),
+    };
+    let text = backup_error_text(&error);
+    assert!(!text.contains("Internal driver error"), "{text}");
+    assert!(text.contains("comparison_analyst"), "{text}");
+    assert!(text.contains("does not exist"), "{text}");
+    assert!(
+        text.contains("Roles named in the backup must already exist on the target database."),
+        "{text}"
+    );
+}
+
+#[test]
+fn a_plain_internal_backup_error_keeps_the_tool_detail() {
+    let detail = "pg_dump failed with exit code 1: permission denied";
+    let text = backup_error_text(&DriverError::Internal(detail.into()));
+    assert_eq!(text, detail);
+    assert!(!text.contains("Internal driver error"));
+}
+
+#[test]
+fn a_failure_without_a_missing_role_gets_no_role_hint() {
+    let text = append_missing_role_hint("pg_restore failed with exit code 1: disk full".into());
+    assert_eq!(text, "pg_restore failed with exit code 1: disk full");
+}
+
+#[test]
+fn an_interrupted_operation_says_the_outcome_could_not_be_confirmed() {
+    let error = DriverError::OperationOutcomeUnknown {
+        source: Box::new(DriverError::Internal("the tunnel dropped".into())),
+    };
+    let text = backup_error_text(&error);
+    assert!(
+        text.contains("could not be confirmed") && text.contains("the tunnel dropped"),
+        "{text}"
+    );
+}
+
+#[test]
+fn other_errors_use_the_shared_driver_wording() {
+    let text = backup_error_text(&DriverError::ReadOnly);
+    assert!(!text.is_empty() && !text.contains('{'), "{text}");
+}

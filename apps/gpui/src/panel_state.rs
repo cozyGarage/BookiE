@@ -63,6 +63,7 @@ pub(crate) struct SearchState {
     pub values: crate::value_search_ui::ValueSearchState,
     pub diagram: crate::schema_diagram_ui::SchemaDiagramState,
     pub rule: crate::filter_rule_ui::FilterRuleState,
+    pub backup: crate::backup_ui::BackupState,
 }
 
 impl SearchState {
@@ -80,6 +81,7 @@ impl SearchState {
             values: Default::default(),
             diagram: Default::default(),
             rule: Default::default(),
+            backup: Default::default(),
         }
     }
 }

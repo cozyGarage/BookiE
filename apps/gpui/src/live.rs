@@ -367,6 +367,14 @@ impl LiveSession {
         })
     }
 
+    pub fn run_backup(
+        &self,
+        job: bookie_app_services::database_backup::BackupJob,
+        cancellation: &CancellationToken,
+    ) -> Result<(), String> {
+        run_backup_on(&self.runtime, &self.sessions, self.session_id, job, cancellation)
+    }
+
     pub fn schema_diagram(&self, cancellation: &CancellationToken) -> Result<SchemaDiagram, String> {
         let supports_keys = drivers_registry::default_registry()
             .get(&self.driver_id)
@@ -580,6 +588,14 @@ impl WriteSession {
             session_id,
             profile: None,
         }
+    }
+
+    pub fn run_backup(
+        &self,
+        job: bookie_app_services::database_backup::BackupJob,
+        cancellation: &CancellationToken,
+    ) -> Result<(), String> {
+        run_backup_on(&self.runtime, &self.sessions, self.session_id, job, cancellation)
     }
 
     pub fn apply(
@@ -1663,4 +1679,27 @@ fn search_error(message: String) -> DriverError {
         sqlstate: None,
         position: None,
     }
+}
+
+fn backup_failure_text(error: &DriverError) -> String {
+    match error {
+        DriverError::Cancelled => "Cancelled. Nothing was changed.".into(),
+        error => bookie_app_services::database_backup::backup_error_text(error),
+    }
+}
+
+fn run_backup_on(
+    runtime: &tokio::runtime::Runtime,
+    sessions: &ReadSessionStore,
+    session_id: SessionId,
+    job: bookie_app_services::database_backup::BackupJob,
+    cancellation: &CancellationToken,
+) -> Result<(), String> {
+    let runtime_dir = std::env::var_os("XDG_RUNTIME_DIR")
+        .map(std::path::PathBuf::from)
+        .ok_or("The private runtime directory is not available")?;
+    let control = OperationControl::new(cancellation.clone(), None);
+    runtime
+        .block_on(sessions.run_backup_job(session_id, job, &runtime_dir, &control))
+        .map_err(|error| backup_failure_text(&error))
 }

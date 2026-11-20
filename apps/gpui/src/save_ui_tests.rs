@@ -1345,3 +1345,21 @@ fn the_schema_diagram_opens_in_its_own_tab_with_one_card_per_table(cx: &mut Test
     });
     std::fs::remove_file(&path).ok();
 }
+
+#[gpui::test]
+fn backups_are_offered_only_on_postgres_and_a_refused_bar_stays_closed(cx: &mut TestAppContext) {
+    let path = fixture_copy("backup-sqlite");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            assert!(view.backup_actions().iter().all(|action| !action.enabled));
+            view.open_backup_bar(false, cx);
+            view.open_backup_bar(true, cx);
+        })
+    });
+    view.read_with(cx, |view, _| {
+        assert!(!view.search.backup.open);
+        assert!(view.status.contains("PostgreSQL"), "{}", view.status);
+    });
+    std::fs::remove_file(&path).ok();
+}

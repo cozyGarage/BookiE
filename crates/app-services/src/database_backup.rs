@@ -127,12 +127,17 @@ pub async fn run_backup_job(
         .await
 }
 
-fn postgres_server_major(driver_id: &str, server_version: Option<&str>) -> Result<u32, DriverError> {
+pub fn ensure_backup_supported(driver_id: &str) -> Result<(), DriverError> {
     if driver_id != "postgres" {
         return Err(DriverError::Unsupported(
             "backups are available for PostgreSQL connections".into(),
         ));
     }
+    Ok(())
+}
+
+fn postgres_server_major(driver_id: &str, server_version: Option<&str>) -> Result<u32, DriverError> {
+    ensure_backup_supported(driver_id)?;
     server_version
         .and_then(parse_postgres_major)
         .ok_or_else(|| DriverError::Unsupported("the server version is not known yet; reconnect and try again".into()))
@@ -158,6 +163,35 @@ fn transport_error(error: TransportError) -> DriverError {
         TransportError::Driver(error) => error,
         error => DriverError::Unsupported(error.to_string()),
     }
+}
+
+fn driver_message(error: &DriverError) -> String {
+    crate::driver_failure_message::driver_failure_message(&crate::driver_error_presentation::classify(error))
+}
+
+pub fn backup_error_text(error: &DriverError) -> String {
+    let text = match error {
+        DriverError::Unsupported(detail) | DriverError::Internal(detail) => detail.clone(),
+        DriverError::OperationOutcomeUnknown { source } => match source.as_ref() {
+            DriverError::Unsupported(detail) | DriverError::Internal(detail) => {
+                crate::tr!("The operation was interrupted, but the database outcome could not be confirmed: {detail}")
+                    .replace("{detail}", detail)
+            }
+            _ => return driver_message(error),
+        },
+        error => return driver_message(error),
+    };
+    append_missing_role_hint(text)
+}
+
+fn append_missing_role_hint(text: String) -> String {
+    if !text.contains("role \"") || !text.contains("does not exist") {
+        return text;
+    }
+    format!(
+        "{text}\n\n{}",
+        crate::tr!("Roles named in the backup must already exist on the target database.")
+    )
 }
 
 #[cfg(test)]
