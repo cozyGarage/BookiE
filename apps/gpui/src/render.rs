@@ -20,10 +20,7 @@ impl GridView {
             let editor = self.sql_input.read(cx).focus_handle(cx);
             window.focus(&editor, cx);
         }
-        self.focus_set_cells_input(window, cx);
-        self.focus_value_search_input(window, cx);
-        self.focus_schema_diagram_input(window, cx);
-        self.focus_filter_rule_input(window, cx);
+        self.prepare_tools(window, cx);
         self.note_frame();
         self.pace_frame(window);
         self.viewport_rows = self.viewport_rows_for(window);
@@ -344,6 +341,7 @@ impl Render for GridView {
             Tab::NewConnection => self.connection_page(theme, cx),
             Tab::History => self.history_page(theme, cx),
             Tab::AuditLog => self.audit_page(theme, cx),
+            Tab::Diagram => self.diagram_page(theme, cx),
             Tab::Query => self.query_page(theme, grid, cx),
             Tab::Table(name) if name == self.catalog.grid_table => grid,
             Tab::Table(table) => self.placeholder_page(&table_label(&table), theme),

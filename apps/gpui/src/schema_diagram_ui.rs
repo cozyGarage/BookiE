@@ -39,6 +39,7 @@ fn write_new_file(path: &Path, text: &str) -> Result<(), String> {
 
 #[derive(Default)]
 pub(crate) struct SchemaDiagramState {
+    pub view: Option<crate::diagram_ui::DiagramView>,
     pub open: bool,
     pub focus: bool,
     pub input: Option<Entity<TextInput>>,

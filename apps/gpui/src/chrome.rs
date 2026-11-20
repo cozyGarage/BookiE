@@ -646,6 +646,7 @@ fn tab_icon_name(tab: &Tab) -> &'static str {
         Tab::NewConnection => "database",
         Tab::History => "clock",
         Tab::AuditLog => "shield",
+        Tab::Diagram => "database",
         Tab::Query => "play",
         Tab::Table(_) => "table",
     }

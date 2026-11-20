@@ -67,6 +67,7 @@ impl GridView {
             .chain(self.run_cursor_actions())
             .chain(self.paste_actions())
             .chain(self.filter_rule_actions())
+            .chain(self.diagram_actions())
             .chain(self.chrome_actions())
             .collect()
     }

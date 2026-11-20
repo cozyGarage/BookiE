@@ -25,6 +25,8 @@ mod approval_ui;
 mod import_ui;
 mod export_file_ui;
 mod selection_stats_ui;
+mod diagram_scene;
+mod diagram_ui;
 mod filter_rule_ui;
 mod health_ui;
 mod paste_ui;

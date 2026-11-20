@@ -1329,3 +1329,19 @@ fn a_structured_rule_filters_the_table_into_a_result(cx: &mut TestAppContext) {
     });
     std::fs::remove_file(&path).ok();
 }
+
+#[gpui::test]
+fn the_schema_diagram_opens_in_its_own_tab_with_one_card_per_table(cx: &mut TestAppContext) {
+    let path = fixture_copy("diagram-tab");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_schema_diagram(cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert_eq!(*view.tabs.current(), bookie_gpui::shell::Tab::Diagram, "{}", view.status);
+        let diagram = view.search.diagram.view.as_ref().expect("a diagram was built");
+        assert_eq!(diagram.scene.cards.len(), 2, "orders and customers");
+        assert!(!diagram.needs_fit, "the first frame fits the diagram to the window");
+        assert!(diagram.zoom > 0.0 && diagram.zoom <= 1.0, "{}", diagram.zoom);
+    });
+    std::fs::remove_file(&path).ok();
+}
