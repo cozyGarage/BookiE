@@ -1677,6 +1677,7 @@ class CiWorkflowTests(unittest.TestCase):
         widgets = re.search(r"(?ms)^  widgets:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
         self.assertIn("--expected-group workspace", unit)
         self.assertIn("nextest run --archive-file", unit)
+        self.assertIn("options: --user 1001:1001", unit)
         self.assertIn("GSETTINGS_SCHEMA_DIR: ${{ runner.temp }}/bookie-unit-bundle/schemas", unit)
         self.assertIn("GSETTINGS_SCHEMA_DIR: ${{ runner.temp }}/bookie-direct-bundle/schemas", widgets)
         self.assertEqual(workflow.count('find "$BOOKIE_TEST_BUNDLE" -type f \\( -path'), 6)

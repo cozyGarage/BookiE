@@ -16,7 +16,7 @@ use tokio::sync::watch;
 use crate::{connect, start_mysql};
 
 const STOP_REQUEST: &[u8] = b"KILL QUERY";
-const STOP_AFTER: Duration = Duration::from_millis(200);
+const STOP_AFTER: Duration = Duration::from_millis(500);
 const OBSERVE_FOR: Duration = Duration::from_secs(4);
 
 type CallFuture = Pin<Box<dyn Future<Output = Result<(), DriverError>> + Send>>;
