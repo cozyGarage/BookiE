@@ -74,6 +74,41 @@ async fn a_flood_of_notices_is_capped_with_an_omitted_count() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn cursor_fetch_messages_reach_the_result_page_and_do_not_leak() {
+    let (_c, opts) = start_pg().await;
+    let conn = connect(opts).await;
+    conn.execute(
+        "CREATE FUNCTION cursor_notice() RETURNS integer LANGUAGE plpgsql AS $$ \
+         BEGIN RAISE NOTICE 'cursor notice'; RETURN 7; END $$",
+    )
+    .await
+    .unwrap();
+    let mut session = conn.open_session().await.unwrap();
+    let cursor = session
+        .open_query_cursor_controlled("SELECT cursor_notice()", &[], &control())
+        .await
+        .unwrap();
+    let page = session
+        .fetch_query_cursor_page_controlled(cursor, &control())
+        .await
+        .unwrap();
+    assert_eq!(
+        page.messages
+            .iter()
+            .map(|message| message.text.as_str())
+            .collect::<Vec<_>>(),
+        ["cursor notice"]
+    );
+    session.close_query_cursor_controlled(cursor, &control()).await.unwrap();
+    let next = session
+        .query_result_sets_params_controlled("SELECT 1", &[], &control())
+        .await
+        .unwrap();
+    assert!(next.messages.is_empty());
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn the_next_statement_never_sees_the_previous_statements_notices() {
     let (_c, opts) = start_pg().await;
     let conn = connect(opts).await;

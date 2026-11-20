@@ -1101,6 +1101,7 @@ impl SqlEditor {
                                 StreamUpdate::Page {
                                     sequence,
                                     page,
+                                    messages,
                                     spooled,
                                     lease,
                                 } => {
@@ -1110,6 +1111,7 @@ impl SqlEditor {
                                             generation,
                                             sequence,
                                             page,
+                                            messages,
                                             spooled,
                                             lease,
                                             accepted,

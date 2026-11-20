@@ -97,6 +97,7 @@ pub(crate) enum StreamUpdate {
     Page {
         sequence: u64,
         page: std::sync::Arc<QueryResult>,
+        messages: bookie_core::ServerMessages,
         spooled: bool,
         lease: bookie_results::stream_page_budget::StreamPageLease,
     },
@@ -513,7 +514,7 @@ where
 {
     let mut sequence = 0;
     loop {
-        let (page, has_next_page, lease) =
+        let (page, messages, has_next_page, lease) =
             match fetch_stream_page(&cursor, &spool, &mut audit_receipts, (sql, sent), control).await {
                 Ok(page) => page,
                 Err(terminal) => {
@@ -526,6 +527,7 @@ where
         if !stream_update(StreamUpdate::Page {
             sequence,
             page,
+            messages,
             spooled,
             lease,
         })
@@ -572,6 +574,7 @@ async fn fetch_stream_page(
 ) -> Result<
     (
         std::sync::Arc<QueryResult>,
+        bookie_core::ServerMessages,
         bool,
         bookie_results::stream_page_budget::StreamPageLease,
     ),
@@ -596,13 +599,14 @@ async fn fetch_stream_page(
         }
     };
     let has_next_page = page.has_next_page;
+    let messages = page.messages;
     let page = std::sync::Arc::new(page.result);
     if !lease.resize_page(&page) {
         return Err(StreamTerminal::Failed(
             bookie_app_services::tr!("This result page exceeds the available memory budget.").into(),
         ));
     }
-    Ok((page, has_next_page, lease))
+    Ok((page, messages, has_next_page, lease))
 }
 
 async fn finish_stream_cursor(cursor: super::session_mode::StatementCursor, close_cursor: bool) {
