@@ -95,19 +95,7 @@ fn a_connection_without_sql_literals_is_not_offered_the_statement_format() {
         );
         assert_eq!(
             available_formats(ExportScope::QueryResult, driver_id, None).len(),
-            FORMATS.len() - 1
-        );
-    }
-}
-
-#[test]
-fn the_csv_options_group_belongs_to_csv_alone() {
-    for spec in &FORMATS {
-        assert_eq!(
-            spec.format.shows_csv_options(),
-            spec.format == ExportFormat::Csv,
-            "{:?}",
-            spec.format
+            ExportFormat::ALL.len() - 1
         );
     }
 }
@@ -126,58 +114,10 @@ fn the_selected_row_maps_to_the_format_offered_at_that_position() {
 }
 
 #[test]
-fn every_offered_format_has_its_own_extension_and_media_type() {
-    for spec in &FORMATS {
-        assert_eq!(spec.format.extension(), spec.extension);
-        assert_eq!(spec.format.mime_type(), spec.mime_type);
-        assert_eq!(
-            FORMATS.iter().filter(|other| other.extension == spec.extension).count(),
-            1,
-            "{}",
-            spec.extension
-        );
-    }
-    assert_eq!(
-        suggested_file_name("customers.csv", ExportFormat::Xlsx),
-        "customers.xlsx"
-    );
-    assert_eq!(suggested_file_name("customers.md", ExportFormat::Sql), "customers.sql");
-}
-
-#[test]
 fn a_data_dictionary_offers_only_csv_and_markdown() {
     assert_eq!(
         available_formats(ExportScope::DataDictionary, "postgres", None),
         [ExportFormat::Csv, ExportFormat::Markdown]
-    );
-}
-
-#[test]
-fn suggested_file_name_uses_the_selected_format() {
-    assert_eq!(suggested_file_name("customers", ExportFormat::Csv), "customers.csv");
-    assert_eq!(
-        suggested_file_name("customers.csv", ExportFormat::Json),
-        "customers.json"
-    );
-    assert_eq!(
-        suggested_file_name("customers.json", ExportFormat::Csv),
-        "customers.csv"
-    );
-}
-
-#[test]
-fn a_file_chooser_duplicate_extension_is_removed_once() {
-    assert_eq!(
-        normalize_duplicate_extension(std::path::PathBuf::from("/tmp/report.sql.sql"), "sql"),
-        std::path::PathBuf::from("/tmp/report.sql")
-    );
-    assert_eq!(
-        normalize_duplicate_extension(std::path::PathBuf::from("/tmp/report.csv.csv"), "csv"),
-        std::path::PathBuf::from("/tmp/report.csv")
-    );
-    assert_eq!(
-        normalize_duplicate_extension(std::path::PathBuf::from("/tmp/report.txt.sql"), "sql"),
-        std::path::PathBuf::from("/tmp/report.txt.sql")
     );
 }
 

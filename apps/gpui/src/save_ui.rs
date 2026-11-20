@@ -195,13 +195,10 @@ impl GridView {
                         }
                         SaveRequest::Import(file) => plan_file_import(target, &live.driver_id, &file),
                         SaveRequest::Structure(kind, text) => {
-                            let structure = match kind {
-                                bookie_app_services::structure_change_plan::StructureChangeKind::DropIndex
-                                | bookie_app_services::structure_change_plan::StructureChangeKind::DropForeignKey
-                                | bookie_app_services::structure_change_plan::StructureChangeKind::DropTable => {
-                                    live.table_structure(&table)?
-                                }
-                                _ => Default::default(),
+                            let structure = if kind.needs_structure() {
+                                live.table_structure(&table)?
+                            } else {
+                                Default::default()
                             };
                             plan_structure(target, kind, &text, &structure)
                         }
@@ -482,13 +479,6 @@ pub(crate) fn with_resolve_hint(message: &str) -> String {
     }
 }
 
-fn expand_home(path: &std::path::Path) -> std::path::PathBuf {
-    match (path.strip_prefix("~"), std::env::var_os("HOME")) {
-        (Ok(rest), Some(home)) => std::path::PathBuf::from(home).join(rest),
-        _ => path.to_path_buf(),
-    }
-}
-
 fn plan_file_import(
     target: SaveTarget<'_>,
     driver_id: &str,
@@ -498,7 +488,7 @@ fn plan_file_import(
         .get(driver_id)
         .map(|driver| driver.capabilities())
         .unwrap_or_default();
-    let file = expand_home(file);
+    let file = bookie_core::user_path::expand_tilde(file);
     let plan = plan_csv_import(target, capabilities, &file, crate::import_ui::IMPORT_ROW_CAP)
         .map_err(|error| error.to_string())?;
     let cut = if plan.truncated {

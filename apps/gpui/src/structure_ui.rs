@@ -12,21 +12,6 @@ pub(crate) struct StructureState {
     pub input: Option<Entity<TextInput>>,
 }
 
-fn title(kind: StructureChangeKind) -> &'static str {
-    match kind {
-        StructureChangeKind::AddColumn => "Add column",
-        StructureChangeKind::RenameColumn => "Rename column",
-        StructureChangeKind::DropColumn => "Drop column",
-        StructureChangeKind::AddIndex => "Create index",
-        StructureChangeKind::DropIndex => "Drop index",
-        StructureChangeKind::AddForeignKey => "Add foreign key",
-        StructureChangeKind::DropForeignKey => "Drop foreign key",
-        StructureChangeKind::TruncateTable => "Empty table",
-        StructureChangeKind::DropTable => "Drop table",
-        StructureChangeKind::RenameTable => "Rename table",
-    }
-}
-
 impl GridView {
     pub(crate) fn structure_change_enabled(&self) -> bool {
         self.can_save_edits() && self.cell_edit.edits.is_empty() && self.compare.is_none() && !self.form_open()
@@ -61,7 +46,7 @@ impl GridView {
         self.structure.kind = Some(kind);
         self.structure.info = None;
         self.structure.open = true;
-        self.status = format!("{}: {}", title(kind), kind.hint());
+        self.status = format!("{}: {}", kind.title(), kind.hint());
         cx.notify();
     }
 
@@ -196,7 +181,7 @@ impl GridView {
             first
         }
         .to_string();
-        let confirm = if unique { "Create unique index" } else { title(kind) };
+        let confirm = if unique { "Create unique index" } else { kind.title() };
         let labels = ReviewLabels {
             title: format!("{confirm} {name} on {}?", self.catalog.grid_table.name),
             done: format!("{confirm} {name}: done"),
@@ -246,7 +231,7 @@ impl GridView {
                 .bg(rgb(theme.chrome))
                 .border_b_1()
                 .border_color(rgb(theme.border))
-                .child(div().font_weight(gpui::FontWeight::MEDIUM).child(title(kind)))
+                .child(div().font_weight(gpui::FontWeight::MEDIUM).child(kind.title()))
                 .child(div().flex_1().min_w_0().child(input))
                 .child(
                     ghost("review-structure", "Review", theme)
