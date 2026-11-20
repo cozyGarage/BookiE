@@ -25,6 +25,7 @@ mod approval_ui;
 mod import_ui;
 mod export_file_ui;
 mod resolve_ui;
+mod saved_filters_ui;
 mod structure_ui;
 mod insert_ui;
 mod params_ui;

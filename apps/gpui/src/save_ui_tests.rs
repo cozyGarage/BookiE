@@ -1150,3 +1150,63 @@ fn show_create_table_fills_the_panel_with_a_create_statement(cx: &mut TestAppCon
     });
     std::fs::remove_file(&path).ok();
 }
+
+#[gpui::test]
+fn a_filter_is_saved_by_name_applied_again_and_deleted_and_an_unshowable_one_says_so(cx: &mut TestAppContext) {
+    let path = fixture_copy("saved-filters");
+    let (view, cx) = saving_view(cx, &path);
+    let store = std::env::temp_dir().join(format!("bookie-filters-{}.json", std::process::id()));
+    std::fs::remove_file(&store).ok();
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.search.saved = crate::saved_filters_ui::SavedFilters::at(store.clone());
+            view.search.filter.update(cx, |input, cx| input.set_content("customer = Ada", cx));
+            view.save_current_filter_as("only ada", cx);
+        })
+    });
+    view.read_with(cx, |view, _| {
+        assert!(view.status.contains("Saved the filter"), "{}", view.status);
+        assert_eq!(view.search.saved.names, vec!["only ada".to_string()]);
+    });
+
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.search.filter.update(cx, |input, cx| input.set_content("", cx));
+            view.apply_saved_filter("only ada", cx);
+        })
+    });
+    settle_saving(cx);
+    view.read_with(cx, |view, cx| {
+        assert_eq!(view.current_filter_text(cx), "customer = Ada");
+        assert!(view.search.filter_visible);
+        assert_eq!(view.dataset_count(), 2, "only the two Ada rows remain: {}", view.status);
+    });
+
+    let unshowable = bookie_app_services::named_filter_presets::NamedFilterPresetsStore::load_at(store.clone());
+    let id = view.read_with(cx, |view, _| view.live.as_ref().and_then(|live| live.saved.as_ref().map(|(id, _)| *id)).unwrap());
+    let between = bookie_core::FilterSet {
+        rules: vec![bookie_core::FilterRule {
+            column: "total".into(),
+            op: bookie_core::FilterOp::Between,
+            value: Some(bookie_core::FilterValue::Pair("1".into(), "5".into())),
+        }],
+        ..bookie_core::FilterSet::default()
+    };
+    unshowable.save(id, None, "orders", "range", between).unwrap();
+    unshowable.flush().unwrap();
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.search.saved = crate::saved_filters_ui::SavedFilters::at(store.clone());
+            view.apply_saved_filter("range", cx);
+        })
+    });
+    view.read_with(cx, |view, _| assert!(view.status.contains("cannot show yet"), "{}", view.status));
+
+    cx.update(|_, cx| view.update(cx, |view, cx| view.delete_saved_filter("only ada", cx)));
+    view.read_with(cx, |view, _| {
+        assert!(view.status.contains("Deleted the filter"), "{}", view.status);
+        assert_eq!(view.search.saved.names, vec!["range".to_string()]);
+    });
+    std::fs::remove_file(&store).ok();
+    std::fs::remove_file(&path).ok();
+}

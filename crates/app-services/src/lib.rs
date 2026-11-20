@@ -115,6 +115,7 @@ pub mod preferences;
 pub mod query_parameters;
 pub mod quick_switcher;
 pub mod reconnect;
+pub mod simple_filter;
 pub mod sql_text;
 pub mod structure_change_plan;
 pub mod structure_summary;

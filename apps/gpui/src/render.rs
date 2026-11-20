@@ -453,6 +453,10 @@ impl GridView {
             PaletteMode::Favorites | PaletteMode::DeleteFavorite => {
                 (self.picker_rows(&theme, cx), "No saved favorites")
             }
+            PaletteMode::SavedFilters | PaletteMode::DeleteSavedFilter => {
+                (self.picker_rows(&theme, cx), "No saved filters for this table")
+            }
+            PaletteMode::NameFilter => (self.picker_rows(&theme, cx), "Type a name for the filter"),
         };
         let empty = rows
             .is_empty()
