@@ -196,20 +196,27 @@ pub struct Predicate {
 pub fn parse_predicate(input: &str, columns: &[ColumnMeta]) -> Result<Predicate, String> {
     let first = columns.first().map_or("column", |column| column.name.as_str());
     let example = format!("for example: {first} contains text");
-    let mut parts = input.trim().splitn(3, ' ');
-    let name = parts.next().unwrap_or("");
-    let column = columns
+    let input = input.trim();
+    let matched = columns
         .iter()
-        .position(|column| column.name.eq_ignore_ascii_case(name))
-        .ok_or_else(|| {
-            let names: Vec<&str> = columns.iter().map(|column| column.name.as_str()).collect();
-            format!("There is no column named {name}. Columns: {}", names.join(", "))
-        })?;
-    let op = parts
-        .next()
-        .and_then(Op::parse)
-        .ok_or_else(|| format!("Use contains, = or != after the column, {example}"))?;
-    let text = parts.next().unwrap_or("").trim();
+        .enumerate()
+        .filter_map(|(index, column)| {
+            let name = input.get(..column.name.len())?;
+            if !name.eq_ignore_ascii_case(&column.name) {
+                return None;
+            }
+            let rest = input.get(column.name.len()..)?.strip_prefix(' ')?;
+            Some((column.name.len(), index, rest))
+        })
+        .max_by_key(|(length, _, _)| *length);
+    let Some((_, column, rest)) = matched else {
+        let name = input.split(' ').next().unwrap_or("");
+        let names: Vec<&str> = columns.iter().map(|column| column.name.as_str()).collect();
+        return Err(format!("There is no column named {name}. Columns: {}", names.join(", ")));
+    };
+    let (operator, text) = rest.split_once(' ').unwrap_or((rest, ""));
+    let op = Op::parse(operator).ok_or_else(|| format!("Use contains, = or != after the column, {example}"))?;
+    let text = text.trim();
     if text.is_empty() {
         return Err(format!("Add the text to match after the operator, {example}"));
     }

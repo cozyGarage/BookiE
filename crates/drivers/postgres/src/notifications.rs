@@ -63,6 +63,45 @@ fn to_message(channel: &str, payload: &str, process_id: u32) -> NotificationMess
     }
 }
 
+pub async fn follow_notifications(
+    opts: ConnectOptions,
+    channels: &[String],
+    cancel: &tokio_util::sync::CancellationToken,
+    mut on_message: impl FnMut(NotificationMessage) + Send,
+) -> Result<u64, DriverError> {
+    check_notification_request(channels, 1, Duration::from_secs(1))?;
+    let pg_opts = full_connect_options(&opts)?;
+    let pool = PgPoolOptions::new()
+        .max_connections(1)
+        .acquire_timeout(bookie_core::CONTROL_SETUP_TIMEOUT)
+        .connect_with(pg_opts)
+        .await
+        .map_err(map_sqlx_error)?;
+    let mut listener = PgListener::connect_with(&pool).await.map_err(map_sqlx_error)?;
+    listener
+        .listen_all(channels.iter().map(String::as_str))
+        .await
+        .map_err(map_sqlx_error)?;
+    let mut received = 0u64;
+    let outcome = loop {
+        tokio::select! {
+            biased;
+            () = cancel.cancelled() => break Ok(received),
+            next = listener.try_recv() => match next {
+                Ok(Some(notification)) => {
+                    received += 1;
+                    on_message(to_message(notification.channel(), notification.payload(), notification.process_id()));
+                }
+                Ok(None) => break Err(DriverError::Disconnected),
+                Err(error) => break Err(map_sqlx_error(error)),
+            },
+        }
+    };
+    drop(listener);
+    pool.close().await;
+    outcome
+}
+
 pub async fn sample_notifications(
     opts: ConnectOptions,
     channels: &[String],

@@ -9,6 +9,7 @@ pub use bookie_results::{
 #[cfg(test)]
 mod value_exact_agreement_tests;
 
+pub mod about;
 pub mod approval_prompt;
 pub mod approval_wait;
 pub mod audit_view;
@@ -40,6 +41,7 @@ pub mod display_as;
 pub mod driver_diagnostics;
 pub mod driver_error_presentation;
 pub mod driver_failure_message;
+pub mod edit_error_text;
 pub mod editor_bookmarks;
 pub mod editor_panel;
 pub mod enum_input;
@@ -48,6 +50,7 @@ pub mod explain_plan;
 pub mod export_pages;
 pub mod export_tables;
 pub mod favorites;
+pub mod filter_catalog;
 pub mod filter_settings;
 pub mod foreign_key_nav;
 pub mod health_report;
@@ -69,6 +72,7 @@ pub mod request_generation;
 pub mod request_ticket;
 pub mod schema_compare;
 pub mod schema_context;
+pub mod selection_stats;
 pub mod sequence_value;
 pub mod server_messages_view;
 pub mod set_cells;
@@ -86,6 +90,7 @@ pub mod structure_metadata;
 pub mod structure_tracker;
 pub mod tab_mark;
 pub mod tls_failure;
+pub mod update_check;
 pub mod value_input;
 #[cfg(test)]
 mod value_input_tests;
@@ -102,6 +107,7 @@ pub mod browse_query;
 
 pub mod cell_save_plan;
 pub mod change_tracker;
+pub mod clipboard_grid;
 pub mod edit_preview;
 pub mod result_copy;
 pub mod result_editability;
@@ -117,6 +123,7 @@ pub mod query_parameters;
 pub mod quick_switcher;
 pub mod reconnect;
 pub mod simple_filter;
+pub mod sql_file;
 pub mod sql_text;
 pub mod statement_plan;
 pub mod structure_change_plan;

@@ -10,6 +10,8 @@ pub(crate) struct PanelState {
     pub ratio: f32,
     pub open: bool,
     pub resizing: bool,
+    pub follow: Option<crate::follow_ui::FollowState>,
+    pub follow_serial: u64,
 }
 
 impl PanelState {
@@ -22,6 +24,8 @@ impl PanelState {
             ratio,
             open: true,
             resizing: false,
+            follow: None,
+            follow_serial: 0,
         }
     }
 }
@@ -61,6 +65,15 @@ pub(crate) struct SearchState {
     pub capped: bool,
     pub reset: bool,
     pub saved: crate::saved_filters_ui::SavedFilters,
+    pub values: crate::value_search_ui::ValueSearchState,
+    pub diagram: crate::schema_diagram_ui::SchemaDiagramState,
+    pub rule: crate::filter_rule_ui::FilterRuleState,
+    pub backup: crate::backup_ui::BackupState,
+    pub sql_file: crate::sql_file_ui::SqlFileState,
+    pub closed: crate::closed_tabs_ui::ClosedTabs,
+    pub recent: crate::closed_tabs_ui::TabRecency,
+    pub origin: Option<bookie_gpui::live::Origin>,
+    pub tables_export: crate::tables_export_ui::TablesExportState,
 }
 
 impl SearchState {
@@ -76,6 +89,15 @@ impl SearchState {
             capped: false,
             reset: false,
             saved: crate::saved_filters_ui::SavedFilters::default(),
+            values: Default::default(),
+            diagram: Default::default(),
+            rule: Default::default(),
+            backup: Default::default(),
+            sql_file: Default::default(),
+            closed: Default::default(),
+            recent: Default::default(),
+            origin: None,
+            tables_export: Default::default(),
         }
     }
 }
@@ -87,6 +109,7 @@ pub(crate) struct CellEditState {
     pub table: crate::grid_edit::Edits,
     pub undo: Vec<crate::edit_history::EditOp>,
     pub redo: Vec<crate::edit_history::EditOp>,
+    pub set: crate::set_cells_ui::SetCellsState,
 }
 
 impl CellEditState {
@@ -98,6 +121,7 @@ impl CellEditState {
             table: Default::default(),
             undo: Vec::new(),
             redo: Vec::new(),
+            set: Default::default(),
         }
     }
 }

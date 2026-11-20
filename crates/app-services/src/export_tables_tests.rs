@@ -166,3 +166,44 @@ fn test_guard(conn: Arc<dyn Connection>) -> Arc<bookie_policy::PolicyGuard> {
         },
     ))
 }
+
+#[tokio::test]
+async fn metadata_preparation_keeps_target_identity_and_honors_cancellation() {
+    let connection = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let token = CancellationToken::new();
+    let control = crate::operation_control::bounded_with(5, token.clone());
+    connection
+        .execute_controlled("CREATE TABLE orders (id INTEGER, name TEXT)", &control)
+        .await
+        .unwrap();
+    let table = TableInfo {
+        schema: None,
+        name: "orders".into(),
+    };
+    let targets = prepare_targets(connection.as_ref(), vec![table.clone()], &control)
+        .await
+        .unwrap();
+    assert_eq!(targets.len(), 1);
+    assert_eq!(targets[0].table, table.name);
+    assert_eq!(targets[0].schema, table.schema);
+    assert_eq!(
+        targets[0]
+            .columns
+            .iter()
+            .map(|column| column.name.as_str())
+            .collect::<Vec<_>>(),
+        ["id", "name"]
+    );
+    token.cancel();
+    assert!(
+        prepare_targets(connection.as_ref(), vec![table], &control)
+            .await
+            .is_err()
+    );
+}

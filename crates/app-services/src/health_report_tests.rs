@@ -239,3 +239,30 @@ async fn a_stalled_server_is_cut_short_by_cancel_and_by_the_deadline() {
         "{timed_out:?}"
     );
 }
+
+#[test]
+fn every_report_has_its_own_label_and_hint() {
+    let labels: Vec<String> = HealthReport::ALL.iter().map(|report| report_label(*report)).collect();
+    let mut unique = labels.clone();
+    unique.sort();
+    unique.dedup();
+    assert_eq!(unique.len(), labels.len());
+    assert!(HealthReport::ALL.iter().all(|report| !report_hint(*report).is_empty()));
+}
+
+#[test]
+fn the_status_says_when_the_list_is_cut_at_the_limit() {
+    let page = |count: usize, may_have_more: bool| HealthRows {
+        rows: (0..count)
+            .map(|index| HealthRow {
+                title: format!("s.t{index}"),
+                summary: String::new(),
+                diagnostic_sql: None,
+            })
+            .collect(),
+        may_have_more,
+    };
+    assert!(rows_status(HealthReport::UnusedIndexes, &page(0, false)).starts_with("Nothing to report."));
+    assert!(rows_status(HealthReport::UnusedIndexes, &page(3, false)).starts_with("3 rows."));
+    assert!(rows_status(HealthReport::UnusedIndexes, &page(50, true)).ends_with("Only the top rows are shown."));
+}

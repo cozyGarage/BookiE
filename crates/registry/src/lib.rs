@@ -1,4 +1,6 @@
-pub use drivers_postgres::{NotificationSample, check_notification_request, sample_notifications};
+pub use drivers_postgres::{
+    NotificationSample, check_notification_request, follow_notifications, sample_notifications,
+};
 pub use drivers_redis::{
     MAX_SAMPLE_MESSAGES, PubSubMessage, PubSubSample, check_request as validate_pubsub_request, sample_pubsub,
 };

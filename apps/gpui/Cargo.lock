@@ -1156,6 +1156,7 @@ dependencies = [
  "tokio-util",
  "tracing",
  "unicode-width",
+ "ureq",
  "uuid",
 ]
 
@@ -1318,6 +1319,7 @@ dependencies = [
  "sqlx",
  "sqlx-core",
  "tokio",
+ "tokio-util",
  "tracing",
  "uuid",
 ]

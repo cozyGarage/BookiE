@@ -150,6 +150,7 @@ impl GridView {
         if closing_query && self.query_has_view_edits() && self.reject_view_edits() {
             return;
         }
+        self.remember_closed_tab(index);
         self.tabs.close(index);
         self.sync_grid_owner();
         if !closing_query {

@@ -1,5 +1,5 @@
 use bookie_app_services::unknown_outcomes::{
-    OutcomeDecision, UnknownOutcome, list_unknown_outcomes, resolve_unknown_outcome,
+    OutcomeDecision, UnknownOutcome, UnknownOutcomeError, list_unknown_outcomes, resolve_unknown_outcome,
 };
 
 use super::*;
@@ -23,6 +23,17 @@ fn blocking<T: Send + 'static>(
         .build()
         .map_err(|error| error.to_string())?
         .block_on(future)
+}
+
+pub(crate) fn decision_status(decided: &Result<(), UnknownOutcomeError>, decision: OutcomeDecision) -> String {
+    match decided {
+        Ok(()) if decision == OutcomeDecision::StillUnknown => "Recorded: still unknown. Writes stay blocked".into(),
+        Ok(()) => "Decision recorded. The connection accepts writes again once none is left".into(),
+        Err(UnknownOutcomeError::NoLongerUnresolved) => {
+            "That write was already decided elsewhere; the list was reloaded".into()
+        }
+        Err(error) => format!("Could not record the decision: {error}"),
+    }
 }
 
 impl GridView {
@@ -56,7 +67,13 @@ impl GridView {
         cx.spawn(async move |this, cx| {
             let listed = cx
                 .background_executor()
-                .spawn(async move { blocking(async move { list_unknown_outcomes(Some(connection_id)).await }) })
+                .spawn(async move {
+                    blocking(async move {
+                        list_unknown_outcomes(Some(connection_id))
+                            .await
+                            .map_err(|error| error.to_string())
+                    })
+                })
                 .await;
             this.update(cx, |this, cx| {
                 match listed {
@@ -100,7 +117,9 @@ impl GridView {
                 .spawn(async move {
                     blocking(async move {
                         let decided = resolve_unknown_outcome(item.operation_id, decision, &text, checked).await;
-                        let left = list_unknown_outcomes(Some(connection_id)).await?;
+                        let left = list_unknown_outcomes(Some(connection_id))
+                            .await
+                            .map_err(|error| error.to_string())?;
                         Ok((decided, left))
                     })
                 })
@@ -112,16 +131,7 @@ impl GridView {
                 match outcome {
                     Ok((decided, left)) => {
                         let applied = decided.is_ok();
-                        this.status = match decided {
-                            Ok(()) if decision == OutcomeDecision::StillUnknown => {
-                                "Recorded: still unknown. Writes stay blocked".into()
-                            }
-                            Ok(()) => "Decision recorded. The connection accepts writes again once none is left".into(),
-                            Err(message) if message.contains("not an unresolved") => {
-                                "That write was already decided elsewhere; the list was reloaded".into()
-                            }
-                            Err(message) => format!("Could not record the decision: {message}"),
-                        };
+                        this.status = decision_status(&decided, decision);
                         if applied {
                             this.save.write = None;
                             if let Some(reason) = &this.resolve.reason {

@@ -177,6 +177,7 @@ pub enum Tab {
     NewConnection,
     History,
     AuditLog,
+    Diagram,
 }
 
 impl Tab {
@@ -189,6 +190,7 @@ impl Tab {
             Tab::NewConnection => "New connection".into(),
             Tab::History => "History".into(),
             Tab::AuditLog => "Audit log".into(),
+            Tab::Diagram => "Schema diagram".into(),
         }
     }
 }
@@ -249,6 +251,16 @@ impl Tabs {
             Some(index) => index,
             None => {
                 self.items.push(Tab::History);
+                self.items.len() - 1
+            }
+        };
+    }
+
+    pub fn open_diagram(&mut self) {
+        self.active = match self.items.iter().position(|item| *item == Tab::Diagram) {
+            Some(index) => index,
+            None => {
+                self.items.push(Tab::Diagram);
                 self.items.len() - 1
             }
         };

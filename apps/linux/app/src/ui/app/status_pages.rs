@@ -108,9 +108,9 @@ impl App {
             .application_icon(crate::config::APP_ID)
             .developer_name(bookie_app_services::tr!("BookiE contributors"))
             .version(crate::config::VERSION)
-            .website("https://github.com/cozyGarage/BookiE")
-            .issue_url("https://github.com/cozyGarage/BookiE/issues")
-            .support_url("https://github.com/cozyGarage/BookiE/discussions")
+            .website(bookie_app_services::about::WEBSITE)
+            .issue_url(bookie_app_services::about::ISSUES_URL)
+            .support_url(bookie_app_services::about::SUPPORT_URL)
             .copyright(bookie_app_services::tr!("© 2025–2026 BookiE contributors"))
             .license_type(gtk::License::Agpl30)
             .comments(bookie_app_services::tr!(
@@ -124,7 +124,7 @@ impl App {
         dialog.set_translator_credits(&bookie_app_services::tr!("translator-credits"));
         dialog.add_link(
             &bookie_app_services::tr!("Releases"),
-            "https://github.com/cozyGarage/BookiE/releases",
+            bookie_app_services::about::RELEASES_URL,
         );
         crate::ui::leak_probe::track("about", &dialog);
         dialog.present(Some(&self.window));

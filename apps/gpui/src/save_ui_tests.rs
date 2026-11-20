@@ -86,6 +86,19 @@ fn settle_saving(cx: &mut gpui::VisualTestContext) {
     cx.run_until_parked();
 }
 
+fn read_when_written(cx: &mut gpui::VisualTestContext, path: &std::path::Path, ready: impl Fn(&str) -> bool) -> String {
+    let mut text = String::new();
+    for _ in 0..200 {
+        settle_saving(cx);
+        text = std::fs::read_to_string(path).unwrap_or_default();
+        if ready(&text) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    text
+}
+
 fn fixture_copy(name: &str) -> std::path::PathBuf {
     let path = std::env::temp_dir().join(format!("bookie-gpui-{name}-{}.sqlite", uuid::Uuid::new_v4()));
     std::fs::copy(orders_fixture(), &path).unwrap();
@@ -1082,8 +1095,7 @@ fn the_page_is_written_to_a_file_in_the_format_of_its_extension_and_never_over_a
     let jsonl = directory.join("rows.jsonl");
     set_export_path(&view, cx, &jsonl);
     cx.update(|_, cx| view.update(cx, |view, cx| view.write_export_file(cx)));
-    settle_saving(cx);
-    let written = std::fs::read_to_string(&jsonl).unwrap();
+    let written = read_when_written(cx, &jsonl, |text| text.lines().count() >= 6);
     assert_eq!(written.lines().count(), 6, "{written}");
     assert!(written.lines().next().unwrap().starts_with('{'), "{written}");
     view.read_with(cx, |view, _| assert!(!view.export.file.open && view.status.starts_with("Wrote 6 row(s)")));
@@ -1092,8 +1104,8 @@ fn the_page_is_written_to_a_file_in_the_format_of_its_extension_and_never_over_a
     let sql = directory.join("rows.sql");
     set_export_path(&view, cx, &sql);
     cx.update(|_, cx| view.update(cx, |view, cx| view.write_export_file(cx)));
-    settle_saving(cx);
-    assert!(std::fs::read_to_string(&sql).unwrap().contains("INSERT INTO"), "a table exports as SQL inserts");
+    let inserts = read_when_written(cx, &sql, |text| text.contains("INSERT INTO"));
+    assert!(inserts.contains("INSERT INTO"), "a table exports as SQL inserts");
 
     cx.update(|_, cx| view.update(cx, |view, cx| view.open_export_file_bar(cx)));
     set_export_path(&view, cx, &jsonl);
@@ -1208,6 +1220,422 @@ fn a_filter_is_saved_by_name_applied_again_and_deleted_and_an_unshowable_one_say
         assert_eq!(view.search.saved.names, vec!["range".to_string()]);
     });
     std::fs::remove_file(&store).ok();
+}
+
+#[gpui::test]
+fn one_value_is_staged_on_every_selected_row_of_the_active_column(cx: &mut TestAppContext) {
+    let path = fixture_copy("set-cells");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_set_cells_bar(cx)));
+    view.read_with(cx, |view, _| assert!(!view.cell_edit.set.open, "nothing selected yet"));
+
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.selection = Some(crate::Selection { anchor: 0, focus: 2 });
+            view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 1 });
+            view.open_set_cells_bar(cx);
+            let input = view
+                .cell_edit
+                .set
+                .input
+                .clone()
+                .expect("the field exists once the bar opened");
+            input.update(cx, |input, cx| input.set_content("bulk", cx));
+            view.apply_set_cells(false, cx);
+        })
+    });
+    view.read_with(cx, |view, _| {
+        assert!(!view.cell_edit.set.open, "{}", view.status);
+        assert_eq!(view.cell_edit.edits.len(), 3, "{}", view.status);
+        assert!(
+            view.cell_edit
+                .edits
+                .values()
+                .all(|cell| *cell == bookie_gpui::model::Cell::Text("bulk".into()))
+        );
+        assert!((0..3).all(|row| view.cell_edit.edits.contains_key(&(row, 1))));
+    });
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn the_selected_rows_are_summarised_per_numeric_column(cx: &mut TestAppContext) {
+    let path = fixture_copy("selection-stats");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.show_selection_stats(cx)));
+    view.read_with(cx, |view, _| assert!(!view.selection_stats_enabled()));
+
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.selection = Some(crate::Selection { anchor: 0, focus: 2 });
+            view.show_selection_stats(cx);
+        })
+    });
+    view.read_with(cx, |view, _| {
+        assert!(view.status.contains("id: count 3, min 1, max 3, sum 6"), "{}", view.status);
+        assert!(!view.status.contains("customer"), "text columns are not summarised: {}", view.status);
+    });
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn health_reports_are_offered_only_on_postgres(cx: &mut TestAppContext) {
+    let path = fixture_copy("health-sqlite");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            assert!(!view.health_supported());
+            assert!(view.health_actions().is_empty());
+            view.show_health_report(bookie_core::HealthReport::TableVacuum, cx);
+        })
+    });
+    view.read_with(cx, |view, _| assert!(view.status.contains("PostgreSQL"), "{}", view.status));
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn searching_every_table_for_a_value_reports_the_matching_rows_in_messages(cx: &mut TestAppContext) {
+    let path = fixture_copy("value-search");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.open_value_search_bar(cx);
+            let input = view.search.values.input.clone().expect("the field exists once the bar opened");
+            input.update(cx, |input, cx| input.set_content("Ada", cx));
+            view.run_value_search(cx);
+        })
+    });
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        let lines: Vec<&str> = view.panel.messages.entries().iter().map(|entry| entry.text.as_str()).collect();
+        assert!(lines.iter().any(|line| line.contains("orders") && line.contains("matching row(s)")), "{lines:?}");
+        assert!(!view.search.values.open);
+    });
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn the_schema_diagram_is_written_to_a_new_file_in_the_format_of_its_extension(cx: &mut TestAppContext) {
+    let path = fixture_copy("schema-diagram");
+    let (view, cx) = saving_view(cx, &path);
+    let directory = std::env::temp_dir().join(format!("bookie-diagram-{}", std::process::id()));
+    std::fs::create_dir_all(&directory).unwrap();
+    let target = directory.join("schema.mmd");
+    let type_path = |view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext, file: &std::path::Path| {
+        let text = file.display().to_string();
+        cx.update(|_, cx| {
+            view.update(cx, |view, cx| {
+                view.open_schema_diagram_bar(cx);
+                let input = view.search.diagram.input.clone().expect("the field exists once the bar opened");
+                input.update(cx, |input, cx| input.set_content(&text, cx));
+                view.write_schema_diagram(cx);
+            })
+        });
+    };
+    type_path(&view, cx, &target);
+    let written = read_when_written(cx, &target, |text| text.starts_with("erDiagram"));
+    let status = view.read_with(cx, |view, _| view.status.clone());
+    assert!(
+        written.starts_with("erDiagram") && written.contains("orders") && written.contains("customers"),
+        "file: {written:?}; status: {status}"
+    );
+    view.read_with(cx, |view, _| assert!(!view.search.diagram.open, "{}", view.status));
+
+    type_path(&view, cx, &target);
+    view.read_with(cx, |view, _| assert!(view.status.contains("already exists"), "{}", view.status));
+    type_path(&view, cx, &directory.join("schema.png"));
+    view.read_with(cx, |view, _| assert!(view.status.contains(".mmd"), "{}", view.status));
+    std::fs::remove_dir_all(&directory).ok();
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn pasting_clipboard_rows_stages_them_down_the_column_from_the_active_cell(cx: &mut TestAppContext) {
+    let path = fixture_copy("paste-cells");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| {
+        cx.write_to_clipboard(gpui::ClipboardItem::new_string("Zed\nYan".into()));
+        view.update(cx, |view, cx| {
+            view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 1 });
+            view.paste_cells(cx);
+        })
+    });
+    view.read_with(cx, |view, _| {
+        let edits = &view.cell_edit.edits;
+        assert_eq!(edits.get(&(0, 1)), Some(&bookie_gpui::model::Cell::Text("Zed".into())), "{}", view.status);
+        assert_eq!(edits.get(&(1, 1)), Some(&bookie_gpui::model::Cell::Text("Yan".into())));
+        assert_eq!(edits.len(), 2);
+    });
+    cx.update(|_, cx| {
+        cx.write_to_clipboard(gpui::ClipboardItem::new_string("a\tb\tc\td\te\tf".into()));
+        view.update(cx, |view, cx| {
+            view.cell_edit.edits.clear();
+            view.paste_cells(cx);
+        })
+    });
+    view.read_with(cx, |view, _| {
+        assert!(view.status.starts_with("Nothing was pasted"), "{}", view.status);
+        assert!(view.cell_edit.edits.is_empty());
+    });
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn a_structured_rule_filters_the_table_into_a_result(cx: &mut TestAppContext) {
+    let path = fixture_copy("filter-rule");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 1 });
+            view.open_filter_rule_bar(cx);
+            let column = view.search.rule.column.clone().expect("column field");
+            assert_eq!(column.read(cx).content().to_string(), "customer", "the active column is prefilled");
+            let value = view.search.rule.value.clone().expect("value field");
+            value.update(cx, |input, cx| input.set_content("Ada", cx));
+            view.run_filter_rule(cx);
+        })
+    });
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert!(!view.search.rule.open);
+        assert_eq!(view.run_tabs.slots.len(), 1, "{}", view.status);
+        assert_eq!(view.run_tabs.slots[0].run.rows, 2, "two orders belong to Ada");
+    });
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn the_schema_diagram_opens_in_its_own_tab_with_one_card_per_table(cx: &mut TestAppContext) {
+    let path = fixture_copy("diagram-tab");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_schema_diagram(cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert_eq!(*view.tabs.current(), bookie_gpui::shell::Tab::Diagram, "{}", view.status);
+        let diagram = view.search.diagram.view.as_ref().expect("a diagram was built");
+        assert_eq!(diagram.scene.cards.len(), 2, "orders and customers");
+        assert!(!diagram.needs_fit, "the first frame fits the diagram to the window");
+        assert!(diagram.zoom > 0.0 && diagram.zoom <= 1.0, "{}", diagram.zoom);
+    });
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn backups_are_offered_only_on_postgres_and_a_refused_bar_stays_closed(cx: &mut TestAppContext) {
+    let path = fixture_copy("backup-sqlite");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            assert!(view.backup_actions().iter().all(|action| !action.enabled));
+            view.open_backup_bar(false, cx);
+            view.open_backup_bar(true, cx);
+        })
+    });
+    view.read_with(cx, |view, _| {
+        assert!(!view.search.backup.open);
+        assert!(view.status.contains("PostgreSQL"), "{}", view.status);
+    });
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn refreshing_reloads_the_table_but_never_throws_pending_edits_away(cx: &mut TestAppContext) {
+    let path = fixture_copy("refresh-table");
+    let (view, cx) = saving_view(cx, &path);
+    queue_edit(&view, cx, "pending");
+    cx.update(|_, cx| view.update(cx, |view, cx| view.refresh_table(cx)));
+    view.read_with(cx, |view, _| {
+        assert!(view.status.contains("pending edits"), "{}", view.status);
+        assert_eq!(view.cell_edit.edits.len(), 1, "the edit is kept");
+    });
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.cell_edit.edits.clear();
+            view.refresh_table(cx);
+        })
+    });
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.status, "Refreshed the table");
+        assert_eq!(view.dataset_count(), 6, "the six fixture rows are loaded again");
+    });
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn a_sql_file_opens_into_the_editor_and_the_editor_text_saves_to_a_new_file(cx: &mut TestAppContext) {
+    let path = fixture_copy("sql-files");
+    let (view, cx) = saving_view(cx, &path);
+    let directory = std::env::temp_dir().join(format!("bookie-sqlfiles-{}", std::process::id()));
+    std::fs::create_dir_all(&directory).unwrap();
+    let script = directory.join("in.sql");
+    std::fs::write(&script, "SELECT 'from file';\n").unwrap();
+
+    let type_path = |view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext, saving: bool, file: &std::path::Path| {
+        let text = file.display().to_string();
+        cx.update(|_, cx| {
+            view.update(cx, |view, cx| {
+                view.open_sql_file_bar(saving, cx);
+                let input = view.search.sql_file.input.clone().expect("the path field");
+                input.update(cx, |input, cx| input.set_content(&text, cx));
+                view.run_sql_file(cx);
+            })
+        });
+        settle_saving(cx);
+    };
+    type_path(&view, cx, false, &script);
+    cx.update(|window, cx| view.update(cx, |view, cx| view.apply_opened_sql(window, cx)));
+    view.read_with(cx, |view, cx| {
+        assert_eq!(view.sql_input.read(cx).value().to_string(), "SELECT 'from file';\n", "{}", view.status);
+    });
+
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.sql_input.update(cx, |input, cx| input.set_value("SELECT 'edited';", window, cx));
+        })
+    });
+    let saved = directory.join("out");
+    type_path(&view, cx, true, &saved);
+    let out = directory.join("out.sql");
+    assert_eq!(read_when_written(cx, &out, |text| !text.is_empty()), "SELECT 'edited';");
+    type_path(&view, cx, true, &directory.join("out.sql"));
+    view.read_with(cx, |view, _| assert!(view.status.contains("already exists"), "{}", view.status));
+    std::fs::remove_dir_all(&directory).ok();
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn a_closed_tab_can_be_reopened(cx: &mut TestAppContext) {
+    let path = fixture_copy("reopen-tab");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            assert!(view.closed_tab_actions().iter().all(|action| !action.enabled));
+            view.tabs.open_query();
+            let index = view.tabs.active;
+            view.close_tab(index);
+            assert!(view.closed_tab_actions().iter().all(|action| action.enabled));
+            assert_ne!(*view.tabs.current(), bookie_gpui::shell::Tab::Query);
+            cx.notify();
+        })
+    });
+    cx.update(|window, cx| view.update(cx, |view, cx| view.reopen_closed_tab(window, cx)));
+    view.read_with(cx, |view, _| {
+        assert_eq!(*view.tabs.current(), bookie_gpui::shell::Tab::Query);
+        assert!(view.closed_tab_actions().iter().all(|action| !action.enabled), "the entry is used up");
+    });
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn closing_a_table_tab_loads_the_table_that_becomes_active(cx: &mut TestAppContext) {
+    let path = fixture_copy("close-loads");
+    let (view, cx) = saving_view(cx, &path);
+    let customers = TableInfo {
+        schema: None,
+        name: "customers".into(),
+    };
+    cx.update(|window, cx| view.update(cx, |view, cx| view.open_table_named(&customers, window, cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| assert_eq!(view.catalog.grid_table, customers, "{}", view.status));
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            let index = view.tabs.active;
+            view.close_tab(index);
+            view.show_current_table(window, cx);
+        })
+    });
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        let bookie_gpui::shell::Tab::Table(shown) = view.tabs.current().clone() else {
+            panic!("a table tab is active");
+        };
+        assert_eq!(shown.name, "orders");
+        assert_eq!(view.catalog.grid_table, shown, "the grid now holds the table whose tab is shown");
+    });
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn exporting_every_table_is_refused_without_a_consistent_snapshot(cx: &mut TestAppContext) {
+    let path = fixture_copy("tables-export");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            assert!(view.tables_export_actions().iter().all(|action| !action.enabled));
+            view.open_tables_export_bar(cx);
+        })
+    });
+    view.read_with(cx, |view, _| {
+        assert!(!view.search.tables_export.open);
+        assert!(view.status.contains("consistent snapshot"), "{}", view.status);
+    });
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn reconnecting_refreshes_the_table_list_and_never_with_pending_edits(cx: &mut TestAppContext) {
+    let path = fixture_copy("reconnect");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            assert!(view.reconnect_actions().iter().all(|action| !action.enabled), "no origin is known yet");
+            view.search.origin = Some(bookie_gpui::live::Origin::File(path.clone()));
+            assert!(view.reconnect_actions().iter().all(|action| action.enabled));
+        })
+    });
+    queue_edit(&view, cx, "pending");
+    cx.update(|_, cx| view.update(cx, |view, cx| view.reconnect_now(cx)));
+    view.read_with(cx, |view, _| {
+        assert!(view.status.contains("pending edits"), "{}", view.status);
+        assert_eq!(view.cell_edit.edits.len(), 1);
+    });
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.cell_edit.edits.clear();
+            view.tabs.open_query();
+            view.reconnect_now(cx);
+        })
+    });
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.status, "Connected", "{}", view.status);
+        assert_eq!(view.tabs.items.len(), 2, "the extra tab was closed by the reconnect");
+        assert_eq!(view.catalog.tables.len(), 2);
+    });
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn disconnecting_is_refused_while_edits_are_pending_and_offered_only_when_connected(cx: &mut TestAppContext) {
+    let path = fixture_copy("disconnect");
+    let (view, cx) = saving_view(cx, &path);
+    view.read_with(cx, |view, _| {
+        assert!(view.disconnect_actions().iter().all(|action| action.enabled), "a connection is open");
+    });
+    queue_edit(&view, cx, "pending");
+    cx.update(|_, cx| view.update(cx, |view, cx| view.disconnect(cx)));
+    view.read_with(cx, |view, _| {
+        assert!(view.status.contains("pending edits"), "{}", view.status);
+        assert_eq!(view.cell_edit.edits.len(), 1, "the edit is kept and the app is still running");
+    });
+    std::fs::remove_file(&path).ok();
+}
+
+#[test]
+fn a_decision_made_elsewhere_is_reported_as_such_and_other_failures_keep_their_text() {
+    use bookie_app_services::unknown_outcomes::{OutcomeDecision, UnknownOutcomeError};
+    let status = |result: Result<(), UnknownOutcomeError>, decision| crate::resolve_ui::decision_status(&result, decision);
+    assert_eq!(
+        status(Err(UnknownOutcomeError::NoLongerUnresolved), OutcomeDecision::Committed),
+        "That write was already decided elsewhere; the list was reloaded"
+    );
+    assert_eq!(
+        status(Err(UnknownOutcomeError::Rejected("a reason is required".into())), OutcomeDecision::Committed),
+        "Could not record the decision: a reason is required"
+    );
+    assert!(status(Ok(()), OutcomeDecision::StillUnknown).contains("still unknown"));
+    assert!(status(Ok(()), OutcomeDecision::RolledBack).contains("accepts writes again"));
 }
 
 #[gpui::test]

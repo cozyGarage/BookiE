@@ -8,7 +8,6 @@ use relm4::adw::prelude::*;
 use relm4::gtk;
 use relm4::gtk::gio;
 
-use crate::services::error_text;
 use crate::ui::progress_dialog::CancellableDialog;
 
 use super::{App, AppMsg};
@@ -168,35 +167,10 @@ impl App {
                 } else {
                     bookie_app_services::tr!("Backup failed")
                 };
-                self.show_error_alert(&title, &backup_error_text(&error));
+                self.show_error_alert(&title, &bookie_app_services::database_backup::backup_error_text(&error));
             }
         }
     }
-}
-
-fn backup_error_text(error: &DriverError) -> String {
-    let text = match error {
-        DriverError::Unsupported(detail) | DriverError::Internal(detail) => detail.clone(),
-        DriverError::OperationOutcomeUnknown { source } => match source.as_ref() {
-            DriverError::Unsupported(detail) | DriverError::Internal(detail) => bookie_app_services::tr!(
-                "The operation was interrupted, but the database outcome could not be confirmed: {detail}"
-            )
-            .replace("{detail}", detail),
-            _ => return error_text::driver_message(error),
-        },
-        error => return error_text::driver_message(error),
-    };
-    append_missing_role_hint(text)
-}
-
-fn append_missing_role_hint(text: String) -> String {
-    if !text.contains("role \"") || !text.contains("does not exist") {
-        return text;
-    }
-    format!(
-        "{text}\n\n{}",
-        bookie_app_services::tr!("Roles named in the backup must already exist on the target database.")
-    )
 }
 
 fn archive_filter() -> gtk::FileFilter {
@@ -208,40 +182,8 @@ fn archive_filter() -> gtk::FileFilter {
 
 #[cfg(test)]
 mod tests {
-    use super::{append_missing_role_hint, backup_error_text};
-    use bookie_core::DriverError;
     use bookie_core::export::normalize_duplicate_extension;
     use std::path::PathBuf;
-
-    #[test]
-    fn a_restore_failure_from_pg_restore_omits_the_internal_driver_prefix() {
-        let detail = "pg_restore failed with exit code 1: pg_restore: error: could not execute query: ERROR:  role \"comparison_analyst\" does not exist";
-        let error = DriverError::OperationOutcomeUnknown {
-            source: Box::new(DriverError::Internal(detail.into())),
-        };
-        let text = backup_error_text(&error);
-        assert!(!text.contains("Internal driver error"), "{text}");
-        assert!(text.contains("comparison_analyst"), "{text}");
-        assert!(text.contains("does not exist"), "{text}");
-        assert!(
-            text.contains("Roles named in the backup must already exist on the target database."),
-            "{text}"
-        );
-    }
-
-    #[test]
-    fn a_plain_internal_backup_error_keeps_the_tool_detail() {
-        let detail = "pg_dump failed with exit code 1: permission denied";
-        let text = backup_error_text(&DriverError::Internal(detail.into()));
-        assert_eq!(text, detail);
-        assert!(!text.contains("Internal driver error"));
-    }
-
-    #[test]
-    fn a_failure_without_a_missing_role_gets_no_role_hint() {
-        let text = append_missing_role_hint("pg_restore failed with exit code 1: disk full".into());
-        assert_eq!(text, "pg_restore failed with exit code 1: disk full");
-    }
 
     #[test]
     fn a_backup_name_that_already_ends_in_dump_keeps_one_suffix() {

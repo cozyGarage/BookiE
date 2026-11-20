@@ -6,6 +6,28 @@ use bookie_storage::AuditJournal;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum UnknownOutcomeError {
+    Journal(String),
+    NoLongerUnresolved,
+    Rejected(String),
+}
+
+impl std::fmt::Display for UnknownOutcomeError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Journal(message) | Self::Rejected(message) => formatter.write_str(message),
+            Self::NoLongerUnresolved => formatter.write_str("that write is no longer an unresolved unknown outcome"),
+        }
+    }
+}
+
+impl std::error::Error for UnknownOutcomeError {}
+
+fn journal_error(error: impl std::fmt::Display) -> UnknownOutcomeError {
+    UnknownOutcomeError::Journal(error.to_string())
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnknownOutcome {
     pub operation_id: Uuid,
     pub connection_id: Uuid,
@@ -24,8 +46,8 @@ pub enum OutcomeDecision {
     StillUnknown,
 }
 
-pub async fn list_unknown_outcomes(connection_id: Option<Uuid>) -> Result<Vec<UnknownOutcome>, String> {
-    let journal = AuditJournal::open_default().map_err(|error| error.to_string())?;
+pub async fn list_unknown_outcomes(connection_id: Option<Uuid>) -> Result<Vec<UnknownOutcome>, UnknownOutcomeError> {
+    let journal = AuditJournal::open_default().map_err(journal_error)?;
     list_in(&journal, connection_id).await
 }
 
@@ -33,8 +55,8 @@ pub async fn list_unknown_outcomes(connection_id: Option<Uuid>) -> Result<Vec<Un
 pub async fn list_unknown_outcomes_at(
     journal_path: std::path::PathBuf,
     connection_id: Option<Uuid>,
-) -> Result<Vec<UnknownOutcome>, String> {
-    let journal = AuditJournal::open_validated(journal_path).map_err(|error| error.to_string())?;
+) -> Result<Vec<UnknownOutcome>, UnknownOutcomeError> {
+    let journal = AuditJournal::open_validated(journal_path).map_err(journal_error)?;
     list_in(&journal, connection_id).await
 }
 
@@ -46,8 +68,8 @@ pub async fn resolve_unknown_outcome_at(
     decision: OutcomeDecision,
     reason: &str,
     checked_myself: bool,
-) -> Result<(), String> {
-    let journal = AuditJournal::open_validated(journal_path).map_err(|error| error.to_string())?;
+) -> Result<(), UnknownOutcomeError> {
+    let journal = AuditJournal::open_validated(journal_path).map_err(journal_error)?;
     resolve_as(&journal, session, operation_id, decision, reason, checked_myself).await
 }
 
@@ -56,7 +78,7 @@ pub async fn resolve_unknown_outcome(
     decision: OutcomeDecision,
     reason: &str,
     checked_myself: bool,
-) -> Result<(), String> {
+) -> Result<(), UnknownOutcomeError> {
     resolve_unknown_outcome_as("gui", operation_id, decision, reason, checked_myself).await
 }
 
@@ -66,18 +88,21 @@ pub async fn resolve_unknown_outcome_as(
     decision: OutcomeDecision,
     reason: &str,
     checked_myself: bool,
-) -> Result<(), String> {
-    let journal = AuditJournal::open_default().map_err(|error| error.to_string())?;
+) -> Result<(), UnknownOutcomeError> {
+    let journal = AuditJournal::open_default().map_err(journal_error)?;
     resolve_as(&journal, session, operation_id, decision, reason, checked_myself).await
 }
 
-async fn unresolved_events(journal: &AuditJournal) -> Result<Vec<AuditEvent>, String> {
-    let mut events = journal.unresolved_unknowns().await.map_err(|error| error.to_string())?;
+async fn unresolved_events(journal: &AuditJournal) -> Result<Vec<AuditEvent>, UnknownOutcomeError> {
+    let mut events = journal.unresolved_unknowns().await.map_err(journal_error)?;
     events.reverse();
     Ok(events)
 }
 
-async fn list_in(journal: &AuditJournal, connection_id: Option<Uuid>) -> Result<Vec<UnknownOutcome>, String> {
+async fn list_in(
+    journal: &AuditJournal,
+    connection_id: Option<Uuid>,
+) -> Result<Vec<UnknownOutcome>, UnknownOutcomeError> {
     Ok(unresolved_events(journal)
         .await?
         .into_iter()
@@ -104,7 +129,7 @@ async fn resolve_in(
     decision: OutcomeDecision,
     reason: &str,
     checked_myself: bool,
-) -> Result<(), String> {
+) -> Result<(), UnknownOutcomeError> {
     resolve_as(journal, "gui", operation_id, decision, reason, checked_myself).await
 }
 
@@ -115,12 +140,12 @@ async fn resolve_as(
     decision: OutcomeDecision,
     reason: &str,
     checked_myself: bool,
-) -> Result<(), String> {
+) -> Result<(), UnknownOutcomeError> {
     let original = unresolved_events(journal)
         .await?
         .into_iter()
         .find(|event| event.operation_id == operation_id)
-        .ok_or_else(|| "that write is no longer an unresolved unknown outcome".to_string())?;
+        .ok_or(UnknownOutcomeError::NoLongerUnresolved)?;
     let evidence = if checked_myself && decision != OutcomeDecision::StillUnknown {
         AuditReconciliationEvidence::ServerCheckedManually
     } else {
@@ -143,8 +168,24 @@ async fn resolve_as(
         },
         AuditReconciliation::new(operation_id, claim, reason, evidence, operator_name()),
     )
-    .map_err(|error| error.to_string())?;
-    journal.record(event).await.map_err(|error| error.to_string())
+    .map_err(|error| UnknownOutcomeError::Rejected(error.to_string()))?;
+    match journal.record(event).await {
+        Ok(()) => Ok(()),
+        Err(error) => Err(refusal_after(journal, operation_id, error).await),
+    }
+}
+
+async fn refusal_after(
+    journal: &AuditJournal,
+    operation_id: Uuid,
+    error: impl std::fmt::Display,
+) -> UnknownOutcomeError {
+    match unresolved_events(journal).await {
+        Ok(events) if !events.iter().any(|event| event.operation_id == operation_id) => {
+            UnknownOutcomeError::NoLongerUnresolved
+        }
+        _ => UnknownOutcomeError::Rejected(error.to_string()),
+    }
 }
 
 const MAX_SHOWN_CHARS: usize = 2000;
@@ -328,5 +369,89 @@ mod tests {
             "a newline stays visible and cannot forge a line: {shown}"
         );
         assert_eq!(plain_text(&"x".repeat(3000), 2000).chars().count(), 2001);
+    }
+
+    #[tokio::test]
+    async fn a_stale_id_and_a_second_decision_say_so_while_a_blank_reason_is_a_plain_refusal() {
+        let dir = tempfile::tempdir().unwrap();
+        let (journal, _connection_id, operation_id) = journal_with_unknown(&dir).await;
+        let blank = resolve_in(&journal, operation_id, OutcomeDecision::Committed, "  ", true)
+            .await
+            .unwrap_err();
+        assert!(matches!(blank, UnknownOutcomeError::Rejected(_)), "{blank:?}");
+        let stale = resolve_in(&journal, Uuid::new_v4(), OutcomeDecision::Committed, "x", true)
+            .await
+            .unwrap_err();
+        assert_eq!(stale, UnknownOutcomeError::NoLongerUnresolved);
+        resolve_in(
+            &journal,
+            operation_id,
+            OutcomeDecision::Committed,
+            "checked by hand",
+            true,
+        )
+        .await
+        .unwrap();
+        let again = resolve_in(&journal, operation_id, OutcomeDecision::RolledBack, "again", true)
+            .await
+            .unwrap_err();
+        assert_eq!(again, UnknownOutcomeError::NoLongerUnresolved);
+    }
+
+    #[test]
+    fn the_error_texts_are_the_wording_the_screens_always_showed() {
+        assert_eq!(
+            UnknownOutcomeError::NoLongerUnresolved.to_string(),
+            "that write is no longer an unresolved unknown outcome"
+        );
+        assert_eq!(
+            UnknownOutcomeError::Journal("disk full".into()).to_string(),
+            "disk full"
+        );
+        assert_eq!(
+            UnknownOutcomeError::Rejected("needs a reason".into()).to_string(),
+            "needs a reason"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_failed_record_keeps_its_reason_while_the_write_is_still_open() {
+        let dir = tempfile::tempdir().unwrap();
+        let (journal, _connection_id, operation_id) = journal_with_unknown(&dir).await;
+        let error = refusal_after(&journal, operation_id, "the journal refused it").await;
+        assert_eq!(error, UnknownOutcomeError::Rejected("the journal refused it".into()));
+    }
+
+    #[tokio::test]
+    async fn a_failed_record_for_a_write_that_is_gone_says_it_was_decided_elsewhere() {
+        let dir = tempfile::tempdir().unwrap();
+        let (journal, _connection_id, operation_id) = journal_with_unknown(&dir).await;
+        resolve_in(
+            &journal,
+            operation_id,
+            OutcomeDecision::Committed,
+            "checked by hand",
+            true,
+        )
+        .await
+        .unwrap();
+        let error = refusal_after(&journal, operation_id, "ignored text").await;
+        assert_eq!(error, UnknownOutcomeError::NoLongerUnresolved);
+    }
+
+    #[tokio::test]
+    async fn an_unreadable_journal_never_turns_a_failure_into_already_decided() {
+        let dir = tempfile::tempdir().unwrap();
+        let (journal, _connection_id, operation_id) = journal_with_unknown(&dir).await;
+        let path = dir.path().join("audit.jsonl");
+        let mut damaged = std::fs::read(&path).unwrap();
+        damaged.extend_from_slice(b"this is not a journal record\n");
+        std::fs::write(&path, damaged).unwrap();
+        assert!(
+            unresolved_events(&journal).await.is_err(),
+            "the damaged journal must fail to read for this test to mean anything"
+        );
+        let error = refusal_after(&journal, operation_id, "disk full").await;
+        assert_eq!(error, UnknownOutcomeError::Rejected("disk full".into()));
     }
 }

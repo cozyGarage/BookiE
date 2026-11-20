@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use bookie_core::export::{
     CsvOptions, ExportError, ResultExport, ResultFormat, SqlTarget, cap_pages, write_paged_file_no_replace,
 };
-use bookie_core::{ColumnInfo, DatabaseDriver, FilterSet};
+use bookie_core::{ColumnInfo, Connection, DatabaseDriver, DriverError, FilterSet, OperationControl, TableInfo};
 use bookie_policy::PolicyGuard;
 use tokio_util::sync::CancellationToken;
 
@@ -22,6 +22,13 @@ pub struct TableTarget {
     pub schema: Option<String>,
     pub table: String,
     pub columns: Vec<ColumnInfo>,
+}
+
+#[derive(Debug, Clone)]
+pub struct TablesExportJob {
+    pub directory: PathBuf,
+    pub max_rows_per_table: Option<usize>,
+    pub timeout_secs: u32,
 }
 
 pub struct TableExportRequest<'a> {
@@ -181,6 +188,42 @@ fn export_one(
     result?;
     finish?;
     Ok((rows.get(), capped.load(Ordering::SeqCst)))
+}
+
+fn driver_message(error: &DriverError) -> String {
+    crate::driver_failure_message::driver_failure_message(&crate::driver_error_presentation::classify(error))
+}
+
+pub async fn prepare_targets(
+    connection: &dyn Connection,
+    tables: Vec<TableInfo>,
+    control: &OperationControl,
+) -> Result<Vec<TableTarget>, String> {
+    let mut targets = Vec::with_capacity(tables.len());
+    for table in tables {
+        if control.cancellation_token().is_cancelled() {
+            return Err(driver_message(&DriverError::Cancelled));
+        }
+        let columns = connection
+            .fetch_columns_controlled(table.schema.as_deref(), &table.name, control)
+            .await
+            .map_err(|error| {
+                let name = table
+                    .schema
+                    .as_ref()
+                    .map_or_else(|| table.name.clone(), |schema| format!("{schema}.{}", table.name));
+                format!("{name}: {}", driver_message(&error))
+            })?;
+        if control.cancellation_token().is_cancelled() {
+            return Err(driver_message(&DriverError::Cancelled));
+        }
+        targets.push(TableTarget {
+            schema: table.schema,
+            table: table.name,
+            columns,
+        });
+    }
+    Ok(targets)
 }
 
 pub fn export_tables(

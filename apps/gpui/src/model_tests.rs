@@ -167,6 +167,19 @@ fn predicates_are_validated() {
 }
 
 #[test]
+fn predicates_match_the_longest_column_name_including_spaces() {
+    let mut columns = synthetic_columns();
+    columns[0].name = "first".into();
+    columns[1].name = "first name".into();
+
+    let predicate = parse_predicate("FIRST NAME = Ada", &columns).unwrap();
+
+    assert_eq!(predicate.column, 1);
+    assert_eq!(predicate.op, Op::Equals);
+    assert_eq!(predicate.text, "Ada");
+}
+
+#[test]
 fn whole_row_compare_counts_added_and_removed_pairs() {
     let diff = Synthetic::new(1_000).compare(false, &CancellationToken::new()).unwrap();
     assert!(!diff.summary.keyed);

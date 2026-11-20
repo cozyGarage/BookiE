@@ -11,7 +11,11 @@ use bookie_app_services::read_session::ConnectionSummary;
 use bookie_app_services::read_session_store::{
     OpenedSession, ReadSessionStore, SessionId, SubscriptionRequest, SubscriptionSample, SubscriptionSampler,
 };
-use bookie_core::{ColumnInfo, OperationControl, QueryResult, QueryResultBudget, QueryRows, TableInfo};
+use bookie_app_services::er_diagram::{SchemaDiagram, TableRead, read::MAX_TABLES as MAX_DIAGRAM_TABLES};
+use bookie_app_services::value_search::{
+    SearchLimits, SearchOptions, SearchReport, SearchRequest, SearchSource, TableTarget, run_search,
+};
+use bookie_core::{ColumnInfo, DriverError, OperationControl, QueryResult, QueryResultBudget, QueryRows, TableInfo};
 use bookie_results::result_scan::ScanSource;
 use tokio_util::sync::CancellationToken;
 
@@ -297,6 +301,21 @@ impl LiveSession {
         outcome.map_err(|failure| driver_failure_message(&failure))
     }
 
+    pub fn follow_pubsub(
+        &self,
+        channel: &str,
+        cancellation: &CancellationToken,
+        on_message: Box<dyn FnMut(bookie_app_services::read_session_store::SubscriptionMessage) + Send>,
+    ) -> Result<u64, String> {
+        let control = OperationControl::new(cancellation.clone(), None);
+        self.runtime
+            .block_on(
+                self.sessions
+                    .follow_subscription(self.session_id, vec![channel.to_string()], &control, on_message),
+            )
+            .map_err(|failure| driver_failure_message(&failure))
+    }
+
     pub fn sample_pubsub(
         &self,
         patterns: &[String],
@@ -361,6 +380,86 @@ impl LiveSession {
             snapshot_consistent: self.supports_snapshot_cursor,
             table: Some(table.clone()),
         })
+    }
+
+    pub fn export_all_tables(
+        &self,
+        directory: std::path::PathBuf,
+        max_rows_per_table: Option<usize>,
+        cancellation: &CancellationToken,
+    ) -> Result<Vec<bookie_app_services::export_tables::TableResult>, String> {
+        let job = bookie_app_services::export_tables::TablesExportJob {
+            directory,
+            max_rows_per_table,
+            timeout_secs: 600,
+        };
+        self.runtime.block_on(self.sessions.export_tables_to_folder(
+            self.session_id,
+            self.tables.clone(),
+            job,
+            cancellation,
+        ))
+    }
+
+    pub fn run_backup(
+        &self,
+        job: bookie_app_services::database_backup::BackupJob,
+        cancellation: &CancellationToken,
+    ) -> Result<(), String> {
+        run_backup_on(&self.runtime, &self.sessions, self.session_id, job, cancellation)
+    }
+
+    pub fn schema_diagram(&self, cancellation: &CancellationToken) -> Result<SchemaDiagram, String> {
+        let supports_keys = drivers_registry::default_registry()
+            .get(&self.driver_id)
+            .is_some_and(|driver| driver.capabilities().supports_foreign_key_metadata);
+        let mut tables: Vec<&TableInfo> = self.tables.iter().collect();
+        tables.sort_unstable_by(|a, b| a.name.cmp(&b.name).then_with(|| a.schema.cmp(&b.schema)));
+        tables.truncate(MAX_DIAGRAM_TABLES);
+        let mut reads = Vec::new();
+        for table in tables {
+            if cancellation.is_cancelled() {
+                return Err("The export was cancelled.".into());
+            }
+            let foreign_keys = if supports_keys {
+                self.table_structure(table)?.foreign_keys
+            } else {
+                Vec::new()
+            };
+            reads.push(TableRead {
+                schema: table.schema.clone(),
+                name: table.name.clone(),
+                columns: self.table_columns(table)?,
+                foreign_keys,
+            });
+        }
+        Ok(SchemaDiagram::build(reads))
+    }
+
+    pub fn search_values(
+        &self,
+        term: &str,
+        options: SearchOptions,
+        cancellation: &CancellationToken,
+    ) -> Result<SearchReport, String> {
+        let tables = self
+            .tables
+            .iter()
+            .map(|table| TableTarget {
+                schema: table.schema.clone(),
+                name: table.name.clone(),
+            })
+            .collect();
+        let request = SearchRequest {
+            driver_id: &self.driver_id,
+            tables,
+            term,
+            options,
+            limits: SearchLimits::default(),
+        };
+        self.runtime
+            .block_on(run_search(&BridgeSource(self), request, cancellation, |_| {}))
+            .map_err(|error| format!("{error:?}"))
     }
 
     fn next_epoch(&self) -> Epoch {
@@ -525,6 +624,14 @@ impl WriteSession {
         }
     }
 
+    pub fn run_backup(
+        &self,
+        job: bookie_app_services::database_backup::BackupJob,
+        cancellation: &CancellationToken,
+    ) -> Result<(), String> {
+        run_backup_on(&self.runtime, &self.sessions, self.session_id, job, cancellation)
+    }
+
     pub fn apply(
         &self,
         statements: &[(String, Vec<bookie_core::Value>)],
@@ -566,6 +673,33 @@ impl SubscriptionSampler for RegistrySubscriptionSampler {
                 "{other} has no live messages to listen to"
             ))),
         }
+    }
+
+    fn follow(
+        &self,
+        driver_id: &str,
+        options: bookie_core::ConnectOptions,
+        channels: Vec<String>,
+        cancel: CancellationToken,
+        mut on_message: Box<dyn FnMut(bookie_app_services::read_session_store::SubscriptionMessage) + Send>,
+    ) -> Pin<Box<dyn Future<Output = Result<u64, bookie_core::DriverError>> + Send + '_>> {
+        let postgres = driver_id == "postgres";
+        Box::pin(async move {
+            if !postgres {
+                return Err(bookie_core::DriverError::Unsupported(
+                    "only PostgreSQL notifications can be followed".into(),
+                ));
+            }
+            drivers_registry::follow_notifications(options, &channels, &cancel, move |message| {
+                on_message(bookie_app_services::read_session_store::SubscriptionMessage {
+                    channel: message.channel,
+                    pattern: None,
+                    payload: message.payload,
+                    payload_bytes: message.payload_bytes,
+                });
+            })
+            .await
+        })
     }
 
     fn sample(
@@ -1555,4 +1689,78 @@ mod tests {
             .is_err()
         );
     }
+}
+
+struct BridgeSource<'a>(&'a LiveSession);
+
+impl SearchSource for BridgeSource<'_> {
+    async fn columns(&self, table: &TableTarget, control: &OperationControl) -> Result<Vec<ColumnInfo>, DriverError> {
+        let session = self.0;
+        let epoch = session.next_epoch();
+        let table = TableInfo {
+            schema: table.schema.clone(),
+            name: table.name.clone(),
+        };
+        let event = dispatch_read(
+            DispatchContext::Sessions(&session.sessions),
+            Command::ReadColumns {
+                epoch,
+                session_id: session.session_id,
+                table,
+            },
+            control,
+            epoch,
+            &session.epoch,
+        )
+        .await
+        .map_err(search_error)?;
+        let Event::ColumnsRead { outcome, .. } = event else {
+            return Err(search_error("The command bridge returned an unexpected event.".into()));
+        };
+        outcome.map_err(|failure| search_error(driver_failure_message(&failure)))
+    }
+
+    async fn query(
+        &self,
+        sql: &str,
+        params: &[bookie_core::Value],
+        control: &OperationControl,
+    ) -> Result<QueryResult, DriverError> {
+        let session = self.0;
+        let epoch = session.next_epoch();
+        bridge_query(&session.sessions, session.session_id, (sql, params), control, epoch, &session.epoch)
+            .await
+            .map_err(search_error)
+    }
+}
+
+fn search_error(message: String) -> DriverError {
+    DriverError::Query {
+        message,
+        sqlstate: None,
+        position: None,
+    }
+}
+
+fn backup_failure_text(error: &DriverError) -> String {
+    match error {
+        DriverError::Cancelled => "Cancelled. Nothing was changed.".into(),
+        error => bookie_app_services::database_backup::backup_error_text(error),
+    }
+}
+
+fn run_backup_on(
+    runtime: &tokio::runtime::Runtime,
+    sessions: &ReadSessionStore,
+    session_id: SessionId,
+    job: bookie_app_services::database_backup::BackupJob,
+    cancellation: &CancellationToken,
+) -> Result<(), String> {
+    let runtime_dir = std::env::var_os("XDG_RUNTIME_DIR")
+        .map(std::path::PathBuf::from)
+        .ok_or("The private runtime directory is not available")?;
+    let control = OperationControl::new(cancellation.clone(), None);
+    runtime
+        .block_on(sessions.run_backup_job(session_id, job, &runtime_dir, &control))
+        .map_err(|error| backup_failure_text(&error))
 }

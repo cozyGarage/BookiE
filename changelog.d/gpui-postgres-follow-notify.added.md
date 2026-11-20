@@ -1,0 +1,1 @@
+On a PostgreSQL connection in the GPUI app, "follow <channel>" in the command palette streams NOTIFY messages live into the Messages panel until you stop it; a dropped connection ends it with a clear message.

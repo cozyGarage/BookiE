@@ -21,6 +21,7 @@ serde_json.workspace = true
 sqlx = { workspace = true, features = ["postgres", "tls-rustls-aws-lc-rs"] }
 sqlx-core = { workspace = true, features = ["rustls-native-certs"] }
 tokio.workspace = true
+tokio-util.workspace = true
 tracing.workspace = true
 uuid.workspace = true
 
@@ -30,7 +31,6 @@ csv.workspace = true
 secrecy.workspace = true
 tempfile.workspace = true
 testcontainers.workspace = true
-tokio-util.workspace = true
 testcontainers-modules = { workspace = true, features = ["postgres"] }
 tracing-subscriber.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
