@@ -86,6 +86,19 @@ fn settle_saving(cx: &mut gpui::VisualTestContext) {
     cx.run_until_parked();
 }
 
+fn read_when_written(cx: &mut gpui::VisualTestContext, path: &std::path::Path, ready: impl Fn(&str) -> bool) -> String {
+    let mut text = String::new();
+    for _ in 0..200 {
+        settle_saving(cx);
+        text = std::fs::read_to_string(path).unwrap_or_default();
+        if ready(&text) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    text
+}
+
 fn fixture_copy(name: &str) -> std::path::PathBuf {
     let path = std::env::temp_dir().join(format!("bookie-gpui-{name}-{}.sqlite", uuid::Uuid::new_v4()));
     std::fs::copy(orders_fixture(), &path).unwrap();
@@ -1082,8 +1095,7 @@ fn the_page_is_written_to_a_file_in_the_format_of_its_extension_and_never_over_a
     let jsonl = directory.join("rows.jsonl");
     set_export_path(&view, cx, &jsonl);
     cx.update(|_, cx| view.update(cx, |view, cx| view.write_export_file(cx)));
-    settle_saving(cx);
-    let written = std::fs::read_to_string(&jsonl).unwrap();
+    let written = read_when_written(cx, &jsonl, |text| text.lines().count() >= 6);
     assert_eq!(written.lines().count(), 6, "{written}");
     assert!(written.lines().next().unwrap().starts_with('{'), "{written}");
     view.read_with(cx, |view, _| assert!(!view.export.file.open && view.status.starts_with("Wrote 6 row(s)")));
@@ -1092,8 +1104,8 @@ fn the_page_is_written_to_a_file_in_the_format_of_its_extension_and_never_over_a
     let sql = directory.join("rows.sql");
     set_export_path(&view, cx, &sql);
     cx.update(|_, cx| view.update(cx, |view, cx| view.write_export_file(cx)));
-    settle_saving(cx);
-    assert!(std::fs::read_to_string(&sql).unwrap().contains("INSERT INTO"), "a table exports as SQL inserts");
+    let inserts = read_when_written(cx, &sql, |text| text.contains("INSERT INTO"));
+    assert!(inserts.contains("INSERT INTO"), "a table exports as SQL inserts");
 
     cx.update(|_, cx| view.update(cx, |view, cx| view.open_export_file_bar(cx)));
     set_export_path(&view, cx, &jsonl);
@@ -1262,8 +1274,7 @@ fn the_schema_diagram_is_written_to_a_new_file_in_the_format_of_its_extension(cx
         });
     };
     type_path(&view, cx, &target);
-    settle_saving(cx);
-    let written = std::fs::read_to_string(&target).unwrap();
+    let written = read_when_written(cx, &target, |text| text.starts_with("erDiagram"));
     assert!(written.starts_with("erDiagram") && written.contains("orders") && written.contains("customers"), "{written}");
     view.read_with(cx, |view, _| assert!(!view.search.diagram.open, "{}", view.status));
 
@@ -1422,7 +1433,8 @@ fn a_sql_file_opens_into_the_editor_and_the_editor_text_saves_to_a_new_file(cx: 
     });
     let saved = directory.join("out");
     type_path(&view, cx, true, &saved);
-    assert_eq!(std::fs::read_to_string(directory.join("out.sql")).unwrap(), "SELECT 'edited';");
+    let out = directory.join("out.sql");
+    assert_eq!(read_when_written(cx, &out, |text| !text.is_empty()), "SELECT 'edited';");
     type_path(&view, cx, true, &directory.join("out.sql"));
     view.read_with(cx, |view, _| assert!(view.status.contains("already exists"), "{}", view.status));
     std::fs::remove_dir_all(&directory).ok();
