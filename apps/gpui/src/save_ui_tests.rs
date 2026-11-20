@@ -1480,3 +1480,20 @@ fn closing_a_table_tab_loads_the_table_that_becomes_active(cx: &mut TestAppConte
     });
     std::fs::remove_file(&path).ok();
 }
+
+#[gpui::test]
+fn exporting_every_table_is_refused_without_a_consistent_snapshot(cx: &mut TestAppContext) {
+    let path = fixture_copy("tables-export");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            assert!(view.tables_export_actions().iter().all(|action| !action.enabled));
+            view.open_tables_export_bar(cx);
+        })
+    });
+    view.read_with(cx, |view, _| {
+        assert!(!view.search.tables_export.open);
+        assert!(view.status.contains("consistent snapshot"), "{}", view.status);
+    });
+    std::fs::remove_file(&path).ok();
+}

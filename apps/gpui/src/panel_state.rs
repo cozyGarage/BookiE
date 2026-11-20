@@ -66,6 +66,7 @@ pub(crate) struct SearchState {
     pub backup: crate::backup_ui::BackupState,
     pub sql_file: crate::sql_file_ui::SqlFileState,
     pub closed: crate::closed_tabs_ui::ClosedTabs,
+    pub tables_export: crate::tables_export_ui::TablesExportState,
 }
 
 impl SearchState {
@@ -86,6 +87,7 @@ impl SearchState {
             backup: Default::default(),
             sql_file: Default::default(),
             closed: Default::default(),
+            tables_export: Default::default(),
         }
     }
 }

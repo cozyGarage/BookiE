@@ -79,6 +79,7 @@ impl GridView {
         self.focus_filter_rule_input(window, cx);
         self.focus_backup_input(window, cx);
         self.focus_sql_file_input(window, cx);
+        self.focus_tables_export_input(window, cx);
         self.apply_opened_sql(window, cx);
         let viewport = self.diagram_viewport(window);
         if let Some(view) = self.search.diagram.view.as_mut().filter(|view| view.needs_fit) {

@@ -149,6 +149,7 @@ impl GridView {
             .or_else(|| self.schema_diagram_bar(theme, cx))
             .or_else(|| self.backup_bar(theme, cx))
             .or_else(|| self.sql_file_bar(theme, cx))
+            .or_else(|| self.tables_export_bar(theme, cx))
     }
 
     pub(crate) fn value_search_bar(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Div> {

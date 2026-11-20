@@ -73,6 +73,7 @@ impl GridView {
             .chain(self.refresh_actions())
             .chain(self.sql_file_actions())
             .chain(self.closed_tab_actions())
+            .chain(self.tables_export_actions())
             .chain(self.chrome_actions())
             .collect()
     }

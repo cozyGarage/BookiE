@@ -39,6 +39,7 @@ impl GridView {
             "backup-database" => self.open_backup_bar(false, cx),
             "refresh-table" => self.refresh_table(cx),
             "reopen-tab" => self.reopen_closed_tab(window, cx),
+            "export-all-tables" => self.open_tables_export_bar(cx),
             "open-sql-file" => self.open_sql_file_bar(false, cx),
             "save-sql-file" => self.open_sql_file_bar(true, cx),
             "restore-database" => self.open_backup_bar(true, cx),

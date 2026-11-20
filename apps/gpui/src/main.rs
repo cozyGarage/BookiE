@@ -34,6 +34,7 @@ mod health_ui;
 mod paste_ui;
 mod refresh_ui;
 mod run_cursor_ui;
+mod tables_export_ui;
 mod sql_file_ui;
 mod schema_diagram_ui;
 mod set_cells_ui;

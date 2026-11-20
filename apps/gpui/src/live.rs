@@ -367,6 +367,25 @@ impl LiveSession {
         })
     }
 
+    pub fn export_all_tables(
+        &self,
+        directory: std::path::PathBuf,
+        max_rows_per_table: Option<usize>,
+        cancellation: &CancellationToken,
+    ) -> Result<Vec<bookie_app_services::export_tables::TableResult>, String> {
+        let job = bookie_app_services::export_tables::TablesExportJob {
+            directory,
+            max_rows_per_table,
+            timeout_secs: 600,
+        };
+        self.runtime.block_on(self.sessions.export_tables_to_folder(
+            self.session_id,
+            self.tables.clone(),
+            job,
+            cancellation,
+        ))
+    }
+
     pub fn run_backup(
         &self,
         job: bookie_app_services::database_backup::BackupJob,
