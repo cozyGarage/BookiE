@@ -37,10 +37,12 @@ jobs:
         with:
           workspaces: apps/gpui
           prefix-key: gpui-binary
-      - name: Install the GPUI linker dependency
+      - name: Install the GPUI build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libxkbcommon-x11-dev
+          sudo apt-get install -y --no-install-recommends \
+            libfontconfig-dev libfreetype-dev libwayland-dev libxkbcommon-dev libxkbcommon-x11-dev \
+            libx11-xcb-dev libxcb1-dev libxcb-xkb-dev libvulkan-dev
       - name: Build
         run: cargo build --release --locked --manifest-path apps/gpui/Cargo.toml
       - name: Package
