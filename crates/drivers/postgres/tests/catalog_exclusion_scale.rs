@@ -180,6 +180,7 @@ async fn seed_catalog(connection: &dyn Connection) {
 }
 
 #[tokio::test]
+#[ignore = "requires docker"]
 async fn large_schema_exclusion_cost_stays_close_to_same_result_scoped_catalog_scan() {
     let image = Postgres::default()
         .with_tag("18-alpine")
