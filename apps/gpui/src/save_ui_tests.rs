@@ -1363,3 +1363,27 @@ fn backups_are_offered_only_on_postgres_and_a_refused_bar_stays_closed(cx: &mut 
     });
     std::fs::remove_file(&path).ok();
 }
+
+#[gpui::test]
+fn refreshing_reloads_the_table_but_never_throws_pending_edits_away(cx: &mut TestAppContext) {
+    let path = fixture_copy("refresh-table");
+    let (view, cx) = saving_view(cx, &path);
+    queue_edit(&view, cx, "pending");
+    cx.update(|_, cx| view.update(cx, |view, cx| view.refresh_table(cx)));
+    view.read_with(cx, |view, _| {
+        assert!(view.status.contains("pending edits"), "{}", view.status);
+        assert_eq!(view.cell_edit.edits.len(), 1, "the edit is kept");
+    });
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.cell_edit.edits.clear();
+            view.refresh_table(cx);
+        })
+    });
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.status, "Refreshed the table");
+        assert_eq!(view.dataset_count(), 6, "the six fixture rows are loaded again");
+    });
+    std::fs::remove_file(&path).ok();
+}

@@ -31,6 +31,7 @@ mod diagram_ui;
 mod filter_rule_ui;
 mod health_ui;
 mod paste_ui;
+mod refresh_ui;
 mod run_cursor_ui;
 mod schema_diagram_ui;
 mod set_cells_ui;
