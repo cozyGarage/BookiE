@@ -283,7 +283,7 @@ pub(in crate::ui::editor) fn stream_progress_text(result: &StreamedResult) -> St
         &crate::ui::count_format::format_thousands(u128::from(result.total_pages)),
     );
     let status = match result.terminal {
-        StreamTerminal::Loading => bookie_app_services::tr!("Receiving…"),
+        StreamTerminal::Loading => bookie_app_services::tr!("Receiving… (total unknown)"),
         StreamTerminal::Complete => bookie_app_services::tr!("Complete"),
         StreamTerminal::Cancelled => bookie_app_services::tr!("Cancelled"),
         StreamTerminal::TimedOut => bookie_app_services::tr!("Timed out"),

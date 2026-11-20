@@ -37,7 +37,7 @@ fn streamed_progress_pluralizes_rows_and_pages_independently() {
         result.terminal = super::super::super::StreamTerminal::Loading;
         assert_eq!(
             super::super::stream_result_view::stream_progress_text(&result),
-            expected.replacen("Complete", "Receiving…", 1)
+            expected.replacen("Complete", "Receiving… (total unknown)", 1)
         );
     }
 }
