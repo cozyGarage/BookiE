@@ -30,6 +30,7 @@ impl GridView {
         self.reset_edit_history();
         self.close_insert_form();
         self.close_import_bar();
+        self.close_structure_bar();
         self.catalog = Catalog {
             connection: format!("{} · {}", session.driver_id, session.label),
             database: session.label.clone(),
@@ -46,6 +47,10 @@ impl GridView {
     }
 
     pub(super) fn connect(&mut self, origin: Origin, cx: &mut Context<Self>) {
+        self.connect_preferring(origin, None, cx);
+    }
+
+    pub(super) fn connect_preferring(&mut self, origin: Origin, prefer: Option<TableInfo>, cx: &mut Context<Self>) {
         if self.reject_view_edits() {
             cx.notify();
             return;
@@ -54,7 +59,7 @@ impl GridView {
         self.begin_background(
             Work::Load,
             cx,
-            move |cancel| open_first_table(&origin, &cancel),
+            move |cancel| open_first_table(&origin, prefer.as_ref(), &cancel),
             |this, opened| match opened {
                 Ok(table) => this.connect_live(table),
                 Err(message) => this.status = message,
@@ -104,6 +109,10 @@ impl GridView {
     }
 
     pub(super) fn reject_view_edits(&mut self) -> bool {
+        if self.save.busy {
+            self.status = "A save is running; wait for it to finish first".into();
+            return true;
+        }
         if !self.has_view_edits() {
             return false;
         }
@@ -184,6 +193,8 @@ impl GridView {
         self.reset_edit_history();
         self.close_insert_form();
         self.close_import_bar();
+        self.close_structure_bar();
+        self.sidebar.fields.clear();
         self.catalog.grid_table = identity.clone();
         self.source = table.clone();
         self.table_source = table;
@@ -213,12 +224,16 @@ enum Opened {
     Empty(Arc<LiveSession>),
 }
 
-fn open_first_table(origin: &Origin, cancellation: &CancellationToken) -> Result<Opened, String> {
+fn open_first_table(
+    origin: &Origin,
+    prefer: Option<&TableInfo>,
+    cancellation: &CancellationToken,
+) -> Result<Opened, String> {
     let session = LiveSession::open_controlled(origin, cancellation)?;
     if cancellation.is_cancelled() {
         return Err("The operation was cancelled.".into());
     }
-    match session.tables.first() {
+    match prefer.and_then(|wanted| session.tables.iter().find(|table| *table == wanted)).or(session.tables.first()) {
         Some(first) => Ok(Opened::Table(Arc::new(session.load_table_controlled(
             first,
             ROW_CAP,
@@ -265,7 +280,7 @@ mod tests {
         let cancellation = tokio_util::sync::CancellationToken::new();
         cancellation.cancel();
         let path = std::env::temp_dir().join(format!("bookie-cancelled-open-{}.sqlite", uuid::Uuid::new_v4()));
-        let result = open_first_table(&Origin::File(PathBuf::from(&path)), &cancellation);
+        let result = open_first_table(&Origin::File(PathBuf::from(&path)), None, &cancellation);
         let was_opened = path.exists();
         let _ = std::fs::remove_file(path);
         assert!(result.is_err(), "cancelled request succeeded");

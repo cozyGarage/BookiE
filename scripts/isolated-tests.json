@@ -360,6 +360,16 @@
     [
       "bookie-app",
       "--lib",
+      "ui::multi_table_export::tests::selects_multiple_qualified_tables_and_validates_optional_limit"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::multi_table_export::tests::export_setup_refuses_invalid_inputs_and_returns_selected_tables"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::grid::row_number_tests::a_shared_base_handle_renumbers_rows_that_are_bound_again"
     ],
     [
@@ -2268,6 +2278,11 @@
       "bookie-app-services",
       "--lib",
       "ssh_chain_secrets::tests::jump_host_secrets_round_trip_through_the_secret_service_and_clear_on_obsolescence"
+    ],
+    [
+      "bookie-storage",
+      "--lib",
+      "audit_journal::tests::audit_journal_keeps_sql_hash_key_and_identifies_keyed_records_after_reopen"
     ],
     [
       "bookie-storage",

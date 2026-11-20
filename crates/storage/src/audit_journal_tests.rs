@@ -3,6 +3,35 @@ use bookie_policy::Principal;
 use tempfile::TempDir;
 
 #[tokio::test]
+#[ignore = "requires a running Secret Service; scripts/test-secret-service.sh provides one"]
+async fn audit_journal_keeps_sql_hash_key_and_identifies_keyed_records_after_reopen() {
+    use sha2::Digest;
+
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("audit.jsonl");
+    let sql = "SELECT * FROM accounts WHERE id = 7";
+    let journal = AuditJournal::open_validated(path.clone()).unwrap();
+    let hash = journal.hash_sql(sql).await.unwrap();
+    let repeated = journal.hash_sql(sql).await.unwrap();
+    let mut event = sample_event(Principal::human_gui());
+    event.sql_hash = hash.value.clone();
+    event.sql_hash_key_id = Some(hash.key_id);
+    journal.append(event).await.unwrap();
+
+    assert_eq!(hash, repeated);
+    assert_ne!(hash.value, hex::encode(sha2::Sha256::digest(sql.as_bytes())));
+    let stored = journal.recent(1).await.unwrap();
+    assert_eq!(stored[0].sql_hash, hash.value);
+    assert_eq!(stored[0].sql_hash_key_id, Some(hash.key_id));
+    drop(journal);
+
+    let reopened = AuditJournal::open_validated(path).unwrap();
+
+    assert_eq!(reopened.hash_sql(sql).await.unwrap(), hash);
+    assert_eq!(reopened.verify_chain().await.unwrap(), 1);
+}
+
+#[tokio::test]
 async fn append_and_verify() {
     let dir = TempDir::new().unwrap();
     let journal = AuditJournal::open_validated(dir.path().join("audit.jsonl")).unwrap();

@@ -1,0 +1,25 @@
+[package]
+name = "bookie-audit"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+name = "bookie_audit"
+path = "src/lib.rs"
+
+[[bin]]
+name = "bookie-audit"
+path = "src/main.rs"
+
+[dependencies]
+bookie-app-services = { path = "../app-services" }
+tokio.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+bookie-policy = { path = "../policy" }
+bookie-storage = { path = "../storage" }
+tempfile.workspace = true

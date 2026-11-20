@@ -4,6 +4,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use async_trait::async_trait;
 use bookie_core::Environment;
 use chrono::{DateTime, Utc};
+use hmac::{Hmac, KeyInit, Mac};
+use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -31,6 +33,24 @@ pub enum AuditError {
 pub enum AuditRecordPhase {
     Intent,
     Outcome,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuditSqlHash {
+    pub value: String,
+    pub key_id: Uuid,
+}
+
+impl AuditSqlHash {
+    pub fn with_key(sql: &str, key_id: Uuid, key: &[u8; 32]) -> Result<Self, AuditError> {
+        let mut mac = Hmac::<Sha256>::new_from_slice(key)
+            .map_err(|_| AuditError::Unavailable("audit SQL hash key is invalid".into()))?;
+        mac.update(sql.as_bytes());
+        Ok(Self {
+            value: hex::encode(mac.finalize().into_bytes()),
+            key_id,
+        })
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -199,6 +219,8 @@ pub struct AuditEvent {
     pub operation_class: AuditOperationClass,
     pub redacted_sql: String,
     pub sql_hash: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sql_hash_key_id: Option<Uuid>,
     pub targets: Vec<String>,
     pub decision_rule: String,
     pub approval_outcome: AuditApprovalOutcome,
@@ -221,6 +243,8 @@ pub struct AuditEvent {
     /// credential material.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub administrative_action: Option<AuditAdministrativeMetadata>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reconciliation: Option<crate::audit_reconciliation::AuditReconciliation>,
 }
 
 impl AuditEvent {
@@ -245,6 +269,7 @@ impl AuditEvent {
             operation_class: AuditOperationClass::Administrative,
             redacted_sql: "[NOT_APPLICABLE]".into(),
             sql_hash: hex::encode(Sha256::digest(action.code().as_bytes())),
+            sql_hash_key_id: None,
             targets: Vec::new(),
             decision_rule: action.code().into(),
             approval_outcome: AuditApprovalOutcome::NotRequired,
@@ -261,6 +286,7 @@ impl AuditEvent {
                 action,
                 affected_count: affected_count.min(u64::MAX as usize) as u64,
             }),
+            reconciliation: None,
         }
     }
 
@@ -318,6 +344,7 @@ impl AuditEvent {
             operation_class: AuditOperationClass::Administrative,
             redacted_sql: "[NOT_APPLICABLE]".into(),
             sql_hash: hex::encode(Sha256::digest(b"transport_attempt")),
+            sql_hash_key_id: None,
             targets: Vec::new(),
             decision_rule: "transport_attempt".into(),
             approval_outcome: AuditApprovalOutcome::NotRequired,
@@ -331,6 +358,7 @@ impl AuditEvent {
             duration_ms: Some(duration_ms),
             transport_attempt: Some(AuditTransportMetadata { client, outcome }),
             administrative_action: None,
+            reconciliation: None,
         }
     }
 }
@@ -360,6 +388,26 @@ fn sanitized_transport_error(category: AuditErrorCategory) -> String {
 #[async_trait]
 pub trait AuditSink: Send + Sync {
     async fn record(&self, event: AuditEvent) -> Result<(), AuditError>;
+
+    async fn hash_sql(&self, sql: &str) -> Result<AuditSqlHash, AuditError> {
+        process_local_sql_hash(sql)
+    }
+}
+
+fn process_local_sql_hash(sql: &str) -> Result<AuditSqlHash, AuditError> {
+    static KEY: std::sync::OnceLock<(Uuid, SecretString)> = std::sync::OnceLock::new();
+    let (key_id, key) = KEY.get_or_init(|| {
+        let mut bytes = [0; 32];
+        bytes[..16].copy_from_slice(Uuid::new_v4().as_bytes());
+        bytes[16..].copy_from_slice(Uuid::new_v4().as_bytes());
+        (Uuid::new_v4(), SecretString::new(hex::encode(bytes).into()))
+    });
+    let decoded = hex::decode(key.expose_secret())
+        .map_err(|_| AuditError::Unavailable("audit SQL hash key is invalid".into()))?;
+    let key: [u8; 32] = decoded
+        .try_into()
+        .map_err(|_| AuditError::Unavailable("audit SQL hash key is invalid".into()))?;
+    AuditSqlHash::with_key(sql, *key_id, &key)
 }
 
 pub struct NullAuditSink;
@@ -464,6 +512,19 @@ impl Drop for PendingWrite<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sql_hashes_correlate_only_within_the_same_install_key() {
+        let sql = "SELECT * FROM accounts WHERE id = 7";
+        let first = AuditSqlHash::with_key(sql, Uuid::from_u128(1), &[1; 32]).unwrap();
+        let same = AuditSqlHash::with_key(sql, Uuid::from_u128(1), &[1; 32]).unwrap();
+        let other = AuditSqlHash::with_key(sql, Uuid::from_u128(2), &[2; 32]).unwrap();
+
+        assert_eq!(first, same);
+        assert_ne!(first.value, other.value);
+        assert_ne!(first.value, hex::encode(Sha256::digest(sql.as_bytes())));
+        assert_eq!(first.key_id, Uuid::from_u128(1));
+    }
 
     #[test]
     fn uncertainty_is_scoped_to_a_connection_generation_but_journal_failure_is_global() {

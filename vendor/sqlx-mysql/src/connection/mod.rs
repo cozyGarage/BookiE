@@ -58,6 +58,18 @@ impl MySqlConnection {
         std::mem::take(&mut self.inner.warning_count)
     }
 
+    /// Reset server session state and discard cached server statement IDs.
+    pub async fn reset_session(&mut self) -> Result<(), Error> {
+        self.inner.stream.wait_until_ready().await?;
+        self.inner.stream.send_packet(&[0x1f][..]).await?;
+        let response = self.inner.stream.recv_ok().await?;
+        self.inner.cache_statement.clear();
+        self.inner.transaction_depth = 0;
+        self.inner.status_flags = response.status;
+        self.inner.warning_count = 0;
+        Ok(())
+    }
+
     pub(crate) fn in_transaction(&self) -> bool {
         self.inner
             .status_flags

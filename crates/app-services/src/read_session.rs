@@ -39,6 +39,13 @@ pub async fn list_saved_connections() -> Result<Vec<ConnectionSummary>, String> 
         .collect())
 }
 
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct TableStructure {
+    pub indexes: Vec<bookie_core::IndexInfo>,
+    pub foreign_keys: Vec<bookie_core::ForeignKeyInfo>,
+    pub referenced_by: Vec<bookie_core::InboundForeignKeyInfo>,
+}
+
 pub struct ReadSession {
     database: Arc<DatabaseService>,
     id: Uuid,
@@ -272,6 +279,48 @@ impl ReadSession {
             .fetch_columns_controlled(table.schema.as_deref(), &table.name, control)
             .await
             .map_err(|error| classify(&error))
+    }
+
+    pub async fn read_structure(
+        &self,
+        table: &TableInfo,
+        capabilities: bookie_core::DriverCapabilities,
+        control: &OperationControl,
+    ) -> Result<TableStructure, DriverFailurePresentation> {
+        let guard = self
+            .database
+            .guard_for_generation(self.id, self.generation, Principal::human_gui())
+            .ok_or(DriverFailurePresentation::Disconnected)?;
+        let schema = table.schema.as_deref();
+        let indexes = if capabilities.supports_index_metadata {
+            guard
+                .fetch_indexes_controlled(schema, &table.name, control)
+                .await
+                .map_err(|error| classify(&error))?
+        } else {
+            Vec::new()
+        };
+        let foreign_keys = if capabilities.supports_foreign_key_metadata {
+            guard
+                .fetch_foreign_keys_controlled(schema, &table.name, control)
+                .await
+                .map_err(|error| classify(&error))?
+        } else {
+            Vec::new()
+        };
+        let referenced_by = if capabilities.supports_foreign_key_metadata {
+            guard
+                .fetch_inbound_foreign_keys_controlled(schema, &table.name, control)
+                .await
+                .map_err(|error| classify(&error))?
+        } else {
+            Vec::new()
+        };
+        Ok(TableStructure {
+            indexes,
+            foreign_keys,
+            referenced_by,
+        })
     }
 
     pub async fn read_catalog(

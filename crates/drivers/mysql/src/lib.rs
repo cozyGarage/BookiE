@@ -154,8 +154,17 @@ impl DatabaseDriver for MysqlDriver {
             .before_acquire(move |connection, _| {
                 let database = std::sync::Arc::clone(&database);
                 Box::pin(async move {
+                    restore_sqlx_session_options(connection).await?;
                     prepare_session(connection, read_only).await?;
                     restore_database(connection, &database).await?;
+                    Ok(true)
+                })
+            })
+            .after_release(|connection, _| {
+                Box::pin(async move {
+                    tokio::time::timeout(std::time::Duration::from_secs(5), connection.reset_session())
+                        .await
+                        .map_err(|_| sqlx::Error::PoolTimedOut)??;
                     Ok(true)
                 })
             })
@@ -774,6 +783,15 @@ impl bookie_core::Transaction for MysqlTransaction {
 
 async fn set_utc_timezone(connection: &mut sqlx::MySqlConnection) -> Result<(), sqlx::Error> {
     sqlx::query("SET time_zone = '+00:00'").execute(connection).await?;
+    Ok(())
+}
+
+async fn restore_sqlx_session_options(connection: &mut sqlx::MySqlConnection) -> Result<(), sqlx::Error> {
+    sqlx::raw_sql(
+        "SET NAMES utf8mb4; SET sql_mode=(SELECT CONCAT(@@sql_mode, ',PIPES_AS_CONCAT,NO_ENGINE_SUBSTITUTION'))",
+    )
+    .execute(connection)
+    .await?;
     Ok(())
 }
 

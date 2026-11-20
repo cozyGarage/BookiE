@@ -19,6 +19,7 @@ pub(crate) struct SaveState {
     pub generation: u64,
     pub banner: Option<(String, bool)>,
     pub banner_serial: u64,
+    pub reconnect_after: Option<bookie_core::TableInfo>,
 }
 
 pub(crate) struct PendingSave {
@@ -27,6 +28,7 @@ pub(crate) struct PendingSave {
     pub done: String,
     pub confirm: &'static str,
     pub note: Option<&'static str>,
+    pub reconnect: Option<bookie_core::TableInfo>,
     pub generation: u64,
     pub table: bookie_core::TableInfo,
 }
@@ -36,6 +38,7 @@ pub(crate) enum SaveRequest {
     Deletes(Vec<Vec<bookie_core::Value>>),
     Insert(Vec<(String, String)>),
     Import(std::path::PathBuf),
+    Structure(bookie_app_services::structure_change_plan::StructureChangeKind, String),
 }
 
 pub(crate) struct ReviewLabels {
@@ -44,6 +47,7 @@ pub(crate) struct ReviewLabels {
     pub review: String,
     pub confirm: &'static str,
     pub note: Option<&'static str>,
+    pub reconnect: Option<bookie_core::TableInfo>,
 }
 
 const MAX_DELETE_ROWS: u64 = 500;
@@ -106,6 +110,7 @@ impl GridView {
             review: format!("Review {count} change(s), then save or cancel"),
             confirm: "Save",
             note: None,
+            reconnect: None,
         };
         self.prepare(live, SaveRequest::Edits(changes), labels, cx);
     }
@@ -149,6 +154,7 @@ impl GridView {
             review: format!("Review the {count} row(s) to delete, then delete or cancel"),
             confirm: "Delete",
             note: Some("Rows that depend on these (foreign keys, triggers) may be affected too."),
+            reconnect: None,
         };
         self.prepare(live, SaveRequest::Deletes(rows), labels, cx);
     }
@@ -188,6 +194,14 @@ impl GridView {
                             plan_row_insert_named(target, &named).map_err(|error| error.to_string())
                         }
                         SaveRequest::Import(file) => plan_file_import(target, &live.driver_id, &file),
+                        SaveRequest::Structure(kind, text) => {
+                            let structure = if kind.needs_structure() {
+                                live.table_structure(&table)?
+                            } else {
+                                Default::default()
+                            };
+                            plan_structure(target, kind, &text, &structure)
+                        }
                     }
                 })
                 .await;
@@ -226,6 +240,7 @@ impl GridView {
                     done: labels.done.replace("{n}", &rows),
                     confirm: labels.confirm,
                     note: labels.note,
+                    reconnect: labels.reconnect,
                     generation,
                     table,
                 });
@@ -284,6 +299,7 @@ impl GridView {
             return;
         }
         self.save.busy = true;
+        self.save.reconnect_after = pending.reconnect.clone();
         self.status = "Saving…".into();
         let write = self
             .save
@@ -292,6 +308,7 @@ impl GridView {
             .filter(|(id, _)| *id == connection_id)
             .map(|(_, write)| write.clone());
         let approvals = self.approval.tx.clone();
+        let opened_with = live.stamp.clone();
         let done = pending.done;
         let (statements, expect_one) = (pending.plan.statements, pending.plan.expect_one);
         cx.spawn(async move |this, cx| {
@@ -300,7 +317,7 @@ impl GridView {
                 .spawn(async move {
                     let write = match write.filter(|write| write.is_current().unwrap_or(false)) {
                         Some(write) => write,
-                        None => Arc::new(WriteSession::open_saved(connection_id, approvals)?),
+                        None => Arc::new(WriteSession::open_saved(connection_id, approvals, opened_with.as_deref())?),
                     };
                     let applied = write.apply(&statements, &expect_one, &tokio_util::sync::CancellationToken::new());
                     Ok::<_, String>((write, applied))
@@ -315,7 +332,17 @@ impl GridView {
         .detach();
     }
 
-    fn finish_save(&mut self, connection_id: uuid::Uuid, done: String, result: SaveOutcome, cx: &mut Context<Self>) {
+    fn reload_after_save_or_reconnect(&mut self, connection_id: uuid::Uuid, text: String, reconnect: Option<bookie_core::TableInfo>, cx: &mut Context<Self>) {
+        if let Some(table) = reconnect {
+            self.status = text;
+            self.connect_preferring(bookie_gpui::live::Origin::Saved(connection_id.to_string()), Some(table), cx);
+        } else {
+            self.reload_after_save(text, cx);
+        }
+    }
+
+    pub(crate) fn finish_save(&mut self, connection_id: uuid::Uuid, done: String, result: SaveOutcome, cx: &mut Context<Self>) {
+        let reconnect = self.save.reconnect_after.take();
         let (write, applied) = match result {
             Ok(done) => done,
             Err(message) => {
@@ -328,22 +355,25 @@ impl GridView {
         self.save.write = applied.is_ok().then(|| (connection_id, write));
         match applied {
             Ok(_) => {
+                self.save.busy = false;
                 self.close_insert_form();
                 self.close_import_bar();
+                self.close_structure_bar();
                 self.show_banner(done.clone(), false, cx);
-                self.reload_after_save(done, cx);
+                self.reload_after_save_or_reconnect(connection_id, done, reconnect, cx);
             }
             Err(failure) if failure.outcome_unknown => {
                 let text = format!(
-                    "The save may or may not have been applied ({}). The table was reloaded; check the data before saving again.",
+                    "The save may or may not have been applied ({}). The table was reloaded; check the data before saving again. If writes stay blocked, use 'Resolve unknown write outcome…' in the command palette.",
                     failure.message
                 );
+                self.save.busy = false;
                 self.show_banner(text.clone(), true, cx);
-                self.reload_after_save(text, cx);
+                self.reload_after_save_or_reconnect(connection_id, text, reconnect, cx);
             }
             Err(failure) => {
                 self.save.busy = false;
-                self.status = format!("Could not save: {}", failure.message);
+                self.status = format!("Could not save: {}", with_resolve_hint(&failure.message));
                 self.show_banner(self.status.clone(), true, cx);
             }
         }
@@ -363,7 +393,7 @@ impl GridView {
                 .border_b_1()
                 .border_color(rgb(theme.border))
                 .when(is_error, |row| row.text_color(rgb(theme.destructive)))
-                .child(div().flex_1().child(text))
+                .child(div().flex_1().min_w_0().child(text))
                 .child(
                     ghost("dismiss-save-banner", "Dismiss", theme).on_click(cx.listener(|this, _, _, cx| {
                         this.dismiss_save_banner(cx);
@@ -424,10 +454,28 @@ impl GridView {
     }
 }
 
-fn expand_home(path: &std::path::Path) -> std::path::PathBuf {
-    match (path.strip_prefix("~"), std::env::var_os("HOME")) {
-        (Ok(rest), Some(home)) => std::path::PathBuf::from(home).join(rest),
-        _ => path.to_path_buf(),
+fn plan_structure(
+    target: SaveTarget<'_>,
+    kind: bookie_app_services::structure_change_plan::StructureChangeKind,
+    text: &str,
+    structure: &bookie_app_services::read_session::TableStructure,
+) -> Result<CellSavePlan, String> {
+    let plan = bookie_app_services::structure_change_plan::plan_structure_change(target, kind, text, structure)
+        .map_err(|error| error.to_string())?;
+    Ok(CellSavePlan {
+        statements: plan.statements,
+        expect_one: Vec::new(),
+        preview: plan.preview,
+    })
+}
+
+pub(crate) fn with_resolve_hint(message: &str) -> String {
+    if message.contains("governed writes are disabled") {
+        format!(
+            "{message}. If a write's result is unknown, decide it with 'Resolve unknown write outcome…' in the command palette"
+        )
+    } else {
+        message.to_string()
     }
 }
 
@@ -440,7 +488,7 @@ fn plan_file_import(
         .get(driver_id)
         .map(|driver| driver.capabilities())
         .unwrap_or_default();
-    let file = expand_home(file);
+    let file = bookie_core::user_path::expand_tilde(file);
     let plan = plan_csv_import(target, capabilities, &file, crate::import_ui::IMPORT_ROW_CAP)
         .map_err(|error| error.to_string())?;
     let cut = if plan.truncated {

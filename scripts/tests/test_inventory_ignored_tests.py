@@ -96,6 +96,18 @@ class InventoryIgnoredTestsTests(unittest.TestCase):
             result.stdout,
         )
 
+    def test_server_smoke_tests_are_classified(self):
+        result = subprocess.run([sys.executable, str(SCRIPT)], cwd=ROOT, capture_output=True, text=True, timeout=120)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("| [postgres_creates_objects_in_the_chosen_schema_including_an_awkward_name](../crates/app-services/tests/schema_context_servers.rs) | Smoke |", result.stdout)
+        self.assertIn("| [mysql_and_mariadb_create_objects_in_the_chosen_database](../crates/app-services/tests/schema_context_servers.rs) | Smoke |", result.stdout)
+        self.assertIn("set SMOKE_PG_*; cargo test -p bookie-app-services --test schema_context_servers", result.stdout)
+        self.assertIn("set SMOKE_MYSQL_*; cargo test -p bookie-app-services --test schema_context_servers", result.stdout)
+        self.assertIn("| [a_session_lists_its_own_temporary_tables_where_the_server_exposes_them](../crates/drivers/mysql/tests/temp_tables_local.rs) | Smoke |", result.stdout)
+        self.assertIn("set SMOKE_MYSQL_*; cargo test -p bookie-driver-mysql --test temp_tables_local", result.stdout)
+        self.assertIn("| [notifications_sent_while_listening_are_collected_up_to_the_limit](../crates/drivers/postgres/tests/notifications_local.rs) | Smoke |", result.stdout)
+        self.assertIn("set SMOKE_PG_*; cargo test -p bookie-driver-postgres --test notifications_local", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

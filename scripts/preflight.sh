@@ -34,6 +34,7 @@ CRATES=(
   bookie-dump
   bookie-mcp
   bookie-agentd
+  bookie-audit
   bookie-driver-postgres
   bookie-driver-mysql
   bookie-driver-sqlite

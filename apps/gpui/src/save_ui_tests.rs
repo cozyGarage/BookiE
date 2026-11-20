@@ -820,3 +820,333 @@ fn a_missing_or_unmatched_file_stops_the_review_keeps_the_bar_and_locks_editing(
     std::fs::remove_file(&path).ok();
     std::fs::remove_file(&unmatched).ok();
 }
+
+fn set_structure_text(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext, text: &str) {
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            let input = view.structure.input.clone().expect("the structure bar has an input");
+            input.update(cx, |input, cx| input.set_content(text, cx));
+        })
+    });
+}
+
+fn scalar_text(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext, sql: &str) -> String {
+    use bookie_gpui::model::CellText;
+    use bookie_gpui::source::ResultSource;
+    view.read_with(cx, |view, _| {
+        let live = view.live.as_ref().expect("a live session");
+        live.run_query(sql, 10).expect("query").row(0)[0].display()
+    })
+}
+
+fn table_columns_of(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext) -> String {
+    scalar_text(view, cx, "SELECT COALESCE(group_concat(name), '') FROM pragma_table_info('orders')")
+}
+
+#[gpui::test]
+fn a_column_is_added_renamed_and_dropped_only_after_each_change_is_reviewed(cx: &mut TestAppContext) {
+    use bookie_app_services::structure_change_plan::StructureChangeKind::{AddColumn, DropColumn, RenameColumn};
+    let path = fixture_copy("structure");
+    let (view, cx) = saving_view(cx, &path);
+    let write = write_session(&path, false);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            let id = view.live.as_ref().and_then(|live| live.writable).expect("writable");
+            view.save.write = Some((id, write));
+        })
+    });
+    let before = table_columns_of(&view, cx);
+    let mut prior = before.clone();
+    for (kind, text, expected) in [
+        (AddColumn, "flag INTEGER", "flag"),
+        (RenameColumn, "flag marker", "marker"),
+        (DropColumn, "marker", ""),
+    ] {
+        cx.update(|_, cx| view.update(cx, |view, cx| view.open_structure_bar(kind, cx)));
+        view.read_with(cx, |view, _| assert!(view.structure.open));
+        set_structure_text(&view, cx, text);
+        cx.update(|_, cx| view.update(cx, |view, cx| view.review_structure(cx)));
+        settle_saving(cx);
+        view.read_with(cx, |view, _| {
+            let pending = view.save.pending.as_ref().unwrap_or_else(|| panic!("no review: {}", view.status));
+            assert!(pending.title.contains(text.split_whitespace().next().unwrap()), "{}", pending.title);
+            assert_ne!(pending.confirm, "Apply", "the button says what it does");
+            assert!(pending.plan.preview.contains("ALTER TABLE"), "{}", pending.plan.preview);
+        });
+        assert_eq!(table_columns_of(&view, cx), prior, "nothing changes before the user confirms");
+        cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_save(cx)));
+        settle_saving(cx);
+        view.read_with(cx, |view, _| {
+            assert!(!view.structure.open, "the bar closes once applied");
+            assert!(view.save.banner.as_ref().is_some_and(|(_, error)| !error), "{:?}", view.save.banner);
+        });
+        let columns = table_columns_of(&view, cx);
+        prior = columns.clone();
+        if expected.is_empty() {
+            assert_eq!(columns, before);
+        } else {
+            assert!(columns.contains(expected), "{columns}");
+        }
+    }
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn a_bad_structure_request_is_refused_before_any_review_and_keeps_the_bar(cx: &mut TestAppContext) {
+    use bookie_app_services::structure_change_plan::StructureChangeKind::DropColumn;
+    let path = fixture_copy("structure-bad");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_structure_bar(DropColumn, cx)));
+    set_structure_text(&view, cx, "no_such_column");
+    cx.update(|_, cx| view.update(cx, |view, cx| view.review_structure(cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert!(view.save.pending.is_none());
+        assert!(view.structure.open);
+        assert!(view.status.contains("no column named"), "{}", view.status);
+        assert!(view.form_open(), "editing stays locked while the bar is open");
+    });
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn a_save_that_finishes_after_the_reload_was_cancelled_still_frees_every_write_feature(cx: &mut TestAppContext) {
+    let path = fixture_copy("busy");
+    let (view, cx) = saving_view(cx, &path);
+    let write = write_session(&path, false);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            let id = view.live.as_ref().and_then(|live| live.writable).expect("writable");
+            view.save.busy = true;
+            view.finish_save(id, "Saved".into(), Ok((write, Ok(vec![1]))), cx);
+            view.invalidate_background();
+        })
+    });
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert!(!view.save.busy, "the write is done, so the save is no longer running: {}", view.status);
+    });
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn opening_a_table_or_running_a_query_is_refused_while_a_save_is_writing(cx: &mut TestAppContext) {
+    let path = fixture_copy("busy-refuse");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.save.busy = true;
+            assert!(view.reject_view_edits());
+            view.run_sql("SELECT 1".into(), cx);
+            assert!(view.status.contains("A save is running"), "{}", view.status);
+        })
+    });
+    std::fs::remove_file(&path).ok();
+}
+
+fn orders_indexes_of(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext) -> String {
+    scalar_text(
+        view,
+        cx,
+        "SELECT COALESCE(group_concat(name), '') FROM pragma_index_list('orders') WHERE origin = 'c'",
+    )
+}
+
+#[gpui::test]
+fn a_unique_index_is_reviewed_created_then_dropped_by_its_live_name_only_on_confirm(cx: &mut TestAppContext) {
+    use bookie_app_services::structure_change_plan::StructureChangeKind::{AddIndex, DropIndex};
+    let path = fixture_copy("indexes");
+    let (view, cx) = saving_view(cx, &path);
+    let write = write_session(&path, false);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            let id = view.live.as_ref().and_then(|live| live.writable).expect("writable");
+            view.save.write = Some((id, write));
+        })
+    });
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_structure_bar(AddIndex, cx)));
+    set_structure_text(&view, cx, "unique by_customer id, customer");
+    cx.update(|_, cx| view.update(cx, |view, cx| view.review_structure(cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        let pending = view.save.pending.as_ref().unwrap_or_else(|| panic!("no review: {}", view.status));
+        assert_eq!(pending.title, "Create unique index by_customer on orders?");
+        assert!(pending.plan.preview.contains("CREATE UNIQUE INDEX"), "{}", pending.plan.preview);
+    });
+    assert_eq!(orders_indexes_of(&view, cx), "", "nothing is created before the user confirms");
+    cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_save(cx)));
+    settle_saving(cx);
+    assert_eq!(orders_indexes_of(&view, cx), "by_customer");
+
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_structure_bar(DropIndex, cx)));
+    set_structure_text(&view, cx, "no_such_index");
+    cx.update(|_, cx| view.update(cx, |view, cx| view.review_structure(cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert!(view.save.pending.is_none());
+        assert!(view.status.contains("no index named"), "{}", view.status);
+    });
+    set_structure_text(&view, cx, "BY_CUSTOMER");
+    cx.update(|_, cx| view.update(cx, |view, cx| view.review_structure(cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        let pending = view.save.pending.as_ref().unwrap_or_else(|| panic!("no review: {}", view.status));
+        assert_eq!(pending.title, "Drop index BY_CUSTOMER on orders?");
+        assert!(pending.plan.preview.contains("by_customer"), "{}", pending.plan.preview);
+    });
+    assert_eq!(orders_indexes_of(&view, cx), "by_customer", "nothing is dropped before the user confirms");
+    cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_save(cx)));
+    settle_saving(cx);
+    assert_eq!(orders_indexes_of(&view, cx), "");
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn the_structure_panel_lists_columns_indexes_and_keys_of_the_open_table_and_closes_on_request(cx: &mut TestAppContext) {
+    let path = fixture_copy("structure-info");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.show_structure(cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        let text = view.structure.info.as_deref().unwrap_or_else(|| panic!("no panel: {}", view.status));
+        assert!(text.starts_with("Columns ("), "{text}");
+        assert!(text.contains("customer"), "{text}");
+        assert!(text.contains("Indexes (") && text.contains("Foreign keys ("), "{text}");
+        assert!(!view.structure_info_enabled(), "one panel at a time");
+    });
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_structure_bar(bookie_app_services::structure_change_plan::StructureChangeKind::AddColumn, cx)));
+    view.read_with(cx, |view, _| assert!(view.structure.info.is_none(), "a change bar replaces the panel"));
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn only_a_table_rename_asks_for_a_reconnect_after_it_is_applied(cx: &mut TestAppContext) {
+    use bookie_app_services::structure_change_plan::StructureChangeKind::{AddColumn, RenameTable};
+    let path = fixture_copy("rename-flag");
+    let (view, cx) = saving_view(cx, &path);
+    for (kind, text, expected) in [(RenameTable, "invoices", true), (AddColumn, "flag INTEGER", false)] {
+        cx.update(|_, cx| view.update(cx, |view, cx| view.open_structure_bar(kind, cx)));
+        set_structure_text(&view, cx, text);
+        cx.update(|_, cx| view.update(cx, |view, cx| view.review_structure(cx)));
+        settle_saving(cx);
+        view.read_with(cx, |view, _| {
+            let pending = view.save.pending.as_ref().unwrap_or_else(|| panic!("no review: {}", view.status));
+            assert_eq!(pending.reconnect.is_some(), expected, "{}", pending.title);
+            assert!(!expected || pending.reconnect.as_ref().is_some_and(|table| table.name == "invoices"));
+        });
+        cx.update(|_, cx| view.update(cx, |view, cx| view.cancel_save(cx)));
+        cx.update(|_, cx| view.update(cx, |view, cx| view.cancel_structure_bar(cx)));
+    }
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn resolving_an_outcome_is_offered_for_a_writable_connection_and_not_while_the_panel_is_open(cx: &mut TestAppContext) {
+    let path = fixture_copy("resolve-offer");
+    let (view, cx) = saving_view(cx, &path);
+    view.read_with(cx, |view, _| {
+        assert!(view.resolve_enabled());
+        assert!(view.resolve_panel_is_closed());
+    });
+    cx.update(|_, cx| view.update(cx, |view, _| view.resolve.open = true));
+    view.read_with(cx, |view, _| assert!(!view.resolve_enabled()));
+    std::fs::remove_file(&path).ok();
+}
+
+#[test]
+fn a_blocked_save_points_to_the_resolve_action_and_other_errors_are_left_alone() {
+    let blocked = "Blocked by policy: governed writes are disabled because a prior audit outcome could not be persisted";
+    assert!(crate::save_ui::with_resolve_hint(blocked).contains("Resolve unknown write outcome"));
+    assert_eq!(crate::save_ui::with_resolve_hint("duplicate key"), "duplicate key");
+}
+
+fn set_export_path(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext, path: &std::path::Path) {
+    let text = path.display().to_string();
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            let input = view.export.file.input.clone().expect("the path field exists once the bar opened");
+            input.update(cx, |input, cx| input.set_content(&text, cx));
+        })
+    });
+}
+
+#[gpui::test]
+fn the_page_is_written_to_a_file_in_the_format_of_its_extension_and_never_over_an_existing_file(cx: &mut TestAppContext) {
+    let path = fixture_copy("export-file");
+    let (view, cx) = saving_view(cx, &path);
+    let directory = std::env::temp_dir().join(format!("bookie-export-{}", std::process::id()));
+    std::fs::create_dir_all(&directory).unwrap();
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_export_file_bar(cx)));
+    view.read_with(cx, |view, _| assert!(view.export.file.open));
+
+    let jsonl = directory.join("rows.jsonl");
+    set_export_path(&view, cx, &jsonl);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.write_export_file(cx)));
+    settle_saving(cx);
+    let written = std::fs::read_to_string(&jsonl).unwrap();
+    assert_eq!(written.lines().count(), 6, "{written}");
+    assert!(written.lines().next().unwrap().starts_with('{'), "{written}");
+    view.read_with(cx, |view, _| assert!(!view.export.file.open && view.status.starts_with("Wrote 6 row(s)")));
+
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_export_file_bar(cx)));
+    let sql = directory.join("rows.sql");
+    set_export_path(&view, cx, &sql);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.write_export_file(cx)));
+    settle_saving(cx);
+    assert!(std::fs::read_to_string(&sql).unwrap().contains("INSERT INTO"), "a table exports as SQL inserts");
+
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_export_file_bar(cx)));
+    set_export_path(&view, cx, &jsonl);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.write_export_file(cx)));
+    view.read_with(cx, |view, _| {
+        assert!(view.status.contains("already exists"), "{}", view.status);
+        assert!(view.export.file.open, "the bar stays so another name can be typed");
+    });
+    set_export_path(&view, cx, &directory.join("rows.txt"));
+    cx.update(|_, cx| view.update(cx, |view, cx| view.write_export_file(cx)));
+    view.read_with(cx, |view, _| assert!(view.status.contains("ending in"), "{}", view.status));
+    assert!(!directory.join("rows.txt").exists());
+    std::fs::remove_dir_all(&directory).ok();
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn dropping_the_table_needs_its_exact_name_then_reviews_the_statement_and_reconnects(cx: &mut TestAppContext) {
+    use bookie_app_services::structure_change_plan::StructureChangeKind::DropTable;
+    let path = fixture_copy("drop-table");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_structure_bar(DropTable, cx)));
+    set_structure_text(&view, cx, "order");
+    cx.update(|_, cx| view.update(cx, |view, cx| view.review_structure(cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert!(view.save.pending.is_none());
+        assert!(view.status.contains("exactly"), "{}", view.status);
+        assert!(view.structure.open, "the bar stays so the name can be fixed");
+    });
+    set_structure_text(&view, cx, "orders");
+    cx.update(|_, cx| view.update(cx, |view, cx| view.review_structure(cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        let pending = view.save.pending.as_ref().unwrap_or_else(|| panic!("no review: {}", view.status));
+        assert_eq!(pending.confirm, "Drop table");
+        assert!(pending.plan.preview.contains("DROP TABLE"), "{}", pending.plan.preview);
+        assert!(pending.reconnect.is_some(), "the open table is gone afterwards");
+    });
+    assert_eq!(order_count(&path), "6", "nothing is dropped before the user confirms");
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn show_create_table_fills_the_panel_with_a_create_statement(cx: &mut TestAppContext) {
+    let path = fixture_copy("create-script");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.show_create_table(cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        let text = view.structure.info.as_deref().unwrap_or_else(|| panic!("no panel: {}", view.status));
+        assert!(text.starts_with("CREATE TABLE"), "{text}");
+        assert!(text.contains("customer"), "{text}");
+    });
+    std::fs::remove_file(&path).ok();
+}

@@ -8,7 +8,6 @@ use bookie_core::{
     OperationControl, QueryResult, QueryResultBatch, ServerMessages, TableInfo, Transaction, Value, check_pre_dispatch,
 };
 use chrono::Utc;
-use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 use crate::approval::{ApprovalOutcome, ApprovalRequest, ApprovalSink};
@@ -227,6 +226,13 @@ impl PolicyGuard {
         self.authorize_with_bound(sql, analysis, None, control, counter).await
     }
 
+    fn refusal_before_policy(&self, analysis: &StatementAnalysis) -> Option<Decision> {
+        analysis.lexical_mode_ambiguous.then(|| Decision::Deny {
+            rule: "session_lexical_mode_ambiguous".into(),
+            message: "SQL token boundaries depend on the database session lexical mode".into(),
+        })
+    }
+
     async fn authorize_with_bound(
         &self,
         sql: &str,
@@ -235,11 +241,7 @@ impl PolicyGuard {
         control: Option<&OperationControl>,
         counter: Option<Counter<'_>>,
     ) -> Result<Authorization, DriverError> {
-        if analysis.lexical_mode_ambiguous {
-            let decision = Decision::Deny {
-                rule: "session_lexical_mode_ambiguous".into(),
-                message: "SQL token boundaries depend on the database session lexical mode".into(),
-            };
+        if let Some(decision) = self.refusal_before_policy(&analysis) {
             return self.resolve_authorization(sql, analysis, decision, None, control).await;
         }
         let facts = &analysis.facts;
@@ -659,7 +661,7 @@ impl PolicyGuard {
             duration_ms,
             rows_skipped,
         } = fields;
-        let sql_hash = hex::encode(Sha256::digest(operation.sql.as_bytes()));
+        let sql_hash = self.ctx.audit.hash_sql(operation.sql).await?;
         let principal = self.ctx.principal.sanitized();
         let error = error_category.map(sanitized_error_detail);
         self.ctx
@@ -676,7 +678,8 @@ impl PolicyGuard {
                 driver_id: self.ctx.driver_id.clone(),
                 operation_class: operation.class,
                 redacted_sql: "[REDACTED]".into(),
-                sql_hash,
+                sql_hash: sql_hash.value,
+                sql_hash_key_id: Some(sql_hash.key_id),
                 targets: operation.targets.clone(),
                 decision_rule: operation.decision_rule.clone(),
                 approval_outcome: operation.approval_outcome,
@@ -690,6 +693,7 @@ impl PolicyGuard {
                 duration_ms,
                 transport_attempt: None,
                 administrative_action: None,
+                reconciliation: None,
             })
             .await
     }

@@ -1978,6 +1978,35 @@ postgres_sidebar_catalog_profile.environment = "local"
 postgres_sidebar_catalog_profile.environment_overrides = {"BOOKIE_UI_STALL_MS": "16"}
 
 
+def postgres_multi_table_export_writes_each_selected_table(_database, base):
+    open_saved_connection(POSTGRES_CONNECTION_NAME)
+    wait_for_frame_containing(f"{POSTGRES_CONNECTION_NAME} — BookiE", timeout=120)
+    wait_for_node(name="public.export_alpha", role=pyatspi.ROLE_LIST_ITEM)
+    invoke_accessible_action("win.export-tables")
+    table_list = wait_for_node(name="Tables to export")
+    selection = table_list.querySelection()
+    assert len(table_list) == 2, "the dedicated PostgreSQL fixture must contain exactly two tables"
+    selection.selectAll()
+    assert selection.nSelectedChildren == 2, accessible_snapshot()
+    wait_for_node(name="Maximum rows (optional)", role=pyatspi.ROLE_TEXT).queryEditableText().setTextContents("1")
+    invoke(wait_for_node(name="Choose destination", role=pyatspi.ROLE_PUSH_BUTTON))
+    chooser = wait_for_node(name="Choose export folder", role=FILE_CHOOSER_ROLES)
+    show_file_chooser_location(chooser)
+    set_visible_editable_within("Choose export folder", FILE_CHOOSER_ROLES, str(base / "home"), action_name="Select")
+    invoke(wait_for_node(name="Select", role=pyatspi.ROLE_PUSH_BUTTON))
+    summary = wait_for_node(name="Table export finished", timeout=120)
+    summary_text = " ".join(node_name(node) for node in descendants(summary))
+    assert "public.export_alpha: 1 rows (limited)" in summary_text, summary_text
+    assert "public.export_beta: 1 rows (limited)" in summary_text, summary_text
+    for name, expected in (("export_alpha", "alpha"), ("export_beta", "beta")):
+        with (base / "home" / f"public.{name}.csv").open(newline="", encoding="utf-8") as handle:
+            rows = list(csv.reader(handle))
+        assert rows == [["value"], [expected]], rows
+
+
+postgres_multi_table_export_writes_each_selected_table.environment = "local"
+
+
 def press_x11_text(text):
     for character in text:
         name = {" ": "space", "_": "underscore", "-": "minus"}.get(character, character)
@@ -3476,6 +3505,8 @@ def main():
     scenarios.extend(gtk_editor_panel.scenarios(sys.modules[__name__]))
     if os.environ.get("BOOKIE_GTK_POSTGRES_PORT"):
         scenarios.extend(gtk_server_messages.scenarios(sys.modules[__name__]))
+    if os.environ.get("BOOKIE_GTK_MULTI_TABLE_FIXTURE"):
+        scenarios.append(postgres_multi_table_export_writes_each_selected_table)
     scenarios.extend(gtk_csv_refresh.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_copy_statements.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_catalog.scenarios(sys.modules[__name__]))

@@ -1,5 +1,5 @@
 mod file;
-mod row_limit;
+pub(crate) mod row_limit;
 mod scope;
 mod spool;
 pub(crate) use scope::ExportScope;
@@ -91,106 +91,8 @@ pub(crate) struct ExportRequest {
     pub(crate) driver_id: String,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum ExportFormat {
-    Csv,
-    Json,
-    JsonLines,
-    Markdown,
-    Html,
-    Xml,
-    Sql,
-    Xlsx,
-}
-
-struct FormatSpec {
-    format: ExportFormat,
-    label: &'static str,
-    extension: &'static str,
-    mime_type: &'static str,
-    csv_options: bool,
-}
-
-const FORMATS: [FormatSpec; 8] = [
-    FormatSpec {
-        format: ExportFormat::Csv,
-        label: "CSV",
-        extension: "csv",
-        mime_type: "text/csv",
-        csv_options: true,
-    },
-    FormatSpec {
-        format: ExportFormat::Json,
-        label: "JSON",
-        extension: "json",
-        mime_type: "application/json",
-        csv_options: false,
-    },
-    FormatSpec {
-        format: ExportFormat::JsonLines,
-        label: "JSON Lines",
-        extension: "jsonl",
-        mime_type: "application/x-ndjson",
-        csv_options: false,
-    },
-    FormatSpec {
-        format: ExportFormat::Markdown,
-        label: "Markdown",
-        extension: "md",
-        mime_type: "text/markdown",
-        csv_options: false,
-    },
-    FormatSpec {
-        format: ExportFormat::Html,
-        label: "HTML",
-        extension: "html",
-        mime_type: "text/html",
-        csv_options: false,
-    },
-    FormatSpec {
-        format: ExportFormat::Xml,
-        label: "XML",
-        extension: "xml",
-        mime_type: "application/xml",
-        csv_options: false,
-    },
-    FormatSpec {
-        format: ExportFormat::Sql,
-        label: "SQL INSERT statements",
-        extension: "sql",
-        mime_type: "application/sql",
-        csv_options: false,
-    },
-    FormatSpec {
-        format: ExportFormat::Xlsx,
-        label: "Excel workbook",
-        extension: "xlsx",
-        mime_type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        csv_options: false,
-    },
-];
-
-impl ExportFormat {
-    fn spec(self) -> &'static FormatSpec {
-        FORMATS.iter().find(|spec| spec.format == self).unwrap_or(&FORMATS[0])
-    }
-
-    fn label(self) -> &'static str {
-        self.spec().label
-    }
-
-    fn extension(self) -> &'static str {
-        self.spec().extension
-    }
-
-    fn mime_type(self) -> &'static str {
-        self.spec().mime_type
-    }
-
-    fn shows_csv_options(self) -> bool {
-        self.spec().csv_options
-    }
-}
+use bookie_core::export::ResultFormat as ExportFormat;
+use bookie_core::export::{insert_target, normalize_duplicate_extension, offered_formats, suggested_file_name};
 
 fn format_subtitle(result: &QueryResult, paged: Option<&PagedExport>) -> String {
     match paged {
@@ -218,14 +120,7 @@ fn available_formats(scope: ExportScope, driver_id: &str, paged: Option<&PagedEx
     if scope == ExportScope::DataDictionary {
         return vec![ExportFormat::Csv, ExportFormat::Markdown];
     }
-    let statements = bookie_core::export::supports_sql_literals(driver_id);
-    let workbook_fits = paged.is_none_or(|paged| paged.total_rows.is_some());
-    FORMATS
-        .iter()
-        .filter(|spec| statements || spec.format != ExportFormat::Sql)
-        .filter(|spec| workbook_fits || spec.format != ExportFormat::Xlsx)
-        .map(|spec| spec.format)
-        .collect()
+    offered_formats(driver_id, paged.is_none_or(|paged| paged.total_rows.is_some()))
 }
 
 fn selected_format(formats: &[ExportFormat], index: u32) -> ExportFormat {
@@ -246,35 +141,6 @@ fn build_sql_group(suggested_name: &str) -> (adw::PreferencesGroup, adw::EntryRo
     });
     group.add(&target);
     (group, target)
-}
-
-fn insert_target(name: &str) -> (Option<String>, String) {
-    match name.rsplit_once('.') {
-        Some((schema, table)) if !schema.is_empty() && !table.is_empty() => {
-            (Some(schema.to_string()), table.to_string())
-        }
-        _ => (None, name.to_string()),
-    }
-}
-
-fn suggested_file_name(name: &str, format: ExportFormat) -> String {
-    let base = FORMATS
-        .iter()
-        .find_map(|spec| name.strip_suffix(&format!(".{}", spec.extension)))
-        .filter(|base| !base.is_empty())
-        .unwrap_or(name);
-    format!("{base}.{}", format.extension())
-}
-
-fn normalize_duplicate_extension(path: std::path::PathBuf, extension: &str) -> std::path::PathBuf {
-    let Some(name) = path.file_name().and_then(std::ffi::OsStr::to_str) else {
-        return path;
-    };
-    let duplicate_suffix = format!(".{extension}.{extension}");
-    if !name.ends_with(&duplicate_suffix) {
-        return path;
-    }
-    path.with_file_name(&name[..name.len() - extension.len() - 1])
 }
 
 pub(crate) fn present(

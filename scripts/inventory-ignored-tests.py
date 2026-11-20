@@ -114,6 +114,7 @@ for path in sorted(
         name = function.group(1)
         reason = match.group(1) or "subprocess helper; invoked by its parent test"
         relative = path.relative_to(root).as_posix()
+        smoke_env = next((env for env in ("SMOKE_PG_*", "SMOKE_MYSQL_*") if env in reason), None)
         if "subprocess" in name or not match.group(1):
             tier, enable = "Helper", "Run parent unit/sandbox test; do not enable globally"
         elif "mssql_kerberos.rs" in relative:
@@ -134,6 +135,10 @@ for path in sorted(
             tier, enable = "Smoke", "VISIBILITY_PG_* env against a disposable PostgreSQL superuser (see the test's module comment)"
         elif "smoke_local" in relative:
             tier, enable = "Smoke", "scripts/smoke-postgres.sh against disposable DB"
+        elif smoke_env:
+            package = package_owning(path, packages)
+            tier = "Smoke"
+            enable = f"set {smoke_env}; cargo test -p {package} --test {path.stem} {name} -- --include-ignored"
         elif "Secret Service" in reason or "secret" in relative:
             if name not in mapped:
                 raise RuntimeError(f"unmapped keyring test: {name}")

@@ -1,5 +1,31 @@
 use super::*;
+use bookie_app_services::structure_change_plan::StructureChangeKind;
 use crate::palette_state::PaletteMode;
+
+fn is_edit_palette_action(id: &str) -> bool {
+    matches!(
+        id,
+        "save-changes"
+            | "undo-edit"
+            | "redo-edit"
+            | "delete-rows"
+            | "insert-row"
+            | "import-csv"
+            | "add-column"
+            | "rename-column"
+            | "drop-column"
+            | "add-index"
+            | "drop-index"
+            | "show-structure"
+            | "show-create-table"
+            | "empty-table"
+            | "drop-table"
+            | "resolve-outcome"
+            | "add-foreign-key"
+            | "rename-table"
+            | "drop-foreign-key"
+    )
+}
 
 impl GridView {
     pub(crate) fn palette_actions(&self) -> Vec<Action> {
@@ -133,6 +159,7 @@ impl GridView {
         vec![
             action("copy", "Copy selected rows", self.selection.is_some()),
             action("copy-csv", "Copy selected rows as CSV", self.selection.is_some()),
+            action("export-file", "Export to a file…", self.export_file_enabled()),
             action("export-csv", "Export current page or selection as CSV", true),
             action("copy-json", "Copy selected rows as JSON", self.selection.is_some()),
             action(
@@ -246,6 +273,19 @@ impl GridView {
                 "Import CSV file…",
                 self.can_save_edits() && self.cell_edit.edits.is_empty() && self.compare.is_none() && !self.form_open(),
             ),
+            action("resolve-outcome", "Resolve unknown write outcome…", self.resolve_enabled()),
+            action("show-create-table", "Show CREATE TABLE", self.structure_info_enabled()),
+            action("empty-table", "Empty the table…", self.structure_change_enabled()),
+            action("drop-table", "Drop the table…", self.structure_change_enabled()),
+            action("show-structure", "Show table structure", self.structure_info_enabled()),
+            action("add-column", "Add a column…", self.structure_change_enabled()),
+            action("rename-column", "Rename a column…", self.structure_change_enabled()),
+            action("drop-column", "Drop a column…", self.structure_change_enabled()),
+            action("add-index", "Create an index…", self.structure_change_enabled()),
+            action("drop-index", "Drop an index…", self.structure_change_enabled()),
+            action("rename-table", "Rename the table…", self.structure_change_enabled()),
+            action("add-foreign-key", "Add a foreign key…", self.foreign_key_change_enabled()),
+            action("drop-foreign-key", "Drop a foreign key…", self.foreign_key_change_enabled()),
             action(
                 "insert-row",
                 "Add a row",
@@ -439,6 +479,7 @@ impl GridView {
             "copy" => self.copy_selection(false, cx),
             "copy-csv" => self.copy_selection_as(CopyFormat::Csv, cx),
             "export-csv" => self.export_selection_or_page(cx),
+            "export-file" => self.open_export_file_bar(cx),
             "set-csv-delimiter" => self.set_csv_delimiter(),
             "reset-csv-delimiter" => self.set_csv_delimiter_to(None),
             "set-export-limit" => self.set_export_limit(),
@@ -496,6 +537,19 @@ impl GridView {
             "redo-edit" => self.redo_edit(cx),
             "delete-rows" => self.request_delete(cx),
             "import-csv" => self.open_import_bar(cx),
+            "show-structure" => self.show_structure(cx),
+            "show-create-table" => self.show_create_table(cx),
+            "empty-table" => self.open_structure_bar(StructureChangeKind::TruncateTable, cx),
+            "drop-table" => self.open_structure_bar(StructureChangeKind::DropTable, cx),
+            "resolve-outcome" => self.open_resolve_panel(cx),
+            "add-column" => self.open_structure_bar(StructureChangeKind::AddColumn, cx),
+            "rename-column" => self.open_structure_bar(StructureChangeKind::RenameColumn, cx),
+            "drop-column" => self.open_structure_bar(StructureChangeKind::DropColumn, cx),
+            "add-index" => self.open_structure_bar(StructureChangeKind::AddIndex, cx),
+            "drop-index" => self.open_structure_bar(StructureChangeKind::DropIndex, cx),
+            "rename-table" => self.open_structure_bar(StructureChangeKind::RenameTable, cx),
+            "add-foreign-key" => self.open_structure_bar(StructureChangeKind::AddForeignKey, cx),
+            "drop-foreign-key" => self.open_structure_bar(StructureChangeKind::DropForeignKey, cx),
             _ => self.open_insert_form(cx),
         }
     }
@@ -508,9 +562,7 @@ impl GridView {
             "shortcuts" => self.open_picker(PaletteMode::Shortcuts, window, cx),
             "save-favorite" => self.save_favorite(cx),
             "favorites" => self.open_picker(PaletteMode::Favorites, window, cx),
-            "save-changes" | "undo-edit" | "redo-edit" | "delete-rows" | "insert-row" | "import-csv" => {
-                self.execute_edit_palette_action(id, cx);
-            }
+            _ if is_edit_palette_action(id) => self.execute_edit_palette_action(id, cx),
             "delete-favorite" => self.open_picker(PaletteMode::DeleteFavorite, window, cx),
             "reveal-sidebar" => self.reveal_in_sidebar(cx),
             "new-connection" => {
