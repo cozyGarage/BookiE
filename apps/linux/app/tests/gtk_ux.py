@@ -719,6 +719,7 @@ GLib.MainLoop().run()
             if approval:
                 ui.invoke(approval)
                 ui.wait_for_node(name="Approve once", present=False)
+            ui.invoke(ui.wait_for_node_containing("SELECT (1)", role=pyatspi.ROLE_PAGE_TAB))
             ui.wait_for_node(name=result_marker, role=pyatspi.ROLE_LABEL)
 
         def show_columns():
