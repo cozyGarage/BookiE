@@ -69,6 +69,7 @@ pub mod request_generation;
 pub mod request_ticket;
 pub mod schema_compare;
 pub mod schema_context;
+pub mod selection_stats;
 pub mod sequence_value;
 pub mod server_messages_view;
 pub mod set_cells;

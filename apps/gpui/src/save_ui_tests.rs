@@ -1186,3 +1186,23 @@ fn one_value_is_staged_on_every_selected_row_of_the_active_column(cx: &mut TestA
     });
     std::fs::remove_file(&path).ok();
 }
+
+#[gpui::test]
+fn the_selected_rows_are_summarised_per_numeric_column(cx: &mut TestAppContext) {
+    let path = fixture_copy("selection-stats");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.show_selection_stats(cx)));
+    view.read_with(cx, |view, _| assert!(!view.selection_stats_enabled()));
+
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.selection = Some(crate::Selection { anchor: 0, focus: 2 });
+            view.show_selection_stats(cx);
+        })
+    });
+    view.read_with(cx, |view, _| {
+        assert!(view.status.contains("id: count 3, min 1, max 3, sum 6"), "{}", view.status);
+        assert!(!view.status.contains("customer"), "text columns are not summarised: {}", view.status);
+    });
+    std::fs::remove_file(&path).ok();
+}
