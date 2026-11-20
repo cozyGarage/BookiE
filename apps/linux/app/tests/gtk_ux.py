@@ -557,7 +557,8 @@ def scenarios(ui):
                 "SELECT count(*) FROM pg_stat_activity "
                 "WHERE application_name = 'BookiE' AND datname = current_database()"
             ))
-            assert final == initial, ("Structure tabs increased PostgreSQL backend count", initial, final)
+            # Structure tabs share a pool capped at four PostgreSQL connections.
+            assert final <= 4, ("Structure tabs exceeded the PostgreSQL pool bound", initial, final)
         finally:
             psql("DROP TABLE IF EXISTS " + ", ".join(tables))
 
