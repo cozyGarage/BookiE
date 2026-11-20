@@ -49,7 +49,7 @@ apps/linux/app/src/ui/ssh_section.rs 9
 apps/linux/app/src/ui/structure_tab/columns.rs 3
 apps/linux/app/src/ui/structure_tab/fks.rs 5
 apps/linux/app/src/ui/structure_tab/indexes.rs 5
-apps/linux/app/src/ui/structure_tab/mod.rs 95
+apps/linux/app/src/ui/structure_tab/mod.rs 47
 apps/linux/app/src/ui/structure_tab_dialogs.rs 2
 crates/agentd/src/audit_isolation_tests.rs 1
 crates/agentd/src/lib.rs 4
