@@ -45,6 +45,19 @@ fn sidebar_catalog_fits(
     retained_bytes.saturating_add(estimated_catalog_bytes(incoming)) <= limit
 }
 
+fn replace_catalog_kind(
+    catalogs: &mut std::collections::HashMap<CatalogObjectKind, Vec<CatalogObject>>,
+    kind: CatalogObjectKind,
+    objects: Vec<CatalogObject>,
+) -> bool {
+    if objects.is_empty() {
+        catalogs.remove(&kind).is_some()
+    } else {
+        catalogs.insert(kind, objects);
+        true
+    }
+}
+
 impl App {
     pub(super) fn reset_sidebar_catalog(&mut self) {
         self.sidebar_catalog.clear();
@@ -105,18 +118,22 @@ impl App {
             return;
         }
         match result {
-            Ok(objects) if objects.is_empty() => {
-                self.show_toast(&bookie_app_services::tr!("Nothing of this kind was found."));
-            }
             Ok(objects) => {
-                if !sidebar_catalog_fits(&self.sidebar_catalog, kind, &objects, MAX_SIDEBAR_CATALOG_BYTES) {
+                if !objects.is_empty()
+                    && !sidebar_catalog_fits(&self.sidebar_catalog, kind, &objects, MAX_SIDEBAR_CATALOG_BYTES)
+                {
                     self.show_toast(&bookie_app_services::tr!(
                         "The catalog exceeds the estimated 64 MiB sidebar limit."
                     ));
                     return;
                 }
-                self.sidebar_catalog.insert(kind, objects);
-                self.repopulate_sidebar(&self.sidebar_tables.clone(), sender);
+                let empty = objects.is_empty();
+                if replace_catalog_kind(&mut self.sidebar_catalog, kind, objects) {
+                    self.repopulate_sidebar(&self.sidebar_tables.clone(), sender);
+                }
+                if empty {
+                    self.show_toast(&bookie_app_services::tr!("Nothing of this kind was found."));
+                }
             }
             Err(message) => self.show_toast(&message),
         }
@@ -179,5 +196,22 @@ mod tests {
         assert!(!current.is_cancelled());
         parent.cancel();
         assert!(current.is_cancelled());
+    }
+
+    #[test]
+    fn an_empty_catalog_response_removes_the_cached_kind() {
+        let mut catalogs = std::collections::HashMap::from([(CatalogObjectKind::Sequence, vec![object("stale")])]);
+
+        assert!(replace_catalog_kind(
+            &mut catalogs,
+            CatalogObjectKind::Sequence,
+            Vec::new()
+        ));
+        assert!(catalogs.is_empty());
+        assert!(!replace_catalog_kind(
+            &mut catalogs,
+            CatalogObjectKind::Sequence,
+            Vec::new()
+        ));
     }
 }
