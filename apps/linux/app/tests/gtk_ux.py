@@ -722,6 +722,10 @@ GLib.MainLoop().run()
             ui.invoke(ui.wait_for_node_containing("SELECT (1)", role=pyatspi.ROLE_PAGE_TAB))
             ui.wait_for_node(name=result_marker, role=pyatspi.ROLE_LABEL)
 
+        def switch_schema(schema):
+            marker = f"{schema}_session_ready"
+            run_active_editor(f"SET search_path TO {schema}; SELECT current_schema() || '_session_ready'", marker)
+
         def show_columns():
             set_active_editor("SELECT * FROM bookie_completion_target WHERE bookie_completion_target")
             editor = visible_editor()
@@ -791,10 +795,7 @@ GLib.MainLoop().run()
             ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
             ui.invoke_accessible_action("win.open-editor")
             ui.invoke(ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON))
-            run_active_editor(
-                f"SET search_path TO {schemas[0]}; SELECT current_schema() || '_session_ready'",
-                f"{schemas[0]}_session_ready",
-            )
+            switch_schema(schemas[0])
             time.sleep(0.5)
             show_columns()
             wait_for_candidate("alpha_only")
@@ -806,20 +807,14 @@ GLib.MainLoop().run()
             set_active_editor("SELECT 1")
             set_active_editor("/* second editor */ SELECT 1;")
             ui.invoke(ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON))
-            run_active_editor(
-                f"SET search_path TO {schemas[1]}; SELECT current_schema() || '_session_ready'",
-                f"{schemas[1]}_session_ready",
-            )
+            switch_schema(schemas[1])
             show_columns()
             wait_for_candidate("beta_only")
             wait_for_candidate("alpha_only", present=False)
             ui.press_x11_key("Escape")
 
             ui.press_x11_key("Tab", ("Control_L",))
-            run_active_editor(
-                f"SET search_path TO {schemas[2]}; SELECT current_schema() || '_session_ready'",
-                f"{schemas[2]}_session_ready",
-            )
+            switch_schema(schemas[2])
             show_columns()
             wait_for_candidate("gamma_only")
             wait_for_candidate("alpha_only", present=False)
