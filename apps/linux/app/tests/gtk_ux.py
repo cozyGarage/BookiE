@@ -803,7 +803,7 @@ GLib.MainLoop().run()
 
             ui.press_x11_key("t", ("Control_L",))
             time.sleep(0.3)
-            ui.invoke_accessible_action("win.focus-editor")
+            set_active_editor("SELECT 1")
             set_active_editor("/* second editor */ SELECT 1;")
             ui.invoke(ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON))
             run_active_editor(
