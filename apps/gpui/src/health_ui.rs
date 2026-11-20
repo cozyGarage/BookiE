@@ -33,6 +33,8 @@ impl GridView {
             "check-for-updates" => self.check_for_updates_now(cx),
             "backup-database" => self.open_backup_bar(false, cx),
             "refresh-table" => self.refresh_table(cx),
+            "open-sql-file" => self.open_sql_file_bar(false, cx),
+            "save-sql-file" => self.open_sql_file_bar(true, cx),
             "restore-database" => self.open_backup_bar(true, cx),
             _ => match health_report_for(id) {
                 Some(report) => self.show_health_report(report, cx),

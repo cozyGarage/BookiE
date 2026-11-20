@@ -9,7 +9,7 @@ use crate::chrome::ghost;
 
 const CONFIRM_WORD: &str = "RESTORE";
 
-fn absolute_path(typed: &str) -> Result<PathBuf, String> {
+pub(crate) fn absolute_path(typed: &str) -> Result<PathBuf, String> {
     let path = bookie_core::user_path::expand_tilde(std::path::Path::new(typed));
     if path.is_absolute() {
         Ok(path)

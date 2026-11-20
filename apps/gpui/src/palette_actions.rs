@@ -71,6 +71,7 @@ impl GridView {
             .chain(self.update_actions())
             .chain(self.backup_actions())
             .chain(self.refresh_actions())
+            .chain(self.sql_file_actions())
             .chain(self.chrome_actions())
             .collect()
     }

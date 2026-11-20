@@ -1387,3 +1387,44 @@ fn refreshing_reloads_the_table_but_never_throws_pending_edits_away(cx: &mut Tes
     });
     std::fs::remove_file(&path).ok();
 }
+
+#[gpui::test]
+fn a_sql_file_opens_into_the_editor_and_the_editor_text_saves_to_a_new_file(cx: &mut TestAppContext) {
+    let path = fixture_copy("sql-files");
+    let (view, cx) = saving_view(cx, &path);
+    let directory = std::env::temp_dir().join(format!("bookie-sqlfiles-{}", std::process::id()));
+    std::fs::create_dir_all(&directory).unwrap();
+    let script = directory.join("in.sql");
+    std::fs::write(&script, "SELECT 'from file';\n").unwrap();
+
+    let type_path = |view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext, saving: bool, file: &std::path::Path| {
+        let text = file.display().to_string();
+        cx.update(|_, cx| {
+            view.update(cx, |view, cx| {
+                view.open_sql_file_bar(saving, cx);
+                let input = view.search.sql_file.input.clone().expect("the path field");
+                input.update(cx, |input, cx| input.set_content(&text, cx));
+                view.run_sql_file(cx);
+            })
+        });
+        settle_saving(cx);
+    };
+    type_path(&view, cx, false, &script);
+    cx.update(|window, cx| view.update(cx, |view, cx| view.apply_opened_sql(window, cx)));
+    view.read_with(cx, |view, cx| {
+        assert_eq!(view.sql_input.read(cx).value().to_string(), "SELECT 'from file';\n", "{}", view.status);
+    });
+
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.sql_input.update(cx, |input, cx| input.set_value("SELECT 'edited';", window, cx));
+        })
+    });
+    let saved = directory.join("out");
+    type_path(&view, cx, true, &saved);
+    assert_eq!(std::fs::read_to_string(directory.join("out.sql")).unwrap(), "SELECT 'edited';");
+    type_path(&view, cx, true, &directory.join("out.sql"));
+    view.read_with(cx, |view, _| assert!(view.status.contains("already exists"), "{}", view.status));
+    std::fs::remove_dir_all(&directory).ok();
+    std::fs::remove_file(&path).ok();
+}
