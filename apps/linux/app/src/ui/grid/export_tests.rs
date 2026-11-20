@@ -227,5 +227,5 @@ fn export_text_table_json_lines_and_value_list_format_rows() {
     assert_eq!(lines[1], r#"{"id":20,"title":null}"#);
 
     let values_list = super::render_value_list("postgres", &columns, &rows);
-    assert_eq!(values_list, "(10, 'Alpha'),\n(20, NULL)");
+    assert_eq!(values_list.unwrap(), "(10, 'Alpha'),\n(20, NULL)");
 }

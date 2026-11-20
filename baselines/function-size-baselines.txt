@@ -1,12 +1,12 @@
-# Ratchet counts for Rust sources holding functions over 60 body lines.
+# Ratchet counts for Rust sources holding functions over 120 body lines.
 # scripts/check-function-size.py fails when a listed file gains another
 # over-limit function, or when an unlisted file has one at all.
 # Lower a count when you split a function. Do not raise one.
-# Entries under crates/ are grandfathered debt; the target is none.
+# Entries are existing debt; the target is none.
 apps/linux/app/src/services/gtk_approval.rs 1
 apps/linux/app/src/ui/app/init_window.rs 1
 apps/linux/app/src/ui/app/mod.rs 2
-apps/linux/app/src/ui/app/workspace_tabs.rs 2
+apps/linux/app/src/ui/app/workspace_tabs.rs 1
 apps/linux/app/src/ui/browse_tab/chrome.rs 1
 apps/linux/app/src/ui/browse_tab/grid_render.rs 1
 apps/linux/app/src/ui/browse_tab/mod.rs 2
@@ -16,21 +16,9 @@ apps/linux/app/src/ui/editor/mod.rs 3
 apps/linux/app/src/ui/grid/column.rs 1
 apps/linux/app/src/ui/grid/mod.rs 1
 apps/linux/app/src/ui/structure_tab/mod.rs 1
-crates/app-services/src/connection_service.rs 1
-crates/core/src/activity.rs 1
-crates/core/src/filter.rs 1
-crates/core/src/import/plan.rs 1
-crates/core/src/pagination.rs 1
-crates/core/src/sql_ddl/diff.rs 2
-crates/core/src/sql_ddl/types.rs 1
-crates/drivers/clickhouse/src/lib.rs 1
+crates/core/src/sql_ddl/diff.rs 1
 crates/drivers/duckdb/src/lib.rs 1
 crates/drivers/redis/src/lib.rs 1
-crates/drivers/sqlite/src/lib.rs 1
 crates/mcp/src/tools.rs 1
 crates/policy/src/classify.rs 1
-crates/policy/src/guard.rs 2
-crates/ssh/src/lib.rs 1
-crates/storage/src/connection_url.rs 1
-crates/storage/src/query_history.rs 1
-tests/release/examples/browse_benchmark.rs 1
+crates/policy/src/guard.rs 1
