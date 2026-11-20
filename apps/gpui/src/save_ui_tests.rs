@@ -1275,7 +1275,11 @@ fn the_schema_diagram_is_written_to_a_new_file_in_the_format_of_its_extension(cx
     };
     type_path(&view, cx, &target);
     let written = read_when_written(cx, &target, |text| text.starts_with("erDiagram"));
-    assert!(written.starts_with("erDiagram") && written.contains("orders") && written.contains("customers"), "{written}");
+    let status = view.read_with(cx, |view, _| view.status.clone());
+    assert!(
+        written.starts_with("erDiagram") && written.contains("orders") && written.contains("customers"),
+        "file: {written:?}; status: {status}"
+    );
     view.read_with(cx, |view, _| assert!(!view.search.diagram.open, "{}", view.status));
 
     type_path(&view, cx, &target);
