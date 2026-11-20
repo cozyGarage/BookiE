@@ -13,8 +13,13 @@ if [[ -n "${BOOKIE_TEST_RUN_ID:-}" && -f "$workspace/src/scripts/cleanup-testcon
   python3 "$workspace/src/scripts/cleanup-testcontainers.py" "$BOOKIE_TEST_RUN_ID" || status=$?
 fi
 
-if [[ "${GITHUB_JOB:-}" == "driver-tls" && "${BOOKIE_TEST_RUN_ID:-}" =~ ^[A-Za-z0-9_-]+$ ]]; then
-  fixture="$workspace/src/tests/fixtures/driver-tls"
+fixture_name=""
+case "${GITHUB_JOB:-}" in
+  driver-tls) fixture_name=driver-tls ;;
+  pg-release) fixture_name=postgres-release ;;
+esac
+if [[ -n "$fixture_name" && "${BOOKIE_TEST_RUN_ID:-}" =~ ^[A-Za-z0-9_-]+$ ]]; then
+  fixture="$workspace/src/tests/fixtures/$fixture_name"
   if [[ -f "$fixture/docker-compose.yml" ]]; then
     docker compose --project-name "$BOOKIE_TEST_RUN_ID" --project-directory "$fixture" \
       -f "$fixture/docker-compose.yml" down --volumes --remove-orphans || status=$?
