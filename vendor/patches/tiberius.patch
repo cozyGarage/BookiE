@@ -1,3 +1,18 @@
+diff --git a/src/client/connection.rs b/src/client/connection.rs
+index 380e489..2bdb9f9 100644
+--- a/src/client/connection.rs
++++ b/src/client/connection.rs
+@@ -510,6 +510,10 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> Connection<S> {
+         Ok(())
+     }
+ 
++    pub(crate) fn expect_next_message(&mut self) {
++        self.flushed = false;
++    }
++
+     /// True if the underlying stream has no more data and is consumed
+     /// completely.
+     pub fn is_eof(&self) -> bool {
 diff --git a/src/client.rs b/src/client.rs
 index dd521e1..a1fa29e 100644
 --- a/src/client.rs
@@ -203,10 +218,48 @@ index d2bfb36..ddb7bf2 100644
          self.packet_size
      }
 diff --git a/src/tds/stream/token.rs b/src/tds/stream/token.rs
-index 8896eaf..658a10b 100644
+index 8896eaf..6f8501f 100644
 --- a/src/tds/stream/token.rs
 +++ b/src/tds/stream/token.rs
-@@ -403,6 +403,7 @@ where
+@@ -219,24 +219,23 @@ where
+     /// received, per MS-TDS section 2.2.1.6. Returns that DONE token so the
+     /// connection is left clean and ready for reuse.
+     pub(crate) async fn flush_done_attention(self) -> crate::Result<TokenDone> {
+-        let mut stream = self.try_unfold();
+-
++        let conn = self.conn;
+         loop {
+-            match stream.try_next().await? {
+-                Some(ReceivedToken::Done(token))
+-                | Some(ReceivedToken::DoneProc(token))
+-                | Some(ReceivedToken::DoneInProc(token))
+-                    if token.is_attention() =>
++            let mut stream = TokenStream::new(&mut *conn).try_unfold();
++            while let Some(token) = stream.try_next().await? {
++                if let ReceivedToken::Done(token)
++                | ReceivedToken::DoneProc(token)
++                | ReceivedToken::DoneInProc(token) = token
+                 {
+-                    return Ok(token);
+-                }
+-                Some(_) => (),
+-                None => {
+-                    return Err(crate::Error::Protocol(
+-                        "Never got a DONE token acknowledging the Attention signal.".into(),
+-                    ))
++                    if token.is_attention() {
++                        return Ok(token);
++                    }
+                 }
+             }
++            drop(stream);
++            // The server may finish the cancelled request in one message and
++            // acknowledge the Attention in a following one.
++            conn.expect_next_message();
+         }
+     }
+ 
+@@ -403,6 +402,7 @@ where
      async fn get_info(&mut self) -> crate::Result<ReceivedToken> {
          let info = TokenInfo::decode(self.conn).await?;
          event!(Level::DEBUG, "{}", info.message);
