@@ -1451,3 +1451,32 @@ fn a_closed_tab_can_be_reopened(cx: &mut TestAppContext) {
     });
     std::fs::remove_file(&path).ok();
 }
+
+#[gpui::test]
+fn closing_a_table_tab_loads_the_table_that_becomes_active(cx: &mut TestAppContext) {
+    let path = fixture_copy("close-loads");
+    let (view, cx) = saving_view(cx, &path);
+    let customers = TableInfo {
+        schema: None,
+        name: "customers".into(),
+    };
+    cx.update(|window, cx| view.update(cx, |view, cx| view.open_table_named(&customers, window, cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| assert_eq!(view.catalog.grid_table, customers, "{}", view.status));
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            let index = view.tabs.active;
+            view.close_tab(index);
+            view.show_current_table(window, cx);
+        })
+    });
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        let bookie_gpui::shell::Tab::Table(shown) = view.tabs.current().clone() else {
+            panic!("a table tab is active");
+        };
+        assert_eq!(shown.name, "orders");
+        assert_eq!(view.catalog.grid_table, shown, "the grid now holds the table whose tab is shown");
+    });
+    std::fs::remove_file(&path).ok();
+}

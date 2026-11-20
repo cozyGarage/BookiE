@@ -35,6 +35,14 @@ impl GridView {
         }
     }
 
+    pub(crate) fn show_current_table(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Tab::Table(table) = self.tabs.current().clone()
+            && table != self.catalog.grid_table
+        {
+            self.open_table_named(&table, window, cx);
+        }
+    }
+
     pub(crate) fn closed_tab_actions(&self) -> Vec<Action> {
         vec![Action {
             id: "reopen-tab",
