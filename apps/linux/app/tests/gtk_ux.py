@@ -709,7 +709,7 @@ GLib.MainLoop().run()
         def set_active_editor(sql):
             visible_editor().queryEditableText().setTextContents(sql)
 
-        def run_active_editor(sql):
+        def run_active_editor(sql, result_marker):
             set_active_editor(sql)
             ui.invoke(ui.wait_for_sensitive_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON))
             try:
@@ -719,10 +719,11 @@ GLib.MainLoop().run()
             if approval:
                 ui.invoke(approval)
                 ui.wait_for_node(name="Approve once", present=False)
-            ui.wait_for_node_containing("done in")
+            ui.wait_for_node(name=result_marker, role=pyatspi.ROLE_LABEL)
 
         def switch_schema(schema):
-            run_active_editor(f"SET search_path TO {schema}")
+            marker = f"{schema}_session_ready"
+            run_active_editor(f"SET search_path TO {schema}; SELECT current_schema() || '_session_ready'", marker)
 
         def show_columns():
             set_active_editor("SELECT * FROM bookie_completion_target WHERE bookie_completion_target")
