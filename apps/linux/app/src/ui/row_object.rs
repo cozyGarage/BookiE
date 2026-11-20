@@ -81,14 +81,12 @@ impl RowObject {
     pub(in crate::ui) fn unloaded(width: usize) -> Self {
         let row: Self = glib::Object::new();
         *row.imp().cells.borrow_mut() = vec![None; width];
-        *row.imp().previews.borrow_mut() = vec![None; width];
         row
     }
 
     pub fn new(cells: Vec<Value>) -> Self {
         let obj: Self = glib::Object::new();
         *obj.imp().cells.borrow_mut() = cells.into_iter().map(Some).collect();
-        *obj.imp().previews.borrow_mut() = vec![None; obj.imp().cells.borrow().len()];
         obj
     }
 
@@ -105,7 +103,6 @@ impl RowObject {
         }
         let obj: Self = glib::Object::new();
         *obj.imp().cells.borrow_mut() = values;
-        *obj.imp().previews.borrow_mut() = vec![None; width];
         Some(obj)
     }
 
@@ -118,7 +115,6 @@ impl RowObject {
         let width = projection.as_ref().map_or(source_row.len(), |indices| indices.len());
         let row: Self = glib::Object::new();
         *row.imp().cells.borrow_mut() = vec![None; width];
-        *row.imp().previews.borrow_mut() = vec![None; width];
         *row.imp().source.borrow_mut() = Some(SharedRow {
             result: Arc::downgrade(result),
             source_index,
@@ -237,13 +233,15 @@ impl RowObject {
 
     fn update_previews(&self, should_preview: impl Fn(usize) -> bool) {
         let len = self.imp().cells.borrow().len();
-        let updates = (0..len)
-            .filter(|index| should_preview(*index))
-            .map(|index| (index, self.with_cell_value(index, preview_value).flatten()))
-            .collect::<Vec<_>>();
         let mut previews = self.imp().previews.borrow_mut();
-        for (index, preview) in updates {
-            previews[index] = preview;
+        for index in (0..len).filter(|index| should_preview(*index)) {
+            let preview = self.with_cell_value(index, preview_value).flatten();
+            if preview.is_some() && previews.is_empty() {
+                previews.resize_with(len, || None);
+            }
+            if let Some(slot) = previews.get_mut(index) {
+                *slot = preview;
+            }
         }
         self.imp().highlight_row_matches.borrow_mut().take();
     }
@@ -333,7 +331,9 @@ impl RowObject {
         let mut cells = self.imp().cells.borrow_mut();
         if idx < cells.len() {
             cells[idx] = Some(value);
-            self.imp().previews.borrow_mut()[idx] = None;
+            if let Some(preview) = self.imp().previews.borrow_mut().get_mut(idx) {
+                *preview = None;
+            }
             self.imp().highlight_row_matches.borrow_mut().take();
             if self
                 .imp()

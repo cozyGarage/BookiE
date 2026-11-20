@@ -5,6 +5,37 @@ use gtk4::prelude::ListModelExt;
 use std::sync::Arc;
 
 #[test]
+fn preview_storage_is_allocated_only_when_a_cell_needs_it() {
+    let row = RowObject::new(vec![Value::Int(1), Value::Text("small".into())]);
+    row.preview_values_from_result();
+    assert!(row.imp().previews.borrow().is_empty());
+    row.set_cell(1, Value::Text("x".repeat(PREVIEW_BYTES + 1)));
+    row.preview_values_from_result();
+    assert!(row.cell_preview(1).is_some());
+    let copy = row.clone_preserving_loading_state();
+    assert_eq!(copy.cell_preview(1), row.cell_preview(1));
+    row.set_cell(1, Value::Text("small".into()));
+    assert!(row.cell_preview(1).is_none());
+    assert!(copy.cell_preview(1).is_some());
+}
+
+#[test]
+fn wide_shared_rows_without_large_cells_do_not_reserve_preview_slots() {
+    let result = Arc::new(QueryResult {
+        columns: Vec::new(),
+        rows: vec![vec![Value::Int(7); 512]].into(),
+        truncated: false,
+    });
+    let row = RowObject::from_shared(&result, 0, None).unwrap();
+    row.preview_values_from_result();
+    assert!(row.imp().previews.borrow().is_empty());
+    assert_eq!(row.cell_value(511), Value::Int(7));
+    row.set_cell(511, Value::Int(8));
+    assert_eq!(row.cell_value(511), Value::Int(8));
+    assert!(row.imp().previews.borrow().is_empty());
+}
+
+#[test]
 fn json_preview_writer_stops_at_its_byte_budget() {
     let mut writer = JsonPreviewWriter {
         prefix: Vec::with_capacity(PREVIEW_BYTES),
