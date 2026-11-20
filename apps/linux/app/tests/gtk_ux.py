@@ -2370,6 +2370,26 @@ GLib.MainLoop().run()
         finally:
             psql(f"DROP FUNCTION IF EXISTS public.{routine}()")
 
+    def postgres_sidebar_empty_catalog_removes_stale_entries(_database, _base):
+        sequence = "bookie_catalog_refresh_probe"
+        psql(f"CREATE SEQUENCE public.{sequence}")
+        try:
+            ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
+            ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
+            ui.wait_for_node(name="people")
+            ui.activate_sidebar_group("Sequences")
+            ui.wait_for_node(name=f"public.{sequence}", role=pyatspi.ROLE_LIST_ITEM)
+            psql(f"DROP SEQUENCE public.{sequence}")
+            ui.activate_sidebar_group("Sequences")
+            ui.activate_sidebar_group("Sequences")
+            ui.wait_for_node(name=f"public.{sequence}", role=pyatspi.ROLE_LIST_ITEM, present=False)
+            ui.wait_for_node(name="Nothing of this kind was found.")
+            ui.wait_for_node(name=f"public.{sequence}", role=pyatspi.ROLE_LIST_ITEM, present=False)
+        finally:
+            psql(f"DROP SEQUENCE IF EXISTS public.{sequence}")
+
+    postgres_sidebar_empty_catalog_removes_stale_entries.requires_editor = False
+
     def postgres_large_stream_pages_round_trip_from_spool(database, base):
         page_size = 5000
         stream_rows = int(os.environ.get("BOOKIE_GTK_STREAM_ROWS", "150000"))
@@ -3451,6 +3471,7 @@ GLib.MainLoop().run()
         result.append(postgres_session_commit_distinguishes_aborted_rollback_from_recovered_commit)
         result.append(postgres_saved_connection_browses_rows_and_values)
         result.append(postgres_sidebar_catalog_lists_routines_inline)
+        result.append(postgres_sidebar_empty_catalog_removes_stale_entries)
         result.append(postgres_hidden_projection_refresh_and_edit_preserve_hidden_value)
         result.append(postgres_reopened_browse_tab_keeps_its_schema_after_switching)
         result.append(postgres_grid_edit_and_delete_commit_to_the_server)

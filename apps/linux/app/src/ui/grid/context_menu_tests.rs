@@ -2,6 +2,16 @@ use super::*;
 use gtk::glib;
 
 #[test]
+fn failed_sql_literal_copy_shows_a_toast_without_copying_to_the_clipboard() {
+    let (sender, receiver) = relm4::channel();
+    send_rendered_copy(&sender, Err("unsupported SQL literal".into()));
+
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let message = runtime.block_on(async { receiver.recv().await }).unwrap();
+    assert!(matches!(message, GridMsg::ShowToast(text) if text == "unsupported SQL literal"));
+}
+
+#[test]
 #[ignore = "requires an isolated GTK display"]
 fn reference_menu_does_not_navigate_from_a_rebound_cell() {
     gtk::init().unwrap();

@@ -20,7 +20,7 @@ pub(super) fn add_text_copy_actions(group: &gio::SimpleActionGroup, setup: &Menu
             column_view,
             columns.clone(),
             selection.clone(),
-            |columns, rows| export::render_tsv(columns, rows, false),
+            |columns, rows| Ok(export::render_tsv(columns, rows, false)),
         ),
         copy_rows_action(
             "copy-rows-headers",
@@ -29,7 +29,7 @@ pub(super) fn add_text_copy_actions(group: &gio::SimpleActionGroup, setup: &Menu
             column_view,
             columns.clone(),
             selection.clone(),
-            |columns, rows| export::render_tsv(columns, rows, true),
+            |columns, rows| Ok(export::render_tsv(columns, rows, true)),
         ),
         copy_rows_action(
             "copy-csv",
@@ -38,7 +38,7 @@ pub(super) fn add_text_copy_actions(group: &gio::SimpleActionGroup, setup: &Menu
             column_view,
             columns.clone(),
             selection.clone(),
-            |columns, rows| export::render_csv(columns, rows, false),
+            |columns, rows| Ok(export::render_csv(columns, rows, false)),
         ),
         copy_rows_action(
             "copy-csv-headers",
@@ -47,7 +47,7 @@ pub(super) fn add_text_copy_actions(group: &gio::SimpleActionGroup, setup: &Menu
             column_view,
             columns.clone(),
             selection.clone(),
-            |columns, rows| export::render_csv(columns, rows, true),
+            |columns, rows| Ok(export::render_csv(columns, rows, true)),
         ),
         copy_rows_action(
             "copy-text-table",
@@ -56,7 +56,7 @@ pub(super) fn add_text_copy_actions(group: &gio::SimpleActionGroup, setup: &Menu
             column_view,
             columns.clone(),
             selection.clone(),
-            export::render_text_table,
+            |columns, rows| Ok(export::render_text_table(columns, rows)),
         ),
     ]);
 }
@@ -76,7 +76,7 @@ pub(super) fn add_structured_copy_actions(group: &gio::SimpleActionGroup, setup:
             column_view,
             columns.clone(),
             selection.clone(),
-            export::render_json,
+            |columns, rows| Ok(export::render_json(columns, rows)),
         ),
         copy_rows_action(
             "copy-markdown",
@@ -85,7 +85,7 @@ pub(super) fn add_structured_copy_actions(group: &gio::SimpleActionGroup, setup:
             column_view,
             columns.clone(),
             selection.clone(),
-            export::render_markdown,
+            |columns, rows| Ok(export::render_markdown(columns, rows)),
         ),
         copy_rows_action(
             "copy-json-lines",
@@ -94,7 +94,7 @@ pub(super) fn add_structured_copy_actions(group: &gio::SimpleActionGroup, setup:
             column_view,
             columns.clone(),
             selection.clone(),
-            export::render_json_lines,
+            |columns, rows| Ok(export::render_json_lines(columns, rows)),
         ),
         copy_rows_action(
             "copy-values-list",
@@ -103,7 +103,13 @@ pub(super) fn add_structured_copy_actions(group: &gio::SimpleActionGroup, setup:
             column_view,
             columns.clone(),
             selection.clone(),
-            move |columns, rows| export::render_value_list(&driver_id, columns, rows),
+            move |columns, rows| {
+                export::render_value_list(&driver_id, columns, rows).map_err(|_| {
+                    bookie_app_services::tr!(
+                        "These values cannot be copied as SQL literals for this database. The clipboard was not changed."
+                    )
+                })
+            },
         ),
     ]);
 }
