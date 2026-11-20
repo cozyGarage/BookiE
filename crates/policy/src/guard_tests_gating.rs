@@ -329,18 +329,26 @@ async fn implicit_transaction_mode_is_denied_before_dispatch_and_audited() {
     assert_eq!(event.terminal_status, AuditTerminalStatus::Denied);
 }
 
+struct TextCapturingApproval(Arc<std::sync::Mutex<Vec<String>>>);
+
+#[async_trait]
+impl ApprovalSink for TextCapturingApproval {
+    async fn request(&self, request: ApprovalRequest) -> ApprovalOutcome {
+        self.0.lock().expect("request lock").push(request.sql);
+        ApprovalOutcome::AllowOnce
+    }
+}
+
 #[tokio::test]
-async fn a_copy_from_stdin_unit_is_denied_before_it_reaches_the_connection() {
+async fn a_copy_unit_runs_after_approval_and_the_prompt_never_shows_its_data() {
     let executes = Arc::new(AtomicUsize::new(0));
-    let approvals = Arc::new(AtomicUsize::new(0));
+    let asked = Arc::new(std::sync::Mutex::new(Vec::new()));
     let audit = Arc::new(SequenceAuditSink::new(vec![]));
     let mut guard_context = context(
         Principal::human_gui(),
-        Environment::Local,
+        Environment::Prod,
         PolicyConfig::default(),
-        Arc::new(CountingApprovalSink {
-            calls: approvals.clone(),
-        }),
+        Arc::new(TextCapturingApproval(asked.clone())),
         audit.clone(),
         Arc::new(AuditState::new()),
     );
@@ -353,14 +361,24 @@ async fn a_copy_from_stdin_unit_is_denied_before_it_reaches_the_connection() {
     guard
         .execute("COPY t (id) FROM STDIN;\n1\n2; DROP TABLE t\n\\.")
         .await
-        .expect_err("a COPY unit with data must be refused");
+        .expect("an approved COPY unit runs");
 
-    assert_eq!(executes.load(Ordering::SeqCst), 0);
-    assert_eq!(approvals.load(Ordering::SeqCst), 0);
+    assert_eq!(executes.load(Ordering::SeqCst), 1);
+    let asked = asked.lock().expect("request lock");
+    assert_eq!(asked.len(), 1);
+    assert!(asked[0].starts_with("COPY t (id) FROM STDIN;"), "{}", asked[0]);
+    assert!(
+        !asked[0].contains("DROP TABLE"),
+        "the prompt showed the data: {}",
+        asked[0]
+    );
     let events = audit.events.lock().expect("audit events");
-    let event = events.last().expect("denial outcome");
-    assert_eq!(event.decision_rule, "copy_from_stdin_unsupported");
-    assert_eq!(event.terminal_status, AuditTerminalStatus::Denied);
+    assert!(
+        events
+            .iter()
+            .all(|event| event.redacted_sql == "[REDACTED]" && !event.decision_rule.contains("unsupported")),
+        "{events:?}"
+    );
 }
 
 #[tokio::test]

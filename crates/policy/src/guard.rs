@@ -242,9 +242,6 @@ impl PolicyGuard {
             };
             return self.resolve_authorization(sql, analysis, decision, None, control).await;
         }
-        if let Some(decision) = crate::rules::unsupported_statement_decision(sql, &self.ctx.driver_id) {
-            return self.resolve_authorization(sql, analysis, decision, None, control).await;
-        }
         let facts = &analysis.facts;
         let effects = facts.effects;
         let env_policy = self
@@ -363,7 +360,7 @@ impl PolicyGuard {
                     environment: self.ctx.environment,
                     connection_id: self.ctx.connection_id,
                     connection_name: self.ctx.connection_name.clone(),
-                    sql: sql.to_string(),
+                    sql: crate::rules::approval_text(sql),
                     facts: facts.clone(),
                     rule: rule.clone(),
                     reason: reason.clone(),

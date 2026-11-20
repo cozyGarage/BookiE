@@ -1,7 +1,7 @@
 use bookie_core::sql_lex::{CopyIn, copy_in_parts};
 use bookie_core::{DriverError, QueryResult, QueryRows};
+use sqlx::Postgres;
 use sqlx::pool::PoolConnection;
-use sqlx::{Connection as SqlxConnection, Postgres};
 
 use crate::errors::map_sqlx_error;
 

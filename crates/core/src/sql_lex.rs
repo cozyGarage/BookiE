@@ -197,6 +197,22 @@ fn statement_spans(sql: &str, driver_id: &str) -> Vec<(usize, usize)> {
     spans
 }
 
+pub(crate) fn copy_data_ranges(sql: &str, driver_id: &str) -> Vec<(usize, usize)> {
+    if driver_id != "postgres" {
+        return Vec::new();
+    }
+    statement_spans(sql, driver_id)
+        .into_iter()
+        .filter_map(|(start, end)| {
+            let unit = sql.get(start..end)?;
+            let lead = unit.len() - unit.trim_start().len();
+            let semicolon = first_semicolon(unit.trim_start(), driver_id)?;
+            copy_in_parts(unit, driver_id)?;
+            Some((start + lead + semicolon + 1, end))
+        })
+        .collect()
+}
+
 fn first_semicolon(sql: &str, driver_id: &str) -> Option<usize> {
     let bytes = sql.as_bytes();
     let mut index = 0usize;
