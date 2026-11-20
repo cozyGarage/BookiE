@@ -152,6 +152,51 @@ impl ReadSessionStore {
         self.open(saved, label, control).await
     }
 
+    pub async fn export_tables_to_folder(
+        &self,
+        id: SessionId,
+        tables: Vec<TableInfo>,
+        job: crate::export_tables::TablesExportJob,
+        cancel: &tokio_util::sync::CancellationToken,
+    ) -> Result<Vec<crate::export_tables::TableResult>, String> {
+        let session = self.get(id).ok_or("The connection is closed")?;
+        let (connection, generation, _) = session.backup_identity();
+        let driver_id = session.driver_id.clone();
+        let driver = self
+            .registry
+            .get(&driver_id)
+            .ok_or("The database driver is not available")?;
+        if !driver.capabilities().supports_snapshot_export {
+            return Err("This connection does not support consistent table export.".into());
+        }
+        let guard = self
+            .database
+            .guard_for_generation(connection, generation, bookie_policy::Principal::human_gui())
+            .ok_or("The connection is closed")?;
+        let control = crate::operation_control::bounded_with(job.timeout_secs, cancel.clone());
+        let targets = crate::export_tables::prepare_targets(&guard, tables, &control).await?;
+        let guard = Arc::new(guard);
+        let handle = tokio::runtime::Handle::current();
+        let cancel = cancel.clone();
+        tokio::task::spawn_blocking(move || {
+            let csv = bookie_core::export::CsvOptions::default();
+            let request = crate::export_tables::TableExportRequest {
+                driver_id: &driver_id,
+                tables: &targets,
+                directory: &job.directory,
+                format: bookie_core::export::ResultFormat::Csv,
+                extension: "csv",
+                csv: &csv,
+                max_rows_per_table: job.max_rows_per_table,
+                timeout_secs: job.timeout_secs,
+            };
+            let run: crate::export_pages::PageRunner = Arc::new(move |future| handle.block_on(future));
+            crate::export_tables::export_tables(guard, driver.as_ref(), &request, &run, &cancel, |_, _| {})
+        })
+        .await
+        .unwrap_or_else(|_| Err("The export task stopped unexpectedly.".into()))
+    }
+
     pub async fn run_backup_job(
         &self,
         id: SessionId,
@@ -691,5 +736,50 @@ mod tests {
             .run_backup_job(read_only.session_id, job, directory.path(), &control)
             .await;
         assert!(matches!(result, Err(DriverError::ReadOnly)), "{result:?}");
+    }
+
+    fn export_job(directory: &std::path::Path) -> crate::export_tables::TablesExportJob {
+        crate::export_tables::TablesExportJob {
+            directory: directory.to_path_buf(),
+            max_rows_per_table: Some(10),
+            timeout_secs: 5,
+        }
+    }
+
+    #[tokio::test]
+    async fn exporting_tables_on_a_closed_session_is_refused() {
+        let (store, _, directory, _) = sqlite_store_with_session(false).await;
+        let result = store
+            .export_tables_to_folder(
+                SessionId::new(),
+                vec![TableInfo {
+                    schema: None,
+                    name: "items".into(),
+                }],
+                export_job(directory.path()),
+                &tokio_util::sync::CancellationToken::new(),
+            )
+            .await;
+        assert!(result.unwrap_err().contains("closed"));
+    }
+
+    #[tokio::test]
+    async fn a_connection_without_a_consistent_snapshot_cannot_export_tables_and_writes_nothing() {
+        let (store, session, directory, _) = sqlite_store_with_session(false).await;
+        let out = directory.path().join("export");
+        std::fs::create_dir_all(&out).unwrap();
+        let result = store
+            .export_tables_to_folder(
+                session,
+                vec![TableInfo {
+                    schema: None,
+                    name: "items".into(),
+                }],
+                export_job(&out),
+                &tokio_util::sync::CancellationToken::new(),
+            )
+            .await;
+        assert!(result.unwrap_err().contains("consistent table export"));
+        assert_eq!(std::fs::read_dir(&out).unwrap().count(), 0);
     }
 }
