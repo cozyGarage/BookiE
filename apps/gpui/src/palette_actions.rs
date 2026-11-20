@@ -61,6 +61,7 @@ impl GridView {
             .chain(self.export_limit_actions())
             .chain(self.grid_actions())
             .chain(self.activity_actions())
+            .chain(self.health_actions())
             .chain(self.chrome_actions())
             .collect()
     }
@@ -601,6 +602,7 @@ impl GridView {
             "run" => self.run_query(cx),
             "explain" => self.explain_query(cx),
             "data-dictionary" => self.show_data_dictionary(cx),
+            id if let Some(report) = crate::health_ui::health_report_for(id) => self.show_health_report(report, cx),
             "previous-run" => self.activate_run(self.run_tabs.active - 1),
             "next-run" => self.activate_run(self.run_tabs.active + 1),
             "close-run" => self.close_run(self.run_tabs.active),

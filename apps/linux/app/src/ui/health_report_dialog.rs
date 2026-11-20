@@ -7,7 +7,9 @@ use relm4::adw::prelude::*;
 use relm4::{adw, gtk};
 use tokio_util::sync::CancellationToken;
 
-use bookie_app_services::health_report::{HealthRow, HealthRows, run_health_report};
+use bookie_app_services::health_report::{
+    HealthRow, HealthRows, report_hint, report_label, rows_status, run_health_report,
+};
 use bookie_app_services::tr;
 use bookie_core::HealthReport;
 
@@ -27,36 +29,6 @@ struct Panel {
     list: gtk::ListBox,
     status: gtk::Label,
     in_flight: RefCell<CancellationToken>,
-}
-
-fn report_label(report: HealthReport) -> String {
-    match report {
-        HealthReport::TableVacuum => tr!("Dead rows and vacuum"),
-        HealthReport::EstimatedBloat => tr!("Estimated bloat"),
-        HealthReport::UnusedIndexes => tr!("Unused indexes"),
-        HealthReport::DuplicateIndexes => tr!("Duplicate indexes"),
-        HealthReport::SeqScanHeavy => tr!("Sequential scans"),
-    }
-}
-
-fn report_hint(report: HealthReport) -> String {
-    match report {
-        HealthReport::TableVacuum => {
-            tr!("Tables with the most dead rows, with their size and last vacuum and analyze.")
-        }
-        HealthReport::EstimatedBloat => {
-            tr!("A rough estimate from the share of dead rows in tables of 1 MiB or more. It is not a measurement.")
-        }
-        HealthReport::UnusedIndexes => tr!(
-            "Non-unique indexes never scanned since the statistics were last reset. Check how long the statistics have run before dropping one."
-        ),
-        HealthReport::DuplicateIndexes => {
-            tr!("Indexes whose leading columns are already covered by another index on the same table.")
-        }
-        HealthReport::SeqScanHeavy => {
-            tr!("Tables of 10,000 rows or more that are read by sequential scans more often than by an index.")
-        }
-    }
 }
 
 pub(crate) fn present(parent: &gtk::Window, source: HealthReportSource) {
@@ -152,19 +124,6 @@ fn show_rows(panel: &Panel, report: HealthReport, rows: &HealthRows) {
     panel.status.set_text(&rows_status(report, rows));
 }
 
-fn rows_status(report: HealthReport, rows: &HealthRows) -> String {
-    if rows.rows.is_empty() {
-        return tr!("Nothing to report. {hint}").replace("{hint}", &report_hint(report));
-    }
-    let shown = tr!("{count} rows. {hint}")
-        .replace("{count}", &rows.rows.len().to_string())
-        .replace("{hint}", &report_hint(report));
-    if rows.may_have_more {
-        return format!("{shown} {}", tr!("Only the top rows are shown."));
-    }
-    shown
-}
-
 fn clear(list: &gtk::ListBox) {
     while let Some(child) = list.first_child() {
         list.remove(&child);
@@ -204,33 +163,6 @@ fn row_widget(row: &HealthRow, open_in_editor: &Rc<dyn Fn(String)>) -> adw::Acti
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn every_report_has_its_own_label_and_hint() {
-        let labels: Vec<String> = HealthReport::ALL.iter().map(|report| report_label(*report)).collect();
-        let mut unique = labels.clone();
-        unique.sort();
-        unique.dedup();
-        assert_eq!(unique.len(), labels.len());
-        assert!(HealthReport::ALL.iter().all(|report| !report_hint(*report).is_empty()));
-    }
-
-    #[test]
-    fn the_status_says_when_the_list_is_cut_at_the_limit() {
-        let page = |count: usize, may_have_more: bool| HealthRows {
-            rows: (0..count)
-                .map(|index| HealthRow {
-                    title: format!("s.t{index}"),
-                    summary: String::new(),
-                    diagnostic_sql: None,
-                })
-                .collect(),
-            may_have_more,
-        };
-        assert!(rows_status(HealthReport::UnusedIndexes, &page(0, false)).starts_with("Nothing to report."));
-        assert!(rows_status(HealthReport::UnusedIndexes, &page(3, false)).starts_with("3 rows."));
-        assert!(rows_status(HealthReport::UnusedIndexes, &page(50, true)).ends_with("Only the top rows are shown."));
-    }
 
     #[test]
     #[ignore = "requires an isolated GTK display"]

@@ -1206,3 +1206,18 @@ fn the_selected_rows_are_summarised_per_numeric_column(cx: &mut TestAppContext) 
     });
     std::fs::remove_file(&path).ok();
 }
+
+#[gpui::test]
+fn health_reports_are_offered_only_on_postgres(cx: &mut TestAppContext) {
+    let path = fixture_copy("health-sqlite");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            assert!(!view.health_supported());
+            assert!(view.health_actions().is_empty());
+            view.show_health_report(bookie_core::HealthReport::TableVacuum, cx);
+        })
+    });
+    view.read_with(cx, |view, _| assert!(view.status.contains("PostgreSQL"), "{}", view.status));
+    std::fs::remove_file(&path).ok();
+}
