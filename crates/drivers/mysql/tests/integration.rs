@@ -36,6 +36,8 @@ mod server_stop_class;
 mod session_use_and_loss;
 #[path = "support/shared_container.rs"]
 mod shared_container;
+#[path = "support/temporary_tables.rs"]
+mod temporary_tables;
 
 #[path = "shared/mysql_atomic.rs"]
 mod mysql_atomic;
