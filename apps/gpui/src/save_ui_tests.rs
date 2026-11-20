@@ -1184,9 +1184,9 @@ fn a_filter_is_saved_by_name_applied_again_and_deleted_and_an_unshowable_one_say
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
             view.search.filter.update(cx, |input, cx| input.set_content("", cx));
-            view.apply_saved_filter("only ada", cx);
         })
     });
+    cx.update(|_, cx| view.update(cx, |view, cx| view.apply_saved_filter("only ada", cx)));
     settle_saving(cx);
     view.read_with(cx, |view, cx| {
         assert_eq!(view.current_filter_text(cx), "customer = Ada");
@@ -1220,6 +1220,40 @@ fn a_filter_is_saved_by_name_applied_again_and_deleted_and_an_unshowable_one_say
         assert_eq!(view.search.saved.names, vec!["range".to_string()]);
     });
     std::fs::remove_file(&store).ok();
+}
+
+#[gpui::test]
+fn a_saved_filter_keeps_the_trailing_space_of_its_text(cx: &mut TestAppContext) {
+    let path = fixture_copy("saved-filters-exact");
+    let (view, cx) = saving_view(cx, &path);
+    let store = std::env::temp_dir().join(format!("bookie-filters-exact-{}.json", std::process::id()));
+    std::fs::remove_file(&store).ok();
+    let id = view.read_with(cx, |view, _| {
+        view.live
+            .as_ref()
+            .and_then(|live| live.saved.as_ref().map(|(id, _)| *id))
+            .unwrap()
+    });
+    let seeded = bookie_app_services::named_filter_presets::NamedFilterPresetsStore::load_at(store.clone());
+    let padded = bookie_app_services::simple_filter::simple_filter_set(
+        "customer",
+        bookie_app_services::simple_filter::SimpleOp::Eq,
+        "Ada ",
+    );
+    seeded.save(id, None, "orders", "padded", padded).unwrap();
+    seeded.flush().unwrap();
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.search.saved = crate::saved_filters_ui::SavedFilters::at(store.clone());
+            view.apply_saved_filter("padded", cx);
+        })
+    });
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.dataset_count(), 0, "\"Ada \" with its space matches no row: {}", view.status);
+    });
+    std::fs::remove_file(&store).ok();
+    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]

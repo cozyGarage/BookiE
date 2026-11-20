@@ -60,18 +60,19 @@ impl GridView {
     }
 
     pub(crate) fn apply_filter(&mut self, cx: &mut Context<Self>) {
+        let content = self.search.filter.read(cx).content().to_string();
+        match parse_predicate(&content, self.source.columns()) {
+            Ok(predicate) => self.apply_predicate(predicate, &content, cx),
+            Err(message) => self.status = message,
+        }
+    }
+
+    pub(crate) fn apply_predicate(&mut self, predicate: Predicate, line: &str, cx: &mut Context<Self>) {
         if matches!(self.tabs.current(), Tab::Query) && self.run_tabs.slots.is_empty() {
             return;
         }
-        let predicate = match parse_predicate(self.search.filter.read(cx).content(), self.source.columns()) {
-            Ok(predicate) => predicate,
-            Err(message) => {
-                self.status = message;
-                return;
-            }
-        };
         let source = self.source.clone();
-        let label = format!("Filter {}", self.search.filter.read(cx).content());
+        let label = format!("Filter {line}");
         self.status = "Filtering…".into();
         self.begin_background(
             Work::Scan,

@@ -41,6 +41,14 @@ fn operator_word(op: SimpleOp) -> &'static str {
     }
 }
 
+fn model_op(op: SimpleOp) -> Op {
+    match op {
+        SimpleOp::Contains => Op::Contains,
+        SimpleOp::Eq => Op::Equals,
+        SimpleOp::NotEq => Op::NotEquals,
+    }
+}
+
 fn simple_op(op: Op) -> SimpleOp {
     match op {
         Op::Contains => SimpleOp::Contains,
@@ -129,13 +137,24 @@ impl GridView {
             self.status = format!("The filter \u{201c}{name}\u{201d} uses rules GPUI cannot show yet");
             return;
         };
+        let columns = self.source.columns();
+        let Some(index) = columns.iter().position(|meta| meta.name == column) else {
+            self.status = format!("The filter \u{201c}{name}\u{201d} names the column {column}, which this table does not have");
+            return;
+        };
+        if text.len() > 256 {
+            self.status = "The text to match is longer than 256 characters".into();
+            return;
+        }
         let line = format!("{column} {} {text}", operator_word(op));
         self.search.filter_visible = true;
-        self.search.filter.update(cx, |input, cx| input.set_content(&line, cx));
-        cx.spawn(async move |this, cx| {
-            this.update(cx, |this, cx| this.apply_filter(cx)).ok();
-        })
-        .detach();
+        self.search.filter.update(cx, |input, cx| input.set_content_quiet(&line, cx));
+        let predicate = Predicate {
+            column: index,
+            op: model_op(op),
+            text,
+        };
+        self.apply_predicate(predicate, &line, cx);
     }
 
     pub(crate) fn delete_saved_filter(&mut self, name: &str, cx: &mut Context<Self>) {
