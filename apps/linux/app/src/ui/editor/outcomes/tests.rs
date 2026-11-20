@@ -454,6 +454,7 @@ fn cursor_page(values: &[i64], has_next_page: bool) -> bookie_core::QueryCursorP
             truncated: false,
         },
         has_next_page,
+        messages: Default::default(),
     }
 }
 
@@ -790,6 +791,42 @@ async fn postgres_editor_streams_pages_in_order_with_one_fetch_in_flight() {
     assert_eq!(counters.fetched.load(std::sync::atomic::Ordering::SeqCst), 2);
     assert_eq!(counters.closed.load(std::sync::atomic::Ordering::SeqCst), 1);
     assert_eq!(counters.rolled_back.load(std::sync::atomic::Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn postgres_editor_keeps_cursor_server_messages_with_their_page() {
+    let mut page = cursor_page(&[7], false);
+    page.messages.push(bookie_core::ServerMessage::new(
+        bookie_core::MessageSeverity::Notice,
+        None,
+        "cursor notice",
+    ));
+    let received = std::sync::Arc::new(std::sync::Mutex::new(bookie_core::ServerMessages::default()));
+    let delivered = received.clone();
+    let result = run_statements_with_stream(
+        StatementRun {
+            target: cursor_target(vec![Ok(page)], std::sync::Arc::new(CursorCounters::default())),
+            statements: vec!["SELECT notice_fn()".into()],
+            driver_id: "postgres",
+            parameter_values: &Default::default(),
+            control: &crate::services::operation_control::bounded(30),
+            error_policy: BatchErrorPolicy::StopScript,
+            settings_check: None,
+            succeeded: |_: &str| {},
+        },
+        move |update| {
+            let received = delivered.clone();
+            Box::pin(async move {
+                if let StreamUpdate::Page { messages, .. } = update {
+                    received.lock().unwrap().extend(messages);
+                }
+                true
+            })
+        },
+    )
+    .await;
+    assert!(matches!(result, ScriptRunResult::Streamed(StreamTerminal::Complete)));
+    assert_eq!(received.lock().unwrap().iter().next().unwrap().text, "cursor notice");
 }
 
 #[tokio::test]

@@ -1,9 +1,10 @@
 use async_trait::async_trait;
 use bookie_core::{
     ConnectOptions, DriverError, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBatch, Value,
-    check_pre_dispatch, run_server_cancellable,
+    check_pre_dispatch,
 };
 
+use crate::attention;
 use crate::variant_guard::is_unsupported_result;
 use crate::{MssqlClient, open_for, run_batch_sets, run_query_sets};
 
@@ -29,13 +30,15 @@ impl MssqlSession {
             .client
             .take()
             .ok_or_else(|| DriverError::Internal("the session's connection was lost".into()))?;
-        let execution = async {
-            match params.is_empty() {
-                true => run_batch_sets(&mut client, sql, MAX_QUERY_ROWS, retain_additional_sets).await,
-                false => run_query_sets(&mut client, sql, params, MAX_QUERY_ROWS, retain_additional_sets).await,
-            }
-        };
-        let result = run_server_cancellable(execution, async { Ok(()) }, |_| false, control).await;
+        let result: Result<QueryResultBatch, DriverError> = async {
+            attention::with_attention!(client, control, async {
+                match params.is_empty() {
+                    true => run_batch_sets(&mut client, sql, MAX_QUERY_ROWS, retain_additional_sets).await,
+                    false => run_query_sets(&mut client, sql, params, MAX_QUERY_ROWS, retain_additional_sets).await,
+                }
+            })
+        }
+        .await;
         if !matches!(
             result,
             Err(DriverError::OperationOutcomeUnknown { .. } | DriverError::Disconnected)

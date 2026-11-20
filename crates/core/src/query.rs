@@ -167,6 +167,7 @@ impl Default for QueryCursorId {
 pub struct QueryCursorPage {
     pub result: QueryResult,
     pub has_next_page: bool,
+    pub messages: ServerMessages,
 }
 
 #[derive(Debug, Default)]

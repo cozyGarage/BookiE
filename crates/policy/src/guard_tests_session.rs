@@ -352,6 +352,42 @@ async fn mysql_session_skips_lexical_settings_lookup_for_mode_stable_sql() {
 }
 
 #[tokio::test]
+async fn postgres_copy_from_stdin_is_refused_before_dispatch_on_a_read_only_connection() {
+    let h = harness(SessionScript::default(), true);
+    let mut session = h.guard.open_session().await.expect("open session");
+
+    let error = run(&mut session, "COPY items (id) FROM STDIN;\n1\n\\.")
+        .await
+        .expect_err("a read-only connection must refuse COPY FROM STDIN");
+
+    assert!(matches!(error, DriverError::PolicyDenied(_)), "{error:?}");
+    assert!(h.script.sent.lock().expect("sent lock").is_empty());
+}
+
+#[tokio::test]
+async fn postgres_copy_from_stdin_is_refused_before_dispatch_for_an_agent() {
+    let h = harness_with_principal(
+        SessionScript::default(),
+        false,
+        "postgres",
+        Principal::Agent {
+            token: "raw-agent-token".into(),
+            client: Some("copy-test".into()),
+            model: None,
+        },
+        Environment::Local,
+    );
+    let mut session = h.guard.open_session().await.expect("open session");
+
+    let error = run(&mut session, "COPY items (id) FROM STDIN;\n1\n\\.")
+        .await
+        .expect_err("agents must be refused COPY FROM STDIN before dispatch");
+
+    assert!(matches!(error, DriverError::PolicyDenied(_)), "{error:?}");
+    assert!(h.script.sent.lock().expect("sent lock").is_empty());
+}
+
+#[tokio::test]
 async fn postgres_read_only_begin_is_audited_as_a_read_and_refuses_writes_before_dispatch() {
     let h = harness(SessionScript::default(), false);
     let mut session = h.guard.open_session().await.expect("open session");

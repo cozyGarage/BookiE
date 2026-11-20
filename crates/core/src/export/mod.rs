@@ -33,7 +33,7 @@ pub use csv::{
 pub use error::ExportError;
 pub use file::{ResultExport, ResultFormat, SqlTarget, write_result_file};
 pub use format::{insert_target, normalize_duplicate_extension, offered_formats, suggested_file_name};
-pub use in_clause::{InClause, render_in_clause, render_value_list};
+pub use in_clause::{InClause, ValueListError, render_in_clause, render_value_list};
 pub use json::{json_field_names, render_json, render_json_lines, render_row_json, row_to_json};
 pub use markdown::render_markdown;
 pub use paged::{RowPage, write_paged_file, write_paged_file_no_replace};

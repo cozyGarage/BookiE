@@ -51,6 +51,16 @@ fn an_agent_with_writes_allowed_is_still_denied_host_and_administrative_reach() 
 }
 
 #[test]
+fn an_agent_cannot_run_copy_from_stdin_even_when_other_writes_are_allowed() {
+    assert!(denied(
+        "COPY items (id) FROM STDIN;\n1\n\\.",
+        "postgres",
+        WritePolicy::Allow,
+        false,
+    ));
+}
+
+#[test]
 fn an_agent_without_write_permission_cannot_run_a_write_hidden_in_another_form() {
     for (sql, driver) in [
         ("EXPLAIN ANALYZE DELETE FROM t WHERE id = 1", "postgres"),

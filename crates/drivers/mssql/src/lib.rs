@@ -19,6 +19,7 @@ use bookie_core::{
 use errors::*;
 use schema_types::*;
 
+mod attention;
 mod catalog;
 mod codec;
 mod errors;
@@ -328,6 +329,13 @@ impl MssqlConnection {
         run_server_cancellable(operation, self.retire(), |_| false, control).await
     }
 
+    async fn retire_if_unknown<T>(&self, result: Result<T, DriverError>) -> Result<T, DriverError> {
+        if matches!(result, Err(DriverError::OperationOutcomeUnknown { .. })) {
+            self.retire().await?;
+        }
+        result
+    }
+
     async fn retire(&self) -> Result<(), DriverError> {
         self.usable.store(false, Ordering::Release);
         let guard = self.fault.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -611,8 +619,15 @@ impl Connection for MssqlConnection {
         control: &OperationControl,
     ) -> Result<QueryResult, DriverError> {
         let mut client = self.client().await?;
-        self.run_abandonable(self.query_result(&mut client, sql, params, MAX_QUERY_ROWS), control)
-            .await
+        let result: Result<QueryResult, DriverError> = async {
+            attention::with_attention!(
+                client,
+                control,
+                self.query_result(&mut client, sql, params, MAX_QUERY_ROWS)
+            )
+        }
+        .await;
+        self.retire_if_unknown(result).await
     }
 
     async fn query_result_sets_controlled(
@@ -622,11 +637,15 @@ impl Connection for MssqlConnection {
         control: &OperationControl,
     ) -> Result<QueryResultBatch, DriverError> {
         let mut client = self.client().await?;
-        self.run_abandonable(
-            self.query_result_sets(&mut client, sql, params, MAX_QUERY_ROWS),
-            control,
-        )
-        .await
+        let result: Result<QueryResultBatch, DriverError> = async {
+            attention::with_attention!(
+                client,
+                control,
+                self.query_result_sets(&mut client, sql, params, MAX_QUERY_ROWS)
+            )
+        }
+        .await;
+        self.retire_if_unknown(result).await
     }
 
     async fn execute_controlled(&self, sql: &str, control: &OperationControl) -> Result<ExecResult, DriverError> {
@@ -640,9 +659,9 @@ impl Connection for MssqlConnection {
         control: &OperationControl,
     ) -> Result<ExecResult, DriverError> {
         let mut client = self.client().await?;
-        let rows_affected = self
-            .run_abandonable(run_execute(&mut client, sql, params), control)
-            .await?;
+        let result: Result<u64, DriverError> =
+            async { attention::with_attention!(client, control, run_execute(&mut client, sql, params)) }.await;
+        let rows_affected = self.retire_if_unknown(result).await?;
         Ok(ExecResult { rows_affected })
     }
 
@@ -860,7 +879,7 @@ impl Connection for MssqlConnection {
     }
 
     fn supports_server_cancellation(&self) -> bool {
-        false
+        true
     }
 
     async fn close(self: Box<Self>) -> Result<(), DriverError> {

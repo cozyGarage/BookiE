@@ -52,7 +52,12 @@ async fn an_unavailable_sql_server_is_classified_as_connection_refused() {
 }
 
 async fn connect(opts: ConnectOptions) -> Box<dyn Connection> {
-    MssqlDriver.connect(opts).await.expect("connect")
+    server_restart::retry_operation("SQL Server", || {
+        let opts = opts.clone();
+        async move { MssqlDriver.connect(opts).await }
+    })
+    .await
+    .unwrap_or_else(|error| panic!("connect after SQL Server startup: {error}"))
 }
 
 #[tokio::test]
@@ -352,27 +357,17 @@ async fn a_result_cut_at_the_row_limit_still_finishes_the_batch() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn the_driver_does_not_claim_server_side_cancellation() {
-    let (_c, opts) = start_mssql().await;
-    let connection = connect(opts).await;
-    assert!(
-        !connection.supports_server_cancellation(),
-        "server cancellation must remain disabled until acknowledgement is verified"
-    );
-}
-
-#[tokio::test]
-#[ignore = "requires docker"]
-async fn an_interrupted_statement_retires_the_connection_instead_of_stranding_it() {
+async fn an_interrupted_read_is_cancelled_by_attention_and_the_connection_stays_usable() {
     let (_c, opts) = start_mssql().await;
     let connection: std::sync::Arc<dyn Connection> = MssqlDriver.connect(opts).await.expect("connect").into();
+    assert!(connection.supports_server_cancellation());
 
     let token = tokio_util::sync::CancellationToken::new();
     let control = bookie_core::OperationControl::new(token.clone(), None);
     let running = connection.clone();
     let task = tokio::spawn(async move {
         running
-            .query_controlled("WAITFOR DELAY '00:00:30'; SELECT 1 /* bookie_mssql_retire */", &control)
+            .query_controlled("WAITFOR DELAY '00:00:30'; SELECT 1", &control)
             .await
     });
     tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
@@ -381,18 +376,46 @@ async fn an_interrupted_statement_retires_the_connection_instead_of_stranding_it
     let error = task
         .await
         .expect("query task")
-        .expect_err("an interrupted query must not succeed");
-    assert!(
-        matches!(error, bookie_core::DriverError::OperationOutcomeUnknown { .. }),
-        "the statement may still be running, so the outcome must be unknown: {error:?}"
+        .expect_err("a cancelled read returns no rows");
+    assert!(matches!(error, bookie_core::DriverError::Cancelled), "{error:?}");
+    assert_eq!(
+        connection.query("SELECT 2").await.unwrap().rows,
+        vec![vec![Value::Int(2)]]
     );
+}
 
-    // The regression: this used to block forever on the poisoned client.
-    let reused = tokio::time::timeout(std::time::Duration::from_secs(5), connection.query("SELECT 1")).await;
-    let reused = reused.expect("a retired connection must answer instead of hanging");
-    assert!(
-        matches!(reused, Err(bookie_core::DriverError::Disconnected)),
-        "a retired connection must report itself disconnected: {reused:?}"
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn an_interrupted_blocked_write_is_cancelled_and_leaves_the_row_unchanged() {
+    let (_c, opts) = start_mssql().await;
+    let connection: std::sync::Arc<dyn Connection> = MssqlDriver.connect(opts).await.expect("connect").into();
+    connection
+        .execute("CREATE TABLE attn_rows (id int PRIMARY KEY, n int)")
+        .await
+        .unwrap();
+    connection.execute("INSERT INTO attn_rows VALUES (1, 0)").await.unwrap();
+
+    let mut blocker = connection.open_session().await.unwrap();
+    let setup = bookie_core::OperationControl::with_timeout(std::time::Duration::from_secs(30));
+    for sql in ["BEGIN TRANSACTION", "UPDATE attn_rows SET n = 99 WHERE id = 1"] {
+        blocker.query_params_controlled(sql, &[], &setup).await.unwrap();
+    }
+
+    let control = bookie_core::OperationControl::with_timeout(std::time::Duration::from_secs(2));
+    let error = connection
+        .execute_controlled("UPDATE attn_rows SET n = 5 WHERE id = 1", &control)
+        .await
+        .expect_err("the blocked write cannot finish");
+    assert!(matches!(error, bookie_core::DriverError::TimedOut), "{error:?}");
+
+    blocker.query_params_controlled("ROLLBACK", &[], &setup).await.unwrap();
+    assert_eq!(
+        connection
+            .query("SELECT n FROM attn_rows WHERE id = 1")
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![Value::Int(0)]]
     );
 }
 
@@ -472,10 +495,15 @@ async fn a_session_keeps_temp_tables_and_its_transaction_between_statements() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn an_interrupted_session_statement_retires_the_session_but_not_the_shared_connection() {
+async fn an_interrupted_session_statement_is_cancelled_and_the_session_keeps_its_state() {
     let (_c, opts) = start_mssql().await;
     let conn = connect(opts).await;
     let mut session = conn.open_session().await.unwrap();
+    let setup = bookie_core::OperationControl::with_timeout(std::time::Duration::from_secs(30));
+    session
+        .query_params_controlled("CREATE TABLE #kept (n int)", &[], &setup)
+        .await
+        .unwrap();
     let token = tokio_util::sync::CancellationToken::new();
     let control = bookie_core::OperationControl::new(token.clone(), None);
     let canceller = tokio::spawn(async move {
@@ -489,11 +517,12 @@ async fn an_interrupted_session_statement_retires_the_session_but_not_the_shared
         .unwrap_err();
     canceller.await.unwrap();
 
-    assert!(
-        matches!(error, bookie_core::DriverError::OperationOutcomeUnknown { .. }),
-        "{error:?}"
+    assert!(matches!(error, bookie_core::DriverError::Cancelled), "{error:?}");
+    assert!(session.is_usable());
+    assert_eq!(
+        session_value(&mut session, "SELECT COUNT(*) FROM #kept").await,
+        Value::Int(0)
     );
-    assert!(!session.is_usable());
     assert_eq!(conn.query("SELECT 1").await.unwrap().rows, vec![vec![Value::Int(1)]]);
 }
 

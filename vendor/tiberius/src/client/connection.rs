@@ -510,6 +510,10 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> Connection<S> {
         Ok(())
     }
 
+    pub(crate) fn expect_next_message(&mut self) {
+        self.flushed = false;
+    }
+
     /// True if the underlying stream has no more data and is consumed
     /// completely.
     pub fn is_eof(&self) -> bool {

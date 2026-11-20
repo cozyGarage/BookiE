@@ -207,6 +207,7 @@ pub enum AppMsg {
     SidebarCatalogLoaded {
         origin: crate::services::catalog::CatalogOrigin,
         kind: bookie_core::CatalogObjectKind,
+        request: tokio_util::sync::CancellationToken,
         result: Result<Vec<bookie_core::CatalogObject>, String>,
     },
     ToggleAllSidebarGroups,

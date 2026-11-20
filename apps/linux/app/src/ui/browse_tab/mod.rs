@@ -9,12 +9,7 @@ use bookie_core::{ColumnInfo, ForeignKeyInfo, QueryResult, Value};
 
 use crate::ui::grid::{GridMsg, TabGridContext, build_column_view};
 
-/// Bulk-delete safety net: when the user marks at least this many
-/// rows pending-delete in one shot, surface a confirmation dialog
-/// before tracking. The marker is reversible via Discard / Ctrl+Z,
-/// but a 200-row Ctrl+A → Delete sequence is destructive enough at
-/// a glance that an explicit confirmation matches GNOME Files'
-/// "Delete N items?" pattern.
+/// Marking this many rows pending-delete at once asks for confirmation first.
 const BULK_DELETE_CONFIRM_THRESHOLD: usize = 10;
 
 pub(super) fn columns_for_browse_page(
@@ -244,13 +239,8 @@ impl BrowseTab {
         self.last_page = false;
         self.current_projection = projected_columns;
         self.current_result = Some(std::sync::Arc::new(result));
-        // Defer rendering until columns are also loaded — the
-        // QueryResult's ColumnInfo lacks `primary_key` /
-        // `is_generated` / `is_auto_increment`, so rendering
-        // before the schema fetch would let the user edit cells
-        // (PK, generated columns) that the DB will reject on
-        // save. Waiting also avoids a wasted full rebuild when
-        // ColumnsLoaded fires next and triggers a re-render.
+        // Wait for columns: QueryResult's ColumnInfo lacks `primary_key`, `is_generated`
+        // and `is_auto_increment`, so an early render lets the user edit cells the DB rejects.
         self.render_grid_if_ready(sender);
     }
 
@@ -259,11 +249,8 @@ impl BrowseTab {
         let words: Vec<String> = columns.iter().map(|c| c.name.clone()).collect();
         self.current_columns = columns.clone();
         self.refresh_member_choices();
-        // Late-arriving columns: if RowsLoaded already cached a
-        // zero-row result with an empty `columns` vector (the
-        // driver derives it from the first row), refill it now
-        // so the upcoming `render_grid_if_ready` builds headers
-        // against the real schema instead of an empty list.
+        // Columns can arrive after a zero-row result cached an empty `columns`; refill so
+        // headers build against the real schema.
         if let Some(result) = self.current_result.as_mut().map(std::sync::Arc::make_mut) {
             merge_table_columns(result, &self.current_columns);
         }
@@ -329,10 +316,8 @@ impl BrowseTab {
         let Some(sel) = self.current_selection.as_ref() else {
             return;
         };
-        // Only clear when we have a true multi-row selection.
-        // Without this guard, every Esc on a single-focus row
-        // would re-trigger the "0 selected" path through GTK's
-        // re-focus logic and strand the focus indicator.
+        // Only for a true multi-row selection: clearing a single-focus row re-triggers GTK
+        // re-focus and strands the focus indicator.
         if sel.selection().size() < 2 {
             return;
         }
@@ -539,13 +524,8 @@ impl SimpleComponent for BrowseTab {
 
     fn init_root() -> Self::Root {
         let root = adw::ToolbarView::new();
-        // BrowseTab attaches directly to the workspace `AdwTabView`
-        // now (no outer wrapper / view switcher), so the default
-        // "raised" top-bar style draws a 1px separator above the grid
-        // even when every top bar is collapsed (banners + filter
-        // strip all start `revealed=false`). Flat style drops the
-        // separator + the slot padding — the grid butts cleanly
-        // against the bottom of the AdwTabBar.
+        // Flat style: the raised top bar draws a 1px separator above the grid even when
+        // every top bar is collapsed.
         root.set_top_bar_style(adw::ToolbarStyle::Flat);
         root
     }
@@ -630,13 +610,8 @@ impl SimpleComponent for BrowseTab {
         let filter_strip =
             crate::ui::filter_strip::build(Vec::new(), filter_set_for_strip, on_apply_filter, preset_context);
 
-        // Banners + filter strip live in `AdwToolbarView::add_top_bar`
-        // (the libadwaita-canonical placement). The default top-bar
-        // slot allocates a thin strip even when every child banner is
-        // collapsed; toggling `reveal-top-bars` on the slot itself
-        // (based on whether ANY child is currently revealed) is the
-        // idiomatic way to collapse the slot to 0px. The closure
-        // re-runs on every banner / filter-strip reveal change.
+        // Toggling `reveal-top-bars` on the slot collapses it to 0px when no child banner or
+        // filter strip is revealed; re-runs on every reveal change.
         root.add_top_bar(&read_only_banner);
         root.add_top_bar(&no_pk_banner);
         root.add_top_bar(&filter_strip.widget);
@@ -682,16 +657,8 @@ impl SimpleComponent for BrowseTab {
         let esc_shortcut = gtk::Shortcut::builder()
             .trigger(&crate::ui::shortcut::parse("Escape"))
             .action(&gtk::CallbackAction::new(move |_, _| {
-                // Esc on the grid (no edit in progress) clears a
-                // multi-row selection. Spreadsheet convention
-                // (Excel / LibreOffice / DataGrip): Esc cancels
-                // the in-progress selection without deleting
-                // anything. Single-row selections fall through
-                // because GtkColumnView treats single-select as
-                // "the focused row" and unselecting it would
-                // strand the focus indicator. Cell-edit Esc fires
-                // first via the editor's capture-phase handler
-                // and never reaches us.
+                // Esc clears a multi-row selection (spreadsheet convention). Single-row selection
+                // falls through: unselecting the focused row strands the focus indicator.
                 sender_for_esc.input(BrowseTabInput::ClearSelection);
                 glib::Propagation::Proceed
             }))
@@ -732,11 +699,8 @@ impl SimpleComponent for BrowseTab {
             }))
             .build();
 
-        // Ctrl+C: when row(s) are selected and focus is NOT inside a
-        // text-editor (cell edit mode, search entry, draft input), copy
-        // the selection as TSV. Bubble-phase Local scope: GtkText
-        // consumes Ctrl+C while editing so the cell-text-selection
-        // copy still works without our handler interfering.
+        // Ctrl+C copies selected rows as TSV unless focus is in a text editor; bubble-phase
+        // Local scope lets GtkText keep its own copy while editing.
         let sender_for_copy = sender.clone();
         let copy_rows_shortcut = gtk::Shortcut::builder()
             .trigger(&crate::ui::shortcut::parse("<Primary>c"))
@@ -754,11 +718,8 @@ impl SimpleComponent for BrowseTab {
                 glib::Propagation::Stop
             }))
             .build();
-        // Page Up / Page Down on the BrowseTab navigate the paginator.
-        // GtkColumnView's built-in scrolling normally handles these,
-        // but our offset-based pagination means scrolling stops at
-        // the page boundary. Mapping PgUp/PgDn to Prev/Next page
-        // keeps the keyboard fluent across pages.
+        // PgUp/PgDn map to Prev/Next page: offset pagination stops column-view scrolling at
+        // the page boundary.
         let sender_for_pgup = sender.clone();
         let page_up_shortcut = gtk::Shortcut::builder()
             .trigger(&crate::ui::shortcut::parse("Page_Up"))
@@ -898,11 +859,8 @@ impl SimpleComponent for BrowseTab {
                 BrowseTabInput::PendingCountChanged(n)
             }
             crate::services::change_tracker::TrackerEvent::Cleared => BrowseTabInput::PendingCountChanged(0),
-            // ChangedRows drives targeted items_changed so only the
-            // affected rows re-bind, not the whole visible viewport.
-            // PendingCountChanged is emitted alongside by the tracker
-            // (see emit_changed) so banner / dirty-flag updates still
-            // run for the same mutation.
+            // ChangedRows re-binds only affected rows; PendingCountChanged is emitted alongside
+            // for banner and dirty-flag updates.
             crate::services::change_tracker::TrackerEvent::ChangedRows(keys) => BrowseTabInput::ChangedRows(keys),
         }));
         let _ = sender.output(BrowseTabOutput::FetchColumns);
