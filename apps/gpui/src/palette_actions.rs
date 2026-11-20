@@ -54,9 +54,21 @@ impl GridView {
             },
             enabled: true,
         });
+        let follow = self.palette.follow.as_ref().map(|channel| Action {
+            id: "follow-pubsub",
+            label: format!("Follow PostgreSQL notifications on {channel} until stopped"),
+            enabled: self.panel.follow.is_none(),
+        });
+        let stop = self.panel.follow.as_ref().map(|state| Action {
+            id: "stop-follow",
+            label: format!("Stop following {}", state.channel),
+            enabled: true,
+        });
         check
             .into_iter()
             .chain(listen)
+            .chain(follow)
+            .chain(stop)
             .chain(self.csv_delimiter_actions())
             .chain(self.export_limit_actions())
             .chain(self.grid_actions())
@@ -515,6 +527,12 @@ impl GridView {
                 }
             }
             "status" => self.show_status(),
+            "follow-pubsub" => {
+                if let Some(channel) = self.palette.follow.clone() {
+                    self.start_follow(channel, cx);
+                }
+            }
+            "stop-follow" => self.stop_follow(cx),
             "sample-pubsub" => {
                 if let Some(pattern) = self.palette.pattern.clone() {
                     self.sample_pubsub(pattern, cx);

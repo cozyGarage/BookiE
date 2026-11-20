@@ -16,7 +16,8 @@ use bookie_core::{
 };
 
 pub use notifications::{
-    MAX_SAMPLE_MESSAGES, NotificationMessage, NotificationSample, check_notification_request, sample_notifications,
+    MAX_SAMPLE_MESSAGES, NotificationMessage, NotificationSample, check_notification_request, follow_notifications,
+    sample_notifications,
 };
 
 mod array;

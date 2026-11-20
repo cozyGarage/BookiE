@@ -1318,6 +1318,7 @@ dependencies = [
  "sqlx",
  "sqlx-core",
  "tokio",
+ "tokio-util",
  "tracing",
  "uuid",
 ]
@@ -1431,6 +1432,8 @@ dependencies = [
  "futures",
  "glob",
  "hex",
+ "hmac 0.13.0",
+ "secrecy",
  "serde",
  "serde_json",
  "sha2 0.11.1",

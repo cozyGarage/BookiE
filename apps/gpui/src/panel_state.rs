@@ -10,6 +10,8 @@ pub(crate) struct PanelState {
     pub ratio: f32,
     pub open: bool,
     pub resizing: bool,
+    pub follow: Option<crate::follow_ui::FollowState>,
+    pub follow_serial: u64,
 }
 
 impl PanelState {
@@ -22,6 +24,8 @@ impl PanelState {
             ratio,
             open: true,
             resizing: false,
+            follow: None,
+            follow_serial: 0,
         }
     }
 }

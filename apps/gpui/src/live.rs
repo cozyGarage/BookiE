@@ -297,6 +297,21 @@ impl LiveSession {
         outcome.map_err(|failure| driver_failure_message(&failure))
     }
 
+    pub fn follow_pubsub(
+        &self,
+        channel: &str,
+        cancellation: &CancellationToken,
+        on_message: Box<dyn FnMut(bookie_app_services::read_session_store::SubscriptionMessage) + Send>,
+    ) -> Result<u64, String> {
+        let control = OperationControl::new(cancellation.clone(), None);
+        self.runtime
+            .block_on(
+                self.sessions
+                    .follow_subscription(self.session_id, vec![channel.to_string()], &control, on_message),
+            )
+            .map_err(|failure| driver_failure_message(&failure))
+    }
+
     pub fn sample_pubsub(
         &self,
         patterns: &[String],
@@ -566,6 +581,33 @@ impl SubscriptionSampler for RegistrySubscriptionSampler {
                 "{other} has no live messages to listen to"
             ))),
         }
+    }
+
+    fn follow(
+        &self,
+        driver_id: &str,
+        options: bookie_core::ConnectOptions,
+        channels: Vec<String>,
+        cancel: CancellationToken,
+        mut on_message: Box<dyn FnMut(bookie_app_services::read_session_store::SubscriptionMessage) + Send>,
+    ) -> Pin<Box<dyn Future<Output = Result<u64, bookie_core::DriverError>> + Send + '_>> {
+        let postgres = driver_id == "postgres";
+        Box::pin(async move {
+            if !postgres {
+                return Err(bookie_core::DriverError::Unsupported(
+                    "only PostgreSQL notifications can be followed".into(),
+                ));
+            }
+            drivers_registry::follow_notifications(options, &channels, &cancel, move |message| {
+                on_message(bookie_app_services::read_session_store::SubscriptionMessage {
+                    channel: message.channel,
+                    pattern: None,
+                    payload: message.payload,
+                    payload_bytes: message.payload_bytes,
+                });
+            })
+            .await
+        })
     }
 
     fn sample(

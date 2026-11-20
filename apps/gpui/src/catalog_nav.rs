@@ -38,6 +38,7 @@ impl GridView {
             grid_table: table,
         };
         self.live = Some(session);
+        self.panel.follow = None;
         self.sidebar.catalog.clear();
         self.sidebar.fields.clear();
         self.sidebar.collapsed_schemas = Default::default();

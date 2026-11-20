@@ -22,6 +22,7 @@ mod palette_state;
 mod edit_history;
 mod favorites_ui;
 mod approval_ui;
+mod follow_ui;
 mod import_ui;
 mod export_file_ui;
 mod resolve_ui;
@@ -300,6 +301,11 @@ impl GridView {
                     this.palette.address = bookie_gpui::net_check::parse_address(&typed);
                     this.palette.delimiter = bookie_gpui::csv_delimiter::parse_command(&typed);
                     this.palette.limit = bookie_gpui::export_limit::parse_command(&typed);
+                    this.palette.follow = this
+                        .live
+                        .as_ref()
+                        .filter(|live| live.driver_id == "postgres")
+                        .and_then(|_| bookie_gpui::pubsub_view::parse_follow(&typed));
                     this.palette.pattern = this.live.as_ref().and_then(|live| match live.driver_id.as_str() {
                         "redis" => bookie_gpui::pubsub_view::parse_pattern(&typed),
                         "postgres" => bookie_gpui::pubsub_view::parse_channel(&typed),

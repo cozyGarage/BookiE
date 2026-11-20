@@ -96,3 +96,73 @@ async fn a_wrong_password_is_reported_not_retried() {
     let result = sample_notifications(options, &["bookie_sample_jobs".to_string()], 1, Duration::from_secs(1)).await;
     assert!(result.is_err());
 }
+
+#[tokio::test]
+#[ignore = "requires a local postgres; set SMOKE_PG_*"]
+async fn a_follow_streams_messages_until_it_is_cancelled() {
+    use drivers_postgres::follow_notifications;
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let (seen_tx, mut seen) = tokio::sync::mpsc::unbounded_channel();
+    let stop = cancel.clone();
+    let channels = vec!["bookie_follow_jobs".to_string()];
+    let follower = tokio::spawn(async move {
+        follow_notifications(opts_from_env(), &channels, &stop, move |message| {
+            let _ = seen_tx.send(message);
+        })
+        .await
+    });
+    tokio::time::sleep(Duration::from_millis(800)).await;
+    let sender = PgDriver.connect(opts_from_env()).await.unwrap();
+    for payload in ["one", "two", "three"] {
+        sender
+            .execute(&format!("SELECT pg_notify('bookie_follow_jobs', '{payload}')"))
+            .await
+            .unwrap();
+    }
+    let mut got = Vec::new();
+    for _ in 0..3 {
+        let message = tokio::time::timeout(Duration::from_secs(5), seen.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        got.push(message.payload);
+    }
+    assert_eq!(got, ["one", "two", "three"]);
+    cancel.cancel();
+    let received = tokio::time::timeout(Duration::from_secs(5), follower)
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    assert_eq!(received, 3, "a cancelled follow ends cleanly with its count");
+}
+
+#[tokio::test]
+#[ignore = "requires a local postgres; set SMOKE_PG_*"]
+async fn a_follow_ends_with_an_error_when_the_server_drops_it() {
+    use drivers_postgres::follow_notifications;
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let channels = vec!["bookie_follow_drop".to_string()];
+    let stop = cancel.clone();
+    let follower = tokio::spawn(async move {
+        let mut options = opts_from_env();
+        options.application_name = Some("claude_follow_victim".into());
+        follow_notifications(options, &channels, &stop, |_| {}).await
+    });
+    tokio::time::sleep(Duration::from_millis(800)).await;
+    let admin = PgDriver.connect(opts_from_env()).await.unwrap();
+    admin
+        .execute(
+            "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE application_name = 'claude_follow_victim'",
+        )
+        .await
+        .unwrap();
+    let ended = tokio::time::timeout(Duration::from_secs(10), follower)
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(
+        ended.is_err(),
+        "a dropped listener must end the follow with an error, not hang"
+    );
+}
