@@ -103,6 +103,7 @@ pub mod browse_query;
 
 pub mod cell_save_plan;
 pub mod change_tracker;
+pub mod clipboard_grid;
 pub mod edit_preview;
 pub mod result_copy;
 pub mod result_editability;

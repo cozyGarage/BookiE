@@ -1274,3 +1274,34 @@ fn the_schema_diagram_is_written_to_a_new_file_in_the_format_of_its_extension(cx
     std::fs::remove_dir_all(&directory).ok();
     std::fs::remove_file(&path).ok();
 }
+
+#[gpui::test]
+fn pasting_clipboard_rows_stages_them_down_the_column_from_the_active_cell(cx: &mut TestAppContext) {
+    let path = fixture_copy("paste-cells");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| {
+        cx.write_to_clipboard(gpui::ClipboardItem::new_string("Zed\nYan".into()));
+        view.update(cx, |view, cx| {
+            view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 1 });
+            view.paste_cells(cx);
+        })
+    });
+    view.read_with(cx, |view, _| {
+        let edits = &view.cell_edit.edits;
+        assert_eq!(edits.get(&(0, 1)), Some(&bookie_gpui::model::Cell::Text("Zed".into())), "{}", view.status);
+        assert_eq!(edits.get(&(1, 1)), Some(&bookie_gpui::model::Cell::Text("Yan".into())));
+        assert_eq!(edits.len(), 2);
+    });
+    cx.update(|_, cx| {
+        cx.write_to_clipboard(gpui::ClipboardItem::new_string("a\tb\tc\td\te\tf".into()));
+        view.update(cx, |view, cx| {
+            view.cell_edit.edits.clear();
+            view.paste_cells(cx);
+        })
+    });
+    view.read_with(cx, |view, _| {
+        assert!(view.status.starts_with("Nothing was pasted"), "{}", view.status);
+        assert!(view.cell_edit.edits.is_empty());
+    });
+    std::fs::remove_file(&path).ok();
+}
