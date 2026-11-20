@@ -28,7 +28,46 @@ impl ClosedTabs {
     }
 }
 
+#[derive(Default)]
+pub(crate) struct TabRecency {
+    current: Option<Tab>,
+    previous: Option<Tab>,
+}
+
+impl TabRecency {
+    pub(crate) fn observe(&mut self, tab: &Tab) {
+        if self.current.as_ref() != Some(tab) {
+            self.previous = self.current.replace(tab.clone());
+        }
+    }
+
+    pub(crate) fn previous(&self) -> Option<&Tab> {
+        self.previous.as_ref()
+    }
+}
+
 impl GridView {
+    pub(crate) fn observe_tab(&mut self) {
+        let tab = self.tabs.current().clone();
+        self.search.recent.observe(&tab);
+    }
+
+    pub(crate) fn switch_to_previous_tab(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let wanted = self
+            .search
+            .recent
+            .previous()
+            .and_then(|previous| self.tabs.items.iter().position(|tab| tab == previous));
+        let Some(index) = wanted else {
+            self.status = "There is no previous tab to switch to".into();
+            return;
+        };
+        self.tabs.active = index;
+        self.sync_grid_owner();
+        self.show_current_table(window, cx);
+        cx.notify();
+    }
+
     pub(crate) fn remember_closed_tab(&mut self, index: usize) {
         if let Some(tab) = self.tabs.items.get(index).cloned() {
             self.search.closed.remember(tab);
@@ -41,6 +80,14 @@ impl GridView {
         {
             self.open_table_named(&table, window, cx);
         }
+    }
+
+    pub(crate) fn recent_tab_actions(&self) -> Vec<Action> {
+        vec![Action {
+            id: "recent-tab",
+            label: "Switch to the previous tab".to_string(),
+            enabled: self.tabs.items.len() > 1,
+        }]
     }
 
     pub(crate) fn closed_tab_actions(&self) -> Vec<Action> {

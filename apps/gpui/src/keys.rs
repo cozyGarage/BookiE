@@ -173,6 +173,7 @@ impl GridView {
                 self.show_current_table(window, cx);
             }
             Command::ReopenTab => self.reopen_closed_tab(window, cx),
+            Command::RecentTab => self.switch_to_previous_tab(window, cx),
         }
     }
 

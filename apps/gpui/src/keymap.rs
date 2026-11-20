@@ -23,10 +23,11 @@ pub enum Command {
     ToggleDetail,
     CloseTab,
     ReopenTab,
+    RecentTab,
 }
 
 impl Command {
-    pub const ALL: [Command; 21] = [
+    pub const ALL: [Command; 22] = [
         Command::Palette,
         Command::QuickSwitcher,
         Command::JumpColumn,
@@ -48,6 +49,7 @@ impl Command {
         Command::ToggleDetail,
         Command::CloseTab,
         Command::ReopenTab,
+        Command::RecentTab,
     ];
 
     pub fn name(self) -> &'static str {
@@ -73,6 +75,7 @@ impl Command {
             Command::ToggleDetail => "toggle-detail",
             Command::CloseTab => "close-tab",
             Command::ReopenTab => "reopen-tab",
+            Command::RecentTab => "recent-tab",
         }
     }
 
@@ -99,6 +102,7 @@ impl Command {
             Command::ToggleDetail => "Show or hide the detail panel",
             Command::CloseTab => "Close the current tab",
             Command::ReopenTab => "Reopen the last closed tab",
+            Command::RecentTab => "Switch to the previous tab",
         }
     }
 
@@ -202,6 +206,7 @@ impl Default for Keymap {
                 (Command::ToggleDetail, chord(false, false, "f3")),
                 (Command::CloseTab, chord(true, false, "w")),
                 (Command::ReopenTab, chord(true, true, "t")),
+                (Command::RecentTab, chord(true, false, "tab")),
             ]),
         }
     }

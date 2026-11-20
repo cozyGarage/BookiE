@@ -14,3 +14,13 @@ fn the_status_says_what_the_check_found() {
     assert!(update_status(&same, "0.2.7").contains("up to date"));
     assert!(update_status(&Err(UpdateCheckError::Network), "0.2.7").contains("could not reach"));
 }
+
+#[test]
+fn the_about_line_carries_the_running_version() {
+    let line = super::about_status();
+    assert!(
+        line.contains(bookie_app_services::update_check::RUNNING_VERSION),
+        "{line}"
+    );
+    assert!(line.starts_with("BookiE "), "{line}");
+}

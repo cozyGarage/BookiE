@@ -41,3 +41,30 @@ fn only_the_last_ten_are_kept() {
     assert_eq!(closed.len(), 10);
     assert_eq!(closed.take(), Some(table("t14")));
 }
+
+#[test]
+fn the_previous_tab_is_the_one_shown_before_the_current_one() {
+    let mut recency = super::TabRecency::default();
+    assert_eq!(recency.previous(), None);
+    recency.observe(&Tab::Home);
+    recency.observe(&table("a"));
+    assert_eq!(recency.previous(), Some(&Tab::Home));
+    recency.observe(&table("a"));
+    assert_eq!(
+        recency.previous(),
+        Some(&Tab::Home),
+        "seeing the same tab again changes nothing"
+    );
+    recency.observe(&Tab::Query);
+    assert_eq!(recency.previous(), Some(&table("a")));
+}
+
+#[test]
+fn switching_back_and_forth_toggles_between_two_tabs() {
+    let mut recency = super::TabRecency::default();
+    recency.observe(&table("a"));
+    recency.observe(&table("b"));
+    let back = recency.previous().cloned().unwrap();
+    recency.observe(&back);
+    assert_eq!(recency.previous(), Some(&table("b")));
+}
