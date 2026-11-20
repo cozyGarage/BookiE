@@ -128,31 +128,7 @@ fn rows_changed_text() -> String {
 }
 
 pub(super) fn error_text(error: &SetCellsError) -> String {
-    match error {
-        SetCellsError::TableNotEditable => {
-            bookie_app_services::tr!("This table cannot be edited, so no cells were set.")
-        }
-        SetCellsError::NothingSelected => bookie_app_services::tr!("No cells are selected."),
-        SetCellsError::TooManyCells => bookie_app_services::tr!("That is too many cells to set at once"),
-        SetCellsError::ReadOnlyColumn { column } => bookie_app_services::tr!(
-            "{column} is a key, generated or identity column and cannot be set. No cells were changed."
-        )
-        .replace("{column}", column),
-        SetCellsError::NotNullable { column } => {
-            bookie_app_services::tr!("{column} does not accept NULL. No cells were changed.")
-                .replace("{column}", column)
-        }
-        SetCellsError::NotEditable { column, position } => {
-            bookie_app_services::tr!("{column} on row {row} can't be edited, so no cells were changed.")
-                .replace("{column}", column)
-                .replace("{row}", &(position + 1).to_string())
-        }
-        SetCellsError::InvalidValue { column, error } => {
-            bookie_app_services::tr!("{column}: {message}. No cells were changed.")
-                .replace("{column}", column)
-                .replace("{message}", &input_error_message(error.clone()))
-        }
-    }
+    bookie_app_services::edit_error_text::set_cells_message(error)
 }
 
 fn dialog_value(entry: &gtk::Entry, null_check: &gtk::CheckButton) -> SetCellsValue {
