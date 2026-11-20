@@ -1305,3 +1305,27 @@ fn pasting_clipboard_rows_stages_them_down_the_column_from_the_active_cell(cx: &
     });
     std::fs::remove_file(&path).ok();
 }
+
+#[gpui::test]
+fn a_structured_rule_filters_the_table_into_a_result(cx: &mut TestAppContext) {
+    let path = fixture_copy("filter-rule");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 1 });
+            view.open_filter_rule_bar(cx);
+            let column = view.search.rule.column.clone().expect("column field");
+            assert_eq!(column.read(cx).content().to_string(), "customer", "the active column is prefilled");
+            let value = view.search.rule.value.clone().expect("value field");
+            value.update(cx, |input, cx| input.set_content("Ada", cx));
+            view.run_filter_rule(cx);
+        })
+    });
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert!(!view.search.rule.open);
+        assert_eq!(view.run_tabs.slots.len(), 1, "{}", view.status);
+        assert_eq!(view.run_tabs.slots[0].run.rows, 2, "two orders belong to Ada");
+    });
+    std::fs::remove_file(&path).ok();
+}

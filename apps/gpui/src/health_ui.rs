@@ -28,6 +28,7 @@ impl GridView {
             "export-schema-diagram" => self.open_schema_diagram_bar(cx),
             "run-at-cursor" => self.run_at_cursor(cx),
             "paste-cells" => self.paste_cells(cx),
+            "filter-rule" => self.open_filter_rule_bar(cx),
             _ => match health_report_for(id) {
                 Some(report) => self.show_health_report(report, cx),
                 None => return false,

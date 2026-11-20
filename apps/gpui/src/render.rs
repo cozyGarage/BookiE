@@ -23,6 +23,7 @@ impl GridView {
         self.focus_set_cells_input(window, cx);
         self.focus_value_search_input(window, cx);
         self.focus_schema_diagram_input(window, cx);
+        self.focus_filter_rule_input(window, cx);
         self.note_frame();
         self.pace_frame(window);
         self.viewport_rows = self.viewport_rows_for(window);

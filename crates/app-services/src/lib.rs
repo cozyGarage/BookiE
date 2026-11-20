@@ -49,6 +49,7 @@ pub mod explain_plan;
 pub mod export_pages;
 pub mod export_tables;
 pub mod favorites;
+pub mod filter_catalog;
 pub mod filter_settings;
 pub mod health_report;
 pub mod highlight_settings;
