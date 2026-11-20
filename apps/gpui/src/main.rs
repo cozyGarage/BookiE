@@ -24,6 +24,7 @@ mod favorites_ui;
 mod approval_ui;
 mod import_ui;
 mod export_file_ui;
+mod fk_nav_ui;
 mod resolve_ui;
 mod structure_ui;
 mod insert_ui;

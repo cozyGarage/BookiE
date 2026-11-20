@@ -771,22 +771,15 @@ fn statements_that_are_not_recognised_reads_keep_their_prompt() {
 }
 
 #[test]
-fn copy_from_stdin_is_refused_with_its_data_and_other_statements_are_not() {
+fn the_approval_text_of_a_copy_unit_hides_its_data_and_other_statements_are_unchanged() {
     let unit = "COPY t (id, note) FROM STDIN;\n1\tpaid; DROP TABLE t\n\\.";
-    for sql in [unit, "SELECT 1; COPY t FROM STDIN;\n1\n\\."] {
-        let decision = unsupported_statement_decision(sql, "postgres");
-        assert_eq!(
-            decision.map(|d| d.rule_name().to_string()).as_deref(),
-            Some("copy_from_stdin_unsupported"),
-            "{sql}"
-        );
-    }
-    for (sql, driver) in [
-        ("COPY t TO STDOUT", "postgres"),
-        ("COPY t FROM STDIN", "mysql"),
-        ("SELECT 'COPY t FROM STDIN'", "postgres"),
-        ("INSERT INTO t VALUES (1)", "postgres"),
-    ] {
-        assert!(unsupported_statement_decision(sql, driver).is_none(), "{driver}: {sql}");
+    let shown = approval_text(unit);
+    assert!(shown.starts_with("COPY t (id, note) FROM STDIN;"), "{shown}");
+    assert!(
+        shown.contains("[COPY data: ") && !shown.contains("DROP TABLE"),
+        "{shown}"
+    );
+    for sql in ["SELECT 1", "COPY t TO STDOUT", "INSERT INTO t VALUES (1)"] {
+        assert_eq!(approval_text(sql), sql);
     }
 }

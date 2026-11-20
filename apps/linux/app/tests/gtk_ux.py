@@ -716,20 +716,27 @@ GLib.MainLoop().run()
             raise AssertionError(f"editor did not receive focus:\n{ui.accessible_snapshot()}")
 
         def set_active_editor(sql):
-            visible_editor().queryEditableText().setTextContents(sql)
+            focus_editor()
+            editor = visible_editor()
+            editor.queryEditableText().setTextContents(sql)
+            text = editor.queryText()
+            actual = text.getText(0, text.characterCount)
+            assert actual == sql, (actual, sql)
 
-        def run_active_editor(sql, result_marker):
+        def run_active_editor(sql, result_marker=None):
             set_active_editor(sql)
             ui.invoke(ui.wait_for_sensitive_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON))
-            try:
-                approval = ui.wait_for_node(name="Approve once", role=pyatspi.ROLE_PUSH_BUTTON, timeout=1)
-            except AssertionError:
-                approval = None
-            if approval:
-                ui.invoke(approval)
-                ui.wait_for_node(name="Approve once", present=False)
-            ui.invoke(ui.wait_for_node_containing("SELECT (1)", role=pyatspi.ROLE_PAGE_TAB))
-            ui.wait_for_node(name=result_marker, role=pyatspi.ROLE_LABEL)
+            if result_marker:
+                ui.wait_for_node(name=result_marker, role=pyatspi.ROLE_LABEL)
+                return
+            ui.invoke(ui.wait_for_node(name="Approve once", role=pyatspi.ROLE_PUSH_BUTTON))
+            ui.wait_for_node(name="Approve once", present=False)
+            ui.wait_for_node_containing("done in")
+
+        def switch_schema(schema):
+            marker = f"{schema}_session_ready"
+            run_active_editor(f"SET search_path TO {schema}")
+            run_active_editor("SELECT current_schema() || '_session_ready'", marker)
 
         def show_columns():
             set_active_editor("SELECT * FROM bookie_completion_target WHERE bookie_completion_target")
@@ -799,10 +806,7 @@ GLib.MainLoop().run()
             ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
             ui.invoke_accessible_action("win.open-editor")
             ui.invoke(visible_control("Session", pyatspi.ROLE_TOGGLE_BUTTON))
-            run_active_editor(
-                f"SET search_path TO {schemas[0]}; SELECT current_schema() || '_session_ready'",
-                f"{schemas[0]}_session_ready",
-            )
+            switch_schema(schemas[0])
             time.sleep(0.5)
             show_columns()
             wait_for_candidate("alpha_only")
@@ -811,23 +815,17 @@ GLib.MainLoop().run()
 
             ui.press_x11_key("t", ("Control_L",))
             time.sleep(0.3)
-            ui.invoke_accessible_action("win.focus-editor")
+            set_active_editor("SELECT 1")
             set_active_editor("/* second editor */ SELECT 1;")
             ui.invoke(visible_control("Session", pyatspi.ROLE_TOGGLE_BUTTON))
-            run_active_editor(
-                f"SET search_path TO {schemas[1]}; SELECT current_schema() || '_session_ready'",
-                f"{schemas[1]}_session_ready",
-            )
+            switch_schema(schemas[1])
             show_columns()
             wait_for_candidate("beta_only")
             wait_for_candidate("alpha_only", present=False)
             ui.press_x11_key("Escape")
 
             ui.press_x11_key("Tab", ("Control_L",))
-            run_active_editor(
-                f"SET search_path TO {schemas[2]}; SELECT current_schema() || '_session_ready'",
-                f"{schemas[2]}_session_ready",
-            )
+            switch_schema(schemas[2])
             show_columns()
             wait_for_candidate("gamma_only")
             wait_for_candidate("alpha_only", present=False)

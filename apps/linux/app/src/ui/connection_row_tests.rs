@@ -181,6 +181,17 @@ fn connection_menu_dispatches_actions_for_its_own_record() {
     });
     let context = gtk::glib::MainContext::default();
     while context.iteration(false) {}
+    factory.guard().get(0).unwrap().open_button.emit_clicked();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(1);
+    let opened = loop {
+        while context.iteration(false) {}
+        if let Ok(output) = outputs.try_recv() {
+            break output;
+        }
+        assert!(std::time::Instant::now() < deadline, "open action did not arrive");
+        std::thread::sleep(std::time::Duration::from_millis(1));
+    };
+    assert!(matches!(opened, ConnectionRowOutput::Open(saved) if saved.id == id));
     let button = factory.guard().get(0).unwrap().actions_button.clone();
     let content = button.popover().unwrap().child().unwrap();
     let mut actions = Vec::new();

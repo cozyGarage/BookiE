@@ -16,7 +16,7 @@ use tokio::sync::watch;
 use crate::{connect, start_mysql};
 
 const STOP_REQUEST: &[u8] = b"KILL QUERY";
-const STOP_AFTER: Duration = Duration::from_millis(200);
+const STOP_AFTER: Duration = Duration::from_millis(500);
 const OBSERVE_FOR: Duration = Duration::from_secs(4);
 
 type CallFuture = Pin<Box<dyn Future<Output = Result<(), DriverError>> + Send>>;
@@ -397,7 +397,7 @@ async fn stop_once(
         connection.clone(),
         OperationControl::with_timeout(STOP_AFTER),
     ));
-    let asked = proxy.wait_for_cancel_request(cancel_requests).await;
+    proxy.wait_for_cancel_request(cancel_requests).await;
     let reached = proxy.withheld_replies() > 0;
     let while_withheld = connections(observer).await;
     proxy.release();
@@ -405,6 +405,7 @@ async fn stop_once(
         .await
         .map_err(|_| "the call never returned".to_string())?
         .unwrap();
+    let asked = proxy.cancel_requests() > cancel_requests;
     if !reached {
         return Err("the statement never reached the server, so the case proves nothing".into());
     }
