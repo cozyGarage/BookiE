@@ -1,6 +1,6 @@
 use crate::ui::spacing;
 use adw::prelude::*;
-use bookie_core::export::{CsvOptions, ExportError, ResultExport, ResultFormat, SqlTarget};
+use bookie_core::export::{CsvOptions, ExportError, ResultExport, SqlTarget};
 use relm4::{adw, gtk};
 use std::sync::{
     Arc,
@@ -42,7 +42,7 @@ fn write_export(job: ExportJob, cancel: &CancellationToken, completed: &AtomicUs
         return Err(ExportError::Source(snapshot_refusal_message()));
     }
     let export = ResultExport {
-        format: result_format(job.format),
+        format: job.format,
         csv: &job.options,
         sql: Some(SqlTarget {
             driver_id: &job.driver_id,
@@ -143,19 +143,6 @@ pub(super) fn snapshot_refusal_message() -> String {
     bookie_app_services::tr!(
         "Full-table export requires a consistent snapshot. Export the current page or a query result instead."
     )
-}
-
-fn result_format(format: super::ExportFormat) -> ResultFormat {
-    match format {
-        super::ExportFormat::Csv => ResultFormat::Csv,
-        super::ExportFormat::Json => ResultFormat::Json,
-        super::ExportFormat::JsonLines => ResultFormat::JsonLines,
-        super::ExportFormat::Markdown => ResultFormat::Markdown,
-        super::ExportFormat::Html => ResultFormat::Html,
-        super::ExportFormat::Xml => ResultFormat::Xml,
-        super::ExportFormat::Sql => ResultFormat::Sql,
-        super::ExportFormat::Xlsx => ResultFormat::Xlsx,
-    }
 }
 
 fn build_progress_dialog(cancel: &CancellationToken, paged: bool) -> (adw::Dialog, gtk::Label, gtk::ProgressBar) {
