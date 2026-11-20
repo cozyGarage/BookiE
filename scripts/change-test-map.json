@@ -277,7 +277,7 @@
         "import::plan::tests::mysql_empty_enum_set_and_varchar_csv_cells_are_reconstructed_without_binding_empty_text"
       ]
     },
-    "apps/linux/app/src/ui/export_dialog.rs": {
+    "apps/linux/app/src/ui/export_dialog_tests.rs": {
       "package": "bookie-app",
       "target": "--lib",
       "tests": [

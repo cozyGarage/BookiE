@@ -442,6 +442,47 @@ class CiJobCleanupTests(unittest.TestCase):
             rm_calls = [json.loads(line) for line in calls.read_text(encoding="utf-8").splitlines()]
             self.assertNotIn(["-rf", "--", "/var/cache/ci/tmp/bookie-b4-rollback-123-2"], rm_calls)
 
+    def test_pg_release_finalizer_removes_only_its_run_scoped_config(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            bin_dir = Path(temporary) / "bin"
+            bin_dir.mkdir()
+            calls = Path(temporary) / "calls"
+            rm = bin_dir / "rm"
+            rm.write_text(
+                "#!/usr/bin/env python3\n"
+                "import json, os, sys\n"
+                "with open(os.environ['RM_CALLS'], 'a', encoding='utf-8') as stream:\n"
+                "    stream.write(json.dumps(sys.argv[1:]) + '\\n')\n",
+                encoding="utf-8",
+            )
+            rm.chmod(0o755)
+            config_path = "/var/cache/ci/tmp/bookie-pg-release-123-2.json"
+
+            for job, removed in (("pg-release", True), ("driver", False)):
+                with self.subTest(job=job):
+                    calls.unlink(missing_ok=True)
+                    result = subprocess.run(
+                        ["bash", str(CLEANUP)],
+                        env={
+                            **os.environ,
+                            "PATH": f"{bin_dir}:{os.environ['PATH']}",
+                            "GITHUB_JOB": job,
+                            "GITHUB_RUN_ID": "123",
+                            "GITHUB_RUN_ATTEMPT": "2",
+                            "GITHUB_WORKSPACE": temporary,
+                            "TMPDIR": "/var/cache/ci/tmp",
+                            "BOOKIE_FIXTURE_TOXIPROXY_CONFIG": config_path,
+                            "RM_CALLS": str(calls),
+                        },
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    rm_calls = [json.loads(line) for line in calls.read_text(encoding="utf-8").splitlines()]
+                    expected = ["-rf", "--", config_path]
+                    self.assertEqual(expected in rm_calls, removed)
+
     def test_b4_rollback_finalizer_cannot_remove_another_run_temp_path(self):
         with tempfile.TemporaryDirectory() as temporary:
             bin_dir = Path(temporary) / "bin"
@@ -527,6 +568,64 @@ class CiJobCleanupTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             rm_calls = [json.loads(line) for line in calls.read_text(encoding="utf-8").splitlines()]
             self.assertNotIn(["-rf", "--", scratch], rm_calls)
+
+    def test_driver_followup_finalizer_removes_only_its_scoped_temp_path(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            bin_dir = Path(temporary) / "bin"
+            bin_dir.mkdir()
+            calls = Path(temporary) / "calls"
+            rm = bin_dir / "rm"
+            rm.write_text(
+                "#!/usr/bin/env python3\n"
+                "import json, os, sys\n"
+                "with open(os.environ['RM_CALLS'], 'a', encoding='utf-8') as stream:\n"
+                "    stream.write(json.dumps(sys.argv[1:]) + '\\n')\n",
+                encoding="utf-8",
+            )
+            rm.chmod(0o755)
+            for group in ("driver-extended", "socket-ssh"):
+                with self.subTest(group=group):
+                    scratch = f"/var/cache/ci/tmp/bookie-driver-123-2-{group}"
+                    result = subprocess.run(
+                        ["bash", str(CLEANUP)],
+                        env={
+                            **os.environ,
+                            "PATH": f"{bin_dir}:{os.environ['PATH']}",
+                            "GITHUB_RUN_ID": "123",
+                            "GITHUB_RUN_ATTEMPT": "2",
+                            "GITHUB_JOB": "driver-followup",
+                            "TMPDIR": scratch,
+                            "RM_CALLS": str(calls),
+                        },
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    rm_calls = [json.loads(line) for line in calls.read_text(encoding="utf-8").splitlines()]
+                    self.assertIn(["-rf", "--", scratch], rm_calls)
+                    calls.unlink(missing_ok=True)
+            result = subprocess.run(
+                ["bash", str(CLEANUP)],
+                env={
+                    **os.environ,
+                    "PATH": f"{bin_dir}:{os.environ['PATH']}",
+                    "GITHUB_RUN_ID": "123",
+                    "GITHUB_RUN_ATTEMPT": "2",
+                    "GITHUB_JOB": "unit",
+                    "TMPDIR": "/var/cache/ci/tmp/bookie-driver-123-2-driver-extended",
+                    "RM_CALLS": str(calls),
+                },
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            rm_calls = [json.loads(line) for line in calls.read_text(encoding="utf-8").splitlines()]
+            self.assertNotIn(
+                ["-rf", "--", "/var/cache/ci/tmp/bookie-driver-123-2-driver-extended"],
+                rm_calls,
+            )
 
     def test_driver_tls_workflow_assigns_a_run_scoped_fixture_project(self):
         job = runner_jobs(WORKFLOWS[0])["driver-tls"]
