@@ -1139,6 +1139,7 @@ jobs:
     env:
       BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-pg-release
       CARGO_TARGET_DIR: /var/cache/ci/target/pg-release
+      BOOKIE_FIXTURE_TOXIPROXY_CONFIG: /var/cache/ci/tmp/bookie-pg-release-${{ github.run_id }}-${{ github.run_attempt }}.json
       TMPDIR: /var/cache/ci/tmp
     steps:
       - name: Prepare runner workspace
@@ -1171,10 +1172,13 @@ jobs:
         run: bash src/scripts/prepull-test-images.sh pg-release
       - name: Select isolated MCP HTTP port
         run: cd src && python3 scripts/ci-mcp-port.py 4
-      - name: PostgreSQL release fixture
+      - name: Prepare Toxiproxy fixture config
         run: |
           mkdir -p "$TMPDIR"
-          cd src && python3 scripts/run-test-layer.py postgres-release
+          rm -rf -- "$BOOKIE_FIXTURE_TOXIPROXY_CONFIG"
+          install -D -m 0644 src/tests/fixtures/postgres-release/toxiproxy/toxiproxy.json "$BOOKIE_FIXTURE_TOXIPROXY_CONFIG"
+      - name: PostgreSQL release fixture
+        run: cd src && python3 scripts/run-test-layer.py postgres-release
 
       - name: Finalize runner job
         if: always()
@@ -1485,10 +1489,13 @@ jobs:
     runs-on: any-host
     needs: [pin-revision, guards, clippy]
     timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
     env:
       RUSTC_WRAPPER: ""
-      CARGO_TARGET_DIR: /var/cache/ci/target/supply-chain-${{ github.run_id }}
-      TMPDIR: /var/cache/ci/tmp/supply-chain-${{ github.run_id }}
+      CARGO_TARGET_DIR: /var/cache/ci/target/${{ github.run_id }}/${{ github.job }}
+      TMPDIR: /var/cache/ci/tmp/${{ github.run_id }}/${{ github.job }}
     steps:
       - name: Prepare runner workspace
         run: |

@@ -243,3 +243,16 @@ fn parameter_kind_index_round_trips() {
     }
     assert_eq!(ParameterKind::from_index(99), ParameterKind::Auto);
 }
+
+#[test]
+fn copy_data_is_never_scanned_for_parameters_or_rewritten() {
+    let script = "SELECT :limit_rows;\nCOPY t (a, b) FROM STDIN;\n12:30:00\tname:value\n:y\tx::int\n\\.\nSELECT :other";
+    let parsed = extract_named_parameters(script, "postgres");
+    assert_eq!(parsed.names, ["limit_rows", "other"]);
+    assert_eq!(
+        parsed.sql,
+        "SELECT $1;\nCOPY t (a, b) FROM STDIN;\n12:30:00\tname:value\n:y\tx::int\n\\.\nSELECT $2"
+    );
+    let other_engine = extract_named_parameters("COPY t FROM STDIN;\n:y\n\\.", "mysql");
+    assert_eq!(other_engine.names, ["y"], "only PostgreSQL has COPY data");
+}

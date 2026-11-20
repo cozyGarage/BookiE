@@ -145,6 +145,7 @@ print(hosts[sys.argv[-1]], "STREAM", sys.argv[-1])
     def test_container_fixture_ports_are_bound_to_the_configured_address(self):
         compose = (ROOT / "tests/fixtures/postgres-release/docker-compose.yml").read_text()
         self.assertEqual(compose.count('${BOOKIE_FIXTURE_BIND_ADDRESS:-127.0.0.1}:'), 3)
+        self.assertIn("create_host_path: false", compose)
 
         script = (ROOT / "scripts/test-postgres-release.sh").read_text()
         self.assertIn('fixture_host="${BOOKIE_FIXTURE_HOST:-localhost}"', script)

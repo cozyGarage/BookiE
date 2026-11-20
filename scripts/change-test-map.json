@@ -277,12 +277,20 @@
         "import::plan::tests::mysql_empty_enum_set_and_varchar_csv_cells_are_reconstructed_without_binding_empty_text"
       ]
     },
-    "apps/linux/app/src/ui/export_dialog.rs": {
+    "apps/linux/app/src/ui/export_dialog_tests.rs": {
       "package": "bookie-app",
       "target": "--lib",
       "tests": [
         "ui::export_dialog::tests::a_connection_without_sql_literals_is_not_offered_the_statement_format",
         "ui::export_dialog::tests::a_qualified_result_name_becomes_a_schema_and_table_for_sql_statements"
+      ]
+    },
+    "crates/core/src/export/format.rs": {
+      "package": "bookie-core",
+      "target": "--lib",
+      "tests": [
+        "export::format_tests::only_csv_shows_the_csv_options",
+        "export::format_tests::every_format_has_a_label_a_unique_extension_and_a_media_type"
       ]
     },
     "apps/linux/app/src/ui/connection_row.rs": {
