@@ -282,7 +282,6 @@
       "target": "--lib",
       "tests": [
         "ui::export_dialog::tests::a_connection_without_sql_literals_is_not_offered_the_statement_format",
-        "ui::export_dialog::tests::every_offered_format_has_its_own_extension_and_media_type",
         "ui::export_dialog::tests::a_qualified_result_name_becomes_a_schema_and_table_for_sql_statements"
       ]
     },
