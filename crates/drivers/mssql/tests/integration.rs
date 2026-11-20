@@ -52,7 +52,12 @@ async fn an_unavailable_sql_server_is_classified_as_connection_refused() {
 }
 
 async fn connect(opts: ConnectOptions) -> Box<dyn Connection> {
-    MssqlDriver.connect(opts).await.expect("connect")
+    server_restart::retry_operation("SQL Server", || {
+        let opts = opts.clone();
+        async move { MssqlDriver.connect(opts).await }
+    })
+    .await
+    .unwrap_or_else(|error| panic!("connect after SQL Server startup: {error}"))
 }
 
 #[tokio::test]
