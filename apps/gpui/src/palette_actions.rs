@@ -17,6 +17,8 @@ fn is_edit_palette_action(id: &str) -> bool {
             | "add-index"
             | "drop-index"
             | "show-structure"
+            | "go-to-reference"
+            | "show-referencing"
             | "show-create-table"
             | "empty-table"
             | "drop-table"
@@ -252,6 +254,7 @@ impl GridView {
 
     fn chrome_actions(&self) -> Vec<Action> {
         let mut actions = self.picker_actions();
+        actions.extend(self.structure_actions());
         actions.extend(self.workspace_actions());
         actions.extend(self.style_actions());
         actions
@@ -286,18 +289,6 @@ impl GridView {
                 self.can_save_edits() && self.cell_edit.edits.is_empty() && self.compare.is_none() && !self.form_open(),
             ),
             action("resolve-outcome", "Resolve unknown write outcome…", self.resolve_enabled()),
-            action("show-create-table", "Show CREATE TABLE", self.structure_info_enabled()),
-            action("empty-table", "Empty the table…", self.structure_change_enabled()),
-            action("drop-table", "Drop the table…", self.structure_change_enabled()),
-            action("show-structure", "Show table structure", self.structure_info_enabled()),
-            action("add-column", "Add a column…", self.structure_change_enabled()),
-            action("rename-column", "Rename a column…", self.structure_change_enabled()),
-            action("drop-column", "Drop a column…", self.structure_change_enabled()),
-            action("add-index", "Create an index…", self.structure_change_enabled()),
-            action("drop-index", "Drop an index…", self.structure_change_enabled()),
-            action("rename-table", "Rename the table…", self.structure_change_enabled()),
-            action("add-foreign-key", "Add a foreign key…", self.foreign_key_change_enabled()),
-            action("drop-foreign-key", "Drop a foreign key…", self.foreign_key_change_enabled()),
             action(
                 "insert-row",
                 "Add a row",
@@ -317,6 +308,30 @@ impl GridView {
                 "Reveal table in sidebar",
                 matches!(self.tabs.current(), Tab::Table(_)),
             ),
+        ]
+    }
+
+    fn structure_actions(&self) -> Vec<Action> {
+        let action = |id, label: &str, enabled| Action {
+            id,
+            label: label.to_string(),
+            enabled,
+        };
+        vec![
+            action("show-create-table", "Show CREATE TABLE", self.structure_info_enabled()),
+            action("empty-table", "Empty the table…", self.structure_change_enabled()),
+            action("drop-table", "Drop the table…", self.structure_change_enabled()),
+            action("go-to-reference", "Go to the referenced row", self.fk_nav_enabled()),
+            action("show-referencing", "Show referencing rows", self.fk_nav_enabled()),
+            action("show-structure", "Show table structure", self.structure_info_enabled()),
+            action("add-column", "Add a column…", self.structure_change_enabled()),
+            action("rename-column", "Rename a column…", self.structure_change_enabled()),
+            action("drop-column", "Drop a column…", self.structure_change_enabled()),
+            action("add-index", "Create an index…", self.structure_change_enabled()),
+            action("drop-index", "Drop an index…", self.structure_change_enabled()),
+            action("rename-table", "Rename the table…", self.structure_change_enabled()),
+            action("add-foreign-key", "Add a foreign key…", self.foreign_key_change_enabled()),
+            action("drop-foreign-key", "Drop a foreign key…", self.foreign_key_change_enabled()),
         ]
     }
 
@@ -556,6 +571,8 @@ impl GridView {
             "delete-rows" => self.request_delete(cx),
             "import-csv" => self.open_import_bar(cx),
             "show-structure" => self.show_structure(cx),
+            "go-to-reference" => self.go_to_referenced_row(cx),
+            "show-referencing" => self.show_referencing_rows(cx),
             "show-create-table" => self.show_create_table(cx),
             "empty-table" => self.open_structure_bar(StructureChangeKind::TruncateTable, cx),
             "drop-table" => self.open_structure_bar(StructureChangeKind::DropTable, cx),

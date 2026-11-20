@@ -75,6 +75,17 @@ class ChangeContractTests(unittest.TestCase):
             actions[0]["required_tests"],
         )
 
+    def test_export_format_path_maps_to_its_shared_format_contracts(self):
+        path = "crates/core/src/export/format.rs"
+        data = CHECKER.load_map()
+        actions = CHECKER.select_actions([path], data)
+        self.assertEqual(len(actions), 1)
+        self.assertEqual(actions[0]["package"], "bookie-core")
+        self.assertEqual(
+            actions[0]["required_tests"],
+            sorted(data["exact_tests"][path]["tests"]),
+        )
+
     def test_stream_export_path_maps_to_its_exact_value_contracts(self):
         actions = CHECKER.select_actions(["crates/core/src/export/stream_tests.rs"], CHECKER.load_map())
         self.assertEqual(len(actions), 1)
