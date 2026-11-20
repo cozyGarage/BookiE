@@ -126,9 +126,11 @@ mod tests {
             (CatalogObjectKind::Trigger, vec![object("trigger")]),
         ]);
         let replacement = vec![object("new")];
+        let routine_bytes = estimated_catalog_bytes(&catalogs[&CatalogObjectKind::Routine]);
         let bytes_without_routine = estimated_catalog_bytes(&catalogs[&CatalogObjectKind::Trigger]);
-
         let replacement_bytes = estimated_catalog_bytes(&replacement);
+        let all_bytes = routine_bytes + bytes_without_routine + replacement_bytes;
+
         assert!(sidebar_catalog_fits(
             &catalogs,
             CatalogObjectKind::Routine,
@@ -139,7 +141,13 @@ mod tests {
             &catalogs,
             CatalogObjectKind::Sequence,
             &replacement,
-            bytes_without_routine + replacement_bytes - 1,
+            all_bytes - 1,
+        ));
+        assert!(sidebar_catalog_fits(
+            &catalogs,
+            CatalogObjectKind::Sequence,
+            &replacement,
+            all_bytes,
         ));
     }
 }
