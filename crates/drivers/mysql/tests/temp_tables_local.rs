@@ -30,18 +30,12 @@ fn control() -> OperationControl {
 #[ignore = "requires a running MySQL or MariaDB; set SMOKE_MYSQL_*"]
 async fn a_session_lists_its_own_temporary_tables_where_the_server_exposes_them() {
     let lists = std::env::var("SMOKE_MYSQL_LISTS_TEMP").is_ok_and(|value| value == "1");
-    let connection = MysqlDriver.connect(opts_from_env()).await.unwrap();
-    connection
-        .execute("CREATE DATABASE IF NOT EXISTS claude_temp_probe")
-        .await
-        .unwrap();
+    let options = opts_from_env();
+    let schema = options.database.clone();
+    let connection = MysqlDriver.connect(options).await.unwrap();
     let mut first = connection.open_session().await.unwrap();
     first
-        .query_params_controlled(
-            "CREATE TEMPORARY TABLE claude_temp_probe.claude_tmp_a (a INT)",
-            &[],
-            &control(),
-        )
+        .query_params_controlled("CREATE TEMPORARY TABLE bookie_temp_probe (a INT)", &[], &control())
         .await
         .unwrap();
     let mut second = connection.open_session().await.unwrap();
@@ -54,7 +48,7 @@ async fn a_session_lists_its_own_temporary_tables_where_the_server_exposes_them(
         .map(|table| (table.schema.as_deref(), table.name.as_str()))
         .collect();
     if lists {
-        assert_eq!(names, [(Some("claude_temp_probe"), "claude_tmp_a")]);
+        assert_eq!(names, [(Some(schema.as_str()), "bookie_temp_probe")]);
     } else {
         assert!(
             names.is_empty(),
@@ -68,5 +62,4 @@ async fn a_session_lists_its_own_temporary_tables_where_the_server_exposes_them(
 
     first.close().await.unwrap();
     second.close().await.unwrap();
-    connection.execute("DROP DATABASE claude_temp_probe").await.unwrap();
 }
