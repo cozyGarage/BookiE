@@ -25,7 +25,7 @@ This is deliberately strict. If the operation wins the initial race, its result 
 
 **SQLite interrupts in process.** It has no second session to kill from, so the driver keeps the raw `sqlite3` handle for the life of the operation and calls `sqlite3_interrupt`, which SQLite documents as safe from another thread. sqlx's progress handler was rejected as the mechanism: it only fires between virtual-machine instructions, so it cannot stop a statement waiting on a database lock, which is one of the cases a Stop has to cover. The unsafe call is isolated in one module holding one pointer and one function.
 
-SQL Server cancellation remains disabled because the client cannot confirm that the server stopped the operation. BookiE returns `OperationOutcomeUnknown` and retires the affected connection or session.
+**SQL Server sends a TDS Attention.** When cancellation or the deadline wins, the driver drops the running request, then calls the vendored Tiberius `cancel_query`, which sends Attention and drains the stream until the server's `DONE_ATTN` acknowledgement. Only that acknowledgement yields `Cancelled` or `TimedOut`; the connection or session stays usable. If the acknowledgement does not arrive within the dispatch timeout, BookiE returns `OperationOutcomeUnknown` and retires the handle. Real SQL Server tests cover a read, a lock-blocked write and a session that keeps its temporary tables. Attention aborts the current batch, but statements of a multi-statement autocommit batch that already finished stay committed. Catalog reads and transaction batches still retire the handle on interruption.
 
 **A driver declares the capability.** `Connection::supports_server_cancellation` defaults to false. Where it is false the outcome of an interrupted operation is genuinely unknown, poisoning is correct, and the UI must not offer a Stop that cannot stop.
 
@@ -33,7 +33,7 @@ SQL Server cancellation remains disabled because the client cannot confirm that 
 
 The PostgreSQL path provides the reference sequence for the shared cancellation coordinator.
 
-Engines use different cancellation mechanisms. PostgreSQL sends `pg_cancel_backend` through a separate single-connection control pool. MySQL uses `KILL QUERY` through a separate single-connection pool. ClickHouse tags the request with a unique query id and sends `KILL QUERY` through its client. SQLite calls `sqlite3_interrupt` in-process. SQL Server, Redis, MongoDB and DuckDB do not report confirmed server cancellation. The shared coordinator still enforces the same ordering and confirmation rule.
+Engines use different cancellation mechanisms. PostgreSQL sends `pg_cancel_backend` through a separate single-connection control pool. MySQL uses `KILL QUERY` through a separate single-connection pool. ClickHouse tags the request with a unique query id and sends `KILL QUERY` through its client. SQLite calls `sqlite3_interrupt` in-process. SQL Server sends a TDS Attention on the same connection. Redis, MongoDB and DuckDB do not report confirmed server cancellation. The shared coordinator still enforces the same ordering and confirmation rule.
 
 Cancellation tests must check server state or returned values rather than treating a client-side error as proof that execution stopped.
 
@@ -57,7 +57,7 @@ Gained:
 
 **Treating a dispatched cancellation as confirmation.** Rejected. It would clear the poison flag while a write might still be running, which is the failure mode the audit rules exist to prevent.
 
-**Leaving non-PostgreSQL drivers on the dropped-future default and hiding Stop.** Rejected for PostgreSQL, MySQL, ClickHouse and SQLite, where a real mechanism exists. Retained for SQL Server, Redis, MongoDB, and DuckDB, which declare the capability as false.
+**Leaving non-PostgreSQL drivers on the dropped-future default and hiding Stop.** Rejected for PostgreSQL, MySQL, ClickHouse and SQLite, where a real mechanism exists. Retained for Redis, MongoDB, and DuckDB, which declare the capability as false.
 
 **`KILL <spid>` for SQL Server.** Deferred, not rejected. It ends the session and rolls back transactions still associated with it, which can take time ([Microsoft documentation](https://learn.microsoft.com/en-us/sql/t-sql/language-elements/kill-transact-sql)). It cannot prove an autocommit write had not committed before the kill took effect. The session's disappearance from `sys.dm_exec_sessions` would confirm the session ended, but Stop would cost the user their connection and a write outcome could remain unknown. Both need deciding before it ships.
 
