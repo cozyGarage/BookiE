@@ -1485,15 +1485,10 @@ jobs:
     runs-on: any-host
     needs: [pin-revision, guards, clippy]
     timeout-minutes: 45
-    defaults:
-      run:
-        shell: bash
     env:
-      CARGO_HOME: /cargo
       RUSTC_WRAPPER: ""
-      PATH: /cargo/bin:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
-      CARGO_TARGET_DIR: /target/${{ github.run_id }}/${{ github.job }}
-      TMPDIR: /target/${{ github.run_id }}/${{ github.job }}
+      CARGO_TARGET_DIR: /var/cache/ci/target/supply-chain-${{ github.run_id }}
+      TMPDIR: /var/cache/ci/tmp/supply-chain-${{ github.run_id }}
     steps:
       - name: Prepare runner workspace
         run: |
