@@ -18,16 +18,21 @@ fn replace_catalog_request(
     token
 }
 
-fn estimated_catalog_bytes(objects: &Vec<CatalogObject>) -> usize {
-    objects
-        .capacity()
-        .saturating_mul(std::mem::size_of::<CatalogObject>())
-        .saturating_add(objects.iter().fold(0, |bytes, object| {
-            bytes
-                .saturating_add(object.name.capacity())
-                .saturating_add(object.schema.as_ref().map_or(0, String::capacity))
-                .saturating_add(object.detail.as_ref().map_or(0, String::capacity))
-        }))
+fn estimated_catalog_bytes_within(objects: &Vec<CatalogObject>, limit: usize) -> Option<usize> {
+    let mut bytes = objects.capacity().checked_mul(std::mem::size_of::<CatalogObject>())?;
+    if bytes > limit {
+        return None;
+    }
+    for object in objects {
+        bytes = bytes
+            .checked_add(object.name.capacity())?
+            .checked_add(object.schema.as_ref().map_or(0, String::capacity))?
+            .checked_add(object.detail.as_ref().map_or(0, String::capacity))?;
+        if bytes > limit {
+            return None;
+        }
+    }
+    Some(bytes)
 }
 
 fn sidebar_catalog_fits(
@@ -36,13 +41,17 @@ fn sidebar_catalog_fits(
     incoming: &Vec<CatalogObject>,
     limit: usize,
 ) -> bool {
-    let retained_bytes = catalogs
-        .iter()
-        .filter(|(kind, _)| **kind != replacing)
-        .fold(0usize, |bytes, (_, objects)| {
-            bytes.saturating_add(estimated_catalog_bytes(objects))
-        });
-    retained_bytes.saturating_add(estimated_catalog_bytes(incoming)) <= limit
+    let mut remaining = limit;
+    for (kind, objects) in catalogs {
+        if *kind == replacing {
+            continue;
+        }
+        let Some(bytes) = estimated_catalog_bytes_within(objects, remaining) else {
+            return false;
+        };
+        remaining -= bytes;
+    }
+    estimated_catalog_bytes_within(incoming, remaining).is_some()
 }
 
 fn replace_catalog_kind(
@@ -126,7 +135,7 @@ impl App {
                         self.repopulate_sidebar(&self.sidebar_tables.clone(), sender.clone());
                     }
                     self.show_toast(&bookie_app_services::tr!(
-                        "The catalog exceeds the estimated 64 MiB sidebar limit."
+                        "This catalog exceeds the estimated 64 MiB supplemental sidebar cache limit."
                     ));
                     return;
                 }
@@ -163,10 +172,20 @@ mod tests {
             (CatalogObjectKind::Trigger, vec![object("trigger")]),
         ]);
         let replacement = vec![object("new")];
-        let routine_bytes = estimated_catalog_bytes(&catalogs[&CatalogObjectKind::Routine]);
-        let bytes_without_routine = estimated_catalog_bytes(&catalogs[&CatalogObjectKind::Trigger]);
-        let replacement_bytes = estimated_catalog_bytes(&replacement);
+        let routine_bytes = estimated_catalog_bytes_within(&catalogs[&CatalogObjectKind::Routine], usize::MAX).unwrap();
+        let bytes_without_routine =
+            estimated_catalog_bytes_within(&catalogs[&CatalogObjectKind::Trigger], usize::MAX).unwrap();
+        let replacement_bytes = estimated_catalog_bytes_within(&replacement, usize::MAX).unwrap();
         let all_bytes = routine_bytes + bytes_without_routine + replacement_bytes;
+
+        assert_eq!(
+            estimated_catalog_bytes_within(&replacement, replacement_bytes),
+            Some(replacement_bytes)
+        );
+        assert_eq!(
+            estimated_catalog_bytes_within(&replacement, replacement_bytes - 1),
+            None
+        );
 
         assert!(sidebar_catalog_fits(
             &catalogs,
