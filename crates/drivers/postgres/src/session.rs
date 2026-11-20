@@ -8,8 +8,8 @@ use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use sqlx::{Pool, Postgres};
 
 use crate::{
-    CONTROL_SETUP_TIMEOUT, MessagedResult, confirms_cancellation, controlled_execute, controlled_query,
-    controlled_query_with_messages, map_sqlx_error, request_cancellation,
+    CONTROL_SETUP_TIMEOUT, MessagedResult, confirms_cancellation, controlled_execute, controlled_query_with_messages,
+    map_sqlx_error, request_cancellation,
 };
 
 struct ActiveCursor {
