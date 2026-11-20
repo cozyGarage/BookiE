@@ -209,62 +209,63 @@ class CiJobCleanupTests(unittest.TestCase):
                 ],
             )
 
-    def test_finalizer_removes_the_driver_tls_compose_project(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            workspace = Path(temporary) / "workspace"
-            scripts = workspace / "src/scripts"
-            scripts.mkdir(parents=True)
-            job_tmp = Path(temporary) / "job-tmp"
-            job_tmp.mkdir()
-            fixture = workspace / "src/tests/fixtures/driver-tls"
-            fixture.mkdir(parents=True)
-            compose_file = fixture / "docker-compose.yml"
-            compose_file.touch()
-            (scripts / "cleanup-testcontainers.py").touch()
-            bin_dir = Path(temporary) / "bin"
-            bin_dir.mkdir()
-            calls = Path(temporary) / "calls"
-            python = bin_dir / "python3"
-            python.write_text(
-                "#!/usr/bin/env bash\nprintf 'python %s\\n' \"$*\" >> \"$CLEANUP_CALLS\"\n",
-                encoding="utf-8",
-            )
-            python.chmod(0o755)
-            docker = bin_dir / "docker"
-            docker.write_text(
-                "#!/usr/bin/env bash\nprintf 'docker %s\\n' \"$*\" >> \"$CLEANUP_CALLS\"\n",
-                encoding="utf-8",
-            )
-            docker.chmod(0o755)
-            run_id = "forgejo-123-1-driver-tls"
-            result = subprocess.run(
-                ["bash", str(CLEANUP)],
-                cwd=workspace,
-                env={
-                    **os.environ,
-                    "PATH": f"{bin_dir}:{os.environ['PATH']}",
-                    "GITHUB_RUN_ID": "123",
-                    "GITHUB_JOB": "driver-tls",
-                    "GITHUB_WORKSPACE": str(workspace),
-                    "CARGO_TARGET_DIR": str(Path(temporary) / "target"),
-                    "TMPDIR": str(job_tmp),
-                    "BOOKIE_TEST_RUN_ID": run_id,
-                    "CLEANUP_CALLS": str(calls),
-                },
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(
-                calls.read_text(encoding="utf-8").splitlines(),
-                [
-                    f"python {scripts / 'cleanup-testcontainers.py'} {run_id}",
-                    f"docker compose --project-name {run_id} --project-directory {fixture} "
-                    f"-f {compose_file} down --volumes --remove-orphans",
-                ],
-            )
-            self.assertFalse((workspace / "src").exists())
+    def test_finalizer_removes_compose_fixture_projects(self):
+        for job_name, fixture_name in (("driver-tls", "driver-tls"), ("pg-release", "postgres-release")):
+            with self.subTest(job=job_name), tempfile.TemporaryDirectory() as temporary:
+                workspace = Path(temporary) / "workspace"
+                scripts = workspace / "src/scripts"
+                scripts.mkdir(parents=True)
+                job_tmp = Path(temporary) / "job-tmp"
+                job_tmp.mkdir()
+                fixture = workspace / f"src/tests/fixtures/{fixture_name}"
+                fixture.mkdir(parents=True)
+                compose_file = fixture / "docker-compose.yml"
+                compose_file.touch()
+                (scripts / "cleanup-testcontainers.py").touch()
+                bin_dir = Path(temporary) / "bin"
+                bin_dir.mkdir()
+                calls = Path(temporary) / "calls"
+                python = bin_dir / "python3"
+                python.write_text(
+                    "#!/usr/bin/env bash\nprintf 'python %s\\n' \"$*\" >> \"$CLEANUP_CALLS\"\n",
+                    encoding="utf-8",
+                )
+                python.chmod(0o755)
+                docker = bin_dir / "docker"
+                docker.write_text(
+                    "#!/usr/bin/env bash\nprintf 'docker %s\\n' \"$*\" >> \"$CLEANUP_CALLS\"\n",
+                    encoding="utf-8",
+                )
+                docker.chmod(0o755)
+                run_id = f"forgejo-123-1-{job_name}"
+                result = subprocess.run(
+                    ["bash", str(CLEANUP)],
+                    cwd=workspace,
+                    env={
+                        **os.environ,
+                        "PATH": f"{bin_dir}:{os.environ['PATH']}",
+                        "GITHUB_RUN_ID": "123",
+                        "GITHUB_JOB": job_name,
+                        "GITHUB_WORKSPACE": str(workspace),
+                        "CARGO_TARGET_DIR": str(Path(temporary) / "target"),
+                        "TMPDIR": str(job_tmp),
+                        "BOOKIE_TEST_RUN_ID": run_id,
+                        "CLEANUP_CALLS": str(calls),
+                    },
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(
+                    calls.read_text(encoding="utf-8").splitlines(),
+                    [
+                        f"python {scripts / 'cleanup-testcontainers.py'} {run_id}",
+                        f"docker compose --project-name {run_id} --project-directory {fixture} "
+                        f"-f {compose_file} down --volumes --remove-orphans",
+                    ],
+                )
+                self.assertFalse((workspace / "src").exists())
 
     def test_pg_dump_uses_and_removes_a_run_scoped_temp_directory(self):
         job = runner_jobs(WORKFLOWS[0])["driver"]
@@ -442,6 +443,47 @@ class CiJobCleanupTests(unittest.TestCase):
             rm_calls = [json.loads(line) for line in calls.read_text(encoding="utf-8").splitlines()]
             self.assertNotIn(["-rf", "--", "/var/cache/ci/tmp/bookie-b4-rollback-123-2"], rm_calls)
 
+    def test_pg_release_finalizer_removes_only_its_run_scoped_config(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            bin_dir = Path(temporary) / "bin"
+            bin_dir.mkdir()
+            calls = Path(temporary) / "calls"
+            rm = bin_dir / "rm"
+            rm.write_text(
+                "#!/usr/bin/env python3\n"
+                "import json, os, sys\n"
+                "with open(os.environ['RM_CALLS'], 'a', encoding='utf-8') as stream:\n"
+                "    stream.write(json.dumps(sys.argv[1:]) + '\\n')\n",
+                encoding="utf-8",
+            )
+            rm.chmod(0o755)
+            config_path = "/var/cache/ci/tmp/bookie-pg-release-123-2.json"
+
+            for job, removed in (("pg-release", True), ("driver", False)):
+                with self.subTest(job=job):
+                    calls.unlink(missing_ok=True)
+                    result = subprocess.run(
+                        ["bash", str(CLEANUP)],
+                        env={
+                            **os.environ,
+                            "PATH": f"{bin_dir}:{os.environ['PATH']}",
+                            "GITHUB_JOB": job,
+                            "GITHUB_RUN_ID": "123",
+                            "GITHUB_RUN_ATTEMPT": "2",
+                            "GITHUB_WORKSPACE": temporary,
+                            "TMPDIR": "/var/cache/ci/tmp",
+                            "BOOKIE_FIXTURE_TOXIPROXY_CONFIG": config_path,
+                            "RM_CALLS": str(calls),
+                        },
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    rm_calls = [json.loads(line) for line in calls.read_text(encoding="utf-8").splitlines()]
+                    expected = ["-rf", "--", config_path]
+                    self.assertEqual(expected in rm_calls, removed)
+
     def test_b4_rollback_finalizer_cannot_remove_another_run_temp_path(self):
         with tempfile.TemporaryDirectory() as temporary:
             bin_dir = Path(temporary) / "bin"
@@ -527,6 +569,64 @@ class CiJobCleanupTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             rm_calls = [json.loads(line) for line in calls.read_text(encoding="utf-8").splitlines()]
             self.assertNotIn(["-rf", "--", scratch], rm_calls)
+
+    def test_driver_followup_finalizer_removes_only_its_scoped_temp_path(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            bin_dir = Path(temporary) / "bin"
+            bin_dir.mkdir()
+            calls = Path(temporary) / "calls"
+            rm = bin_dir / "rm"
+            rm.write_text(
+                "#!/usr/bin/env python3\n"
+                "import json, os, sys\n"
+                "with open(os.environ['RM_CALLS'], 'a', encoding='utf-8') as stream:\n"
+                "    stream.write(json.dumps(sys.argv[1:]) + '\\n')\n",
+                encoding="utf-8",
+            )
+            rm.chmod(0o755)
+            for group in ("driver-extended", "socket-ssh"):
+                with self.subTest(group=group):
+                    scratch = f"/var/cache/ci/tmp/bookie-driver-123-2-{group}"
+                    result = subprocess.run(
+                        ["bash", str(CLEANUP)],
+                        env={
+                            **os.environ,
+                            "PATH": f"{bin_dir}:{os.environ['PATH']}",
+                            "GITHUB_RUN_ID": "123",
+                            "GITHUB_RUN_ATTEMPT": "2",
+                            "GITHUB_JOB": "driver-followup",
+                            "TMPDIR": scratch,
+                            "RM_CALLS": str(calls),
+                        },
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    rm_calls = [json.loads(line) for line in calls.read_text(encoding="utf-8").splitlines()]
+                    self.assertIn(["-rf", "--", scratch], rm_calls)
+                    calls.unlink(missing_ok=True)
+            result = subprocess.run(
+                ["bash", str(CLEANUP)],
+                env={
+                    **os.environ,
+                    "PATH": f"{bin_dir}:{os.environ['PATH']}",
+                    "GITHUB_RUN_ID": "123",
+                    "GITHUB_RUN_ATTEMPT": "2",
+                    "GITHUB_JOB": "unit",
+                    "TMPDIR": "/var/cache/ci/tmp/bookie-driver-123-2-driver-extended",
+                    "RM_CALLS": str(calls),
+                },
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            rm_calls = [json.loads(line) for line in calls.read_text(encoding="utf-8").splitlines()]
+            self.assertNotIn(
+                ["-rf", "--", "/var/cache/ci/tmp/bookie-driver-123-2-driver-extended"],
+                rm_calls,
+            )
 
     def test_driver_tls_workflow_assigns_a_run_scoped_fixture_project(self):
         job = runner_jobs(WORKFLOWS[0])["driver-tls"]

@@ -41,6 +41,7 @@ mod schema_diagram_ui;
 mod set_cells_ui;
 mod update_ui;
 mod value_search_ui;
+mod fk_nav_ui;
 mod resolve_ui;
 mod structure_ui;
 mod insert_ui;

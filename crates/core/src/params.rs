@@ -105,9 +105,16 @@ pub fn extract_named_parameters(sql: &str, driver_id: &str) -> NamedParameters {
     let mut bindings: Vec<String> = Vec::new();
     let bytes = sql.as_bytes();
     let mut index = 0usize;
+    let copy_data = crate::sql_lex::copy_data_ranges(sql, driver_id);
 
     while index < bytes.len() {
         let rest = &sql[index..];
+
+        if let Some(&(_, to)) = copy_data.iter().find(|(from, to)| (*from..*to).contains(&index)) {
+            out.push_str(&sql[index..to]);
+            index = to;
+            continue;
+        }
 
         if let Some(length) = skip_span_at(sql, index, driver_id).filter(|length| *length > 0) {
             out.push_str(&sql[index..index + length]);

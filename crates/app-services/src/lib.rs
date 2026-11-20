@@ -52,6 +52,7 @@ pub mod export_tables;
 pub mod favorites;
 pub mod filter_catalog;
 pub mod filter_settings;
+pub mod foreign_key_nav;
 pub mod health_report;
 pub mod highlight_settings;
 pub mod i18n;
