@@ -61,6 +61,7 @@ pub(crate) struct SearchState {
     pub capped: bool,
     pub reset: bool,
     pub values: crate::value_search_ui::ValueSearchState,
+    pub diagram: crate::schema_diagram_ui::SchemaDiagramState,
 }
 
 impl SearchState {
@@ -76,6 +77,7 @@ impl SearchState {
             capped: false,
             reset: false,
             values: Default::default(),
+            diagram: Default::default(),
         }
     }
 }

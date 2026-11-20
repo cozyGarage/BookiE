@@ -1242,3 +1242,35 @@ fn searching_every_table_for_a_value_reports_the_matching_rows_in_messages(cx: &
     });
     std::fs::remove_file(&path).ok();
 }
+
+#[gpui::test]
+fn the_schema_diagram_is_written_to_a_new_file_in_the_format_of_its_extension(cx: &mut TestAppContext) {
+    let path = fixture_copy("schema-diagram");
+    let (view, cx) = saving_view(cx, &path);
+    let directory = std::env::temp_dir().join(format!("bookie-diagram-{}", std::process::id()));
+    std::fs::create_dir_all(&directory).unwrap();
+    let target = directory.join("schema.mmd");
+    let type_path = |view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext, file: &std::path::Path| {
+        let text = file.display().to_string();
+        cx.update(|_, cx| {
+            view.update(cx, |view, cx| {
+                view.open_schema_diagram_bar(cx);
+                let input = view.search.diagram.input.clone().expect("the field exists once the bar opened");
+                input.update(cx, |input, cx| input.set_content(&text, cx));
+                view.write_schema_diagram(cx);
+            })
+        });
+    };
+    type_path(&view, cx, &target);
+    settle_saving(cx);
+    let written = std::fs::read_to_string(&target).unwrap();
+    assert!(written.starts_with("erDiagram") && written.contains("orders") && written.contains("customers"), "{written}");
+    view.read_with(cx, |view, _| assert!(!view.search.diagram.open, "{}", view.status));
+
+    type_path(&view, cx, &target);
+    view.read_with(cx, |view, _| assert!(view.status.contains("already exists"), "{}", view.status));
+    type_path(&view, cx, &directory.join("schema.png"));
+    view.read_with(cx, |view, _| assert!(view.status.contains(".mmd"), "{}", view.status));
+    std::fs::remove_dir_all(&directory).ok();
+    std::fs::remove_file(&path).ok();
+}

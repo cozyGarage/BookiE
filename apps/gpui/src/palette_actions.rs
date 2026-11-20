@@ -63,6 +63,7 @@ impl GridView {
             .chain(self.activity_actions())
             .chain(self.health_actions())
             .chain(self.value_search_actions())
+            .chain(self.schema_diagram_actions())
             .chain(self.chrome_actions())
             .collect()
     }
@@ -604,6 +605,7 @@ impl GridView {
             "explain" => self.explain_query(cx),
             "data-dictionary" => self.show_data_dictionary(cx),
             "search-values" => self.open_value_search_bar(cx),
+            "export-schema-diagram" => self.open_schema_diagram_bar(cx),
             id if let Some(report) = crate::health_ui::health_report_for(id) => self.show_health_report(report, cx),
             "previous-run" => self.activate_run(self.run_tabs.active - 1),
             "next-run" => self.activate_run(self.run_tabs.active + 1),

@@ -11,6 +11,7 @@ use bookie_app_services::read_session::ConnectionSummary;
 use bookie_app_services::read_session_store::{
     OpenedSession, ReadSessionStore, SessionId, SubscriptionRequest, SubscriptionSample, SubscriptionSampler,
 };
+use bookie_app_services::er_diagram::{SchemaDiagram, TableRead, read::MAX_TABLES as MAX_DIAGRAM_TABLES};
 use bookie_app_services::value_search::{
     SearchLimits, SearchOptions, SearchReport, SearchRequest, SearchSource, TableTarget, run_search,
 };
@@ -364,6 +365,33 @@ impl LiveSession {
             snapshot_consistent: self.supports_snapshot_cursor,
             table: Some(table.clone()),
         })
+    }
+
+    pub fn schema_diagram(&self, cancellation: &CancellationToken) -> Result<SchemaDiagram, String> {
+        let supports_keys = drivers_registry::default_registry()
+            .get(&self.driver_id)
+            .is_some_and(|driver| driver.capabilities().supports_foreign_key_metadata);
+        let mut tables: Vec<&TableInfo> = self.tables.iter().collect();
+        tables.sort_unstable_by(|a, b| a.name.cmp(&b.name).then_with(|| a.schema.cmp(&b.schema)));
+        tables.truncate(MAX_DIAGRAM_TABLES);
+        let mut reads = Vec::new();
+        for table in tables {
+            if cancellation.is_cancelled() {
+                return Err("The export was cancelled.".into());
+            }
+            let foreign_keys = if supports_keys {
+                self.table_structure(table)?.foreign_keys
+            } else {
+                Vec::new()
+            };
+            reads.push(TableRead {
+                schema: table.schema.clone(),
+                name: table.name.clone(),
+                columns: self.table_columns(table)?,
+                foreign_keys,
+            });
+        }
+        Ok(SchemaDiagram::build(reads))
     }
 
     pub fn search_values(
