@@ -575,8 +575,8 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("python3 scripts/run-test-layer.py unused-dependencies", supply_chain)
         self.assertIn("cargo install --locked cargo-shear --version 1.13.4", github_supply_chain)
         self.assertIn("cargo install --locked cargo-shear --version 1.13.4", supply_chain)
-        self.assertRegex(supply_chain, r"(?m)^      CARGO_HOME: /cargo$")
-        self.assertRegex(supply_chain, r"(?m)^      PATH: /cargo/bin:")
+        self.assertNotRegex(supply_chain, r"(?m)^      CARGO_HOME: /cargo$")
+        self.assertNotRegex(supply_chain, r"(?m)^      PATH: /cargo/bin:")
         self.assertIn("cargo-shear 1.13.4", layer["prerequisites"])
         self.assertEqual(layer["steps"][0]["argv"], ["cargo", "shear"])
         contracts = (ROOT / ".github/workflows/linux-ci-contracts.yml").read_text()
@@ -723,6 +723,9 @@ class CiWorkflowTests(unittest.TestCase):
             r"(?ms)^  driver-tls:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", forgejo_workflow
         ).group(1)
         pg_release = re.search(r"(?ms)^  pg-release:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
+        forgejo_pg_release = re.search(
+            r"(?ms)^  pg-release:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", forgejo_workflow
+        ).group(1)
         tls_compose = (ROOT / "tests/fixtures/driver-tls/docker-compose.yml").read_text()
         release_compose = (ROOT / "tests/fixtures/postgres-release/docker-compose.yml").read_text()
         tls_fixture_script = (ROOT / "scripts/test-driver-tls.sh").read_text()
@@ -753,9 +756,27 @@ class CiWorkflowTests(unittest.TestCase):
         )
         self.assertIn('getent ahostsv4 "$BOOKIE_DRIVER_TLS_HOST"', tls_fixture_script)
         self.assertIn("BOOKIE_DRIVER_TLS_WRONG_IDENTITY_HOST", tls_test_helpers)
-        self.assertNotIn("TOXIPROXY_CONFIG", release_compose)
-        self.assertNotIn("bookie-pg-release-fixtures", pg_release)
-        self.assertIn("toxiproxy/Dockerfile", release_compose)
+        self.assertIn("/var/tmp/bookie-pg-release-fixtures:/var/tmp/bookie-pg-release-fixtures", pg_release)
+        self.assertIn(
+            "BOOKIE_FIXTURE_TOXIPROXY_CONFIG: /var/tmp/bookie-pg-release-fixtures/toxiproxy.json",
+            pg_release,
+        )
+        self.assertIn(
+            'install -m 0644 tests/fixtures/postgres-release/toxiproxy/toxiproxy.json "$BOOKIE_FIXTURE_TOXIPROXY_CONFIG"',
+            pg_release,
+        )
+        self.assertIn(
+            "BOOKIE_FIXTURE_TOXIPROXY_CONFIG: /var/cache/ci/tmp/bookie-pg-release-${{ github.run_id }}-${{ github.run_attempt }}.json",
+            forgejo_pg_release,
+        )
+        self.assertIn(
+            'install -D -m 0644 src/tests/fixtures/postgres-release/toxiproxy/toxiproxy.json "$BOOKIE_FIXTURE_TOXIPROXY_CONFIG"',
+            forgejo_pg_release,
+        )
+        self.assertIn("TMPDIR: /var/cache/ci/tmp\n", forgejo_pg_release)
+        self.assertIn('mkdir -p "$TMPDIR"', forgejo_pg_release)
+        self.assertIn("${BOOKIE_FIXTURE_TOXIPROXY_CONFIG:-./toxiproxy/toxiproxy.json}", release_compose)
+        self.assertIn("create_host_path: false", release_compose)
 
     def test_mongo_fixture_health_checks_wait_for_seeded_rows(self):
         compose = (ROOT / "tests/fixtures/driver-tls/docker-compose.yml").read_text()
@@ -1090,7 +1111,9 @@ class CiWorkflowTests(unittest.TestCase):
                 self.assertNotIn('rm -rf -- "$CARGO_TARGET_DIR"', job)
                 self.assertIn('cleanup --min-free-gib 30', job)
         supply_chain = re.search(r"(?ms)^  supply-chain:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
-        self.assertIn("CARGO_TARGET_DIR: /target/${{ github.run_id }}/${{ github.job }}", supply_chain)
+        self.assertIn("runs-on: any-host", supply_chain)
+        self.assertIn("CARGO_TARGET_DIR: /var/cache/ci/target/${{ github.run_id }}/${{ github.job }}", supply_chain)
+        self.assertIn("TMPDIR: /var/cache/ci/tmp/${{ github.run_id }}/${{ github.job }}", supply_chain)
         self.assertIn('rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"', supply_chain)
         guards = re.search(r"(?ms)^  guards:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
         self.assertIn("CARGO_TARGET_DIR: /var/cache/ci/target/bookie-guards-${{ github.run_id }}", guards)
@@ -1657,6 +1680,7 @@ class CiWorkflowTests(unittest.TestCase):
         widgets = re.search(r"(?ms)^  widgets:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
         self.assertIn("--expected-group workspace", unit)
         self.assertIn("nextest run --archive-file", unit)
+        self.assertIn("options: --user 1001:1001", unit)
         self.assertIn("GSETTINGS_SCHEMA_DIR: ${{ runner.temp }}/bookie-unit-bundle/schemas", unit)
         self.assertIn("GSETTINGS_SCHEMA_DIR: ${{ runner.temp }}/bookie-direct-bundle/schemas", widgets)
         self.assertEqual(workflow.count('find "$BOOKIE_TEST_BUNDLE" -type f \\( -path'), 6)

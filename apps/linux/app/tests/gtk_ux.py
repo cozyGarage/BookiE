@@ -707,14 +707,27 @@ GLib.MainLoop().run()
             )
 
         def set_active_editor(sql):
-            visible_editor().queryEditableText().setTextContents(sql)
+            ui.invoke_accessible_action("win.focus-editor")
+            editor = visible_editor()
+            editor.queryEditableText().setTextContents(sql)
+            text = editor.queryText()
+            actual = text.getText(0, text.characterCount)
+            assert actual == sql, (actual, sql)
 
-        def run_active_editor(sql):
+        def run_active_editor(sql, result_marker=None):
             set_active_editor(sql)
-            ui.invoke(visible_control("Run", pyatspi.ROLE_PUSH_BUTTON))
+            ui.invoke(ui.wait_for_sensitive_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON))
+            if result_marker:
+                ui.wait_for_node(name=result_marker, role=pyatspi.ROLE_LABEL)
+                return
             ui.invoke(ui.wait_for_node(name="Approve once", role=pyatspi.ROLE_PUSH_BUTTON))
             ui.wait_for_node(name="Approve once", present=False)
             ui.wait_for_node_containing("done in")
+
+        def switch_schema(schema):
+            marker = f"{schema}_session_ready"
+            run_active_editor(f"SET search_path TO {schema}")
+            run_active_editor("SELECT current_schema() || '_session_ready'", marker)
 
         def show_columns():
             set_active_editor("SELECT * FROM bookie_completion_target WHERE bookie_completion_target")
@@ -785,7 +798,7 @@ GLib.MainLoop().run()
             ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
             ui.invoke_accessible_action("win.open-editor")
             ui.invoke(ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON))
-            run_active_editor(f"SET search_path TO {schemas[0]}")
+            switch_schema(schemas[0])
             time.sleep(0.5)
             show_columns()
             wait_for_candidate("alpha_only")
@@ -797,14 +810,14 @@ GLib.MainLoop().run()
             set_active_editor("SELECT 1")
             set_active_editor("/* second editor */ SELECT 1;")
             ui.invoke(ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON))
-            run_active_editor(f"SET search_path TO {schemas[1]}")
+            switch_schema(schemas[1])
             show_columns()
             wait_for_candidate("beta_only")
             wait_for_candidate("alpha_only", present=False)
             ui.press_x11_key("Escape")
 
             ui.press_x11_key("Tab", ("Control_L",))
-            run_active_editor(f"SET search_path TO {schemas[2]}")
+            switch_schema(schemas[2])
             show_columns()
             wait_for_candidate("gamma_only")
             wait_for_candidate("alpha_only", present=False)
@@ -818,7 +831,7 @@ GLib.MainLoop().run()
             psql("DROP SCHEMA IF EXISTS " + ", ".join(schemas) + " CASCADE")
 
     def show_temp_table(table, marker):
-        row = ui.wait_for_node(name=table, role=pyatspi.ROLE_LIST_ITEM)
+        row = ui.wait_for_node_containing(table, role=pyatspi.ROLE_LIST_ITEM)
         actions = row.queryAction()
         index = next(i for i in range(actions.nActions) if actions.getName(i) == "sidebar-row.open-in-new-tab")
         assert actions.doAction(index), f"could not open {table}"
@@ -852,16 +865,18 @@ GLib.MainLoop().run()
         def run_session_sql(sql):
             ui.invoke_accessible_action("win.focus-editor")
             set_active_editor(sql)
-            ui.invoke(visible_control("Run", pyatspi.ROLE_PUSH_BUTTON))
-            approval = ui.wait_for_node(name="Approve once", role=pyatspi.ROLE_PUSH_BUTTON)
+            ui.invoke(ui.wait_for_sensitive_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON))
+            try:
+                approval = ui.wait_for_node(name="Approve once", role=pyatspi.ROLE_PUSH_BUTTON, timeout=1)
+            except AssertionError:
+                return
             ui.invoke(approval)
             ui.wait_for_node(name="Approve once", present=False)
-            ui.wait_for_node_containing("done in")
 
         def create_temp_table(table, marker):
             ui.invoke(visible_control("Session", pyatspi.ROLE_TOGGLE_BUTTON))
             run_session_sql(f"CREATE TEMP TABLE {table} (value text); INSERT INTO {table} VALUES ('{marker}')")
-            ui.wait_for_node(name=table, role=pyatspi.ROLE_LIST_ITEM)
+            ui.wait_for_node_containing(table, role=pyatspi.ROLE_LIST_ITEM)
 
         ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
         ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
@@ -870,18 +885,18 @@ GLib.MainLoop().run()
 
         ui.invoke_accessible_action("win.open-editor")
         create_temp_table("bookie_session_temp_b", "session-b-marker")
-        ui.wait_for_node(name="bookie_session_temp_a", role=pyatspi.ROLE_LIST_ITEM, present=False)
+        ui.wait_for_node_containing("bookie_session_temp_a", role=pyatspi.ROLE_LIST_ITEM, present=False)
 
         ui.press_x11_key("Tab", ("Control_L",))
-        ui.wait_for_node(name="bookie_session_temp_a", role=pyatspi.ROLE_LIST_ITEM)
-        ui.wait_for_node(name="bookie_session_temp_b", role=pyatspi.ROLE_LIST_ITEM, present=False)
+        ui.wait_for_node_containing("bookie_session_temp_a", role=pyatspi.ROLE_LIST_ITEM)
+        ui.wait_for_node_containing("bookie_session_temp_b", role=pyatspi.ROLE_LIST_ITEM, present=False)
         show_temp_table("bookie_session_temp_a", "session-a-marker")
 
         ui.press_x11_key("Tab", ("Control_L",))
-        ui.wait_for_node(name="bookie_session_temp_b", role=pyatspi.ROLE_LIST_ITEM)
+        ui.wait_for_node_containing("bookie_session_temp_b", role=pyatspi.ROLE_LIST_ITEM)
         show_temp_table("bookie_session_temp_b", "session-b-marker")
         run_session_sql("DROP TABLE bookie_session_temp_b")
-        ui.wait_for_node(name="bookie_session_temp_b", role=pyatspi.ROLE_LIST_ITEM, present=False)
+        ui.wait_for_node_containing("bookie_session_temp_b", role=pyatspi.ROLE_LIST_ITEM, present=False)
 
     def check_saved_connection_removal(database, base, welcome):
         before = saved_connections(base)

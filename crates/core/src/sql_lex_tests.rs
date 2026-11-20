@@ -268,3 +268,27 @@ fn copy_forms_that_do_not_read_stdin_still_split_normally() {
         "only PostgreSQL has the COPY data protocol"
     );
 }
+
+#[test]
+fn a_copy_unit_splits_into_its_command_and_its_data() {
+    use super::{CopyIn, copy_in_parts};
+    let unit = "COPY accounts (id, note) FROM STDIN WITH (FORMAT csv);\n1,\"a; b\"\n2,c\n\\.";
+    assert_eq!(
+        copy_in_parts(unit, "postgres"),
+        Some(CopyIn {
+            command: "COPY accounts (id, note) FROM STDIN WITH (FORMAT csv)",
+            data: "1,\"a; b\"\n2,c",
+            terminated: true,
+        })
+    );
+    let open = copy_in_parts("COPY t FROM STDIN;\n1\t2\n", "postgres").unwrap();
+    assert_eq!(
+        (open.command, open.data, open.terminated),
+        ("COPY t FROM STDIN", "1\t2", false)
+    );
+    let empty = copy_in_parts("COPY t FROM STDIN;\n\\.", "postgres").unwrap();
+    assert_eq!((empty.data, empty.terminated), ("", true));
+    assert_eq!(copy_in_parts("COPY t TO STDOUT", "postgres"), None);
+    assert_eq!(copy_in_parts("SELECT 1", "postgres"), None);
+    assert_eq!(copy_in_parts(unit, "mysql"), None);
+}
