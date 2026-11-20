@@ -72,6 +72,7 @@ impl GridView {
             .chain(self.backup_actions())
             .chain(self.refresh_actions())
             .chain(self.reconnect_actions())
+            .chain(self.new_window_actions())
             .chain(self.sql_file_actions())
             .chain(self.closed_tab_actions())
             .chain(self.recent_tab_actions())

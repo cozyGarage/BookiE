@@ -40,6 +40,7 @@ impl GridView {
             "backup-database" => self.open_backup_bar(false, cx),
             "refresh-table" => self.refresh_table(cx),
             "reconnect" => self.reconnect_now(cx),
+            "new-window" => self.open_new_window(cx),
             "reopen-tab" => self.reopen_closed_tab(window, cx),
             "recent-tab" => self.switch_to_previous_tab(window, cx),
             "export-all-tables" => self.open_tables_export_bar(cx),

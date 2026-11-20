@@ -33,6 +33,7 @@ mod filter_rule_ui;
 mod health_ui;
 mod paste_ui;
 mod refresh_ui;
+mod new_window_ui;
 mod run_cursor_ui;
 mod tables_export_ui;
 mod sql_file_ui;
