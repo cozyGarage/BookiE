@@ -893,7 +893,10 @@ impl SimpleComponent for App {
                 self.sidebar_group_expansion_changed(&key, expanded);
             }
             AppMsg::SidebarSearchChanged => self.refresh_sidebar_model(),
-            AppMsg::RefreshSidebar => self.refresh_sidebar(sender),
+            AppMsg::RefreshSidebar => {
+                self.reset_sidebar_catalog();
+                self.refresh_sidebar(sender);
+            }
             AppMsg::RevealInSidebar => self.on_reveal_in_sidebar(),
             AppMsg::HideSidebarSchema(schema) => self.hide_sidebar_schema(&schema, &sender),
             AppMsg::ShowSidebarSchema(schema) => self.show_sidebar_schema(&schema, &sender),
@@ -1057,8 +1060,13 @@ impl SimpleComponent for App {
             AppMsg::ShowCatalog => self.show_catalog(None),
             AppMsg::ShowCatalogKind(kind) => self.show_catalog(Some(kind)),
             AppMsg::LoadSidebarCatalog(kind) => self.on_load_sidebar_catalog(kind, &sender),
-            AppMsg::SidebarCatalogLoaded { origin, kind, result } => {
-                self.on_sidebar_catalog_loaded(&origin, kind, result, sender.clone());
+            AppMsg::SidebarCatalogLoaded {
+                origin,
+                kind,
+                request,
+                result,
+            } => {
+                self.on_sidebar_catalog_loaded(&origin, kind, &request, result, sender.clone());
             }
             AppMsg::ToggleAllSidebarGroups => self.toggle_all_sidebar_groups(),
             AppMsg::ShowErDiagram { schema } => self.on_show_er_diagram(schema),

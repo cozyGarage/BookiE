@@ -265,6 +265,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::app::multi_session::gtk_tests::cancelled_sidebar_catalog_response_does_not_restore_entries"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::app::multi_session::gtk_tests::reconnecting_changed_saved_settings_replaces_only_the_target_session"
     ],
     [

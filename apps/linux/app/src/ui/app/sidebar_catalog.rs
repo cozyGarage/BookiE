@@ -55,7 +55,7 @@ impl App {
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
-                    let control = crate::services::operation_control::bounded_with(timeout_secs, token);
+                    let control = crate::services::operation_control::bounded_with(timeout_secs, token.clone());
                     let result = crate::services::catalog::list_objects_excluding(
                         conn.as_ref(),
                         kind,
@@ -65,7 +65,12 @@ impl App {
                     )
                     .await
                     .map_err(|error| crate::services::error_text::driver_message(&error));
-                    reply.input(AppMsg::SidebarCatalogLoaded { origin, kind, result });
+                    reply.input(AppMsg::SidebarCatalogLoaded {
+                        origin,
+                        kind,
+                        request: token,
+                        result,
+                    });
                 })
                 .drop_on_shutdown()
         });
@@ -75,10 +80,11 @@ impl App {
         &mut self,
         origin: &CatalogOrigin,
         kind: CatalogObjectKind,
+        request: &tokio_util::sync::CancellationToken,
         result: Result<Vec<CatalogObject>, String>,
         sender: ComponentSender<Self>,
     ) {
-        if !origin.owns_window(self.connection_id, &self.database) {
+        if request.is_cancelled() || !origin.owns_window(self.connection_id, &self.database) {
             return;
         }
         match result {
