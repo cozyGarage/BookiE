@@ -30,6 +30,7 @@ impl GridView {
             "paste-cells" => self.paste_cells(cx),
             "filter-rule" => self.open_filter_rule_bar(cx),
             "show-schema-diagram" => self.open_schema_diagram(cx),
+            "check-for-updates" => self.check_for_updates_now(cx),
             _ => match health_report_for(id) {
                 Some(report) => self.show_health_report(report, cx),
                 None => return false,

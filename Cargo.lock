@@ -1023,7 +1023,6 @@ dependencies = [
  "tokio-util",
  "tracing",
  "tracing-subscriber",
- "ureq",
  "uuid",
  "whoami",
  "zip",
@@ -1066,6 +1065,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "unicode-width",
+ "ureq",
  "uuid",
 ]
 
