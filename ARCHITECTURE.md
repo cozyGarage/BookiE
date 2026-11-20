@@ -143,9 +143,11 @@ flowchart TB
     app --> policy
     app --> storage
     app --> ssh
+    app --> results
     gpui --> app_services
     gpui --> registry
     gpui --> core
+    gpui --> results
     app_services --> results
     app_services --> checks
     app_services --> pg_sessions
@@ -154,11 +156,10 @@ flowchart TB
     app_services --> core
     app_services --> policy
     app_services --> transport
+    app_services --> ssh
     app_services --> dump
     results --> core
-    checks --> core
     pg_sessions --> core
-    kafka --> core
     app --> transport
     agentd --> core
     agentd --> policy
@@ -167,6 +168,7 @@ flowchart TB
     agentd --> transport
     mcp --> policy
     mcp --> storage
+    mcp --> core
     transport --> storage
     transport --> ssh
     transport --> policy
@@ -176,6 +178,7 @@ flowchart TB
     storage --> policy
     storage --> core
     registry --> drv
+    registry --> core
     drv --> core
     app --> registry
     agentd --> registry

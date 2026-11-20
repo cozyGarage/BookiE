@@ -9,7 +9,7 @@ This page describes current BookiE behavior. Published artifact versions and pac
 | PostgreSQL | Stable | Broadest test coverage, including server-confirmed cancellation and verified TLS through SSH. |
 | MySQL and MariaDB | Stable | Unix socket connections are supported. |
 | SQLite | Stable | File based. Additional database files can be attached under custom schema aliases. |
-| SQL Server | Stable | Kerberos sign-in is available. |
+| SQL Server | Stable | Kerberos sign-in is available. Stop sends a TDS Attention and keeps the connection for queries and statements. |
 | ClickHouse | Stable | Mutations are awaited, so saved edits show up in the grid. |
 | MongoDB | Experimental | Collections, find and aggregate. An optional authentication database can be set. |
 | Redis | Experimental | One host and port. Sentinel and Cluster are not supported. |
@@ -116,7 +116,7 @@ The sidebar table menu has Edit Structure, Show CREATE TABLE, Show ER Diagram, I
 - Rename Table is refused while the table has open tabs, so no pending change is lost.
 - Truncate Table asks for confirmation and runs through the same guard as every other statement. SQLite does not support it.
 - Drop Table asks for confirmation and names the tables that reference it before you confirm.
-- Show ER Diagram (also on a schema row) draws the schema's tables as cards with their columns, key badges and foreign-key relations. It reads at most 150 tables with the connection's metadata calls, under the operation timeout, and can be cancelled. Pan by dragging, zoom with the buttons or Ctrl+scroll, and pick a table in the list to centre it. Cards are laid out automatically and cannot be moved. Copy the diagram as Mermaid or DBML text.
+- Show ER Diagram (also on a schema row) draws the schema's tables as cards with their columns, key badges and foreign-key relations. It reads at most 150 tables with the connection's metadata calls, under the operation timeout, and can be cancelled. Pan by dragging, zoom with the buttons or Ctrl+scroll, and pick a table in the list to centre it. Cards are laid out automatically and cannot be moved. Copy the diagram as Mermaid or DBML text, or use the export button in the diagram window and choose **Export Data Dictionary…** to save the schema's tables, columns, indexes and foreign keys through the usual export dialog. It reads through the policy-guarded connection, can be cancelled, stops at 100,000 metadata rows, and is refused when the catalog read was truncated or skipped objects.
 
 ![The structure view of a table](images/structure-light.png)
 

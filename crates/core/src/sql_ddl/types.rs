@@ -73,29 +73,19 @@ pub enum BuildDdlError {
 const MAX_TYPE_LEN: usize = 200;
 const MAX_DEFAULT_LEN: usize = 500;
 
-/// MySQL caps a column `COMMENT` at 1024 characters and rejects a
-/// longer one outright, so the shortest engine limit is the limit for
-/// every dialect.
+/// MySQL rejects a column `COMMENT` over 1024 characters; the tightest engine limit applies to every dialect.
 const MAX_COMMENT_LEN: usize = 1024;
 
-/// Characters that some SQL drivers (notably MySQL with certain
-/// client encodings) treat as effective statement terminators or
-/// line breaks. ASCII LF/CR are the obvious cases; Unicode
-/// `LINE SEPARATOR` (U+2028) and `PARAGRAPH SEPARATOR` (U+2029) round
-/// out the set so a crafted type / default string can't smuggle a
-/// newline that bypasses the comment / `;` heuristics.
+/// Characters some drivers treat as statement terminators or line breaks: LF, CR, U+2028 and
+/// U+2029, so a crafted type or default cannot smuggle a newline past the comment and `;` checks.
 const FORBIDDEN_CONTROL_CHARS: &[char] = &['\0', '\n', '\r', '\u{2028}', '\u{2029}'];
 
 fn contains_forbidden_control(s: &str) -> bool {
     s.chars().any(|c| FORBIDDEN_CONTROL_CHARS.contains(&c))
 }
 
-/// Reject sequences that escape the type-name syntactic context into
-/// statement scope (`;`, comments) or break identifier quoting (double
-/// quote, backtick, NUL, line-terminators). Type names may include
-/// spaces (`DOUBLE PRECISION`), parens (`VARCHAR(255)`), commas
-/// (`DECIMAL(10,2)`), brackets (`INT[]`), single quotes for
-/// `ENUM('a','b')`, and dots for schema-qualified user types.
+/// Reject sequences that leave the type-name context (`;`, comments, quote, backtick, NUL, line
+/// terminators). Spaces, parens, commas, brackets, single quotes and dots stay valid in type names.
 const MAX_COLLATION_LEN: usize = 128;
 
 const COLLATABLE_TYPE_PREFIXES: &[&str] = &[
@@ -181,12 +171,8 @@ fn is_single_clause(text: &str) -> bool {
     depth == 0 && quote.is_none()
 }
 
-/// DEFAULT expressions sit between `DEFAULT` and the next column-def
-/// boundary (comma, paren, end of statement). The user can legitimately
-/// type literals (`'foo'`, `42`), function calls (`now()`), and
-/// SQL-quoted strings with embedded escapes (`'O''Brien'`). The
-/// dangerous shapes are statement-terminators and SQL comments —
-/// outright reject those.
+/// DEFAULT expressions may hold literals, calls and escaped strings (`'O''Brien'`); statement
+/// terminators and SQL comments are rejected.
 pub(crate) fn validate_safe_default(s: &str) -> Result<(), BuildDdlError> {
     if s.len() > MAX_DEFAULT_LEN {
         return Err(BuildDdlError::UnsafeDefault(s.into()));
@@ -203,10 +189,8 @@ pub(crate) fn validate_safe_default(s: &str) -> Result<(), BuildDdlError> {
     Ok(())
 }
 
-/// A comment is a fully quoted string literal, so `;`, `--` and `/*`
-/// carry no syntactic weight inside it and prose legitimately contains
-/// them. Only the characters that could terminate the literal's line
-/// or the statement itself are rejected.
+/// A comment is a quoted literal, so `;`, `--` and `/*` are allowed; only characters that end the
+/// literal's line or the statement are rejected.
 pub(crate) fn validate_safe_comment(comment: &str) -> Result<(), BuildDdlError> {
     if comment.chars().count() > MAX_COMMENT_LEN {
         return Err(BuildDdlError::UnsafeComment(comment.into()));
@@ -294,9 +278,7 @@ pub fn column_comment_placement(driver_id: &str) -> CommentPlacement {
 
 const FK_ACTIONS: &[&str] = &["NO ACTION", "RESTRICT", "CASCADE", "SET NULL", "SET DEFAULT"];
 
-/// T-SQL's `ON DELETE` / `ON UPDATE` grammar has no `RESTRICT`; the
-/// engine spells that behaviour `NO ACTION`. Emitting `RESTRICT` is a
-/// syntax error, so it is not an option the UI may offer either.
+/// T-SQL has no `RESTRICT`; it spells that `NO ACTION`, and emitting `RESTRICT` is a syntax error.
 const FK_ACTIONS_MSSQL: &[&str] = &["NO ACTION", "CASCADE", "SET NULL", "SET DEFAULT"];
 
 /// Referential actions the engine accepts, in the order the UI should
@@ -312,9 +294,7 @@ pub fn supported_fk_actions(driver_id: &str) -> &'static [&'static str] {
     }
 }
 
-/// FK actions are a closed enum per dialect. Allow-list rather than
-/// escape; case-insensitive match against the canonical strings
-/// returned in upper case for emission.
+/// Closed enum per dialect: allow-list, case-insensitive match, returned upper case for emission.
 pub(crate) fn validate_fk_action(driver_id: &str, s: &str) -> Result<&'static str, BuildDdlError> {
     let upper = s.trim().to_ascii_uppercase();
     supported_fk_actions(driver_id)
@@ -324,9 +304,7 @@ pub(crate) fn validate_fk_action(driver_id: &str, s: &str) -> Result<&'static st
         .ok_or_else(|| BuildDdlError::InvalidFkAction(s.into()))
 }
 
-/// User-edited column draft. Carries both the original (loaded from
-/// `fetch_columns`) and the in-flight edit. `original` is `None` for
-/// newly-added columns.
+/// User-edited column draft: the loaded `original` (`None` for new columns) and the in-flight edit.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DraftColumn {
     pub original: Option<ColumnInfo>,
