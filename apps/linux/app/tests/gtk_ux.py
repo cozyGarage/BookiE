@@ -681,7 +681,7 @@ GLib.MainLoop().run()
 
         def visible_editor():
             deadline = time.monotonic() + ui.WAIT_SECONDS
-            while True:
+            while time.monotonic() < deadline:
                 candidates = []
                 for node in ui.descendants(ui.application_node()):
                     if ui.node_role(node) != pyatspi.ROLE_TEXT or not node.getState().contains(pyatspi.STATE_SHOWING):
@@ -691,11 +691,11 @@ GLib.MainLoop().run()
                         candidates.append(node)
                     except Exception:
                         continue
-                if candidates or time.monotonic() >= deadline:
-                    break
+                if candidates:
+                    focused = [node for node in candidates if node.getState().contains(pyatspi.STATE_FOCUSED)]
+                    return (focused or candidates)[-1]
                 time.sleep(ui.POLL_SECONDS)
-            focused = [node for node in candidates if node.getState().contains(pyatspi.STATE_FOCUSED)]
-            return (focused or candidates)[-1]
+            raise AssertionError(f"no visible editor:\n{ui.accessible_snapshot()}")
 
         def visible_control(name, role):
             return next(
@@ -705,6 +705,15 @@ GLib.MainLoop().run()
                 and ui.node_role(node) == role
                 and node.getState().contains(pyatspi.STATE_SHOWING)
             )
+
+        def focus_editor():
+            ui.invoke_accessible_action("win.focus-editor")
+            deadline = time.monotonic() + ui.WAIT_SECONDS
+            while time.monotonic() < deadline:
+                if visible_editor().getState().contains(pyatspi.STATE_FOCUSED):
+                    return
+                time.sleep(ui.POLL_SECONDS)
+            raise AssertionError(f"editor did not receive focus:\n{ui.accessible_snapshot()}")
 
         def set_active_editor(sql):
             visible_editor().queryEditableText().setTextContents(sql)
@@ -757,8 +766,7 @@ GLib.MainLoop().run()
                     time.sleep(ui.POLL_SECONDS)
                 actual_offset = text.caretOffset
                 assert actual_offset == offset, (position, actual_offset, offset)
-                ui.invoke_accessible_action("win.focus-editor")
-                time.sleep(1.0)  # let the view settle after the far caret jump before typing the trigger
+                focus_editor()
                 started = time.monotonic()
                 ui.press_x11_key("period")
                 wait_for_candidate("alpha_only")
@@ -767,7 +775,7 @@ GLib.MainLoop().run()
                 assert text.getText(offset, offset + 1) == ".", position
                 ui.press_x11_key("Escape")
                 wait_for_candidate("alpha_only", present=False)
-                ui.invoke_accessible_action("win.focus-editor")
+                focus_editor()
                 text.setCaretOffset(offset + 1)
                 deadline = time.monotonic() + ui.WAIT_SECONDS
                 while text.caretOffset != offset + 1 and time.monotonic() < deadline:
@@ -794,7 +802,7 @@ GLib.MainLoop().run()
 
             ui.press_x11_key("t", ("Control_L",))
             time.sleep(0.3)
-            set_active_editor("SELECT 1")
+            ui.invoke_accessible_action("win.focus-editor")
             set_active_editor("/* second editor */ SELECT 1;")
             ui.invoke(ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON))
             run_active_editor(f"SET search_path TO {schemas[1]}")
