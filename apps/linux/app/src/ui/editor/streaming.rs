@@ -518,6 +518,7 @@ mod tests {
                 .create()
                 .expect("test spool"),
             cache: StreamPageCache::default(),
+            messages: Default::default(),
             error: None,
         });
 
