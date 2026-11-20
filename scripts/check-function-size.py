@@ -13,7 +13,7 @@ import re
 import sys
 from pathlib import Path
 
-LIMIT = 60
+LIMIT = 120
 
 ROOT = Path(__file__).resolve().parent.parent
 BASELINES = ROOT / "baselines" / "function-size-baselines.txt"

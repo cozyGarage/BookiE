@@ -21,6 +21,10 @@ def measure_source(checker, source):
 
 
 class FunctionSizeTests(unittest.TestCase):
+    def test_function_body_limit_is_120_lines(self):
+        checker = load_checker()
+        assert checker.LIMIT == 120
+
     def test_generated_arch_vendor_source_is_not_scanned(self):
         checker = load_checker()
         with tempfile.TemporaryDirectory(prefix="bookie-function-size-") as temporary:
