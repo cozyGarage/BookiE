@@ -11,14 +11,34 @@ pub fn parse_pattern(text: &str) -> Option<String> {
     (!text.is_empty() && text.chars().count() <= 256 && !text.contains(char::is_whitespace)).then(|| text.to_string())
 }
 
-pub fn parse_channel(text: &str) -> Option<String> {
+fn channel_after(text: &str, word: &str) -> Option<String> {
     let text = text.trim();
+    let prefix = word.len() + 1;
     let name = text
-        .get(..7)
-        .filter(|prefix| prefix.eq_ignore_ascii_case("listen "))
-        .and_then(|_| text.get(7..))?
+        .get(..prefix)
+        .filter(|head| head[..word.len()].eq_ignore_ascii_case(word) && head.ends_with(' '))
+        .and_then(|_| text.get(prefix..))?
         .trim();
     (!name.is_empty() && name.len() <= 63 && !name.contains(char::is_whitespace)).then(|| name.to_string())
+}
+
+pub fn parse_channel(text: &str) -> Option<String> {
+    channel_after(text, "listen")
+}
+
+pub fn parse_follow(text: &str) -> Option<String> {
+    channel_after(text, "follow")
+}
+
+pub fn message_line(message: &bookie_app_services::read_session_store::SubscriptionMessage) -> String {
+    let payload: String = message.payload.chars().take(SHOWN_PAYLOAD_CHARS).collect();
+    let cut =
+        if message.payload_bytes > message.payload.len() || message.payload.chars().count() > SHOWN_PAYLOAD_CHARS {
+            " …"
+        } else {
+            ""
+        };
+    format!("{} · {payload}{cut}", message.channel)
 }
 
 pub fn describe(pattern: &str, outcome: Result<SubscriptionSample, String>) -> Vec<(MessageKind, String)> {
@@ -34,14 +54,7 @@ pub fn describe(pattern: &str, outcome: Result<SubscriptionSample, String>) -> V
     };
     let mut lines = vec![(MessageKind::Success, format!("{pattern} · {count} messages · {ending}"))];
     for message in sample.messages {
-        let payload: String = message.payload.chars().take(SHOWN_PAYLOAD_CHARS).collect();
-        let cut =
-            if message.payload_bytes > message.payload.len() || message.payload.chars().count() > SHOWN_PAYLOAD_CHARS {
-                " …"
-            } else {
-                ""
-            };
-        lines.push((MessageKind::Info, format!("{} · {payload}{cut}", message.channel)));
+        lines.push((MessageKind::Info, message_line(&message)));
     }
     lines
 }
@@ -58,6 +71,16 @@ mod tests {
             payload: payload.into(),
             payload_bytes: bytes,
         }
+    }
+
+    #[test]
+    fn follow_takes_the_follow_word_and_one_short_name() {
+        assert_eq!(parse_follow("follow jobs"), Some("jobs".into()));
+        assert_eq!(parse_follow("  FOLLOW   orders_changed "), Some("orders_changed".into()));
+        for bad in ["jobs", "follow", "follow ", "follow two words", "listen jobs", "unfollow jobs"] {
+            assert_eq!(parse_follow(bad), None, "{bad}");
+        }
+        assert_eq!(parse_channel("follow jobs"), None, "listen and follow are different commands");
     }
 
     #[test]

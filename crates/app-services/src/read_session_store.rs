@@ -42,6 +42,17 @@ pub trait SubscriptionSampler: Send + Sync {
         options: ConnectOptions,
         request: SubscriptionRequest,
     ) -> Pin<Box<dyn Future<Output = Result<SubscriptionSample, DriverError>> + Send + '_>>;
+
+    fn follow(
+        &self,
+        _driver_id: &str,
+        _options: ConnectOptions,
+        _channels: Vec<String>,
+        _cancel: tokio_util::sync::CancellationToken,
+        _on_message: Box<dyn FnMut(SubscriptionMessage) + Send>,
+    ) -> Pin<Box<dyn Future<Output = Result<u64, DriverError>> + Send + '_>> {
+        Box::pin(async { Err(DriverError::Unsupported("following live messages".into())) })
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -307,6 +318,38 @@ impl ReadSessionStore {
         session
             .with_subscription(&self.registry, control, |options| {
                 sampler.sample(&driver_id, options, request)
+            })
+            .await
+    }
+
+    pub async fn follow_subscription(
+        &self,
+        id: SessionId,
+        channels: Vec<String>,
+        control: &OperationControl,
+        on_message: Box<dyn FnMut(SubscriptionMessage) + Send>,
+    ) -> Result<u64, DriverFailurePresentation> {
+        bookie_core::check_pre_dispatch(control).map_err(|error| crate::driver_error_presentation::classify(&error))?;
+        let session = self.get(id).ok_or(DriverFailurePresentation::Disconnected)?;
+        let sampler = self
+            .subscription_sampler
+            .as_ref()
+            .ok_or_else(|| DriverFailurePresentation::Unsupported("subscription sampling is unavailable".into()))?;
+        let driver_id = session.driver_id.clone();
+        sampler
+            .validate(
+                &driver_id,
+                &SubscriptionRequest {
+                    patterns: channels.clone(),
+                    max_messages: 1,
+                    window: std::time::Duration::from_secs(1),
+                },
+            )
+            .map_err(|error| crate::driver_error_presentation::classify(&error))?;
+        let cancel = control.cancellation_token().clone();
+        session
+            .with_subscription(&self.registry, control, |options| {
+                sampler.follow(&driver_id, options, channels, cancel, on_message)
             })
             .await
     }

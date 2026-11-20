@@ -33,6 +33,7 @@ pub(crate) struct PaletteState {
     pub mode: PaletteMode,
     pub address: Option<String>,
     pub pattern: Option<String>,
+    pub follow: Option<String>,
     pub delimiter: Option<bookie_gpui::csv_delimiter::Parsed>,
     pub limit: Option<bookie_gpui::export_limit::Parsed>,
 }
@@ -47,6 +48,7 @@ impl PaletteState {
             mode: PaletteMode::Commands,
             address: None,
             pattern: None,
+            follow: None,
             delimiter: None,
             limit: None,
         }
