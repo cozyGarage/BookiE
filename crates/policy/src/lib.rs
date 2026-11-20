@@ -40,8 +40,8 @@ pub use approval::{
 pub use audit::{
     AuditAdministrativeAction, AuditAdministrativeMetadata, AuditApprovalOutcome, AuditConnectionContext,
     AuditConnectionIdentity, AuditError, AuditErrorCategory, AuditEvent, AuditOperationClass, AuditPreviewState,
-    AuditRecordPhase, AuditSink, AuditState, AuditTerminalStatus, AuditTransactionOutcome, AuditTransportClient,
-    AuditTransportMetadata, AuditTransportOutcome, NullAuditSink,
+    AuditRecordPhase, AuditSink, AuditSqlHash, AuditState, AuditTerminalStatus, AuditTransactionOutcome,
+    AuditTransportClient, AuditTransportMetadata, AuditTransportOutcome, NullAuditSink,
 };
 pub use audit_reconciliation::{
     AuditReconciliation, AuditReconciliationClaim, AuditReconciliationEvidence, MAX_RECONCILIATION_REASON_CHARS,

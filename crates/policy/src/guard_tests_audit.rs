@@ -1,5 +1,28 @@
 use super::*;
 
+#[tokio::test]
+async fn query_audit_uses_a_keyed_hash_and_identifies_the_key() {
+    use sha2::Digest;
+
+    let audit = Arc::new(SequenceAuditSink::new(vec![]));
+    let guard = gui_guard(
+        connection(Arc::new(AtomicUsize::new(0)), Arc::new(AtomicUsize::new(0))),
+        audit.clone(),
+        Arc::new(AuditState::new()),
+    );
+
+    guard.query("SELECT 1").await.unwrap();
+
+    let events = audit.events.lock().unwrap();
+    assert!(!events.is_empty());
+    assert!(events.iter().all(|event| event.sql_hash_key_id.is_some()));
+    assert!(
+        events
+            .iter()
+            .all(|event| event.sql_hash != hex::encode(sha2::Sha256::digest(b"SELECT 1")))
+    );
+}
+
 struct UnresolvedWriteAuditSink {
     events: Arc<Mutex<Vec<AuditEvent>>>,
 }

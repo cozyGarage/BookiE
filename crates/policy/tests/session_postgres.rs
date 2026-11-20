@@ -9,7 +9,6 @@ use bookie_policy::{
     AuditTransactionOutcome, AutoApproveSink, GuardContext, PolicyConfig, PolicyGuard, Principal,
 };
 use drivers_postgres::PgDriver;
-use sha2::{Digest, Sha256};
 use testcontainers::ContainerAsync;
 use testcontainers::ImageExt;
 use testcontainers_modules::postgres::Postgres;
@@ -274,7 +273,7 @@ async fn a_read_scoped_agent_sleep_times_out_is_audited_and_keeps_its_session_us
     assert_eq!(recovered.rows, vec![vec![Value::Int(1)]]);
     session.close().await.expect("close agent session");
 
-    let sleep_hash = hex::encode(Sha256::digest(b"SELECT pg_sleep(5)"));
+    let sleep_hash = audit.hash_sql("SELECT pg_sleep(5)").await.unwrap().value;
     let sleep_events = audit
         .events
         .lock()
