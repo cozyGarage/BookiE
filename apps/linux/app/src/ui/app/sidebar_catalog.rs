@@ -122,6 +122,9 @@ impl App {
                 if !objects.is_empty()
                     && !sidebar_catalog_fits(&self.sidebar_catalog, kind, &objects, MAX_SIDEBAR_CATALOG_BYTES)
                 {
+                    if replace_catalog_kind(&mut self.sidebar_catalog, kind, Vec::new()) {
+                        self.repopulate_sidebar(&self.sidebar_tables.clone(), sender.clone());
+                    }
                     self.show_toast(&bookie_app_services::tr!(
                         "The catalog exceeds the estimated 64 MiB sidebar limit."
                     ));
