@@ -1150,3 +1150,39 @@ fn show_create_table_fills_the_panel_with_a_create_statement(cx: &mut TestAppCon
     });
     std::fs::remove_file(&path).ok();
 }
+
+#[gpui::test]
+fn one_value_is_staged_on_every_selected_row_of_the_active_column(cx: &mut TestAppContext) {
+    let path = fixture_copy("set-cells");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_set_cells_bar(cx)));
+    view.read_with(cx, |view, _| assert!(!view.cell_edit.set.open, "nothing selected yet"));
+
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.selection = Some(crate::Selection { anchor: 0, focus: 2 });
+            view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 1 });
+            view.open_set_cells_bar(cx);
+            let input = view
+                .cell_edit
+                .set
+                .input
+                .clone()
+                .expect("the field exists once the bar opened");
+            input.update(cx, |input, cx| input.set_content("bulk", cx));
+            view.apply_set_cells(false, cx);
+        })
+    });
+    view.read_with(cx, |view, _| {
+        assert!(!view.cell_edit.set.open, "{}", view.status);
+        assert_eq!(view.cell_edit.edits.len(), 3, "{}", view.status);
+        assert!(
+            view.cell_edit
+                .edits
+                .values()
+                .all(|cell| *cell == bookie_gpui::model::Cell::Text("bulk".into()))
+        );
+        assert!((0..3).all(|row| view.cell_edit.edits.contains_key(&(row, 1))));
+    });
+    std::fs::remove_file(&path).ok();
+}

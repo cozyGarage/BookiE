@@ -20,6 +20,7 @@ impl GridView {
             let editor = self.sql_input.read(cx).focus_handle(cx);
             window.focus(&editor, cx);
         }
+        self.focus_set_cells_input(window, cx);
         self.note_frame();
         self.pace_frame(window);
         self.viewport_rows = self.viewport_rows_for(window);
@@ -332,7 +333,8 @@ impl Render for GridView {
             .or_else(|| self.structure_bar(theme, cx))
             .or_else(|| self.structure_info_panel(theme, cx))
             .or_else(|| self.resolve_panel(theme, cx))
-            .or_else(|| self.export_file_bar(theme, cx));
+            .or_else(|| self.export_file_bar(theme, cx))
+            .or_else(|| self.set_cells_bar(theme, cx));
         let grid = self.grid_pane(theme, strip, (filter_row, compare_bar, save_bar, banner, insert_form));
         let content = match self.tabs.current().clone() {
             Tab::Home => self.home_page(theme, cx),

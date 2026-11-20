@@ -24,6 +24,7 @@ mod favorites_ui;
 mod approval_ui;
 mod import_ui;
 mod export_file_ui;
+mod set_cells_ui;
 mod resolve_ui;
 mod structure_ui;
 mod insert_ui;
@@ -346,7 +347,11 @@ impl GridView {
                     };
                     cx.notify();
                 }
-                gpui_kit::component::table::TableEvent::RightClickedCell(row, _) => {
+                gpui_kit::component::table::TableEvent::RightClickedCell(row, column) => {
+                    this.cell_cursor = Some(bookie_results::grid_cursor::Cursor {
+                        row: *row,
+                        column: *column,
+                    });
                     let dataset = this.base() + *row as u64;
                     if !this.selection.is_some_and(|selection| selection.contains(dataset)) {
                         this.click_row(dataset, false);
