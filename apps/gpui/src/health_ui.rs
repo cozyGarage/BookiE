@@ -22,6 +22,19 @@ pub(crate) fn health_label(report: HealthReport) -> String {
 }
 
 impl GridView {
+    pub(crate) fn execute_tool_palette_action(&mut self, id: &'static str, cx: &mut Context<Self>) -> bool {
+        match id {
+            "search-values" => self.open_value_search_bar(cx),
+            "export-schema-diagram" => self.open_schema_diagram_bar(cx),
+            "run-at-cursor" => self.run_at_cursor(cx),
+            _ => match health_report_for(id) {
+                Some(report) => self.show_health_report(report, cx),
+                None => return false,
+            },
+        }
+        true
+    }
+
     pub(crate) fn health_actions(&self) -> Vec<Action> {
         if !self.health_supported() {
             return Vec::new();

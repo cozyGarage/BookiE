@@ -26,6 +26,7 @@ mod import_ui;
 mod export_file_ui;
 mod selection_stats_ui;
 mod health_ui;
+mod run_cursor_ui;
 mod schema_diagram_ui;
 mod set_cells_ui;
 mod value_search_ui;
