@@ -85,10 +85,6 @@ impl BrowseTab {
             store.insert(0, &draft_row);
         }
         self.refresh_inner_stack_visibility();
-        // Scroll + focus deferred via FocusInsertedDraft — see
-        // the matching note in the `InsertRow` arm above. Same
-        // `bounds.y == 0` assertion fires if `cv.scroll_to`
-        // lands in the same tick as a stack flip.
         sender.input(BrowseTabInput::FocusInsertedDraft);
     }
 
@@ -110,23 +106,10 @@ impl BrowseTab {
             let draft_row = crate::ui::row_object::RowObject::new_draft(draft_id, default_values);
             store.insert(0, &draft_row);
         }
-        // The empty-state status page hides the column view —
-        // if we were sitting on it (zero persisted rows on the
-        // first page) the draft we just appended would be
-        // invisible. Re-derive the inner stack visibility now
-        // that there's a draft to show.
         self.refresh_inner_stack_visibility();
-        // Scroll + focus are deferred via FocusInsertedDraft.
-        // Calling `cv.scroll_to(...)` synchronously here used
-        // to crash with
-        //   Gtk-ERROR gtk_list_base_update_adjustments:
-        //   assertion failed: (bounds.y == 0)
-        // when the empty → grid flip and the scroll landed in
-        // the same tick: the ColumnView's ScrolledWindow had
-        // no realized adjustments to update. FocusInsertedDraft
-        // runs from `glib::idle_add_local_once`, after GTK has
-        // finished allocating the now-visible grid, so the
-        // adjustments are valid by then.
+        // Synchronous `cv.scroll_to` in the same tick as the empty → grid flip
+        // asserts `bounds.y == 0` in gtk_list_base_update_adjustments;
+        // FocusInsertedDraft runs from idle, after allocation.
         sender.input(BrowseTabInput::FocusInsertedDraft);
     }
 
