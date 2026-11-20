@@ -7,6 +7,8 @@ use super::*;
 use crate::chrome::ghost;
 use crate::diagram_scene::{Scene, build_scene};
 
+const DIAGRAM_EDGE_STROKE_WIDTH: f32 = 1.5;
+
 pub(crate) struct DiagramView {
     pub diagram: SchemaDiagram,
     pub scene: Scene,
@@ -160,7 +162,7 @@ fn diagram_canvas(view: &DiagramView, theme: Theme, cx: &mut Context<GridView>) 
                 )
             };
             for edge in &edges {
-                let mut path = PathBuilder::stroke(px(1.5));
+                let mut path = PathBuilder::stroke(px(DIAGRAM_EDGE_STROKE_WIDTH));
                 path.move_to(at(edge.start.x, edge.start.y));
                 path.line_to(at(edge.start_stub.x, edge.start_stub.y));
                 path.cubic_bezier_to(

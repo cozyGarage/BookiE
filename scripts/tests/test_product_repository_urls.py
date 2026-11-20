@@ -12,7 +12,8 @@ class ProductRepositoryUrlTests(unittest.TestCase):
             "scripts/build-arch-rc.sh": f'remote="${{BOOKIE_RC_REMOTE:-{PRODUCT_URL}.git}}"',
             "apps/linux/packaging/arch/PKGBUILD": f'url="{PRODUCT_URL}"',
             "apps/linux/flatpak/com.bookie.linux.metainfo.xml": f"<url type=\"homepage\">{PRODUCT_URL}</url>",
-            "apps/linux/app/src/ui/app/status_pages.rs": f'.website("{PRODUCT_URL}")',
+            "apps/linux/app/src/ui/app/status_pages.rs": ".website(bookie_app_services::about::WEBSITE)",
+            "crates/app-services/src/about.rs": f'pub const WEBSITE: &str = "{PRODUCT_URL}";',
             "scripts/update-translations.py": f'--msgid-bugs-address={PRODUCT_URL}/issues',
         }
         for relative_path, expected in paths.items():
