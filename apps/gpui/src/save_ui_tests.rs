@@ -1497,3 +1497,36 @@ fn exporting_every_table_is_refused_without_a_consistent_snapshot(cx: &mut TestA
     });
     std::fs::remove_file(&path).ok();
 }
+
+#[gpui::test]
+fn reconnecting_refreshes_the_table_list_and_never_with_pending_edits(cx: &mut TestAppContext) {
+    let path = fixture_copy("reconnect");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            assert!(view.reconnect_actions().iter().all(|action| !action.enabled), "no origin is known yet");
+            view.search.origin = Some(bookie_gpui::live::Origin::File(path.clone()));
+            assert!(view.reconnect_actions().iter().all(|action| action.enabled));
+        })
+    });
+    queue_edit(&view, cx, "pending");
+    cx.update(|_, cx| view.update(cx, |view, cx| view.reconnect_now(cx)));
+    view.read_with(cx, |view, _| {
+        assert!(view.status.contains("pending edits"), "{}", view.status);
+        assert_eq!(view.cell_edit.edits.len(), 1);
+    });
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.cell_edit.edits.clear();
+            view.tabs.open_query();
+            view.reconnect_now(cx);
+        })
+    });
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.status, "Connected", "{}", view.status);
+        assert_eq!(view.tabs.items.len(), 2, "the extra tab was closed by the reconnect");
+        assert_eq!(view.catalog.tables.len(), 2);
+    });
+    std::fs::remove_file(&path).ok();
+}

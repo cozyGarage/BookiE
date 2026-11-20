@@ -67,6 +67,7 @@ pub(crate) struct SearchState {
     pub sql_file: crate::sql_file_ui::SqlFileState,
     pub closed: crate::closed_tabs_ui::ClosedTabs,
     pub recent: crate::closed_tabs_ui::TabRecency,
+    pub origin: Option<bookie_gpui::live::Origin>,
     pub tables_export: crate::tables_export_ui::TablesExportState,
 }
 
@@ -89,6 +90,7 @@ impl SearchState {
             sql_file: Default::default(),
             closed: Default::default(),
             recent: Default::default(),
+            origin: None,
             tables_export: Default::default(),
         }
     }
