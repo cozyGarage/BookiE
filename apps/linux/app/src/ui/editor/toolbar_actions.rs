@@ -70,7 +70,13 @@ impl SqlEditor {
             RunMessage::RunAtCursor => self.run_scope(true, sender),
             RunMessage::Explain => self.explain_at_cursor(),
             RunMessage::ShowTemporaryTable { schema, name } => {
-                self.begin_run(temporary_table_query(schema.as_deref(), &name), None, true, sender);
+                let driver_id = self.metadata().map(|metadata| metadata.driver_id).unwrap_or_default();
+                self.begin_run(
+                    temporary_table_query(&driver_id, schema.as_deref(), &name),
+                    None,
+                    true,
+                    sender,
+                );
             }
         }
     }
@@ -288,14 +294,10 @@ pub(super) fn run_menu_items() -> [(String, &'static str, &'static str); 2] {
     ]
 }
 
-fn temporary_table_query(schema: Option<&str>, name: &str) -> String {
-    let table = bookie_core::sql_dialect::quote_ident("postgres", name);
+fn temporary_table_query(driver_id: &str, schema: Option<&str>, name: &str) -> String {
+    let table = bookie_core::sql_dialect::quote_ident(driver_id, name);
     let relation = schema.map_or(table.clone(), |schema| {
-        format!(
-            "{}.{}",
-            bookie_core::sql_dialect::quote_ident("postgres", schema),
-            table
-        )
+        format!("{}.{}", bookie_core::sql_dialect::quote_ident(driver_id, schema), table)
     });
     format!("SELECT * FROM {relation}")
 }
@@ -307,8 +309,16 @@ mod tests {
     #[test]
     fn a_temporary_table_query_quotes_each_identifier() {
         assert_eq!(
-            temporary_table_query(Some("pg_temp_4"), "x\"; DROP TABLE users;--"),
+            temporary_table_query("postgres", Some("pg_temp_4"), "x\"; DROP TABLE users;--"),
             "SELECT * FROM \"pg_temp_4\".\"x\"\"; DROP TABLE users;--\""
+        );
+    }
+
+    #[test]
+    fn a_mariadb_temporary_table_query_uses_mysql_identifiers() {
+        assert_eq!(
+            temporary_table_query("mysql", Some("test"), "scratch"),
+            "SELECT * FROM `test`.`scratch`"
         );
     }
 }
