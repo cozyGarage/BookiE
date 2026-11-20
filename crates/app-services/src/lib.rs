@@ -122,6 +122,7 @@ pub mod preferences;
 pub mod query_parameters;
 pub mod quick_switcher;
 pub mod reconnect;
+pub mod simple_filter;
 pub mod sql_file;
 pub mod sql_text;
 pub mod statement_plan;

@@ -18,6 +18,9 @@ pub(crate) enum Pick {
     Command(Command),
     Favorite(String),
     DeleteFavorite(uuid::Uuid, String),
+    SavedFilter(String),
+    DeleteSavedFilter(String),
+    NameFilter(String),
 }
 
 impl GridView {
@@ -29,6 +32,8 @@ impl GridView {
             PaletteMode::Columns => self.column_items(needle),
             PaletteMode::Shortcuts => self.shortcut_items(needle),
             PaletteMode::Favorites | PaletteMode::DeleteFavorite => self.favorite_items(needle),
+            PaletteMode::SavedFilters | PaletteMode::DeleteSavedFilter => self.saved_filter_items(needle),
+            PaletteMode::NameFilter => self.name_filter_items(needle, cx),
         }
     }
 
@@ -109,6 +114,47 @@ impl GridView {
         scored.into_iter().map(|(_, _, item)| item).collect()
     }
 
+    fn saved_filter_items(&self, needle: &str) -> Vec<PickerItem> {
+        let delete = self.palette.mode == PaletteMode::DeleteSavedFilter;
+        let mut scored: Vec<(u32, usize, PickerItem)> = self
+            .search
+            .saved
+            .names
+            .iter()
+            .enumerate()
+            .filter_map(|(position, name)| {
+                let score = bookie_gpui::palette::fuzzy_score(needle, name);
+                (score > 0).then(|| {
+                    let pick = if delete {
+                        Pick::DeleteSavedFilter(name.clone())
+                    } else {
+                        Pick::SavedFilter(name.clone())
+                    };
+                    let item = PickerItem {
+                        title: name.clone(),
+                        subtitle: "Saved filter".into(),
+                        pick,
+                    };
+                    (score, position, item)
+                })
+            })
+            .collect();
+        scored.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)));
+        scored.into_iter().map(|(_, _, item)| item).collect()
+    }
+
+    fn name_filter_items(&self, needle: &str, cx: &App) -> Vec<PickerItem> {
+        let name = needle.trim();
+        if name.is_empty() {
+            return Vec::new();
+        }
+        vec![PickerItem {
+            title: format!("Save as \u{201c}{name}\u{201d}"),
+            subtitle: self.current_filter_text(cx),
+            pick: Pick::NameFilter(name.to_string()),
+        }]
+    }
+
     fn favorite_items(&self, needle: &str) -> Vec<PickerItem> {
         let delete = self.palette.mode == PaletteMode::DeleteFavorite;
         self.favorite_items_labeled(needle, "", delete)
@@ -162,6 +208,9 @@ impl GridView {
         if matches!(mode, PaletteMode::Favorites | PaletteMode::DeleteFavorite) {
             self.refresh_favorites(cx);
         }
+        if matches!(mode, PaletteMode::SavedFilters | PaletteMode::DeleteSavedFilter) {
+            self.refresh_saved_filter_names();
+        }
     }
 
     pub(crate) fn run_picker(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -177,6 +226,9 @@ impl GridView {
             Pick::Command(command) => self.run_command(command, window, cx),
             Pick::Favorite(sql) => self.load_favorite(&sql, window, cx),
             Pick::DeleteFavorite(id, name) => self.delete_favorite(id, name, cx),
+            Pick::SavedFilter(name) => self.apply_saved_filter(&name, cx),
+            Pick::DeleteSavedFilter(name) => self.delete_saved_filter(&name, cx),
+            Pick::NameFilter(name) => self.save_current_filter_as(&name, cx),
             Pick::Column(column) => {
                 let row = self.cell_cursor.map_or(0, |cursor| cursor.row);
                 self.place_cursor(Some(Cursor { row, column }));

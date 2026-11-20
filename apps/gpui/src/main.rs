@@ -44,6 +44,7 @@ mod update_ui;
 mod value_search_ui;
 mod fk_nav_ui;
 mod resolve_ui;
+mod saved_filters_ui;
 mod structure_ui;
 mod insert_ui;
 mod params_ui;

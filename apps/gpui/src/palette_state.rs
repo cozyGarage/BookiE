@@ -10,6 +10,9 @@ pub(crate) enum PaletteMode {
     Shortcuts,
     Favorites,
     DeleteFavorite,
+    SavedFilters,
+    DeleteSavedFilter,
+    NameFilter,
 }
 
 impl PaletteMode {
@@ -21,6 +24,9 @@ impl PaletteMode {
             PaletteMode::Shortcuts => "Search keyboard shortcuts",
             PaletteMode::Favorites => "Open a favorite",
             PaletteMode::DeleteFavorite => "Delete a favorite",
+            PaletteMode::SavedFilters => "Apply a saved filter",
+            PaletteMode::DeleteSavedFilter => "Delete a saved filter",
+            PaletteMode::NameFilter => "Type a name for this filter, then press Enter",
         }
     }
 }

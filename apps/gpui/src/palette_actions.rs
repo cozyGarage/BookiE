@@ -275,6 +275,7 @@ impl GridView {
         let mut actions = self.picker_actions();
         actions.extend(self.structure_actions());
         actions.extend(self.workspace_actions());
+        actions.extend(self.filter_actions());
         actions.extend(self.style_actions());
         actions
     }
@@ -327,6 +328,20 @@ impl GridView {
                 "Reveal table in sidebar",
                 matches!(self.tabs.current(), Tab::Table(_)),
             ),
+        ]
+    }
+
+    fn filter_actions(&self) -> Vec<Action> {
+        let enabled = self.saved_filter_enabled();
+        let action = |id, label: &str| Action {
+            id,
+            label: label.to_string(),
+            enabled,
+        };
+        vec![
+            action("save-filter", "Save the current filter…"),
+            action("saved-filters", "Apply a saved filter"),
+            action("delete-saved-filter", "Delete a saved filter"),
         ]
     }
 
@@ -618,6 +633,9 @@ impl GridView {
             "shortcuts" => self.open_picker(PaletteMode::Shortcuts, window, cx),
             "save-favorite" => self.save_favorite(cx),
             "favorites" => self.open_picker(PaletteMode::Favorites, window, cx),
+            "save-filter" => self.open_picker(PaletteMode::NameFilter, window, cx),
+            "saved-filters" => self.open_picker(PaletteMode::SavedFilters, window, cx),
+            "delete-saved-filter" => self.open_picker(PaletteMode::DeleteSavedFilter, window, cx),
             _ if is_edit_palette_action(id) => self.execute_edit_palette_action(id, cx),
             "delete-favorite" => self.open_picker(PaletteMode::DeleteFavorite, window, cx),
             "reveal-sidebar" => self.reveal_in_sidebar(cx),
