@@ -1,4 +1,4 @@
-use bookie_core::{FilterOp, FilterRule, FilterValue};
+use bookie_core::{FilterOp, FilterRule, FilterValue, FilterValueKind};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ValueShape {
@@ -39,6 +39,202 @@ pub const OPERATORS: [OperatorEntry; 18] = [
     entry(FilterOp::NotIn, "is none of", ValueShape::List),
     entry(FilterOp::Between, "is between", ValueShape::Pair),
 ];
+
+const OPS_TEXT: [OperatorEntry; 15] = [
+    OperatorEntry {
+        op: FilterOp::Eq,
+        label: "equals",
+        shape: ValueShape::Single,
+    },
+    OperatorEntry {
+        op: FilterOp::NotEq,
+        label: "doesn't equal",
+        shape: ValueShape::Single,
+    },
+    OperatorEntry {
+        op: FilterOp::Contains,
+        label: "contains",
+        shape: ValueShape::Single,
+    },
+    OperatorEntry {
+        op: FilterOp::IContains,
+        label: "contains (case-insensitive)",
+        shape: ValueShape::Single,
+    },
+    OperatorEntry {
+        op: FilterOp::StartsWith,
+        label: "starts with",
+        shape: ValueShape::Single,
+    },
+    OperatorEntry {
+        op: FilterOp::EndsWith,
+        label: "ends with",
+        shape: ValueShape::Single,
+    },
+    OperatorEntry {
+        op: FilterOp::Like,
+        label: "LIKE",
+        shape: ValueShape::Single,
+    },
+    OperatorEntry {
+        op: FilterOp::NotLike,
+        label: "NOT LIKE",
+        shape: ValueShape::Single,
+    },
+    OperatorEntry {
+        op: FilterOp::Ilike,
+        label: "ILIKE (case-insensitive)",
+        shape: ValueShape::Single,
+    },
+    OperatorEntry {
+        op: FilterOp::IsNull,
+        label: "is empty",
+        shape: ValueShape::None,
+    },
+    OperatorEntry {
+        op: FilterOp::IsNotNull,
+        label: "is not empty",
+        shape: ValueShape::None,
+    },
+    OperatorEntry {
+        op: FilterOp::In,
+        label: "is one of",
+        shape: ValueShape::List,
+    },
+    OperatorEntry {
+        op: FilterOp::NotIn,
+        label: "is none of",
+        shape: ValueShape::List,
+    },
+    OperatorEntry {
+        op: FilterOp::Lt,
+        label: "less than (lex)",
+        shape: ValueShape::Single,
+    },
+    OperatorEntry {
+        op: FilterOp::Gt,
+        label: "greater than (lex)",
+        shape: ValueShape::Single,
+    },
+];
+
+const OPS_NUMERIC: [OperatorEntry; 11] = [
+    OperatorEntry {
+        op: FilterOp::Eq,
+        label: "=",
+        shape: ValueShape::Single,
+    },
+    OperatorEntry {
+        op: FilterOp::NotEq,
+        label: "≠",
+        shape: ValueShape::Single,
+    },
+    OperatorEntry {
+        op: FilterOp::Lt,
+        label: "<",
+        shape: ValueShape::Single,
+    },
+    OperatorEntry {
+        op: FilterOp::LtEq,
+        label: "≤",
+        shape: ValueShape::Single,
+    },
+    OperatorEntry {
+        op: FilterOp::Gt,
+        label: ">",
+        shape: ValueShape::Single,
+    },
+    OperatorEntry {
+        op: FilterOp::GtEq,
+        label: "≥",
+        shape: ValueShape::Single,
+    },
+    OperatorEntry {
+        op: FilterOp::Between,
+        label: "between",
+        shape: ValueShape::Pair,
+    },
+    OperatorEntry {
+        op: FilterOp::IsNull,
+        label: "is empty",
+        shape: ValueShape::None,
+    },
+    OperatorEntry {
+        op: FilterOp::IsNotNull,
+        label: "is not empty",
+        shape: ValueShape::None,
+    },
+    OperatorEntry {
+        op: FilterOp::In,
+        label: "is one of",
+        shape: ValueShape::List,
+    },
+    OperatorEntry {
+        op: FilterOp::NotIn,
+        label: "is none of",
+        shape: ValueShape::List,
+    },
+];
+
+const OPS_BOOL: [OperatorEntry; 3] = [
+    OperatorEntry {
+        op: FilterOp::Eq,
+        label: "=",
+        shape: ValueShape::Single,
+    },
+    OperatorEntry {
+        op: FilterOp::IsNull,
+        label: "is empty",
+        shape: ValueShape::None,
+    },
+    OperatorEntry {
+        op: FilterOp::IsNotNull,
+        label: "is not empty",
+        shape: ValueShape::None,
+    },
+];
+
+const OPS_UUID: [OperatorEntry; 4] = [
+    OperatorEntry {
+        op: FilterOp::Eq,
+        label: "=",
+        shape: ValueShape::Single,
+    },
+    OperatorEntry {
+        op: FilterOp::NotEq,
+        label: "≠",
+        shape: ValueShape::Single,
+    },
+    OperatorEntry {
+        op: FilterOp::IsNull,
+        label: "is empty",
+        shape: ValueShape::None,
+    },
+    OperatorEntry {
+        op: FilterOp::IsNotNull,
+        label: "is not empty",
+        shape: ValueShape::None,
+    },
+];
+
+pub fn operators_for_kind(kind: FilterValueKind) -> &'static [OperatorEntry] {
+    match kind {
+        FilterValueKind::Bool => &OPS_BOOL,
+        FilterValueKind::Uuid | FilterValueKind::Json => &OPS_UUID,
+        FilterValueKind::Int
+        | FilterValueKind::Float
+        | FilterValueKind::Decimal
+        | FilterValueKind::Date
+        | FilterValueKind::Time
+        | FilterValueKind::DateTime
+        | FilterValueKind::TimestampTz => &OPS_NUMERIC,
+        FilterValueKind::Text | FilterValueKind::Bytes => &OPS_TEXT,
+    }
+}
+
+pub fn operator_allowed(kind: FilterValueKind, op: FilterOp) -> bool {
+    operators_for_kind(kind).iter().any(|entry| entry.op == op)
+}
 
 pub fn operator(op: FilterOp) -> OperatorEntry {
     OPERATORS

@@ -86,3 +86,19 @@ fn an_unknown_column_or_a_value_of_the_wrong_type_is_refused() {
     let wrong = rule("id", FilterOp::Eq, Some(FilterValue::Single("abc".into())));
     assert!(filter_statement("postgres", &table(), &columns, &wrong).is_err());
 }
+
+#[test]
+fn an_operator_that_does_not_fit_the_column_kind_is_refused_by_name() {
+    let columns = [column("paid", "boolean"), column("total", "numeric")];
+    let on_bool = rule("paid", FilterOp::Contains, Some(FilterValue::Single("t".into())));
+    let error = filter_statement("postgres", &table(), &columns, &on_bool).unwrap_err();
+    assert!(error.contains("contains") && error.contains("paid"), "{error}");
+    let on_number = rule("total", FilterOp::StartsWith, Some(FilterValue::Single("1".into())));
+    assert!(filter_statement("postgres", &table(), &columns, &on_number).is_err());
+    let fine = rule(
+        "total",
+        FilterOp::Between,
+        Some(FilterValue::Pair("1".into(), "5".into())),
+    );
+    assert!(filter_statement("postgres", &table(), &columns, &fine).is_ok());
+}

@@ -1,6 +1,7 @@
-use bookie_app_services::filter_catalog::{OPERATORS, ValueShape, operator, rule_from_text};
+use bookie_app_services::filter_catalog::{OPERATORS, ValueShape, operator, operator_allowed, rule_from_text};
 use bookie_core::{
-    ColumnInfo, FilterRule, FilterSet, TableInfo, Value, build_filter_where, sql_dialect::qualified_table,
+    ColumnInfo, FilterRule, FilterSet, TableInfo, Value, build_filter_where, filter_value_kind,
+    sql_dialect::qualified_table,
 };
 
 use super::*;
@@ -12,6 +13,16 @@ pub(crate) fn filter_statement(
     columns: &[ColumnInfo],
     rule: &FilterRule,
 ) -> Result<(String, Vec<Value>), String> {
+    if let Some(column) = columns.iter().find(|column| column.name == rule.column)
+        && !operator_allowed(filter_value_kind(column), rule.op)
+    {
+        return Err(format!(
+            "\"{}\" does not apply to the {} column {}",
+            operator(rule.op).label,
+            column.data_type,
+            column.name
+        ));
+    }
     let set = FilterSet {
         rules: vec![rule.clone()],
         ..FilterSet::default()

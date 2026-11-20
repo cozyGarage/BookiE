@@ -1,6 +1,6 @@
-use bookie_core::{FilterOp, FilterValue};
+use bookie_core::{FilterOp, FilterValue, FilterValueKind};
 
-use super::{OPERATORS, ValueShape, operator, rule_from_text};
+use super::{OPERATORS, ValueShape, operator, operator_allowed, operators_for_kind, rule_from_text};
 
 #[test]
 fn every_operator_is_listed_once_with_its_own_label() {
@@ -51,4 +51,36 @@ fn missing_or_malformed_values_are_refused_with_a_reason() {
             .contains("at least one")
     );
     assert!(rule_from_text("", FilterOp::Eq, "x").is_err());
+}
+
+#[test]
+fn each_column_kind_offers_only_the_operators_that_make_sense_for_it() {
+    let count = |kind| operators_for_kind(kind).len();
+    assert_eq!(count(FilterValueKind::Text), 15);
+    assert_eq!(count(FilterValueKind::Int), 11);
+    assert_eq!(count(FilterValueKind::Bool), 3);
+    assert_eq!(count(FilterValueKind::Uuid), 4);
+    assert!(operator_allowed(FilterValueKind::Text, FilterOp::Contains));
+    assert!(!operator_allowed(FilterValueKind::Text, FilterOp::Between));
+    assert!(operator_allowed(FilterValueKind::Decimal, FilterOp::Between));
+    assert!(!operator_allowed(FilterValueKind::Decimal, FilterOp::Contains));
+    assert!(!operator_allowed(FilterValueKind::Bool, FilterOp::Gt));
+}
+
+#[test]
+fn every_kind_starts_with_equals_and_agrees_with_the_shared_value_shapes() {
+    for kind in [
+        FilterValueKind::Text,
+        FilterValueKind::Int,
+        FilterValueKind::Bool,
+        FilterValueKind::Uuid,
+        FilterValueKind::Json,
+        FilterValueKind::Bytes,
+    ] {
+        let list = operators_for_kind(kind);
+        assert_eq!(list[0].op, FilterOp::Eq, "{kind:?}");
+        for entry in list {
+            assert_eq!(entry.shape, operator(entry.op).shape, "{kind:?} {:?}", entry.op);
+        }
+    }
 }
