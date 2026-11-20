@@ -309,6 +309,7 @@ class LayerRunnerTests(unittest.TestCase):
         expected.update({
             ".github/workflows/gtk-soak.yml",
             ".github/workflows/gpui-macos.yml",
+            ".github/workflows/gpui-binary.yml",
             ".github/workflows/release.yml",
         })
         expected.update(f".forgejo/workflows/{path.name}" for path in forgejo.glob("*.yml"))
