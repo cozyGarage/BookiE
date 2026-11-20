@@ -144,6 +144,9 @@ pub struct App {
     temporary_tables_by_tab: std::collections::HashMap<Uuid, Vec<bookie_core::TableInfo>>,
     sidebar_catalog: std::collections::HashMap<bookie_core::CatalogObjectKind, Vec<bookie_core::CatalogObject>>,
     sidebar_catalog_cancel: std::cell::RefCell<tokio_util::sync::CancellationToken>,
+    sidebar_catalog_requests: std::cell::RefCell<
+        std::collections::HashMap<bookie_core::CatalogObjectKind, tokio_util::sync::CancellationToken>,
+    >,
     catalog_generation: std::cell::Cell<u64>,
     catalog_cancel: std::cell::RefCell<tokio_util::sync::CancellationToken>,
     catalog_dialog_cancel: std::cell::RefCell<tokio_util::sync::CancellationToken>,
@@ -614,6 +617,7 @@ impl SimpleComponent for App {
             temporary_tables_by_tab: std::collections::HashMap::new(),
             sidebar_catalog: Default::default(),
             sidebar_catalog_cancel: Default::default(),
+            sidebar_catalog_requests: Default::default(),
             catalog_generation: std::cell::Cell::new(0),
             catalog_cancel: Default::default(),
             catalog_dialog_cancel: Default::default(),

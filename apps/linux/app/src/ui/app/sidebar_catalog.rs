@@ -6,6 +6,18 @@ use crate::services::catalog::CatalogOrigin;
 
 const MAX_SIDEBAR_CATALOG_BYTES: usize = 64 * 1024 * 1024;
 
+fn replace_catalog_request(
+    requests: &std::cell::RefCell<std::collections::HashMap<CatalogObjectKind, tokio_util::sync::CancellationToken>>,
+    parent: &tokio_util::sync::CancellationToken,
+    kind: CatalogObjectKind,
+) -> tokio_util::sync::CancellationToken {
+    let token = parent.child_token();
+    if let Some(previous) = requests.borrow_mut().insert(kind, token.clone()) {
+        previous.cancel();
+    }
+    token
+}
+
 fn estimated_catalog_bytes(objects: &Vec<CatalogObject>) -> usize {
     objects
         .capacity()
@@ -36,6 +48,7 @@ fn sidebar_catalog_fits(
 impl App {
     pub(super) fn reset_sidebar_catalog(&mut self) {
         self.sidebar_catalog.clear();
+        self.sidebar_catalog_requests.borrow_mut().clear();
         let fresh = tokio_util::sync::CancellationToken::new();
         self.sidebar_catalog_cancel.replace(fresh).cancel();
     }
@@ -47,7 +60,11 @@ impl App {
         ) else {
             return;
         };
-        let token = self.sidebar_catalog_cancel.borrow().child_token();
+        let token = replace_catalog_request(
+            &self.sidebar_catalog_requests,
+            &self.sidebar_catalog_cancel.borrow(),
+            kind,
+        );
         let hidden_schemas = self.hidden_schema_names();
         let timeout_secs =
             crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
@@ -149,5 +166,18 @@ mod tests {
             &replacement,
             all_bytes,
         ));
+    }
+
+    #[test]
+    fn replacing_a_catalog_request_cancels_the_stale_response() {
+        let requests = std::cell::RefCell::new(std::collections::HashMap::new());
+        let parent = tokio_util::sync::CancellationToken::new();
+        let stale = replace_catalog_request(&requests, &parent, CatalogObjectKind::Sequence);
+        let current = replace_catalog_request(&requests, &parent, CatalogObjectKind::Sequence);
+
+        assert!(stale.is_cancelled());
+        assert!(!current.is_cancelled());
+        parent.cancel();
+        assert!(current.is_cancelled());
     }
 }
