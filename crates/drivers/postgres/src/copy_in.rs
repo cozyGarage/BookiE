@@ -23,11 +23,15 @@ pub(crate) fn parse(sql: &str) -> Result<Option<CopyIn<'_>>, DriverError> {
 
 pub(crate) async fn run(connection: &mut PoolConnection<Postgres>, parts: &CopyIn<'_>) -> Result<u64, DriverError> {
     let mut copy = connection.copy_in_raw(parts.command).await.map_err(map_sqlx_error)?;
-    let mut data = parts.data.as_bytes().to_vec();
-    if !data.is_empty() {
-        data.push(b'\n');
+    let send_result = async {
+        if !parts.data.is_empty() {
+            copy.send(parts.data.as_bytes()).await?;
+            copy.send(&b"\n"[..]).await?;
+        }
+        Ok::<_, sqlx::Error>(())
     }
-    if let Err(error) = copy.send(data).await {
+    .await;
+    if let Err(error) = send_result {
         let _ = copy.abort("the client could not send the data").await;
         return Err(map_sqlx_error(error));
     }
