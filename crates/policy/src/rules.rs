@@ -60,19 +60,11 @@ pub(crate) fn evaluate_with_effects(
     })
 }
 
-pub(crate) fn unsupported_statement_decision(sql: &str, driver_id: &str) -> Option<Decision> {
-    if driver_id != "postgres" {
-        return None;
+pub(crate) fn approval_text(sql: &str) -> String {
+    match bookie_core::sql_lex::copy_in_parts(sql, "postgres") {
+        Some(parts) => format!("{};\n[COPY data: {} bytes, not shown]", parts.command, parts.data.len()),
+        None => sql.to_string(),
     }
-    bookie_core::sql_lex::split_statements(sql, driver_id)
-        .iter()
-        .any(|statement| bookie_core::sql_lex::is_copy_from_stdin(statement, driver_id))
-        .then(|| Decision::Deny {
-            rule: "copy_from_stdin_unsupported".into(),
-            message: "COPY ... FROM STDIN with inline data cannot run in BookiE yet. It was refused before it reached \
-                      the server; load the data with psql or pg_restore"
-                .into(),
-        })
 }
 
 pub(crate) fn shared_connection_decision(sql: &str, driver_id: &str, facts: &StatementFacts) -> Option<Decision> {
