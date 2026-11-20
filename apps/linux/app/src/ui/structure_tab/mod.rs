@@ -104,41 +104,17 @@ pub struct StructureTab {
     drop_button: gtk::Button,
 
     last_dirty: Rc<RefCell<bool>>,
-    /// Suppress reentrant rebuilds: programmatic `set_text` /
-    /// `set_active` while seeding row widgets fires `changed` /
-    /// `notify::active` signals synchronously. Without this guard,
-    /// the row's connect_* callbacks would treat seeding as a user
-    /// edit and shift the live model away from the snapshot, surfacing
-    /// phantom pending changes. `Cell` (not `RefCell`) because GTK can
-    /// fire those signals re-entrantly during `clear_box` while
-    /// another `borrow_mut` is still live on the stack — a
-    /// `RefCell::borrow` racing it would panic.
+    /// Programmatic `set_text` / `set_active` fire `changed` signals synchronously
+    /// and would read as user edits. `Cell`, not `RefCell`: GTK fires them
+    /// re-entrantly during `clear_box` while a `borrow_mut` is live.
     suppress_emit: Rc<Cell<bool>>,
-    /// Monotonic counter for the "Add Column" placeholder name. Using
-    /// `vec.len() + 1` produced duplicate `column_1` after the user
-    /// removed a column; a forever-incrementing counter avoids the
-    /// collision (validate_save rejects duplicates anyway, but the
-    /// confusing UX is worse than the no-op rename the user has to
-    /// do afterwards).
+    /// Forever-incrementing, so removing a column cannot reissue a `column_N` name.
     next_column_seq: Rc<RefCell<usize>>,
-    /// Popovers attached to column rows (currently only the type
-    /// suggestions popover). Each `rebuild_columns_view` call must
-    /// `popdown` and clear this list before `clear_box`, otherwise an
-    /// open popover keeps a strong reference to the now-detached
-    /// AdwEntryRow and a click on a suggestion `set_text`s a stale
-    /// widget. The detached entry's `changed` handler then dispatches
-    /// `ColumnEdited` with whatever index was captured at build time —
-    /// which may now point at a different (or nonexistent) column.
+    /// Popovers on column rows, popped down and cleared before each rebuild: an open
+    /// one keeps the detached entry alive and its `ColumnEdited` carries a stale index.
     column_popovers: Rc<RefCell<Vec<gtk::Popover>>>,
-    /// True between `SaveCompleted` and the matching `StructureLoaded`
-    /// (or `LoadFailed`). During this window the live model has been
-    /// committed to the database but `original_*` snapshots still hold
-    /// the pre-save state. Diffing the live model against the stale
-    /// snapshot would surface phantom pending ops — visible to the user
-    /// as a spurious "Save changes?" prompt if they close the tab
-    /// mid-refetch. `recompute_dirty_state` short-circuits while this
-    /// flag is set; `StructureLoaded` flips it back and triggers a
-    /// fresh recompute against the up-to-date snapshots.
+    /// True from `SaveCompleted` until `StructureLoaded` or `LoadFailed`: the
+    /// snapshots are pre-save, so diffing now would show phantom pending changes.
     refetching: Rc<Cell<bool>>,
 }
 
@@ -393,17 +369,8 @@ impl StructureTab {
             self.name_row.set_visible(false);
         }
         if matches!(*self.mode.borrow(), StructureMode::Edit) {
-            // Eagerly zero the dirty state before the async refetch
-            // round-trip. Without this, recompute_dirty_state would
-            // diff the live model against the pre-save snapshot for
-            // the entire FetchStructure window, producing phantom
-            // pending ops for changes that were just committed —
-            // and the close-with-pending dialog would surface them
-            // if the user closed the tab during the refetch. The
-            // SQL preview is also reset to "no pending changes" so
-            // a New→Edit promotion doesn't leave a stale CREATE
-            // TABLE statement visible in the preview pane until
-            // StructureLoaded arrives.
+            // Zero the dirty state and SQL preview now; the snapshot is stale until
+            // StructureLoaded, and diffing against it shows phantom pending ops.
             self.structure_trackers.with_tab(self.tab_id, |t| t.clear());
             self.refresh_buttons(0);
             self.regenerate_sql_preview_from(&[]);
@@ -532,25 +499,10 @@ impl StructureTab {
     }
 
     fn rebuild_columns_view(&self, sender: ComponentSender<Self>) {
-        // Tear down + rebuild. Editing happens infrequently enough
-        // that rebuilding the whole layout per change is cheap.
-        //
-        // suppress_emit must be true while we tear down + recreate
-        // the row widgets: AdwEntryRow::set_text and SwitchRow::set_active
-        // for the initial values fire `changed` / `notify::active`
-        // signals synchronously, and the row's connect_* callbacks
-        // (registered earlier in the build) would treat those as user
-        // edits — every Edit-mode reload would shift the live model
-        // away from the snapshot and surface phantom pending changes.
-        // We re-enable emit on the next idle tick so legitimate user
-        // input afterwards flows through.
+        // Seeding rows fires `changed` / `notify::active` synchronously; suppress_emit
+        // keeps those from reading as edits. Re-enabled on the next idle tick.
         self.suppress_emit.set(true);
-        // Popdown + drop any popovers attached to the previous rows
-        // before they're unparented. An open suggestions popover holds
-        // the old AdwEntryRow alive via a closure clone; without this
-        // step a click on a suggestion after a Refresh would `set_text`
-        // a detached widget and dispatch `ColumnEdited` with a stale
-        // index (see `column_popovers` doc on `StructureTab`).
+        // An open popover holds the old row alive; see `column_popovers`.
         {
             let mut popovers = self.column_popovers.borrow_mut();
             for p in popovers.drain(..) {
