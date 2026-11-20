@@ -20,6 +20,13 @@ if [[ "${GITHUB_JOB:-}" == "driver-tls" && "${BOOKIE_TEST_RUN_ID:-}" =~ ^[A-Za-z
       -f "$fixture/docker-compose.yml" down --volumes --remove-orphans || status=$?
   fi
 fi
+if [[ "${GITHUB_JOB:-}" == "pg-release" && "${BOOKIE_TEST_RUN_ID:-}" =~ ^forgejo-[0-9]+-[0-9]+-pg-release$ ]]; then
+  fixture="$workspace/src/tests/fixtures/postgres-release"
+  if [[ -f "$fixture/docker-compose.yml" ]]; then
+    docker compose --project-name "$BOOKIE_TEST_RUN_ID" --project-directory "$fixture" \
+      -f "$fixture/docker-compose.yml" down --volumes --remove-orphans || status=$?
+  fi
+fi
 
 if [[ "${GITHUB_RUN_ID:-}" =~ ^[0-9]+$ ]]; then
   if [[ "${CARGO_TARGET_DIR:-}" == "/var/cache/ci/target/bookie-guards-$GITHUB_RUN_ID" ]]; then

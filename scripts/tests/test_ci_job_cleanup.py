@@ -483,6 +483,56 @@ class CiJobCleanupTests(unittest.TestCase):
                     expected = ["-rf", "--", config_path]
                     self.assertEqual(expected in rm_calls, removed)
 
+    def test_pg_release_finalizer_stops_only_its_compose_project(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            fixture = workspace / "src/tests/fixtures/postgres-release"
+            fixture.mkdir(parents=True)
+            (fixture / "docker-compose.yml").write_text("services: {}\n", encoding="utf-8")
+            bin_dir = workspace / "bin"
+            bin_dir.mkdir()
+            calls = workspace / "docker-calls"
+            docker = bin_dir / "docker"
+            docker.write_text(
+                "#!/usr/bin/env python3\n"
+                "import json, os, sys\n"
+                "with open(os.environ['DOCKER_CALLS'], 'a', encoding='utf-8') as stream:\n"
+                "    stream.write(json.dumps(sys.argv[1:]) + '\\n')\n",
+                encoding="utf-8",
+            )
+            docker.chmod(0o755)
+
+            cases = (
+                ("pg-release", "forgejo-123-2-pg-release", True),
+                ("driver", "forgejo-123-2-pg-release", False),
+                ("pg-release", "forgejo-123-2-pg-release;touch /tmp/not-safe", False),
+            )
+            for job, run_id, should_clean in cases:
+                with self.subTest(job=job, run_id=run_id):
+                    calls.unlink(missing_ok=True)
+                    result = subprocess.run(
+                        ["bash", str(CLEANUP)],
+                        env={
+                            **os.environ,
+                            "PATH": f"{bin_dir}:{os.environ['PATH']}",
+                            "GITHUB_JOB": job,
+                            "GITHUB_WORKSPACE": str(workspace),
+                            "BOOKIE_TEST_RUN_ID": run_id,
+                            "DOCKER_CALLS": str(calls),
+                        },
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    docker_calls = [json.loads(line) for line in calls.read_text().splitlines()] if calls.exists() else []
+                    expected = [
+                        "compose", "--project-name", "forgejo-123-2-pg-release",
+                        "--project-directory", str(fixture), "-f", str(fixture / "docker-compose.yml"),
+                        "down", "--volumes", "--remove-orphans",
+                    ]
+                    self.assertEqual(expected in docker_calls, should_clean)
+
     def test_b4_rollback_finalizer_cannot_remove_another_run_temp_path(self):
         with tempfile.TemporaryDirectory() as temporary:
             bin_dir = Path(temporary) / "bin"
