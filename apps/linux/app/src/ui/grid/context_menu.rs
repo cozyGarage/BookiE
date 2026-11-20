@@ -450,7 +450,7 @@ fn copy_rows_action<F>(
     render: F,
 ) -> gio::ActionEntry<gio::SimpleActionGroup>
 where
-    F: Fn(&[ColumnInfo], &[Vec<Value>]) -> String + 'static,
+    F: Fn(&[ColumnInfo], &[Vec<Value>]) -> Result<String, String> + 'static,
 {
     let view = column_view.downgrade();
     gio::ActionEntry::builder(name)
@@ -460,7 +460,7 @@ where
             let Some(view) = view.upgrade() else { return };
             match super::column_select::projected_rows(&view, &selection, &columns) {
                 super::column_select::Projection::Rows(picked, rows) => {
-                    sender.send(GridMsg::CopyToClipboard(render(&picked, &rows))).ok();
+                    send_rendered_copy(&sender, render(&picked, &rows));
                     return;
                 }
                 super::column_select::Projection::Incomplete => {
@@ -473,9 +473,16 @@ where
                 sender.send(GridMsg::IncompleteRowData).ok();
                 return;
             };
-            sender.send(GridMsg::CopyToClipboard(render(&columns, &rows))).ok();
+            send_rendered_copy(&sender, render(&columns, &rows));
         })
         .build()
+}
+
+fn send_rendered_copy(sender: &relm4::Sender<GridMsg>, rendered: Result<String, String>) {
+    match rendered {
+        Ok(text) => sender.send(GridMsg::CopyToClipboard(text)).ok(),
+        Err(message) => sender.send(GridMsg::ShowToast(message)).ok(),
+    };
 }
 
 pub(super) struct CellGestureOptions {

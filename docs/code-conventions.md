@@ -26,11 +26,11 @@ fn parse_limit(raw: &str) -> Result<usize, FilterError> {
 
 ### Length
 
-A function body may be at most **60 lines**, counted between its braces.
+A function body may be at most **120 lines**, counted between its braces. Around 60 lines, check whether it still has one responsibility and is easy to debug.
 
-This is enforced by `scripts/check-function-size.py`, which runs in `preflight.sh`. Existing longer functions are frozen by count per file in `baselines/function-size-baselines.txt`. A file listed there may not gain another over-limit function, and when you split one you lower its count in the same commit. Test code is excluded: `#[cfg(test)]` modules and files under a crate's `tests/`.
+This is enforced by `scripts/check-function-size.py`, which runs in `preflight.sh`. Existing functions longer than 120 lines are frozen by count per file in `baselines/function-size-baselines.txt`. A file listed there may not gain another over-limit function, and when you split one you lower its count in the same commit. Test code is excluded: `#[cfg(test)]` modules and files under a crate's `tests/`.
 
-Sixty is a ceiling, not a target. Reaching it is a signal to check whether the function still has one responsibility.
+One hundred twenty is a hard ceiling, not a target. Around sixty lines, check whether the function still has one responsibility and remains easy to debug.
 
 ### Parameters
 

@@ -1,5 +1,4 @@
 use super::supports_sql_literals;
-use crate::export::value_to_text;
 use crate::query::{ColumnInfo, Value};
 use crate::query_rows::QueryRowSet;
 
@@ -7,6 +6,16 @@ use crate::query_rows::QueryRowSet;
 pub struct InClause {
     pub sql: String,
     pub skipped: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum ValueListError {
+    #[error("the database driver does not support SQL literal rendering")]
+    UnsupportedDriver,
+    #[error("the result row is incomplete")]
+    IncompleteRow,
+    #[error("a result value cannot be represented as a SQL literal")]
+    UnrepresentableValue,
 }
 
 pub fn render_in_clause<R: QueryRowSet + ?Sized>(driver_id: &str, rows: &R, column_index: usize) -> InClause {
@@ -28,33 +37,40 @@ pub fn render_in_clause<R: QueryRowSet + ?Sized>(driver_id: &str, rows: &R, colu
     }
 }
 
-pub fn render_value_list<R: QueryRowSet + ?Sized>(driver_id: &str, columns: &[ColumnInfo], rows: &R) -> String {
+pub fn render_value_list<R: QueryRowSet + ?Sized>(
+    driver_id: &str,
+    columns: &[ColumnInfo],
+    rows: &R,
+) -> Result<String, ValueListError> {
     if rows.row_count() == 0 || columns.is_empty() {
-        return String::new();
+        return Ok(String::new());
+    }
+    if !supports_sql_literals(driver_id) {
+        return Err(ValueListError::UnsupportedDriver);
     }
     let mut row_tuples = Vec::with_capacity(rows.row_count());
     for row_index in 0..rows.row_count() {
         let Some(row) = rows.row(row_index) else {
-            continue;
+            return Err(ValueListError::IncompleteRow);
         };
         let mut literals = Vec::with_capacity(columns.len());
         for (i, _) in columns.iter().enumerate() {
-            let val = row.get(i).unwrap_or(&Value::Null);
+            let Some(val) = row.get(i) else {
+                return Err(ValueListError::IncompleteRow);
+            };
             if matches!(val, Value::Null) {
                 literals.push("NULL".to_string());
             } else if let Some(lit) = in_clause_literal(driver_id, val) {
                 literals.push(lit);
             } else if let Some(lit) = binary_literal(driver_id, val) {
                 literals.push(lit);
-            } else if let Some(txt) = value_to_text(val) {
-                literals.push(format!("'{}'", txt.replace('\'', "''")));
             } else {
-                literals.push("NULL".to_string());
+                return Err(ValueListError::UnrepresentableValue);
             }
         }
         row_tuples.push(format!("({})", literals.join(", ")));
     }
-    row_tuples.join(",\n")
+    Ok(row_tuples.join(",\n"))
 }
 
 fn binary_literal(driver_id: &str, value: &Value) -> Option<String> {
@@ -139,10 +155,10 @@ mod tests {
             vec![Value::Int(2), Value::Null, Value::Bool(false)],
         ];
 
-        let sql = render_value_list("postgres", &columns, &rows);
+        let sql = render_value_list("postgres", &columns, &rows).unwrap();
         assert_eq!(sql, "(1, 'Book''s Title', TRUE),\n(2, NULL, FALSE)");
-        assert_eq!(render_value_list("postgres", &columns, &[]), "");
-        assert_eq!(render_value_list("postgres", &[], &rows), "");
+        assert_eq!(render_value_list("postgres", &columns, &[]).unwrap(), "");
+        assert_eq!(render_value_list("postgres", &[], &rows).unwrap(), "");
     }
 
     #[test]
@@ -151,10 +167,10 @@ mod tests {
         let date = Value::Date(chrono::NaiveDate::from_ymd_opt(2026, 10, 29).unwrap());
         let rows = vec![vec![Value::Int(10), date, Value::Bool(true)]];
 
-        let mssql_sql = render_value_list("mssql", &columns, &rows);
+        let mssql_sql = render_value_list("mssql", &columns, &rows).unwrap();
         assert_eq!(mssql_sql, "(10, N'2026-10-29', 1)");
 
-        let sqlite_sql = render_value_list("sqlite", &columns, &rows);
+        let sqlite_sql = render_value_list("sqlite", &columns, &rows).unwrap();
         assert_eq!(sqlite_sql, "(10, '2026-10-29', TRUE)");
     }
 
@@ -168,7 +184,35 @@ mod tests {
             ("sqlite", "(X'dead')"),
             ("mssql", "(0xdead)"),
         ] {
-            assert_eq!(render_value_list(driver, &columns, &rows), expected, "{driver}");
+            assert_eq!(
+                render_value_list(driver, &columns, &rows).unwrap(),
+                expected,
+                "{driver}"
+            );
         }
+    }
+
+    #[test]
+    fn value_list_renderer_refuses_values_it_cannot_encode_as_sql() {
+        let columns = vec![column("value")];
+        for (driver, value) in [
+            ("postgres", Value::Undecodable("NUMERIC".into())),
+            ("postgres", Value::Float(f64::NAN)),
+            ("sqlite", Value::Float(-0.0)),
+        ] {
+            assert_eq!(
+                render_value_list(driver, &columns, &[vec![value]]),
+                Err(ValueListError::UnrepresentableValue),
+                "{driver}"
+            );
+        }
+        assert_eq!(
+            render_value_list("redis", &columns, &[vec![Value::Int(1)]]),
+            Err(ValueListError::UnsupportedDriver)
+        );
+        assert_eq!(
+            render_value_list("postgres", &columns, &[vec![]]),
+            Err(ValueListError::IncompleteRow)
+        );
     }
 }
