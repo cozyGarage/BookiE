@@ -1,15 +1,15 @@
 use async_trait::async_trait;
 use bookie_core::{
     DriverError, MAX_QUERY_CURSOR_PAGE_ROWS, OperationControl, QueryCursorId, QueryCursorPage, QueryResult,
-    QueryResultBatch, Value, check_pre_dispatch,
+    QueryResultBatch, Value, check_pre_dispatch, run_server_cancellable,
 };
 use sqlx::pool::PoolConnection;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use sqlx::{Pool, Postgres};
 
 use crate::{
-    CONTROL_SETUP_TIMEOUT, MessagedResult, controlled_execute, controlled_query, controlled_query_with_messages,
-    map_sqlx_error,
+    CONTROL_SETUP_TIMEOUT, MessagedResult, confirms_cancellation, controlled_execute, controlled_query,
+    controlled_query_with_messages, map_sqlx_error, request_cancellation,
 };
 
 struct ActiveCursor {
@@ -282,6 +282,35 @@ impl PgSession {
             .map(|(rows, _, _)| rows)
     }
 
+    async fn run_copy_in(
+        &mut self,
+        parts: &bookie_core::sql_lex::CopyIn<'_>,
+        control: &OperationControl,
+    ) -> MessagedResult {
+        let mut connection = self
+            .connection
+            .take()
+            .ok_or_else(|| DriverError::Internal("the session's connection was lost".into()))?;
+        let cancel_token = connection.cancel_token();
+        let result = run_server_cancellable(
+            crate::copy_in::run(&mut connection, parts),
+            request_cancellation(cancel_token),
+            confirms_cancellation,
+            control,
+        )
+        .await;
+        if !matches!(result, Err(DriverError::Disconnected)) {
+            self.connection = Some(connection);
+        }
+        result.map(|copied| {
+            (
+                crate::copy_in::empty_result(),
+                bookie_core::ServerMessages::default(),
+                Some(copied),
+            )
+        })
+    }
+
     async fn run_messaged_query_controlled(
         &mut self,
         sql: &str,
@@ -289,6 +318,9 @@ impl PgSession {
         control: &OperationControl,
     ) -> MessagedResult {
         check_pre_dispatch(control)?;
+        if let Some(parts) = crate::copy_in::parse(sql)? {
+            return self.run_copy_in(&parts, control).await;
+        }
         let connection = self
             .connection
             .take()

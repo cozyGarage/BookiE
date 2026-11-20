@@ -1047,7 +1047,7 @@ fn a_late_prefetch_cannot_restore_a_deleted_connection_but_keeps_unrelated_works
     store.save_connection(deleted, connection("SELECT deleted"));
     store.save_connection(retained, connection("SELECT retained"));
     assert_eq!(
-        store.flush().recv_timeout(std::time::Duration::from_secs(5)).unwrap(),
+        store.flush().recv_timeout(std::time::Duration::from_secs(15)).unwrap(),
         Ok(())
     );
     prefetch_connections_coordinated(

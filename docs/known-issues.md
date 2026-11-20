@@ -9,7 +9,6 @@ This page is an index of ledger IDs to issues. Do not track evidence, owners or 
 | ID | Issue | Lane |
 | --- | --- | --- |
 | PEER-4 | [#1026](https://github.com/cozyGarage/BookiE/issues/1026) | UX |
-| PEER-10 | [#1032](https://github.com/cozyGarage/BookiE/issues/1032) | UX |
 | PEER-11 | [#1033](https://github.com/cozyGarage/BookiE/issues/1033) | Data |
 | PEER-12 | [#1034](https://github.com/cozyGarage/BookiE/issues/1034) | UX |
 | PEER-16 | [#1065](https://github.com/cozyGarage/BookiE/issues/1065) | Data |

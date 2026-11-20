@@ -1208,5 +1208,58 @@ fn a_filter_is_saved_by_name_applied_again_and_deleted_and_an_unshowable_one_say
         assert_eq!(view.search.saved.names, vec!["range".to_string()]);
     });
     std::fs::remove_file(&store).ok();
+}
+
+#[gpui::test]
+fn showing_referencing_rows_runs_the_child_query_and_a_plain_column_opens_nothing(cx: &mut TestAppContext) {
+    let path = fixture_copy("fk-nav");
+    let (view, cx) = saving_view(cx, &path);
+    let write = write_session(&path, false);
+    let cancel = tokio_util::sync::CancellationToken::new();
+    write
+        .apply(
+            &[
+                (
+                    "CREATE TABLE notes(id INTEGER PRIMARY KEY, order_id INTEGER REFERENCES orders(id), body TEXT)".into(),
+                    Vec::new(),
+                ),
+            ],
+            &[],
+            &cancel,
+        )
+        .ok()
+        .expect("create the child table");
+    write
+        .apply(
+            &[("INSERT INTO notes(order_id, body) VALUES (1, 'first note'), (1, 'second note')".into(), Vec::new())],
+            &[],
+            &cancel,
+        )
+        .ok()
+        .expect("insert child rows");
+
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 1 });
+        })
+    });
+    settle_saving(cx);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.go_to_referenced_row(cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert!(!view.grid_is_query, "a column that is no foreign key opens nothing");
+        assert_eq!(view.source.total(), 6);
+    });
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 0 });
+        })
+    });
+    settle_saving(cx);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.show_referencing_rows(cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert!(view.status.contains("2 rows"), "the two child rows ran as a query: {}", view.status);
+    });
     std::fs::remove_file(&path).ok();
 }
