@@ -65,6 +65,7 @@ pub(crate) struct SearchState {
     pub rule: crate::filter_rule_ui::FilterRuleState,
     pub backup: crate::backup_ui::BackupState,
     pub sql_file: crate::sql_file_ui::SqlFileState,
+    pub closed: crate::closed_tabs_ui::ClosedTabs,
 }
 
 impl SearchState {
@@ -84,6 +85,7 @@ impl SearchState {
             rule: Default::default(),
             backup: Default::default(),
             sql_file: Default::default(),
+            closed: Default::default(),
         }
     }
 }

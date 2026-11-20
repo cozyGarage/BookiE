@@ -1428,3 +1428,26 @@ fn a_sql_file_opens_into_the_editor_and_the_editor_text_saves_to_a_new_file(cx: 
     std::fs::remove_dir_all(&directory).ok();
     std::fs::remove_file(&path).ok();
 }
+
+#[gpui::test]
+fn a_closed_tab_can_be_reopened(cx: &mut TestAppContext) {
+    let path = fixture_copy("reopen-tab");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            assert!(view.closed_tab_actions().iter().all(|action| !action.enabled));
+            view.tabs.open_query();
+            let index = view.tabs.active;
+            view.close_tab(index);
+            assert!(view.closed_tab_actions().iter().all(|action| action.enabled));
+            assert_ne!(*view.tabs.current(), bookie_gpui::shell::Tab::Query);
+            cx.notify();
+        })
+    });
+    cx.update(|window, cx| view.update(cx, |view, cx| view.reopen_closed_tab(window, cx)));
+    view.read_with(cx, |view, _| {
+        assert_eq!(*view.tabs.current(), bookie_gpui::shell::Tab::Query);
+        assert!(view.closed_tab_actions().iter().all(|action| !action.enabled), "the entry is used up");
+    });
+    std::fs::remove_file(&path).ok();
+}

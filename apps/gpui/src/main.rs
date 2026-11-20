@@ -3,6 +3,7 @@ use std::time::{Duration, Instant};
 
 mod assets;
 mod catalog_nav;
+mod closed_tabs_ui;
 mod chrome;
 mod home_page;
 mod query_pane;

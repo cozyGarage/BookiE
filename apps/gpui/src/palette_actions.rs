@@ -72,6 +72,7 @@ impl GridView {
             .chain(self.backup_actions())
             .chain(self.refresh_actions())
             .chain(self.sql_file_actions())
+            .chain(self.closed_tab_actions())
             .chain(self.chrome_actions())
             .collect()
     }
@@ -612,7 +613,7 @@ impl GridView {
             "run" => self.run_query(cx),
             "explain" => self.explain_query(cx),
             "data-dictionary" => self.show_data_dictionary(cx),
-            _ if self.execute_tool_palette_action(id, cx) => {}
+            _ if self.execute_tool_palette_action(id, window, cx) => {}
             "previous-run" => self.activate_run(self.run_tabs.active - 1),
             "next-run" => self.activate_run(self.run_tabs.active + 1),
             "close-run" => self.close_run(self.run_tabs.active),

@@ -22,7 +22,12 @@ pub(crate) fn health_label(report: HealthReport) -> String {
 }
 
 impl GridView {
-    pub(crate) fn execute_tool_palette_action(&mut self, id: &'static str, cx: &mut Context<Self>) -> bool {
+    pub(crate) fn execute_tool_palette_action(
+        &mut self,
+        id: &'static str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
         match id {
             "search-values" => self.open_value_search_bar(cx),
             "export-schema-diagram" => self.open_schema_diagram_bar(cx),
@@ -33,6 +38,7 @@ impl GridView {
             "check-for-updates" => self.check_for_updates_now(cx),
             "backup-database" => self.open_backup_bar(false, cx),
             "refresh-table" => self.refresh_table(cx),
+            "reopen-tab" => self.reopen_closed_tab(window, cx),
             "open-sql-file" => self.open_sql_file_bar(false, cx),
             "save-sql-file" => self.open_sql_file_bar(true, cx),
             "restore-database" => self.open_backup_bar(true, cx),
