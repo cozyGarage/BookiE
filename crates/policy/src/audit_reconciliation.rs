@@ -130,6 +130,7 @@ impl AuditEvent {
             operation_class: AuditOperationClass::Administrative,
             redacted_sql: "[NOT_APPLICABLE]".into(),
             sql_hash: hex::encode(Sha256::digest(RULE.as_bytes())),
+            sql_hash_key_id: None,
             targets: Vec::new(),
             decision_rule: RULE.into(),
             approval_outcome: AuditApprovalOutcome::NotRequired,

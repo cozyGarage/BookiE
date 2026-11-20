@@ -13,25 +13,7 @@ pub(crate) struct ExportFileState {
 }
 
 pub(crate) fn format_for_extension(path: &std::path::Path) -> Option<ResultFormat> {
-    let extension = path.extension()?.to_str()?.to_ascii_lowercase();
-    Some(match extension.as_str() {
-        "csv" => ResultFormat::Csv,
-        "json" => ResultFormat::Json,
-        "jsonl" | "ndjson" => ResultFormat::JsonLines,
-        "md" | "markdown" => ResultFormat::Markdown,
-        "html" | "htm" => ResultFormat::Html,
-        "xml" => ResultFormat::Xml,
-        "sql" => ResultFormat::Sql,
-        "xlsx" => ResultFormat::Xlsx,
-        _ => return None,
-    })
-}
-
-fn expand_home(path: &str) -> PathBuf {
-    match (path.strip_prefix("~/"), std::env::var_os("HOME")) {
-        (Some(rest), Some(home)) => PathBuf::from(home).join(rest),
-        _ => PathBuf::from(path),
-    }
+    ResultFormat::from_extension(path.extension()?.to_str()?)
 }
 
 impl GridView {
@@ -65,7 +47,7 @@ impl GridView {
     }
 
     fn export_destination(&mut self, typed: &str) -> Option<(PathBuf, ResultFormat, Option<bookie_core::TableInfo>)> {
-        let path = expand_home(typed);
+        let path = bookie_core::user_path::expand_tilde(std::path::Path::new(typed));
         let Some(format) = format_for_extension(&path) else {
             self.status = "Use a file name ending in .csv, .json, .jsonl, .md, .html, .xml, .sql or .xlsx".into();
             return None;

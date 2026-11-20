@@ -39,6 +39,7 @@ mod sqlite_any_csv;
 pub mod text_file;
 mod tls;
 mod transaction;
+pub mod user_path;
 mod value_search;
 mod view_editability;
 
