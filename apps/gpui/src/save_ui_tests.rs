@@ -1542,3 +1542,19 @@ fn reconnecting_refreshes_the_table_list_and_never_with_pending_edits(cx: &mut T
     });
     std::fs::remove_file(&path).ok();
 }
+
+#[gpui::test]
+fn disconnecting_is_refused_while_edits_are_pending_and_offered_only_when_connected(cx: &mut TestAppContext) {
+    let path = fixture_copy("disconnect");
+    let (view, cx) = saving_view(cx, &path);
+    view.read_with(cx, |view, _| {
+        assert!(view.disconnect_actions().iter().all(|action| action.enabled), "a connection is open");
+    });
+    queue_edit(&view, cx, "pending");
+    cx.update(|_, cx| view.update(cx, |view, cx| view.disconnect(cx)));
+    view.read_with(cx, |view, _| {
+        assert!(view.status.contains("pending edits"), "{}", view.status);
+        assert_eq!(view.cell_edit.edits.len(), 1, "the edit is kept and the app is still running");
+    });
+    std::fs::remove_file(&path).ok();
+}
