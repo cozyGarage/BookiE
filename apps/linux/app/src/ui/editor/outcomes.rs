@@ -473,6 +473,18 @@ struct StreamExecution<'a> {
     approval_wait_before: std::time::Duration,
 }
 
+struct StreamTiming {
+    query_started: std::time::Instant,
+    approval_wait_before: std::time::Duration,
+}
+
+struct StreamPageContext<'a> {
+    audit_receipts: Vec<AuditReceipt>,
+    sql: &'a str,
+    sent: &'a str,
+    timing: StreamTiming,
+}
+
 async fn run_streamed_statement<F, Fut>(
     execution: StreamExecution<'_>,
     stream_update: &mut F,
@@ -510,12 +522,17 @@ where
     }
     fetch_stream_pages(
         cursor,
-        audit_receipts,
         spool,
-        (sql, &sent),
         control,
-        query_started,
-        approval_wait_before,
+        StreamPageContext {
+            audit_receipts,
+            sql,
+            sent: &sent,
+            timing: StreamTiming {
+                query_started,
+                approval_wait_before,
+            },
+        },
         stream_update,
         succeeded,
     )
@@ -524,12 +541,9 @@ where
 
 async fn fetch_stream_pages<F, Fut>(
     cursor: super::session_mode::StatementCursor,
-    mut audit_receipts: Vec<AuditReceipt>,
     spool: StreamResultSpool,
-    (sql, sent): (&str, &str),
     control: &OperationControl,
-    query_started: std::time::Instant,
-    approval_wait_before: std::time::Duration,
+    context: StreamPageContext<'_>,
     stream_update: &mut F,
     succeeded: &impl Fn(&str),
 ) -> ScriptRunResult
@@ -537,6 +551,12 @@ where
     F: FnMut(StreamUpdate) -> Fut,
     Fut: Future<Output = bool>,
 {
+    let StreamPageContext {
+        mut audit_receipts,
+        sql,
+        sent,
+        timing,
+    } = context;
     let mut sequence = 0;
     loop {
         let (page, messages, has_next_page, lease) =
@@ -550,9 +570,10 @@ where
         let truncated = page.truncated;
         let spooled = spool.append_page(sequence, page.clone()).await.is_ok();
         let page_timing = (!page.rows.is_empty()).then(|| {
-            query_started
+            timing
+                .query_started
                 .elapsed()
-                .saturating_sub(crate::services::approval_wait::waited().saturating_sub(approval_wait_before))
+                .saturating_sub(crate::services::approval_wait::waited().saturating_sub(timing.approval_wait_before))
                 .as_millis()
         });
         if !stream_update(StreamUpdate::Page {
