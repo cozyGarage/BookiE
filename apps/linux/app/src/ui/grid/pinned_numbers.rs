@@ -24,6 +24,7 @@ mod imp {
         #[property(override_interface = gtk::Scrollable, get, set = Self::set_vscroll_policy)]
         vscroll_policy: Cell<gtk::ScrollablePolicy>,
         pub view: OnceCell<gtk::ColumnView>,
+        pub(super) data_factories: RefCell<Vec<Option<DataFactory>>>,
         pub gutter_backing: OnceCell<gtk::Box>,
         pub gutter_header: OnceCell<gtk::Box>,
         pub hadjust_handler: RefCell<Option<glib::SignalHandlerId>>,
@@ -37,6 +38,7 @@ mod imp {
                 hscroll_policy: Cell::new(gtk::ScrollablePolicy::Minimum),
                 vscroll_policy: Cell::new(gtk::ScrollablePolicy::Minimum),
                 view: OnceCell::new(),
+                data_factories: RefCell::default(),
                 gutter_backing: OnceCell::new(),
                 gutter_header: OnceCell::new(),
                 hadjust_handler: RefCell::default(),
@@ -80,6 +82,7 @@ mod imp {
                 return;
             };
             child.allocate(width, height, baseline, None);
+            super::sync(&self.obj());
             super::sync_header_state(&self.obj());
         }
 
@@ -142,6 +145,12 @@ mod imp {
     }
 }
 
+pub(super) struct DataFactory {
+    column: gtk::ColumnViewColumn,
+    factory: gtk::ListItemFactory,
+    fallback_width: i32,
+}
+
 glib::wrapper! {
     pub struct PinnedNumbers(ObjectSubclass<imp::PinnedNumbers>)
         @extends adw::Bin, gtk::Widget,
@@ -179,6 +188,47 @@ fn install(pinned: &PinnedNumbers, view: &gtk::ColumnView, backing: &gtk::Box, h
     let _ = imp.view.set(view.clone());
     let _ = imp.gutter_backing.set(backing.clone());
     let _ = imp.gutter_header.set(header.clone());
+    let factories: Vec<_> = (0..view.columns().n_items())
+        .filter_map(|position| view.columns().item(position)?.downcast::<gtk::ColumnViewColumn>().ok())
+        .filter_map(|column| {
+            let index = column.id()?.parse::<usize>().ok()?;
+            let factory = column.factory()?;
+            let fallback_width = column.fixed_width().max(200);
+            Some((
+                index,
+                DataFactory {
+                    column,
+                    factory,
+                    fallback_width,
+                },
+            ))
+        })
+        .collect();
+    if let Some(max_index) = factories.iter().map(|(index, _)| *index).max() {
+        let mut data_factories = std::iter::repeat_with(|| None).take(max_index + 1).collect::<Vec<_>>();
+        for (index, factory) in factories {
+            factory.column.set_factory(None::<&gtk::ListItemFactory>);
+            data_factories[index] = Some(factory);
+        }
+        imp.data_factories.replace(data_factories);
+    }
+    let weak_pinned = pinned.downgrade();
+    view.columns()
+        .connect_items_changed(move |_, _, _, _| schedule_sync(&weak_pinned));
+    let weak_pinned = pinned.downgrade();
+    for position in 0..view.columns().n_items() {
+        let Some(column) = view.columns().item(position).and_downcast::<gtk::ColumnViewColumn>() else {
+            continue;
+        };
+        column.connect_notify_local(Some("visible"), {
+            let weak_pinned = weak_pinned.clone();
+            move |_, _| schedule_sync(&weak_pinned)
+        });
+        column.connect_notify_local(Some("fixed-width"), {
+            let weak_pinned = weak_pinned.clone();
+            move |_, _| schedule_sync(&weak_pinned)
+        });
+    }
     view.set_hadjustment(pinned.hadjustment().as_ref());
     view.set_vadjustment(pinned.vadjustment().as_ref());
     view.set_hscroll_policy(pinned.hscroll_policy());
@@ -232,6 +282,7 @@ pub(super) fn sync(pinned: &PinnedNumbers) {
     if let Some(column) = row_number_column::row_numbers_column(view) {
         backing.set_width_request(column.fixed_width());
     }
+    sync_data_factories(pinned, view);
     let scrolled = pinned
         .hadjustment()
         .as_ref()
@@ -239,6 +290,105 @@ pub(super) fn sync(pinned: &PinnedNumbers) {
     backing.set_visible(scrolled);
     header.set_visible(row_number_column::row_numbers_column(view).is_some());
     pinned.queue_draw();
+}
+
+fn sync_data_factories(pinned: &PinnedNumbers, view: &gtk::ColumnView) {
+    let Some(adjustment) = pinned.hadjustment() else { return };
+    let width = adjustment.page_size();
+    if width <= 0.0 {
+        return;
+    }
+    let mut data_factories = pinned.imp().data_factories.borrow_mut();
+    if data_factories.iter().flatten().count() <= 8 {
+        for data in data_factories.iter_mut().flatten() {
+            if data.column.factory().is_none() {
+                data.column.set_factory(Some(&data.factory));
+            }
+        }
+        return;
+    }
+    let protected = protected_columns(view);
+    let left = adjustment.value() - width.min(400.0);
+    let right = adjustment.value() + width + width.min(400.0);
+    let columns = view.columns();
+    let mut x = 0.0;
+    for position in 0..columns.n_items() {
+        let Some(column) = columns.item(position).and_downcast::<gtk::ColumnViewColumn>() else {
+            continue;
+        };
+        let index = column.id().and_then(|id| id.parse::<usize>().ok());
+        let managed = index.and_then(|index| data_factories.get(index)?.as_ref());
+        let column_width = if column.fixed_width() > 0 {
+            f64::from(column.fixed_width())
+        } else {
+            f64::from(managed.map_or(200, |data| data.fallback_width))
+        };
+        if let Some(data) = managed {
+            let should_realize = should_realize_data_factory(
+                column.is_visible(),
+                x + column_width >= left && x <= right,
+                index.is_some_and(|index| protected.contains(&index)),
+            );
+            if should_realize && column.factory().is_none() {
+                column.set_factory(Some(&data.factory));
+            } else if !should_realize && column.factory().is_some() {
+                column.set_factory(None::<&gtk::ListItemFactory>);
+            }
+        }
+        if column.is_visible() {
+            x += column_width;
+        }
+    }
+}
+
+fn should_realize_data_factory(column_visible: bool, in_range: bool, protected: bool) -> bool {
+    protected || column_visible && in_range
+}
+
+fn protected_columns(view: &gtk::ColumnView) -> std::collections::HashSet<usize> {
+    let mut protected = std::collections::HashSet::new();
+    if let Some(window) = view.root().and_downcast::<gtk::Window>()
+        && let Some(mut focused) = gtk::prelude::GtkWindowExt::focus(&window)
+    {
+        loop {
+            if let Some(index) = super::display::COLUMN_SLOT.get(&focused) {
+                protected.insert(index);
+                break;
+            }
+            let Some(parent) = focused.parent() else { break };
+            if parent == *view {
+                break;
+            }
+            focused = parent;
+        }
+    }
+    let mut pending = vec![view.clone().upcast::<gtk::Widget>()];
+    while let Some(widget) = pending.pop() {
+        if let Ok(cell) = widget.clone().downcast::<crate::ui::cell_editor::CellEditor>()
+            && (cell.is_editing()
+                || super::display::POPOVER_SLOT
+                    .cloned(&cell)
+                    .is_some_and(|popover| popover.is_visible()))
+            && let Some(index) = super::display::COLUMN_SLOT.get(&cell)
+        {
+            protected.insert(index);
+        }
+        let mut child = widget.first_child();
+        while let Some(current) = child {
+            child = current.next_sibling();
+            pending.push(current);
+        }
+    }
+    protected
+}
+
+fn schedule_sync(pinned: &glib::WeakRef<PinnedNumbers>) {
+    let pinned = pinned.clone();
+    glib::idle_add_local_once(move || {
+        if let Some(pinned) = pinned.upgrade() {
+            sync(&pinned);
+        }
+    });
 }
 
 fn bounds(pinned: &PinnedNumbers) -> Option<gtk::graphene::Rect> {
@@ -355,4 +505,19 @@ fn pinned_for(view: &gtk::ColumnView) -> Option<PinnedNumbers> {
     view.parent()
         .and_then(|overlay| overlay.parent())
         .and_then(|parent| parent.downcast::<PinnedNumbers>().ok())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::should_realize_data_factory;
+
+    #[test]
+    fn active_cell_factory_stays_attached_after_its_column_is_hidden() {
+        assert!(should_realize_data_factory(false, false, true));
+    }
+
+    #[test]
+    fn an_offscreen_unprotected_factory_is_detached() {
+        assert!(!should_realize_data_factory(true, false, false));
+    }
 }
