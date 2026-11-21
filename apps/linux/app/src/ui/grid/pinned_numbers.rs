@@ -341,6 +341,24 @@ fn sync_data_factories(pinned: &PinnedNumbers, view: &gtk::ColumnView) {
     }
 }
 
+pub(super) fn prepare_column_for_scroll(view: &gtk::ColumnView, column: &gtk::ColumnViewColumn) {
+    let Some(pinned) = view
+        .ancestor(PinnedNumbers::static_type())
+        .and_then(|widget| widget.downcast::<PinnedNumbers>().ok())
+    else {
+        return;
+    };
+    let Some(index) = column.id().and_then(|id| id.parse::<usize>().ok()) else {
+        return;
+    };
+    let data_factories = pinned.imp().data_factories.borrow();
+    if let Some(data) = data_factories.get(index).and_then(Option::as_ref)
+        && column.factory().is_none()
+    {
+        column.set_factory(Some(&data.factory));
+    }
+}
+
 fn should_realize_data_factory(column_visible: bool, in_range: bool, protected: bool) -> bool {
     protected || column_visible && in_range
 }
