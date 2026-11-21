@@ -7,7 +7,7 @@ Rules for contributors are in [AGENTS.md](../AGENTS.md). Accepted ADRs define ar
 | Audience | Documents |
 |---|---|
 | People using BookiE | [User guide](user-guide.md), [feature list](features.md), [platforms](platforms.md), [root README](../README.md) |
-| Contributors | [AGENTS.md](../AGENTS.md), [architecture](../ARCHITECTURE.md), [code conventions](code-conventions.md), [adding drivers](adding-drivers.md), [state management](state-management.md), [value contract rules](value-contract-rules.md), [connections](connections.md), [storage](storage.md), [error handling](error-handling.md), [vendor patch guide](vendor-patches.md) |
+| Contributors | [AGENTS.md](../AGENTS.md), [CONTRIBUTING.md](../CONTRIBUTING.md), [contributor avatars](../CONTRIBUTORS.md), [architecture](../ARCHITECTURE.md), [code conventions](code-conventions.md), [adding drivers](adding-drivers.md), [state management](state-management.md), [value contract rules](value-contract-rules.md), [connections](connections.md), [storage](storage.md), [error handling](error-handling.md), [vendor patch guide](vendor-patches.md) |
 | Testing | [Validation playbook](validation-playbook.md), [testing](testing.md), [GTK testing](testing-gtk.md), [CI testing](testing-ci.md), [test design rules](test-design-rules.md), [manual verification](manual-verification-0.2-features.md) |
 | Current work | [Work selection](backlog.md), [Project #3](https://github.com/users/cozyGarage/projects/3), [issue ledger](known-issues.md), [known limitations](known-limitations.md), [changelog](../CHANGELOG.md) |
 | Product and security | [PRODUCT.md](../PRODUCT.md), [personas](personas.md), [PRINCIPLES.md](../PRINCIPLES.md), [SECURITY.md](../SECURITY.md), [capability specs](../specs/README.md) |
