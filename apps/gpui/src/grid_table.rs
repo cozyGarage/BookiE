@@ -51,6 +51,7 @@ impl RowMap {
 pub struct GridDelegate {
     columns: Vec<(String, f32)>,
     numeric: Vec<bool>,
+    kinds: Vec<(String, bool)>,
     source: Option<Source>,
     map: RowMap,
     cached: Option<(usize, Vec<(String, bool)>)>,
@@ -84,14 +85,47 @@ impl TableDelegate for GridDelegate {
             .resizable(true)
     }
 
+    fn render_th(
+        &mut self,
+        col_ix: usize,
+        _window: &mut Window,
+        cx: &mut Context<TableState<Self>>,
+    ) -> impl IntoElement {
+        let theme = Theme::current(cx);
+        let name = self.columns.get(col_ix).map(|(name, _)| name.clone()).unwrap_or_default();
+        let kind = self.kinds.get(col_ix).map(|(kind, key)| header_kind(kind, *key)).unwrap_or_default();
+        div()
+            .size_full()
+            .min_w_0()
+            .flex()
+            .flex_col()
+            .justify_center()
+            .overflow_hidden()
+            .child(div().overflow_hidden().whitespace_nowrap().text_ellipsis().child(name))
+            .when(!kind.is_empty(), |el| {
+                el.child(
+                    div()
+                        .overflow_hidden()
+                        .whitespace_nowrap()
+                        .text_ellipsis()
+                        .text_xs()
+                        .text_color(gpui::rgb(theme.muted_foreground))
+                        .child(kind),
+                )
+            })
+    }
+
     fn render_td(
         &mut self,
         row_ix: usize,
         col_ix: usize,
         _window: &mut Window,
-        _cx: &mut Context<TableState<Self>>,
+        cx: &mut Context<TableState<Self>>,
     ) -> impl IntoElement {
         let is_numeric = self.numeric.get(col_ix).copied().unwrap_or(false);
+        let edited_tint = self
+            .is_edited(row_ix, col_ix)
+            .then(|| gpui::rgb(Theme::current(cx).edited));
         match &self.editor {
             Some((row, column, view)) if *row == row_ix && *column == col_ix => {
                 div().w_full().flex().when(is_numeric, |el| el.justify_end()).child(
@@ -104,7 +138,7 @@ impl TableDelegate for GridDelegate {
             }
             _ => {
                 let (text, right) = self.label_of(row_ix, col_ix);
-                div().w_full().flex().child(
+                div().w_full().flex().when_some(edited_tint, |el, tint| el.bg(tint)).child(
                     div()
                         .flex_1()
                         .min_w_0()
@@ -120,11 +154,20 @@ impl TableDelegate for GridDelegate {
 }
 
 impl GridDelegate {
+    fn is_edited(&self, row_ix: usize, col_ix: usize) -> bool {
+        self.map.compare.is_none()
+            && self
+                .map
+                .source_row(row_ix)
+                .is_some_and(|index| self.edits.contains_key(&(index, col_ix)))
+    }
+
     fn is_changed(
         &self,
         source: &Source,
         columns: &[(String, f32)],
         numeric: &[bool],
+        kinds: &[(String, bool)],
         map: &RowMap,
         edits: &Edits,
         editor: &Option<(usize, usize, gpui::AnyView)>,
@@ -133,6 +176,7 @@ impl GridDelegate {
         !same_source
             || self.columns != columns
             || self.numeric != numeric
+            || self.kinds != kinds
             || self.map != *map
             || self.edits != *edits
             || self.editor.as_ref().map(|(row, column, _)| (*row, *column))
@@ -204,6 +248,17 @@ impl GridView {
         } else {
             numeric
         };
+        let kinds: Vec<(String, bool)> = self
+            .source
+            .columns()
+            .iter()
+            .map(|column| (column.data_type.clone(), column.primary_key))
+            .collect();
+        let kinds = if self.compare.is_some() {
+            std::iter::once((String::new(), false)).chain(kinds).collect()
+        } else {
+            kinds
+        };
         let mut columns = if self.compare.is_some() {
             std::iter::once(("Change".to_string(), COMPARE_CHANGE_WIDTH))
                 .chain(columns)
@@ -233,11 +288,12 @@ impl GridView {
             }
             let delegate = table.delegate_mut();
             delegate.cached = None;
-            if !delegate.is_changed(&self.source, &columns, &numeric, &map, &self.cell_edit.edits, &editor) {
+            if !delegate.is_changed(&self.source, &columns, &numeric, &kinds, &map, &self.cell_edit.edits, &editor) {
                 return;
             }
             delegate.columns = columns;
             delegate.numeric = numeric;
+            delegate.kinds = kinds;
             delegate.source = Some(self.source.clone());
             delegate.map = map;
             delegate.edits = self.cell_edit.edits.clone();
@@ -247,11 +303,23 @@ impl GridView {
     }
 
     pub(crate) fn data_table(&self) -> DataTable<GridDelegate> {
-        DataTable::new(&self.table).stripe(true).xsmall()
+        DataTable::new(&self.table)
+            .stripe(true)
+            .xsmall()
+            .header_row_height(px(bookie_gpui::theme::size::GRID_HEADER))
     }
 }
 
 const COMPARE_CHANGE_WIDTH: f32 = 70.0;
+
+fn header_kind(data_type: &str, primary_key: bool) -> String {
+    match (data_type.is_empty(), primary_key) {
+        (true, false) => String::new(),
+        (true, true) => "PK".into(),
+        (false, false) => data_type.into(),
+        (false, true) => format!("{data_type} · PK"),
+    }
+}
 
 fn fill_last_column(columns: &mut [(String, f32)], available_width: f32) {
     let Some(last) = columns.len().checked_sub(1) else {
@@ -318,6 +386,19 @@ pub fn table_cell(cursor: Option<bookie_results::grid_cursor::Cursor>) -> Option
 #[cfg(test)]
 pub fn cursor_at(cell: Option<(usize, usize)>) -> Option<bookie_results::grid_cursor::Cursor> {
     cell.map(|(row, column)| bookie_results::grid_cursor::Cursor { row, column })
+}
+
+#[cfg(test)]
+mod header_kind_tests {
+    use super::header_kind;
+
+    #[test]
+    fn a_header_shows_the_type_and_marks_the_primary_key() {
+        assert_eq!(header_kind("integer", true), "integer · PK");
+        assert_eq!(header_kind("text", false), "text");
+        assert_eq!(header_kind("", true), "PK");
+        assert_eq!(header_kind("", false), "");
+    }
 }
 
 #[cfg(test)]

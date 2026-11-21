@@ -93,6 +93,8 @@ fn copied_headers_are_the_result_columns_not_a_fixed_list() {
         name: "customer_name".into(),
         width: 120.0,
         numeric: false,
+        data_type: String::new(),
+        primary_key: false,
     }]);
     let text = bookie_app_services::result_copy::tsv(&columns, vec![vec![Cell::Text("Ada".into())]], true);
     assert_eq!(text, "customer_name\nAda");

@@ -150,6 +150,8 @@ pub struct ColumnMeta {
     pub name: String,
     pub width: f32,
     pub numeric: bool,
+    pub data_type: String,
+    pub primary_key: bool,
 }
 
 pub fn synthetic_columns() -> Vec<ColumnMeta> {
@@ -164,6 +166,8 @@ pub fn synthetic_columns() -> Vec<ColumnMeta> {
         name: name.into(),
         width,
         numeric,
+        data_type: String::new(),
+        primary_key: false,
     })
     .collect()
 }

@@ -21,6 +21,8 @@ impl TypedSource {
                 name: format!("value_{index}"),
                 width: 160.0,
                 numeric: false,
+                data_type: String::new(),
+                primary_key: false,
             })
             .collect();
         Self { row, columns }
@@ -100,4 +102,31 @@ fn selection_and_copy_keep_every_core_value_variant(cx: &mut TestAppContext) {
         false,
     );
     assert_eq!(copied.as_deref(), Some(expected.as_str()));
+}
+
+#[gpui::test]
+fn every_column_header_of_a_wide_result_is_drawn(cx: &mut TestAppContext) {
+    use gpui_kit::test::TestWindowExt;
+
+    let columns = 7;
+    let source = Arc::new(TypedSource::new(vec![Value::Null; columns]));
+    cx.update(text_input::bind_keys);
+    let (_view, cx) = cx.add_window_view(|window, cx| GridView::with_source(source, Instant::now(), window, cx));
+    cx.simulate_resize(gpui::size(gpui::px(2_600.0), gpui::px(1_000.0)));
+    cx.run_until_parked();
+    cx.update(|window, cx| {
+        window.render_frame(cx);
+        window.render_frame(cx);
+        let report: Vec<String> = (0..columns)
+            .map(|index| match window.try_find(("col-header", index)) {
+                Some(header) => {
+                    let bounds = header.bounds();
+                    format!("{index}: visible={} x={:?} w={:?}", header.visible(), bounds.origin.x, bounds.size.width)
+                }
+                None => format!("{index}: absent"),
+            })
+            .collect();
+        let drawn = |line: &String| line.contains("visible=true") && !line.contains("w=0px");
+        assert!(report.iter().all(drawn), "column headers not drawn:\n{}", report.join("\n"));
+    });
 }

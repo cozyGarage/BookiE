@@ -681,6 +681,7 @@ impl GridView {
         cx: &mut Context<Self>,
     ) -> Stateful<Div> {
         let selected = index == active;
+        let dirty = tab_is_dirty(tab, &self.catalog.grid_table, self.cell_edit.edits.len());
         let mut item = div()
             .id(("tab", index))
             .flex()
@@ -696,7 +697,8 @@ impl GridView {
                 tab_icon_name(tab),
                 if selected { theme.info } else { theme.muted_foreground },
             ))
-            .child(tab.title());
+            .child(tab.title())
+            .when(dirty, |el| el.child(div().text_color(rgb(theme.warning)).child("•")));
         item = if selected {
             item.bg(rgb(theme.background))
                 .text_color(rgb(theme.foreground))
@@ -861,4 +863,29 @@ impl GridView {
         )
     }
 
+}
+
+fn tab_is_dirty(tab: &Tab, grid_table: &bookie_core::TableInfo, pending_edits: usize) -> bool {
+    pending_edits > 0 && matches!(tab, Tab::Table(table) if table == grid_table)
+}
+
+#[cfg(test)]
+mod tab_dirty_tests {
+    use super::*;
+
+    fn table(name: &str) -> bookie_core::TableInfo {
+        bookie_core::TableInfo {
+            schema: None,
+            name: name.into(),
+        }
+    }
+
+    #[test]
+    fn only_the_table_tab_with_pending_edits_is_marked() {
+        let open = table("customers");
+        assert!(tab_is_dirty(&Tab::Table(open.clone()), &open, 1));
+        assert!(!tab_is_dirty(&Tab::Table(open.clone()), &open, 0));
+        assert!(!tab_is_dirty(&Tab::Table(table("orders")), &open, 3));
+        assert!(!tab_is_dirty(&Tab::Query, &open, 3));
+    }
 }
