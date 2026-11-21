@@ -1765,6 +1765,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::grid::lifetime_tests::a_narrow_wide_grid_does_not_construct_offscreen_cells"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::grid::lifetime_tests::a_rendered_editable_grid_releases_its_page"
     ],
     [

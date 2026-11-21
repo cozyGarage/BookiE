@@ -12,8 +12,9 @@ pub(super) const COLUMN_ID: &str = "row-numbers";
 const CHROME_PX: i32 = 16;
 
 type Watches = Rc<RefCell<HashMap<glib::Object, Vec<(glib::WeakRef<glib::Object>, glib::SignalHandlerId)>>>>;
+type VisibleRows = Rc<RefCell<HashMap<usize, u32>>>;
 
-pub(super) fn build(base: Rc<Cell<u64>>) -> gtk::ColumnViewColumn {
+pub(super) fn build(base: Rc<Cell<u64>>, visibility: Option<Rc<dyn Fn(u32, bool)>>) -> gtk::ColumnViewColumn {
     let factory = gtk::SignalListItemFactory::new();
     factory.connect_setup(|_, item| {
         let Some(cell) = item.downcast_ref::<gtk::ColumnViewCell>() else {
@@ -32,18 +33,27 @@ pub(super) fn build(base: Rc<Cell<u64>>) -> gtk::ColumnViewColumn {
         cell.set_child(Some(&content));
     });
     let watches: Watches = Rc::default();
+    let visible_rows: VisibleRows = Rc::default();
     {
         let watches = watches.clone();
         let base = base.clone();
+        let visibility = visibility.clone();
+        let visible_rows = visible_rows.clone();
         factory.connect_bind(move |_, item| {
             let Some(cell) = item.downcast_ref::<gtk::ColumnViewCell>() else {
                 return;
             };
-            bind_cell(cell, &base, &watches);
+            bind_cell(cell, &base, &watches, &visible_rows, &visibility);
         });
     }
-    factory.connect_unbind(move |_, item| {
-        unwatch(&watches, item.upcast_ref());
+    factory.connect_unbind({
+        let visible_rows = visible_rows.clone();
+        move |_, item| {
+            if let Some(cell) = item.downcast_ref::<gtk::ColumnViewCell>() {
+                update_visible_position(cell, &visible_rows, &visibility, false);
+            }
+            unwatch(&watches, item.upcast_ref());
+        }
     });
     let column = gtk::ColumnViewColumn::builder()
         .title("#")
@@ -52,6 +62,70 @@ pub(super) fn build(base: Rc<Cell<u64>>) -> gtk::ColumnViewColumn {
         .build();
     column.set_id(Some(COLUMN_ID));
     column
+}
+
+fn bind_cell(
+    cell: &gtk::ColumnViewCell,
+    base: &Rc<Cell<u64>>,
+    watches: &Watches,
+    visible_rows: &VisibleRows,
+    visibility: &Option<Rc<dyn Fn(u32, bool)>>,
+) {
+    let show = {
+        let cell = cell.downgrade();
+        let base = base.clone();
+        let visible_rows = visible_rows.clone();
+        let visibility = visibility.clone();
+        move || {
+            if let Some(cell) = cell.upgrade() {
+                show_cell(&cell, base.get());
+                update_visible_position(&cell, &visible_rows, &visibility, true);
+            }
+        }
+    };
+    show();
+    let on_position = {
+        let show = show.clone();
+        cell.connect_notify_local(Some("position"), move |_, _| show())
+    };
+    watches.borrow_mut().insert(
+        cell.clone().upcast(),
+        vec![(cell.upcast_ref::<glib::Object>().downgrade(), on_position)],
+    );
+}
+
+fn update_visible_position(
+    cell: &gtk::ColumnViewCell,
+    visible_rows: &VisibleRows,
+    visibility: &Option<Rc<dyn Fn(u32, bool)>>,
+    bound: bool,
+) {
+    let position = (bound && cell.position() != gtk::INVALID_LIST_POSITION).then_some(cell.position());
+    let previous = if let Some(position) = position {
+        visible_rows.borrow_mut().insert(cell.as_ptr() as usize, position)
+    } else {
+        visible_rows.borrow_mut().remove(&(cell.as_ptr() as usize))
+    };
+    if previous != position
+        && let Some(visibility) = visibility
+    {
+        if let Some(previous) = previous {
+            visibility(previous, false);
+        }
+        if let Some(position) = position {
+            visibility(position, true);
+        }
+    }
+}
+
+fn unwatch(watches: &Watches, item: &glib::Object) {
+    if let Some(handlers) = watches.borrow_mut().remove(item) {
+        for (object, handler) in handlers {
+            if let Some(object) = object.upgrade() {
+                object.disconnect(handler);
+            }
+        }
+    }
 }
 
 pub(super) fn fit(view: &gtk::ColumnView, base: u64) {
@@ -91,27 +165,6 @@ pub(super) fn keep_first(view: &gtk::ColumnView) {
     }
 }
 
-fn bind_cell(cell: &gtk::ColumnViewCell, base: &Rc<Cell<u64>>, watches: &Watches) {
-    let show = {
-        let cell = cell.downgrade();
-        let base = base.clone();
-        move || {
-            if let Some(cell) = cell.upgrade() {
-                show_cell(&cell, base.get());
-            }
-        }
-    };
-    show();
-    let on_position = {
-        let show = show.clone();
-        cell.connect_notify_local(Some("position"), move |_, _| show())
-    };
-    watches.borrow_mut().insert(
-        cell.clone().upcast(),
-        vec![(cell.upcast_ref::<glib::Object>().downgrade(), on_position)],
-    );
-}
-
 fn show_cell(cell: &gtk::ColumnViewCell, base: u64) {
     let Some(content) = cell.child() else {
         return;
@@ -141,16 +194,6 @@ pub(super) fn number_for(base: u64, position: u32, source_index: Option<usize>, 
         Some(source) => base.saturating_add(source as u64).saturating_add(1),
         None => base.saturating_add(u64::from(position)).saturating_add(1),
     })
-}
-
-fn unwatch(watches: &Watches, item: &glib::Object) {
-    if let Some(handlers) = watches.borrow_mut().remove(item) {
-        for (object, handler) in handlers {
-            if let Some(object) = object.upgrade() {
-                object.disconnect(handler);
-            }
-        }
-    }
 }
 
 #[cfg(test)]

@@ -9,6 +9,15 @@ def scenarios(ui):
         with sqlite3.connect(database) as connection:
             return connection.execute("SELECT id, note FROM safety_items ORDER BY id").fetchall()
 
+    def has_visible_focus(node):
+        try:
+            state = node.getState()
+            return state is not None and state.contains(ui.pyatspi.STATE_FOCUSED) and state.contains(
+                ui.pyatspi.STATE_SHOWING
+            )
+        except Exception:
+            return False
+
     def wait_for_prompt(name):
         node = ui.wait_for_node(name=name)
         for _ in range(8):
@@ -166,12 +175,7 @@ def scenarios(ui):
         ui.wait_for_node(name="Run", role=ui.pyatspi.ROLE_PUSH_BUTTON)
         deadline = time.monotonic() + ui.WAIT_SECONDS
         while time.monotonic() < deadline:
-            focused = [
-                node
-                for node in ui.descendants(ui.application_node())
-                if node.getState().contains(ui.pyatspi.STATE_FOCUSED)
-                and node.getState().contains(ui.pyatspi.STATE_SHOWING)
-            ]
+            focused = [node for node in ui.descendants(ui.application_node()) if has_visible_focus(node)]
             if focused:
                 return
             time.sleep(ui.POLL_SECONDS)
@@ -189,12 +193,7 @@ def scenarios(ui):
         ui.wait_for_node(name="Open SQL editor", role=ui.pyatspi.ROLE_PUSH_BUTTON)
         deadline = time.monotonic() + ui.WAIT_SECONDS
         while time.monotonic() < deadline:
-            focused = [
-                node
-                for node in ui.descendants(ui.application_node())
-                if node.getState().contains(ui.pyatspi.STATE_FOCUSED)
-                and node.getState().contains(ui.pyatspi.STATE_SHOWING)
-            ]
+            focused = [node for node in ui.descendants(ui.application_node()) if has_visible_focus(node)]
             if focused:
                 return
             time.sleep(ui.POLL_SECONDS)
