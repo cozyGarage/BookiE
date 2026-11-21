@@ -1,10 +1,24 @@
-use bookie_app_services::read_session_store::SubscriptionSample;
+use bookie_app_services::read_session_store::{SubscriptionMessage, SubscriptionSample};
 
 use crate::messages::MessageKind;
 
 pub const SAMPLE_MESSAGES: usize = 50;
 pub const SAMPLE_SECONDS: u64 = 5;
 const SHOWN_PAYLOAD_CHARS: usize = 200;
+
+pub fn subscription_message(
+    channel: String,
+    pattern: Option<String>,
+    payload: String,
+    payload_bytes: usize,
+) -> SubscriptionMessage {
+    SubscriptionMessage {
+        channel,
+        pattern,
+        payload,
+        payload_bytes,
+    }
+}
 
 pub fn parse_pattern(text: &str) -> Option<String> {
     let text = text.trim();
