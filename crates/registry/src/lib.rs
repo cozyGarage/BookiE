@@ -2,7 +2,8 @@ pub use drivers_postgres::{
     NotificationSample, check_notification_request, follow_notifications, sample_notifications,
 };
 pub use drivers_redis::{
-    MAX_SAMPLE_MESSAGES, PubSubMessage, PubSubSample, check_request as validate_pubsub_request, follow_pubsub, sample_pubsub,
+    MAX_SAMPLE_MESSAGES, PubSubMessage, PubSubSample, check_request as validate_pubsub_request, follow_pubsub,
+    sample_pubsub,
 };
 use std::sync::Arc;
 
