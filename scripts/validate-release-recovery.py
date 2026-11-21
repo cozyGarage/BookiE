@@ -10,10 +10,12 @@ def validate(run, jobs, tag, source):
     if any(run.get(key) != value for key, value in expected.items()):
         raise ValueError("The package run does not match the release tag and workflow")
     required = {"Arch package", "AppImage", "GPUI Linux preview"}
-    for name in required:
+    for name in sorted(required):
         matches = [job for job in jobs.get("jobs", []) if job.get("name") == name]
+        if not matches:
+            raise ValueError(f"Required asset job {name} is missing from this release run; it may predate that job")
         if len(matches) != 1 or matches[0].get("conclusion") != "success":
-            raise ValueError("Every required asset job must succeed before publication recovery")
+            raise ValueError(f"Required asset job {name} must appear once and succeed before publication recovery")
 
 
 def main():
