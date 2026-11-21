@@ -108,6 +108,118 @@ fn clicking_another_table_of_a_live_connection_loads_it_into_the_grid(cx: &mut T
 }
 
 #[gpui::test]
+fn a_table_row_can_be_shown_vertically_and_counted_exactly(cx: &mut TestAppContext) {
+    use bookie_gpui::live::{LiveTable, Origin};
+    let table = std::sync::Arc::new(
+        LiveTable::load(
+            &Origin::File(orders_fixture()),
+            &TableInfo {
+                schema: None,
+                name: "orders".into(),
+            },
+            100,
+        )
+        .expect("load orders"),
+    );
+    cx.update(text_input::bind_keys);
+    let (view, cx) = cx.add_window_view(|window, cx| {
+        let mut view = GridView::with_source(table.clone(), Instant::now(), window, cx);
+        view.attach_live(table.clone());
+        view
+    });
+
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 0 });
+            view.cell_edit.edits.insert(
+                (0, 1),
+                bookie_gpui::model::Cell::Text("edited Ada".into()),
+            );
+            view.run_palette_id("show-row-vertically", window, cx);
+            assert!(view.row_detail_open);
+            let fields = view.row_detail_target().expect("selected row details");
+            assert_eq!(fields.len(), 5);
+            assert_eq!(fields[0].0, "id");
+            assert_eq!(fields[0].1, "1");
+            assert_eq!(fields[1].0, "customer");
+            assert_eq!(fields[1].1, "edited Ada");
+            view.run_palette_id("count-table-rows", window, cx);
+        });
+    });
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.status, "Database table orders has 6 rows at count time")
+    });
+}
+
+#[gpui::test]
+fn a_selected_table_row_copies_as_tsv_csv_json_and_insert(cx: &mut TestAppContext) {
+    use bookie_app_services::result_copy::CopyFormat;
+    use bookie_gpui::live::{LiveTable, Origin};
+    let table = std::sync::Arc::new(
+        LiveTable::load(
+            &Origin::File(orders_fixture()),
+            &TableInfo {
+                schema: None,
+                name: "orders".into(),
+            },
+            100,
+        )
+        .expect("load orders"),
+    );
+    cx.update(text_input::bind_keys);
+    let (view, cx) = cx.add_window_view(|window, cx| {
+        let mut view = GridView::with_source(table.clone(), Instant::now(), window, cx);
+        view.attach_live(table.clone());
+        view
+    });
+    view.update(cx, |view, _| view.click_row(0, false));
+    let copied = |cx: &mut gpui::VisualTestContext| {
+        cx.update(|_, cx| cx.read_from_clipboard().and_then(|item| item.text()))
+    };
+
+    cx.update(|_, cx| view.update(cx, |view, cx| view.copy_selection(false, cx)));
+    assert!(copied(cx).is_some_and(|text| text.starts_with("1\tAda\t10.5\t1\tfirst")));
+    cx.update(|_, cx| view.update(cx, |view, cx| view.copy_selection_as(CopyFormat::Csv, cx)));
+    assert!(copied(cx).is_some_and(|text| {
+        text.lines().nth(1).is_some_and(|row| row.starts_with("1,Ada,10.5,1,first"))
+    }));
+    cx.update(|_, cx| view.update(cx, |view, cx| view.copy_selection_as(CopyFormat::Json, cx)));
+    let json: serde_json::Value = serde_json::from_str(&copied(cx).expect("JSON clipboard")).expect("valid JSON");
+    assert_eq!(json[0]["customer"], "Ada");
+    cx.update(|_, cx| view.update(cx, |view, cx| view.copy_selection_as(CopyFormat::Insert, cx)));
+    assert!(copied(cx).is_some_and(|text| text.starts_with("INSERT INTO \"orders\"")));
+}
+
+#[gpui::test]
+fn table_row_palette_lists_the_copy_formats(cx: &mut TestAppContext) {
+    use bookie_gpui::live::{LiveTable, Origin};
+    let table = std::sync::Arc::new(
+        LiveTable::load(
+            &Origin::File(orders_fixture()),
+            &TableInfo {
+                schema: None,
+                name: "orders".into(),
+            },
+            100,
+        )
+        .expect("load orders"),
+    );
+    cx.update(text_input::bind_keys);
+    let (view, cx) = cx.add_window_view(|window, cx| {
+        let mut view = GridView::with_source(table.clone(), Instant::now(), window, cx);
+        view.attach_live(table.clone());
+        view
+    });
+    view.read_with(cx, |view, _| {
+        for id in ["copy", "copy-csv", "copy-json", "copy-insert"] {
+            assert!(view.palette_actions().iter().any(|action| action.id == id));
+        }
+    });
+}
+
+#[gpui::test]
 fn a_live_connection_runs_typed_sql_into_a_result_tab_and_refuses_writes(cx: &mut TestAppContext) {
     use bookie_gpui::live::{LiveTable, Origin};
     let origin = Origin::File(orders_fixture());

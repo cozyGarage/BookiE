@@ -11,6 +11,44 @@ use tokio_util::sync::CancellationToken;
 use crate::{GridView, Mode, Work};
 
 impl GridView {
+    pub(crate) fn count_table_rows(&mut self, cx: &mut Context<Self>) {
+        let Some(session) = self
+            .live
+            .clone()
+            .filter(|_| !self.grid_is_query && self.compare.is_none() && !self.catalog.grid_table.name.is_empty())
+        else {
+            return;
+        };
+        let table = self.catalog.grid_table.clone();
+        let current_session = session.clone();
+        let current_table = table.clone();
+        self.status = format!("Counting all rows in {}…", table.name);
+        self.begin_background(
+            Work::Count,
+            cx,
+            move |cancel| session.count_table_rows(&table, &cancel),
+            move |this, result| {
+                if this.grid_is_query
+                    || this.catalog.grid_table != current_table
+                    || !this
+                        .live
+                        .as_ref()
+                        .is_some_and(|live| Arc::ptr_eq(live, &current_session))
+                {
+                    return;
+                }
+                this.status = match result {
+                    Ok(count) => format!(
+                        "Database table {} has {} rows at count time",
+                        current_table.name,
+                        crate::thousands(count)
+                    ),
+                    Err(message) => format!("Could not count rows in {}: {message}", current_table.name),
+                };
+            },
+        );
+    }
+
     pub(super) fn attach_live(&mut self, table: Arc<LiveTable>) {
         let session = table.session().clone();
         let Some(identity) = table.table_info().cloned() else {
