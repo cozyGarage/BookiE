@@ -1,1 +1,0 @@
-- Added import of supported DBX connection settings without importing credentials or saved SQL.

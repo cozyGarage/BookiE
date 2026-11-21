@@ -1,1 +1,0 @@
-PostgreSQL connections can open a read-only table and index health report with dead rows, estimated bloat, unused and duplicate indexes and sequential-scan-heavy tables, and copy ready-made maintenance statements without running them.
