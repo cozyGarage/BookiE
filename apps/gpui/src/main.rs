@@ -356,8 +356,13 @@ impl GridView {
         FocusHandle,
         gpui::Subscription,
     ) {
+        let owner = cx.weak_entity();
         let table = cx.new(|cx| {
-            gpui_kit::component::table::TableState::new(grid_table::GridDelegate::default(), window, cx)
+            let delegate = grid_table::GridDelegate {
+                owner: Some(owner),
+                ..Default::default()
+            };
+            gpui_kit::component::table::TableState::new(delegate, window, cx)
                 .cell_selectable(true)
                 .row_header(false)
         });

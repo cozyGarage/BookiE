@@ -11,6 +11,54 @@ use tokio_util::sync::CancellationToken;
 use crate::{GridView, Mode, Work};
 
 impl GridView {
+    pub(crate) fn sort_current_table(
+        &mut self,
+        column: &str,
+        ascending: Option<bool>,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(session) = self.live.clone().filter(|session| session.driver_id == "postgres") else {
+            self.status = "Server-side table sorting is not available for this connection.".into();
+            return;
+        };
+        let Tab::Table(table) = self.tabs.current().clone() else {
+            return;
+        };
+        if self.reject_view_edits() {
+            cx.notify();
+            return;
+        }
+        let sort = ascending.map(|ascending| bookie_app_services::read_session::TableSort {
+            column: column.to_owned(),
+            ascending,
+        });
+        let current_session = session.clone();
+        let current_table = table.clone();
+        self.status = format!("Sorting {column}…");
+        self.begin_background(
+            Work::Load,
+            cx,
+            move |cancel| {
+                session
+                    .load_table_sorted_controlled(&table, ROW_CAP, sort.as_ref(), &cancel)
+                    .map(|loaded| Arc::new(loaded) as Source)
+            },
+            move |this, result| {
+                if !this.is_current_session(&current_session)
+                    || this.catalog.grid_table != current_table
+                    || this.grid_is_query
+                {
+                    return;
+                }
+                match result {
+                    Ok(source) => this.show_loaded_table(current_table, source),
+                    Err(message) => this.status = format!("Could not sort {column}: {message}"),
+                }
+            },
+        );
+    }
+
     pub(crate) fn count_table_rows(&mut self, cx: &mut Context<Self>) {
         let Some(session) = self
             .live
