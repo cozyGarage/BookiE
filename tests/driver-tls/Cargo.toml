@@ -24,6 +24,7 @@ bookie-core = { path = "../../crates/core" }
 bookie-ssh = { path = "../../crates/ssh" }
 bookie-transport = { path = "../../crates/transport" }
 secrecy.workspace = true
+tokio.workspace = true
 
 [dev-dependencies]
 bookie-driver-clickhouse = { path = "../../crates/drivers/clickhouse" }
@@ -32,8 +33,6 @@ bookie-driver-mssql = { path = "../../crates/drivers/mssql" }
 bookie-driver-mysql = { path = "../../crates/drivers/mysql" }
 bookie-driver-postgres = { path = "../../crates/drivers/postgres" }
 bookie-driver-redis = { path = "../../crates/drivers/redis" }
-tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
-
 
 [lints.clippy]
 unwrap_used = "allow"

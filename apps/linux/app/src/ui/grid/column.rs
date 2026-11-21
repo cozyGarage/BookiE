@@ -84,8 +84,10 @@ fn shown_type(info: &ColumnInfo) -> Option<&str> {
 
 fn header_details(info: &ColumnInfo, foreign_key: bool, sort_enabled: bool) -> gtk4::gio::Menu {
     let details = gtk4::gio::Menu::new();
+    let name = info.name.replace('_', "__");
+    let column_label = bookie_app_services::tr!("Column: {name}").replace("{name}", &name);
     for text in [
-        bookie_app_services::tr!("Column: {name}").replace("{name}", &info.name),
+        column_label,
         bookie_app_services::tr!("Type: {type}").replace("{type}", shown_type(info).unwrap_or("\u{2014}")),
         if info.nullable {
             bookie_app_services::tr!("NULL allowed")
