@@ -196,6 +196,7 @@ pub(crate) fn choice_chip(
 ) -> Stateful<Div> {
     div()
         .id(id)
+        .debug_selector(move || label.into())
         .flex()
         .items_center()
         .h(px(size::SMALL_CONTROL))
