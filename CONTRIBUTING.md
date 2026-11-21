@@ -25,6 +25,16 @@ cargo run -p bookie-app
 
 Use the [validation playbook](docs/validation-playbook.md) to select local checks for your change and identify the applicable required checks. Do not treat a skipped check as a pass.
 
+## Contributor credits
+
+The avatar list in [`CONTRIBUTORS.md`](CONTRIBUTORS.md) and the README Contributors section is generated. Refresh both from the repository root after merges that add new GitHub contributors:
+
+```bash
+python3 scripts/generate-contributors.py
+```
+
+Use `python3 scripts/generate-contributors.py --check` to verify the files match the API without writing. The script prefers the `gh` CLI; without it, set `GITHUB_TOKEN` or `GH_TOKEN` for authenticated GitHub API access.
+
 ## Reporting bugs
 
 Open a [bug report](https://github.com/cozyGarage/BookiE/issues/new?template=bug_report.yml) with the BookiE version, Linux distribution, desktop session, reproduction steps, database type and version, and redacted logs. Never attach credentials, tokens, connection strings, SQL parameters or unmasked database values.

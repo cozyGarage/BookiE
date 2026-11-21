@@ -1,4 +1,5 @@
 use bookie_core::Value;
+use relm4::adw::prelude::{ActionRowExt, PreferencesRowExt};
 use relm4::gtk::prelude::*;
 use relm4::{ComponentController, Controller, gtk};
 use uuid::Uuid;
@@ -20,6 +21,109 @@ fn descendants(root: &gtk::Widget) -> Vec<gtk::Widget> {
 fn launch_tab(read_only: bool) -> (Controller<BrowseTab>, std::sync::mpsc::Receiver<BrowseTabOutput>) {
     relm4::gtk::init().unwrap();
     launch_with_read_only(Uuid::new_v4(), read_only)
+}
+
+fn inspector_value(controller: &Controller<BrowseTab>, column: &str) -> Option<String> {
+    let model = controller.model();
+    let widget: &gtk::Widget = model.inspector.widget().upcast_ref();
+    descendants(widget)
+        .into_iter()
+        .filter_map(|widget| widget.downcast::<relm4::adw::ActionRow>().ok())
+        .find(|row| row.title().as_str() == format!("{column} · text"))
+        .and_then(|row| row.subtitle().map(|subtitle| subtitle.to_string()))
+}
+
+fn load_title_page(
+    controller: &Controller<BrowseTab>,
+    outputs: &std::sync::mpsc::Receiver<BrowseTabOutput>,
+    title: &str,
+) {
+    let columns = vec![column("id", true), column("title", false), column("body", false)];
+    let request = controller.model().begin_page_request();
+    controller
+        .sender()
+        .send(BrowseTabInput::RowsLoaded {
+            request,
+            result: bookie_core::QueryResult {
+                columns,
+                rows: vec![vec![Value::Int(1), Value::Text(title.into()), Value::Text("b".into())]].into(),
+                truncated: false,
+            },
+            projected_columns: None,
+            elapsed: std::time::Duration::ZERO,
+        })
+        .unwrap();
+    pump(outputs);
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
+fn selected_row_details_refresh_after_save_and_discard() {
+    let (controller, outputs) = launch_tab(false);
+    load_two_rows(&controller, &outputs);
+    controller
+        .model()
+        .current_selection
+        .as_ref()
+        .unwrap()
+        .select_item(0, false);
+    pump(&outputs);
+    assert_eq!(inspector_value(&controller, "title").as_deref(), Some("a"));
+    let selected_key = controller.model().row_key_at(0).expect("row primary key").0;
+    assert_eq!(controller.model().find_row_position_by_key(&selected_key), Some(0));
+
+    controller
+        .sender()
+        .send(BrowseTabInput::GridCellEdited {
+            row_position: 0,
+            col_index: 1,
+            new_value: "saved".into(),
+            value: None,
+            row_key: vec![Value::Int(1)],
+            draft_id: None,
+        })
+        .unwrap();
+    pump(&outputs);
+    assert!(controller.model().current_selection.as_ref().unwrap().is_selected(0));
+    controller.sender().send(BrowseTabInput::CommitSave).unwrap();
+    let save = transaction_save_id(&pump(&outputs));
+    controller.sender().send(BrowseTabInput::SaveCompleted(save)).unwrap();
+    pump(&outputs);
+    load_title_page(&controller, &outputs, "saved");
+    assert_eq!(
+        controller.model().current_result.as_ref().unwrap().rows[0][1],
+        Value::Text("saved".into())
+    );
+    assert_eq!(controller.model().find_row_position_by_key(&selected_key), Some(0));
+    assert_eq!(
+        controller
+            .model()
+            .current_selection
+            .as_ref()
+            .unwrap()
+            .selection()
+            .size(),
+        1,
+        "the saved row should remain selected"
+    );
+    assert_eq!(inspector_value(&controller, "title").as_deref(), Some("saved"));
+
+    controller
+        .sender()
+        .send(BrowseTabInput::GridCellEdited {
+            row_position: 0,
+            col_index: 1,
+            new_value: "temporary".into(),
+            value: None,
+            row_key: vec![Value::Int(1)],
+            draft_id: None,
+        })
+        .unwrap();
+    pump(&outputs);
+    controller.sender().send(BrowseTabInput::DiscardAll).unwrap();
+    pump(&outputs);
+    load_title_page(&controller, &outputs, "saved");
+    assert_eq!(inspector_value(&controller, "title").as_deref(), Some("saved"));
 }
 
 #[test]

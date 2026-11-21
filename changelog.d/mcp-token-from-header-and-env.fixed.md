@@ -1,1 +1,0 @@
-MCP clients that cannot put a token in the request body can now send `Authorization: Bearer <token>` over HTTP, or set `BOOKIE_MCP_TOKEN` for `bookie-agentd` over standard input; a token in the request still wins.

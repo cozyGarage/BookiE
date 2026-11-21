@@ -20,6 +20,8 @@ pub(crate) const ROW_GROUPS: &[&[&str]] = &[
         "copy-markdown",
         "copy-insert",
         "copy-in-list",
+        "show-row-vertically",
+        "count-table-rows",
         "selection-stats",
     ],
     &["edit", "set-cells", "delete-rows", "clear-selection"],

@@ -33,7 +33,7 @@ impl GridView {
             .collapse_when_narrow(f32::from(window.viewport_size().width));
         let sidebar_width = if self.sidebar.open { self.sidebar.width } else { 0.0 };
         let grid_width = (f32::from(window.viewport_size().width) - sidebar_width).max(0.0);
-        self.sync_table(grid_width, cx);
+        self.sync_table(grid_width, window, cx);
         if self.synced_width != grid_width {
             self.synced_width = grid_width;
             let table = self.table.clone();
@@ -317,6 +317,7 @@ impl GridView {
             .children(banner)
             .child(self.data_table())
             .children(self.detail_panel(theme))
+            .children(self.row_detail_panel(theme))
     }
 
     fn main_layout(&self, sidebar: Option<Div>, tab_row: Stateful<Div>, content: Div) -> Div {

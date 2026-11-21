@@ -2,6 +2,205 @@
 
 ## [Unreleased]
 
+## [0.2.8] - 2026-11-21
+
+### Added
+
+- The community AUR recipe is now in the repository, builds version 0.2.7, and is prepared automatically for each release tag.
+- A new local bookie-audit command lists unknown write outcomes and records your decision on one, including a block on every connection.
+- Browse tabs can refresh their current page automatically while preserving filters, sorting, and pending edits.
+- Fast estimated row counts using engine metadata (`reltuples`, `table_rows`, `sys.partitions`) for un-filtered table browsing.
+- Table browsing shows how long the current page took to load beside its row count.
+- Check for Updates from the primary menu, and see What's new the first time you open a new version.
+- Use Ctrl+Home and Ctrl+End to select the first and last rows in continuously scrolled results.
+- In the SQL editor, a PostgreSQL COPY ... FROM STDIN block now loads its data (up to 64 MiB per block). The approval prompt shows only the command and the data size, and the audit never records the data.
+- CSV import and export can use multi-character delimiters such as || or ::, with automatic delimiter suggestion during import.
+- Export table, column, index, and foreign-key metadata as CSV or Markdown.
+- Import supported DBX connection settings without importing credentials or saved SQL.
+- Server Activity, Table and Index Health, Catalog and Audit Log dialogs can be zoomed with Ctrl+scroll, Ctrl+plus, Ctrl+minus and Ctrl+0.
+- The value viewer shows Unix timestamps as UTC time, UUIDs in other spellings and JSON stored in text as formatted JSON, without changing the stored value.
+- Results can be exported as JSON Lines (one JSON object per line) from the export dialog.
+- Export several tables as separate CSV files, with an optional row limit for each table.
+- The export dialog has an optional Maximum rows field that stops a table, query or result export after that many rows and says when more rows existed.
+- The app can now export several tables at once with a per-table row limit, one file per table (service layer; the export dialog does not offer it yet).
+- Foreign-key value picker in the grid cell editor with live search filtering for referenced table keys.
+- Add GTK row density classes (.row-compact, .row-comfortable, .row-spacious), contrast queries, and color-mix token styling, and right-align numeric inline cell editing in GPUI.
+- MariaDB editor sessions now list their own temporary tables in the sidebar. MySQL does not expose them, so none are listed there.
+- The desktop app now also serves MCP on a private Unix socket in your runtime folder, and bookie-agentd --connect-socket lets an MCP client use it; BOOKIE_MCP_HTTP=off closes the TCP port.
+- SQL Server views that map to one table and expose the complete primary key now open editable in the app, with staged edits, approval and audit like tables.
+- MySQL and MariaDB views that map to one table and expose the complete primary key now open editable in the app, with staged edits, approval and audit like tables.
+- Open Quickly also lists recent successful queries from the current connection; choosing one opens it in a new editor tab.
+- Font family, size and weight can be adjusted independently for the interface, SQL editor, result grid and error text.
+- PostgreSQL temporary tables from the active editor session appear in the sidebar and open in that session's results.
+- Saved queries can be organized into folders and searched by keywords.
+- A SQL script on PostgreSQL, MySQL, or MariaDB can run in a schema you choose while the editor session is on.
+- The Server Activity dialog adds Server variables and Server status for PostgreSQL and MySQL.
+- Rows from supported updatable views can be edited when their primary keys are exposed.
+- Quietly check for a newer release at startup and show a dismissible banner when one is available.
+- A release tag can now be checked against a committed list of trusted signing keys with scripts/verify-release-tag.sh; it refuses unsigned tags and tags signed by any other key. The release workflow does not run it yet.
+
+### Changed
+
+- The Forgejo nightly workflow now runs every night at 23:00 UTC.
+- The connection dialog grows with the window (up to 1000 px) so the TLS options are visible, and a "server does not support TLS" test or connect failure on a loopback host offers a "Set TLS to Disabled" button.
+- Reconnect an edited saved connection without closing other open connections.
+- Table browsing accepts a custom page size from 1 to 5,000 rows.
+- The design guide now has a tokens page (DESIGN.md) and a review checklist for widget changes.
+- Documentation: view editing is now recorded as checked by hand on MariaDB 11.8 as well as MySQL and SQL Server.
+- The Drop Table confirmation names the tables that reference the table before you confirm.
+- Streamed SQL query results show their pager and status in a bottom bar with First and Last page buttons.
+- The default look is now neutral (dbx colours, 4 px controls); Pin, Explain and Split in the editor toolbar are icons with tooltips.
+- Dialogs size themselves to their content, long dropdown choices wrap instead of ending in "...", and the Results and Errors tabs under the editor are icons.
+- Modularized GTK UI dialogs and components to stay within function length limits, and updated documentation and engine badges for all 11 supported databases.
+- Saving changes to a connection that is already open now says that the open session still uses the previous settings and must be reconnected to apply them.
+- MongoDB nested documents and arrays use readable relaxed Extended JSON in the grid while preserving canonical values for edits and export.
+- Stop now cancels a running SQL Server query without dropping the connection.
+- Display 16-byte BINARY and VARBINARY column values as UUID text in result grids and the value viewer.
+- SQL result exports can target the visible page or the complete saved result.
+- Redis collection browsing shows cardinality without loading members and refuses oversized string values before fetching them.
+- Schema compare lists table removals as SQL comments so they cannot run accidentally.
+- Long database server messages now wrap within narrow result panels.
+- Read-only monospace text views in Server Activity, Explain, the SQL preview and the value viewers now come from one shared constructor with the spacing scale.
+- In the sidebar, a click on a table shows or hides its columns and a double click opens it; the two arrow buttons are gone.
+- When the database sidebar is narrow, row actions move below table names to keep names readable.
+- Show when the total row count is unknown while a query result is streaming.
+- System OpenSSH tunnels are refused on non-Linux targets where BookiE cannot guarantee child cleanup.
+- UI design guide: docs/ui-design.md sets the look (dbx tokens), the language (icon first, few words) and the building rules (extract at the third copy, spacing scale, state passed in); ADR 0054 proposes it for both apps.
+- Activity dialog formats query results into padded monospace tables and translates action labels; GPUI detail panel and status bar clarify empty selections and status messages; refreshed documentation and diagrams to highlight Linux-first and cross-platform desktop development.
+
+### Fixed
+
+- Opening a listed MariaDB temporary table uses the correct identifier quoting.
+- The headless MCP daemon now closes the database connection and SSH tunnel of a saved connection that an agent has not used for 15 minutes, instead of holding them until the daemon exits.
+- The approval dialog no longer offers "Approve and remember" for AI agent requests, which are always approved one write at a time.
+- An AI agent write that waits a long time for human approval is no longer cut off by the statement timeout, and the statement still gets its full time to run once approved.
+- AppStream release notes render correctly in the What's New dialog.
+- The Audit Log filter placeholder now lists what the filter searches (operation id, connection, principal, kind, outcome) instead of promising a SQL search, since statements are redacted there.
+- The audit journal no longer fails an append when a signal interrupts its wait for the journal file lock.
+- When a failed statement has several audit entries, each "View in Audit Log" button is numbered instead of repeating the same label.
+- Backups clean up cleartext password files that an earlier crash or power loss left in the runtime directory.
+- Browse table row numbers now continue from the current offset instead of restarting at 1 on later pages.
+- Browsing a deep page of a Cassandra or ScyllaDB table no longer decodes or counts the rows before the page against the result size limit.
+- The fixture images copy their seed file by exact name, which the workflow contract tests require.
+- The PostgreSQL release and MongoDB TLS test fixtures carry their seed scripts inside the image instead of bind-mounting them, so container CI jobs no longer start an unseeded database.
+- A ClickHouse server that does not use TLS is no longer reported as a certificate host-name mismatch; the connect dialog now offers Set TLS to Disabled for a local one.
+- Read-only ClickHouse connections can browse without changing session settings.
+- ClickHouse metadata reads, table pages and saves that time out or are cancelled now stop on the server instead of running on in the background.
+- File-based connections keep their settings when edited, and explicit database changes no longer trigger an unnecessary reconnect prompt.
+- The saved-connection list no longer goes stale when two reloads finish out of order.
+- Long context menus open beside the pointer and slide along the screen edge instead of shrinking mid-screen.
+- Importing a one-column CSV file keeps its blank lines as rows, so NULL values exported from a single column are no longer dropped.
+- Switching databases now opens the selected database instead of returning to the existing session.
+- Zoom in Server Activity, Explain, Audit Log, Health and Catalog now changes only the result view; buttons and headers keep their size. Explain plan windows can be zoomed too.
+- Saving grid edits to a DuckDB table now refuses the whole save, and keeps your edits, when a row was changed or deleted by someone else, like the other SQL engines.
+- DuckDB table pages and grid saves that time out or are cancelled now stop inside DuckDB, so one stuck statement no longer blocks every later statement on the connection.
+- PostgreSQL SQL editor writes now report the affected-row count when the server provides one.
+- Replacing a large SQL script no longer triggers a GtkSourceView assertion.
+- The SQL editor no longer shows "Only the rows of one SELECT can be edited" above a statement error or a write that returned no rows.
+- Preview SQL in the query editor now shows the values each pending edit will send, the same as in the table browser.
+- When the server or network ends an editor session while a transaction is open, BookiE now says the connection was lost with a transaction open and that uncommitted changes should not have been saved.
+- Keep the query editor in place when execution status text changes.
+- The SQL editor toolbar is more compact (smaller buttons and icons), and Run and its options arrow are joined into one button with matching rounded corners.
+- A write statement in the SQL editor now reports "N rows affected" instead of an empty "No rows returned" page.
+- The saved-connections popover says so when nothing is saved.
+- Keep an existing export when closing its paged data source fails.
+- The Export Results dialog is wide enough for its scope row.
+- Formatting JSON preserves duplicate object entries and exact number spellings.
+- JSON Lines copy and export keep each row on one line while preserving exact-source JSON cells as text.
+- Opening a large SQL draft no longer performs a syntax-highlighting pass that will immediately be disabled.
+- Large SQL scripts pause the SQL language parser while syntax highlighting is paused, then restore it when the script is small enough.
+- The MCP settings page now says when the local MCP server could not start, for example because another program holds port 17432, and new MCP tokens expire after 90 days unless you choose a different time or never.
+- The MCP HTTP endpoint now accepts notifications with a 202 reply and answers `ping`, and the stdio and socket transports no longer send an error reply to a notification they do not know.
+- bookie-agentd --connect-socket now adds the token in BOOKIE_MCP_TOKEN to every request that has none, so MCP clients such as Claude Code can list and call tools through the socket.
+- The MCP socket relay no longer overrides a token a client put in the tool arguments, a saved connection that changes its strict-encryption, auth-source, connect-timeout or attached-database setting now gets a fresh agent session, and one failed accept no longer stops the MCP socket server.
+- MCP clients that cannot put a token in the request body can now send `Authorization: Bearer <token>` over HTTP, or set `BOOKIE_MCP_TOKEN` for `bookie-agentd` over standard input; a token in the request still wins.
+- The token list in Preferences now shows tokens issued or revoked by another process, such as `bookie-agentd --issue-token`, without waiting for the next MCP request.
+- MongoDB metadata sampling keeps large documents in smaller cursor batches to reduce temporary memory use.
+- MongoDB TLS now trusts the system certificate store when no custom CA file is configured.
+- A SQL Server save that is stopped or times out no longer leaves its transaction and row locks open; the connection is retired and reconnected.
+- A SQL Server save that the server already rolled back, for example after a deadlock, now reports the real error instead of a failed rollback and no longer drops the connection.
+- Renaming or commenting SQL Server tables and columns with non-Latin names now works on databases with a non-Unicode collation.
+- Reject missing, unreadable, or oversized files before a multi-file import starts writing rows.
+- A failed transaction batch on a MySQL or MariaDB connection now closes the connection it ran on, so session effects from the failed batch cannot reach later queries.
+- Fixed: MySQL and MariaDB pooled queries no longer inherit session state from earlier queries.
+- Stored procedure results now disclose when earlier warning details may be missing.
+- Read-only MySQL connections remain available on older servers while BookiE continues to refuse changes.
+- Running a MySQL or MariaDB script no longer cuts a stored procedure, function, trigger or event body at the semicolons inside its BEGIN … END block, and a PostgreSQL word ending in "e" directly before a quote no longer swallows the statements after it.
+- A MySQL session transaction refuses statements that would commit it implicitly, so a later rollback is recorded truthfully.
+- MySQL metadata reads, table pages, grid saves and transaction starts that time out or are cancelled now stop on the server instead of running on in the background, and a save the server confirms as stopped is reported as not applied.
+- MySQL connection prepared statement cache now invalidates on USE statements so identical queries read from the newly selected database.
+- MySQL and MariaDB recognize editable keyed views while keeping computed columns read-only, and cancel view metadata reads on the server.
+- Long editor action labels now shrink to keep query controls inside narrow windows.
+- Blank edits of non-nullable defaulted values are rejected instead of being sent as SQL NULL.
+- A lost race for the local port of an OpenSSH tunnel is now retried once on a fresh port instead of failing the connection.
+- Timed-out or cancelled Oracle queries retire their connection so later reads cannot reuse a session with an unknown result.
+- Paged exports now stop with an error when row data does not match the exported columns, preventing incomplete files.
+- The command palette entries "Export results as CSV" and "Export results as JSON" now work from an SQL editor tab instead of saying "Nothing to export".
+- Routine DDL with compound bodies no longer triggers a false transaction-control refusal on a shared connection.
+- PostgreSQL Server Activity now uses wall-clock time for query durations and long-running query detection.
+- Large PostgreSQL bit strings are checked against the result budget before expansion.
+- PostgreSQL query timeouts return promptly when a network failure leaves the connection unresponsive.
+- An interrupted PostgreSQL transaction start no longer leaves its pooled session inside an open transaction.
+- PostgreSQL notices from streamed query results are now shown with the result.
+- Keep PostgreSQL dates and timestamps before 1 AD consistent across display, filters and exports.
+- A PostgreSQL session closed by the server's idle transaction timeout is reported as disconnected and must be reopened.
+- Show CREATE TABLE and structure changes on PostgreSQL keep expression, partial, descending, INCLUDE and non-btree indexes exactly as the server defines them instead of failing or rewriting them.
+- Reading the indexes of a PostgreSQL table works again, and editing an existing index applies the edited columns.
+- PostgreSQL interactive transaction starts now honor cancellation and retire sessions when the result is uncertain.
+- PostgreSQL metadata reads, table pages and grid saves that time out or are cancelled now stop on the server instead of running on in the background, and a save the server confirms as stopped is reported as not applied.
+- A write that fails because the database is unreachable, refuses the login or rejects the TLS certificate no longer blocks later writes on that connection.
+- The new SQL tab selects its starter query, the footer keeps the row range while sorted, a mistyped statement on a read-only connection explains itself, and file connections are named after the file.
+- Copying selected values as SQL now reports when exact literals cannot be produced.
+- A restored editor draft larger than the editor limit is no longer loaded into memory at startup; the file is left untouched on disk.
+- Schema diagram and comparison reads stop at an estimated 64 MiB of retained catalog metadata per schema read and report incomplete results.
+- Server Activity shows a readable message after Kill instead of 'Kill issued; rows_affected=1'.
+- The sidebar clears stale supplemental catalog entries on refresh and declines additions above its 64 MiB retained-data budget.
+- The sidebar's header buttons (refresh, search, collapse, schema filter), tree arrows and row icons are smaller so they no longer look as big as the table names.
+- The sidebar shows the columns and open buttons again at narrow widths, the field list lines up with the table name, and sidebar text is one step smaller.
+- Sidebar search shows each table or view once while keeping same-named objects in different schemas separate.
+- The sidebar tree no longer draws two stacked hover highlights per row, and its left indentation is tighter so names have more room in a narrow sidebar.
+- Editing large SQL scripts no longer clears folding decorations when none are active.
+- Connections now report when an existing configured SQLite database cannot be attached.
+- SQLite writes in the SQL editor now report how many rows they changed instead of saying the count is unavailable.
+- SQLite tables read after a column is added, renamed or dropped no longer crash a pooled connection or show the old columns.
+- Show SQLite temporary tables in the sidebar for the session that created them.
+- SQLite table pages, saves and transaction statements that time out or are cancelled now stop inside SQLite, and a stopped batch or transaction no longer leaves the connection in a state where later writes fail or are lost.
+- A SQLite transaction that is dropped after its own COMMIT or ROLLBACK statement no longer leaves the connection in a state where later writes fail or are lost.
+- Prevent rare stalls while database connections are reused concurrently.
+- The built-in SSH client no longer reports a changed host key when your known_hosts file holds the server key of a different type than the one it tried first.
+- A server whose SSH host key is marked @revoked in known_hosts is now refused and recorded as a revoked host key, not as a generic connection failure.
+- Keep streamed pages counted against the memory budget while an export is open or running.
+- Avoid exporting a different streamed result page when the visible page is unavailable.
+- The window subtitle of a Production connection now says Production, matching the header badge, instead of Prod.
+- Failed temporary-table catalog refreshes keep the last known list visible and mark it as possibly outdated.
+- With certificate verification enabled, invalid custom certificate authority files now fail before connection attempts and identify the selected file.
+- CSV imports preserve unsigned 64-bit values and reject values outside their range.
+- Copy as VALUES list now writes binary cells as binary literals for the connected engine instead of text strings.
+- Fixed: Wide result tables use less memory while scrolling.
+
+### Security
+
+- Agent writes containing Unicode characters hidden by normal text rendering are refused when human approval is required.
+- Approving an AI agent request with "remember" no longer lets later writes from that agent run without asking; each agent write is approved on its own.
+- An AI agent write that is too long to read in the approval dialog, or hides characters that change how it looks, is now refused instead of being shown for approval.
+- A statement that is too long or contains invisible characters can no longer be approved in the write-approval dialog; it is shown with approval disabled.
+- Importing a connection bundle can no longer make a saved SSH password be sent to a different jump host: a bundle that moves hop identities between positions is imported as a separate connection.
+- Importing a connection bundle can no longer set the trusted certificate authority of a connection you already have.
+- Importing a connection bundle can no longer turn off strict encryption on a connection that has it on.
+- SQL scripts and other component input values are no longer included in diagnostic logs.
+- A pasted or opened PostgreSQL dump with a COPY ... FROM STDIN block is no longer split at its data rows, and the block is refused with a clear message instead of any data row running as SQL.
+- The local MCP server now refuses more than eight tool calls at once instead of letting an agent exhaust memory with parallel requests.
+- The local MCP server now cuts a query or table result at 8 MiB and marks it truncated, instead of returning every row of a result that is huge but under the row limit.
+- The local MCP tool listing now answers every failed sign-in with the same short message, so it no longer reveals token-store file paths or whether a token expired.
+- A data-modifying subquery inside a comparison such as ANY, ALL or SOME is now classified as a write instead of a read.
+- Statements whose meaning depends on MySQL or PostgreSQL session string settings are refused before execution, and ClickHouse sensitive-column masking uses the correct projection.
+- Queries that spell a PostgreSQL name with Unicode escapes are refused, so they cannot hide a function call or a masked column from policy.
+- Reading column statistics tables masks every returned column, so samples of masked columns no longer appear in query results.
+
+### Contributors
+
+- [Trung Nguyen](https://github.com/cozyGarage) ([@cozyGarage](https://github.com/cozyGarage))
+
 ## [0.2.7] - 2026-11-12
 
 ### Added
@@ -987,9 +1186,10 @@ Source version **0.2.0** (`Cargo.toml`, inherited by every workspace crate). Thi
 - Agentd session reuse after Secret Service or SSH/CA file rotation.
 - Unbounded PostgreSQL and MongoDB SCRAM iteration counts.
 
-[Unreleased]: https://github.com/cozyGarage/BookiE/compare/linux-v0.2.5...main
+[Unreleased]: https://github.com/cozyGarage/BookiE/compare/linux-v0.2.8...main
 [0.1.5]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.1.5
 [0.2.0]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.0
 [0.2.2]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.2
 [0.2.3]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.3
 [0.2.5]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.5
+[0.2.8]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.8

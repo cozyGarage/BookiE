@@ -24,8 +24,22 @@ impl BrowseTab {
         };
         // ColumnView skips rebinding when a changed item keeps the same GObject identity.
         if let (Some(store), Some(store_pos), Some(old)) = (store, store_pos, row_obj) {
+            let selection = self.current_selection.as_ref();
+            let was_selected = selection.is_some_and(|selection| selection.is_selected(pos));
             let replacement = old.clone_preserving_loading_state();
             store.splice(store_pos, 1, &[replacement]);
+            if was_selected && let Some(selection) = selection {
+                selection.select_item(pos, false);
+            }
+            self.refresh_row_inspector();
+        }
+    }
+
+    fn refresh_row_inspector(&self) {
+        if let Some(selection) = self.current_selection.as_ref() {
+            self.inspector
+                .downgrade()
+                .show_row(inspected_row(selection, &self.current_columns));
         }
     }
 
@@ -189,6 +203,7 @@ impl BrowseTab {
             }
             self.refresh_grid_chrome();
             self.restore_focused_row();
+            self.refresh_row_inspector();
             if dropped_column_selection {
                 self.refresh_selection_chrome();
             }

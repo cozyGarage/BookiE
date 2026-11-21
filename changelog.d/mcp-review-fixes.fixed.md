@@ -1,1 +1,0 @@
-The MCP socket relay no longer overrides a token a client put in the tool arguments, a saved connection that changes its strict-encryption, auth-source, connect-timeout or attached-database setting now gets a fresh agent session, and one failed accept no longer stops the MCP socket server.
