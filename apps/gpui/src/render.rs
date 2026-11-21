@@ -34,6 +34,11 @@ impl GridView {
         let sidebar_width = if self.sidebar.open { self.sidebar.width } else { 0.0 };
         let grid_width = (f32::from(window.viewport_size().width) - sidebar_width).max(0.0);
         self.sync_table(grid_width, cx);
+        if self.synced_width != grid_width {
+            self.synced_width = grid_width;
+            let table = self.table.clone();
+            window.on_next_frame(move |_, cx| table.update(cx, |_, cx| cx.notify()));
+        }
     }
 
     fn pager_labels(&self) -> (String, String) {
@@ -332,7 +337,10 @@ impl Render for GridView {
         let filter_row = self.grid_filter_row(theme, cx);
         let compare_bar = self.grid_compare_bar(theme, cx);
         let palette = self.palette.open.then(|| self.palette_overlay(cx));
-        let save_bar = self.approval_bar(theme, cx).or_else(|| self.save_bar(theme, cx));
+        let save_bar = self
+            .approval_bar(theme, cx)
+            .or_else(|| self.save_bar(theme, cx))
+            .or_else(|| self.edits_bar(theme, cx));
         let banner = self.save_banner(theme, cx);
         let insert_form = self.insert_form(theme, cx).or_else(|| self.import_bar(theme, cx))
             .or_else(|| self.structure_bar(theme, cx))

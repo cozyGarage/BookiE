@@ -367,9 +367,19 @@ impl LiveSession {
             return Err(format!("Row limit must be between 1 and {ROW_CAP}."));
         }
         let table = find_table(&self.tables, table)?.clone();
+        let key: Vec<String> = self
+            .table_columns(&table)
+            .map(|columns| {
+                columns
+                    .into_iter()
+                    .filter(|column| column.primary_key)
+                    .map(|column| column.name)
+                    .collect()
+            })
+            .unwrap_or_default();
         let epoch = self.next_epoch();
         let started = std::time::Instant::now();
-        let (columns, rows, scan, truncated) = self.runtime.block_on(read_pages(
+        let (mut columns, rows, scan, truncated) = self.runtime.block_on(read_pages(
             &self.sessions,
             self.session_id,
             &table,
@@ -378,6 +388,9 @@ impl LiveSession {
             epoch,
             &self.epoch,
         ))?;
+        for column in &mut columns {
+            column.primary_key = key.contains(&column.name);
+        }
         Ok(LiveTable {
             session: self.clone(),
             columns,
@@ -1143,18 +1156,45 @@ fn find_table(tables: &[TableInfo], wanted: &TableInfo) -> Result<TableInfo, Str
         .ok_or_else(|| format!("no table named {}", table_label(wanted)))
 }
 
+const MIN_COLUMN_WIDTH: f32 = 80.0;
+const MAX_COLUMN_WIDTH: f32 = 360.0;
+const TEXT_COLUMN_WIDTH: f32 = 160.0;
+
 fn column_meta(info: &ColumnInfo) -> ColumnMeta {
-    let measured = (info.name.chars().count() as f32 * 9.0 + 48.0).clamp(160.0, 320.0);
-    let width = if numeric_type(&info.data_type) {
-        measured.max(200.0)
-    } else {
-        measured
-    };
     ColumnMeta {
         name: info.name.clone(),
-        width,
+        width: column_width(&info.name, &info.data_type),
         numeric: numeric_type(&info.data_type),
+        data_type: info.data_type.clone(),
+        primary_key: info.primary_key,
     }
+}
+
+fn column_width(name: &str, data_type: &str) -> f32 {
+    let header = name.chars().count() as f32 * 9.0 + 48.0;
+    let lower = data_type.to_ascii_lowercase();
+    let value = if lower.contains("timestamp") {
+        272.0
+    } else if lower.contains("uuid") {
+        300.0
+    } else if lower.contains("bool") {
+        88.0
+    } else if lower.contains("json") {
+        200.0
+    } else if lower == "date" {
+        120.0
+    } else if lower.starts_with("time") {
+        130.0
+    } else if lower.contains("bigint") || lower.contains("int8") || lower.contains("bigserial") {
+        200.0
+    } else if lower.contains("smallint") || lower.contains("int2") || lower.contains("smallserial") {
+        96.0
+    } else if matches!(lower.as_str(), "int" | "integer" | "int4") || lower.contains("serial") {
+        120.0
+    } else {
+        TEXT_COLUMN_WIDTH
+    };
+    header.max(value).clamp(MIN_COLUMN_WIDTH, MAX_COLUMN_WIDTH)
 }
 
 #[cfg(test)]
@@ -1178,6 +1218,41 @@ mod column_meta_tests {
         });
 
         assert!(column.width >= 200.0, "{}", column.width);
+    }
+
+    #[test]
+    fn a_column_is_as_wide_as_its_type_needs_not_its_name() {
+        assert_eq!(column_width("id", "integer"), 120.0);
+        assert!(column_width("id", "smallint") < column_width("id", "integer"));
+        assert!(column_width("id", "boolean") <= 100.0);
+        assert!(column_width("created_at", "timestamp with time zone") >= 272.0);
+        assert!(column_width("created_at", "timestamp without time zone") >= 272.0);
+        assert!(column_width("ref", "uuid") >= 300.0);
+        assert_eq!(column_width("name", "text"), TEXT_COLUMN_WIDTH);
+        assert_eq!(column_width("name", ""), TEXT_COLUMN_WIDTH);
+    }
+
+    #[test]
+    fn a_long_column_name_is_capped() {
+        assert_eq!(column_width(&"x".repeat(80), "text"), MAX_COLUMN_WIDTH);
+    }
+
+    #[test]
+    fn column_meta_carries_the_type_and_the_primary_key_flag() {
+        let column = column_meta(&ColumnInfo {
+            name: "id".into(),
+            data_type: "integer".into(),
+            nullable: false,
+            primary_key: true,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: None,
+            domain_type: None,
+        });
+        assert_eq!((column.data_type.as_str(), column.primary_key), ("integer", true));
     }
 }
 
@@ -1547,6 +1622,8 @@ mod tests {
         .expect("load");
         let names: Vec<&str> = table.columns().iter().map(|column| column.name.as_str()).collect();
         assert_eq!(names, ["id", "customer", "total", "paid", "note"]);
+        let keys: Vec<bool> = table.columns().iter().map(|column| column.primary_key).collect();
+        assert_eq!(keys, [true, false, false, false, false]);
         assert_eq!(table.total(), 6);
         assert!(!table.truncated);
         assert_eq!(table.row(1)[1], Cell::Text("Grace".into()));
