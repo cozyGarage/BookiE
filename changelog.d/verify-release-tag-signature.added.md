@@ -1,1 +1,0 @@
-A release tag can now be checked against a committed list of trusted signing keys with scripts/verify-release-tag.sh; it refuses unsigned tags and tags signed by any other key. The release workflow does not run it yet.

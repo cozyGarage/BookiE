@@ -70,6 +70,9 @@
   </keywords>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="0.2.8" type="stable" date="2026-11-21">
+      <description><p>Release after 0.2.7: multi-table and data-dictionary export, JSON Lines export, optional export row limits, editable keyed views on MySQL/MariaDB/SQL Server, session temporary tables in the sidebar, COPY FROM STDIN loads, Check for Updates, font preferences, saved-query folders, and a large fix and security pass across policy, MCP, SSH import and drivers.</p></description>
+    </release>
     <release version="0.2.7" type="stable" date="2026-11-12">
       <description><p>Release after 0.2.6: grid menus no longer act on a different row after the grid changes, large JSON cell previews no longer scan the whole value, result pages that finish late no longer stay in memory, and the AppImage uses libadwaita's own styling.</p></description>
     </release>
