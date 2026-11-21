@@ -780,7 +780,7 @@ impl GridView {
             let input = self.font_inputs[index].clone();
             SettingField::render(move |_, _, cx| {
                 input.update(cx, |input, cx| input.set_placeholder(&placeholder, cx));
-                div().w(px(256.)).child(input.clone())
+                div().w_64().child(input.clone())
             })
         };
         let size = |get: fn(&font_settings::FontSettings) -> f32, set: fn(&mut font_settings::FontSettings, f32)| {
