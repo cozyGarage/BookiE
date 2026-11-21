@@ -4,7 +4,10 @@ const MAX_CHARS: usize = 512;
 
 pub fn cell_preview(cell: &Cell) -> String {
     match cell {
-        Cell::Text(text) | Cell::JsonText(text) => text_preview(text),
+        Cell::Bool(true) => "TRUE".into(),
+        Cell::Bool(false) => "FALSE".into(),
+        Cell::Text(text) => text_preview(text),
+        Cell::JsonText(text) => json_text_preview(text),
         Cell::Json(value) => json_preview(value),
         Cell::Undecodable(value) => format!("<undecodable {}>", text_preview(value)),
         Cell::Bytes(bytes) if bytes.len() > 16 => {
@@ -52,9 +55,39 @@ pub(crate) fn bounded_json(value: &serde_json::Value, limit: usize, pretty: bool
 }
 
 fn json_preview(value: &serde_json::Value) -> String {
-    let (text, truncated) = bounded_json(value, MAX_CHARS, false);
-    let text = text_preview(&text);
+    let (text, truncated) = bounded_json(value, MAX_CHARS, true);
+    let text = text_preview(&text.replace('\n', " "));
     if truncated { format!("{text}…") } else { text }
+}
+
+fn json_text_preview(text: &str) -> String {
+    let preview = text_preview(text);
+    let mut out = String::with_capacity(preview.len());
+    let mut quoted = false;
+    let mut escaped = false;
+    let mut chars = preview.chars().peekable();
+    while let Some(ch) = chars.next() {
+        out.push(ch);
+        if quoted {
+            if escaped {
+                escaped = false;
+            } else if ch == '\\' {
+                escaped = true;
+            } else if ch == '"' {
+                quoted = false;
+            }
+        } else if ch == '"' {
+            quoted = true;
+        } else if matches!(ch, ':' | ',') && chars.peek().is_some_and(|next| !next.is_whitespace()) {
+            out.push(' ');
+        }
+    }
+    if out.chars().count() > MAX_CHARS + 64 {
+        let prefix: String = out.chars().take(MAX_CHARS).collect();
+        format!("{prefix}… ({} bytes total)", text.len())
+    } else {
+        out
+    }
 }
 
 fn text_preview(text: &str) -> String {
@@ -81,6 +114,35 @@ fn text_preview(text: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn typed_cells_have_readable_previews_without_changing_values() {
+        assert_eq!(cell_preview(&Cell::Null), Cell::Null.display());
+        assert_eq!(cell_preview(&Cell::Bool(true)), "TRUE");
+        assert_eq!(cell_preview(&Cell::Bool(false)), "FALSE");
+        assert_eq!(cell_preview(&Cell::Text("true".into())), "true");
+        let raw = Cell::JsonText(r#"{"a":"x,y:z","a":2}"#.into());
+        assert_eq!(cell_preview(&raw), r#"{"a": "x,y:z", "a": 2}"#);
+        assert_eq!(raw.display(), r#"{"a":"x,y:z","a":2}"#);
+        let json = Cell::Json(Box::new(serde_json::json!({"outer": {"n": 1}})));
+        let preview = cell_preview(&json);
+        assert!(preview.contains("\"outer\": "));
+        assert!(preview.contains("\"n\": 1"));
+        assert_eq!(json, Cell::Json(Box::new(serde_json::json!({"outer": {"n": 1}}))));
+    }
+
+    #[test]
+    fn json_text_spacing_handles_escapes_and_stays_bounded() {
+        let raw = r#"{"a":"escaped\" ,: text","b":1}"#;
+        assert_eq!(
+            cell_preview(&Cell::JsonText(raw.into())),
+            r#"{"a": "escaped\" ,: text", "b": 1}"#
+        );
+        let long = format!("[{}]", "1,".repeat(2000));
+        let shown = cell_preview(&Cell::JsonText(long.clone()));
+        assert!(shown.chars().count() <= MAX_CHARS + 64);
+        assert!(shown.ends_with(&format!("({} bytes total)", long.len())));
+    }
 
     #[test]
     fn real_json_is_shared_and_previewed_without_losing_its_value() {
