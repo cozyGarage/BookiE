@@ -4,7 +4,9 @@ use relm4::gtk::prelude::*;
 use relm4::{ComponentController, Controller, gtk};
 use uuid::Uuid;
 
-use super::save_in_flight_tests::{column, launch_with_read_only, load_two_rows, pump, transaction_save_id};
+use super::save_in_flight_tests::{
+    column, launch_for_driver, launch_with_read_only, load_two_rows, pump, transaction_save_id,
+};
 use super::{BrowseTab, BrowseTabInput, BrowseTabOutput};
 
 fn descendants(root: &gtk::Widget) -> Vec<gtk::Widget> {
@@ -21,6 +23,52 @@ fn descendants(root: &gtk::Widget) -> Vec<gtk::Widget> {
 fn launch_tab(read_only: bool) -> (Controller<BrowseTab>, std::sync::mpsc::Receiver<BrowseTabOutput>) {
     relm4::gtk::init().unwrap();
     launch_with_read_only(Uuid::new_v4(), read_only)
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
+fn read_only_keyless_table_warns_about_unstable_order() {
+    relm4::gtk::init().unwrap();
+    for driver in ["sqlite", "mysql", "mssql", "clickhouse", "duckdb"] {
+        let (controller, outputs) = launch_for_driver(Uuid::new_v4(), true, driver, None);
+        controller
+            .sender()
+            .send(BrowseTabInput::ColumnsLoaded(vec![column("name", false)]))
+            .unwrap();
+        pump(&outputs);
+        let request = controller.model().begin_page_request();
+        controller
+            .sender()
+            .send(BrowseTabInput::RowsLoaded {
+                request,
+                result: bookie_core::QueryResult {
+                    columns: vec![column("name", false)],
+                    rows: vec![vec![Value::Text("a".into())]].into(),
+                    truncated: false,
+                },
+                projected_columns: None,
+                elapsed: std::time::Duration::ZERO,
+            })
+            .unwrap();
+        pump(&outputs);
+        assert!(controller.model().read_only_banner.is_revealed());
+        assert!(controller.model().no_pk_banner.is_revealed(), "{driver}");
+        controller
+            .sender()
+            .send(BrowseTabInput::ViewRestriction(Some(
+                bookie_app_services::view_edit::ViewEditRestriction::NotUpdatable,
+            )))
+            .unwrap();
+        pump(&outputs);
+        assert!(controller.model().no_pk_banner.title().contains("Row order may change"));
+        assert!(
+            controller
+                .model()
+                .no_pk_banner
+                .title()
+                .contains("not automatically updatable")
+        );
+    }
 }
 
 fn inspector_value(controller: &Controller<BrowseTab>, column: &str) -> Option<String> {

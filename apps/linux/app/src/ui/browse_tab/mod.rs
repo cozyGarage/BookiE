@@ -887,6 +887,7 @@ impl SimpleComponent for BrowseTab {
             } => self.on_rows_loaded(request, result, projected_columns, elapsed, sender),
             BrowseTabInput::ViewRestriction(restriction) => {
                 self.view_restriction = restriction;
+                self.refresh_crud_buttons();
             }
             BrowseTabInput::ColumnsLoaded(columns) => self.on_columns_loaded(columns, sender),
             BrowseTabInput::EnumLabelsLoaded(labels) => self.apply_enum_labels(labels),

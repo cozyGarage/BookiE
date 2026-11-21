@@ -80,7 +80,7 @@ fn clicking_another_table_of_a_live_connection_loads_it_into_the_grid(cx: &mut T
         assert!(
             view.source
                 .origin()
-                .contains("concurrent changes may skip or repeat rows")
+                .contains("page order may change; rows may be skipped or repeated")
         );
     });
     cx.update(|window, cx| {
@@ -101,7 +101,7 @@ fn clicking_another_table_of_a_live_connection_loads_it_into_the_grid(cx: &mut T
         assert!(
             view.source
                 .origin()
-                .contains("concurrent changes may skip or repeat rows")
+                .contains("page order may change; rows may be skipped or repeated")
         );
         assert!(view.status.is_empty(), "{}", view.status);
     });

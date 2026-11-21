@@ -535,6 +535,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::browse_tab::chrome_tests::read_only_keyless_table_warns_about_unstable_order"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::browse_tab::chrome_tests::read_only_selection_does_not_offer_delete"
     ],
     [
