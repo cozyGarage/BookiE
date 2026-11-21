@@ -35,6 +35,7 @@ pub(in crate::ui) struct StreamPageUpdate {
     pub(super) messages: bookie_core::ServerMessages,
     pub(super) spooled: bool,
     pub(super) lease: bookie_results::stream_page_budget::StreamPageLease,
+    pub(super) first_row_ms: Option<u128>,
     pub(super) accepted: tokio::sync::oneshot::Sender<bool>,
 }
 
@@ -55,6 +56,8 @@ pub(in crate::ui) struct StreamStart {
     pub(super) sql: String,
     pub(super) export_query: Option<crate::ui::export_dialog::StreamExportQuery>,
     pub(super) spool: bookie_app_services::stream_result_spool::StreamResultSpool,
+    pub(super) query_started: std::time::Instant,
+    pub(super) approval_wait_before: std::time::Duration,
     pub(super) accepted: tokio::sync::oneshot::Sender<bool>,
 }
 
@@ -68,15 +71,23 @@ pub(super) struct ActiveStream {
     cache: StreamPageCache,
     messages: bookie_core::ServerMessages,
     error: Option<String>,
+    first_row_ms: Option<u128>,
+    query_started: std::time::Instant,
+    approval_wait_before: std::time::Duration,
 }
 
 impl ActiveStream {
     fn outcome(&mut self, terminal: StreamTerminal) -> StatementOutcome {
+        let approval_wait = crate::services::approval_wait::waited().saturating_sub(self.approval_wait_before);
+        let elapsed_ms = self.query_started.elapsed().saturating_sub(approval_wait).as_millis();
+        let first_row_ms = self.first_row_ms.or_else(|| {
+            (matches!(&terminal, StreamTerminal::Complete) && self.cache.total_rows() == 0).then_some(elapsed_ms)
+        });
         StatementOutcome {
             identity: self.identity,
             sql_preview: self.sql_preview.clone(),
             sql: self.sql.clone(),
-            elapsed_ms: 0,
+            elapsed_ms,
             kind: StatementOutcomeKind::Streamed(Box::new(self.cache.snapshot_with_spool(
                 terminal,
                 self.export_query.clone(),
@@ -86,6 +97,8 @@ impl ActiveStream {
             pinned: false,
             detail: super::outcome_detail::OutcomeDetail {
                 messages: self.messages.clone(),
+                approval_wait_ms: approval_wait.as_millis(),
+                first_row_ms,
                 ..Default::default()
             },
         }
@@ -145,11 +158,14 @@ impl SqlEditor {
                 sql,
                 export_query: None,
                 spool: spool.clone(),
+                query_started: std::time::Instant::now(),
+                approval_wait_before: crate::services::approval_wait::waited(),
                 accepted,
             }),
             sender,
         );
         let lease = spool.page_budget().retain(&page).expect("test page fits the budget");
+        let first_row_ms = (!page.rows.is_empty()).then_some(0);
         let (accepted, _) = tokio::sync::oneshot::channel();
         self.on_stream_input(
             Input::Page(StreamPageUpdate {
@@ -159,6 +175,7 @@ impl SqlEditor {
                 messages: Default::default(),
                 spooled: true,
                 lease,
+                first_row_ms,
                 accepted,
             }),
             sender,
@@ -224,6 +241,8 @@ impl SqlEditor {
             sql,
             export_query,
             spool,
+            query_started,
+            approval_wait_before,
             accepted,
         } = start;
         let page_budget = spool.page_budget();
@@ -241,6 +260,9 @@ impl SqlEditor {
             cache: StreamPageCache::with_budget(page_budget),
             messages: Default::default(),
             error: None,
+            first_row_ms: None,
+            query_started,
+            approval_wait_before,
         });
         self.stream_eviction_cursor = Default::default();
         if self.results_surface().first_child().is_none() {
@@ -258,6 +280,7 @@ impl SqlEditor {
             messages,
             spooled,
             lease,
+            first_row_ms,
             accepted,
         } = page;
         if !self.run_generation.accepts(generation) {
@@ -269,6 +292,9 @@ impl SqlEditor {
                 let _ = accepted.send(false);
                 return;
             };
+            if stream.first_row_ms.is_none() {
+                stream.first_row_ms = first_row_ms;
+            }
             stream.messages.extend(messages);
             if let Err(error) = stream.cache.append_with_lease(sequence, page, spooled, lease) {
                 let message = match error {
@@ -360,19 +386,22 @@ impl SqlEditor {
             .map(|duration| duration.as_millis() as i64)
             .unwrap_or(0);
         let timed_out = (context.timeout_secs, context.sql.clone());
-        let (terminal, rows, mut outcomes) = finish_stream_outcomes(
-            take_stream_for_generation(&mut self.streaming, generation),
-            terminal,
-            elapsed,
-        );
+        let (terminal, rows, mut outcomes) =
+            finish_stream_outcomes(take_stream_for_generation(&mut self.streaming, generation), terminal);
+        let outcome_elapsed = outcomes
+            .first()
+            .map_or(elapsed.max(0) as u128, |outcome| outcome.elapsed_ms)
+            .min(i64::MAX as u128) as i64;
         super::error_navigation::locate(generation, &context, &mut outcomes);
         self.mark_statements(&context, run_terminal.replace_ui, &outcomes);
-        self.finish_stream_history(context, elapsed, rows, &terminal);
+        self.finish_stream_history(context, outcome_elapsed, rows, &terminal);
         if !run_terminal.replace_ui {
             return;
         }
         self.cancel_token = None;
-        self.apply_stream_status(&terminal, elapsed, timed_out);
+        self.apply_stream_status(&terminal, outcome_elapsed, timed_out);
+        let (timing, _) = super::outcome_detail::totals(&outcomes);
+        self.status.set_tooltip_text(Some(&timing.tooltip()));
         let shown = self.pinned.show(outcomes);
         self.refresh_pin_button();
         self.clear_result_surface();
@@ -440,18 +469,13 @@ impl SqlEditor {
 fn finish_stream_outcomes(
     stream: Option<ActiveStream>,
     terminal: StreamTerminal,
-    elapsed: i64,
 ) -> (StreamTerminal, Option<i64>, Vec<StatementOutcome>) {
     let terminal = stream
         .as_ref()
         .and_then(|stream| stream.error.clone())
         .map_or(terminal, |message| StreamTerminal::Failed(message.into()));
     let rows = stream.as_ref().map(|stream| stream.cache.total_rows() as i64);
-    let outcome = stream.map(|mut stream| {
-        let mut outcome = stream.outcome(terminal.clone());
-        outcome.elapsed_ms = elapsed.max(0) as u128;
-        outcome
-    });
+    let outcome = stream.map(|mut stream| stream.outcome(terminal.clone()));
     (terminal, rows, outcome.into_iter().collect())
 }
 
@@ -520,10 +544,37 @@ mod tests {
             cache: StreamPageCache::default(),
             messages: Default::default(),
             error: None,
+            first_row_ms: None,
+            query_started: std::time::Instant::now(),
+            approval_wait_before: crate::services::approval_wait::waited(),
         });
 
         assert!(take_stream_for_generation(&mut streaming, 1).is_none());
         assert_eq!(streaming.as_ref().map(|stream| stream.generation), Some(2));
+    }
+
+    #[test]
+    fn an_empty_completed_stream_uses_completion_time_instead_of_first_row_time() {
+        let spool = bookie_app_services::stream_result_spool::StreamResultSpoolManager::default()
+            .create()
+            .expect("test spool");
+        let mut stream = ActiveStream {
+            generation: 1,
+            identity: StatementIdentity::default(),
+            sql_preview: "SELECT 1 WHERE false".into(),
+            sql: "SELECT 1 WHERE false".into(),
+            export_query: None,
+            spool,
+            cache: StreamPageCache::default(),
+            messages: Default::default(),
+            error: None,
+            first_row_ms: None,
+            query_started: std::time::Instant::now(),
+            approval_wait_before: crate::services::approval_wait::waited(),
+        };
+
+        let outcome = stream.outcome(StreamTerminal::Complete);
+        assert_eq!(outcome.detail.first_row_ms, Some(outcome.elapsed_ms));
     }
 
     #[test]

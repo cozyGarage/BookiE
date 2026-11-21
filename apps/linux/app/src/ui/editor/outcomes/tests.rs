@@ -373,7 +373,11 @@ impl bookie_core::Session for CursorSession {
         }
         Ok(bookie_core::QueryResult {
             columns: Vec::new(),
-            rows: Vec::new().into(),
+            rows: if sql == "SELECT 1" {
+                vec![vec![bookie_core::Value::Int(1)]].into()
+            } else {
+                Vec::new().into()
+            },
             truncated: false,
         })
     }
@@ -791,6 +795,133 @@ async fn postgres_editor_streams_pages_in_order_with_one_fetch_in_flight() {
     assert_eq!(counters.fetched.load(std::sync::atomic::Ordering::SeqCst), 2);
     assert_eq!(counters.closed.load(std::sync::atomic::Ordering::SeqCst), 1);
     assert_eq!(counters.rolled_back.load(std::sync::atomic::Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn postgres_stream_reports_time_to_its_first_page() {
+    let first_row_ms = std::sync::Arc::new(std::sync::Mutex::new(None));
+    let received = first_row_ms.clone();
+    let started = std::time::Instant::now();
+    let result = run_statements_with_stream(
+        StatementRun {
+            target: cursor_target(
+                vec![Ok(cursor_page(&[1], false))],
+                std::sync::Arc::new(CursorCounters::default()),
+            ),
+            statements: vec!["SELECT id FROM items".into()],
+            driver_id: "postgres",
+            parameter_values: &Default::default(),
+            control: &crate::services::operation_control::bounded(30),
+            error_policy: BatchErrorPolicy::StopScript,
+            settings_check: None,
+            succeeded: |_: &str| {},
+        },
+        move |update| {
+            let received = received.clone();
+            Box::pin(async move {
+                if let StreamUpdate::Page { first_row_ms, .. } = update {
+                    *received.lock().unwrap() = first_row_ms;
+                }
+                true
+            })
+        },
+    )
+    .await;
+
+    assert!(matches!(result, ScriptRunResult::Streamed(StreamTerminal::Complete)));
+    let first_row_ms = first_row_ms.lock().unwrap().expect("first page timing");
+    assert!(first_row_ms <= started.elapsed().as_millis());
+}
+
+#[tokio::test]
+async fn postgres_empty_stream_defers_timing_until_completion() {
+    let page_timing = std::sync::Arc::new(std::sync::Mutex::new(None));
+    let received = page_timing.clone();
+    let result = run_statements_with_stream(
+        StatementRun {
+            target: cursor_target(
+                vec![Ok(cursor_page(&[], false))],
+                std::sync::Arc::new(CursorCounters::default()),
+            ),
+            statements: vec!["SELECT id FROM items WHERE false".into()],
+            driver_id: "postgres",
+            parameter_values: &Default::default(),
+            control: &crate::services::operation_control::bounded(30),
+            error_policy: BatchErrorPolicy::StopScript,
+            settings_check: None,
+            succeeded: |_: &str| {},
+        },
+        move |update| {
+            let received = received.clone();
+            Box::pin(async move {
+                if let StreamUpdate::Page { first_row_ms, .. } = update {
+                    *received.lock().unwrap() = Some(first_row_ms);
+                }
+                true
+            })
+        },
+    )
+    .await;
+
+    assert!(matches!(result, ScriptRunResult::Streamed(StreamTerminal::Complete)));
+    assert_eq!(*page_timing.lock().unwrap(), Some(None));
+}
+
+#[tokio::test]
+async fn mysql_buffered_result_has_no_first_row_timing() {
+    let stream_started = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let observed = stream_started.clone();
+    let result = run_statements_with_stream(
+        StatementRun {
+            target: cursor_target(Vec::new(), std::sync::Arc::new(CursorCounters::default())),
+            statements: vec!["SELECT 1".into()],
+            driver_id: "mysql",
+            parameter_values: &Default::default(),
+            control: &crate::services::operation_control::bounded(30),
+            error_policy: BatchErrorPolicy::StopScript,
+            settings_check: None,
+            succeeded: |_: &str| {},
+        },
+        move |update| {
+            let observed = observed.clone();
+            Box::pin(async move {
+                if matches!(update, StreamUpdate::Started { .. } | StreamUpdate::Page { .. }) {
+                    observed.store(true, std::sync::atomic::Ordering::SeqCst);
+                }
+                true
+            })
+        },
+    )
+    .await;
+
+    let ScriptRunResult::Completed(outcomes) = result else {
+        panic!("buffered query should complete without streaming")
+    };
+    assert_eq!(outcomes[0].detail.first_row_ms, None);
+    assert!(!stream_started.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[tokio::test]
+async fn mysql_buffered_empty_result_reports_completion_time() {
+    let result = run_statements_with_stream(
+        StatementRun {
+            target: cursor_target(Vec::new(), std::sync::Arc::new(CursorCounters::default())),
+            statements: vec!["SELECT 1 WHERE false".into()],
+            driver_id: "mysql",
+            parameter_values: &Default::default(),
+            control: &crate::services::operation_control::bounded(30),
+            error_policy: BatchErrorPolicy::StopScript,
+            settings_check: None,
+            succeeded: |_: &str| {},
+        },
+        |_| Box::pin(async { true }),
+    )
+    .await;
+
+    let ScriptRunResult::Completed(outcomes) = result else {
+        panic!("buffered query should complete without streaming")
+    };
+    assert_eq!(outcomes[0].detail.first_row_ms, Some(outcomes[0].elapsed_ms));
 }
 
 #[tokio::test]
