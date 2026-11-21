@@ -151,6 +151,29 @@ fn a_write_the_guard_denies_leaves_the_database_unchanged_and_keeps_the_edit(cx:
 }
 
 #[gpui::test]
+fn a_save_with_an_unknown_outcome_shows_an_error_instead_of_success(cx: &mut TestAppContext) {
+    let path = fixture_copy("unknown-outcome");
+    let (view, cx) = saving_view(cx, &path);
+    let write = write_session(&path, false);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            let id = view.live.as_ref().and_then(|live| live.writable).unwrap();
+            view.finish_save(id, "Saved".into(), Ok((write, Err(bookie_gpui::live::SaveFailure {
+                message: "acknowledgement lost".into(),
+                outcome_unknown: true,
+            }))), cx);
+        })
+    });
+    view.read_with(cx, |view, _| {
+        let (text, is_error) = view.save.banner.as_ref().expect("unknown outcome banner");
+        assert!(*is_error && text.contains("may or may not have been applied"), "{text}");
+        assert!(!text.starts_with("Saved"), "{text}");
+        assert!(view.save.write.is_none());
+    });
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
 fn a_plan_prepared_before_the_edits_changed_is_dropped_and_a_stale_review_cannot_be_confirmed(cx: &mut TestAppContext) {
     let path = fixture_copy("stale");
     let (view, cx) = saving_view(cx, &path);
