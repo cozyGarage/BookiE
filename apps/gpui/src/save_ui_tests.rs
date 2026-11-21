@@ -1520,6 +1520,56 @@ fn refreshing_reloads_the_table_but_never_throws_pending_edits_away(cx: &mut Tes
 }
 
 #[gpui::test]
+fn refresh_reuses_the_table_sort_and_keeps_rows_if_reload_fails(cx: &mut TestAppContext) {
+    let path = fixture_copy("refresh-sorted-table");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| view.update(cx, |view, cx| {
+        let table = view.catalog.grid_table.clone();
+        view.remember_table_sort(&table, Some(bookie_app_services::read_session::TableSort {
+            column: "customer".into(), ascending: false,
+        }));
+        view.refresh_table(cx);
+    }));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert!(view.status.contains("Server-side table sorting is not available"), "{}", view.status);
+        assert_eq!(view.dataset_count(), 6, "failed reload keeps the existing rows");
+        assert_eq!(view.table_sort(&view.catalog.grid_table).unwrap().column, "customer");
+    });
+    cx.update(|_, cx| view.update(cx, |view, cx| view.reload_after_save("Saved".into(), cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert!(view.status.contains("Server-side table sorting is not available"), "{}", view.status);
+        assert_eq!(view.dataset_count(), 6);
+    });
+    let orders = bookie_gpui::shell::table_info("orders");
+    let customers = bookie_gpui::shell::table_info("customers");
+    cx.update(|window, cx| view.update(cx, |view, cx| view.open_table_named(&customers, window, cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.catalog.grid_table, customers);
+        assert!(view.table_sort(&customers).is_none());
+        assert_eq!(view.table_sort(&orders).unwrap().column, "customer");
+    });
+    cx.update(|window, cx| view.update(cx, |view, cx| view.open_table_named(&orders, window, cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.catalog.grid_table, customers, "failed reload keeps the previous table");
+        assert!(view.status.contains("Server-side table sorting is not available"), "{}", view.status);
+    });
+    cx.update(|_, cx| view.update(cx, |view, _| {
+        view.remember_table_sort(&orders, None);
+    }));
+    cx.update(|window, cx| view.update(cx, |view, cx| view.open_table_named(&orders, window, cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.catalog.grid_table, orders);
+        assert!(view.table_sort(&orders).is_none());
+    });
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
 fn a_sql_file_opens_into_the_editor_and_the_editor_text_saves_to_a_new_file(cx: &mut TestAppContext) {
     let path = fixture_copy("sql-files");
     let (view, cx) = saving_view(cx, &path);
