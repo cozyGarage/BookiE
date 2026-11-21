@@ -115,17 +115,23 @@ def role_matches(node, role):
 
 
 def application_node():
-    desktop = pyatspi.Registry.getDesktop(0)
-    for application in desktop:
-        names = {node_name(application)}
-        names.update(node_name(node) for node in descendants(application))
-        if APP_NAME in names or any(CONNECTION_NAME in name for name in names):
-            return application
-    return None
+    applications = desktop_applications()
+    return applications[0] if applications else None
 
 
 def desktop_applications():
-    return list(pyatspi.Registry.getDesktop(0))
+    applications = list(pyatspi.Registry.getDesktop(0))
+    if _owned_application is None:
+        return applications
+    process_id = _owned_application.process.pid
+    matching = []
+    for application in applications:
+        try:
+            if application.get_process_id() == process_id:
+                matching.append(application)
+        except Exception:
+            continue
+    return matching
 
 
 def find_node(name=None, role=None):
