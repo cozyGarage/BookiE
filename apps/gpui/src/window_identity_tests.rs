@@ -1,6 +1,6 @@
 use gpui::TestAppContext;
 
-use crate::{shell::Tab, ui_tests};
+use crate::{Tab, ui_tests};
 
 #[gpui::test]
 fn title_tracks_the_active_tab(cx: &mut TestAppContext) {
