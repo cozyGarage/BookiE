@@ -22,6 +22,14 @@ fn non_postgres_table_without_pk_or_sort_keeps_native_ordering() {
 }
 
 #[test]
+fn non_postgres_explicit_sort_does_not_emit_postgres_null_ordering() {
+    assert_eq!(
+        resolved_order_by("mysql", &[column("name", false)], Some((0, true)), false).as_deref(),
+        Some("`name` ASC")
+    );
+}
+
+#[test]
 fn postgres_unkeyed_browse_pages_have_a_stable_generated_order() {
     let columns = [column("group_name", false)];
     let filter = FilterSet::default();

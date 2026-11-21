@@ -787,23 +787,23 @@ impl SubscriptionSampler for RegistrySubscriptionSampler {
             match driver_id.as_str() {
                 "postgres" => {
                     drivers_registry::follow_notifications(options, &channels, &cancel, move |message| {
-                        on_message(bookie_app_services::read_session_store::SubscriptionMessage {
-                            channel: message.channel,
-                            pattern: None,
-                            payload: message.payload,
-                            payload_bytes: message.payload_bytes,
-                        });
+                        on_message(crate::pubsub_view::subscription_message(
+                            message.channel,
+                            None,
+                            message.payload,
+                            message.payload_bytes,
+                        ));
                     })
                     .await
                 }
                 "redis" => {
                     drivers_registry::follow_pubsub(options, &channels, &cancel, move |message| {
-                        on_message(bookie_app_services::read_session_store::SubscriptionMessage {
-                            channel: message.channel,
-                            pattern: message.pattern,
-                            payload: message.payload,
-                            payload_bytes: message.payload_bytes,
-                        });
+                        on_message(crate::pubsub_view::subscription_message(
+                            message.channel,
+                            message.pattern,
+                            message.payload,
+                            message.payload_bytes,
+                        ));
                     })
                     .await
                 }
@@ -834,11 +834,13 @@ impl SubscriptionSampler for RegistrySubscriptionSampler {
                     messages: sample
                         .messages
                         .into_iter()
-                        .map(|message| bookie_app_services::read_session_store::SubscriptionMessage {
-                            channel: message.channel,
-                            pattern: None,
-                            payload: message.payload,
-                            payload_bytes: message.payload_bytes,
+                        .map(|message| {
+                            crate::pubsub_view::subscription_message(
+                                message.channel,
+                                None,
+                                message.payload,
+                                message.payload_bytes,
+                            )
                         })
                         .collect(),
                     reached_limit: sample.reached_limit,
@@ -851,11 +853,13 @@ impl SubscriptionSampler for RegistrySubscriptionSampler {
                 messages: sample
                     .messages
                     .into_iter()
-                    .map(|message| bookie_app_services::read_session_store::SubscriptionMessage {
-                        channel: message.channel,
-                        pattern: message.pattern,
-                        payload: message.payload,
-                        payload_bytes: message.payload_bytes,
+                    .map(|message| {
+                        crate::pubsub_view::subscription_message(
+                            message.channel,
+                            message.pattern,
+                            message.payload,
+                            message.payload_bytes,
+                        )
                     })
                     .collect(),
                 reached_limit: sample.reached_limit,

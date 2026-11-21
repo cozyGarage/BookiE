@@ -7,6 +7,29 @@ use crate::live_ui_tests::open_live;
 use crate::text_input;
 use bookie_core::TableInfo;
 
+struct TestDirectory(std::path::PathBuf);
+
+impl TestDirectory {
+    fn new(name: &str) -> Self {
+        let path = std::env::temp_dir().join(format!(
+            "bookie-gpui-{name}-{}",
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::create_dir(&path).expect("create a private test directory");
+        Self(path)
+    }
+
+    fn file(&self, name: &str) -> std::path::PathBuf {
+        self.0.join(name)
+    }
+}
+
+impl Drop for TestDirectory {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
 fn orders_fixture() -> std::path::PathBuf {
     std::path::PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/orders.sqlite")
@@ -1190,8 +1213,8 @@ fn show_create_table_fills_the_panel_with_a_create_statement(cx: &mut TestAppCon
 fn a_filter_is_saved_by_name_applied_again_and_deleted_and_an_unshowable_one_says_so(cx: &mut TestAppContext) {
     let path = fixture_copy("saved-filters");
     let (view, cx) = saving_view(cx, &path);
-    let store = std::env::temp_dir().join(format!("bookie-filters-{}.json", std::process::id()));
-    std::fs::remove_file(&store).ok();
+    let directory = TestDirectory::new("saved-filters");
+    let store = directory.file("filters.json");
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
             view.search.saved = crate::saved_filters_ui::SavedFilters::at(store.clone());
@@ -1249,8 +1272,8 @@ fn a_filter_is_saved_by_name_applied_again_and_deleted_and_an_unshowable_one_say
 fn a_saved_filter_keeps_the_trailing_space_of_its_text(cx: &mut TestAppContext) {
     let path = fixture_copy("saved-filters-exact");
     let (view, cx) = saving_view(cx, &path);
-    let store = std::env::temp_dir().join(format!("bookie-filters-exact-{}.json", std::process::id()));
-    std::fs::remove_file(&store).ok();
+    let directory = TestDirectory::new("saved-filters-exact");
+    let store = directory.file("filters.json");
     let id = view.read_with(cx, |view, _| {
         view.live
             .as_ref()
