@@ -124,6 +124,7 @@ exclusions = [
 unsafe_op_in_unsafe_fn = "deny"
 
 [workspace.lints.clippy]
+indexing_slicing = "allow"
 unwrap_used = "deny"
 expect_used = "deny"
 panic = "deny"
