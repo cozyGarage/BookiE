@@ -160,6 +160,7 @@ impl LiveSession {
             return Err(format!("Row limit must be between 1 and {ROW_CAP}."));
         }
         let epoch = self.next_epoch();
+        let started = std::time::Instant::now();
         let (columns, rows, scan, truncated) = self.runtime.block_on(query_pages(
             &self.sessions,
             self.session_id,
@@ -176,6 +177,8 @@ impl LiveSession {
             scan,
             truncated,
             snapshot_consistent: false,
+            executed_sql: Some(sql.to_owned()),
+            load_elapsed: started.elapsed(),
             table: None,
         })
     }
@@ -186,6 +189,7 @@ impl LiveSession {
         cancellation: &CancellationToken,
     ) -> Result<LiveTable, String> {
         let epoch = self.next_epoch();
+        let started = std::time::Instant::now();
         let (columns, rows, scan, truncated) = self.runtime.block_on(dictionary_pages(
             &self.sessions,
             self.session_id,
@@ -201,6 +205,8 @@ impl LiveSession {
             scan,
             truncated,
             snapshot_consistent: false,
+            executed_sql: None,
+            load_elapsed: started.elapsed(),
             table: None,
         })
     }
@@ -362,6 +368,7 @@ impl LiveSession {
         }
         let table = find_table(&self.tables, table)?.clone();
         let epoch = self.next_epoch();
+        let started = std::time::Instant::now();
         let (columns, rows, scan, truncated) = self.runtime.block_on(read_pages(
             &self.sessions,
             self.session_id,
@@ -378,6 +385,8 @@ impl LiveSession {
             scan,
             truncated,
             snapshot_consistent: self.supports_snapshot_cursor,
+            executed_sql: None,
+            load_elapsed: started.elapsed(),
             table: Some(table.clone()),
         })
     }
@@ -481,10 +490,16 @@ pub struct LiveTable {
     scan: ScanSource,
     pub truncated: bool,
     snapshot_consistent: bool,
+    executed_sql: Option<String>,
+    load_elapsed: Duration,
     table: Option<TableInfo>,
 }
 
 impl LiveTable {
+    pub fn executed_sql(&self) -> Option<&str> {
+        self.executed_sql.as_deref()
+    }
+
     pub fn session(&self) -> &Arc<LiveSession> {
         &self.session
     }
@@ -1176,6 +1191,14 @@ fn numeric_type(data_type: &str) -> bool {
 }
 
 impl ResultSource for LiveTable {
+    fn load_elapsed(&self) -> Option<Duration> {
+        Some(self.load_elapsed)
+    }
+
+    fn executed_sql(&self) -> Option<&str> {
+        self.executed_sql.as_deref()
+    }
+
     fn columns(&self) -> &[ColumnMeta] {
         &self.columns
     }
@@ -1499,11 +1522,16 @@ mod tests {
             .run_query_bound("SELECT id FROM orders WHERE id = ?", &params, 100, &cancel)
             .unwrap();
         assert_eq!(found.total(), 1);
+        assert_eq!(found.executed_sql(), Some("SELECT id FROM orders WHERE id = ?"));
+        assert!(ResultSource::load_elapsed(&found).is_some());
         assert!(
             live.run_query_bound("DELETE FROM orders WHERE id = ?", &params, 100, &cancel)
                 .is_err()
         );
-        assert_eq!(live.run_query("SELECT id FROM orders", 100).unwrap().total(), 6);
+        let later = live.run_query("SELECT id FROM orders", 100).unwrap();
+        assert_eq!(later.total(), 6);
+        assert_eq!(later.executed_sql(), Some("SELECT id FROM orders"));
+        assert_eq!(found.executed_sql(), Some("SELECT id FROM orders WHERE id = ?"));
     }
 
     #[test]
