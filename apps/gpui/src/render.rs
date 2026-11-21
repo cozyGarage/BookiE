@@ -327,7 +327,10 @@ impl Render for GridView {
         let filter_row = self.grid_filter_row(theme, cx);
         let compare_bar = self.grid_compare_bar(theme, cx);
         let palette = self.palette.open.then(|| self.palette_overlay(cx));
-        let save_bar = self.approval_bar(theme, cx).or_else(|| self.save_bar(theme, cx));
+        let save_bar = self
+            .approval_bar(theme, cx)
+            .or_else(|| self.save_bar(theme, cx))
+            .or_else(|| self.edits_bar(theme, cx));
         let banner = self.save_banner(theme, cx);
         let insert_form = self.insert_form(theme, cx).or_else(|| self.import_bar(theme, cx))
             .or_else(|| self.structure_bar(theme, cx))
