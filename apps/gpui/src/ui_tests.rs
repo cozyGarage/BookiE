@@ -941,6 +941,10 @@ fn the_palette_opens_one_new_connection_tab_with_the_default_port(cx: &mut TestA
         assert!(!draft.capabilities.is_file_based);
         assert!(draft.read_only);
     });
+    view.update(cx, |view, cx| {
+        view.connection_form.port.update(cx, |input, cx| input.set_content("not-a-port", cx));
+        assert_eq!(view.connection_form.draft(cx).port, 0);
+    });
     let sqlite = view.read_with(cx, |view, _| {
         view.connection_form
             .drivers
@@ -952,6 +956,24 @@ fn the_palette_opens_one_new_connection_tab_with_the_default_port(cx: &mut TestA
         view.connection_form.driver = sqlite;
         assert!(view.connection_form.draft(cx).capabilities.is_file_based);
     });
+}
+
+#[gpui::test]
+fn connection_form_keeps_actions_visible_at_two_widths(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    view.update(cx, |view, cx| {
+        view.tabs.open_new_connection();
+        cx.notify();
+    });
+    for width in [720.0, 1100.0] {
+        cx.simulate_resize(gpui::size(gpui::px(width), gpui::px(760.0)));
+        cx.run_until_parked();
+        let page = cx.debug_bounds("connection-page").expect("connection form is rendered");
+        let actions = cx.debug_bounds("connection-actions").expect("connection actions are rendered");
+        assert!(page.size.width > gpui::px(200.0));
+        assert!(actions.origin.y >= page.origin.y);
+        assert!(actions.origin.y + actions.size.height <= gpui::px(760.0));
+    }
 }
 
 struct Tiny;
