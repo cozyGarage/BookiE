@@ -400,52 +400,7 @@ impl GridView {
 
     fn with_source(source: Source, started: Instant, window: &mut Window, cx: &mut Context<Self>) -> Self {
         if !cfg!(test) {
-            let (sender, receiver) = std::sync::mpsc::channel::<()>();
-            let latest = std::sync::Arc::new(std::sync::Mutex::new(None::<bookie_gpui::window_geometry::WindowGeometry>));
-            let background_latest = latest.clone();
-            std::thread::spawn(move || {
-                while receiver.recv().is_ok() {
-                    while receiver.recv_timeout(std::time::Duration::from_millis(300)).is_ok() {}
-                    if let Ok(geometry) = background_latest.lock()
-                        && let Some(geometry) = *geometry
-                        && let Err(error) = geometry.save() {
-                            tracing::warn!(%error, "could not save window geometry");
-                    }
-                }
-            });
-            let window_id = window.window_handle().window_id();
-            let closing_latest = latest.clone();
-            let observer_latest = latest.clone();
-            cx.on_window_closed(move |_, id| {
-                if id == window_id
-                    && let Ok(geometry) = closing_latest.lock()
-                    && let Some(geometry) = *geometry
-                    && let Err(error) = geometry.save() {
-                        tracing::warn!(%error, "could not save window geometry");
-                }
-            }).detach();
-            cx.on_app_quit(move |_, _| {
-                if let Ok(geometry) = latest.lock()
-                    && let Some(geometry) = *geometry
-                    && let Err(error) = geometry.save() {
-                        tracing::warn!(%error, "could not save window geometry");
-                }
-                async {}
-            }).detach();
-            cx.observe_window_bounds(window, move |_, window, _| {
-                let bounds = window.window_bounds().get_bounds();
-                let geometry = bookie_gpui::window_geometry::WindowGeometry {
-                    x: bounds.origin.x.into(),
-                    y: bounds.origin.y.into(),
-                    width: bounds.size.width.into(),
-                    height: bounds.size.height.into(),
-                };
-                if let Ok(mut latest) = observer_latest.lock() {
-                    *latest = Some(geometry);
-                    let _ = sender.send(());
-                }
-            })
-            .detach();
+            Self::persist_window_geometry(window, cx);
         }
         let total = source.total();
         let (find, filter, editor, sql_input) = Self::init_query_inputs(window, cx);
@@ -537,6 +492,62 @@ impl GridView {
             scans: Ticket::new(),
             status: String::new(),
         }
+    }
+
+    fn persist_window_geometry(window: &mut Window, cx: &mut Context<Self>) {
+        let (sender, receiver) = std::sync::mpsc::channel::<()>();
+        let latest = std::sync::Arc::new(std::sync::Mutex::new(
+            None::<bookie_gpui::window_geometry::WindowGeometry>,
+        ));
+        let background_latest = latest.clone();
+        std::thread::spawn(move || {
+            while receiver.recv().is_ok() {
+                while receiver.recv_timeout(std::time::Duration::from_millis(300)).is_ok() {}
+                if let Ok(geometry) = background_latest.lock()
+                    && let Some(geometry) = *geometry
+                    && let Err(error) = geometry.save()
+                {
+                    tracing::warn!(%error, "could not save window geometry");
+                }
+            }
+        });
+        let window_id = window.window_handle().window_id();
+        let closing_latest = latest.clone();
+        let observer_latest = latest.clone();
+        cx.on_window_closed(move |_, id| {
+            if id == window_id
+                && let Ok(geometry) = closing_latest.lock()
+                && let Some(geometry) = *geometry
+                && let Err(error) = geometry.save()
+            {
+                tracing::warn!(%error, "could not save window geometry");
+            }
+        })
+        .detach();
+        cx.on_app_quit(move |_, _| {
+            if let Ok(geometry) = latest.lock()
+                && let Some(geometry) = *geometry
+                && let Err(error) = geometry.save()
+            {
+                tracing::warn!(%error, "could not save window geometry");
+            }
+            async {}
+        })
+        .detach();
+        cx.observe_window_bounds(window, move |_, window, _| {
+            let bounds = window.window_bounds().get_bounds();
+            let geometry = bookie_gpui::window_geometry::WindowGeometry {
+                x: bounds.origin.x.into(),
+                y: bounds.origin.y.into(),
+                width: bounds.size.width.into(),
+                height: bounds.size.height.into(),
+            };
+            if let Ok(mut latest) = observer_latest.lock() {
+                *latest = Some(geometry);
+                let _ = sender.send(());
+            }
+        })
+        .detach();
     }
 
     fn dataset_count(&self) -> u64 {
