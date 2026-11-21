@@ -730,6 +730,7 @@ impl BrowseTab {
     }
 
     pub(super) fn handle_discard_all(&mut self, sender: ComponentSender<Self>) {
+        self.capture_focus_for_restore();
         self.change_trackers.with_tab(self.tab_id, |t| t.clear());
         self.emit_fetch_page(&sender);
     }
