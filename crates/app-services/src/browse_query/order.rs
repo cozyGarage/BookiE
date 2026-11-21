@@ -10,8 +10,9 @@ pub(super) fn resolved_order_by(
     let selected = sort.and_then(|(index, ascending)| {
         columns.get(index).map(|column| {
             let direction = if ascending { "ASC" } else { "DESC" };
+            let null_order = if driver_id == "postgres" { " NULLS LAST" } else { "" };
             terms.push(format!(
-                "{} {direction}",
+                "{} {direction}{null_order}",
                 bookie_core::sql_dialect::quote_ident(driver_id, &column.name)
             ));
             column.name.as_str()
