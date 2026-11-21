@@ -1,6 +1,6 @@
 use bookie_app_services::connection_save::{self, ConnectionDraft};
 use bookie_core::{AuthMode, DriverCapabilities, Environment, TlsMode};
-use gpui::{Context, Div, Entity, Stateful, div, prelude::*, px, rgb};
+use gpui::{Context, Div, Entity, Focusable, Stateful, Window, div, prelude::*, px, rgb};
 use secrecy::SecretString;
 
 use crate::GridView;
@@ -25,6 +25,7 @@ pub(crate) struct ConnectionForm {
     pub driver: usize,
     pub read_only: bool,
     pub status: String,
+    validation_error: Option<(gpui::EntityId, String)>,
     pub saving: bool,
     pub testing: bool,
     pub confirm_delete: bool,
@@ -40,7 +41,17 @@ pub(crate) struct ConnectionForm {
 
 impl ConnectionForm {
     pub fn new(cx: &mut Context<GridView>) -> Self {
-        let input = |placeholder: &str, cx: &mut Context<GridView>| cx.new(|cx| TextInput::new(placeholder, cx));
+        let input = |placeholder: &str, cx: &mut Context<GridView>| {
+            let input = cx.new(|cx| TextInput::new(placeholder, cx));
+            cx.subscribe(&input, |this, _, event: &crate::text_input::InputEvent, cx| {
+                if matches!(event, crate::text_input::InputEvent::Changed) {
+                    this.clear_resolved_connection_error(cx);
+                    cx.notify();
+                }
+            })
+            .detach();
+            input
+        };
         let mut drivers: Vec<DriverChoice> = drivers_registry::default_registry()
             .iter()
             .map(|driver| DriverChoice {
@@ -68,6 +79,7 @@ impl ConnectionForm {
             driver,
             read_only: true,
             status: String::new(),
+            validation_error: None,
             saving: false,
             testing: false,
             confirm_delete: false,
@@ -86,6 +98,27 @@ impl ConnectionForm {
         self.drivers.get(self.driver)
     }
 
+    pub(crate) fn validation_field(
+        &self,
+        theme: Theme,
+        label: impl Into<gpui::SharedString>,
+        input: &Entity<TextInput>,
+        cx: &gpui::App,
+    ) -> Div {
+        let error = self.validation_error.as_ref().filter(|(id, message)| {
+            *id == input.entity_id() && connection_save::validate(&self.draft(cx)).as_ref().err() == Some(message)
+        });
+        div()
+            .flex()
+            .flex_col()
+            .gap_1()
+            .when(error.is_some(), |row| {
+                row.border_1().border_color(rgb(theme.destructive))
+            })
+            .child(field(theme, label, input))
+            .children(error.map(|(_, message)| div().text_color(rgb(theme.destructive)).child(message.clone())))
+    }
+
     fn socket_kind(&self) -> Option<bookie_app_services::connection_form::LocalSocketPathKind> {
         let driver = drivers_registry::default_registry().get(self.selected()?.id)?;
         bookie_app_services::connection_form::local_socket_path_kind(driver.capabilities())
@@ -100,10 +133,7 @@ impl ConnectionForm {
             driver_id: driver.map(|driver| driver.id.to_string()).unwrap_or_default(),
             capabilities: driver.map_or_else(DriverCapabilities::default, |driver| driver.capabilities),
             host: text(&self.host),
-            port: text(&self.port)
-                .trim()
-                .parse()
-                .unwrap_or_else(|_| driver.map_or(0, |driver| driver.port)),
+            port: text(&self.port).trim().parse().unwrap_or(0),
             database: text(&self.database),
             username: text(&self.username),
             password: SecretString::from(text(&self.password)),
@@ -158,7 +188,12 @@ pub(crate) fn note(theme: Theme, text: &str) -> Div {
     div().text_color(rgb(theme.muted_foreground)).child(text.to_string())
 }
 
-pub(crate) fn choice_chip(id: impl Into<gpui::ElementId>, label: &'static str, selected: bool, theme: Theme) -> Stateful<Div> {
+pub(crate) fn choice_chip(
+    id: impl Into<gpui::ElementId>,
+    label: &'static str,
+    selected: bool,
+    theme: Theme,
+) -> Stateful<Div> {
     div()
         .id(id)
         .flex()
@@ -188,64 +223,73 @@ pub(crate) fn choice_row(
                 .text_color(rgb(theme.muted_foreground))
                 .child(gpui::SharedString::from(label.into())),
         )
-        .child(div().flex().flex_wrap().gap_1().children(chips))
+        .child(div().flex_1().min_w_0().flex().flex_wrap().gap_1().children(chips))
 }
 
 impl GridView {
     pub(crate) fn connection_page(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
         let form = &self.connection_form;
-        let file_based = form
-            .selected()
-            .is_some_and(|driver| driver.capabilities.is_file_based);
+        let file_based = form.selected().is_some_and(|driver| driver.capabilities.is_file_based);
         let title = if form.editing.is_some() {
             "Edit connection"
         } else {
             "New connection"
         };
-        div().flex_1().min_h_0().flex().flex_col().child(
-            div()
-                .id("connection-page")
-                .flex_1()
-                .min_h_0()
-                .overflow_y_scroll()
-                .p_4()
-                .child(
-                    div()
-                        .w(px(size::HOME_WIDTH / 2.0))
-                        .flex()
-                        .flex_col()
-                        .gap_3()
-                        .child(div().font_weight(gpui::FontWeight::SEMIBOLD).child(title))
-                        .child(div().flex().flex_wrap().gap_1().children(self.driver_chips(theme, cx)))
-                        .child(field(theme, "Name", &form.name))
-                        .when(!file_based, |page| page.children(self.network_fields(theme, cx)))
-                        .child(field(
-                            theme,
-                            if file_based { "File" } else { "Database" },
-                            &form.database,
-                        ))
-                        .when(!file_based, |page| page.children(self.security_fields(theme, cx)))
-                        .when(!file_based, |page| page.children(self.ssh_fields(theme, cx)))
-                        .child(
-                            div()
-                                .flex()
-                                .items_center()
-                                .gap_2()
-                                .child(self.save_button(theme, cx))
-                                .child(self.test_button(theme, cx))
-                                .children(form.editing.map(|_| self.delete_button(theme, cx)))
-                                .child(self.read_only_toggle(theme, cx))
-                                .child(div().text_color(rgb(theme.muted_foreground)).child(form.status.clone())),
-                        ),
-                ),
-        )
+        div()
+            .flex_1()
+            .min_h_0()
+            .flex()
+            .flex_col()
+            .child(
+                div()
+                    .id("connection-page")
+                    .debug_selector(|| "connection-page".into())
+                    .flex_1()
+                    .min_h_0()
+                    .overflow_y_scroll()
+                    .p_4()
+                    .child(
+                        div()
+                            .w_full()
+                            .max_w(px(size::HOME_WIDTH))
+                            .flex()
+                            .flex_col()
+                            .gap_3()
+                            .child(div().font_weight(gpui::FontWeight::SEMIBOLD).child(title))
+                            .child(div().flex().flex_wrap().gap_1().children(self.driver_chips(theme, cx)))
+                            .child(field(theme, "Name", &form.name))
+                            .when(!file_based, |page| page.children(self.network_fields(theme, cx)))
+                            .child(form.validation_field(
+                                theme,
+                                if file_based { "File" } else { "Database" },
+                                &form.database,
+                                cx,
+                            ))
+                            .when(!file_based, |page| page.children(self.security_fields(theme, cx)))
+                            .when(!file_based, |page| page.children(self.ssh_fields(theme, cx))),
+                    ),
+            )
+            .child(
+                div()
+                    .debug_selector(|| "connection-actions".into())
+                    .p_4()
+                    .flex()
+                    .flex_wrap()
+                    .items_center()
+                    .gap_2()
+                    .child(self.save_button(theme, cx))
+                    .child(self.test_button(theme, cx))
+                    .children(form.editing.map(|_| self.delete_button(theme, cx)))
+                    .child(self.read_only_toggle(theme, cx))
+                    .child(div().text_color(rgb(theme.muted_foreground)).child(form.status.clone())),
+            )
     }
 
-    fn network_fields(&self, theme: Theme, _cx: &mut Context<Self>) -> Vec<Div> {
+    fn network_fields(&self, theme: Theme, cx: &mut Context<Self>) -> Vec<Div> {
         let form = &self.connection_form;
         let mut rows = vec![
-            field(theme, "Host", &form.host),
-            field(theme, "Port", &form.port),
+            form.validation_field(theme, "Host", &form.host, cx),
+            form.validation_field(theme, "Port", &form.port, cx),
             field(theme, "User", &form.username),
         ];
         if !form.kerberos {
@@ -281,6 +325,7 @@ impl GridView {
                 )
                 .on_click(cx.listener(move |this, _, _, cx| {
                     this.connection_form.tls = mode.index();
+                    this.clear_resolved_connection_error(cx);
                     cx.notify();
                 }))
             }),
@@ -288,11 +333,11 @@ impl GridView {
         let mut rows = vec![auth, tls];
         if TlsMode::from_index(form.tls) != TlsMode::Disabled {
             rows.push(field(theme, "CA file", &form.tls_root));
-            rows.push(field(theme, "Client cert", &form.tls_cert));
-            rows.push(field(theme, "Client key", &form.tls_key));
+            rows.push(form.validation_field(theme, "Client cert", &form.tls_cert, cx));
+            rows.push(form.validation_field(theme, "Client key", &form.tls_key, cx));
         }
         if form.socket_kind().is_some() {
-            rows.push(field(theme, "Socket", &form.socket));
+            rows.push(form.validation_field(theme, "Socket", &form.socket, cx));
         }
         rows
     }
@@ -307,6 +352,7 @@ impl GridView {
                 choice_chip(("driver", index), driver.label, index == form.driver, theme).on_click(cx.listener(
                     move |this, _, _, cx| {
                         this.connection_form.driver = index;
+                        this.clear_resolved_connection_error(cx);
                         let port_text = if port == 0 { String::new() } else { port.to_string() };
                         this.connection_form
                             .port
@@ -331,42 +377,47 @@ impl GridView {
             .text_color(rgb(theme.background))
             .when(!busy, |button| button.cursor_pointer())
             .child(if busy { "Saving…" } else { "Save" })
-            .on_click(cx.listener(|this, _, _, cx| {
-                this.save_connection(cx);
+            .on_click(cx.listener(|this, _, window, cx| {
+                this.save_connection(window, cx);
             }))
     }
 
     fn test_button(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
         let busy = self.connection_form.testing;
         outline_button("test-connection", if busy { "Testing…" } else { "Test" }, theme)
-            .on_click(cx.listener(|this, _, _, cx| this.test_connection(cx)))
+            .on_click(cx.listener(|this, _, window, cx| this.test_connection(window, cx)))
     }
 
     fn delete_button(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
         let confirm = self.connection_form.confirm_delete;
-        outline_button("delete-connection", if confirm { "Confirm delete" } else { "Delete" }, theme)
-            .text_color(rgb(theme.destructive))
-            .on_click(cx.listener(|this, _, _, cx| this.delete_connection(cx)))
+        outline_button(
+            "delete-connection",
+            if confirm { "Confirm delete" } else { "Delete" },
+            theme,
+        )
+        .text_color(rgb(theme.destructive))
+        .on_click(cx.listener(|this, _, _, cx| this.delete_connection(cx)))
     }
 
-    fn read_only_toggle(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
+    fn read_only_toggle(&self, _theme: Theme, cx: &mut Context<Self>) -> Div {
         let on = self.connection_form.read_only;
+        let view = cx.entity();
         div()
-            .id("connection-read-only")
             .flex()
             .items_center()
-            .h(px(size::SMALL_CONTROL))
-            .px_2()
-            .rounded(px(theme.radius))
-            .cursor_pointer()
-            .border_1()
-            .border_color(rgb(theme.border))
-            .when(on, |button| button.bg(rgb(theme.accent)))
+            .gap_2()
+            .child(
+                gpui_kit::component::switch::Switch::new("connection-read-only")
+                    .accessibility_label("Read-only")
+                    .checked(on)
+                    .on_click(move |on, _, cx| {
+                        view.update(cx, |this, cx| {
+                            this.connection_form.read_only = *on;
+                            cx.notify();
+                        });
+                    }),
+            )
             .child("Read-only")
-            .on_click(cx.listener(|this, _, _, cx| {
-                this.connection_form.read_only = !this.connection_form.read_only;
-                cx.notify();
-            }))
     }
 
     pub(crate) fn edit_connection(&mut self, id: uuid::Uuid, cx: &mut Context<Self>) {
@@ -426,11 +477,86 @@ impl GridView {
         }
     }
 
-    pub(crate) fn test_connection(&mut self, cx: &mut Context<Self>) {
+    pub(crate) fn clear_resolved_connection_error(&mut self, cx: &mut Context<Self>) {
+        if let Some((_, message)) = &self.connection_form.validation_error {
+            if connection_save::validate(&self.connection_form.draft(cx))
+                .as_ref()
+                .err()
+                != Some(message)
+            {
+                self.connection_form.validation_error = None;
+                self.connection_form.status.clear();
+            }
+        }
+    }
+
+    fn validate_connection(&mut self, draft: &ConnectionDraft, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        self.connection_form.validation_error = None;
+        if let Err(message) = connection_save::validate(draft) {
+            if draft.capabilities.is_file_based && draft.database.trim().is_empty() {
+                let input = &self.connection_form.database;
+                self.connection_form.validation_error = Some((input.entity_id(), message.clone()));
+                window.focus(&input.read(cx).focus_handle(cx), cx);
+            } else if draft.socket_endpoint.trim().is_empty() && draft.host.trim().is_empty() {
+                let input = &self.connection_form.host;
+                self.connection_form.validation_error = Some((input.entity_id(), message.clone()));
+                window.focus(&input.read(cx).focus_handle(cx), cx);
+            } else if !draft.socket_endpoint.trim().is_empty()
+                && !bookie_app_services::connection_form::socket_path_is_absolute(draft.socket_endpoint.trim())
+            {
+                let input = &self.connection_form.socket;
+                self.connection_form.validation_error = Some((input.entity_id(), message.clone()));
+                window.focus(&input.read(cx).focus_handle(cx), cx);
+            } else if draft.port == 0 && draft.socket_endpoint.trim().is_empty() {
+                let input = &self.connection_form.port;
+                self.connection_form.validation_error = Some((input.entity_id(), message.clone()));
+                window.focus(&input.read(cx).focus_handle(cx), cx);
+            } else if draft.tls_client_cert.trim().is_empty() != draft.tls_client_key.trim().is_empty() {
+                let input = if draft.tls_client_cert.trim().is_empty() {
+                    &self.connection_form.tls_cert
+                } else {
+                    &self.connection_form.tls_key
+                };
+                self.connection_form.validation_error = Some((input.entity_id(), message.clone()));
+                window.focus(&input.read(cx).focus_handle(cx), cx);
+            } else if let Some(ssh) = &draft.ssh {
+                let form = &self.connection_form.ssh;
+                for (hop, input) in
+                    std::iter::once((&ssh.head, &form.head)).chain(ssh.jumps.iter().zip(form.jumps.iter()))
+                {
+                    let invalid = if hop.host.trim().is_empty() {
+                        Some(&input.host)
+                    } else if hop.username.trim().is_empty() {
+                        Some(&input.user)
+                    } else if hop.port == 0 {
+                        Some(&input.port)
+                    } else if hop.auth == connection_save::SshAuthKind::KeyFile && hop.key_path.trim().is_empty() {
+                        Some(&input.key)
+                    } else {
+                        None
+                    };
+                    if let Some(invalid) = invalid {
+                        self.connection_form.validation_error = Some((invalid.entity_id(), message.clone()));
+                        window.focus(&invalid.read(cx).focus_handle(cx), cx);
+                        break;
+                    }
+                }
+            }
+            self.connection_form.status = message;
+            cx.notify();
+            return false;
+        }
+        true
+    }
+
+    pub(crate) fn test_connection(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.connection_form.testing {
             return;
         }
         let draft = self.connection_form.draft(cx);
+        if !self.validate_connection(&draft, window, cx) {
+            return;
+        }
         self.connection_form.testing = true;
         self.connection_form.status = "Testing…".into();
         cx.notify();
@@ -466,7 +592,8 @@ impl GridView {
             return;
         };
         if !std::mem::replace(&mut self.connection_form.confirm_delete, true) {
-            self.connection_form.status = "Click Delete again to remove this connection and its stored passwords.".into();
+            self.connection_form.status =
+                "Click Delete again to remove this connection and its stored passwords.".into();
             cx.notify();
             return;
         }
@@ -507,14 +634,12 @@ impl GridView {
         }
     }
 
-    pub(crate) fn save_connection(&mut self, cx: &mut Context<Self>) {
+    pub(crate) fn save_connection(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.connection_form.saving {
             return;
         }
         let draft = self.connection_form.draft(cx);
-        if let Err(message) = connection_save::validate(&draft) {
-            self.connection_form.status = message;
-            cx.notify();
+        if !self.validate_connection(&draft, window, cx) {
             return;
         }
         self.connection_form.saving = true;
