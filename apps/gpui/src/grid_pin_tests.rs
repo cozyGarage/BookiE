@@ -87,11 +87,13 @@ fn pinned_columns_stay_visible_after_scroll_and_tab_reopen(cx: &mut TestAppConte
         assert!(last.visible(), "scrolled-to header is outside the viewport");
     });
 
-    view.update(cx, |view, cx| {
-        let table = view.catalog.grid_table.clone();
-        view.tabs.close(view.tabs.active);
-        view.tabs.open_table(&table);
-        view.sync_table(900.0, cx);
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            let table = view.catalog.grid_table.clone();
+            view.tabs.close(view.tabs.active);
+            view.tabs.open_table(&table);
+            view.sync_table(900.0, window, cx);
+        })
     });
     cx.run_until_parked();
     view.read_with(cx, |view, cx| {
