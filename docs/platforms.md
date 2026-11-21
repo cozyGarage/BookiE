@@ -4,12 +4,15 @@ BookiE is focused on Linux first as a native desktop application, with cross-pla
 
 ## Published artifacts
 
-Current releases publish an Arch package and an AppImage on the [GitHub releases](https://github.com/cozyGarage/BookiE/releases) page. Artifact names follow `bookie-<version>-1-x86_64.pkg.tar.zst` and `BookiE-<version>-x86_64.AppImage`.
+The release workflow publishes an Arch package and an AppImage on the [GitHub releases](https://github.com/cozyGarage/BookiE/releases) page. Future tagged runs also include an unsupported GPUI Linux x86_64 preview tarball. Artifact names follow `bookie-<version>-1-x86_64.pkg.tar.zst`, `BookiE-<version>-x86_64.AppImage` and `bookie-gpui-linux-x86_64-<version>.tar.gz`.
 
 | Target | Architecture | Artifact pattern | Install or launch |
 |---|---|---|---|
 | Arch Linux | x86_64 | `bookie-<version>-1-x86_64.pkg.tar.zst` | Install with `pacman` |
 | AppImage | x86_64 | `BookiE-<version>-x86_64.AppImage` | Run the downloaded file |
+| GPUI Linux preview | x86_64 | `bookie-gpui-linux-x86_64-<version>.tar.gz` | Verify the adjacent `.sha256` file, extract, enter the directory, then run `./bookie-gpui` |
+
+The GPUI Linux preview is a plain tarball, not an AppImage or a supported platform release. It is built on Ubuntu 24.04 and requires glibc 2.39 or newer, Vulkan-capable graphics, and the runtime libraries listed in the archive's `INSTALL.txt`. It is read-only and does not have verified keyboard or screen-reader accessibility. The About view displays its version. See [ADR 0052](decisions/0052-gpui-is-the-cross-platform-frontend.md) for the preview boundary.
 
 From 0.2.5 the release workflow no longer publishes a Debian package ([ADR 0031](decisions/0031-stop-publishing-the-debian-package.md)) or a Flatpak bundle ([ADR 0032](decisions/0032-stop-publishing-the-flatpak.md)). The [0.2.4 release](https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.4) still carries both (`bookie.flatpak` and a `.deb`). The workflow builds the Arch package against current Arch packages and the AppImage against Debian testing. Current source requirements are listed above.
 

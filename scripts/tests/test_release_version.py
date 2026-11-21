@@ -42,6 +42,9 @@ class ReleaseVersionTests(unittest.TestCase):
         metadata = root / "apps/linux/flatpak/com.bookie.linux.metainfo.xml"
         metadata.parent.mkdir(parents=True)
         metadata.write_text('<component><releases><release version="0.2.0" type="development"/><release version="0.1.5"/></releases></component>')
+        gpui = root / "apps/gpui/Cargo.toml"
+        gpui.parent.mkdir(parents=True)
+        gpui.write_text('[package]\nname = "bookie-gpui"\nversion = "0.2.0"\n')
         return crate, metadata
 
     def test_accepts_shared_version_and_preserves_older_releases(self):
@@ -51,13 +54,15 @@ class ReleaseVersionTests(unittest.TestCase):
             self.assertEqual(VERSION.release_version(root), "0.2.0")
             self.assertEqual(VERSION.problems(root), [])
 
-    def test_rejects_independent_crate_meson_and_appstream_drift(self):
-        for target in ("crate", "meson", "appstream"):
+    def test_rejects_independent_crate_gpui_meson_and_appstream_drift(self):
+        for target in ("crate", "gpui", "meson", "appstream"):
             with self.subTest(target=target), tempfile.TemporaryDirectory() as temporary:
                 root = Path(temporary)
                 crate, metadata = self.fixture(root)
                 if target == "crate":
                     crate.write_text('[package]\nversion = "0.1.0"\n')
+                elif target == "gpui":
+                    (root / "apps/gpui/Cargo.toml").write_text('[package]\nname = "bookie-gpui"\nversion = "0.1.0"\n')
                 elif target == "meson":
                     (root / "meson.build").write_text("project('bookie', version: '0.1.6-dev')\n")
                 else:

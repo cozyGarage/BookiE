@@ -24,6 +24,9 @@ def problems(root):
             package = tomllib.loads((directory / "Cargo.toml").read_text())["package"]
             if package.get("version") != {"workspace": True}:
                 errors.append(f"{directory.relative_to(root)}/Cargo.toml must inherit the workspace version")
+    gpui = tomllib.loads((root / "apps/gpui/Cargo.toml").read_text())["package"]
+    if gpui.get("version") != version:
+        errors.append("apps/gpui/Cargo.toml version differs from the workspace version")
     meson = (root / "meson.build").read_text()
     match = re.search(r"project\([^,]+,\s*version:\s*['\"]([^'\"]+)['\"]", meson)
     if not match or match.group(1) != version:

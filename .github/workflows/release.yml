@@ -7,8 +7,21 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/release.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "meson.build"
+      - "apps/linux/flatpak/com.bookie.linux.metainfo.xml"
+      - "scripts/check-release-version.py"
+      - "scripts/tests/test_release_version.py"
       - "scripts/build-appimage.sh"
       - "scripts/build-deb.sh"
+      - "apps/gpui/Cargo.toml"
+      - "apps/gpui/Cargo.lock"
+      - "docs/decisions/0052-gpui-is-the-cross-platform-frontend.md"
+      - "docs/platforms.md"
+      - "changelog.d/gpui-linux-preview.added.md"
+      - "scripts/tests/test_release_publication.py"
+      - "scripts/validate-release-recovery.py"
       - "scripts/validate_release_inputs.py"
       - "scripts/tests/test_release_inputs.py"
       - "scripts/validate-deb-package.sh"
@@ -18,7 +31,7 @@ on:
   workflow_dispatch:
     inputs:
       artifact_run_id:
-        description: Existing tag run whose two package builds passed; leave empty to build packages
+        description: Existing tag run whose release asset builds passed; leave empty to build assets
         type: string
         default: ""
       release_tag:
@@ -86,6 +99,13 @@ jobs:
             [[ "$REF" == "refs/tags/linux-v${version}" ]] || { echo "tag $REF does not match source version $version" >&2; exit 1; }
             git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "tagged commit $GITHUB_SHA is not on main" >&2; exit 1; }
             python3 scripts/release-notes.py notes "$version" > release-notes.md
+            cat >> release-notes.md <<'EOF'
+
+          ### Linux frontend assets
+
+          - GTK frontend: Arch package and AppImage.
+          - GPUI frontend: unsupported Linux x86_64 preview tarball; glibc 2.39 or newer; accessibility is unverified.
+          EOF
             publish=true
           fi
           {
@@ -201,6 +221,70 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+  gpui-linux:
+    name: GPUI Linux preview
+    if: inputs.artifact_run_id == ''
+    needs: [prepare]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      CARGO_BUILD_JOBS: 2
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
+        with:
+          toolchain: "1.98"
+      - name: Install GPUI build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libfontconfig-dev libfreetype-dev libwayland-dev libxkbcommon-dev libxkbcommon-x11-dev \
+            libx11-xcb-dev libxcb1-dev libxcb-xkb-dev libvulkan-dev
+      - name: Check release toolchain floor
+        run: |
+          glibc="$(getconf GNU_LIBC_VERSION | awk '{print $2}')"
+          dpkg --compare-versions "$glibc" ge 2.39 || { echo "Ubuntu 24.04 build requires glibc 2.39; found $glibc" >&2; exit 1; }
+          echo "GPUI Linux preview runtime floor: glibc 2.39 or newer" >> "$GITHUB_STEP_SUMMARY"
+      - name: Build GPUI
+        run: cargo build --release --locked --manifest-path apps/gpui/Cargo.toml
+      - name: Package GPUI preview
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          name="bookie-gpui-linux-x86_64-${VERSION}"
+          mkdir -p "dist/${name}"
+          install -m 0755 apps/gpui/target/release/bookie-gpui "dist/${name}/bookie-gpui"
+          printf '%s\n' "$VERSION" > "dist/${name}/VERSION"
+          git rev-parse HEAD > "dist/${name}/SOURCE_COMMIT"
+          cat > "dist/${name}/INSTALL.txt" <<'EOF'
+          Unsupported BookiE GPUI Linux x86_64 preview.
+
+          Extract this archive, change into the extracted directory, and run ./bookie-gpui from a graphical X11 or Wayland session.
+          Requires glibc 2.39 or newer, a Vulkan-capable graphics driver, and the host runtime
+          libraries: fontconfig, freetype, Wayland client, xkbcommon and Vulkan loader.
+          This preview is read-only. Keyboard and screen-reader accessibility are unverified;
+          this artifact does not claim supported Linux platform status.
+          EOF
+          ldd "dist/${name}/bookie-gpui" > "dist/${name}/RUNTIME_DEPENDENCIES.txt"
+          if grep -q 'not found' "dist/${name}/RUNTIME_DEPENDENCIES.txt"; then
+            cat "dist/${name}/RUNTIME_DEPENDENCIES.txt" >&2
+            exit 1
+          fi
+          tar -C dist -czf "dist/${name}.tar.gz" "$name"
+          (cd dist && sha256sum "${name}.tar.gz" > "${name}.tar.gz.sha256")
+          echo "GPUI Linux preview: ${name}.tar.gz (glibc 2.39+)" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: package-gpui-linux
+          path: |
+            dist/*.tar.gz
+            dist/*.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 14
+
   aur-recipe:
     name: AUR recipe
     if: >-
@@ -234,8 +318,8 @@ jobs:
     if: >-
       always() && needs.prepare.result == 'success' && needs.prepare.outputs.publish == 'true' &&
       (needs.prepare.outputs.artifact_run != '' ||
-       (needs.appimage.result == 'success' && needs.arch.result == 'success'))
-    needs: [prepare, appimage, arch]
+       (needs.appimage.result == 'success' && needs.arch.result == 'success' && needs.gpui-linux.result == 'success'))
+    needs: [prepare, appimage, arch, gpui-linux]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -253,7 +337,10 @@ jobs:
         run: |
           mkdir release
           cd artifacts
-          cp -- *.AppImage *.pkg.tar.zst translations/bookie.pot ../release/
+          cp -- *.AppImage *.pkg.tar.zst \
+            bookie-gpui-linux-x86_64-*.tar.gz \
+            bookie-gpui-linux-x86_64-*.tar.gz.sha256 \
+            translations/bookie.pot ../release/
           cp release-notes.md ../release-notes.md
           cd ../release
           sha256sum -- * > SHA256SUMS

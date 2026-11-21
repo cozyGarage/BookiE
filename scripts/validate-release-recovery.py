@@ -9,11 +9,11 @@ def validate(run, jobs, tag, source):
     expected = {"head_sha": source, "head_branch": tag, "event": "push", "path": ".github/workflows/release.yml"}
     if any(run.get(key) != value for key, value in expected.items()):
         raise ValueError("The package run does not match the release tag and workflow")
-    required = {"Arch package", "AppImage"}
+    required = {"Arch package", "AppImage", "GPUI Linux preview"}
     for name in required:
         matches = [job for job in jobs.get("jobs", []) if job.get("name") == name]
         if len(matches) != 1 or matches[0].get("conclusion") != "success":
-            raise ValueError("Every package job must succeed before publication recovery")
+            raise ValueError("Every required asset job must succeed before publication recovery")
 
 
 def main():

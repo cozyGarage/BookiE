@@ -1,6 +1,6 @@
 # BookiE GPUI app
 
-The GPUI frontend for BookiE, built with `gpui-pre` 0.3.11. [ADR 0052](../../docs/decisions/0052-gpui-is-the-cross-platform-frontend.md) chooses GPUI as the cross-platform frontend and keeps the GTK Linux client ([ADR 0002](../../docs/decisions/0002-rust-gtk4-libadwaita.md)) in parallel. This tree lives at `apps/gpui` with its own lockfile. It is **not shipped**: no package or release includes it until ADR 0052's accessibility, packaging and security conditions hold, and GPUI changes carry no changelog fragment until then.
+The GPUI frontend for BookiE, built with `gpui-pre` 0.3.11. [ADR 0052](../../docs/decisions/0052-gpui-is-the-cross-platform-frontend.md) chooses GPUI as the cross-platform frontend and keeps the GTK Linux client ([ADR 0002](../../docs/decisions/0002-rust-gtk4-libadwaita.md)) in parallel. This tree lives at `apps/gpui` with its own lockfile. Tagged releases may include an unsupported Linux x86_64 preview under ADR 0052; accessibility remains unverified, and the preview is not a platform-support claim. Other packaging and release conditions remain in force.
 
 By default it shows a synthetic result grid. With `BOOKIE_PROTOTYPE_FILE` (a SQLite or DuckDB file) or `BOOKIE_PROTOTYPE_CONNECTION` (a saved connection name or id) plus `BOOKIE_PROTOTYPE_TABLE` it reads a real table, read-only, through `bookie-app-services` and a `PolicyGuard`-wrapped connection. Writes stay off until app-services offers the same guarded write path GTK uses. ADR 0043 and 0044 are superseded by 0052 and remain as history.
 
