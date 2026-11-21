@@ -245,7 +245,7 @@ impl GridView {
             .child(
                 div()
                     .id("connection-page")
-                    .debug_selector("connection-page")
+                    .debug_selector(|| "connection-page".into())
                     .flex_1()
                     .min_h_0()
                     .overflow_y_scroll()
@@ -273,7 +273,7 @@ impl GridView {
             )
             .child(
                 div()
-                    .debug_selector("connection-actions")
+                    .debug_selector(|| "connection-actions".into())
                     .p_4()
                     .flex()
                     .flex_wrap()
