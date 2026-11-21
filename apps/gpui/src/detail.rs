@@ -83,15 +83,7 @@ pub fn detail_of(cell: &Cell) -> Detail {
                 Detail::Json { pretty: text }
             }
         }
-        Cell::JsonText(text) if text.len() <= MAX_PRETTY_BYTES => {
-            match serde_json::from_str::<serde_json::Value>(text)
-                .ok()
-                .and_then(|value| serde_json::to_string_pretty(&value).ok())
-            {
-                Some(pretty) => Detail::Json { pretty },
-                None => Detail::Text(text.clone()),
-            }
-        }
+        Cell::JsonText(text) => Detail::Text(text.clone()),
         other => Detail::Text(other.display()),
     }
 }
@@ -194,6 +186,12 @@ mod tests {
             detail_of(&Cell::JsonText("{broken".into())),
             Detail::Text("{broken".into())
         );
+    }
+
+    #[test]
+    fn json_text_detail_preserves_duplicate_keys_and_original_bytes() {
+        let raw = r#"{"a":1, "a":2}"#;
+        assert_eq!(detail_of(&Cell::JsonText(raw.into())), Detail::Text(raw.into()));
     }
 
     #[test]
