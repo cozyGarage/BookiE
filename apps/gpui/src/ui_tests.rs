@@ -940,6 +940,25 @@ fn the_palette_opens_one_new_connection_tab_with_the_default_port(cx: &mut TestA
     });
 }
 
+#[gpui::test]
+fn palette_end_keeps_the_last_command_in_view(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-shift-p");
+    cx.run_until_parked();
+    cx.simulate_keystrokes("end");
+    cx.run_until_parked();
+    view.read_with(cx, |view, cx| {
+        let count = view.palette_shown(cx).len();
+        assert!(count > 20);
+        assert_eq!(view.palette.index, count - 1);
+        let scroll = &view.palette.scroll;
+        let item = scroll.bounds_for_item(count - 1).expect("last command was laid out");
+        let viewport = scroll.bounds();
+        assert!(item.top() + scroll.offset().y >= viewport.top());
+        assert!(item.bottom() + scroll.offset().y <= viewport.bottom());
+    });
+}
+
 struct Tiny;
 
 struct CountingSource(std::sync::Arc<std::sync::atomic::AtomicUsize>);

@@ -90,9 +90,20 @@ impl GridView {
         let key = stroke.key.as_str();
         if self.palette.open {
             match key {
-                "down" | "up" => {
+                "down" | "up" | "home" | "end" | "pageup" | "pagedown" => {
                     let count = self.palette_len(cx);
-                    self.palette.index = palette_step(self.palette.index, count, key == "down");
+                    self.palette.index = self.palette.index.min(count.saturating_sub(1));
+                    self.palette.index = match key {
+                        "home" => 0,
+                        "end" => count.saturating_sub(1),
+                        "pageup" => self.palette.index.saturating_sub(10),
+                        "pagedown" => self.palette.index.saturating_add(10).min(count.saturating_sub(1)),
+                        _ => palette_step(self.palette.index, count, key == "down"),
+                    };
+                    if count > 0 {
+                        self.palette.scroll.scroll_to_item(self.palette.index);
+                    }
+                    cx.stop_propagation();
                     cx.notify();
                 }
                 "escape" => self.close_palette(window, cx),
