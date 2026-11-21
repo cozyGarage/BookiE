@@ -374,11 +374,6 @@ impl Render for GridView {
                 root.font_family(self.fonts.settings.ui_family.clone())
             })
             .track_focus(&self.focus)
-            .capture_key_down(cx.listener(|this, event: &gpui::KeyDownEvent, window, cx| {
-                if this.palette.open && matches!(event.keystroke.key.as_str(), "up" | "down" | "home" | "end" | "pageup" | "pagedown") {
-                    this.key_down(event, window, cx);
-                }
-            }))
             .on_key_down(cx.listener(Self::key_down))
             .on_mouse_move(cx.listener(Self::drag_resize))
             .on_mouse_up(

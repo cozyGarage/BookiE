@@ -8,6 +8,15 @@ use crate::{GridView, Tab, palette_step};
 
 impl GridView {
     pub(super) fn intercept_key(&mut self, event: &KeystrokeEvent, window: &mut Window, cx: &mut Context<Self>) {
+        if self.palette.open {
+            let key = event.keystroke.key.as_str();
+            if matches!(key, "up" | "down" | "home" | "end" | "pageup" | "pagedown") {
+                self.move_palette_selection(key, cx);
+                cx.stop_propagation();
+                cx.notify();
+            }
+            return;
+        }
         let modifiers = event.keystroke.modifiers;
         if !self.grid_key_ready(window, modifiers.control || modifiers.alt) {
             return;
@@ -23,6 +32,21 @@ impl GridView {
         if plain && self.cross_page_edge(key) {
             cx.stop_propagation();
             cx.notify();
+        }
+    }
+
+    fn move_palette_selection(&mut self, key: &str, cx: &mut Context<Self>) {
+        let count = self.palette_len(cx);
+        self.palette.index = self.palette.index.min(count.saturating_sub(1));
+        self.palette.index = match key {
+            "home" => 0,
+            "end" => count.saturating_sub(1),
+            "pageup" => self.palette.index.saturating_sub(10),
+            "pagedown" => self.palette.index.saturating_add(10).min(count.saturating_sub(1)),
+            _ => palette_step(self.palette.index, count, key == "down"),
+        };
+        if count > 0 {
+            self.palette.scroll.scroll_to_item(self.palette.index);
         }
     }
 
