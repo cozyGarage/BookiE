@@ -170,6 +170,22 @@ impl GridView {
                 true,
             ),
             action(
+                "show-row-vertically",
+                if self.row_detail_open {
+                    "Hide row details"
+                } else {
+                    "Show this row vertically"
+                },
+                self.cell_cursor.is_some() && self.compare.is_none(),
+            ),
+            action(
+                "count-table-rows",
+                "Count rows in database table",
+                self.live.as_ref().is_some_and(|live| {
+                    live.supports_table_row_count() && !self.grid_is_query && self.compare.is_none()
+                }),
+            ),
+            action(
                 "continuous",
                 if self.continuous {
                     "Switch to paged scrolling"
@@ -188,7 +204,7 @@ impl GridView {
             enabled,
         };
         vec![
-            action("copy", "Copy selected rows", self.selection.is_some()),
+            action("copy", "Copy selected rows as TSV", self.selection.is_some()),
             action("copy-csv", "Copy selected rows as CSV", self.selection.is_some()),
             action("set-cells", "Set selected cells to a value…", self.set_cells_enabled()),
             action("selection-stats", "Show statistics for the selected rows", self.selection_stats_enabled()),
@@ -533,6 +549,8 @@ impl GridView {
             "clear-filter" => self.clear_filter(),
             "compare" => self.compare(false, cx),
             "detail" => self.toggle_detail(),
+            "show-row-vertically" => self.toggle_row_detail(),
+            "count-table-rows" => self.count_table_rows(cx),
             "continuous" => {
                 self.continuous = !self.continuous;
                 self.scroll.scroll_to_item_strict(0, ScrollStrategy::Top);
