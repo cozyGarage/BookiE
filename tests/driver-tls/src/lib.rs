@@ -21,7 +21,19 @@ pub async fn assert_connection_rejected(
     accepted: ConnectOptions,
     rejected: ConnectOptions,
 ) -> DriverError {
-    let connection = driver.connect(accepted).await.expect("verified control connection");
+    let connection = tokio::time::timeout(std::time::Duration::from_secs(30), async {
+        loop {
+            match driver.connect(accepted.clone()).await {
+                Ok(connection) => break connection,
+                Err(DriverError::ConnectionRefused) => {
+                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                }
+                Err(error) => panic!("verified control connection failed: {error:?}"),
+            }
+        }
+    })
+    .await
+    .expect("verified control connection must become available within 30 seconds");
     connection.ping().await.expect("control ping");
     connection.close().await.expect("close control");
     match driver.connect(rejected).await {
