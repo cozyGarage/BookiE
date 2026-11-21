@@ -1,5 +1,4 @@
-use std::collections::HashMap;
-use std::sync::Arc;
+use std::{collections::HashMap, ops::Range, sync::Arc};
 
 use gpui::{App, Context, IntoElement, Window, div, prelude::*, px};
 use gpui_kit::component::Sizable;
@@ -59,6 +58,8 @@ impl RowMap {
 #[derive(Default)]
 pub struct GridDelegate {
     columns: Vec<(String, f32)>,
+    content_widths: Vec<f32>,
+    available_width: f32,
     numeric: Vec<bool>,
     kinds: Vec<(String, bool)>,
     source: Option<Source>,
@@ -72,6 +73,46 @@ pub struct GridDelegate {
 }
 
 impl TableDelegate for GridDelegate {
+    fn visible_rows_changed(
+        &mut self,
+        visible: Range<usize>,
+        window: &mut Window,
+        cx: &mut Context<TableState<Self>>,
+    ) {
+        let Some(source) = &self.source else { return };
+        if self.map.compare.is_some()
+            || self.content_widths.len() != self.columns.len()
+            || !visible.clone().take(64).any(|row| self.map.source_row(row).is_some_and(|index| source.row_ref(index).is_some()))
+        {
+            return;
+        }
+        let measured = measure_visible_columns(
+            source,
+            &self.map,
+            &self.columns,
+            &self.edits,
+            visible.start,
+            visible.len(),
+            |text| measure_text(text, window),
+        );
+        for (current, measured) in self.content_widths.iter_mut().zip(measured) {
+            *current = current.max(measured);
+        }
+        let mut columns = self.columns.clone();
+        for ((_, width), measured) in columns.iter_mut().zip(&self.content_widths) {
+            *width = *measured;
+        }
+        fill_text_columns(&mut columns, &self.numeric, self.available_width);
+        if columns == self.columns {
+            return;
+        }
+        self.columns = columns;
+        let table = cx.entity();
+        window.on_next_frame(move |_, cx| {
+            let _ = table.update(cx, |table, cx| table.refresh(cx));
+        });
+    }
+
     fn render_empty(&mut self, _window: &mut Window, cx: &mut Context<TableState<Self>>) -> impl IntoElement {
         div()
             .size_full()
@@ -324,7 +365,7 @@ impl GridView {
         }
     }
 
-    pub(crate) fn sync_table(&self, available_width: f32, cx: &mut Context<Self>) {
+    pub(crate) fn sync_table(&self, available_width: f32, window: &mut Window, cx: &mut Context<Self>) {
         let columns: Vec<(String, f32)> = self
             .source
             .columns()
@@ -355,8 +396,31 @@ impl GridView {
         } else {
             columns
         };
-        fill_last_column(&mut columns, available_width);
         let map = self.row_map();
+        let table = self.table.read(cx);
+        let delegate = table.delegate();
+        let widths_match = delegate.source.as_ref().is_some_and(|source| Arc::ptr_eq(source, &self.source))
+            && delegate.map == map
+            && delegate.edits == self.cell_edit.edits
+            && delegate.content_widths.len() == columns.len();
+        let content_widths = if widths_match {
+            delegate.content_widths.clone()
+        } else {
+            let start = table.vertical_scroll_handle.0.borrow().base_handle.top_item();
+            measure_visible_columns(
+                &self.source,
+                &map,
+                &columns,
+                &self.cell_edit.edits,
+                start,
+                self.viewport_rows,
+                |text| measure_text(text, window),
+            )
+        };
+        for ((_, width), measured) in columns.iter_mut().zip(&content_widths) {
+            *width = *measured;
+        }
+        fill_text_columns(&mut columns, &numeric, available_width);
         let pin_scope = self.pin_scope();
         let editor = self.cell_edit.active.as_ref().and_then(|editing| {
             let dataset = self.dataset_index_of(editing.row)?.checked_sub(map.base)?;
@@ -378,6 +442,8 @@ impl GridView {
             }
             let delegate = table.delegate_mut();
             delegate.cached = None;
+            delegate.content_widths = content_widths;
+            delegate.available_width = available_width;
             let pinned_columns = pin_scope
                 .as_ref()
                 .and_then(|scope| delegate.pin_counts.get(scope))
@@ -450,15 +516,103 @@ fn header_kind(data_type: &str, primary_key: bool) -> String {
     }
 }
 
-fn fill_last_column(columns: &mut [(String, f32)], available_width: f32) {
-    let Some(last) = columns.len().checked_sub(1) else {
-        return;
-    };
+const MIN_CONTENT_WIDTH: f32 = 56.0;
+const MAX_CONTENT_WIDTH: f32 = 360.0;
+const MAX_MEASURE_CELLS: usize = 2048;
+
+fn fill_text_columns(columns: &mut [(String, f32)], numeric: &[bool], available_width: f32) {
     if !available_width.is_finite() || available_width <= 0.0 {
         return;
     }
-    let preceding_width: f32 = columns[..last].iter().map(|(_, width)| width).sum();
-    columns[last].1 = columns[last].1.max((available_width - preceding_width).max(0.0));
+    let mut remaining = (available_width - columns.iter().map(|(_, width)| width).sum::<f32>()).max(0.0);
+    while remaining > 0.5 {
+        let flexible: Vec<usize> = columns
+            .iter()
+            .enumerate()
+            .filter_map(|(index, (_, width))| {
+                (!numeric.get(index).copied().unwrap_or(false) && *width < MAX_CONTENT_WIDTH).then_some(index)
+            })
+            .collect();
+        if flexible.is_empty() {
+            break;
+        }
+        let share = remaining / flexible.len() as f32;
+        let mut used = 0.0;
+        for index in flexible {
+            let add = share.min(MAX_CONTENT_WIDTH - columns[index].1);
+            columns[index].1 += add;
+            used += add;
+        }
+        if used <= 0.0 {
+            break;
+        }
+        remaining -= used;
+    }
+}
+
+fn measure_visible_columns(
+    source: &Source,
+    map: &RowMap,
+    columns: &[(String, f32)],
+    edits: &Edits,
+    start: usize,
+    viewport_rows: usize,
+    mut measure: impl FnMut(&str) -> f32,
+) -> Vec<f32> {
+    let mut widths: Vec<f32> = columns
+        .iter()
+        .map(|(name, _)| measure(name).max(MIN_CONTENT_WIDTH).min(MAX_CONTENT_WIDTH))
+        .collect();
+    if columns.is_empty() || map.compare.is_some() {
+        return widths;
+    }
+    let row_limit = viewport_rows.max(1).saturating_add(4).min(64);
+    let cell_limit_rows = (MAX_MEASURE_CELLS / columns.len().max(1)).max(1);
+    let end = start.saturating_add(row_limit.min(cell_limit_rows)).min(map.count);
+    let mut borrowed_row = false;
+    for row in start.min(end)..end {
+        let Some(source_row) = map.source_row(row) else { continue };
+        let Some(cells) = source.row_ref(source_row) else { continue };
+        borrowed_row = true;
+        for (column, cell) in cells.iter().take(widths.len()).enumerate() {
+            let preview = cell_preview(edits.get(&(source_row, column)).unwrap_or(cell));
+            widths[column] = widths[column].max(measure(&preview).min(MAX_CONTENT_WIDTH));
+        }
+    }
+    if !borrowed_row {
+        for (width, (_, fallback)) in widths.iter_mut().zip(columns) {
+            *width = (*width).max((*fallback).min(MAX_CONTENT_WIDTH));
+        }
+    }
+    widths
+}
+
+fn measure_text(text: &str, window: &Window) -> f32 {
+    if text.is_empty() {
+        return 0.0;
+    }
+    let style = window.text_style();
+    let normalized;
+    let text = if text.contains(['\n', '\r', '\t']) {
+        normalized = text.replace(['\n', '\r', '\t'], " ");
+        normalized.as_str()
+    } else {
+        text
+    };
+    let run = gpui::TextRun {
+        len: text.len(),
+        font: style.font(),
+        color: style.color,
+        background_color: None,
+        underline: None,
+        strikethrough: None,
+    };
+    f32::from(
+        window
+            .text_system()
+            .shape_line(text.into(), style.font_size.to_pixels(window.rem_size()), &[run], None)
+            .width,
+    ) + 12.0
 }
 
 fn labels(cells: &[Cell], numeric: &[bool]) -> Vec<(String, bool)> {
@@ -645,6 +799,32 @@ mod tests {
     }
 
     #[test]
+    fn visible_values_size_columns_without_cloning_rows_or_using_type_guesses() {
+        let source = Arc::new(BorrowedRowSource {
+            cells: vec![
+                Cell::Int(7),
+                Cell::Text("2026-11-20T16:44:22.133000+01:00".into()),
+            ],
+            row_copies: AtomicUsize::new(0),
+        });
+        let source_dyn: Source = source.clone();
+        let columns = vec![("id".into(), 120.0), ("created_at".into(), 272.0)];
+        let widths = measure_visible_columns(
+            &source_dyn,
+            &RowMap { count: 1, ..Default::default() },
+            &columns,
+            &Edits::default(),
+            0,
+            20,
+            |text| text.chars().count() as f32 * 8.5 + 12.0,
+        );
+
+        assert_eq!(widths[0], MIN_CONTENT_WIDTH);
+        assert!(widths[1] > columns[1].1);
+        assert_eq!(source.row_copies.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
     fn borrowed_wide_rows_format_only_requested_cells_and_keep_pending_edits() {
         let source = Arc::new(BorrowedRowSource {
             cells: vec![Cell::Int(7); 512],
@@ -744,17 +924,21 @@ mod tests {
     }
 
     #[test]
-    fn the_last_column_fills_only_unused_viewport_space() {
-        let mut columns = vec![("id".into(), 200.0), ("label".into(), 100.0)];
-        fill_last_column(&mut columns, 520.0);
-        assert_eq!(columns, vec![("id".into(), 200.0), ("label".into(), 320.0)]);
+    fn spare_width_is_shared_by_text_columns_without_widening_numbers() {
+        let mut columns = vec![("id".into(), 56.0), ("created_at".into(), 200.0), ("name".into(), 100.0)];
+        fill_text_columns(&mut columns, &[true, false, false], 800.0);
+        assert_eq!(columns[0].1, 56.0);
+        assert_eq!(columns[1].1, MAX_CONTENT_WIDTH);
+        assert_eq!(columns[2].1, MAX_CONTENT_WIDTH);
 
-        fill_last_column(&mut columns, 250.0);
-        assert_eq!(columns, vec![("id".into(), 200.0), ("label".into(), 320.0)]);
+        fill_text_columns(&mut columns, &[true, false, false], 250.0);
+        assert_eq!(columns[0].1, 56.0);
+        assert_eq!(columns[1].1, MAX_CONTENT_WIDTH);
+        assert_eq!(columns[2].1, MAX_CONTENT_WIDTH);
     }
 
     #[test]
     fn an_empty_result_has_no_column_to_expand() {
-        fill_last_column(&mut [], 520.0);
+        fill_text_columns(&mut [], &[], 520.0);
     }
 }
