@@ -264,3 +264,26 @@ mod port_tests {
         assert_eq!(super::ssh_port("65536"), 0);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use gpui::TestAppContext;
+
+    #[gpui::test]
+    fn system_openssh_hides_the_add_jump_host_control(cx: &mut TestAppContext) {
+        let (view, cx) = crate::ui_tests::open(cx);
+        cx.simulate_resize(gpui::size(gpui::px(1100.0), gpui::px(1600.0)));
+        view.update(cx, |view, cx| {
+            view.tabs.open_new_connection();
+            view.connection_form.ssh.on = true;
+            cx.notify();
+        });
+        cx.run_until_parked();
+        assert!(cx.debug_bounds("Add jump host").is_some());
+        let openssh = cx.debug_bounds("System OpenSSH").expect("System OpenSSH choice is rendered");
+        cx.simulate_click(openssh.center(), Default::default());
+        cx.run_until_parked();
+        view.read_with(cx, |view, _| assert!(view.connection_form.ssh.openssh));
+        assert!(cx.debug_bounds("Add jump host").is_none());
+    }
+}
