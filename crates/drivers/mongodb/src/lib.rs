@@ -106,7 +106,7 @@ impl DatabaseDriver for MongodbDriver {
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 const METADATA_SAMPLE_SIZE: i64 = 128;
-const METADATA_SAMPLE_BATCH_SIZE: u32 = 1;
+const METADATA_SAMPLE_BATCH_SIZE: u32 = 16;
 const METADATA_SAMPLE_MAX_FIELDS: usize = 4096;
 const METADATA_SAMPLE_MAX_FIELD_NAME_BYTES: usize = 1024 * 1024;
 

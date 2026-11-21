@@ -989,6 +989,8 @@ fn main() {
 }
 
 #[cfg(test)]
+mod follow_ui_tests;
+#[cfg(test)]
 mod grid_pin_tests;
 #[cfg(test)]
 mod live_ui_tests;
