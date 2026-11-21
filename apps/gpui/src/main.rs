@@ -103,6 +103,7 @@ enum Mode {
 enum Work {
     Load,
     Scan,
+    Count,
 }
 
 struct Ticket {
@@ -141,6 +142,7 @@ struct GridView {
     cell_cursor: Option<Cursor>,
     viewport_rows: usize,
     detail_open: bool,
+    row_detail_open: bool,
     catalog: Catalog,
     live: Option<std::sync::Arc<bookie_gpui::live::LiveSession>>,
     connections: Vec<bookie_app_services::read_session::ConnectionSummary>,
@@ -175,6 +177,7 @@ struct GridView {
     measure: measure::Measure,
     loads: Ticket,
     scans: Ticket,
+    counts: Ticket,
     compare: Option<std::sync::Arc<Diff>>,
     status: String,
     selection: Option<Selection>,
@@ -473,6 +476,7 @@ impl GridView {
             search: panel_state::SearchState::new(find, filter),
             cell_edit: panel_state::CellEditState::new(editor),
             detail_open: false,
+            row_detail_open: false,
             catalog: Catalog::synthetic(),
             live: None,
             keymap: Keymap::default(),
@@ -487,6 +491,7 @@ impl GridView {
             check_histories: Vec::new(),
             loads: Ticket::new(),
             scans: Ticket::new(),
+            counts: Ticket::new(),
             status: String::new(),
         }
     }
@@ -574,10 +579,12 @@ impl GridView {
         match work_kind {
             Work::Load => self.invalidate_background(),
             Work::Scan => self.invalidate_scans(),
+            Work::Count => self.counts.invalidate(),
         }
         let ticket = match work_kind {
             Work::Load => &mut self.loads,
             Work::Scan => &mut self.scans,
+            Work::Count => &mut self.counts,
         };
         let generation = ticket.generation;
         let cancel = CancellationToken::new();
@@ -588,6 +595,7 @@ impl GridView {
                 let current = match work_kind {
                     Work::Load => this.loads.generation,
                     Work::Scan => this.scans.generation,
+                    Work::Count => this.counts.generation,
                 };
                 if current == generation {
                     apply(this, result);
@@ -602,6 +610,7 @@ impl GridView {
     fn invalidate_background(&mut self) {
         self.loads.invalidate();
         self.invalidate_scans();
+        self.counts.invalidate();
     }
 
     fn invalidate_scans(&mut self) {

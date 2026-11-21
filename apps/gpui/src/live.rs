@@ -43,6 +43,20 @@ pub const ROW_CAP: u64 = 100_000;
 
 const PAGE_TIMEOUT: Duration = Duration::from_secs(30);
 
+fn table_count_sql(driver_id: &str, table: &TableInfo) -> String {
+    let quote = |identifier| bookie_core::sql_dialect::quote_ident(driver_id, identifier);
+    let target = match table.schema.as_deref() {
+        Some(schema) => format!("{}.{}", quote(schema), quote(&table.name)),
+        None => quote(&table.name),
+    };
+    let count = if driver_id == "mssql" {
+        "COUNT_BIG(*)"
+    } else {
+        "COUNT(*)"
+    };
+    format!("SELECT {count} FROM {target}")
+}
+
 pub struct LiveSession {
     runtime: tokio::runtime::Runtime,
     sessions: ReadSessionStore,
@@ -58,6 +72,13 @@ pub struct LiveSession {
 }
 
 impl LiveSession {
+    pub fn supports_table_row_count(&self) -> bool {
+        matches!(
+            self.driver_id.as_str(),
+            "cassandra" | "clickhouse" | "duckdb" | "mssql" | "mysql" | "oracle" | "postgres" | "sqlite"
+        )
+    }
+
     pub fn open(origin: &Origin) -> Result<Arc<LiveSession>, String> {
         Self::open_controlled(origin, &CancellationToken::new())
     }
@@ -228,6 +249,42 @@ impl LiveSession {
             return Err("The command bridge returned an unexpected event.".into());
         };
         Ok(outcome)
+    }
+
+    pub fn count_table_rows(&self, table: &TableInfo, cancellation: &CancellationToken) -> Result<u64, String> {
+        if !self.supports_table_row_count() {
+            return Err("Exact row counts are not available for this database type.".into());
+        }
+        let sql = table_count_sql(&self.driver_id, table);
+        let epoch = Epoch(self.epoch.load(Ordering::Relaxed));
+        let control = OperationControl::new(
+            cancellation.clone(),
+            Some(tokio::time::Instant::now() + Duration::from_secs(60)),
+        );
+        let result = self.runtime.block_on(bridge_query(
+            &self.sessions,
+            self.session_id,
+            (&sql, &[]),
+            &control,
+            epoch,
+            &self.epoch,
+        ))?;
+        let Some(row) = result.rows.first().filter(|row| row.len() == 1) else {
+            return Err("The database did not return one exact row count.".into());
+        };
+        if result.truncated || result.rows.len() != 1 {
+            return Err("The database did not return one exact row count.".into());
+        }
+        match &row[0] {
+            bookie_core::Value::Int(count) => u64::try_from(*count).map_err(|_| "The row count was negative.".into()),
+            bookie_core::Value::Decimal(count) if count.scale() == 0 => {
+                u64::try_from(count.mantissa()).map_err(|_| "The row count is outside the supported range.".into())
+            }
+            bookie_core::Value::Text(count) => count
+                .parse::<u64>()
+                .map_err(|_| "The database returned an invalid row count.".into()),
+            _ => Err("The database returned an unsupported row count value.".into()),
+        }
     }
 
     pub fn table_columns(&self, table: &TableInfo) -> Result<Vec<ColumnInfo>, String> {
@@ -1339,6 +1396,22 @@ impl ResultSource for LiveTable {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn table_count_sql_uses_a_wide_count_for_sql_server_and_quotes_schema_names() {
+        let table = TableInfo {
+            schema: Some("orders schema".into()),
+            name: "order]items".into(),
+        };
+        assert_eq!(
+            super::table_count_sql("mssql", &table),
+            "SELECT COUNT_BIG(*) FROM [orders schema].[order]]items]"
+        );
+        assert_eq!(
+            super::table_count_sql("postgres", &table),
+            "SELECT COUNT(*) FROM \"orders schema\".\"order]items\""
+        );
+    }
+
     #[test]
     fn a_write_session_is_refused_when_the_saved_connection_changed_since_the_table_opened() {
         assert!(super::refuse_edited_connection(Some("a"), "a").is_ok());

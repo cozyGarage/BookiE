@@ -317,6 +317,7 @@ impl GridView {
             .children(banner)
             .child(self.data_table())
             .children(self.detail_panel(theme))
+            .children(self.row_detail_panel(theme))
     }
 
     fn main_layout(&self, sidebar: Option<Div>, tab_row: Stateful<Div>, content: Div) -> Div {
