@@ -204,9 +204,7 @@ pub(crate) fn choice_chip(
         .cursor_pointer()
         .border_1()
         .border_color(rgb(if selected { theme.foreground } else { theme.border }))
-        .when(selected, |chip| {
-            chip.bg(rgb(theme.foreground)).text_color(rgb(theme.background))
-        })
+        .when(selected, |chip| chip.bg(rgb(theme.foreground)).text_color(rgb(theme.background)))
         .child(label)
 }
 
@@ -688,10 +686,7 @@ mod choice_style_tests {
         for theme in [Theme::light(), Theme::dark()] {
             let mut selected = choice_chip("selected", "Selected", true, theme);
             let mut unselected = choice_chip("unselected", "Unselected", false, theme);
-            assert_eq!(
-                selected.style().background,
-                Some(gpui::Fill::from(gpui::Hsla::from(rgb(theme.foreground))))
-            );
+            assert_eq!(selected.style().background, Some(gpui::Fill::from(gpui::Hsla::from(rgb(theme.foreground)))));
             assert!(unselected.style().background.is_none());
         }
     }

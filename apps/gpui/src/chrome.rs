@@ -681,6 +681,7 @@ impl GridView {
         cx: &mut Context<Self>,
     ) -> Stateful<Div> {
         let selected = index == active;
+        let dirty = tab_is_dirty(tab, &self.catalog.grid_table, self.cell_edit.edits.len());
         let mut item = div()
             .id(("tab", index))
             .flex()
@@ -696,7 +697,8 @@ impl GridView {
                 tab_icon_name(tab),
                 if selected { theme.info } else { theme.muted_foreground },
             ))
-            .child(tab.title());
+            .child(tab.title())
+            .when(dirty, |el| el.child(div().text_color(rgb(theme.warning)).child("•")));
         item = if selected {
             item.bg(rgb(theme.background))
                 .text_color(rgb(theme.foreground))
@@ -732,7 +734,7 @@ impl GridView {
 
     pub fn settings_page(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
         let view = cx.entity();
-        let fonts = self.font_group(view.clone());
+        let fonts = self.font_group(view.clone(), cx);
         let dark_mode = gpui_kit::component::setting::SettingField::switch(
             |cx| Theme::current(cx).dark,
             move |on, cx| {
@@ -753,27 +755,35 @@ impl GridView {
             .flex_1()
             .min_h_0()
             .bg(rgb(theme.background))
-            .child(gpui_kit::component::setting::Settings::new("bookie-settings").page(page))
+            .child(
+                gpui_kit::component::setting::Settings::new("bookie-settings")
+                    .header_style(&gpui::StyleRefinement {
+                        display: Some(gpui::Display::None),
+                        ..Default::default()
+                    })
+                    .page(page),
+            )
     }
 
-    fn font_group(&self, view: gpui::Entity<Self>) -> gpui_kit::component::setting::SettingGroup {
+    fn font_group(&self, view: gpui::Entity<Self>, cx: &gpui::App) -> gpui_kit::component::setting::SettingGroup {
         use gpui_kit::component::setting::{NumberFieldOptions, SettingField, SettingGroup, SettingItem};
         let size_options = || NumberFieldOptions {
             min: f64::from(font_settings::MIN_SIZE),
             max: f64::from(font_settings::MAX_SIZE),
             step: 1.0,
         };
-        let family = |get: fn(&font_settings::FontSettings) -> &String,
-                      set: fn(&mut font_settings::FontSettings, String)| {
-            let (read, write) = (view.clone(), view.clone());
-            SettingField::input(
-                move |cx| get(&read.read(cx).fonts.settings).clone().into(),
-                move |value: gpui::SharedString, cx| {
-                    write.update(cx, |this, cx| {
-                        this.edit_fonts(|fonts| set(fonts, value.to_string()), cx)
-                    });
-                },
-            )
+        let ui_default = if self.fonts.current.is_empty() {
+            gpui_kit::component::theme::Theme::global(cx).font_family.clone()
+        } else {
+            self.fonts.current.clone()
+        };
+        let editor_default = gpui_kit::component::theme::Theme::global(cx).mono_font_family.clone();
+        let family = |index: usize, placeholder: gpui::SharedString| {
+            let input = self.font_inputs[index].clone();
+            SettingField::render(move |_, _, cx| {
+                input.update(cx, |input, cx| input.set_placeholder(&placeholder, cx));
+                div().w_64().child(input.clone())
+            })
         };
         let size = |get: fn(&font_settings::FontSettings) -> f32, set: fn(&mut font_settings::FontSettings, f32)| {
             let (read, write) = (view.clone(), view.clone());
@@ -788,18 +798,18 @@ impl GridView {
             )
         };
         SettingGroup::new()
-            .item(SettingItem::new(
-                "UI font",
-                family(|f| &f.ui_family, |f, v| f.ui_family = v),
-            ))
+            .item(
+                SettingItem::new("UI font", family(0, ui_default.clone()))
+                    .description(format!("Default: {ui_default}")),
+            )
             .item(SettingItem::new(
                 "UI font size",
                 size(|f| f.ui_size, |f, v| f.ui_size = v),
             ))
-            .item(SettingItem::new(
-                "Editor font",
-                family(|f| &f.editor_family, |f, v| f.editor_family = v),
-            ))
+            .item(
+                SettingItem::new("Editor font", family(1, editor_default.clone()))
+                    .description(format!("Default: {editor_default}")),
+            )
             .item(SettingItem::new(
                 "Editor font size",
                 size(|f| f.editor_size, |f, v| f.editor_size = v),
@@ -808,6 +818,14 @@ impl GridView {
 
     pub fn edit_fonts(&mut self, edit: impl FnOnce(&mut font_settings::FontSettings), cx: &mut Context<Self>) {
         edit(&mut self.fonts.settings);
+        for (input, value) in self.font_inputs.iter().zip([
+            &self.fonts.settings.ui_family,
+            &self.fonts.settings.editor_family,
+        ]) {
+            if input.read(cx).content() != value {
+                input.update(cx, |input, cx| input.set_content_quiet(value, cx));
+            }
+        }
         if let Err(error) = font_settings::save(&self.fonts.settings) {
             self.status = format!("Could not save font settings: {error}");
         }
@@ -845,4 +863,29 @@ impl GridView {
         )
     }
 
+}
+
+fn tab_is_dirty(tab: &Tab, grid_table: &bookie_core::TableInfo, pending_edits: usize) -> bool {
+    pending_edits > 0 && matches!(tab, Tab::Table(table) if table == grid_table)
+}
+
+#[cfg(test)]
+mod tab_dirty_tests {
+    use super::*;
+
+    fn table(name: &str) -> bookie_core::TableInfo {
+        bookie_core::TableInfo {
+            schema: None,
+            name: name.into(),
+        }
+    }
+
+    #[test]
+    fn only_the_table_tab_with_pending_edits_is_marked() {
+        let open = table("customers");
+        assert!(tab_is_dirty(&Tab::Table(open.clone()), &open, 1));
+        assert!(!tab_is_dirty(&Tab::Table(open.clone()), &open, 0));
+        assert!(!tab_is_dirty(&Tab::Table(table("orders")), &open, 3));
+        assert!(!tab_is_dirty(&Tab::Query, &open, 3));
+    }
 }

@@ -8,6 +8,7 @@ pub mod size {
     pub const XL: f32 = 24.0;
     pub const COMPACT_CONTROL: f32 = 24.0;
     pub const SMALL_CONTROL: f32 = 28.0;
+    pub const GRID_HEADER: f32 = 40.0;
     pub const FORM_CONTROL: f32 = 32.0;
     pub const CONTROL_RADIUS: f32 = 4.0;
     pub const SURFACE_RADIUS: f32 = 6.0;
@@ -52,6 +53,7 @@ pub struct Theme {
     pub success: u32,
     pub warning: u32,
     pub destructive: u32,
+    pub edited: u32,
 }
 
 impl Default for Theme {
@@ -81,6 +83,7 @@ impl Theme {
             success: 0x16a34a,
             warning: 0xd97706,
             destructive: 0xe7000b,
+            edited: 0xfef3c7,
         }
     }
 
@@ -104,6 +107,7 @@ impl Theme {
             success: 0x4ade80,
             warning: 0xfbbf24,
             destructive: 0xf3625f,
+            edited: 0x4a3b12,
         }
     }
 

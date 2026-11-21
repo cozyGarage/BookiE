@@ -402,6 +402,47 @@ impl GridView {
         )
     }
 
+    pub(crate) fn edits_bar(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Div> {
+        let count = self.cell_edit.edits.len();
+        if count == 0 || self.compare.is_some() || self.save.busy {
+            return None;
+        }
+        let can_save = self.can_save_edits();
+        let label = if can_save {
+            format!("{count} change(s) pending")
+        } else {
+            format!("{count} edit(s) in this view only; nothing is saved")
+        };
+        Some(
+            div()
+                .flex()
+                .items_center()
+                .gap_2()
+                .px_2()
+                .py_1()
+                .flex_none()
+                .bg(rgb(theme.chrome))
+                .border_b_1()
+                .border_color(rgb(theme.border))
+                .child(div().flex_1().min_w_0().child(label))
+                .when(can_save, |bar| {
+                    bar.child(
+                        primary_button(
+                            "preview-pending-sql",
+                            "Preview SQL",
+                            "Review the statements, then save or cancel",
+                            theme,
+                        )
+                        .on_click(cx.listener(|this, _, _, cx| this.request_save(cx))),
+                    )
+                })
+                .child(ghost("discard-pending-edits", "Discard", theme).on_click(cx.listener(|this, _, _, cx| {
+                    this.discard_view_edits();
+                    cx.notify();
+                }))),
+        )
+    }
+
     pub(crate) fn save_bar(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Div> {
         let pending = self.save.pending.as_ref()?;
         Some(
