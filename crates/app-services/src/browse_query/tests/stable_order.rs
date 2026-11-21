@@ -17,6 +17,34 @@ fn postgres_table_without_pk_uses_ctid_as_sort_tie_breaker() {
 }
 
 #[test]
+fn descending_nullable_sort_keeps_the_same_order_when_paging_backwards() {
+    let columns = [column("id", true), column("rank", false)];
+    let target = BrowseTarget {
+        driver_id: "postgres",
+        schema: None,
+        table: "items",
+        columns: &columns,
+        filter: &FilterSet::default(),
+        hidden_columns: None,
+        long_text_preview: false,
+        supports_reverse_keyset: true,
+    };
+    for page in [
+        target.page(20_000, 25, Some((1, false)), Some(&[Value::Int(4)])),
+        target.page_before(20_000, 25, Some((1, false)), Some(&[Value::Int(4)])),
+    ] {
+        let PageQuery::Sql(page) = page.unwrap() else {
+            panic!("expected sorted SQL")
+        };
+        assert!(
+            page.sql
+                .ends_with("ORDER BY \"rank\" DESC NULLS LAST, \"id\" ASC LIMIT 25 OFFSET 20000")
+        );
+        assert!(!page.reverse_rows);
+    }
+}
+
+#[test]
 fn non_postgres_table_without_pk_or_sort_keeps_native_ordering() {
     assert_eq!(resolved_order_by("mysql", &[column("name", false)], None, true), None);
 }

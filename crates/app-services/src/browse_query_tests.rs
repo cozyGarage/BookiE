@@ -114,7 +114,7 @@ fn hidden_sort_column_stays_in_order_clause_and_composite_keys_stay_projected() 
     assert_eq!(page.projected_columns, Some(vec![0, 1, 2]));
     assert!(
         page.sql
-            .ends_with("ORDER BY \"rank\" ASC, \"tenant\" ASC, \"id\" ASC LIMIT 100 OFFSET 0")
+            .ends_with("ORDER BY \"rank\" ASC NULLS LAST, \"tenant\" ASC, \"id\" ASC LIMIT 100 OFFSET 0")
     );
 }
 

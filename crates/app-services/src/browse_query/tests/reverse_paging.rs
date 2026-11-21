@@ -169,7 +169,7 @@ fn explicit_sort_ignores_a_keyset_cursor_and_keeps_offset_pagination() {
     else {
         panic!("expected offset SQL")
     };
-    assert!(page.sql.contains("ORDER BY \"rank\" ASC, \"id\" ASC"));
+    assert!(page.sql.contains("ORDER BY \"rank\" ASC NULLS LAST, \"id\" ASC"));
     assert!(
         page.sql
             .ends_with(&format!("LIMIT 25 OFFSET {KEYSET_OFFSET_THRESHOLD}"))
