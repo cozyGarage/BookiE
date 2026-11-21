@@ -146,6 +146,7 @@ struct GridView {
     keymap: Keymap,
     dark_mode: bool,
     tabs: Tabs,
+    window_title_tab: Option<Tab>,
     tab_scroll: ScrollHandle,
     sql_input: Entity<EditorState>,
     run_tabs: panel_state::RunTabs,
@@ -444,6 +445,7 @@ impl GridView {
             live: None,
             keymap: Keymap::default(),
             tabs: Tabs::default(),
+            window_title_tab: None,
             tab_scroll: ScrollHandle::new(),
             scroll: UniformListScrollHandle::new(),
             run_tabs: panel_state::RunTabs::new(runs::RunSlot::new(first_run(total), None)),
@@ -825,6 +827,7 @@ fn main() {
             let opened = cx.open_window(
                 WindowOptions {
                     window_bounds: Some(WindowBounds::Windowed(bounds)),
+                    app_id: Some("com.bookie.linux".into()),
                     ..Default::default()
                 },
                 |window, cx| {
@@ -869,6 +872,8 @@ mod save_ui_tests;
 mod typed_value_ui_tests;
 #[cfg(test)]
 mod ui_tests;
+#[cfg(test)]
+mod window_identity_tests;
 
 fn load_keymap() -> Keymap {
     let Some(path) = bookie_app_services::config_io::xdg_config_path("gpui-keymap.json") else {

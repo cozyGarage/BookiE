@@ -4,6 +4,11 @@ use crate::palette_state::PaletteMode;
 
 impl GridView {
     fn sync_render_state(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let tab = self.tabs.current();
+        if self.window_title_tab.as_ref() != Some(tab) {
+            window.set_window_title(&format!("{} — BookiE", tab.title()));
+            self.window_title_tab = Some(tab.clone());
+        }
         if self.keystroke_hook.is_none() {
             let view = cx.entity();
             self.keystroke_hook = Some(cx.intercept_keystrokes(move |event, window, cx| {
