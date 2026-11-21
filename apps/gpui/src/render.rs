@@ -34,6 +34,11 @@ impl GridView {
         let sidebar_width = if self.sidebar.open { self.sidebar.width } else { 0.0 };
         let grid_width = (f32::from(window.viewport_size().width) - sidebar_width).max(0.0);
         self.sync_table(grid_width, cx);
+        if self.synced_width != grid_width {
+            self.synced_width = grid_width;
+            let table = self.table.clone();
+            window.on_next_frame(move |_, cx| table.update(cx, |_, cx| cx.notify()));
+        }
     }
 
     fn pager_labels(&self) -> (String, String) {
