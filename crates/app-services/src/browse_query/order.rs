@@ -6,11 +6,12 @@ pub(super) fn resolved_order_by(
     sort: Option<(usize, bool)>,
     row_id_order: bool,
 ) -> Option<String> {
+    let is_postgres = driver_id == "postgres";
     let mut terms = Vec::new();
     let selected = sort.and_then(|(index, ascending)| {
         columns.get(index).map(|column| {
             let direction = if ascending { "ASC" } else { "DESC" };
-            let null_order = if driver_id == "postgres" { " NULLS LAST" } else { "" };
+            let null_order = if is_postgres { " NULLS LAST" } else { "" };
             terms.push(format!(
                 "{} {direction}{null_order}",
                 bookie_core::sql_dialect::quote_ident(driver_id, &column.name)
@@ -27,7 +28,7 @@ pub(super) fn resolved_order_by(
             bookie_core::sql_dialect::quote_ident(driver_id, &column.name)
         ));
     }
-    if row_id_order && driver_id == "postgres" && !columns.iter().any(|column| column.primary_key) {
+    if row_id_order && is_postgres && !columns.iter().any(|column| column.primary_key) {
         terms.push("ctid ASC".to_owned());
     }
     (!terms.is_empty()).then(|| terms.join(", "))
