@@ -33,7 +33,7 @@ impl GridView {
             .collapse_when_narrow(f32::from(window.viewport_size().width));
         let sidebar_width = if self.sidebar.open { self.sidebar.width } else { 0.0 };
         let grid_width = (f32::from(window.viewport_size().width) - sidebar_width).max(0.0);
-        self.sync_table(grid_width, cx);
+        self.sync_table(grid_width, window, cx);
         if self.synced_width != grid_width {
             self.synced_width = grid_width;
             let table = self.table.clone();
@@ -99,8 +99,8 @@ impl GridView {
         let (progress, range_label) = self.pager_labels();
         let pager = div()
             .flex()
-            .flex_wrap()
-            .max_w_full()
+            .flex_none()
+            .debug_selector(|| "grid-pager".into())
             .items_center()
             .gap_1()
             .child(div().child(progress));
@@ -160,6 +160,7 @@ impl GridView {
     fn grid_action_buttons(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
         div()
             .flex()
+            .debug_selector(|| "grid-actions".into())
             .items_center()
             .gap_1()
             .child(
@@ -217,10 +218,12 @@ impl GridView {
             )
     }
 
-    fn grid_control_strip(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+    fn grid_control_strip(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
         div()
+            .id("grid-controls")
             .flex()
-            .flex_wrap()
+            .min_w_0()
+            .overflow_x_scroll()
             .items_center()
             .gap_1()
             .px_2()
@@ -302,7 +305,7 @@ impl GridView {
         })
     }
 
-    fn grid_pane(&self, theme: Theme, strip: Div, bars: (Option<Div>, Option<Div>, Option<Div>, Option<Div>, Option<Div>)) -> Div {
+    fn grid_pane(&self, theme: Theme, strip: Stateful<Div>, bars: (Option<Div>, Option<Div>, Option<Div>, Option<Div>, Option<Div>)) -> Div {
         let (filter_row, compare_bar, save_bar, banner, insert_form) = bars;
         div()
             .flex_1()

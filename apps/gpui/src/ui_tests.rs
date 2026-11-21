@@ -22,6 +22,24 @@ pub(super) fn open(cx: &mut TestAppContext) -> (gpui::Entity<GridView>, &mut Vis
 }
 
 #[gpui::test]
+fn opening_the_filter_keeps_grid_controls_on_one_line_at_default_width(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_resize(gpui::size(gpui::px(1100.0), gpui::px(800.0)));
+    cx.update(|_, cx| view.update(cx, |view, cx| {
+        view.search.filter_visible = true;
+        cx.notify();
+    }));
+    cx.run_until_parked();
+    let pager = cx.debug_bounds("grid-pager").expect("pager is rendered");
+    let actions = cx.debug_bounds("grid-actions").expect("actions are rendered");
+    assert!(
+        pager.origin.y < actions.origin.y + actions.size.height
+            && actions.origin.y < pager.origin.y + pager.size.height,
+        "pager and grid actions should share a row"
+    );
+}
+
+#[gpui::test]
 fn a_valid_edit_is_applied_to_the_typed_cell_and_marked(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(2, 3, window, cx)));
@@ -1038,33 +1056,46 @@ fn painting_a_row_reads_the_source_once_and_keeps_pending_edits_available(cx: &m
     let (view, cx) = cx.add_window_view(|window, cx| GridView::with_source(source, Instant::now(), window, cx));
     cx.run_until_parked();
     let full = "💾".repeat(10_000);
-    view.update(cx, |view, cx| {
-        view.cell_edit.edits.insert((1, 1), Cell::Text(full.clone()));
-        requests.store(0, Ordering::Relaxed);
-        view.sync_table(0.0, cx);
-        view.table.update(cx, |table, _| {
-            let delegate = table.delegate_mut();
-            let edited = delegate.label_of(1, 1).0;
-            assert_eq!(edited, bookie_gpui::preview::cell_preview(&Cell::Text(full.clone())));
-            assert_ne!(edited, delegate.label_of(1, 0).0);
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.cell_edit.edits.insert((1, 1), Cell::Text(full.clone()));
+            requests.store(0, Ordering::Relaxed);
+            view.sync_table(0.0, window, cx);
+            view.table.update(cx, |table, _| {
+                let delegate = table.delegate_mut();
+                let edited = delegate.label_of(1, 1).0;
+                assert_eq!(edited, bookie_gpui::preview::cell_preview(&Cell::Text(full.clone())));
+                assert_ne!(edited, delegate.label_of(1, 0).0);
+            });
+            assert_eq!(requests.load(Ordering::Relaxed), 1);
         });
-        assert_eq!(requests.load(Ordering::Relaxed), 1);
     });
     cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(1, 1, window, cx)));
     view.read_with(cx, |view, cx| assert_eq!(view.cell_edit.editor.read(cx).content(), full));
 }
 
 #[gpui::test]
-fn grid_table_expands_the_last_column_to_fill_wide_viewports(cx: &mut TestAppContext) {
+fn grid_table_shares_wide_viewport_space_without_widening_numeric_columns(cx: &mut TestAppContext) {
     let source = std::sync::Arc::new(bookie_gpui::source::Synthetic::new(1));
     cx.update(text_input::bind_keys);
     let (view, cx) = cx.add_window_view(|window, cx| GridView::with_source(source, Instant::now(), window, cx));
-    view.update(cx, |view, cx| view.sync_table(1_200.0, cx));
-    cx.run_until_parked();
-
-    view.read_with(cx, |view, cx| {
-        assert_eq!(view.table.read(cx).col_width(3), Some(gpui::px(560.0)));
-    });
+    let mut previous_text_width = 0.0;
+    for width in [800.0, 1_200.0] {
+        cx.simulate_resize(gpui::size(gpui::px(width), gpui::px(760.0)));
+        cx.run_until_parked();
+        view.read_with(cx, |view, cx| {
+            let table = view.table.read(cx);
+            let widths: Vec<f32> = (0..4)
+                .map(|column| f32::from(table.col_width(column).expect("synthetic column is rendered")))
+                .collect();
+            if width == 1_200.0 {
+                assert!(widths.iter().sum::<f32>() <= width);
+            }
+            assert!(widths[1] <= 360.0 && widths[3] <= 360.0);
+            assert!(widths[1] + widths[3] >= previous_text_width);
+            previous_text_width = widths[1] + widths[3];
+        });
+    }
 }
 
 #[gpui::test]

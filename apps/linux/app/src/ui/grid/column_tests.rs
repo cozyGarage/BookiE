@@ -135,6 +135,28 @@ fn comments_are_in_column_details_without_growing_every_header() {
 }
 
 #[test]
+#[ignore = "requires an isolated GTK display"]
+fn header_menu_displays_database_column_underscores_literally() {
+    gtk4::init().unwrap();
+
+    for name in ["created_at", "_x", "a__b"] {
+        let mut info = col("text", false);
+        info.name = name.into();
+        let menu = header_details(&info, false, false);
+        let details = menu.item_link(0, "section").unwrap();
+        let label = details
+            .item_attribute_value(0, "label", None)
+            .unwrap()
+            .get::<String>()
+            .unwrap();
+        let rendered = gtk4::Label::new(None);
+        rendered.set_text_with_mnemonic(&label);
+
+        assert_eq!(rendered.text().as_str(), format!("Column: {name}"));
+    }
+}
+
+#[test]
 fn a_result_column_takes_the_comment_from_the_table_metadata() {
     let mut result = col("int4", false);
     result.name = "id".into();
