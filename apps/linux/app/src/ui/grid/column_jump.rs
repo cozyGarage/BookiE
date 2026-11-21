@@ -248,6 +248,7 @@ fn reveal(view: &gtk::ColumnView, column: &gtk::ColumnViewColumn) -> bool {
     }
     column.set_visible(true);
     if let Some(model) = view.model().filter(|model| model.n_items() > 0) {
+        super::pinned_numbers::prepare_column_for_scroll(view, column);
         let selected = model.selection();
         let position = if selected.is_empty() { 0 } else { selected.minimum() };
         view.scroll_to(position, Some(column), gtk::ListScrollFlags::FOCUS, None);
