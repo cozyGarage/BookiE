@@ -4,6 +4,18 @@ pub struct Action {
     pub enabled: bool,
 }
 
+pub fn group(id: &str) -> &'static str {
+    match id {
+        "query" | "run" | "explain" | "favorites" | "save-favorite" | "delete-favorite" => "Query",
+        "add-column" | "rename-column" | "drop-column" | "add-index" | "drop-index" | "rename-table"
+        | "add-foreign-key" | "drop-foreign-key" | "show-structure" | "show-create-table" | "empty-table"
+        | "drop-table" => "Structure",
+        "save-changes" | "undo-edit" | "redo-edit" | "delete-rows" | "insert-row" | "filter" | "find"
+        | "save-filter" | "saved-filters" | "delete-saved-filter" => "Data",
+        _ => "Workspace",
+    }
+}
+
 pub fn fuzzy_score(query: &str, text: &str) -> u32 {
     let needle = query.trim().to_lowercase();
     let hay: Vec<char> = text.to_lowercase().chars().collect();
