@@ -2280,6 +2280,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::grid::column::tests::header_menu_displays_database_column_underscores_literally"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::browse_tab::chrome_tests::selected_row_details_refresh_after_save_and_discard"
     ]
   ],
