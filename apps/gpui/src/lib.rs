@@ -28,3 +28,5 @@ mod edit_tests;
 mod model_tests;
 #[cfg(test)]
 mod selection_tests;
+
+pub mod window_geometry;

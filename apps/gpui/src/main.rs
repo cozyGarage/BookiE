@@ -399,6 +399,9 @@ impl GridView {
     }
 
     fn with_source(source: Source, started: Instant, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        if !cfg!(test) {
+            Self::persist_window_geometry(window, cx);
+        }
         let total = source.total();
         let (find, filter, editor, sql_input) = Self::init_query_inputs(window, cx);
         let (sidebar_search, palette_input) = Self::init_chrome_inputs(window, cx);
@@ -489,6 +492,62 @@ impl GridView {
             scans: Ticket::new(),
             status: String::new(),
         }
+    }
+
+    fn persist_window_geometry(window: &mut Window, cx: &mut Context<Self>) {
+        let (sender, receiver) = std::sync::mpsc::channel::<()>();
+        let latest = std::sync::Arc::new(std::sync::Mutex::new(
+            None::<bookie_gpui::window_geometry::WindowGeometry>,
+        ));
+        let background_latest = latest.clone();
+        std::thread::spawn(move || {
+            while receiver.recv().is_ok() {
+                while receiver.recv_timeout(std::time::Duration::from_millis(300)).is_ok() {}
+                if let Ok(geometry) = background_latest.lock()
+                    && let Some(geometry) = *geometry
+                    && let Err(error) = geometry.save()
+                {
+                    tracing::warn!(%error, "could not save window geometry");
+                }
+            }
+        });
+        let window_id = window.window_handle().window_id();
+        let closing_latest = latest.clone();
+        let observer_latest = latest.clone();
+        cx.on_window_closed(move |_, id| {
+            if id == window_id
+                && let Ok(geometry) = closing_latest.lock()
+                && let Some(geometry) = *geometry
+                && let Err(error) = geometry.save()
+            {
+                tracing::warn!(%error, "could not save window geometry");
+            }
+        })
+        .detach();
+        cx.on_app_quit(move |_, _| {
+            if let Ok(geometry) = latest.lock()
+                && let Some(geometry) = *geometry
+                && let Err(error) = geometry.save()
+            {
+                tracing::warn!(%error, "could not save window geometry");
+            }
+            async {}
+        })
+        .detach();
+        cx.observe_window_bounds(window, move |_, window, _| {
+            let bounds = window.window_bounds().get_bounds();
+            let geometry = bookie_gpui::window_geometry::WindowGeometry {
+                x: bounds.origin.x.into(),
+                y: bounds.origin.y.into(),
+                width: bounds.size.width.into(),
+                height: bounds.size.height.into(),
+            };
+            if let Ok(mut latest) = observer_latest.lock() {
+                *latest = Some(geometry);
+                let _ = sender.send(());
+            }
+        })
+        .detach();
     }
 
     fn dataset_count(&self) -> u64 {
@@ -855,7 +914,30 @@ fn main() {
             text_input::bind_keys(cx);
             ui_theme::apply_editor_size(font_settings::load().editor_size, cx);
             Theme::named(std::env::var("BOOKIE_PROTOTYPE_THEME").ok().as_deref()).install(cx);
-            let bounds = Bounds::centered(None, size(px(width), px(height)), cx);
+            let saved = if std::env::var_os("BOOKIE_PROTOTYPE_WIDTH").is_some()
+                || std::env::var_os("BOOKIE_PROTOTYPE_HEIGHT").is_some()
+            {
+                None
+            } else {
+                bookie_gpui::window_geometry::WindowGeometry::load()
+            };
+            let saved = saved.filter(|saved| {
+                cx.displays().iter().any(|display| {
+                    let bounds = display.bounds();
+                    let x = f32::from(bounds.origin.x);
+                    let y = f32::from(bounds.origin.y);
+                    saved.visible_on(x, y, bounds.size.width.into(), bounds.size.height.into())
+                })
+            });
+            let bounds = saved.map_or_else(
+                || Bounds::centered(None, size(px(width), px(height)), cx),
+                |saved| {
+                    Bounds::new(
+                        gpui::point(px(saved.x), px(saved.y)),
+                        size(px(saved.width), px(saved.height)),
+                    )
+                },
+            );
             let opened = cx.open_window(
                 WindowOptions {
                     window_bounds: Some(WindowBounds::Windowed(bounds)),
