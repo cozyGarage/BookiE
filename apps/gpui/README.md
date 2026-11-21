@@ -10,6 +10,8 @@ It has its own `Cargo.toml` with an empty `[workspace]` table, so it is not a me
 
 The model in `src/model.rs` has no GPU dependency and is unit tested without a display. Its generator is deterministic (`value` is 9007199254740993 + row, `label` is `Sample N`, `state` is NULL for every third row and alternates true/false otherwise), Find with a 10,000-match cap, the filter predicates (`contains`, `=`, `!=`; `!=` keeps NULL), whole-row and keyed compare with exact counts and 200 shown differences, and the 5,000-row pager.
 
+Settings keeps appearance controls together. Connection access stays with each connection, export limits stay with the export operation, and keyboard shortcuts are available from the command palette. Global policy defaults and a configurable query row limit are not exposed by this frontend.
+
 The window (`src/main.rs`) has:
 
 - One wrapping strip: progress, pager (First, Previous page, range, Next page, Last), Find with Previous and Next match and a "Match N of M" status, Show matching rows, Compare…, Export all rows… (inert) and Continuous scrolling.

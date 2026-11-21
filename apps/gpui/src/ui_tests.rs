@@ -1794,6 +1794,33 @@ fn the_settings_tab_opens_and_shows_the_appearance_page(cx: &mut TestAppContext)
 }
 
 #[gpui::test]
+fn settings_font_inputs_keep_editable_values_and_show_defaults(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.tabs.open_settings();
+            view.edit_fonts(|fonts| {
+                fonts.ui_family.clear();
+                fonts.editor_family.clear();
+            }, cx);
+            cx.notify();
+        });
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, cx| {
+        assert!(!view.font_inputs[0].read(cx).placeholder().is_empty());
+        assert!(!view.font_inputs[1].read(cx).placeholder().is_empty());
+        assert_eq!(view.font_inputs[0].read(cx).content(), "");
+    });
+    cx.update(|_, cx| {
+        let input = view.read(cx).font_inputs[0].clone();
+        input.update(cx, |input, cx| input.set_content("Test Font", cx));
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert_eq!(view.fonts.settings.ui_family, "Test Font"));
+}
+
+#[gpui::test]
 fn the_palette_opens_the_history_tab_and_a_status_chip_narrows_the_list(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.simulate_keystrokes("ctrl-shift-p");
