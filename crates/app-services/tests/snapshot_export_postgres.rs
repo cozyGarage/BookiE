@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use bookie_app_services::export_pages::{PagePlan, PageRunner};
-use bookie_app_services::read_session::PostgresTableCursor;
+use bookie_app_services::read_session::{PostgresTableCursor, TableSort};
 use bookie_app_services::snapshot_export::SnapshotPages;
 use bookie_core::export::{CsvOptions, ExportError, ResultExport, ResultFormat, write_paged_file};
 use bookie_core::{
@@ -205,6 +205,45 @@ async fn live_table_cursor_keeps_a_snapshot_when_the_table_changes_between_pages
         .map(|id| vec![Value::Int(id), Value::Text(format!("row {id}"))])
         .collect();
     assert_eq!(seen, expected);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires Docker; run cargo test -p bookie-app-services --test snapshot_export_postgres -- --include-ignored"]
+async fn a_sorted_table_cursor_orders_by_the_requested_column_with_key_ties() {
+    let fixture = fixture().await;
+    fixture
+        .admin
+        .execute("UPDATE snap SET label = CASE WHEN id % 2 = 0 THEN 'same' ELSE 'other' END")
+        .await
+        .unwrap();
+    let guard = guard(&fixture, Arc::new(CapturingAudit::default()), "postgres").await;
+    let table = TableInfo {
+        schema: Some("public".into()),
+        name: "snap".into(),
+    };
+    let sort = TableSort {
+        column: "label".into(),
+        ascending: false,
+    };
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(60));
+    let mut cursor = PostgresTableCursor::open_sorted(&guard, &table, Some(&sort), &control)
+        .await
+        .unwrap();
+    let mut ids = Vec::new();
+    loop {
+        let page = cursor.next_page(&control).await.unwrap();
+        ids.extend(page.result.rows.iter().map(|row| row[0].clone()));
+        if !page.has_next_page {
+            break;
+        }
+    }
+    cursor.close().await.unwrap();
+    let expected: Vec<Value> = (1..=ROWS)
+        .filter(|id| id % 2 == 0)
+        .chain((1..=ROWS).filter(|id| id % 2 == 1))
+        .map(Value::Int)
+        .collect();
+    assert_eq!(ids, expected);
 }
 
 #[tokio::test(flavor = "multi_thread")]
