@@ -94,8 +94,6 @@ pub async fn sample_pubsub(
     })
 }
 
-/// Follows channel patterns until `cancel` fires (returns the count) or the server drops the
-/// connection (`Disconnected`). Each message is handed to `on_message`; the caller owns any buffer.
 pub async fn follow_pubsub(
     opts: ConnectOptions,
     patterns: &[String],
