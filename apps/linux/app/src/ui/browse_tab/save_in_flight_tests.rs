@@ -48,7 +48,7 @@ pub(super) fn launch_with_read_only(id: Uuid, read_only: bool) -> (Controller<Br
     launch_for_driver(id, read_only, "postgres", Some("public"))
 }
 
-fn launch_for_driver(
+pub(super) fn launch_for_driver(
     id: Uuid,
     read_only: bool,
     driver_id: &str,

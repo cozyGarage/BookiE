@@ -1358,7 +1358,7 @@ impl ResultSource for LiveTable {
             if self.snapshot_consistent {
                 " · snapshot for this load"
             } else {
-                " · concurrent changes may skip or repeat rows"
+                " · page order may change; rows may be skipped or repeated"
             }
         });
         let access = if self.editable() { "editable" } else { "read-only" };
@@ -1823,7 +1823,7 @@ mod tests {
         assert!(table.truncated);
         assert_eq!(
             table.origin(),
-            "sqlite · orders · read-only · concurrent changes may skip or repeat rows · 4 rows loaded; result may be incomplete"
+            "sqlite · orders · read-only · page order may change; rows may be skipped or repeated · 4 rows loaded; result may be incomplete"
         );
         let whole = LiveTable::load(
             &fixture(),
@@ -1836,9 +1836,9 @@ mod tests {
         .expect("load");
         assert_eq!(
             whole.origin(),
-            "sqlite · orders · read-only · concurrent changes may skip or repeat rows"
+            "sqlite · orders · read-only · page order may change; rows may be skipped or repeated"
         );
-        assert!(whole.origin().contains("concurrent changes may skip or repeat rows"));
+        assert!(whole.origin().contains("page order may change; rows may be skipped or repeated"));
     }
 
     #[test]
