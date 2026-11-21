@@ -1,1 +1,0 @@
-UI design guide: docs/ui-design.md sets the look (dbx tokens), the language (icon first, few words) and the building rules (extract at the third copy, spacing scale, state passed in); ADR 0054 proposes it for both apps.

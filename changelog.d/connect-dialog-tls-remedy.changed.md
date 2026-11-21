@@ -1,1 +1,0 @@
-The connection dialog grows with the window (up to 1000 px) so the TLS options are visible, and a "server does not support TLS" test or connect failure on a loopback host offers a "Set TLS to Disabled" button.

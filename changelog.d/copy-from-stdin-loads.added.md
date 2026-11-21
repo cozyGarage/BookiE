@@ -1,1 +1,0 @@
-In the SQL editor, a PostgreSQL COPY ... FROM STDIN block now loads its data (up to 64 MiB per block). The approval prompt shows only the command and the data size, and the audit never records the data.
