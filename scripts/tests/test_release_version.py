@@ -45,6 +45,7 @@ class ReleaseVersionTests(unittest.TestCase):
         gpui = root / "apps/gpui/Cargo.toml"
         gpui.parent.mkdir(parents=True)
         gpui.write_text('[package]\nname = "bookie-gpui"\nversion = "0.2.0"\n')
+        (gpui.parent / "Cargo.lock").write_text('[[package]]\nname = "bookie-gpui"\nversion = "0.2.0"\n')
         return crate, metadata
 
     def test_accepts_shared_version_and_preserves_older_releases(self):
@@ -92,3 +93,12 @@ class ReleaseVersionTests(unittest.TestCase):
             manifest = root / "Cargo.toml"
             manifest.write_text(manifest.read_text().replace('version = "0.2.0"', 'version = "0.2.0-dev"'))
             self.assertTrue(VERSION.problems(root))
+
+    def test_rejects_missing_or_stale_gpui_lock_entry(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.fixture(root)
+            lock = root / "apps/gpui/Cargo.lock"
+            for content in ('[[package]]\nname = "bookie-gpui"\nversion = "0.1.0"\n', 'package = []\n'):
+                lock.write_text(content)
+                self.assertTrue(any("Cargo.lock" in error for error in VERSION.problems(root)))
