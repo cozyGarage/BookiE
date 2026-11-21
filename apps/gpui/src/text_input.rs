@@ -97,6 +97,9 @@ impl TextInput {
     }
 
     pub fn set_placeholder(&mut self, placeholder: &str, cx: &mut Context<Self>) {
+        if self.placeholder.as_ref() == placeholder {
+            return;
+        }
         self.placeholder = placeholder.to_string().into();
         cx.notify();
     }
