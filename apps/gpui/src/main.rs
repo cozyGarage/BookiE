@@ -424,7 +424,7 @@ impl GridView {
                         tracing::warn!(%error, "could not save window geometry");
                 }
             }).detach();
-            cx.on_app_quit(move |_| {
+            cx.on_app_quit(move |_, _| {
                 if let Ok(geometry) = latest.lock()
                     && let Some(geometry) = *geometry
                     && let Err(error) = geometry.save() {
