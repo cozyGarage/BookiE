@@ -36,6 +36,7 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 - [ ] On MySQL or MariaDB, run `SELECT CAST('abc' AS SIGNED)`. A warning with code 1292 appears next to the result.
 - [ ] With the connection in an editor session, repeat the PostgreSQL steps. Messages come from the session's own statements only.
 - [ ] Hover the status line after a run. The tooltip shows the run time, and the approval wait when a write waited for approval, and says the server does not report its own time.
+- [ ] Run a streamed PostgreSQL query that returns rows, then hover the status line. The tooltip shows time to first row and result transfer. Run a streamed empty PostgreSQL query and confirm the tooltip shows completion time. Run a buffered MySQL query that returns rows and confirm first-row and transfer values are omitted.
 - [ ] Use an MCP client against the same connection and run the PostgreSQL notice statement. The tool result carries no messages.
 
 ## SQL result editing

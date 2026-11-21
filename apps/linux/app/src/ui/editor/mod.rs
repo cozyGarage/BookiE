@@ -1080,6 +1080,8 @@ impl SqlEditor {
                                     sql_preview,
                                     sql,
                                     spool,
+                                    query_started,
+                                    approval_wait_before,
                                 } => {
                                     let (accepted, delivered) = tokio::sync::oneshot::channel();
                                     sender.input(SqlEditorInput::Stream(streaming::Input::Started(
@@ -1093,6 +1095,8 @@ impl SqlEditor {
                                                 suggested_name: export_suggested_name.clone(),
                                             }),
                                             spool,
+                                            query_started,
+                                            approval_wait_before,
                                             accepted,
                                         },
                                     )));
@@ -1104,6 +1108,7 @@ impl SqlEditor {
                                     messages,
                                     spooled,
                                     lease,
+                                    first_row_ms,
                                 } => {
                                     let (accepted, delivered) = tokio::sync::oneshot::channel();
                                     sender.input(SqlEditorInput::Stream(streaming::Input::Page(
@@ -1114,6 +1119,7 @@ impl SqlEditor {
                                             messages,
                                             spooled,
                                             lease,
+                                            first_row_ms,
                                             accepted,
                                         },
                                     )));
