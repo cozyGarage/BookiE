@@ -335,7 +335,7 @@ pub fn build_column_view(
         .clone()
         .unwrap_or_else(|| Rc::new(Cell::new(tab_ctx.row_number_base)));
     row_number_base.set(tab_ctx.row_number_base);
-    let numbers = row_number_column::build(row_number_base.clone());
+    let numbers = row_number_column::build(row_number_base.clone(), tab_ctx.row_visibility.clone());
     column_view.append_column(&numbers);
 
     if let Some(sender) = menu_sender.as_ref() {

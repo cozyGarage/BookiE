@@ -31,6 +31,23 @@ fn cells(widget: &gtk4::Widget, found: &mut Vec<gtk4::glib::WeakRef<gtk4::Widget
     }
 }
 
+fn contains_cell_value(widget: &gtk4::Widget, value: &str) -> bool {
+    if widget
+        .downcast_ref::<gtk4::Label>()
+        .is_some_and(|label| label.text() == value)
+    {
+        return true;
+    }
+    let mut child = widget.first_child();
+    while let Some(current) = child {
+        if contains_cell_value(&current, value) {
+            return true;
+        }
+        child = current.next_sibling();
+    }
+    false
+}
+
 struct RetiredGrid {
     view: gtk4::glib::WeakRef<gtk4::ColumnView>,
     selection: gtk4::glib::WeakRef<gtk4::MultiSelection>,
@@ -245,6 +262,86 @@ fn a_wide_result_realizes_a_bounded_row_window() {
         "wide result realized {} cells across {} columns",
         cell_refs.len(),
         columns.len()
+    );
+    window.destroy();
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn a_narrow_wide_grid_does_not_construct_offscreen_cells() {
+    gtk4::init().unwrap();
+    let columns: Vec<_> = (0..512)
+        .map(|index| ColumnInfo {
+            name: format!("column-{index}"),
+            data_type: "TEXT".into(),
+            nullable: true,
+            primary_key: false,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: None,
+            domain_type: None,
+        })
+        .collect();
+    let result = Arc::new(QueryResult {
+        columns: columns.clone(),
+        rows: (0..100)
+            .map(|row| {
+                (0..columns.len())
+                    .map(|column| Value::Text(format!("value-{row}-{column}")))
+                    .collect()
+            })
+            .collect(),
+        truncated: false,
+    });
+    let (view, _) = build_column_view(
+        &result,
+        &columns,
+        "items",
+        None,
+        crate::ui::grid::GridSenders {
+            edit: None,
+            menu: None,
+            sort: None,
+        },
+        crate::ui::grid::GridEnv {
+            connection_id: None,
+            tab_ctx: TabGridContext::default(),
+            column_widths: None,
+            highlight_settings: None,
+            database: Arc::new(DatabaseService::new()),
+        },
+    );
+    let scrolled = super::wrap_grid_scrolled(&view);
+    let window = gtk4::Window::builder()
+        .default_width(640)
+        .default_height(300)
+        .child(&scrolled)
+        .build();
+    window.present();
+    drain();
+    let mut cell_refs = Vec::new();
+    cells(view.upcast_ref(), &mut cell_refs);
+    assert!(
+        cell_refs.len() <= 2_048,
+        "narrow viewport constructed {} cells for a 100 × 512 result",
+        cell_refs.len()
+    );
+    let adjustment = scrolled.hadjustment();
+    adjustment.set_value((adjustment.upper() - adjustment.page_size()).max(0.0));
+    drain();
+    let mut last_column_cells = Vec::new();
+    cells(view.upcast_ref(), &mut last_column_cells);
+    assert!(
+        contains_cell_value(view.upcast_ref(), "value-0-511"),
+        "the last result column must be rendered after horizontal scrolling"
+    );
+    assert!(
+        last_column_cells.len() <= 2_048,
+        "scrolling to the final column retained {} cells across the full result",
+        last_column_cells.len()
     );
     window.destroy();
 }
