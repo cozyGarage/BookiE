@@ -34,7 +34,7 @@ fn explicit_sort_appends_primary_key_tie_breakers() {
     let columns = vec![column("tenant", true), column("name", false), column("id", true)];
     assert_eq!(
         resolved_order_by("postgres", &columns, Some((1, false)), false).as_deref(),
-        Some("\"name\" DESC, \"tenant\" ASC, \"id\" ASC")
+        Some("\"name\" DESC NULLS LAST, \"tenant\" ASC, \"id\" ASC")
     );
 }
 
@@ -43,7 +43,7 @@ fn sorted_primary_key_is_not_duplicated() {
     let columns = vec![column("tenant", true), column("id", true)];
     assert_eq!(
         resolved_order_by("postgres", &columns, Some((0, false)), false).as_deref(),
-        Some("\"tenant\" DESC, \"id\" ASC")
+        Some("\"tenant\" DESC NULLS LAST, \"id\" ASC")
     );
 }
 

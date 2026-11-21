@@ -93,6 +93,8 @@ pub(crate) enum StreamUpdate {
         sql_preview: String,
         sql: String,
         spool: StreamResultSpool,
+        query_started: std::time::Instant,
+        approval_wait_before: std::time::Duration,
     },
     Page {
         sequence: u64,
@@ -100,6 +102,7 @@ pub(crate) enum StreamUpdate {
         messages: bookie_core::ServerMessages,
         spooled: bool,
         lease: bookie_results::stream_page_budget::StreamPageLease,
+        first_row_ms: Option<u128>,
     },
 }
 
@@ -272,16 +275,24 @@ fn statement_outcome(
     waited_before: std::time::Duration,
     result: StatementResult,
 ) -> StatementOutcome {
+    let elapsed_ms = elapsed_without_approval_wait(started, waited_before);
+    let first_row_ms = match &result.kind {
+        StatementOutcomeKind::Rows(result_sets) if result_sets.iter().all(|set| set.rows.is_empty()) => {
+            Some(elapsed_ms)
+        }
+        _ => None,
+    };
     StatementOutcome {
         identity,
         sql_preview: preview,
         sql,
-        elapsed_ms: elapsed_without_approval_wait(started, waited_before),
+        elapsed_ms,
         kind: result.kind,
         pinned: false,
         detail: super::outcome_detail::OutcomeDetail {
             messages: result.messages,
             approval_wait_ms: approval_wait_since(waited_before),
+            first_row_ms,
             rows_affected: result.rows_affected,
             is_write: result.is_write,
         },
@@ -397,6 +408,8 @@ where
             detail: Default::default(),
         })
     })?;
+    let query_started = std::time::Instant::now();
+    let approval_wait_before = crate::services::approval_wait::waited();
     let opened = attempt
         .target
         .open_query_cursor_with_audit(attempt.bound_sql, attempt.bound_params, attempt.control)
@@ -414,6 +427,8 @@ where
                     sql: attempt.sql,
                     control: attempt.control,
                     spool,
+                    query_started,
+                    approval_wait_before,
                 },
                 stream_update,
                 succeeded,
@@ -454,6 +469,20 @@ struct StreamExecution<'a> {
     sql: &'a str,
     control: &'a OperationControl,
     spool: StreamResultSpool,
+    query_started: std::time::Instant,
+    approval_wait_before: std::time::Duration,
+}
+
+struct StreamTiming {
+    query_started: std::time::Instant,
+    approval_wait_before: std::time::Duration,
+}
+
+struct StreamPageContext<'a> {
+    audit_receipts: Vec<AuditReceipt>,
+    sql: &'a str,
+    sent: &'a str,
+    timing: StreamTiming,
 }
 
 async fn run_streamed_statement<F, Fut>(
@@ -474,6 +503,8 @@ where
         sql,
         control,
         spool,
+        query_started,
+        approval_wait_before,
     } = execution;
     let sent = bound_sql;
     let started = stream_update(StreamUpdate::Started {
@@ -481,6 +512,8 @@ where
         sql_preview: preview,
         sql: sql.to_owned(),
         spool: spool.clone(),
+        query_started,
+        approval_wait_before,
     })
     .await;
     if !started {
@@ -489,10 +522,17 @@ where
     }
     fetch_stream_pages(
         cursor,
-        audit_receipts,
         spool,
-        (sql, &sent),
         control,
+        StreamPageContext {
+            audit_receipts,
+            sql,
+            sent: &sent,
+            timing: StreamTiming {
+                query_started,
+                approval_wait_before,
+            },
+        },
         stream_update,
         succeeded,
     )
@@ -501,10 +541,9 @@ where
 
 async fn fetch_stream_pages<F, Fut>(
     cursor: super::session_mode::StatementCursor,
-    mut audit_receipts: Vec<AuditReceipt>,
     spool: StreamResultSpool,
-    (sql, sent): (&str, &str),
     control: &OperationControl,
+    context: StreamPageContext<'_>,
     stream_update: &mut F,
     succeeded: &impl Fn(&str),
 ) -> ScriptRunResult
@@ -512,6 +551,12 @@ where
     F: FnMut(StreamUpdate) -> Fut,
     Fut: Future<Output = bool>,
 {
+    let StreamPageContext {
+        mut audit_receipts,
+        sql,
+        sent,
+        timing,
+    } = context;
     let mut sequence = 0;
     loop {
         let (page, messages, has_next_page, lease) =
@@ -524,12 +569,20 @@ where
             };
         let truncated = page.truncated;
         let spooled = spool.append_page(sequence, page.clone()).await.is_ok();
+        let page_timing = (!page.rows.is_empty()).then(|| {
+            timing
+                .query_started
+                .elapsed()
+                .saturating_sub(crate::services::approval_wait::waited().saturating_sub(timing.approval_wait_before))
+                .as_millis()
+        });
         if !stream_update(StreamUpdate::Page {
             sequence,
             page,
             messages,
             spooled,
             lease,
+            first_row_ms: page_timing,
         })
         .await
         {

@@ -8,16 +8,16 @@ use super::StatementOutcome;
 pub struct OutcomeDetail {
     pub messages: ServerMessages,
     pub approval_wait_ms: u128,
+    pub first_row_ms: Option<u128>,
     pub rows_affected: Option<u64>,
     pub is_write: bool,
 }
 
 pub(super) fn totals(outcomes: &[StatementOutcome]) -> (StatementTiming, MessagesView) {
-    let timing = StatementTiming::total(
-        outcomes
-            .iter()
-            .map(|outcome| StatementTiming::new(outcome.elapsed_ms, outcome.detail.approval_wait_ms)),
-    );
+    let timing = StatementTiming::total(outcomes.iter().map(|outcome| {
+        StatementTiming::new(outcome.elapsed_ms, outcome.detail.approval_wait_ms)
+            .with_first_row(outcome.detail.first_row_ms)
+    }));
     let mut messages = ServerMessages::default();
     for outcome in outcomes {
         messages.extend(outcome.detail.messages.clone());
@@ -57,5 +57,13 @@ mod tests {
         let (timing, view) = totals(&[outcome(10, 5, &["a", "b"]), outcome(20, 0, &["c"])]);
         assert_eq!(timing, StatementTiming::new(30, 5));
         assert_eq!(view.total(), 3);
+    }
+
+    #[test]
+    fn a_script_omits_first_row_timing_when_a_statement_is_buffered() {
+        let mut streamed = outcome(40, 0, &[]);
+        streamed.detail.first_row_ms = Some(10);
+        let (timing, _) = totals(&[streamed, outcome(20, 0, &[])]);
+        assert_eq!(timing.first_row_ms, None);
     }
 }

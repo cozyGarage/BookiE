@@ -12,7 +12,7 @@ fn postgres_table_without_pk_uses_ctid_for_default_order() {
 fn postgres_table_without_pk_uses_ctid_as_sort_tie_breaker() {
     assert_eq!(
         resolved_order_by("postgres", &[column("name", false)], Some((0, false)), true).as_deref(),
-        Some("\"name\" DESC, ctid ASC")
+        Some("\"name\" DESC NULLS LAST, ctid ASC")
     );
 }
 

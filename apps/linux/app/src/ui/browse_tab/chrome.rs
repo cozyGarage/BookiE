@@ -305,21 +305,25 @@ impl BrowseTab {
         self.refresh_banner_visibility();
     }
 
-    /// Reveal at most ONE banner at a time. Read-only takes priority
-    /// over no-PK because read-only blocks every kind of edit.
     pub(super) fn refresh_banner_visibility(&self) {
         let read_only = self.read_only;
         let no_pk = self.current_columns.iter().any(|c| !c.primary_key)
             && !self.current_columns.is_empty()
             && !self.current_columns.iter().any(|c| c.primary_key);
         self.read_only_banner.set_revealed(read_only);
-        if let Some(text) = self.view_restriction.and_then(|restriction| restriction.banner_text()) {
-            self.no_pk_banner.set_title(&text);
-        }
-        self.no_pk_banner.set_revealed(!read_only && no_pk);
+        let warning = bookie_app_services::tr!(
+            "No primary key is available for paging. Row order may change; rows may be skipped or repeated between pages."
+        );
+        let title = match self.view_restriction.and_then(|restriction| restriction.banner_text()) {
+            Some(text) => format!("{text} {warning}"),
+            None => warning,
+        };
+        self.no_pk_banner.set_title(&title);
+        self.no_pk_banner.set_revealed(no_pk);
     }
 
     pub(super) fn refresh_crud_buttons(&self) {
+        self.refresh_banner_visibility();
         let has_columns = !self.current_columns.is_empty();
         let has_pk = self.has_primary_key();
         if !self.allows_row_mutations() {
@@ -347,7 +351,6 @@ impl BrowseTab {
             self.insert_button
                 .set_tooltip_text(Some(&bookie_app_services::tr!("Insert row (Ctrl+N)")));
         }
-        self.refresh_banner_visibility();
     }
 
     pub(super) fn allows_row_mutations(&self) -> bool {

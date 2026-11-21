@@ -420,6 +420,16 @@ impl LiveSession {
         max_rows: u64,
         cancellation: &CancellationToken,
     ) -> Result<LiveTable, String> {
+        self.load_table_sorted_controlled(table, max_rows, None, cancellation)
+    }
+
+    pub fn load_table_sorted_controlled(
+        self: &Arc<Self>,
+        table: &TableInfo,
+        max_rows: u64,
+        sort: Option<&bookie_app_services::read_session::TableSort>,
+        cancellation: &CancellationToken,
+    ) -> Result<LiveTable, String> {
         if max_rows == 0 || max_rows > ROW_CAP {
             return Err(format!("Row limit must be between 1 and {ROW_CAP}."));
         }
@@ -434,6 +444,9 @@ impl LiveSession {
                     .collect()
             })
             .unwrap_or_default();
+        if sort.is_some() && !self.supports_snapshot_cursor {
+            return Err("Server-side table sorting is not available for this connection.".into());
+        }
         let epoch = self.next_epoch();
         let started = std::time::Instant::now();
         let (mut columns, rows, scan, truncated) = self.runtime.block_on(read_pages(
@@ -441,6 +454,7 @@ impl LiveSession {
             self.session_id,
             &table,
             max_rows,
+            sort,
             cancellation,
             epoch,
             &self.epoch,
@@ -857,13 +871,14 @@ async fn read_pages(
     session_id: SessionId,
     table: &TableInfo,
     max_rows: u64,
+    sort: Option<&bookie_app_services::read_session::TableSort>,
     cancellation: &CancellationToken,
     epoch: Epoch,
     current_epoch: &AtomicU64,
 ) -> Result<Pages, String> {
     let open_control = OperationControl::new(cancellation.clone(), Some(tokio::time::Instant::now() + PAGE_TIMEOUT));
     let mut cursor = sessions
-        .open_table_cursor(session_id, table, &open_control)
+        .open_table_cursor_sorted(session_id, table, sort, &open_control)
         .await
         .map_err(|failure| driver_failure_message(&failure))?;
     let result = collect_pages(
@@ -1371,7 +1386,7 @@ impl ResultSource for LiveTable {
             if self.snapshot_consistent {
                 " · snapshot for this load"
             } else {
-                " · concurrent changes may skip or repeat rows"
+                " · page order may change; rows may be skipped or repeated"
             }
         });
         let access = if self.editable() { "editable" } else { "read-only" };
@@ -1552,6 +1567,22 @@ mod tests {
                 )
                 .is_err()
         );
+    }
+
+    #[test]
+    fn unsupported_server_sort_is_refused_instead_of_sorting_a_partial_page() {
+        let session = LiveSession::open(&fixture()).unwrap();
+        let sort = bookie_app_services::read_session::TableSort {
+            column: "customer".into(),
+            ascending: true,
+        };
+        let result = session.load_table_sorted_controlled(
+            &TableInfo { schema: None, name: "orders".into() },
+            100,
+            Some(&sort),
+            &CancellationToken::new(),
+        );
+        assert!(matches!(result, Err(message) if message.contains("Server-side table sorting is not available")));
     }
 
     #[test]
@@ -1836,7 +1867,7 @@ mod tests {
         assert!(table.truncated);
         assert_eq!(
             table.origin(),
-            "sqlite · orders · read-only · concurrent changes may skip or repeat rows · 4 rows loaded; result may be incomplete"
+            "sqlite · orders · read-only · page order may change; rows may be skipped or repeated · 4 rows loaded; result may be incomplete"
         );
         let whole = LiveTable::load(
             &fixture(),
@@ -1849,9 +1880,9 @@ mod tests {
         .expect("load");
         assert_eq!(
             whole.origin(),
-            "sqlite · orders · read-only · concurrent changes may skip or repeat rows"
+            "sqlite · orders · read-only · page order may change; rows may be skipped or repeated"
         );
-        assert!(whole.origin().contains("concurrent changes may skip or repeat rows"));
+        assert!(whole.origin().contains("page order may change; rows may be skipped or repeated"));
     }
 
     #[test]

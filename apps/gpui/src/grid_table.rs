@@ -1,8 +1,8 @@
 use std::{collections::HashMap, ops::Range, sync::Arc};
 
-use gpui::{App, Context, IntoElement, Window, div, prelude::*, px};
+use gpui::{App, Context, IntoElement, WeakEntity, Window, div, prelude::*, px};
 use gpui_kit::component::Sizable;
-use gpui_kit::component::table::{Column, DataTable, TableDelegate, TableState};
+use gpui_kit::component::table::{Column, ColumnSort, DataTable, TableDelegate, TableState};
 
 use crate::GridView;
 use crate::grid_edit::Edits;
@@ -57,6 +57,8 @@ impl RowMap {
 
 #[derive(Default)]
 pub struct GridDelegate {
+    owner: Option<WeakEntity<GridView>>,
+    sortable: bool,
     columns: Vec<(String, f32)>,
     content_widths: Vec<f32>,
     available_width: f32,
@@ -73,6 +75,31 @@ pub struct GridDelegate {
 }
 
 impl TableDelegate for GridDelegate {
+    fn perform_sort(
+        &mut self,
+        col_ix: usize,
+        sort: ColumnSort,
+        window: &mut Window,
+        _cx: &mut Context<TableState<Self>>,
+    ) {
+        if !self.sortable {
+            return;
+        }
+        let Some((column, _)) = self.columns.get(col_ix) else {
+            return;
+        };
+        let column = column.clone();
+        let ascending = match sort {
+            ColumnSort::Ascending => Some(true),
+            ColumnSort::Descending => Some(false),
+            ColumnSort::Default => None,
+        };
+        let Some(owner) = self.owner.clone() else {
+            return;
+        };
+        Self::schedule_sort(owner, column, ascending, window);
+    }
+
     fn visible_rows_changed(
         &mut self,
         visible: Range<usize>,
@@ -133,9 +160,12 @@ impl TableDelegate for GridDelegate {
 
     fn column(&self, col_ix: usize, _cx: &App) -> Column {
         let (name, width) = &self.columns[col_ix];
-        let column = Column::new(name.clone(), name.clone())
+        let mut column = Column::new(name.clone(), name.clone())
             .width(px(*width))
             .resizable(true);
+        if self.sortable {
+            column = column.sortable();
+        }
         if col_ix < self.pinned_columns {
             column.fixed_left()
         } else {
@@ -160,6 +190,41 @@ impl TableDelegate for GridDelegate {
             .get(col_ix)
             .map(|(kind, key)| header_kind(kind, *key))
             .unwrap_or_default();
+        let menu = {
+            use gpui_component::button::{Button, ButtonVariants};
+            use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
+
+            let column_name = name.clone();
+            let owner = self.owner.clone();
+            let sortable = self.sortable;
+            Button::new(format!("column-menu-{col_ix}"))
+                .ghost()
+                .compact()
+                .tooltip(format!("Actions for {name}"))
+                .accessibility_label(format!("Actions for {name}"))
+                .child(crate::assets::icon("ellipsis", theme.muted_foreground))
+                .dropdown_menu(move |menu, _, _| {
+                    let copy_name = column_name.clone();
+                    let mut menu = menu.item(PopupMenuItem::new("Copy column name").on_click(
+                        move |_, _, cx| {
+                            cx.write_to_clipboard(gpui::ClipboardItem::new_string(copy_name.clone()))
+                        },
+                    ));
+                    let Some(owner) = owner.clone().filter(|_| sortable) else {
+                        return menu;
+                    };
+                    for (label, ascending) in [("Sort ascending", true), ("Sort descending", false)] {
+                        let owner = owner.clone();
+                        let column = column_name.clone();
+                        menu = menu.item(PopupMenuItem::new(label).on_click(move |_, window, cx| {
+                            let _ = owner.update(cx, |view, cx| {
+                                view.sort_current_table(&column, Some(ascending), window, cx);
+                            });
+                        }));
+                    }
+                    menu
+                })
+        };
         let pin = self.pin_scope.clone().map(|scope| {
             use gpui_component::button::{Button, ButtonVariants};
 
@@ -206,6 +271,7 @@ impl TableDelegate for GridDelegate {
                             .text_ellipsis()
                             .child(name),
                     )
+                    .child(menu)
                     .children(pin),
             )
             .when(!kind.is_empty(), |el| {
@@ -264,6 +330,21 @@ impl TableDelegate for GridDelegate {
 }
 
 impl GridDelegate {
+    pub(crate) fn new(owner: WeakEntity<GridView>) -> Self {
+        Self {
+            owner: Some(owner),
+            ..Default::default()
+        }
+    }
+
+    fn schedule_sort(owner: WeakEntity<GridView>, column: String, ascending: Option<bool>, window: &mut Window) {
+        window.on_next_frame(move |_, app| {
+            let _ = owner.update_in(app, |view, window, cx| {
+                view.sort_current_table(&column, ascending, window, cx);
+            });
+        });
+    }
+
     fn is_edited(&self, row_ix: usize, col_ix: usize) -> bool {
         self.map.compare.is_none()
             && self
@@ -281,12 +362,14 @@ impl GridDelegate {
         map: &RowMap,
         edits: &Edits,
         editor: &Option<(usize, usize, gpui::AnyView)>,
+        sortable: bool,
     ) -> bool {
         let same_source = self.source.as_ref().is_some_and(|current| Arc::ptr_eq(current, source));
         !same_source
             || self.columns != columns
             || self.numeric != numeric
             || self.kinds != kinds
+            || self.sortable != sortable
             || self.map != *map
             || self.edits != *edits
             || self.editor.as_ref().map(|(row, column, _)| (*row, *column))
@@ -422,6 +505,9 @@ impl GridView {
         }
         fill_text_columns(&mut columns, &numeric, available_width);
         let pin_scope = self.pin_scope();
+        let sortable = !self.grid_is_query
+            && self.compare.is_none()
+            && self.live.as_ref().is_some_and(|session| session.driver_id == "postgres");
         let editor = self.cell_edit.active.as_ref().and_then(|editing| {
             let dataset = self.dataset_index_of(editing.row)?.checked_sub(map.base)?;
             (dataset < map.count as u64).then(|| {
@@ -458,12 +544,14 @@ impl GridView {
                 &map,
                 &self.cell_edit.edits,
                 &editor,
+                sortable,
             ) && delegate.pin_scope == pin_scope
                 && delegate.pinned_columns == pinned_columns
             {
                 return;
             }
             delegate.columns = columns;
+            delegate.sortable = sortable;
             delegate.numeric = numeric;
             delegate.kinds = kinds;
             delegate.source = Some(self.source.clone());

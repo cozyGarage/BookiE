@@ -276,10 +276,23 @@ impl ReadSessionStore {
         Option<crate::read_session::PostgresTableCursor>,
         crate::driver_error_presentation::DriverFailurePresentation,
     > {
+        self.open_table_cursor_sorted(id, table, None, control).await
+    }
+
+    pub async fn open_table_cursor_sorted(
+        &self,
+        id: SessionId,
+        table: &TableInfo,
+        sort: Option<&crate::read_session::TableSort>,
+        control: &OperationControl,
+    ) -> Result<
+        Option<crate::read_session::PostgresTableCursor>,
+        crate::driver_error_presentation::DriverFailurePresentation,
+    > {
         let session = self
             .get(id)
             .ok_or(crate::driver_error_presentation::DriverFailurePresentation::Disconnected)?;
-        session.open_table_cursor(table, control).await
+        session.open_table_cursor_sorted(table, sort, control).await
     }
 
     pub async fn with_subscription<T, F, Fut>(
