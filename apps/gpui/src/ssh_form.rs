@@ -121,12 +121,14 @@ impl GridView {
         let toggle = choice_row(
             theme,
             "SSH tunnel",
-            [choice_chip("ssh-on", if ssh.on { "On" } else { "Off" }, ssh.on, theme).on_click(cx.listener(
-                |this, _, _, cx| {
-                    this.connection_form.ssh.on = !this.connection_form.ssh.on;
-                    cx.notify();
-                },
-            ))],
+            [("ssh-off", "Off", false), ("ssh-on", "On", true)]
+                .into_iter()
+                .map(|(id, label, on)| {
+                    choice_chip(id, label, ssh.on == on, theme).on_click(cx.listener(move |this, _, _, cx| {
+                        this.connection_form.ssh.on = on;
+                        cx.notify();
+                    }))
+                }),
         );
         let mut rows = vec![toggle];
         if !ssh.on {
@@ -136,32 +138,32 @@ impl GridView {
         rows.push(choice_row(
             theme,
             "Client",
-            [choice_chip(
-                "ssh-openssh",
-                if ssh.openssh { "System OpenSSH" } else { "Built in" },
-                ssh.openssh,
-                theme,
-            )
-            .on_click(cx.listener(|this, _, _, cx| {
-                this.connection_form.ssh.openssh = !this.connection_form.ssh.openssh;
-                cx.notify();
-            }))],
+            [("ssh-built-in", "Built in", false), ("ssh-openssh", "System OpenSSH", true)]
+                .into_iter()
+                .map(|(id, label, openssh)| {
+                    choice_chip(id, label, ssh.openssh == openssh, theme).on_click(cx.listener(move |this, _, _, cx| {
+                        this.connection_form.ssh.openssh = openssh;
+                        cx.notify();
+                    }))
+                }),
         ));
         for (index, jump) in ssh.jumps.iter().enumerate() {
             rows.extend(self.hop_rows(jump, Which::Jump(index), &format!("Jump {}", index + 1), theme, cx));
         }
-        if ssh.openssh && !ssh.jumps.is_empty() {
+        if ssh.openssh {
             rows.push(note(theme, "The system OpenSSH client cannot use saved jump hosts."));
         }
-        rows.push(choice_row(
-            theme,
-            "Jump hosts",
-            [choice_chip("ssh-add-jump", "Add jump host", false, theme).on_click(cx.listener(|this, _, _, cx| {
-                let jump = HopForm::new(cx);
-                this.connection_form.ssh.jumps.push(jump);
-                cx.notify();
-            }))],
-        ));
+        if !ssh.openssh {
+            rows.push(choice_row(
+                theme,
+                "Jump hosts",
+                [choice_chip("ssh-add-jump", "Add jump host", false, theme).on_click(cx.listener(|this, _, _, cx| {
+                    let jump = HopForm::new(cx);
+                    this.connection_form.ssh.jumps.push(jump);
+                    cx.notify();
+                }))],
+            ));
+        }
         rows
     }
 

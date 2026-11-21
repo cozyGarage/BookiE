@@ -73,6 +73,14 @@ impl PostgresTableCursor {
         table: &TableInfo,
         control: &OperationControl,
     ) -> Result<Self, DriverFailurePresentation> {
+        let key: Vec<String> = guard
+            .fetch_columns_controlled(table.schema.as_deref(), &table.name, control)
+            .await
+            .map_err(|error| classify(&error))?
+            .into_iter()
+            .filter(|column| column.primary_key)
+            .map(|column| column.name)
+            .collect();
         let mut session = guard
             .open_session_with_audit()
             .await
@@ -84,7 +92,7 @@ impl PostgresTableCursor {
             let _ = Box::new(session).close().await;
             return Err(classify(&error));
         }
-        match open_table_cursor(&mut session, table, control).await {
+        match open_table_cursor(&mut session, table, &key, control).await {
             Ok(cursor) => Ok(Self { session, cursor }),
             Err(error) => {
                 let _ = Box::new(session).close().await;
@@ -121,17 +129,26 @@ impl PostgresTableCursor {
     }
 }
 
-async fn open_table_cursor(
-    session: &mut AuditedSession,
-    table: &TableInfo,
-    control: &OperationControl,
-) -> Result<QueryCursorId, DriverFailurePresentation> {
+fn table_select(table: &TableInfo, key: &[String]) -> String {
     let quote = |name: &str| bookie_core::sql_dialect::quote_ident("postgres", name);
     let relation = table.schema.as_deref().map_or_else(
         || quote(&table.name),
         |schema| format!("{}.{}", quote(schema), quote(&table.name)),
     );
-    let sql = format!("SELECT * FROM {relation}");
+    if key.is_empty() {
+        return format!("SELECT * FROM {relation}");
+    }
+    let order = key.iter().map(|name| quote(name)).collect::<Vec<_>>().join(", ");
+    format!("SELECT * FROM {relation} ORDER BY {order}")
+}
+
+async fn open_table_cursor(
+    session: &mut AuditedSession,
+    table: &TableInfo,
+    key: &[String],
+    control: &OperationControl,
+) -> Result<QueryCursorId, DriverFailurePresentation> {
+    let sql = table_select(table, key);
     session
         .open_query_cursor_controlled_with_audit(&sql, &[], control)
         .await
@@ -497,5 +514,37 @@ impl ReadSession {
 impl Drop for ReadSession {
     fn drop(&mut self) {
         self.database.close_generation(self.id, self.generation);
+    }
+}
+
+#[cfg(test)]
+mod table_select_tests {
+    use super::*;
+
+    fn table(schema: Option<&str>, name: &str) -> TableInfo {
+        TableInfo {
+            schema: schema.map(str::to_owned),
+            name: name.into(),
+        }
+    }
+
+    #[test]
+    fn a_table_with_a_primary_key_is_read_in_key_order() {
+        let sql = table_select(&table(Some("public"), "customers"), &["id".into()]);
+        assert_eq!(sql, r#"SELECT * FROM "public"."customers" ORDER BY "id""#);
+    }
+
+    #[test]
+    fn a_composite_key_orders_by_every_key_column_and_quotes_each() {
+        let sql = table_select(&table(None, "t"), &["a b".into(), "c".into()]);
+        assert_eq!(sql, r#"SELECT * FROM "t" ORDER BY "a b", "c""#);
+    }
+
+    #[test]
+    fn a_table_without_a_primary_key_keeps_the_plain_select() {
+        assert_eq!(
+            table_select(&table(Some("s"), "log"), &[]),
+            r#"SELECT * FROM "s"."log""#
+        );
     }
 }

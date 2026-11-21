@@ -128,6 +128,7 @@ struct GridView {
     table: gpui::Entity<gpui_kit::component::table::TableState<grid_table::GridDelegate>>,
     _table_events: gpui::Subscription,
     keystroke_hook: Option<gpui::Subscription>,
+    synced_width: f32,
     focus_editor: bool,
     source: Source,
     table_source: Source,
@@ -168,6 +169,8 @@ struct GridView {
     audit_page: audit_page::AuditPage,
     panel: panel_state::PanelState,
     fonts: panel_state::FontState,
+    font_inputs: [Entity<TextInput>; 2],
+
     export: panel_state::ExportState,
     measure: measure::Measure,
     loads: Ticket,
@@ -402,6 +405,33 @@ impl GridView {
         let (sidebar_search, palette_input) = Self::init_chrome_inputs(window, cx);
         let (table, table_focus, table_events) = Self::init_grid_table(window, cx);
         let font_names = installed_font_names(cx);
+        let saved_fonts = font_settings::load();
+        let font_inputs = [cx.new(|cx| TextInput::new("", cx)), cx.new(|cx| TextInput::new("", cx))];
+        for (index, input) in font_inputs.iter().enumerate() {
+            let value = if index == 0 {
+                &saved_fonts.ui_family
+            } else {
+                &saved_fonts.editor_family
+            };
+            input.update(cx, |input, cx| input.set_content_quiet(value, cx));
+            cx.subscribe(input, move |this, input, event: &InputEvent, cx| {
+                if matches!(event, InputEvent::Changed) {
+                    let value = input.read(cx).content().to_string();
+                    this.edit_fonts(
+                        |fonts| {
+                            if index == 0 {
+                                fonts.ui_family = value;
+                            } else {
+                                fonts.editor_family = value;
+                            }
+                        },
+                        cx,
+                    );
+                }
+            })
+            .detach();
+        }
+
         let (approval, approval_inbox) = approval_ui::ApprovalUi::new();
         Self::watch_approvals(approval_inbox, cx);
         GridView {
@@ -429,10 +459,12 @@ impl GridView {
             history_page: history_view::HistoryPage::new(cx),
             audit_page: audit_page::AuditPage::new(cx),
             panel: panel_state::PanelState::new(DEFAULT_RESULT_RATIO),
-            fonts: panel_state::FontState::new(font_settings::load(), default_font(&font_names).into(), font_names),
+            fonts: panel_state::FontState::new(saved_fonts, default_font(&font_names).into(), font_names),
+            font_inputs,
             export: panel_state::ExportState::default(),
             measure: measure::Measure::new(started),
             keystroke_hook: None,
+            synced_width: 0.0,
             cell_cursor: None,
             compare: None,
             selection: None,
