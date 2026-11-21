@@ -320,6 +320,7 @@ impl GridView {
             |this, _, event: &InputEvent, window, cx| match event {
                 InputEvent::Changed => {
                     this.palette.index = 0;
+                    this.palette.scroll.scroll_to_item(0);
                     let typed = this.palette.input.read(cx).content().to_string();
                     this.palette.address = bookie_gpui::net_check::parse_address(&typed);
                     this.palette.delimiter = bookie_gpui::csv_delimiter::parse_command(&typed);
@@ -896,6 +897,8 @@ fn main() {
         });
 }
 
+#[cfg(test)]
+mod grid_pin_tests;
 #[cfg(test)]
 mod live_ui_tests;
 #[cfg(test)]

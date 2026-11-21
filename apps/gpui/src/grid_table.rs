@@ -1,4 +1,4 @@
-use std::{ops::Range, sync::Arc};
+use std::{collections::HashMap, ops::Range, sync::Arc};
 
 use gpui::{App, Context, IntoElement, Window, div, prelude::*, px};
 use gpui_kit::component::Sizable;
@@ -18,6 +18,14 @@ pub struct RowMap {
     count: usize,
     kept: Option<Arc<Vec<u32>>>,
     compare: Option<Arc<Diff>>,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct PinScope {
+    connection: String,
+    database: String,
+    schema: Option<String>,
+    table: String,
 }
 
 impl PartialEq for RowMap {
@@ -59,6 +67,9 @@ pub struct GridDelegate {
     cached: Option<(usize, Vec<(String, bool)>)>,
     edits: Edits,
     editor: Option<(usize, usize, gpui::AnyView)>,
+    pin_scope: Option<PinScope>,
+    pinned_columns: usize,
+    pin_counts: HashMap<PinScope, usize>,
 }
 
 impl TableDelegate for GridDelegate {
@@ -122,9 +133,14 @@ impl TableDelegate for GridDelegate {
 
     fn column(&self, col_ix: usize, _cx: &App) -> Column {
         let (name, width) = &self.columns[col_ix];
-        Column::new(name.clone(), name.clone())
+        let column = Column::new(name.clone(), name.clone())
             .width(px(*width))
-            .resizable(true)
+            .resizable(true);
+        if col_ix < self.pinned_columns {
+            column.fixed_left()
+        } else {
+            column
+        }
     }
 
     fn render_th(
@@ -134,16 +150,64 @@ impl TableDelegate for GridDelegate {
         cx: &mut Context<TableState<Self>>,
     ) -> impl IntoElement {
         let theme = Theme::current(cx);
-        let name = self.columns.get(col_ix).map(|(name, _)| name.clone()).unwrap_or_default();
-        let kind = self.kinds.get(col_ix).map(|(kind, key)| header_kind(kind, *key)).unwrap_or_default();
+        let name = self
+            .columns
+            .get(col_ix)
+            .map(|(name, _)| name.clone())
+            .unwrap_or_default();
+        let kind = self
+            .kinds
+            .get(col_ix)
+            .map(|(kind, key)| header_kind(kind, *key))
+            .unwrap_or_default();
+        let pin = self.pin_scope.clone().map(|scope| {
+            use gpui_component::button::{Button, ButtonVariants};
+
+            let pinned = col_ix < self.pinned_columns;
+            let action = if pinned { "Unpin from" } else { "Pin through" };
+            let label = format!("{action} {name}");
+            let color = if pinned {
+                theme.foreground
+            } else {
+                theme.muted_foreground
+            };
+            Button::new(format!("pin-column-{col_ix}"))
+                .ghost()
+                .compact()
+                .tooltip(label.clone())
+                .accessibility_label(label.clone())
+                .on_click(cx.listener(move |table, _, _, cx| {
+                    let delegate = table.delegate_mut();
+                    delegate.pinned_columns =
+                        next_pinned_count(delegate.pinned_columns, col_ix, delegate.columns.len());
+                    delegate.pin_counts.insert(scope.clone(), delegate.pinned_columns);
+                    table.refresh(cx);
+                }))
+                .child(crate::assets::icon("pin", color))
+        });
         div()
             .size_full()
             .min_w_0()
             .flex()
-            .flex_col()
             .justify_center()
             .overflow_hidden()
-            .child(div().overflow_hidden().whitespace_nowrap().text_ellipsis().child(name))
+            .flex_col()
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .justify_between()
+                    .min_w_0()
+                    .child(
+                        div()
+                            .min_w_0()
+                            .overflow_hidden()
+                            .whitespace_nowrap()
+                            .text_ellipsis()
+                            .child(name),
+                    )
+                    .children(pin),
+            )
             .when(!kind.is_empty(), |el| {
                 el.child(
                     div()
@@ -180,16 +244,20 @@ impl TableDelegate for GridDelegate {
             }
             _ => {
                 let (text, right) = self.label_of(row_ix, col_ix);
-                div().w_full().flex().when_some(edited_tint, |el, tint| el.bg(tint)).child(
-                    div()
-                        .flex_1()
-                        .min_w_0()
-                        .overflow_hidden()
-                        .whitespace_nowrap()
-                        .text_ellipsis()
-                        .when(right, |cell| cell.text_right())
-                        .child(text),
-                )
+                div()
+                    .w_full()
+                    .flex()
+                    .when_some(edited_tint, |el, tint| el.bg(tint))
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .overflow_hidden()
+                            .whitespace_nowrap()
+                            .text_ellipsis()
+                            .when(right, |cell| cell.text_right())
+                            .child(text),
+                    )
             }
         }
     }
@@ -257,6 +325,26 @@ impl GridDelegate {
 }
 
 impl GridView {
+    fn pin_scope(&self) -> Option<PinScope> {
+        let bookie_gpui::shell::Tab::Table(table) = self.tabs.current() else {
+            return None;
+        };
+        Some(PinScope {
+            connection: self.live.as_ref().map_or_else(
+                || self.catalog.connection.clone(),
+                |session| {
+                    session.saved.as_ref().map_or_else(
+                        || format!("{}:{}", session.driver_id, session.label),
+                        |(id, _)| id.to_string(),
+                    )
+                },
+            ),
+            database: self.catalog.database.clone(),
+            schema: table.schema.clone(),
+            table: table.name.clone(),
+        })
+    }
+
     fn row_map(&self) -> RowMap {
         if let Some(diff) = &self.compare {
             return RowMap {
@@ -333,6 +421,7 @@ impl GridView {
             *width = *measured;
         }
         fill_text_columns(&mut columns, &numeric, available_width);
+        let pin_scope = self.pin_scope();
         let editor = self.cell_edit.active.as_ref().and_then(|editing| {
             let dataset = self.dataset_index_of(editing.row)?.checked_sub(map.base)?;
             (dataset < map.count as u64).then(|| {
@@ -355,7 +444,23 @@ impl GridView {
             delegate.cached = None;
             delegate.content_widths = content_widths;
             delegate.available_width = available_width;
-            if !delegate.is_changed(&self.source, &columns, &numeric, &kinds, &map, &self.cell_edit.edits, &editor) {
+            let pinned_columns = pin_scope
+                .as_ref()
+                .and_then(|scope| delegate.pin_counts.get(scope))
+                .copied()
+                .unwrap_or(0)
+                .min(columns.len());
+            if !delegate.is_changed(
+                &self.source,
+                &columns,
+                &numeric,
+                &kinds,
+                &map,
+                &self.cell_edit.edits,
+                &editor,
+            ) && delegate.pin_scope == pin_scope
+                && delegate.pinned_columns == pinned_columns
+            {
                 return;
             }
             delegate.columns = columns;
@@ -365,6 +470,8 @@ impl GridView {
             delegate.map = map;
             delegate.edits = self.cell_edit.edits.clone();
             delegate.editor = editor;
+            delegate.pin_scope = pin_scope;
+            delegate.pinned_columns = pinned_columns;
             table.refresh(cx);
         });
     }
@@ -378,6 +485,27 @@ impl GridView {
 }
 
 const COMPARE_CHANGE_WIDTH: f32 = 70.0;
+
+fn next_pinned_count(current: usize, clicked: usize, column_count: usize) -> usize {
+    if clicked < current {
+        clicked
+    } else {
+        clicked.saturating_add(1).min(column_count)
+    }
+}
+
+#[cfg(test)]
+mod pin_tests {
+    use super::next_pinned_count;
+
+    #[test]
+    fn pin_actions_keep_a_contiguous_leading_prefix() {
+        assert_eq!(next_pinned_count(0, 2, 60), 3);
+        assert_eq!(next_pinned_count(3, 1, 60), 1);
+        assert_eq!(next_pinned_count(3, 0, 60), 0);
+        assert_eq!(next_pinned_count(3, 99, 60), 60);
+    }
+}
 
 fn header_kind(data_type: &str, primary_key: bool) -> String {
     match (data_type.is_empty(), primary_key) {
