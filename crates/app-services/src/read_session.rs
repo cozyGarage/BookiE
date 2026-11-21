@@ -156,38 +156,6 @@ async fn open_table_cursor(
         .map_err(|error| classify(&error))
 }
 
-#[cfg(test)]
-mod table_select_tests {
-    use super::*;
-
-    fn table(schema: Option<&str>, name: &str) -> TableInfo {
-        TableInfo {
-            schema: schema.map(str::to_owned),
-            name: name.into(),
-        }
-    }
-
-    #[test]
-    fn a_table_with_a_primary_key_is_read_in_key_order() {
-        let sql = table_select(&table(Some("public"), "customers"), &["id".into()]);
-        assert_eq!(sql, r#"SELECT * FROM "public"."customers" ORDER BY "id""#);
-    }
-
-    #[test]
-    fn a_composite_key_orders_by_every_key_column_and_quotes_each() {
-        let sql = table_select(&table(None, "t"), &["a b".into(), "c".into()]);
-        assert_eq!(sql, r#"SELECT * FROM "t" ORDER BY "a b", "c""#);
-    }
-
-    #[test]
-    fn a_table_without_a_primary_key_keeps_the_plain_select() {
-        assert_eq!(
-            table_select(&table(Some("s"), "log"), &[]),
-            r#"SELECT * FROM "s"."log""#
-        );
-    }
-}
-
 impl ReadSession {
     pub fn supports_snapshot_cursor(&self) -> bool {
         self.supports_snapshot_cursor
@@ -546,5 +514,37 @@ impl ReadSession {
 impl Drop for ReadSession {
     fn drop(&mut self) {
         self.database.close_generation(self.id, self.generation);
+    }
+}
+
+#[cfg(test)]
+mod table_select_tests {
+    use super::*;
+
+    fn table(schema: Option<&str>, name: &str) -> TableInfo {
+        TableInfo {
+            schema: schema.map(str::to_owned),
+            name: name.into(),
+        }
+    }
+
+    #[test]
+    fn a_table_with_a_primary_key_is_read_in_key_order() {
+        let sql = table_select(&table(Some("public"), "customers"), &["id".into()]);
+        assert_eq!(sql, r#"SELECT * FROM "public"."customers" ORDER BY "id""#);
+    }
+
+    #[test]
+    fn a_composite_key_orders_by_every_key_column_and_quotes_each() {
+        let sql = table_select(&table(None, "t"), &["a b".into(), "c".into()]);
+        assert_eq!(sql, r#"SELECT * FROM "t" ORDER BY "a b", "c""#);
+    }
+
+    #[test]
+    fn a_table_without_a_primary_key_keeps_the_plain_select() {
+        assert_eq!(
+            table_select(&table(Some("s"), "log"), &[]),
+            r#"SELECT * FROM "s"."log""#
+        );
     }
 }
