@@ -7,6 +7,13 @@ use crate::connection_form::{choice_chip, choice_row, field, note};
 use crate::text_input::TextInput;
 use bookie_gpui::theme::Theme;
 
+fn ssh_port(text: &str) -> u16 {
+    match text.trim() {
+        "" => 22,
+        port => port.parse().unwrap_or(0),
+    }
+}
+
 pub(crate) struct HopForm {
     pub hop_id: Option<uuid::Uuid>,
     pub host: Entity<TextInput>,
@@ -21,7 +28,17 @@ pub(crate) struct HopForm {
 
 impl HopForm {
     pub fn new(cx: &mut Context<GridView>) -> Self {
-        let input = |placeholder: &str, cx: &mut Context<GridView>| cx.new(|cx| TextInput::new(placeholder, cx));
+        let input = |placeholder: &str, cx: &mut Context<GridView>| {
+            let input = cx.new(|cx| TextInput::new(placeholder, cx));
+            cx.subscribe(&input, |this, _, event: &crate::text_input::InputEvent, cx| {
+                if matches!(event, crate::text_input::InputEvent::Changed) {
+                    this.clear_resolved_connection_error(cx);
+                    cx.notify();
+                }
+            })
+            .detach();
+            input
+        };
         Self {
             hop_id: None,
             host: input("Host", cx),
@@ -40,7 +57,7 @@ impl HopForm {
         SshHopDraft {
             hop_id: self.hop_id,
             host: text(&self.host),
-            port: text(&self.port).trim().parse().unwrap_or(22),
+            port: ssh_port(&text(&self.port)),
             username: text(&self.user),
             auth: self.auth,
             key_path: text(&self.key),
@@ -138,14 +155,17 @@ impl GridView {
         rows.push(choice_row(
             theme,
             "Client",
-            [("ssh-built-in", "Built in", false), ("ssh-openssh", "System OpenSSH", true)]
-                .into_iter()
-                .map(|(id, label, openssh)| {
-                    choice_chip(id, label, ssh.openssh == openssh, theme).on_click(cx.listener(move |this, _, _, cx| {
-                        this.connection_form.ssh.openssh = openssh;
-                        cx.notify();
-                    }))
-                }),
+            [
+                ("ssh-built-in", "Built in", false),
+                ("ssh-openssh", "System OpenSSH", true),
+            ]
+            .into_iter()
+            .map(|(id, label, openssh)| {
+                choice_chip(id, label, ssh.openssh == openssh, theme).on_click(cx.listener(move |this, _, _, cx| {
+                    this.connection_form.ssh.openssh = openssh;
+                    cx.notify();
+                }))
+            }),
         ));
         for (index, jump) in ssh.jumps.iter().enumerate() {
             rows.extend(self.hop_rows(jump, Which::Jump(index), &format!("Jump {}", index + 1), theme, cx));
@@ -157,11 +177,15 @@ impl GridView {
             rows.push(choice_row(
                 theme,
                 "Jump hosts",
-                [choice_chip("ssh-add-jump", "Add jump host", false, theme).on_click(cx.listener(|this, _, _, cx| {
-                    let jump = HopForm::new(cx);
-                    this.connection_form.ssh.jumps.push(jump);
-                    cx.notify();
-                }))],
+                [
+                    choice_chip("ssh-add-jump", "Add jump host", false, theme).on_click(cx.listener(
+                        |this, _, _, cx| {
+                            let jump = HopForm::new(cx);
+                            this.connection_form.ssh.jumps.push(jump);
+                            cx.notify();
+                        },
+                    )),
+                ],
             ));
         }
         rows
@@ -178,22 +202,36 @@ impl GridView {
             rows.push(choice_row(
                 theme,
                 gpui::SharedString::from(label.to_owned()),
-                [choice_chip(("hop-remove", index), "Remove", false, theme).on_click(cx.listener(
-                    move |this, _, _, cx| {
-                        this.connection_form.ssh.jumps.remove(index);
-                        cx.notify();
-                    },
-                ))],
+                [
+                    choice_chip(("hop-remove", index), "Remove", false, theme).on_click(cx.listener(
+                        move |this, _, _, cx| {
+                            this.connection_form.ssh.jumps.remove(index);
+                            cx.notify();
+                        },
+                    )),
+                ],
             ));
         }
-        rows.push(field(theme, name("host"), &hop.host));
-        rows.push(field(theme, name("port"), &hop.port));
-        rows.push(field(theme, name("user"), &hop.user));
+        rows.push(
+            self.connection_form
+                .validation_field(theme, name("host"), &hop.host, cx),
+        );
+        rows.push(
+            self.connection_form
+                .validation_field(theme, name("port"), &hop.port, cx),
+        );
+        rows.push(
+            self.connection_form
+                .validation_field(theme, name("user"), &hop.user, cx),
+        );
         rows.push(self.auth_chips(hop.auth, which, &id, theme, cx));
         match hop.auth {
             SshAuthKind::Password => rows.push(field(theme, name("password"), &hop.secret)),
             SshAuthKind::KeyFile => {
-                rows.push(field(theme, name("key file"), &hop.key));
+                rows.push(
+                    self.connection_form
+                        .validation_field(theme, name("key file"), &hop.key, cx),
+                );
                 rows.push(field(theme, name("passphrase"), &hop.secret));
             }
             SshAuthKind::Agent => rows.push(field(theme, name("agent key"), &hop.identity)),
@@ -220,5 +258,16 @@ impl GridView {
             }))
         });
         choice_row(theme, "Sign in", chips)
+    }
+}
+
+#[cfg(test)]
+mod port_tests {
+    #[test]
+    fn ssh_port_rejects_invalid_values_instead_of_using_default() {
+        assert_eq!(super::ssh_port(""), 22);
+        assert_eq!(super::ssh_port(" 2222 "), 2222);
+        assert_eq!(super::ssh_port("abc"), 0);
+        assert_eq!(super::ssh_port("65536"), 0);
     }
 }
