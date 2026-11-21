@@ -29,6 +29,8 @@ class ReleasePublicationTests(unittest.TestCase):
             result = subprocess.run(["bash", "-e", "-c", script], cwd=base, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual((base / "release/bookie.pot").read_text(), "translations/bookie.pot")
+            for name in ("bookie-gpui-linux-x86_64-0.2.8.tar.gz", "bookie-gpui-linux-x86_64-0.2.8.tar.gz.sha256"):
+                self.assertEqual((base / "release" / name).read_text(), name)
             subprocess.run(["sha256sum", "--check", "SHA256SUMS"], cwd=base / "release", check=True, capture_output=True)
 
     def test_gpui_preview_job_is_required_for_release_publication(self):
@@ -84,6 +86,12 @@ class ReleasePublicationTests(unittest.TestCase):
         run, jobs = self.fixture()
         jobs["jobs"].append({"name": "Arch package", "conclusion": "failure"})
         with self.assertRaises(ValueError):
+            self.load_validator().validate(run, jobs, "linux-v0.2.0", "a" * 40)
+
+    def test_old_release_run_missing_gpui_reports_the_missing_job(self):
+        run, jobs = self.fixture()
+        jobs["jobs"].pop()
+        with self.assertRaisesRegex(ValueError, "GPUI Linux preview.*missing"):
             self.load_validator().validate(run, jobs, "linux-v0.2.0", "a" * 40)
 
     def test_release_tag_verifier_accepts_only_a_trusted_ssh_signature(self):
