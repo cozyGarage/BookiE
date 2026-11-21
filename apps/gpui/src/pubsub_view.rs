@@ -81,6 +81,7 @@ mod tests {
             assert_eq!(parse_follow(bad), None, "{bad}");
         }
         assert_eq!(parse_channel("follow jobs"), None, "listen and follow are different commands");
+        assert_eq!(parse_follow("follow news.*"), Some("news.*".into()), "a Redis glob pattern is one word");
     }
 
     #[test]

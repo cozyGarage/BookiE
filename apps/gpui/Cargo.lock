@@ -1335,6 +1335,7 @@ dependencies = [
  "secrecy",
  "serde_json",
  "tokio",
+ "tokio-util",
 ]
 
 [[package]]
@@ -1384,7 +1385,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-gpui"
-version = "0.1.0"
+version = "0.2.8"
 dependencies = [
  "bookie-app-services",
  "bookie-core",

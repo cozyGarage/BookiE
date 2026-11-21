@@ -14,7 +14,7 @@ use bookie_core::{
 
 mod pubsub;
 mod value;
-pub use pubsub::{MAX_SAMPLE_MESSAGES, PubSubMessage, PubSubSample, check_request, sample_pubsub};
+pub use pubsub::{MAX_SAMPLE_MESSAGES, PubSubMessage, PubSubSample, check_request, follow_pubsub, sample_pubsub};
 
 pub struct RedisDriver;
 
