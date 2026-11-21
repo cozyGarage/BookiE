@@ -27,6 +27,10 @@ def problems(root):
     gpui = tomllib.loads((root / "apps/gpui/Cargo.toml").read_text())["package"]
     if gpui.get("version") != version:
         errors.append("apps/gpui/Cargo.toml version differs from the workspace version")
+    lock = tomllib.loads((root / "apps/gpui/Cargo.lock").read_text())
+    entries = [package for package in lock.get("package", []) if package.get("name") == "bookie-gpui"]
+    if len(entries) != 1 or entries[0].get("version") != version:
+        errors.append("apps/gpui/Cargo.lock bookie-gpui version differs from the workspace version")
     meson = (root / "meson.build").read_text()
     match = re.search(r"project\([^,]+,\s*version:\s*['\"]([^'\"]+)['\"]", meson)
     if not match or match.group(1) != version:
