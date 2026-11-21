@@ -623,7 +623,7 @@ mod table_select_tests {
         let sql = table_select_sorted(&table(Some("s\"chema"), "t"), &columns, &request).unwrap();
         assert_eq!(
             sql,
-            "SELECT * FROM \"s\"\"chema\".\"t\" ORDER BY \"x\"\"; DROP TABLE t; --\" DESC, \"tenant\" ASC, \"id\" ASC"
+            "SELECT * FROM \"s\"\"chema\".\"t\" ORDER BY \"x\"\"; DROP TABLE t; --\" DESC NULLS LAST, \"tenant\" ASC, \"id\" ASC"
         );
     }
 

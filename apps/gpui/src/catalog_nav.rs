@@ -18,6 +18,7 @@ impl GridView {
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        let column = column.to_owned();
         let Some(session) = self.live.clone().filter(|session| session.driver_id == "postgres") else {
             self.status = "Server-side table sorting is not available for this connection.".into();
             return;
@@ -30,7 +31,7 @@ impl GridView {
             return;
         }
         let sort = ascending.map(|ascending| bookie_app_services::read_session::TableSort {
-            column: column.to_owned(),
+            column: column.clone(),
             ascending,
         });
         let current_session = session.clone();

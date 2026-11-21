@@ -5,7 +5,7 @@ use bookie_gpui::model::{Cell, ColumnMeta, Diff, FindResult, Predicate};
 use bookie_gpui::source::ResultSource;
 use gpui::TestAppContext;
 use gpui_kit::component::table::{ColumnFixed, TableDelegate};
-use gpui_kit::test::TestWindowExt;
+use gpui_kit::test::{TestQueryExt, TestWindowExt};
 use tokio_util::sync::CancellationToken;
 
 use crate::{GridView, text_input};
@@ -58,6 +58,18 @@ fn pinned_columns_stay_visible_after_scroll_and_tab_reopen(cx: &mut TestAppConte
     let (view, cx) = cx.add_window_view(|window, cx| GridView::with_source(source, Instant::now(), window, cx));
     cx.simulate_resize(gpui::size(gpui::px(900.0), gpui::px(760.0)));
     cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    let menu_bounds = cx.update(|window, _| window.find_by_label("Actions for column_0").bounds());
+    cx.simulate_click(menu_bounds.center(), Default::default());
+    cx.run_until_parked();
+    cx.update(|window, _| {
+        assert!(window.try_find_by_label("Copy column name").is_some());
+        assert!(window.try_find_by_label("Sort ascending").is_none());
+    });
+    let copy_bounds = cx.update(|window, _| window.find_by_label("Copy column name").bounds());
+    cx.simulate_click(copy_bounds.center(), Default::default());
+    cx.run_until_parked();
+
     cx.update(|window, cx| window.render_frame(cx));
     let header = cx.update(|window, _| {
         window

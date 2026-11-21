@@ -97,11 +97,7 @@ impl TableDelegate for GridDelegate {
         let Some(owner) = self.owner.clone() else {
             return;
         };
-        window.on_next_frame(move |_, app| {
-            let _ = owner.update_in(app, |view, window, cx| {
-                view.sort_current_table(&column, ascending, window, cx);
-            });
-        });
+        Self::schedule_sort(owner, column, ascending, window);
     }
 
     fn visible_rows_changed(
@@ -194,6 +190,41 @@ impl TableDelegate for GridDelegate {
             .get(col_ix)
             .map(|(kind, key)| header_kind(kind, *key))
             .unwrap_or_default();
+        let menu = {
+            use gpui_component::button::{Button, ButtonVariants};
+            use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
+
+            let column_name = name.clone();
+            let owner = self.owner.clone();
+            let sortable = self.sortable;
+            Button::new(format!("column-menu-{col_ix}"))
+                .ghost()
+                .compact()
+                .tooltip(format!("Actions for {name}"))
+                .accessibility_label(format!("Actions for {name}"))
+                .child(crate::assets::icon("ellipsis", theme.muted_foreground))
+                .dropdown_menu(move |menu, _, _| {
+                    let copy_name = column_name.clone();
+                    let mut menu = menu.item(PopupMenuItem::new("Copy column name").on_click(
+                        move |_, _, cx| {
+                            cx.write_to_clipboard(gpui::ClipboardItem::new_string(copy_name.clone()))
+                        },
+                    ));
+                    let Some(owner) = owner.clone().filter(|_| sortable) else {
+                        return menu;
+                    };
+                    for (label, ascending) in [("Sort ascending", true), ("Sort descending", false)] {
+                        let owner = owner.clone();
+                        let column = column_name.clone();
+                        menu = menu.item(PopupMenuItem::new(label).on_click(move |_, window, cx| {
+                            let _ = owner.update(cx, |view, cx| {
+                                view.sort_current_table(&column, Some(ascending), window, cx);
+                            });
+                        }));
+                    }
+                    menu
+                })
+        };
         let pin = self.pin_scope.clone().map(|scope| {
             use gpui_component::button::{Button, ButtonVariants};
 
@@ -240,6 +271,7 @@ impl TableDelegate for GridDelegate {
                             .text_ellipsis()
                             .child(name),
                     )
+                    .child(menu)
                     .children(pin),
             )
             .when(!kind.is_empty(), |el| {
@@ -298,6 +330,21 @@ impl TableDelegate for GridDelegate {
 }
 
 impl GridDelegate {
+    pub(crate) fn new(owner: WeakEntity<GridView>) -> Self {
+        Self {
+            owner: Some(owner),
+            ..Default::default()
+        }
+    }
+
+    fn schedule_sort(owner: WeakEntity<GridView>, column: String, ascending: Option<bool>, window: &mut Window) {
+        window.on_next_frame(move |_, app| {
+            let _ = owner.update_in(app, |view, window, cx| {
+                view.sort_current_table(&column, ascending, window, cx);
+            });
+        });
+    }
+
     fn is_edited(&self, row_ix: usize, col_ix: usize) -> bool {
         self.map.compare.is_none()
             && self

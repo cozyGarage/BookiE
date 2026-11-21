@@ -358,10 +358,7 @@ impl GridView {
     ) {
         let owner = cx.weak_entity();
         let table = cx.new(|cx| {
-            let delegate = grid_table::GridDelegate {
-                owner: Some(owner),
-                ..Default::default()
-            };
+            let delegate = grid_table::GridDelegate::new(owner);
             gpui_kit::component::table::TableState::new(delegate, window, cx)
                 .cell_selectable(true)
                 .row_header(false)

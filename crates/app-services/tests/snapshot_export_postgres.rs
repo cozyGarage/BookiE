@@ -213,7 +213,12 @@ async fn a_sorted_table_cursor_orders_by_the_requested_column_with_key_ties() {
     let fixture = fixture().await;
     fixture
         .admin
-        .execute("UPDATE snap SET label = CASE WHEN id % 2 = 0 THEN 'same' ELSE 'other' END")
+        .execute("ALTER TABLE snap ALTER COLUMN label DROP NOT NULL")
+        .await
+        .unwrap();
+    fixture
+        .admin
+        .execute("UPDATE snap SET label = CASE WHEN id = 1 THEN NULL WHEN id % 2 = 0 THEN 'same' ELSE 'other' END")
         .await
         .unwrap();
     let guard = guard(&fixture, Arc::new(CapturingAudit::default()), "postgres").await;
@@ -221,29 +226,57 @@ async fn a_sorted_table_cursor_orders_by_the_requested_column_with_key_ties() {
         schema: Some("public".into()),
         name: "snap".into(),
     };
-    let sort = TableSort {
-        column: "label".into(),
-        ascending: false,
-    };
     let control = OperationControl::with_timeout(std::time::Duration::from_secs(60));
-    let mut cursor = PostgresTableCursor::open_sorted(&guard, &table, Some(&sort), &control)
-        .await
-        .unwrap();
-    let mut ids = Vec::new();
-    loop {
-        let page = cursor.next_page(&control).await.unwrap();
-        ids.extend(page.result.rows.iter().map(|row| row[0].clone()));
-        if !page.has_next_page {
-            break;
+    for (ascending, groups) in [(false, [true, false]), (true, [false, true])] {
+        let sort = TableSort {
+            column: "label".into(),
+            ascending,
+        };
+        let mut cursor = PostgresTableCursor::open_sorted(&guard, &table, Some(&sort), &control)
+            .await
+            .unwrap();
+        let mut ids = Vec::new();
+        loop {
+            let page = cursor.next_page(&control).await.unwrap();
+            ids.extend(page.result.rows.iter().map(|row| row[0].clone()));
+            if !page.has_next_page {
+                break;
+            }
         }
+        cursor.close().await.unwrap();
+        let ordered: Vec<Value> = groups
+            .into_iter()
+            .flat_map(|even| (1..=ROWS).filter(move |id| *id != 1 && (id % 2 == 0) == even))
+            .map(Value::Int)
+            .chain(std::iter::once(Value::Int(1)))
+            .collect();
+        assert_eq!(ids, ordered, "ascending={ascending}: NULL remains last");
     }
-    cursor.close().await.unwrap();
-    let expected: Vec<Value> = (1..=ROWS)
-        .filter(|id| id % 2 == 0)
-        .chain((1..=ROWS).filter(|id| id % 2 == 1))
-        .map(Value::Int)
-        .collect();
-    assert_eq!(ids, expected);
+
+    for ascending in [false, true] {
+        let sort = TableSort {
+            column: "id".into(),
+            ascending,
+        };
+        let mut cursor = PostgresTableCursor::open_sorted(&guard, &table, Some(&sort), &control)
+            .await
+            .unwrap();
+        let mut ids = Vec::new();
+        loop {
+            let page = cursor.next_page(&control).await.unwrap();
+            ids.extend(page.result.rows.iter().map(|row| row[0].clone()));
+            if !page.has_next_page {
+                break;
+            }
+        }
+        cursor.close().await.unwrap();
+        let expected: Vec<Value> = if ascending {
+            (1..=ROWS).map(Value::Int).collect()
+        } else {
+            (1..=ROWS).rev().map(Value::Int).collect()
+        };
+        assert_eq!(ids, expected, "ascending={ascending}: numeric sort is exact");
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
