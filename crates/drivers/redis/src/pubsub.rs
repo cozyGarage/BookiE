@@ -94,6 +94,46 @@ pub async fn sample_pubsub(
     })
 }
 
+pub async fn follow_pubsub(
+    opts: ConnectOptions,
+    patterns: &[String],
+    cancel: &tokio_util::sync::CancellationToken,
+    mut on_message: impl FnMut(PubSubMessage) + Send,
+) -> Result<u64, DriverError> {
+    check_request(patterns, 1, Duration::from_secs(1))?;
+    let verifies = opts.tls.mode.verifies_cert();
+    let client = build_client(&opts)?;
+    let mut pubsub = tokio::time::timeout(CONNECT_TIMEOUT, client.get_async_pubsub())
+        .await
+        .map_err(|_| DriverError::ConnectionRefused)?
+        .map_err(|err| map_redis_connect_error(err, verifies))?;
+    for pattern in patterns {
+        pubsub
+            .psubscribe(pattern.as_str())
+            .await
+            .map_err(|err| map_redis_connect_error(err, verifies))?;
+    }
+    let mut stream = pubsub.on_message();
+    let mut received = 0u64;
+    loop {
+        tokio::select! {
+            biased;
+            () = cancel.cancelled() => return Ok(received),
+            next = stream.next() => match next {
+                Some(message) => {
+                    received += 1;
+                    on_message(to_message(
+                        message.get_channel_name(),
+                        message.get_pattern::<String>().ok(),
+                        message.get_payload_bytes(),
+                    ));
+                }
+                None => return Err(DriverError::Disconnected),
+            },
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

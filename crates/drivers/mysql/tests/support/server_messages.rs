@@ -136,3 +136,42 @@ async fn many_warnings_are_capped_with_an_omitted_count() {
     assert_eq!(batch.messages.len(), MAX_SERVER_MESSAGES);
     assert_eq!(batch.messages.total(), total as u64);
 }
+
+async fn assert_each_statement_reports_its_own_warnings(opts: bookie_core::ConnectOptions) {
+    let conn = connect(opts).await;
+    let first = conn
+        .query_result_sets_controlled("SELECT CAST('first_bad' AS SIGNED)", &[], &control())
+        .await
+        .unwrap();
+    let second = conn
+        .query_result_sets_controlled("SELECT CAST('second_bad' AS SIGNED)", &[], &control())
+        .await
+        .unwrap();
+    let texts =
+        |batch: &bookie_core::QueryResultBatch| batch.messages.iter().map(|m| m.text.clone()).collect::<Vec<_>>();
+    assert!(
+        texts(&first).iter().all(|t| t.contains("first_bad")),
+        "{:?}",
+        texts(&first)
+    );
+    assert!(
+        texts(&second).iter().all(|t| t.contains("second_bad")),
+        "{:?}",
+        texts(&second)
+    );
+    assert!(!texts(&first).is_empty() && !texts(&second).is_empty());
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn mysql_statements_run_one_after_another_keep_their_own_warnings() {
+    let (_db, opts) = start_mysql().await;
+    assert_each_statement_reports_its_own_warnings(opts).await;
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn mariadb_statements_run_one_after_another_keep_their_own_warnings() {
+    let (_db, opts) = start_mariadb().await;
+    assert_each_statement_reports_its_own_warnings(opts).await;
+}
