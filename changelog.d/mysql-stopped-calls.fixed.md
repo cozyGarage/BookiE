@@ -1,1 +1,0 @@
-MySQL metadata reads, table pages, grid saves and transaction starts that time out or are cancelled now stop on the server instead of running on in the background, and a save the server confirms as stopped is reported as not applied.
