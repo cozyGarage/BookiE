@@ -197,6 +197,10 @@
 - Queries that spell a PostgreSQL name with Unicode escapes are refused, so they cannot hide a function call or a masked column from policy.
 - Reading column statistics tables masks every returned column, so samples of masked columns no longer appear in query results.
 
+### Contributors
+
+- [Trung Nguyen](https://github.com/cozyGarage) ([@cozyGarage](https://github.com/cozyGarage))
+
 ## [0.2.7] - 2026-11-12
 
 ### Added
