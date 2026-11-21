@@ -1,5 +1,6 @@
 import importlib.util
 from pathlib import Path
+import re
 import subprocess
 import tempfile
 import unittest
@@ -16,12 +17,34 @@ class ReleasePublicationTests(unittest.TestCase):
             base = Path(directory)
             artifacts = base / "artifacts"
             (artifacts / "translations").mkdir(parents=True)
-            for name in ["bookie.AppImage", "bookie.pkg.tar.zst", "release-notes.md", "translations/bookie.pot"]:
+            for name in (
+                "bookie.AppImage",
+                "bookie.pkg.tar.zst",
+                "bookie-gpui-linux-x86_64-0.2.8.tar.gz",
+                "bookie-gpui-linux-x86_64-0.2.8.tar.gz.sha256",
+                "release-notes.md",
+                "translations/bookie.pot",
+            ):
                 (artifacts / name).write_text(name)
             result = subprocess.run(["bash", "-e", "-c", script], cwd=base, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual((base / "release/bookie.pot").read_text(), "translations/bookie.pot")
             subprocess.run(["sha256sum", "--check", "SHA256SUMS"], cwd=base / "release", check=True, capture_output=True)
+
+    def test_gpui_preview_job_is_required_for_release_publication(self):
+        workflow = (ROOT / ".github/workflows/release.yml").read_text()
+        gpui = re.search(r"(?ms)^  gpui-linux:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
+        publish = re.search(r"(?ms)^  publish:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
+
+        self.assertIn("name: GPUI Linux preview", gpui)
+        self.assertIn("cargo build --release --locked --manifest-path apps/gpui/Cargo.toml", gpui)
+        self.assertIn("glibc 2.39", gpui)
+        self.assertIn('name="bookie-gpui-linux-x86_64-${VERSION}"', gpui)
+        self.assertIn("needs: [prepare, appimage, arch, gpui-linux]", publish)
+        self.assertIn("needs.gpui-linux.result == 'success'", publish)
+        self.assertIn("bookie-gpui-linux-x86_64-*.tar.gz.sha256", publish)
+        self.assertIn("GTK frontend: Arch package and AppImage.", workflow)
+        self.assertIn("GPUI frontend: unsupported Linux x86_64 preview tarball", workflow)
 
     def load_validator(self):
         spec = importlib.util.spec_from_file_location("release_recovery", ROOT / "scripts/validate-release-recovery.py")
@@ -31,7 +54,7 @@ class ReleasePublicationTests(unittest.TestCase):
 
     def fixture(self):
         run = {"head_sha": "a" * 40, "head_branch": "linux-v0.2.0", "event": "push", "path": ".github/workflows/release.yml"}
-        jobs = {"jobs": [{"name": name, "conclusion": "success"} for name in ["Arch package", "AppImage"]]}
+        jobs = {"jobs": [{"name": name, "conclusion": "success"} for name in ["Arch package", "AppImage", "GPUI Linux preview"]]}
         return run, jobs
 
     def test_successful_packages_can_recover_a_failed_publication(self):
