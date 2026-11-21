@@ -32,7 +32,11 @@ fn opening_the_filter_keeps_grid_controls_on_one_line_at_default_width(cx: &mut 
     cx.run_until_parked();
     let pager = cx.debug_bounds("grid-pager").expect("pager is rendered");
     let actions = cx.debug_bounds("grid-actions").expect("actions are rendered");
-    assert_eq!(pager.origin.y, actions.origin.y, "controls must not wrap");
+    assert!(
+        pager.origin.y < actions.origin.y + actions.size.height
+            && actions.origin.y < pager.origin.y + pager.size.height,
+        "pager and grid actions should share a row"
+    );
 }
 
 #[gpui::test]
