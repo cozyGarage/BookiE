@@ -67,20 +67,40 @@ pub struct PostgresTableCursor {
     cursor: QueryCursorId,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TableSort {
+    pub column: String,
+    pub ascending: bool,
+}
+
 impl PostgresTableCursor {
     pub async fn open(
         guard: &PolicyGuard,
         table: &TableInfo,
         control: &OperationControl,
     ) -> Result<Self, DriverFailurePresentation> {
-        let key: Vec<String> = guard
+        Self::open_sorted(guard, table, None, control).await
+    }
+
+    pub async fn open_sorted(
+        guard: &PolicyGuard,
+        table: &TableInfo,
+        sort: Option<&TableSort>,
+        control: &OperationControl,
+    ) -> Result<Self, DriverFailurePresentation> {
+        let columns = guard
             .fetch_columns_controlled(table.schema.as_deref(), &table.name, control)
             .await
-            .map_err(|error| classify(&error))?
-            .into_iter()
+            .map_err(|error| classify(&error))?;
+        let key: Vec<String> = columns
+            .iter()
             .filter(|column| column.primary_key)
-            .map(|column| column.name)
+            .map(|column| column.name.clone())
             .collect();
+        let sql = match sort {
+            Some(sort) => table_select_sorted(table, &columns, sort).map_err(DriverFailurePresentation::Unsupported)?,
+            None => table_select(table, &key),
+        };
         let mut session = guard
             .open_session_with_audit()
             .await
@@ -92,7 +112,7 @@ impl PostgresTableCursor {
             let _ = Box::new(session).close().await;
             return Err(classify(&error));
         }
-        match open_table_cursor(&mut session, table, &key, control).await {
+        match open_table_cursor(&mut session, &sql, control).await {
             Ok(cursor) => Ok(Self { session, cursor }),
             Err(error) => {
                 let _ = Box::new(session).close().await;
@@ -142,15 +162,44 @@ fn table_select(table: &TableInfo, key: &[String]) -> String {
     format!("SELECT * FROM {relation} ORDER BY {order}")
 }
 
+fn table_select_sorted(
+    table: &TableInfo,
+    columns: &[bookie_core::ColumnInfo],
+    sort: &TableSort,
+) -> Result<String, String> {
+    let mut matching = columns
+        .iter()
+        .enumerate()
+        .filter(|(_, column)| column.name == sort.column);
+    let Some((index, _)) = matching.next() else {
+        return Err("The requested sort column no longer exists.".into());
+    };
+    if matching.next().is_some() {
+        return Err("The requested sort column is ambiguous.".into());
+    }
+    let filter = bookie_core::FilterSet::default();
+    let target = crate::browse_query::BrowseTarget {
+        driver_id: "postgres",
+        schema: table.schema.as_deref(),
+        table: &table.name,
+        columns,
+        filter: &filter,
+        hidden_columns: None,
+        long_text_preview: false,
+        supports_reverse_keyset: false,
+    };
+    target
+        .full_select(Some((index, sort.ascending)), false)
+        .map(|query| query.sql)
+}
+
 async fn open_table_cursor(
     session: &mut AuditedSession,
-    table: &TableInfo,
-    key: &[String],
+    sql: &str,
     control: &OperationControl,
 ) -> Result<QueryCursorId, DriverFailurePresentation> {
-    let sql = table_select(table, key);
     session
-        .open_query_cursor_controlled_with_audit(&sql, &[], control)
+        .open_query_cursor_controlled_with_audit(sql, &[], control)
         .await
         .result
         .map_err(|error| classify(&error))
@@ -382,14 +431,30 @@ impl ReadSession {
         table: &TableInfo,
         control: &OperationControl,
     ) -> Result<Option<PostgresTableCursor>, DriverFailurePresentation> {
+        self.open_table_cursor_sorted(table, None, control).await
+    }
+
+    pub async fn open_table_cursor_sorted(
+        &self,
+        table: &TableInfo,
+        sort: Option<&TableSort>,
+        control: &OperationControl,
+    ) -> Result<Option<PostgresTableCursor>, DriverFailurePresentation> {
         if !self.supports_snapshot_cursor {
+            if sort.is_some() {
+                return Err(DriverFailurePresentation::Unsupported(
+                    "Server-side table sorting is not available for this connection.".into(),
+                ));
+            }
             return Ok(None);
         }
         let guard = self
             .database
             .guard_for_generation(self.id, self.generation, Principal::human_gui())
             .ok_or(DriverFailurePresentation::Disconnected)?;
-        PostgresTableCursor::open(&guard, table, control).await.map(Some)
+        PostgresTableCursor::open_sorted(&guard, table, sort, control)
+            .await
+            .map(Some)
     }
 }
 
@@ -525,6 +590,52 @@ mod table_select_tests {
         TableInfo {
             schema: schema.map(str::to_owned),
             name: name.into(),
+        }
+    }
+
+    fn column(name: &str, primary_key: bool) -> bookie_core::ColumnInfo {
+        bookie_core::ColumnInfo {
+            name: name.into(),
+            data_type: "text".into(),
+            nullable: false,
+            primary_key,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: None,
+            domain_type: None,
+        }
+    }
+
+    #[test]
+    fn sorting_quotes_names_and_appends_unique_key_ties() {
+        let columns = vec![
+            column("tenant", true),
+            column("id", true),
+            column("x\"; DROP TABLE t; --", false),
+        ];
+        let request = TableSort {
+            column: columns[2].name.clone(),
+            ascending: false,
+        };
+        let sql = table_select_sorted(&table(Some("s\"chema"), "t"), &columns, &request).unwrap();
+        assert_eq!(
+            sql,
+            "SELECT * FROM \"s\"\"chema\".\"t\" ORDER BY \"x\"\"; DROP TABLE t; --\" DESC, \"tenant\" ASC, \"id\" ASC"
+        );
+    }
+
+    #[test]
+    fn sorting_rejects_unknown_or_ambiguous_metadata_columns() {
+        let columns = vec![column("id", true), column("id", false)];
+        for name in ["missing", "id"] {
+            let request = TableSort {
+                column: name.into(),
+                ascending: true,
+            };
+            assert!(table_select_sorted(&table(None, "t"), &columns, &request).is_err());
         }
     }
 
