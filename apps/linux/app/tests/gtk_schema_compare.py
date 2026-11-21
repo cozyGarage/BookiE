@@ -77,9 +77,32 @@ def scenarios(ui):
         finally:
             postgres(cleanup)
 
+    def postgres_sidebar_hidden_schema_can_be_restored(_database, _base):
+        cleanup = f"DROP SCHEMA IF EXISTS {CURRENT}, {DESIRED} CASCADE"
+        postgres(cleanup)
+        postgres(f"CREATE SCHEMA {CURRENT}; CREATE SCHEMA {DESIRED}; "
+                 f"CREATE TABLE {CURRENT}.items (id integer); CREATE TABLE {DESIRED}.items (id integer)")
+        try:
+            ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
+            ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
+            ui.wait_for_node(name=CURRENT, role=ui.pyatspi.ROLE_LIST_ITEM)
+            ui.wait_for_node(name=DESIRED, role=ui.pyatspi.ROLE_LIST_ITEM)
+            invoke_row_action(CURRENT, "sidebar-row.hide-schema")
+            ui.wait_for_node(name=CURRENT, role=ui.pyatspi.ROLE_LIST_ITEM, present=False)
+            ui.wait_for_node(name=DESIRED, role=ui.pyatspi.ROLE_LIST_ITEM)
+            button = ui.wait_for_node(name="Filter schemas", role=ui.pyatspi.ROLE_PUSH_BUTTON)
+            bounds = button.queryComponent().getExtents(ui.pyatspi.WINDOW_COORDS)
+            ui.gtk_ux.x11_click(bounds.x + bounds.width // 2, bounds.y + bounds.height // 2, button=1)
+            ui.invoke(ui.wait_for_node(name=f"Show {CURRENT}", role=ui.pyatspi.ROLE_PUSH_BUTTON))
+            ui.wait_for_node(name=CURRENT, role=ui.pyatspi.ROLE_LIST_ITEM)
+            ui.wait_for_node(name=DESIRED, role=ui.pyatspi.ROLE_LIST_ITEM)
+        finally:
+            postgres(cleanup)
+
     result = []
     if os.environ.get("BOOKIE_GTK_POSTGRES_CONTAINER"):
-        result.append(postgres_schema_compare_opens_a_script_and_runs_nothing)
+        result.extend((postgres_schema_compare_opens_a_script_and_runs_nothing,
+                       postgres_sidebar_hidden_schema_can_be_restored))
     for scenario in result:
         scenario.environment_overrides = {"BOOKIE_SCHEMA_COMPARE": "1"}
         scenario.environment = "local"
