@@ -22,6 +22,20 @@ pub(super) fn open(cx: &mut TestAppContext) -> (gpui::Entity<GridView>, &mut Vis
 }
 
 #[gpui::test]
+fn opening_the_filter_keeps_grid_controls_on_one_line_at_default_width(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_resize(gpui::size(gpui::px(1100.0), gpui::px(800.0)));
+    cx.update(|_, cx| view.update(cx, |view, cx| {
+        view.search.filter_visible = true;
+        cx.notify();
+    }));
+    cx.run_until_parked();
+    let pager = cx.debug_bounds("grid-pager").expect("pager is rendered");
+    let actions = cx.debug_bounds("grid-actions").expect("actions are rendered");
+    assert_eq!(pager.origin.y, actions.origin.y, "controls must not wrap");
+}
+
+#[gpui::test]
 fn a_valid_edit_is_applied_to_the_typed_cell_and_marked(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(2, 3, window, cx)));
