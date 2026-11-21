@@ -25,6 +25,12 @@ pub trait ResultSource: Send + Sync + 'static {
         "Synthetic data · no database connection".into()
     }
     fn total(&self) -> u64;
+    fn executed_sql(&self) -> Option<&str> {
+        None
+    }
+    fn load_elapsed(&self) -> Option<std::time::Duration> {
+        None
+    }
     fn is_partial(&self) -> bool {
         false
     }
