@@ -1335,6 +1335,7 @@ dependencies = [
  "secrecy",
  "serde_json",
  "tokio",
+ "tokio-util",
 ]
 
 [[package]]

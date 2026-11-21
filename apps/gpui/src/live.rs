@@ -768,22 +768,35 @@ impl SubscriptionSampler for RegistrySubscriptionSampler {
         cancel: CancellationToken,
         mut on_message: Box<dyn FnMut(bookie_app_services::read_session_store::SubscriptionMessage) + Send>,
     ) -> Pin<Box<dyn Future<Output = Result<u64, bookie_core::DriverError>> + Send + '_>> {
-        let postgres = driver_id == "postgres";
+        let driver_id = driver_id.to_string();
         Box::pin(async move {
-            if !postgres {
-                return Err(bookie_core::DriverError::Unsupported(
-                    "only PostgreSQL notifications can be followed".into(),
-                ));
+            match driver_id.as_str() {
+                "postgres" => {
+                    drivers_registry::follow_notifications(options, &channels, &cancel, move |message| {
+                        on_message(bookie_app_services::read_session_store::SubscriptionMessage {
+                            channel: message.channel,
+                            pattern: None,
+                            payload: message.payload,
+                            payload_bytes: message.payload_bytes,
+                        });
+                    })
+                    .await
+                }
+                "redis" => {
+                    drivers_registry::follow_pubsub(options, &channels, &cancel, move |message| {
+                        on_message(bookie_app_services::read_session_store::SubscriptionMessage {
+                            channel: message.channel,
+                            pattern: message.pattern,
+                            payload: message.payload,
+                            payload_bytes: message.payload_bytes,
+                        });
+                    })
+                    .await
+                }
+                other => Err(bookie_core::DriverError::Unsupported(format!(
+                    "{other} has no live messages to follow"
+                ))),
             }
-            drivers_registry::follow_notifications(options, &channels, &cancel, move |message| {
-                on_message(bookie_app_services::read_session_store::SubscriptionMessage {
-                    channel: message.channel,
-                    pattern: None,
-                    payload: message.payload,
-                    payload_bytes: message.payload_bytes,
-                });
-            })
-            .await
         })
     }
 

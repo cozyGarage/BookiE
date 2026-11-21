@@ -58,7 +58,10 @@ impl GridView {
         });
         let follow = self.palette.follow.as_ref().map(|channel| Action {
             id: "follow-pubsub",
-            label: format!("Follow PostgreSQL notifications on {channel} until stopped"),
+            label: match self.live.as_ref().map(|live| live.driver_id.as_str()) {
+                Some("redis") => format!("Follow Redis channels {channel} until stopped"),
+                _ => format!("Follow PostgreSQL notifications on {channel} until stopped"),
+            },
             enabled: self.panel.follow.is_none(),
         });
         let stop = self.panel.follow.as_ref().map(|state| Action {
