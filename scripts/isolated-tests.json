@@ -2271,6 +2271,11 @@
       "bookie-app",
       "--lib",
       "ui::app::connection::dismiss_tests::deleting_a_connection_dismisses_the_saved_connections_popover"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::column::tests::header_menu_displays_database_column_underscores_literally"
     ]
   ],
   "keyring": [
