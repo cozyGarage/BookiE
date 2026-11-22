@@ -57,6 +57,13 @@ pub(crate) fn mapped_error_location(editor: &str, sql: &str, position: usize, so
 
 pub(crate) fn error_token(sql: &str, position: usize) -> Option<Range<usize>> {
     let (offset, ch) = sql.char_indices().nth(position.checked_sub(1)?)?;
+    if ch == ':' && !sql[..offset].ends_with(':') {
+        let rest = &sql[offset + 1..];
+        if rest.chars().next().is_some_and(|c| c.is_ascii_alphabetic() || c == '_') {
+            let length = rest.bytes().take_while(|b| b.is_ascii_alphanumeric() || *b == b'_').count();
+            return Some(offset..offset + 1 + length);
+        }
+    }
     let identifier = |c: char| c.is_alphanumeric() || c == '_' || c == '$';
     if !identifier(ch) {
         return Some(offset..offset + ch.len_utf8());

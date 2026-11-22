@@ -51,6 +51,10 @@ fn error_token_selects_an_identifier_on_character_boundaries() {
     let pos = sql.chars().position(|c| c == 'n').unwrap() + 1;
     assert_eq!(&sql[super::error_token(sql, pos).unwrap()], "naïve");
     assert_eq!(&sql[super::error_token(sql, pos + 2).unwrap()], "naïve");
+    let sql = "SELECT :long_name, value::text";
+    assert_eq!(&sql[super::error_token(sql, 8).unwrap()], ":long_name");
+    assert_eq!(&sql[super::error_token(sql, 25).unwrap()], ":");
+    assert_eq!(&sql[super::error_token(sql, 26).unwrap()], ":");
     assert!(super::error_token(sql, 0).is_none());
 }
 
