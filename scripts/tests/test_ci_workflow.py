@@ -722,6 +722,7 @@ class CiWorkflowTests(unittest.TestCase):
         forgejo_driver_tls = re.search(
             r"(?ms)^  driver-tls:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", forgejo_workflow
         ).group(1)
+        self.assertIn("runs-on: [any-host, build-host]", forgejo_driver_tls)
         pg_release = re.search(r"(?ms)^  pg-release:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
         forgejo_pg_release = re.search(
             r"(?ms)^  pg-release:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", forgejo_workflow
@@ -1357,10 +1358,10 @@ class CiWorkflowTests(unittest.TestCase):
         for name in ("linux-build", "clippy", "test-build"):
             with self.subTest(job=name):
                 self.assertIn("runs-on: build-host", jobs[name])
+        self.assertIn("runs-on: [any-host, build-host]", jobs["driver-tls"])
         for name in (
             "guards", "unit", "sandbox", "widgets", "distro-floor-scenarios", "driver",
-            "consumers", "gtk", "pg-release", "gtk-server",
-            "driver-tls", "keyring", "supply-chain",
+            "consumers", "gtk", "pg-release", "gtk-server", "keyring", "supply-chain",
         ):
             with self.subTest(job=name):
                 self.assertIn("runs-on: any-host", jobs[name])
@@ -1987,7 +1988,8 @@ class CiWorkflowTests(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         focused = workflow.split("  b4-rollback:\n", 1)[1].split("  driver-tls:\n", 1)[0]
         for required in [
-            "prefix-key: linux-integration",
+            "bookie-tests-${{ needs.pin-revision.outputs.revision }}-driver-core",
+            "BOOKIE_REQUIRE_PREBUILT=1",
             "run-test-layer.py b4-rollback",
             "regression-b4-rollback-${{ github.run_id }}-${{ github.run_attempt }}",
         ]:
@@ -2001,6 +2003,7 @@ class CiWorkflowTests(unittest.TestCase):
         layers = json.loads((ROOT / "scripts/test-layers.json").read_text())["layers"]["b4-rollback"]
         commands = [step["argv"] for step in layers["steps"]]
         self.assertEqual(len(commands), 2)
+        self.assertTrue(all(command[:2] == ["bash", "scripts/run-rust-tests.sh"] for command in commands))
         self.assertIn("mysql_atomic", commands[0])
         self.assertIn(
             "rollback_failure::a_batch_reports_rollback_failure_after_postgres_terminates_its_backend",
@@ -2014,7 +2017,12 @@ class CiWorkflowTests(unittest.TestCase):
         forgejo_job = re.search(r"(?ms)^  b4-rollback:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo)
         self.assertIsNotNone(github_job)
         self.assertIsNotNone(forgejo_job)
+        self.assertIn("needs: [pin-revision, ensure-ci-gtk-image, test-build]", github_job.group(1))
+        self.assertIn("bookie-tests-${{ needs.pin-revision.outputs.revision }}-driver-core", github_job.group(1))
+        self.assertIn("BOOKIE_REQUIRE_PREBUILT=1", github_job.group(1))
         self.assertIn("python3 scripts/run-test-layer.py b4-rollback", github_job.group(1))
+        self.assertIn("needs: [pin-revision, test-build]", forgejo_job.group(1))
+        self.assertIn("Prepare source-pinned driver-core test bundle", forgejo_job.group(1))
         self.assertIn("python3 scripts/run-test-layer.py b4-rollback", forgejo_job.group(1))
 
         layers = json.loads((ROOT / "scripts/test-layers.json").read_text())["layers"]

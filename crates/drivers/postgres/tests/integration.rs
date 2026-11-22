@@ -122,6 +122,9 @@ mod enum_role_context_contract;
 #[path = "support/enum_type_privilege_contract.rs"]
 mod enum_type_privilege_contract;
 
+#[path = "support/unicode_identifiers.rs"]
+mod unicode_identifiers;
+
 #[path = "support/quoted_enum_identifier_contract.rs"]
 mod quoted_enum_identifier_contract;
 
