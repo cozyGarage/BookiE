@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use bookie_app_services::statement_plan::statement_at_cursor;
+use bookie_app_services::statement_plan::{statement_at_cursor, statement_range_at};
 
 use super::*;
 
@@ -19,6 +19,17 @@ pub(crate) fn run_target(text: &str, driver: &str, cursor: usize, selection: Ran
     statement_at_cursor(text, driver, cursor)
         .filter(|statement| !statement.is_empty())
         .ok_or_else(|| "The cursor is not inside a complete statement".into())
+}
+
+/// Capture the exact editor range for a selection or caret execution.
+pub(crate) fn run_source_range(text: &str, driver: &str, cursor: usize, selection: Range<usize>) -> Option<Range<usize>> {
+    if selection.start < selection.end {
+        let selected = text.get(selection.clone())?;
+        let leading = selected.len() - selected.trim_start().len();
+        let length = selected.trim().len();
+        return (length > 0).then_some(selection.start + leading..selection.start + leading + length);
+    }
+    statement_range_at(text, driver, cursor)
 }
 
 /// PostgreSQL positions count Unicode characters from one. Only map an unchanged
@@ -69,7 +80,12 @@ impl GridView {
             .map_or_else(|| "postgres".to_string(), |session| session.driver_id.clone());
         let editor = self.sql_input.read(cx);
         let (text, cursor, selection) = (editor.value().to_string(), editor.cursor(), editor.selected_range());
+        let range = run_source_range(&text, &driver, cursor, selection.clone());
         match run_target(&text, &driver, cursor, selection) {
+            Ok(sql) if bookie_app_services::query_parameters::statement_names(&sql, &driver).is_empty() => {
+                let source = range.filter(|range| text.get(range.clone()) == Some(sql.as_str())).map(|range| (text, range));
+                self.run_sql_with_source(sql, Vec::new(), source, cx);
+            }
             Ok(sql) => self.run_with_parameters(sql, cx),
             Err(message) => {
                 self.status = message;

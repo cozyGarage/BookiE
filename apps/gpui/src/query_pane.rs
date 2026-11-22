@@ -284,7 +284,7 @@ impl GridView {
                     self.panel
                         .error_location
                         .as_ref()
-                        .filter(|(_, _, id)| {
+                        .filter(|(_, _, id, _)| {
                             matches!(self.tabs.current(), Tab::Query)
                                 && self
                                     .panel
@@ -293,12 +293,17 @@ impl GridView {
                                     .last()
                                     .is_some_and(|message| message.id == *id)
                         })
-                        .and_then(|(sql, position, _)| {
+                        .and_then(|(sql, position, _, source)| {
                             let current = self.sql_input.read(cx).value();
-                            crate::run_cursor_ui::error_location(current.as_ref(), sql, *position).map(
+                            let (expected, start) = match source {
+                                Some((snapshot, range)) if current.as_ref() == snapshot && snapshot.get(range.clone()) == Some(sql.as_str()) => (snapshot.clone(), range.start),
+                                None if current.as_ref() == sql => (sql.clone(), 0),
+                                _ => return None,
+                            };
+                            let absolute_position = expected[..start].chars().count().checked_add(*position)?;
+                            crate::run_cursor_ui::error_location(current.as_ref(), &expected, absolute_position).map(
                                 |(line, column)| {
-                                    let expected = sql.clone();
-                                    let token = crate::run_cursor_ui::error_token(sql, *position);
+                                    let token = crate::run_cursor_ui::error_token(sql, *position).map(|range| start + range.start..start + range.end);
                                     ghost(
                                         "go-to-query-error",
                                         format!("Go to error ({}:{})", line + 1, column + 1),

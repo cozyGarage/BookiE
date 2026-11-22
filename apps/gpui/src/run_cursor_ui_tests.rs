@@ -53,3 +53,14 @@ fn error_token_selects_an_identifier_on_character_boundaries() {
     assert_eq!(&sql[super::error_token(sql, pos + 2).unwrap()], "naïve");
     assert!(super::error_token(sql, 0).is_none());
 }
+
+#[test]
+fn source_range_tracks_selection_and_duplicate_caret_statements() {
+    let sql = "SELECT 1;\nSELECT 1;";
+    let range = super::run_source_range(sql, "postgres", 12, 12..12).unwrap();
+    assert_eq!(&sql[range.clone()], "SELECT 1");
+    assert_eq!(range.start, 10);
+    let range = super::run_source_range("  SELECT x  ", "postgres", 0, 0..12).unwrap();
+    assert_eq!(range, 2..10);
+    assert!(super::run_source_range("é", "postgres", 0, 1..2).is_none());
+}

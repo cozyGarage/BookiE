@@ -5,7 +5,7 @@ use bookie_gpui::shell::ResultView;
 pub(crate) struct PanelState {
     pub view: ResultView,
     pub messages: MessageLog,
-    pub error_location: Option<(String, usize, u64)>,
+    pub error_location: Option<(String, usize, u64, Option<(String, std::ops::Range<usize>)>)>,
     pub plan: Vec<PlanNode>,
     pub explaining: bool,
     pub ratio: f32,

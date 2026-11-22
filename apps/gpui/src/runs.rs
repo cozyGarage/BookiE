@@ -54,6 +54,10 @@ impl GridView {
     }
 
     pub(crate) fn run_sql_with(&mut self, sql: String, params: Vec<bookie_core::Value>, cx: &mut Context<Self>) {
+        self.run_sql_with_source(sql, params, None, cx);
+    }
+
+    pub(crate) fn run_sql_with_source(&mut self, sql: String, params: Vec<bookie_core::Value>, source: Option<(String, std::ops::Range<usize>)>, cx: &mut Context<Self>) {
         if self.save.busy {
             self.status = "A save is running; wait for it to finish first".into();
             return;
@@ -78,10 +82,10 @@ impl GridView {
                             Err(error) => (None, Some(error.message.clone())),
                         };
                         session.record_history(&statement, clock, started.elapsed(), rows, error);
-                        (statement, started.elapsed(), result)
+                        (statement, source, started.elapsed(), result)
                     }
                 },
-                |this, (sql, elapsed, result)| match result {
+                |this, (sql, source, elapsed, result)| match result {
                     Ok(table) => {
                         this.panel.error_location = None;
                         let (rows, truncated) = (bookie_gpui::source::ResultSource::total(&table), table.truncated);
@@ -98,7 +102,7 @@ impl GridView {
                         this.panel.error_location = error
                             .position
                             .zip(this.panel.messages.entries().last())
-                            .map(|(position, message)| (sql.clone(), position, message.id));
+                            .map(|(position, message)| (sql.clone(), position, message.id, source));
                         this.panel.view = ResultView::Messages;
                         this.status = error.message;
                     }
