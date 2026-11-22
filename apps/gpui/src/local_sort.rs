@@ -129,15 +129,15 @@ mod tests {
         }
 
         fn find(&self, _: &str, _: usize, _: &CancellationToken) -> Result<FindResult, &'static str> {
-            unreachable!()
+            Err("not used by sort tests")
         }
 
         fn filter(&self, _: &Predicate, _: &CancellationToken) -> Result<Vec<u32>, &'static str> {
-            unreachable!()
+            Err("not used by sort tests")
         }
 
         fn compare(&self, _: bool, _: &CancellationToken) -> Result<Diff, &'static str> {
-            unreachable!()
+            Err("not used by sort tests")
         }
     }
 
