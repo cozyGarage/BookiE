@@ -8,7 +8,9 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::Duration;
 
-use bookie_core::{CatalogObjectKind, ConnectOptions, Connection, DriverError, OperationControl, RoutineRef, Value};
+use bookie_core::{
+    CatalogObjectKind, ConnectOptions, Connection, DriverError, OperationControl, RoutineRef, TableInfo, Value,
+};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::watch;
@@ -90,6 +92,18 @@ fn stop_cases() -> Vec<StopCase> {
         sends("fetch_columns_controlled", b"system.columns", |c, control| async move {
             c.fetch_columns_controlled(None, "stop_class_rows", &control).await
         }),
+        sends(
+            "fetch_schema_table_metadata_controlled",
+            b"system.columns",
+            |c, control| async move {
+                let tables = [TableInfo {
+                    schema: Some("default".into()),
+                    name: "stop_class_rows".into(),
+                }];
+                c.fetch_schema_table_metadata_controlled(&tables, false, &control, &mut |_, _| true)
+                    .await
+            },
+        ),
         sends("fetch_indexes_controlled", b"primary_key", |c, control| async move {
             c.fetch_indexes_controlled(None, "stop_class_rows", &control).await
         }),
