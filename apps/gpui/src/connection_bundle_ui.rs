@@ -2,25 +2,26 @@ use std::path::{Path, PathBuf};
 
 use super::*;
 use crate::chrome::ghost;
+use bookie_app_services::connection_bundle as bundles;
 use gpui_component::scroll::ScrollableElement;
 
 #[derive(Default)]
 pub(crate) struct BundleState {
     pub pending: Option<PendingImport>,
-    pub encrypted: Option<bookie_storage::EncryptedBundle>,
+    pub encrypted: Option<bundles::EncryptedBundle>,
     pub passphrase: Option<Entity<TextInput>>,
     pub busy: bool,
 }
 
 pub(crate) struct PendingImport {
-    plan: bookie_storage::ImportPlan,
-    secrets: Vec<bookie_storage::BundleSecrets>,
+    plan: bundles::ImportPlan,
+    secrets: Vec<bundles::BundleSecrets>,
     skipped: Vec<String>,
 }
 
 enum PreparedImport {
     Review(PendingImport),
-    Locked(bookie_storage::EncryptedBundle),
+    Locked(bundles::EncryptedBundle),
 }
 
 fn runtime() -> Result<tokio::runtime::Runtime, String> {
@@ -52,16 +53,16 @@ fn read_bounded(path: &Path, limit: usize) -> Result<Vec<u8>, String> {
 fn prepare_import(path: &Path) -> Result<PreparedImport, String> {
     if is_sqlite_file(path)? {
         let imported = runtime()?
-            .block_on(bookie_storage::parse_dbx_connection_database(path))
+            .block_on(bundles::parse_dbx_connection_database(path))
             .map_err(|error| error.to_string())?;
         let skipped = imported.skipped.clone();
         return plan_body(imported.into_body(), skipped);
     }
-    let bytes = read_bounded(path, bookie_storage::MAX_BUNDLE_BYTES)?;
-    match bookie_storage::parse_bundle(&bytes) {
-        Ok(bookie_storage::ParsedBundle::Plaintext(body)) => return plan_body(body, Vec::new()),
-        Ok(bookie_storage::ParsedBundle::Encrypted(bundle)) => return Ok(PreparedImport::Locked(bundle)),
-        Err(bookie_storage::BundleError::NotABundle | bookie_storage::BundleError::Malformed) => {}
+    let bytes = read_bounded(path, bundles::MAX_BUNDLE_BYTES)?;
+    match bundles::parse_bundle(&bytes) {
+        Ok(bundles::ParsedBundle::Plaintext(body)) => return plan_body(body, Vec::new()),
+        Ok(bundles::ParsedBundle::Encrypted(bundle)) => return Ok(PreparedImport::Locked(bundle)),
+        Err(bundles::BundleError::NotABundle | bundles::BundleError::Malformed) => {}
         Err(error) => return Err(error.to_string()),
     }
     let (body, skipped) = parse_peer(path, &bytes)?;
@@ -77,34 +78,34 @@ fn is_sqlite_file(path: &Path) -> Result<bool, String> {
     Ok(read == header.len() && header == *b"SQLite format 3\0")
 }
 
-fn parse_peer(path: &Path, bytes: &[u8]) -> Result<(bookie_storage::BundleBody, Vec<String>), String> {
+fn parse_peer(path: &Path, bytes: &[u8]) -> Result<(bundles::BundleBody, Vec<String>), String> {
     let text = std::str::from_utf8(bytes).map_err(|_| "The connection file is not valid UTF-8".to_string())?;
     let parsed = if text.contains("<Connections") {
-        bookie_storage::parse_navicat_connections(text)
+        bundles::parse_navicat_connections(text)
     } else if text.trim_start().starts_with('<') {
         let local = read_bounded(
             &path.with_file_name("dataSources.local.xml"),
-            bookie_storage::MAX_DATAGRIP_BYTES,
+            bundles::MAX_DATAGRIP_BYTES,
         )
         .ok()
         .and_then(|local| String::from_utf8(local).ok());
-        bookie_storage::parse_datagrip_data_sources(text, local.as_deref())
-    } else if bookie_storage::looks_like_resp_export(text) {
-        bookie_storage::parse_resp_connections(text)
+        bundles::parse_datagrip_data_sources(text, local.as_deref())
+    } else if bundles::looks_like_resp_export(text) {
+        bundles::parse_resp_connections(text)
     } else {
-        bookie_storage::parse_dbeaver_data_sources(text)
-            .or_else(|error| bookie_storage::parse_another_redis_connections(text).map_err(|_| error))
+        bundles::parse_dbeaver_data_sources(text)
+            .or_else(|error| bundles::parse_another_redis_connections(text).map_err(|_| error))
     }
     .map_err(|error| error.to_string())?;
     let skipped = parsed.skipped.clone();
     Ok((parsed.into_body(), skipped))
 }
 
-fn plan_body(body: bookie_storage::BundleBody, skipped: Vec<String>) -> Result<PreparedImport, String> {
+fn plan_body(body: bundles::BundleBody, skipped: Vec<String>) -> Result<PreparedImport, String> {
     let local = runtime()?
-        .block_on(bookie_storage::load_connections())
+        .block_on(bundles::load_connections())
         .map_err(|error| error.to_string())?;
-    let plan = bookie_storage::plan_import(&local, &body).map_err(|error| error.to_string())?;
+    let plan = bundles::plan_import(&local, &body).map_err(|error| error.to_string())?;
     Ok(PreparedImport::Review(PendingImport {
         plan,
         secrets: body.secrets,
@@ -112,7 +113,7 @@ fn plan_body(body: bookie_storage::BundleBody, skipped: Vec<String>) -> Result<P
     }))
 }
 
-fn unlock_import(bundle: &bookie_storage::EncryptedBundle, passphrase: &str) -> Result<PendingImport, String> {
+fn unlock_import(bundle: &bundles::EncryptedBundle, passphrase: &str) -> Result<PendingImport, String> {
     let body = bundle.unlock(passphrase).map_err(|error| error.to_string())?;
     match plan_body(body, Vec::new())? {
         PreparedImport::Review(pending) => Ok(pending),
@@ -121,10 +122,10 @@ fn unlock_import(bundle: &bookie_storage::EncryptedBundle, passphrase: &str) -> 
 }
 
 fn bundle_export(
-    connections: Vec<bookie_storage::SavedConnection>,
-    organization: Vec<(uuid::Uuid, bookie_storage::ConnectionOrganization)>,
-) -> bookie_storage::BundleExport {
-    bookie_storage::BundleExport {
+    connections: Vec<bundles::SavedConnection>,
+    organization: Vec<(uuid::Uuid, bundles::ConnectionOrganization)>,
+) -> bundles::BundleExport {
+    bundles::BundleExport {
         producer: format!("bookie {}", env!("CARGO_PKG_VERSION")),
         exported_at: chrono::Utc::now().to_rfc3339(),
         connections,
@@ -133,11 +134,11 @@ fn bundle_export(
     }
 }
 
-fn disposition_name(disposition: &bookie_storage::ImportDisposition) -> &'static str {
+fn disposition_name(disposition: &bundles::ImportDisposition) -> &'static str {
     match disposition {
-        bookie_storage::ImportDisposition::New => "Add",
-        bookie_storage::ImportDisposition::UpdateInPlace => "Update",
-        bookie_storage::ImportDisposition::Remapped => "Add as new",
+        bundles::ImportDisposition::New => "Add",
+        bundles::ImportDisposition::UpdateInPlace => "Update",
+        bundles::ImportDisposition::Remapped => "Add as new",
     }
 }
 
@@ -348,7 +349,7 @@ impl GridView {
                         div()
                             .flex_1()
                             .min_w_0()
-                            .max_h(px(180.0))
+                            .max_h(px(crate::size::SAVE_PREVIEW_MAX_HEIGHT))
                             .overflow_y_scrollbar()
                             .flex()
                             .flex_col()
@@ -421,9 +422,9 @@ fn apply_import(pending: PendingImport) -> Result<usize, String> {
         database
             .audit_administrative_action(
                 operation,
-                bookie_policy::AuditAdministrativeAction::ConnectionBundleImport,
-                bookie_policy::AuditRecordPhase::Intent,
-                bookie_policy::AuditTerminalStatus::Pending,
+                bundles::AuditAdministrativeAction::ConnectionBundleImport,
+                bundles::AuditRecordPhase::Intent,
+                bundles::AuditTerminalStatus::Pending,
                 planned,
                 None,
             )
@@ -432,14 +433,14 @@ fn apply_import(pending: PendingImport) -> Result<usize, String> {
         let started = Instant::now();
         let outcome = apply_items(pending).await;
         let (status, affected) = match &outcome {
-            Ok(count) => (bookie_policy::AuditTerminalStatus::Succeeded, *count),
-            Err((count, _)) => (bookie_policy::AuditTerminalStatus::Failed, *count),
+            Ok(count) => (bundles::AuditTerminalStatus::Succeeded, *count),
+            Err((count, _)) => (bundles::AuditTerminalStatus::Failed, *count),
         };
         if database
             .audit_administrative_action(
                 operation,
-                bookie_policy::AuditAdministrativeAction::ConnectionBundleImport,
-                bookie_policy::AuditRecordPhase::Outcome,
+                bundles::AuditAdministrativeAction::ConnectionBundleImport,
+                bundles::AuditRecordPhase::Outcome,
                 status,
                 affected,
                 Some(started.elapsed().as_millis().min(u128::from(u64::MAX)) as u64),
@@ -460,27 +461,27 @@ async fn apply_items(pending: PendingImport) -> Result<usize, (usize, String)> {
             .secrets
             .iter()
             .find(|secret| secret.connection_id == item.source_id);
-        let single = bookie_storage::ImportPlan {
+        let single = bundles::ImportPlan {
             items: vec![item.clone()],
         };
-        if let Err(error) = bookie_storage::apply_import(&single).await {
+        if let Err(error) = bundles::apply_import(&single).await {
             return Err((imported, format!("the connection could not be saved: {error}")));
         }
         if let Some(secrets) = carried {
-            if bookie_storage::store_bundle_secrets(item.connection.id, secrets, &item.connection.name, false)
+            if bundles::store_bundle_secrets(item.connection.id, secrets, &item.connection.name, false)
                 .await
                 .is_err()
             {
-                let restored = bookie_storage::restore_connection(item.previous.as_ref(), item.connection.id)
+                let restored = bundles::restore_connection(item.previous.as_ref(), item.connection.id)
                     .await
                     .is_ok();
                 if restored
                     && matches!(
                         item.disposition,
-                        bookie_storage::ImportDisposition::New | bookie_storage::ImportDisposition::Remapped
+                        bundles::ImportDisposition::New | bundles::ImportDisposition::Remapped
                     )
                 {
-                    bookie_storage::forget_imported_bundle_secrets(item.connection.id, secrets).await;
+                    bundles::forget_imported_bundle_secrets(item.connection.id, secrets).await;
                 }
                 return Err((imported, "a saved credential could not be stored".into()));
             }
@@ -494,18 +495,16 @@ fn export_connections(path: PathBuf) -> Result<usize, String> {
     runtime()?.block_on(async move {
         let database = bookie_app_services::database_service::DatabaseService::new();
         let operation = uuid::Uuid::new_v4();
-        let connections = bookie_storage::load_connections()
-            .await
-            .map_err(|error| error.to_string())?;
+        let connections = bundles::load_connections().await.map_err(|error| error.to_string())?;
         if connections.is_empty() {
             return Err("There are no saved connections to export".into());
         }
         database
             .audit_administrative_action(
                 operation,
-                bookie_policy::AuditAdministrativeAction::ConnectionBundleExport,
-                bookie_policy::AuditRecordPhase::Intent,
-                bookie_policy::AuditTerminalStatus::Pending,
+                bundles::AuditAdministrativeAction::ConnectionBundleExport,
+                bundles::AuditRecordPhase::Intent,
+                bundles::AuditTerminalStatus::Pending,
                 connections.len(),
                 None,
             )
@@ -514,16 +513,16 @@ fn export_connections(path: PathBuf) -> Result<usize, String> {
         let started = Instant::now();
         let outcome = write_export(path, connections).await;
         let status = if outcome.is_ok() {
-            bookie_policy::AuditTerminalStatus::Succeeded
+            bundles::AuditTerminalStatus::Succeeded
         } else {
-            bookie_policy::AuditTerminalStatus::Failed
+            bundles::AuditTerminalStatus::Failed
         };
         let count = outcome.as_ref().copied().unwrap_or_default();
         if database
             .audit_administrative_action(
                 operation,
-                bookie_policy::AuditAdministrativeAction::ConnectionBundleExport,
-                bookie_policy::AuditRecordPhase::Outcome,
+                bundles::AuditAdministrativeAction::ConnectionBundleExport,
+                bundles::AuditRecordPhase::Outcome,
                 status,
                 count,
                 Some(started.elapsed().as_millis().min(u128::from(u64::MAX)) as u64),
@@ -539,19 +538,19 @@ fn export_connections(path: PathBuf) -> Result<usize, String> {
 
 async fn write_export(
     path: PathBuf,
-    connections: Vec<bookie_storage::SavedConnection>,
-) -> Result<usize, bookie_storage::BundleError> {
+    connections: Vec<bundles::SavedConnection>,
+) -> Result<usize, bundles::BundleError> {
     let count = connections.len();
-    let organization = bookie_storage::load_organization()
+    let organization = bundles::load_organization()
         .await
-        .map_err(|_| bookie_storage::BundleError::Field("organization"))?;
+        .map_err(|_| bundles::BundleError::Field("organization"))?;
     let organization = connections
         .iter()
         .map(|connection| (connection.id, organization.get(connection.id)))
         .collect();
     let export = bundle_export(connections, organization);
-    let bytes = bookie_storage::export_plaintext(&export)?;
-    std::fs::write(path, bytes).map_err(|_| bookie_storage::BundleError::Field("destination"))?;
+    let bytes = bundles::export_plaintext(&export)?;
+    std::fs::write(path, bytes).map_err(|_| bundles::BundleError::Field("destination"))?;
     Ok(count)
 }
 
@@ -562,12 +561,12 @@ mod tests {
     #[test]
     fn import_disposition_text_is_user_visible_and_distinct() {
         assert_ne!(
-            disposition_name(&bookie_storage::ImportDisposition::New),
-            disposition_name(&bookie_storage::ImportDisposition::UpdateInPlace)
+            disposition_name(&bundles::ImportDisposition::New),
+            disposition_name(&bundles::ImportDisposition::UpdateInPlace)
         );
         assert_ne!(
-            disposition_name(&bookie_storage::ImportDisposition::Remapped),
-            disposition_name(&bookie_storage::ImportDisposition::UpdateInPlace)
+            disposition_name(&bundles::ImportDisposition::Remapped),
+            disposition_name(&bundles::ImportDisposition::UpdateInPlace)
         );
     }
 
@@ -603,11 +602,11 @@ mod tests {
 
     #[test]
     fn exported_bundle_contains_profiles_but_no_secrets() -> Result<(), Box<dyn std::error::Error>> {
-        let connection: bookie_storage::SavedConnection = serde_json::from_str(
+        let connection: bundles::SavedConnection = serde_json::from_str(
             r#"{"id":"6af4b280-82ec-4d81-b780-3878f7af1647","name":"local","driver_id":"postgres","host":"localhost","port":5432,"database":"test","username":"test"}"#,
         )?;
-        let bytes = bookie_storage::export_plaintext(&bundle_export(vec![connection], Vec::new()))?;
-        let bookie_storage::ParsedBundle::Plaintext(body) = bookie_storage::parse_bundle(&bytes)? else {
+        let bytes = bundles::export_plaintext(&bundle_export(vec![connection], Vec::new()))?;
+        let bundles::ParsedBundle::Plaintext(body) = bundles::parse_bundle(&bytes)? else {
             return Err("plaintext export was unexpectedly encrypted".into());
         };
         assert_eq!(body.connections.len(), 1);
