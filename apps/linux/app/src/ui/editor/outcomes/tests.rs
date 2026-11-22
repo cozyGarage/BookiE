@@ -814,10 +814,7 @@ async fn postgres_stream_reports_time_to_its_first_page() {
     let started = std::time::Instant::now();
     let result = run_statements_with_stream(
         StatementRun {
-            target: cursor_target(
-                vec![Ok(cursor_page(&[1], false))],
-                counters,
-            ),
+            target: cursor_target(vec![Ok(cursor_page(&[1], false))], counters),
             statements: vec!["SELECT id FROM items".into()],
             driver_id: "postgres",
             parameter_values: &Default::default(),
@@ -840,8 +837,14 @@ async fn postgres_stream_reports_time_to_its_first_page() {
 
     assert!(matches!(result, ScriptRunResult::Streamed(StreamTerminal::Complete)));
     let first_row_ms = first_row_ms.lock().unwrap().expect("first page timing");
-    assert!(first_row_ms >= 70, "setup and fetch time must be counted: {first_row_ms}");
-    assert!(started.elapsed().as_millis().saturating_sub(first_row_ms) >= 270, "approval wait must be excluded");
+    assert!(
+        first_row_ms >= 70,
+        "setup and fetch time must be counted: {first_row_ms}"
+    );
+    assert!(
+        started.elapsed().as_millis().saturating_sub(first_row_ms) >= 270,
+        "approval wait must be excluded"
+    );
     assert!(first_row_ms <= started.elapsed().as_millis());
 }
 
