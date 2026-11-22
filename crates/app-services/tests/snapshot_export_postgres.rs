@@ -736,3 +736,61 @@ async fn multi_table_export_does_not_publish_when_snapshot_audit_fails() {
     assert!(matches!(results[0].outcome, TableOutcome::Failed(_)));
     assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 0);
 }
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires Docker; run cargo test -p bookie-app-services --test snapshot_export_postgres -- --include-ignored"]
+async fn multi_table_export_preserves_normalization_distinct_names() {
+    use bookie_app_services::export_tables::{TableExportRequest, TableOutcome, TableTarget, export_tables};
+    let fixture = fixture().await;
+    let names = ["caf\u{e9}", "cafe\u{301}"];
+    for (index, name) in names.iter().enumerate() {
+        let quoted = bookie_core::sql_dialect::quote_ident("postgres", name);
+        fixture
+            .admin
+            .execute(&format!("CREATE TABLE public.{quoted} ({quoted} integer)"))
+            .await
+            .unwrap();
+        fixture
+            .admin
+            .execute(&format!("INSERT INTO public.{quoted} VALUES ({index})"))
+            .await
+            .unwrap();
+    }
+    let mut targets = Vec::new();
+    for name in names {
+        targets.push(TableTarget {
+            schema: Some("public".into()),
+            table: name.into(),
+            columns: fixture.admin.fetch_columns(Some("public"), name).await.unwrap(),
+        });
+    }
+    let directory = tempfile::tempdir().unwrap();
+    let csv = CsvOptions::default();
+    let request = TableExportRequest {
+        driver_id: "postgres",
+        tables: &targets,
+        directory: directory.path(),
+        format: ResultFormat::Csv,
+        extension: "csv",
+        csv: &csv,
+        max_rows_per_table: None,
+        timeout_secs: 60,
+    };
+    let results = export_tables(
+        guard(&fixture, Arc::new(CapturingAudit::default()), "postgres").await,
+        &PgDriver,
+        &request,
+        &runner(),
+        &CancellationToken::new(),
+        |_, _| {},
+    )
+    .unwrap();
+    assert_eq!(results.len(), 2);
+    assert_ne!(results[0].path, results[1].path);
+    for (index, result) in results.iter().enumerate() {
+        assert_eq!(result.outcome, TableOutcome::Written { rows: 1, capped: false });
+        let contents = std::fs::read_to_string(result.path.as_ref().unwrap()).unwrap();
+        assert!(contents.contains(names[index]), "{contents:?}");
+        assert!(contents.lines().any(|line| line == index.to_string()), "{contents:?}");
+    }
+}
