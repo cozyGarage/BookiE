@@ -21,6 +21,7 @@ fn every_driver_error_variant_has_a_typed_classification() {
                 message: "syntax error".into(),
                 sqlstate: None,
                 position: None,
+                hint: None,
             },
         ),
         (DriverError::Disconnected, DriverFailurePresentation::Disconnected),
@@ -190,11 +191,27 @@ fn query_message_and_sqlstate_are_structured_without_a_rendered_sentence() {
             message: "permission denied".into(),
             sqlstate: Some("42501".into()),
             position: Some(8),
+            hint: None,
         }),
         DriverFailurePresentation::Query {
             message: "permission denied".into(),
             sqlstate: Some("42501".into()),
             position: Some(8),
+            hint: None,
         }
+    );
+}
+
+#[test]
+fn query_hint_survives_classification_without_changing_display() {
+    let error = DriverError::Query {
+        message: "bad column".into(),
+        sqlstate: None,
+        position: Some(8),
+        hint: Some("try name".into()),
+    };
+    assert!(!error.to_string().contains("try name"));
+    assert!(
+        matches!(classify(&error), DriverFailurePresentation::Query { hint: Some(hint), .. } if hint == "try name")
     );
 }

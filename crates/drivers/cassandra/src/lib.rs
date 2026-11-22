@@ -119,6 +119,7 @@ fn map_error(message: &str) -> DriverError {
             message: message.to_string(),
             sqlstate: None,
             position: None,
+            hint: None,
         }
     }
 }

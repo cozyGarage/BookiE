@@ -63,6 +63,7 @@ fn map_mongo_error_in_context(err: mongodb::error::Error, connecting: bool) -> D
             message: err.to_string(),
             sqlstate: None,
             position: None,
+            hint: None,
         },
     }
 }
