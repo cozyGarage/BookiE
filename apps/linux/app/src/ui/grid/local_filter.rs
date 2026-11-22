@@ -385,11 +385,11 @@ impl LocalResultView {
                     return;
                 }
             }
-            if let Ok(Some(order)) = planned {
-                if view.apply_prepared_order(&order) {
-                    view.0.borrow_mut().sort = keys;
-                    view.persist_settings();
-                }
+            if let Ok(Some(order)) = planned
+                && view.apply_prepared_order(&order)
+            {
+                view.0.borrow_mut().sort = keys;
+                view.persist_settings();
             }
             update_status(&view.0.borrow());
         });
