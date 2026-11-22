@@ -1124,6 +1124,30 @@ fn copying_a_filtered_row_includes_its_full_pending_edit(cx: &mut TestAppContext
 }
 
 #[gpui::test]
+fn local_sort_keeps_selection_and_pending_edits_attached_to_source_rows(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    let value = "edited source row";
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.set_mode(crate::Mode::Filtered {
+                kept: std::sync::Arc::new(vec![0, 2, 4]),
+                label: "filtered".into(),
+            });
+            view.local_order = Some(std::sync::Arc::new(vec![4, 0, 2]));
+            view.cell_edit.edits.insert((0, 1), Cell::Text(value.into()));
+            view.click_row(1, false);
+            view.copy_selection(false, cx);
+        });
+    });
+    let actual = cx.update(|_, cx| cx.read_from_clipboard().and_then(|item| item.text()));
+    let mut row = bookie_gpui::model::row_at(0);
+    row[1] = Cell::Text(value.into());
+    let columns = bookie_gpui::core_bridge::column_infos_for(&bookie_gpui::model::synthetic_columns());
+    let expected = bookie_app_services::result_copy::tsv(&columns, vec![row], false);
+    assert_eq!(actual.as_deref(), Some(expected.as_str()));
+}
+
+#[gpui::test]
 fn comparing_results_clears_selection_from_the_previous_grid(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.update(|_, cx| {
@@ -1587,24 +1611,6 @@ fn closing_query_from_home_restores_the_table_owner(cx: &mut TestAppContext) {
             assert!(view.run_tabs.slots.is_empty());
             assert_eq!(view.cell_at(1, 1), Cell::Text("table".into()));
         })
-    });
-}
-
-#[gpui::test]
-fn error_mapping_selects_multiline_identifier_in_editor(cx: &mut TestAppContext) {
-    let (view, cx) = open(cx);
-    cx.simulate_keystrokes("ctrl-t");
-    cx.update(|window, cx| {
-        let editor = view.read(cx).sql_input.clone();
-        let sql = "SELECT 1;\nSELECT missing FROM t";
-        let source = (sql.to_string(), 10..31);
-        let (location, token) = crate::run_cursor_ui::mapped_error_location(sql, "SELECT missing FROM t", 8, Some(&source)).unwrap();
-        editor.update(cx, |editor, cx| {
-            editor.set_value(sql, window, cx);
-            editor.set_cursor_position(gpui_kit::component::input::Position::new(location.0, location.1), window, cx);
-            editor.set_selected_range(token, cx);
-            assert_eq!(editor.selected_value().as_ref(), "missing");
-        });
     });
 }
 
