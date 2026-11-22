@@ -1,0 +1,1 @@
+GPUI's command palette now handles action clicks and shields controls behind it. The sidebar Import / Export menu uses the standard anchored dropdown so it stays above the sidebar and palette content.
