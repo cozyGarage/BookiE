@@ -1,6 +1,7 @@
 use super::*;
 use crate::chrome::{STATUS_HEIGHT, TAB_HEIGHT, TOOLBAR_HEIGHT};
 use crate::palette_state::PaletteMode;
+use gpui_kit::component::scroll::Scrollbar;
 
 impl GridView {
     fn sync_render_state(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -33,7 +34,7 @@ impl GridView {
             .collapse_when_narrow(f32::from(window.viewport_size().width));
         let sidebar_width = if self.sidebar.open { self.sidebar.width } else { 0.0 };
         let grid_width = (f32::from(window.viewport_size().width) - sidebar_width).max(0.0);
-        self.sync_table(grid_width, window, cx);
+        self.sync_table((grid_width - f32::from(Scrollbar::width())).max(0.0), window, cx);
         if self.synced_width != grid_width {
             self.synced_width = grid_width;
             let table = self.table.clone();
@@ -305,7 +306,13 @@ impl GridView {
         })
     }
 
-    fn grid_pane(&self, theme: Theme, strip: Stateful<Div>, bars: (Option<Div>, Option<Div>, Option<Div>, Option<Div>, Option<Div>)) -> Div {
+    fn grid_pane(
+        &self,
+        theme: Theme,
+        strip: Stateful<Div>,
+        bars: (Option<Div>, Option<Div>, Option<Div>, Option<Div>, Option<Div>),
+        cx: &App,
+    ) -> Div {
         let (filter_row, compare_bar, save_bar, banner, insert_form) = bars;
         div()
             .flex_1()
@@ -318,7 +325,7 @@ impl GridView {
             .children(save_bar)
             .children(insert_form)
             .children(banner)
-            .child(self.data_table())
+            .child(self.data_table(cx))
             .children(self.detail_panel(theme))
             .children(self.row_detail_panel(theme))
     }
@@ -348,7 +355,12 @@ impl Render for GridView {
             .or_else(|| self.structure_info_panel(theme, cx))
             .or_else(|| self.resolve_panel(theme, cx))
             .or_else(|| self.late_bars(theme, cx));
-        let grid = self.grid_pane(theme, strip, (filter_row, compare_bar, save_bar, banner, insert_form));
+        let grid = self.grid_pane(
+            theme,
+            strip,
+            (filter_row, compare_bar, save_bar, banner, insert_form),
+            cx,
+        );
         let content = match self.tabs.current().clone() {
             Tab::Home => self.home_page(theme, cx),
             Tab::Settings => self.settings_page(theme, cx),
