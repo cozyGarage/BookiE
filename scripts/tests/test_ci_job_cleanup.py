@@ -323,11 +323,8 @@ class CiJobCleanupTests(unittest.TestCase):
     def test_b4_rollback_finalizer_removes_only_its_run_scoped_temp_path(self):
         job = runner_jobs(WORKFLOWS[0])["b4-rollback"]
         self.assertIn("TMPDIR: /var/cache/ci/tmp/bookie-b4-rollback-${{ github.run_id }}-${{ github.run_attempt }}", job)
-        self.assertIn(
-            "SCCACHE_SERVER_UDS: /var/cache/ci/tmp/bookie-b4-rollback-${{ github.run_id }}-${{ github.run_attempt }}/sccache.sock",
-            job,
-        )
-        self.assertIn("sccache --start-server", job)
+        self.assertNotIn("SCCACHE_SERVER_UDS", job)
+        self.assertNotIn("sccache --start-server", job)
         with tempfile.TemporaryDirectory() as temporary:
             bin_dir = Path(temporary) / "bin"
             bin_dir.mkdir()

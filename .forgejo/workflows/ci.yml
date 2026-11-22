@@ -877,12 +877,11 @@ jobs:
           fi
   b4-rollback:
     if: github.event_name != 'push'
-    needs: [pin-revision]
+    needs: [pin-revision, test-build]
     runs-on: any-host
     timeout-minutes: 45
     env:
       TMPDIR: /var/cache/ci/tmp/bookie-b4-rollback-${{ github.run_id }}-${{ github.run_attempt }}
-      SCCACHE_SERVER_UDS: /var/cache/ci/tmp/bookie-b4-rollback-${{ github.run_id }}-${{ github.run_attempt }}/sccache.sock
       BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-b4-rollback
     steps:
       - name: Prepare runner workspace
@@ -899,10 +898,11 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
           path: src
-      - name: Start job-scoped compiler cache
-        run: |
-          mkdir -p "$TMPDIR"
-          sccache --start-server
+      - name: Prepare source-pinned driver-core test bundle
+        env:
+          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
+          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
+        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" driver-core
       - name: Docker Hub login
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
