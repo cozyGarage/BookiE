@@ -211,8 +211,6 @@ async fn wait_for_deadline(deadline: Option<Instant>) {
     }
 }
 
-/// Run an operation until it completes, is cancelled, or reaches its deadline.
-/// Interrupting an in-flight operation reports an unknown outcome.
 pub async fn run_controlled<T, F>(operation: F, control: &OperationControl) -> Result<T, DriverError>
 where
     F: Future<Output = Result<T, DriverError>>,
