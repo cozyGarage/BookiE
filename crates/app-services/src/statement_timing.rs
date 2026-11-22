@@ -109,7 +109,10 @@ mod tests {
         ]);
         assert_eq!(mixed.first_row_ms, None);
         assert_eq!(StatementTiming::total([]).first_row_ms, None);
-        assert_eq!(StatementTiming::total([StatementTiming::new(50, 3).with_first_row(Some(20))]).first_row_ms, Some(20));
+        assert_eq!(
+            StatementTiming::total([StatementTiming::new(50, 3).with_first_row(Some(20))]).first_row_ms,
+            Some(20)
+        );
     }
 
     #[test]
