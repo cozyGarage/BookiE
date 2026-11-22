@@ -7,6 +7,8 @@ mod disconnection;
 mod hostile_scram;
 #[path = "support/metadata_sample_batch_budget.rs"]
 mod metadata_sample_batch_budget;
+#[path = "support/round_trip_budget.rs"]
+mod round_trip_budget;
 #[path = "../../shared/server_restart.rs"]
 mod server_restart;
 #[path = "support/tls_roots.rs"]

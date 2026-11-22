@@ -6,6 +6,9 @@ use testcontainers::core::{IntoContainerPort, WaitFor};
 use testcontainers::runners::AsyncRunner;
 use testcontainers::{GenericImage, ImageExt};
 
+#[path = "support/round_trip_budget.rs"]
+mod round_trip_budget;
+
 const START_ATTEMPTS: u32 = 6;
 
 fn retry_delay(attempt: u32) -> std::time::Duration {
