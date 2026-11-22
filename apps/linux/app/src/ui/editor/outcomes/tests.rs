@@ -326,6 +326,7 @@ fn a_fresh_result_keeps_its_script_number_after_pinned_results_precede_it() {
 
 #[derive(Default)]
 struct CursorCounters {
+    timing_delays: std::sync::atomic::AtomicBool,
     opened: std::sync::atomic::AtomicUsize,
     fetched: std::sync::atomic::AtomicUsize,
     closed: std::sync::atomic::AtomicUsize,
@@ -388,6 +389,10 @@ impl bookie_core::Session for CursorSession {
         _params: &[bookie_core::Value],
         _control: &bookie_core::OperationControl,
     ) -> Result<bookie_core::QueryCursorId, bookie_core::DriverError> {
+        if self.counters.timing_delays.load(std::sync::atomic::Ordering::SeqCst) {
+            tokio::time::sleep(std::time::Duration::from_millis(40)).await;
+            crate::services::approval_wait::measure(tokio::time::sleep(std::time::Duration::from_millis(300))).await;
+        }
         self.counters.lifecycle.lock().unwrap().push("open_cursor");
         self.cursor_open = true;
         self.counters
@@ -402,6 +407,9 @@ impl bookie_core::Session for CursorSession {
         _cursor_id: bookie_core::QueryCursorId,
         _control: &bookie_core::OperationControl,
     ) -> Result<bookie_core::QueryCursorPage, bookie_core::DriverError> {
+        if self.counters.timing_delays.load(std::sync::atomic::Ordering::SeqCst) {
+            tokio::time::sleep(std::time::Duration::from_millis(40)).await;
+        }
         self.counters.fetched.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         match self.pages.pop_front() {
             Some(Ok(page)) => Ok(page),
@@ -799,6 +807,8 @@ async fn postgres_editor_streams_pages_in_order_with_one_fetch_in_flight() {
 
 #[tokio::test]
 async fn postgres_stream_reports_time_to_its_first_page() {
+    let counters = std::sync::Arc::new(CursorCounters::default());
+    counters.timing_delays.store(true, std::sync::atomic::Ordering::SeqCst);
     let first_row_ms = std::sync::Arc::new(std::sync::Mutex::new(None));
     let received = first_row_ms.clone();
     let started = std::time::Instant::now();
@@ -806,7 +816,7 @@ async fn postgres_stream_reports_time_to_its_first_page() {
         StatementRun {
             target: cursor_target(
                 vec![Ok(cursor_page(&[1], false))],
-                std::sync::Arc::new(CursorCounters::default()),
+                counters,
             ),
             statements: vec!["SELECT id FROM items".into()],
             driver_id: "postgres",
@@ -830,6 +840,8 @@ async fn postgres_stream_reports_time_to_its_first_page() {
 
     assert!(matches!(result, ScriptRunResult::Streamed(StreamTerminal::Complete)));
     let first_row_ms = first_row_ms.lock().unwrap().expect("first page timing");
+    assert!(first_row_ms >= 70, "setup and fetch time must be counted: {first_row_ms}");
+    assert!(started.elapsed().as_millis().saturating_sub(first_row_ms) >= 270, "approval wait must be excluded");
     assert!(first_row_ms <= started.elapsed().as_millis());
 }
 
