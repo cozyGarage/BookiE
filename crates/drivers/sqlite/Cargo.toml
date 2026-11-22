@@ -29,6 +29,8 @@ async-trait.workspace = true
 tempfile.workspace = true
 tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
 tokio-util.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
 uuid.workspace = true
 
 # The integration test includes the value contract by path; the shared exact-grid test also uses this crate.

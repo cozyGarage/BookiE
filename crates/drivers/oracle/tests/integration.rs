@@ -1,6 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 #[path = "../../shared/connect_refusal.rs"]
 mod connect_refusal;
+#[path = "support/round_trip_budget.rs"]
+mod round_trip_budget;
 
 use bookie_core::{ConnectOptions, Connection, DatabaseDriver, DriverError, TlsConfig, Value};
 use drivers_oracle::OracleDriver;

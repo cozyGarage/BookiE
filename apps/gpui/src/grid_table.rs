@@ -2,6 +2,7 @@ use std::{collections::{HashMap, HashSet}, ops::Range, sync::Arc};
 
 use gpui::{App, Context, IntoElement, WeakEntity, Window, div, prelude::*, px};
 use gpui_kit::component::Sizable;
+use gpui_kit::component::scroll::Scrollbar;
 use gpui_kit::component::table::{Column, ColumnSort, DataTable, TableDelegate, TableState};
 
 use crate::GridView;
@@ -654,11 +655,75 @@ impl GridView {
         });
     }
 
-    pub(crate) fn data_table(&self) -> DataTable<GridDelegate> {
-        DataTable::new(&self.table)
-            .stripe(true)
-            .xsmall()
-            .header_row_height(px(bookie_gpui::theme::size::GRID_HEADER))
+    pub(crate) fn data_table(&self, cx: &App) -> impl IntoElement {
+        let (vertical_scroll, horizontal_scroll) = {
+            let table = self.table.read(cx);
+            (
+                table.vertical_scroll_handle.clone(),
+                table.horizontal_scroll_handle.clone(),
+            )
+        };
+        let gutter = Scrollbar::width();
+        div()
+            .size_full()
+            .min_w_0()
+            .min_h_0()
+            .flex()
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .min_h_0()
+                    .flex()
+                    .flex_col()
+                    .child(
+                        div()
+                            .id("grid-table-viewport")
+                            .debug_selector(|| "grid-table-viewport".into())
+                            .flex_1()
+                            .min_w_0()
+                            .min_h_0()
+                            .child(
+                                DataTable::new(&self.table)
+                                    .scrollbar_visible(false, false)
+                                    .stripe(true)
+                                    .xsmall()
+                                    .header_row_height(px(bookie_gpui::theme::size::GRID_HEADER)),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .id("grid-horizontal-scrollbar-gutter")
+                            .debug_selector(|| "grid-horizontal-scrollbar-gutter".into())
+                            .h(gutter)
+                            .flex_none()
+                            .child(
+                                Scrollbar::horizontal(&horizontal_scroll)
+                                    .id("grid-horizontal-scrollbar")
+                                    .viewport_from_layout(),
+                            ),
+                    ),
+            )
+            .child(
+                div()
+                    .w(gutter)
+                    .flex_none()
+                    .flex()
+                    .flex_col()
+                    .child(div().h(px(bookie_gpui::theme::size::GRID_HEADER)).flex_none())
+                    .child(
+                        div()
+                            .id("grid-vertical-scrollbar-gutter")
+                            .debug_selector(|| "grid-vertical-scrollbar-gutter".into())
+                            .flex_1()
+                            .min_h_0()
+                            .child(
+                                Scrollbar::vertical(&vertical_scroll)
+                                    .id("grid-vertical-scrollbar")
+                                    .viewport_from_layout(),
+                            ),
+                    ),
+            )
     }
 
     fn hide_column(&mut self, name: &str, _window: &mut Window, cx: &mut Context<Self>) {

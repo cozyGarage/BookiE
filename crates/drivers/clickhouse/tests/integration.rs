@@ -9,6 +9,8 @@ mod connect_refusal;
 mod clickhouse;
 #[path = "support/result_budget.rs"]
 mod result_budget;
+#[path = "support/round_trip_budget.rs"]
+mod round_trip_budget;
 #[path = "support/server_stop_class.rs"]
 mod server_stop_class;
 
