@@ -21,6 +21,38 @@ pub(crate) fn run_target(text: &str, driver: &str, cursor: usize, selection: Ran
         .ok_or_else(|| "The cursor is not inside a complete statement".into())
 }
 
+/// PostgreSQL positions count Unicode characters from one. Only map an unchanged
+/// whole editor buffer; selection and parameter rewriting require a source map.
+pub(crate) fn error_location(editor: &str, submitted: &str, position: usize) -> Option<(u32, u32)> {
+    if editor != submitted || position == 0 {
+        return None;
+    }
+    let byte = submitted.char_indices().nth(position - 1)?.0;
+    let prefix = &submitted[..byte];
+    let line = prefix.bytes().filter(|&byte| byte == b'\n').count();
+    let column = prefix.rsplit('\n').next()?.chars().count();
+    Some((u32::try_from(line).ok()?, u32::try_from(column).ok()?))
+}
+
+/// Select the identifier at a server position, or the single character for punctuation.
+pub(crate) fn error_token(sql: &str, position: usize) -> Option<Range<usize>> {
+    let (offset, ch) = sql.char_indices().nth(position.checked_sub(1)?)?;
+    let identifier = |c: char| c.is_alphanumeric() || c == '_' || c == '$';
+    if !identifier(ch) {
+        return Some(offset..offset + ch.len_utf8());
+    }
+    let start = sql[..offset]
+        .char_indices()
+        .rev()
+        .find(|(_, c)| !identifier(*c))
+        .map_or(0, |(index, c)| index + c.len_utf8());
+    let end = sql[offset..]
+        .char_indices()
+        .find(|(_, c)| !identifier(*c))
+        .map_or(sql.len(), |(index, _)| offset + index);
+    Some(start..end)
+}
+
 impl GridView {
     pub(crate) fn run_cursor_actions(&self) -> Vec<Action> {
         vec![Action {

@@ -31,3 +31,25 @@ fn an_unterminated_statement_is_refused_rather_than_guessed() {
     let error = run_target("SELECT 'oops", "postgres", 4, 4..4).unwrap_err();
     assert!(error.contains("complete statement"), "{error}");
 }
+
+#[test]
+fn error_location_uses_server_character_offsets_only_for_unchanged_buffer() {
+    let sql = "SELECT 'é';\nSELECT missing";
+    let pos = sql.chars().position(|c| c == 'm').unwrap() + 1;
+    assert_eq!(super::error_location(sql, sql, pos), Some((1, 7)));
+    assert_eq!(super::error_location("changed", sql, pos), None);
+    assert_eq!(super::error_location(sql, sql, 0), None);
+    assert_eq!(super::error_location(sql, sql, 999), None);
+    let emoji_sql = "SELECT '🎉', missing";
+    let emoji_pos = emoji_sql.chars().position(|c| c == 'm').unwrap() + 1;
+    assert_eq!(super::error_location(emoji_sql, emoji_sql, emoji_pos), Some((0, 12)));
+}
+
+#[test]
+fn error_token_selects_an_identifier_on_character_boundaries() {
+    let sql = "SELECT 🎉, naïve FROM t";
+    let pos = sql.chars().position(|c| c == 'n').unwrap() + 1;
+    assert_eq!(&sql[super::error_token(sql, pos).unwrap()], "naïve");
+    assert_eq!(&sql[super::error_token(sql, pos + 2).unwrap()], "naïve");
+    assert!(super::error_token(sql, 0).is_none());
+}

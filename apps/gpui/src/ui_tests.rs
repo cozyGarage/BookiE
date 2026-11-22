@@ -1597,10 +1597,12 @@ fn closing_query_from_home_discards_its_pending_result(cx: &mut TestAppContext) 
             view.begin_background(Work::Load, cx, |_| (), |view, ()| view.status = "stale".into());
             let cancel = view.loads.cancel.clone();
             let query = view.tabs.active;
+            view.panel.error_location = Some(("SELECT missing".into(), 8, 0));
             view.tabs.open_home();
             view.sync_grid_owner();
             assert!(cancel.is_cancelled());
             view.close_tab(query);
+            assert!(view.panel.error_location.is_none());
         })
     });
     cx.run_until_parked();

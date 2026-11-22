@@ -7,11 +7,11 @@ use std::time::Duration;
 use bookie_app_services::command_bridge::{ChannelEventSink, Command, DispatchContext, Epoch, Event, dispatch};
 use bookie_app_services::database_service::{ConnectionOverview, DatabaseService};
 use bookie_app_services::driver_failure_message::driver_failure_message;
+use bookie_app_services::er_diagram::{SchemaDiagram, TableRead, read::MAX_TABLES as MAX_DIAGRAM_TABLES};
 use bookie_app_services::read_session::ConnectionSummary;
 use bookie_app_services::read_session_store::{
     OpenedSession, ReadSessionStore, SessionId, SubscriptionRequest, SubscriptionSample, SubscriptionSampler,
 };
-use bookie_app_services::er_diagram::{SchemaDiagram, TableRead, read::MAX_TABLES as MAX_DIAGRAM_TABLES};
 use bookie_app_services::value_search::{
     SearchLimits, SearchOptions, SearchReport, SearchRequest, SearchSource, TableTarget, run_search,
 };
@@ -37,6 +37,43 @@ pub fn saved_connections() -> Result<Vec<ConnectionSummary>, String> {
 pub enum Origin {
     Saved(String),
     File(std::path::PathBuf),
+}
+
+/// A query failure retains the server position until the editor can map it.
+#[derive(Clone, Debug)]
+pub struct QueryFailure {
+    pub message: String,
+    pub position: Option<usize>,
+}
+
+impl From<&str> for QueryFailure {
+    fn from(message: &str) -> Self {
+        Self::from(message.to_owned())
+    }
+}
+
+impl From<String> for QueryFailure {
+    fn from(message: String) -> Self {
+        Self {
+            message,
+            position: None,
+        }
+    }
+}
+
+impl From<bookie_app_services::driver_error_presentation::DriverFailurePresentation> for QueryFailure {
+    fn from(failure: bookie_app_services::driver_error_presentation::DriverFailurePresentation) -> Self {
+        let position = match &failure {
+            bookie_app_services::driver_error_presentation::DriverFailurePresentation::Query { position, .. } => {
+                *position
+            }
+            _ => None,
+        };
+        Self {
+            message: driver_failure_message(&failure),
+            position,
+        }
+    }
 }
 
 pub const ROW_CAP: u64 = 100_000;
@@ -89,7 +126,8 @@ impl LiveSession {
             .enable_all()
             .build()
             .map_err(|error| error.to_string())?;
-        let (sessions, opened, saved, writable, stamp) = runtime.block_on(open_session(origin, cancellation.clone()))?;
+        let (sessions, opened, saved, writable, stamp) =
+            runtime.block_on(open_session(origin, cancellation.clone()))?;
         let writable = saved.as_ref().filter(|_| writable).map(|(id, _)| *id);
         Ok(Arc::new(LiveSession {
             driver_id: opened.driver_id.clone(),
@@ -177,8 +215,19 @@ impl LiveSession {
         max_rows: u64,
         cancellation: &CancellationToken,
     ) -> Result<LiveTable, String> {
+        self.run_query_bound_detailed(sql, params, max_rows, cancellation)
+            .map_err(|error| error.message)
+    }
+
+    pub fn run_query_bound_detailed(
+        self: &Arc<Self>,
+        sql: &str,
+        params: &[bookie_core::Value],
+        max_rows: u64,
+        cancellation: &CancellationToken,
+    ) -> Result<LiveTable, QueryFailure> {
         if max_rows == 0 || max_rows > ROW_CAP {
-            return Err(format!("Row limit must be between 1 and {ROW_CAP}."));
+            return Err(format!("Row limit must be between 1 and {ROW_CAP}.").into());
         }
         let epoch = self.next_epoch();
         let started = std::time::Instant::now();
@@ -372,10 +421,12 @@ impl LiveSession {
     ) -> Result<u64, String> {
         let control = OperationControl::new(cancellation.clone(), None);
         self.runtime
-            .block_on(
-                self.sessions
-                    .follow_subscription(self.session_id, vec![channel.to_string()], &control, on_message),
-            )
+            .block_on(self.sessions.follow_subscription(
+                self.session_id,
+                vec![channel.to_string()],
+                &control,
+                on_message,
+            ))
             .map_err(|failure| driver_failure_message(&failure))
     }
 
@@ -605,12 +656,15 @@ fn file_identity(path: &std::path::Path) -> (uuid::Uuid, String) {
     )
 }
 
-type OpenedParts = (ReadSessionStore, OpenedSession, Option<(uuid::Uuid, String)>, bool, Option<String>);
+type OpenedParts = (
+    ReadSessionStore,
+    OpenedSession,
+    Option<(uuid::Uuid, String)>,
+    bool,
+    Option<String>,
+);
 
-async fn open_session(
-    origin: &Origin,
-    cancellation: CancellationToken,
-) -> Result<OpenedParts, String> {
+async fn open_session(origin: &Origin, cancellation: CancellationToken) -> Result<OpenedParts, String> {
     let registry = Arc::new(drivers_registry::default_registry());
     let sessions = ReadSessionStore::new(registry, Arc::new(DatabaseService::new()))
         .with_subscription_sampler(Arc::new(RegistrySubscriptionSampler));
@@ -714,7 +768,11 @@ impl WriteSession {
     }
 
     #[doc(hidden)]
-    pub fn from_parts(runtime: tokio::runtime::Runtime, sessions: ReadSessionStore, session_id: SessionId) -> WriteSession {
+    pub fn from_parts(
+        runtime: tokio::runtime::Runtime,
+        sessions: ReadSessionStore,
+        session_id: SessionId,
+    ) -> WriteSession {
         WriteSession {
             runtime,
             sessions,
@@ -750,8 +808,9 @@ impl WriteSession {
                 message: driver_failure_message(&failure),
                 outcome_unknown: matches!(
                     failure,
-                    bookie_app_services::driver_error_presentation::DriverFailurePresentation::OperationOutcomeUnknown(_)
-                        | bookie_app_services::driver_error_presentation::DriverFailurePresentation::TimedOut
+                    bookie_app_services::driver_error_presentation::DriverFailurePresentation::OperationOutcomeUnknown(
+                        _
+                    ) | bookie_app_services::driver_error_presentation::DriverFailurePresentation::TimedOut
                 ),
             })
     }
@@ -1024,10 +1083,10 @@ async fn query_pages(
     cancellation: &CancellationToken,
     epoch: Epoch,
     current_epoch: &AtomicU64,
-) -> Result<Pages, String> {
+) -> Result<Pages, QueryFailure> {
     let control = OperationControl::new(cancellation.clone(), Some(tokio::time::Instant::now() + PAGE_TIMEOUT));
-    let result = bridge_query(sessions, session_id, (sql, params), &control, epoch, current_epoch).await?;
-    spooled_pages(result, max_rows, cancellation).await
+    let result = bridge_query_detailed(sessions, session_id, (sql, params), &control, epoch, current_epoch).await?;
+    spooled_pages(result, max_rows, cancellation).await.map_err(Into::into)
 }
 
 async fn dictionary_pages(
@@ -1106,6 +1165,19 @@ async fn bridge_query(
     epoch: Epoch,
     current_epoch: &AtomicU64,
 ) -> Result<QueryResult, String> {
+    bridge_query_detailed(sessions, session_id, (sql, params), control, epoch, current_epoch)
+        .await
+        .map_err(|error| error.message)
+}
+
+async fn bridge_query_detailed(
+    sessions: &ReadSessionStore,
+    session_id: SessionId,
+    (sql, params): (&str, &[bookie_core::Value]),
+    control: &OperationControl,
+    epoch: Epoch,
+    current_epoch: &AtomicU64,
+) -> Result<QueryResult, QueryFailure> {
     let event = dispatch_read(
         DispatchContext::Sessions(sessions),
         Command::RunQuery {
@@ -1122,7 +1194,7 @@ async fn bridge_query(
     let Event::QueryCompleted { outcome, .. } = event else {
         return Err("The command bridge returned an unexpected event.".into());
     };
-    outcome.map_err(|failure| driver_failure_message(&failure))
+    outcome.map_err(Into::into)
 }
 
 async fn bridge_read_page(
@@ -1429,6 +1501,19 @@ impl ResultSource for LiveTable {
 #[cfg(test)]
 mod tests {
     #[test]
+    fn query_failure_preserves_server_position_without_inventing_one() {
+        use bookie_app_services::driver_error_presentation::DriverFailurePresentation as Failure;
+        let error = super::QueryFailure::from(Failure::Query {
+            message: "unknown column".into(),
+            sqlstate: Some("42703".into()),
+            position: Some(17),
+        });
+        assert_eq!(error.position, Some(17));
+        assert!(error.message.contains("unknown column"));
+        assert_eq!(super::QueryFailure::from(Failure::TimedOut).position, None);
+    }
+
+    #[test]
     fn table_count_sql_uses_a_wide_count_for_sql_server_and_quotes_schema_names() {
         let table = TableInfo {
             schema: Some("orders schema".into()),
@@ -1581,7 +1666,10 @@ mod tests {
             ascending: true,
         };
         let result = session.load_table_sorted_controlled(
-            &TableInfo { schema: None, name: "orders".into() },
+            &TableInfo {
+                schema: None,
+                name: "orders".into(),
+            },
             100,
             Some(&sort),
             &CancellationToken::new(),
@@ -1886,7 +1974,11 @@ mod tests {
             whole.origin(),
             "sqlite · orders · read-only · page order may change; rows may be skipped or repeated"
         );
-        assert!(whole.origin().contains("page order may change; rows may be skipped or repeated"));
+        assert!(
+            whole
+                .origin()
+                .contains("page order may change; rows may be skipped or repeated")
+        );
     }
 
     #[test]
@@ -1954,9 +2046,16 @@ impl SearchSource for BridgeSource<'_> {
     ) -> Result<QueryResult, DriverError> {
         let session = self.0;
         let epoch = session.next_epoch();
-        bridge_query(&session.sessions, session.session_id, (sql, params), control, epoch, &session.epoch)
-            .await
-            .map_err(search_error)
+        bridge_query(
+            &session.sessions,
+            session.session_id,
+            (sql, params),
+            control,
+            epoch,
+            &session.epoch,
+        )
+        .await
+        .map_err(search_error)
     }
 }
 
