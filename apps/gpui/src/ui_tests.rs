@@ -10,6 +10,8 @@ use crate::text_input;
 use crate::ui_theme::ThemeExt;
 use crate::{GridView, Work};
 
+mod failed_runs;
+
 pub(super) fn open(cx: &mut TestAppContext) -> (gpui::Entity<GridView>, &mut VisualTestContext) {
     cx.update(text_input::bind_keys);
     let (view, cx) = cx.add_window_view(|window, cx| GridView::new(150_000, Instant::now(), window, cx));

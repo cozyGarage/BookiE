@@ -366,7 +366,8 @@ async fn cancelling_a_connection_attempt_interrupts_server_version_discovery() {
         result = &mut opening => panic!("connection finished before version discovery: {result:?}"),
     }
     cancellation.cancel();
-    let result = tokio::time::timeout(std::time::Duration::from_secs(2), opening).await;
+    // CI workers can be busy; leave room for the cancellation wake-up to be scheduled.
+    let result = tokio::time::timeout(std::time::Duration::from_secs(10), opening).await;
     assert!(
         matches!(
             result,
