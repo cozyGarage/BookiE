@@ -259,6 +259,7 @@ impl App {
         let reverse_rows = matches!(&query, PageQuery::Sql(bound) if bound.reverse_rows);
         let offset = page.request.offset;
         let limit = page.limit;
+        let columns = page.columns;
         let schema = page.schema;
         let table = page.table;
         let request = page.request;
@@ -269,8 +270,15 @@ impl App {
                     let control = crate::services::operation_control::bounded_with(timeout_secs, token);
                     let (result, projected_columns) = match query {
                         PageQuery::Native => (
-                            conn.fetch_rows_controlled(schema.as_deref(), &table, offset, limit, &control)
-                                .await,
+                            conn.fetch_rows_with_columns_controlled(
+                                schema.as_deref(),
+                                &table,
+                                offset,
+                                limit,
+                                &columns,
+                                &control,
+                            )
+                            .await,
                             None,
                         ),
                         PageQuery::Sql(query) => {
