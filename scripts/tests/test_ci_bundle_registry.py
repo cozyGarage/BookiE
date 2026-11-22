@@ -316,6 +316,42 @@ class RegistryExtractionTests(unittest.TestCase):
                 registry.request('https://registry.example/file', 'PUT', b'body', 4)
             self.assertEqual(opener.return_value.open.call_count, 1)
 
+    def test_lost_upload_response_is_reconciled_over_http(self):
+        import http.server
+        import threading
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            data = None
+            puts = 0
+
+            def log_message(self, *_):
+                pass
+
+            def do_PUT(self):
+                Handler.puts += 1
+                Handler.data = self.rfile.read(int(self.headers['Content-Length']))
+                self.connection.shutdown(2)
+                self.connection.close()
+
+            def do_GET(self):
+                self.send_response(200)
+                self.send_header('Content-Length', str(len(Handler.data)))
+                self.end_headers()
+                self.wfile.write(Handler.data)
+
+        server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            with patch.dict('os.environ', {'BOOKIE_REGISTRY_TOKEN': 'test-token'}):
+                registry.upload_bytes(f'http://127.0.0.1:{server.server_port}/file', b'exact payload')
+            self.assertEqual(Handler.puts, 1)
+            self.assertEqual(Handler.data, b'exact payload')
+        finally:
+            server.shutdown()
+            thread.join()
+            server.server_close()
+
     def test_upload_reconciles_lost_response_and_refuses_different_bytes(self):
         import io
         with patch.object(registry.time, 'sleep'), patch.object(registry, 'request') as request:
