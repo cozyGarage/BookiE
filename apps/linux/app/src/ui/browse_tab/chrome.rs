@@ -312,7 +312,7 @@ impl BrowseTab {
             && !self.current_columns.iter().any(|c| c.primary_key);
         self.read_only_banner.set_revealed(read_only);
         let warning = bookie_app_services::tr!(
-            "No primary key is available for paging. Row order may change; rows may be skipped or repeated between pages."
+            "Row order may change; rows may be skipped or repeated between pages."
         );
         let title = match self.view_restriction.and_then(|restriction| restriction.banner_text()) {
             Some(text) => format!("{text} {warning}"),
