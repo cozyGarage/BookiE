@@ -19,6 +19,9 @@ MAX_ARCHIVE = 8 * 1024 ** 3
 MAX_EXTRACTED = 24 * 1024 ** 3
 UPLOAD_CHUNK_SIZE = 64 * 1024 ** 2
 PROGRESS_INTERVAL_SECONDS = 10
+# shortcut: the two-day lookback covers the 90-minute job limit plus queue recovery; revisit if either grows.
+ACTION_RUN_LOOKBACK_DAYS = 2
+TERMINAL_JOB_STATUSES = {'success', 'failure', 'cancelled', 'skipped'}
 BUNDLE_GROUPS = {'default', 'direct', 'unit', 'sandbox', 'gpui', 'workspace'} | set(
     json.loads((Path(__file__).parent / 'ci-test-bundle-groups.json').read_text())['groups']
 )
@@ -296,13 +299,39 @@ def discover_protected_revisions():
     branches = forgejo_list(api, 'branches', {}, token)
     pulls = forgejo_list(api, 'pulls', {'state': 'open'}, token)
     runs = forgejo_list(api, 'actions/runs', {'status': ['waiting', 'running']}, token, 'workflow_runs')
+    runs.extend(forgejo_list(
+        api, 'actions/runs', {'status': ['failure', 'cancelled']}, token, 'workflow_runs'))
     for branch in branches:
         revisions.add(branch['commit']['id'])
     for pull in pulls:
         if pull['state'] == 'open':
             revisions.add(pull['head']['sha'])
     for run in runs:
-        if run['status'] in ('waiting', 'running'):
+        status = run['status']
+        if status in ('waiting', 'running'):
+            revisions.add(run['commit_sha'])
+            continue
+        if status not in ('failure', 'cancelled'):
+            continue
+        created = run.get('created')
+        if not isinstance(created, str):
+            raise ValueError('Forgejo returned an incomplete actions/runs reference inventory')
+        try:
+            created_at = datetime.fromisoformat(created.replace('Z', '+00:00'))
+        except ValueError as error:
+            raise ValueError('Forgejo returned an invalid actions/runs creation time') from error
+        if created_at.tzinfo is None:
+            raise ValueError('Forgejo returned an invalid actions/runs creation time')
+        if created_at < datetime.now(timezone.utc) - timedelta(days=ACTION_RUN_LOOKBACK_DAYS):
+            continue
+        run_id = run.get('id')
+        if type(run_id) is not int:
+            raise ValueError('Forgejo returned an incomplete actions/runs reference inventory')
+        with request(f'{api}/actions/runs/{run_id}/jobs', token=token) as response:
+            jobs = json.load(response)
+        if not isinstance(jobs, list):
+            raise ValueError('Forgejo returned an incomplete actions/jobs reference inventory')
+        if any(not isinstance(job, dict) or job.get('status') not in TERMINAL_JOB_STATUSES for job in jobs):
             revisions.add(run['commit_sha'])
     if any(not isinstance(revision, str) or not re.fullmatch(r'[0-9a-f]{40}', revision)
            for revision in revisions):
