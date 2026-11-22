@@ -417,6 +417,13 @@ mod tests {
     }
 
     #[test]
+    fn cursor_position_rewrite_preserves_query_message_and_sqlstate() {
+        let shifted = position_in_cursor_query(query_error(Some(CURSOR_PREFIX.chars().count() + 8)));
+        assert!(matches!(shifted, DriverError::Query { ref message, ref sqlstate, position: Some(8) }
+            if message == "column \"nope\" does not exist" && sqlstate.as_deref() == Some("42703")));
+    }
+
+    #[test]
     fn a_position_inside_the_cursor_prefix_is_dropped() {
         let dropped = position_in_cursor_query(query_error(Some(3)));
         assert!(
