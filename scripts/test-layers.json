@@ -197,13 +197,13 @@
     },
     "b4-rollback": {
       "purpose": "Focused MySQL failed-batch rollback and PostgreSQL rollback-failure acceptance",
-      "prerequisites": "Rust 1.98; Docker; native TLS build dependencies",
+      "prerequisites": "Source-pinned driver-core test bundle; Docker",
       "hosted_gate": "Build Linux / Policy rollback acceptance; lab-ci / b4-rollback",
       "steps": [
         {
           "argv": [
-            "cargo",
-            "test",
+            "bash",
+            "scripts/run-rust-tests.sh",
             "--locked",
             "-p",
             "bookie-driver-mysql",
@@ -219,8 +219,8 @@
         },
         {
           "argv": [
-            "cargo",
-            "test",
+            "bash",
+            "scripts/run-rust-tests.sh",
             "--locked",
             "-p",
             "bookie-driver-postgres",
@@ -879,7 +879,8 @@
   },
   "b4-rollback": {
     "needs": [
-      "pin-revision"
+      "pin-revision",
+      "test-build"
     ],
     "timeout_minutes": 45,
     "condition": "github.event_name != 'push'",
