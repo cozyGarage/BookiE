@@ -332,8 +332,7 @@ impl GridView {
                     this.palette.follow = this
                         .live
                         .as_ref()
-                        .filter(|live| matches!(live.driver_id.as_str(), "postgres" | "redis"))
-                        .and_then(|_| bookie_gpui::pubsub_view::parse_follow(&typed));
+                        .and_then(|live| bookie_gpui::pubsub_view::parse_follow(&live.driver_id, &typed));
                     this.palette.pattern = this.live.as_ref().and_then(|live| match live.driver_id.as_str() {
                         "redis" => bookie_gpui::pubsub_view::parse_pattern(&typed),
                         "postgres" => bookie_gpui::pubsub_view::parse_channel(&typed),
