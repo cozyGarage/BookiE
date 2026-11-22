@@ -1020,6 +1020,9 @@ mod grid_pin_tests;
 #[cfg(test)]
 mod live_ui_tests;
 #[cfg(test)]
+#[cfg(test)]
+mod overlay_ui_tests;
+#[cfg(test)]
 mod save_ui_tests;
 #[cfg(test)]
 mod typed_value_ui_tests;
