@@ -722,6 +722,7 @@ class CiWorkflowTests(unittest.TestCase):
         forgejo_driver_tls = re.search(
             r"(?ms)^  driver-tls:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", forgejo_workflow
         ).group(1)
+        self.assertIn("runs-on: [any-host, build-host]", forgejo_driver_tls)
         pg_release = re.search(r"(?ms)^  pg-release:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
         forgejo_pg_release = re.search(
             r"(?ms)^  pg-release:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", forgejo_workflow
@@ -1357,10 +1358,10 @@ class CiWorkflowTests(unittest.TestCase):
         for name in ("linux-build", "clippy", "test-build"):
             with self.subTest(job=name):
                 self.assertIn("runs-on: build-host", jobs[name])
+        self.assertIn("runs-on: [any-host, build-host]", jobs["driver-tls"])
         for name in (
             "guards", "unit", "sandbox", "widgets", "distro-floor-scenarios", "driver",
-            "consumers", "gtk", "pg-release", "gtk-server",
-            "driver-tls", "keyring", "supply-chain",
+            "consumers", "gtk", "pg-release", "gtk-server", "keyring", "supply-chain",
         ):
             with self.subTest(job=name):
                 self.assertIn("runs-on: any-host", jobs[name])

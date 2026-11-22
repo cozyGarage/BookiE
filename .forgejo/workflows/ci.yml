@@ -1388,7 +1388,8 @@ jobs:
           fi
   driver-tls:
     if: github.event_name != 'push'
-    runs-on: any-host
+    # This starts all TLS database fixtures together; small workers can OOM.
+    runs-on: [any-host, build-host]
     needs: [pin-revision, guards, clippy, test-build]
     timeout-minutes: 45
     env:
