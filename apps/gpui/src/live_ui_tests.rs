@@ -1418,6 +1418,28 @@ fn the_sql_editor_edits_at_several_carets_and_ctrl_enter_still_runs_the_whole_bu
 }
 
 #[gpui::test]
+fn follow_palette_uses_the_connected_engine_limits(cx: &mut TestAppContext) {
+    let (view, cx) = open_live(cx);
+    view.update(cx, |view, _| {
+        view.live = Some(view.live.as_ref().unwrap().with_driver_id("redis"));
+    });
+    let long = "é".repeat(256);
+    cx.update(|_, cx| {
+        let input = view.read(cx).palette.input.clone();
+        input.update(cx, |input, cx| input.set_content(&format!("follow {long}"), cx));
+    });
+    view.read_with(cx, |view, _| assert_eq!(view.palette.follow.as_deref(), Some(long.as_str())));
+    view.update(cx, |view, _| {
+        view.live = Some(view.live.as_ref().unwrap().with_driver_id("postgres"));
+    });
+    cx.update(|_, cx| {
+        let input = view.read(cx).palette.input.clone();
+        input.update(cx, |input, cx| input.set_content(&format!("follow {long}x"), cx));
+    });
+    view.read_with(cx, |view, _| assert!(view.palette.follow.is_none()));
+}
+
+#[gpui::test]
 fn activity_palette_queries_reflect_driver_capabilities(cx: &mut TestAppContext) {
     let (view, cx) = open_live(cx);
 

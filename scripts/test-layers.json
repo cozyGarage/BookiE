@@ -595,6 +595,11 @@
       "hosted_gate": "Build Linux / supply-chain; Linux Security / scheduled supply-chain; lab-ci / supply-chain",
       "steps": [
         {
+          "argv": ["python3", "scripts/check-advisory-review.py"],
+          "timeout_seconds": 30,
+          "evidence": "exit"
+        },
+        {
           "argv": [
             "cargo",
             "deny",
