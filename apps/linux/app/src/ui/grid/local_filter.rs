@@ -447,7 +447,7 @@ impl LocalResultView {
             };
             (store, selection)
         };
-        let previous_selection = selection.selection();
+        let previous_selection = selection.selection().copy();
         let item_count = store.n_items();
         let selected = selected_source_rows(&store, &selection);
         let syncing = self.0.borrow().selection_syncing.clone();
