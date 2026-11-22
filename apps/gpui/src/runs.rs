@@ -4,6 +4,7 @@ pub(crate) struct RunSlot {
     pub run: Run,
     pub edits: grid_edit::Edits,
     pub source: Option<Source>,
+    pub failure: Option<String>,
 }
 
 impl RunSlot {
@@ -12,6 +13,7 @@ impl RunSlot {
             run,
             edits: grid_edit::Edits::new(),
             source,
+            failure: None,
         }
     }
 }
@@ -107,6 +109,7 @@ impl GridView {
                             _ => error.message.clone(),
                         };
                         this.panel.messages.statement_failed(&sql, &detail, elapsed);
+                        this.add_failed_run(detail, elapsed);
                         let (original, position) = match mapping {
                             Some((original, map)) if map.sql == sql => {
                                 let mapped = error.position.and_then(|position| map.source_byte_for_position(&original, position))
@@ -169,6 +172,20 @@ impl GridView {
         self.run_tabs.next_number += 1;
         self.run_tabs.slots.push(RunSlot::new(run, source));
         self.activate_run(self.run_tabs.slots.len() - 1);
+    }
+
+    pub(crate) fn add_failed_run(&mut self, detail: String, elapsed: std::time::Duration) {
+        let mut run = next_run(self.run_tabs.next_number);
+        run.rows = 0;
+        run.elapsed_ms = Some(u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX));
+        self.run_tabs.next_number += 1;
+        let source: Source = std::sync::Arc::new(crate::catalog_nav::EmptySource("Failed query".into()));
+        let mut slot = RunSlot::new(run, Some(source));
+        slot.failure = Some(detail);
+        self.run_tabs.slots.push(slot);
+        if self.cell_edit.active.is_none() {
+            self.activate_run(self.run_tabs.slots.len() - 1);
+        }
     }
 
     pub(crate) fn close_tab(&mut self, index: usize) {
@@ -294,7 +311,12 @@ impl GridView {
         self.compare = None;
         self.search.cursor = MatchCursor::default();
         self.set_mode(Mode::All);
-        self.status = format!("{} · {} rows", run.label(), thousands(run.rows));
+        if self.run_tabs.slots[index].failure.is_some() {
+            self.panel.view = ResultView::Messages;
+            self.status = format!("{} · failed", run.label());
+        } else {
+            self.status = format!("{} · {} rows", run.label(), thousands(run.rows));
+        }
     }
 
     pub(crate) fn close_run(&mut self, index: usize) {
