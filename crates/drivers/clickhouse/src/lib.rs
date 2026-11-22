@@ -764,6 +764,7 @@ async fn fetch_result(
                     message: message.to_owned(),
                     sqlstate: None,
                     position: None,
+                    hint: None,
                 });
             }
             response_row_into(raw, &columns, values, !output_settings_allowed)
@@ -1218,6 +1219,7 @@ fn map_clickhouse_error_in_context(err: clickhouse::error::Error, connecting: bo
                     message: err.to_string(),
                     sqlstate: None,
                     position: None,
+                    hint: None,
                 }
             }
         }

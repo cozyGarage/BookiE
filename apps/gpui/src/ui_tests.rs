@@ -1589,6 +1589,24 @@ fn closing_query_from_home_restores_the_table_owner(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn error_mapping_selects_multiline_identifier_in_editor(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-t");
+    cx.update(|window, cx| {
+        let editor = view.read(cx).sql_input.clone();
+        let sql = "SELECT 1;\nSELECT missing FROM t";
+        let source = (sql.to_string(), 10..31);
+        let (location, token) = crate::run_cursor_ui::mapped_error_location(sql, "SELECT missing FROM t", 8, Some(&source)).unwrap();
+        editor.update(cx, |editor, cx| {
+            editor.set_value(sql, window, cx);
+            editor.set_cursor_position(gpui_kit::component::input::Position::new(location.0, location.1), window, cx);
+            editor.set_selected_range(token, cx);
+            assert_eq!(editor.selected_value().as_ref(), "missing");
+        });
+    });
+}
+
+#[gpui::test]
 fn closing_query_from_home_discards_its_pending_result(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.simulate_keystrokes("ctrl-t");
@@ -1597,10 +1615,12 @@ fn closing_query_from_home_discards_its_pending_result(cx: &mut TestAppContext) 
             view.begin_background(Work::Load, cx, |_| (), |view, ()| view.status = "stale".into());
             let cancel = view.loads.cancel.clone();
             let query = view.tabs.active;
+            view.panel.error_location = Some(("SELECT missing".into(), 8, 0, None));
             view.tabs.open_home();
             view.sync_grid_owner();
             assert!(cancel.is_cancelled());
             view.close_tab(query);
+            assert!(view.panel.error_location.is_none());
         })
     });
     cx.run_until_parked();

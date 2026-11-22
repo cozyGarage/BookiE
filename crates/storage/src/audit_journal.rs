@@ -961,16 +961,20 @@ impl AuditSink for AuditJournal {
     }
 
     async fn record(&self, event: AuditEvent) -> Result<(), AuditError> {
-        let durable = event.phase == AuditRecordPhase::Intent
-            || event.operation_class == AuditOperationClass::TransactionCommit
-            || event.administrative_action.is_some()
-            || event.reconciliation.is_some();
+        let durable = requires_durable_append(&event);
         self.append_record(event, durable).await.map_err(|error| match error {
             StorageError::UnresolvedWrite => AuditError::UnresolvedWrite,
             StorageError::WriteInFlight => AuditError::WriteInFlight,
             error => AuditError::Persistence(error.to_string()),
         })
     }
+}
+
+fn requires_durable_append(event: &AuditEvent) -> bool {
+    (event.phase == AuditRecordPhase::Intent && event.operation_class.is_write())
+        || event.operation_class == AuditOperationClass::TransactionCommit
+        || event.administrative_action.is_some()
+        || event.reconciliation.is_some()
 }
 
 pub fn sample_event(principal: Principal) -> AuditEvent {

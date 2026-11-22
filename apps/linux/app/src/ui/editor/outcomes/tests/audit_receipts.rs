@@ -236,6 +236,7 @@ impl bookie_core::Connection for FailingCursorConnection {
                 message: "cursor fetch failed".into(),
                 sqlstate: Some("XX000".into()),
                 position: None,
+                hint: None,
             })]),
             counters: std::sync::Arc::new(super::CursorCounters::default()),
             transaction_open: false,

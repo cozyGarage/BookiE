@@ -8,6 +8,7 @@ async fn fetch_failure(
         message: "division by zero".into(),
         sqlstate: Some("22012".into()),
         position: Some(8),
+        hint: None,
     };
     let result = run_statements_with_stream(
         StatementRun {
