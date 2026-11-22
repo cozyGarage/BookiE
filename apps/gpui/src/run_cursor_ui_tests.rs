@@ -74,4 +74,8 @@ fn mapped_error_stays_inside_submitted_statement_and_unchanged_snapshot() {
     assert_eq!(&editor[token], "missing");
     assert!(super::mapped_error_location(editor, "SELECT missing", 15, Some(&source)).is_none());
     assert!(super::mapped_error_location("changed", "SELECT missing", 8, Some(&source)).is_none());
+    let mismatched = (editor.to_string(), 0..8);
+    assert!(super::mapped_error_location(editor, "SELECT missing", 8, Some(&mismatched)).is_none());
+    let invalid = (editor.to_string(), 1..usize::MAX);
+    assert!(super::mapped_error_location(editor, "SELECT missing", 8, Some(&invalid)).is_none());
 }
