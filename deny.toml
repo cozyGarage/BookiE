@@ -13,7 +13,7 @@ yanked = "warn"
 # paste and similar are transitive only.
 unmaintained = "workspace"
 ignore = [
-    { id = "RUSTSEC-2026-0543", reason = "chrono is unmaintained with no safe upgrade; used by every driver crate and by sqlx, arrow, duckdb and bson; migrating to jiff or time is tracked separately" },
+    { id = "RUSTSEC-2026-0543", reason = "chrono is unmaintained with no safe upgrade; used by every driver crate and by sqlx, arrow, duckdb and bson; migrating to jiff or time is tracked separately; review-by: 2027-02-22" },
 ]
 
 [licenses]
