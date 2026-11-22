@@ -1242,6 +1242,7 @@ fn map_sqlx_error(err: sqlx::Error) -> DriverError {
             message: e.message().to_string(),
             sqlstate: e.code().map(|c| c.to_string()),
             position: None,
+            hint: None,
         },
         Io(e) if e.kind() == std::io::ErrorKind::ConnectionRefused => DriverError::ConnectionRefused,
         Tls(e) => DriverError::Tls(e.to_string()),

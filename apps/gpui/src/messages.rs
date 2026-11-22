@@ -14,11 +14,13 @@ pub enum MessageKind {
 pub struct Message {
     pub kind: MessageKind,
     pub text: String,
+    pub id: u64,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct MessageLog {
     entries: Vec<Message>,
+    next_id: u64,
 }
 
 impl MessageLog {
@@ -26,9 +28,12 @@ impl MessageLog {
         if self.entries.len() == MAX_MESSAGES {
             self.entries.remove(0);
         }
+        let id = self.next_id;
+        self.next_id = self.next_id.wrapping_add(1);
         self.entries.push(Message {
             kind,
             text: text.into(),
+            id,
         });
     }
 
@@ -86,6 +91,8 @@ mod tests {
         log.statement_ok("SELECT 1", 100_000, true, Duration::from_millis(0));
         log.statement_failed("DELETE FROM t", "ReadOnly", Duration::from_millis(4));
         let entries = log.entries();
+        assert_ne!(entries[0].id, entries[1].id);
+        assert_ne!(entries[1].id, entries[2].id);
         assert_eq!(entries[0].text, "SELECT a, b FROM t · 3 rows · 12 ms");
         assert_eq!(
             entries[1].text,
@@ -114,6 +121,8 @@ mod tests {
         }
         assert_eq!(log.entries().len(), MAX_MESSAGES);
         assert_eq!(log.entries()[0].text, "5");
+        assert_eq!(log.entries()[0].id, 5);
+        assert_eq!(log.entries().last().unwrap().id, (MAX_MESSAGES + 4) as u64);
         assert_eq!(log.entries().last().unwrap().text, (MAX_MESSAGES + 4).to_string());
     }
 }

@@ -84,6 +84,7 @@ impl PolicyGuard {
                 message: "query failed; details withheld for masked agent".into(),
                 sqlstate,
                 position,
+                hint: None,
             },
             DriverError::Transaction {
                 statement_index,

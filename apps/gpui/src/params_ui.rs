@@ -50,7 +50,12 @@ impl GridView {
         }
         let bound = collect_values(&entries).and_then(|values| bind_statement(&sql, &driver_id, &values));
         match bound {
-            Ok(bound) => self.run_sql_with(bound.sql, bound.values, cx),
+            Ok(bound) => {
+                let editor = self.sql_input.read(cx).value().to_string();
+                let source = (editor == sql).then(|| (editor.clone(), 0..editor.len()));
+                let parsed = bookie_core::extract_named_parameters(&sql, &driver_id);
+                self.run_sql_with_mapping(bound.sql, bound.values, source, Some((sql, parsed)), cx);
+            }
             Err(error) => self.status = error.to_string(),
         }
     }

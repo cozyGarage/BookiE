@@ -1034,6 +1034,7 @@ async fn a_late_cursor_error_keeps_prior_pages_and_rolls_back_the_snapshot() {
                         message: "later page failed".into(),
                         sqlstate: Some("XX000".into()),
                         position: None,
+                        hint: None,
                     }),
                 ],
                 counters.clone(),
