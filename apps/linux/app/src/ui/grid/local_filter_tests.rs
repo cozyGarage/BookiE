@@ -697,7 +697,7 @@ fn large_sort_replacement_keeps_newest_order_and_selection() {
     failed_view.attach(failed_store.clone(), failed_selection.clone());
     failed_selection.select_item(24, false);
     let order = crate::ui::row_store::PreparedSourceRows::checked(
-        result,
+        result.clone(),
         (0..20_000).rev().collect(),
         &std::sync::atomic::AtomicBool::new(false),
     )
@@ -708,4 +708,22 @@ fn large_sort_replacement_keeps_newest_order_and_selection() {
     assert_eq!(selected.size(), 1);
     assert_eq!(selected.nth(0), 24);
     assert_eq!(failed_store.source_index_at(selected.nth(0)), Some(23));
+
+    let all_store = crate::ui::row_store::RowStore::from_shared(result.clone());
+    let all_selection = gtk4::MultiSelection::new(Some(all_store.clone()));
+    let all_view = LocalResultView::new(result.clone(), LocalResultSettingsStore::default(), key);
+    all_view.attach(all_store.clone(), all_selection.clone());
+    all_selection.select_all();
+    let reversed = crate::ui::row_store::PreparedSourceRows::checked(
+        result,
+        (0..20_000).rev().collect(),
+        &std::sync::atomic::AtomicBool::new(false),
+    )
+    .unwrap();
+    assert!(all_view.apply_prepared_order(&reversed));
+    let all_selected = all_selection.selection();
+    assert_eq!(all_selected.size(), 20_000);
+    assert!(all_selected.contains(0));
+    assert!(all_selected.contains(19_999));
+    assert_eq!(all_store.source_index_at(0), Some(19_999));
 }
