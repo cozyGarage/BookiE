@@ -79,7 +79,11 @@ fn import_menu(theme: Theme, cx: &mut Context<GridView>) -> Div {
             .child(label)
             .on_click(cx.listener(move |this, _, _, cx| {
                 this.sidebar.import_menu_open = false;
-                this.status = format!("{label} is not available in this prototype yet.");
+                match id {
+                    "import-connections" => this.pick_connection_import(cx),
+                    "export-connections" => this.pick_connection_export(cx),
+                    _ => {}
+                }
                 cx.notify();
             }))
     };
@@ -97,12 +101,7 @@ fn import_menu(theme: Theme, cx: &mut Context<GridView>) -> Div {
         .bg(rgb(theme.background))
         .shadow_lg()
         .occlude()
-        .child(item("import-dbx", "Import DBX Config", cx))
-        .child(item("import-navicat", "Import Navicat NCX", cx))
-        .child(item("import-dbeaver", "Import DBeaver", cx))
-        .child(item("import-datagrip", "Import DataGrip", cx))
-        .child(item("import-rdm", "Import RDM", cx))
-        .child(item("import-anotherrdm", "Import AnotherRDM", cx))
+        .child(item("import-connections", "Import Connections…", cx))
         .child(item("export-connections", "Export Connections", cx))
 }
 

@@ -350,7 +350,10 @@ impl Render for GridView {
         let palette = self.palette.open.then(|| self.palette_overlay(window, cx));
         let save_bar = self.approval_bar(theme, cx).or_else(|| self.save_bar(theme, cx)).or_else(|| self.edits_bar(theme, cx));
         let banner = self.save_banner(theme, cx);
-        let insert_form = self.insert_form(theme, cx).or_else(|| self.import_bar(theme, cx))
+        let insert_form = self
+            .insert_form(theme, cx)
+            .or_else(|| self.connection_bundle_bar(theme, cx))
+            .or_else(|| self.import_bar(theme, cx))
             .or_else(|| self.structure_bar(theme, cx))
             .or_else(|| self.structure_info_panel(theme, cx))
             .or_else(|| self.resolve_panel(theme, cx))
