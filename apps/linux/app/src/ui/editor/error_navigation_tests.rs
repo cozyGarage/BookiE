@@ -23,6 +23,7 @@ fn a_server_error_navigates_to_its_original_unicode_statement() {
             message: "unknown column".into(),
             sqlstate: Some("42703".into()),
             position: Some(8),
+            hint: None,
         }),
     );
     let navigate = descendants(fixture.controller.widget().upcast_ref())
@@ -47,6 +48,7 @@ fn error() -> Result<QueryResultBatch, DriverError> {
         message: "unknown column".into(),
         sqlstate: Some("42703".into()),
         position: Some(8),
+        hint: None,
     })
 }
 

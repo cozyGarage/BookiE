@@ -4,7 +4,7 @@ use gpui::{Context, Div, MouseDownEvent, Stateful, Window, div, prelude::*, px, 
 use crate::assets::icon;
 use crate::chrome::{SQL, TOOLBAR_HEIGHT, ghost, ghost_icon, primary_button};
 use crate::{GridView, thousands};
-use bookie_gpui::shell::{ResultView, Run};
+use bookie_gpui::shell::{ResultView, Run, Tab};
 use bookie_gpui::theme::{Theme, size};
 
 impl GridView {
@@ -270,7 +270,7 @@ impl GridView {
             )
     }
 
-    pub(crate) fn result_messages_body(&self, theme: Theme) -> Div {
+    pub(crate) fn result_messages_body(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
         div().flex_1().min_h_0().flex().flex_col().child(
             div()
                 .id("messages")
@@ -280,6 +280,49 @@ impl GridView {
                 .gap_1()
                 .p_4()
                 .overflow_y_scroll()
+                .children(
+                    self.panel
+                        .error_location
+                        .as_ref()
+                        .filter(|(_, _, id, _)| {
+                            matches!(self.tabs.current(), Tab::Query)
+                                && self
+                                    .panel
+                                    .messages
+                                    .entries()
+                                    .last()
+                                    .is_some_and(|message| message.id == *id)
+                        })
+                        .and_then(|(sql, position, _, source)| {
+                            let current = self.sql_input.read(cx).value();
+                            let ((line, column), token) = crate::run_cursor_ui::mapped_error_location(current.as_ref(), sql, *position, source.as_ref())?;
+                            let expected = source.as_ref().map_or_else(|| sql.clone(), |(snapshot, _)| snapshot.clone());
+                            Some({
+                                    ghost(
+                                        "go-to-query-error",
+                                        format!("Go to error ({}:{})", line + 1, column + 1),
+                                        theme,
+                                    )
+                                    .on_click(cx.listener(
+                                        move |this, _, window, cx| {
+                                            if matches!(this.tabs.current(), Tab::Query)
+                                                && this.sql_input.read(cx).value().as_ref() == expected
+                                            {
+                                                this.sql_input.update(cx, |editor, cx| {
+                                                    editor.set_cursor_position(
+                                                        gpui_kit::component::input::Position::new(line, column),
+                                                        window,
+                                                        cx,
+                                                    );
+                                                    editor.set_selected_range(token.clone(), cx);
+                                                    editor.focus(window, cx);
+                                                });
+                                            }
+                                        },
+                                    ))
+                            })
+                        }),
+                )
                 .children(if self.panel.messages.entries().is_empty() {
                     vec![div().text_color(rgb(theme.muted_foreground)).child("No messages yet")]
                 } else {
@@ -322,9 +365,9 @@ impl GridView {
             )
     }
 
-    pub(crate) fn result_body(&self, theme: Theme, grid: Div) -> Div {
+    pub(crate) fn result_body(&self, theme: Theme, grid: Div, cx: &mut Context<Self>) -> Div {
         if self.panel.view == ResultView::Messages {
-            self.result_messages_body(theme)
+            self.result_messages_body(theme, cx)
         } else if self.panel.view == ResultView::Plan && !self.panel.plan.is_empty() {
             self.plan_body(theme)
         } else if let Some(slot) = self
@@ -343,7 +386,7 @@ impl GridView {
 
     pub(crate) fn result_pane(&mut self, theme: Theme, grid: Div, cx: &mut Context<Self>) -> Div {
         let header = self.result_header(theme, cx);
-        let body = self.result_body(theme, grid);
+        let body = self.result_body(theme, grid, cx);
         div()
             .flex()
             .flex_col()

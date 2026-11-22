@@ -7,11 +7,56 @@ pub struct NamedParameters {
     pub sql: String,
     pub names: Vec<String>,
     pub bindings: Vec<String>,
+    pub replacements: Vec<ParameterReplacement>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParameterReplacement {
+    pub source: std::ops::Range<usize>,
+    pub rewritten: std::ops::Range<usize>,
 }
 
 impl NamedParameters {
     pub fn is_empty(&self) -> bool {
         self.bindings.is_empty()
+    }
+
+    pub fn source_byte_for_position(&self, original: &str, position: usize) -> Option<usize> {
+        let mut source_end = 0;
+        let mut rewritten_end = 0;
+        for (replacement, name) in self.replacements.iter().zip(&self.bindings) {
+            if original.get(source_end..replacement.source.start)?
+                != self.sql.get(rewritten_end..replacement.rewritten.start)?
+                || original.get(replacement.source.clone())?.strip_prefix(':')? != name
+            {
+                return None;
+            }
+            source_end = replacement.source.end;
+            rewritten_end = replacement.rewritten.end;
+        }
+        if self.replacements.len() != self.bindings.len()
+            || original.get(source_end..)? != self.sql.get(rewritten_end..)?
+        {
+            return None;
+        }
+        let rewritten_byte = self.sql.char_indices().nth(position.checked_sub(1)?)?.0;
+        let mut source_cursor = 0usize;
+        let mut rewritten_cursor = 0usize;
+        for replacement in &self.replacements {
+            if rewritten_byte < replacement.rewritten.start {
+                return source_cursor.checked_add(rewritten_byte.checked_sub(rewritten_cursor)?);
+            }
+            if replacement.rewritten.contains(&rewritten_byte) {
+                return Some(replacement.source.start);
+            }
+            source_cursor = replacement.source.end;
+            rewritten_cursor = replacement.rewritten.end;
+        }
+        let offset = source_cursor.checked_add(rewritten_byte.checked_sub(rewritten_cursor)?)?;
+        original
+            .is_char_boundary(offset)
+            .then_some(offset)
+            .filter(|offset| *offset < original.len())
     }
 }
 
@@ -103,6 +148,7 @@ pub fn extract_named_parameters(sql: &str, driver_id: &str) -> NamedParameters {
     let mut out = String::with_capacity(sql.len());
     let mut names: Vec<String> = Vec::new();
     let mut bindings: Vec<String> = Vec::new();
+    let mut replacements = Vec::new();
     let bytes = sql.as_bytes();
     let mut index = 0usize;
     let copy_data = crate::sql_lex::copy_data_ranges(sql, driver_id);
@@ -134,8 +180,14 @@ pub fn extract_named_parameters(sql: &str, driver_id: &str) -> NamedParameters {
                 if !names.contains(&name) {
                     names.push(name.clone());
                 }
+                let rewritten_start = out.len();
                 out.push_str(&placeholder_for(driver_id, position));
-                index += 1 + name.len();
+                let end = index + 1 + name.len();
+                replacements.push(ParameterReplacement {
+                    source: index..end,
+                    rewritten: rewritten_start..out.len(),
+                });
+                index = end;
                 continue;
             }
         }
@@ -149,6 +201,7 @@ pub fn extract_named_parameters(sql: &str, driver_id: &str) -> NamedParameters {
         sql: out,
         names,
         bindings,
+        replacements,
     }
 }
 

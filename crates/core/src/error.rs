@@ -19,6 +19,7 @@ pub enum DriverError {
         message: String,
         sqlstate: Option<String>,
         position: Option<usize>,
+        hint: Option<String>,
     },
 
     #[error("connection closed unexpectedly")]
@@ -101,6 +102,7 @@ impl DriverError {
             message: message.into(),
             sqlstate: None,
             position: None,
+            hint: None,
         }
     }
 
@@ -119,6 +121,7 @@ mod tests {
             message: "m".into(),
             sqlstate: state.map(str::to_string),
             position: None,
+            hint: None,
         };
         assert!(with(Some("57014")).has_sqlstate("57014"));
         assert!(!with(Some("57014")).has_sqlstate("70100"));

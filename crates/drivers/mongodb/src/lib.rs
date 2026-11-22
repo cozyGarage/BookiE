@@ -345,6 +345,7 @@ impl Connection for MongodbConnection {
                     message: format!("invalid MongoDB filter JSON: {e}"),
                     sqlstate: None,
                     position: None,
+                    hint: None,
                 })?;
             let mut collections = self.list_tables().await?.into_iter();
             let (Some(only), None) = (collections.next(), collections.next()) else {
@@ -353,6 +354,7 @@ impl Connection for MongodbConnection {
                         .into(),
                     sqlstate: None,
                     position: None,
+                    hint: None,
                 });
             };
             let coll_name = only.name;
@@ -550,6 +552,7 @@ impl MongodbConnection {
                     message: "MongoDB value field is missing".into(),
                     sqlstate: None,
                     position: None,
+                    hint: None,
                 })?;
                 Ok(vec![bson_to_value(value)])
             })

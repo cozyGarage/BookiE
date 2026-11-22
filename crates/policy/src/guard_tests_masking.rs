@@ -68,6 +68,7 @@ fn leak() -> DriverError {
         message: SECRET.into(),
         sqlstate: Some("23505".into()),
         position: Some(7),
+        hint: Some("sensitive hint canary".into()),
     }
 }
 
@@ -151,6 +152,8 @@ async fn an_agent_never_sees_driver_text_however_deeply_the_error_is_nested() {
 
         assert!(!format!("{error:?}").contains("4111111111111111"), "{error:?}");
         assert!(!error.to_string().contains("4111111111111111"), "{error}");
+        assert!(!format!("{error:?}").contains("sensitive hint canary"));
+        assert!(matches!(innermost(&error), DriverError::Query { hint: None, .. }));
         assert!(
             matches!(innermost(&error), DriverError::Query { sqlstate: Some(state), .. } if state == "23505"),
             "the SQLSTATE stays so the agent can tell what kind of failure it was: {error:?}"
@@ -194,7 +197,7 @@ async fn a_human_sees_the_full_driver_text_of_a_nested_error() {
             .unwrap_err();
 
         assert!(
-            matches!(innermost(&error), DriverError::Query { message, .. } if message == SECRET),
+            matches!(innermost(&error), DriverError::Query { message, hint: Some(hint), .. } if message == SECRET && hint == "sensitive hint canary"),
             "{error:?}"
         );
     }
