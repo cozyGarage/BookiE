@@ -29,7 +29,7 @@ fn launch_tab(read_only: bool) -> (Controller<BrowseTab>, std::sync::mpsc::Recei
 #[ignore = "requires isolated GTK display"]
 fn read_only_keyless_table_warns_about_unstable_order() {
     relm4::gtk::init().unwrap();
-    for driver in ["sqlite", "mysql", "mssql", "clickhouse", "duckdb"] {
+    for driver in ["sqlite", "mysql", "mssql", "clickhouse", "duckdb", "postgres", "redis"] {
         let (controller, outputs) = launch_for_driver(Uuid::new_v4(), true, driver, None);
         controller
             .sender()
@@ -60,7 +60,10 @@ fn read_only_keyless_table_warns_about_unstable_order() {
             )))
             .unwrap();
         pump(&outputs);
-        assert!(controller.model().no_pk_banner.title().contains("Row order may change"));
+        let title = controller.model().no_pk_banner.title();
+        assert!(title.contains("Row order may change"), "{title}");
+        assert!(title.contains("skipped or repeated"), "{title}");
+        assert!(!title.contains("primary key"), "{title}");
         assert!(
             controller
                 .model()
