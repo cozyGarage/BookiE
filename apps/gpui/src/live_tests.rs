@@ -39,6 +39,32 @@
     use super::*;
 
     #[test]
+    fn spooled_query_pages_preserve_rows_across_page_boundaries() {
+        let count = PAGE_ROWS as usize * 2 + 1;
+        let result = QueryResult {
+            columns: Vec::new(),
+            rows: QueryRows::from_rows((0..count).map(|id| vec![bookie_core::Value::Int(id as i64)]).collect()),
+            truncated: false,
+        };
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        runtime.block_on(async {
+            let (_, rows, scan, truncated) = spooled_pages(result, count as u64, &CancellationToken::new()).await.unwrap();
+            assert!(!truncated);
+            assert_eq!(rows.len(), count);
+            assert_eq!(scan.spool().page_count(), 3);
+            for page in 0..3 {
+                let loaded = scan.spool().load_page(page, Vec::new()).await.unwrap();
+                let start = page as usize * PAGE_ROWS as usize;
+                let expected = (count - start).min(PAGE_ROWS as usize);
+                assert_eq!(loaded.rows.len(), expected);
+                for (offset, row) in loaded.rows.iter().enumerate() {
+                    assert_eq!(row[0], bookie_core::Value::Int((start + offset) as i64));
+                }
+            }
+        });
+    }
+
+    #[test]
     fn a_stale_open_event_closes_its_session() {
         let Origin::File(source) = fixture() else {
             panic!("the fixture is a file")

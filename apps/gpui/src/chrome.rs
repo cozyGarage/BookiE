@@ -67,44 +67,6 @@ fn expand_sidebar_button(theme: Theme, cx: &mut Context<GridView>) -> Stateful<D
         }))
 }
 
-fn import_menu(theme: Theme, cx: &mut Context<GridView>) -> Div {
-    let item = |id: &'static str, label: &'static str, cx: &mut Context<GridView>| {
-        div()
-            .id(id)
-            .px_3()
-            .py_1()
-            .cursor_pointer()
-            .text_color(rgb(theme.foreground))
-            .hover(move |style| style.bg(rgb(theme.accent)))
-            .child(label)
-            .on_click(cx.listener(move |this, _, _, cx| {
-                this.sidebar.import_menu_open = false;
-                match id {
-                    "import-connections" => this.pick_connection_import(cx),
-                    "export-connections" => this.pick_connection_export(cx),
-                    _ => {}
-                }
-                cx.notify();
-            }))
-    };
-    div()
-        .absolute()
-        .top(px(TOOLBAR_HEIGHT))
-        .left(px(size::SM))
-        .w(px(size::MENU_WIDTH))
-        .flex()
-        .flex_col()
-        .py_1()
-        .rounded(px(theme.radius))
-        .border_1()
-        .border_color(rgb(theme.border))
-        .bg(rgb(theme.background))
-        .shadow_lg()
-        .occlude()
-        .child(item("import-connections", "Import Connections…", cx))
-        .child(item("export-connections", "Export Connections", cx))
-}
-
 fn toggle_icon(
     id: &'static str,
     name: &'static str,
@@ -414,23 +376,39 @@ impl GridView {
             .children(empty)
     }
 
-    fn sidebar_import_export_button(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
-        div()
-            .id("import-export-menu")
-            .tooltip(tip("Import / Export connections"))
-            .flex_1()
-            .min_w_0()
-            .flex()
-            .flex_wrap()
-            .items_center()
-            .gap_1()
-            .cursor_pointer()
-            .child(icon("arrow-down-up", theme.muted_foreground).flex_none())
+    fn sidebar_import_export_button(&self, theme: Theme, cx: &mut Context<Self>) -> impl IntoElement {
+        use gpui_component::button::{Button, ButtonVariants};
+        use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
+
+        let owner = cx.entity().downgrade();
+        Button::new("import-export-menu")
+            .ghost()
+            .compact()
+            .w_full()
+            .justify_start()
+            .tooltip("Import / Export connections")
+            .accessibility_label("Import / Export connections")
+            .child(icon("arrow-down-up", theme.muted_foreground))
             .children((self.sidebar.width >= 320.0).then(|| div().flex_1().min_w_0().child("Import / Export")))
-            .on_click(cx.listener(|this, _, _, cx| {
-                this.sidebar.import_menu_open = !this.sidebar.import_menu_open;
-                cx.notify();
-            }))
+            .dropdown_menu(move |mut menu, _, _| {
+                for (id, label) in [
+                    ("import-connections", "Import Connections…"),
+                    ("export-connections", "Export Connections"),
+                ] {
+                    let owner = owner.clone();
+                    menu = menu.item(PopupMenuItem::new(label).on_click(move |_, _, cx| {
+                        let _ = owner.update(cx, |this, cx| {
+                            match id {
+                                "import-connections" => this.pick_connection_import(cx),
+                                "export-connections" => this.pick_connection_export(cx),
+                                _ => {}
+                            }
+                            cx.notify();
+                        });
+                    }));
+                }
+                menu
+            })
     }
 
     fn sidebar_header_action_icons(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
@@ -557,7 +535,6 @@ impl GridView {
             .border_r_1()
             .border_color(rgb(theme.border))
             .child(self.sidebar_header(theme, cx))
-            .children(self.sidebar.import_menu_open.then(|| import_menu(theme, cx)))
             .child(self.sidebar_search_bar(theme, cx))
             .child(self.sidebar_tree_view(theme, &search, cx))
             .child(self.sidebar_resize_handle(theme, cx))
