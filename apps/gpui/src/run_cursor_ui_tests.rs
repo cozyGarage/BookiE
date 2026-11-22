@@ -1,3 +1,6 @@
+use gpui::TestAppContext;
+
+use crate::ui_tests::open;
 use super::run_target;
 
 const SCRIPT: &str = "SELECT 1;\nSELECT 2;\nSELECT 3;";
@@ -95,4 +98,22 @@ fn rewritten_parameter_error_maps_to_second_line_in_editor() {
     assert_eq!(location, (1, 7));
     assert_eq!(&editor[token], "missing");
     assert!(super::mapped_error_location("changed", editor, original_position, None).is_none());
+}
+
+#[gpui::test]
+fn error_mapping_selects_multiline_identifier_in_editor(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-t");
+    cx.update(|window, cx| {
+        let editor = view.read(cx).sql_input.clone();
+        let sql = "SELECT 1;\nSELECT missing FROM t";
+        let source = (sql.to_string(), 10..31);
+        let (location, token) = crate::run_cursor_ui::mapped_error_location(sql, "SELECT missing FROM t", 8, Some(&source)).unwrap();
+        editor.update(cx, |editor, cx| {
+            editor.set_value(sql, window, cx);
+            editor.set_cursor_position(gpui_kit::component::input::Position::new(location.0, location.1), window, cx);
+            editor.set_selected_range(token, cx);
+            assert_eq!(editor.selected_value().as_ref(), "missing");
+        });
+    });
 }
