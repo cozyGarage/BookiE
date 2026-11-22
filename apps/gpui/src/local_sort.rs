@@ -37,13 +37,7 @@ pub(crate) fn sorted_source_indices(
         }
         values.push((index, value));
     }
-    values.sort_by(|(_, left), (_, right)| {
-        if cancel.is_cancelled() {
-            Ordering::Equal
-        } else {
-            compare_values(left, right, ascending)
-        }
-    });
+    values.sort_by(|(_, left), (_, right)| compare_values(left, right, ascending));
     if cancel.is_cancelled() {
         return Err("the operation was cancelled");
     }
