@@ -25,6 +25,8 @@ mod oversized_cell;
 mod result_budget;
 #[path = "support/result_column_types.rs"]
 mod result_column_types;
+#[path = "support/round_trip_budget.rs"]
+mod round_trip_budget;
 #[path = "support/rust_decimal_boundaries.rs"]
 mod rust_decimal_boundaries;
 #[path = "support/server_stop_class.rs"]

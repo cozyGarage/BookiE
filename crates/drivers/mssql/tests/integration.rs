@@ -25,6 +25,8 @@ mod datetimeoffset_csv;
 mod disconnection;
 #[path = "support/result_sets.rs"]
 mod result_sets;
+#[path = "support/round_trip_budget.rs"]
+mod round_trip_budget;
 #[path = "support/server_messages.rs"]
 mod server_messages;
 #[path = "support/server_owned_columns.rs"]
