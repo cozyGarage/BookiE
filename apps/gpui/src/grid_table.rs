@@ -549,19 +549,18 @@ impl GridView {
             });
         let scope_changed = delegate.pin_scope.as_ref() != pin_scope.as_ref()
             || delegate.source.as_ref().is_none_or(|source| !Arc::ptr_eq(source, &self.source));
-        let hidden: HashSet<usize> = persisted.map(|hidden_names| {
-            columns
-                .iter()
-                .enumerate()
-                .filter_map(|(index, (name, _))| hidden_names.contains(name).then_some(index))
-                .collect()
-        }).unwrap_or_else(|| {
-            if scope_changed {
-                HashSet::new()
-            } else {
-                delegate.hidden_columns.clone()
-            }
-        });
+        let hidden: HashSet<usize> = persisted
+            .map(|hidden_names| {
+                let names = columns.iter().map(|(name, _)| name.as_str()).collect::<Vec<_>>();
+                crate::column_projection::hidden_from_names(&names, &hidden_names)
+            })
+            .unwrap_or_else(|| {
+                if scope_changed {
+                    HashSet::new()
+                } else {
+                    delegate.hidden_columns.clone()
+                }
+            });
         let projection = ColumnProjection::new(columns.len(), &hidden);
         (hidden, projection)
     }
@@ -764,10 +763,12 @@ impl GridView {
             return;
         }
         hidden.insert(source_col);
+        let unique_name = columns.iter().filter(|(column, _)| column == name).count() == 1;
         if !self.grid_is_query
             && self.compare.is_none()
             && let Some((id, _)) = self.live.as_ref().and_then(|session| session.saved.as_ref())
             && let Some(store) = &self.column_widths
+            && unique_name
             && let Err(error) = store.set_hidden(*id, &self.catalog.grid_table.name, name, true)
         {
             tracing::warn!(%error, "could not persist the hidden GPUI grid column");
@@ -816,6 +817,9 @@ impl GridView {
         {
             for source_col in &hidden {
                 let Some((name, _)) = columns.get(*source_col) else { continue };
+                if columns.iter().filter(|(column, _)| column == name).count() != 1 {
+                    continue;
+                }
                 if let Err(error) = store.set_hidden(*id, &self.catalog.grid_table.name, name, false) {
                     tracing::warn!(%error, column = %name, "could not restore a hidden GPUI grid column preference");
                 }

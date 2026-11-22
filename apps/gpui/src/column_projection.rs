@@ -1,4 +1,17 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+
+pub(crate) fn hidden_from_names(columns: &[&str], hidden_names: &HashSet<String>) -> HashSet<usize> {
+    let mut counts = HashMap::new();
+    for name in columns {
+        *counts.entry(*name).or_insert(0usize) += 1;
+    }
+    columns
+        .iter()
+        .enumerate()
+        .filter_map(|(index, name)| (counts.get(*name) == Some(&1) && hidden_names.contains(*name)).then_some(index))
+        .collect()
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct ColumnProjection {
     source_indices: Vec<usize>,
@@ -6,9 +19,7 @@ pub(crate) struct ColumnProjection {
 
 impl ColumnProjection {
     pub(crate) fn new(column_count: usize, hidden: &HashSet<usize>) -> Self {
-        let mut source_indices: Vec<_> = (0..column_count)
-            .filter(|index| !hidden.contains(index))
-            .collect();
+        let mut source_indices: Vec<_> = (0..column_count).filter(|index| !hidden.contains(index)).collect();
         if source_indices.is_empty() && column_count > 0 {
             source_indices.push(0);
         }
@@ -67,5 +78,13 @@ mod tests {
             .filter_map(|index| projection.source_index(index).map(|source| names[source]))
             .collect::<Vec<_>>();
         assert_eq!(visible_names, ["id", "name"]);
+    }
+
+    #[test]
+    fn saved_names_do_not_hide_ambiguous_columns() {
+        let columns = ["id", "id", "name"];
+        let hidden = HashSet::from(["id".to_owned(), "name".to_owned()]);
+
+        assert_eq!(hidden_from_names(&columns, &hidden), HashSet::from([2]));
     }
 }
