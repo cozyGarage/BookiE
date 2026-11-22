@@ -129,6 +129,11 @@ impl Connection for Catalog {
             if table == "denied" {
                 return Err(DriverError::PolicyDenied("denied".into()));
             }
+            if table == "a-unknown" {
+                return Err(DriverError::OperationOutcomeUnknown {
+                    source: Box::new(DriverError::TimedOut),
+                });
+            }
             return Err(DriverError::query("permission denied"));
         }
         Ok(vec![column("id")])
@@ -260,7 +265,7 @@ async fn an_engine_without_foreign_key_metadata_reads_no_keys_and_says_so() {
 
 #[tokio::test]
 async fn terminal_metadata_errors_stop_diagram_loading() {
-    for name in ["denied", "disconnected"] {
+    for name in ["a-unknown", "denied", "disconnected"] {
         let calls = Arc::new(Calls::default());
         let connection = catalog(&calls, vec![name]);
         let result = read_schema(
@@ -274,7 +279,7 @@ async fn terminal_metadata_errors_stop_diagram_loading() {
         .await;
         assert!(matches!(
             result,
-            Err(DriverError::Disconnected | DriverError::PolicyDenied(_))
+            Err(DriverError::Disconnected | DriverError::PolicyDenied(_) | DriverError::OperationOutcomeUnknown { .. })
         ));
         assert_eq!(calls.columns.load(Ordering::SeqCst), 1);
     }

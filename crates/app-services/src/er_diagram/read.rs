@@ -163,6 +163,7 @@ fn terminal_metadata_error(error: &DriverError) -> bool {
             | DriverError::AuthFailed
             | DriverError::Tls(_)
             | DriverError::PolicyDenied(_)
+            | DriverError::OperationOutcomeUnknown { .. }
     )
 }
 
