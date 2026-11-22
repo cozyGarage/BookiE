@@ -21,7 +21,6 @@ pub(crate) fn run_target(text: &str, driver: &str, cursor: usize, selection: Ran
         .ok_or_else(|| "The cursor is not inside a complete statement".into())
 }
 
-/// Capture the exact editor range for a selection or caret execution.
 pub(crate) fn run_source_range(text: &str, driver: &str, cursor: usize, selection: Range<usize>) -> Option<Range<usize>> {
     if selection.start < selection.end {
         let selected = text.get(selection.clone())?;
@@ -32,8 +31,6 @@ pub(crate) fn run_source_range(text: &str, driver: &str, cursor: usize, selectio
     statement_range_at(text, driver, cursor)
 }
 
-/// PostgreSQL positions count Unicode characters from one. Only map an unchanged
-/// whole editor buffer; selection and parameter rewriting require a source map.
 pub(crate) fn error_location(editor: &str, submitted: &str, position: usize) -> Option<(u32, u32)> {
     if editor != submitted || position == 0 {
         return None;
@@ -45,7 +42,6 @@ pub(crate) fn error_location(editor: &str, submitted: &str, position: usize) -> 
     Some((u32::try_from(line).ok()?, u32::try_from(column).ok()?))
 }
 
-/// Translate a statement-relative server position into an unchanged editor buffer.
 pub(crate) fn mapped_error_location(editor: &str, sql: &str, position: usize, source: Option<&(String, Range<usize>)>) -> Option<((u32, u32), Range<usize>)> {
     let start = match source {
         Some((snapshot, range)) if editor == snapshot && snapshot.get(range.clone()) == Some(sql) => range.start,
@@ -59,7 +55,6 @@ pub(crate) fn mapped_error_location(editor: &str, sql: &str, position: usize, so
     Some((location, start + token.start..start + token.end))
 }
 
-/// Select the identifier at a server position, or the single character for punctuation.
 pub(crate) fn error_token(sql: &str, position: usize) -> Option<Range<usize>> {
     let (offset, ch) = sql.char_indices().nth(position.checked_sub(1)?)?;
     let identifier = |c: char| c.is_alphanumeric() || c == '_' || c == '$';

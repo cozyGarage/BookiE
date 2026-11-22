@@ -39,7 +39,6 @@ pub enum Origin {
     File(std::path::PathBuf),
 }
 
-/// A query failure retains the server position until the editor can map it.
 #[derive(Clone, Debug)]
 pub struct QueryFailure {
     pub message: String,
