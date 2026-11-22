@@ -1139,12 +1139,10 @@ async fn spooled_pages(
     let mut budget = QueryResultBudget::default();
     let truncated = bound_query_result(&mut result, cap, &mut budget);
     let page_size = PAGE_ROWS as usize;
+    let mut rows = result.rows.iter();
     for page_index in 0..result.rows.len().div_ceil(page_size) {
-        let start = page_index * page_size;
-        let page_rows = result
-            .rows
-            .iter()
-            .skip(start)
+        let page_rows = rows
+            .by_ref()
             .take(page_size)
             .map(|row| row.to_vec())
             .collect();
