@@ -58,6 +58,10 @@ impl GridView {
     }
 
     pub(crate) fn run_sql_with_source(&mut self, sql: String, params: Vec<bookie_core::Value>, source: Option<(String, std::ops::Range<usize>)>, cx: &mut Context<Self>) {
+        self.run_sql_with_mapping(sql, params, source, None, cx);
+    }
+
+    pub(crate) fn run_sql_with_mapping(&mut self, sql: String, params: Vec<bookie_core::Value>, source: Option<(String, std::ops::Range<usize>)>, mapping: Option<(String, bookie_core::NamedParameters)>, cx: &mut Context<Self>) {
         if self.save.busy {
             self.status = "A save is running; wait for it to finish first".into();
             return;
@@ -82,10 +86,10 @@ impl GridView {
                             Err(error) => (None, Some(error.message.clone())),
                         };
                         session.record_history(&statement, clock, started.elapsed(), rows, error);
-                        (statement, source, started.elapsed(), result)
+                        (statement, source, mapping, started.elapsed(), result)
                     }
                 },
-                |this, (sql, source, elapsed, result)| match result {
+                |this, (sql, source, mapping, elapsed, result)| match result {
                     Ok(table) => {
                         this.panel.error_location = None;
                         let (rows, truncated) = (bookie_gpui::source::ResultSource::total(&table), table.truncated);
@@ -103,10 +107,17 @@ impl GridView {
                             _ => error.message.clone(),
                         };
                         this.panel.messages.statement_failed(&sql, &detail, elapsed);
-                        this.panel.error_location = error
-                            .position
-                            .zip(this.panel.messages.entries().last())
-                            .map(|(position, message)| (sql.clone(), position, message.id, source));
+                        let (original, position) = match mapping {
+                            Some((original, map)) if map.sql == sql => {
+                                let mapped = error.position.and_then(|position| map.source_byte_for_position(&original, position))
+                                    .map(|byte| original[..byte].chars().count() + 1);
+                                (original, mapped)
+                            }
+                            Some((original, _)) => (original, None),
+                            None => (sql.clone(), error.position),
+                        };
+                        this.panel.error_location = position.zip(this.panel.messages.entries().last())
+                            .map(|(position, message)| (original, position, message.id, source));
                         this.panel.view = ResultView::Messages;
                         this.status = error.message;
                     }

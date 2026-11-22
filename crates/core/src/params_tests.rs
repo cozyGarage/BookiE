@@ -256,3 +256,52 @@ fn copy_data_is_never_scanned_for_parameters_or_rewritten() {
     let other_engine = extract_named_parameters("COPY t FROM STDIN;\n:y\n\\.", "mysql");
     assert_eq!(other_engine.names, ["y"], "only PostgreSQL has COPY data");
 }
+
+#[test]
+fn replacement_ranges_track_unicode_and_repeated_parameters() {
+    let sql = "SELECT '🎉', :name, :name";
+    let parsed = extract_named_parameters(sql, "postgres");
+    assert_eq!(parsed.replacements.len(), 2);
+    for (index, replacement) in parsed.replacements.iter().enumerate() {
+        assert_eq!(&sql[replacement.source.clone()], ":name");
+        assert_eq!(&parsed.sql[replacement.rewritten.clone()], format!("${}", index + 1));
+    }
+}
+
+#[test]
+fn rewritten_positions_map_to_original_text_and_parameters() {
+    let sql = "SELECT '🎉', :long_name, missing";
+    let parsed = extract_named_parameters(sql, "postgres");
+    let position = parsed.sql.chars().position(|c| c == 'm').unwrap() + 1;
+    let offset = parsed.source_byte_for_position(sql, position).unwrap();
+    assert_eq!(&sql[offset..], "missing");
+    let position = parsed.sql.chars().position(|c| c == '$').unwrap() + 1;
+    assert_eq!(
+        &sql[parsed.source_byte_for_position(sql, position).unwrap()..],
+        ":long_name, missing"
+    );
+    assert_eq!(parsed.source_byte_for_position(sql, 0), None);
+    assert_eq!(parsed.source_byte_for_position(sql, 999), None);
+    assert_eq!(parsed.source_byte_for_position("SELECT other", 1), None);
+}
+
+#[test]
+fn mapping_handles_multiple_replacements_and_rejects_changed_sql() {
+    let sql = "SELECT :a, :long_name, :a, missing";
+    let parsed = extract_named_parameters(sql, "postgres");
+    for needle in ["$1", "$2", "$3", "missing"] {
+        let byte = parsed.sql.find(needle).unwrap();
+        let position = parsed.sql[..byte].chars().count() + 1;
+        let offset = parsed.source_byte_for_position(sql, position).unwrap();
+        let expected = match needle {
+            "$1" | "$3" => ":a",
+            "$2" => ":long_name",
+            _ => "missing",
+        };
+        assert!(sql[offset..].starts_with(expected));
+    }
+    assert_eq!(
+        parsed.source_byte_for_position("SELECT :x, :long_name, :a, missing", 1),
+        None
+    );
+}
