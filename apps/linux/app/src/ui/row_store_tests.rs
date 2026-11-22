@@ -75,6 +75,25 @@ fn a_local_filter_rejects_duplicate_and_out_of_range_source_rows() {
 }
 
 #[test]
+fn prepared_orders_reject_invalid_or_stale_sources_and_draft_rows() {
+    let source = shared(3);
+    let cancel = std::sync::atomic::AtomicBool::new(false);
+    assert!(PreparedSourceRows::checked(source.clone(), vec![1, 1], &cancel).is_none());
+    assert!(PreparedSourceRows::checked(source.clone(), vec![3], &cancel).is_none());
+    let order = PreparedSourceRows::checked(source.clone(), vec![2, 0], &cancel).unwrap();
+    let wrong_store = RowStore::from_shared(shared(3));
+    assert!(!wrong_store.replace_prepared_source_rows(&order));
+    let store = RowStore::from_shared(source);
+    assert!(store.replace_prepared_source_rows(&order));
+    assert_eq!(store.source_index_at(0), Some(2));
+    assert_eq!(store.source_index_at(1), Some(0));
+    store.insert(0, &RowObject::new_draft(7, vec![Value::Int(-1)]));
+    assert!(!store.replace_prepared_source_rows(&order));
+    cancel.store(true, std::sync::atomic::Ordering::Relaxed);
+    assert!(PreparedSourceRows::checked(shared(1), vec![0], &cancel).is_none());
+}
+
+#[test]
 fn local_reordering_rejects_non_permutations_and_draft_rows() {
     let store = RowStore::from_shared(shared(3));
     assert!(!store.reorder_source_rows(&[0, 0, 2]));
