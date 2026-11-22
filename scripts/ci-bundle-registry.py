@@ -32,14 +32,51 @@ def request(url, method='GET', data=None, size=None, token=None):
     headers = {'Authorization': 'token ' + token}
     if size is not None:
         headers.update({'Content-Type': 'application/octet-stream', 'Content-Length': str(size)})
-    try:
-        return urllib.request.build_opener(ArtifactRedirect()).open(
-            urllib.request.Request(url, data=data, method=method, headers=headers), timeout=180)
-    except urllib.error.HTTPError as error:
-        path = urllib.parse.urlsplit(url).path
-        error.msg = f'registry {method} {path} returned HTTP {error.code}'
-        error.close()
-        raise
+    for attempt in range(3 if method == 'GET' else 1):
+        try:
+            return urllib.request.build_opener(ArtifactRedirect()).open(
+                urllib.request.Request(url, data=data, method=method, headers=headers), timeout=180)
+        except urllib.error.HTTPError as error:
+            if method == 'GET' and error.code in (429, 500, 502, 503, 504) and attempt < 2:
+                error.close()
+                time.sleep(2 ** attempt)
+                continue
+            path = urllib.parse.urlsplit(url).path
+            error.msg = f'registry {method} {path} returned HTTP {error.code}'
+            error.close()
+            raise
+        except (urllib.error.URLError, TimeoutError, ConnectionError):
+            if method != 'GET' or attempt == 2:
+                raise
+            time.sleep(2 ** attempt)
+
+
+def upload_bytes(url, data):
+    for attempt in range(3):
+        try:
+            with request(url, 'PUT', data, len(data)) as response:
+                if response.status != 201:
+                    raise ValueError('registry did not accept a bundle file')
+                return
+        except urllib.error.HTTPError as error:
+            if error.code not in (409, 429, 500, 502, 503, 504):
+                raise
+            failure = error
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as error:
+            failure = error
+        try:
+            with request(url) as response:
+                received = response.read(len(data) + 1)
+            if received == data:
+                return
+            raise ValueError('registry already contains different bundle bytes')
+        except urllib.error.HTTPError as error:
+            if error.code != 404:
+                raise
+        if attempt == 2:
+            raise failure
+        time.sleep(2 ** attempt)
+
 
 
 def extract(archive, destination):
@@ -132,15 +169,11 @@ def publish(directory, revision, group, url):
             while chunk := content.read(UPLOAD_CHUNK_SIZE):
                 name = f'bundle.tar.gz.part-{number:04d}'
                 chunk_sha256 = hashlib.sha256(chunk).hexdigest()
-                with request(url + name, 'PUT', chunk, len(chunk)) as response:
-                    if response.status != 201:
-                        raise ValueError('registry did not accept a bundle chunk')
+                upload_bytes(url + name, chunk)
                 manifest['chunks'].append({'name': name, 'size': len(chunk), 'sha256': chunk_sha256})
                 number += 1
         data = json.dumps(manifest, sort_keys=True).encode()
-        with request(url + 'manifest.json', 'PUT', data, len(data)) as response:
-            if response.status != 201:
-                raise ValueError('registry did not accept the bundle manifest')
+        upload_bytes(url + 'manifest.json', data)
         print(json.dumps(manifest, sort_keys=True))
 
 
