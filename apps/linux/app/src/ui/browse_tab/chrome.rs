@@ -311,9 +311,7 @@ impl BrowseTab {
             && !self.current_columns.is_empty()
             && !self.current_columns.iter().any(|c| c.primary_key);
         self.read_only_banner.set_revealed(read_only);
-        let warning = bookie_app_services::tr!(
-            "Row order may change; rows may be skipped or repeated between pages."
-        );
+        let warning = bookie_app_services::tr!("Row order may change; rows may be skipped or repeated between pages.");
         let title = match self.view_restriction.and_then(|restriction| restriction.banner_text()) {
             Some(text) => format!("{text} {warning}"),
             None => warning,
