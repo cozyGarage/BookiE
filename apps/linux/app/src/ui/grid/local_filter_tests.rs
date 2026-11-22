@@ -671,6 +671,18 @@ fn large_sort_replacement_keeps_newest_order_and_selection() {
     assert!(view.0.borrow().pending.is_none(), "filter worker timed out");
     assert_eq!(store.n_items(), 1);
     assert_eq!(store.source_index_at(0), Some(42));
+    selection.select_all();
+    view.clear_filter();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+    while view.0.borrow().pending.is_some() && std::time::Instant::now() < deadline {
+        context.iteration(false);
+        std::thread::sleep(std::time::Duration::from_millis(1));
+    }
+    assert!(view.0.borrow().pending.is_none(), "clear worker timed out");
+    assert_eq!(store.n_items(), 20_000);
+    let selected = selection.selection();
+    assert_eq!(selected.size(), 1);
+    assert_eq!(store.source_index_at(selected.nth(0)), Some(42));
     view.sort_by(0, true);
     let pending = view.0.borrow().pending.clone().unwrap();
     let weak = std::rc::Rc::downgrade(&view.0);
