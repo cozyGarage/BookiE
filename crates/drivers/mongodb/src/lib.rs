@@ -26,7 +26,7 @@ use update::{parse_browse_page_select, parse_keyed_delete, parse_keyed_update, p
 use bookie_core::{
     ColumnInfo, ConnectOptions, Connection, DataModel, DatabaseDriver, DriverError, DriverMaturity,
     DriverValueInputCapabilities, ExecResult, MAX_QUERY_RESULT_BYTES, MAX_QUERY_RESULT_CELLS, MAX_QUERY_ROWS,
-    QueryResult, QueryResultBudget, QueryRows, TableInfo, Value,
+    OperationControl, QueryResult, QueryResultBudget, QueryRows, TableInfo, Value, run_controlled,
 };
 
 pub struct MongodbDriver;
@@ -251,6 +251,7 @@ impl MongodbConnection {
         &self,
         table: &str,
         page: Option<(u64, u64)>,
+        known_columns: Option<&[ColumnInfo]>,
     ) -> Result<(Vec<ColumnInfo>, Vec<Document>), DriverError> {
         let coll = self.db().collection::<Document>(table);
         let mut page_docs = Vec::new();
@@ -268,18 +269,37 @@ impl MongodbConnection {
                 page_docs.push(doc);
             }
         }
-        let cursor = coll
-            .find(doc! {})
-            .sort(doc! { "_id": 1 })
-            .limit(METADATA_SAMPLE_SIZE)
-            .batch_size(METADATA_SAMPLE_BATCH_SIZE)
-            .await
-            .map_err(map_mongo_error)?;
-        let mut types = observe_sample(cursor).await?;
-        types.entry("_id".into()).or_insert_with(|| "ObjectId".into());
-        let mut columns = columns_from_types(types);
+        let mut columns = match known_columns {
+            Some(columns) => columns.to_vec(),
+            None => {
+                let cursor = coll
+                    .find(doc! {})
+                    .sort(doc! { "_id": 1 })
+                    .limit(METADATA_SAMPLE_SIZE)
+                    .batch_size(METADATA_SAMPLE_BATCH_SIZE)
+                    .await
+                    .map_err(map_mongo_error)?;
+                let mut types = observe_sample(cursor).await?;
+                types.entry("_id".into()).or_insert_with(|| "ObjectId".into());
+                columns_from_types(types)
+            }
+        };
         merge_page_types(&mut columns, &page_docs);
         Ok((columns, page_docs))
+    }
+}
+
+fn query_result_for_docs(columns: Vec<ColumnInfo>, docs: &[Document]) -> QueryResult {
+    let mut rows = QueryRows::with_capacity(docs.len(), 0);
+    let mut decoded = Vec::with_capacity(columns.len());
+    for doc in docs {
+        document_to_row_into(doc, &columns, &mut decoded);
+        rows.push_row(&mut decoded);
+    }
+    QueryResult {
+        columns,
+        rows,
+        truncated: false,
     }
 }
 
@@ -306,7 +326,9 @@ impl Connection for MongodbConnection {
     }
 
     async fn fetch_columns(&self, _schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
-        self.columns_and_page(table, None).await.map(|(columns, _)| columns)
+        self.columns_and_page(table, None, None)
+            .await
+            .map(|(columns, _)| columns)
     }
 
     async fn fetch_rows(
@@ -316,18 +338,38 @@ impl Connection for MongodbConnection {
         offset: u64,
         limit: u64,
     ) -> Result<QueryResult, DriverError> {
-        let (columns, docs) = self.columns_and_page(table, Some((offset, limit))).await?;
-        let mut rows = QueryRows::with_capacity(docs.len(), 0);
-        let mut decoded = Vec::with_capacity(columns.len());
-        for doc in &docs {
-            document_to_row_into(doc, &columns, &mut decoded);
-            rows.push_row(&mut decoded);
-        }
-        Ok(QueryResult {
-            columns,
-            rows,
-            truncated: false,
-        })
+        let (columns, docs) = self.columns_and_page(table, Some((offset, limit)), None).await?;
+        Ok(query_result_for_docs(columns, &docs))
+    }
+
+    async fn fetch_rows_with_columns(
+        &self,
+        _schema: Option<&str>,
+        table: &str,
+        offset: u64,
+        limit: u64,
+        columns: &[ColumnInfo],
+    ) -> Result<QueryResult, DriverError> {
+        let (columns, docs) = self
+            .columns_and_page(table, Some((offset, limit)), Some(columns))
+            .await?;
+        Ok(query_result_for_docs(columns, &docs))
+    }
+
+    async fn fetch_rows_with_columns_controlled(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        offset: u64,
+        limit: u64,
+        columns: &[ColumnInfo],
+        control: &OperationControl,
+    ) -> Result<QueryResult, DriverError> {
+        run_controlled(
+            self.fetch_rows_with_columns(schema, table, offset, limit, columns),
+            control,
+        )
+        .await
     }
 
     async fn query(&self, sql: &str) -> Result<QueryResult, DriverError> {
@@ -562,7 +604,7 @@ impl MongodbConnection {
     }
 
     async fn run_find(&self, q: FindQuery) -> Result<QueryResult, DriverError> {
-        let (mut columns, _) = self.columns_and_page(&q.collection, None).await?;
+        let (mut columns, _) = self.columns_and_page(&q.collection, None, None).await?;
         let coll = self.db().collection::<Document>(&q.collection);
         let mut find = coll.find(q.filter).skip(q.skip).limit(q.limit);
         if !q.sort.is_empty() {

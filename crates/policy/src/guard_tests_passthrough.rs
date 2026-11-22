@@ -321,6 +321,8 @@ async fn run_every_read(guard: &PolicyGuard, control: Option<&OperationControl>)
             .fetch_columns_controlled(schema, "t", c)),
         read!(guard.fetch_rows(schema, "t", 0, 10), |c| guard
             .fetch_rows_controlled(schema, "t", 0, 10, c)),
+        read!(guard.fetch_rows_with_columns(schema, "t", 0, 10, &[]), |c| guard
+            .fetch_rows_with_columns_controlled(schema, "t", 0, 10, &[], c)),
         read!(guard.fetch_indexes(schema, "t"), |c| guard
             .fetch_indexes_controlled(schema, "t", c)),
         read!(guard.fetch_foreign_keys(schema, "t"), |c| guard
