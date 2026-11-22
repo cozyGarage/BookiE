@@ -11,6 +11,17 @@ use tokio_util::sync::CancellationToken;
 use crate::{GridView, Mode, Work};
 
 impl GridView {
+    pub(crate) fn table_sort(&self, table: &TableInfo) -> Option<&bookie_app_services::read_session::TableSort> {
+        self.table_sorts.iter().find(|(identity, _)| identity == table).map(|(_, sort)| sort)
+    }
+
+    pub(crate) fn remember_table_sort(&mut self, table: &TableInfo, sort: Option<bookie_app_services::read_session::TableSort>) {
+        self.table_sorts.retain(|(identity, _)| identity != table);
+        if let Some(sort) = sort {
+            self.table_sorts.push((table.clone(), sort));
+        }
+    }
+
     pub(crate) fn sort_current_table(
         &mut self,
         column: &str,
@@ -18,6 +29,7 @@ impl GridView {
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        self.table.update(cx, |table, cx| table.refresh(cx));
         let column = column.to_owned();
         let Some(session) = self.live.clone().filter(|session| session.driver_id == "postgres") else {
             self.status = "Server-side table sorting is not available for this connection.".into();
@@ -36,6 +48,7 @@ impl GridView {
         });
         let current_session = session.clone();
         let current_table = table.clone();
+        let requested_sort = sort.clone();
         self.status = format!("Sorting {column}…");
         self.begin_background(
             Work::Load,
@@ -53,7 +66,13 @@ impl GridView {
                     return;
                 }
                 match result {
-                    Ok(source) => this.show_loaded_table(current_table, source),
+                    Ok(source) => {
+                        if this.reject_view_edits() {
+                            return;
+                        }
+                        this.remember_table_sort(&current_table, requested_sort);
+                        this.show_loaded_table(current_table, source);
+                    }
                     Err(message) => this.status = format!("Could not sort {column}: {message}"),
                 }
             },
@@ -113,6 +132,7 @@ impl GridView {
     }
 
     fn attach_session(&mut self, session: Arc<LiveSession>, table: TableInfo) {
+        self.table_sorts.clear();
         self.edits_changed();
         self.reset_edit_history();
         self.close_insert_form();
@@ -239,10 +259,11 @@ impl GridView {
         }
         self.status = format!("Loading {}…", table_label(table));
         let wanted = table.clone();
+        let sort = self.table_sort(&wanted).cloned();
         self.begin_background(
             Work::Load,
             cx,
-            move |cancel| load(&session, &wanted, &cancel),
+            move |cancel| load(&session, &wanted, sort.as_ref(), &cancel),
             move |this, loaded| match loaded {
                 Ok((name, table)) => this.show_loaded_table(name, table),
                 Err(message) => this.status = message,
@@ -257,10 +278,11 @@ impl GridView {
         };
         self.cell_edit.edits.clear();
         let wanted = self.catalog.grid_table.clone();
+        let sort = self.table_sort(&wanted).cloned();
         self.begin_background(
             Work::Load,
             cx,
-            move |cancel| load(&session, &wanted, &cancel),
+            move |cancel| load(&session, &wanted, sort.as_ref(), &cancel),
             move |this, loaded| {
                 this.save.busy = false;
                 match loaded {
@@ -302,9 +324,10 @@ impl GridView {
 fn load(
     session: &Arc<LiveSession>,
     table: &TableInfo,
+    sort: Option<&bookie_app_services::read_session::TableSort>,
     cancellation: &tokio_util::sync::CancellationToken,
 ) -> Result<(TableInfo, Source), String> {
-    let loaded = session.load_table_controlled(table, ROW_CAP, cancellation)?;
+    let loaded = session.load_table_sorted_controlled(table, ROW_CAP, sort, cancellation)?;
     Ok((table.clone(), Arc::new(loaded)))
 }
 
