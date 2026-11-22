@@ -21,15 +21,13 @@ impl StatementTiming {
 
     pub fn total(timings: impl IntoIterator<Item = StatementTiming>) -> Self {
         let mut total = Self::default();
-        let mut first_row_ms = Some(0u128);
         let mut count = 0;
         for timing in timings {
             total.run_ms = total.run_ms.saturating_add(timing.run_ms);
             total.approval_wait_ms = total.approval_wait_ms.saturating_add(timing.approval_wait_ms);
-            first_row_ms = first_row_ms.and_then(|sum| timing.first_row_ms.map(|value| sum.saturating_add(value)));
             count += 1;
+            total.first_row_ms = if count == 1 { timing.first_row_ms } else { None };
         }
-        total.first_row_ms = (count > 0).then_some(first_row_ms).flatten();
         total
     }
 
@@ -97,18 +95,24 @@ mod tests {
     }
 
     #[test]
-    fn a_script_shows_first_row_timing_only_when_every_statement_has_it() {
+    fn a_script_does_not_present_summed_statement_times_as_time_to_first_row() {
         let streamed = StatementTiming::total([
             StatementTiming::new(50, 0).with_first_row(Some(20)),
             StatementTiming::new(40, 0).with_first_row(Some(10)),
         ]);
-        assert_eq!(streamed.first_row_ms, Some(30));
+        assert_eq!(streamed.first_row_ms, None);
+        assert!(!streamed.tooltip().contains("first row"));
 
         let mixed = StatementTiming::total([
             StatementTiming::new(50, 0).with_first_row(Some(20)),
             StatementTiming::new(40, 0),
         ]);
         assert_eq!(mixed.first_row_ms, None);
+        assert_eq!(StatementTiming::total([]).first_row_ms, None);
+        assert_eq!(
+            StatementTiming::total([StatementTiming::new(50, 3).with_first_row(Some(20))]).first_row_ms,
+            Some(20)
+        );
     }
 
     #[test]
