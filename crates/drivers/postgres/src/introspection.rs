@@ -391,6 +391,10 @@ pub(crate) async fn read_fetch_inbound_foreign_keys(
         WHERE c.contype = 'f'
           AND (($2::text IS NULL AND fn_class.relname = $1 AND pg_catalog.pg_table_is_visible(fn_class.oid))
              OR (fn_ns.nspname = $2 AND fn_class.relname = $1))
+          AND pg_catalog.has_schema_privilege(t_ns.oid, 'USAGE')
+          AND pg_catalog.has_any_column_privilege(t.oid, 'SELECT,INSERT,UPDATE,REFERENCES')
+          AND pg_catalog.has_schema_privilege(fn_ns.oid, 'USAGE')
+          AND pg_catalog.has_any_column_privilege(fn_class.oid, 'SELECT,INSERT,UPDATE,REFERENCES')
         GROUP BY c.conname, t_ns.nspname, t.relname
         ORDER BY c.conname",
     )
