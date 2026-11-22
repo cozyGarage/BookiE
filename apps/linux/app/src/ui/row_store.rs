@@ -6,7 +6,7 @@ use gtk4::prelude::*;
 use gtk4::subclass::prelude::*;
 
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use bookie_core::{QueryResult, Value};
 
@@ -20,6 +20,31 @@ static NEXT_ROW_STORE_GENERATION: AtomicU64 = AtomicU64::new(1);
 pub(in crate::ui) struct ColumnProjection {
     source_to_view: Arc<[usize]>,
     view_to_source: Arc<[Option<usize>]>,
+}
+
+pub(in crate::ui) struct PreparedSourceRows {
+    source: Arc<QueryResult>,
+    indices: Vec<usize>,
+}
+
+impl PreparedSourceRows {
+    pub(in crate::ui) fn checked(
+        source: Arc<QueryResult>,
+        indices: Vec<usize>,
+        cancelled: &AtomicBool,
+    ) -> Option<Self> {
+        let mut seen = std::collections::HashSet::with_capacity(indices.len());
+        for &index in &indices {
+            if cancelled.load(Ordering::Relaxed) || index >= source.rows.len() || !seen.insert(index) {
+                return None;
+            }
+        }
+        Some(Self { source, indices })
+    }
+
+    pub(in crate::ui) fn indices(&self) -> &[usize] {
+        &self.indices
+    }
 }
 
 pub(super) enum Slot {
@@ -400,6 +425,29 @@ impl RowStore {
             return false;
         }
         self.replace_source_rows(order)
+    }
+
+    pub(in crate::ui) fn replace_prepared_source_rows(&self, order: &PreparedSourceRows) -> bool {
+        if !self
+            .imp()
+            .source
+            .borrow()
+            .as_ref()
+            .is_some_and(|source| Arc::ptr_eq(source, &order.source))
+            || self
+                .imp()
+                .slots
+                .borrow()
+                .iter()
+                .any(|slot| matches!(slot, Slot::Object(_)))
+        {
+            return false;
+        }
+        let removed = self.n_items();
+        self.detach_cached_rows();
+        *self.imp().slots.borrow_mut() = order.indices.iter().copied().map(Slot::Shared).collect();
+        self.items_changed(0, removed, order.indices.len() as u32);
+        true
     }
 
     pub fn replace_source_rows(&self, source_indices: &[usize]) -> bool {

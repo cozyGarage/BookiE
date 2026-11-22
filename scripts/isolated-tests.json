@@ -1845,6 +1845,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::grid::local_filter::tests::large_sort_replacement_keeps_newest_order_and_selection"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::grid::local_filter::tests::local_filter_and_sort_keep_selection_attached_to_the_source_row"
     ],
     [

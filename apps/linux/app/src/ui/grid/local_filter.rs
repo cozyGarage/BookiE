@@ -3,11 +3,12 @@ use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use bookie_core::{QueryResult, Value};
 use gtk4::prelude::*;
 
-use crate::ui::row_store::RowStore;
+use crate::ui::row_store::{PreparedSourceRows, RowStore};
 
 use super::local_sort;
 
@@ -79,6 +80,15 @@ struct LocalResultViewState {
     settings_key: ResultViewKey,
     selection_syncing: Rc<Cell<bool>>,
     column_view: Option<glib::WeakRef<gtk4::ColumnView>>,
+    pending: Option<Arc<AtomicBool>>,
+}
+
+impl Drop for LocalResultViewState {
+    fn drop(&mut self) {
+        if let Some(cancel) = self.pending.take() {
+            cancel.store(true, Ordering::Relaxed);
+        }
+    }
 }
 
 impl LocalResultView {
@@ -113,6 +123,7 @@ impl LocalResultView {
             settings_key,
             selection_syncing: Rc::new(Cell::new(false)),
             column_view: None,
+            pending: None,
         })));
         let weak_view = Rc::downgrade(&view.0);
         clear.connect_clicked(move |_| {
@@ -171,7 +182,7 @@ impl LocalResultView {
                 &store,
                 &selection,
                 &selected,
-                has_saved_view_order,
+                has_saved_view_order && self.0.borrow().pending.is_none(),
                 result.rows.len(),
                 &selection_syncing,
             );
@@ -221,6 +232,7 @@ impl LocalResultView {
     }
 
     pub(crate) fn clear_filter_and_sort(&self) {
+        self.cancel_pending();
         let had_filter = self.0.borrow().filter.is_some();
         if had_filter {
             self.0.borrow_mut().filter = None;
@@ -260,6 +272,11 @@ impl LocalResultView {
                 state.filter.clone(),
             )
         };
+        if attached && result.rows.len() >= 10_000 {
+            self.start_background_order(keys);
+            return;
+        }
+        self.cancel_pending();
         let sorted_order = if keys.is_empty() {
             None
         } else if !attached {
@@ -296,7 +313,86 @@ impl LocalResultView {
     }
 
     fn rebuild_visible_rows(&self) {
-        self.rebuild_visible_rows_with_sorted_order(None);
+        let (large, keys) = {
+            let state = self.0.borrow();
+            (
+                state.result.rows.len() >= 10_000 && state.store.is_some(),
+                state.sort.clone(),
+            )
+        };
+        if large {
+            self.start_background_order(keys);
+        } else {
+            self.cancel_pending();
+            self.rebuild_visible_rows_with_sorted_order(None);
+        }
+    }
+
+    fn cancel_pending(&self) {
+        let mut state = self.0.borrow_mut();
+        if let Some(cancel) = state.pending.take() {
+            cancel.store(true, Ordering::Relaxed);
+            update_status(&state);
+        }
+    }
+
+    fn start_background_order(&self, keys: Vec<(usize, bool)>) {
+        self.cancel_pending();
+        let cancel = Arc::new(AtomicBool::new(false));
+        let (result, filter) = {
+            let mut state = self.0.borrow_mut();
+            state.pending = Some(cancel.clone());
+            state.status.set_text(&bookie_app_services::tr!("Loading…"));
+            state.controls.set_visible(true);
+            (state.result.clone(), state.filter.clone())
+        };
+        let weak = Rc::downgrade(&self.0);
+        gtk4::glib::spawn_future_local(async move {
+            let worker_cancel = cancel.clone();
+            let worker_keys = keys.clone();
+            let planned = gtk4::gio::spawn_blocking(move || {
+                let mut indices = Vec::with_capacity(result.rows.len());
+                for (index, row) in result.rows.iter().enumerate() {
+                    if worker_cancel.load(Ordering::Relaxed) {
+                        return None;
+                    }
+                    let keep = filter.as_ref().is_none_or(|filter| {
+                        row.get(filter.column)
+                            .is_some_and(|candidate| same_filter_value(candidate, &filter.value) != filter.exclude)
+                    });
+                    if keep {
+                        indices.push(index);
+                    }
+                }
+                let order =
+                    local_sort::sorted_source_indices_cancellable(&result, &worker_keys, indices, &worker_cancel)?;
+                PreparedSourceRows::checked(result, order, &worker_cancel)
+            })
+            .await;
+            let Some(inner) = weak.upgrade() else { return };
+            let view = Self(inner);
+            {
+                let mut state = view.0.borrow_mut();
+                if state
+                    .pending
+                    .as_ref()
+                    .is_none_or(|current| !Arc::ptr_eq(current, &cancel))
+                {
+                    return;
+                }
+                state.pending = None;
+                if cancel.load(Ordering::Relaxed) {
+                    return;
+                }
+            }
+            if let Ok(Some(order)) = planned {
+                if view.apply_prepared_order(&order) {
+                    view.0.borrow_mut().sort = keys;
+                    view.persist_settings();
+                }
+            }
+            update_status(&view.0.borrow());
+        });
     }
 
     fn rebuild_visible_rows_with_sorted_order(&self, sorted_order: Option<Vec<usize>>) {
@@ -339,22 +435,58 @@ impl LocalResultView {
                 }
             }
         };
+        self.apply_order_with_selection(order, store, selection, selected);
+    }
+
+    fn apply_prepared_order(&self, order: &PreparedSourceRows) -> bool {
+        let (store, selection) = {
+            let state = self.0.borrow();
+            let Some(store) = state.store.clone() else { return false };
+            let Some(selection) = state.selection.clone() else {
+                return false;
+            };
+            (store, selection)
+        };
+        let selected = selected_source_rows(&store, &selection);
+        let syncing = self.0.borrow().selection_syncing.clone();
+        syncing.set(true);
+        let applied = store.replace_prepared_source_rows(order);
+        if applied {
+            apply_selected_order(order.indices(), &selection, &selected);
+        }
+        syncing.set(false);
+        applied
+    }
+
+    fn apply_order_with_selection(
+        &self,
+        order: Vec<usize>,
+        store: RowStore,
+        selection: gtk4::MultiSelection,
+        selected: HashSet<usize>,
+    ) {
         let syncing = self.0.borrow().selection_syncing.clone();
         syncing.set(true);
         if !store.replace_source_rows(&order) {
             syncing.set(false);
             return;
         }
-        let positions = gtk4::Bitset::new_empty();
+        apply_selected_order(&order, &selection, &selected);
+        syncing.set(false);
+        update_status(&self.0.borrow());
+    }
+}
+
+fn apply_selected_order(order: &[usize], selection: &gtk4::MultiSelection, selected: &HashSet<usize>) {
+    let positions = gtk4::Bitset::new_empty();
+    if !selected.is_empty() {
         for (position, source_index) in order.iter().enumerate() {
             if selected.contains(source_index) {
                 positions.add(position as u32);
             }
         }
-        selection.set_selection(&positions, &gtk4::Bitset::new_range(0, order.len() as u32));
-        syncing.set(false);
-        update_status(&self.0.borrow());
     }
+    selection.set_selection(&positions, &gtk4::Bitset::new_range(0, order.len() as u32));
 }
 
 fn restore_selection(

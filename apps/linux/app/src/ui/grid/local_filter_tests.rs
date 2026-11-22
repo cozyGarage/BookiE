@@ -614,3 +614,67 @@ fn local_multi_key_sort_reverses_secondary_and_clears_to_source_order() {
         vec![Some(0), Some(1), Some(2), Some(3)]
     );
 }
+
+#[test]
+#[ignore = "requires isolated GTK display"]
+fn large_sort_replacement_keeps_newest_order_and_selection() {
+    gtk4::init().unwrap();
+    let result = Arc::new(result((0..20_000).map(Value::Int).collect()));
+    let store = crate::ui::row_store::RowStore::from_shared(result.clone());
+    let selection = gtk4::MultiSelection::new(Some(store.clone()));
+    let key = ResultViewKey {
+        statement_identity: crate::ui::editor::StatementIdentity {
+            statement_index: 0,
+            digest: [9; 32],
+        },
+        result_set_index: 0,
+    };
+    let settings = LocalResultSettingsStore::default();
+    let view = LocalResultView::new(result.clone(), settings.clone(), key);
+    view.attach(store.clone(), selection.clone());
+    selection.select_item(123, false);
+    view.sort_by(0, true);
+    let first = view.0.borrow().pending.clone().unwrap();
+    view.sort_by(0, false);
+    assert!(first.load(std::sync::atomic::Ordering::Relaxed));
+    let context = gtk4::glib::MainContext::default();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+    while view.0.borrow().pending.is_some() && std::time::Instant::now() < deadline {
+        context.iteration(false);
+        std::thread::sleep(std::time::Duration::from_millis(1));
+    }
+    assert!(view.0.borrow().pending.is_none(), "worker timed out");
+    assert_eq!(store.source_index_at(0), Some(19_999));
+    let selected = selection.selection();
+    assert_eq!(selected.size(), 1);
+    assert_eq!(store.source_index_at(selected.nth(0)), Some(123));
+    let restored_store = crate::ui::row_store::RowStore::from_shared(result.clone());
+    let restored_selection = gtk4::MultiSelection::new(Some(restored_store.clone()));
+    let restored_view = LocalResultView::new(result, settings, key);
+    restored_view.attach(restored_store.clone(), restored_selection.clone());
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+    while restored_view.0.borrow().pending.is_some() && std::time::Instant::now() < deadline {
+        context.iteration(false);
+        std::thread::sleep(std::time::Duration::from_millis(1));
+    }
+    assert!(restored_view.0.borrow().pending.is_none(), "restore worker timed out");
+    assert_eq!(restored_store.source_index_at(0), Some(19_999));
+    let restored = restored_selection.selection();
+    assert_eq!(restored.size(), 1);
+    assert_eq!(restored_store.source_index_at(restored.nth(0)), Some(123));
+    assert!(view.filter_by_value(0, Value::Int(42), false));
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+    while view.0.borrow().pending.is_some() && std::time::Instant::now() < deadline {
+        context.iteration(false);
+        std::thread::sleep(std::time::Duration::from_millis(1));
+    }
+    assert!(view.0.borrow().pending.is_none(), "filter worker timed out");
+    assert_eq!(store.n_items(), 1);
+    assert_eq!(store.source_index_at(0), Some(42));
+    view.sort_by(0, true);
+    let pending = view.0.borrow().pending.clone().unwrap();
+    let weak = std::rc::Rc::downgrade(&view.0);
+    drop(view);
+    assert!(weak.upgrade().is_none(), "worker must not retain the view");
+    assert!(pending.load(std::sync::atomic::Ordering::Relaxed));
+}
