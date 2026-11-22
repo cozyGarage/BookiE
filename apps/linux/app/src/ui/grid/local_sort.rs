@@ -68,17 +68,13 @@ pub(super) fn sorted_source_indices_cancellable(
 ) -> Option<Vec<usize>> {
     for &(column, _) in keys {
         let mut state = Sortability::new();
-        for row in &result.rows {
+        for &index in &order {
             if cancelled.load(AtomicOrdering::Relaxed) {
                 return None;
             }
-            state.observe(row.get(column)?);
+            state.observe(result.rows.get(index)?.get(column)?);
         }
-        if !state.is_sortable
-            || order
-                .iter()
-                .any(|index| result.rows.get(*index).and_then(|row| row.get(column)).is_none())
-        {
+        if !state.is_sortable {
             return None;
         }
     }
@@ -403,6 +399,21 @@ mod tests {
         assert!(
             super::sorted_source_indices_cancellable(&result, &[(0, true)], (0..result.rows.len()).collect(), &cancel)
                 .is_none()
+        );
+    }
+
+    #[test]
+    fn cancellable_subset_sort_ignores_unsortable_values_outside_the_subset() {
+        let result = result(vec![
+            Value::Text("z".into()),
+            Value::Undecodable("json".into()),
+            Value::Text("a".into()),
+        ]);
+        let cancelled = std::sync::atomic::AtomicBool::new(false);
+
+        assert_eq!(
+            super::sorted_source_indices_cancellable(&result, &[(0, true)], vec![0, 2], &cancelled),
+            Some(vec![2, 0])
         );
     }
 
