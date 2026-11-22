@@ -45,6 +45,8 @@ mod mysql_atomic;
 mod mysql_trigger_errors;
 #[path = "support/result_sets.rs"]
 mod result_sets;
+#[path = "support/round_trip_budget.rs"]
+mod round_trip_budget;
 #[path = "support/schema_introspection.rs"]
 mod schema_introspection;
 #[path = "support/table_default_collation.rs"]

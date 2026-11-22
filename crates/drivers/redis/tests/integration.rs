@@ -13,6 +13,8 @@ mod connect_refusal;
 mod disconnection;
 #[path = "support/full_value_refetch.rs"]
 mod full_value_refetch;
+#[path = "support/round_trip_budget.rs"]
+mod round_trip_budget;
 
 #[tokio::test]
 async fn an_unavailable_redis_server_is_classified_as_connection_refused() {

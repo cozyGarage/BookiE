@@ -7,6 +7,9 @@ use drivers_sqlite::SqliteDriver;
 use tempfile::TempDir;
 use tokio_util::sync::CancellationToken;
 
+#[path = "support/round_trip_budget.rs"]
+mod round_trip_budget;
+
 fn options_for(path: &str) -> ConnectOptions {
     ConnectOptions {
         database: path.to_string(),
