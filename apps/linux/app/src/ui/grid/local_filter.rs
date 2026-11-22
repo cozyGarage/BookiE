@@ -447,12 +447,19 @@ impl LocalResultView {
             };
             (store, selection)
         };
+        let previous_selection = selection.selection();
+        let item_count = store.n_items();
         let selected = selected_source_rows(&store, &selection);
         let syncing = self.0.borrow().selection_syncing.clone();
         syncing.set(true);
+        if previous_selection.size() > 0 {
+            selection.set_selection(&gtk4::Bitset::new_empty(), &gtk4::Bitset::new_range(0, item_count));
+        }
         let applied = store.replace_prepared_source_rows(order);
         if applied {
             apply_selected_order(order.indices(), &selection, &selected);
+        } else if previous_selection.size() > 0 {
+            selection.set_selection(&previous_selection, &gtk4::Bitset::new_range(0, item_count));
         }
         syncing.set(false);
         applied
