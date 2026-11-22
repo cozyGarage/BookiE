@@ -53,7 +53,9 @@ pub(super) async fn query_connection_with_rows_affected(
         connection.clear_cached_statements().await.map_err(map_sqlx_error)?;
         return query_connection_once_with_rows_affected(connection, sql, params, stop).await;
     }
-    result.map_err(QueryFailure::into_driver)
+    let result = result.map_err(QueryFailure::into_driver);
+    log_undecodable(&result);
+    result
 }
 
 pub(super) async fn query_connection_once(
@@ -73,9 +75,27 @@ pub(super) async fn query_connection_once_with_rows_affected(
     params: &[Value],
     stop: Option<QueryStop>,
 ) -> Result<(QueryResult, Option<u64>), DriverError> {
+    let result = query_connection_once_unlogged(connection, sql, params, stop).await;
+    log_undecodable(&result);
+    result
+}
+
+pub(super) async fn query_connection_once_unlogged(
+    connection: &mut PoolConnection<Postgres>,
+    sql: &str,
+    params: &[Value],
+    stop: Option<QueryStop>,
+) -> Result<(QueryResult, Option<u64>), DriverError> {
     query_attempt(connection, sql, params, stop)
         .await
         .map_err(QueryFailure::into_driver)
+}
+
+fn log_undecodable(result: &Result<(QueryResult, Option<u64>), DriverError>) {
+    if let Ok((result, _)) = result {
+        let mut counts = super::undecodable_counts::UndecodableCounts::default();
+        counts.observe(&result.rows);
+    }
 }
 
 async fn query_attempt(
@@ -261,14 +281,17 @@ pub(super) async fn stream_into_result(
     let stop = Some(QueryStop {
         cancel_token: connection.cancel_token(),
     });
-    let result = stream_into_result_once(&mut connection, sql, limit, stop.clone()).await;
+    let mut result = stream_into_result_once(&mut connection, sql, limit, stop.clone()).await;
     if result.as_ref().is_err_and(is_stale_type_cache_error) {
         connection.clear_cached_statements().await.map_err(map_sqlx_error)?;
-        return stream_into_result_once(&mut connection, sql, limit, stop.clone())
-            .await
-            .map_err(QueryFailure::into_driver);
+        result = stream_into_result_once(&mut connection, sql, limit, stop).await;
     }
-    result.map_err(QueryFailure::into_driver)
+    let result = result.map_err(QueryFailure::into_driver);
+    if let Ok(result) = &result {
+        let mut counts = super::undecodable_counts::UndecodableCounts::default();
+        counts.observe(&result.rows);
+    }
+    result
 }
 
 async fn stream_into_result_once(
@@ -681,11 +704,7 @@ fn extract_enum_value(raw: &sqlx::postgres::PgValueRef<'_>, idx: usize, type_nam
 }
 
 pub(super) fn undecodable(idx: usize, type_name: &str) -> Value {
-    tracing::warn!(
-        column_index = idx + 1,
-        type_name,
-        "postgres column value could not be decoded; showing it as undecodable"
-    );
+    let _ = idx;
     Value::Undecodable(type_name.to_string())
 }
 

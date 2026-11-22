@@ -40,6 +40,7 @@ mod temporal;
 #[cfg(test)]
 mod test_rng;
 mod transaction;
+mod undecodable_counts;
 mod view_editability;
 
 use errors::*;
@@ -477,7 +478,7 @@ impl Connection for PgConnection {
             return Ok(QueryResultBatch::single(copy_in::empty_result()).with_rows_affected(Some(copied)));
         }
         let connection = acquire_controlled(&self.pool, control).await?;
-        let (connection, result) = controlled_query_with_messages(connection, sql, params, true, control).await;
+        let (connection, result) = controlled_query_with_messages(connection, sql, params, true, true, control).await;
         drop(connection);
         let (rows, messages, rows_affected) = result?;
         Ok(QueryResultBatch::single(rows)
@@ -927,7 +928,7 @@ async fn controlled_query(
     control: &OperationControl,
 ) -> (Option<PoolConnection<Postgres>>, Result<QueryResult, DriverError>) {
     let (connection, result) =
-        controlled_query_with_messages(connection, sql, params, retry_stale_type_cache, control).await;
+        controlled_query_with_messages(connection, sql, params, retry_stale_type_cache, true, control).await;
     (connection, result.map(|(rows, _, _)| rows))
 }
 
@@ -938,6 +939,7 @@ async fn controlled_query_with_messages(
     sql: &str,
     params: &[Value],
     retry_stale_type_cache: bool,
+    log_decoding: bool,
     control: &OperationControl,
 ) -> (Option<PoolConnection<Postgres>>, MessagedResult) {
     let cancel_token = connection.cancel_token();
@@ -949,8 +951,10 @@ async fn controlled_query_with_messages(
         async {
             let (rows, rows_affected) = if retry_stale_type_cache {
                 query_connection_with_rows_affected(&mut connection, sql, params, stop).await
-            } else {
+            } else if log_decoding {
                 query_connection_once_with_rows_affected(&mut connection, sql, params, stop).await
+            } else {
+                query::query_connection_once_unlogged(&mut connection, sql, params, stop).await
             }?;
             Ok((rows, notices::drain(&mut connection), rows_affected))
         },
