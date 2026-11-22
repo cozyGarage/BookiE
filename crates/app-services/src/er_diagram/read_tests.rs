@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use async_trait::async_trait;
 use bookie_core::{
     ColumnInfo, Connection, DriverCapabilities, DriverError, ExecResult, ForeignKeyInfo, OperationControl, QueryResult,
-    TableInfo, Value,
+    SchemaTableMetadataVisitor, TableInfo, Value,
 };
 use tokio_util::sync::CancellationToken;
 
@@ -14,9 +14,11 @@ use super::read::{MAX_TABLES, read_schema, read_schema_with_limit};
 
 #[derive(Default)]
 struct Calls {
+    schema_metadata: AtomicUsize,
     columns: AtomicUsize,
     keys: AtomicUsize,
     cancel_at: AtomicUsize,
+    batch_error_after: AtomicUsize,
     cancellation: CancellationToken,
     column_schemas: Mutex<Vec<Option<String>>>,
 }
@@ -59,6 +61,53 @@ fn table_in(schema: Option<&str>, name: &str) -> TableInfo {
 
 #[async_trait]
 impl Connection for Catalog {
+    async fn fetch_schema_table_metadata_controlled(
+        &self,
+        tables: &[TableInfo],
+        include_foreign_keys: bool,
+        control: &OperationControl,
+        visit: &mut SchemaTableMetadataVisitor<'_>,
+    ) -> Result<(), DriverError> {
+        self.calls.schema_metadata.fetch_add(1, Ordering::SeqCst);
+        for (index, table) in tables.iter().enumerate() {
+            let columns = match self
+                .fetch_columns_controlled(table.schema.as_deref(), &table.name, control)
+                .await
+            {
+                Ok(columns) => columns,
+                Err(error) => {
+                    if !visit(index, Err(error)) {
+                        break;
+                    }
+                    continue;
+                }
+            };
+            let foreign_keys = if include_foreign_keys {
+                match self
+                    .fetch_foreign_keys_controlled(table.schema.as_deref(), &table.name, control)
+                    .await
+                {
+                    Ok(keys) => keys,
+                    Err(error) => {
+                        if !visit(index, Err(error)) {
+                            break;
+                        }
+                        continue;
+                    }
+                }
+            } else {
+                Vec::new()
+            };
+            if !visit(index, Ok((columns, foreign_keys))) {
+                break;
+            }
+            if self.calls.batch_error_after.load(Ordering::SeqCst) == index + 1 {
+                return Err(DriverError::query("batch stream failed"));
+            }
+        }
+        Ok(())
+    }
+
     async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
         Ok(Vec::new())
     }
@@ -159,6 +208,7 @@ async fn every_table_is_read_in_name_order_with_progress() {
     let names: Vec<&str> = read.reads.iter().map(|read| read.name.as_str()).collect();
     assert_eq!(names, ["customers", "orders"]);
     assert_eq!(progress, [(1, 2), (2, 2)]);
+    assert_eq!(calls.schema_metadata.load(Ordering::SeqCst), 1);
     assert_eq!(calls.keys.load(Ordering::SeqCst), 2);
     assert!(read.foreign_keys_supported);
     assert!(read.skipped.is_empty());
@@ -228,6 +278,30 @@ async fn terminal_metadata_errors_stop_diagram_loading() {
         ));
         assert_eq!(calls.columns.load(Ordering::SeqCst), 1);
     }
+}
+
+#[tokio::test]
+async fn a_recoverable_batch_failure_falls_back_after_the_last_emitted_table() {
+    let calls = Arc::new(Calls::default());
+    calls.batch_error_after.store(1, Ordering::SeqCst);
+    let connection = catalog(&calls, Vec::new());
+    let mut progress = Vec::new();
+
+    let read = read_schema(
+        &connection,
+        Some("shop"),
+        &[table("a"), table("b"), table("c")],
+        capabilities(true),
+        &control(&calls),
+        |done, total| progress.push((done, total)),
+    )
+    .await
+    .unwrap();
+
+    let names: Vec<_> = read.reads.iter().map(|table| table.name.as_str()).collect();
+    assert_eq!(names, ["a", "b", "c"]);
+    assert_eq!(calls.columns.load(Ordering::SeqCst), 3);
+    assert_eq!(progress, [(1, 3), (2, 3), (3, 3)]);
 }
 
 #[tokio::test]

@@ -148,6 +148,10 @@ const BOUNDED: &[(&str, &str)] = &[
         "PRAGMA table_info prepares the table and runs nothing over its rows",
     ),
     (
+        "fetch_schema_table_metadata_controlled",
+        "catalog reads are bounded by the requested tables and their schema metadata",
+    ),
+    (
         "fetch_indexes_controlled",
         "PRAGMA index_list and index_info read the catalog only",
     ),

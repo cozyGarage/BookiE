@@ -693,6 +693,145 @@ async fn list_views_records_a_governed_read_outcome() {
 }
 
 #[tokio::test]
+async fn schema_metadata_batch_is_audited_once_with_all_table_targets() {
+    let audit = Arc::new(SequenceAuditSink::new(vec![]));
+    let guard = PolicyGuard::new(
+        connection(Arc::new(AtomicUsize::new(0)), Arc::new(AtomicUsize::new(0))),
+        context(
+            Principal::Agent {
+                token: "token".into(),
+                client: None,
+                model: None,
+            },
+            Environment::Local,
+            PolicyConfig::default(),
+            Arc::new(AutoApproveSink),
+            audit.clone(),
+            Arc::new(AuditState::new()),
+        ),
+    );
+    let tables = vec![
+        TableInfo {
+            schema: Some("shop".into()),
+            name: "orders".into(),
+        },
+        TableInfo {
+            schema: Some("shop".into()),
+            name: "people".into(),
+        },
+    ];
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
+    let mut completed = Vec::new();
+    guard
+        .fetch_schema_table_metadata_controlled(&tables, false, &control, &mut |index, result| {
+            result.expect("mock metadata read");
+            completed.push(index);
+            true
+        })
+        .await
+        .expect("read schema metadata");
+
+    let expected_hash = audit.hash_sql("FETCH SCHEMA METADATA").await.unwrap().value;
+    let events = audit.events.lock().expect("event lock");
+    let matching: Vec<_> = events
+        .iter()
+        .filter(|event| event.decision_rule == "metadata_read" && event.sql_hash == expected_hash)
+        .collect();
+    assert_eq!(completed, [0, 1]);
+    assert_eq!(matching.len(), 2, "one intent and one terminal outcome are written");
+    assert!(
+        matching
+            .iter()
+            .all(|event| event.targets == ["shop.orders", "shop.people"])
+    );
+}
+
+struct CancelledSchemaMetadataConn;
+
+#[async_trait]
+impl Connection for CancelledSchemaMetadataConn {
+    async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
+        Ok(vec![])
+    }
+
+    async fn fetch_columns(&self, _: Option<&str>, _: &str) -> Result<Vec<ColumnInfo>, DriverError> {
+        Ok(vec![])
+    }
+
+    async fn fetch_columns_controlled(
+        &self,
+        _: Option<&str>,
+        _: &str,
+        _: &OperationControl,
+    ) -> Result<Vec<ColumnInfo>, DriverError> {
+        Err(DriverError::Cancelled)
+    }
+
+    async fn fetch_rows(&self, _: Option<&str>, _: &str, _: u64, _: u64) -> Result<QueryResult, DriverError> {
+        Ok(empty_result())
+    }
+
+    async fn query(&self, _: &str) -> Result<QueryResult, DriverError> {
+        Ok(empty_result())
+    }
+
+    async fn execute(&self, _: &str) -> Result<ExecResult, DriverError> {
+        Ok(ExecResult { rows_affected: 0 })
+    }
+
+    async fn execute_params(&self, _: &str, _: &[Value]) -> Result<ExecResult, DriverError> {
+        self.execute("").await
+    }
+
+    async fn execute_in_transaction(&self, _: &[(String, Vec<Value>)]) -> Result<Vec<u64>, DriverError> {
+        Ok(vec![])
+    }
+
+    async fn ping(&self) -> Result<(), DriverError> {
+        Ok(())
+    }
+
+    async fn close(self: Box<Self>) -> Result<(), DriverError> {
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn cancelled_schema_table_read_records_cancelled_audit_outcome() {
+    let audit = Arc::new(SequenceAuditSink::new(vec![]));
+    let guard = PolicyGuard::new(
+        Arc::new(CancelledSchemaMetadataConn),
+        context(
+            Principal::human_gui(),
+            Environment::Local,
+            PolicyConfig::default(),
+            Arc::new(AutoApproveSink),
+            audit.clone(),
+            Arc::new(AuditState::new()),
+        ),
+    );
+    let tables = vec![TableInfo {
+        schema: Some("shop".into()),
+        name: "orders".into(),
+    }];
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
+
+    guard
+        .fetch_schema_table_metadata_controlled(&tables, false, &control, &mut |_, result| {
+            assert!(matches!(result, Err(DriverError::Cancelled)));
+            false
+        })
+        .await
+        .expect("the visitor owns the terminal table error");
+
+    assert_eq!(last_terminal_status(&audit), Some(AuditTerminalStatus::Cancelled));
+    assert!(audit.events.lock().expect("audit events").iter().any(|event| {
+        event.phase == crate::audit::AuditRecordPhase::Outcome
+            && event.error_category == Some(crate::audit::AuditErrorCategory::Cancelled)
+    }));
+}
+
+#[tokio::test]
 async fn list_databases_is_a_governed_read_with_its_own_audit_record() {
     let audit = Arc::new(SequenceAuditSink::new(vec![]));
     let guard = PolicyGuard::new(

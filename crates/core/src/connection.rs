@@ -8,7 +8,7 @@ use tokio::sync::Notify;
 
 use crate::catalog::{CatalogObject, CatalogObjectKind};
 use crate::error::DriverError;
-use crate::operation::{OperationControl, run_controlled};
+use crate::operation::{OperationControl, check_pre_dispatch, run_controlled};
 use crate::query::{
     ColumnInfo, ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, QueryResult, QueryResultBatch, TableInfo,
     Value,
@@ -16,6 +16,9 @@ use crate::query::{
 use crate::routine::{RoutineLookup, RoutineRef};
 use crate::tls::TlsConfig;
 use crate::transaction::Transaction;
+
+pub type SchemaTableMetadataVisitor<'a> =
+    dyn FnMut(usize, Result<(Vec<ColumnInfo>, Vec<ForeignKeyInfo>), DriverError>) -> bool + Send + 'a;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -316,6 +319,49 @@ pub trait Connection: Send + Sync {
         control: &OperationControl,
     ) -> Result<Vec<ColumnInfo>, DriverError> {
         run_controlled(self.fetch_columns(schema, table), control).await
+    }
+    async fn fetch_schema_table_metadata_controlled(
+        &self,
+        tables: &[TableInfo],
+        include_foreign_keys: bool,
+        control: &OperationControl,
+        visit: &mut SchemaTableMetadataVisitor<'_>,
+    ) -> Result<(), DriverError> {
+        for (index, table) in tables.iter().enumerate() {
+            check_pre_dispatch(control)?;
+            let columns = match self
+                .fetch_columns_controlled(table.schema.as_deref(), &table.name, control)
+                .await
+            {
+                Ok(columns) => columns,
+                Err(error) => {
+                    if !visit(index, Err(error)) {
+                        break;
+                    }
+                    continue;
+                }
+            };
+            let foreign_keys = if include_foreign_keys {
+                match self
+                    .fetch_foreign_keys_controlled(table.schema.as_deref(), &table.name, control)
+                    .await
+                {
+                    Ok(keys) => keys,
+                    Err(error) => {
+                        if !visit(index, Err(error)) {
+                            break;
+                        }
+                        continue;
+                    }
+                }
+            } else {
+                Vec::new()
+            };
+            if !visit(index, Ok((columns, foreign_keys))) {
+                break;
+            }
+        }
+        Ok(())
     }
     async fn fetch_rows(
         &self,
