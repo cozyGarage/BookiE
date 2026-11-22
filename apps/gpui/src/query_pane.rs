@@ -152,9 +152,10 @@ impl GridView {
             .rounded(px(theme.radius))
             .border_1()
             .cursor_pointer()
-            .child(match run.measured() {
-                Some(took) => format!("{} · {} rows · {took}", run.label(), thousands(run.rows)),
-                None => format!("{} · {} rows", run.label(), thousands(run.rows)),
+            .child(match (self.run_tabs.slots[index].failure.is_some(), run.measured()) {
+                (true, _) => format!("{} · failed", run.label()),
+                (false, Some(took)) => format!("{} · {} rows · {took}", run.label(), thousands(run.rows)),
+                (false, None) => format!("{} · {} rows", run.label(), thousands(run.rows)),
             })
             .child(
                 div()
@@ -368,6 +369,8 @@ impl GridView {
     pub(crate) fn result_body(&self, theme: Theme, grid: Div, cx: &mut Context<Self>) -> Div {
         if self.panel.view == ResultView::Messages {
             self.result_messages_body(theme, cx)
+        } else if let Some(failure) = self.run_tabs.slots.get(self.run_tabs.active).and_then(|slot| slot.failure.as_ref()) {
+            div().flex_1().p_4().child(failure.clone())
         } else if self.panel.view == ResultView::Plan && !self.panel.plan.is_empty() {
             self.plan_body(theme)
         } else if let Some(slot) = self
