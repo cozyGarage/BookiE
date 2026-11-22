@@ -431,3 +431,40 @@ async fn lost_read_intent_does_not_block_a_later_write() {
         .unwrap();
     assert_eq!(reopened.verify_chain().await.unwrap(), 1);
 }
+
+#[tokio::test]
+async fn torn_read_tail_preserves_durable_history_and_allows_later_writes() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("audit.jsonl");
+    let connection_id = Uuid::new_v4();
+    let journal = AuditJournal::open_validated(path.clone()).unwrap();
+    journal
+        .record(write_event(
+            connection_id,
+            AuditRecordPhase::Outcome,
+            AuditTerminalStatus::Succeeded,
+        ))
+        .await
+        .unwrap();
+    let durable_length = std::fs::metadata(&path).unwrap().len();
+    let mut read = sample_event(Principal::human_gui());
+    read.connection_id = connection_id;
+    read.phase = AuditRecordPhase::Intent;
+    read.terminal_status = AuditTerminalStatus::Pending;
+    journal.record(read).await.unwrap();
+    drop(journal);
+    let file = std::fs::OpenOptions::new().write(true).open(&path).unwrap();
+    file.set_len(durable_length + 20).unwrap();
+    drop(file);
+    let reopened = AuditJournal::open_validated(path).unwrap();
+    assert!(!reopened.recovery().has_unresolved_writes());
+    reopened
+        .record(write_event(
+            connection_id,
+            AuditRecordPhase::Intent,
+            AuditTerminalStatus::Pending,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(reopened.verify_chain().await.unwrap(), 2);
+}
