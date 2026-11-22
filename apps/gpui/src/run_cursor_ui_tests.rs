@@ -83,3 +83,16 @@ fn mapped_error_stays_inside_submitted_statement_and_unchanged_snapshot() {
     let invalid = (editor.to_string(), 1..usize::MAX);
     assert!(super::mapped_error_location(editor, "SELECT missing", 8, Some(&invalid)).is_none());
 }
+
+#[test]
+fn rewritten_parameter_error_maps_to_second_line_in_editor() {
+    let editor = "SELECT :long_name,\n       missing FROM people";
+    let parsed = bookie_core::extract_named_parameters(editor, "postgres");
+    let server_position = parsed.sql.chars().position(|c| c == 'm').unwrap() + 1;
+    let byte = parsed.source_byte_for_position(editor, server_position).unwrap();
+    let original_position = editor[..byte].chars().count() + 1;
+    let (location, token) = super::mapped_error_location(editor, editor, original_position, None).unwrap();
+    assert_eq!(location, (1, 7));
+    assert_eq!(&editor[token], "missing");
+    assert!(super::mapped_error_location("changed", editor, original_position, None).is_none());
+}
