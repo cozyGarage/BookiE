@@ -295,15 +295,9 @@ impl GridView {
                         })
                         .and_then(|(sql, position, _, source)| {
                             let current = self.sql_input.read(cx).value();
-                            let (expected, start) = match source {
-                                Some((snapshot, range)) if current.as_ref() == snapshot && snapshot.get(range.clone()) == Some(sql.as_str()) => (snapshot.clone(), range.start),
-                                None if current.as_ref() == sql => (sql.clone(), 0),
-                                _ => return None,
-                            };
-                            let absolute_position = expected[..start].chars().count().checked_add(*position)?;
-                            crate::run_cursor_ui::error_location(current.as_ref(), &expected, absolute_position).map(
-                                |(line, column)| {
-                                    let token = crate::run_cursor_ui::error_token(sql, *position).map(|range| start + range.start..start + range.end);
+                            let ((line, column), token) = crate::run_cursor_ui::mapped_error_location(current.as_ref(), sql, *position, source.as_ref())?;
+                            let expected = source.as_ref().map_or_else(|| sql.clone(), |(snapshot, _)| snapshot.clone());
+                            Some({
                                     ghost(
                                         "go-to-query-error",
                                         format!("Go to error ({}:{})", line + 1, column + 1),
@@ -320,16 +314,13 @@ impl GridView {
                                                         window,
                                                         cx,
                                                     );
-                                                    if let Some(range) = token.clone() {
-                                                        editor.set_selected_range(range, cx);
-                                                    }
+                                                    editor.set_selected_range(token.clone(), cx);
                                                     editor.focus(window, cx);
                                                 });
                                             }
                                         },
                                     ))
-                                },
-                            )
+                            })
                         }),
                 )
                 .children(if self.panel.messages.entries().is_empty() {

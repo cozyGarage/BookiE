@@ -64,3 +64,14 @@ fn source_range_tracks_selection_and_duplicate_caret_statements() {
     assert_eq!(range, 2..10);
     assert!(super::run_source_range("é", "postgres", 0, 1..2).is_none());
 }
+
+#[test]
+fn mapped_error_stays_inside_submitted_statement_and_unchanged_snapshot() {
+    let editor = "SELECT 1;\nSELECT missing;\nSELECT later";
+    let source = (editor.to_string(), 10..24);
+    let (location, token) = super::mapped_error_location(editor, "SELECT missing", 8, Some(&source)).unwrap();
+    assert_eq!(location, (1, 7));
+    assert_eq!(&editor[token], "missing");
+    assert!(super::mapped_error_location(editor, "SELECT missing", 15, Some(&source)).is_none());
+    assert!(super::mapped_error_location("changed", "SELECT missing", 8, Some(&source)).is_none());
+}

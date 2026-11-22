@@ -45,6 +45,20 @@ pub(crate) fn error_location(editor: &str, submitted: &str, position: usize) -> 
     Some((u32::try_from(line).ok()?, u32::try_from(column).ok()?))
 }
 
+/// Translate a statement-relative server position into an unchanged editor buffer.
+pub(crate) fn mapped_error_location(editor: &str, sql: &str, position: usize, source: Option<&(String, Range<usize>)>) -> Option<((u32, u32), Range<usize>)> {
+    let start = match source {
+        Some((snapshot, range)) if editor == snapshot && snapshot.get(range.clone()) == Some(sql) => range.start,
+        None if editor == sql => 0,
+        _ => return None,
+    };
+    sql.chars().nth(position.checked_sub(1)?)?;
+    let absolute = editor[..start].chars().count().checked_add(position)?;
+    let location = error_location(editor, editor, absolute)?;
+    let token = error_token(sql, position)?;
+    Some((location, start + token.start..start + token.end))
+}
+
 /// Select the identifier at a server position, or the single character for punctuation.
 pub(crate) fn error_token(sql: &str, position: usize) -> Option<Range<usize>> {
     let (offset, ch) = sql.char_indices().nth(position.checked_sub(1)?)?;
