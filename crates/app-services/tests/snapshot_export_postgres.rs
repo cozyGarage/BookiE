@@ -3,12 +3,13 @@
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
+use bookie_app_services::browse_query::{BrowseTarget, PageQuery};
 use bookie_app_services::export_pages::{PagePlan, PageRunner};
 use bookie_app_services::read_session::{PostgresTableCursor, TableSort};
 use bookie_app_services::snapshot_export::SnapshotPages;
 use bookie_core::export::{CsvOptions, ExportError, ResultExport, ResultFormat, write_paged_file};
 use bookie_core::{
-    ConnectOptions, Connection, DatabaseDriver, Environment, FilterSet, OperationControl, TableInfo, Value,
+    ColumnInfo, ConnectOptions, Connection, DatabaseDriver, Environment, FilterSet, OperationControl, TableInfo, Value,
 };
 use bookie_policy::{
     AuditError, AuditEvent, AuditRecordPhase, AuditSink, AuditState, AuditTerminalStatus, AutoApproveSink,
@@ -27,6 +28,54 @@ const ROWS: i64 = 12_000;
 #[derive(Default)]
 struct CapturingAudit {
     events: Mutex<Vec<AuditEvent>>,
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires Docker; run cargo test -p bookie-app-services --test snapshot_export_postgres -- --include-ignored"]
+async fn sorted_browse_keeps_nulls_last_across_offset_pages() {
+    let fixture = fixture().await;
+    fixture
+        .admin
+        .execute("ALTER TABLE snap ALTER COLUMN label DROP NOT NULL")
+        .await
+        .unwrap();
+    fixture
+        .admin
+        .execute("UPDATE snap SET label = CASE WHEN id <= 3 THEN NULL ELSE 'same' END")
+        .await
+        .unwrap();
+    let column = |name: &str, primary_key: bool| ColumnInfo {
+        name: name.into(),
+        data_type: "text".into(),
+        nullable: !primary_key,
+        primary_key,
+        is_auto_increment: false,
+        default_value: None,
+        is_generated: false,
+        comment: None,
+        collation: None,
+        enum_type: None,
+        domain_type: None,
+    };
+    let columns = [column("id", true), column("label", false)];
+    let target = BrowseTarget {
+        driver_id: "postgres",
+        schema: Some("public"),
+        table: "snap",
+        columns: &columns,
+        filter: &FilterSet::default(),
+        hidden_columns: None,
+        long_text_preview: false,
+        supports_reverse_keyset: true,
+    };
+    for (offset, expected) in [(ROWS as u64 - 4, vec![ROWS, 1, 2]), (ROWS as u64 - 1, vec![3])] {
+        let PageQuery::Sql(page) = target.page(offset, 3, Some((1, false)), None).unwrap() else {
+            panic!("expected sorted SQL")
+        };
+        let result = fixture.admin.query(&page.sql).await.unwrap();
+        let ids: Vec<_> = result.rows.iter().map(|row| row[0].clone()).collect();
+        assert_eq!(ids, expected.into_iter().map(Value::Int).collect::<Vec<_>>());
+    }
 }
 
 #[async_trait]
