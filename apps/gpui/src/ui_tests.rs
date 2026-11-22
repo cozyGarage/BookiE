@@ -1361,6 +1361,7 @@ fn failed_run_has_no_grid_data_and_preserves_previous_edits(cx: &mut TestAppCont
         assert!(view.cell_edit.edits.is_empty());
         assert!(!view.run_tabs.slots[previous].edits.is_empty());
         view.activate_run(previous);
+        assert_eq!(view.panel.view, bookie_gpui::shell::ResultView::Table);
         assert_eq!(view.cell_at(1, 1), Cell::Text("pending".into()));
     }));
 }

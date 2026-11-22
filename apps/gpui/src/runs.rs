@@ -315,6 +315,7 @@ impl GridView {
             self.panel.view = ResultView::Messages;
             self.status = format!("{} · failed", run.label());
         } else {
+            self.panel.view = ResultView::Table;
             self.status = format!("{} · {} rows", run.label(), thousands(run.rows));
         }
     }
