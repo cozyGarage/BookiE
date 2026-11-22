@@ -457,7 +457,7 @@ fn open_first_table(
     }
 }
 
-struct EmptySource(String);
+pub(crate) struct EmptySource(pub(crate) String);
 
 impl ResultSource for EmptySource {
     fn columns(&self) -> &[ColumnMeta] {
