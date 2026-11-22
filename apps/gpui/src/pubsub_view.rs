@@ -22,10 +22,10 @@ pub fn subscription_message(
 
 pub fn parse_pattern(text: &str) -> Option<String> {
     let text = text.trim();
-    (!text.is_empty() && text.chars().count() <= 256 && !text.contains(char::is_whitespace)).then(|| text.to_string())
+    (!text.is_empty() && text.chars().count() <= 256 && !text.contains(char::is_whitespace) && !text.contains('\0')).then(|| text.to_string())
 }
 
-fn channel_after(text: &str, word: &str) -> Option<String> {
+fn channel_after<'a>(text: &'a str, word: &str) -> Option<&'a str> {
     let text = text.trim();
     let prefix = word.len() + 1;
     let name = text
@@ -33,15 +33,24 @@ fn channel_after(text: &str, word: &str) -> Option<String> {
         .filter(|head| head[..word.len()].eq_ignore_ascii_case(word) && head.ends_with(' '))
         .and_then(|_| text.get(prefix..))?
         .trim();
-    (!name.is_empty() && name.len() <= 63 && !name.contains(char::is_whitespace)).then(|| name.to_string())
+    Some(name)
 }
 
 pub fn parse_channel(text: &str) -> Option<String> {
-    channel_after(text, "listen")
+    postgres_channel(channel_after(text, "listen")?)
 }
 
-pub fn parse_follow(text: &str) -> Option<String> {
-    channel_after(text, "follow")
+fn postgres_channel(name: &str) -> Option<String> {
+    (!name.is_empty() && name.len() <= 63 && !name.contains(char::is_whitespace) && !name.contains('\0')).then(|| name.to_string())
+}
+
+pub fn parse_follow(driver: &str, text: &str) -> Option<String> {
+    let name = channel_after(text, "follow")?;
+    match driver {
+        "redis" => parse_pattern(name),
+        "postgres" => postgres_channel(name),
+        _ => None,
+    }
 }
 
 pub fn message_line(message: &bookie_app_services::read_session_store::SubscriptionMessage) -> String {
@@ -89,13 +98,26 @@ mod tests {
 
     #[test]
     fn follow_takes_the_follow_word_and_one_short_name() {
-        assert_eq!(parse_follow("follow jobs"), Some("jobs".into()));
-        assert_eq!(parse_follow("  FOLLOW   orders_changed "), Some("orders_changed".into()));
+        assert_eq!(parse_follow("postgres", "follow jobs"), Some("jobs".into()));
+        assert_eq!(parse_follow("postgres", "  FOLLOW   orders_changed "), Some("orders_changed".into()));
         for bad in ["jobs", "follow", "follow ", "follow two words", "listen jobs", "unfollow jobs"] {
-            assert_eq!(parse_follow(bad), None, "{bad}");
+            assert_eq!(parse_follow("postgres", bad), None, "{bad}");
         }
         assert_eq!(parse_channel("follow jobs"), None, "listen and follow are different commands");
-        assert_eq!(parse_follow("follow news.*"), Some("news.*".into()), "a Redis glob pattern is one word");
+        assert_eq!(parse_follow("redis", "follow news.*"), Some("news.*".into()));
+    }
+
+    #[test]
+    fn follow_obeys_each_engines_name_limits() {
+        for driver in ["redis", "postgres"] {
+            assert_eq!(parse_follow(driver, "follow a\0b"), None);
+            assert_eq!(parse_follow(driver, "follow two words"), None);
+        }
+        assert!(parse_follow("redis", &format!("follow {}", "é".repeat(256))).is_some());
+        assert!(parse_follow("redis", &format!("follow {}", "x".repeat(257))).is_none());
+        assert!(parse_follow("postgres", &format!("follow {}", "é".repeat(31))).is_some());
+        assert!(parse_follow("postgres", &format!("follow {}", "é".repeat(32))).is_none());
+        assert_eq!(parse_follow("sqlite", "follow foo"), None);
     }
 
     #[test]
