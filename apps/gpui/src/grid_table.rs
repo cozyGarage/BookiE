@@ -79,6 +79,57 @@ pub struct GridDelegate {
     pin_counts: HashMap<PinScope, usize>,
 }
 
+fn header_menu(
+    col_ix: usize,
+    source_col: usize,
+    column_name: String,
+    owner: Option<WeakEntity<GridView>>,
+    sortable: bool,
+    has_hidden: bool,
+    icon: impl IntoElement,
+) -> impl IntoElement {
+    use gpui_component::button::{Button, ButtonVariants};
+    use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
+
+    Button::new(format!("column-menu-{col_ix}"))
+        .ghost()
+        .compact()
+        .tooltip(format!("Actions for {column_name}"))
+        .accessibility_label(format!("Actions for {column_name}"))
+        .child(icon)
+        .dropdown_menu(move |menu, _, _| {
+            let copy_name = column_name.clone();
+            let mut menu = menu.item(PopupMenuItem::new("Copy column name").on_click(move |_, _, cx| {
+                cx.write_to_clipboard(gpui::ClipboardItem::new_string(copy_name.clone()))
+            }));
+            if let Some(owner) = owner.clone() {
+                let column = column_name.clone();
+                let hide_owner = owner.clone();
+                menu = menu.item(PopupMenuItem::new("Hide column").on_click(move |_, window, cx| {
+                    let _ = hide_owner.update(cx, |view, cx| view.hide_column(source_col, &column, window, cx));
+                }));
+                if has_hidden {
+                    menu = menu.item(PopupMenuItem::new("Show all hidden columns").on_click(move |_, window, cx| {
+                        let _ = owner.update(cx, |view, cx| view.show_all_hidden_columns(window, cx));
+                    }));
+                }
+            }
+            let Some(owner) = owner.clone().filter(|_| sortable) else {
+                return menu;
+            };
+            for (label, ascending) in [("Sort ascending", true), ("Sort descending", false)] {
+                let owner = owner.clone();
+                let column = column_name.clone();
+                menu = menu.item(PopupMenuItem::new(label).on_click(move |_, window, cx| {
+                    let _ = owner.update(cx, |view, cx| {
+                        view.sort_current_column(source_col, &column, Some(ascending), window, cx);
+                    });
+                }));
+            }
+            menu
+        })
+}
+
 impl TableDelegate for GridDelegate {
     fn perform_sort(
         &mut self,
@@ -204,56 +255,15 @@ impl TableDelegate for GridDelegate {
             .get(source_col)
             .map(|(kind, key)| header_kind(kind, *key))
             .unwrap_or_default();
-        let menu = {
-            use gpui_component::button::{Button, ButtonVariants};
-            use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
-
-            let column_name = name.clone();
-            let owner = self.owner.clone();
-            let sortable = self.sortable;
-            let has_hidden = !self.hidden_columns.is_empty();
-            Button::new(format!("column-menu-{col_ix}"))
-                .ghost()
-                .compact()
-                .tooltip(format!("Actions for {name}"))
-                .accessibility_label(format!("Actions for {name}"))
-                .child(crate::assets::icon("ellipsis", theme.muted_foreground))
-                .dropdown_menu(move |menu, _, _| {
-                    let copy_name = column_name.clone();
-                    let mut menu = menu.item(PopupMenuItem::new("Copy column name").on_click(
-                        move |_, _, cx| {
-                            cx.write_to_clipboard(gpui::ClipboardItem::new_string(copy_name.clone()))
-                        },
-                    ));
-                    if let Some(owner) = owner.clone() {
-                        let column = column_name.clone();
-                        let source_col = source_col;
-                        let hide_owner = owner.clone();
-                        menu = menu.item(PopupMenuItem::new("Hide column").on_click(move |_, window, cx| {
-                            let _ = hide_owner.update(cx, |view, cx| view.hide_column(source_col, &column, window, cx));
-                        }));
-                        if has_hidden {
-                            menu = menu.item(PopupMenuItem::new("Show all hidden columns").on_click(move |_, window, cx| {
-                                let _ = owner.update(cx, |view, cx| view.show_all_hidden_columns(window, cx));
-                            }));
-                        }
-                    }
-                    let Some(owner) = owner.clone().filter(|_| sortable) else {
-                        return menu;
-                    };
-                    for (label, ascending) in [("Sort ascending", true), ("Sort descending", false)] {
-                        let owner = owner.clone();
-                        let column = column_name.clone();
-                        let source_col = source_col;
-                        menu = menu.item(PopupMenuItem::new(label).on_click(move |_, window, cx| {
-                            let _ = owner.update(cx, |view, cx| {
-                                view.sort_current_column(source_col, &column, Some(ascending), window, cx);
-                            });
-                        }));
-                    }
-                    menu
-                })
-        };
+        let menu = header_menu(
+            col_ix,
+            source_col,
+            name.clone(),
+            self.owner.clone(),
+            self.sortable,
+            !self.hidden_columns.is_empty(),
+            crate::assets::icon("ellipsis", theme.muted_foreground),
+        );
         let pin = self.pin_scope.clone().map(|scope| {
             use gpui_component::button::{Button, ButtonVariants};
 
