@@ -120,11 +120,6 @@ pub enum Value {
     Undecodable(String),
 }
 
-/// Native value families with a well-defined in-process ordering.
-///
-/// Database collation and engine-specific NULL placement remain the caller's
-/// responsibility; this type only describes comparisons between decoded
-/// BookiE values.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ValueSortKind {
     Bool,
@@ -153,8 +148,6 @@ pub fn parse_partial(type_name: &str) -> Option<(u64, &str)> {
 impl Value {
     pub const MISSING_FIELD: &'static str = "missing BSON field";
 
-    /// Returns the comparable native family, or `None` for structured and
-    /// undecodable values that need an explicit ordering policy.
     pub fn sort_kind(&self) -> Option<ValueSortKind> {
         Some(match self {
             Self::Bool(_) => ValueSortKind::Bool,
@@ -172,9 +165,6 @@ impl Value {
         })
     }
 
-    /// Compares native values, keeping NULL after non-NULL values in either
-    /// direction. Returns `None` when the values do not share a comparable
-    /// native family.
     pub fn compare_for_sort(&self, other: &Self, ascending: bool) -> Option<std::cmp::Ordering> {
         use std::cmp::Ordering;
 
