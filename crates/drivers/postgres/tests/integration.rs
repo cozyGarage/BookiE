@@ -65,6 +65,9 @@ mod range_array_contract;
 #[path = "support/range_scalar_contract.rs"]
 mod range_scalar_contract;
 
+#[path = "support/undecodable_log.rs"]
+mod undecodable_log;
+
 #[path = "support/identity_copy_contract.rs"]
 mod identity_copy_contract;
 
