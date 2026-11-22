@@ -1,10 +1,4 @@
 use std::collections::HashSet;
-
-/// Maps the displayed columns back to their stable positions in the result source.
-///
-/// GPUI table selection and editing use visible column indexes, while BookiE's
-/// values, edits, copy, and find paths use source-column indexes. Keep that
-/// translation explicit whenever a projection hides columns.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct ColumnProjection {
     source_indices: Vec<usize>,
@@ -17,7 +11,6 @@ impl ColumnProjection {
             .enumerate()
             .filter_map(|(index, name)| (!hidden.contains(name)).then_some(index))
             .collect();
-        // A corrupt or stale preference must never produce an empty grid.
         if source_indices.is_empty() && !names.is_empty() {
             source_indices.push(0);
         }

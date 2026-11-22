@@ -244,7 +244,7 @@ impl TableDelegate for GridDelegate {
                         let column = column_name.clone();
                         menu = menu.item(PopupMenuItem::new(label).on_click(move |_, window, cx| {
                             let _ = owner.update(cx, |view, cx| {
-                                view.sort_current_table(&column, Some(ascending), window, cx);
+                                view.sort_current_column(&column, Some(ascending), window, cx);
                             });
                         }));
                     }
@@ -380,7 +380,7 @@ impl GridDelegate {
     fn schedule_sort(owner: WeakEntity<GridView>, column: String, ascending: Option<bool>, window: &mut Window) {
         window.on_next_frame(move |_, app| {
             let _ = owner.update_in(app, |view, window, cx| {
-                view.sort_current_table(&column, ascending, window, cx);
+                view.sort_current_column(&column, ascending, window, cx);
             });
         });
     }
@@ -483,49 +483,42 @@ impl GridView {
             base: self.base(),
             count: self.visible_count(),
             kept: match &self.mode {
-                crate::Mode::All => None,
-                crate::Mode::Filtered { kept, .. } => Some(kept.clone()),
+                crate::Mode::All => self.local_order.clone(),
+                crate::Mode::Filtered { kept, .. } => self.local_order.clone().or_else(|| Some(kept.clone())),
             },
             compare: None,
         }
     }
 
-    pub(crate) fn sync_table(&self, available_width: f32, window: &mut Window, cx: &mut Context<Self>) {
-        let columns: Vec<(String, f32)> = self
+    fn grid_columns(&self) -> (Vec<(String, f32)>, Vec<bool>, Vec<(String, bool)>) {
+        let mut columns: Vec<_> = self
             .source
             .columns()
             .iter()
             .map(|column| (column.name.clone(), column.width))
             .collect();
-        let numeric: Vec<bool> = self.source.columns().iter().map(|column| column.numeric).collect();
-        let numeric = if self.compare.is_some() {
-            std::iter::once(false).chain(numeric).collect()
-        } else {
-            numeric
-        };
-        let kinds: Vec<(String, bool)> = self
+        let mut numeric: Vec<_> = self.source.columns().iter().map(|column| column.numeric).collect();
+        let mut kinds: Vec<_> = self
             .source
             .columns()
             .iter()
             .map(|column| (column.data_type.clone(), column.primary_key))
             .collect();
-        let kinds = if self.compare.is_some() {
-            std::iter::once((String::new(), false)).chain(kinds).collect()
-        } else {
-            kinds
-        };
-        let mut columns = if self.compare.is_some() {
-            std::iter::once(("Change".to_string(), COMPARE_CHANGE_WIDTH))
-                .chain(columns)
-                .collect()
-        } else {
-            columns
-        };
-        let map = self.row_map();
-        let pin_scope = self.pin_scope();
-        let table = self.table.read(cx);
-        let delegate = table.delegate();
-        let persisted_hidden = self
+        if self.compare.is_some() {
+            columns.insert(0, ("Change".into(), COMPARE_CHANGE_WIDTH));
+            numeric.insert(0, false);
+            kinds.insert(0, (String::new(), false));
+        }
+        (columns, numeric, kinds)
+    }
+
+    fn column_projection(
+        &self,
+        columns: &[(String, f32)],
+        delegate: &GridDelegate,
+        pin_scope: &Option<PinScope>,
+    ) -> (HashSet<String>, ColumnProjection) {
+        let persisted = self
             .live
             .as_ref()
             .filter(|_| !self.grid_is_query && self.compare.is_none())
@@ -535,19 +528,46 @@ impl GridView {
                     .as_ref()
                     .map(|store| store.hidden_columns(id, &self.catalog.grid_table.name))
             });
-        let scope_changed = delegate.pin_scope != pin_scope
+        let scope_changed = delegate.pin_scope.as_ref() != pin_scope.as_ref()
             || delegate.source.as_ref().is_none_or(|source| !Arc::ptr_eq(source, &self.source));
-        let hidden_columns = persisted_hidden.unwrap_or_else(|| {
+        let hidden = persisted.unwrap_or_else(|| {
             if scope_changed {
                 HashSet::new()
             } else {
                 delegate.hidden_columns.clone()
             }
         });
-        let projection = ColumnProjection::new(
-            &columns.iter().map(|(name, _)| name.clone()).collect::<Vec<_>>(),
-            &hidden_columns,
-        );
+        let names = columns.iter().map(|(name, _)| name.clone()).collect::<Vec<_>>();
+        let projection = ColumnProjection::new(&names, &hidden);
+        (hidden, projection)
+    }
+
+    fn sort_state(&self) -> (bool, Option<bookie_app_services::read_session::TableSort>) {
+        let server_sortable = !self.grid_is_query
+            && self.compare.is_none()
+            && self.live.as_ref().is_some_and(|session| session.driver_id == "postgres");
+        let local_sortable = (self.grid_is_query
+            || self.live.as_ref().is_some_and(|session| session.driver_id != "postgres"))
+            && self.compare.is_none()
+            && self.dataset_count() <= crate::local_sort::MAX_LOCAL_SORT_ROWS
+            && !self.source.is_partial()
+            && (self.dataset_count() == 0 || self.source.row_ref(0).is_some());
+        let sortable = server_sortable || local_sortable;
+        let sort = if local_sortable {
+            self.local_sort.clone()
+        } else {
+            server_sortable.then(|| self.table_sort(&self.catalog.grid_table)).flatten().cloned()
+        };
+        (sortable, sort)
+    }
+
+    pub(crate) fn sync_table(&self, available_width: f32, window: &mut Window, cx: &mut Context<Self>) {
+        let (mut columns, numeric, kinds) = self.grid_columns();
+        let map = self.row_map();
+        let pin_scope = self.pin_scope();
+        let table = self.table.read(cx);
+        let delegate = table.delegate();
+        let (hidden_columns, projection) = self.column_projection(&columns, delegate, &pin_scope);
         let widths_match = delegate.source.as_ref().is_some_and(|source| Arc::ptr_eq(source, &self.source))
             && delegate.map == map
             && delegate.edits == self.cell_edit.edits
@@ -570,10 +590,7 @@ impl GridView {
             *width = *measured;
         }
         fill_text_columns(&mut columns, &numeric, available_width);
-        let sortable = !self.grid_is_query
-            && self.compare.is_none()
-            && self.live.as_ref().is_some_and(|session| session.driver_id == "postgres");
-        let sort = sortable.then(|| self.table_sort(&self.catalog.grid_table)).flatten().cloned();
+        let (sortable, sort) = self.sort_state();
         let editor = self.cell_edit.active.as_ref().and_then(|editing| {
             let dataset = self.dataset_index_of(editing.row)?.checked_sub(map.base)?;
             (dataset < map.count as u64).then(|| {

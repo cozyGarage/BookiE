@@ -14,6 +14,7 @@ mod detail_panel;
 mod find_filter;
 mod grid_edit;
 mod grid_table;
+mod local_sort;
 mod audit_page;
 mod history_view;
 mod keys;
@@ -146,6 +147,8 @@ struct GridView {
     row_detail_open: bool,
     catalog: Catalog,
     table_sorts: Vec<(bookie_core::TableInfo, bookie_app_services::read_session::TableSort)>,
+    local_order: Option<std::sync::Arc<Vec<u32>>>,
+    local_sort: Option<bookie_app_services::read_session::TableSort>,
     column_widths: Option<bookie_app_services::column_widths::ColumnWidthStore>,
     live: Option<std::sync::Arc<bookie_gpui::live::LiveSession>>,
     connections: Vec<bookie_app_services::read_session::ConnectionSummary>,
@@ -491,6 +494,8 @@ impl GridView {
             row_detail_open: false,
             catalog: Catalog::synthetic(),
             table_sorts: Vec::new(),
+            local_order: None,
+            local_sort: None,
             live: None,
             keymap: Keymap::default(),
             tabs: Tabs::default(),
@@ -569,6 +574,9 @@ impl GridView {
         if matches!(self.tabs.current(), Tab::Query) && self.run_tabs.slots.is_empty() {
             return 0;
         }
+        if let Some(order) = &self.local_order {
+            return order.len() as u64;
+        }
         match &self.mode {
             Mode::All => self.source.total(),
             Mode::Filtered { kept, .. } => kept.len() as u64,
@@ -596,6 +604,9 @@ impl GridView {
     }
 
     fn source_row(&self, dataset_index: u64) -> u64 {
+        if let Some(order) = &self.local_order {
+            return order.get(dataset_index as usize).map_or(dataset_index, |index| u64::from(*index));
+        }
         match &self.mode {
             Mode::All => dataset_index,
             Mode::Filtered { kept, .. } => u64::from(kept[dataset_index as usize]),
@@ -603,6 +614,9 @@ impl GridView {
     }
 
     fn dataset_index_of(&self, source: u64) -> Option<u64> {
+        if let Some(order) = &self.local_order {
+            return order.iter().position(|index| u64::from(*index) == source).map(|index| index as u64);
+        }
         match &self.mode {
             Mode::All => Some(source),
             Mode::Filtered { kept, .. } => kept.binary_search(&(source as u32)).ok().map(|index| index as u64),
@@ -616,6 +630,8 @@ impl GridView {
 
     fn set_mode(&mut self, mode: Mode) {
         self.mode = mode;
+        self.local_order = None;
+        self.local_sort = None;
         self.pager = self.pager.with_total(self.dataset_count());
         self.selection = None;
         self.cell_cursor = None;

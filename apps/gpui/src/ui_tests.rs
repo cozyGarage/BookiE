@@ -1122,6 +1122,30 @@ fn copying_a_filtered_row_includes_its_full_pending_edit(cx: &mut TestAppContext
 }
 
 #[gpui::test]
+fn local_sort_keeps_selection_and_pending_edits_attached_to_source_rows(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    let value = "edited source row";
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.set_mode(crate::Mode::Filtered {
+                kept: std::sync::Arc::new(vec![0, 2, 4]),
+                label: "filtered".into(),
+            });
+            view.local_order = Some(std::sync::Arc::new(vec![4, 0, 2]));
+            view.cell_edit.edits.insert((0, 1), Cell::Text(value.into()));
+            view.click_row(1, false);
+            view.copy_selection(false, cx);
+        });
+    });
+    let actual = cx.update(|_, cx| cx.read_from_clipboard().and_then(|item| item.text()));
+    let mut row = bookie_gpui::model::row_at(0);
+    row[1] = Cell::Text(value.into());
+    let columns = bookie_gpui::core_bridge::column_infos_for(&bookie_gpui::model::synthetic_columns());
+    let expected = bookie_app_services::result_copy::tsv(&columns, vec![row], false);
+    assert_eq!(actual.as_deref(), Some(expected.as_str()));
+}
+
+#[gpui::test]
 fn comparing_results_clears_selection_from_the_previous_grid(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.update(|_, cx| {
