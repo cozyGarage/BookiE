@@ -207,3 +207,40 @@ async fn metadata_preparation_keeps_target_identity_and_honors_cancellation() {
             .is_err()
     );
 }
+
+#[tokio::test]
+async fn export_targets_preserve_normalization_distinct_table_and_column_names() {
+    let connection = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let names = ["caf\u{e9}", "cafe\u{301}"];
+    for name in names {
+        let quoted = bookie_core::sql_dialect::quote_ident("sqlite", name);
+        connection
+            .execute(&format!("CREATE TABLE {quoted} ({quoted} INTEGER)"))
+            .await
+            .unwrap();
+    }
+    let tables = names
+        .into_iter()
+        .map(|name| TableInfo {
+            schema: None,
+            name: name.into(),
+        })
+        .collect();
+    let targets = prepare_targets(connection.as_ref(), tables, &crate::operation_control::bounded(5))
+        .await
+        .unwrap();
+    assert_eq!(targets.len(), 2);
+    for name in names {
+        assert!(
+            targets
+                .iter()
+                .any(|target| target.table == name && target.columns[0].name == name)
+        );
+    }
+}
