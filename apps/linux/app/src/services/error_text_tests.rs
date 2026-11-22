@@ -156,12 +156,14 @@ fn driver_messages_include_sqlstate_when_present() {
         message: "duplicate key".into(),
         sqlstate: Some("23505".into()),
         position: None,
+        hint: None,
     });
     assert!(with_state.contains("23505"));
     let without = driver_message(&DriverError::Query {
         message: "syntax error".into(),
         sqlstate: None,
         position: None,
+        hint: None,
     });
     assert!(!without.contains("SQLSTATE"));
     assert!(without.contains("syntax error"));
@@ -183,6 +185,7 @@ fn failed_transaction_rollback_does_not_claim_no_changes() {
             message: "statement failed".into(),
             sqlstate: None,
             position: None,
+            hint: None,
         }),
         rollback_error: Box::new(DriverError::Disconnected),
     });
@@ -211,6 +214,7 @@ fn confirmed_rollback_warns_that_nontransactional_side_effects_may_remain() {
             message: "statement failed".into(),
             sqlstate: None,
             position: None,
+            hint: None,
         }),
     });
     assert!(message.contains("rollback request succeeded"));

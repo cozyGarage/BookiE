@@ -43,6 +43,7 @@ pub enum Origin {
 pub struct QueryFailure {
     pub message: String,
     pub position: Option<usize>,
+    pub hint: Option<String>,
 }
 
 impl From<&str> for QueryFailure {
@@ -56,6 +57,7 @@ impl From<String> for QueryFailure {
         Self {
             message,
             position: None,
+            hint: None,
         }
     }
 }
@@ -68,9 +70,14 @@ impl From<bookie_app_services::driver_error_presentation::DriverFailurePresentat
             }
             _ => None,
         };
+        let hint = match &failure {
+            bookie_app_services::driver_error_presentation::DriverFailurePresentation::Query { hint, .. } => hint.clone(),
+            _ => None,
+        };
         Self {
             message: driver_failure_message(&failure),
             position,
+            hint,
         }
     }
 }
@@ -1556,6 +1563,7 @@ fn search_error(message: String) -> DriverError {
         message,
         sqlstate: None,
         position: None,
+        hint: None,
     }
 }
 

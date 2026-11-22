@@ -290,6 +290,7 @@ fn map_error(error: oracledb::Error) -> DriverError {
             message: db.message().to_string(),
             sqlstate: Some(format!("ORA-{:05}", db.code())),
             position: None,
+            hint: None,
         },
         ErrorKind::NoCredentials => DriverError::AuthFailed,
         ErrorKind::CallTimeoutExceeded => DriverError::TimedOut,

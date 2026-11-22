@@ -7,6 +7,7 @@ pub(crate) fn map_sqlx_error(err: sqlx::Error) -> DriverError {
             message: e.message().to_string(),
             sqlstate: e.code().map(|c| c.to_string()),
             position: None,
+            hint: None,
         },
         Io(e) if e.kind() == std::io::ErrorKind::ConnectionRefused => DriverError::ConnectionRefused,
         Io(e) if bookie_core::looks_like_tls_failure(&bookie_core::error_chain_text(&e)) => {

@@ -32,6 +32,10 @@ pub(crate) fn map_sqlx_error(err: sqlx::Error) -> DriverError {
                     message: with_pooler_hint(e.message(), sqlstate.as_deref()),
                     sqlstate,
                     position: statement_position(e.as_ref()),
+                    hint: e
+                        .try_downcast_ref::<sqlx::postgres::PgDatabaseError>()
+                        .and_then(|error| error.hint())
+                        .map(str::to_owned),
                 }
             }
         }

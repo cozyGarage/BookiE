@@ -378,6 +378,7 @@ fn position_in_cursor_query(error: DriverError) -> DriverError {
         message,
         sqlstate,
         position,
+        hint,
     } = error
     else {
         return error;
@@ -386,6 +387,7 @@ fn position_in_cursor_query(error: DriverError) -> DriverError {
     DriverError::Query {
         message,
         sqlstate,
+        hint,
         position: position
             .and_then(|position| position.checked_sub(prefix))
             .filter(|position| *position > 0),
@@ -403,6 +405,7 @@ mod tests {
             message: "column \"nope\" does not exist".into(),
             sqlstate: Some("42703".into()),
             position,
+            hint: Some("try another column".into()),
         }
     }
 
@@ -419,8 +422,10 @@ mod tests {
     #[test]
     fn cursor_position_rewrite_preserves_query_message_and_sqlstate() {
         let shifted = position_in_cursor_query(query_error(Some(CURSOR_PREFIX.chars().count() + 8)));
-        assert!(matches!(shifted, DriverError::Query { ref message, ref sqlstate, position: Some(8) }
-            if message == "column \"nope\" does not exist" && sqlstate.as_deref() == Some("42703")));
+        assert!(
+            matches!(shifted, DriverError::Query { ref message, ref sqlstate, position: Some(8), ref hint }
+            if message == "column \"nope\" does not exist" && sqlstate.as_deref() == Some("42703") && hint.as_deref() == Some("try another column"))
+        );
     }
 
     #[test]

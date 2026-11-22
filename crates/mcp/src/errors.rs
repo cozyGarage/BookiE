@@ -225,6 +225,7 @@ mod tests {
             message: "sensitive server detail".into(),
             sqlstate: Some("42703".into()),
             position: Some(42),
+            hint: None,
         });
         let wire = serde_json::to_string(&error).unwrap();
         assert!(!wire.contains("sensitive server detail"));

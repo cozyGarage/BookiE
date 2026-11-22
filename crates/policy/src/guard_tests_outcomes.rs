@@ -9,6 +9,7 @@ fn rollback_failure_is_audited_as_an_unknown_transaction_outcome() {
             message: "statement failed".into(),
             sqlstate: None,
             position: None,
+            hint: None,
         }),
         rollback_error: Box::new(DriverError::Disconnected),
     };

@@ -5,8 +5,10 @@
             message: "unknown column".into(),
             sqlstate: Some("42703".into()),
             position: Some(17),
+            hint: Some("try another name".into()),
         });
         assert_eq!(error.position, Some(17));
+        assert_eq!(error.hint.as_deref(), Some("try another name"));
         assert!(error.message.contains("unknown column"));
         assert_eq!(super::QueryFailure::from(Failure::TimedOut).position, None);
     }

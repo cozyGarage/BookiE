@@ -98,7 +98,11 @@ impl GridView {
                     }
                     Err(error) => {
                         this.panel.explaining = false;
-                        this.panel.messages.statement_failed(&sql, &error.message, elapsed);
+                        let detail = match error.hint.as_deref() {
+                            Some(hint) if !hint.is_empty() => format!("{} · Hint: {hint}", error.message),
+                            _ => error.message.clone(),
+                        };
+                        this.panel.messages.statement_failed(&sql, &detail, elapsed);
                         this.panel.error_location = error
                             .position
                             .zip(this.panel.messages.entries().last())

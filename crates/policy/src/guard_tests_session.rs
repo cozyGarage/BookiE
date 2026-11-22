@@ -61,6 +61,7 @@ impl bookie_core::Session for ScriptedSession {
                 message: "deferred foreign key constraint violated".into(),
                 sqlstate: Some("23503".into()),
                 position: None,
+                hint: None,
             });
         }
         if !self.failed_once && self.script.fail_once_on == Some(sql) {
