@@ -40,6 +40,8 @@ mod connection_paths;
 mod pool_saturation;
 #[path = "support/pool_session_reset.rs"]
 mod pool_session_reset;
+#[path = "support/query_hint.rs"]
+mod query_hint;
 #[path = "support/read_only_session.rs"]
 mod read_only_session;
 #[path = "support/server_messages.rs"]
