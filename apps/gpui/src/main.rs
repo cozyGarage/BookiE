@@ -3,6 +3,7 @@ use std::time::{Duration, Instant};
 
 mod assets;
 mod catalog_nav;
+mod column_projection;
 mod closed_tabs_ui;
 mod chrome;
 mod home_page;
@@ -145,6 +146,7 @@ struct GridView {
     row_detail_open: bool,
     catalog: Catalog,
     table_sorts: Vec<(bookie_core::TableInfo, bookie_app_services::read_session::TableSort)>,
+    column_widths: Option<bookie_app_services::column_widths::ColumnWidthStore>,
     live: Option<std::sync::Arc<bookie_gpui::live::LiveSession>>,
     connections: Vec<bookie_app_services::read_session::ConnectionSummary>,
     keymap: Keymap,
@@ -367,11 +369,12 @@ impl GridView {
         let table_events = cx.subscribe_in(
             &table,
             window,
-            |this: &mut Self, _, event: &gpui_kit::component::table::TableEvent, window, cx| match event {
+            |this: &mut Self, table, event: &gpui_kit::component::table::TableEvent, window, cx| match event {
                 gpui_kit::component::table::TableEvent::SelectCell(row, column) => {
+                    let column = table.read(cx).delegate().source_column(*column).unwrap_or(*column);
                     let cursor = bookie_results::grid_cursor::Cursor {
                         row: *row,
-                        column: *column,
+                        column,
                     };
                     this.cell_cursor = Some(cursor);
                     let dataset = this.base() + *row as u64;
@@ -382,9 +385,10 @@ impl GridView {
                     cx.notify();
                 }
                 gpui_kit::component::table::TableEvent::RightClickedCell(row, column) => {
+                    let column = table.read(cx).delegate().source_column(*column).unwrap_or(*column);
                     this.cell_cursor = Some(bookie_results::grid_cursor::Cursor {
                         row: *row,
-                        column: *column,
+                        column,
                     });
                     let dataset = this.base() + *row as u64;
                     if !this.selection.is_some_and(|selection| selection.contains(dataset)) {
@@ -396,7 +400,8 @@ impl GridView {
                     this.edit_clicked_row(*row, None, window, cx);
                 }
                 gpui_kit::component::table::TableEvent::DoubleClickedCell(row, column) => {
-                    this.edit_clicked_row(*row, Some(*column), window, cx);
+                    let source_column = table.read(cx).delegate().source_column(*column).unwrap_or(*column);
+                    this.edit_clicked_row(*row, Some(source_column), window, cx);
                 }
                 _ => {}
             },
@@ -445,6 +450,7 @@ impl GridView {
         GridView {
             table,
             _table_events: table_events,
+            column_widths: bookie_app_services::column_widths::ColumnWidthStore::open(),
             focus: table_focus,
             table_source: source.clone(),
             source,
