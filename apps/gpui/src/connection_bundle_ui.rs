@@ -4,19 +4,6 @@ use super::*;
 use crate::chrome::ghost;
 use gpui_component::scroll::ScrollableElement;
 
-fn peer_file_limit() -> usize {
-    [
-        bookie_storage::MAX_DBEAVER_BYTES,
-        bookie_storage::MAX_DATAGRIP_BYTES,
-        bookie_storage::MAX_NAVICAT_BYTES,
-        bookie_storage::MAX_RESP_BYTES,
-        bookie_storage::MAX_ANOTHER_REDIS_BYTES,
-        bookie_storage::MAX_DBX_CONFIG_BYTES,
-    ]
-    .into_iter()
-    .fold(0, usize::max)
-}
-
 #[derive(Default)]
 pub(crate) struct BundleState {
     pub pending: Option<PendingImport>,
@@ -573,16 +560,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn every_visible_import_format_has_a_bounded_parser() {
-        assert!(bookie_storage::MAX_DBX_CONFIG_BYTES > 0);
-        assert!(peer_file_limit() >= bookie_storage::MAX_DBEAVER_BYTES);
-        assert!(peer_file_limit() >= bookie_storage::MAX_DATAGRIP_BYTES);
-        assert!(peer_file_limit() >= bookie_storage::MAX_NAVICAT_BYTES);
-        assert!(peer_file_limit() >= bookie_storage::MAX_RESP_BYTES);
-        assert!(peer_file_limit() >= bookie_storage::MAX_ANOTHER_REDIS_BYTES);
-    }
-
-    #[test]
     fn import_disposition_text_is_user_visible_and_distinct() {
         assert_ne!(
             disposition_name(&bookie_storage::ImportDisposition::New),
@@ -615,7 +592,7 @@ mod tests {
     }
 
     #[test]
-    fn invalid_connection_file_is_refused_without_persisting_changes() -> Result<(), Box<dyn std::error::Error>> {
+    fn invalid_connection_file_is_refused_before_import_review() -> Result<(), Box<dyn std::error::Error>> {
         let path = std::env::temp_dir().join(format!("bookie-import-{}.json", uuid::Uuid::new_v4()));
         std::fs::write(&path, b"not a supported connection file")?;
         let result = prepare_import(&path);
