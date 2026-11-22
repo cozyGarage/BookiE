@@ -17,6 +17,7 @@ struct ActiveCursor {
     columns: Vec<bookie_core::ColumnInfo>,
     failed: bool,
     messages: ServerMessages,
+    undecodable: crate::undecodable_counts::UndecodableCounts,
 }
 
 pub(crate) struct PgSession {
@@ -161,6 +162,7 @@ impl bookie_core::Session for PgSession {
         self.active_cursor = Some(ActiveCursor {
             id,
             columns: Vec::new(),
+            undecodable: Default::default(),
             failed: false,
             messages: self
                 .connection
@@ -197,6 +199,7 @@ impl bookie_core::Session for PgSession {
         };
         if let Some(cursor) = self.active_cursor.as_mut() {
             messages.extend(std::mem::take(&mut cursor.messages));
+            cursor.undecodable.observe(&page.rows);
         }
         if page.truncated {
             self.retire_cursor_session();
@@ -336,7 +339,7 @@ impl PgSession {
             .connection
             .take()
             .ok_or_else(|| DriverError::Internal("the session's connection was lost".into()))?;
-        let (connection, result) = controlled_query_with_messages(connection, sql, params, true, control).await;
+        let (connection, result) = controlled_query_with_messages(connection, sql, params, true, true, control).await;
         self.connection = connection;
         if matches!(result, Err(DriverError::Disconnected)) {
             // A lost backend also loses session-local state. Do not let the
@@ -352,7 +355,7 @@ impl PgSession {
             .connection
             .take()
             .ok_or_else(|| DriverError::Internal("the session's connection was lost".into()))?;
-        let (connection, result) = controlled_query_with_messages(connection, sql, &[], false, control).await;
+        let (connection, result) = controlled_query_with_messages(connection, sql, &[], false, false, control).await;
         self.connection = connection;
         result
     }

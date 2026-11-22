@@ -59,6 +59,7 @@ impl RowMap {
 pub struct GridDelegate {
     owner: Option<WeakEntity<GridView>>,
     sortable: bool,
+    sort: Option<bookie_app_services::read_session::TableSort>,
     columns: Vec<(String, f32)>,
     content_widths: Vec<f32>,
     available_width: f32,
@@ -164,7 +165,11 @@ impl TableDelegate for GridDelegate {
             .width(px(*width))
             .resizable(true);
         if self.sortable {
-            column = column.sortable();
+            column = match self.sort.as_ref().filter(|sort| sort.column == *name) {
+                Some(sort) if sort.ascending => column.ascending(),
+                Some(_) => column.descending(),
+                None => column.sortable(),
+            };
         }
         if col_ix < self.pinned_columns {
             column.fixed_left()
@@ -363,6 +368,7 @@ impl GridDelegate {
         edits: &Edits,
         editor: &Option<(usize, usize, gpui::AnyView)>,
         sortable: bool,
+        sort: Option<&bookie_app_services::read_session::TableSort>,
     ) -> bool {
         let same_source = self.source.as_ref().is_some_and(|current| Arc::ptr_eq(current, source));
         !same_source
@@ -370,6 +376,7 @@ impl GridDelegate {
             || self.numeric != numeric
             || self.kinds != kinds
             || self.sortable != sortable
+            || self.sort.as_ref() != sort
             || self.map != *map
             || self.edits != *edits
             || self.editor.as_ref().map(|(row, column, _)| (*row, *column))
@@ -508,6 +515,7 @@ impl GridView {
         let sortable = !self.grid_is_query
             && self.compare.is_none()
             && self.live.as_ref().is_some_and(|session| session.driver_id == "postgres");
+        let sort = sortable.then(|| self.table_sort(&self.catalog.grid_table)).flatten().cloned();
         let editor = self.cell_edit.active.as_ref().and_then(|editing| {
             let dataset = self.dataset_index_of(editing.row)?.checked_sub(map.base)?;
             (dataset < map.count as u64).then(|| {
@@ -545,6 +553,7 @@ impl GridView {
                 &self.cell_edit.edits,
                 &editor,
                 sortable,
+                sort.as_ref(),
             ) && delegate.pin_scope == pin_scope
                 && delegate.pinned_columns == pinned_columns
             {
@@ -552,6 +561,7 @@ impl GridView {
             }
             delegate.columns = columns;
             delegate.sortable = sortable;
+            delegate.sort = sort;
             delegate.numeric = numeric;
             delegate.kinds = kinds;
             delegate.source = Some(self.source.clone());
@@ -780,6 +790,23 @@ mod tests {
     use bookie_gpui::model::Cell;
     use bookie_gpui::source::{ResultSource, Synthetic};
     use bookie_results::grid_cursor::Cursor;
+
+    #[gpui::test]
+    fn header_sort_indicator_matches_the_applied_sort(cx: &mut gpui::TestAppContext) {
+        let (_, cx) = crate::ui_tests::open(cx);
+        cx.update(|_, cx| {
+            let mut delegate = GridDelegate {
+                sortable: true,
+                columns: vec![("name".into(), 100.0), ("id".into(), 100.0)],
+                sort: Some(bookie_app_services::read_session::TableSort { column: "name".into(), ascending: false }),
+                ..Default::default()
+            };
+            assert_eq!(delegate.column(0, cx).sort, Some(ColumnSort::Descending));
+            assert_eq!(delegate.column(1, cx).sort, Some(ColumnSort::Default));
+            delegate.sort = None;
+            assert_eq!(delegate.column(0, cx).sort, Some(ColumnSort::Default));
+        });
+    }
 
     #[test]
     fn an_empty_grid_says_whether_a_filter_or_the_table_is_empty() {

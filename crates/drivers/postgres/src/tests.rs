@@ -123,12 +123,17 @@ fn an_undecodable_column_is_reported_to_the_logs_with_its_index_and_type() {
         .with_writer(logs.clone())
         .with_ansi(false)
         .finish();
-    let value = tracing::subscriber::with_default(subscriber, || undecodable(3, "MYDOMAIN"));
-    assert!(matches!(&value, Value::Undecodable(name) if name == "MYDOMAIN"));
+    tracing::subscriber::with_default(subscriber, || {
+        let mut counts = crate::undecodable_counts::UndecodableCounts::default();
+        let row = vec![Value::Null, Value::Null, Value::Null, undecodable(3, "MYDOMAIN")];
+        counts.observe(&vec![row; 100_000].into());
+    });
     let text = logs.text();
     assert!(text.contains("WARN"), "{text}");
     assert!(text.contains("column_index=4"), "{text}");
     assert!(text.contains("type_name=\"MYDOMAIN\""), "{text}");
+    assert!(text.contains("count=100000"), "{text}");
+    assert_eq!(text.lines().count(), 1, "{text}");
 }
 
 #[test]
