@@ -206,6 +206,33 @@ impl Connection for SessionConnection {
             .await
     }
 
+    async fn fetch_rows_with_columns(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        offset: u64,
+        limit: u64,
+        columns: &[ColumnInfo],
+    ) -> Result<QueryResult, DriverError> {
+        self.inner
+            .fetch_rows_with_columns(schema, table, offset, limit, columns)
+            .await
+    }
+
+    async fn fetch_rows_with_columns_controlled(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        offset: u64,
+        limit: u64,
+        columns: &[ColumnInfo],
+        control: &OperationControl,
+    ) -> Result<QueryResult, DriverError> {
+        self.inner
+            .fetch_rows_with_columns_controlled(schema, table, offset, limit, columns, control)
+            .await
+    }
+
     async fn query(&self, sql: &str) -> Result<QueryResult, DriverError> {
         self.inner.query(sql).await
     }

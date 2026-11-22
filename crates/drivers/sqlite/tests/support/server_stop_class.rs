@@ -86,6 +86,10 @@ fn stop_cases() -> Vec<StopCase> {
             c.fetch_rows_controlled(None, "endless", 3_000_000_000, 10, &control)
                 .await
         }),
+        stoppable("fetch_rows_with_columns_controlled", |c, control| async move {
+            c.fetch_rows_with_columns_controlled(None, "endless", 3_000_000_000, 10, &[], &control)
+                .await
+        }),
         stoppable("Transaction::query_controlled", |c, control| async move {
             c.begin().await?.query_controlled(ENDLESS_SELECT, &control).await
         }),

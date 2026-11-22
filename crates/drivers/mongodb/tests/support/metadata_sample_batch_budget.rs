@@ -64,6 +64,82 @@ async fn a_wide_metadata_sample_bounds_cursor_batches() {
     assert_profiled_sample_batch_size(&database, 4, 16).await;
 }
 
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn browse_page_metadata_sample_is_reused_until_reload() {
+    use mongodb::bson::{Document, doc};
+
+    let (_container, host, port) = start_mongo().await;
+    let client = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))
+        .await
+        .expect("connect profiler fixture client");
+    let database = client.database("appdb");
+    database
+        .run_command(doc! { "profile": 2 })
+        .await
+        .expect("enable command profiling");
+    let collection = database.collection::<Document>("browse_sample_cache");
+    let mut documents = (0..138)
+        .map(|id| doc! { "_id": id, "common": "value" })
+        .collect::<Vec<_>>();
+    documents[128].insert("late_field", "found outside the sample");
+    documents[129].insert("late_field", 9);
+    collection.insert_many(documents).await.expect("seed browse pages");
+
+    let connection = MongodbDriver
+        .connect(opts(&host, port, "appdb"))
+        .await
+        .expect("connect BookiE");
+    let mut columns = connection
+        .fetch_columns(None, "browse_sample_cache")
+        .await
+        .expect("sample browse columns");
+    assert_eq!(profiled_sample_find_count(&database).await, 1);
+
+    assert!(!columns.iter().any(|column| column.name == "late_field"));
+    for offset in 128..138 {
+        let page = connection
+            .fetch_rows_with_columns(None, "browse_sample_cache", offset, 1, &columns)
+            .await
+            .expect("fetch browse page");
+        let late_field = page.columns.iter().position(|column| column.name == "late_field");
+        assert!(late_field.is_some(), "column absent at offset {offset}");
+        let value = &page.rows[0][late_field.expect("late field is present")];
+        match offset {
+            128 => {
+                assert_eq!(page.columns[late_field.unwrap()].data_type, "string");
+                assert_eq!(value, &bookie_core::Value::Text("found outside the sample".into()));
+            }
+            129 => {
+                assert_eq!(page.columns[late_field.unwrap()].data_type, "mixed");
+                assert_eq!(
+                    value,
+                    &bookie_core::Value::Json(Box::new(serde_json::json!({ "$numberInt": "9" })))
+                );
+            }
+            _ => assert!(value.is_missing_field()),
+        }
+        columns = page.columns;
+    }
+    assert_eq!(profiled_sample_find_count(&database).await, 1);
+
+    let reloaded_columns = connection
+        .fetch_columns(None, "browse_sample_cache")
+        .await
+        .expect("reload browse columns");
+    assert!(!reloaded_columns.iter().any(|column| column.name == "late_field"));
+    assert_eq!(profiled_sample_find_count(&database).await, 2);
+    assert!(columns.iter().any(|column| column.name == "late_field"));
+}
+
+async fn profiled_sample_find_count(database: &mongodb::Database) -> usize {
+    database
+        .collection::<mongodb::bson::Document>("system.profile")
+        .count_documents(doc! { "command.find": "browse_sample_cache", "command.limit": 128 })
+        .await
+        .expect("count metadata sample queries") as usize
+}
+
 async fn seed_wide_documents(collection: &mongodb::Collection<mongodb::bson::Document>) {
     let payload = Binary {
         subtype: BinarySubtype::Generic,

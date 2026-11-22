@@ -380,6 +380,27 @@ pub trait Connection: Send + Sync {
     ) -> Result<QueryResult, DriverError> {
         run_controlled(self.fetch_rows(schema, table, offset, limit), control).await
     }
+    async fn fetch_rows_with_columns(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        offset: u64,
+        limit: u64,
+        _columns: &[ColumnInfo],
+    ) -> Result<QueryResult, DriverError> {
+        self.fetch_rows(schema, table, offset, limit).await
+    }
+    async fn fetch_rows_with_columns_controlled(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        offset: u64,
+        limit: u64,
+        _columns: &[ColumnInfo],
+        control: &OperationControl,
+    ) -> Result<QueryResult, DriverError> {
+        self.fetch_rows_controlled(schema, table, offset, limit, control).await
+    }
     async fn query(&self, sql: &str) -> Result<QueryResult, DriverError>;
     async fn query_controlled(&self, sql: &str, control: &OperationControl) -> Result<QueryResult, DriverError> {
         run_controlled(self.query(sql), control).await
