@@ -303,6 +303,94 @@ class RegistryExtractionTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'build group mismatch'):
                 registry.bundle.verify(root, 'a' * 40, 'default')
 
+    def test_registry_get_retries_connection_reset_but_not_put(self):
+        with patch.dict('os.environ', {'BOOKIE_REGISTRY_TOKEN': 'test-token'}), \
+                patch.object(registry.urllib.request, 'build_opener') as opener, \
+                patch.object(registry.time, 'sleep'):
+            opener.return_value.open.side_effect = [ConnectionResetError('reset'), 'response']
+            self.assertEqual(registry.request('https://registry.example/file'), 'response')
+            self.assertEqual(opener.return_value.open.call_count, 2)
+            opener.return_value.open.reset_mock(side_effect=True)
+            opener.return_value.open.side_effect = ConnectionResetError('reset')
+            with self.assertRaises(ConnectionResetError):
+                registry.request('https://registry.example/file', 'PUT', b'body', 4)
+            self.assertEqual(opener.return_value.open.call_count, 1)
+
+    def test_lost_upload_response_is_reconciled_over_http(self):
+        import http.server
+        import threading
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            data = None
+            puts = 0
+
+            def log_message(self, *_):
+                pass
+
+            def do_PUT(self):
+                Handler.puts += 1
+                Handler.data = self.rfile.read(int(self.headers['Content-Length']))
+                self.connection.shutdown(2)
+                self.connection.close()
+
+            def do_GET(self):
+                self.send_response(200)
+                self.send_header('Content-Length', str(len(Handler.data)))
+                self.end_headers()
+                self.wfile.write(Handler.data)
+
+        server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            with patch.dict('os.environ', {'BOOKIE_REGISTRY_TOKEN': 'test-token'}):
+                registry.upload_bytes(f'http://127.0.0.1:{server.server_port}/file', b'exact payload')
+            self.assertEqual(Handler.puts, 1)
+            self.assertEqual(Handler.data, b'exact payload')
+        finally:
+            server.shutdown()
+            thread.join()
+            server.server_close()
+
+    def test_upload_reconciles_lost_response_and_refuses_different_bytes(self):
+        import io
+        with patch.object(registry.time, 'sleep'), patch.object(registry, 'request') as request:
+            request.side_effect = [ConnectionResetError('reset'), io.BytesIO(b'expected')]
+            registry.upload_bytes('https://registry.example/file', b'expected')
+            self.assertEqual(request.call_count, 2)
+            request.reset_mock(side_effect=True)
+            request.side_effect = [ConnectionResetError('reset'), io.BytesIO(b'different')]
+            with self.assertRaisesRegex(ValueError, 'different bundle bytes'):
+                registry.upload_bytes('https://registry.example/file', b'expected')
+
+    def test_upload_conflict_is_accepted_only_when_bytes_match(self):
+        import io
+        conflict = registry.urllib.error.HTTPError('https://registry.example/file', 409, 'conflict', {}, None)
+        with patch.object(registry, 'request', side_effect=[conflict, io.BytesIO(b'expected')]) as request:
+            registry.upload_bytes('https://registry.example/file', b'expected')
+            self.assertEqual(request.call_count, 2)
+
+    def test_upload_gives_up_after_bounded_missing_retries(self):
+        def request(_url, method='GET', *_args):
+            if method == 'PUT':
+                raise ConnectionResetError('reset')
+            raise registry.urllib.error.HTTPError('https://registry.example/file', 404, 'missing', {}, None)
+        with patch.object(registry.time, 'sleep'), patch.object(registry, 'request', side_effect=request) as mocked:
+            with self.assertRaises(ConnectionResetError):
+                registry.upload_bytes('https://registry.example/file', b'expected')
+            self.assertEqual(mocked.call_count, 6)
+
+    def test_upload_retries_if_file_was_not_stored(self):
+        import io
+        missing = registry.urllib.error.HTTPError('https://registry.example/file', 404, 'missing', {}, None)
+        response = io.BytesIO()
+        response.status = 201
+        with patch.object(registry.time, 'sleep'), patch.object(registry, 'request') as request:
+            request.side_effect = [ConnectionResetError('reset'), missing, response]
+            registry.upload_bytes('https://registry.example/file', b'expected')
+            self.assertEqual([call.args[1] if len(call.args) > 1 else 'GET' for call in request.call_args_list],
+                             ['PUT', 'GET', 'PUT'])
+
     def test_registry_http_errors_identify_the_failed_request(self):
         error = registry.urllib.error.HTTPError(
             'https://registry.example/bundle/bundle.tar.gz', 500, 'Internal Server Error', {}, None)
