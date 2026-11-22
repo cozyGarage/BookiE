@@ -10,6 +10,8 @@ use crate::text_input;
 use crate::ui_theme::ThemeExt;
 use crate::{GridView, Work};
 
+mod failed_runs;
+
 pub(super) fn open(cx: &mut TestAppContext) -> (gpui::Entity<GridView>, &mut VisualTestContext) {
     cx.update(text_input::bind_keys);
     let (view, cx) = cx.add_window_view(|window, cx| GridView::new(150_000, Instant::now(), window, cx));
@@ -1344,26 +1346,6 @@ fn selecting_the_active_result_keeps_its_filter_and_selection(cx: &mut TestAppCo
             assert_eq!(view.selection.map(|selection| selection.focus), Some(1));
         });
     });
-}
-
-#[gpui::test]
-fn failed_run_has_no_grid_data_and_preserves_previous_edits(cx: &mut TestAppContext) {
-    let (view, cx) = open(cx);
-    cx.simulate_keystrokes("ctrl-t");
-    cx.update(|_, cx| view.update(cx, |view, _| {
-        view.add_run(None);
-        let previous = view.run_tabs.active;
-        view.cell_edit.edits.insert((1, 1), Cell::Text("pending".into()));
-        view.add_failed_run("query failed".into(), std::time::Duration::ZERO);
-        assert_eq!(view.dataset_count(), 0);
-        assert!(view.source.columns().is_empty());
-        assert!(!view.export_file_enabled());
-        assert!(view.cell_edit.edits.is_empty());
-        assert!(!view.run_tabs.slots[previous].edits.is_empty());
-        view.activate_run(previous);
-        assert_eq!(view.panel.view, bookie_gpui::shell::ResultView::Table);
-        assert_eq!(view.cell_at(1, 1), Cell::Text("pending".into()));
-    }));
 }
 
 #[gpui::test]
