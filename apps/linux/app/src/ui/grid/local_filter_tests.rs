@@ -650,7 +650,7 @@ fn large_sort_replacement_keeps_newest_order_and_selection() {
     assert_eq!(store.source_index_at(selected.nth(0)), Some(123));
     let restored_store = crate::ui::row_store::RowStore::from_shared(result.clone());
     let restored_selection = gtk4::MultiSelection::new(Some(restored_store.clone()));
-    let restored_view = LocalResultView::new(result, settings, key);
+    let restored_view = LocalResultView::new(result.clone(), settings, key);
     restored_view.attach(restored_store.clone(), restored_selection.clone());
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
     while restored_view.0.borrow().pending.is_some() && std::time::Instant::now() < deadline {
@@ -689,4 +689,41 @@ fn large_sort_replacement_keeps_newest_order_and_selection() {
     drop(view);
     assert!(weak.upgrade().is_none(), "worker must not retain the view");
     assert!(pending.load(std::sync::atomic::Ordering::Relaxed));
+
+    let failed_store = crate::ui::row_store::RowStore::from_shared(result.clone());
+    failed_store.insert(0, &crate::ui::row_object::RowObject::new_draft(1, vec![Value::Int(-1)]));
+    let failed_selection = gtk4::MultiSelection::new(Some(failed_store.clone()));
+    let failed_view = LocalResultView::new(result.clone(), LocalResultSettingsStore::default(), key);
+    failed_view.attach(failed_store.clone(), failed_selection.clone());
+    failed_selection.select_item(24, false);
+    let order = crate::ui::row_store::PreparedSourceRows::checked(
+        result.clone(),
+        (0..20_000).rev().collect(),
+        &std::sync::atomic::AtomicBool::new(false),
+    )
+    .unwrap();
+    assert!(!failed_view.apply_prepared_order(&order));
+    assert_eq!(failed_store.source_index_at(24), Some(23));
+    let selected = failed_selection.selection();
+    assert_eq!(selected.size(), 1);
+    assert_eq!(selected.nth(0), 24);
+    assert_eq!(failed_store.source_index_at(selected.nth(0)), Some(23));
+
+    let all_store = crate::ui::row_store::RowStore::from_shared(result.clone());
+    let all_selection = gtk4::MultiSelection::new(Some(all_store.clone()));
+    let all_view = LocalResultView::new(result.clone(), LocalResultSettingsStore::default(), key);
+    all_view.attach(all_store.clone(), all_selection.clone());
+    all_selection.select_all();
+    let reversed = crate::ui::row_store::PreparedSourceRows::checked(
+        result,
+        (0..20_000).rev().collect(),
+        &std::sync::atomic::AtomicBool::new(false),
+    )
+    .unwrap();
+    assert!(all_view.apply_prepared_order(&reversed));
+    let all_selected = all_selection.selection();
+    assert_eq!(all_selected.size(), 20_000);
+    assert!(all_selected.contains(0));
+    assert!(all_selected.contains(19_999));
+    assert_eq!(all_store.source_index_at(0), Some(19_999));
 }
