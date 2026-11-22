@@ -295,3 +295,7 @@ When inline unit tests push a production module over the limit, move them to a s
 
 - [GTK tests](testing-gtk.md)
 - [CI tests and gates](testing-ci.md)
+
+### Recording classification expectations
+
+Run `BOOKIE_RECORD=1 cargo test -p bookie-policy --test classification_corpus` to record intentional classification changes. Review the diff before committing. Recording is refused when `CI` is set; more than 20 changed lines additionally require `BOOKIE_RECORD_FORCE=1`.
