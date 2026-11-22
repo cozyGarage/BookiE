@@ -89,6 +89,9 @@ class RegistryExtractionTests(unittest.TestCase):
             '/actions/runs?limit=50&page=1&status=waiting&status=running': {
                 'total_count': 1, 'workflow_runs': [{'status': 'running', 'commit_sha': 'c' * 40}]
             },
+            '/actions/runs?limit=50&page=1&status=failure&status=cancelled': {
+                'total_count': 0, 'workflow_runs': []
+            },
         }
         requests = []
 
@@ -108,6 +111,9 @@ class RegistryExtractionTests(unittest.TestCase):
             '/actions/runs?limit=50&page=1&status=waiting&status=running': {
                 'total_count': 1, 'workflow_runs': [{'status': 'completed', 'commit_sha': 'c' * 40}]
             },
+            '/actions/runs?limit=50&page=1&status=failure&status=cancelled': {
+                'total_count': 0, 'workflow_runs': []
+            },
         }
 
         with patch.dict('os.environ', {
@@ -125,6 +131,9 @@ class RegistryExtractionTests(unittest.TestCase):
             '/actions/runs?limit=50&page=1&status=waiting&status=running': {
                 'total_count': 0, 'workflow_runs': []
             },
+            '/actions/runs?limit=50&page=1&status=failure&status=cancelled': {
+                'total_count': 0, 'workflow_runs': []
+            },
         }
 
         with patch.dict('os.environ', {
@@ -132,6 +141,70 @@ class RegistryExtractionTests(unittest.TestCase):
                 'BOOKIE_FORGEJO_TOKEN': 'repo-token'}), patch.object(
                     registry, 'request', side_effect=forgejo_api_request(responses)):
             with self.assertRaisesRegex(ValueError, 'invalid protected source revision'):
+                registry.discover_protected_revisions()
+
+    def test_discovery_protects_a_failed_run_revision_when_a_job_is_still_active(self):
+        created = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+        responses = {
+            '/branches?limit=50&page=1': [],
+            '/pulls?limit=50&page=1&state=open': [],
+            '/actions/runs?limit=50&page=1&status=waiting&status=running': {
+                'total_count': 0, 'workflow_runs': []
+            },
+            '/actions/runs?limit=50&page=1&status=failure&status=cancelled': {
+                'total_count': 1,
+                'workflow_runs': [{'id': 17, 'status': 'failure', 'commit_sha': 'd' * 40, 'created': created}],
+            },
+            '/actions/runs/17/jobs?': [{'status': 'running'}, {'status': 'success'}],
+        }
+
+        with patch.dict('os.environ', {
+                'BOOKIE_FORGEJO_API_URL': 'https://forgejo.example/api/v1/repos/Bookie/bookie',
+                'BOOKIE_FORGEJO_TOKEN': 'repo-token'}), patch.object(
+                    registry, 'request', side_effect=forgejo_api_request(responses)):
+            revisions = registry.discover_protected_revisions()
+
+        self.assertEqual(revisions, {'d' * 40})
+
+    def test_discovery_ignores_old_failed_run_with_no_active_jobs(self):
+        created = (datetime.now(timezone.utc) - timedelta(days=3)).isoformat()
+        responses = {
+            '/branches?limit=50&page=1': [],
+            '/pulls?limit=50&page=1&state=open': [],
+            '/actions/runs?limit=50&page=1&status=waiting&status=running': {
+                'total_count': 0, 'workflow_runs': []
+            },
+            '/actions/runs?limit=50&page=1&status=failure&status=cancelled': {
+                'total_count': 1,
+                'workflow_runs': [{'id': 18, 'status': 'failure', 'commit_sha': 'e' * 40, 'created': created}],
+            },
+        }
+
+        with patch.dict('os.environ', {
+                'BOOKIE_FORGEJO_API_URL': 'https://forgejo.example/api/v1/repos/Bookie/bookie',
+                'BOOKIE_FORGEJO_TOKEN': 'repo-token'}), patch.object(
+                    registry, 'request', side_effect=forgejo_api_request(responses)):
+            revisions = registry.discover_protected_revisions()
+
+        self.assertEqual(revisions, set())
+
+    def test_discovery_fails_closed_when_a_failed_run_has_no_creation_time(self):
+        responses = {
+            '/branches?limit=50&page=1': [],
+            '/pulls?limit=50&page=1&state=open': [],
+            '/actions/runs?limit=50&page=1&status=waiting&status=running': {
+                'total_count': 0, 'workflow_runs': []
+            },
+            '/actions/runs?limit=50&page=1&status=failure&status=cancelled': {
+                'total_count': 1, 'workflow_runs': [{'id': 19, 'status': 'failure', 'commit_sha': 'f' * 40}]
+            },
+        }
+
+        with patch.dict('os.environ', {
+                'BOOKIE_FORGEJO_API_URL': 'https://forgejo.example/api/v1/repos/Bookie/bookie',
+                'BOOKIE_FORGEJO_TOKEN': 'repo-token'}), patch.object(
+                    registry, 'request', side_effect=forgejo_api_request(responses)):
+            with self.assertRaisesRegex(ValueError, 'incomplete actions/runs reference inventory'):
                 registry.discover_protected_revisions()
 
     def test_discovery_rejects_incomplete_action_run_revisions(self):
