@@ -10,6 +10,11 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{GridView, Mode, Work};
 
+fn result_column_index(columns: &[ColumnMeta], index: usize, name: &str) -> Option<usize> {
+    let column = columns.get(index)?;
+    (column.name == name).then_some(index)
+}
+
 impl GridView {
     pub(crate) fn table_sort(&self, table: &TableInfo) -> Option<&bookie_app_services::read_session::TableSort> {
         self.table_sorts.iter().find(|(identity, _)| identity == table).map(|(_, sort)| sort)
@@ -81,6 +86,7 @@ impl GridView {
 
     pub(crate) fn sort_current_column(
         &mut self,
+        column_index: usize,
         column: &str,
         ascending: Option<bool>,
         window: &mut Window,
@@ -89,23 +95,29 @@ impl GridView {
         let needs_local_sort = self.grid_is_query
             || self.live.as_ref().is_some_and(|session| session.driver_id != "postgres");
         if needs_local_sort {
-            self.sort_current_result(column, ascending, cx);
+            self.sort_current_result(column_index, column, ascending, cx);
         } else {
             self.sort_current_table(column, ascending, window, cx);
         }
     }
 
-    fn sort_current_result(&mut self, column: &str, ascending: Option<bool>, cx: &mut Context<Self>) {
+    fn sort_current_result(
+        &mut self,
+        column_index: usize,
+        column: &str,
+        ascending: Option<bool>,
+        cx: &mut Context<Self>,
+    ) {
         if self.compare.is_some() {
             self.status = "Sorting is not available in a comparison view".into();
             cx.notify();
             return;
         }
-        let Some(column_index) = self.source.columns().iter().position(|meta| meta.name == column) else {
+        if result_column_index(self.source.columns(), column_index, column).is_none() {
             self.status = format!("Could not find result column {column}");
             cx.notify();
             return;
-        };
+        }
         if ascending.is_none() {
             self.local_order = None;
             self.local_sort = None;
@@ -499,5 +511,22 @@ mod tests {
         let _ = std::fs::remove_file(path);
         assert!(result.is_err(), "cancelled request succeeded");
         assert!(!was_opened, "cancelled request created its database file");
+    }
+
+    #[test]
+    fn duplicate_result_names_keep_the_requested_column_index() {
+        let columns = ["id", "id"]
+            .into_iter()
+            .map(|name| ColumnMeta {
+                name: name.into(),
+                width: 100.0,
+                numeric: false,
+                data_type: String::new(),
+                primary_key: false,
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(result_column_index(&columns, 1, "id"), Some(1));
+        assert_eq!(result_column_index(&columns, 1, "other"), None);
     }
 }

@@ -5,13 +5,11 @@ pub(crate) struct ColumnProjection {
 }
 
 impl ColumnProjection {
-    pub(crate) fn new(names: &[String], hidden: &HashSet<String>) -> Self {
-        let mut source_indices: Vec<_> = names
-            .iter()
-            .enumerate()
-            .filter_map(|(index, name)| (!hidden.contains(name)).then_some(index))
+    pub(crate) fn new(column_count: usize, hidden: &HashSet<usize>) -> Self {
+        let mut source_indices: Vec<_> = (0..column_count)
+            .filter(|index| !hidden.contains(index))
             .collect();
-        if source_indices.is_empty() && !names.is_empty() {
+        if source_indices.is_empty() && column_count > 0 {
             source_indices.push(0);
         }
         Self { source_indices }
@@ -34,18 +32,10 @@ impl ColumnProjection {
 mod tests {
     use super::*;
 
-    fn names() -> Vec<String> {
-        ["id", "name", "secret"]
-            .into_iter()
-            .map(str::to_string)
-            .collect()
-    }
-
     #[test]
     fn hidden_columns_keep_stable_source_identity_and_can_be_restored() {
-        let names = names();
-        let hidden = HashSet::from(["name".to_string()]);
-        let projection = ColumnProjection::new(&names, &hidden);
+        let hidden = HashSet::from([1]);
+        let projection = ColumnProjection::new(3, &hidden);
 
         assert_eq!(projection.len(), 2);
         assert_eq!(projection.source_index(0), Some(0));
@@ -53,18 +43,29 @@ mod tests {
         assert_eq!(projection.visible_index(2), Some(1));
         assert_eq!(projection.visible_index(1), None);
 
-        let restored = ColumnProjection::new(&names, &HashSet::new());
+        let restored = ColumnProjection::new(3, &HashSet::new());
         assert_eq!(restored.source_index(1), Some(1));
         assert_eq!(restored.visible_index(1), Some(1));
     }
 
     #[test]
     fn stale_preferences_cannot_hide_every_column() {
-        let names = names();
-        let hidden = names.iter().cloned().collect();
-        let projection = ColumnProjection::new(&names, &hidden);
+        let hidden = HashSet::from([0, 1, 2]);
+        let projection = ColumnProjection::new(3, &hidden);
 
         assert_eq!(projection.len(), 1);
         assert_eq!(projection.source_index(0), Some(0));
+    }
+
+    #[test]
+    fn hiding_one_duplicate_name_keeps_the_other_column() {
+        let names = ["id", "id", "name"];
+        let projection = ColumnProjection::new(names.len(), &HashSet::from([1]));
+
+        assert_eq!(projection.len(), 2);
+        let visible_names = (0..projection.len())
+            .filter_map(|index| projection.source_index(index).map(|source| names[source]))
+            .collect::<Vec<_>>();
+        assert_eq!(visible_names, ["id", "name"]);
     }
 }

@@ -61,11 +61,11 @@ fn hidden_middle_column_keeps_visible_cells_bound_to_their_source_columns(cx: &m
     cx.simulate_resize(gpui::size(gpui::px(900.0), gpui::px(760.0)));
     cx.run_until_parked();
     view.update(cx, |view, cx| {
-        let names = view.source.columns().iter().map(|column| column.name.clone()).collect::<Vec<_>>();
-        let hidden = std::collections::HashSet::from(["name".to_string()]);
+        let column_count = view.source.columns().len();
+        let hidden = std::collections::HashSet::from([1]);
         view.table.update(cx, |table, cx| {
             let delegate = table.delegate_mut();
-            delegate.set_hidden_columns(&names, hidden);
+            delegate.set_hidden_columns(column_count, hidden);
             table.refresh(cx);
         });
     });

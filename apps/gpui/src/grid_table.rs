@@ -64,7 +64,7 @@ pub struct GridDelegate {
     sort: Option<bookie_app_services::read_session::TableSort>,
     columns: Vec<(String, f32)>,
     projection: ColumnProjection,
-    hidden_columns: HashSet<String>,
+    hidden_columns: HashSet<usize>,
     content_widths: Vec<f32>,
     available_width: f32,
     numeric: Vec<bool>,
@@ -105,7 +105,7 @@ impl TableDelegate for GridDelegate {
         let Some(owner) = self.owner.clone() else {
             return;
         };
-        Self::schedule_sort(owner, column, ascending, window);
+        Self::schedule_sort(owner, source_col, column, ascending, window);
     }
 
     fn visible_rows_changed(
@@ -227,9 +227,10 @@ impl TableDelegate for GridDelegate {
                     ));
                     if let Some(owner) = owner.clone() {
                         let column = column_name.clone();
+                        let source_col = source_col;
                         let hide_owner = owner.clone();
                         menu = menu.item(PopupMenuItem::new("Hide column").on_click(move |_, window, cx| {
-                            let _ = hide_owner.update(cx, |view, cx| view.hide_column(&column, window, cx));
+                            let _ = hide_owner.update(cx, |view, cx| view.hide_column(source_col, &column, window, cx));
                         }));
                         if has_hidden {
                             menu = menu.item(PopupMenuItem::new("Show all hidden columns").on_click(move |_, window, cx| {
@@ -243,9 +244,10 @@ impl TableDelegate for GridDelegate {
                     for (label, ascending) in [("Sort ascending", true), ("Sort descending", false)] {
                         let owner = owner.clone();
                         let column = column_name.clone();
+                        let source_col = source_col;
                         menu = menu.item(PopupMenuItem::new(label).on_click(move |_, window, cx| {
                             let _ = owner.update(cx, |view, cx| {
-                                view.sort_current_column(&column, Some(ascending), window, cx);
+                                view.sort_current_column(source_col, &column, Some(ascending), window, cx);
                             });
                         }));
                     }
@@ -373,15 +375,21 @@ impl GridDelegate {
         self.projection.clone()
     }
 
-    pub(crate) fn set_hidden_columns(&mut self, names: &[String], hidden: HashSet<String>) {
-        self.projection = ColumnProjection::new(names, &hidden);
+    pub(crate) fn set_hidden_columns(&mut self, column_count: usize, hidden: HashSet<usize>) {
+        self.projection = ColumnProjection::new(column_count, &hidden);
         self.hidden_columns = hidden;
     }
 
-    fn schedule_sort(owner: WeakEntity<GridView>, column: String, ascending: Option<bool>, window: &mut Window) {
+    fn schedule_sort(
+        owner: WeakEntity<GridView>,
+        column_index: usize,
+        column: String,
+        ascending: Option<bool>,
+        window: &mut Window,
+    ) {
         window.on_next_frame(move |_, app| {
             let _ = owner.update_in(app, |view, window, cx| {
-                view.sort_current_column(&column, ascending, window, cx);
+                view.sort_current_column(column_index, &column, ascending, window, cx);
             });
         });
     }
@@ -518,7 +526,7 @@ impl GridView {
         columns: &[(String, f32)],
         delegate: &GridDelegate,
         pin_scope: &Option<PinScope>,
-    ) -> (HashSet<String>, ColumnProjection) {
+    ) -> (HashSet<usize>, ColumnProjection) {
         let persisted = self
             .live
             .as_ref()
@@ -531,15 +539,20 @@ impl GridView {
             });
         let scope_changed = delegate.pin_scope.as_ref() != pin_scope.as_ref()
             || delegate.source.as_ref().is_none_or(|source| !Arc::ptr_eq(source, &self.source));
-        let hidden = persisted.unwrap_or_else(|| {
+        let hidden: HashSet<usize> = persisted.map(|hidden_names| {
+            columns
+                .iter()
+                .enumerate()
+                .filter_map(|(index, (name, _))| hidden_names.contains(name).then_some(index))
+                .collect()
+        }).unwrap_or_else(|| {
             if scope_changed {
                 HashSet::new()
             } else {
                 delegate.hidden_columns.clone()
             }
         });
-        let names = columns.iter().map(|(name, _)| name.clone()).collect::<Vec<_>>();
-        let projection = ColumnProjection::new(&names, &hidden);
+        let projection = ColumnProjection::new(columns.len(), &hidden);
         (hidden, projection)
     }
 
@@ -726,43 +739,49 @@ impl GridView {
             )
     }
 
-    fn hide_column(&mut self, name: &str, _window: &mut Window, cx: &mut Context<Self>) {
-        let Some(source_col) = self.source.columns().iter().position(|column| column.name == name) else {
-            return;
-        };
-        let mut hidden = self.table.read(cx).delegate().hidden_columns.clone();
-        if hidden.contains(name) {
+    fn hide_column(&mut self, source_col: usize, name: &str, _window: &mut Window, cx: &mut Context<Self>) {
+        let columns = self.table.read(cx).delegate().columns.clone();
+        if columns.get(source_col).is_none_or(|(column, _)| column != name) {
             return;
         }
-        let names: Vec<_> = self.source.columns().iter().map(|column| column.name.clone()).collect();
-        let projection = ColumnProjection::new(&names, &hidden);
+        let mut hidden = self.table.read(cx).delegate().hidden_columns.clone();
+        if hidden.contains(&source_col) {
+            return;
+        }
+        let projection = ColumnProjection::new(columns.len(), &hidden);
         if projection.len() <= 1 {
             self.status = "At least one column must remain visible.".into();
             return;
         }
-        hidden.insert(name.to_string());
+        hidden.insert(source_col);
         if !self.grid_is_query
+            && self.compare.is_none()
             && let Some((id, _)) = self.live.as_ref().and_then(|session| session.saved.as_ref())
             && let Some(store) = &self.column_widths
             && let Err(error) = store.set_hidden(*id, &self.catalog.grid_table.name, name, true)
         {
             tracing::warn!(%error, "could not persist the hidden GPUI grid column");
         }
-        let projection = ColumnProjection::new(&names, &hidden);
+        let projection = ColumnProjection::new(columns.len(), &hidden);
         self.table.update(cx, |table, cx| {
             let delegate = table.delegate_mut();
             delegate.hidden_columns = hidden;
             delegate.projection = projection;
             table.refresh(cx);
         });
-        if self.cell_cursor.is_some_and(|cursor| cursor.column == source_col) {
+        let compare_offset = usize::from(self.compare.is_some());
+        if self
+            .cell_cursor
+            .is_some_and(|cursor| cursor.column + compare_offset == source_col)
+        {
             let next_col = self
                 .table
                 .read(cx)
                 .delegate()
                 .projection
                 .source_index(0)
-                .unwrap_or(0);
+                .unwrap_or(compare_offset)
+                .saturating_sub(compare_offset);
             if let Some(cursor) = &mut self.cell_cursor {
                 cursor.column = next_col;
             }
@@ -772,22 +791,27 @@ impl GridView {
     }
 
     fn show_all_hidden_columns(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
-        let hidden = self.table.read(cx).delegate().hidden_columns.clone();
+        let (hidden, columns) = {
+            let table = self.table.read(cx);
+            let delegate = table.delegate();
+            (delegate.hidden_columns.clone(), delegate.columns.clone())
+        };
         if hidden.is_empty() {
             return;
         }
         if !self.grid_is_query
+            && self.compare.is_none()
             && let Some((id, _)) = self.live.as_ref().and_then(|session| session.saved.as_ref())
             && let Some(store) = &self.column_widths
         {
-            for name in &hidden {
+            for source_col in &hidden {
+                let Some((name, _)) = columns.get(*source_col) else { continue };
                 if let Err(error) = store.set_hidden(*id, &self.catalog.grid_table.name, name, false) {
                     tracing::warn!(%error, column = %name, "could not restore a hidden GPUI grid column preference");
                 }
             }
         }
-        let names: Vec<_> = self.source.columns().iter().map(|column| column.name.clone()).collect();
-        let projection = ColumnProjection::new(&names, &HashSet::new());
+        let projection = ColumnProjection::new(columns.len(), &HashSet::new());
         self.table.update(cx, |table, cx| {
             let delegate = table.delegate_mut();
             delegate.hidden_columns.clear();
