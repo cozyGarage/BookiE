@@ -31,6 +31,7 @@ mod import_ui;
 mod export_file_ui;
 mod selection_stats_ui;
 mod backup_ui;
+mod connection_bundle_ui;
 mod diagram_scene;
 mod diagram_ui;
 mod filter_rule_ui;
@@ -169,6 +170,7 @@ struct GridView {
     approval: approval_ui::ApprovalUi,
     insert: insert_ui::InsertState,
     import: import_ui::ImportState,
+    connection_bundle: connection_bundle_ui::BundleState,
     structure: structure_ui::StructureState,
     resolve: resolve_ui::ResolveState,
     sidebar: sidebar_state::SidebarState,
@@ -470,6 +472,7 @@ impl GridView {
             approval,
             insert: insert_ui::InsertState::default(),
             import: import_ui::ImportState::default(),
+            connection_bundle: connection_bundle_ui::BundleState::default(),
             structure: structure_ui::StructureState::default(),
             resolve: resolve_ui::ResolveState::default(),
             sidebar: sidebar_state::SidebarState::new(sidebar_search),

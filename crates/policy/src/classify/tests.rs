@@ -559,3 +559,24 @@ fn a_locking_read_inside_any_all_or_some_is_a_write_in_a_transaction_script_too(
         }
     }
 }
+
+#[test]
+fn each_nested_query_is_classified_once() {
+    for template in [
+        "SELECT * FROM ({}) AS d",
+        "SELECT ({}) AS v",
+        "SELECT coalesce(({}), 0)",
+        "SELECT * FROM a JOIN ({}) AS d ON true",
+    ] {
+        let mut sql = "SELECT 1".to_owned();
+        for _ in 0..12 {
+            sql = template.replace("{}", &sql);
+        }
+        let parsed = ParsedSql::new(&sql, "postgres");
+        let statements = parsed.statements().unwrap();
+        super::query_walks::reset();
+        let details = classify_statement(&statements[0]);
+        assert_eq!(details.class, StatementClass::Select, "{template}");
+        assert_eq!(super::query_walks::count(), 13, "{template}");
+    }
+}
