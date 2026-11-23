@@ -1821,3 +1821,45 @@ fn compact_grid_menu_preserves_grid_commands(cx: &mut TestAppContext) {
         assert_eq!(ids, ["first", "last", "compare", "export-csv", "continuous"]);
     });
 }
+
+#[gpui::test]
+fn tab_moves_focus_from_the_filter_field(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.search.filter_visible = true;
+            let focus = view.search.filter.read(cx).focus_handle_for_tests();
+            window.focus(&focus, cx);
+            cx.notify();
+        });
+    });
+    cx.run_until_parked();
+    let before = cx.update(|window, cx| window.focused(cx));
+    cx.simulate_keystrokes("tab");
+    cx.run_until_parked();
+    let after = cx.update(|window, cx| window.focused(cx));
+    assert_ne!(before, after, "Tab should move focus away from the filter field");
+    cx.update(|window, cx| {
+        if let Some(focus) = before.as_ref() {
+            window.focus(focus, cx);
+        }
+    });
+    cx.simulate_keystrokes("shift-tab");
+    cx.run_until_parked();
+    let previous = cx.update(|window, cx| window.focused(cx));
+    assert_ne!(before, previous, "Shift-Tab should move focus away from the filter field");
+}
+
+#[gpui::test]
+fn compact_menu_can_be_opened_from_find_with_keyboard(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_resize(gpui::size(gpui::px(720.0), gpui::px(800.0)));
+    cx.run_until_parked();
+    cx.update(|window, cx| {
+        let focus = view.read(cx).search.find.read(cx).focus_handle_for_tests();
+        window.focus(&focus, cx);
+    });
+    cx.simulate_keystrokes("tab enter down down enter");
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert_eq!(view.pager.page + 1, view.pager.pages()));
+}
