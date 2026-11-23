@@ -17,6 +17,27 @@ impl GridView {
         self.panel.open = !self.panel.open;
     }
 
+    pub(crate) fn format_query(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let driver = self
+            .live
+            .as_ref()
+            .map_or_else(|| "postgres".to_string(), |session| session.driver_id.clone());
+        let Some(grammar) = bookie_app_services::result_editability::grammar_for_driver(&driver) else {
+            self.status = "Formatting is unavailable for this connection".into();
+            return;
+        };
+        let text = self.sql_input.read(cx).value().to_string();
+        if text.trim().is_empty() {
+            return;
+        }
+        let settings = bookie_core::sql_syntax::script::LexicalSettings::default_for(grammar);
+        let formatted = bookie_core::sql_format::format_script(&text, grammar, settings);
+        if formatted != text {
+            self.sql_input.update(cx, |input, cx| input.set_value(formatted, window, cx));
+            self.status = "Formatted the SQL".into();
+        }
+    }
+
     pub(crate) fn query_editor_toolbar(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
         div()
             .flex()
@@ -29,21 +50,33 @@ impl GridView {
             .border_b_1()
             .border_color(rgb(theme.border))
             .child(
-                primary_button("run-query", "Run", "Run query (Ctrl+Enter)", theme).on_click(cx.listener(
-                    |this, _, _, cx| {
-                        this.run_query(cx);
+                primary_button("run-statement", "Run", "Run the selection or the statement at the cursor", theme)
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.run_at_cursor(cx);
                         cx.notify();
-                    },
-                )),
+                    })),
             )
             .child(
-                ghost_icon("explain-query", "info", "Explain the query", theme).on_click(cx.listener(
-                    |this, _, _, cx| {
-                        this.explain_query(cx);
+                ghost("run-query", "Run all", theme)
+                    .tooltip(|window, cx| gpui_component::tooltip::Tooltip::new("Run every statement (Ctrl+Enter)").build(window, cx))
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.run_query(cx);
                         cx.notify();
-                    },
-                )),
+                    })),
             )
+            .child(ghost("explain-query", "Explain", theme).on_click(cx.listener(|this, _, _, cx| {
+                this.explain_query(cx);
+                cx.notify();
+            })))
+            .child(ghost("format-query", "Format", theme).on_click(cx.listener(|this, _, window, cx| {
+                this.format_query(window, cx);
+                cx.notify();
+            })))
+            .child(ghost("save-query", "Save", theme).on_click(cx.listener(|this, _, _, cx| {
+                this.save_favorite(cx);
+                cx.notify();
+            })))
+            .child(div().flex_1())
             .child(
                 div()
                     .min_w_0()
