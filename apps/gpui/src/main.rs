@@ -1050,6 +1050,8 @@ mod query_pane_ui_tests;
 #[cfg(test)]
 mod save_ui_tests;
 #[cfg(test)]
+mod server_filter_ui_tests;
+#[cfg(test)]
 mod typed_value_ui_tests;
 #[cfg(test)]
 mod ui_tests;
