@@ -111,21 +111,21 @@ impl GridView {
         pager
             .when(!compact, |pager| {
                 pager.child(
-                icon_button("first", "chevrons-left", "First page", false, theme).on_click(cx.listener(
-                    |this, _, _, cx| {
-                        this.pager.first();
-                        cx.notify();
-                    },
-                )),
+                    icon_button("first", "chevrons-left", "First page", false, theme).on_click(
+                        cx.listener(|this, _, _, cx| {
+                            this.pager.first();
+                            cx.notify();
+                        }),
+                    ),
                 )
             })
             .child(
-                icon_button("prev", "chevron-left", "Previous page", false, theme).on_click(cx.listener(
-                    |this, _, _, cx| {
+                icon_button("prev", "chevron-left", "Previous page", false, theme).on_click(
+                    cx.listener(|this, _, _, cx| {
                         this.pager.previous();
                         cx.notify();
-                    },
-                )),
+                    }),
+                ),
             )
             .child(div().child(range_label))
             .child(self.page_size_button(theme, cx))
@@ -143,21 +143,21 @@ impl GridView {
                 })),
             )
             .child(
-                icon_button("next", "chevron-right", "Next page", false, theme).on_click(cx.listener(
-                    |this, _, _, cx| {
+                icon_button("next", "chevron-right", "Next page", false, theme).on_click(
+                    cx.listener(|this, _, _, cx| {
                         this.pager.next();
                         cx.notify();
-                    },
-                )),
+                    }),
+                ),
             )
             .when(!compact, |pager| {
                 pager.child(
-                icon_button("last", "chevrons-right", "Last page", false, theme).on_click(cx.listener(
-                    |this, _, _, cx| {
-                        this.pager.last();
-                        cx.notify();
-                    },
-                )),
+                    icon_button("last", "chevrons-right", "Last page", false, theme).on_click(
+                        cx.listener(|this, _, _, cx| {
+                            this.pager.last();
+                            cx.notify();
+                        }),
+                    ),
                 )
             })
     }
@@ -166,8 +166,10 @@ impl GridView {
         use gpui_component::button::{Button, ButtonVariants};
         use gpui_component::menu::DropdownMenu;
         let compact = self.synced_width < 900.0;
-        let groups =
-            crate::menus::command_groups(self, &[&["first", "last"], &["compare", "export-csv", "continuous"]]);
+        let groups = crate::menus::command_groups(
+            self,
+            &[&["first", "last"], &["compare", "export-csv", "continuous"]],
+        );
         div()
             .flex()
             .debug_selector(|| "grid-actions".into())
@@ -188,56 +190,61 @@ impl GridView {
                     .on_click(cx.listener(|this, _, _, cx| this.run_find(true, cx))),
             )
             .child(
-                icon_button("show", "sliders-horizontal", "Show matching rows only", false, theme).on_click(
-                    cx.listener(|this, _, _, cx| {
-                        this.show_matching(cx);
-                        cx.notify();
-                    }),
-                ),
-            )
-            .when(!compact, |actions| {
-                actions
-            .child(
-                icon_button("compare", "arrow-left-right", "Compare", false, theme)
-                    .on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))),
-            )
-            .child(
                 icon_button(
-                    "export",
-                    "download",
-                    "Export current page or selection as CSV",
+                    "show",
+                    "sliders-horizontal",
+                    "Show matching rows only",
                     false,
                     theme,
                 )
                 .on_click(cx.listener(|this, _, _, cx| {
-                    this.export_selection_or_page(cx);
+                    this.show_matching(cx);
                     cx.notify();
                 })),
             )
-            .child(
-                icon_button(
-                    "continuous",
-                    "chevrons-down-up",
-                    "Scroll continuously",
-                    self.continuous,
-                    theme,
-                )
-                .on_click(cx.listener(|this, _, _, cx| {
-                    this.continuous = !this.continuous;
-                    this.scroll.scroll_to_item_strict(0, ScrollStrategy::Top);
-                    cx.notify();
-                })),
-            )
+            .when(!compact, |actions| {
+                actions
+                    .child(
+                        icon_button("compare", "arrow-left-right", "Compare", false, theme)
+                            .on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))),
+                    )
+                    .child(
+                        icon_button(
+                            "export",
+                            "download",
+                            "Export current page or selection as CSV",
+                            false,
+                            theme,
+                        )
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.export_selection_or_page(cx);
+                            cx.notify();
+                        })),
+                    )
+                    .child(
+                        icon_button(
+                            "continuous",
+                            "chevrons-down-up",
+                            "Scroll continuously",
+                            self.continuous,
+                            theme,
+                        )
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.continuous = !this.continuous;
+                            this.scroll.scroll_to_item_strict(0, ScrollStrategy::Top);
+                            cx.notify();
+                        })),
+                    )
             })
             .when(compact, |actions| {
                 actions.child(
-                Button::new("grid-more")
-                    .ghost()
-                    .compact()
-                    .tooltip("More grid actions")
-                    .accessibility_label("More grid actions")
-                    .child(icon("ellipsis", theme.muted_foreground))
-                    .dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), groups)),
+                    Button::new("grid-more")
+                        .ghost()
+                        .compact()
+                        .tooltip("More grid actions")
+                        .accessibility_label("More grid actions")
+                        .child(icon("ellipsis", theme.muted_foreground))
+                        .dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), groups)),
                 )
             })
     }
@@ -353,8 +360,19 @@ impl GridView {
             .children(self.row_detail_panel(theme))
     }
 
-    fn main_layout(&self, sidebar: Option<Div>, tab_row: Stateful<Div>, bundle_bar: Option<Div>, content: Div) -> Div {
-        div().flex_1().flex().min_h_0().children(sidebar).child(
+    fn main_layout(
+        &self,
+        sidebar: Option<Div>,
+        tab_row: Stateful<Div>,
+        bundle_bar: Option<Div>,
+        content: Div,
+    ) -> Div {
+        div()
+            .flex_1()
+            .flex()
+            .min_h_0()
+            .children(sidebar)
+            .child(
                 div()
                     .flex_1()
                     .flex()
@@ -379,10 +397,7 @@ impl Render for GridView {
         } else {
             None
         };
-        let save_bar = self
-            .approval_bar(theme, cx)
-            .or_else(|| self.save_bar(theme, cx))
-            .or_else(|| self.edits_bar(theme, cx));
+        let save_bar = self.approval_bar(theme, cx).or_else(|| self.save_bar(theme, cx)).or_else(|| self.edits_bar(theme, cx));
         let banner = self.save_banner(theme, cx);
         let bundle_bar = self.connection_bundle_bar(theme, cx);
         let insert_form = self
@@ -467,33 +482,22 @@ impl GridView {
             .enumerate()
             .map(|(position, index)| {
                 let action = &actions[*index];
-                let shortcut = bookie_gpui::keymap::Command::ALL
-                    .into_iter()
+                let shortcut = bookie_gpui::keymap::Command::ALL.into_iter()
                     .find(|command| command.name() == action.id || command.title() == action.label)
                     .and_then(|command| self.keymap.binding(command))
                     .map(bookie_gpui::keymap::Chord::label);
                 let row = div()
                     .id(("palette-command-row", position))
                     .debug_selector(move || format!("palette-command-row-{position}").into())
-                    .px_2()
-                    .py_1()
-                    .rounded_md()
-                    .flex()
-                    .justify_between()
-                    .gap_2()
+                    .px_2().py_1().rounded_md().flex().justify_between().gap_2()
                     .cursor_pointer()
                     .child(action.label.clone())
-                    .child(
-                        div()
-                            .flex()
-                            .gap_2()
-                            .text_color(rgb(theme.muted_foreground))
+                    .child(div().flex().gap_2().text_color(rgb(theme.muted_foreground))
                         .child(bookie_gpui::palette::group(action.id))
-                            .children(shortcut.map(|keys| div().child(keys))),
-                    );
+                        .children(shortcut.map(|keys| div().child(keys))));
                 let hover = theme.active_row;
-                let row =
-                    row.hover(move |style| style.bg(rgb(hover)))
+                let row = row
+                    .hover(move |style| style.bg(rgb(hover)))
                     .on_click(cx.listener(move |this, _, window, cx| {
                         this.palette.index = position;
                         this.run_palette(window, cx);
@@ -598,16 +602,8 @@ impl GridView {
                     .on_click(cx.listener(|_, _, _, cx| cx.stop_propagation()))
                     .child(self.palette.input.clone())
                     .child(
-                        div()
-                            .id("palette-results")
-                            .max_h(
-                                (window.viewport_size().height - px(size::PALETTE_TOP + size::FORM_CONTROL + 40.0))
-                                    .max(px(0.0)),
-                            )
-                            .overflow_y_scroll()
-                            .track_scroll(&self.palette.scroll)
-                            .children(rows)
-                            .children(empty),
+                        div().id("palette-results").max_h((window.viewport_size().height - px(size::PALETTE_TOP + size::FORM_CONTROL + 40.0)).max(px(0.0))).overflow_y_scroll()
+                            .track_scroll(&self.palette.scroll).children(rows).children(empty),
                     ),
             )
     }
