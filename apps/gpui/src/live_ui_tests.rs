@@ -1863,3 +1863,21 @@ fn compact_menu_can_be_opened_from_find_with_keyboard(cx: &mut TestAppContext) {
     cx.run_until_parked();
     view.read_with(cx, |view, _| assert_eq!(view.pager.page + 1, view.pager.pages()));
 }
+#[gpui::test]
+fn real_table_grid_keyboard_and_jump_column_follow_active_tab(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    view.update(cx, |view, _| {
+        let table = bookie_gpui::shell::table_info("customers");
+        view.catalog.grid_table = table.clone();
+        view.tabs.open_table(&table);
+    });
+    cx.simulate_keystrokes("down space shift-down");
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.selection.map(|s| s.count()), Some(2));
+        assert!(view.palette_actions().iter().any(|a| a.id == "jump-column" && a.enabled));
+    });
+    view.update(cx, |view, _| view.tabs.open_home());
+    view.read_with(cx, |view, _| {
+        assert!(!view.palette_actions().iter().any(|a| a.id == "jump-column" && a.enabled));
+    });
+}

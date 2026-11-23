@@ -1,0 +1,13 @@
+[
+  {"data_type": "INT", "cases": [{"literal": "-2147483648", "cell": "-2147483648"}, {"literal": "NULL", "cell": "NULL"}]},
+  {"data_type": "BIGINT", "contract": "integers"},
+  {"data_type": "DECIMAL(30,8)", "cases": [{"literal": "1.23", "cell": "1.23000000"}]},
+  {"data_type": "DOUBLE", "cases": [{"literal": "0.1", "cell": "0.1"}, {"literal": "-1.5", "cell": "-1.5"}]},
+  {"data_type": "VARCHAR(255) CHARACTER SET utf8mb4", "contract": "texts"},
+  {"data_type": "BLOB", "cases": [{"literal": "X'DEADBEEF'", "cell": "<4 bytes>"}]},
+  {"data_type": "DATE", "cases": [{"literal": "'2024-02-29'", "cell": "2024-02-29"}]},
+  {"data_type": "DATETIME", "cases": [{"literal": "'2024-02-29 13:45:30'", "cell": "2024-02-29 13:45:30"}]},
+  {"data_type": "TIME", "cases": [{"literal": "'13:45:30'", "cell": "13:45:30"}]},
+  {"data_type": "JSON", "cases": [{"literal": "'{\"a\": 1}'", "cell": "{\"a\":1}"}]},
+  {"data_type": "ENUM('a','b')", "cases": [{"literal": "'b'", "cell": "b"}]}
+]
