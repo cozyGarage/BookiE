@@ -21,6 +21,7 @@ pub(crate) enum Pick {
     SavedFilter(String),
     DeleteSavedFilter(String),
     NameFilter(String),
+    SchemaContext(Option<String>),
     Theme(String),
 }
 
@@ -35,6 +36,7 @@ impl GridView {
             PaletteMode::Favorites | PaletteMode::DeleteFavorite => self.favorite_items(needle),
             PaletteMode::SavedFilters | PaletteMode::DeleteSavedFilter => self.saved_filter_items(needle),
             PaletteMode::NameFilter => self.name_filter_items(needle, cx),
+            PaletteMode::SchemaContext => self.schema_context_items(needle),
             PaletteMode::Themes => theme_items(needle, cx),
         }
     }
@@ -157,6 +159,13 @@ impl GridView {
         }]
     }
 
+    fn schema_context_items(&self, needle: &str) -> Vec<PickerItem> {
+        let Some(session) = &self.live else {
+            return Vec::new();
+        };
+        schema_context_items_for(&session.driver_id, needle)
+    }
+
     fn favorite_items(&self, needle: &str) -> Vec<PickerItem> {
         let delete = self.palette.mode == PaletteMode::DeleteFavorite;
         self.favorite_items_labeled(needle, "", delete)
@@ -231,6 +240,13 @@ impl GridView {
             Pick::SavedFilter(name) => self.apply_saved_filter(&name, cx),
             Pick::DeleteSavedFilter(name) => self.delete_saved_filter(&name, cx),
             Pick::NameFilter(name) => self.save_current_filter_as(&name, cx),
+            Pick::SchemaContext(name) => {
+                self.schema_context = name.clone();
+                self.status = name.map_or_else(
+                    || "Keeping the session’s current schema or database".into(),
+                    |name| format!("Schema or database context set to {name}"),
+                );
+            }
             Pick::Theme(name) => self.choose_theme(&name, window, cx),
             Pick::Column(column) => {
                 let row = self.cell_cursor.map_or(0, |cursor| cursor.row);
@@ -238,6 +254,51 @@ impl GridView {
             }
         }
         cx.notify();
+    }
+}
+
+fn schema_context_items_for(driver_id: &str, needle: &str) -> Vec<PickerItem> {
+    if !bookie_app_services::schema_context::supports_schema_context(driver_id) {
+        return Vec::new();
+    }
+    let name = needle.trim();
+    if name.is_empty() {
+        return vec![PickerItem {
+            title: "Keep the current session schema or database".into(),
+            subtitle: "Do not add a context statement; keep the session’s current context".into(),
+            pick: Pick::SchemaContext(None),
+        }];
+    }
+    if bookie_app_services::schema_context::schema_context_statement(driver_id, name).is_err() {
+        return Vec::new();
+    }
+    vec![PickerItem {
+        title: format!("Use schema or database “{name}”"),
+        subtitle: "Applied before each query on this session".into(),
+        pick: Pick::SchemaContext(Some(name.to_owned())),
+    }]
+}
+
+#[cfg(test)]
+mod schema_context_tests {
+    use super::{Pick, schema_context_items_for};
+
+    #[test]
+    fn picker_offers_schema_context_for_postgres_and_mysql_but_not_sqlite() {
+        assert!(schema_context_items_for("postgres", "billing")
+            .first()
+            .is_some_and(|item| matches!(&item.pick, Pick::SchemaContext(Some(_)))));
+        assert!(schema_context_items_for("mysql", "billing")
+            .first()
+            .is_some_and(|item| matches!(&item.pick, Pick::SchemaContext(Some(_)))));
+        assert!(schema_context_items_for("sqlite", "billing").is_empty());
+    }
+
+    #[test]
+    fn picker_keeps_the_current_session_context_when_the_input_is_empty() {
+        assert!(schema_context_items_for("postgres", " ")
+            .first()
+            .is_some_and(|item| matches!(&item.pick, Pick::SchemaContext(None))));
     }
 }
 
