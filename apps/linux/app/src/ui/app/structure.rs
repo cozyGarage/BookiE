@@ -70,6 +70,26 @@ impl App {
         );
     }
 
+    pub(super) fn on_compare_data(&self, schema: Option<String>, table: String, sender: &ComponentSender<Self>) {
+        let script_sender = sender.input_sender().clone();
+        crate::ui::data_compare::present(
+            self.window.upcast_ref::<relm4::gtk::Window>(),
+            crate::ui::data_compare::DataCompareRequest {
+                schema,
+                table,
+                connection_id: self.connection_id,
+                driver_id: self.driver_id().to_string(),
+                scope: self.catalog_dialog_cancel.borrow().clone(),
+                hidden_schemas: self.hidden_schema_names(),
+            },
+            &self.database,
+            &self.preferences,
+            move |sql| {
+                let _ = script_sender.send(AppMsg::ShowCreateTableLoaded { sql });
+            },
+        );
+    }
+
     pub(super) fn on_new_table_tab(&mut self, schema: Option<String>, sender: ComponentSender<Self>) {
         if !self.connected {
             self.show_toast(&bookie_app_services::tr!("Connect to a database first."));

@@ -4,6 +4,7 @@ import time
 
 CURRENT = "a_cmp_current"
 DESIRED = "a_cmp_desired"
+DATA_SCHEMA = "a_dc_cmp"
 
 
 def scenarios(ui):
@@ -99,6 +100,36 @@ def scenarios(ui):
         finally:
             postgres(cleanup)
 
+    def postgres_data_compare_opens_a_script_and_runs_nothing(_database, _base):
+        cleanup = f"DROP SCHEMA IF EXISTS {DATA_SCHEMA} CASCADE"
+        postgres(cleanup)
+        postgres(
+            f"CREATE SCHEMA {DATA_SCHEMA}; "
+            f"CREATE TABLE {DATA_SCHEMA}.dc_source (id integer PRIMARY KEY, name text); "
+            f"CREATE TABLE {DATA_SCHEMA}.dc_target (id integer PRIMARY KEY, name text); "
+            f"INSERT INTO {DATA_SCHEMA}.dc_source VALUES (1, 'same'), (2, 'new name'), (3, 'missing'); "
+            f"INSERT INTO {DATA_SCHEMA}.dc_target VALUES (1, 'same'), (2, 'old name'), (4, 'extra')"
+        )
+        try:
+            ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
+            ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
+            invoke_row_action("dc_target", "sidebar-row.compare-data")
+            ui.wait_for_node(name="Compare data")
+            ui.invoke(ui.wait_for_node(name="Compare", role=ui.pyatspi.ROLE_PUSH_BUTTON))
+            ui.wait_for_node_containing("1 same, 1 to insert, 1 to update and 1 to delete")
+            ui.invoke(ui.wait_for_node(name="Open Script", role=ui.pyatspi.ROLE_PUSH_BUTTON))
+
+            script = wait_for_editor_text("Data compare: review before running")
+            target = f'"{DATA_SCHEMA}"."dc_target"'
+            assert f"INSERT INTO {target}" in script and "'missing'" in script, script
+            assert f"UPDATE {target} SET \"name\" = 'new name' WHERE \"id\" = 2;" in script, script
+            assert f"-- DELETE FROM {target} WHERE \"id\" = 4;" in script, script
+
+            rows = postgres(f"SELECT string_agg(id || ':' || name, ',' ORDER BY id) FROM {DATA_SCHEMA}.dc_target")
+            assert rows == "1:same,2:old name,4:extra", f"opening the script changed the database: {rows!r}"
+        finally:
+            postgres(cleanup)
+
     result = []
     if os.environ.get("BOOKIE_GTK_POSTGRES_CONTAINER"):
         result.extend((postgres_schema_compare_opens_a_script_and_runs_nothing,
@@ -107,4 +138,8 @@ def scenarios(ui):
         scenario.environment_overrides = {"BOOKIE_SCHEMA_COMPARE": "1"}
         scenario.environment = "local"
         scenario.requires_editor = False
+    if os.environ.get("BOOKIE_GTK_POSTGRES_CONTAINER"):
+        postgres_data_compare_opens_a_script_and_runs_nothing.environment = "local"
+        postgres_data_compare_opens_a_script_and_runs_nothing.requires_editor = False
+        result.append(postgres_data_compare_opens_a_script_and_runs_nothing)
     return result
