@@ -397,7 +397,7 @@ impl Render for GridView {
             Tab::Table(table) => self.placeholder_page(&table_label(&table), theme),
         };
         let sidebar = self.sidebar.open.then(|| self.sidebar(theme, cx));
-        let toolbar = self.toolbar(theme, cx);
+        let toolbar = self.toolbar(theme, window, cx);
         let tab_row = self.tab_bar(theme, cx);
         div()
             .size_full()

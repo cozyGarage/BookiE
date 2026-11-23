@@ -90,6 +90,10 @@ impl GridView {
     }
 
     pub(crate) fn run_at_cursor(&mut self, cx: &mut Context<Self>) {
+        if self.live.is_none() {
+            self.run_query(cx);
+            return;
+        }
         let driver = self
             .live
             .as_ref()

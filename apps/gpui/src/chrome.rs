@@ -5,7 +5,7 @@ pub(crate) const SQL: [&str; 3] = [
     "FROM synthetic_rows",
     "ORDER BY value;",
 ];
-use gpui::{Context, Div, MouseDownEvent, Stateful, Window, div, prelude::*, px, rgb};
+use gpui::{Context, Decorations, Div, MouseDownEvent, Stateful, Window, WindowControls, div, prelude::*, px, rgb};
 
 use crate::assets::icon;
 use crate::ui_theme::ThemeExt;
@@ -110,6 +110,25 @@ fn window_button(id: &'static str, name: &'static str, label: &'static str, them
         .child(icon(name, theme.foreground))
 }
 
+#[derive(Debug, Default, Eq, PartialEq)]
+struct ToolbarWindowControls {
+    minimize: bool,
+    maximize: bool,
+    close: bool,
+}
+
+fn toolbar_window_controls(decorations: Decorations, supported: WindowControls) -> ToolbarWindowControls {
+    if decorations == Decorations::Server {
+        return ToolbarWindowControls::default();
+    }
+
+    ToolbarWindowControls {
+        minimize: supported.minimize,
+        maximize: supported.maximize,
+        close: true,
+    }
+}
+
 pub(crate) fn ghost_icon(id: impl Into<gpui::ElementId>, name: &'static str, label: &'static str, theme: Theme) -> Stateful<Div> {
     div()
         .id(id)
@@ -143,7 +162,7 @@ fn toolbar_icon(id: &'static str, name: &'static str, label: &'static str, theme
 
 
 impl GridView {
-    pub fn toolbar(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+    pub fn toolbar(&self, theme: Theme, window: &Window, cx: &mut Context<Self>) -> Div {
         div()
             .flex()
             .items_center()
@@ -185,7 +204,7 @@ impl GridView {
                         )),
                     ),
             )
-            .child(self.toolbar_right(theme, cx))
+            .child(self.toolbar_right(theme, window, cx))
     }
 
     fn overflow_menu(&self, theme: Theme, cx: &mut Context<Self>) -> impl IntoElement {
@@ -200,7 +219,13 @@ impl GridView {
             .dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), groups))
     }
 
-    fn toolbar_right(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+    fn toolbar_right(&self, theme: Theme, window: &Window, cx: &mut Context<Self>) -> Div {
+        let controls = if cfg!(target_os = "macos") {
+            ToolbarWindowControls::default()
+        } else {
+            toolbar_window_controls(window.window_decorations(), window.window_controls())
+        };
+
         div()
             .flex()
             .items_center()
@@ -227,21 +252,21 @@ impl GridView {
                     window.refresh();
                 })),
             )
-            .child(
-                window_button("win-min", "minus", "Minimize", theme).on_click(cx.listener(|_, _, window, _| {
+            .when(controls.minimize, |this| {
+                this.child(window_button("win-min", "minus", "Minimize", theme).on_click(cx.listener(|_, _, window, _| {
                     window.minimize_window();
-                })),
-            )
-            .child(
-                window_button("win-max", "square", "Maximize", theme).on_click(cx.listener(|_, _, window, _| {
+                })))
+            })
+            .when(controls.maximize, |this| {
+                this.child(window_button("win-max", "square", "Maximize", theme).on_click(cx.listener(|_, _, window, _| {
                     window.zoom_window();
-                })),
-            )
-            .child(
-                window_button("win-close", "x", "Close", theme).on_click(cx.listener(|_, _, window, _| {
+                })))
+            })
+            .when(controls.close, |this| {
+                this.child(window_button("win-close", "x", "Close", theme).on_click(cx.listener(|_, _, window, _| {
                     window.remove_window();
-                })),
-            )
+                })))
+            })
     }
 
     fn sidebar_tree_row(
@@ -843,6 +868,42 @@ impl GridView {
 
 fn tab_is_dirty(tab: &Tab, grid_table: &bookie_core::TableInfo, pending_edits: usize) -> bool {
     pending_edits > 0 && matches!(tab, Tab::Table(table) if table == grid_table)
+}
+
+#[cfg(test)]
+mod window_control_tests {
+    use super::*;
+
+    #[test]
+    fn server_decorations_use_native_window_controls() {
+        let controls = toolbar_window_controls(Decorations::Server, WindowControls::default());
+
+        assert_eq!(controls, ToolbarWindowControls::default());
+    }
+
+    #[test]
+    fn client_decorations_only_show_controls_supported_by_the_window_manager() {
+        let controls = toolbar_window_controls(
+            Decorations::Client {
+                tiling: gpui::Tiling::default(),
+            },
+            WindowControls {
+                minimize: false,
+                maximize: true,
+                fullscreen: false,
+                window_menu: false,
+            },
+        );
+
+        assert_eq!(
+            controls,
+            ToolbarWindowControls {
+                minimize: false,
+                maximize: true,
+                close: true,
+            }
+        );
+    }
 }
 
 #[cfg(test)]
