@@ -1,6 +1,6 @@
 # Investigation roles
 
-The lead gives each role the path of `<tree>/.analysis/<slug>/problem.md` (and `plan.md` for `critic`), the crates in play, and the one section of this file it runs. Roles are not BookiE lanes: a role is a temporary investigation task, a lane owns files.
+The lead gives each role the path of `<tree>/.analysis/<slug>/problem.md` (and `plan.md` for `critic`), the crates in play, and the one section of this file it runs. A role is a temporary investigation task.
 
 ## Rules for every role
 
