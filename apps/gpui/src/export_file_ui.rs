@@ -581,12 +581,13 @@ mod tests {
     #[test]
     fn streaming_export_preserves_typed_json_and_cancellation_publishes_nothing() {
         use bookie_core::export::{CsvOptions, ResultExport, write_paged_file_no_replace};
-        use bookie_gpui::source::{ResultSource, Source, Synthetic};
+        use bookie_gpui::source::{Source, Synthetic};
 
         let source: Source = Arc::new(Synthetic::new(12));
         let columns = bookie_gpui::core_bridge::column_infos_for(source.columns());
-        let directory = tempfile::tempdir().expect("temporary export directory");
-        let path = directory.path().join("typed.jsonl");
+        let directory = std::env::temp_dir().join(format!("bookie-gpui-export-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir(&directory).expect("create temporary export directory");
+        let path = directory.join("typed.jsonl");
         let csv = CsvOptions::default();
         let export = ResultExport {
             format: ResultFormat::JsonLines,
@@ -622,7 +623,7 @@ mod tests {
         assert!(first["value"].is_number());
         assert!(first["typed"].is_number());
 
-        let cancelled_path = directory.path().join("cancelled.jsonl");
+        let cancelled_path = directory.join("cancelled.jsonl");
         let cancellation = CancellationToken::new();
         let cancel_after_first_row = cancellation.clone();
         let mut next = 0;
@@ -641,5 +642,6 @@ mod tests {
         );
         assert!(result.is_err());
         assert!(!cancelled_path.exists());
+        std::fs::remove_dir_all(&directory).expect("remove temporary export directory");
     }
 }

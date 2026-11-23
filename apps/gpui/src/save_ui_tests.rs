@@ -1144,7 +1144,7 @@ fn export_uses_the_selected_scope_and_format_and_never_overwrites_a_file(cx: &mu
     let directory = std::env::temp_dir().join(format!("bookie-export-{}", std::process::id()));
     std::fs::create_dir_all(&directory).unwrap();
     cx.update(|_, cx| view.update(cx, |view, _| {
-        view.selection = Some(crate::selection::Selection { anchor: 0, focus: 0 });
+        view.selection = Some(bookie_gpui::selection::Selection { anchor: 0, focus: 0 });
     }));
     cx.update(|_, cx| view.update(cx, |view, cx| view.open_export_file_bar(cx)));
     view.read_with(cx, |view, _| assert!(view.export.file.open));
