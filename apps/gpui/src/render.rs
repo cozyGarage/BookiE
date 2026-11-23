@@ -548,7 +548,6 @@ impl GridView {
             PaletteMode::NameFilter => "Type a name for the filter",
             PaletteMode::Themes => "No matching theme",
         };
-        };
         let (count, list) = if self.palette.mode == PaletteMode::Commands {
             let actions = self.palette_actions();
             let shown = palette_matches(self.palette.input.read(cx).content(), &actions);
