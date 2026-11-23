@@ -1389,6 +1389,41 @@ fn the_selected_rows_are_summarised_per_numeric_column(cx: &mut TestAppContext) 
 }
 
 #[gpui::test]
+fn the_status_bar_sums_the_cursor_column_of_the_selected_rows(cx: &mut TestAppContext) {
+    let path = fixture_copy("selection-status-stats");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.selection = Some(crate::Selection { anchor: 0, focus: 2 });
+            view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 0 });
+        })
+    });
+    view.read_with(cx, |view, _| {
+        let items = view.selection_stat_items();
+        assert_eq!(
+            items,
+            vec![
+                ("Count", "3".to_string()),
+                ("Sum", "6".to_string()),
+                ("Avg", "2".to_string()),
+                ("Min", "1".to_string()),
+                ("Max", "3".to_string()),
+            ]
+        );
+    });
+    cx.update(|_, cx| view.update(cx, |_, cx| cx.notify()));
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("selection-stat-Sum").is_some(), "the sum is drawn in the status bar");
+
+    cx.update(|_, cx| view.update(cx, |view, _| view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 1 })));
+    view.read_with(cx, |view, _| assert!(view.selection_stat_items().is_empty(), "a text column has no stats"));
+
+    cx.update(|_, cx| view.update(cx, |view, _| view.selection = Some(crate::Selection { anchor: 1, focus: 1 })));
+    view.read_with(cx, |view, _| assert!(view.selection_stat_items().is_empty(), "one row is not summarised"));
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
 fn health_reports_are_offered_only_on_postgres(cx: &mut TestAppContext) {
     let path = fixture_copy("health-sqlite");
     let (view, cx) = saving_view(cx, &path);
