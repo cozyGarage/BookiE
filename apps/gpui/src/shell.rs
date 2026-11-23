@@ -364,6 +364,7 @@ pub struct Run {
     pub number: usize,
     pub rows: u64,
     pub elapsed_ms: Option<u64>,
+    pub first_row_ms: Option<u64>,
 }
 
 impl Run {
@@ -379,6 +380,18 @@ impl Run {
         self.elapsed_ms
             .map(|ms| crate::messages::format_elapsed(std::time::Duration::from_millis(ms)))
     }
+
+    pub fn tooltip(self) -> Option<String> {
+        let run_ms = self.elapsed_ms?;
+        Some(
+            bookie_app_services::statement_timing::StatementTiming {
+                run_ms: u128::from(run_ms),
+                approval_wait_ms: 0,
+                first_row_ms: self.first_row_ms.map(u128::from),
+            }
+            .tooltip(),
+        )
+    }
 }
 
 pub fn next_run(number: usize) -> Run {
@@ -386,6 +399,7 @@ pub fn next_run(number: usize) -> Run {
         number,
         rows: RUN_ROWS[(number - 1) % RUN_ROWS.len()],
         elapsed_ms: None,
+        first_row_ms: None,
     }
 }
 
@@ -675,5 +689,13 @@ mod tests {
             ..runs[1]
         };
         assert_eq!((measured.millis(), measured.measured().as_deref()), (12, Some("12 ms")));
+        let with_timing = Run {
+            elapsed_ms: Some(100),
+            first_row_ms: Some(30),
+            ..runs[0]
+        };
+        let tip = with_timing.tooltip().unwrap_or_default();
+        assert!(tip.contains("Run time: 100 ms"));
+        assert!(tip.contains("Time to first row or completion: 30 ms"));
     }
 }

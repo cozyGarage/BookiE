@@ -20,11 +20,68 @@ impl GridView {
         self.navigate_foreign_key(Direction::ToReferenced, cx);
     }
 
+    pub(crate) fn peek_referenced_row(&mut self, cx: &mut Context<Self>) {
+        let Some(live) = self.live.clone().filter(|_| self.fk_nav_enabled()) else {
+            return;
+        };
+        let Some((row, column)) = self.active_row_with_names() else {
+            return;
+        };
+        let table = self.catalog.grid_table.clone();
+        self.status = "Peeking foreign key…".into();
+        cx.spawn(async move |this, cx| {
+            let found = cx
+                .background_executor()
+                .spawn(async move {
+                    use bookie_gpui::source::ResultSource;
+                    let structure = live.table_structure(&table)?;
+                    let mut targets =
+                        reference_targets(&structure.foreign_keys, table.schema.as_deref(), &column, &row)?;
+                    let target = targets.remove(0);
+                    let (sql, params) = target_statement(&live, &target)?;
+                    let peek_sql = format!("{sql} LIMIT 1");
+                    let cancel = tokio_util::sync::CancellationToken::new();
+                    let live_table = live.run_query_bound(&peek_sql, &params, 1, &cancel)?;
+                    let cols = live_table.columns();
+                    let first_row = live_table.row(0);
+                    let fields: Vec<(String, String)> = cols
+                        .iter()
+                        .enumerate()
+                        .map(|(idx, col)| {
+                            let val_str = first_row
+                                .get(idx)
+                                .map_or_else(|| "NULL".to_string(), bookie_gpui::preview::cell_preview);
+                            (col.name.clone(), val_str)
+                        })
+                        .collect();
+                    Ok::<_, String>((target.table, fields, sql, params))
+                })
+                .await;
+            this.update(cx, |this, cx| {
+                match found {
+                    Ok((table_name, fields, sql, params)) => {
+                        this.fk_peek = Some(crate::fk_peek_ui::FkPeekState {
+                            table: table_name.clone(),
+                            fields,
+                            sql,
+                            params,
+                        });
+                        this.status = format!("Peeking row in {table_name}");
+                    }
+                    Err(message) => this.status = message,
+                }
+                cx.notify();
+            })
+            .ok();
+        })
+        .detach();
+    }
+
     pub(crate) fn show_referencing_rows(&mut self, cx: &mut Context<Self>) {
         self.navigate_foreign_key(Direction::ToReferencing, cx);
     }
 
-    fn active_row_with_names(&self) -> Option<(Vec<(String, Value)>, String)> {
+    pub(crate) fn active_row_with_names(&self) -> Option<(Vec<(String, Value)>, String)> {
         let cursor = self.cell_cursor?;
         let names = self.column_names();
         let source = self.source_row(self.base() + cursor.row as u64);

@@ -309,7 +309,7 @@ impl GridView {
         theme: Theme,
         strip: Stateful<Div>,
         bars: (Option<Div>, Option<Div>, Option<Div>, Option<Div>, Option<Div>),
-        cx: &App,
+        cx: &mut Context<Self>,
     ) -> Div {
         let (filter_row, compare_bar, save_bar, banner, insert_form) = bars;
         div()
@@ -326,6 +326,7 @@ impl GridView {
             .child(self.data_table(cx))
             .children(self.detail_panel(theme))
             .children(self.row_detail_panel(theme))
+            .children(self.fk_peek_panel(theme, cx))
     }
 
     fn main_layout(&self, sidebar: Option<Div>, tab_row: Stateful<Div>, content: Div) -> Div {
@@ -350,9 +351,14 @@ impl Render for GridView {
         } else {
             None
         };
-        let save_bar = self.approval_bar(theme, cx).or_else(|| self.save_bar(theme, cx)).or_else(|| self.edits_bar(theme, cx));
+        let save_bar = self
+            .approval_bar(theme, cx)
+            .or_else(|| self.save_bar(theme, cx))
+            .or_else(|| self.edits_bar(theme, cx));
         let banner = self.save_banner(theme, cx);
-        let insert_form = self.insert_form(theme, cx).or_else(|| self.import_bar(theme, cx))
+        let insert_form = self
+            .insert_form(theme, cx)
+            .or_else(|| self.import_bar(theme, cx))
             .or_else(|| self.structure_bar(theme, cx))
             .or_else(|| self.structure_info_panel(theme, cx))
             .or_else(|| self.resolve_panel(theme, cx))
@@ -432,26 +438,37 @@ impl GridView {
             .enumerate()
             .map(|(position, index)| {
                 let action = &actions[*index];
-                let shortcut = bookie_gpui::keymap::Command::ALL.into_iter()
+                let shortcut = bookie_gpui::keymap::Command::ALL
+                    .into_iter()
                     .find(|command| command.name() == action.id || command.title() == action.label)
                     .and_then(|command| self.keymap.binding(command))
                     .map(bookie_gpui::keymap::Chord::label);
                 let row = div()
                     .id(("palette-command-row", position))
                     .debug_selector(move || format!("palette-command-row-{position}").into())
-                    .px_2().py_1().rounded_md().flex().justify_between().gap_2()
+                    .px_2()
+                    .py_1()
+                    .rounded_md()
+                    .flex()
+                    .justify_between()
+                    .gap_2()
                     .cursor_pointer()
                     .child(action.label.clone())
-                    .child(div().flex().gap_2().text_color(rgb(theme.muted_foreground))
-                        .child(bookie_gpui::palette::group(action.id))
-                        .children(shortcut.map(|keys| div().child(keys))));
+                    .child(
+                        div()
+                            .flex()
+                            .gap_2()
+                            .text_color(rgb(theme.muted_foreground))
+                            .child(bookie_gpui::palette::group(action.id))
+                            .children(shortcut.map(|keys| div().child(keys))),
+                    );
                 let hover = theme.active_row;
-                let row = row
-                    .hover(move |style| style.bg(rgb(hover)))
-                    .on_click(cx.listener(move |this, _, window, cx| {
-                        this.palette.index = position;
-                        this.run_palette(window, cx);
-                    }));
+                let row =
+                    row.hover(move |style| style.bg(rgb(hover)))
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            this.palette.index = position;
+                            this.run_palette(window, cx);
+                        }));
                 if position == selected {
                     row.bg(rgb(theme.active_row))
                 } else {
@@ -531,8 +548,8 @@ impl GridView {
             .items_start()
             .occlude()
             .on_click(cx.listener(|this, _, window, cx| {
-                    this.close_palette(window, cx);
-                }))
+                this.close_palette(window, cx);
+            }))
             .child(
                 div()
                     .id("palette-surface")
@@ -551,8 +568,16 @@ impl GridView {
                     .on_click(cx.listener(|_, _, _, cx| cx.stop_propagation()))
                     .child(self.palette.input.clone())
                     .child(
-                        div().id("palette-results").max_h((window.viewport_size().height - px(size::PALETTE_TOP + size::FORM_CONTROL + 40.0)).max(px(0.0))).overflow_y_scroll()
-                            .track_scroll(&self.palette.scroll).children(rows).children(empty),
+                        div()
+                            .id("palette-results")
+                            .max_h(
+                                (window.viewport_size().height - px(size::PALETTE_TOP + size::FORM_CONTROL + 40.0))
+                                    .max(px(0.0)),
+                            )
+                            .overflow_y_scroll()
+                            .track_scroll(&self.palette.scroll)
+                            .children(rows)
+                            .children(empty),
                     ),
             )
     }

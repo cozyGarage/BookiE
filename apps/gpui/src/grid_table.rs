@@ -1,4 +1,8 @@
-use std::{collections::{HashMap, HashSet}, ops::Range, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    ops::Range,
+    sync::Arc,
+};
 
 use gpui::{App, Context, IntoElement, WeakEntity, Window, div, prelude::*, px};
 use gpui_kit::component::Sizable;
@@ -77,6 +81,7 @@ pub struct GridDelegate {
     pin_scope: Option<PinScope>,
     pinned_columns: usize,
     pin_counts: HashMap<PinScope, usize>,
+    pub binary_modes: HashMap<usize, bookie_gpui::binary_mode::BinaryMode>,
 }
 
 fn header_menu(
@@ -87,6 +92,7 @@ fn header_menu(
     sortable: bool,
     has_hidden: bool,
     pin_action: Option<(gpui::Entity<TableState<GridDelegate>>, PinScope, bool)>,
+    binary_action: Option<gpui::Entity<TableState<GridDelegate>>>,
     icon: impl IntoElement,
 ) -> impl IntoElement {
     use gpui_component::button::{Button, ButtonVariants};
@@ -100,9 +106,10 @@ fn header_menu(
         .child(icon)
         .dropdown_menu(move |menu, _, _| {
             let copy_name = column_name.clone();
-            let mut menu = menu.item(PopupMenuItem::new("Copy column name").on_click(move |_, _, cx| {
-                cx.write_to_clipboard(gpui::ClipboardItem::new_string(copy_name.clone()))
-            }));
+            let mut menu =
+                menu.item(PopupMenuItem::new("Copy column name").on_click(move |_, _, cx| {
+                    cx.write_to_clipboard(gpui::ClipboardItem::new_string(copy_name.clone()))
+                }));
             if let Some(owner) = owner.clone() {
                 let column = column_name.clone();
                 let hide_owner = owner.clone();
@@ -110,9 +117,11 @@ fn header_menu(
                     let _ = hide_owner.update(cx, |view, cx| view.hide_column(source_col, &column, window, cx));
                 }));
                 if has_hidden {
-                    menu = menu.item(PopupMenuItem::new("Show all hidden columns").on_click(move |_, window, cx| {
-                        let _ = owner.update(cx, |view, cx| view.show_all_hidden_columns(window, cx));
-                    }));
+                    menu = menu.item(
+                        PopupMenuItem::new("Show all hidden columns").on_click(move |_, window, cx| {
+                            let _ = owner.update(cx, |view, cx| view.show_all_hidden_columns(window, cx));
+                        }),
+                    );
                 }
             }
             if let Some((table, scope, pinned)) = pin_action
@@ -133,6 +142,19 @@ fn header_menu(
                         table.refresh(cx);
                     });
                 }));
+            }
+            if let Some(table) = binary_action.as_ref() {
+                for mode in bookie_gpui::binary_mode::BinaryMode::ALL {
+                    let label = format!("Display as {}", mode.label());
+                    let mode_table = table.clone();
+                    menu = menu.item(PopupMenuItem::new(label).on_click(move |_, _, cx| {
+                        let _ = mode_table.update(cx, |table, cx| {
+                            table.delegate_mut().binary_modes.insert(source_col, mode);
+                            table.delegate_mut().cached = None;
+                            table.refresh(cx);
+                        });
+                    }));
+                }
             }
             let Some(owner) = owner.clone().filter(|_| sortable) else {
                 return menu;
@@ -179,16 +201,15 @@ impl TableDelegate for GridDelegate {
         Self::schedule_sort(owner, source_col, column, ascending, window);
     }
 
-    fn visible_rows_changed(
-        &mut self,
-        visible: Range<usize>,
-        window: &mut Window,
-        cx: &mut Context<TableState<Self>>,
-    ) {
+    fn visible_rows_changed(&mut self, visible: Range<usize>, window: &mut Window, cx: &mut Context<TableState<Self>>) {
         let Some(source) = &self.source else { return };
         if self.map.compare.is_some()
             || self.content_widths.len() != self.columns.len()
-            || !visible.clone().take(64).any(|row| self.map.source_row(row).is_some_and(|index| source.row_ref(index).is_some()))
+            || !visible.clone().take(64).any(|row| {
+                self.map
+                    .source_row(row)
+                    .is_some_and(|index| source.row_ref(index).is_some())
+            })
         {
             return;
         }
@@ -276,11 +297,12 @@ impl TableDelegate for GridDelegate {
             .get(source_col)
             .map(|(kind, key)| header_kind(kind, *key))
             .unwrap_or_default();
-        let column_width = self
-            .columns
-            .get(source_col)
-            .map_or(0.0, |(_, width)| *width);
+        let column_width = self.columns.get(source_col).map_or(0.0, |(_, width)| *width);
         let show_pin_button = pin_button_visible(column_width);
+        let is_binary = self
+            .kinds
+            .get(source_col)
+            .is_some_and(|(k, _)| bookie_gpui::binary_mode::is_binary_type(k));
         let menu = header_menu(
             col_ix,
             source_col,
@@ -292,6 +314,7 @@ impl TableDelegate for GridDelegate {
                 .clone()
                 .filter(|_| !show_pin_button)
                 .map(|scope| (cx.entity(), scope, col_ix < self.pinned_columns)),
+            is_binary.then(|| cx.entity()),
             crate::assets::icon("ellipsis", theme.muted_foreground),
         );
         let pin = self.pin_scope.clone().filter(|_| show_pin_button).map(|scope| {
@@ -483,15 +506,20 @@ impl GridDelegate {
             return cells.get(col_ix).map_or_else(Default::default, |cell| {
                 let cell = self.edits.get(&(index, col_ix)).unwrap_or(cell);
                 let right = crate::right_aligned(self.numeric.get(col_ix).copied().unwrap_or(false), cell);
-                (cell_preview(cell), right)
+                let preview = match (cell, self.binary_modes.get(&col_ix)) {
+                    (Cell::Bytes(bytes), Some(mode)) => mode.format(bytes),
+                    _ => cell_preview(cell),
+                };
+                (preview, right)
             });
         }
         if self.cached.as_ref().is_none_or(|(row, _)| *row != row_ix) {
             let numeric = &self.numeric;
+            let binary_modes = &self.binary_modes;
             let labels = match (&self.map.compare, &self.source) {
                 (Some(diff), _) => compare_labels(diff, row_ix, numeric),
                 (None, Some(source)) => match self.map.source_row(row_ix) {
-                    Some(index) => source_labels(source, index, numeric, &self.edits),
+                    Some(index) => source_labels(source, index, numeric, &self.edits, binary_modes),
                     None => Vec::new(),
                 },
                 (None, None) => Vec::new(),
@@ -586,7 +614,10 @@ impl GridView {
                     .map(|store| store.hidden_columns(id, &self.catalog.grid_table.name))
             });
         let scope_changed = delegate.pin_scope.as_ref() != pin_scope.as_ref()
-            || delegate.source.as_ref().is_none_or(|source| !Arc::ptr_eq(source, &self.source));
+            || delegate
+                .source
+                .as_ref()
+                .is_none_or(|source| !Arc::ptr_eq(source, &self.source));
         let hidden: HashSet<usize> = persisted
             .map(|hidden_names| {
                 let names = columns.iter().map(|(name, _)| name.as_str()).collect::<Vec<_>>();
@@ -606,9 +637,15 @@ impl GridView {
     fn sort_state(&self) -> (bool, Option<bookie_app_services::read_session::TableSort>) {
         let server_sortable = !self.grid_is_query
             && self.compare.is_none()
-            && self.live.as_ref().is_some_and(|session| session.driver_id == "postgres");
+            && self
+                .live
+                .as_ref()
+                .is_some_and(|session| session.driver_id == "postgres");
         let local_sortable = (self.grid_is_query
-            || self.live.as_ref().is_some_and(|session| session.driver_id != "postgres"))
+            || self
+                .live
+                .as_ref()
+                .is_some_and(|session| session.driver_id != "postgres"))
             && self.compare.is_none()
             && self.dataset_count() <= crate::local_sort::MAX_LOCAL_SORT_ROWS
             && !self.source.is_partial()
@@ -617,7 +654,10 @@ impl GridView {
         let sort = if local_sortable {
             self.local_sort.clone()
         } else {
-            server_sortable.then(|| self.table_sort(&self.catalog.grid_table)).flatten().cloned()
+            server_sortable
+                .then(|| self.table_sort(&self.catalog.grid_table))
+                .flatten()
+                .cloned()
         };
         (sortable, sort)
     }
@@ -629,7 +669,10 @@ impl GridView {
         let table = self.table.read(cx);
         let delegate = table.delegate();
         let (hidden_columns, projection) = self.column_projection(&columns, delegate, &pin_scope);
-        let widths_match = delegate.source.as_ref().is_some_and(|source| Arc::ptr_eq(source, &self.source))
+        let widths_match = delegate
+            .source
+            .as_ref()
+            .is_some_and(|source| Arc::ptr_eq(source, &self.source))
             && delegate.map == map
             && delegate.edits == self.cell_edit.edits
             && delegate.content_widths.len() == columns.len();
@@ -854,7 +897,9 @@ impl GridView {
             && let Some(store) = &self.column_widths
         {
             for source_col in &hidden {
-                let Some((name, _)) = columns.get(*source_col) else { continue };
+                let Some((name, _)) = columns.get(*source_col) else {
+                    continue;
+                };
                 if columns.iter().filter(|(column, _)| column == name).count() != 1 {
                     continue;
                 }
@@ -973,8 +1018,12 @@ fn measure_visible_columns(
     let end = start.saturating_add(row_limit.min(cell_limit_rows)).min(map.count);
     let mut borrowed_row = false;
     for row in start.min(end)..end {
-        let Some(source_row) = map.source_row(row) else { continue };
-        let Some(cells) = source.row_ref(source_row) else { continue };
+        let Some(source_row) = map.source_row(row) else {
+            continue;
+        };
+        let Some(cells) = source.row_ref(source_row) else {
+            continue;
+        };
         borrowed_row = true;
         for (column, cell) in cells.iter().take(widths.len()).enumerate() {
             let preview = cell_preview(edits.get(&(source_row, column)).unwrap_or(cell));
@@ -1028,21 +1077,37 @@ fn labels(cells: &[Cell], numeric: &[bool]) -> Vec<(String, bool)> {
         .collect()
 }
 
-fn source_labels(source: &Source, index: u64, numeric: &[bool], edits: &Edits) -> Vec<(String, bool)> {
+fn source_labels(
+    source: &Source,
+    index: u64,
+    numeric: &[bool],
+    edits: &Edits,
+    binary_modes: &HashMap<usize, bookie_gpui::binary_mode::BinaryMode>,
+) -> Vec<(String, bool)> {
     match source.row_ref(index) {
-        Some(cells) => labels_with_edits(cells, numeric, index, edits),
-        None => labels_with_edits(&source.row(index), numeric, index, edits),
+        Some(cells) => labels_with_edits(cells, numeric, index, edits, binary_modes),
+        None => labels_with_edits(&source.row(index), numeric, index, edits, binary_modes),
     }
 }
 
-fn labels_with_edits(cells: &[Cell], numeric: &[bool], row: u64, edits: &Edits) -> Vec<(String, bool)> {
+fn labels_with_edits(
+    cells: &[Cell],
+    numeric: &[bool],
+    row: u64,
+    edits: &Edits,
+    binary_modes: &HashMap<usize, bookie_gpui::binary_mode::BinaryMode>,
+) -> Vec<(String, bool)> {
     cells
         .iter()
         .enumerate()
         .map(|(column, cell)| {
             let cell = edits.get(&(row, column)).unwrap_or(cell);
             let right = crate::right_aligned(numeric.get(column).copied().unwrap_or(false), cell);
-            (cell_preview(cell), right)
+            let preview = match (cell, binary_modes.get(&column)) {
+                (Cell::Bytes(bytes), Some(mode)) => mode.format(bytes),
+                _ => cell_preview(cell),
+            };
+            (preview, right)
         })
         .collect()
 }
@@ -1102,7 +1167,10 @@ mod tests {
             let mut delegate = GridDelegate {
                 sortable: true,
                 columns: vec![("name".into(), 100.0), ("id".into(), 100.0)],
-                sort: Some(bookie_app_services::read_session::TableSort { column: "name".into(), ascending: false }),
+                sort: Some(bookie_app_services::read_session::TableSort {
+                    column: "name".into(),
+                    ascending: false,
+                }),
                 ..Default::default()
             };
             assert_eq!(delegate.column(0, cx).sort, Some(ColumnSort::Descending));
@@ -1220,17 +1288,17 @@ mod tests {
     #[test]
     fn visible_values_size_columns_without_cloning_rows_or_using_type_guesses() {
         let source = Arc::new(BorrowedRowSource {
-            cells: vec![
-                Cell::Int(7),
-                Cell::Text("2026-11-20T16:44:22.133000+01:00".into()),
-            ],
+            cells: vec![Cell::Int(7), Cell::Text("2026-11-20T16:44:22.133000+01:00".into())],
             row_copies: AtomicUsize::new(0),
         });
         let source_dyn: Source = source.clone();
         let columns = vec![("id".into(), 120.0), ("created_at".into(), 272.0)];
         let widths = measure_visible_columns(
             &source_dyn,
-            &RowMap { count: 1, ..Default::default() },
+            &RowMap {
+                count: 1,
+                ..Default::default()
+            },
             &columns,
             &Edits::default(),
             0,
@@ -1344,7 +1412,11 @@ mod tests {
 
     #[test]
     fn spare_width_is_shared_by_text_columns_without_widening_numbers() {
-        let mut columns = vec![("id".into(), 56.0), ("created_at".into(), 200.0), ("name".into(), 100.0)];
+        let mut columns = vec![
+            ("id".into(), 56.0),
+            ("created_at".into(), 200.0),
+            ("name".into(), 100.0),
+        ];
         fill_text_columns(&mut columns, &[true, false, false], 800.0);
         assert_eq!(columns[0].1, 56.0);
         assert_eq!(columns[1].1, MAX_CONTENT_WIDTH);

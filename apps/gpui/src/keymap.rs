@@ -20,6 +20,7 @@ pub enum Command {
     ToggleSidebar,
     NewQuery,
     RunQuery,
+    RunAtCursor,
     ToggleDetail,
     CloseTab,
     ReopenTab,
@@ -27,7 +28,7 @@ pub enum Command {
 }
 
 impl Command {
-    pub const ALL: [Command; 22] = [
+    pub const ALL: [Command; 23] = [
         Command::Palette,
         Command::QuickSwitcher,
         Command::JumpColumn,
@@ -46,6 +47,7 @@ impl Command {
         Command::ToggleSidebar,
         Command::NewQuery,
         Command::RunQuery,
+        Command::RunAtCursor,
         Command::ToggleDetail,
         Command::CloseTab,
         Command::ReopenTab,
@@ -72,6 +74,7 @@ impl Command {
             Command::ToggleSidebar => "toggle-sidebar",
             Command::NewQuery => "new-query",
             Command::RunQuery => "run-query",
+            Command::RunAtCursor => "run-at-cursor",
             Command::ToggleDetail => "toggle-detail",
             Command::CloseTab => "close-tab",
             Command::ReopenTab => "reopen-tab",
@@ -98,7 +101,8 @@ impl Command {
             Command::CopyCellsWithHeaders => "Copy cells with headers",
             Command::ToggleSidebar => "Show or hide the sidebar",
             Command::NewQuery => "New query tab",
-            Command::RunQuery => "Run the query",
+            Command::RunQuery => "Run full query buffer",
+            Command::RunAtCursor => "Run statement at cursor",
             Command::ToggleDetail => "Show or hide the detail panel",
             Command::CloseTab => "Close the current tab",
             Command::ReopenTab => "Reopen the last closed tab",
@@ -202,7 +206,8 @@ impl Default for Keymap {
                 (Command::CopyCellsWithHeaders, chord(true, true, "c")),
                 (Command::ToggleSidebar, chord(true, false, "b")),
                 (Command::NewQuery, chord(true, false, "t")),
-                (Command::RunQuery, chord(true, false, "enter")),
+                (Command::RunAtCursor, chord(true, false, "enter")),
+                (Command::RunQuery, chord(true, true, "enter")),
                 (Command::ToggleDetail, chord(false, false, "f3")),
                 (Command::CloseTab, chord(true, false, "w")),
                 (Command::ReopenTab, chord(true, true, "t")),
@@ -273,12 +278,23 @@ mod tests {
             keymap.resolve(&Chord::parse("f3").unwrap()),
             Some(Command::ToggleDetail)
         );
+        assert_eq!(
+            keymap.resolve(&Chord::parse("ctrl-enter").unwrap()),
+            Some(Command::RunAtCursor)
+        );
+        assert_eq!(
+            keymap.resolve(&Chord::parse("ctrl-shift-enter").unwrap()),
+            Some(Command::RunQuery)
+        );
     }
 
     #[test]
     fn closing_and_reopening_a_tab_use_the_same_chords_as_the_gtk_app() {
         let keymap = Keymap::default();
-        assert_eq!(keymap.resolve(&Chord::parse("ctrl-w").unwrap()), Some(Command::CloseTab));
+        assert_eq!(
+            keymap.resolve(&Chord::parse("ctrl-w").unwrap()),
+            Some(Command::CloseTab)
+        );
         assert_eq!(
             keymap.resolve(&Chord::parse("ctrl-shift-t").unwrap()),
             Some(Command::ReopenTab)

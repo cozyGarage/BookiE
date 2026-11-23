@@ -29,12 +29,16 @@ impl GridView {
             .border_b_1()
             .border_color(rgb(theme.border))
             .child(
-                primary_button("run-query", "Run", "Run query (Ctrl+Enter)", theme).on_click(cx.listener(
-                    |this, _, _, cx| {
-                        this.run_query(cx);
-                        cx.notify();
-                    },
-                )),
+                primary_button(
+                    "run-query",
+                    "Run",
+                    "Run statement at cursor (Ctrl+Enter, Ctrl+Shift+Enter for all)",
+                    theme,
+                )
+                .on_click(cx.listener(|this, _, _, cx| {
+                    this.run_at_cursor(cx);
+                    cx.notify();
+                })),
             )
             .child(
                 ghost_icon("explain-query", "info", "Explain the query", theme).on_click(cx.listener(
@@ -97,13 +101,40 @@ impl GridView {
                         )
                     }))
                     .children(self.live.is_some().then(|| {
+                        let active = {
+                            let driver = self
+                                .live
+                                .as_ref()
+                                .map_or_else(|| "postgres".to_string(), |session| session.driver_id.clone());
+                            let editor = self.sql_input.read(cx);
+                            let (text, cursor, selection) =
+                                (editor.value().to_string(), editor.cursor(), editor.selected_range());
+                            crate::run_cursor_ui::run_source_range(&text, &driver, cursor, selection)
+                        };
                         div()
+                            .flex()
                             .flex_1()
-                            .when(!self.fonts.settings.editor_family.is_empty(), |pane| {
-                                pane.font_family(self.fonts.settings.editor_family.clone())
-                            })
-                            .text_size(px(self.fonts.settings.editor_size))
-                            .child(gpui_kit::component::input::Editor::new(&self.sql_input).h(gpui::relative(1.0)))
+                            .min_w_0()
+                            .gap_1()
+                            .child(
+                                div()
+                                    .w(px(size::GUTTER_MARKER_WIDTH))
+                                    .h_full()
+                                    .rounded_full()
+                                    .when(active.is_some(), |strip| strip.bg(rgb(theme.accent)))
+                                    .when(active.is_none(), |strip| strip.bg(rgb(theme.muted))),
+                            )
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .when(!self.fonts.settings.editor_family.is_empty(), |pane| {
+                                        pane.font_family(self.fonts.settings.editor_family.clone())
+                                    })
+                                    .text_size(px(self.fonts.settings.editor_size))
+                                    .child(
+                                        gpui_kit::component::input::Editor::new(&self.sql_input).h(gpui::relative(1.0)),
+                                    ),
+                            )
                     })),
             )
     }
@@ -190,6 +221,11 @@ impl GridView {
             tab.border_color(rgb(theme.muted))
                 .text_color(rgb(theme.muted_foreground))
                 .hover(move |style| style.bg(rgb(theme.accent)))
+        };
+        let tab = if let Some(tip) = run.tooltip() {
+            tab.tooltip(move |window, cx| gpui_component::tooltip::Tooltip::new(tip.clone()).build(window, cx))
+        } else {
+            tab
         };
         tab.on_click(cx.listener(move |this, _, _, cx| {
             this.select_run(index);
@@ -305,31 +341,36 @@ impl GridView {
                         })
                         .and_then(|(sql, position, _, source)| {
                             let current = self.sql_input.read(cx).value();
-                            let ((line, column), token) = crate::run_cursor_ui::mapped_error_location(current.as_ref(), sql, *position, source.as_ref())?;
-                            let expected = source.as_ref().map_or_else(|| sql.clone(), |(snapshot, _)| snapshot.clone());
+                            let ((line, column), token) = crate::run_cursor_ui::mapped_error_location(
+                                current.as_ref(),
+                                sql,
+                                *position,
+                                source.as_ref(),
+                            )?;
+                            let expected = source
+                                .as_ref()
+                                .map_or_else(|| sql.clone(), |(snapshot, _)| snapshot.clone());
                             Some({
-                                    ghost(
-                                        "go-to-query-error",
-                                        format!("Go to error ({}:{})", line + 1, column + 1),
-                                        theme,
-                                    )
-                                    .on_click(cx.listener(
-                                        move |this, _, window, cx| {
-                                            if matches!(this.tabs.current(), Tab::Query)
-                                                && this.sql_input.read(cx).value().as_ref() == expected
-                                            {
-                                                this.sql_input.update(cx, |editor, cx| {
-                                                    editor.set_cursor_position(
-                                                        gpui_kit::component::input::Position::new(line, column),
-                                                        window,
-                                                        cx,
-                                                    );
-                                                    editor.set_selected_range(token.clone(), cx);
-                                                    editor.focus(window, cx);
-                                                });
-                                            }
-                                        },
-                                    ))
+                                ghost(
+                                    "go-to-query-error",
+                                    format!("Go to error ({}:{})", line + 1, column + 1),
+                                    theme,
+                                )
+                                .on_click(cx.listener(move |this, _, window, cx| {
+                                    if matches!(this.tabs.current(), Tab::Query)
+                                        && this.sql_input.read(cx).value().as_ref() == expected
+                                    {
+                                        this.sql_input.update(cx, |editor, cx| {
+                                            editor.set_cursor_position(
+                                                gpui_kit::component::input::Position::new(line, column),
+                                                window,
+                                                cx,
+                                            );
+                                            editor.set_selected_range(token.clone(), cx);
+                                            editor.focus(window, cx);
+                                        });
+                                    }
+                                }))
                             })
                         }),
                 )
@@ -364,9 +405,17 @@ impl GridView {
             .child(div().font_weight(gpui::FontWeight::SEMIBOLD).child("Execution summary"))
             .children(self.live.is_none().then(|| format!("Statement: {}", SQL.join(" "))))
             .child(format!("Rows returned: {}", thousands(run.rows)))
-            .child(match run.measured() {
-                Some(took) => format!("Elapsed: {took}"),
-                None => format!("Elapsed: {} ms (synthetic)", run.millis()),
+            .child({
+                let line = match run.measured() {
+                    Some(took) => format!("Elapsed: {took}"),
+                    None => format!("Elapsed: {} ms (synthetic)", run.millis()),
+                };
+                let el = div().id("execution-summary-elapsed").child(line);
+                if let Some(tip) = run.tooltip() {
+                    el.tooltip(move |window, cx| gpui_component::tooltip::Tooltip::new(tip.clone()).build(window, cx))
+                } else {
+                    el
+                }
             })
             .children(
                 self.live
@@ -378,7 +427,12 @@ impl GridView {
     pub(crate) fn result_body(&self, theme: Theme, grid: Div, cx: &mut Context<Self>) -> Div {
         if self.panel.view == ResultView::Messages {
             self.result_messages_body(theme, cx)
-        } else if let Some(failure) = self.run_tabs.slots.get(self.run_tabs.active).and_then(|slot| slot.failure.as_ref()) {
+        } else if let Some(failure) = self
+            .run_tabs
+            .slots
+            .get(self.run_tabs.active)
+            .and_then(|slot| slot.failure.as_ref())
+        {
             div().flex_1().p_4().child(failure.clone())
         } else if self.panel.view == ResultView::Plan && !self.panel.plan.is_empty() {
             self.plan_body(theme)

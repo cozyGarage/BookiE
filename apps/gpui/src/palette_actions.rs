@@ -1,6 +1,6 @@
 use super::*;
-use bookie_app_services::structure_change_plan::StructureChangeKind;
 use crate::palette_state::PaletteMode;
+use bookie_app_services::structure_change_plan::StructureChangeKind;
 
 fn is_edit_palette_action(id: &str) -> bool {
     matches!(
@@ -18,6 +18,7 @@ fn is_edit_palette_action(id: &str) -> bool {
             | "drop-index"
             | "show-structure"
             | "go-to-reference"
+            | "peek-foreign-key"
             | "show-referencing"
             | "show-create-table"
             | "empty-table"
@@ -81,6 +82,7 @@ impl GridView {
             .chain(self.health_actions())
             .chain(self.value_search_actions())
             .chain(self.schema_diagram_actions())
+            .chain(self.schema_compare_actions())
             .chain(self.run_cursor_actions())
             .chain(self.paste_actions())
             .chain(self.filter_rule_actions())
@@ -210,7 +212,11 @@ impl GridView {
             action("copy", "Copy selected rows as TSV", self.selection.is_some()),
             action("copy-csv", "Copy selected rows as CSV", self.selection.is_some()),
             action("set-cells", "Set selected cells to a value…", self.set_cells_enabled()),
-            action("selection-stats", "Show statistics for the selected rows", self.selection_stats_enabled()),
+            action(
+                "selection-stats",
+                "Show statistics for the selected rows",
+                self.selection_stats_enabled(),
+            ),
             action("export-file", "Export to a file…", self.export_file_enabled()),
             action("export-csv", "Export current page or selection as CSV", true),
             action("copy-json", "Copy selected rows as JSON", self.selection.is_some()),
@@ -286,6 +292,18 @@ impl GridView {
                 "Show server runtime status",
                 has(bookie_core::ActivityQuery::ServerStatus),
             ),
+            action(
+                "activity-console",
+                "Show activity console (server processes)",
+                has(bookie_core::ActivityQuery::Sessions),
+            ),
+            action(
+                "cancel-process",
+                "Cancel selected server process (PolicyGuard governed)",
+                self.live
+                    .as_ref()
+                    .is_some_and(|l| l.driver_id == "postgres" || l.driver_id == "mysql"),
+            ),
             action("status", "Show connection and tunnel status", self.live.is_some()),
         ]
     }
@@ -327,7 +345,11 @@ impl GridView {
                 "Import CSV file…",
                 self.can_save_edits() && self.cell_edit.edits.is_empty() && self.compare.is_none() && !self.form_open(),
             ),
-            action("resolve-outcome", "Resolve unknown write outcome…", self.resolve_enabled()),
+            action(
+                "resolve-outcome",
+                "Resolve unknown write outcome…",
+                self.resolve_enabled(),
+            ),
             action(
                 "insert-row",
                 "Add a row",
@@ -375,6 +397,11 @@ impl GridView {
             action("empty-table", "Empty the table…", self.structure_change_enabled()),
             action("drop-table", "Drop the table…", self.structure_change_enabled()),
             action("go-to-reference", "Go to the referenced row", self.fk_nav_enabled()),
+            action(
+                "peek-foreign-key",
+                "Peek referenced row (foreign key preview)",
+                self.fk_nav_enabled(),
+            ),
             action("show-referencing", "Show referencing rows", self.fk_nav_enabled()),
             action("show-structure", "Show table structure", self.structure_info_enabled()),
             action("add-column", "Add a column…", self.structure_change_enabled()),
@@ -383,8 +410,16 @@ impl GridView {
             action("add-index", "Create an index…", self.structure_change_enabled()),
             action("drop-index", "Drop an index…", self.structure_change_enabled()),
             action("rename-table", "Rename the table…", self.structure_change_enabled()),
-            action("add-foreign-key", "Add a foreign key…", self.foreign_key_change_enabled()),
-            action("drop-foreign-key", "Drop a foreign key…", self.foreign_key_change_enabled()),
+            action(
+                "add-foreign-key",
+                "Add a foreign key…",
+                self.foreign_key_change_enabled(),
+            ),
+            action(
+                "drop-foreign-key",
+                "Drop a foreign key…",
+                self.foreign_key_change_enabled(),
+            ),
         ]
     }
 
@@ -406,7 +441,9 @@ impl GridView {
             action(
                 "previous-run",
                 "Previous result",
-                matches!(self.tabs.current(), Tab::Query) && !self.run_tabs.slots.is_empty() && self.run_tabs.active > 0,
+                matches!(self.tabs.current(), Tab::Query)
+                    && !self.run_tabs.slots.is_empty()
+                    && self.run_tabs.active > 0,
             ),
             action(
                 "next-run",
@@ -477,9 +514,9 @@ impl GridView {
         self.palette.open = true;
         self.palette.fonts = false;
         self.palette.mode = PaletteMode::Commands;
-        self.palette
-            .input
-            .update(cx, |input, cx| input.set_placeholder(PaletteMode::Commands.placeholder(), cx));
+        self.palette.input.update(cx, |input, cx| {
+            input.set_placeholder(PaletteMode::Commands.placeholder(), cx)
+        });
         self.palette.index = 0;
         self.palette.input.update(cx, |input, cx| input.set_content("", cx));
         window.focus(&self.palette.input.read(cx).focus_handle(cx), cx);
@@ -587,7 +624,10 @@ impl GridView {
         cx: &mut Context<Self>,
     ) -> bool {
         match id {
-            "sessions" => self.show_sessions(window, cx),
+            "sessions" | "activity-console" => self.show_sessions(window, cx),
+            "cancel-process" => {
+                self.cancel_selected_process(cx);
+            }
             "blocking-locks" => self.show_activity(bookie_core::ActivityQuery::BlockingLocks, window, cx),
             "long-running" => self.show_activity(bookie_core::ActivityQuery::LongRunning, window, cx),
             "replication-lag" => self.show_activity(bookie_core::ActivityQuery::ReplicationLag, window, cx),
@@ -629,6 +669,7 @@ impl GridView {
             "import-csv" => self.open_import_bar(cx),
             "show-structure" => self.show_structure(cx),
             "go-to-reference" => self.go_to_referenced_row(cx),
+            "peek-foreign-key" => self.peek_referenced_row(cx),
             "show-referencing" => self.show_referencing_rows(cx),
             "show-create-table" => self.show_create_table(cx),
             "empty-table" => self.open_structure_bar(StructureChangeKind::TruncateTable, cx),
