@@ -1,72 +1,74 @@
 use std::io::Write;
 use std::time::{Duration, Instant};
 
+mod approval_ui;
 mod assets;
+mod audit_page;
+mod backup_ui;
 mod binary_mode;
 mod catalog_nav;
-mod column_projection;
-mod closed_tabs_ui;
 mod chrome;
-mod home_page;
-mod query_pane;
+mod closed_tabs_ui;
+mod column_projection;
 mod connection_form;
 mod copy_selection;
 mod detail_panel;
-mod find_filter;
-mod grid_edit;
-mod grid_table;
-mod local_sort;
-mod audit_page;
-mod history_view;
-mod keys;
-mod measure;
-mod menus;
-mod palette_actions;
-mod palette_state;
-mod edit_history;
-mod favorites_ui;
-mod approval_ui;
-mod follow_ui;
-mod import_ui;
-mod export_file_ui;
-mod selection_stats_ui;
-mod backup_ui;
 mod connection_bundle_ui;
 mod diagram_scene;
 mod diagram_ui;
+mod edit_history;
+mod export_file_ui;
+mod favorites_ui;
 mod filter_rule_ui;
-mod health_ui;
-mod paste_ui;
-mod refresh_ui;
-mod new_window_ui;
-mod run_cursor_ui;
-mod tables_export_ui;
-mod sql_file_ui;
-mod schema_diagram_ui;
-mod set_cells_ui;
-mod update_ui;
-mod value_search_ui;
+mod find_filter;
 mod fk_nav_ui;
-mod resolve_ui;
-mod saved_filters_ui;
-mod structure_ui;
+mod fk_peek_ui;
+mod follow_ui;
+mod grid_edit;
+mod grid_table;
+mod health_ui;
+mod history_view;
+mod home_page;
+mod import_ui;
 mod insert_ui;
-mod params_ui;
-mod picker;
-mod save_ui;
-mod plan_view;
-mod reveal;
+mod keys;
+mod local_sort;
+mod measure;
+mod menus;
+mod new_window_ui;
+mod palette_actions;
+mod palette_state;
 mod panel_state;
+mod params_ui;
+mod paste_ui;
+mod picker;
+mod plan_view;
+mod query_pane;
+mod refresh_ui;
 mod render;
+mod resolve_ui;
+mod reveal;
+mod run_cursor_ui;
 mod runs;
+mod save_ui;
+mod saved_filters_ui;
+mod schema_compare_ui;
+mod schema_diagram_ui;
 mod scroll_pace;
+mod selection_stats_ui;
 mod services;
+mod set_cells_ui;
 mod sidebar_catalog;
-mod ssh_form;
 mod sidebar_fields;
 mod sidebar_state;
+mod sql_file_ui;
+mod ssh_form;
+mod structure_ui;
+mod tables_export_ui;
 mod text_input;
 mod ui_theme;
+mod update_ui;
+mod value_search_ui;
 
 use bookie_app_services::result_copy::{self, CopyContext, CopyFormat};
 use bookie_gpui::core_bridge::column_infos_for;
@@ -147,6 +149,7 @@ struct GridView {
     viewport_rows: usize,
     detail_open: bool,
     row_detail_open: bool,
+    pub(crate) fk_peek: Option<fk_peek_ui::FkPeekState>,
     row_detail_filter: Entity<TextInput>,
     row_detail_hide_null: bool,
     catalog: Catalog,
@@ -238,6 +241,7 @@ fn first_run(total: u64) -> Run {
         number: 1,
         rows: total,
         elapsed_ms: None,
+        first_row_ms: None,
     }
 }
 
@@ -389,10 +393,7 @@ impl GridView {
                 }
                 gpui_kit::component::table::TableEvent::SelectCell(row, column) => {
                     let column = table.read(cx).delegate().source_column(*column).unwrap_or(*column);
-                    let cursor = bookie_results::grid_cursor::Cursor {
-                        row: *row,
-                        column,
-                    };
+                    let cursor = bookie_results::grid_cursor::Cursor { row: *row, column };
                     this.cell_cursor = Some(cursor);
                     let dataset = this.base() + *row as u64;
                     this.status = match this.selection {
@@ -403,10 +404,7 @@ impl GridView {
                 }
                 gpui_kit::component::table::TableEvent::RightClickedCell(row, column) => {
                     let column = table.read(cx).delegate().source_column(*column).unwrap_or(*column);
-                    this.cell_cursor = Some(bookie_results::grid_cursor::Cursor {
-                        row: *row,
-                        column,
-                    });
+                    this.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: *row, column });
                     let dataset = this.base() + *row as u64;
                     if !this.selection.is_some_and(|selection| selection.contains(dataset)) {
                         this.click_row(dataset, false);
@@ -515,6 +513,7 @@ impl GridView {
             cell_edit: panel_state::CellEditState::new(editor, value_editor),
             detail_open: false,
             row_detail_open: false,
+            fk_peek: None,
             row_detail_filter,
             row_detail_hide_null: false,
             catalog: Catalog::synthetic(),
@@ -631,7 +630,9 @@ impl GridView {
 
     fn source_row(&self, dataset_index: u64) -> u64 {
         if let Some(order) = &self.local_order {
-            return order.get(dataset_index as usize).map_or(dataset_index, |index| u64::from(*index));
+            return order
+                .get(dataset_index as usize)
+                .map_or(dataset_index, |index| u64::from(*index));
         }
         match &self.mode {
             Mode::All => dataset_index,
@@ -641,7 +642,10 @@ impl GridView {
 
     fn dataset_index_of(&self, source: u64) -> Option<u64> {
         if let Some(order) = &self.local_order {
-            return order.iter().position(|index| u64::from(*index) == source).map(|index| index as u64);
+            return order
+                .iter()
+                .position(|index| u64::from(*index) == source)
+                .map(|index| index as u64);
         }
         match &self.mode {
             Mode::All => Some(source),
