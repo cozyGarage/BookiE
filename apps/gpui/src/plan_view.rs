@@ -10,7 +10,7 @@ const PLAN_ROW_CAP: u64 = 2_000;
 
 impl GridView {
     pub(crate) fn show_plan_of(&mut self, table: &impl ResultSource) {
-        let explaining = std::mem::take(&mut self.panel.explaining);
+        let explaining = std::mem::take(&mut self.panel.explaining) || table.executed_sql().is_some_and(typed_explain);
         self.panel.plan = if explaining { plan_nodes(table) } else { Vec::new() };
         if !self.panel.plan.is_empty() {
             self.panel.view = ResultView::Plan;
@@ -44,6 +44,10 @@ impl GridView {
                 ),
         )
     }
+}
+
+fn typed_explain(sql: &str) -> bool {
+    sql.trim_start().get(..7).is_some_and(|word| word.eq_ignore_ascii_case("explain"))
 }
 
 fn plan_nodes(table: &impl ResultSource) -> Vec<PlanNode> {

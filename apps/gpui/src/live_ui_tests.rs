@@ -1142,6 +1142,28 @@ fn a_parameter_typed_as_text_keeps_its_leading_zeros_while_auto_turns_it_into_a_
 }
 
 #[gpui::test]
+fn a_typed_explain_opens_in_the_plan_view(cx: &mut TestAppContext) {
+    use bookie_gpui::shell::ResultView;
+    let (view, cx) = open_live(cx);
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.tabs.open_query();
+            view.sync_grid_owner();
+            view.sql_input.update(cx, |input, cx| {
+                input.set_value("  explain query plan SELECT customer FROM orders", window, cx)
+            });
+            view.run_query(cx);
+        })
+    });
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.panel.view, ResultView::Plan);
+        assert!(!view.panel.plan.is_empty());
+    });
+}
+
+#[gpui::test]
 fn explain_refuses_a_statement_with_parameters_instead_of_sending_a_literal_name(cx: &mut TestAppContext) {
     let (view, cx) = open_live(cx);
     cx.update(|window, cx| {
