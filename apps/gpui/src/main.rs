@@ -843,6 +843,14 @@ mod tests {
         assert!(!right_aligned(false, &Cell::Null));
         assert!(!right_aligned(true, &Cell::Text("7".into())));
     }
+
+    #[test]
+    fn rustls_tls_client_config_initializes_without_panicking() {
+        install_crypto_provider();
+        let _config = rustls::ClientConfig::builder()
+            .with_root_certificates(rustls::RootCertStore::empty())
+            .with_no_client_auth();
+    }
 }
 
 fn open_requested_start_tab(view: &Entity<GridView>, name: &str, cx: &mut App) {
@@ -927,6 +935,7 @@ mod logging_tests {
 }
 
 fn main() {
+    install_crypto_provider();
     let started = Instant::now();
     init_logging();
     let total = rows_from(std::env::var("BOOKIE_PROTOTYPE_ROWS").ok().as_deref());
@@ -1011,6 +1020,10 @@ fn main() {
                 std::process::exit(2);
             }
         });
+}
+
+fn install_crypto_provider() {
+    bookie_transport::install_crypto_provider();
 }
 
 #[cfg(test)]
