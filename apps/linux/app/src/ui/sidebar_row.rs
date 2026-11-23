@@ -626,10 +626,7 @@ impl SidebarRow {
         let menu = schema_menu(self.schema_actions);
         let popover = crate::ui::context_menu::from_model(Some(&menu));
         popover.set_parent(root);
-        root.insert_action_group(
-            "sidebar-row",
-            Some(&schema_action_group(sender, self.schema_actions)),
-        );
+        root.insert_action_group("sidebar-row", Some(&schema_action_group(sender, self.schema_actions)));
         attach_schema_popover(root, &popover);
         *self.popover.borrow_mut() = Some(popover);
     }
