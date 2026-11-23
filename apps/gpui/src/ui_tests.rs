@@ -663,6 +663,10 @@ fn a_long_sidebar_scrolls_and_reveal_brings_the_open_table_into_view(cx: &mut Te
     });
     assert!(cx.debug_bounds("sidebar-row-0").is_some(), "the first row is drawn");
     assert!(
+        cx.debug_bounds("sidebar-guide-1").is_some(),
+        "nested rows draw an indent guide for each open parent"
+    );
+    assert!(
         cx.debug_bounds("sidebar-row-72").is_none(),
         "rows below the fold are not built"
     );
