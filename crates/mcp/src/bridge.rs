@@ -362,18 +362,16 @@ impl McpBridge {
                 let mut remaining = max_rows;
                 let mut bytes_left = max_response_bytes;
                 for result_set in &mut result.result_sets {
-                    let rows = u64::try_from(result_set.rows.len()).unwrap_or(u64::MAX);
+                    let rows = result_set.rows.len();
                     if rows > remaining {
-                        result_set
-                            .rows
-                            .truncate(usize::try_from(remaining).unwrap_or(usize::MAX));
+                        result_set.rows.truncate(remaining);
                         result_set.truncated = true;
                         result.truncated = true;
                     }
                     if keep_rows_within_bytes(result_set, &mut bytes_left) {
                         result.truncated = true;
                     }
-                    remaining = remaining.saturating_sub(u64::try_from(result_set.rows.len()).unwrap_or(u64::MAX));
+                    remaining = remaining.saturating_sub(result_set.rows.len());
                 }
                 check_pre_dispatch(&control).map_err(|error| error.to_string())?;
                 Ok(result)
