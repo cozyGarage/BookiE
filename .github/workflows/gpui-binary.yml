@@ -24,6 +24,8 @@ jobs:
     name: GPUI release binary (Linux x86_64)
     runs-on: ubuntu-24.04
     timeout-minutes: 90
+    env:
+      CARGO_TARGET_DIR: apps/gpui/target
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:

@@ -211,7 +211,7 @@ fn attaching_a_sorted_result_restores_selection_by_source_row() {
     let selected = std::collections::HashSet::from([0, 2]);
     settings.update(key, |current| {
         current.sort = vec![(0, false)];
-        current.selection = Some((Arc::downgrade(&result), Arc::new(selected)));
+        current.selection = Some((Arc::downgrade(&result), super::SavedSelection::Rows(Arc::new(selected))));
     });
 
     let store = crate::ui::row_store::RowStore::from_shared(result.clone());
@@ -246,7 +246,7 @@ fn attaching_a_sorted_result_restores_all_source_rows_as_selected() {
     };
     settings.update(key, |current| {
         current.sort = vec![(0, false)];
-        current.selection = Some((Arc::downgrade(&result), Arc::new((0..result.rows.len()).collect())));
+        current.selection = Some((Arc::downgrade(&result), super::SavedSelection::All));
     });
 
     let store = crate::ui::row_store::RowStore::from_shared(result.clone());
@@ -276,7 +276,7 @@ fn attaching_a_filtered_result_restores_all_visible_selected_source_rows() {
             value: Value::Int(2),
             exclude: false,
         });
-        current.selection = Some((Arc::downgrade(&result), Arc::new((0..result.rows.len()).collect())));
+        current.selection = Some((Arc::downgrade(&result), super::SavedSelection::All));
     });
 
     let store = crate::ui::row_store::RowStore::from_shared(result.clone());
@@ -708,6 +708,10 @@ fn large_sort_replacement_keeps_newest_order_and_selection() {
     assert_eq!(selected.size(), 1);
     assert_eq!(selected.nth(0), 24);
     assert_eq!(failed_store.source_index_at(selected.nth(0)), Some(23));
+    failed_selection.select_all();
+    let selected_count = failed_selection.selection().size();
+    assert!(!failed_view.apply_prepared_order(&order));
+    assert_eq!(failed_selection.selection().size(), selected_count);
 
     let all_store = crate::ui::row_store::RowStore::from_shared(result.clone());
     let all_selection = gtk4::MultiSelection::new(Some(all_store.clone()));
@@ -726,4 +730,38 @@ fn large_sort_replacement_keeps_newest_order_and_selection() {
     assert!(all_selected.contains(0));
     assert!(all_selected.contains(19_999));
     assert_eq!(all_store.source_index_at(0), Some(19_999));
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
+fn million_row_select_all_sort_application_profile() {
+    gtk4::init().unwrap();
+    let row_count = 1_000_000usize;
+    let result = Arc::new(result((0..row_count).map(|value| Value::Int(value as i64)).collect()));
+    let store = crate::ui::row_store::RowStore::from_shared(result.clone());
+    let selection = gtk4::MultiSelection::new(Some(store.clone()));
+    let view = LocalResultView::new(
+        result.clone(),
+        LocalResultSettingsStore::default(),
+        ResultViewKey {
+            statement_identity: crate::ui::editor::StatementIdentity {
+                statement_index: 0,
+                digest: [10; 32],
+            },
+            result_set_index: 0,
+        },
+    );
+    view.attach(store.clone(), selection.clone());
+    selection.select_all();
+    let order = crate::ui::row_store::PreparedSourceRows::checked(
+        result,
+        (0..row_count).rev().collect(),
+        &std::sync::atomic::AtomicBool::new(false),
+    )
+    .unwrap();
+    let started = std::time::Instant::now();
+    assert!(view.apply_prepared_order(&order));
+    eprintln!("million-row select-all apply: {:?}", started.elapsed());
+    assert_eq!(selection.selection().size(), row_count as u64);
+    assert_eq!(store.source_index_at(0), Some(row_count - 1));
 }

@@ -28,12 +28,18 @@ pub(crate) struct LocalCellFilter {
     pub(crate) exclude: bool,
 }
 
+#[derive(Clone)]
+enum SavedSelection {
+    All,
+    Rows(Arc<HashSet<usize>>),
+}
+
 #[derive(Clone, Default)]
 pub(crate) struct LocalResultSettings {
     pub(crate) filter: Option<LocalCellFilter>,
     pub(crate) sort: Vec<(usize, bool)>,
     pub(crate) changed_cells: Option<Arc<bookie_app_services::result_compare::ChangedCells>>,
-    selection: Option<(std::sync::Weak<QueryResult>, Arc<HashSet<usize>>)>,
+    selection: Option<(std::sync::Weak<QueryResult>, SavedSelection)>,
 }
 
 impl LocalResultSettingsStore {
@@ -56,7 +62,7 @@ impl LocalResultSettingsStore {
         self.0.borrow_mut().retain(|key, _| keys.contains(key));
     }
 
-    fn selection_for(&self, key: ResultViewKey, result: &Arc<QueryResult>) -> Option<Arc<HashSet<usize>>> {
+    fn selection_for(&self, key: ResultViewKey, result: &Arc<QueryResult>) -> Option<SavedSelection> {
         let state = self.0.borrow();
         let (saved_result, selected) = state.get(&key)?.selection.as_ref()?;
         let saved_result = saved_result.upgrade()?;
@@ -191,9 +197,15 @@ impl LocalResultView {
             if selection_syncing.get() {
                 return;
             }
-            let selected = selected_source_rows(&store, selection);
+            let positions = selection.selection();
+            let selected =
+                if store.n_items() as usize == result.rows.len() && positions.size() == u64::from(store.n_items()) {
+                    SavedSelection::All
+                } else {
+                    SavedSelection::Rows(Arc::new(selected_source_rows(&store, selection)))
+                };
             settings_store.update(settings_key, |settings| {
-                settings.selection = Some((Arc::downgrade(&result), Arc::new(selected)));
+                settings.selection = Some((Arc::downgrade(&result), selected));
             });
         });
     }
@@ -439,26 +451,39 @@ impl LocalResultView {
     }
 
     fn apply_prepared_order(&self, order: &PreparedSourceRows) -> bool {
-        let (store, selection) = {
+        let (store, selection, source_row_count) = {
             let state = self.0.borrow();
             let Some(store) = state.store.clone() else { return false };
             let Some(selection) = state.selection.clone() else {
                 return false;
             };
-            (store, selection)
+            (store, selection, state.result.rows.len())
         };
-        let previous_selection = selection.selection().copy();
         let item_count = store.n_items();
-        let selected = selected_source_rows(&store, &selection);
+        let all_selected = item_count > 0
+            && item_count as usize == source_row_count
+            && selection.selection().size() == u64::from(item_count);
+        let previous_selection = (!all_selected).then(|| selection.selection().copy());
+        let selected = (!all_selected).then(|| selected_source_rows(&store, &selection));
         let syncing = self.0.borrow().selection_syncing.clone();
         syncing.set(true);
-        if previous_selection.size() > 0 {
+        if all_selected {
+            selection.set_model(None::<&RowStore>);
+        } else if previous_selection.as_ref().is_some_and(|selected| selected.size() > 0) {
             selection.set_selection(&gtk4::Bitset::new_empty(), &gtk4::Bitset::new_range(0, item_count));
         }
         let applied = store.replace_prepared_source_rows(order);
         if applied {
-            apply_selected_order(order.indices(), &selection, &selected);
-        } else if previous_selection.size() > 0 {
+            if all_selected {
+                selection.set_model(Some(&store));
+                selection.select_all();
+            } else if let Some(selected) = selected.as_ref() {
+                apply_selected_order(order.indices(), &selection, selected);
+            }
+        } else if all_selected {
+            selection.set_model(Some(&store));
+            selection.select_all();
+        } else if let Some(previous_selection) = previous_selection.filter(|selected| selected.size() > 0) {
             selection.set_selection(&previous_selection, &gtk4::Bitset::new_range(0, item_count));
         }
         syncing.set(false);
@@ -499,39 +524,43 @@ fn apply_selected_order(order: &[usize], selection: &gtk4::MultiSelection, selec
 fn restore_selection(
     store: &RowStore,
     selection: &gtk4::MultiSelection,
-    selected: &HashSet<usize>,
+    selected: &SavedSelection,
     has_saved_view_order: bool,
     source_row_count: usize,
     selection_syncing: &Cell<bool>,
 ) {
     selection_syncing.set(true);
     let item_count = store.n_items();
-    let all_source_rows_selected = selected.len() == source_row_count;
-    let positions = if all_source_rows_selected || (!has_saved_view_order && selected.len() == item_count as usize) {
-        gtk4::Bitset::new_range(0, item_count)
+    let (all_source_rows_selected, selected_count) = match selected {
+        SavedSelection::All => (true, source_row_count),
+        SavedSelection::Rows(rows) => (rows.len() == source_row_count, rows.len()),
+    };
+    if all_source_rows_selected || (!has_saved_view_order && selected_count == item_count as usize) {
+        selection.select_all();
     } else {
         let positions = gtk4::Bitset::new_empty();
-        if !has_saved_view_order && selected.len().saturating_mul(4) < item_count as usize {
-            for source in selected {
-                if let Ok(position) = u32::try_from(*source)
-                    && position < item_count
-                {
-                    positions.add(position);
+        if let SavedSelection::Rows(rows) = selected {
+            if !has_saved_view_order && rows.len().saturating_mul(4) < item_count as usize {
+                for source in rows.iter() {
+                    if let Ok(position) = u32::try_from(*source)
+                        && position < item_count
+                    {
+                        positions.add(position);
+                    }
                 }
-            }
-        } else {
-            for position in 0..item_count {
-                if store
-                    .source_index_at(position)
-                    .is_some_and(|source| selected.contains(&source))
-                {
-                    positions.add(position);
+            } else {
+                for position in 0..item_count {
+                    if store
+                        .source_index_at(position)
+                        .is_some_and(|source| rows.contains(&source))
+                    {
+                        positions.add(position);
+                    }
                 }
             }
         }
-        positions
-    };
-    selection.set_selection(&positions, &gtk4::Bitset::new_range(0, item_count));
+        selection.set_selection(&positions, &gtk4::Bitset::new_range(0, item_count));
+    }
     selection_syncing.set(false);
 }
 
