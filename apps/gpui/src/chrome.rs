@@ -836,13 +836,25 @@ impl GridView {
 
     pub fn home_page(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
         div()
+            .relative()
             .flex_1()
             .flex()
             .justify_center()
             .p_6()
             .bg(rgb(theme.background))
             .child(
+                gpui::svg()
+                    .path("backdrop/contours.svg")
+                    .debug_selector(|| "home-backdrop".into())
+                    .absolute()
+                    .top_0()
+                    .left_0()
+                    .size_full()
+                    .text_color(rgb(theme.border)),
+            )
+            .child(
             div()
+                .relative()
                 .pt(px(size::HOME_TOP))
                 .w(px(size::HOME_WIDTH))
                 .max_w_full()
