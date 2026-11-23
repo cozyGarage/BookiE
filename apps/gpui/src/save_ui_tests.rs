@@ -432,6 +432,7 @@ fn an_edited_cell_is_reviewed_then_saved_and_the_table_shows_the_saved_value(cx:
             assert_eq!(view.cell_edit.value_editor.read(cx).value().as_ref(), staged);
         })
     });
+    cx.run_until_parked();
     cx.update(|_, cx| cx.write_to_clipboard(gpui::ClipboardItem::new_string(replacement.clone())));
     cx.simulate_keystrokes("ctrl-a ctrl-v");
     cx.run_until_parked();
