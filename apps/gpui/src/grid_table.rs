@@ -112,6 +112,17 @@ fn header_menu(
                 cx.write_to_clipboard(gpui::ClipboardItem::new_string(copy_name.clone()))
             }));
             if let Some(owner) = owner.clone() {
+                let fit_owner = owner.clone();
+                menu = menu.item(PopupMenuItem::new("Fit column to content").on_click(move |_, window, cx| {
+                    let _ = fit_owner.update(cx, |view, cx| {
+                        view.table.update(cx, |table, cx| { table.fit_col(col_ix, window, cx); });
+                    });
+                }));
+                menu = menu.item(PopupMenuItem::new("Reset column widths").on_click(move |_, window, cx| {
+                    let _ = owner.update(cx, |view, cx| view.reset_grid_widths(window, cx));
+                }));
+            }
+            if let Some(owner) = owner.clone() {
                 let column = column_name.clone();
                 let hide_owner = owner.clone();
                 menu = menu.item(PopupMenuItem::new("Hide column").on_click(move |_, window, cx| {
@@ -159,6 +170,12 @@ fn header_menu(
 }
 
 impl TableDelegate for GridDelegate {
+    fn fit_column(&mut self, col_ix: usize, window: &mut Window, _cx: &mut Context<TableState<Self>>) -> Option<gpui::Pixels> {
+        let source_col = self.projection.source_index(col_ix)?;
+        let source = self.source.as_ref()?;
+        let measured = measure_visible_columns(source, &self.map, &self.columns, &self.edits, 0, self.map.count.min(64), |text| measure_text(text, window));
+        measured.get(source_col).copied().map(px)
+    }
     fn perform_sort(
         &mut self,
         col_ix: usize,
@@ -522,6 +539,21 @@ impl GridDelegate {
 }
 
 impl GridView {
+    fn reset_grid_widths(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(scope) = self.pin_scope() else { return };
+        if let Some((id, _)) = self.live.as_ref().and_then(|session| session.saved.as_ref())
+            && let Some(store) = &self.column_widths
+            && let Err(error) = store.forget_widths(*id, &scope.width_key())
+        {
+            tracing::warn!(%error, "could not reset grid column widths");
+        }
+        self.table.update(cx, |table, _| {
+            table.delegate_mut().manual_widths.remove(&scope);
+        });
+        let available_width = self.table.read(cx).delegate().available_width;
+        self.sync_table(available_width, window, cx);
+        cx.notify();
+    }
     pub(crate) fn remember_grid_widths(&mut self, widths: &[gpui::Pixels], cx: &mut Context<Self>) {
         let table = self.table.read(cx);
         let delegate = table.delegate();
@@ -1184,6 +1216,18 @@ mod tests {
     use bookie_gpui::model::Cell;
     use bookie_gpui::source::{ResultSource, Synthetic};
     use bookie_results::grid_cursor::Cursor;
+
+    #[test]
+    fn width_keys_distinguish_database_schema_and_delimiters() {
+        let scope = |database: &str, schema: Option<&str>, table: &str| PinScope {
+            connection: "connection".into(),
+            database: database.into(),
+            schema: schema.map(str::to_owned),
+            table: table.into(),
+        };
+        assert_ne!(scope("a.b", Some("c"), "d").width_key(), scope("a", Some("b.c"), "d").width_key());
+        assert_ne!(scope("a", None, "d").width_key(), scope("a", Some(""), "d").width_key());
+    }
 
     #[gpui::test]
     fn header_sort_indicator_matches_the_applied_sort(cx: &mut gpui::TestAppContext) {
