@@ -41,6 +41,11 @@ impl PinScope {
     }
 }
 
+fn query_width_identity(sql: &str, columns: &[bookie_gpui::model::ColumnMeta]) -> Option<String> {
+    let shape = columns.iter().map(|column| (&column.name, &column.data_type)).collect::<Vec<_>>();
+    serde_json::to_string(&(sql, shape)).ok()
+}
+
 impl PartialEq for RowMap {
     fn eq(&self, other: &Self) -> bool {
         self.base == other.base
@@ -727,8 +732,7 @@ impl GridView {
             return None;
         }
         let sql = self.source.executed_sql()?;
-        let shape = self.source.columns().iter().map(|column| (&column.name, &column.data_type)).collect::<Vec<_>>();
-        let table = serde_json::to_string(&(sql, shape)).ok()?;
+        let table = query_width_identity(sql, self.source.columns())?;
         let crate::binary_mode::Scope::Query { connection, database } = self.binary_scope() else { return None };
         Some(PinScope { connection, database, schema: None, table })
     }
@@ -1384,6 +1388,19 @@ mod tests {
     use bookie_gpui::model::Cell;
     use bookie_gpui::source::{ResultSource, Synthetic};
     use bookie_results::grid_cursor::Cursor;
+
+    #[test]
+    fn query_width_identity_depends_on_executed_sql_and_result_shape() {
+        let column = |name: &str, data_type: &str| bookie_gpui::model::ColumnMeta {
+            name: name.into(), data_type: data_type.into(), width: 100.0, numeric: false, primary_key: false,
+        };
+        let columns = [column("id", "integer")];
+        let original = query_width_identity("select id from a", &columns);
+        assert_eq!(original, query_width_identity("select id from a", &columns));
+        assert_ne!(original, query_width_identity("select id from b", &columns));
+        assert_ne!(original, query_width_identity("select id from a", &[column("id", "text")]));
+        assert_ne!(original, query_width_identity("select id from a", &[column("name", "integer")]));
+    }
 
     #[test]
     fn width_keys_distinguish_database_schema_and_delimiters() {
