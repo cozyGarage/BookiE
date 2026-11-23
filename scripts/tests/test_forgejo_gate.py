@@ -75,7 +75,8 @@ else:
 """
 
 
-def gate(tasks, initial_status='failure', dispatch_capture=None, target='subject', remote_sha=None):
+def gate(tasks, initial_status='failure', dispatch_capture=None, target='subject', remote_sha=None,
+         timeout_minutes='1'):
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         tools = root / 'bin'
@@ -92,7 +93,7 @@ def gate(tasks, initial_status='failure', dispatch_capture=None, target='subject
                    GATE_TEST_HEAD=HEAD, GATE_TEST_FIXTURE=str(fixture), FORGEJO_TOKEN_FILE=str(token),
                    GATE_TEST_DISPATCH_FILE=str(root / 'dispatch.json'),
                    FORGEJO_GATE_LOCK=str(root / 'gate.lock'), FORGEJO_GATE_LOCK_DIR=str(root / 'locks'),
-                   FORGEJO_GATE_TIMEOUT_MINUTES='1')
+                   FORGEJO_GATE_TIMEOUT_MINUTES=timeout_minutes)
         if remote_sha is not None:
             env['GATE_TEST_REMOTE_SHA'] = remote_sha
         result = subprocess.run(['bash', str(ROOT / 'scripts/forgejo-gate.sh'), 'subject', target],
@@ -131,6 +132,12 @@ class ForgejoGateTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn('928', result.stdout)
         self.assertIn('929', result.stdout)
+
+    def test_timed_out_gate_keeps_its_slot_until_the_remote_run_finishes(self):
+        result = gate([], initial_status='running', timeout_minutes='0')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('keeping the gate slot until Forgejo reports a terminal status', result.stderr)
+        self.assertIn('passed for ' + HEAD, result.stdout)
 
     def test_failure_reporting_uses_jobs_for_the_failed_run(self):
         result = gate([
