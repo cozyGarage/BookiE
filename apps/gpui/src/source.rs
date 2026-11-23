@@ -34,6 +34,9 @@ pub trait ResultSource: Send + Sync + 'static {
     fn is_partial(&self) -> bool {
         false
     }
+    fn snapshot_consistent(&self) -> bool {
+        false
+    }
     fn row(&self, index: u64) -> Vec<Cell>;
     fn row_ref(&self, _index: u64) -> Option<&[Cell]> {
         None

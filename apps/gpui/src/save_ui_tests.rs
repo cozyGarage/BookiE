@@ -1129,24 +1129,53 @@ fn set_export_path(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestConte
     });
 }
 
+fn set_export_format(
+    view: &gpui::Entity<GridView>,
+    cx: &mut gpui::VisualTestContext,
+    format: bookie_core::export::ResultFormat,
+) {
+    cx.update(|_, cx| view.update(cx, |view, _| view.export.file.format = format));
+}
+
 #[gpui::test]
-fn the_page_is_written_to_a_file_in_the_format_of_its_extension_and_never_over_an_existing_file(cx: &mut TestAppContext) {
+fn export_uses_the_selected_scope_and_format_and_never_overwrites_a_file(cx: &mut TestAppContext) {
     let path = fixture_copy("export-file");
     let (view, cx) = saving_view(cx, &path);
     let directory = std::env::temp_dir().join(format!("bookie-export-{}", std::process::id()));
     std::fs::create_dir_all(&directory).unwrap();
+    cx.update(|_, cx| view.update(cx, |view, _| {
+        view.selection = Some(bookie_gpui::selection::Selection { anchor: 0, focus: 0 });
+    }));
     cx.update(|_, cx| view.update(cx, |view, cx| view.open_export_file_bar(cx)));
     view.read_with(cx, |view, _| assert!(view.export.file.open));
 
-    let jsonl = directory.join("rows.jsonl");
-    set_export_path(&view, cx, &jsonl);
+    set_export_format(&view, cx, bookie_core::export::ResultFormat::JsonLines);
+    let selected = directory.join("selected");
+    set_export_path(&view, cx, &selected);
     cx.update(|_, cx| view.update(cx, |view, cx| view.write_export_file(cx)));
-    let written = read_when_written(cx, &jsonl, |text| text.lines().count() >= 6);
+    let jsonl = directory.join("selected.jsonl");
+    let written = read_when_written(cx, &jsonl, |text| !text.is_empty());
+    assert_eq!(written.lines().count(), 1, "selected rows only: {written}");
+    let value: serde_json::Value = serde_json::from_str(written.lines().next().unwrap()).unwrap();
+    assert!(value["id"].is_number(), "JSON keeps the database number type: {value}");
+    view.read_with(cx, |view, _| assert!(!view.export.file.open && view.status.starts_with("Wrote 1 row(s)")));
+
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_export_file_bar(cx)));
+    cx.update(|_, cx| view.update(cx, |view, _| {
+        view.export.file.scope = crate::export_file_ui::ExportScope::CurrentPage;
+    }));
+    set_export_format(&view, cx, bookie_core::export::ResultFormat::JsonLines);
+    let page = directory.join("page");
+    set_export_path(&view, cx, &page);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.write_export_file(cx)));
+    let page_path = directory.join("page.jsonl");
+    let written = read_when_written(cx, &page_path, |text| text.lines().count() >= 6);
     assert_eq!(written.lines().count(), 6, "{written}");
     assert!(written.lines().next().unwrap().starts_with('{'), "{written}");
     view.read_with(cx, |view, _| assert!(!view.export.file.open && view.status.starts_with("Wrote 6 row(s)")));
 
     cx.update(|_, cx| view.update(cx, |view, cx| view.open_export_file_bar(cx)));
+    set_export_format(&view, cx, bookie_core::export::ResultFormat::Sql);
     let sql = directory.join("rows.sql");
     set_export_path(&view, cx, &sql);
     cx.update(|_, cx| view.update(cx, |view, cx| view.write_export_file(cx)));
@@ -1154,6 +1183,7 @@ fn the_page_is_written_to_a_file_in_the_format_of_its_extension_and_never_over_a
     assert!(inserts.contains("INSERT INTO"), "a table exports as SQL inserts");
 
     cx.update(|_, cx| view.update(cx, |view, cx| view.open_export_file_bar(cx)));
+    set_export_format(&view, cx, bookie_core::export::ResultFormat::JsonLines);
     set_export_path(&view, cx, &jsonl);
     cx.update(|_, cx| view.update(cx, |view, cx| view.write_export_file(cx)));
     view.read_with(cx, |view, _| {
@@ -1162,7 +1192,7 @@ fn the_page_is_written_to_a_file_in_the_format_of_its_extension_and_never_over_a
     });
     set_export_path(&view, cx, &directory.join("rows.txt"));
     cx.update(|_, cx| view.update(cx, |view, cx| view.write_export_file(cx)));
-    view.read_with(cx, |view, _| assert!(view.status.contains("ending in"), "{}", view.status));
+    view.read_with(cx, |view, _| assert!(view.status.contains(".jsonl"), "{}", view.status));
     assert!(!directory.join("rows.txt").exists());
     std::fs::remove_dir_all(&directory).ok();
     std::fs::remove_file(&path).ok();

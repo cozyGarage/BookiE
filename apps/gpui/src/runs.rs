@@ -45,6 +45,7 @@ impl GridView {
         match bookie_core::sql_dialect::explain_statement(&session.driver_id, &sql) {
             Some(statement) => {
                 self.panel.explaining = true;
+                self.panel.plan.clear();
                 self.run_sql(statement, cx)
             }
             None => self.status = "This database cannot explain a query".into(),

@@ -1400,6 +1400,7 @@ dependencies = [
  "regex",
  "rfd",
  "rust_decimal",
+ "rustls",
  "secrecy",
  "serde_json",
  "tokio",
