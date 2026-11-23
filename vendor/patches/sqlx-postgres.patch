@@ -1,5 +1,5 @@
 diff --git a/Cargo.toml b/Cargo.toml
-index 11782a8..76677e1 100644
+index 1517590..990aeff 100644
 --- a/Cargo.toml
 +++ b/Cargo.toml
 @@ -111,6 +111,13 @@ optional = true
@@ -17,10 +17,10 @@ index 11782a8..76677e1 100644
  version = "1.4.3"
  features = ["std"]
 diff --git a/src/connection/describe.rs b/src/connection/describe.rs
-index f08e213..8ceccd6 100755
+index ee99189..92f3ae4 100644
 --- a/src/connection/describe.rs
 +++ b/src/connection/describe.rs
-@@ -2,11 +2,11 @@ use crate::error::Error;
+@@ -3,11 +3,11 @@ use crate::executor::Executor;
  use crate::io::StatementId;
  use crate::query_as::query_as;
  use crate::statement::PgStatementMetadata;
@@ -34,7 +34,7 @@ index f08e213..8ceccd6 100755
  impl PgConnection {
      /// Check whether EXPLAIN statements are supported by the current connection
 diff --git a/src/connection/establish.rs b/src/connection/establish.rs
-index 3c2f516..fea836f 100755
+index 3c2f516..fea836f 100644
 --- a/src/connection/establish.rs
 +++ b/src/connection/establish.rs
 @@ -29,8 +29,6 @@ impl PgConnection {
@@ -60,10 +60,36 @@ index 3c2f516..fea836f 100755
                  next_statement_id: StatementId::NAMED_START,
                  cache_statement: StatementCache::new(options.statement_cache_capacity),
 diff --git a/src/connection/executor.rs b/src/connection/executor.rs
-index e0f4c3d..fd892bc 100755
+index 387160a..4f9c322 100644
 --- a/src/connection/executor.rs
 +++ b/src/connection/executor.rs
-@@ -205,6 +205,12 @@ impl PgConnection {
+@@ -219,6 +219,7 @@ impl PgConnection {
+         arguments: Option<&mut PgArguments>,
+         persistent: bool,
+         metadata_opt: Option<Arc<PgStatementMetadata>>,
++        result_format: PgValueFormat,
+     ) -> Result<(PgValueFormat, Arc<PgStatementMetadata>), Error> {
+         let metadata: Arc<PgStatementMetadata>;
+ 
+@@ -257,7 +258,7 @@ impl PgConnection {
+                 formats: &[PgValueFormat::Binary],
+                 num_params,
+                 params: &arguments.buffer,
+-                result_formats: &[PgValueFormat::Binary],
++                result_formats: &[result_format],
+             })?;
+ 
+             // executes the portal up to the passed limit
+@@ -289,7 +290,7 @@ impl PgConnection {
+             self.write_sync();
+ 
+             // prepared statements are binary
+-            PgValueFormat::Binary
++            result_format
+         } else {
+             // Query will trigger a ReadyForQuery
+             self.queue_simple_query(sql)?;
+@@ -315,12 +316,24 @@ impl PgConnection {
      ) -> Result<impl Stream<Item = Result<Either<PgQueryResult, PgRow>, Error>> + 'e, Error> {
          let mut logger = QueryLogger::new(query, self.inner.log_settings.clone());
          let sql = logger.sql().as_str();
@@ -76,26 +102,29 @@ index e0f4c3d..fd892bc 100755
  
          // before we continue, wait until we are "ready" to accept more queries
          self.wait_until_ready().await?;
-@@ -246,7 +252,7 @@ impl PgConnection {
-                 formats: &[PgValueFormat::Binary],
-                 num_params,
-                 params: &arguments.buffer,
--                result_formats: &[PgValueFormat::Binary],
-+                result_formats: &[result_format],
-             })?;
  
-             // executes the portal up to the passed limit
-@@ -278,7 +284,7 @@ impl PgConnection {
-             self.write_sync();
+         let (mut format, mut metadata) = self
+-            .try_get_or_prepare(sql, arguments.as_mut(), persistent, metadata_opt.clone())
++            .try_get_or_prepare(
++                sql,
++                arguments.as_mut(),
++                persistent,
++                metadata_opt.clone(),
++                result_format,
++            )
+             .await?;
  
-             // prepared statements are binary
--            PgValueFormat::Binary
-+            result_format
-         } else {
-             // Query will trigger a ReadyForQuery
-             self.queue_simple_query(sql)?;
+         let mut message = match self.inner.stream.recv().await {
+@@ -347,6 +360,7 @@ impl PgConnection {
+                             arguments.as_mut(),
+                             persistent,
+                             metadata_opt.clone(),
++                            result_format,
+                         )
+                         .await?;
+ 
 diff --git a/src/connection/mod.rs b/src/connection/mod.rs
-index d594585..96fe820 100755
+index 76637a8..09e4779 100644
 --- a/src/connection/mod.rs
 +++ b/src/connection/mod.rs
 @@ -16,12 +16,12 @@ use crate::message::{
@@ -186,10 +215,10 @@ index d594585..96fe820 100755
      pub(crate) async fn wait_until_ready(&mut self) -> Result<(), Error> {
          if !self.inner.stream.write_buffer_mut().is_empty() {
 diff --git a/src/connection/resolve.rs b/src/connection/resolve.rs
-index e47c318..d00cd41 100755
+index 425772f..708c782 100644
 --- a/src/connection/resolve.rs
 +++ b/src/connection/resolve.rs
-@@ -166,7 +166,7 @@ impl PgConnection {
+@@ -173,7 +173,7 @@ impl PgConnection {
                  // Eagerly bring the element type into cache for array types declared by-name
                  resolver.push_type(
                      format_args!("E'{}'", array_of.elem_name),
@@ -198,7 +227,7 @@ index e47c318..d00cd41 100755
                  );
              }
  
-@@ -177,7 +177,7 @@ impl PgConnection {
+@@ -184,7 +184,7 @@ impl PgConnection {
                  format_args!("E'{}'", ty.name().escape_default()),
                  // `to_regtype()` evaluates to `NULL` if the type does not exist,
                  // instead of throwing an exception like `'<name>'::regtype` does.
@@ -207,7 +236,7 @@ index e47c318..d00cd41 100755
              );
          }
  
-@@ -310,6 +310,8 @@ impl PgConnection {
+@@ -317,6 +317,8 @@ impl PgConnection {
                  PgTypeKind::Composite(attributes.into())
              }
  
@@ -216,7 +245,7 @@ index e47c318..d00cd41 100755
              _ => PgTypeKind::Simple,
          };
  
-@@ -364,22 +366,22 @@ impl TypeResolver {
+@@ -371,22 +373,22 @@ impl TypeResolver {
                  &mut self.query,
                  // Postgres 13 would return `0` instead of `NULL` for `typelem`, `typbasetype`
                  "SELECT pg_type.oid,\n\
@@ -244,8 +273,8 @@ index e47c318..d00cd41 100755
                          FROM pg_catalog.pg_attribute\n\
                          WHERE attrelid = pg_type.typrelid\n\
                              AND NOT attisdropped\n\
-@@ -400,9 +402,8 @@ impl TypeResolver {
-         let mut missing_dependencies = HashMap::<Oid, Vec<TypeResolverRow>>::new();
+@@ -408,9 +410,8 @@ impl TypeResolver {
+         let mut ran_query = false;
  
          // Iteratively resolve types until all are resolved, or we hit a dead-end.
 -        // We statically cap the number of iterations in case we somehow encounter a circular type
@@ -256,7 +285,7 @@ index e47c318..d00cd41 100755
              if self.query.is_empty() {
                  break;
              }
-@@ -530,8 +531,8 @@ impl ColumnResolver {
+@@ -547,8 +548,8 @@ impl ColumnResolver {
                  // Postgres 13 does not accept `(attnum,attname)` without `ROW`
                  "SELECT\n\
                      attrelid table_oid,\n\
@@ -267,7 +296,7 @@ index e47c318..d00cd41 100755
                  FROM (VALUES ({}, {attribute_no})",
                  table_oid.0,
              )
-@@ -601,6 +602,7 @@ enum TypType {
+@@ -618,6 +619,7 @@ enum TypType {
      Composite,
      Domain,
      Enum,
@@ -275,7 +304,7 @@ index e47c318..d00cd41 100755
      Pseudo,
      Range,
  }
-@@ -616,6 +618,7 @@ impl TryFrom<i8> for TypType {
+@@ -633,6 +635,7 @@ impl TryFrom<i8> for TypType {
              b'c' => Self::Composite,
              b'd' => Self::Domain,
              b'e' => Self::Enum,
@@ -284,7 +313,7 @@ index e47c318..d00cd41 100755
              b'r' => Self::Range,
              _ => return Err(format!("unknown type code {t}")),
 diff --git a/src/connection/sasl.rs b/src/connection/sasl.rs
-index 157e121..9c1cb1e 100755
+index 157e121..9c1cb1e 100644
 --- a/src/connection/sasl.rs
 +++ b/src/connection/sasl.rs
 @@ -16,6 +16,7 @@ const CHANNEL_ATTR: &str = "c";
@@ -346,10 +375,10 @@ index 157e121..9c1cb1e 100755
  
      mac.update(salt);
 diff --git a/src/connection/stream.rs b/src/connection/stream.rs
-index e8a1aed..c39c17d 100755
+index 3115e92..f216f63 100644
 --- a/src/connection/stream.rs
 +++ b/src/connection/stream.rs
-@@ -38,6 +38,51 @@ pub struct PgStream {
+@@ -37,6 +37,51 @@ pub struct PgStream {
      pub(crate) parameter_statuses: BTreeMap<String, String>,
  
      pub(crate) server_version_num: Option<u32>,
@@ -401,7 +430,7 @@ index e8a1aed..c39c17d 100755
  }
  
  impl PgStream {
-@@ -54,6 +99,8 @@ impl PgStream {
+@@ -62,6 +107,8 @@ impl PgStream {
              notifications: None,
              parameter_statuses: BTreeMap::default(),
              server_version_num: None,
@@ -410,7 +439,7 @@ index e8a1aed..c39c17d 100755
          })
      }
  
-@@ -62,6 +109,17 @@ impl PgStream {
+@@ -70,6 +117,17 @@ impl PgStream {
          self.write(EncodeMessage(message))
      }
  
@@ -428,7 +457,7 @@ index e8a1aed..c39c17d 100755
      pub(crate) async fn send<T>(&mut self, message: T) -> Result<(), Error>
      where
          T: FrontendMessage,
-@@ -163,6 +221,7 @@ impl PgStream {
+@@ -175,6 +233,7 @@ impl PgStream {
                      // if you are reading this comment and think so, open an issue
  
                      let notice: Notice = message.decode()?;
@@ -436,7 +465,7 @@ index e8a1aed..c39c17d 100755
  
                      let (log_level, tracing_level) = match notice.severity() {
                          PgSeverity::Fatal | PgSeverity::Panic | PgSeverity::Error => {
-@@ -263,7 +322,10 @@ fn parse_server_version(s: &str) -> Option<u32> {
+@@ -275,7 +334,10 @@ fn parse_server_version(s: &str) -> Option<u32> {
  
  #[cfg(test)]
  mod tests {
@@ -448,7 +477,7 @@ index e8a1aed..c39c17d 100755
  
      #[test]
      fn test_parse_server_version_num() {
-@@ -279,4 +341,15 @@ mod tests {
+@@ -291,4 +353,15 @@ mod tests {
          // unknown
          assert_eq!(parse_server_version("unknown"), None);
      }
@@ -465,10 +494,10 @@ index e8a1aed..c39c17d 100755
 +    }
  }
 diff --git a/src/connection/tls.rs b/src/connection/tls.rs
-index a49c9ca..e9b9595 100755
+index ecc15e1..d0874a8 100644
 --- a/src/connection/tls.rs
 +++ b/src/connection/tls.rs
-@@ -11,6 +11,7 @@ impl WithSocket for MaybeUpgradeTls<'_> {
+@@ -13,6 +13,7 @@ impl WithSocket for MaybeUpgradeTls<'_> {
      type Output = crate::Result<Box<dyn Socket>>;
  
      async fn with_socket<S: Socket>(self, socket: S) -> Self::Output {
@@ -476,11 +505,10 @@ index a49c9ca..e9b9595 100755
          maybe_upgrade(socket, self.0).await
      }
  }
-@@ -98,3 +99,14 @@ async fn request_upgrade(
-         )),
+@@ -113,6 +114,17 @@ async fn request_upgrade(
      }
  }
-+
+ 
 +pub(crate) fn enable_tcp_keepalive<S: 'static>(socket: &S) {
 +    let any: &dyn std::any::Any = socket;
 +    let Some(stream) = any.downcast_ref::<tokio::net::TcpStream>() else {
@@ -491,8 +519,12 @@ index a49c9ca..e9b9595 100755
 +        .with_interval(std::time::Duration::from_secs(10));
 +    let _ = socket2::SockRef::from(stream).set_tcp_keepalive(&keepalive);
 +}
++
+ #[cfg(test)]
+ mod tests {
+     use super::*;
 diff --git a/src/lib.rs b/src/lib.rs
-index f68c928..c743320 100755
+index f68c928..c743320 100644
 --- a/src/lib.rs
 +++ b/src/lib.rs
 @@ -50,7 +50,7 @@ pub use advisory_lock::{PgAdvisoryLock, PgAdvisoryLockGuard, PgAdvisoryLockKey};
@@ -504,94 +536,36 @@ index f68c928..c743320 100755
  pub use copy::{PgCopyIn, PgPoolCopyExt};
  pub use database::Postgres;
  pub use error::{PgDatabaseError, PgErrorPosition};
-diff --git a/src/transaction.rs b/src/transaction.rs
-index 3f4122e..b748ad7 100755
---- a/src/transaction.rs
-+++ b/src/transaction.rs
-@@ -27,11 +27,12 @@ impl TransactionManager for PgTransactionManager {
- 
-         let rollback = Rollback::new(conn);
-         rollback.conn.queue_simple_query(statement.as_str())?;
-+        rollback.conn.inner.transaction_depth += 1;
-         rollback.conn.wait_until_ready().await?;
-         if !rollback.conn.in_transaction() {
-+            rollback.conn.inner.transaction_depth -= 1;
-             return Err(Error::BeginFailed);
-         }
--        rollback.conn.inner.transaction_depth += 1;
-         rollback.defuse();
- 
-         Ok(())
-diff --git a/src/types/array.rs b/src/types/array.rs
-index 692771c..3d44a7b 100755
---- a/src/types/array.rs
-+++ b/src/types/array.rs
-@@ -270,6 +270,7 @@ where
-                 let mut done = false;
-                 let mut in_quotes = false;
-                 let mut in_escape = false;
-+                let mut was_quoted = false;
-                 let mut value = String::with_capacity(10);
-                 let mut chars = s.chars();
-                 let mut elements = Vec::with_capacity(4);
-@@ -285,6 +286,7 @@ where
- 
-                                 '"' => {
-                                     in_quotes = !in_quotes;
-+                                    was_quoted = true;
-                                 }
- 
-                                 '\\' => {
-@@ -307,7 +309,7 @@ where
-                         }
-                     }
- 
--                    let value_opt = if value == "NULL" {
-+                    let value_opt = if value == "NULL" && !was_quoted {
-                         None
-                     } else {
-                         Some(value.as_bytes())
-@@ -321,6 +323,7 @@ where
-                     })?);
- 
-                     value.clear();
-+                    was_quoted = false;
-                 }
- 
-                 Ok(elements)
-@@ -328,3 +331,30 @@ where
-         }
-     }
- }
-+
-+#[cfg(test)]
-+mod tests {
-+    use super::*;
-+
-+    #[test]
-+    fn text_array_distinguishes_quoted_null_from_sql_null() {
-+        let raw = PgValueRef {
-+            value: Some(br#"{"NULL",NULL,"null","",ordinary}"#),
-+            row: None,
-+            type_info: PgTypeInfo::TEXT_ARRAY,
-+            format: PgValueFormat::Text,
-+        };
-+        let decoded = <Vec<Option<String>> as Decode<Postgres>>::decode(raw).unwrap();
-+
-+        assert_eq!(
-+            decoded,
-+            vec![
-+                Some("NULL".into()),
-+                None,
-+                Some("null".into()),
-+                Some(String::new()),
-+                Some("ordinary".into()),
-+            ]
-+        );
-+    }
-+}
+diff --git a/src/options/doc.md b/src/options/doc.md
+index 057e9dd..3cd01ad 100644
+--- a/src/options/doc.md
++++ b/src/options/doc.md
+@@ -29,7 +29,7 @@ if a parameter is not passed in via URL, it is populated by reading
+ | `password`         | `PGPASSWORD`         | Read from [`passfile`], if it exists.                       |
+ | [`passfile`]       | `PGPASSFILE`         | `~/.pgpass` or `%APPDATA%\postgresql\pgpass.conf` (Windows) |
+ | `host`             | `PGHOST`             | See [Note: Default Host](#note-default-host).               |
+-| `hostaddr`         | `PGHOSTADDR`         | Unset.               |
++| `hostaddr`         | (not read)           | Unset.               |
+ | `port`             | `PGPORT`             | `5432`                                                      |
+ | `dbname`           | `PGDATABASE`         | Unset; defaults to the username server-side.                |
+ | `sslmode`          | `PGSSLMODE`          | `prefer`. See [`PgSslMode`] for details.                    |
+diff --git a/src/options/mod.rs b/src/options/mod.rs
+index b837cfa..369aeb5 100644
+--- a/src/options/mod.rs
++++ b/src/options/mod.rs
+@@ -86,9 +86,7 @@ impl PgConnectOptions {
+         PgConnectOptions {
+             port,
+             host: host.into(),
+-            hostaddr: var("PGHOSTADDR")
+-                .ok()
+-                .and_then(|hostaddr| hostaddr.parse().ok()),
++            hostaddr: None,
+             socket: None,
+             username,
+             password: var("PGPASSWORD").ok(),
 diff --git a/src/types/mod.rs b/src/types/mod.rs
-index f4ff7ef..57da82d 100755
+index f4ff7ef..57da82d 100644
 --- a/src/types/mod.rs
 +++ b/src/types/mod.rs
 @@ -211,8 +211,6 @@
@@ -604,7 +578,7 @@ index f4ff7ef..57da82d 100755
  
  mod array;
 diff --git a/src/types/numeric.rs b/src/types/numeric.rs
-index 67713d7..d97c7ad 100755
+index 67713d7..d97c7ad 100644
 --- a/src/types/numeric.rs
 +++ b/src/types/numeric.rs
 @@ -88,6 +88,7 @@ impl PgNumeric {

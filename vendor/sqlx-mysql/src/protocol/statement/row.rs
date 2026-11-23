@@ -80,6 +80,7 @@ impl<'de> ProtocolDecode<'de, &'de [MySqlColumn]> for BinaryRow {
                 | ColumnType::Blob
                 | ColumnType::TinyBlob
                 | ColumnType::Geometry
+                | ColumnType::Vector
                 | ColumnType::Bit
                 | ColumnType::Decimal
                 | ColumnType::Json
