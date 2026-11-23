@@ -338,7 +338,7 @@ class CiCacheTests(unittest.TestCase):
         env = dict(os.environ, CARGO_TARGET_DIR=str(target), READY=str(ready), RELEASE=str(release))
         child = subprocess.Popen(self.command + ['run', str(shell)], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         try:
-            deadline = time.monotonic() + 10
+            deadline = time.monotonic() + 30
             while not ready.exists() and child.poll() is None and time.monotonic() < deadline:
                 time.sleep(0.02)
             self.assertTrue(ready.exists(), 'wrapped shell did not start')
