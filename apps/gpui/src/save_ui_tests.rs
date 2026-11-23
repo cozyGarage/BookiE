@@ -7,6 +7,9 @@ use crate::live_ui_tests::open_live;
 use crate::text_input;
 use bookie_core::TableInfo;
 
+#[path = "paste_literal_save_tests.rs"]
+mod paste_literal_save_tests;
+
 struct TestDirectory(std::path::PathBuf);
 
 impl TestDirectory {
