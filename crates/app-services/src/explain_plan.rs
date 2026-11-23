@@ -4,6 +4,7 @@ pub struct PlanNode {
     pub title: String,
     pub cost: Option<f64>,
     pub rows: Option<f64>,
+    pub actual_rows: Option<f64>,
     pub details: Vec<String>,
 }
 
@@ -30,6 +31,7 @@ fn postgres_node(depth: usize, text: &str) -> PlanNode {
         title: title.to_string(),
         cost,
         rows: number_after(stats, "rows="),
+        actual_rows: stats.find("(actual").and_then(|at| number_after(&stats[at..], "rows=")),
         details: Vec::new(),
     }
 }
@@ -77,6 +79,7 @@ fn parse_sqlite(text: &str) -> Vec<PlanNode> {
             title: detail.trim().to_string(),
             cost: None,
             rows: None,
+            actual_rows: None,
             details: Vec::new(),
         });
     }
@@ -94,6 +97,24 @@ pub fn parse_plan(text: &str) -> Vec<PlanNode> {
     } else {
         Vec::new()
     }
+}
+
+pub fn misestimate(nodes: &[PlanNode], index: usize) -> Option<f64> {
+    let node = nodes.get(index)?;
+    let estimated = node.rows?.max(1.0);
+    let actual = node.actual_rows?.max(1.0);
+    let factor = (actual / estimated).max(estimated / actual);
+    if factor < 10.0 {
+        return None;
+    }
+    let mut depth = node.depth;
+    let stopped = nodes[..index].iter().rev().any(|ancestor| {
+        let is_ancestor = ancestor.depth < depth;
+        depth = depth.min(ancestor.depth);
+        let title = ancestor.title.to_lowercase();
+        is_ancestor && (title.starts_with("limit") || title.contains("semi join") || title.contains("anti join"))
+    });
+    (!(actual < estimated && stopped)).then_some(factor)
 }
 
 pub fn plan_text(columns: &[String], rows: &[Vec<String>]) -> String {
@@ -133,6 +154,20 @@ mod tests {
         assert_eq!(nodes[0].details, ["Hash Cond: (a.id = b.id)"]);
         assert_eq!(nodes[1].details, ["Filter: (x > 1)"]);
         assert!(nodes[3].details.contains(&"Planning Time: 0.1 ms".to_string()));
+    }
+
+    #[test]
+    fn an_analyzed_plan_flags_tenfold_row_misses_except_under_a_limit() {
+        let plan = "Limit  (cost=0.00..1.00 rows=10 width=4) (actual time=0.01..0.02 rows=10 loops=1)\n  ->  Seq Scan on a  (cost=0.00..60.00 rows=1000 width=4) (actual time=0.01..0.02 rows=10 loops=1)\nHash Join  (cost=10.00..120.50 rows=5 width=8) (actual time=1.00..9.00 rows=5000 loops=1)\n  ->  Seq Scan on b  (cost=0.00..60.00 rows=100 width=4) (actual time=0.01..0.20 rows=120 loops=1)\n  ->  Seq Scan on c  (cost=0.00..60.00 rows=100 width=4) (never executed)";
+        let nodes = parse_plan(plan);
+        assert_eq!(nodes[1].rows, Some(1000.0));
+        assert_eq!(nodes[1].actual_rows, Some(10.0));
+        assert_eq!(misestimate(&nodes, 1), None, "a scan cut short by its Limit is expected");
+        assert_eq!(misestimate(&nodes, 2), Some(1000.0), "5 estimated, 5000 actual");
+        assert_eq!(misestimate(&nodes, 3), None, "within ten times");
+        assert_eq!(nodes[4].actual_rows, None);
+        assert_eq!(misestimate(&nodes, 4), None, "a node that never ran has nothing to compare");
+        assert_eq!(misestimate(&nodes, 99), None);
     }
 
     #[test]

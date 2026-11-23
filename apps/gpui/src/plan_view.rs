@@ -1,4 +1,4 @@
-use bookie_app_services::explain_plan::{PlanNode, parse_plan, plan_text};
+use bookie_app_services::explain_plan::{PlanNode, misestimate, parse_plan, plan_text};
 use bookie_gpui::model::CellText;
 use bookie_gpui::source::ResultSource;
 
@@ -35,7 +35,13 @@ impl GridView {
                 .flex_col()
                 .gap_2()
                 .p_4()
-                .children(self.panel.plan.iter().map(|node| plan_row(node, heaviest, theme))),
+                .children(
+                    self.panel
+                        .plan
+                        .iter()
+                        .enumerate()
+                        .map(|(index, node)| plan_row(node, misestimate(&self.panel.plan, index), heaviest, theme)),
+                ),
         )
     }
 }
@@ -48,7 +54,7 @@ fn plan_nodes(table: &impl ResultSource) -> Vec<PlanNode> {
     parse_plan(&plan_text(&columns, &rows))
 }
 
-fn plan_row(node: &PlanNode, heaviest: f64, theme: Theme) -> Div {
+fn plan_row(node: &PlanNode, missed: Option<f64>, heaviest: f64, theme: Theme) -> Div {
     let bar = node.cost.filter(|_| heaviest > 0.0).map(|cost| {
         let share = (cost / heaviest).clamp(0.0, 1.0) as f32;
         div()
@@ -65,8 +71,16 @@ fn plan_row(node: &PlanNode, heaviest: f64, theme: Theme) -> Div {
             )
     });
     let rows = node.rows.map(|rows| format!("~{rows:.0} rows"));
+    let actual = node.actual_rows.map(|rows| format!("{rows:.0} actual"));
     let cost = node.cost.map(|cost| format!("cost {cost:.2}"));
-    let stats: Vec<String> = cost.into_iter().chain(rows).collect();
+    let stats: Vec<String> = cost.into_iter().chain(rows).chain(actual).collect();
+    let warning = missed.map(|factor| {
+        div()
+            .debug_selector(|| "plan-misestimate".into())
+            .text_size(px(size::TEXT_SMALL))
+            .text_color(rgb(theme.warning))
+            .child(format!("Row estimate off by {factor:.0}×"))
+    });
     div()
         .flex()
         .flex_col()
@@ -80,6 +94,7 @@ fn plan_row(node: &PlanNode, heaviest: f64, theme: Theme) -> Div {
                 .text_color(rgb(theme.muted_foreground))
                 .child(stats.join(" · "))
         }))
+        .children(warning)
         .children(node.details.iter().map(|detail| {
             div()
                 .text_size(px(size::TEXT_SMALL))
