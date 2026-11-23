@@ -16,8 +16,13 @@ This decision adds no new security model. It says how both frontends present int
    - Begin opens one dedicated audited session for that tab through `PolicyGuard`. Every run from the tab uses that session until Commit or Roll back.
    - Other tabs, table browsing and grid saves never join it.
    - Closing the tab, switching its connection or closing the window asks for Commit or Roll back, with no default. Cancelling keeps the transaction open.
-3. **The buttons are the only way to end a transaction.** Typed transaction control stays refused, as in ADR 0008: `BEGIN`, `START TRANSACTION`, `COMMIT`, `ROLLBACK`, `SET autocommit`, `XA` and the implicit starters. Savepoints follow the existing per-engine rules in the guard.
-4. **Policy does not loosen inside a transaction.** Every statement goes through the normal guard: classification, environment rules, read-only connections, approval of writes on Prod, and agent scopes. **Commit on a Prod connection needs its own approval**, which shows the number of governed writes pending in the transaction.
+3. **Buttons and typed statements take the same guarded path.** Inside the tab's dedicated session, the guard already tracks typed `BEGIN`, `COMMIT` and `ROLLBACK` sent as separate statements (`crates/policy/src/guard/session.rs`). Begin, Commit and Roll back in the toolbar send exactly those through the same session, so both routes record the same audit. The guard keeps refusing:
+   - transaction control hidden inside a larger statement batch (`hidden_transaction_control`);
+   - a read-write begin on a read-only connection;
+   - MySQL statements that would commit the transaction implicitly.
+
+   On shared connections, outside a transaction tab, the ADR 0008 refusals of implicit transaction starters and unterminated batches stay as they are.
+4. **Policy does not loosen inside a transaction.** Every statement goes through the normal guard: classification, environment rules, read-only connections, approval of writes on Prod, and agent scopes. **Committing a transaction on a Prod connection needs its own approval**, whether it comes from the Commit button or a typed `COMMIT`, and the approval shows the number of governed writes pending in the transaction. The check belongs in the guard session's commit path, so neither route can skip it.
 5. **Outcomes:**
 
    | What happens | Recorded outcome |
@@ -42,6 +47,6 @@ This decision adds no new security model. It says how both frontends present int
 - The idle warning waits for the confirmation steps in #1750: the timeout error mapping (25P03 on PostgreSQL) and what the session shows after it.
 - Required tests:
   - **Shared module:** rollback completes before close; a rollback failure still closes and reports; a late callback cannot end a newer session; a COMMIT on a lost session records Unknown and blocks writes.
-  - **GPUI and GTK UI:** Roll back leaves rows unchanged; Commit changes them; typed `COMMIT` is refused with a pointer to the buttons; closing a tab with an open transaction asks; cancelling keeps it open.
+  - **GPUI and GTK UI:** Roll back leaves rows unchanged; Commit changes them; a typed `COMMIT` in the transaction tab records the same audit as the button; `BEGIN` hidden in a batch is refused; closing a tab with an open transaction asks; cancelling keeps it open.
   - **PostgreSQL Docker layer:** an error leaves only Roll back; an idle timeout records `rolled_back`; Prod Commit asks for approval with the pending count.
   - **Audit:** exactly one terminal record per intent on every path, and the chain verifies.
