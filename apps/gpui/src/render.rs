@@ -235,6 +235,7 @@ impl GridView {
                     .ghost()
                     .compact()
                     .tooltip("More grid actions")
+                    .accessibility_label("More grid actions")
                     .child(icon("ellipsis", theme.muted_foreground))
                     .dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), groups)),
                 )
