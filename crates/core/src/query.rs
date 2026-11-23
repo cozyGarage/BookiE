@@ -120,6 +120,21 @@ pub enum Value {
     Undecodable(String),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ValueSortKind {
+    Bool,
+    Int,
+    Float,
+    Text,
+    Bytes,
+    Date,
+    Time,
+    DateTime,
+    TimestampTz,
+    Decimal,
+    Uuid,
+}
+
 pub fn partial_value(byte_count: u64, prefix: &str) -> Value {
     Value::Undecodable(format!("partial {byte_count} bytes\u{1}{prefix}"))
 }
@@ -132,6 +147,51 @@ pub fn parse_partial(type_name: &str) -> Option<(u64, &str)> {
 
 impl Value {
     pub const MISSING_FIELD: &'static str = "missing BSON field";
+
+    pub fn sort_kind(&self) -> Option<ValueSortKind> {
+        Some(match self {
+            Self::Bool(_) => ValueSortKind::Bool,
+            Self::Int(_) => ValueSortKind::Int,
+            Self::Float(_) => ValueSortKind::Float,
+            Self::Text(_) => ValueSortKind::Text,
+            Self::Bytes(_) => ValueSortKind::Bytes,
+            Self::Date(_) => ValueSortKind::Date,
+            Self::Time(_) => ValueSortKind::Time,
+            Self::DateTime(_) => ValueSortKind::DateTime,
+            Self::TimestampTz(_) => ValueSortKind::TimestampTz,
+            Self::Decimal(_) => ValueSortKind::Decimal,
+            Self::Uuid(_) => ValueSortKind::Uuid,
+            Self::Null | Self::Json(_) | Self::JsonText(_) | Self::Undecodable(_) => return None,
+        })
+    }
+
+    pub fn compare_for_sort(&self, other: &Self, ascending: bool) -> Option<std::cmp::Ordering> {
+        use std::cmp::Ordering;
+
+        let order = match (self, other) {
+            (Self::Null, Self::Null) => Ordering::Equal,
+            (Self::Null, _) => Ordering::Greater,
+            (_, Self::Null) => Ordering::Less,
+            (Self::Bool(left), Self::Bool(right)) => left.cmp(right),
+            (Self::Int(left), Self::Int(right)) => left.cmp(right),
+            (Self::Float(left), Self::Float(right)) => left.total_cmp(right),
+            (Self::Text(left), Self::Text(right)) => left.cmp(right),
+            (Self::Bytes(left), Self::Bytes(right)) => left.cmp(right),
+            (Self::Date(left), Self::Date(right)) => left.cmp(right),
+            (Self::Time(left), Self::Time(right)) => left.cmp(right),
+            (Self::DateTime(left), Self::DateTime(right)) => left.cmp(right),
+            (Self::TimestampTz(left), Self::TimestampTz(right)) => left.cmp(right),
+            (Self::Decimal(left), Self::Decimal(right)) => left.cmp(right),
+            (Self::Uuid(left), Self::Uuid(right)) => left.cmp(right),
+            _ => return None,
+        };
+
+        if ascending || matches!((self, other), (Self::Null, _) | (_, Self::Null)) {
+            Some(order)
+        } else {
+            Some(order.reverse())
+        }
+    }
 
     pub fn is_missing_field(&self) -> bool {
         matches!(self, Self::Undecodable(kind) if kind == Self::MISSING_FIELD)

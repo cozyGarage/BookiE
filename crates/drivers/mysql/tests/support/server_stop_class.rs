@@ -8,7 +8,9 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::Duration;
 
-use bookie_core::{CatalogObjectKind, ConnectOptions, Connection, DriverError, OperationControl, RoutineRef, Value};
+use bookie_core::{
+    CatalogObjectKind, ConnectOptions, Connection, DriverError, OperationControl, RoutineRef, TableInfo, Value,
+};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::watch;
@@ -138,6 +140,18 @@ fn table_metadata_cases() -> Vec<StopCase> {
             b"generation_expression",
             |c, control| async move { c.fetch_columns_controlled(None, "stop_class_rows", &control).await },
         ),
+        sends(
+            "fetch_schema_table_metadata_controlled",
+            b"generation_expression",
+            |c, control| async move {
+                let tables = [TableInfo {
+                    schema: None,
+                    name: "stop_class_rows".into(),
+                }];
+                c.fetch_schema_table_metadata_controlled(&tables, false, &control, &mut |_, _| true)
+                    .await
+            },
+        ),
         sends("fetch_indexes_controlled", b"seq_in_index", |c, control| async move {
             c.fetch_indexes_controlled(None, "stop_class_rows", &control).await
         }),
@@ -157,6 +171,14 @@ fn table_metadata_cases() -> Vec<StopCase> {
         sends("fetch_rows_controlled", b"stop_class_rows", |c, control| async move {
             c.fetch_rows_controlled(None, "stop_class_rows", 0, 10, &control).await
         }),
+        sends(
+            "fetch_rows_with_columns_controlled",
+            b"stop_class_rows",
+            |c, control| async move {
+                c.fetch_rows_with_columns_controlled(None, "stop_class_rows", 0, 10, &[], &control)
+                    .await
+            },
+        ),
         sends(
             "fetch_view_editability_controlled",
             b"information_schema.views",

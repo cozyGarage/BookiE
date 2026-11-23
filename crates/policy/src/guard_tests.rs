@@ -479,6 +479,7 @@ fn query_error() -> DriverError {
         message: "invalid input value: 4111111111111111".into(),
         sqlstate: Some("42000".into()),
         position: None,
+        hint: None,
     }
 }
 

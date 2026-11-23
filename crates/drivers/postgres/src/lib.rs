@@ -11,8 +11,8 @@ use bookie_core::{
     CANCELLATION_DISPATCH_TIMEOUT, CONTROL_SETUP_TIMEOUT, ColumnInfo, CommitResolution, CommitToken, ConnectOptions,
     Connection, DatabaseDriver, DriverError, DriverValueInputCapabilities, ExecResult, ForeignKeyInfo,
     InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QualifiedTypeName, QueryResult,
-    QueryResultBatch, ServerMessages, TableInfo, Transport, Value, check_pre_dispatch, run_controlled_setup,
-    run_server_cancellable, run_server_cancellable_preserving_transaction_rollback,
+    QueryResultBatch, SchemaTableMetadataVisitor, ServerMessages, TableInfo, Transport, Value, check_pre_dispatch,
+    run_controlled_setup, run_server_cancellable, run_server_cancellable_preserving_transaction_rollback,
 };
 
 pub use notifications::{
@@ -405,6 +405,21 @@ impl Connection for PgConnection {
             &mut connection,
             schema,
             table
+        ))
+    }
+
+    async fn fetch_schema_table_metadata_controlled(
+        &self,
+        tables: &[TableInfo],
+        include_foreign_keys: bool,
+        control: &OperationControl,
+        visit: &mut SchemaTableMetadataVisitor<'_>,
+    ) -> Result<(), DriverError> {
+        stoppable!(self, control, |connection| read_fetch_schema_table_metadata(
+            &mut connection,
+            tables,
+            include_foreign_keys,
+            visit
         ))
     }
 

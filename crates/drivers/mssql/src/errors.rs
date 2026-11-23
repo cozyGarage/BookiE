@@ -37,6 +37,7 @@ pub(crate) fn map_server_error(code: u32, message: &str, state: u8) -> DriverErr
             message: message.to_string(),
             sqlstate: Some(state.to_string()),
             position: None,
+            hint: None,
         },
     }
 }

@@ -84,6 +84,10 @@ fn stop_cases() -> Vec<StopCase> {
             c.fetch_rows_controlled(None, "endless", 3_000_000_000_000, 10, &control)
                 .await
         }),
+        stoppable("fetch_rows_with_columns_controlled", |c, control| async move {
+            c.fetch_rows_with_columns_controlled(None, "endless", 3_000_000_000_000, 10, &[], &control)
+                .await
+        }),
     ]
 }
 
@@ -126,6 +130,10 @@ const BOUNDED: &[(&str, &str)] = &[
     (
         "fetch_columns_controlled",
         "reads information_schema in process; bounded by schema size",
+    ),
+    (
+        "fetch_schema_table_metadata_controlled",
+        "uses controlled per-table metadata reads; bounded by the requested schema size",
     ),
     (
         "fetch_indexes_controlled",

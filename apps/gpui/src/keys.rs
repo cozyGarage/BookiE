@@ -1,7 +1,7 @@
 use bookie_gpui::font_settings;
 use bookie_gpui::keymap::{Chord, Command};
 use bookie_results::grid_cursor::{Cursor, move_cursor};
-use gpui::{Context, Focusable, KeyDownEvent, KeystrokeEvent, Window};
+use gpui::{App, Context, Focusable, KeyDownEvent, KeystrokeEvent, Window};
 
 use crate::palette_state::PaletteMode;
 use crate::{GridView, Tab, palette_step};
@@ -23,7 +23,7 @@ impl GridView {
         }
         let key = event.keystroke.key.as_str();
         if modifiers.shift && matches!(key, "up" | "down") {
-            self.extend_selection_with_arrow(key);
+            self.extend_selection_with_arrow(key, cx);
             cx.stop_propagation();
             cx.notify();
             return;
@@ -60,7 +60,7 @@ impl GridView {
             && self.tabs.shows_grid()
     }
 
-    fn extend_selection_with_arrow(&mut self, key: &str) {
+    fn extend_selection_with_arrow(&mut self, key: &str, cx: &App) {
         if let (None, Some(cursor)) = (self.selection, self.cell_cursor) {
             self.click_row(self.base() + cursor.row as u64, false);
         }
@@ -70,16 +70,22 @@ impl GridView {
             }
             return;
         }
-        let Some(next) = move_cursor(
-            self.cell_cursor,
+        let projection = self.table.read(cx).delegate().clone_projection();
+        let current = self.cell_cursor.map(|cursor| Cursor {
+            row: cursor.row,
+            column: projection.visible_index(cursor.column).unwrap_or(0),
+        });
+        let Some(mut next) = move_cursor(
+            current,
             key,
             self.visible_count(),
-            self.source.columns().len(),
+            projection.len(),
             self.viewport_rows,
             false,
         ) else {
             return;
         };
+        next.column = projection.source_index(next.column).unwrap_or(0);
         self.place_cursor(Some(next));
         self.click_row(self.base() + next.row as u64, true);
     }
@@ -240,16 +246,22 @@ impl GridView {
                 }));
             }
             _ => {
-                let Some(next) = move_cursor(
-                    self.cell_cursor,
+                let projection = self.table.read(cx).delegate().clone_projection();
+                let current = self.cell_cursor.map(|cursor| Cursor {
+                    row: cursor.row,
+                    column: projection.visible_index(cursor.column).unwrap_or(0),
+                });
+                let Some(mut next) = move_cursor(
+                    current,
                     key,
                     rows,
-                    self.source.columns().len(),
+                    projection.len(),
                     self.viewport_rows,
                     ctrl,
                 ) else {
                     return;
                 };
+                next.column = projection.source_index(next.column).unwrap_or(0);
                 self.place_cursor(Some(next));
                 if shift && matches!(key, "up" | "down") {
                     self.click_row(self.base() + next.row as u64, true);

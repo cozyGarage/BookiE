@@ -1,6 +1,6 @@
 use super::{
     ColumnInfo, MAX_QUERY_RESULT_BYTES, MAX_QUERY_RESULT_CELLS, MAX_QUERY_ROWS, QualifiedTypeName, QueryResult,
-    QueryResultBatch, QueryResultBudget, QueryRows, Value,
+    QueryResultBatch, QueryResultBudget, QueryRows, Value, ValueSortKind,
 };
 
 #[test]
@@ -31,6 +31,25 @@ fn enum_catalog_metadata_does_not_change_column_info_wire_shape() {
 #[test]
 fn result_cells_stay_within_four_machine_words() {
     assert!(std::mem::size_of::<Value>() <= 32);
+}
+
+#[test]
+fn value_sort_contract_uses_native_families_and_keeps_null_last() {
+    assert_eq!(Value::Int(1).sort_kind(), Some(ValueSortKind::Int));
+    assert_eq!(Value::Json(serde_json::Value::Null.into()).sort_kind(), None);
+    assert_eq!(
+        Value::Text("a".into()).compare_for_sort(&Value::Text("b".into()), true),
+        Some(std::cmp::Ordering::Less)
+    );
+    assert_eq!(
+        Value::Int(1).compare_for_sort(&Value::Int(2), false),
+        Some(std::cmp::Ordering::Greater)
+    );
+    assert_eq!(
+        Value::Null.compare_for_sort(&Value::Int(1), false),
+        Some(std::cmp::Ordering::Greater)
+    );
+    assert_eq!(Value::Int(1).compare_for_sort(&Value::Text("1".into()), true), None);
 }
 
 #[test]

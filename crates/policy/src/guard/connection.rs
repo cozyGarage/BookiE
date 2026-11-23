@@ -164,6 +164,89 @@ impl Connection for PolicyGuard {
         result
     }
 
+    async fn fetch_schema_table_metadata_controlled(
+        &self,
+        tables: &[TableInfo],
+        include_foreign_keys: bool,
+        control: &OperationControl,
+        visit: &mut SchemaTableMetadataVisitor<'_>,
+    ) -> Result<(), DriverError> {
+        check_pre_dispatch(control)?;
+        let targets = tables
+            .iter()
+            .map(|table| {
+                table
+                    .schema
+                    .as_ref()
+                    .map_or_else(|| table.name.clone(), |schema| format!("{schema}.{}", table.name))
+            })
+            .collect();
+        let operation = self.metadata_operation("FETCH SCHEMA METADATA", targets);
+        self.prepare_governed_read(&operation).await?;
+        let start = Instant::now();
+        let mut rows = 0u64;
+        let mut failed_table = false;
+        let mut interrupted = None;
+        let result = {
+            let mut governed_visit =
+                |index: usize, result: Result<(Vec<ColumnInfo>, Vec<ForeignKeyInfo>), DriverError>| {
+                    if let Ok((columns, keys)) = &result {
+                        rows = rows.saturating_add(columns.len() as u64 + keys.len() as u64);
+                    } else {
+                        failed_table = true;
+                        if let Err(error) = &result {
+                            let status = controlled_error_terminal_status(error);
+                            if matches!(
+                                status,
+                                AuditTerminalStatus::Cancelled
+                                    | AuditTerminalStatus::TimedOut
+                                    | AuditTerminalStatus::Unknown
+                            ) {
+                                interrupted.get_or_insert((status, error_category(error)));
+                            }
+                        }
+                    }
+                    visit(index, result)
+                };
+            self.caught_read(
+                "FETCH SCHEMA METADATA",
+                self.inner.fetch_schema_table_metadata_controlled(
+                    tables,
+                    include_foreign_keys,
+                    control,
+                    &mut governed_visit,
+                ),
+            )
+            .await
+        };
+        if failed_table && result.is_ok() {
+            if let Some((terminal_status, error_category)) = interrupted {
+                let audit_result = self
+                    .record_outcome(
+                        &operation,
+                        AuditOutcome {
+                            terminal_status,
+                            transaction_outcome: AuditTransactionOutcome::NotApplicable,
+                            rows_affected: None,
+                            error_category: Some(error_category),
+                            duration_ms: start.elapsed().as_millis() as u64,
+                        },
+                    )
+                    .await;
+                self.handle_read_audit_failure(audit_result)?;
+            } else {
+                let audit_result: Result<(), DriverError> =
+                    Err(DriverError::query("one or more schema metadata reads failed"));
+                self.audit_controlled_read_result(&operation, start, &audit_result, Some(rows))
+                    .await?;
+            }
+        } else {
+            self.audit_controlled_read_result(&operation, start, &result, Some(rows))
+                .await?;
+        }
+        result
+    }
+
     async fn fetch_rows(
         &self,
         schema: Option<&str>,
@@ -199,6 +282,57 @@ impl Connection for PolicyGuard {
             .caught_read(
                 "FETCH ROWS",
                 self.inner.fetch_rows_controlled(schema, table, offset, limit, control),
+            )
+            .await
+            .map(|rows| self.mask_result(rows));
+        let row_count = result.as_ref().ok().map(|rows| rows.rows.len() as u64);
+        self.audit_controlled_read_result(&operation, start, &result, row_count)
+            .await?;
+        result
+    }
+
+    async fn fetch_rows_with_columns(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        offset: u64,
+        limit: u64,
+        columns: &[ColumnInfo],
+    ) -> Result<QueryResult, DriverError> {
+        let operation = self.table_metadata_operation("FETCH ROWS", schema, table);
+        self.prepare_governed_read(&operation).await?;
+        let start = Instant::now();
+        let result = self
+            .caught_read(
+                "FETCH ROWS",
+                self.inner
+                    .fetch_rows_with_columns(schema, table, offset, limit, columns),
+            )
+            .await
+            .map(|rows| self.mask_result(rows));
+        let row_count = result.as_ref().ok().map(|rows| rows.rows.len() as u64);
+        self.audit_read_result(&operation, start, &result, row_count).await?;
+        result
+    }
+
+    async fn fetch_rows_with_columns_controlled(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        offset: u64,
+        limit: u64,
+        columns: &[ColumnInfo],
+        control: &OperationControl,
+    ) -> Result<QueryResult, DriverError> {
+        check_pre_dispatch(control)?;
+        let operation = self.table_metadata_operation("FETCH ROWS", schema, table);
+        self.prepare_governed_read(&operation).await?;
+        let start = Instant::now();
+        let result = self
+            .caught_read(
+                "FETCH ROWS",
+                self.inner
+                    .fetch_rows_with_columns_controlled(schema, table, offset, limit, columns, control),
             )
             .await
             .map(|rows| self.mask_result(rows));

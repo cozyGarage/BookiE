@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 use async_trait::async_trait;
 use bookie_core::{
     AuthMode, ColumnInfo, Connection, DriverError, DriverRegistry, ExecResult, ForeignKeyInfo, InboundForeignKeyInfo,
-    IndexInfo, OperationControl, QueryResult, TableInfo, TlsMode, Transaction, Value,
+    IndexInfo, OperationControl, QueryResult, SchemaTableMetadataVisitor, TableInfo, TlsMode, Transaction, Value,
 };
 use bookie_mcp::ConnectionProvider;
 use bookie_policy::{AuditState, GuardContext, PolicyConfig, PolicyGuard, Principal};
@@ -171,6 +171,18 @@ impl Connection for SessionConnection {
         self.inner.fetch_columns_controlled(schema, table, control).await
     }
 
+    async fn fetch_schema_table_metadata_controlled(
+        &self,
+        tables: &[TableInfo],
+        include_foreign_keys: bool,
+        control: &OperationControl,
+        visit: &mut SchemaTableMetadataVisitor<'_>,
+    ) -> Result<(), DriverError> {
+        self.inner
+            .fetch_schema_table_metadata_controlled(tables, include_foreign_keys, control, visit)
+            .await
+    }
+
     async fn fetch_rows(
         &self,
         schema: Option<&str>,
@@ -191,6 +203,33 @@ impl Connection for SessionConnection {
     ) -> Result<QueryResult, DriverError> {
         self.inner
             .fetch_rows_controlled(schema, table, offset, limit, control)
+            .await
+    }
+
+    async fn fetch_rows_with_columns(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        offset: u64,
+        limit: u64,
+        columns: &[ColumnInfo],
+    ) -> Result<QueryResult, DriverError> {
+        self.inner
+            .fetch_rows_with_columns(schema, table, offset, limit, columns)
+            .await
+    }
+
+    async fn fetch_rows_with_columns_controlled(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        offset: u64,
+        limit: u64,
+        columns: &[ColumnInfo],
+        control: &OperationControl,
+    ) -> Result<QueryResult, DriverError> {
+        self.inner
+            .fetch_rows_with_columns_controlled(schema, table, offset, limit, columns, control)
             .await
     }
 

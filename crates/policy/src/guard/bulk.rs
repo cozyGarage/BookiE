@@ -203,6 +203,7 @@ fn too_many_skipped_rows() -> DriverError {
         message: format!("more than {MAX_SKIPPED_ROWS} rows were rejected by the database; the import stopped"),
         sqlstate: None,
         position: None,
+        hint: None,
     }
 }
 

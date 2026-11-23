@@ -85,6 +85,7 @@ mod failure_tests {
                 message: "refused".into(),
                 sqlstate: Some(sqlstate.into()),
                 position: None,
+                hint: None,
             });
             assert!(is_permanent_failure(&error), "{sqlstate} must stop a reconnect");
         }
@@ -92,6 +93,7 @@ mod failure_tests {
             message: "too many connections".into(),
             sqlstate: Some("53300".into()),
             position: None,
+            hint: None,
         });
         assert!(!is_permanent_failure(&busy), "a busy server is worth retrying");
     }

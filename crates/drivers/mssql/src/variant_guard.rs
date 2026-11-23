@@ -62,6 +62,7 @@ mod tests {
             message: "server rejected SQL".into(),
             sqlstate: Some("42000".into()),
             position: None,
+            hint: None,
         }));
     }
 

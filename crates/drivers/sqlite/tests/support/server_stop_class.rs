@@ -86,6 +86,10 @@ fn stop_cases() -> Vec<StopCase> {
             c.fetch_rows_controlled(None, "endless", 3_000_000_000, 10, &control)
                 .await
         }),
+        stoppable("fetch_rows_with_columns_controlled", |c, control| async move {
+            c.fetch_rows_with_columns_controlled(None, "endless", 3_000_000_000, 10, &[], &control)
+                .await
+        }),
         stoppable("Transaction::query_controlled", |c, control| async move {
             c.begin().await?.query_controlled(ENDLESS_SELECT, &control).await
         }),
@@ -146,6 +150,10 @@ const BOUNDED: &[(&str, &str)] = &[
     (
         "fetch_columns_controlled",
         "PRAGMA table_info prepares the table and runs nothing over its rows",
+    ),
+    (
+        "fetch_schema_table_metadata_controlled",
+        "catalog reads are bounded by the requested tables and their schema metadata",
     ),
     (
         "fetch_indexes_controlled",

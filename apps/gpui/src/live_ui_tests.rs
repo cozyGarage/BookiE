@@ -273,7 +273,9 @@ fn a_live_connection_runs_typed_sql_into_a_result_tab_and_refuses_writes(cx: &mu
     });
     run(cx, "DELETE FROM orders");
     view.read_with(cx, |view, _| {
-        assert_eq!(view.run_tabs.slots.len(), 1, "a refused write adds no result tab");
+        assert_eq!(view.run_tabs.slots.len(), 2, "a refused write has a failed result tab");
+        assert!(view.run_tabs.slots[1].failure.is_some());
+        assert_eq!(view.source.total(), 0);
         let failure = view.status.to_lowercase();
         assert!(
             failure.contains("read-only") || failure.contains("blocked by policy"),
@@ -283,7 +285,7 @@ fn a_live_connection_runs_typed_sql_into_a_result_tab_and_refuses_writes(cx: &mu
     });
     run(cx, "SELECT id FROM orders");
     view.read_with(cx, |view, _| {
-        assert_eq!(view.run_tabs.slots.len(), 2);
+        assert_eq!(view.run_tabs.slots.len(), 3);
         assert_eq!(view.source.total(), 6);
     });
 }
@@ -489,7 +491,9 @@ fn every_statement_is_logged_and_a_refused_one_opens_the_messages_view(cx: &mut 
             "{}",
             entries[1].text
         );
-        assert_eq!(view.run_tabs.slots.len(), 1, "no result tab for a refused statement");
+        assert_eq!(view.run_tabs.slots.len(), 2, "a refused statement has a failed result tab");
+        assert!(view.run_tabs.slots[1].failure.is_some());
+        assert_eq!(view.source.total(), 0);
     });
 }
 

@@ -42,6 +42,8 @@ mod inbound_fk_visibility;
 mod pool_saturation;
 #[path = "support/pool_session_reset.rs"]
 mod pool_session_reset;
+#[path = "support/query_hint.rs"]
+mod query_hint;
 #[path = "support/read_only_session.rs"]
 mod read_only_session;
 #[path = "support/server_messages.rs"]
@@ -121,6 +123,9 @@ mod enum_role_context_contract;
 
 #[path = "support/enum_type_privilege_contract.rs"]
 mod enum_type_privilege_contract;
+
+#[path = "support/unicode_identifiers.rs"]
+mod unicode_identifiers;
 
 #[path = "support/quoted_enum_identifier_contract.rs"]
 mod quoted_enum_identifier_contract;

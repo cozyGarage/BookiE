@@ -102,7 +102,7 @@ A failed reload preserves the last successfully loaded policy. Repair the file a
 
 `AuditJournal::open_default()` opens `$XDG_DATA_HOME/bookie/audit.jsonl`. Initialization creates the parent directory, sets the journal mode to `0600`, verifies the hash chain, recovers safe trailing fragments, and reports unresolved operation IDs.
 
-Each record contains a sequence number, previous hash, current hash, and audit event. Mutation intents and transaction commit records use the durable append path. File locks serialize initialization and appends across processes.
+Each record contains a sequence number, previous hash, current hash, and audit event. Write intents, transaction commit records, administrative actions and reconciliations use the durable append path. Read intents do not require a disk sync and can be lost on a crash. File locks serialize initialization and appends across processes.
 
 The GUI and `bookie-agentd` may hold the journal at the same time. Each live owner holds a shared process lock; startup recovery requires the exclusive lock, so a second process does not record another process's in-flight mutation as `Unknown`. It validates the chain without recovery. New write intents are still refused while an earlier write remains pending. After all owners exit, the next opener recovers any intents left pending by a crash. A query cursor that has delivered its first page is not yet covered: a crash mid-stream leaves its operation pending ([#1719](https://github.com/cozyGarage/BookiE/issues/1719)).
 

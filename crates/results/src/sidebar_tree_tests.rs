@@ -611,3 +611,25 @@ fn an_empty_listing_leaves_the_entry_a_leaf() {
     assert_eq!(nodes[1].kind, NodeKind::Catalog(CatalogObjectKind::Routine));
     assert_eq!(nodes.len(), 2);
 }
+
+#[test]
+fn normalization_distinct_identifiers_keep_separate_sidebar_nodes() {
+    let names = ["caf\u{e9}", "cafe\u{301}"];
+    let nodes = build_nodes(&[info(Some("public"), names[0]), info(Some("public"), names[1])], &[]);
+    let tables: Vec<_> = nodes
+        .iter()
+        .filter_map(|node| match &node.kind {
+            NodeKind::Table { schema, name } => Some((schema.as_deref(), name.as_str(), node.key.as_str())),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(tables.len(), 2);
+    for name in names {
+        assert!(
+            tables
+                .iter()
+                .any(|(schema, value, _)| *schema == Some("public") && *value == name)
+        );
+    }
+    assert_ne!(tables[0].2, tables[1].2);
+}

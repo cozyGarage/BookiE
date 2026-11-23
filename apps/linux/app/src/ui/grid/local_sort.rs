@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 use std::collections::HashSet;
+use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
 
 use bookie_core::{QueryResult, Value};
 
@@ -59,6 +60,127 @@ pub(super) fn sorted_source_indices_for_subset_by_keys(
     Ok(order)
 }
 
+pub(super) fn sorted_source_indices_cancellable(
+    result: &QueryResult,
+    keys: &[(usize, bool)],
+    mut order: Vec<usize>,
+    cancelled: &AtomicBool,
+) -> Option<Vec<usize>> {
+    for &(column, _) in keys {
+        let mut state = Sortability::new();
+        for &index in &order {
+            if cancelled.load(AtomicOrdering::Relaxed) {
+                return None;
+            }
+            state.observe(result.rows.get(index)?.get(column)?);
+        }
+        if !state.is_sortable {
+            return None;
+        }
+    }
+    for &(column, ascending) in keys.iter().rev() {
+        order = cancellable_sort_one_key(result, column, ascending, order, cancelled)?;
+    }
+    (!cancelled.load(AtomicOrdering::Relaxed)).then_some(order)
+}
+
+fn cancellable_sort_one_key(
+    result: &QueryResult,
+    column: usize,
+    ascending: bool,
+    order: Vec<usize>,
+    cancelled: &AtomicBool,
+) -> Option<Vec<usize>> {
+    let text = order
+        .iter()
+        .filter_map(|index| result.rows.get(*index).and_then(|row| row.get(column)))
+        .find(|value| !matches!(value, Value::Null))
+        .is_some_and(|value| matches!(value, Value::Text(_)));
+    if !text {
+        let compare = |left: &usize, right: &usize| compare_source_values(result, column, left, right, ascending);
+        return sort_in_chunks(order.into_iter(), &compare, cancelled);
+    }
+    let compare = |left: &(usize, Option<glib::CollationKey>), right: &(usize, Option<glib::CollationKey>)| match (
+        &left.1, &right.1,
+    ) {
+        (Some(a), Some(b)) => {
+            let value = a
+                .cmp(b)
+                .then_with(|| compare_source_values(result, column, &left.0, &right.0, true));
+            if ascending { value } else { value.reverse() }
+        }
+        _ => compare_source_values(result, column, &left.0, &right.0, ascending),
+    };
+    let keyed = order.into_iter().map(|index| {
+        let key = match result.rows.get(index).and_then(|row| row.get(column)) {
+            Some(Value::Text(value)) => Some(glib::CollationKey::from(value)),
+            _ => None,
+        };
+        (index, key)
+    });
+    Some(
+        sort_in_chunks(keyed, &compare, cancelled)?
+            .into_iter()
+            .map(|(index, _)| index)
+            .collect(),
+    )
+}
+
+fn sort_in_chunks<T>(
+    mut input: impl Iterator<Item = T>,
+    compare: &impl Fn(&T, &T) -> Ordering,
+    cancelled: &AtomicBool,
+) -> Option<Vec<T>> {
+    let mut chunks = Vec::new();
+    loop {
+        if cancelled.load(AtomicOrdering::Relaxed) {
+            return None;
+        }
+        let mut chunk: Vec<_> = input.by_ref().take(4096).collect();
+        if chunk.is_empty() {
+            break;
+        }
+        chunk.sort_by(compare);
+        chunks.push(chunk);
+    }
+    while chunks.len() > 1 {
+        let mut next = Vec::with_capacity(chunks.len().div_ceil(2));
+        let mut pairs = chunks.into_iter();
+        while let Some(left) = pairs.next() {
+            if let Some(right) = pairs.next() {
+                next.push(merge_sorted_chunks(left, right, compare, cancelled)?);
+            } else {
+                next.push(left);
+            }
+        }
+        chunks = next;
+    }
+    Some(chunks.pop().unwrap_or_default())
+}
+
+fn merge_sorted_chunks<T>(
+    left: Vec<T>,
+    right: Vec<T>,
+    compare: &impl Fn(&T, &T) -> Ordering,
+    cancelled: &AtomicBool,
+) -> Option<Vec<T>> {
+    let mut output = Vec::with_capacity(left.len() + right.len());
+    let (mut left, mut right) = (left.into_iter().peekable(), right.into_iter().peekable());
+    loop {
+        if output.len() % 1024 == 0 && cancelled.load(AtomicOrdering::Relaxed) {
+            return None;
+        }
+        match (left.peek(), right.peek()) {
+            (Some(a), Some(b)) if compare(a, b) != Ordering::Greater => output.push(left.next()?),
+            (Some(_), Some(_)) => output.push(right.next()?),
+            _ => break,
+        }
+    }
+    output.extend(left);
+    output.extend(right);
+    Some(output)
+}
+
 fn sort_subset_one_key(result: &QueryResult, column: usize, ascending: bool, source_indices: Vec<usize>) -> Vec<usize> {
     let sorts_text = source_indices
         .iter()
@@ -101,7 +223,7 @@ pub(super) fn sortable_columns(result: &QueryResult) -> HashSet<usize> {
 
 #[derive(Clone, Copy)]
 struct Sortability {
-    kind: Option<std::mem::Discriminant<Value>>,
+    kind: Option<bookie_core::ValueSortKind>,
     is_sortable: bool,
 }
 
@@ -117,7 +239,7 @@ impl Sortability {
         if !self.is_sortable || matches!(value, Value::Null) {
             return;
         }
-        let Some(kind) = comparable_kind(value) else {
+        let Some(kind) = value.sort_kind() else {
             self.is_sortable = false;
             return;
         };
@@ -171,52 +293,8 @@ fn compare_source_values(
     }
 }
 
-fn comparable_kind(value: &Value) -> Option<std::mem::Discriminant<Value>> {
-    match value {
-        Value::Bool(_)
-        | Value::Int(_)
-        | Value::Float(_)
-        | Value::Text(_)
-        | Value::Bytes(_)
-        | Value::Date(_)
-        | Value::Time(_)
-        | Value::DateTime(_)
-        | Value::TimestampTz(_)
-        | Value::Decimal(_)
-        | Value::Uuid(_) => Some(std::mem::discriminant(value)),
-        Value::Null | Value::Json(_) | Value::JsonText(_) | Value::Undecodable(_) => None,
-    }
-}
-
 fn compare_values(left: &Value, right: &Value, ascending: bool) -> Ordering {
-    let order = match (left, right) {
-        (Value::Null, Value::Null) => Ordering::Equal,
-        (Value::Null, _) => Ordering::Greater,
-        (_, Value::Null) => Ordering::Less,
-        _ => compare_non_null(left, right).unwrap_or(Ordering::Equal),
-    };
-    if ascending || matches!((left, right), (Value::Null, _) | (_, Value::Null)) {
-        order
-    } else {
-        order.reverse()
-    }
-}
-
-fn compare_non_null(left: &Value, right: &Value) -> Option<Ordering> {
-    Some(match (left, right) {
-        (Value::Bool(left), Value::Bool(right)) => left.cmp(right),
-        (Value::Int(left), Value::Int(right)) => left.cmp(right),
-        (Value::Float(left), Value::Float(right)) => left.total_cmp(right),
-        (Value::Text(left), Value::Text(right)) => left.cmp(right),
-        (Value::Bytes(left), Value::Bytes(right)) => left.cmp(right),
-        (Value::Date(left), Value::Date(right)) => left.cmp(right),
-        (Value::Time(left), Value::Time(right)) => left.cmp(right),
-        (Value::DateTime(left), Value::DateTime(right)) => left.cmp(right),
-        (Value::TimestampTz(left), Value::TimestampTz(right)) => left.cmp(right),
-        (Value::Decimal(left), Value::Decimal(right)) => left.cmp(right),
-        (Value::Uuid(left), Value::Uuid(right)) => left.cmp(right),
-        _ => return None,
-    })
+    left.compare_for_sort(right, ascending).unwrap_or(Ordering::Equal)
 }
 
 #[cfg(test)]
@@ -248,6 +326,51 @@ mod tests {
             rows: values.into_iter().map(|value| vec![value]).collect(),
             truncated: false,
         }
+    }
+
+    #[test]
+    fn cancellable_sort_matches_existing_order_across_chunk_boundaries() {
+        let values = (0..10_000)
+            .map(|i| {
+                if i % 11 == 0 {
+                    Value::Null
+                } else {
+                    Value::Text(format!("value {}", i % 37))
+                }
+            })
+            .collect();
+        let result = result(values);
+        let cancel = std::sync::atomic::AtomicBool::new(false);
+        for ascending in [true, false] {
+            let expected = sorted_source_indices(&result, 0, ascending);
+            let actual = super::sorted_source_indices_cancellable(
+                &result,
+                &[(0, ascending)],
+                (0..result.rows.len()).collect(),
+                &cancel,
+            );
+            assert_eq!(actual, expected);
+        }
+        cancel.store(true, std::sync::atomic::Ordering::Relaxed);
+        assert!(
+            super::sorted_source_indices_cancellable(&result, &[(0, true)], (0..result.rows.len()).collect(), &cancel)
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn cancellable_subset_sort_ignores_unsortable_values_outside_the_subset() {
+        let result = result(vec![
+            Value::Text("z".into()),
+            Value::Undecodable("json".into()),
+            Value::Text("a".into()),
+        ]);
+        let cancelled = std::sync::atomic::AtomicBool::new(false);
+
+        assert_eq!(
+            super::sorted_source_indices_cancellable(&result, &[(0, true)], vec![0, 2], &cancelled),
+            Some(vec![2, 0])
+        );
     }
 
     #[test]

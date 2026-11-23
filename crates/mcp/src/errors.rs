@@ -220,6 +220,21 @@ mod tests {
     use super::{McpToolError, OperationOutcome, TransactionOutcome};
 
     #[test]
+    fn query_error_wire_envelope_omits_database_text_and_position() {
+        let error = McpToolError::from_write_error(&DriverError::Query {
+            message: "sensitive server detail".into(),
+            sqlstate: Some("42703".into()),
+            position: Some(42),
+            hint: None,
+        });
+        let wire = serde_json::to_string(&error).unwrap();
+        assert!(!wire.contains("sensitive server detail"));
+        assert!(!wire.contains("42703"));
+        assert!(!wire.contains("42"));
+        assert!(error.legacy_diagnostic().contains("sensitive server detail"));
+    }
+
+    #[test]
     fn unknown_write_outcome_has_a_stable_safe_envelope() {
         let error = McpToolError::from_write_error(&DriverError::OperationOutcomeUnknown {
             source: Box::new(DriverError::query("secret_value")),
