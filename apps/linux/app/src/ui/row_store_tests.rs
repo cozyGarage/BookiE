@@ -94,6 +94,26 @@ fn prepared_orders_reject_invalid_or_stale_sources_and_draft_rows() {
 }
 
 #[test]
+fn prepared_order_reuses_its_index_vector_without_per_row_slots() {
+    let source = shared(20_000);
+    let store = RowStore::from_shared(source.clone());
+    let order = PreparedSourceRows::checked(
+        source,
+        (0..20_000).rev().collect(),
+        &std::sync::atomic::AtomicBool::new(false),
+    )
+    .unwrap();
+
+    assert!(store.replace_prepared_source_rows(&order));
+
+    assert!(store.imp().slots.borrow().is_empty());
+    assert_eq!(store.source_index_at(0), Some(19_999));
+    assert_eq!(store.cell_at(0, 0), Some(Value::Int(19_999)));
+    assert_eq!(first_cell(&store, 0), Value::Int(19_999));
+    assert_eq!(store.materialized(), 1);
+}
+
+#[test]
 fn local_reordering_rejects_non_permutations_and_draft_rows() {
     let store = RowStore::from_shared(shared(3));
     assert!(!store.reorder_source_rows(&[0, 0, 2]));
