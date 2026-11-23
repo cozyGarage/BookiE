@@ -69,6 +69,15 @@ impl GridView {
             self.status = "A save is running; wait for it to finish first".into();
             return;
         }
+        if self.transaction_open() {
+            if !params.is_empty() || mapping.is_some() {
+                self.status = "Parameters are not supported inside a transaction yet".into();
+                return;
+            }
+            let _ = source;
+            self.run_in_transaction(sql, cx);
+            return;
+        }
         if let Some(session) = self.live.clone() {
             let schema_statement = match bookie_app_services::schema_context::schema_context_for_run(
                 &session.driver_id,
@@ -233,6 +242,10 @@ impl GridView {
 
     pub(crate) fn close_tab(&mut self, index: usize) {
         let closing_query = matches!(self.tabs.items.get(index), Some(Tab::Query));
+        if closing_query && self.transaction_open() {
+            self.status = "Commit or roll back the open transaction before closing the query tab".into();
+            return;
+        }
         if closing_query && self.query_has_view_edits() && self.reject_view_edits() {
             return;
         }
