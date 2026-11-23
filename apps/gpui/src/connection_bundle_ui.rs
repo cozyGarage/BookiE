@@ -204,27 +204,51 @@ impl GridView {
     }
 
     pub(crate) fn unlock_connection_import(&mut self, cx: &mut Context<Self>) {
-        let (Some(bundle), Some(passphrase)) = (
-            self.connection_bundle.encrypted.as_ref(),
-            self.connection_bundle.passphrase.clone(),
-        ) else {
+        if self.connection_bundle.busy {
+            return;
+        }
+        let Some(passphrase) = self.connection_bundle.passphrase.clone() else {
+            return;
+        };
+        let Some(bundle) = self.connection_bundle.encrypted.take() else {
             return;
         };
         let text = secrecy::SecretString::from(passphrase.read(cx).content().to_string());
-        match unlock_import(bundle, secrecy::ExposeSecret::expose_secret(&text)) {
-            Ok(pending) if pending.plan.items.is_empty() => {
-                self.connection_bundle.encrypted = None;
-                self.status = "The selected file contains no connections to import".into();
-            }
-            Ok(pending) => {
-                self.connection_bundle.encrypted = None;
-                self.connection_bundle.pending = Some(pending);
-                passphrase.update(cx, |input, cx| input.set_content("", cx));
-                self.status = "Review the connection changes, then import or cancel".into();
-            }
-            Err(message) => self.status = format!("Could not unlock the connection bundle: {message}"),
-        }
+        self.connection_bundle.busy = true;
+        self.status = "Unlocking the connection bundle…".into();
         cx.notify();
+        cx.spawn(async move |this, cx| {
+            let outcome = cx
+                .background_executor()
+                .spawn(async move {
+                    let result = unlock_import(&bundle, secrecy::ExposeSecret::expose_secret(&text));
+                    (bundle, result)
+                })
+                .await;
+            this.update(cx, |this, cx| {
+                this.connection_bundle.busy = false;
+                match outcome {
+                    (bundle, Err(message)) => {
+                        this.connection_bundle.encrypted = Some(bundle);
+                        this.status = format!("Could not unlock the connection bundle: {message}");
+                    }
+                    (_, Ok(pending)) if pending.plan.items.is_empty() => {
+                        this.connection_bundle.encrypted = None;
+                        passphrase.update(cx, |input, cx| input.set_content("", cx));
+                        this.status = "The selected file contains no connections to import".into();
+                    }
+                    (_, Ok(pending)) => {
+                        this.connection_bundle.encrypted = None;
+                        this.connection_bundle.pending = Some(pending);
+                        passphrase.update(cx, |input, cx| input.set_content("", cx));
+                        this.status = "Review the connection changes, then import or cancel".into();
+                    }
+                }
+                cx.notify();
+            })
+            .ok();
+        })
+        .detach();
     }
 
     pub(crate) fn cancel_connection_import(&mut self, cx: &mut Context<Self>) {
@@ -316,6 +340,9 @@ impl GridView {
     }
 
     pub(crate) fn connection_bundle_bar(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Div> {
+        if self.connection_bundle.busy {
+            return None;
+        }
         if let Some(pending) = &self.connection_bundle.pending {
             let rows = pending.plan.items.iter().map(|item| {
                 div()
