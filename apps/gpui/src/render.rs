@@ -1,5 +1,6 @@
 use super::*;
 use crate::chrome::{STATUS_HEIGHT, TAB_HEIGHT, TOOLBAR_HEIGHT};
+use crate::assets::icon;
 use crate::palette_state::PaletteMode;
 use gpui_kit::component::scroll::Scrollbar;
 
@@ -96,25 +97,26 @@ impl GridView {
 
     fn grid_pager_buttons(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
         let (progress, range_label) = self.pager_labels();
+        let compact = self.synced_width < 900.0;
         let pager = div()
             .flex()
             .flex_none()
             .debug_selector(|| "grid-pager".into())
             .items_center()
             .gap_1()
-            .child(div().child(progress));
+            .when(!compact, |pager| pager.child(div().child(progress)));
         if self.continuous {
             return pager.child(div().child(range_label));
         }
         pager
-            .child(
+            .when(!compact, |pager| pager.child(
                 icon_button("first", "chevrons-left", "First page", false, theme).on_click(cx.listener(
                     |this, _, _, cx| {
                         this.pager.first();
                         cx.notify();
                     },
                 )),
-            )
+            ))
             .child(
                 icon_button("prev", "chevron-left", "Previous page", false, theme).on_click(cx.listener(
                     |this, _, _, cx| {
@@ -146,17 +148,21 @@ impl GridView {
                     },
                 )),
             )
-            .child(
+            .when(!compact, |pager| pager.child(
                 icon_button("last", "chevrons-right", "Last page", false, theme).on_click(cx.listener(
                     |this, _, _, cx| {
                         this.pager.last();
                         cx.notify();
                     },
                 )),
-            )
+            ))
     }
 
     fn grid_action_buttons(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+        use gpui_component::button::{Button, ButtonVariants};
+        use gpui_component::menu::DropdownMenu;
+        let compact = self.synced_width < 900.0;
+        let groups = crate::menus::command_groups(self, &[&["first", "last"], &["compare", "export-csv", "continuous"]]);
         div()
             .flex()
             .debug_selector(|| "grid-actions".into())
@@ -184,6 +190,7 @@ impl GridView {
                     }),
                 ),
             )
+            .when(!compact, |actions| actions
             .child(
                 icon_button("compare", "arrow-left-right", "Compare", false, theme)
                     .on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))),
@@ -215,6 +222,15 @@ impl GridView {
                     cx.notify();
                 })),
             )
+            )
+            .when(compact, |actions| actions.child(
+                Button::new("grid-more")
+                    .ghost()
+                    .compact()
+                    .tooltip("More grid actions")
+                    .child(icon("ellipsis", theme.muted_foreground))
+                    .dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), groups)),
+            ))
     }
 
     fn grid_control_strip(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {

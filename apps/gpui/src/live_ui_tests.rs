@@ -1790,3 +1790,18 @@ fn switching_connection_expands_every_sidebar_schema_again(cx: &mut TestAppConte
         );
     });
 }
+
+#[gpui::test]
+fn narrow_grid_toolbar_keeps_actions_inside_window(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_resize(gpui::size(gpui::px(1100.0), gpui::px(800.0)));
+    view.update(cx, |view, cx| {
+        view.sidebar.open = true;
+        view.sidebar.width = 340.0;
+        view.search.filter_visible = true;
+        cx.notify();
+    });
+    cx.run_until_parked();
+    let actions = cx.debug_bounds("grid-actions").expect("grid actions");
+    assert!(actions.origin.x + actions.size.width <= gpui::px(1100.0), "grid actions extend outside the window");
+}
