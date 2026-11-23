@@ -1,7 +1,7 @@
 use bookie_gpui::font_settings;
 use bookie_gpui::keymap::{Chord, Command};
 use bookie_results::grid_cursor::{Cursor, move_cursor};
-use gpui::{App, Context, Focusable, KeyDownEvent, KeystrokeEvent, Window};
+use gpui::{App, Context, Focusable, KeyDownEvent, KeystrokeEvent, ScrollStrategy, Window};
 
 use crate::palette_state::PaletteMode;
 use crate::{GridView, Tab, palette_step};
@@ -46,7 +46,7 @@ impl GridView {
             _ => palette_step(self.palette.index, count, key == "down"),
         };
         if count > 0 {
-            self.palette.scroll.scroll_to_item(self.palette.index);
+            self.palette.scroll.scroll_to_item(self.palette.index, ScrollStrategy::Nearest);
         }
     }
 
@@ -131,7 +131,7 @@ impl GridView {
                         _ => palette_step(self.palette.index, count, key == "down"),
                     };
                     if count > 0 {
-                        self.palette.scroll.scroll_to_item(self.palette.index);
+                        self.palette.scroll.scroll_to_item(self.palette.index, ScrollStrategy::Nearest);
                     }
                     cx.stop_propagation();
                     cx.notify();
