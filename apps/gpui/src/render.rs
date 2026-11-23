@@ -1,4 +1,5 @@
 use super::*;
+use crate::assets::icon;
 use crate::chrome::{STATUS_HEIGHT, TAB_HEIGHT, TOOLBAR_HEIGHT};
 use crate::palette_state::PaletteMode;
 use gpui_kit::component::scroll::Scrollbar;
@@ -96,32 +97,35 @@ impl GridView {
 
     fn grid_pager_buttons(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
         let (progress, range_label) = self.pager_labels();
+        let compact = self.synced_width < 900.0;
         let pager = div()
             .flex()
             .flex_none()
             .debug_selector(|| "grid-pager".into())
             .items_center()
             .gap_1()
-            .child(div().child(progress));
+            .when(!compact, |pager| pager.child(div().child(progress)));
         if self.continuous {
             return pager.child(div().child(range_label));
         }
         pager
+            .when(!compact, |pager| {
+                pager.child(
+                    icon_button("first", "chevrons-left", "First page", false, theme).on_click(
+                        cx.listener(|this, _, _, cx| {
+                            this.pager.first();
+                            cx.notify();
+                        }),
+                    ),
+                )
+            })
             .child(
-                icon_button("first", "chevrons-left", "First page", false, theme).on_click(cx.listener(
-                    |this, _, _, cx| {
-                        this.pager.first();
-                        cx.notify();
-                    },
-                )),
-            )
-            .child(
-                icon_button("prev", "chevron-left", "Previous page", false, theme).on_click(cx.listener(
-                    |this, _, _, cx| {
+                icon_button("prev", "chevron-left", "Previous page", false, theme).on_click(
+                    cx.listener(|this, _, _, cx| {
                         this.pager.previous();
                         cx.notify();
-                    },
-                )),
+                    }),
+                ),
             )
             .child(div().child(range_label))
             .child(self.page_size_button(theme, cx))
@@ -139,24 +143,33 @@ impl GridView {
                 })),
             )
             .child(
-                icon_button("next", "chevron-right", "Next page", false, theme).on_click(cx.listener(
-                    |this, _, _, cx| {
+                icon_button("next", "chevron-right", "Next page", false, theme).on_click(
+                    cx.listener(|this, _, _, cx| {
                         this.pager.next();
                         cx.notify();
-                    },
-                )),
+                    }),
+                ),
             )
-            .child(
-                icon_button("last", "chevrons-right", "Last page", false, theme).on_click(cx.listener(
-                    |this, _, _, cx| {
-                        this.pager.last();
-                        cx.notify();
-                    },
-                )),
-            )
+            .when(!compact, |pager| {
+                pager.child(
+                    icon_button("last", "chevrons-right", "Last page", false, theme).on_click(
+                        cx.listener(|this, _, _, cx| {
+                            this.pager.last();
+                            cx.notify();
+                        }),
+                    ),
+                )
+            })
     }
 
     fn grid_action_buttons(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+        use gpui_component::button::{Button, ButtonVariants};
+        use gpui_component::menu::DropdownMenu;
+        let compact = self.synced_width < 900.0;
+        let groups = crate::menus::command_groups(
+            self,
+            &[&["first", "last"], &["compare", "export-csv", "continuous"]],
+        );
         div()
             .flex()
             .debug_selector(|| "grid-actions".into())
@@ -177,44 +190,63 @@ impl GridView {
                     .on_click(cx.listener(|this, _, _, cx| this.run_find(true, cx))),
             )
             .child(
-                icon_button("show", "sliders-horizontal", "Show matching rows only", false, theme).on_click(
-                    cx.listener(|this, _, _, cx| {
-                        this.show_matching(cx);
-                        cx.notify();
-                    }),
-                ),
-            )
-            .child(
-                icon_button("compare", "arrow-left-right", "Compare", false, theme)
-                    .on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))),
-            )
-            .child(
                 icon_button(
-                    "export",
-                    "download",
-                    "Export current page or selection as CSV",
+                    "show",
+                    "sliders-horizontal",
+                    "Show matching rows only",
                     false,
                     theme,
                 )
                 .on_click(cx.listener(|this, _, _, cx| {
-                    this.export_selection_or_page(cx);
+                    this.show_matching(cx);
                     cx.notify();
                 })),
             )
-            .child(
-                icon_button(
-                    "continuous",
-                    "chevrons-down-up",
-                    "Scroll continuously",
-                    self.continuous,
-                    theme,
+            .when(!compact, |actions| {
+                actions
+                    .child(
+                        icon_button("compare", "arrow-left-right", "Compare", false, theme)
+                            .on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))),
+                    )
+                    .child(
+                        icon_button(
+                            "export",
+                            "download",
+                            "Export current page or selection as CSV",
+                            false,
+                            theme,
+                        )
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.export_selection_or_page(cx);
+                            cx.notify();
+                        })),
+                    )
+                    .child(
+                        icon_button(
+                            "continuous",
+                            "chevrons-down-up",
+                            "Scroll continuously",
+                            self.continuous,
+                            theme,
+                        )
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.continuous = !this.continuous;
+                            this.scroll.scroll_to_item_strict(0, ScrollStrategy::Top);
+                            cx.notify();
+                        })),
+                    )
+            })
+            .when(compact, |actions| {
+                actions.child(
+                    Button::new("grid-more")
+                        .ghost()
+                        .compact()
+                        .tooltip("More grid actions")
+                        .accessibility_label("More grid actions")
+                        .child(icon("ellipsis", theme.muted_foreground))
+                        .dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), groups)),
                 )
-                .on_click(cx.listener(|this, _, _, cx| {
-                    this.continuous = !this.continuous;
-                    this.scroll.scroll_to_item_strict(0, ScrollStrategy::Top);
-                    cx.notify();
-                })),
-            )
+            })
     }
 
     fn grid_control_strip(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
