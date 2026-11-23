@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use sqlparser::ast::Statement;
 
 use super::legacy_oracle_tests as legacy_oracle;
@@ -110,17 +108,6 @@ fn string_literals(source: &str) -> Vec<String> {
     literals
 }
 
-fn policy_sources(directory: &Path, sources: &mut Vec<String>) {
-    for entry in std::fs::read_dir(directory).unwrap().map(Result::unwrap) {
-        let path = entry.path();
-        if path.is_dir() {
-            policy_sources(&path, sources);
-        } else if path.extension().is_some_and(|extension| extension == "rs") {
-            sources.push(std::fs::read_to_string(&path).unwrap());
-        }
-    }
-}
-
 fn nested_corpus() -> Vec<String> {
     let mut corpus: Vec<String> = LEAVES.iter().map(|leaf| (*leaf).to_owned()).collect();
     let mut frontier = corpus.clone();
@@ -153,12 +140,9 @@ fn the_select_walk_matches_the_legacy_helpers_on_the_recorded_corpus() {
 
 #[test]
 fn the_select_walk_matches_the_legacy_helpers_on_every_policy_test_literal() {
-    let mut sources = Vec::new();
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    policy_sources(&root.join("src"), &mut sources);
-    policy_sources(&root.join("tests"), &mut sources);
+    let sources = include_str!(concat!(env!("OUT_DIR"), "/policy-sources.rs"));
     let mut statements = 0;
-    for literal in sources.iter().flat_map(|source| string_literals(source)) {
+    for literal in string_literals(sources) {
         for driver in DRIVERS {
             statements += assert_same(&literal, driver);
         }
