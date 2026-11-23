@@ -440,7 +440,17 @@ fn an_edited_cell_is_reviewed_then_saved_and_the_table_shows_the_saved_value(cx:
     });
     cx.update(|window, cx| view.update(cx, |view, cx| view.apply_active_cell_edit(window, cx)));
 
-    cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(1, 1, window, cx)));
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.cell_edit.edits.insert(
+                (1, 1),
+                bookie_gpui::model::Cell::Text("temporary\nvalue".into()),
+            );
+            view.start_edit(1, 1, window, cx);
+            assert!(view.cell_edit.active.as_ref().is_some_and(|editing| editing.full_value));
+            assert_eq!(view.cell_edit.value_editor.read(cx).value().as_ref(), "temporary\nvalue");
+        });
+    });
     cx.run_until_parked();
     cx.simulate_keystrokes("ctrl-a backspace");
     cx.run_until_parked();
