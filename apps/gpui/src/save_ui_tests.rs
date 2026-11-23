@@ -395,7 +395,7 @@ fn an_edited_cell_is_reviewed_then_saved_and_the_table_shows_the_saved_value(cx:
     use bookie_gpui::model::CellText;
     let path = std::env::temp_dir().join(format!("bookie-gpui-save-{}.sqlite", uuid::Uuid::new_v4()));
     let staged = format!("draft {}\r\nlast line", "🧪".repeat(160));
-    let replacement = format!("  {}\r\nlast line\t ", "💾".repeat(160));
+    let replacement = "first\tsecond\r\nthird 💾".to_string();
     std::fs::copy(orders_fixture(), &path).unwrap();
     let table = writable_table(&path);
     cx.update(text_input::bind_keys);
@@ -430,12 +430,24 @@ fn an_edited_cell_is_reviewed_then_saved_and_the_table_shows_the_saved_value(cx:
                 view.cell_edit.active.as_ref().is_some_and(|editing| editing.full_value)
             );
             assert_eq!(view.cell_edit.value_editor.read(cx).value().as_ref(), staged);
-            view.cell_edit
-                .value_editor
-                .update(cx, |editor, cx| editor.set_value(&replacement, window, cx));
-            view.apply_active_cell_edit(window, cx);
         })
     });
+    cx.update(|_, cx| cx.write_to_clipboard(gpui::ClipboardItem::new_string(replacement.clone())));
+    cx.simulate_keystrokes("ctrl-a ctrl-v");
+    cx.run_until_parked();
+    view.read_with(cx, |view, cx| {
+        assert_eq!(view.cell_edit.value_editor.read(cx).value().as_ref(), replacement);
+    });
+    cx.update(|window, cx| view.update(cx, |view, cx| view.apply_active_cell_edit(window, cx)));
+
+    cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(1, 1, window, cx)));
+    cx.update(|_, cx| cx.write_to_clipboard(gpui::ClipboardItem::new_string(String::new())));
+    cx.simulate_keystrokes("ctrl-a ctrl-v");
+    cx.run_until_parked();
+    view.read_with(cx, |view, cx| {
+        assert_eq!(view.cell_edit.value_editor.read(cx).value().as_ref(), "");
+    });
+    cx.update(|window, cx| view.update(cx, |view, cx| view.apply_active_cell_edit(window, cx)));
 
     cx.simulate_keystrokes("ctrl-s");
     settle(cx);
@@ -454,7 +466,7 @@ fn an_edited_cell_is_reviewed_then_saved_and_the_table_shows_the_saved_value(cx:
             .any(|value| value == &bookie_gpui::model::Cell::Text(replacement.clone())));
         assert_eq!(
             view.cell_edit.edits.len(),
-            1,
+            2,
             "nothing is saved before the user confirms"
         );
     });
@@ -462,7 +474,7 @@ fn an_edited_cell_is_reviewed_then_saved_and_the_table_shows_the_saved_value(cx:
     cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_save(cx)));
     settle(cx);
     view.read_with(cx, |view, _| {
-        assert_eq!(view.save.banner, Some(("Saved 1 change(s)".to_string(), false)));
+        assert_eq!(view.save.banner, Some(("Saved 2 change(s)".to_string(), false)));
         assert!(view.source.origin().contains("editable"), "{}", view.source.origin());
         assert!(view.cell_edit.edits.is_empty());
         assert!(view.save.pending.is_none());
@@ -471,7 +483,10 @@ fn an_edited_cell_is_reviewed_then_saved_and_the_table_shows_the_saved_value(cx:
             replacement,
             "the grid shows the saved value"
         );
+        assert_eq!(view.source.row(1)[1].display(), "", "the empty clipboard value is saved");
     });
+    assert_eq!(saved_customer(&path, 1), replacement);
+    assert_eq!(saved_customer(&path, 2), "");
     std::fs::remove_file(&path).ok();
 }
 
