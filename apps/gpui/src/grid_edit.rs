@@ -57,6 +57,11 @@ impl GridView {
         } else {
             self.cell_edit.editor.read(cx).content().to_string()
         };
+        if full_value && text.len() > MAX_FULL_VALUE_EDIT_BYTES {
+            self.status = "This value exceeds the 1 MiB full-value editor limit".into();
+            cx.notify();
+            return;
+        }
         if editing.kind == "null" && text.is_empty() {
             self.stop_edit(window, cx);
             return;

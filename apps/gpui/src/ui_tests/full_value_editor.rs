@@ -138,6 +138,27 @@ fn oversized_full_value_refuses_edit_without_replacing_the_staged_value(cx: &mut
 }
 
 #[gpui::test]
+fn oversized_full_value_replacement_is_rejected_without_closing_editor(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    let previous = Cell::Text("old\nvalue".into());
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.cell_edit.edits.insert((2, 1), previous.clone());
+            view.start_edit(2, 1, window, cx);
+            view.cell_edit.value_editor.update(cx, |editor, cx| {
+                editor.set_value(&"x".repeat(1024 * 1024 + 1), window, cx);
+            });
+            view.apply_active_cell_edit(window, cx);
+        });
+    });
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.cell_edit.edits.get(&(2, 1)), Some(&previous));
+        assert!(view.cell_edit.active.as_ref().is_some_and(|editing| editing.full_value));
+        assert!(view.status.contains("1 MiB"));
+    });
+}
+
+#[gpui::test]
 fn opening_a_multiline_value_preserves_it_in_the_full_value_editor(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     let value = Cell::Text("first\nsecond".into());
