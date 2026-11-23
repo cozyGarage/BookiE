@@ -1399,6 +1399,7 @@ dependencies = [
  "gpui-pre-platform",
  "regex",
  "rust_decimal",
+ "rustls",
  "secrecy",
  "serde_json",
  "tokio",
