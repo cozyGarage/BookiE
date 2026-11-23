@@ -4,7 +4,7 @@ BookiE is a Linux-first native database client. GTK is the shipped Linux applica
 
 ## Start here
 
-- Read [`AGENTS.md`](AGENTS.md) for contributor rules, lane ownership, tests, security, commits and review workflow.
+- Read [`AGENTS.md`](AGENTS.md) for contributor rules, worktrees, tests, security, commits and review workflow.
 - Read the [documentation map](docs/README.md) and choose work from [Project #3](https://github.com/users/cozyGarage/projects/3). Each issue lists its acceptance criteria.
 - The Cargo workspace is at the repository root. [Architecture](ARCHITECTURE.md) explains crate boundaries and data flow.
 
