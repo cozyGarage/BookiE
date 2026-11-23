@@ -1074,7 +1074,10 @@ fn painting_a_row_reads_the_source_once_and_keeps_pending_edits_available(cx: &m
         });
     });
     cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(1, 1, window, cx)));
-    view.read_with(cx, |view, cx| assert_eq!(view.cell_edit.editor.read(cx).content(), full));
+    view.read_with(cx, |view, cx| {
+        assert!(view.cell_edit.active.as_ref().is_some_and(|editing| editing.full_value));
+        assert_eq!(view.cell_edit.value_editor.read(cx).value().as_ref(), full);
+    });
 }
 
 #[gpui::test]
