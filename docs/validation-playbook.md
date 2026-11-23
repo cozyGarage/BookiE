@@ -139,7 +139,7 @@ Copy this and fill in every field:
 
 ```text
 Repository and branch: <name>; expected full SHA: <sha>
-Goal: <one invariant or failure>; issue and lane: <issue id> / <lane>
+Goal: <one invariant or failure>; issue: <issue id>
 Allowed edits: <paths>; other agent-owned paths: <paths>
 Run layers: <catalog names>; narrow reproducer: <exact command>
 Available test prerequisites: <relevant tools or fixtures>

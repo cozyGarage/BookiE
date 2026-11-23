@@ -22,7 +22,7 @@ def write_ledger(script_dir, rows):
     docs = script_dir.parent / "docs"
     docs.mkdir()
     (docs / "known-issues.md").write_text(
-        f"{PROJECT_URL}\n\n## Open work index\n\n| ID | Issue | Lane |\n| --- | --- | --- |\n{rows}",
+        f"{PROJECT_URL}\n\n## Open work index\n\n| ID | Issue |\n| --- | --- |\n{rows}",
         encoding="utf-8",
     )
 
@@ -123,7 +123,7 @@ class GitHubIssueStatusTests(unittest.TestCase):
             script_dir.mkdir()
             write_ledger(
                 script_dir,
-                "| UI-1 | [#1](https://github.com/cozyGarage/BookiE/issues/1) | UX |\n",
+                "| UI-1 | [#1](https://github.com/cozyGarage/BookiE/issues/1) |\n",
             )
             stdout = io.StringIO()
             with (
@@ -145,7 +145,7 @@ class GitHubIssueStatusTests(unittest.TestCase):
                 script_dir.mkdir()
                 write_ledger(
                     script_dir,
-                    "| UI-1 | [#1](https://github.com/cozyGarage/BookiE/issues/1) | UX |\n",
+                    "| UI-1 | [#1](https://github.com/cozyGarage/BookiE/issues/1) |\n",
                 )
                 stderr = io.StringIO()
                 with (
