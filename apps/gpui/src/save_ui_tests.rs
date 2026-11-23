@@ -1,6 +1,7 @@
 use std::time::Instant;
 
 use gpui::TestAppContext;
+use gpui_kit::test::TestWindowExt;
 
 use crate::GridView;
 use crate::live_ui_tests::open_live;
