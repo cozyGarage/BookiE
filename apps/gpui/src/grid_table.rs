@@ -704,6 +704,9 @@ impl GridView {
         }
         let (sortable, sort) = self.sort_state();
         let editor = self.cell_edit.active.as_ref().and_then(|editing| {
+            if editing.full_value {
+                return None;
+            }
             let dataset = self.dataset_index_of(editing.row)?.checked_sub(map.base)?;
             (dataset < map.count as u64).then(|| {
                 (
