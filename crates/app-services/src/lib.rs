@@ -92,6 +92,7 @@ pub mod structure_metadata;
 pub mod structure_tracker;
 pub mod tab_mark;
 pub mod tls_failure;
+pub mod transaction_idle;
 pub mod update_check;
 pub mod value_input;
 #[cfg(test)]
