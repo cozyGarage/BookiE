@@ -152,6 +152,7 @@ struct GridView {
     local_sort: Option<bookie_app_services::read_session::TableSort>,
     column_widths: Option<bookie_app_services::column_widths::ColumnWidthStore>,
     live: Option<std::sync::Arc<bookie_gpui::live::LiveSession>>,
+    schema_context: Option<String>,
     connections: Vec<bookie_app_services::read_session::ConnectionSummary>,
     keymap: Keymap,
     dark_mode: bool,
@@ -303,6 +304,8 @@ impl GridView {
         let sql_input = cx.new(|cx| {
             EditorState::new(window, cx)
                 .language("sql")
+                .line_number(true)
+                .folding(true)
                 .placeholder("SELECT … (Enter adds a line, Ctrl+Enter runs it)")
         });
         cx.subscribe(
@@ -500,6 +503,7 @@ impl GridView {
             local_order: None,
             local_sort: None,
             live: None,
+            schema_context: None,
             keymap: Keymap::default(),
             tabs: Tabs::default(),
             window_title_tab: None,

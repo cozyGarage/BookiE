@@ -13,7 +13,7 @@
 edition = "2024"
 rust-version = "1.88"
 name = "mongodb"
-version = "3.10.0"
+version = "3.10.2"
 authors = [
     "Saghm Rossi <saghmrossi@gmail.com>",
     "Patrick Freed <patrick.freed@mongodb.com>",
@@ -264,7 +264,7 @@ optional = true
 default-features = false
 
 [dependencies.mongodb-internal-macros]
-version = "3.10.0"
+version = "3.10.2"
 
 [dependencies.num_cpus]
 version = "1.13.1"
