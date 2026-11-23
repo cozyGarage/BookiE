@@ -79,10 +79,12 @@ Row counts are 150,000, 500,000 or 1,000,000 through `BOOKIE_PROTOTYPE_ROWS`. Re
 From the repository root:
 
 ```bash
-cargo test --manifest-path apps/gpui/Cargo.toml --locked
-cargo deny --manifest-path apps/gpui/Cargo.toml --config deny.toml check advisories licenses
-cargo run --release --manifest-path apps/gpui/Cargo.toml --locked
+scripts/gpui-cargo.sh test --locked
+scripts/gpui-cargo.sh deny --config deny.toml check advisories licenses
+scripts/gpui-cargo.sh run --release --locked
 ```
+
+The standalone GPUI workspace shares the repository `target` directory with the main workspace. The wrapper also uses the installed `sccache` for Rust and C/C++ compilation when available, so DuckDB's unchanged C++ sources can be reused across GPUI rebuilds and worktrees. Set `CARGO_TARGET_DIR` explicitly to use another target directory.
 
 Forgejo runs the model and simulated interaction tests without a display. Native rendering and system clipboard behavior require a desktop session.
 
