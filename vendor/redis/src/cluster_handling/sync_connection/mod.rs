@@ -80,7 +80,7 @@ use super::{
 };
 use crate::IntoConnectionInfo;
 pub use crate::TlsMode; // Pub for backwards compatibility
-use crate::cluster_handling::{get_connection_info, slot_cmd};
+use crate::cluster_handling::{get_connection_info, redirect_address, slot_cmd};
 use crate::cluster_routing::{
     MultipleNodeRoutingInfo, ResponsePolicy, Routable, SingleNodeRoutingInfo, Slot, SlotAddr,
 };
@@ -189,6 +189,9 @@ pub trait Connect: Sized {
     /// If the provided value is `None`, then `send_packed_command` call will
     /// block indefinitely. It is an error to pass the zero `Duration` to this
     /// method.
+    ///
+    /// A write that fails, including by timing out, closes the connection, and callers must
+    /// reconnect.
     fn set_write_timeout(&self, dur: Option<Duration>) -> RedisResult<()>;
 
     /// Sets the read timeout for the connection.
@@ -375,6 +378,9 @@ where
     /// If the provided value is `None`, then `send_packed_command` call will
     /// block indefinitely. It is an error to pass the zero `Duration` to this
     /// method.
+    ///
+    /// A write that fails, including by timing out, closes the connection, and callers must
+    /// reconnect.
     pub fn set_write_timeout(&self, dur: Option<Duration>) -> RedisResult<()> {
         // Check if duration is valid before updating local value.
         if dur.is_some() && dur.unwrap().is_zero() {
@@ -589,7 +595,11 @@ where
         addr: &NodeAddress,
     ) -> RedisResult<&'a mut C> {
         match connections.entry(addr.clone()) {
-            std::collections::hash_map::Entry::Occupied(occupied_entry) => {
+            std::collections::hash_map::Entry::Occupied(mut occupied_entry) => {
+                if !occupied_entry.get().is_open() {
+                    // The connection was closed, e.g. by a failed write, so it can't be reused.
+                    occupied_entry.insert(self.connect(addr)?);
+                }
                 Ok(occupied_entry.into_mut())
             }
             std::collections::hash_map::Entry::Vacant(vacant_entry) => {
@@ -802,6 +812,13 @@ where
                     .collect::<RedisResult<Vec<_>>>()?;
                 crate::cluster_routing::logical_aggregate(results, op)
             }
+            Some(ResponsePolicy::AggregateArray(op)) => {
+                let results = results
+                    .into_iter()
+                    .map(|res| res.map(|(_, val)| val))
+                    .collect::<RedisResult<Vec<_>>>()?;
+                crate::cluster_routing::aggregate_array(results, op)
+            }
             Some(ResponsePolicy::CombineArrays) => {
                 let results = results
                     .into_iter()
@@ -914,7 +931,7 @@ where
                     match err.retry_method() {
                         RetryMethod::AskRedirect => {
                             redirected = err.redirect_node().and_then(|(node, _slot)| {
-                                NodeAddress::try_from(node).ok().map(Redirect::Ask)
+                                redirect_address(node, &addr).map(Redirect::Ask)
                             });
                         }
                         RetryMethod::MovedRedirect => {
@@ -922,7 +939,7 @@ where
                             self.refresh_slots()?;
                             // Request again.
                             redirected = err.redirect_node().and_then(|(node, _slot)| {
-                                NodeAddress::try_from(node).ok().map(Redirect::Moved)
+                                redirect_address(node, &addr).map(Redirect::Moved)
                             });
                         }
                         RetryMethod::WaitAndRetry => {
