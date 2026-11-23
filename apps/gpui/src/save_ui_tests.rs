@@ -1911,7 +1911,7 @@ fn grid_paste_shortcut_stages_clipboard_values(cx: &mut TestAppContext) {
             view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 1 });
         });
     });
-    cx.simulate_keystrokes("ctrl-v");
+    cx.simulate_keystrokes("secondary-v");
     view.read_with(cx, |view, _| {
         assert_eq!(view.cell_edit.edits.get(&(0, 1)), Some(&bookie_gpui::model::Cell::Text("Shortcut value".into())), "{}", view.status);
     });
@@ -1932,7 +1932,7 @@ fn paste_shortcut_in_filter_does_not_edit_grid(cx: &mut TestAppContext) {
             window.focus(&view.search.filter.read(cx).focus_handle(cx), cx);
         });
     });
-    cx.simulate_keystrokes("ctrl-v");
+    cx.simulate_keystrokes("secondary-v");
     view.read_with(cx, |view, cx| {
         assert!(view.cell_edit.edits.is_empty());
         assert_eq!(view.search.filter.read(cx).content().to_string(), "filter text");

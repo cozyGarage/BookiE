@@ -88,6 +88,14 @@ pub fn bind_keys(cx: &mut App) {
         KeyBinding::new("escape", Cancel, Some("TextInput")),
         KeyBinding::new("ctrl-enter", gpui::NoAction, Some("Input")),
     ]);
+    if cfg!(target_os = "macos") {
+        cx.bind_keys([
+            KeyBinding::new("cmd-a", SelectAll, Some("TextInput")),
+            KeyBinding::new("cmd-v", Paste, Some("TextInput")),
+            KeyBinding::new("cmd-c", Copy, Some("TextInput")),
+            KeyBinding::new("cmd-x", Cut, Some("TextInput")),
+        ]);
+    }
 }
 
 impl TextInput {
