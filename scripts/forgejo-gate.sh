@@ -87,6 +87,9 @@ dispatch_payload="$(python3 -c 'import json,sys; print(json.dumps({"ref": sys.ar
 api_post --request POST --header 'Content-Type: application/json' \
   --data-binary "$dispatch_payload" "$api/actions/workflows/ci.yml/dispatches" >/dev/null
 deadline=$((SECONDS + timeout_minutes * 60))
+observed_run_id=0
+observed_run_number=0
+timeout_reported=0
 
 summarize() {
   api_get "$api/actions/runs?page=1&limit=50" | python3 -c '
@@ -104,8 +107,12 @@ else:
 ' "$sha" "$after"
 }
 
-while [ "$SECONDS" -lt "$deadline" ]; do
+while true; do
   read -r status run_id run_number <<<"$(summarize)"
+  if [ "$status" = running ]; then
+    observed_run_id="$run_id"
+    observed_run_number="$run_number"
+  fi
   case "$status" in
     success) echo "forgejo run $run_number (API id $run_id) passed for $sha"; exit 0 ;;
     failure|cancelled)
@@ -145,7 +152,14 @@ else:
         exit 1
       fi ;;
   esac
+  if [ "$SECONDS" -ge "$deadline" ] && [ "$timeout_reported" -eq 0 ]; then
+    if [ "$observed_run_id" -gt 0 ]; then
+      echo "Forgejo run $observed_run_number (API id $observed_run_id) exceeded $timeout_minutes minutes; keeping the gate slot until Forgejo reports a terminal status" >&2
+      timeout_reported=1
+    else
+      echo "Forgejo did not start a run for $sha within $timeout_minutes minutes" >&2
+      exit 2
+    fi
+  fi
   sleep 30
 done
-echo "forgejo run for $sha did not finish within $timeout_minutes minutes" >&2
-exit 2
