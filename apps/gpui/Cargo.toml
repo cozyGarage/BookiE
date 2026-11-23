@@ -28,6 +28,7 @@ gpui_platform = { package = "gpui-pre-platform", version = "=0.3.11" }
 gpui_macros = { package = "gpui-pre-macros", version = "=0.3.11" }
 gpui-kit = "=0.9.0"
 gpui-component = { version = "=0.9.0", features = ["tree-sitter-sql"] }
+rfd = "=0.18.0"
 
 [dev-dependencies]
 bookie-app-services = { path = "../../crates/app-services", features = ["test-support"] }

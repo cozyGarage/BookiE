@@ -391,19 +391,18 @@ impl GridView {
             .child(icon("arrow-down-up", theme.muted_foreground))
             .children((self.sidebar.width >= 320.0).then(|| div().flex_1().min_w_0().child("Import / Export")))
             .dropdown_menu(move |mut menu, _, _| {
-                for label in [
-                    "Import DBX Config",
-                    "Import Navicat NCX",
-                    "Import DBeaver",
-                    "Import DataGrip",
-                    "Import RDM",
-                    "Import AnotherRDM",
-                    "Export Connections",
+                for (id, label) in [
+                    ("import-connections", "Import Connections…"),
+                    ("export-connections", "Export Connections"),
                 ] {
                     let owner = owner.clone();
                     menu = menu.item(PopupMenuItem::new(label).on_click(move |_, _, cx| {
                         let _ = owner.update(cx, |this, cx| {
-                            this.status = format!("{label} is not available in this prototype yet.");
+                            match id {
+                                "import-connections" => this.pick_connection_import(cx),
+                                "export-connections" => this.pick_connection_export(cx),
+                                _ => {}
+                            }
                             cx.notify();
                         });
                     }));
