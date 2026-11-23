@@ -503,6 +503,23 @@ impl ReadSession {
             .map_err(|error| classify(&error))
     }
 
+    pub async fn run_query_batch(
+        &self,
+        sql: &str,
+        params: &[bookie_core::Value],
+        control: &OperationControl,
+    ) -> Result<bookie_core::QueryResultBatch, DriverFailurePresentation> {
+        self.refuse_free_form_on_a_writable_session()?;
+        let guard = self
+            .database
+            .guard_for_generation(self.id, self.generation, Principal::human_gui())
+            .ok_or(DriverFailurePresentation::Disconnected)?;
+        guard
+            .query_result_sets_controlled(sql, params, control)
+            .await
+            .map_err(|error| classify(&error))
+    }
+
     pub async fn run_query(
         &self,
         sql: &str,

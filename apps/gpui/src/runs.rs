@@ -97,6 +97,7 @@ impl GridView {
                         this.panel.error_location = None;
                         let (rows, truncated) = (bookie_gpui::source::ResultSource::total(&table), table.truncated);
                         this.panel.messages.statement_ok(&sql, rows, truncated, elapsed);
+                        this.panel.messages.server_messages(&table.messages);
                         this.show_plan_of(&table);
                         this.add_run(Some(std::sync::Arc::new(table)));
                         if let Some(slot) = this.run_tabs.slots.last_mut() {
