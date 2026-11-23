@@ -1896,3 +1896,43 @@ fn paste_skips_a_hidden_middle_column(cx: &mut TestAppContext) {
     assert_eq!(saved.row(0)[3], original.row(0)[3]);
     std::fs::remove_file(path).ok();
 }
+
+#[gpui::test]
+fn grid_paste_shortcut_stages_clipboard_values(cx: &mut TestAppContext) {
+    let path = fixture_copy("paste-shortcut");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| {
+        cx.write_to_clipboard(gpui::ClipboardItem::new_string("Shortcut value".into()));
+        view.update(cx, |view, _| {
+            view.tabs.open_table(&view.catalog.grid_table);
+            view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 1 });
+        });
+    });
+    cx.simulate_keystrokes("ctrl-v");
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.cell_edit.edits.get(&(0, 1)), Some(&bookie_gpui::model::Cell::Text("Shortcut value".into())), "{}", view.status);
+    });
+    std::fs::remove_file(path).ok();
+}
+
+#[gpui::test]
+fn paste_shortcut_in_filter_does_not_edit_grid(cx: &mut TestAppContext) {
+    use gpui::Focusable;
+    let path = fixture_copy("paste-filter-focus");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|window, cx| {
+        cx.write_to_clipboard(gpui::ClipboardItem::new_string("filter text".into()));
+        view.update(cx, |view, cx| {
+            view.tabs.open_table(&view.catalog.grid_table);
+            view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 1 });
+            view.search.filter_visible = true;
+            window.focus(&view.search.filter.read(cx).focus_handle(cx), cx);
+        });
+    });
+    cx.simulate_keystrokes("ctrl-v");
+    view.read_with(cx, |view, cx| {
+        assert!(view.cell_edit.edits.is_empty());
+        assert_eq!(view.search.filter.read(cx).content().to_string(), "filter text");
+    });
+    std::fs::remove_file(path).ok();
+}
