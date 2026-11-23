@@ -84,6 +84,7 @@ impl GridView {
             .chain(self.run_cursor_actions())
             .chain(self.paste_actions())
             .chain(self.filter_rule_actions())
+            .chain(self.server_filter_actions())
             .chain(self.diagram_actions())
             .chain(self.update_actions())
             .chain(self.backup_actions())
@@ -159,8 +160,8 @@ impl GridView {
                 paged && self.pager.page + 1 < self.pager.pages(),
             ),
             action("last", "Go to last page", paged),
-            action("find", "Find in all rows", !filtering),
-            action("filter", "Filter rows (WHERE)", true),
+            action("find", "Find in loaded rows", !filtering),
+            action("filter", "Filter loaded rows", true),
             action("clear-filter", "Clear filter", filtering),
             action("compare", "Compare results", true),
             action(

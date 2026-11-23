@@ -306,11 +306,23 @@ impl LiveSession {
         Ok(outcome)
     }
 
-    pub fn count_table_rows(&self, table: &TableInfo, cancellation: &CancellationToken) -> Result<u64, String> {
+    pub fn count_table_rows(
+        &self,
+        table: &TableInfo,
+        where_sql: &str,
+        cancellation: &CancellationToken,
+    ) -> Result<u64, String> {
         if !self.supports_table_row_count() {
             return Err("Exact row counts are not available for this database type.".into());
         }
-        let sql = table_count_sql(&self.driver_id, table);
+        let (sql, params) = if where_sql.trim().is_empty() {
+            (table_count_sql(&self.driver_id, table), Vec::new())
+        } else {
+            let columns = self.table_columns(table)?;
+            let filter = where_filter(where_sql);
+            let query = browse_target(&self.driver_id, table, &columns, &filter).count()?;
+            (query.sql, query.params)
+        };
         let epoch = Epoch(self.epoch.load(Ordering::Relaxed));
         let control = OperationControl::new(
             cancellation.clone(),
@@ -319,7 +331,7 @@ impl LiveSession {
         let result = self.runtime.block_on(bridge_query(
             &self.sessions,
             self.session_id,
-            (&sql, &[]),
+            (&sql, &params),
             &control,
             epoch,
             &self.epoch,
@@ -530,6 +542,53 @@ impl LiveSession {
             load_elapsed: started.elapsed(),
             table: Some(table.clone()),
         })
+    }
+
+    pub fn load_table_where_controlled(
+        self: &Arc<Self>,
+        table: &TableInfo,
+        max_rows: u64,
+        sort: Option<&bookie_app_services::read_session::TableSort>,
+        where_sql: &str,
+        cancellation: &CancellationToken,
+    ) -> Result<LiveTable, String> {
+        if where_sql.trim().is_empty() {
+            return self.load_table_sorted_controlled(table, max_rows, sort, cancellation);
+        }
+        if matches!(self.driver_id.as_str(), "mongodb" | "redis") {
+            return Err("WHERE filters need a SQL database.".into());
+        }
+        let table = find_table(&self.tables, table)?;
+        let columns = self.table_columns(&table)?;
+        let sort = match sort {
+            Some(sort) => Some((
+                columns
+                    .iter()
+                    .position(|column| column.name == sort.column)
+                    .ok_or("The requested sort column no longer exists.")?,
+                sort.ascending,
+            )),
+            None => None,
+        };
+        let filter = where_filter(where_sql);
+        let page = browse_target(&self.driver_id, &table, &columns, &filter).page(
+            0,
+            max_rows.saturating_add(1),
+            sort,
+            None,
+        )?;
+        let bookie_app_services::browse_query::PageQuery::Sql(query) = page else {
+            return Err("The WHERE filter could not be sent to the database.".into());
+        };
+        let mut loaded = self.run_query_bound(&query.sql, &query.params, max_rows, cancellation)?;
+        for column in &mut loaded.columns {
+            column.primary_key = columns
+                .iter()
+                .any(|info| info.primary_key && info.name == column.name);
+        }
+        loaded.executed_sql = None;
+        loaded.table = Some(table);
+        Ok(loaded)
     }
 
     pub fn export_all_tables(
@@ -1311,6 +1370,31 @@ fn bound_page(page: &mut QueryResult, budget: &mut QueryResultBudget) -> bool {
     page.rows.truncate(admitted);
     page.truncated = incomplete;
     incomplete
+}
+
+fn where_filter(where_sql: &str) -> bookie_core::FilterSet {
+    bookie_core::FilterSet {
+        extra_sql: Some(where_sql.to_owned()),
+        ..bookie_core::FilterSet::default()
+    }
+}
+
+fn browse_target<'a>(
+    driver_id: &'a str,
+    table: &'a TableInfo,
+    columns: &'a [ColumnInfo],
+    filter: &'a bookie_core::FilterSet,
+) -> bookie_app_services::browse_query::BrowseTarget<'a> {
+    bookie_app_services::browse_query::BrowseTarget {
+        driver_id,
+        schema: table.schema.as_deref(),
+        table: &table.name,
+        columns,
+        filter,
+        hidden_columns: None,
+        long_text_preview: false,
+        supports_reverse_keyset: false,
+    }
 }
 
 fn find_table(tables: &[TableInfo], wanted: &TableInfo) -> Result<TableInfo, String> {

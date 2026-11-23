@@ -54,13 +54,14 @@ impl GridView {
         let current_session = session.clone();
         let current_table = table.clone();
         let requested_sort = sort.clone();
+        let where_sql = self.table_where(&table);
         self.status = format!("Sorting {column}…");
         self.begin_background(
             Work::Load,
             cx,
             move |cancel| {
                 session
-                    .load_table_sorted_controlled(&table, ROW_CAP, sort.as_ref(), &cancel)
+                    .load_table_where_controlled(&table, ROW_CAP, sort.as_ref(), &where_sql, &cancel)
                     .map(|loaded| Arc::new(loaded) as Source)
             },
             move |this, result| {
@@ -204,11 +205,13 @@ impl GridView {
         let table = self.catalog.grid_table.clone();
         let current_session = session.clone();
         let current_table = table.clone();
+        let where_sql = self.table_where(&table);
+        let scope = if where_sql.is_empty() { "" } else { " matching the WHERE filter" };
         self.status = format!("Counting all rows in {}…", table.name);
         self.begin_background(
             Work::Count,
             cx,
-            move |cancel| session.count_table_rows(&table, &cancel),
+            move |cancel| session.count_table_rows(&table, &where_sql, &cancel),
             move |this, result| {
                 if this.grid_is_query
                     || this.catalog.grid_table != current_table
@@ -221,7 +224,7 @@ impl GridView {
                 }
                 this.status = match result {
                     Ok(count) => format!(
-                        "Database table {} has {} rows at count time",
+                        "Database table {} has {} rows{scope} at count time",
                         current_table.name,
                         crate::thousands(count)
                     ),
@@ -247,6 +250,7 @@ impl GridView {
 
     fn attach_session(&mut self, session: Arc<LiveSession>, table: TableInfo) {
         self.table_sorts.clear();
+        self.search.server.applied.clear();
         self.edits_changed();
         self.reset_edit_history();
         self.close_insert_form();
@@ -374,10 +378,11 @@ impl GridView {
         self.status = format!("Loading {}…", table_label(table));
         let wanted = table.clone();
         let sort = self.table_sort(&wanted).cloned();
+        let where_sql = self.table_where(&wanted);
         self.begin_background(
             Work::Load,
             cx,
-            move |cancel| load(&session, &wanted, sort.as_ref(), &cancel),
+            move |cancel| load(&session, &wanted, sort.as_ref(), &where_sql, &cancel),
             move |this, loaded| match loaded {
                 Ok((name, table)) => this.show_loaded_table(name, table),
                 Err(message) => this.status = message,
@@ -393,10 +398,11 @@ impl GridView {
         self.cell_edit.edits.clear();
         let wanted = self.catalog.grid_table.clone();
         let sort = self.table_sort(&wanted).cloned();
+        let where_sql = self.table_where(&wanted);
         self.begin_background(
             Work::Load,
             cx,
-            move |cancel| load(&session, &wanted, sort.as_ref(), &cancel),
+            move |cancel| load(&session, &wanted, sort.as_ref(), &where_sql, &cancel),
             move |this, loaded| {
                 this.save.busy = false;
                 match loaded {
@@ -410,7 +416,7 @@ impl GridView {
         );
     }
 
-    fn show_loaded_table(&mut self, identity: TableInfo, table: Source) {
+    pub(crate) fn show_loaded_table(&mut self, identity: TableInfo, table: Source) {
         if self.reject_view_edits() {
             return;
         }
@@ -435,13 +441,14 @@ impl GridView {
     }
 }
 
-fn load(
+pub(crate) fn load(
     session: &Arc<LiveSession>,
     table: &TableInfo,
     sort: Option<&bookie_app_services::read_session::TableSort>,
+    where_sql: &str,
     cancellation: &tokio_util::sync::CancellationToken,
 ) -> Result<(TableInfo, Source), String> {
-    let loaded = session.load_table_sorted_controlled(table, ROW_CAP, sort, cancellation)?;
+    let loaded = session.load_table_where_controlled(table, ROW_CAP, sort, where_sql, cancellation)?;
     Ok((table.clone(), Arc::new(loaded)))
 }
 

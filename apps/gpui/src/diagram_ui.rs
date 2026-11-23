@@ -79,6 +79,7 @@ impl GridView {
         self.focus_value_search_input(window, cx);
         self.focus_schema_diagram_input(window, cx);
         self.focus_filter_rule_input(window, cx);
+        self.prepare_server_filter(cx);
         self.focus_backup_input(window, cx);
         self.focus_sql_file_input(window, cx);
         self.focus_tables_export_input(window, cx);

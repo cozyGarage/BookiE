@@ -48,6 +48,7 @@ mod value_search_ui;
 mod fk_nav_ui;
 mod resolve_ui;
 mod saved_filters_ui;
+mod server_filter_ui;
 mod structure_ui;
 mod insert_ui;
 mod params_ui;
@@ -271,7 +272,7 @@ impl GridView {
         Entity<TextInput>,
         Entity<EditorState>,
     ) {
-        let find = cx.new(|cx| TextInput::new("Find", cx));
+        let find = cx.new(|cx| TextInput::new("Find in loaded rows", cx));
         let filter = cx.new(|cx| TextInput::new("label contains 7", cx));
         cx.subscribe(&find, |this, _, event: &InputEvent, cx| match event {
             InputEvent::Changed => {

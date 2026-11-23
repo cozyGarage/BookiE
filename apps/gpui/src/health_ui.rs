@@ -34,6 +34,8 @@ impl GridView {
             "run-at-cursor" => self.run_at_cursor(cx),
             "paste-cells" => self.paste_cells(cx),
             "filter-rule" => self.open_filter_rule_bar(cx),
+            "where" => self.focus_where(window, cx),
+            "clear-where" => self.clear_where(cx),
             "show-schema-diagram" => self.open_schema_diagram(cx),
             "check-for-updates" => self.check_for_updates_now(cx),
             "about" => self.status = crate::update_ui::about_status(),

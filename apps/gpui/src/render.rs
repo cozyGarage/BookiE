@@ -242,7 +242,7 @@ impl GridView {
                 .gap_2()
                 .px_2()
                 .pb_2()
-                .child(div().child("Filter"))
+                .child(div().child("Filter loaded rows"))
                 .child(div().w(px(size::FILTER_WIDTH)).child(self.search.filter.clone()))
                 .child(button("apply", "Apply", theme).on_click(cx.listener(|this, _, _, cx| this.apply_filter(cx))))
                 .child(
@@ -358,7 +358,7 @@ impl Render for GridView {
         self.sync_render_state(window, cx);
         let theme = Theme::current(cx);
         let strip = self.grid_control_strip(theme, cx);
-        let filter_row = self.grid_filter_row(theme, cx);
+        let filter_row = self.filter_rows(self.grid_filter_row(theme, cx), theme, cx);
         let compare_bar = self.grid_compare_bar(theme, cx);
         let palette = if self.palette.open {
             Some(self.palette_overlay(window, cx))
