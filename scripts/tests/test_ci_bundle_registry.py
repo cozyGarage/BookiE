@@ -78,9 +78,56 @@ class RegistryExtractionTests(unittest.TestCase):
         ]
         for body, headers, error in cases:
             with self.subTest(error=error), patch.object(
-                    registry, 'request', return_value=JsonResponse(body, headers)):
+                    registry, 'request', return_value=JsonResponse(body, headers)), patch.object(
+                        registry.time, 'sleep'):
                 with self.assertRaisesRegex(ValueError, error):
                     registry.forgejo_list('https://forgejo.example/api', 'branches', {}, 'repo-token')
+
+    def test_forgejo_list_retries_when_inventory_changes_during_pagination(self):
+        responses = [
+            JsonResponse([{'name': 'first'}], {
+                'Link': '<https://forgejo.example/branches?page=2>; rel="next"',
+                'X-Total-Count': '2',
+            }),
+            JsonResponse([], {'X-Total-Count': '3'}),
+            JsonResponse([{'name': 'first'}, {'name': 'second'}], {'X-Total-Count': '2'}),
+        ]
+
+        with patch.object(registry, 'request', side_effect=responses), patch.object(registry.time, 'sleep'):
+            branches = registry.forgejo_list('https://forgejo.example/api', 'branches', {}, 'repo-token')
+
+        self.assertEqual(branches, [{'name': 'first'}, {'name': 'second'}])
+
+    def test_forgejo_list_follows_next_link_even_if_total_count_is_met(self):
+        responses = [
+            JsonResponse([{'name': 'first'}], {
+                'Link': '<https://forgejo.example/branches?page=2>; rel="next"',
+                'X-Total-Count': '1',
+            }),
+            JsonResponse([{'name': 'second'}], {'X-Total-Count': '2'}),
+        ]
+
+        with patch.object(registry, 'request', side_effect=responses):
+            branches = registry.forgejo_list('https://forgejo.example/api', 'branches', {}, 'repo-token')
+
+        self.assertEqual(branches, [{'name': 'first'}, {'name': 'second'}])
+
+    def test_forgejo_list_trusts_final_link_when_total_count_is_stale(self):
+        responses = [
+            JsonResponse([{'name': 'first'}], {
+                'Link': '<https://forgejo.example/branches?page=2>; rel="next"',
+                'X-Total-Count': '2',
+            }),
+            JsonResponse([{'name': 'second'}], {
+                'Link': '<https://forgejo.example/branches?page=1>; rel="first"',
+                'X-Total-Count': '3',
+            }),
+        ]
+
+        with patch.object(registry, 'request', side_effect=responses):
+            branches = registry.forgejo_list('https://forgejo.example/api', 'branches', {}, 'repo-token')
+
+        self.assertEqual(branches, [{'name': 'first'}, {'name': 'second'}])
 
     def test_discover_protected_revisions_from_branches_open_prs_and_active_runs(self):
         responses = {

@@ -229,6 +229,7 @@ jobs:
     timeout-minutes: 90
     env:
       CARGO_BUILD_JOBS: 2
+      CARGO_TARGET_DIR: apps/gpui/target
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
@@ -256,7 +257,7 @@ jobs:
         run: |
           name="bookie-gpui-linux-x86_64-${VERSION}"
           mkdir -p "dist/${name}"
-          install -m 0755 apps/gpui/target/release/bookie-gpui "dist/${name}/bookie-gpui"
+          install -m 0755 target/release/bookie-gpui "dist/${name}/bookie-gpui"
           printf '%s\n' "$VERSION" > "dist/${name}/VERSION"
           git rev-parse HEAD > "dist/${name}/SOURCE_COMMIT"
           cat > "dist/${name}/INSTALL.txt" <<'EOF'
