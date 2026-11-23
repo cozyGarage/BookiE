@@ -104,6 +104,7 @@ Other options and why they were rejected.
 | [0054](0054-one-visual-language.md) | One visual language for both apps | Accepted (2026-11-18) | dbx look and TablePro/macOS language for GTK and GPUI; shared parts at the third copy |
 | [0055](0055-postgresql-routine-debugging-scope.md) | Scope PostgreSQL routine debugging before implementation | Proposed | Limit the first debugger slice to policy-governed PL/pgSQL routines on explicitly provisioned development connections. |
 | [0056](0056-audited-reconciliation-of-unknown-write-outcomes.md) | Audited reconciliation of unknown write outcomes | Accepted | A human operator records committed, rolled back or still unknown with a reason as an appended, hash-chained record; the original Unknown stays and nothing clears it implicitly. |
+| [0057](0057-interactive-transactions-are-tab-owned-sessions.md) | Interactive transactions are tab-owned sessions in both frontends | Accepted | One shared session state machine for GTK and GPUI; a transaction belongs to one query tab; buttons and typed BEGIN/COMMIT/ROLLBACK take the same guarded path; Prod Commit needs its own approval; a 5-minute idle warning never ends the transaction. |
 
 Three records use "snapshot" for different things: ADR 0011 a read-only snapshot session, ADR 0014 the read snapshot a full export holds, and ADR 0015 a saved copy of a database.
 

@@ -90,16 +90,14 @@ impl GridView {
     }
 
     pub(crate) fn show_sessions(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(live) = &self.live {
-            if live.driver_id == "postgres" {
-                self.tabs.open_query();
-                self.sync_grid_owner();
-                self.sql_input.update(cx, |input, cx| {
-                    input.set_value(bookie_app_services::pg_sessions::SESSIONS_SQL, window, cx)
-                });
-                self.run_query(cx);
-                return;
-            }
+        if self.live.as_ref().is_some_and(|live| live.driver_id == "postgres") {
+            self.tabs.open_query();
+            self.sync_grid_owner();
+            self.sql_input.update(cx, |input, cx| {
+                input.set_value(bookie_app_services::pg_sessions::SESSIONS_SQL, window, cx)
+            });
+            self.run_query(cx);
+            return;
         }
         self.show_activity(bookie_core::ActivityQuery::Sessions, window, cx);
     }
@@ -114,10 +112,44 @@ impl GridView {
         if let Ok(sql) = bookie_core::activity_sql(&live.driver_id, kind, None) {
             self.tabs.open_query();
             self.sync_grid_owner();
-            self.sql_input.update(cx, |input, cx| {
-                input.set_value(&sql, window, cx)
-            });
+            self.sql_input.update(cx, |input, cx| input.set_value(&sql, window, cx));
             self.run_query(cx);
         }
+    }
+
+    pub(crate) fn cancel_server_process(&mut self, pid: i64, cx: &mut Context<Self>) {
+        let Some(live) = self.live.as_ref() else {
+            self.status = "No active database connection.".into();
+            return;
+        };
+        let sql = match live.driver_id.as_str() {
+            "postgres" => format!("SELECT pg_cancel_backend({pid});"),
+            "mysql" => format!("KILL QUERY {pid};"),
+            _ => {
+                self.status = "Cancelling processes is not supported for this database engine.".into();
+                return;
+            }
+        };
+        self.status = format!("Cancelling server process {pid}…");
+        self.run_sql(sql, cx);
+    }
+
+    pub(crate) fn cancel_selected_process(&mut self, cx: &mut Context<Self>) {
+        let Some((row, _)) = self.active_row_with_names() else {
+            self.status = "Select a process row to cancel".into();
+            return;
+        };
+        let pid = row
+            .iter()
+            .find(|(k, _)| k.eq_ignore_ascii_case("pid"))
+            .and_then(|(_, v)| match v {
+                bookie_core::Value::Int(n) => Some(*n),
+                _ => None,
+            });
+        let Some(pid) = pid else {
+            self.status = "No process PID found in selected row".into();
+            return;
+        };
+        self.cancel_server_process(pid, cx);
     }
 }
