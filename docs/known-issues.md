@@ -32,6 +32,7 @@ This page is an index of ledger IDs to issues. Do not track evidence, owners or 
 | TEST-28 | [#560](https://github.com/cozyGarage/BookiE/issues/560) | UX |
 | TEST-31 | [#556](https://github.com/cozyGarage/BookiE/issues/556) | UX |
 | TEST-32 | [#594](https://github.com/cozyGarage/BookiE/issues/594) | Data |
+| TEST-33 | [#3816](https://github.com/cozyGarage/BookiE/issues/3816) | Policy |
 | DOC-3 | [#561](https://github.com/cozyGarage/BookiE/issues/561) | Maintainer |
 | DOC-5 | [#561](https://github.com/cozyGarage/BookiE/issues/561) | Maintainer |
 | PERF-4 | [#2961](https://github.com/cozyGarage/BookiE/issues/2961) | Data |
