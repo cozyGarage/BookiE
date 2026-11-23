@@ -13,6 +13,8 @@ export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$default_target_dir}"
 if command -v sccache >/dev/null 2>&1; then
   sccache_path="$(command -v sccache)"
   export RUSTC_WRAPPER="${RUSTC_WRAPPER:-$sccache_path}"
+  export CC="${CC:-$sccache_path cc}"
+  export CXX="${CXX:-$sccache_path c++}"
   export CMAKE_C_COMPILER_LAUNCHER="${CMAKE_C_COMPILER_LAUNCHER:-$sccache_path}"
   export CMAKE_CXX_COMPILER_LAUNCHER="${CMAKE_CXX_COMPILER_LAUNCHER:-$sccache_path}"
 fi

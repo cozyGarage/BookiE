@@ -18,6 +18,7 @@ class GpuiCargoTests(unittest.TestCase):
             cargo.write_text(
                 "#!/usr/bin/env bash\n"
                 "printf '%s\\n' \"$CARGO_TARGET_DIR\" \"$RUSTC_WRAPPER\" "
+                "\"$CC\" \"$CXX\" "
                 "\"$CMAKE_C_COMPILER_LAUNCHER\" \"$CMAKE_CXX_COMPILER_LAUNCHER\"\n"
                 "printf 'arg=%s\\n' \"$@\"\n"
             )
@@ -31,6 +32,8 @@ class GpuiCargoTests(unittest.TestCase):
                 if key not in {
                     "CARGO_TARGET_DIR",
                     "RUSTC_WRAPPER",
+                    "CC",
+                    "CXX",
                     "CMAKE_C_COMPILER_LAUNCHER",
                     "CMAKE_CXX_COMPILER_LAUNCHER",
                 }
@@ -55,7 +58,10 @@ class GpuiCargoTests(unittest.TestCase):
             capture_output=True,
             text=True,
         ).stdout.strip()
-        self.assertEqual(output[:4], [str(Path(common_dir).parent / "target"), sccache, sccache, sccache])
+        self.assertEqual(
+            output[:6],
+            [str(Path(common_dir).parent / "target"), sccache, f"{sccache} cc", f"{sccache} c++", sccache, sccache],
+        )
         self.assertIn(f"arg=--manifest-path", output)
         self.assertIn(f"arg={ROOT / 'apps/gpui/Cargo.toml'}", output)
 
@@ -63,12 +69,16 @@ class GpuiCargoTests(unittest.TestCase):
         output, _ = self.run_wrapper({
             "CARGO_TARGET_DIR": "/tmp/bookie-target",
             "RUSTC_WRAPPER": "/usr/bin/custom-rust-cache",
+            "CC": "/usr/bin/custom-c",
+            "CXX": "/usr/bin/custom-cxx",
             "CMAKE_C_COMPILER_LAUNCHER": "/usr/bin/custom-c-cache",
             "CMAKE_CXX_COMPILER_LAUNCHER": "/usr/bin/custom-cxx-cache",
         })
-        self.assertEqual(output[:4], [
+        self.assertEqual(output[:6], [
             "/tmp/bookie-target",
             "/usr/bin/custom-rust-cache",
+            "/usr/bin/custom-c",
+            "/usr/bin/custom-cxx",
             "/usr/bin/custom-c-cache",
             "/usr/bin/custom-cxx-cache",
         ])
