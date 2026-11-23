@@ -1,35 +1,80 @@
 use std::ops::ControlFlow;
 
 use sqlparser::ast::{
-    Expr, Function, FunctionArg, FunctionArgExpr, FunctionArguments, JoinConstraint, JoinOperator, Query, Select,
-    SelectItem, SetExpr, TableFactor, Visit, Visitor,
+    Expr, Function, FunctionArg, FunctionArgExpr, FunctionArguments, JoinConstraint, JoinOperator, ObjectName, Query,
+    Select, SelectItem, SetExpr, TableFactor, Visit, Visitor,
 };
 
 use sqlparser::dialect::Dialect;
 use sqlparser::keywords::Keyword;
 use sqlparser::tokenizer::{Token, Tokenizer};
 
-use crate::classify::{StatementClass, StatementFacts, classify_query};
+use crate::admin_functions::is_administrative_function_name;
+use crate::classify::{StatementClass, StatementFacts, classify_query, table_factor_names};
 use crate::effects::Effects;
 
-pub(crate) fn select_writes(select: &Select) -> bool {
-    select.into.is_some()
-        || select.from.iter().any(|t| {
-            std::iter::once(&t.relation)
-                .chain(t.joins.iter().map(|j| &j.relation))
-                .any(|factor| matches!(factor, TableFactor::Derived { subquery, .. } if classify_query(subquery).class.is_write()))
-        })
-        || select
-            .from
+pub(crate) struct SelectFacts {
+    pub(crate) administrative: bool,
+    pub(crate) writes: bool,
+    pub(crate) tables: Vec<String>,
+}
+
+#[derive(Clone, Copy, Default)]
+struct ExprFacts {
+    administrative: bool,
+    writes: bool,
+}
+
+impl ExprFacts {
+    fn or(self, other: Self) -> Self {
+        Self {
+            administrative: self.administrative || other.administrative,
+            writes: self.writes || other.writes,
+        }
+    }
+
+    fn writes(writes: bool) -> Self {
+        Self {
+            administrative: false,
+            writes,
+        }
+    }
+}
+
+pub(crate) fn select_facts(select: &Select) -> SelectFacts {
+    let mut facts = ExprFacts::writes(select.into.is_some());
+    for item in &select.projection {
+        if let SelectItem::ExprWithAlias { expr, .. } | SelectItem::UnnamedExpr(expr) = item {
+            facts = facts.or(expr_facts(expr, true));
+        }
+    }
+    let mut tables = Vec::new();
+    for table in &select.from {
+        for factor in std::iter::once(&table.relation).chain(table.joins.iter().map(|join| &join.relation)) {
+            let TableFactor::Derived { subquery, .. } = factor else {
+                tables.extend(table_factor_names(factor));
+                continue;
+            };
+            let inner = classify_query(subquery);
+            facts.writes |= inner.class.is_write();
+            tables.extend(inner.tables);
+        }
+        for constraint in table
+            .joins
             .iter()
-            .flat_map(|t| t.joins.iter())
-            .any(|join| join_constraint(&join.join_operator).is_some_and(expr_writes))
-        || select.selection.as_ref().is_some_and(expr_writes)
-        || select.having.as_ref().is_some_and(expr_writes)
-        || select.projection.iter().any(|item| match item {
-            SelectItem::ExprWithAlias { expr, .. } | SelectItem::UnnamedExpr(expr) => expr_writes(expr),
-            _ => false,
-        })
+            .filter_map(|join| join_constraint(&join.join_operator))
+        {
+            facts.writes |= expr_writes(constraint);
+        }
+    }
+    for predicate in select.selection.iter().chain(&select.having) {
+        facts.writes |= expr_writes(predicate);
+    }
+    SelectFacts {
+        administrative: facts.administrative,
+        writes: facts.writes,
+        tables,
+    }
 }
 
 pub(crate) fn with_locking_backstop(mut facts: StatementFacts, sql: &str, dialect: &dyn Dialect) -> StatementFacts {
@@ -85,12 +130,48 @@ fn join_constraint(operator: &JoinOperator) -> Option<&Expr> {
     }
 }
 
-pub(crate) fn expr_writes(expr: &Expr) -> bool {
+fn query_facts(query: &Query, projected: bool) -> ExprFacts {
+    let class = classify_query(query).class;
+    ExprFacts {
+        administrative: projected && class == StatementClass::Administrative,
+        writes: class.is_write(),
+    }
+}
+
+fn expr_facts(expr: &Expr, projected: bool) -> ExprFacts {
     match expr {
-        Expr::Subquery(q) => classify_query(q).class.is_write(),
-        Expr::BinaryOp { left, right, .. } => expr_writes(left) || expr_writes(right),
-        Expr::UnaryOp { expr, .. } => expr_writes(expr),
-        Expr::Nested(e) => expr_writes(e),
+        Expr::Subquery(query) => query_facts(query, projected),
+        Expr::BinaryOp { left, right, .. } => expr_facts(left, projected).or(expr_facts(right, projected)),
+        Expr::UnaryOp { expr, .. } | Expr::Nested(expr) => expr_facts(expr, projected),
+        Expr::Function(function) => function_facts(function, projected),
+        Expr::Case {
+            operand,
+            conditions,
+            else_result,
+            ..
+        } => operand
+            .iter()
+            .chain(else_result)
+            .map(|expr| expr_facts(expr, projected))
+            .chain(conditions.iter().flat_map(|case| {
+                [
+                    expr_facts(&case.condition, projected),
+                    expr_facts(&case.result, projected),
+                ]
+            }))
+            .fold(ExprFacts::default(), ExprFacts::or),
+        _ => ExprFacts::writes(expr_writes(expr)),
+    }
+}
+
+fn expr_writes(expr: &Expr) -> bool {
+    match expr {
+        Expr::Subquery(_)
+        | Expr::BinaryOp { .. }
+        | Expr::UnaryOp { .. }
+        | Expr::Nested(_)
+        | Expr::Function(_)
+        | Expr::Case { .. } => expr_facts(expr, false).writes,
         Expr::Exists { subquery, .. } => classify_query(subquery).class.is_write(),
         Expr::InSubquery { expr, subquery, .. } => expr_writes(expr) || classify_query(subquery).class.is_write(),
         Expr::InList { expr, list, .. } => expr_writes(expr) || list.iter().any(expr_writes),
@@ -110,21 +191,36 @@ pub(crate) fn expr_writes(expr: &Expr) -> bool {
             expr_writes(left) || expr_writes(right)
         }
         Expr::Tuple(items) => items.iter().any(expr_writes),
-        Expr::Function(function) => function_writes(function),
-        Expr::Case {
-            operand,
-            conditions,
-            else_result,
-            ..
-        } => {
-            operand.as_ref().is_some_and(|e| expr_writes(e))
-                || conditions
-                    .iter()
-                    .any(|c| expr_writes(&c.condition) || expr_writes(&c.result))
-                || else_result.as_ref().is_some_and(|e| expr_writes(e))
-        }
         _ => nested_query_writes(expr),
     }
+}
+
+fn function_facts(function: &Function, projected: bool) -> ExprFacts {
+    let named = ExprFacts {
+        administrative: projected && is_administrative_function(&function.name),
+        writes: false,
+    };
+    let arguments = match &function.args {
+        FunctionArguments::Subquery(query) => return named.or(query_facts(query, projected)),
+        FunctionArguments::List(list) => &list.args,
+        FunctionArguments::None => return named,
+    };
+    let filter = ExprFacts::writes(function.filter.as_deref().is_some_and(expr_writes));
+    arguments
+        .iter()
+        .filter_map(|argument| match argument {
+            FunctionArg::Named { arg, .. } | FunctionArg::ExprNamed { arg, .. } | FunctionArg::Unnamed(arg) => {
+                match arg {
+                    FunctionArgExpr::Expr(expr) => Some(expr_facts(expr, projected)),
+                    _ => None,
+                }
+            }
+        })
+        .fold(named.or(filter), ExprFacts::or)
+}
+
+fn is_administrative_function(name: &ObjectName) -> bool {
+    is_administrative_function_name(&name.to_string())
 }
 
 struct NestedQueryWrite;
@@ -152,20 +248,6 @@ fn set_expr_is_write_node(body: &SetExpr) -> bool {
 
 fn nested_query_writes(expr: &Expr) -> bool {
     expr.visit(&mut NestedQueryWrite).is_break()
-}
-
-fn function_writes(function: &Function) -> bool {
-    let arguments = match &function.args {
-        FunctionArguments::Subquery(query) => return classify_query(query).class.is_write(),
-        FunctionArguments::List(list) => &list.args,
-        FunctionArguments::None => return false,
-    };
-    arguments.iter().any(|argument| {
-        let value = match argument {
-            FunctionArg::Named { arg, .. } | FunctionArg::ExprNamed { arg, .. } | FunctionArg::Unnamed(arg) => arg,
-        };
-        matches!(value, FunctionArgExpr::Expr(expr) if expr_writes(expr))
-    }) || function.filter.as_deref().is_some_and(expr_writes)
 }
 
 #[cfg(test)]
