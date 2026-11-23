@@ -13,6 +13,7 @@ pub struct Editing {
     pub row: u64,
     pub column: usize,
     pub kind: &'static str,
+    pub binary_mode: Option<crate::binary_mode::BinaryMode>,
 }
 
 impl GridView {
@@ -45,7 +46,10 @@ impl GridView {
             self.stop_edit(window, cx);
             return;
         }
-        match parse_edit(editing.kind, &text) {
+        let parsed = editing
+            .binary_mode
+            .map_or_else(|| parse_edit(editing.kind, &text), |mode| crate::binary_mode::parse_edit(&text, mode));
+        match parsed {
             Ok(cell) => {
                 let key = (editing.row, editing.column);
                 self.record_edit(key, cell);
@@ -87,8 +91,18 @@ impl GridView {
             cx.notify();
             return;
         }
+        let binary_mode = matches!(cell, Cell::Bytes(_)).then(|| self.binary_mode_for_column(column));
         let text = if matches!(cell, Cell::Null) {
             String::new()
+        } else if let (Cell::Bytes(bytes), Some(mode)) = (&cell, binary_mode) {
+            match crate::binary_mode::edit_text(bytes, mode) {
+                Ok(text) => text,
+                Err(reason) => {
+                    self.status = reason.into();
+                    cx.notify();
+                    return;
+                }
+            }
         } else {
             cell.display()
         };
@@ -105,6 +119,7 @@ impl GridView {
             row,
             column,
             kind: cell.kind(),
+            binary_mode,
         });
         self.cell_edit.editor.update(cx, |editor, cx| {
             editor.set_text_align(

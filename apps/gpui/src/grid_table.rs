@@ -69,6 +69,7 @@ pub struct GridDelegate {
     available_width: f32,
     numeric: Vec<bool>,
     kinds: Vec<(String, bool)>,
+    binary_modes: Vec<crate::binary_mode::BinaryMode>,
     source: Option<Source>,
     map: RowMap,
     cached: Option<(usize, Vec<(String, bool)>)>,
@@ -86,6 +87,7 @@ fn header_menu(
     owner: Option<WeakEntity<GridView>>,
     sortable: bool,
     has_hidden: bool,
+    binary: bool,
     icon: impl IntoElement,
 ) -> impl IntoElement {
     use gpui_component::button::{Button, ButtonVariants};
@@ -112,6 +114,21 @@ fn header_menu(
                     menu = menu.item(PopupMenuItem::new("Show all hidden columns").on_click(move |_, window, cx| {
                         let _ = owner.update(cx, |view, cx| view.show_all_hidden_columns(window, cx));
                     }));
+                }
+            }
+            if binary {
+                for mode in [
+                    crate::binary_mode::BinaryMode::Hex,
+                    crate::binary_mode::BinaryMode::Utf8,
+                    crate::binary_mode::BinaryMode::Base64,
+                ] {
+                    if let Some(owner) = owner.clone() {
+                        menu = menu.item(PopupMenuItem::new(format!("Display as {}", mode.label())).on_click(
+                            move |_, _, cx| {
+                                let _ = owner.update(cx, |view, cx| view.set_binary_mode(source_col, mode, cx));
+                            },
+                        ));
+                    }
                 }
             }
             let Some(owner) = owner.clone().filter(|_| sortable) else {
@@ -255,6 +272,10 @@ impl TableDelegate for GridDelegate {
             .get(source_col)
             .map(|(kind, key)| header_kind(kind, *key))
             .unwrap_or_default();
+        let binary = self
+            .kinds
+            .get(source_col)
+            .is_some_and(|(kind, _)| crate::binary_mode::is_binary_type(kind));
         let menu = header_menu(
             col_ix,
             source_col,
@@ -262,6 +283,7 @@ impl TableDelegate for GridDelegate {
             self.owner.clone(),
             self.sortable,
             !self.hidden_columns.is_empty(),
+            binary,
             crate::assets::icon("ellipsis", theme.muted_foreground),
         );
         let pin = self.pin_scope.clone().map(|scope| {
@@ -423,12 +445,14 @@ impl GridDelegate {
         editor: &Option<(usize, usize, gpui::AnyView)>,
         sortable: bool,
         sort: Option<&bookie_app_services::read_session::TableSort>,
+        binary_modes: &[crate::binary_mode::BinaryMode],
     ) -> bool {
         let same_source = self.source.as_ref().is_some_and(|current| Arc::ptr_eq(current, source));
         !same_source
             || self.columns != columns
             || self.numeric != numeric
             || self.kinds != kinds
+            || self.binary_modes != binary_modes
             || self.sortable != sortable
             || self.sort.as_ref() != sort
             || self.map != *map
@@ -445,7 +469,13 @@ impl GridDelegate {
             return cells.get(col_ix).map_or_else(Default::default, |cell| {
                 let cell = self.edits.get(&(index, col_ix)).unwrap_or(cell);
                 let right = crate::right_aligned(self.numeric.get(col_ix).copied().unwrap_or(false), cell);
-                (cell_preview(cell), right)
+                (
+                    crate::binary_mode::preview(
+                        cell,
+                        self.binary_modes.get(col_ix).copied().unwrap_or_default(),
+                    ),
+                    right,
+                )
             });
         }
         if self.cached.as_ref().is_none_or(|(row, _)| *row != row_ix) {
@@ -453,7 +483,7 @@ impl GridDelegate {
             let labels = match (&self.map.compare, &self.source) {
                 (Some(diff), _) => compare_labels(diff, row_ix, numeric),
                 (None, Some(source)) => match self.map.source_row(row_ix) {
-                    Some(index) => source_labels(source, index, numeric, &self.edits),
+                    Some(index) => source_labels(source, index, numeric, &self.edits, &self.binary_modes),
                     None => Vec::new(),
                 },
                 (None, None) => Vec::new(),
@@ -469,6 +499,60 @@ impl GridDelegate {
 }
 
 impl GridView {
+    pub(crate) fn binary_mode_for_column(&self, column: usize) -> crate::binary_mode::BinaryMode {
+        let Some(meta) = self.source.columns().get(column) else {
+            return crate::binary_mode::BinaryMode::Hex;
+        };
+        if !crate::binary_mode::is_binary_type(&meta.data_type) {
+            return crate::binary_mode::BinaryMode::Hex;
+        }
+        let occurrence = self.source.columns()[..column].iter().filter(|item| item.name == meta.name).count();
+        self.binary_modes
+            .get(&(self.binary_scope(), meta.name.clone(), occurrence))
+            .copied()
+            .unwrap_or_default()
+    }
+
+    pub(crate) fn set_binary_mode(
+        &mut self,
+        source_column: usize,
+        mode: crate::binary_mode::BinaryMode,
+        cx: &mut Context<Self>,
+    ) {
+        let column = source_column.saturating_sub(usize::from(self.compare.is_some()));
+        let Some(meta) = self.source.columns().get(column) else { return };
+        if !crate::binary_mode::is_binary_type(&meta.data_type) {
+            return;
+        }
+        let occurrence = self.source.columns()[..column].iter().filter(|item| item.name == meta.name).count();
+        let scope = self.binary_scope();
+        self.binary_modes.insert((scope, meta.name.clone(), occurrence), mode);
+        cx.notify();
+    }
+
+    fn binary_scope(&self) -> crate::binary_mode::Scope {
+        if let Some(scope) = self.pin_scope() {
+            return crate::binary_mode::Scope::Table {
+                connection: scope.connection,
+                database: scope.database,
+                schema: scope.schema,
+                table: scope.table,
+            };
+        }
+        crate::binary_mode::Scope::Query {
+            connection: self.live.as_ref().map_or_else(
+                || self.catalog.connection.clone(),
+                |session| {
+                    session.saved.as_ref().map_or_else(
+                        || format!("{}:{}", session.driver_id, session.label),
+                        |(id, _)| id.to_string(),
+                    )
+                },
+            ),
+            database: self.catalog.database.clone(),
+        }
+    }
+
     fn pin_scope(&self) -> Option<PinScope> {
         let bookie_gpui::shell::Tab::Table(table) = self.tabs.current() else {
             return None;
@@ -614,6 +698,11 @@ impl GridView {
         }
         fill_text_columns(&mut columns, &numeric, available_width);
         let (sortable, sort) = self.sort_state();
+        let mut binary_modes = Vec::with_capacity(kinds.len());
+        if self.compare.is_some() {
+            binary_modes.push(crate::binary_mode::BinaryMode::Hex);
+        }
+        binary_modes.extend((0..self.source.columns().len()).map(|column| self.binary_mode_for_column(column)));
         let editor = self.cell_edit.active.as_ref().and_then(|editing| {
             let dataset = self.dataset_index_of(editing.row)?.checked_sub(map.base)?;
             (dataset < map.count as u64).then(|| {
@@ -654,6 +743,7 @@ impl GridView {
                 &editor,
                 sortable,
                 sort.as_ref(),
+                &binary_modes,
             ) && delegate.projection == projection
                 && delegate.pin_scope == pin_scope
                 && delegate.pinned_columns == pinned_columns
@@ -667,6 +757,7 @@ impl GridView {
             delegate.sort = sort;
             delegate.numeric = numeric;
             delegate.kinds = kinds;
+            delegate.binary_modes = binary_modes;
             delegate.source = Some(self.source.clone());
             delegate.map = map;
             delegate.edits = self.cell_edit.edits.clone();
@@ -978,21 +1069,36 @@ fn labels(cells: &[Cell], numeric: &[bool]) -> Vec<(String, bool)> {
         .collect()
 }
 
-fn source_labels(source: &Source, index: u64, numeric: &[bool], edits: &Edits) -> Vec<(String, bool)> {
+fn source_labels(
+    source: &Source,
+    index: u64,
+    numeric: &[bool],
+    edits: &Edits,
+    binary_modes: &[crate::binary_mode::BinaryMode],
+) -> Vec<(String, bool)> {
     match source.row_ref(index) {
-        Some(cells) => labels_with_edits(cells, numeric, index, edits),
-        None => labels_with_edits(&source.row(index), numeric, index, edits),
+        Some(cells) => labels_with_edits(cells, numeric, index, edits, binary_modes),
+        None => labels_with_edits(&source.row(index), numeric, index, edits, binary_modes),
     }
 }
 
-fn labels_with_edits(cells: &[Cell], numeric: &[bool], row: u64, edits: &Edits) -> Vec<(String, bool)> {
+fn labels_with_edits(
+    cells: &[Cell],
+    numeric: &[bool],
+    row: u64,
+    edits: &Edits,
+    binary_modes: &[crate::binary_mode::BinaryMode],
+) -> Vec<(String, bool)> {
     cells
         .iter()
         .enumerate()
         .map(|(column, cell)| {
             let cell = edits.get(&(row, column)).unwrap_or(cell);
             let right = crate::right_aligned(numeric.get(column).copied().unwrap_or(false), cell);
-            (cell_preview(cell), right)
+            (
+                crate::binary_mode::preview(cell, binary_modes.get(column).copied().unwrap_or_default()),
+                right,
+            )
         })
         .collect()
 }

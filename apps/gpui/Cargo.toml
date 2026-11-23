@@ -23,6 +23,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", default-features = false, features = ["env-filter", "fmt", "ansi"] }
 unicode-segmentation = "1"
 regex = "1"
+base64 = { version = "0.23", default-features = false, features = ["std"] }
 gpui = { package = "gpui-pre", version = "=0.3.11" }
 gpui_platform = { package = "gpui-pre-platform", version = "=0.3.11" }
 gpui_macros = { package = "gpui-pre-macros", version = "=0.3.11" }

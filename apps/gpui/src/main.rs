@@ -2,6 +2,7 @@ use std::io::Write;
 use std::time::{Duration, Instant};
 
 mod assets;
+mod binary_mode;
 mod catalog_nav;
 mod column_projection;
 mod closed_tabs_ui;
@@ -150,6 +151,7 @@ struct GridView {
     local_order: Option<std::sync::Arc<Vec<u32>>>,
     local_sort: Option<bookie_app_services::read_session::TableSort>,
     column_widths: Option<bookie_app_services::column_widths::ColumnWidthStore>,
+    binary_modes: binary_mode::ColumnModes,
     live: Option<std::sync::Arc<bookie_gpui::live::LiveSession>>,
     connections: Vec<bookie_app_services::read_session::ConnectionSummary>,
     keymap: Keymap,
@@ -454,6 +456,7 @@ impl GridView {
             table,
             _table_events: table_events,
             column_widths: bookie_app_services::column_widths::ColumnWidthStore::open(),
+            binary_modes: Default::default(),
             focus: table_focus,
             table_source: source.clone(),
             source,
