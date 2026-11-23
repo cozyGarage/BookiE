@@ -303,6 +303,8 @@ impl GridView {
         let sql_input = cx.new(|cx| {
             EditorState::new(window, cx)
                 .language("sql")
+                .line_number(true)
+                .folding(true)
                 .placeholder("SELECT … (Enter adds a line, Ctrl+Enter runs it)")
         });
         cx.subscribe(
