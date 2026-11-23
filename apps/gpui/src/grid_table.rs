@@ -519,7 +519,7 @@ impl GridDelegate {
         if self.cached.as_ref().is_none_or(|(row, _)| *row != row_ix) {
             let numeric = &self.numeric;
             let labels = match (&self.map.compare, &self.source) {
-                (Some(diff), _) => compare_labels(diff, row_ix, numeric),
+                (Some(diff), _) => compare_labels(diff, row_ix, numeric, &self.binary_modes),
                 (None, Some(source)) => match self.map.source_row(row_ix) {
                     Some(index) => source_labels(source, index, numeric, &self.edits, &self.binary_modes),
                     None => Vec::new(),
@@ -1108,13 +1108,13 @@ fn measure_text(text: &str, window: &Window) -> f32 {
     ) + 12.0
 }
 
-fn labels(cells: &[Cell], numeric: &[bool]) -> Vec<(String, bool)> {
+fn labels(cells: &[Cell], numeric: &[bool], binary_modes: &[crate::binary_mode::BinaryMode]) -> Vec<(String, bool)> {
     cells
         .iter()
         .enumerate()
         .map(|(column, cell)| {
             let right = crate::right_aligned(numeric.get(column).copied().unwrap_or(false), cell);
-            (cell_preview(cell), right)
+            (crate::binary_mode::preview(cell, binary_modes.get(column).copied().unwrap_or_default()), right)
         })
         .collect()
 }
@@ -1153,12 +1153,21 @@ fn labels_with_edits(
         .collect()
 }
 
-fn compare_labels(diff: &Diff, row: usize, numeric: &[bool]) -> Vec<(String, bool)> {
+fn compare_labels(
+    diff: &Diff,
+    row: usize,
+    numeric: &[bool],
+    binary_modes: &[crate::binary_mode::BinaryMode],
+) -> Vec<(String, bool)> {
     let Some(row) = diff.rows.get(row) else {
         return Vec::new();
     };
     std::iter::once((row.change.to_string(), false))
-        .chain(labels(&row.cells, numeric.get(1..).unwrap_or(&[])))
+        .chain(labels(
+            &row.cells,
+            numeric.get(1..).unwrap_or(&[]),
+            binary_modes.get(1..).unwrap_or(&[]),
+        ))
         .collect()
 }
 
@@ -1419,7 +1428,7 @@ mod tests {
             },
             rows: vec![DiffRow {
                 change: "changed",
-                cells: vec![Cell::Text("a".into()), Cell::Int(7)],
+                cells: vec![Cell::Text("a".into()), Cell::Int(7), Cell::Bytes(vec![0, 255, 65])],
             }],
             capped: false,
         };
@@ -1430,10 +1439,17 @@ mod tests {
                 kept: None,
                 compare: Some(Arc::new(diff)),
             },
+            binary_modes: vec![
+                crate::binary_mode::BinaryMode::Hex,
+                crate::binary_mode::BinaryMode::Hex,
+                crate::binary_mode::BinaryMode::Hex,
+                crate::binary_mode::BinaryMode::Base64,
+            ],
             ..Default::default()
         };
         assert_eq!(delegate.label_of(0, 0).0, "changed");
         assert_eq!(delegate.label_of(0, 2).0, "7");
+        assert_eq!(delegate.label_of(0, 3).0, "AP9B");
     }
 
     #[test]
@@ -1441,6 +1457,7 @@ mod tests {
         let flags: Vec<bool> = labels(
             &[Cell::Int(7), Cell::Null, Cell::Text("x".into())],
             &[true, true, false],
+            &[],
         )
         .into_iter()
         .map(|(_, right)| right)
