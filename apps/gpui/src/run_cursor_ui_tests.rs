@@ -117,3 +117,26 @@ fn error_mapping_selects_multiline_identifier_in_editor(cx: &mut TestAppContext)
         });
     });
 }
+
+#[gpui::test]
+fn clicking_go_to_error_selects_the_second_line_token(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-t");
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            let sql = "SELECT 1;\nSELECT missing FROM t";
+            view.sql_input.update(cx, |editor, cx| editor.set_value(sql, window, cx));
+            view.panel.messages.push(bookie_gpui::messages::MessageKind::Error, "missing column");
+            let id = view.panel.messages.entries().last().unwrap().id;
+            view.panel.error_location = Some((sql.into(), 18, id, None));
+            view.panel.view = bookie_gpui::shell::ResultView::Messages;
+            view.panel.open = true;
+            cx.notify();
+        });
+    });
+    cx.run_until_parked();
+    let bounds = cx.debug_bounds("go-to-query-error").expect("error action is visible");
+    cx.simulate_click(bounds.center(), Default::default());
+    cx.run_until_parked();
+    view.read_with(cx, |view, cx| assert_eq!(view.sql_input.read(cx).selected_value().as_ref(), "missing"));
+}
