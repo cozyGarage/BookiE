@@ -24,7 +24,14 @@ impl GridView {
         let cursor = self.cell_cursor?;
         let source = self.source_row(self.base() + cursor.row as u64);
         let name = self.source.columns().get(cursor.column)?.name.clone();
-        Some((name, detail_of(&self.cell_at(source, cursor.column))))
+        let cell = self.cell_at(source, cursor.column);
+        let detail = match (&cell, self.binary_mode_for_column(cursor.column)) {
+            (bookie_gpui::model::Cell::Bytes(bytes), mode) if mode != crate::binary_mode::BinaryMode::Hex => {
+                Detail::Text(crate::binary_mode::detail_text(bytes, mode))
+            }
+            _ => detail_of(&cell),
+        };
+        Some((name, detail))
     }
 
     pub(super) fn row_detail_target(&self, filter: &str, hide_null: bool) -> Option<Vec<(usize, String, String)>> {
