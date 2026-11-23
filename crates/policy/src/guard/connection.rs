@@ -505,6 +505,48 @@ impl Connection for PolicyGuard {
         result
     }
 
+    async fn query_result_sets_bounded_controlled(
+        &self,
+        sql: &str,
+        params: &[Value],
+        max_rows: usize,
+        max_bytes: usize,
+        control: &OperationControl,
+    ) -> Result<QueryResultBatch, DriverError> {
+        let authorization = self.authorize(sql, Some(control)).await?;
+        let control = &authorization.rearm(control);
+        let operation = self.operation(
+            sql,
+            None,
+            &authorization.analysis.facts,
+            &authorization.decision,
+            authorization.approval_outcome,
+            authorization.preview_state,
+        );
+        let start = Instant::now();
+        if authorization.analysis.facts.writes() {
+            let result: Result<QueryResultBatch, DriverError> = Err(DriverError::PolicyDenied(
+                "bounded query results require a read-only statement".into(),
+            ));
+            self.audit_controlled_read_result(&operation, start, &result, None)
+                .await?;
+            return result;
+        }
+        self.prepare_governed_read(&operation).await?;
+        let result = self
+            .caught_read(
+                "BOUNDED QUERY RESULT SETS",
+                self.inner
+                    .query_result_sets_bounded_controlled(sql, params, max_rows, max_bytes, control),
+            )
+            .await
+            .map(|batch| self.mask_result_batch_for_analysis(&authorization.analysis, batch));
+        let rows = result.as_ref().ok().map(QueryResultBatch::retained_rows);
+        self.audit_controlled_read_result(&operation, start, &result, rows)
+            .await?;
+        result
+    }
+
     async fn execute(&self, sql: &str) -> Result<ExecResult, DriverError> {
         let authorization = self.authorize(sql, None).await?;
         self.execute_write(sql, None, authorization, |inner| inner.execute(sql))

@@ -10,7 +10,7 @@ use bookie_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, Environment, ExecResult, OperationControl,
     QueryResult, TableInfo, TlsConfig, Value,
 };
-use bookie_mcp::{ConnectionProvider, McpBridge, TokenPermissions, TokenStore};
+use bookie_mcp::{ConnectionProvider, McpBridge, McpLimits, TokenPermissions, TokenStore};
 use bookie_policy::{
     AuditError, AuditEvent, AuditRecordPhase, AuditSink, AuditState, AuditTerminalStatus, AutoApproveSink,
     GuardContext, PolicyConfig, PolicyGuard, Principal, WritePolicy,
@@ -57,6 +57,7 @@ fn mcp_context(
     connection: Arc<dyn Connection>,
     host: String,
     port: u16,
+    limits: McpLimits,
 ) -> (Uuid, McpBridge, bookie_mcp::McpToken, tempfile::TempDir) {
     let connection_id = Uuid::new_v4();
     let saved = SavedConnection {
@@ -100,7 +101,7 @@ fn mcp_context(
             None,
         )
         .expect("issue read-only MCP token");
-    let bridge = McpBridge::new(provider, tokens);
+    let bridge = McpBridge::with_limits(provider, tokens, limits);
     let token = bridge.authenticate(&plaintext).expect("authenticate MCP token");
     (connection_id, bridge, token, directory)
 }
@@ -136,7 +137,7 @@ async fn postgres_custom_enum_labels_and_sql_null_survive_mcp_query_tool() {
         .expect("fetch import target enum metadata");
     let connection: Arc<dyn Connection> = Arc::from(connection);
 
-    let (connection_id, bridge, token, _directory) = mcp_context(connection.clone(), host, port);
+    let (connection_id, bridge, token, _directory) = mcp_context(connection.clone(), host, port, McpLimits::default());
 
     let sql = "SELECT id, status::text AS label, pg_typeof(status)::text AS native_type FROM mcp_enum.rows ORDER BY id";
     let response = bookie_mcp::dispatch(
@@ -342,7 +343,7 @@ async fn postgres_domain_over_enum_values_survive_mcp_query_export_and_csv_impor
         .expect("fetch domain import target metadata");
     assert_eq!(target_columns[1].enum_type.as_ref().unwrap().name, "state");
     let connection: Arc<dyn Connection> = Arc::from(connection);
-    let (connection_id, bridge, token, _directory) = mcp_context(connection.clone(), host, port);
+    let (connection_id, bridge, token, _directory) = mcp_context(connection.clone(), host, port, McpLimits::default());
 
     let sql = "SELECT id, status, pg_typeof(status)::text AS native_type \
                FROM mcp_domain_enum.rows ORDER BY id";
@@ -684,4 +685,79 @@ async fn postgres_lost_write_ack_is_structured_and_never_retried() {
     assert_eq!(events[1].terminal_status, AuditTerminalStatus::Unknown);
     assert_eq!(events[2].phase, AuditRecordPhase::Outcome);
     assert_eq!(events[2].terminal_status, AuditTerminalStatus::Denied);
+}
+
+#[cfg(target_os = "linux")]
+fn resident_bytes() -> usize {
+    std::fs::read_to_string("/proc/self/status")
+        .expect("read process status")
+        .lines()
+        .find_map(|line| line.strip_prefix("VmRSS:"))
+        .expect("VmRSS field")
+        .split_whitespace()
+        .next()
+        .expect("VmRSS value")
+        .parse::<usize>()
+        .expect("parse VmRSS")
+        .saturating_mul(1024)
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+#[cfg(target_os = "linux")]
+async fn five_million_row_query_keeps_process_growth_within_mcp_budget_margin() {
+    let (_container, host, port) = start_postgres().await;
+    let connection = PgDriver
+        .connect(ConnectOptions {
+            host: host.clone(),
+            port,
+            database: "postgres".into(),
+            username: "postgres".into(),
+            password: secrecy::SecretString::new("postgres".to_string().into()),
+            tls: TlsConfig::disabled(),
+            ..Default::default()
+        })
+        .await
+        .expect("connect PostgreSQL driver");
+    let connection: Arc<dyn Connection> = Arc::from(connection);
+    const MCP_BYTES: usize = 8 * 1024 * 1024;
+    let (connection_id, bridge, token, _directory) = mcp_context(
+        connection,
+        host,
+        port,
+        McpLimits {
+            max_rows: 500,
+            max_response_bytes: MCP_BYTES,
+            ..McpLimits::default()
+        },
+    );
+    let baseline = resident_bytes();
+    let peak = Arc::new(AtomicUsize::new(baseline));
+    let sampled_peak = Arc::clone(&peak);
+    let sampler = tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_millis(2));
+        loop {
+            interval.tick().await;
+            sampled_peak.fetch_max(resident_bytes(), Ordering::Relaxed);
+        }
+    });
+
+    let result = bridge
+        .execute_query(
+            &token,
+            connection_id,
+            "SELECT n, repeat('x', 65536) FROM generate_series(1, 5000000) AS n",
+        )
+        .await
+        .expect("run bounded MCP query");
+    peak.fetch_max(resident_bytes(), Ordering::Relaxed);
+    sampler.abort();
+
+    assert!(result.truncated);
+    assert!(result.result_sets[0].rows.len() < 500);
+    let growth = peak.load(Ordering::Relaxed).saturating_sub(baseline);
+    assert!(
+        growth <= MCP_BYTES + 32 * 1024 * 1024,
+        "measured RSS growth: {growth} bytes"
+    );
 }

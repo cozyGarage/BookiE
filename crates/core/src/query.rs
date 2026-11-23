@@ -230,14 +230,32 @@ pub struct QueryCursorPage {
     pub messages: ServerMessages,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct QueryResultBudget {
     rows: usize,
     cells: usize,
     bytes: usize,
+    max_rows: usize,
+    max_bytes: usize,
+}
+
+impl Default for QueryResultBudget {
+    fn default() -> Self {
+        Self::with_limits(MAX_QUERY_ROWS, MAX_QUERY_RESULT_BYTES)
+    }
 }
 
 impl QueryResultBudget {
+    pub fn with_limits(max_rows: usize, max_bytes: usize) -> Self {
+        Self {
+            rows: 0,
+            cells: 0,
+            bytes: 0,
+            max_rows: max_rows.min(MAX_QUERY_ROWS),
+            max_bytes: max_bytes.min(MAX_QUERY_RESULT_BYTES),
+        }
+    }
+
     pub fn admit(&mut self, row: &[Value]) -> bool {
         let row_bytes = row_size(row);
         if !self.can_admit(row.len(), row_bytes) {
@@ -287,9 +305,9 @@ impl QueryResultBudget {
     }
 
     fn can_admit(&self, cells: usize, row_bytes: usize) -> bool {
-        self.rows < MAX_QUERY_ROWS
+        self.rows < self.max_rows
             && self.cells.saturating_add(cells) <= MAX_QUERY_RESULT_CELLS
-            && self.bytes.saturating_add(row_bytes) <= MAX_QUERY_RESULT_BYTES
+            && self.bytes.saturating_add(row_bytes) <= self.max_bytes
     }
 }
 

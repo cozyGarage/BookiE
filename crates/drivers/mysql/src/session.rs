@@ -242,6 +242,6 @@ impl MysqlSession {
 // MySQL refuses some statements, START TRANSACTION among them, over the
 // prepared-statement protocol (ER_UNSUPPORTED_PS, 1295). Only those are
 // re-sent as plain text; everything else keeps typed result decoding.
-fn needs_text_protocol(error: &DriverError) -> bool {
+pub(crate) fn needs_text_protocol(error: &DriverError) -> bool {
     matches!(error, DriverError::Query { message, .. } if message.contains("prepared statement protocol"))
 }

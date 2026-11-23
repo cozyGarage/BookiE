@@ -501,6 +501,43 @@ impl Connection for PgConnection {
             .with_rows_affected(rows_affected))
     }
 
+    async fn query_result_sets_bounded_controlled(
+        &self,
+        sql: &str,
+        params: &[Value],
+        max_rows: usize,
+        max_bytes: usize,
+        control: &OperationControl,
+    ) -> Result<QueryResultBatch, DriverError> {
+        if copy_in::parse(sql)?.is_some() {
+            return Err(DriverError::Unsupported("bounded COPY".into()));
+        }
+        let mut connection = acquire_controlled(&self.pool, control).await?;
+        connection.close_on_drop();
+        let cancel_token = connection.cancel_token();
+        let stop = Some(QueryStop {
+            cancel_token: cancel_token.clone(),
+        });
+        notices::discard(&mut connection);
+        let result = run_server_cancellable(
+            async {
+                let (rows, affected) =
+                    query::query_connection_bounded(&mut connection, sql, params, stop, max_rows, max_bytes).await?;
+                Ok((rows, notices::drain(&mut connection), affected))
+            },
+            request_cancellation(cancel_token),
+            confirms_cancellation,
+            control,
+        )
+        .await;
+        let (connection, result) = finish_connection(connection, result).await;
+        drop(connection);
+        let (rows, messages, affected) = result?;
+        Ok(QueryResultBatch::single(rows)
+            .with_messages(messages)
+            .with_rows_affected(affected))
+    }
+
     async fn query_params(&self, sql: &str, params: &[Value]) -> Result<QueryResult, DriverError> {
         let mut connection = self.pool.acquire().await.map_err(map_sqlx_error)?;
         let stop = Some(QueryStop {

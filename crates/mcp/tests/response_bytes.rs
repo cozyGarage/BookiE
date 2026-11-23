@@ -4,7 +4,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use bookie_core::{
     ColumnInfo, Connection, DriverError, Environment, ExecResult, OperationControl, QueryResult, QueryResultBatch,
-    TableInfo, Transaction, Value,
+    QueryResultBudget, TableInfo, Transaction, Value,
 };
 use bookie_mcp::{ConnectionProvider, McpBridge, McpLimits, TokenPermissions, TokenStore, dispatch};
 use bookie_policy::Principal;
@@ -12,6 +12,8 @@ use bookie_storage::SavedConnection;
 use uuid::Uuid;
 
 const ROW_BYTES: usize = 4 * 1024 * 1024;
+static ROWS_READ: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+static MAX_BYTES_PASSED: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
 struct RowsProvider {
     connection_id: Uuid,
@@ -33,6 +35,7 @@ impl ConnectionProvider for RowsProvider {
 enum RowFixture {
     Big,
     Escaped,
+    Counted,
 }
 
 impl RowFixture {
@@ -46,6 +49,14 @@ impl RowFixture {
                     .into(),
                 truncated: false,
             },
+            Self::Counted => {
+                ROWS_READ.fetch_add(100, std::sync::atomic::Ordering::SeqCst);
+                QueryResult {
+                    columns: Vec::new(),
+                    rows: (0..100).map(|n| vec![Value::Int(n)]).collect::<Vec<_>>().into(),
+                    truncated: false,
+                }
+            }
             Self::Escaped => QueryResult {
                 columns: Vec::new(),
                 rows: (0..4)
@@ -89,6 +100,42 @@ impl Connection for RowsConnection {
         let mut batch = QueryResultBatch::single(self.fixture.result());
         if matches!(self.fixture, RowFixture::Escaped) && !sql.contains("WHERE id = 1") {
             batch.result_sets.push(self.fixture.result());
+        }
+        Ok(batch)
+    }
+
+    async fn query_result_sets_bounded_controlled(
+        &self,
+        sql: &str,
+        params: &[Value],
+        max_rows: usize,
+        max_bytes: usize,
+        control: &OperationControl,
+    ) -> Result<QueryResultBatch, DriverError> {
+        if matches!(self.fixture, RowFixture::Counted) {
+            MAX_BYTES_PASSED.store(max_bytes, std::sync::atomic::Ordering::SeqCst);
+            ROWS_READ.fetch_add(max_rows.saturating_add(1).min(100), std::sync::atomic::Ordering::SeqCst);
+            let result = QueryResult {
+                columns: Vec::new(),
+                rows: (0..max_rows.min(100))
+                    .map(|n| vec![Value::Int(n as i64)])
+                    .collect::<Vec<_>>()
+                    .into(),
+                truncated: max_rows < 100,
+            };
+            return Ok(QueryResultBatch::single(result));
+        }
+        let mut batch = self.query_result_sets_controlled(sql, params, control).await?;
+        let mut budget = QueryResultBudget::with_limits(max_rows, max_bytes);
+        for result_set in &mut batch.result_sets {
+            let original_len = result_set.rows.len();
+            let retained = result_set.rows.iter().take_while(|row| budget.admit(row)).count();
+            if retained < original_len {
+                result_set.rows.truncate(retained);
+                result_set.truncated = true;
+                batch.truncated = true;
+                break;
+            }
         }
         Ok(batch)
     }
@@ -239,4 +286,39 @@ fn saved_connection(id: Uuid) -> SavedConnection {
         attached_databases: Vec::new(),
         tls_strict_encryption: false,
     }
+}
+
+#[tokio::test]
+async fn execute_query_pushes_its_row_budget_into_the_driver() {
+    ROWS_READ.store(0, std::sync::atomic::Ordering::SeqCst);
+    MAX_BYTES_PASSED.store(0, std::sync::atomic::Ordering::SeqCst);
+    let directory = tempfile::TempDir::new().unwrap();
+    let connection_id = Uuid::new_v4();
+    let tokens = Arc::new(TokenStore::open(directory.path().join("tokens.json")).unwrap());
+    let (_, plaintext) = tokens
+        .issue("bounded".into(), TokenPermissions::ReadOnly, vec![connection_id], None)
+        .unwrap();
+    let token = tokens.authenticate(&plaintext).unwrap();
+    let bridge = McpBridge::with_limits(
+        Arc::new(RowsProvider {
+            connection_id,
+            fixture: RowFixture::Counted,
+        }),
+        tokens,
+        McpLimits {
+            max_rows: 3,
+            ..McpLimits::default()
+        },
+    );
+    let result = bridge
+        .execute_query(&token, connection_id, "SELECT note FROM notes")
+        .await
+        .unwrap();
+    assert!(result.truncated);
+    assert_eq!(result.result_sets[0].rows.len(), 3);
+    assert_eq!(ROWS_READ.load(std::sync::atomic::Ordering::SeqCst), 4);
+    assert_eq!(
+        MAX_BYTES_PASSED.load(std::sync::atomic::Ordering::SeqCst),
+        8 * 1024 * 1024
+    );
 }

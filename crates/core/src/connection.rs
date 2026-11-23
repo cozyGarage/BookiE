@@ -10,8 +10,8 @@ use crate::catalog::{CatalogObject, CatalogObjectKind};
 use crate::error::DriverError;
 use crate::operation::{OperationControl, check_pre_dispatch, run_controlled};
 use crate::query::{
-    ColumnInfo, ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, QueryResult, QueryResultBatch, TableInfo,
-    Value,
+    ColumnInfo, ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, QueryResult, QueryResultBatch,
+    QueryResultBudget, TableInfo, Value,
 };
 use crate::routine::{RoutineLookup, RoutineRef};
 use crate::tls::TlsConfig;
@@ -461,6 +461,28 @@ pub trait Connection: Send + Sync {
             self.query_params_controlled(sql, params, control).await
         }?;
         Ok(QueryResultBatch::single(result))
+    }
+    async fn query_result_sets_bounded_controlled(
+        &self,
+        sql: &str,
+        params: &[Value],
+        max_rows: usize,
+        max_bytes: usize,
+        control: &OperationControl,
+    ) -> Result<QueryResultBatch, DriverError> {
+        let mut batch = self.query_result_sets_controlled(sql, params, control).await?;
+        let mut budget = QueryResultBudget::with_limits(max_rows, max_bytes);
+        for result_set in &mut batch.result_sets {
+            let original_len = result_set.rows.len();
+            let retained = result_set.rows.iter().take_while(|row| budget.admit(row)).count();
+            if retained < original_len {
+                result_set.rows.truncate(retained);
+                result_set.truncated = true;
+                batch.truncated = true;
+                break;
+            }
+        }
+        Ok(batch)
     }
     async fn execute(&self, sql: &str) -> Result<ExecResult, DriverError>;
     async fn execute_controlled(&self, sql: &str, control: &OperationControl) -> Result<ExecResult, DriverError> {

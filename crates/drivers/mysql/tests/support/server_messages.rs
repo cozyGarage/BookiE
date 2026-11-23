@@ -36,6 +36,12 @@ async fn assert_multi_statement_warning_limit(opts: bookie_core::ConnectOptions)
             .any(|message| message.text.contains("warning details may be incomplete"))
     );
     assert_eq!(batch.result_sets.len(), 2);
+    let bounded = conn
+        .query_result_sets_bounded_controlled("CALL warning_test()", &[], 1, 4096, &control())
+        .await
+        .unwrap();
+    assert!(bounded.truncated);
+    assert_eq!(bounded.result_sets.iter().map(|set| set.rows.len()).sum::<usize>(), 1);
     let next = conn
         .query_result_sets_controlled("SELECT 1", &[], &control())
         .await
@@ -174,4 +180,40 @@ async fn mysql_statements_run_one_after_another_keep_their_own_warnings() {
 async fn mariadb_statements_run_one_after_another_keep_their_own_warnings() {
     let (_db, opts) = start_mariadb().await;
     assert_each_statement_reports_its_own_warnings(opts).await;
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn bounded_query_truncates_and_next_query_succeeds() {
+    let (_db, opts) = start_mysql().await;
+    let conn = connect(opts).await;
+    let batch = conn
+        .query_result_sets_bounded_controlled(
+            "SELECT 1 AS n UNION ALL SELECT 2 UNION ALL SELECT 3",
+            &[],
+            2,
+            4096,
+            &control(),
+        )
+        .await
+        .unwrap();
+    assert!(batch.truncated);
+    assert!(
+        batch
+            .messages
+            .iter()
+            .any(|message| message.text.contains("warnings may be incomplete"))
+    );
+    assert_eq!(batch.result_sets[0].rows.len(), 2);
+    let wide = conn
+        .query_result_sets_bounded_controlled("SELECT REPEAT('x', 1024)", &[], 2, 32, &control())
+        .await
+        .unwrap();
+    assert!(wide.truncated);
+    assert!(wide.result_sets[0].rows.is_empty());
+    let next = conn
+        .query_result_sets_controlled("SELECT 7", &[], &control())
+        .await
+        .unwrap();
+    assert_eq!(next.result_sets[0].rows.len(), 1);
 }

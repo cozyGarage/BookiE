@@ -43,3 +43,30 @@ async fn a_write_reports_how_many_rows_it_changed_and_a_select_reports_none() {
     assert_eq!(batch("DELETE FROM notes", connection).await, Some(3));
     assert_eq!(batch("SELECT * FROM notes", connection).await, None);
 }
+
+#[tokio::test]
+async fn bounded_read_stops_at_row_and_byte_limits() {
+    let directory = TempDir::new().unwrap();
+    let path = directory.path().join("bounded.db");
+    std::fs::File::create(&path).unwrap();
+    let connection = SqliteDriver
+        .connect(ConnectOptions {
+            database: path.to_string_lossy().to_string(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
+    let rows = connection
+        .query_result_sets_bounded_controlled("SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3", &[], 2, 4096, &control)
+        .await
+        .unwrap();
+    assert!(rows.truncated);
+    assert_eq!(rows.result_sets[0].rows.len(), 2);
+    let bytes = connection
+        .query_result_sets_bounded_controlled("SELECT 'a long value'", &[], 2, 1, &control)
+        .await
+        .unwrap();
+    assert!(bytes.truncated);
+    assert!(bytes.result_sets[0].rows.is_empty());
+}

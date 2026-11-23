@@ -347,13 +347,15 @@ impl McpBridge {
                     .into(),
             );
         }
-        let max_rows = self.max_rows;
+        let max_rows = usize::try_from(self.max_rows)
+            .unwrap_or(usize::MAX)
+            .min(bookie_core::MAX_QUERY_ROWS);
         let max_response_bytes = self.max_response_bytes;
         let sql = sql.to_string();
         self.with_connection_controlled(token, connection_id, control, move |conn, control| {
             Box::pin(async move {
                 let mut result = conn
-                    .query_result_sets_controlled(&sql, &[], &control)
+                    .query_result_sets_bounded_controlled(&sql, &[], max_rows, max_response_bytes, &control)
                     .await
                     .map_err(|error| error.to_string())?;
                 check_pre_dispatch(&control).map_err(|error| error.to_string())?;
