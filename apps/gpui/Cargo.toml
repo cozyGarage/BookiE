@@ -37,9 +37,7 @@ gpui-kit = { version = "=0.10.0", features = ["test-support"] }
 rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs", "ring", "std", "tls12"] }
 
 [patch.crates-io]
-sqlx-core = { path = "../../vendor/sqlx-core" }
 sqlx-mysql = { path = "../../vendor/sqlx-mysql" }
-sqlx-sqlite = { path = "../../vendor/sqlx-sqlite" }
 sqlx-postgres = { path = "../../vendor/sqlx-postgres" }
 mongodb = { path = "../../vendor/mongodb" }
 redis = { path = "../../vendor/redis" }
