@@ -52,10 +52,16 @@ impl GridView {
         .detach();
     }
 
-    pub(crate) fn field_rows(&self, table: &TableInfo, depth: usize, theme: Theme) -> Vec<Div> {
-        let Some((_, state)) = self.sidebar.fields.iter().find(|(open, _)| open == table) else {
-            return Vec::new();
-        };
+    pub(crate) fn field_count(&self, table: &TableInfo) -> usize {
+        match self.sidebar.fields.iter().find(|(open, _)| open == table) {
+            Some((_, FieldState::Loaded(fields))) => fields.len(),
+            Some(_) => 1,
+            None => 0,
+        }
+    }
+
+    pub(crate) fn field_row(&self, table: &TableInfo, depth: usize, index: usize, theme: Theme) -> Option<Div> {
+        let (_, state) = self.sidebar.fields.iter().find(|(open, _)| open == table)?;
         let indent = size::SM + size::LG * (depth + 1) as f32;
         let line = |marker: Option<&'static str>, name: String, detail: String, dim: bool| {
             div()
@@ -85,19 +91,16 @@ impl GridView {
                 .child(div().text_color(rgb(theme.muted_foreground)).child(detail))
         };
         match state {
-            FieldState::Loading => vec![line(None, "Loading fields…".into(), String::new(), true)],
-            FieldState::Failed(message) => vec![line(None, message.clone(), String::new(), true)],
-            FieldState::Loaded(fields) => fields
-                .iter()
-                .map(|field| {
-                    line(
-                        field.primary_key.then_some("key-round"),
-                        field.name.clone(),
-                        field.data_type.clone(),
-                        false,
-                    )
-                })
-                .collect(),
+            FieldState::Loading => Some(line(None, "Loading fields…".into(), String::new(), true)),
+            FieldState::Failed(message) => Some(line(None, message.clone(), String::new(), true)),
+            FieldState::Loaded(fields) => fields.get(index).map(|field| {
+                line(
+                    field.primary_key.then_some("key-round"),
+                    field.name.clone(),
+                    field.data_type.clone(),
+                    false,
+                )
+            }),
         }
     }
 }

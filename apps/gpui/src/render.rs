@@ -1,6 +1,7 @@
 use super::*;
 use crate::chrome::{STATUS_HEIGHT, TAB_HEIGHT, TOOLBAR_HEIGHT};
 use crate::palette_state::PaletteMode;
+use gpui::uniform_list;
 use gpui_kit::component::scroll::Scrollbar;
 
 impl GridView {
@@ -423,14 +424,19 @@ pub(crate) fn progress_text(title: &str, rows: u64, partial: bool, pages: u64) -
 }
 
 impl GridView {
-    fn command_rows(&self, theme: &Theme, cx: &mut Context<Self>) -> Vec<gpui::Stateful<Div>> {
-        let actions = self.palette_actions();
-        let shown = palette_matches(self.palette.input.read(cx).content(), &actions);
+    fn command_rows(
+        &self,
+        actions: &[Action],
+        shown: &[usize],
+        range: std::ops::Range<usize>,
+        theme: &Theme,
+        cx: &mut Context<Self>,
+    ) -> Vec<gpui::Stateful<Div>> {
         let selected = self.palette.index.min(shown.len().saturating_sub(1));
-        shown
+        shown[range.clone()]
             .iter()
-            .enumerate()
-            .map(|(position, index)| {
+            .zip(range)
+            .map(|(index, position)| {
                 let action = &actions[*index];
                 let shortcut = bookie_gpui::keymap::Command::ALL.into_iter()
                     .find(|command| command.name() == action.id || command.title() == action.label)
@@ -461,13 +467,18 @@ impl GridView {
             .collect()
     }
 
-    fn picker_rows(&self, theme: &Theme, cx: &mut Context<Self>) -> Vec<gpui::Stateful<Div>> {
-        let shown = self.picker_items(cx);
+    fn picker_rows(
+        &self,
+        shown: &[crate::picker::PickerItem],
+        range: std::ops::Range<usize>,
+        theme: &Theme,
+        cx: &mut Context<Self>,
+    ) -> Vec<gpui::Stateful<Div>> {
         let selected = self.palette.index.min(shown.len().saturating_sub(1));
-        shown
-            .into_iter()
-            .enumerate()
-            .map(|(position, item)| {
+        shown[range.clone()]
+            .iter()
+            .zip(range)
+            .map(|(item, position)| {
                 let mut row = div()
                     .id(("palette-picker-row", position))
                     .px_2()
@@ -483,9 +494,15 @@ impl GridView {
                             .overflow_hidden()
                             .whitespace_nowrap()
                             .text_ellipsis()
-                            .child(item.title),
+                            .child(item.title.clone()),
                     )
-                    .child(div().text_color(rgb(theme.muted_foreground)).child(item.subtitle));
+                    .child(
+                        div()
+                            .flex_none()
+                            .whitespace_nowrap()
+                            .text_color(rgb(theme.muted_foreground))
+                            .child(item.subtitle.clone()),
+                    );
                 let hover = theme.active_row;
                 row = row
                     .hover(move |style| style.bg(rgb(hover)))
@@ -504,22 +521,35 @@ impl GridView {
 
     fn palette_overlay(&self, window: &Window, cx: &mut Context<Self>) -> gpui::Stateful<Div> {
         let theme = Theme::current(cx);
-        let (rows, empty_text) = match self.palette.mode {
-            PaletteMode::Commands => (self.command_rows(&theme, cx), "No matching command"),
-            PaletteMode::Tables => (self.picker_rows(&theme, cx), "No matching table"),
-            PaletteMode::Columns => (self.picker_rows(&theme, cx), "No matching column"),
-            PaletteMode::Shortcuts => (self.picker_rows(&theme, cx), "No matching command"),
-            PaletteMode::Favorites | PaletteMode::DeleteFavorite => {
-                (self.picker_rows(&theme, cx), "No saved favorites")
-            }
-            PaletteMode::SavedFilters | PaletteMode::DeleteSavedFilter => {
-                (self.picker_rows(&theme, cx), "No saved filters for this table")
-            }
-            PaletteMode::NameFilter => (self.picker_rows(&theme, cx), "Type a name for the filter"),
+        let empty_text = match self.palette.mode {
+            PaletteMode::Commands | PaletteMode::Shortcuts => "No matching command",
+            PaletteMode::Tables => "No matching table",
+            PaletteMode::Columns => "No matching column",
+            PaletteMode::Favorites | PaletteMode::DeleteFavorite => "No saved favorites",
+            PaletteMode::SavedFilters | PaletteMode::DeleteSavedFilter => "No saved filters for this table",
+            PaletteMode::NameFilter => "Type a name for the filter",
         };
-        let empty = rows
-            .is_empty()
-            .then(|| div().px_2().text_color(rgb(theme.muted_foreground)).child(empty_text));
+        // Matches are scored once per frame and only the rows in view become elements.
+        let (count, list) = if self.palette.mode == PaletteMode::Commands {
+            let actions = self.palette_actions();
+            let shown = palette_matches(self.palette.input.read(cx).content(), &actions);
+            let count = shown.len();
+            let rows = cx.processor(move |this, range: std::ops::Range<usize>, _window, cx| {
+                let theme = Theme::current(cx);
+                this.command_rows(&actions, &shown, range, &theme, cx)
+            });
+            (count, uniform_list("palette-results", count, rows))
+        } else {
+            let shown = self.picker_items(cx);
+            let count = shown.len();
+            let rows = cx.processor(move |this, range: std::ops::Range<usize>, _window, cx| {
+                let theme = Theme::current(cx);
+                this.picker_rows(&shown, range, &theme, cx)
+            });
+            (count, uniform_list("palette-results", count, rows))
+        };
+        let empty = (count == 0).then(|| div().px_2().text_color(rgb(theme.muted_foreground)).child(empty_text));
+        let max_height = (window.viewport_size().height - px(size::PALETTE_TOP + size::FORM_CONTROL + 40.0)).max(px(0.0));
         div()
             .id("palette-overlay")
             .absolute()
@@ -551,9 +581,11 @@ impl GridView {
                     .on_click(cx.listener(|_, _, _, cx| cx.stop_propagation()))
                     .child(self.palette.input.clone())
                     .child(
-                        div().id("palette-results").max_h((window.viewport_size().height - px(size::PALETTE_TOP + size::FORM_CONTROL + 40.0)).max(px(0.0))).overflow_y_scroll()
-                            .track_scroll(&self.palette.scroll).children(rows).children(empty),
-                    ),
+                        list.with_sizing_behavior(gpui::ListSizingBehavior::Infer)
+                            .max_h(max_height)
+                            .track_scroll(&self.palette.scroll),
+                    )
+                    .children(empty),
             )
     }
 }

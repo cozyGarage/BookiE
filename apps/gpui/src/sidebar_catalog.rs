@@ -51,7 +51,8 @@ impl GridView {
         .detach();
     }
 
-    pub(crate) fn catalog_rows(&self, theme: Theme, cx: &mut Context<Self>) -> Vec<gpui::AnyElement> {
+    /// The catalog section of the sidebar, one entry per drawn line.
+    pub(crate) fn catalog_lines(&self) -> Vec<CatalogLine> {
         let Some(session) = self.live.as_ref() else {
             return Vec::new();
         };
@@ -59,13 +60,38 @@ impl GridView {
         if kinds.is_empty() {
             return Vec::new();
         }
-        let mut rows = vec![
-            tree_line(
+        let mut lines = vec![CatalogLine::Header(kinds.len())];
+        if !self.sidebar.catalog_open {
+            return lines;
+        }
+        for (index, kind) in kinds.iter().copied().enumerate() {
+            lines.push(CatalogLine::Kind(index, kind));
+            let entries = match self.catalog_state(kind) {
+                Some(ObjectState::Loaded(objects)) if !objects.is_empty() => objects.len(),
+                Some(_) => 1,
+                None => 0,
+            };
+            lines.extend((0..entries).map(|entry| CatalogLine::Entry(kind, entry)));
+        }
+        lines
+    }
+
+    fn catalog_state(&self, kind: CatalogObjectKind) -> Option<&ObjectState> {
+        self.sidebar
+            .catalog
+            .iter()
+            .find(|(open, _)| *open == kind)
+            .map(|(_, state)| state)
+    }
+
+    pub(crate) fn catalog_line(&self, line: &CatalogLine, theme: Theme, cx: &mut Context<Self>) -> gpui::AnyElement {
+        match *line {
+            CatalogLine::Header(count) => tree_line(
                 theme,
                 "catalog".into(),
                 0.0,
                 "Catalog".into(),
-                kinds.len().to_string(),
+                count.to_string(),
                 Some(self.sidebar.catalog_open),
             )
             .font_weight(gpui::FontWeight::MEDIUM)
@@ -74,22 +100,12 @@ impl GridView {
                 cx.notify();
             }))
             .into_any_element(),
-        ];
-        if !self.sidebar.catalog_open {
-            return rows;
-        }
-        for (index, kind) in kinds.iter().copied().enumerate() {
-            let state = self
-                .sidebar
-                .catalog
-                .iter()
-                .find(|(open, _)| *open == kind)
-                .map(|(_, state)| state);
-            let count = match state {
-                Some(ObjectState::Loaded(objects)) => objects.len().to_string(),
-                _ => String::new(),
-            };
-            rows.push(
+            CatalogLine::Kind(index, kind) => {
+                let state = self.catalog_state(kind);
+                let count = match state {
+                    Some(ObjectState::Loaded(objects)) => objects.len().to_string(),
+                    _ => String::new(),
+                };
                 tree_line(
                     theme,
                     ("catalog-kind", index).into(),
@@ -102,23 +118,28 @@ impl GridView {
                     this.toggle_catalog_kind(kind, cx);
                     cx.notify();
                 }))
-                .into_any_element(),
-            );
-            rows.extend(state_rows(state, theme));
+                .into_any_element()
+            }
+            CatalogLine::Entry(kind, entry) => state_row(self.catalog_state(kind), entry, theme),
         }
-        rows
     }
 }
 
-fn state_rows(state: Option<&ObjectState>, theme: Theme) -> Vec<gpui::AnyElement> {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum CatalogLine {
+    Header(usize),
+    Kind(usize, CatalogObjectKind),
+    Entry(CatalogObjectKind, usize),
+}
+
+fn state_row(state: Option<&ObjectState>, entry: usize, theme: Theme) -> gpui::AnyElement {
     match state {
-        Some(ObjectState::Loading) => vec![note("Loading…", theme)],
-        Some(ObjectState::Failed(message)) => vec![note(message, theme)],
-        Some(ObjectState::Loaded(objects)) if objects.is_empty() => {
-            vec![note("Nothing of this kind was found.", theme)]
-        }
-        Some(ObjectState::Loaded(objects)) => objects.iter().map(|object| object_row(object, theme)).collect(),
-        None => Vec::new(),
+        Some(ObjectState::Loading) | None => note("Loading…", theme),
+        Some(ObjectState::Failed(message)) => note(message, theme),
+        Some(ObjectState::Loaded(objects)) => match objects.get(entry) {
+            Some(object) => object_row(object, theme),
+            None => note("Nothing of this kind was found.", theme),
+        },
     }
 }
 

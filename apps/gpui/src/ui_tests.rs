@@ -657,20 +657,16 @@ fn a_long_sidebar_scrolls_and_reveal_brings_the_open_table_into_view(cx: &mut Te
     });
     cx.run_until_parked();
     view.read_with(cx, |view, _| {
-        assert!(
-            view.sidebar.scroll.max_offset().y > gpui::px(0.0),
-            "the tree overflows and can scroll"
-        );
+        assert!(view.sidebar.scroll.is_scrollable(), "the tree overflows and can scroll");
     });
+    assert!(cx.debug_bounds("sidebar-row-0").is_some(), "the first row is drawn");
+    assert!(
+        cx.debug_bounds("sidebar-row-72").is_none(),
+        "rows below the fold are not built"
+    );
     cx.simulate_keystrokes("ctrl-shift-l");
     cx.run_until_parked();
-    view.read_with(cx, |view, _| {
-        let (top, bottom) = (view.sidebar.scroll.top_item(), view.sidebar.scroll.bottom_item());
-        assert!(
-            top <= 72 && 72 <= bottom,
-            "row 72 (t70) is visible, saw {top}..{bottom}"
-        );
-    });
+    assert!(cx.debug_bounds("sidebar-row-72").is_some(), "row 72 (t70) is revealed");
 }
 
 #[gpui::test]
@@ -975,12 +971,18 @@ fn palette_end_keeps_the_last_command_in_view(cx: &mut TestAppContext) {
         let count = view.palette_shown(cx).len();
         assert!(count > 20);
         assert_eq!(view.palette.index, count - 1);
-        let scroll = &view.palette.scroll;
-        let item = scroll.bounds_for_item(count - 1).expect("last command was laid out");
-        let viewport = scroll.bounds();
-        assert!(item.top() + scroll.offset().y >= viewport.top());
-        assert!(item.bottom() + scroll.offset().y <= viewport.bottom());
+        assert_eq!(view.palette.scroll.is_scrolled_to_end(), Some(true));
     });
+    let count = view.read_with(cx, |view, cx| view.palette_shown(cx).len());
+    // debug_bounds takes a static selector; leaking one short string per test run is fine.
+    let last: &'static str = Box::leak(format!("palette-command-row-{}", count - 1).into_boxed_str());
+    let last = cx.debug_bounds(last).expect("last command is drawn");
+    let height = cx.update(|window, _| window.viewport_size().height);
+    assert!(last.bottom() <= height, "last command ends inside the window");
+    assert!(
+        cx.debug_bounds("palette-command-row-0").is_none(),
+        "commands scrolled out of view are not built"
+    );
 }
 
 #[gpui::test]

@@ -34,7 +34,7 @@ pub(crate) struct SidebarState {
     pub database_open: bool,
     pub collapsed_schemas: bookie_results::sidebar_tree::CollapseState,
     pub narrow_handled: bool,
-    pub scroll: gpui::ScrollHandle,
+    pub scroll: gpui::UniformListScrollHandle,
     pub reveal: std::cell::RefCell<Option<bookie_core::TableInfo>>,
 }
 
@@ -65,7 +65,7 @@ impl SidebarState {
             database_open: true,
             collapsed_schemas: Default::default(),
             narrow_handled: false,
-            scroll: gpui::ScrollHandle::new(),
+            scroll: gpui::UniformListScrollHandle::new(),
             reveal: std::cell::RefCell::new(None),
         }
     }
