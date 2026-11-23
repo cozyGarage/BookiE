@@ -91,7 +91,7 @@ The full `--lib --bins` command builds and runs tests from library crates and bi
 
 ## Contract guardrails
 
-A guardrail test pins a contract that other code relies on but that no feature test exercises on its own, so a refactor cannot break it silently. Each one names the invariant it protects, and each was checked by injecting the regression it guards against and watching it fail. When a guardrail fails, the change broke the contract: fix the change, not the test. Weakening or removing a guardrail needs the owner of the contract (the ADR or the lane that owns the code) to agree in the pull request.
+A guardrail test pins a contract that other code relies on but that no feature test exercises on its own, so a refactor cannot break it silently. Each one names the invariant it protects, and each was checked by injecting the regression it guards against and watching it fail. When a guardrail fails, the change broke the contract: fix the change, not the test. Weakening or removing a guardrail needs the owner of the contract (the ADR or the maintainer) to agree in the pull request.
 
 | Contract | Test | Where |
 | --- | --- | --- |
