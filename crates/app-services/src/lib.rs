@@ -72,6 +72,7 @@ pub mod referencing_tables;
 pub mod release_updates;
 pub mod request_generation;
 pub mod request_ticket;
+pub mod result_chart;
 pub mod schema_compare;
 pub mod schema_context;
 pub mod selection_stats;
