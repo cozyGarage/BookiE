@@ -1894,6 +1894,14 @@ fn the_settings_tab_opens_and_shows_the_appearance_page(cx: &mut TestAppContext)
     view.read_with(cx, |view, _| {
         assert_eq!(view.tabs.current(), &bookie_gpui::shell::Tab::Settings)
     });
+    assert!(cx.debug_bounds("settings-card").is_some(), "settings sit on a card");
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| view.open_picker(crate::palette_state::PaletteMode::Themes, window, cx))
+    });
+    view.read_with(cx, |view, _| {
+        assert!(view.palette.open);
+        assert_eq!(view.palette.mode, crate::palette_state::PaletteMode::Themes);
+    });
 }
 
 #[gpui::test]

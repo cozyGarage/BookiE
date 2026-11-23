@@ -745,24 +745,83 @@ impl GridView {
                 view.update(cx, |this, _| this.dark_mode = on);
             },
         );
+        let chosen = if self.fonts.settings.theme.is_empty() {
+            if Theme::current(cx).dark { crate::picker::BUILT_IN_DARK } else { crate::picker::BUILT_IN_LIGHT }.to_string()
+        } else {
+            self.fonts.settings.theme.clone()
+        };
+        let picker_view = cx.entity();
+        let colour_theme = gpui_kit::component::setting::SettingField::render(move |_, _, _| {
+            let view = picker_view.clone();
+            ghost("choose-theme", "Choose…", theme).on_click(move |_, window, cx| {
+                view.update(cx, |this, cx| {
+                    this.open_picker(crate::palette_state::PaletteMode::Themes, window, cx);
+                    cx.notify();
+                })
+            })
+        });
         let page = gpui_kit::component::setting::SettingPage::new("Appearance")
             .default_open(true)
             .group(
                 gpui_kit::component::setting::SettingGroup::new()
+                    .item(
+                        gpui_kit::component::setting::SettingItem::new("Colour theme", colour_theme)
+                            .description(format!("Current: {chosen}")),
+                    )
                     .item(gpui_kit::component::setting::SettingItem::new("Dark theme", dark_mode)),
             )
             .group(fonts);
         div()
+            .relative()
             .flex_1()
             .min_h_0()
+            .flex()
+            .justify_center()
+            .items_start()
+            .p_6()
             .bg(rgb(theme.background))
             .child(
-                gpui_kit::component::setting::Settings::new("bookie-settings")
-                    .header_style(&gpui::StyleRefinement {
-                        display: Some(gpui::Display::None),
-                        ..Default::default()
-                    })
-                    .page(page),
+                gpui::svg()
+                    .path("backdrop/contours.svg")
+                    .absolute()
+                    .top_0()
+                    .left_0()
+                    .size_full()
+                    .text_color(rgb(theme.border)),
+            )
+            .child(
+                div()
+                    .relative()
+                    .debug_selector(|| "settings-card".into())
+                    .w_full()
+                    .max_w(px(size::HOME_WIDTH))
+                    .max_h_full()
+                    .min_h_0()
+                    .flex()
+                    .flex_col()
+                    .rounded(px(size::SURFACE_RADIUS))
+                    .border_1()
+                    .border_color(rgb(theme.border))
+                    .bg(rgb(theme.popover))
+                    .shadow_lg()
+                    .child(
+                        div()
+                            .px_4()
+                            .pt_4()
+                            .pb_2()
+                            .font_weight(gpui::FontWeight::SEMIBOLD)
+                            .child("Settings"),
+                    )
+                    .child(
+                        div().flex_1().min_h_0().child(
+                            gpui_kit::component::setting::Settings::new("bookie-settings")
+                                .header_style(&gpui::StyleRefinement {
+                                    display: Some(gpui::Display::None),
+                                    ..Default::default()
+                                })
+                                .page(page),
+                        ),
+                    ),
             )
     }
 
