@@ -88,6 +88,7 @@ pub struct GridDelegate {
     edits: Edits,
     editor: Option<(usize, usize, gpui::AnyView)>,
     pin_scope: Option<PinScope>,
+    width_scope: Option<PinScope>,
     pinned_columns: usize,
     pin_counts: HashMap<PinScope, usize>,
     manual_widths: HashMap<PinScope, HashMap<String, f32>>,
@@ -264,7 +265,7 @@ impl TableDelegate for GridDelegate {
             *width = *measured;
         }
         fill_text_columns(&mut columns, &self.numeric, self.available_width);
-        if let Some(widths) = self.pin_scope.as_ref().and_then(|scope| self.manual_widths.get(scope)) {
+        if let Some(widths) = self.width_scope.as_ref().and_then(|scope| self.manual_widths.get(scope)) {
             for (name, width) in &mut columns {
                 if let Some(manual) = widths.get(name) {
                     *width = *manual;
@@ -583,8 +584,9 @@ impl GridDelegate {
 
 impl GridView {
     fn reset_grid_widths(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(scope) = self.pin_scope() else { return };
-        if let Some((id, _)) = self.live.as_ref().and_then(|session| session.saved.as_ref())
+        let Some(scope) = self.table.read(cx).delegate().width_scope.clone() else { return };
+        if !self.grid_is_query && self.compare.is_none()
+            && let Some((id, _)) = self.live.as_ref().and_then(|session| session.saved.as_ref())
             && let Some(store) = &self.column_widths
             && let Err(error) = store.forget_widths(*id, &scope.width_key())
         {
@@ -600,7 +602,7 @@ impl GridView {
     pub(crate) fn remember_grid_widths(&mut self, widths: &[gpui::Pixels], cx: &mut Context<Self>) {
         let table = self.table.read(cx);
         let delegate = table.delegate();
-        let Some(scope) = delegate.pin_scope.clone() else {
+        let Some(scope) = delegate.width_scope.clone() else {
             return;
         };
         let previous = (0..delegate.projection.len())
@@ -717,6 +719,20 @@ impl GridView {
         })
     }
 
+    fn width_scope(&self) -> Option<PinScope> {
+        if let Some(scope) = self.pin_scope() {
+            return Some(scope);
+        }
+        if !self.grid_is_query || self.compare.is_some() {
+            return None;
+        }
+        let sql = self.source.executed_sql()?;
+        let shape = self.source.columns().iter().map(|column| (&column.name, &column.data_type)).collect::<Vec<_>>();
+        let table = serde_json::to_string(&(sql, shape)).ok()?;
+        let crate::binary_mode::Scope::Query { connection, database } = self.binary_scope() else { return None };
+        Some(PinScope { connection, database, schema: None, table })
+    }
+
     fn row_map(&self) -> RowMap {
         if let Some(diff) = &self.compare {
             return RowMap {
@@ -828,6 +844,7 @@ impl GridView {
         let (mut columns, numeric, kinds) = self.grid_columns();
         let map = self.row_map();
         let pin_scope = self.pin_scope();
+        let width_scope = self.width_scope();
         let table = self.table.read(cx);
         let delegate = table.delegate();
         let (hidden_columns, projection) = self.column_projection(&columns, delegate, &pin_scope);
@@ -872,7 +889,7 @@ impl GridView {
                 }
             }
         }
-        if let Some(widths) = pin_scope.as_ref().and_then(|scope| delegate.manual_widths.get(scope)) {
+        if let Some(widths) = width_scope.as_ref().and_then(|scope| delegate.manual_widths.get(scope)) {
             for (name, width) in &mut columns {
                 if let Some(manual) = widths.get(name) {
                     *width = *manual;
@@ -934,6 +951,7 @@ impl GridView {
                 &binary_modes,
             ) && delegate.projection == projection
                 && delegate.pin_scope == pin_scope
+                && delegate.width_scope == width_scope
                 && delegate.pinned_columns == pinned_columns
             {
                 return;
@@ -951,6 +969,7 @@ impl GridView {
             delegate.edits = self.cell_edit.edits.clone();
             delegate.editor = editor;
             delegate.pin_scope = pin_scope;
+            delegate.width_scope = width_scope;
             delegate.pinned_columns = pinned_columns;
             table.refresh(cx);
         });
