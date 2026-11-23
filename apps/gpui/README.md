@@ -98,8 +98,9 @@ To measure scrolling, run `experiments/profile.sh` from a desktop session (`ROWS
 
 
 ```bash
-cargo build --release --locked --manifest-path apps/gpui/Cargo.toml
-node apps/gpui/measure.mjs --rows=150000 --steps=120 --runs=3
+scripts/gpui-cargo.sh build --release --locked
+target_dir="$(scripts/gpui-cargo.sh target-dir)"
+node apps/gpui/measure.mjs --binary "$target_dir/release/bookie-gpui" --rows=150000 --steps=120 --runs=3
 ```
 
 The script starts the release binary on the current display, waits for the application to report its first frame, scrolls the first 5,000-row page from top to bottom in the requested number of steps, samples resident and proportional memory of the process every 400 ms, and prints one JSON line per run. It steps, then waits briefly so total elapsed time is comparable.

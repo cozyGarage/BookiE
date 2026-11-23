@@ -10,6 +10,11 @@ else
 fi
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$default_target_dir}"
 
+if [[ "${1:-}" == "target-dir" ]]; then
+  printf '%s\n' "$CARGO_TARGET_DIR"
+  exit 0
+fi
+
 if command -v sccache >/dev/null 2>&1; then
   sccache_path="$(command -v sccache)"
   export RUSTC_WRAPPER="${RUSTC_WRAPPER:-$sccache_path}"

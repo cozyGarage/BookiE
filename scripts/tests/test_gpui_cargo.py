@@ -101,6 +101,19 @@ class GpuiCargoTests(unittest.TestCase):
         self.assertLess(args.index("--manifest-path"), args.index("--"))
         self.assertEqual(args[-2:], ["--exact", "--test-threads=1"])
 
+    def test_target_dir_prints_the_shared_or_explicit_target_directory(self):
+        output, _ = self.run_wrapper({}, ["target-dir"])
+        common_dir = subprocess.run(
+            ["git", "-C", str(ROOT), "rev-parse", "--path-format=absolute", "--git-common-dir"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        self.assertEqual(output, [str(Path(common_dir).parent / "target")])
+
+        output, _ = self.run_wrapper({"CARGO_TARGET_DIR": "/tmp/bookie-target"}, ["target-dir"])
+        self.assertEqual(output, ["/tmp/bookie-target"])
+
     def test_cargo_deny_gets_manifest_path_before_its_subcommand(self):
         output, _ = self.run_wrapper({}, ["deny", "--config", "deny.toml", "check", "advisories", "licenses"])
         args = [line.removeprefix("arg=") for line in output if line.startswith("arg=")]
