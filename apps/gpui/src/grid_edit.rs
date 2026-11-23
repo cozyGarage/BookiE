@@ -13,9 +13,20 @@ pub struct Editing {
     pub row: u64,
     pub column: usize,
     pub kind: &'static str,
+    pub full_value: bool,
 }
 
+const MAX_FULL_VALUE_EDIT_BYTES: usize = 1024 * 1024;
+
 impl GridView {
+    pub(crate) fn apply_active_cell_edit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.commit_edit(window, cx);
+    }
+
+    pub(crate) fn cancel_active_cell_edit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.stop_edit(window, cx);
+    }
+
     pub fn on_editor_event(&mut self, event: &InputEvent, window: &mut Window, cx: &mut Context<Self>) {
         match event {
             InputEvent::Submit => self.commit_edit(window, cx),
@@ -40,7 +51,12 @@ impl GridView {
             self.stop_edit(window, cx);
             return;
         }
-        let text = self.cell_edit.editor.read(cx).content().to_string();
+        let full_value = editing.full_value;
+        let text = if full_value {
+            self.cell_edit.value_editor.read(cx).value().to_string()
+        } else {
+            self.cell_edit.editor.read(cx).content().to_string()
+        };
         if editing.kind == "null" && text.is_empty() {
             self.stop_edit(window, cx);
             return;
@@ -92,8 +108,12 @@ impl GridView {
         } else {
             cell.display()
         };
-        if text.contains('\n') {
-            self.status = "Multiline values cannot be edited in this single-line prototype".into();
+        let full_value = matches!(cell, Cell::Text(_) | Cell::JsonText(_) | Cell::Json(_))
+            && (matches!(cell, Cell::JsonText(_) | Cell::Json(_))
+                || text.len() > 512
+                || text.contains(['\n', '\r', '\t', '\0']));
+        if full_value && text.len() > MAX_FULL_VALUE_EDIT_BYTES {
+            self.status = "This value exceeds the 1 MiB full-value editor limit".into();
             cx.notify();
             return;
         }
@@ -105,15 +125,23 @@ impl GridView {
             row,
             column,
             kind: cell.kind(),
+            full_value,
         });
-        self.cell_edit.editor.update(cx, |editor, cx| {
-            editor.set_text_align(
-                if is_numeric { gpui::TextAlign::Right } else { gpui::TextAlign::Left },
-                cx,
-            );
-            editor.set_content(&text, cx);
-        });
-        window.focus(&self.cell_edit.editor.read(cx).focus_handle(cx), cx);
+        if full_value {
+            self.cell_edit
+                .value_editor
+                .update(cx, |editor, cx| editor.set_value(&text, window, cx));
+            window.focus(&self.cell_edit.value_editor.read(cx).focus_handle(cx), cx);
+        } else {
+            self.cell_edit.editor.update(cx, |editor, cx| {
+                editor.set_text_align(
+                    if is_numeric { gpui::TextAlign::Right } else { gpui::TextAlign::Left },
+                    cx,
+                );
+                editor.set_content(&text, cx);
+            });
+            window.focus(&self.cell_edit.editor.read(cx).focus_handle(cx), cx);
+        }
         cx.notify();
     }
 

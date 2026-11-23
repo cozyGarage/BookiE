@@ -268,6 +268,7 @@ impl GridView {
         Entity<TextInput>,
         Entity<TextInput>,
         Entity<EditorState>,
+        Entity<EditorState>,
     ) {
         let find = cx.new(|cx| TextInput::new("Find", cx));
         let filter = cx.new(|cx| TextInput::new("label contains 7", cx));
@@ -315,7 +316,8 @@ impl GridView {
             },
         )
         .detach();
-        (find, filter, editor, sql_input)
+        let value_editor = cx.new(|cx| EditorState::new(window, cx).placeholder("Edit full value"));
+        (find, filter, editor, sql_input, value_editor)
     }
 
     fn init_chrome_inputs(window: &mut Window, cx: &mut Context<Self>) -> (Entity<TextInput>, Entity<TextInput>) {
@@ -417,7 +419,7 @@ impl GridView {
             Self::persist_window_geometry(window, cx);
         }
         let total = source.total();
-        let (find, filter, editor, sql_input) = Self::init_query_inputs(window, cx);
+        let (find, filter, editor, sql_input, value_editor) = Self::init_query_inputs(window, cx);
         let (sidebar_search, palette_input) = Self::init_chrome_inputs(window, cx);
         let (table, table_focus, table_events) = Self::init_grid_table(window, cx);
         let font_names = installed_font_names(cx);
@@ -489,7 +491,7 @@ impl GridView {
             continuous: false,
             grid_is_query: false,
             search: panel_state::SearchState::new(find, filter),
-            cell_edit: panel_state::CellEditState::new(editor),
+            cell_edit: panel_state::CellEditState::new(editor, value_editor),
             detail_open: false,
             row_detail_open: false,
             catalog: Catalog::synthetic(),

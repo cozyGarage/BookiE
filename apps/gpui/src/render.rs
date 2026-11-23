@@ -336,6 +336,84 @@ impl GridView {
             .children(sidebar)
             .child(div().flex_1().flex().flex_col().min_w_0().child(tab_row).child(content))
     }
+
+    fn full_value_editor_overlay(&self, theme: Theme, cx: &mut Context<Self>) -> Option<gpui::AnyElement> {
+        let editing = self.cell_edit.active.as_ref().filter(|editing| editing.full_value)?;
+        let column = self
+            .source
+            .columns()
+            .get(editing.column)
+            .map_or("value", |column| column.name.as_str())
+            .to_string();
+        Some(
+            div()
+                .id("full-value-editor-overlay")
+                .absolute()
+                .top_0()
+                .left_0()
+                .size_full()
+                .flex()
+                .justify_center()
+                .items_center()
+                .bg(gpui::rgba(0x00000088))
+                .occlude()
+                .child(
+                    div()
+                        .id("full-value-editor-dialog")
+                        .debug_selector(|| "full-value-editor-dialog".into())
+                        .w(px(size::FULL_VALUE_EDITOR_WIDTH))
+                        .max_w(gpui::relative(0.92))
+                        .h(px(size::FULL_VALUE_EDITOR_HEIGHT))
+                        .max_h(gpui::relative(0.9))
+                        .flex()
+                        .flex_col()
+                        .min_h_0()
+                        .p_3()
+                        .gap_2()
+                        .bg(rgb(theme.background))
+                        .border_1()
+                        .border_color(rgb(theme.border))
+                        .rounded(px(theme.radius))
+                        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                        .child(
+                            div()
+                                .flex()
+                                .items_center()
+                                .justify_between()
+                                .child(div().font_weight(gpui::FontWeight::SEMIBOLD).child(format!("Edit {column}")))
+                                .child(div().text_color(rgb(theme.muted_foreground)).child("Full value")),
+                        )
+                        .child(
+                            div()
+                                .id("full-value-editor-input")
+                                .flex_1()
+                                .min_h_0()
+                                .border_1()
+                                .border_color(rgb(theme.border))
+                                .child(gpui_kit::component::input::Editor::new(&self.cell_edit.value_editor).h(gpui::relative(1.0))),
+                        )
+                        .child(
+                            div()
+                                .flex()
+                                .items_center()
+                                .justify_between()
+                                .child(div().min_w_0().text_color(rgb(theme.muted_foreground)).child(self.status.clone()))
+                                .child(
+                                    div()
+                                        .flex()
+                                        .gap_2()
+                                        .child(button("cancel-full-value", "Cancel", theme).on_click(cx.listener(
+                                            |this, _, window, cx| this.cancel_active_cell_edit(window, cx),
+                                        )))
+                                        .child(button("apply-full-value", "Apply", theme).on_click(cx.listener(
+                                            |this, _, window, cx| this.apply_active_cell_edit(window, cx),
+                                        ))),
+                                ),
+                        ),
+                )
+                .into_any_element(),
+        )
+    }
 }
 
 impl Render for GridView {
@@ -350,6 +428,7 @@ impl Render for GridView {
         } else {
             None
         };
+        let full_value_editor = self.full_value_editor_overlay(theme, cx);
         let save_bar = self.approval_bar(theme, cx).or_else(|| self.save_bar(theme, cx)).or_else(|| self.edits_bar(theme, cx));
         let banner = self.save_banner(theme, cx);
         let insert_form = self.insert_form(theme, cx).or_else(|| self.import_bar(theme, cx))
@@ -409,6 +488,7 @@ impl Render for GridView {
             .children(self.row_menu_overlay())
             .child(self.status_bar(theme))
             .children(palette)
+            .children(full_value_editor)
     }
 }
 

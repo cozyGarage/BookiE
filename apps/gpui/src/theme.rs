@@ -17,6 +17,8 @@ pub mod size {
     pub const STRUCTURE_PANEL_MAX_HEIGHT: f32 = 280.0;
     pub const ROW_DETAIL_HEIGHT: f32 = 280.0;
     pub const ROW_DETAIL_LABEL_WIDTH: f32 = 180.0;
+    pub const FULL_VALUE_EDITOR_WIDTH: f32 = 760.0;
+    pub const FULL_VALUE_EDITOR_HEIGHT: f32 = 560.0;
     pub const TEXT: f32 = 13.0;
     pub const STAT_TEXT: f32 = 22.0;
     pub const TREE_ROW: f32 = 26.0;
