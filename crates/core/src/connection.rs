@@ -8,7 +8,7 @@ use tokio::sync::Notify;
 
 use crate::catalog::{CatalogObject, CatalogObjectKind};
 use crate::error::DriverError;
-use crate::operation::{OperationControl, run_controlled};
+use crate::operation::{OperationControl, check_pre_dispatch, run_controlled};
 use crate::query::{
     ColumnInfo, ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, QueryResult, QueryResultBatch, TableInfo,
     Value,
@@ -16,6 +16,23 @@ use crate::query::{
 use crate::routine::{RoutineLookup, RoutineRef};
 use crate::tls::TlsConfig;
 use crate::transaction::Transaction;
+
+pub type SchemaTableMetadataVisitor<'a> =
+    dyn FnMut(usize, Result<(Vec<ColumnInfo>, Vec<ForeignKeyInfo>), DriverError>) -> bool + Send + 'a;
+
+fn terminal_schema_metadata_error(error: &DriverError) -> bool {
+    matches!(
+        error,
+        DriverError::Cancelled
+            | DriverError::TimedOut
+            | DriverError::Disconnected
+            | DriverError::ConnectionRefused
+            | DriverError::AuthFailed
+            | DriverError::Tls(_)
+            | DriverError::PolicyDenied(_)
+            | DriverError::OperationOutcomeUnknown { .. }
+    )
+}
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -316,6 +333,55 @@ pub trait Connection: Send + Sync {
         control: &OperationControl,
     ) -> Result<Vec<ColumnInfo>, DriverError> {
         run_controlled(self.fetch_columns(schema, table), control).await
+    }
+    async fn fetch_schema_table_metadata_controlled(
+        &self,
+        tables: &[TableInfo],
+        include_foreign_keys: bool,
+        control: &OperationControl,
+        visit: &mut SchemaTableMetadataVisitor<'_>,
+    ) -> Result<(), DriverError> {
+        for (index, table) in tables.iter().enumerate() {
+            check_pre_dispatch(control)?;
+            let columns = match self
+                .fetch_columns_controlled(table.schema.as_deref(), &table.name, control)
+                .await
+            {
+                Ok(columns) => columns,
+                Err(error) => {
+                    if terminal_schema_metadata_error(&error) {
+                        return Err(error);
+                    }
+                    if !visit(index, Err(error)) {
+                        break;
+                    }
+                    continue;
+                }
+            };
+            let foreign_keys = if include_foreign_keys {
+                match self
+                    .fetch_foreign_keys_controlled(table.schema.as_deref(), &table.name, control)
+                    .await
+                {
+                    Ok(keys) => keys,
+                    Err(error) => {
+                        if terminal_schema_metadata_error(&error) {
+                            return Err(error);
+                        }
+                        if !visit(index, Err(error)) {
+                            break;
+                        }
+                        continue;
+                    }
+                }
+            } else {
+                Vec::new()
+            };
+            if !visit(index, Ok((columns, foreign_keys))) {
+                break;
+            }
+        }
+        Ok(())
     }
     async fn fetch_rows(
         &self,
@@ -855,6 +921,40 @@ mod controlled_default_tests {
             1,
             "the call started before cancellation"
         );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn an_interrupted_default_schema_metadata_read_reports_an_unknown_outcome() {
+        let dispatched = Arc::new(AtomicUsize::new(0));
+        let connection = SlowConnection {
+            dispatched: dispatched.clone(),
+            ..SlowConnection::default()
+        };
+        let control = OperationControl::with_timeout(Duration::from_secs(5));
+        let tables = [TableInfo {
+            schema: Some("shop".into()),
+            name: "items".into(),
+        }];
+        let task = tokio::spawn(async move {
+            connection
+                .fetch_schema_table_metadata_controlled(&tables, false, &control, &mut |_, _| true)
+                .await
+        });
+
+        while dispatched.load(Ordering::SeqCst) == 0 {
+            tokio::task::yield_now().await;
+        }
+        tokio::time::advance(Duration::from_secs(5)).await;
+
+        let error = task
+            .await
+            .expect("schema metadata task")
+            .expect_err("the stalled read must not succeed");
+        assert!(
+            matches!(error, DriverError::OperationOutcomeUnknown { .. }),
+            "{error:?}"
+        );
+        assert_eq!(dispatched.load(Ordering::SeqCst), 1);
     }
 
     #[tokio::test(start_paused = true)]
