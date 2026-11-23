@@ -57,7 +57,7 @@ impl GridView {
             && self.compare.is_none()
             && !self.continuous
             && !self.palette.open
-            && self.tabs.shows_grid()
+            && self.tabs.shows_grid_for(&self.catalog.grid_table)
     }
 
     fn extend_selection_with_arrow(&mut self, key: &str, cx: &App) {
@@ -166,7 +166,7 @@ impl GridView {
             cx.notify();
             return;
         }
-        if self.focus.is_focused(window) && self.cell_edit.active.is_none() && self.compare.is_none() && self.tabs.shows_grid() {
+        if self.focus.is_focused(window) && self.cell_edit.active.is_none() && self.compare.is_none() && self.tabs.shows_grid_for(&self.catalog.grid_table) {
             self.grid_key(key, modifiers.shift, modifiers.control, window, cx);
         }
     }
