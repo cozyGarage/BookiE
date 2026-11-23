@@ -4,12 +4,11 @@ import sys
 from pathlib import Path
 
 PROJECT_URL = "https://github.com/users/cozyGarage/projects/3"
-LANES = {"Data", "Policy", "UX", "Maintainer"}
 ID = re.compile(r"^[A-Z0-9]+-\d+[a-z]?$")
 ISSUE = re.compile(
     r"^\[#(\d+)\]\(https://github\.com/cozyGarage/BookiE/issues/\1\)$"
 )
-ROW = re.compile(r"^\|([^|]+)\|([^|]+)\|([^|]+)\|\s*$")
+ROW = re.compile(r"^\|([^|]+)\|([^|]+)\|\s*$")
 INDEX_HEADING = "## Open work index"
 
 
@@ -29,7 +28,7 @@ def problems(text):
         match = ROW.match(line)
         if not match:
             continue
-        ident, issue, lane = (cell.strip() for cell in match.groups())
+        ident, issue = (cell.strip() for cell in match.groups())
         if ident in {"ID", "---"} or ident.startswith("---"):
             continue
         rows += 1
@@ -41,8 +40,6 @@ def problems(text):
         seen.add(ident)
         if not ISSUE.match(issue):
             found.append(f"index line {number}: {ident} issue link must be [#N](https://github.com/cozyGarage/BookiE/issues/N)")
-        if lane not in LANES:
-            found.append(f"index line {number}: {ident} has unknown lane {lane!r}")
     if rows == 0:
         found.append("open work index has no rows")
     return found
@@ -57,8 +54,8 @@ def indexed_issues(text):
         match = ROW.match(line)
         if not match:
             continue
-        ident, issue, lane = (cell.strip() for cell in match.groups())
-        if ident in {"ID", "---"} or ident.startswith("---") or lane not in LANES:
+        ident, issue = (cell.strip() for cell in match.groups())
+        if ident in {"ID", "---"} or ident.startswith("---"):
             continue
         issue_match = ISSUE.match(issue)
         if issue_match:
