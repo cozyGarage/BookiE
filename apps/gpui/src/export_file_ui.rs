@@ -257,7 +257,9 @@ impl GridView {
         }
         let mut path = bookie_core::user_path::expand_tilde(std::path::Path::new(typed));
         match path.extension().and_then(|extension| extension.to_str()) {
-            None => path.set_extension(format.extension()),
+            None => {
+                path.set_extension(format.extension());
+            }
             Some(extension) if ResultFormat::from_extension(extension) == Some(format) => {}
             Some(_) => {
                 self.status = format!("Choose a .{} file name for {}", format.extension(), format.label());
@@ -437,7 +439,7 @@ fn scope_range(
     source_count: u64,
     page: u64,
     page_rows: u64,
-    selection: Option<crate::selection::Selection>,
+    selection: Option<crate::Selection>,
     page_available: bool,
     full_allowed: bool,
 ) -> Option<Range<u64>> {
@@ -503,7 +505,7 @@ mod tests {
 
     #[test]
     fn current_page_and_selection_have_distinct_ranges() {
-        let selection = crate::selection::Selection { anchor: 3, focus: 5 };
+        let selection = crate::Selection { anchor: 3, focus: 5 };
         assert_eq!(
             scope_range(ExportScope::CurrentPage, 30, 30, 2, 10, Some(selection), true, true),
             Some(20..30)
@@ -519,7 +521,7 @@ mod tests {
                 30,
                 2,
                 10,
-                Some(crate::selection::Selection { anchor: 4, focus: 6 }),
+                Some(crate::Selection { anchor: 4, focus: 6 }),
                 true,
                 true,
             ),
