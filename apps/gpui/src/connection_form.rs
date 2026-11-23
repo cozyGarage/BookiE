@@ -228,6 +228,18 @@ pub(crate) fn choice_row(
 }
 
 impl GridView {
+    pub(crate) fn tab_title(&self, tab: &bookie_gpui::shell::Tab, cx: &gpui::App) -> String {
+        if *tab != bookie_gpui::shell::Tab::NewConnection || self.connection_form.editing.is_none() {
+            return tab.title();
+        }
+        let name = self.connection_form.name.read(cx).content().trim().to_string();
+        if name.is_empty() {
+            "Edit connection".into()
+        } else {
+            name
+        }
+    }
+
     pub(crate) fn connection_page(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
         let form = &self.connection_form;
         let file_based = form.selected().is_some_and(|driver| driver.capabilities.is_file_based);
