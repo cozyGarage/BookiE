@@ -25,6 +25,7 @@ mod palette_state;
 mod edit_history;
 mod favorites_ui;
 mod approval_ui;
+mod host_key_ui;
 mod follow_ui;
 mod import_ui;
 mod export_file_ui;
@@ -165,6 +166,7 @@ struct GridView {
     params: params_ui::ParamsState,
     save: save_ui::SaveState,
     approval: approval_ui::ApprovalUi,
+    host_key: host_key_ui::HostKeyUi,
     insert: insert_ui::InsertState,
     import: import_ui::ImportState,
     structure: structure_ui::StructureState,
@@ -450,6 +452,9 @@ impl GridView {
 
         let (approval, approval_inbox) = approval_ui::ApprovalUi::new();
         Self::watch_approvals(approval_inbox, cx);
+        let (host_key, host_key_inbox) = host_key_ui::HostKeyUi::new();
+        bookie_gpui::host_key::install(host_key.tx.clone());
+        Self::watch_host_keys(host_key_inbox, cx);
         GridView {
             table,
             _table_events: table_events,
@@ -465,6 +470,7 @@ impl GridView {
             params: params_ui::ParamsState::default(),
             save: save_ui::SaveState::default(),
             approval,
+            host_key,
             insert: insert_ui::InsertState::default(),
             import: import_ui::ImportState::default(),
             structure: structure_ui::StructureState::default(),
@@ -1029,6 +1035,8 @@ fn main() {
 mod follow_ui_tests;
 #[cfg(test)]
 mod grid_pin_tests;
+#[cfg(test)]
+mod host_key_ui_tests;
 #[cfg(test)]
 mod live_ui_tests;
 #[cfg(test)]

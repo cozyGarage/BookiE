@@ -465,6 +465,7 @@ pub async fn test(
     draft: &ConnectionDraft,
     cancellation: tokio_util::sync::CancellationToken,
     audit: Option<&bookie_transport::TransportAuditFactory>,
+    host_key_prompter: Option<std::sync::Arc<dyn bookie_ssh::openssh::Prompter>>,
 ) -> Result<String, String> {
     validate(draft)?;
     if draft.ssh.is_some() && draft.id.is_none() {
@@ -485,6 +486,9 @@ pub async fn test(
     }
     opts.application_name = Some("BookiE".into());
     let mut environment = bookie_transport::SshEnvironment::builtin(bookie_ssh::UnknownHostKey::Refuse);
+    if let Some(prompter) = host_key_prompter {
+        environment.set_builtin_prompter(prompter);
+    }
     if let Some(audit) = audit {
         environment = environment.with_audit(audit.context(
             bookie_policy::Principal::human_gui(),
@@ -823,14 +827,14 @@ mod tests {
         file.capabilities.is_file_based = true;
         file.database = path.display().to_string();
         assert!(
-            test(&registry, &file, cancel(), None)
+            test(&registry, &file, cancel(), None, None)
                 .await
                 .unwrap()
                 .starts_with("Connected")
         );
         let mut bad = draft();
         bad.driver_id = "nonesuch".into();
-        assert!(test(&registry, &bad, cancel(), None).await.is_err());
+        assert!(test(&registry, &bad, cancel(), None, None).await.is_err());
         let mut ssh = draft();
         ssh.ssh = Some(SshDraft {
             head: hop("h", SshAuthKind::Password),
@@ -838,7 +842,7 @@ mod tests {
             jumps: Vec::new(),
         });
         assert!(
-            test(&registry, &ssh, cancel(), None)
+            test(&registry, &ssh, cancel(), None, None)
                 .await
                 .unwrap_err()
                 .contains("Save the connection first")

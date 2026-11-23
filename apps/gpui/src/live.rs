@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use bookie_app_services::command_bridge::{ChannelEventSink, Command, DispatchContext, Epoch, Event, dispatch};
-use bookie_app_services::database_service::{ConnectionOverview, DatabaseService};
+use bookie_app_services::database_service::ConnectionOverview;
 use bookie_app_services::driver_failure_message::driver_failure_message;
 use bookie_app_services::er_diagram::{SchemaDiagram, TableRead, read::MAX_TABLES as MAX_DIAGRAM_TABLES};
 use bookie_app_services::read_session::ConnectionSummary;
@@ -182,7 +182,7 @@ impl LiveSession {
 
     pub fn with_driver_id(self: &Arc<Self>, driver_id: &str) -> Arc<Self> {
         let registry = Arc::new(drivers_registry::default_registry());
-        let sessions = ReadSessionStore::new(registry, Arc::new(DatabaseService::new()));
+        let sessions = ReadSessionStore::new(registry, crate::host_key::database_service());
         let Ok(runtime) = tokio::runtime::Builder::new_current_thread().build() else {
             return self.clone();
         };
@@ -672,7 +672,7 @@ type OpenedParts = (
 
 async fn open_session(origin: &Origin, cancellation: CancellationToken) -> Result<OpenedParts, String> {
     let registry = Arc::new(drivers_registry::default_registry());
-    let sessions = ReadSessionStore::new(registry, Arc::new(DatabaseService::new()))
+    let sessions = ReadSessionStore::new(registry, crate::host_key::database_service())
         .with_subscription_sampler(Arc::new(RegistrySubscriptionSampler));
     let epoch = Epoch(1);
     let current_epoch = AtomicU64::new(epoch.0);
@@ -748,7 +748,7 @@ impl WriteSession {
             .enable_all()
             .build()
             .map_err(|error| error.to_string())?;
-        let database = Arc::new(DatabaseService::new());
+        let database = crate::host_key::database_service();
         database.set_approval_sink(bookie_app_services::approval_prompt::reviewable_prompt_sink(approvals));
         let sessions = ReadSessionStore::new(Arc::new(drivers_registry::default_registry()), database);
         let control = OperationControl::with_timeout(Duration::from_secs(30));

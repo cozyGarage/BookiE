@@ -588,6 +588,7 @@ impl GridView {
                         &draft,
                         tokio_util::sync::CancellationToken::new(),
                         Some(&audit),
+                        bookie_gpui::host_key::prompter(),
                     ))
                 })
                 .await;
