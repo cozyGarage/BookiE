@@ -16,7 +16,7 @@ The Forgejo mirror may retain a separate `linux` branch until that service is mi
 ## Where to start
 
 1. [docs/README.md](docs/README.md): the documentation map and where each fact belongs.
-2. [BookiE Project #3](https://github.com/users/cozyGarage/projects/3): open work, status and lane. The [ledger index](docs/known-issues.md) maps ledger IDs to issues. Filter the project by **Lane** (Data, Policy, UX, Maintainer).
+2. [BookiE Project #3](https://github.com/users/cozyGarage/projects/3): open work and status. The [ledger index](docs/known-issues.md) maps ledger IDs to issues.
 3. The ADR that governs your change ([index](docs/decisions/README.md)). Every type or value change follows [ADR 0007](docs/decisions/0007-type-and-value-preservation.md).
 
 Accepted ADRs constrain architecture. Project #3 owns selected work order; each issue owns its acceptance. Private verification records support review but do not override current decisions.
@@ -25,21 +25,11 @@ Accepted ADRs constrain architecture. Project #3 owns selected work order; each 
 
 [PRODUCT.md](PRODUCT.md) says what BookiE is and is not, [docs/personas.md](docs/personas.md) says who it serves, and [PRINCIPLES.md](PRINCIPLES.md) holds the standing principles. [specs/](specs/README.md) describe current behaviour extracted from the code. They are drafts until reviewed: this file and accepted ADRs rank above them, and when a spec and the code disagree, check the code and fix the spec.
 
-## Lanes and ownership
+## Worktrees and branches
 
-Lanes keep parallel agents from editing the same files. Pick open work from [Project #3](https://github.com/users/cozyGarage/projects/3) filtered by your **Lane**. Each open issue has one lane; edit only that lane's files unless a handoff comment on the issue records otherwise.
-
-| Lane | Owns |
-| --- | --- |
-| Data | Types, values, drivers and result paths: `crates/core` value and result types, decoders under `crates/drivers/`, grid value display |
-| Policy | Transport, guard, audit, SSH and rollback: `crates/policy`, `crates/transport`, `crates/ssh`, audit storage |
-| UX | App layer (`apps/linux/`), packaging, repository automation, the ledger index, and shared documentation |
-| Cursor | Documentation and tests only. UX reviews test pull requests; the maintainer reviews documentation pull requests |
-| Maintainer | Decisions and anything needing a person or a real desktop |
-
-- To work in another lane's files, first record the handoff on the GitHub issue (and update the project **Lane** / `lane:*` label plus the [ledger index](docs/known-issues.md) Lane column) in the same commit as the first change.
-- When a lane finishes a row, close or move the issue on the project and remove its line from the ledger index.
-- Each agent works in its own git worktree (a sibling directory named for the lane, for example `bookie-data`), never in another agent's checkout. Branch from the latest `main` on [`cozyGarage/BookiE`](https://github.com/cozyGarage/BookiE). Name branches `<lane>/<topic>` or `<type>/<topic>` (lane prefixes include `data/` and `policy/`).
+- Pick open work from [Project #3](https://github.com/users/cozyGarage/projects/3).
+- When you finish a row, close or move the issue on the project and remove its line from the ledger index.
+- Each agent works in its own git worktree (a sibling directory named for the topic, for example `bookie-<topic>`), never in another agent's checkout. Branch from the latest `main` on [`cozyGarage/BookiE`](https://github.com/cozyGarage/BookiE). Name branches `<type>/<topic>`.
 
 ## Workflow
 
@@ -49,7 +39,7 @@ The [`fix-issue` skill](.claude/skills/fix-issue/SKILL.md) runs these steps in o
 2. Run the checks in [Validation](#validation) locally. Run each script directly; piping `bash scripts/preflight.sh` through `tail` reports `tail`'s status, not the script's.
 3. Merge the latest BookiE `main` branch from GitHub `cozyGarage/BookiE` into the branch (do not rebase a shared branch). Resolve generated files such as `Cargo.lock` by regenerating them.
 4. **Required checks.** Every pull request must pass the required checks for its exact source revision. Missing, skipped, cancelled or failed checks are not passes; maintainers confirm acceptance before merging.
-5. **Pull requests and merge.** Open pull requests against `main`. Merge only after required checks and lane review pass for the reviewed source. Keep one open pull request per lane and theme: when you already have one open, push the next fix to that branch instead of opening another, and hold a fix that is not urgent for the next one. A pull request for one small change costs a full validation run, so batch related fixes into one.
+5. **Pull requests and merge.** Open pull requests against `main`. Merge only after required checks and maintainer review pass for the reviewed source. Keep one open pull request per theme: when you already have one open, push the next fix to that branch instead of opening another, and hold a fix that is not urgent for the next one. A pull request for one small change costs a full validation run, so batch related fixes into one.
 6. **Documentation-only changes.** Run `python3 scripts/check-doc-links.py`, `check-known-issues.py` and `inventory-ignored-tests.py --check`, then commit directly to `main` without a pull request. Rule changes (`AGENTS.md`, accepted ADRs) and anything that touches code, workflows or packages still go through a pull request and the applicable full validation.
 
 7. **Isolated test inputs.** Keep mutable fixtures, display sessions and build inputs isolated between test runs. Check isolation before attributing overlapping-run failures to product code.
@@ -57,7 +47,7 @@ The [`fix-issue` skill](.claude/skills/fix-issue/SKILL.md) runs these steps in o
 9. **Protected branch.** Merge only through the protected `main` branch. Do not force-push or delete it. Resolve a non-fast-forward rejection by including the latest base before retrying.
 
 10. Never leave a background job, container or temporary resource running that you did not start, and never stop one you did not start. On shared systems, stop only resources you own.
-11. Keep the diff to the requested behaviour. No drive-by refactors, renames, formatting of untouched files, or edits to another lane's ledger/sprint/policy files.
+11. Keep the diff to the requested behaviour. No drive-by refactors, renames, formatting of untouched files, or unrelated edits to ledger, sprint or policy files.
 12. **Validate once per batch.** While developing, run only the narrow test for the code you touch. Run `scripts/preflight.sh` and any Forgejo acceptance run once, when the branch is ready for review. Every push to a pull request restarts its required checks, so keep commits local until the batch is complete, and merge `main` into the branch only when it conflicts or just before that final run.
 
 ## Reuse before building
@@ -66,7 +56,7 @@ The [`fix-issue` skill](.claude/skills/fix-issue/SKILL.md) runs these steps in o
 2. Adopt a component through its crate. Our code is only the adapter: it maps our `ResultSource`, `Connection` and policy types onto the component. Do not copy component source into this repository.
 3. Adopting a component that is not yet a dependency needs an ADR and the licence and advisory review in [Validation](#validation), in the same pull request.
 4. A replacement lands as one pull request. It adds the adapter, moves every caller, deletes the code it replaces, and keeps the tests that proved the old behaviour. Two paths for the same feature are not allowed after a merge.
-5. A feature slice may be larger than a single fix when it is one replacement or one feature end to end. The size rules still apply: no baseline raised, no function over 120 lines, and every changed behaviour has a test.
+5. The size rules apply to every change: no baseline raised, no function over 120 lines, and every changed behaviour has a test.
 
 ## Principles
 
@@ -154,13 +144,13 @@ Unit tests sit next to pure logic; integration tests live in each crate's `tests
 
 [Contract guardrail tests](docs/testing.md#contract-guardrails) pin invariants other code relies on. When one fails, fix the change, not the guardrail; weakening one needs the contract owner's agreement.
 
-Rules for pull requests that add tests (any agent, including Cursor):
+Rules for pull requests that add tests (any agent):
 
 - Assert observable behaviour, such as an outcome, a stored value or an error kind, and not rule names, message text or internal identifiers that the code owner may rename.
-- A test pull request does not change product rules. When a rule looks wrong, tell the lane owner and leave the rule alone.
+- A test pull request does not change product rules. When a rule looks wrong, tell the maintainer and leave the rule alone.
 - A new test fails on the code before the fix, or its commit says it pins existing behaviour.
 - Merge the latest BookiE `main` branch into the branch and run `scripts/preflight.sh` before opening the pull request.
-- Do not edit ledger rows, sprint text or files that another lane owns (for example `policy/src/rules.rs`, owned by Policy in the lane table); those edits are what conflict.
+- Do not edit ledger rows, sprint text or product rule files (for example `policy/src/rules.rs`); those edits are what conflict.
 - Check the open pull requests for the same files first. When two change the same map or sentinel (for example `change-test-map.json`), say which one lands first and rebase the other.
 - Say in the pull request which validation layers apply; maintainers confirm the exact-head acceptance results.
 
@@ -202,7 +192,7 @@ Driver integration tests need Docker. If a prerequisite is missing, say which ch
 
 ## Documentation rules
 
-The [documentation map](docs/README.md) says where each fact lives and where a new document goes. In short: decisions in ADRs, open work in Project #3 and the issue ledger, release completion in the sprint, and generic commands and behavior in contributor documentation. Keep run-specific proof and research outside the public source tree. Write each fact once and link to it. Keep file paths stable; scripts and other lanes depend on them.
+The [documentation map](docs/README.md) says where each fact lives and where a new document goes. In short: decisions in ADRs, open work in Project #3 and the issue ledger, release completion in the sprint, and generic commands and behavior in contributor documentation. Keep run-specific proof and research outside the public source tree. Write each fact once and link to it. Keep file paths stable; scripts and other contributors depend on them.
 
 ## Writing style
 

@@ -554,7 +554,7 @@ jobs:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
         run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" direct
-      - name: Focused Data-lane change contracts
+      - name: Focused value-path change contracts
         env:
           BOOKIE_CI_REF: ${{ github.ref }}
           BOOKIE_CI_EVENT_NAME: ${{ github.event_name }}

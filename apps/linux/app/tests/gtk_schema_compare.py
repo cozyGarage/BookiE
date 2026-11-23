@@ -135,7 +135,6 @@ def scenarios(ui):
         result.extend((postgres_schema_compare_opens_a_script_and_runs_nothing,
                        postgres_sidebar_hidden_schema_can_be_restored))
     for scenario in result:
-        scenario.environment_overrides = {"BOOKIE_SCHEMA_COMPARE": "1"}
         scenario.environment = "local"
         scenario.requires_editor = False
     if os.environ.get("BOOKIE_GTK_POSTGRES_CONTAINER"):
