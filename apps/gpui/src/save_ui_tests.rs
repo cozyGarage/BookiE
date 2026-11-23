@@ -441,8 +441,7 @@ fn an_edited_cell_is_reviewed_then_saved_and_the_table_shows_the_saved_value(cx:
     cx.update(|window, cx| view.update(cx, |view, cx| view.apply_active_cell_edit(window, cx)));
 
     cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(1, 1, window, cx)));
-    cx.update(|_, cx| cx.write_to_clipboard(gpui::ClipboardItem::new_string(String::new())));
-    cx.simulate_keystrokes("ctrl-a ctrl-v");
+    cx.simulate_keystrokes("ctrl-a backspace");
     cx.run_until_parked();
     view.read_with(cx, |view, cx| {
         assert_eq!(view.cell_edit.value_editor.read(cx).value().as_ref(), "");
