@@ -132,6 +132,10 @@ const BOUNDED: &[(&str, &str)] = &[
         "reads information_schema in process; bounded by schema size",
     ),
     (
+        "fetch_schema_table_metadata_controlled",
+        "uses controlled per-table metadata reads; bounded by the requested schema size",
+    ),
+    (
         "fetch_indexes_controlled",
         "reads the catalog only; bounded by schema size",
     ),

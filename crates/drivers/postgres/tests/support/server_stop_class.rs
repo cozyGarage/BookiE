@@ -8,7 +8,9 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::Duration;
 
-use bookie_core::{CatalogObjectKind, ConnectOptions, Connection, DriverError, OperationControl, RoutineRef, Value};
+use bookie_core::{
+    CatalogObjectKind, ConnectOptions, Connection, DriverError, OperationControl, RoutineRef, TableInfo, Value,
+};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::watch;
@@ -123,6 +125,18 @@ fn table_metadata_cases() -> Vec<StopCase> {
         sends("fetch_columns_controlled", b"attgenerated", |c, control| async move {
             c.fetch_columns_controlled(None, "stop_class_rows", &control).await
         }),
+        sends(
+            "fetch_schema_table_metadata_controlled",
+            b"pg_catalog.pg_class",
+            |c, control| async move {
+                let tables = [TableInfo {
+                    schema: Some("public".into()),
+                    name: "stop_class_rows".into(),
+                }];
+                c.fetch_schema_table_metadata_controlled(&tables, false, &control, &mut |_, _| true)
+                    .await
+            },
+        ),
         sends("fetch_indexes_controlled", b"indisunique", |c, control| async move {
             c.fetch_indexes_controlled(None, "stop_class_rows", &control).await
         }),
