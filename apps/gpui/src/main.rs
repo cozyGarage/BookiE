@@ -962,8 +962,14 @@ fn main() {
         .with_assets(assets::Assets)
         .run(move |cx: &mut App| {
             text_input::bind_keys(cx);
-            ui_theme::apply_editor_size(font_settings::load().editor_size, cx);
-            Theme::named(std::env::var("BOOKIE_PROTOTYPE_THEME").ok().as_deref()).install(cx);
+            ui_theme::load_bundled_themes(cx);
+            let settings = font_settings::load();
+            ui_theme::apply_editor_size(settings.editor_size, cx);
+            match std::env::var("BOOKIE_PROTOTYPE_THEME").ok() {
+                Some(name) => Theme::named(Some(&name)).install(cx),
+                None if picker::install_theme(&settings.theme, cx) => {}
+                None => Theme::named(None).install(cx),
+            }
             let saved = if std::env::var_os("BOOKIE_PROTOTYPE_WIDTH").is_some()
                 || std::env::var_os("BOOKIE_PROTOTYPE_HEIGHT").is_some()
             {

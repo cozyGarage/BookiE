@@ -13,6 +13,7 @@ pub(crate) enum PaletteMode {
     SavedFilters,
     DeleteSavedFilter,
     NameFilter,
+    Themes,
 }
 
 impl PaletteMode {
@@ -27,6 +28,7 @@ impl PaletteMode {
             PaletteMode::SavedFilters => "Apply a saved filter",
             PaletteMode::DeleteSavedFilter => "Delete a saved filter",
             PaletteMode::NameFilter => "Type a name for this filter, then press Enter",
+            PaletteMode::Themes => "Choose a colour theme",
         }
     }
 }

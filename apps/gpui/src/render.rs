@@ -546,6 +546,8 @@ impl GridView {
             PaletteMode::Favorites | PaletteMode::DeleteFavorite => "No saved favorites",
             PaletteMode::SavedFilters | PaletteMode::DeleteSavedFilter => "No saved filters for this table",
             PaletteMode::NameFilter => "Type a name for the filter",
+            PaletteMode::Themes => "No matching theme",
+        };
         };
         let (count, list) = if self.palette.mode == PaletteMode::Commands {
             let actions = self.palette_actions();
