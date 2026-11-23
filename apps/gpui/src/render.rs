@@ -566,6 +566,7 @@ impl GridView {
                 (self.picker_rows(&theme, cx), "No saved filters for this table")
             }
             PaletteMode::NameFilter => (self.picker_rows(&theme, cx), "Type a name for the filter"),
+            PaletteMode::SchemaContext => (self.picker_rows(&theme, cx), "Enter a valid schema or database name"),
             PaletteMode::Themes => (self.picker_rows(&theme, cx), "No matching theme"),
         };
         let empty = rows
