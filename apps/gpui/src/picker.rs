@@ -285,20 +285,26 @@ mod schema_context_tests {
 
     #[test]
     fn picker_offers_schema_context_for_postgres_and_mysql_but_not_sqlite() {
-        assert!(schema_context_items_for("postgres", "billing")
-            .first()
-            .is_some_and(|item| matches!(&item.pick, Pick::SchemaContext(Some(_)))));
-        assert!(schema_context_items_for("mysql", "billing")
-            .first()
-            .is_some_and(|item| matches!(&item.pick, Pick::SchemaContext(Some(_)))));
+        assert!(
+            schema_context_items_for("postgres", "billing")
+                .first()
+                .is_some_and(|item| matches!(&item.pick, Pick::SchemaContext(Some(_))))
+        );
+        assert!(
+            schema_context_items_for("mysql", "billing")
+                .first()
+                .is_some_and(|item| matches!(&item.pick, Pick::SchemaContext(Some(_))))
+        );
         assert!(schema_context_items_for("sqlite", "billing").is_empty());
     }
 
     #[test]
     fn picker_keeps_the_current_session_context_when_the_input_is_empty() {
-        assert!(schema_context_items_for("postgres", " ")
-            .first()
-            .is_some_and(|item| matches!(&item.pick, Pick::SchemaContext(None))));
+        assert!(
+            schema_context_items_for("postgres", " ")
+                .first()
+                .is_some_and(|item| matches!(&item.pick, Pick::SchemaContext(None)))
+        );
     }
 }
 

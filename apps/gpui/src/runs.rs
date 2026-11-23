@@ -117,10 +117,8 @@ impl GridView {
                         )
                         .map_err(|error| match error {
                             SchemaContextRunError::Schema(mut error) => {
-                                error.message = format!(
-                                    "Could not apply the selected schema or database: {}",
-                                    error.message
-                                );
+                                error.message =
+                                    format!("Could not apply the selected schema or database: {}", error.message);
                                 error
                             }
                             SchemaContextRunError::Query(error) => error,
@@ -424,16 +422,16 @@ mod tests {
 
     #[test]
     fn schema_prefix_failure_stops_before_the_user_statement() {
-        let mut statements = Vec::new();
+        let statements = std::cell::RefCell::new(Vec::new());
         let result = run_with_schema_context(
             Some("SET search_path TO \"billing\""),
             "SELECT * FROM invoices",
             |sql| {
-                statements.push(sql.to_owned());
+                statements.borrow_mut().push(sql.to_owned());
                 Err("schema change denied")
             },
             |sql| -> Result<(), &'static str> {
-                statements.push(sql.to_owned());
+                statements.borrow_mut().push(sql.to_owned());
                 Ok(())
             },
         );
@@ -442,29 +440,29 @@ mod tests {
             Err(SchemaContextRunError::Schema("schema change denied"))
         ));
         assert_eq!(
-            statements.iter().map(String::as_str).collect::<Vec<_>>(),
+            statements.borrow().iter().map(String::as_str).collect::<Vec<_>>(),
             ["SET search_path TO \"billing\""]
         );
     }
 
     #[test]
     fn successful_schema_prefix_runs_before_the_user_statement() {
-        let mut statements = Vec::new();
+        let statements = std::cell::RefCell::new(Vec::new());
         let result = run_with_schema_context(
             Some("USE `billing`"),
             "SELECT * FROM invoices",
             |sql| -> Result<(), &'static str> {
-                statements.push(sql.to_owned());
+                statements.borrow_mut().push(sql.to_owned());
                 Ok(())
             },
             |sql| {
-                statements.push(sql.to_owned());
+                statements.borrow_mut().push(sql.to_owned());
                 Ok(sql.to_owned())
             },
         );
         assert!(matches!(result, Ok(sql) if sql == "SELECT * FROM invoices"));
         assert_eq!(
-            statements.iter().map(String::as_str).collect::<Vec<_>>(),
+            statements.borrow().iter().map(String::as_str).collect::<Vec<_>>(),
             ["USE `billing`", "SELECT * FROM invoices"]
         );
     }
