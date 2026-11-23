@@ -414,8 +414,8 @@ fn an_edited_cell_is_reviewed_then_saved_and_the_table_shows_the_saved_value(cx:
     };
     settle(cx);
     let write = write_session(&path, false);
-    cx.update(|_, cx| {
-        view.update(cx, |view, _| {
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
             let id = view
                 .live
                 .as_ref()
