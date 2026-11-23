@@ -32,10 +32,12 @@ impl PgConnection {
         param_desc: Option<ParameterDescription>,
         row_desc: Option<RowDescription>,
         resolve_column_origin: bool,
-    ) -> Result<Arc<PgStatementMetadata>, Error> {
+    ) -> Result<(Arc<PgStatementMetadata>, bool), Error> {
         let param_types = param_desc.map_or_else(Default::default, |desc| desc.types);
 
         let fields = row_desc.map_or_else(Default::default, |desc| desc.fields);
+
+        let mut ran_query = false;
 
         if QUERIES_ALLOWED {
             let mut type_resolver = TypeResolver::default();
@@ -62,10 +64,12 @@ impl PgConnection {
             }
 
             // No-op if `.push_type()` was not called
-            type_resolver.fill_cache(self).await?;
+            let type_ran = type_resolver.fill_cache(self).await?;
 
             // No-op if `.push_column()` was not called
-            column_resolver.fill_cache(self).await?;
+            let column_ran = column_resolver.fill_cache(self).await?;
+
+            ran_query = type_ran || column_ran;
         }
 
         let mut parameters = Vec::with_capacity(param_types.len());
@@ -109,11 +113,14 @@ impl PgConnection {
             column_names.insert(name, ordinal);
         }
 
-        Ok(Arc::new(PgStatementMetadata {
-            columns,
-            column_names: column_names.into(),
-            parameters,
-        }))
+        Ok((
+            Arc::new(PgStatementMetadata {
+                columns,
+                column_names: column_names.into(),
+                parameters,
+            }),
+            ran_query,
+        ))
     }
 
     fn try_table_column(&self, relation_oid: Oid, attribute_no: i16) -> Option<TableColumn> {
@@ -398,8 +405,9 @@ impl TypeResolver {
         }
     }
 
-    async fn fill_cache(&mut self, conn: &mut PgConnection) -> Result<(), Error> {
+    async fn fill_cache(&mut self, conn: &mut PgConnection) -> Result<bool, Error> {
         let mut missing_dependencies = HashMap::<Oid, Vec<TypeResolverRow>>::new();
+        let mut ran_query = false;
 
         // Iteratively resolve types until all are resolved, or we hit a dead-end.
         // Keep circular type metadata bounded while resolving 512-level domain arrays.
@@ -407,6 +415,7 @@ impl TypeResolver {
             if self.query.is_empty() {
                 break;
             }
+            ran_query = true;
 
             // * Cancel-safety
             // * Makes this type reusable if we want to for whatever reason
@@ -445,7 +454,15 @@ impl TypeResolver {
 
                         self.push_type("NULL", missing_oid.0);
 
-                        continue 'outer;
+                        // Keep draining rows whose dependency was just resolved;
+                        // abandoning them here would leave them unresolved forever.
+                        match resolved_dependencies.pop_back() {
+                            Some(next_row) => {
+                                type_row = next_row;
+                                continue;
+                            }
+                            None => continue 'outer,
+                        }
                     }
 
                     resolved_dependencies.extend(
@@ -477,7 +494,7 @@ impl TypeResolver {
             )));
         }
 
-        Ok(())
+        Ok(ran_query)
     }
 }
 
@@ -543,9 +560,9 @@ impl ColumnResolver {
         }
     }
 
-    async fn fill_cache(&mut self, conn: &mut PgConnection) -> Result<(), Error> {
+    async fn fill_cache(&mut self, conn: &mut PgConnection) -> Result<bool, Error> {
         if self.query.is_empty() {
-            return Ok(());
+            return Ok(false);
         }
 
         let mut query = mem::take(&mut self.query);
@@ -572,7 +589,7 @@ impl ColumnResolver {
             table_columns.columns.extend(row.columns);
         }
 
-        Ok(())
+        Ok(true)
     }
 }
 
