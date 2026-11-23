@@ -1,5 +1,5 @@
 diff --git a/Cargo.toml b/Cargo.toml
-index 75fad95..abc0a7f 100644
+index 33e3af0..ecaab48 100644
 --- a/Cargo.toml
 +++ b/Cargo.toml
 @@ -131,6 +131,7 @@ rustls-tls = [
@@ -31,7 +31,7 @@ index 75fad95..abc0a7f 100644
  version = "1.0.125"
  features = ["derive"]
 diff --git a/Cargo.toml.orig b/Cargo.toml.orig
-index b3d1864..af3ca22 100644
+index 7032c06..98fa3e5 100644
 --- a/Cargo.toml.orig
 +++ b/Cargo.toml.orig
 @@ -31,8 +31,8 @@ bson-3 = ["dep:bson3", "mongocrypt?/bson-3"]
@@ -54,10 +54,10 @@ index b3d1864..af3ca22 100644
  macro_magic = "0.5.1"
  tokio-util = { version = "0.7.0", features = ["compat", "rt"] }
 diff --git a/src/client/options.rs b/src/client/options.rs
-index 22afcb7..93933f9 100644
+index e8b6ad2..69cc2c1 100644
 --- a/src/client/options.rs
 +++ b/src/client/options.rs
-@@ -1282,6 +1282,13 @@ pub struct TlsOptions {
+@@ -1302,6 +1302,13 @@ pub struct TlsOptions {
      /// If set, the key in `cert_key_file_path` must be encrypted with this password.
      #[cfg(feature = "cert-key-password")]
      pub tls_certificate_key_file_password: Option<Vec<u8>>,
@@ -70,7 +70,15 @@ index 22afcb7..93933f9 100644
 +    pub verify_hostname: Option<String>,
  }
  
- impl TlsOptions {
+ impl Debug for TlsOptions {
+@@ -1314,6 +1321,7 @@ impl Debug for TlsOptions {
+             allow_invalid_hostnames,
+             #[cfg(feature = "cert-key-password")]
+             tls_certificate_key_file_password,
++            verify_hostname: _,
+         } = self;
+         let mut d = f.debug_struct("TlsOptions");
+         d.field("allow_invalid_certificates", allow_invalid_certificates)
 diff --git a/src/runtime/tls_openssl.rs b/src/runtime/tls_openssl.rs
 index 20d8c40..9e2ddb6 100644
 --- a/src/runtime/tls_openssl.rs
