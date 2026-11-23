@@ -151,10 +151,10 @@ From the repository root:
 cargo run -p bookie-app
 
 # Cross-platform GPUI application
-cargo run --manifest-path apps/gpui/Cargo.toml
+scripts/gpui-cargo.sh run --locked
 ```
 
-The first build compiles the bundled DuckDB engine, which takes several minutes.
+The GPUI wrapper shares Cargo output across linked BookiE worktrees and uses `sccache` for Rust and DuckDB C/C++ compilation when installed. The first build compiles the bundled DuckDB engine; later builds reuse it while its inputs stay unchanged.
 
 A plain `cargo run` shares settings, saved connections, the keyring entries and the single-instance lock with an installed BookiE. To keep test data apart, build with the development profile, which uses `~/.config/bookie-devel` and its own keyring schema:
 
