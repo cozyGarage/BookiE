@@ -1,5 +1,4 @@
 #![recursion_limit = "256"]
-pub mod binary_mode;
 pub mod core_bridge;
 pub mod csv_delimiter;
 pub mod detail;
