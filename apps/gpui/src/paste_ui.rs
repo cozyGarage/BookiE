@@ -165,6 +165,10 @@ impl GridView {
             self.status = "Save or cancel the review before pasting".into();
             return;
         }
+        if !self.source.editable() || self.compare.is_some() {
+            self.status = "The selected result cannot be edited".into();
+            return;
+        }
         let Some(text) = cx.read_from_clipboard().and_then(|item| item.text()) else {
             self.status = "The clipboard has no text to paste".into();
             return;
