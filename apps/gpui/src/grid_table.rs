@@ -30,6 +30,13 @@ struct PinScope {
     table: String,
 }
 
+impl PinScope {
+    fn width_key(&self) -> String {
+        serde_json::to_string(&(self.database.as_str(), self.schema.as_deref(), self.table.as_str()))
+            .unwrap_or_default()
+    }
+}
+
 impl PartialEq for RowMap {
     fn eq(&self, other: &Self) -> bool {
         self.base == other.base
@@ -538,6 +545,16 @@ impl GridView {
                     .then_some((name.clone(), width))
             })
             .collect::<Vec<_>>();
+        if !self.grid_is_query && self.compare.is_none()
+            && let Some((id, _)) = self.live.as_ref().and_then(|session| session.saved.as_ref())
+            && let Some(store) = &self.column_widths
+        {
+            for (name, width) in &changes {
+                if let Err(error) = store.save(*id, &scope.width_key(), name, width.round() as i32) {
+                    tracing::warn!(%error, "could not persist grid column width");
+                }
+            }
+        }
         self.table.update(cx, |table, cx| {
             let delegate = table.delegate_mut();
             let remembered = delegate.manual_widths.entry(scope).or_default();
@@ -695,6 +712,22 @@ impl GridView {
             *width = *measured;
         }
         fill_text_columns(&mut columns, &numeric, available_width);
+        let mut saved_widths = HashMap::new();
+        if !self.grid_is_query && self.compare.is_none()
+            && let Some(scope) = &pin_scope
+            && let Some((id, _)) = self.live.as_ref().and_then(|session| session.saved.as_ref())
+            && let Some(store) = &self.column_widths
+        {
+            let names = columns.iter().map(|(name, _)| name.clone()).collect::<Vec<_>>();
+            for (name, width) in &mut columns {
+                if names.iter().filter(|other| *other == name).count() == 1
+                    && let Some(saved) = store.load(*id, &scope.width_key(), name)
+                {
+                    *width = saved as f32;
+                    saved_widths.insert(name.clone(), *width);
+                }
+            }
+        }
         if let Some(widths) = pin_scope.as_ref().and_then(|scope| delegate.manual_widths.get(scope)) {
             for (name, width) in &mut columns {
                 if let Some(manual) = widths.get(name) {
@@ -728,6 +761,9 @@ impl GridView {
             }
             let delegate = table.delegate_mut();
             delegate.cached = None;
+            if let Some(scope) = &pin_scope {
+                delegate.manual_widths.entry(scope.clone()).or_default().extend(saved_widths);
+            }
             delegate.content_widths = content_widths;
             delegate.available_width = available_width;
             let pinned_columns = pin_scope
