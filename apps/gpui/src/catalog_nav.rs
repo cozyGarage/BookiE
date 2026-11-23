@@ -249,6 +249,9 @@ impl GridView {
     }
 
     fn attach_session(&mut self, session: Arc<LiveSession>, table: TableInfo) {
+        if !self.live.as_ref().is_some_and(|live| Arc::ptr_eq(live, &session)) {
+            self.schema_context = None;
+        }
         self.table_sorts.clear();
         self.search.server.applied.clear();
         self.edits_changed();
