@@ -3,6 +3,7 @@ use std::time::{Duration, Instant};
 
 mod assets;
 mod catalog_nav;
+mod column_projection;
 mod closed_tabs_ui;
 mod chrome;
 mod home_page;
@@ -13,6 +14,7 @@ mod detail_panel;
 mod find_filter;
 mod grid_edit;
 mod grid_table;
+mod local_sort;
 mod audit_page;
 mod history_view;
 mod keys;
@@ -145,6 +147,9 @@ struct GridView {
     row_detail_open: bool,
     catalog: Catalog,
     table_sorts: Vec<(bookie_core::TableInfo, bookie_app_services::read_session::TableSort)>,
+    local_order: Option<std::sync::Arc<Vec<u32>>>,
+    local_sort: Option<bookie_app_services::read_session::TableSort>,
+    column_widths: Option<bookie_app_services::column_widths::ColumnWidthStore>,
     live: Option<std::sync::Arc<bookie_gpui::live::LiveSession>>,
     connections: Vec<bookie_app_services::read_session::ConnectionSummary>,
     keymap: Keymap,
@@ -367,11 +372,12 @@ impl GridView {
         let table_events = cx.subscribe_in(
             &table,
             window,
-            |this: &mut Self, _, event: &gpui_kit::component::table::TableEvent, window, cx| match event {
+            |this: &mut Self, table, event: &gpui_kit::component::table::TableEvent, window, cx| match event {
                 gpui_kit::component::table::TableEvent::SelectCell(row, column) => {
+                    let column = table.read(cx).delegate().source_column(*column).unwrap_or(*column);
                     let cursor = bookie_results::grid_cursor::Cursor {
                         row: *row,
-                        column: *column,
+                        column,
                     };
                     this.cell_cursor = Some(cursor);
                     let dataset = this.base() + *row as u64;
@@ -382,9 +388,10 @@ impl GridView {
                     cx.notify();
                 }
                 gpui_kit::component::table::TableEvent::RightClickedCell(row, column) => {
+                    let column = table.read(cx).delegate().source_column(*column).unwrap_or(*column);
                     this.cell_cursor = Some(bookie_results::grid_cursor::Cursor {
                         row: *row,
-                        column: *column,
+                        column,
                     });
                     let dataset = this.base() + *row as u64;
                     if !this.selection.is_some_and(|selection| selection.contains(dataset)) {
@@ -396,7 +403,8 @@ impl GridView {
                     this.edit_clicked_row(*row, None, window, cx);
                 }
                 gpui_kit::component::table::TableEvent::DoubleClickedCell(row, column) => {
-                    this.edit_clicked_row(*row, Some(*column), window, cx);
+                    let source_column = table.read(cx).delegate().source_column(*column).unwrap_or(*column);
+                    this.edit_clicked_row(*row, Some(source_column), window, cx);
                 }
                 _ => {}
             },
@@ -445,6 +453,7 @@ impl GridView {
         GridView {
             table,
             _table_events: table_events,
+            column_widths: bookie_app_services::column_widths::ColumnWidthStore::open(),
             focus: table_focus,
             table_source: source.clone(),
             source,
@@ -485,6 +494,8 @@ impl GridView {
             row_detail_open: false,
             catalog: Catalog::synthetic(),
             table_sorts: Vec::new(),
+            local_order: None,
+            local_sort: None,
             live: None,
             keymap: Keymap::default(),
             tabs: Tabs::default(),
@@ -563,6 +574,9 @@ impl GridView {
         if matches!(self.tabs.current(), Tab::Query) && self.run_tabs.slots.is_empty() {
             return 0;
         }
+        if let Some(order) = &self.local_order {
+            return order.len() as u64;
+        }
         match &self.mode {
             Mode::All => self.source.total(),
             Mode::Filtered { kept, .. } => kept.len() as u64,
@@ -590,6 +604,9 @@ impl GridView {
     }
 
     fn source_row(&self, dataset_index: u64) -> u64 {
+        if let Some(order) = &self.local_order {
+            return order.get(dataset_index as usize).map_or(dataset_index, |index| u64::from(*index));
+        }
         match &self.mode {
             Mode::All => dataset_index,
             Mode::Filtered { kept, .. } => u64::from(kept[dataset_index as usize]),
@@ -597,6 +614,9 @@ impl GridView {
     }
 
     fn dataset_index_of(&self, source: u64) -> Option<u64> {
+        if let Some(order) = &self.local_order {
+            return order.iter().position(|index| u64::from(*index) == source).map(|index| index as u64);
+        }
         match &self.mode {
             Mode::All => Some(source),
             Mode::Filtered { kept, .. } => kept.binary_search(&(source as u32)).ok().map(|index| index as u64),
@@ -610,6 +630,8 @@ impl GridView {
 
     fn set_mode(&mut self, mode: Mode) {
         self.mode = mode;
+        self.local_order = None;
+        self.local_sort = None;
         self.pager = self.pager.with_total(self.dataset_count());
         self.selection = None;
         self.cell_cursor = None;
@@ -997,6 +1019,9 @@ mod follow_ui_tests;
 mod grid_pin_tests;
 #[cfg(test)]
 mod live_ui_tests;
+#[cfg(test)]
+#[cfg(test)]
+mod overlay_ui_tests;
 #[cfg(test)]
 mod save_ui_tests;
 #[cfg(test)]

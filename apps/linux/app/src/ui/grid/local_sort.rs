@@ -223,7 +223,7 @@ pub(super) fn sortable_columns(result: &QueryResult) -> HashSet<usize> {
 
 #[derive(Clone, Copy)]
 struct Sortability {
-    kind: Option<std::mem::Discriminant<Value>>,
+    kind: Option<bookie_core::ValueSortKind>,
     is_sortable: bool,
 }
 
@@ -239,7 +239,7 @@ impl Sortability {
         if !self.is_sortable || matches!(value, Value::Null) {
             return;
         }
-        let Some(kind) = comparable_kind(value) else {
+        let Some(kind) = value.sort_kind() else {
             self.is_sortable = false;
             return;
         };
@@ -293,52 +293,8 @@ fn compare_source_values(
     }
 }
 
-fn comparable_kind(value: &Value) -> Option<std::mem::Discriminant<Value>> {
-    match value {
-        Value::Bool(_)
-        | Value::Int(_)
-        | Value::Float(_)
-        | Value::Text(_)
-        | Value::Bytes(_)
-        | Value::Date(_)
-        | Value::Time(_)
-        | Value::DateTime(_)
-        | Value::TimestampTz(_)
-        | Value::Decimal(_)
-        | Value::Uuid(_) => Some(std::mem::discriminant(value)),
-        Value::Null | Value::Json(_) | Value::JsonText(_) | Value::Undecodable(_) => None,
-    }
-}
-
 fn compare_values(left: &Value, right: &Value, ascending: bool) -> Ordering {
-    let order = match (left, right) {
-        (Value::Null, Value::Null) => Ordering::Equal,
-        (Value::Null, _) => Ordering::Greater,
-        (_, Value::Null) => Ordering::Less,
-        _ => compare_non_null(left, right).unwrap_or(Ordering::Equal),
-    };
-    if ascending || matches!((left, right), (Value::Null, _) | (_, Value::Null)) {
-        order
-    } else {
-        order.reverse()
-    }
-}
-
-fn compare_non_null(left: &Value, right: &Value) -> Option<Ordering> {
-    Some(match (left, right) {
-        (Value::Bool(left), Value::Bool(right)) => left.cmp(right),
-        (Value::Int(left), Value::Int(right)) => left.cmp(right),
-        (Value::Float(left), Value::Float(right)) => left.total_cmp(right),
-        (Value::Text(left), Value::Text(right)) => left.cmp(right),
-        (Value::Bytes(left), Value::Bytes(right)) => left.cmp(right),
-        (Value::Date(left), Value::Date(right)) => left.cmp(right),
-        (Value::Time(left), Value::Time(right)) => left.cmp(right),
-        (Value::DateTime(left), Value::DateTime(right)) => left.cmp(right),
-        (Value::TimestampTz(left), Value::TimestampTz(right)) => left.cmp(right),
-        (Value::Decimal(left), Value::Decimal(right)) => left.cmp(right),
-        (Value::Uuid(left), Value::Uuid(right)) => left.cmp(right),
-        _ => return None,
-    })
+    left.compare_for_sort(right, ascending).unwrap_or(Ordering::Equal)
 }
 
 #[cfg(test)]

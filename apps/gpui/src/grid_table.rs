@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ops::Range, sync::Arc};
+use std::{collections::{HashMap, HashSet}, ops::Range, sync::Arc};
 
 use gpui::{App, Context, IntoElement, WeakEntity, Window, div, prelude::*, px};
 use gpui_kit::component::Sizable;
@@ -6,6 +6,7 @@ use gpui_kit::component::scroll::Scrollbar;
 use gpui_kit::component::table::{Column, ColumnSort, DataTable, TableDelegate, TableState};
 
 use crate::GridView;
+use crate::column_projection::ColumnProjection;
 use crate::grid_edit::Edits;
 use crate::ui_theme::ThemeExt;
 use bookie_gpui::model::{Cell, Diff};
@@ -62,6 +63,8 @@ pub struct GridDelegate {
     sortable: bool,
     sort: Option<bookie_app_services::read_session::TableSort>,
     columns: Vec<(String, f32)>,
+    projection: ColumnProjection,
+    hidden_columns: HashSet<usize>,
     content_widths: Vec<f32>,
     available_width: f32,
     numeric: Vec<bool>,
@@ -76,6 +79,57 @@ pub struct GridDelegate {
     pin_counts: HashMap<PinScope, usize>,
 }
 
+fn header_menu(
+    col_ix: usize,
+    source_col: usize,
+    column_name: String,
+    owner: Option<WeakEntity<GridView>>,
+    sortable: bool,
+    has_hidden: bool,
+    icon: impl IntoElement,
+) -> impl IntoElement {
+    use gpui_component::button::{Button, ButtonVariants};
+    use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
+
+    Button::new(format!("column-menu-{col_ix}"))
+        .ghost()
+        .compact()
+        .tooltip(format!("Actions for {column_name}"))
+        .accessibility_label(format!("Actions for {column_name}"))
+        .child(icon)
+        .dropdown_menu(move |menu, _, _| {
+            let copy_name = column_name.clone();
+            let mut menu = menu.item(PopupMenuItem::new("Copy column name").on_click(move |_, _, cx| {
+                cx.write_to_clipboard(gpui::ClipboardItem::new_string(copy_name.clone()))
+            }));
+            if let Some(owner) = owner.clone() {
+                let column = column_name.clone();
+                let hide_owner = owner.clone();
+                menu = menu.item(PopupMenuItem::new("Hide column").on_click(move |_, window, cx| {
+                    let _ = hide_owner.update(cx, |view, cx| view.hide_column(source_col, &column, window, cx));
+                }));
+                if has_hidden {
+                    menu = menu.item(PopupMenuItem::new("Show all hidden columns").on_click(move |_, window, cx| {
+                        let _ = owner.update(cx, |view, cx| view.show_all_hidden_columns(window, cx));
+                    }));
+                }
+            }
+            let Some(owner) = owner.clone().filter(|_| sortable) else {
+                return menu;
+            };
+            for (label, ascending) in [("Sort ascending", true), ("Sort descending", false)] {
+                let owner = owner.clone();
+                let column = column_name.clone();
+                menu = menu.item(PopupMenuItem::new(label).on_click(move |_, window, cx| {
+                    let _ = owner.update(cx, |view, cx| {
+                        view.sort_current_column(source_col, &column, Some(ascending), window, cx);
+                    });
+                }));
+            }
+            menu
+        })
+}
+
 impl TableDelegate for GridDelegate {
     fn perform_sort(
         &mut self,
@@ -87,7 +141,10 @@ impl TableDelegate for GridDelegate {
         if !self.sortable {
             return;
         }
-        let Some((column, _)) = self.columns.get(col_ix) else {
+        let Some(source_col) = self.projection.source_index(col_ix) else {
+            return;
+        };
+        let Some((column, _)) = self.columns.get(source_col) else {
             return;
         };
         let column = column.clone();
@@ -99,7 +156,7 @@ impl TableDelegate for GridDelegate {
         let Some(owner) = self.owner.clone() else {
             return;
         };
-        Self::schedule_sort(owner, column, ascending, window);
+        Self::schedule_sort(owner, source_col, column, ascending, window);
     }
 
     fn visible_rows_changed(
@@ -153,7 +210,7 @@ impl TableDelegate for GridDelegate {
     }
 
     fn columns_count(&self, _cx: &App) -> usize {
-        self.columns.len()
+        self.projection.len()
     }
 
     fn rows_count(&self, _cx: &App) -> usize {
@@ -161,7 +218,8 @@ impl TableDelegate for GridDelegate {
     }
 
     fn column(&self, col_ix: usize, _cx: &App) -> Column {
-        let (name, width) = &self.columns[col_ix];
+        let source_col = self.projection.source_index(col_ix).unwrap_or(col_ix);
+        let (name, width) = &self.columns[source_col];
         let mut column = Column::new(name.clone(), name.clone())
             .width(px(*width))
             .resizable(true);
@@ -186,51 +244,26 @@ impl TableDelegate for GridDelegate {
         cx: &mut Context<TableState<Self>>,
     ) -> impl IntoElement {
         let theme = Theme::current(cx);
+        let source_col = self.projection.source_index(col_ix).unwrap_or(col_ix);
         let name = self
             .columns
-            .get(col_ix)
+            .get(source_col)
             .map(|(name, _)| name.clone())
             .unwrap_or_default();
         let kind = self
             .kinds
-            .get(col_ix)
+            .get(source_col)
             .map(|(kind, key)| header_kind(kind, *key))
             .unwrap_or_default();
-        let menu = {
-            use gpui_component::button::{Button, ButtonVariants};
-            use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
-
-            let column_name = name.clone();
-            let owner = self.owner.clone();
-            let sortable = self.sortable;
-            Button::new(format!("column-menu-{col_ix}"))
-                .ghost()
-                .compact()
-                .tooltip(format!("Actions for {name}"))
-                .accessibility_label(format!("Actions for {name}"))
-                .child(crate::assets::icon("ellipsis", theme.muted_foreground))
-                .dropdown_menu(move |menu, _, _| {
-                    let copy_name = column_name.clone();
-                    let mut menu = menu.item(PopupMenuItem::new("Copy column name").on_click(
-                        move |_, _, cx| {
-                            cx.write_to_clipboard(gpui::ClipboardItem::new_string(copy_name.clone()))
-                        },
-                    ));
-                    let Some(owner) = owner.clone().filter(|_| sortable) else {
-                        return menu;
-                    };
-                    for (label, ascending) in [("Sort ascending", true), ("Sort descending", false)] {
-                        let owner = owner.clone();
-                        let column = column_name.clone();
-                        menu = menu.item(PopupMenuItem::new(label).on_click(move |_, window, cx| {
-                            let _ = owner.update(cx, |view, cx| {
-                                view.sort_current_table(&column, Some(ascending), window, cx);
-                            });
-                        }));
-                    }
-                    menu
-                })
-        };
+        let menu = header_menu(
+            col_ix,
+            source_col,
+            name.clone(),
+            self.owner.clone(),
+            self.sortable,
+            !self.hidden_columns.is_empty(),
+            crate::assets::icon("ellipsis", theme.muted_foreground),
+        );
         let pin = self.pin_scope.clone().map(|scope| {
             use gpui_component::button::{Button, ButtonVariants};
 
@@ -300,12 +333,13 @@ impl TableDelegate for GridDelegate {
         _window: &mut Window,
         cx: &mut Context<TableState<Self>>,
     ) -> impl IntoElement {
-        let is_numeric = self.numeric.get(col_ix).copied().unwrap_or(false);
+        let source_col = self.projection.source_index(col_ix).unwrap_or(col_ix);
+        let is_numeric = self.numeric.get(source_col).copied().unwrap_or(false);
         let edited_tint = self
-            .is_edited(row_ix, col_ix)
+            .is_edited(row_ix, source_col)
             .then(|| gpui::rgb(Theme::current(cx).edited));
         match &self.editor {
-            Some((row, column, view)) if *row == row_ix && *column == col_ix => {
+            Some((row, column, view)) if *row == row_ix && *column == source_col => {
                 div().w_full().flex().when(is_numeric, |el| el.justify_end()).child(
                     div()
                         .flex_1()
@@ -315,7 +349,7 @@ impl TableDelegate for GridDelegate {
                 )
             }
             _ => {
-                let (text, right) = self.label_of(row_ix, col_ix);
+                let (text, right) = self.label_of(row_ix, source_col);
                 div()
                     .w_full()
                     .flex()
@@ -343,10 +377,29 @@ impl GridDelegate {
         }
     }
 
-    fn schedule_sort(owner: WeakEntity<GridView>, column: String, ascending: Option<bool>, window: &mut Window) {
+    pub(crate) fn source_column(&self, visible: usize) -> Option<usize> {
+        self.projection.source_index(visible)
+    }
+
+    pub(crate) fn clone_projection(&self) -> ColumnProjection {
+        self.projection.clone()
+    }
+
+    pub(crate) fn set_hidden_columns(&mut self, column_count: usize, hidden: HashSet<usize>) {
+        self.projection = ColumnProjection::new(column_count, &hidden);
+        self.hidden_columns = hidden;
+    }
+
+    fn schedule_sort(
+        owner: WeakEntity<GridView>,
+        column_index: usize,
+        column: String,
+        ascending: Option<bool>,
+        window: &mut Window,
+    ) {
         window.on_next_frame(move |_, app| {
             let _ = owner.update_in(app, |view, window, cx| {
-                view.sort_current_table(&column, ascending, window, cx);
+                view.sort_current_column(column_index, &column, ascending, window, cx);
             });
         });
     }
@@ -449,47 +502,95 @@ impl GridView {
             base: self.base(),
             count: self.visible_count(),
             kept: match &self.mode {
-                crate::Mode::All => None,
-                crate::Mode::Filtered { kept, .. } => Some(kept.clone()),
+                crate::Mode::All => self.local_order.clone(),
+                crate::Mode::Filtered { kept, .. } => self.local_order.clone().or_else(|| Some(kept.clone())),
             },
             compare: None,
         }
     }
 
-    pub(crate) fn sync_table(&self, available_width: f32, window: &mut Window, cx: &mut Context<Self>) {
-        let columns: Vec<(String, f32)> = self
+    fn grid_columns(&self) -> (Vec<(String, f32)>, Vec<bool>, Vec<(String, bool)>) {
+        let mut columns: Vec<_> = self
             .source
             .columns()
             .iter()
             .map(|column| (column.name.clone(), column.width))
             .collect();
-        let numeric: Vec<bool> = self.source.columns().iter().map(|column| column.numeric).collect();
-        let numeric = if self.compare.is_some() {
-            std::iter::once(false).chain(numeric).collect()
-        } else {
-            numeric
-        };
-        let kinds: Vec<(String, bool)> = self
+        let mut numeric: Vec<_> = self.source.columns().iter().map(|column| column.numeric).collect();
+        let mut kinds: Vec<_> = self
             .source
             .columns()
             .iter()
             .map(|column| (column.data_type.clone(), column.primary_key))
             .collect();
-        let kinds = if self.compare.is_some() {
-            std::iter::once((String::new(), false)).chain(kinds).collect()
+        if self.compare.is_some() {
+            columns.insert(0, ("Change".into(), COMPARE_CHANGE_WIDTH));
+            numeric.insert(0, false);
+            kinds.insert(0, (String::new(), false));
+        }
+        (columns, numeric, kinds)
+    }
+
+    fn column_projection(
+        &self,
+        columns: &[(String, f32)],
+        delegate: &GridDelegate,
+        pin_scope: &Option<PinScope>,
+    ) -> (HashSet<usize>, ColumnProjection) {
+        let persisted = self
+            .live
+            .as_ref()
+            .filter(|_| !self.grid_is_query && self.compare.is_none())
+            .and_then(|session| session.saved.as_ref().map(|(id, _)| (*id, session)))
+            .and_then(|(id, _)| {
+                self.column_widths
+                    .as_ref()
+                    .map(|store| store.hidden_columns(id, &self.catalog.grid_table.name))
+            });
+        let scope_changed = delegate.pin_scope.as_ref() != pin_scope.as_ref()
+            || delegate.source.as_ref().is_none_or(|source| !Arc::ptr_eq(source, &self.source));
+        let hidden: HashSet<usize> = persisted
+            .map(|hidden_names| {
+                let names = columns.iter().map(|(name, _)| name.as_str()).collect::<Vec<_>>();
+                crate::column_projection::hidden_from_names(&names, &hidden_names)
+            })
+            .unwrap_or_else(|| {
+                if scope_changed {
+                    HashSet::new()
+                } else {
+                    delegate.hidden_columns.clone()
+                }
+            });
+        let projection = ColumnProjection::new(columns.len(), &hidden);
+        (hidden, projection)
+    }
+
+    fn sort_state(&self) -> (bool, Option<bookie_app_services::read_session::TableSort>) {
+        let server_sortable = !self.grid_is_query
+            && self.compare.is_none()
+            && self.live.as_ref().is_some_and(|session| session.driver_id == "postgres");
+        let local_sortable = (self.grid_is_query
+            || self.live.as_ref().is_some_and(|session| session.driver_id != "postgres"))
+            && self.compare.is_none()
+            && self.dataset_count() <= crate::local_sort::MAX_LOCAL_SORT_ROWS
+            && !self.source.is_partial()
+            && (self.dataset_count() == 0 || self.source.row_ref(0).is_some());
+        let sortable = server_sortable || local_sortable;
+        let sort = if local_sortable {
+            self.local_sort.clone()
         } else {
-            kinds
+            server_sortable.then(|| self.table_sort(&self.catalog.grid_table)).flatten().cloned()
         };
-        let mut columns = if self.compare.is_some() {
-            std::iter::once(("Change".to_string(), COMPARE_CHANGE_WIDTH))
-                .chain(columns)
-                .collect()
-        } else {
-            columns
-        };
+        (sortable, sort)
+    }
+
+    pub(crate) fn sync_table(&self, available_width: f32, window: &mut Window, cx: &mut Context<Self>) {
+        let (mut columns, numeric, kinds) = self.grid_columns();
         let map = self.row_map();
+        let pin_scope = self.pin_scope();
         let table = self.table.read(cx);
         let delegate = table.delegate();
+        let (hidden_columns, projection) = self.column_projection(&columns, delegate, &pin_scope);
         let widths_match = delegate.source.as_ref().is_some_and(|source| Arc::ptr_eq(source, &self.source))
             && delegate.map == map
             && delegate.edits == self.cell_edit.edits
@@ -512,11 +613,7 @@ impl GridView {
             *width = *measured;
         }
         fill_text_columns(&mut columns, &numeric, available_width);
-        let pin_scope = self.pin_scope();
-        let sortable = !self.grid_is_query
-            && self.compare.is_none()
-            && self.live.as_ref().is_some_and(|session| session.driver_id == "postgres");
-        let sort = sortable.then(|| self.table_sort(&self.catalog.grid_table)).flatten().cloned();
+        let (sortable, sort) = self.sort_state();
         let editor = self.cell_edit.active.as_ref().and_then(|editing| {
             let dataset = self.dataset_index_of(editing.row)?.checked_sub(map.base)?;
             (dataset < map.count as u64).then(|| {
@@ -528,7 +625,9 @@ impl GridView {
             })
         });
         self.table.update(cx, |table, cx| {
-            let cell = table_cell(self.cell_cursor).or((map.count > 0).then_some((0, 0)));
+            let cell = table_cell(self.cell_cursor)
+                .map(|(row, source_col)| (row, projection.visible_index(source_col).unwrap_or(0)))
+                .or((map.count > 0).then_some((0, 0)));
             if table.selected_cell() != cell {
                 match cell {
                     Some((row, column)) => table.set_selected_cell(row, column, cx),
@@ -555,12 +654,15 @@ impl GridView {
                 &editor,
                 sortable,
                 sort.as_ref(),
-            ) && delegate.pin_scope == pin_scope
+            ) && delegate.projection == projection
+                && delegate.pin_scope == pin_scope
                 && delegate.pinned_columns == pinned_columns
             {
                 return;
             }
             delegate.columns = columns;
+            delegate.hidden_columns = hidden_columns;
+            delegate.projection = projection;
             delegate.sortable = sortable;
             delegate.sort = sort;
             delegate.numeric = numeric;
@@ -644,6 +746,93 @@ impl GridView {
                             ),
                     ),
             )
+    }
+
+    fn hide_column(&mut self, source_col: usize, name: &str, _window: &mut Window, cx: &mut Context<Self>) {
+        let columns = self.table.read(cx).delegate().columns.clone();
+        if columns.get(source_col).is_none_or(|(column, _)| column != name) {
+            return;
+        }
+        let mut hidden = self.table.read(cx).delegate().hidden_columns.clone();
+        if hidden.contains(&source_col) {
+            return;
+        }
+        let projection = ColumnProjection::new(columns.len(), &hidden);
+        if projection.len() <= 1 {
+            self.status = "At least one column must remain visible.".into();
+            return;
+        }
+        hidden.insert(source_col);
+        let unique_name = columns.iter().filter(|(column, _)| column == name).count() == 1;
+        if !self.grid_is_query
+            && self.compare.is_none()
+            && let Some((id, _)) = self.live.as_ref().and_then(|session| session.saved.as_ref())
+            && let Some(store) = &self.column_widths
+            && unique_name
+            && let Err(error) = store.set_hidden(*id, &self.catalog.grid_table.name, name, true)
+        {
+            tracing::warn!(%error, "could not persist the hidden GPUI grid column");
+        }
+        let projection = ColumnProjection::new(columns.len(), &hidden);
+        self.table.update(cx, |table, cx| {
+            let delegate = table.delegate_mut();
+            delegate.hidden_columns = hidden;
+            delegate.projection = projection;
+            table.refresh(cx);
+        });
+        let compare_offset = usize::from(self.compare.is_some());
+        if self
+            .cell_cursor
+            .is_some_and(|cursor| cursor.column + compare_offset == source_col)
+        {
+            let next_col = self
+                .table
+                .read(cx)
+                .delegate()
+                .projection
+                .source_index(0)
+                .unwrap_or(compare_offset)
+                .saturating_sub(compare_offset);
+            if let Some(cursor) = &mut self.cell_cursor {
+                cursor.column = next_col;
+            }
+        }
+        self.status = format!("Hidden column {name}");
+        cx.notify();
+    }
+
+    fn show_all_hidden_columns(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
+        let (hidden, columns) = {
+            let table = self.table.read(cx);
+            let delegate = table.delegate();
+            (delegate.hidden_columns.clone(), delegate.columns.clone())
+        };
+        if hidden.is_empty() {
+            return;
+        }
+        if !self.grid_is_query
+            && self.compare.is_none()
+            && let Some((id, _)) = self.live.as_ref().and_then(|session| session.saved.as_ref())
+            && let Some(store) = &self.column_widths
+        {
+            for source_col in &hidden {
+                let Some((name, _)) = columns.get(*source_col) else { continue };
+                if columns.iter().filter(|(column, _)| column == name).count() != 1 {
+                    continue;
+                }
+                if let Err(error) = store.set_hidden(*id, &self.catalog.grid_table.name, name, false) {
+                    tracing::warn!(%error, column = %name, "could not restore a hidden GPUI grid column preference");
+                }
+            }
+        }
+        let projection = ColumnProjection::new(columns.len(), &HashSet::new());
+        self.table.update(cx, |table, cx| {
+            let delegate = table.delegate_mut();
+            delegate.hidden_columns.clear();
+            delegate.projection = projection;
+            table.refresh(cx);
+        });
+        cx.notify();
     }
 }
 

@@ -208,6 +208,57 @@ impl Connection for PolicyGuard {
         result
     }
 
+    async fn fetch_rows_with_columns(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        offset: u64,
+        limit: u64,
+        columns: &[ColumnInfo],
+    ) -> Result<QueryResult, DriverError> {
+        let operation = self.table_metadata_operation("FETCH ROWS", schema, table);
+        self.prepare_governed_read(&operation).await?;
+        let start = Instant::now();
+        let result = self
+            .caught_read(
+                "FETCH ROWS",
+                self.inner
+                    .fetch_rows_with_columns(schema, table, offset, limit, columns),
+            )
+            .await
+            .map(|rows| self.mask_result(rows));
+        let row_count = result.as_ref().ok().map(|rows| rows.rows.len() as u64);
+        self.audit_read_result(&operation, start, &result, row_count).await?;
+        result
+    }
+
+    async fn fetch_rows_with_columns_controlled(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        offset: u64,
+        limit: u64,
+        columns: &[ColumnInfo],
+        control: &OperationControl,
+    ) -> Result<QueryResult, DriverError> {
+        check_pre_dispatch(control)?;
+        let operation = self.table_metadata_operation("FETCH ROWS", schema, table);
+        self.prepare_governed_read(&operation).await?;
+        let start = Instant::now();
+        let result = self
+            .caught_read(
+                "FETCH ROWS",
+                self.inner
+                    .fetch_rows_with_columns_controlled(schema, table, offset, limit, columns, control),
+            )
+            .await
+            .map(|rows| self.mask_result(rows));
+        let row_count = result.as_ref().ok().map(|rows| rows.rows.len() as u64);
+        self.audit_controlled_read_result(&operation, start, &result, row_count)
+            .await?;
+        result
+    }
+
     async fn query(&self, sql: &str) -> Result<QueryResult, DriverError> {
         let authorization = self.authorize(sql, None).await?;
         if authorization.analysis.facts.writes() {

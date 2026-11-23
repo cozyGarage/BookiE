@@ -43,6 +43,46 @@ impl ResultSource for WideSource {
 }
 
 #[gpui::test]
+fn hidden_middle_column_keeps_visible_cells_bound_to_their_source_columns(cx: &mut TestAppContext) {
+    let source = Arc::new(WideSource(
+        ["id", "name", "secret"]
+            .into_iter()
+            .map(|name| ColumnMeta {
+                name: name.into(),
+                width: 120.0,
+                numeric: false,
+                data_type: "text".into(),
+                primary_key: false,
+            })
+            .collect(),
+    ));
+    cx.update(text_input::bind_keys);
+    let (view, cx) = cx.add_window_view(|window, cx| GridView::with_source(source, Instant::now(), window, cx));
+    cx.simulate_resize(gpui::size(gpui::px(900.0), gpui::px(760.0)));
+    cx.run_until_parked();
+    view.update(cx, |view, cx| {
+        let column_count = view.source.columns().len();
+        let hidden = std::collections::HashSet::from([1]);
+        view.table.update(cx, |table, cx| {
+            let delegate = table.delegate_mut();
+            delegate.set_hidden_columns(column_count, hidden);
+            table.refresh(cx);
+        });
+    });
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    let label = view.update(cx, |view, cx| view.table.update(cx, |table, _| table.delegate_mut().label_of(0, 2).0));
+    view.read_with(cx, |view, app| {
+        let table = view.table.read(app);
+        let delegate = table.delegate();
+        assert_eq!(delegate.columns_count(app), 2);
+        assert_eq!(delegate.column(1, app).name.as_ref(), "secret");
+        assert_eq!(delegate.source_column(1), Some(2));
+    });
+    assert_eq!(label, "row-0-secret");
+}
+
+#[gpui::test]
 fn pinned_columns_stay_visible_after_scroll_and_tab_reopen(cx: &mut TestAppContext) {
     let source = Arc::new(WideSource(
         (0..60)

@@ -6,10 +6,8 @@ use gpui_kit::component::scroll::Scrollbar;
 impl GridView {
     fn sync_render_state(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let tab = self.tabs.current();
-        if self.window_title_tab.as_ref() != Some(tab) {
-            window.set_window_title(&format!("{} — BookiE", tab.title()));
-            self.window_title_tab = Some(tab.clone());
-        }
+        window.set_window_title(&format!("{} — BookiE", self.tab_title(tab, cx)));
+        self.window_title_tab = Some(tab.clone());
         if self.keystroke_hook.is_none() {
             let view = cx.entity();
             self.keystroke_hook = Some(cx.intercept_keystrokes(move |event, window, cx| {
@@ -347,7 +345,11 @@ impl Render for GridView {
         let strip = self.grid_control_strip(theme, cx);
         let filter_row = self.grid_filter_row(theme, cx);
         let compare_bar = self.grid_compare_bar(theme, cx);
-        let palette = self.palette.open.then(|| self.palette_overlay(window, cx));
+        let palette = if self.palette.open {
+            Some(self.palette_overlay(window, cx))
+        } else {
+            None
+        };
         let save_bar = self.approval_bar(theme, cx).or_else(|| self.save_bar(theme, cx)).or_else(|| self.edits_bar(theme, cx));
         let banner = self.save_banner(theme, cx);
         let insert_form = self.insert_form(theme, cx).or_else(|| self.import_bar(theme, cx))
@@ -421,7 +423,7 @@ pub(crate) fn progress_text(title: &str, rows: u64, partial: bool, pages: u64) -
 }
 
 impl GridView {
-    fn command_rows(&self, theme: &Theme, cx: &App) -> Vec<Div> {
+    fn command_rows(&self, theme: &Theme, cx: &mut Context<Self>) -> Vec<gpui::Stateful<Div>> {
         let actions = self.palette_actions();
         let shown = palette_matches(self.palette.input.read(cx).content(), &actions);
         let selected = self.palette.index.min(shown.len().saturating_sub(1));
@@ -434,11 +436,22 @@ impl GridView {
                     .find(|command| command.name() == action.id || command.title() == action.label)
                     .and_then(|command| self.keymap.binding(command))
                     .map(bookie_gpui::keymap::Chord::label);
-                let row = div().px_2().py_1().rounded_md().flex().justify_between().gap_2()
+                let row = div()
+                    .id(("palette-command-row", position))
+                    .debug_selector(move || format!("palette-command-row-{position}").into())
+                    .px_2().py_1().rounded_md().flex().justify_between().gap_2()
+                    .cursor_pointer()
                     .child(action.label.clone())
                     .child(div().flex().gap_2().text_color(rgb(theme.muted_foreground))
                         .child(bookie_gpui::palette::group(action.id))
                         .children(shortcut.map(|keys| div().child(keys))));
+                let hover = theme.active_row;
+                let row = row
+                    .hover(move |style| style.bg(rgb(hover)))
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.palette.index = position;
+                        this.run_palette(window, cx);
+                    }));
                 if position == selected {
                     row.bg(rgb(theme.active_row))
                 } else {
@@ -448,17 +461,19 @@ impl GridView {
             .collect()
     }
 
-    fn picker_rows(&self, theme: &Theme, cx: &App) -> Vec<Div> {
+    fn picker_rows(&self, theme: &Theme, cx: &mut Context<Self>) -> Vec<gpui::Stateful<Div>> {
         let shown = self.picker_items(cx);
         let selected = self.palette.index.min(shown.len().saturating_sub(1));
         shown
             .into_iter()
             .enumerate()
             .map(|(position, item)| {
-                let row = div()
+                let mut row = div()
+                    .id(("palette-picker-row", position))
                     .px_2()
                     .py_1()
                     .rounded_md()
+                    .cursor_pointer()
                     .flex()
                     .justify_between()
                     .gap_2()
@@ -471,6 +486,13 @@ impl GridView {
                             .child(item.title),
                     )
                     .child(div().text_color(rgb(theme.muted_foreground)).child(item.subtitle));
+                let hover = theme.active_row;
+                row = row
+                    .hover(move |style| style.bg(rgb(hover)))
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.palette.index = position;
+                        this.run_picker(window, cx);
+                    }));
                 if position == selected {
                     row.bg(rgb(theme.active_row))
                 } else {
@@ -480,7 +502,7 @@ impl GridView {
             .collect()
     }
 
-    fn palette_overlay(&self, window: &Window, cx: &mut Context<Self>) -> Div {
+    fn palette_overlay(&self, window: &Window, cx: &mut Context<Self>) -> gpui::Stateful<Div> {
         let theme = Theme::current(cx);
         let (rows, empty_text) = match self.palette.mode {
             PaletteMode::Commands => (self.command_rows(&theme, cx), "No matching command"),
@@ -499,15 +521,24 @@ impl GridView {
             .is_empty()
             .then(|| div().px_2().text_color(rgb(theme.muted_foreground)).child(empty_text));
         div()
+            .id("palette-overlay")
             .absolute()
-            .top(px(size::PALETTE_TOP))
-            .w_full()
+            .top_0()
+            .left_0()
+            .size_full()
             .flex()
             .justify_center()
+            .items_start()
+            .occlude()
+            .on_click(cx.listener(|this, _, window, cx| {
+                    this.close_palette(window, cx);
+                }))
             .child(
                 div()
+                    .id("palette-surface")
                     .w_full()
                     .max_w(px(size::PALETTE_WIDTH))
+                    .mt(px(size::PALETTE_TOP))
                     .p_2()
                     .gap_1()
                     .flex()
@@ -517,6 +548,7 @@ impl GridView {
                     .border_color(rgb(theme.border))
                     .bg(rgb(theme.background))
                     .shadow_lg()
+                    .on_click(cx.listener(|_, _, _, cx| cx.stop_propagation()))
                     .child(self.palette.input.clone())
                     .child(
                         div().id("palette-results").max_h((window.viewport_size().height - px(size::PALETTE_TOP + size::FORM_CONTROL + 40.0)).max(px(0.0))).overflow_y_scroll()

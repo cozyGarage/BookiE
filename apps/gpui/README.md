@@ -14,7 +14,7 @@ Settings keeps appearance controls together. Connection access stays with each c
 
 The window (`src/main.rs`) has:
 
-- One wrapping strip: progress, pager (First, Previous page, range, Next page, Last), Find with Previous and Next match and a "Match N of M" status, Show matching rows, Compare…, Export all rows… (inert) and Continuous scrolling.
+- One horizontally scrollable strip: progress, pager (First, Previous page, range, Next page, Last), Find with Previous and Next match and a "Match N of M" status, Show matching rows, Compare…, CSV clipboard export for the current page or selection, and Continuous scrolling. File export also uses the current page or selection and infers the format from the destination extension. Full-result export and an explicit scope picker are not implemented yet ([#3786](https://github.com/cozyGarage/BookiE/issues/3786)).
 - A filter row (Ctrl+F): a WHERE expression such as `label contains 7`, Apply and Clear all.
 - A compare bar with Whole row and Key: value.
 - A fourth `typed` column that cycles through every value kind (float, bytes, date, time, datetime, timestamp with time zone, decimal, UUID, JSON, raw JSON text, undecodable, NULL), searchable with Find and the filter row.
