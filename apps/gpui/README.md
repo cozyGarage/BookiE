@@ -79,10 +79,12 @@ Row counts are 150,000, 500,000 or 1,000,000 through `BOOKIE_PROTOTYPE_ROWS`. Re
 From the repository root:
 
 ```bash
-cargo test --manifest-path apps/gpui/Cargo.toml --locked
-cargo deny --manifest-path apps/gpui/Cargo.toml --config deny.toml check advisories licenses
-cargo run --release --manifest-path apps/gpui/Cargo.toml --locked
+scripts/gpui-cargo.sh test --locked
+scripts/gpui-cargo.sh deny --config deny.toml check advisories licenses
+scripts/gpui-cargo.sh run --release --locked
 ```
+
+The wrapper uses the primary checkout's `target` directory when run from a Git worktree, so GPUI builds reuse Cargo and DuckDB artifacts across BookiE worktrees. Outside a Git checkout it defaults to `${XDG_CACHE_HOME:-~/.cache}/bookie/gpui-target`. It also uses the installed `sccache` for Rust and C/C++ compilation when available, so unchanged DuckDB C++ sources can be reused if Cargo reruns their build. Set `CARGO_TARGET_DIR` explicitly to use another target directory.
 
 Forgejo runs the model and simulated interaction tests without a display. Native rendering and system clipboard behavior require a desktop session.
 
@@ -96,8 +98,9 @@ To measure scrolling, run `experiments/profile.sh` from a desktop session (`ROWS
 
 
 ```bash
-cargo build --release --locked --manifest-path apps/gpui/Cargo.toml
-node apps/gpui/measure.mjs --rows=150000 --steps=120 --runs=3
+scripts/gpui-cargo.sh build --release --locked
+target_dir="$(scripts/gpui-cargo.sh target-dir)"
+node apps/gpui/measure.mjs --binary "$target_dir/release/bookie-gpui" --rows=150000 --steps=120 --runs=3
 ```
 
 The script starts the release binary on the current display, waits for the application to report its first frame, scrolls the first 5,000-row page from top to bottom in the requested number of steps, samples resident and proportional memory of the process every 400 ms, and prints one JSON line per run. It steps, then waits briefly so total elapsed time is comparable.
