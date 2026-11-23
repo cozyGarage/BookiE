@@ -10,7 +10,25 @@ pub const SAMPLE_ROWS: usize = 200;
 pub const MAX_PLAN_ROWS: usize = 50_000;
 const SAMPLE_VALUE_CHARS: usize = 80;
 
-const ENGINES: [&str; 4] = ["postgres", "mysql", "sqlite", "mssql"];
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Dialect {
+    Postgres,
+    Mysql,
+    Sqlite,
+    Mssql,
+}
+
+impl Dialect {
+    fn from_id(driver_id: &str) -> Option<Self> {
+        match driver_id {
+            "postgres" => Some(Self::Postgres),
+            "mysql" => Some(Self::Mysql),
+            "sqlite" => Some(Self::Sqlite),
+            "mssql" => Some(Self::Mssql),
+            _ => None,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Side {
@@ -185,7 +203,8 @@ impl DataCompare {
             return Ok(out);
         }
         let columns = &self.layout.columns;
-        let identity = self.layout.identity && driver_id == "mssql" && !self.inserts.is_empty();
+        let identity =
+            self.layout.identity && Dialect::from_id(driver_id) == Some(Dialect::Mssql) && !self.inserts.is_empty();
         let qualified = qualified_table(driver_id, schema, table);
         if !self.inserts.is_empty() {
             out.push_str("\n-- Inserts\n");
@@ -573,7 +592,7 @@ fn order_term(driver_id: &str, column: &ColumnInfo) -> String {
 
 fn param_term(driver_id: &str, column: &ColumnInfo, index: usize) -> String {
     let placeholder = placeholder_for(driver_id, index);
-    if driver_id == "mysql" && is_text(&column.data_type) {
+    if Dialect::from_id(driver_id) == Some(Dialect::Mysql) && is_text(&column.data_type) {
         return format!("CAST({placeholder} AS BINARY)");
     }
     placeholder
@@ -618,7 +637,7 @@ pub fn page_query(
         .collect::<Vec<_>>()
         .join(", ");
     sql.push_str(&format!(" ORDER BY {order}"));
-    if driver_id == "mssql" {
+    if Dialect::from_id(driver_id) == Some(Dialect::Mssql) {
         sql.push_str(&format!(" OFFSET 0 ROWS FETCH NEXT {PAGE_ROWS} ROWS ONLY"));
     } else {
         sql.push_str(&format!(" LIMIT {PAGE_ROWS}"));
@@ -633,7 +652,7 @@ pub async fn compare_tables(
     key: Option<&[String]>,
     control: &OperationControl,
 ) -> Result<DataCompare, DataCompareError> {
-    if !ENGINES.contains(&driver_id) {
+    if Dialect::from_id(driver_id).is_none() {
         return Err(DataCompareError::Unsupported);
     }
     let source_columns = source
