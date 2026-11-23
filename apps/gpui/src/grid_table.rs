@@ -271,10 +271,10 @@ impl TableDelegate for GridDelegate {
             .get(source_col)
             .map(|(name, _)| name.clone())
             .unwrap_or_default();
-        let kind = self
+        let (kind, key) = self
             .kinds
             .get(source_col)
-            .map(|(kind, key)| header_kind(kind, *key))
+            .map(|(kind, key)| (header_kind(kind), *key))
             .unwrap_or_default();
         let column_width = self
             .columns
@@ -323,15 +323,16 @@ impl TableDelegate for GridDelegate {
             .size_full()
             .min_w_0()
             .flex()
-            .justify_center()
+            .items_center()
             .overflow_hidden()
-            .flex_col()
             .child(
                 div()
                     .flex()
+                    .flex_1()
                     .items_center()
-                    .justify_between()
+                    .gap_1()
                     .min_w_0()
+                    .children(key.then(|| crate::assets::icon("key-round", theme.warning)))
                     .child(
                         div()
                             .id(("column-header-name", col_ix))
@@ -342,26 +343,29 @@ impl TableDelegate for GridDelegate {
                                     gpui_component::tooltip::Tooltip::new(full_name.clone()).build(window, cx)
                                 }
                             })
-                            .min_w_0()
+                            .flex_none()
+                            .max_w_full()
                             .overflow_hidden()
                             .whitespace_nowrap()
                             .text_ellipsis()
                             .child(name),
                     )
-                    .child(menu)
-                    .children(pin),
+                    .when(!kind.is_empty(), |el| {
+                        el.child(
+                            div()
+                                .debug_selector(move || format!("column-header-type-{col_ix}"))
+                                .min_w_0()
+                                .overflow_hidden()
+                                .whitespace_nowrap()
+                                .text_ellipsis()
+                                .text_xs()
+                                .text_color(gpui::rgb(theme.muted_foreground))
+                                .child(kind),
+                        )
+                    }),
             )
-            .when(!kind.is_empty(), |el| {
-                el.child(
-                    div()
-                        .overflow_hidden()
-                        .whitespace_nowrap()
-                        .text_ellipsis()
-                        .text_xs()
-                        .text_color(gpui::rgb(theme.muted_foreground))
-                        .child(kind),
-                )
-            })
+            .child(menu)
+            .children(pin)
     }
 
     fn render_td(
@@ -909,13 +913,8 @@ mod pin_tests {
     }
 }
 
-fn header_kind(data_type: &str, primary_key: bool) -> String {
-    match (data_type.is_empty(), primary_key) {
-        (true, false) => String::new(),
-        (true, true) => "PK".into(),
-        (false, false) => data_type.into(),
-        (false, true) => format!("{data_type} · PK"),
-    }
+fn header_kind(data_type: &str) -> String {
+    data_type.to_uppercase()
 }
 
 const MIN_CONTENT_WIDTH: f32 = 56.0;
@@ -1078,11 +1077,10 @@ mod header_kind_tests {
     use super::header_kind;
 
     #[test]
-    fn a_header_shows_the_type_and_marks_the_primary_key() {
-        assert_eq!(header_kind("integer", true), "integer · PK");
-        assert_eq!(header_kind("text", false), "text");
-        assert_eq!(header_kind("", true), "PK");
-        assert_eq!(header_kind("", false), "");
+    fn a_header_type_reads_in_capitals_like_a_label() {
+        assert_eq!(header_kind("integer"), "INTEGER");
+        assert_eq!(header_kind("numeric(10,2)"), "NUMERIC(10,2)");
+        assert_eq!(header_kind(""), "");
     }
 }
 
