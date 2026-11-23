@@ -1451,6 +1451,10 @@ impl ResultSource for LiveTable {
         self.truncated
     }
 
+    fn snapshot_consistent(&self) -> bool {
+        self.snapshot_consistent
+    }
+
     fn origin(&self) -> String {
         let cap = if self.truncated {
             format!(" · {} rows loaded; result may be incomplete", self.rows.len())

@@ -34,6 +34,7 @@ gpui-component = { version = "=0.9.0", features = ["tree-sitter-sql"] }
 bookie-app-services = { path = "../../crates/app-services", features = ["test-support"] }
 gpui = { package = "gpui-pre", version = "=0.3.11", features = ["test-support"] }
 gpui-kit = { version = "=0.9.0", features = ["test-support"] }
+rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs", "ring", "std", "tls12"] }
 
 [patch.crates-io]
 sqlx-core = { path = "../../vendor/sqlx-core" }
