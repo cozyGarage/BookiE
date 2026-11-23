@@ -108,6 +108,7 @@ impl SearchState {
 
 pub(crate) struct CellEditState {
     pub editor: gpui::Entity<crate::text_input::TextInput>,
+    pub value_editor: gpui::Entity<gpui_kit::component::input::EditorState>,
     pub active: Option<crate::grid_edit::Editing>,
     pub edits: crate::grid_edit::Edits,
     pub table: crate::grid_edit::Edits,
@@ -117,9 +118,13 @@ pub(crate) struct CellEditState {
 }
 
 impl CellEditState {
-    pub fn new(editor: gpui::Entity<crate::text_input::TextInput>) -> Self {
+    pub fn new(
+        editor: gpui::Entity<crate::text_input::TextInput>,
+        value_editor: gpui::Entity<gpui_kit::component::input::EditorState>,
+    ) -> Self {
         Self {
             editor,
+            value_editor,
             active: None,
             edits: Default::default(),
             table: Default::default(),
