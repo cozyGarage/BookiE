@@ -328,13 +328,28 @@ impl GridView {
             .children(self.row_detail_panel(theme))
     }
 
-    fn main_layout(&self, sidebar: Option<Div>, tab_row: Stateful<Div>, content: Div) -> Div {
+    fn main_layout(
+        &self,
+        sidebar: Option<Div>,
+        tab_row: Stateful<Div>,
+        bundle_bar: Option<Div>,
+        content: Div,
+    ) -> Div {
         div()
             .flex_1()
             .flex()
             .min_h_0()
             .children(sidebar)
-            .child(div().flex_1().flex().flex_col().min_w_0().child(tab_row).child(content))
+            .child(
+                div()
+                    .flex_1()
+                    .flex()
+                    .flex_col()
+                    .min_w_0()
+                    .child(tab_row)
+                    .children(bundle_bar)
+                    .child(content),
+            )
     }
 
     fn full_value_editor_overlay(&self, theme: Theme, cx: &mut Context<Self>) -> Option<gpui::AnyElement> {
@@ -431,7 +446,10 @@ impl Render for GridView {
         let full_value_editor = self.full_value_editor_overlay(theme, cx);
         let save_bar = self.approval_bar(theme, cx).or_else(|| self.save_bar(theme, cx)).or_else(|| self.edits_bar(theme, cx));
         let banner = self.save_banner(theme, cx);
-        let insert_form = self.insert_form(theme, cx).or_else(|| self.import_bar(theme, cx))
+        let bundle_bar = self.connection_bundle_bar(theme, cx);
+        let insert_form = self
+            .insert_form(theme, cx)
+            .or_else(|| self.import_bar(theme, cx))
             .or_else(|| self.structure_bar(theme, cx))
             .or_else(|| self.structure_info_panel(theme, cx))
             .or_else(|| self.resolve_panel(theme, cx))
@@ -454,7 +472,7 @@ impl Render for GridView {
             Tab::Table(table) => self.placeholder_page(&table_label(&table), theme),
         };
         let sidebar = self.sidebar.open.then(|| self.sidebar(theme, cx));
-        let toolbar = self.toolbar(theme, cx);
+        let toolbar = self.toolbar(theme, window, cx);
         let tab_row = self.tab_bar(theme, cx);
         div()
             .size_full()
@@ -484,7 +502,7 @@ impl Render for GridView {
                 }),
             )
             .child(toolbar)
-            .child(self.main_layout(sidebar, tab_row, content))
+            .child(self.main_layout(sidebar, tab_row, bundle_bar, content))
             .children(self.row_menu_overlay())
             .child(self.status_bar(theme))
             .children(palette)
@@ -611,8 +629,9 @@ impl GridView {
             .items_start()
             .occlude()
             .on_click(cx.listener(|this, _, window, cx| {
-                    this.close_palette(window, cx);
-                }))
+                this.close_palette(window, cx);
+                cx.stop_propagation();
+            }))
             .child(
                 div()
                     .id("palette-surface")
