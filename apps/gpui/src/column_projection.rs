@@ -67,6 +67,11 @@ mod tests {
             vec![(2, 120.0)]
         );
         assert!(changed_widths(&projection, &[100.0], &[100.0, 120.0, 90.0]).is_empty());
+        assert!(changed_widths(&projection, &[100.0, 80.0, 90.0], &[f32::NAN, 80.3, f32::INFINITY]).is_empty());
+        assert_eq!(
+            changed_widths(&projection, &[100.0, 80.0, 90.0], &[110.0, 80.0, 140.0]),
+            vec![(0, 110.0), (3, 140.0)]
+        );
     }
 
     #[test]
