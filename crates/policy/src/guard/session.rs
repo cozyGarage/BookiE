@@ -17,6 +17,7 @@ pub(crate) struct PolicySession {
     batch: Option<OpenBatch>,
     cursor: Option<ActiveCursor>,
     retired: Cell<bool>,
+    ended_by_server: Cell<bool>,
     extra: ExtraSets,
 }
 
@@ -149,6 +150,7 @@ impl PolicyGuard {
             batch: None,
             cursor: None,
             retired: Cell::new(false),
+            ended_by_server: Cell::new(false),
             extra: ExtraSets::default(),
         })
     }
@@ -507,6 +509,9 @@ impl Session for PolicySession {
             if !self.is_usable() && batch.read_only && !batch.wrote {
                 record_ended_read_only_batch(&self.guard, batch.id).await;
                 Ok(())
+            } else if !self.is_usable() && self.ended_by_server.get() && !batch.uncertain {
+                record_ended_read_only_batch(&self.guard, batch.id).await;
+                Ok(())
             } else if self.is_usable() && !batch.uncertain {
                 let control = OperationControl::with_timeout(CLOSE_ROLLBACK_TIMEOUT);
                 let rollback = self.finish("ROLLBACK", &control, Finish::Rollback, false).await;
@@ -628,10 +633,8 @@ impl PolicySession {
     }
 
     fn note_cursor_error(&mut self, error: &DriverError) {
-        if matches!(
-            error,
-            DriverError::Disconnected | DriverError::OperationOutcomeUnknown { .. }
-        ) {
+        self.note_lost_session(error);
+        if matches!(error, DriverError::OperationOutcomeUnknown { .. }) {
             self.retired.set(true);
         }
         let Some(batch) = self.batch.as_mut() else {
@@ -780,8 +783,17 @@ impl PolicySession {
     }
 
     fn note_disconnect<T>(&mut self, result: &Result<T, DriverError>) {
-        if matches!(result, Err(DriverError::Disconnected)) {
+        if let Err(error) = result {
+            self.note_lost_session(error);
+        }
+    }
+
+    fn note_lost_session(&self, error: &DriverError) {
+        if error.is_disconnect() {
             self.retired.set(true);
+        }
+        if matches!(error, DriverError::SessionEndedByServer { .. }) {
+            self.ended_by_server.set(true);
         }
     }
 
@@ -990,8 +1002,8 @@ impl PolicySession {
             .guard
             .caught_write(operation.sql, self.inner.query_params_controlled(sql, &[], control))
             .await;
-        if matches!(result, Err(DriverError::Disconnected)) {
-            self.retired.set(true);
+        if let Err(error) = &result {
+            self.note_lost_session(error);
         }
         let (mut terminal_status, mut transaction_outcome, error_category, mut ambiguous) =
             finish_outcome(kind, batch.aborted, &result);

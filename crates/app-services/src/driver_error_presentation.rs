@@ -68,7 +68,7 @@ pub fn classify(error: &DriverError) -> DriverFailurePresentation {
             position: *position,
             hint: hint.clone(),
         },
-        DriverError::Disconnected | DriverError::CommitUnconfirmed(_) => DriverFailurePresentation::Disconnected,
+        DriverError::Disconnected | DriverError::SessionEndedByServer { .. } | DriverError::CommitUnconfirmed(_) => DriverFailurePresentation::Disconnected,
         DriverError::ReadOnly => DriverFailurePresentation::ReadOnly,
         DriverError::PolicyDenied(detail) => DriverFailurePresentation::PolicyDenied(detail.clone()),
         DriverError::Unsupported(detail) => DriverFailurePresentation::Unsupported(detail.clone()),

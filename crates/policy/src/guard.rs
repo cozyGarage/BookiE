@@ -1115,6 +1115,9 @@ fn interactive_transaction_error_outcome(error: &DriverError) -> (AuditTerminalS
         DriverError::Query { .. } | DriverError::ReadOnly => {
             (AuditTerminalStatus::Failed, AuditTransactionOutcome::Failed, false)
         }
+        DriverError::SessionEndedByServer { .. } => {
+            (AuditTerminalStatus::Failed, AuditTransactionOutcome::RolledBack, false)
+        }
         _ => transaction_error_outcome(error),
     }
 }
@@ -1122,6 +1125,7 @@ fn interactive_transaction_error_outcome(error: &DriverError) -> (AuditTerminalS
 pub fn is_ambiguous_post_dispatch(error: &DriverError) -> bool {
     match error {
         DriverError::Disconnected
+        | DriverError::SessionEndedByServer { .. }
         | DriverError::Internal(_)
         | DriverError::CommitUnconfirmed(_)
         | DriverError::OperationOutcomeUnknown { .. } => true,
@@ -1146,7 +1150,10 @@ pub fn is_ambiguous_post_dispatch(error: &DriverError) -> bool {
 
 fn error_category(error: &DriverError) -> AuditErrorCategory {
     match error {
-        DriverError::ConnectionRefused | DriverError::DatabaseFileNotFound(_) | DriverError::Disconnected => {
+        DriverError::ConnectionRefused
+        | DriverError::DatabaseFileNotFound(_)
+        | DriverError::Disconnected
+        | DriverError::SessionEndedByServer { .. } => {
             AuditErrorCategory::Connection
         }
         DriverError::AuthFailed | DriverError::IntegratedAuth(_) => AuditErrorCategory::Authentication,

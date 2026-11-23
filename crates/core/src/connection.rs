@@ -26,6 +26,7 @@ fn terminal_schema_metadata_error(error: &DriverError) -> bool {
         DriverError::Cancelled
             | DriverError::TimedOut
             | DriverError::Disconnected
+            | DriverError::SessionEndedByServer { .. }
             | DriverError::ConnectionRefused
             | DriverError::AuthFailed
             | DriverError::Tls(_)

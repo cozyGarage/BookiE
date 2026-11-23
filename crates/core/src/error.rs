@@ -25,6 +25,9 @@ pub enum DriverError {
     #[error("connection closed unexpectedly")]
     Disconnected,
 
+    #[error("the server ended the session: {reason}")]
+    SessionEndedByServer { reason: String },
+
     #[error("connection is read-only; mutations are not permitted")]
     ReadOnly,
 
@@ -82,6 +85,10 @@ pub enum DriverError {
 }
 
 impl DriverError {
+    pub fn is_disconnect(&self) -> bool {
+        matches!(self, Self::Disconnected | Self::SessionEndedByServer { .. })
+    }
+
     pub fn non_atomic_batch_failure(statement_index: usize, source: DriverError) -> Self {
         let source = Box::new(source);
         if statement_index == 0 {
@@ -114,6 +121,18 @@ impl DriverError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_session_ended_by_the_server_counts_as_a_disconnect() {
+        assert!(DriverError::Disconnected.is_disconnect());
+        assert!(
+            DriverError::SessionEndedByServer {
+                reason: "25P03".into()
+            }
+            .is_disconnect()
+        );
+        assert!(!DriverError::TimedOut.is_disconnect());
+    }
 
     #[test]
     fn has_sqlstate_matches_only_a_query_error_with_that_code() {

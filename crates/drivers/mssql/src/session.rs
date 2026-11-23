@@ -41,7 +41,7 @@ impl MssqlSession {
         .await;
         if !matches!(
             result,
-            Err(DriverError::OperationOutcomeUnknown { .. } | DriverError::Disconnected)
+            Err(DriverError::OperationOutcomeUnknown { .. } | DriverError::Disconnected | DriverError::SessionEndedByServer { .. })
         ) && !result.as_ref().is_err_and(is_unsupported_result)
         {
             self.client = Some(client);
