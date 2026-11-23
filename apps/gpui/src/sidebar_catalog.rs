@@ -51,7 +51,6 @@ impl GridView {
         .detach();
     }
 
-    /// The catalog section of the sidebar, one entry per drawn line.
     pub(crate) fn catalog_lines(&self) -> Vec<CatalogLine> {
         let Some(session) = self.live.as_ref() else {
             return Vec::new();

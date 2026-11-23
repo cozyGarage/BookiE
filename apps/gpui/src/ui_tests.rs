@@ -974,7 +974,6 @@ fn palette_end_keeps_the_last_command_in_view(cx: &mut TestAppContext) {
         assert_eq!(view.palette.scroll.is_scrolled_to_end(), Some(true));
     });
     let count = view.read_with(cx, |view, cx| view.palette_shown(cx).len());
-    // debug_bounds takes a static selector; leaking one short string per test run is fine.
     let last: &'static str = Box::leak(format!("palette-command-row-{}", count - 1).into_boxed_str());
     let last = cx.debug_bounds(last).expect("last command is drawn");
     let height = cx.update(|window, _| window.viewport_size().height);

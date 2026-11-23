@@ -383,8 +383,6 @@ impl GridView {
     }
 
     fn sidebar_tree_view(&self, theme: Theme, search: &str, cx: &mut Context<Self>) -> Div {
-        // Only the rows in view are built each frame; a catalog of thousands of tables
-        // otherwise rebuilds every row element on every notify.
         let lines = std::rc::Rc::new(self.sidebar_lines(search));
         let pending = self.sidebar.reveal.borrow_mut().take();
         if let Some(pending) = pending {
@@ -961,7 +959,6 @@ mod tab_dirty_tests {
     }
 }
 
-/// One drawn sidebar line; the list keeps only data and builds elements for the rows in view.
 enum SidebarLine {
     Tree { index: usize, depth: usize, row: TreeRow },
     Field { table: std::rc::Rc<bookie_core::TableInfo>, depth: usize, field: usize },

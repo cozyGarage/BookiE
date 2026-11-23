@@ -547,7 +547,6 @@ impl GridView {
             PaletteMode::SavedFilters | PaletteMode::DeleteSavedFilter => "No saved filters for this table",
             PaletteMode::NameFilter => "Type a name for the filter",
         };
-        // Matches are scored once per frame and only the rows in view become elements.
         let (count, list) = if self.palette.mode == PaletteMode::Commands {
             let actions = self.palette_actions();
             let shown = palette_matches(self.palette.input.read(cx).content(), &actions);
