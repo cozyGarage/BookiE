@@ -199,6 +199,8 @@ impl GridView {
             Command::CopyCells if self.focus.is_focused(window) => self.copy_selection(false, cx),
             Command::CopyCellsWithHeaders if self.focus.is_focused(window) => self.copy_selection(true, cx),
             Command::CopyCells | Command::CopyCellsWithHeaders => {}
+            Command::PasteCells if self.focus.is_focused(window) && self.tabs.shows_grid_for(&self.catalog.grid_table) && self.cell_edit.active.is_none() => self.paste_cells(cx),
+            Command::PasteCells => {}
             Command::ToggleSidebar => self.sidebar.open = !self.sidebar.open,
             Command::NewQuery => {
                 self.tabs.open_query();

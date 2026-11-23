@@ -17,6 +17,7 @@ pub enum Command {
     Filter,
     CopyCells,
     CopyCellsWithHeaders,
+    PasteCells,
     ToggleSidebar,
     NewQuery,
     RunQuery,
@@ -28,7 +29,7 @@ pub enum Command {
 }
 
 impl Command {
-    pub const ALL: [Command; 23] = [
+    pub const ALL: [Command; 24] = [
         Command::Palette,
         Command::QuickSwitcher,
         Command::JumpColumn,
@@ -44,6 +45,7 @@ impl Command {
         Command::Filter,
         Command::CopyCells,
         Command::CopyCellsWithHeaders,
+        Command::PasteCells,
         Command::ToggleSidebar,
         Command::NewQuery,
         Command::RunQuery,
@@ -71,6 +73,7 @@ impl Command {
             Command::Filter => "filter",
             Command::CopyCells => "copy",
             Command::CopyCellsWithHeaders => "copy-with-headers",
+            Command::PasteCells => "paste-cells",
             Command::ToggleSidebar => "toggle-sidebar",
             Command::NewQuery => "new-query",
             Command::RunQuery => "run-query",
@@ -99,6 +102,7 @@ impl Command {
             Command::Filter => "Filter rows",
             Command::CopyCells => "Copy cells",
             Command::CopyCellsWithHeaders => "Copy cells with headers",
+            Command::PasteCells => "Paste cells",
             Command::ToggleSidebar => "Show or hide the sidebar",
             Command::NewQuery => "New query tab",
             Command::RunQuery => "Run full query buffer",
@@ -204,6 +208,7 @@ impl Default for Keymap {
                 (Command::Filter, chord(true, false, "f")),
                 (Command::CopyCells, chord(true, false, "c")),
                 (Command::CopyCellsWithHeaders, chord(true, true, "c")),
+                (Command::PasteCells, chord(true, false, "v")),
                 (Command::ToggleSidebar, chord(true, false, "b")),
                 (Command::NewQuery, chord(true, false, "t")),
                 (Command::RunAtCursor, chord(true, false, "enter")),
