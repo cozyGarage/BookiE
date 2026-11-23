@@ -65,6 +65,8 @@ impl GridView {
         let indent = size::SM + size::LG * (depth + 1) as f32;
         let line = |marker: Option<&'static str>, name: String, detail: String, dim: bool| {
             div()
+                .relative()
+                .children(crate::chrome::indent_guides(depth + 1, theme))
                 .flex()
                 .items_center()
                 .h(px(size::TREE_ROW))

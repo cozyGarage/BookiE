@@ -292,6 +292,8 @@ impl GridView {
         let line = div()
             .id(("tree", index))
             .debug_selector(move || format!("sidebar-row-{index}"))
+            .relative()
+            .children(indent_guides(depth, theme))
             .flex()
             .items_center()
             .h(px(size::TREE_ROW))
@@ -975,4 +977,30 @@ enum SidebarLine {
     Tree { index: usize, depth: usize, row: TreeRow },
     Field { table: std::rc::Rc<bookie_core::TableInfo>, depth: usize, field: usize },
     Catalog(crate::sidebar_catalog::CatalogLine),
+}
+
+pub(crate) fn guide_left(level: usize) -> f32 {
+    8.0 + 14.0 * level as f32 + size::ICON / 2.0
+}
+
+pub(crate) fn indent_guides(depth: usize, theme: Theme) -> impl Iterator<Item = Div> {
+    (0..depth).map(move |level| {
+        div()
+            .debug_selector(move || format!("sidebar-guide-{level}"))
+            .absolute()
+            .top_0()
+            .bottom_0()
+            .left(px(guide_left(level)))
+            .w(px(1.0))
+            .bg(rgb(theme.border))
+    })
+}
+
+#[cfg(test)]
+mod guide_tests {
+    #[test]
+    fn a_guide_runs_under_the_centre_of_its_parent_chevron() {
+        assert_eq!(super::guide_left(0), 15.0);
+        assert_eq!(super::guide_left(2), 43.0);
+    }
 }
