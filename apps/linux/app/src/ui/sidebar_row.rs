@@ -623,13 +623,12 @@ impl SidebarRow {
     }
 
     fn wire_schema_menu(&mut self, root: &gtk::ListBoxRow, sender: &FactorySender<Self>) {
-        let compare_enabled = std::env::var_os("BOOKIE_SCHEMA_COMPARE").is_some();
-        let menu = schema_menu(compare_enabled, self.schema_actions);
+        let menu = schema_menu(self.schema_actions);
         let popover = crate::ui::context_menu::from_model(Some(&menu));
         popover.set_parent(root);
         root.insert_action_group(
             "sidebar-row",
-            Some(&schema_action_group(sender, self.schema_actions, compare_enabled)),
+            Some(&schema_action_group(sender, self.schema_actions)),
         );
         attach_schema_popover(root, &popover);
         *self.popover.borrow_mut() = Some(popover);
@@ -650,7 +649,6 @@ fn schema_action(
 fn schema_action_group(
     sender: &FactorySender<SidebarRow>,
     actions: SchemaCatalogActions,
-    compare_enabled: bool,
 ) -> gtk::gio::SimpleActionGroup {
     let group = gtk::gio::SimpleActionGroup::new();
     group.add_action_entries([schema_action("show-diagram", sender, SidebarRowMsg::ShowDiagram)]);
@@ -660,9 +658,7 @@ fn schema_action_group(
     if actions.drop {
         group.add_action_entries([schema_action("drop-schema", sender, SidebarRowMsg::DropSchema)]);
     }
-    if compare_enabled {
-        group.add_action_entries([schema_action("compare-schema", sender, SidebarRowMsg::CompareSchema)]);
-    }
+    group.add_action_entries([schema_action("compare-schema", sender, SidebarRowMsg::CompareSchema)]);
     if actions.hide {
         group.add_action_entries([schema_action("hide-schema", sender, SidebarRowMsg::HideSchema)]);
     }
@@ -698,7 +694,7 @@ fn attach_schema_popover(root: &gtk::ListBoxRow, popover: &gtk::PopoverMenu) {
     root.add_controller(shortcut_controller);
 }
 
-fn schema_menu(compare_enabled: bool, actions: SchemaCatalogActions) -> gtk::gio::Menu {
+fn schema_menu(actions: SchemaCatalogActions) -> gtk::gio::Menu {
     let menu = gtk::gio::Menu::new();
     menu.append(
         Some(&bookie_app_services::tr!("Show ER Diagram")),
@@ -716,12 +712,10 @@ fn schema_menu(compare_enabled: bool, actions: SchemaCatalogActions) -> gtk::gio
             Some("sidebar-row.drop-schema"),
         );
     }
-    if compare_enabled {
-        menu.append(
-            Some(&bookie_app_services::tr!("Compare with another schema…")),
-            Some("sidebar-row.compare-schema"),
-        );
-    }
+    menu.append(
+        Some(&bookie_app_services::tr!("Compare with another schema…")),
+        Some("sidebar-row.compare-schema"),
+    );
     if actions.hide {
         menu.append(
             Some(&bookie_app_services::tr!("Hide schema")),
@@ -737,7 +731,7 @@ mod tests {
     use relm4::factory::FactoryVecDeque;
 
     #[test]
-    fn schema_compare_menu_requires_explicit_opt_in() {
+    fn schema_compare_is_in_the_menu_without_an_environment_variable() {
         use gtk::gio::prelude::MenuModelExt;
 
         let catalog = SchemaCatalogActions {
@@ -745,30 +739,34 @@ mod tests {
             drop: true,
             hide: true,
         };
-        for enabled in [false, true] {
-            let menu = schema_menu(enabled, catalog);
-            let actions: Vec<_> = (0..menu.n_items())
-                .filter_map(|index| menu.item_attribute_value(index, "action", None))
-                .filter_map(|value| value.get::<String>())
-                .collect();
-            assert_eq!(actions.contains(&"sidebar-row.compare-schema".to_owned()), enabled);
-            assert!(actions.contains(&"sidebar-row.show-diagram".to_owned()));
-            assert!(actions.contains(&"sidebar-row.hide-schema".to_owned()));
-            assert!(actions.contains(&"sidebar-row.new-schema".to_owned()));
-            assert!(actions.contains(&"sidebar-row.drop-schema".to_owned()));
-        }
+        let menu = schema_menu(catalog);
+        let actions: Vec<_> = (0..menu.n_items())
+            .filter_map(|index| menu.item_attribute_value(index, "action", None))
+            .filter_map(|value| value.get::<String>())
+            .collect();
+        assert!(actions.contains(&"sidebar-row.compare-schema".to_owned()));
+        assert!(actions.contains(&"sidebar-row.show-diagram".to_owned()));
+        assert!(actions.contains(&"sidebar-row.hide-schema".to_owned()));
+        assert!(actions.contains(&"sidebar-row.new-schema".to_owned()));
+        assert!(actions.contains(&"sidebar-row.drop-schema".to_owned()));
     }
 
     #[test]
     fn schema_catalog_actions_omit_unsupported_entries() {
         use gtk::gio::prelude::MenuModelExt;
 
-        let menu = schema_menu(false, SchemaCatalogActions::default());
+        let menu = schema_menu(SchemaCatalogActions::default());
         let actions: Vec<_> = (0..menu.n_items())
             .filter_map(|index| menu.item_attribute_value(index, "action", None))
             .filter_map(|value| value.get::<String>())
             .collect();
-        assert_eq!(actions, vec!["sidebar-row.show-diagram".to_owned()]);
+        assert_eq!(
+            actions,
+            vec![
+                "sidebar-row.show-diagram".to_owned(),
+                "sidebar-row.compare-schema".to_owned()
+            ]
+        );
     }
 
     fn pump() {
