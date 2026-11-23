@@ -673,7 +673,7 @@ impl GridView {
                 tab_icon_name(tab),
                 if selected { theme.info } else { theme.muted_foreground },
             ))
-            .child(tab.title())
+            .child(self.tab_title(tab, cx))
             .when(dirty, |el| el.child(div().text_color(rgb(theme.warning)).child("•")));
         item = if selected {
             item.bg(rgb(theme.background))

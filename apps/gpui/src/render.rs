@@ -6,10 +6,8 @@ use gpui_kit::component::scroll::Scrollbar;
 impl GridView {
     fn sync_render_state(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let tab = self.tabs.current();
-        if self.window_title_tab.as_ref() != Some(tab) {
-            window.set_window_title(&format!("{} — BookiE", tab.title()));
-            self.window_title_tab = Some(tab.clone());
-        }
+        window.set_window_title(&format!("{} — BookiE", self.tab_title(tab, cx)));
+        self.window_title_tab = Some(tab.clone());
         if self.keystroke_hook.is_none() {
             let view = cx.entity();
             self.keystroke_hook = Some(cx.intercept_keystrokes(move |event, window, cx| {
@@ -445,14 +443,18 @@ impl GridView {
                     .id(("palette-command-row", position))
                     .debug_selector(move || format!("palette-command-row-{position}").into())
                     .px_2().py_1().rounded_md().flex().justify_between().gap_2()
+                    .cursor_pointer()
                     .child(action.label.clone())
                     .child(div().flex().gap_2().text_color(rgb(theme.muted_foreground))
                         .child(bookie_gpui::palette::group(action.id))
                         .children(shortcut.map(|keys| div().child(keys))));
-                let row = row.on_click(cx.listener(move |this, _, window, cx| {
-                    this.palette.index = position;
-                    this.run_palette(window, cx);
-                }));
+                let hover = theme.active_row;
+                let row = row
+                    .hover(move |style| style.bg(rgb(hover)))
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.palette.index = position;
+                        this.run_palette(window, cx);
+                    }));
                 if position == selected {
                     row.bg(rgb(theme.active_row))
                 } else {
@@ -474,6 +476,7 @@ impl GridView {
                     .px_2()
                     .py_1()
                     .rounded_md()
+                    .cursor_pointer()
                     .flex()
                     .justify_between()
                     .gap_2()
@@ -486,10 +489,13 @@ impl GridView {
                             .child(item.title),
                     )
                     .child(div().text_color(rgb(theme.muted_foreground)).child(item.subtitle));
-                row = row.on_click(cx.listener(move |this, _, window, cx| {
-                    this.palette.index = position;
-                    this.run_picker(window, cx);
-                }));
+                let hover = theme.active_row;
+                row = row
+                    .hover(move |style| style.bg(rgb(hover)))
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.palette.index = position;
+                        this.run_picker(window, cx);
+                    }));
                 if position == selected {
                     row.bg(rgb(theme.active_row))
                 } else {
