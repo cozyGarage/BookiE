@@ -230,6 +230,9 @@ impl GridView {
     pub(crate) fn cancel_connection_import(&mut self, cx: &mut Context<Self>) {
         self.connection_bundle.pending = None;
         self.connection_bundle.encrypted = None;
+        if let Some(passphrase) = &self.connection_bundle.passphrase {
+            passphrase.update(cx, |input, cx| input.set_content("", cx));
+        }
         self.status = "Cancelled the connection import".into();
         cx.notify();
     }
@@ -550,7 +553,8 @@ async fn write_export(
         .collect();
     let export = bundle_export(connections, organization);
     let bytes = bundles::export_plaintext(&export)?;
-    std::fs::write(path, bytes).map_err(|_| bundles::BundleError::Field("destination"))?;
+    bookie_core::export::write_atomically(&path, |file| file.write_all(&bytes))
+        .map_err(|_| bundles::BundleError::Field("destination"))?;
     Ok(count)
 }
 
