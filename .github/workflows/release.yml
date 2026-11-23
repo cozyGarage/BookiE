@@ -257,7 +257,7 @@ jobs:
         run: |
           name="bookie-gpui-linux-x86_64-${VERSION}"
           mkdir -p "dist/${name}"
-          install -m 0755 target/release/bookie-gpui "dist/${name}/bookie-gpui"
+          install -m 0755 apps/gpui/target/release/bookie-gpui "dist/${name}/bookie-gpui"
           printf '%s\n' "$VERSION" > "dist/${name}/VERSION"
           git rev-parse HEAD > "dist/${name}/SOURCE_COMMIT"
           cat > "dist/${name}/INSTALL.txt" <<'EOF'
