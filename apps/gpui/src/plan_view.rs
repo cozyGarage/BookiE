@@ -10,6 +10,10 @@ const PLAN_ROW_CAP: u64 = 2_000;
 
 impl GridView {
     pub(crate) fn show_plan_of(&mut self, table: &impl ResultSource) {
+        self.panel.chart = None;
+        if self.panel.view == ResultView::Chart {
+            self.panel.view = ResultView::Table;
+        }
         let explaining = std::mem::take(&mut self.panel.explaining);
         self.panel.plan = if explaining { plan_nodes(table) } else { Vec::new() };
         if !self.panel.plan.is_empty() {

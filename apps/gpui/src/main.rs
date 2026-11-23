@@ -54,6 +54,8 @@ mod params_ui;
 mod picker;
 mod save_ui;
 mod plan_view;
+mod chart_plot;
+mod chart_ui;
 mod reveal;
 mod panel_state;
 mod render;

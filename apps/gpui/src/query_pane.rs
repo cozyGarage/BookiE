@@ -221,6 +221,9 @@ impl GridView {
             button.text_color(rgb(theme.muted_foreground))
         };
         button.on_click(cx.listener(move |this, _, _, cx| {
+            if view == ResultView::Chart {
+                this.show_chart();
+            }
             this.panel.view = view;
             cx.notify();
         }))
@@ -262,6 +265,10 @@ impl GridView {
             .children(
                 (!self.panel.plan.is_empty())
                     .then(|| self.result_view_switch("view-plan", "Plan", ResultView::Plan, theme, cx)),
+            )
+            .children(
+                (!self.run_tabs.slots.is_empty())
+                    .then(|| self.result_view_switch("view-chart", "Chart", ResultView::Chart, theme, cx)),
             )
             .child(
                 ghost("toggle-results", "", theme)
@@ -383,6 +390,8 @@ impl GridView {
             div().flex_1().p_4().child(failure.clone())
         } else if self.panel.view == ResultView::Plan && !self.panel.plan.is_empty() {
             self.plan_body(theme)
+        } else if self.panel.view == ResultView::Chart && !self.run_tabs.slots.is_empty() {
+            self.chart_body(theme, cx)
         } else if let Some(slot) = self
             .run_tabs
             .slots
