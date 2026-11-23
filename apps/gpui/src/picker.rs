@@ -21,6 +21,7 @@ pub(crate) enum Pick {
     SavedFilter(String),
     DeleteSavedFilter(String),
     NameFilter(String),
+    Theme(String),
 }
 
 impl GridView {
@@ -34,6 +35,7 @@ impl GridView {
             PaletteMode::Favorites | PaletteMode::DeleteFavorite => self.favorite_items(needle),
             PaletteMode::SavedFilters | PaletteMode::DeleteSavedFilter => self.saved_filter_items(needle),
             PaletteMode::NameFilter => self.name_filter_items(needle, cx),
+            PaletteMode::Themes => theme_items(needle, cx),
         }
     }
 
@@ -229,6 +231,7 @@ impl GridView {
             Pick::SavedFilter(name) => self.apply_saved_filter(&name, cx),
             Pick::DeleteSavedFilter(name) => self.delete_saved_filter(&name, cx),
             Pick::NameFilter(name) => self.save_current_filter_as(&name, cx),
+            Pick::Theme(name) => self.choose_theme(&name, window, cx),
             Pick::Column(column) => {
                 let row = self.cell_cursor.map_or(0, |cursor| cursor.row);
                 self.place_cursor(Some(Cursor { row, column }));
@@ -245,4 +248,54 @@ fn preview(sql: &str) -> String {
         text.push('…');
     }
     text
+}
+
+pub(crate) const BUILT_IN_LIGHT: &str = "BookiE Light";
+pub(crate) const BUILT_IN_DARK: &str = "BookiE Dark";
+
+fn theme_items(needle: &str, cx: &App) -> Vec<PickerItem> {
+    let names = [BUILT_IN_LIGHT.into(), BUILT_IN_DARK.into()]
+        .into_iter()
+        .chain(crate::ui_theme::bundled_theme_names(cx));
+    let mut scored: Vec<(u32, usize, PickerItem)> = names
+        .enumerate()
+        .filter_map(|(position, name)| {
+            let score = bookie_gpui::palette::fuzzy_score(needle, &name);
+            (score > 0).then(|| {
+                let item = PickerItem {
+                    title: name.to_string(),
+                    subtitle: "Theme".into(),
+                    pick: Pick::Theme(name.to_string()),
+                };
+                (score, position, item)
+            })
+        })
+        .collect();
+    scored.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)));
+    scored.into_iter().map(|(_, _, item)| item).collect()
+}
+
+pub(crate) fn install_theme(name: &str, cx: &mut App) -> bool {
+    match name {
+        BUILT_IN_LIGHT => Theme::light().install(cx),
+        BUILT_IN_DARK => Theme::dark().install(cx),
+        other => return crate::ui_theme::install_named(other, cx),
+    }
+    true
+}
+
+impl GridView {
+    fn choose_theme(&mut self, name: &str, window: &mut Window, cx: &mut Context<Self>) {
+        if !install_theme(name, cx) {
+            self.status = format!("Theme {name} is not available");
+            return;
+        }
+        self.dark_mode = Theme::current(cx).dark;
+        self.fonts.settings.theme = name.to_string();
+        self.status = match bookie_gpui::font_settings::save(&self.fonts.settings) {
+            Ok(()) => format!("Theme: {name}"),
+            Err(error) => format!("Theme: {name} (not saved: {error})"),
+        };
+        window.refresh();
+    }
 }

@@ -307,7 +307,7 @@ impl GridView {
         };
         vec![
             action("quick-switcher", "Go to table", !self.catalog.tables.is_empty()),
-            action("jump-column", "Jump to column", self.tabs.shows_grid()),
+            action("jump-column", "Jump to column", self.tabs.shows_grid_for(&self.catalog.grid_table)),
             action("shortcuts", "Keyboard shortcuts", true),
             action(
                 "save-favorite",
@@ -457,6 +457,7 @@ impl GridView {
                 true,
             ),
             action("font", "Choose font…", true),
+            action("select-theme", "Choose colour theme…", true),
             action(
                 "theme",
                 if self.dark_mode {
@@ -655,6 +656,7 @@ impl GridView {
             "save-favorite" => self.save_favorite(cx),
             "favorites" => self.open_picker(PaletteMode::Favorites, window, cx),
             "save-filter" => self.open_picker(PaletteMode::NameFilter, window, cx),
+            "select-theme" => self.open_picker(PaletteMode::Themes, window, cx),
             "saved-filters" => self.open_picker(PaletteMode::SavedFilters, window, cx),
             "delete-saved-filter" => self.open_picker(PaletteMode::DeleteSavedFilter, window, cx),
             _ if is_edit_palette_action(id) => self.execute_edit_palette_action(id, cx),
