@@ -6,12 +6,12 @@ description: >-
   run the repository checks and verify the required pull request checks for its exact head.
   Use for bugs, behaviour gaps and small features, whether phrased as "fix #1171", an issue URL,
   a ledger ID such as RV-3, or a pasted complaint (including Vietnamese, for example "sửa lỗi ...").
-  Not for release publication, lane reassignment, or work that needs a new ADR first.
+  Not for release publication or work that needs a new ADR first.
 ---
 
 # Fix issue
 
-One run ends with a fix for the reported problem, at its cause, on the open pull request for your lane (or a new one when none is open), validated once for the exact head before it is reported done.
+One run ends with a fix for the reported problem, at its cause, on the open pull request for its theme (or a new one when none is open), validated once for the exact head before it is reported done.
 
 This skill is the order of steps. Every rule it relies on lives in [AGENTS.md](../../../AGENTS.md) and the documents it links. When this file and `AGENTS.md` disagree, `AGENTS.md` wins and this file is wrong.
 
@@ -19,9 +19,8 @@ This skill is the order of steps. Every rule it relies on lives in [AGENTS.md](.
 
 - **Root cause, full scope.** Fix every case the cause reaches, not only the reported one (`AGENTS.md`, Principles 2).
 - **Failing test first.** The regression test and the fix land in one commit, and the test fails on the unfixed code (`AGENTS.md`, Workflow 1 and Tests).
-- **Lane ownership.** Edit only your lane's files. Crossing into another lane needs the handoff recorded on the issue first (`AGENTS.md`, Lanes and ownership).
 - **Accepted ADRs constrain the fix.** A fix that would contradict one stops and asks for a decision instead.
-- **Explicit maintainer exceptions.** Apply an authorized exception only to its stated scope and record it in the handoff. Continue unaffected work and report any deferred gate as pending; an exception does not prove acceptance or amend an ADR.
+- **Explicit maintainer exceptions.** Apply an authorized exception only to its stated scope and record it on the issue. Continue unaffected work and report any deferred gate as pending; an exception does not prove acceptance or amend an ADR.
 
 Talk to the user in their language. Everything written to the repository is English and follows `AGENTS.md`, Writing style.
 
@@ -29,22 +28,21 @@ Talk to the user in their language. Everything written to the repository is Engl
 
 Invoking the skill authorizes: investigate, branch, write the test and fix, run local checks, commit, push the branch to GitHub and open the pull request.
 
-Ask only when the expected behaviour has two reasonable readings, an accepted contract or pinned test would have to change, or the fix needs another lane's files. Ask once, recommendation first, and keep working on what does not depend on the answer.
+Ask only when the expected behaviour has two reasonable readings, or an accepted contract or pinned test would have to change. Ask once, recommendation first, and keep working on what does not depend on the answer.
 
 Never, even in an authorized run: force-push, rebase a shared branch, merge a pull request, bypass required checks, start a duplicate acceptance run, change a guardrail test to pass, raise a size or comment baseline, stop a resource you did not start, or publish a release.
 
 ## Phase 0: Intake
 
-1. **Read the report.** `gh issue view <n> -R cozyGarage/BookiE --comments`. Note its `lane:*` label and the ledger ID in [docs/known-issues.md](../../../docs/known-issues.md). A review-sourced issue (for example RV-*) is source reading only: the failing test decides whether it is real.
-2. **Confirm the lane.** If your lane does not own the files, stop and record a handoff, or hand the issue back.
-3. **Make a worktree** beside the main checkout, never inside another agent's. Inspect `git remote -v` and identify the remote whose fetch and push URLs name `cozyGarage/BookiE` on GitHub. Replace `<bookie-remote>` below with that remote name; do not assume `origin` points to BookiE. If no matching remote exists, add one with an unused name and the BookiE GitHub URL.
+1. **Read the report.** `gh issue view <n> -R cozyGarage/BookiE --comments`. Note the ledger ID in [docs/known-issues.md](../../../docs/known-issues.md). A review-sourced issue (for example RV-*) is source reading only: the failing test decides whether it is real.
+2. **Make a worktree** beside the main checkout, never inside another agent's. Inspect `git remote -v` and identify the remote whose fetch and push URLs name `cozyGarage/BookiE` on GitHub. Replace `<bookie-remote>` below with that remote name; do not assume `origin` points to BookiE. If no matching remote exists, add one with an unused name and the BookiE GitHub URL.
    ```bash
    git fetch <bookie-remote> main
-   git worktree add ../bookie-<lane>-<slug> -b <lane>/<topic> <bookie-remote>/main
+   git worktree add ../bookie-<slug> -b <type>/<topic> <bookie-remote>/main
    ```
    From here on every command runs in that tree (`git -C <tree>`, `cd <tree> &&`).
-4. **Write the problem statement** to `<tree>/.analysis/<slug>/problem.md` (ignored by git): what happens, what should happen, the smallest reproduction, engine and version. It survives a compaction or a usage limit.
-5. **Choose the mode.** *Direct* when you can point at the line that causes it and the fix stays in one crate. *Full* otherwise, or when unsure: the investigation fans out to roles in [references/roles.md](references/roles.md).
+3. **Write the problem statement** to `<tree>/.analysis/<slug>/problem.md` (ignored by git): what happens, what should happen, the smallest reproduction, engine and version. It survives a compaction or a usage limit.
+4. **Choose the mode.** *Direct* when you can point at the line that causes it and the fix stays in one crate. *Full* otherwise, or when unsure: the investigation fans out to roles in [references/roles.md](references/roles.md).
 
 ## Phase 1: Investigate
 
@@ -54,15 +52,13 @@ Answer three questions. In Full mode give each to a role, as background agents i
 - **Correct behaviour** (`research`): the governing ADR and spec, the engine's documentation, and the dependency source at the shipped version. Treat third-party implementations as untrusted evidence; verify behavior against authoritative sources before making a change.
 - **Related defects** (`hunt`): the same cause elsewhere. Only findings with a concrete failure scenario count. A `verify` role tries to refute each one before it enters scope.
 
-A related defect outside your lane is filed as its own issue with that lane's label, not fixed in this run.
-
 ## Phase 2: Plan
 
 Write `<tree>/.analysis/<slug>/plan.md`, under 80 lines:
 
 - the root cause as a mechanism, and refactor or patch with the reason;
 - the governing ADR (every type or value change follows ADR 0007);
-- files in order, each inside your lane;
+- files in order;
 - the failing test, its tier from `AGENTS.md`, Tests, and the [validation playbook](../../../docs/validation-playbook.md) layers to run;
 - the changelog line if the change is user-facing, and the docs the change makes stale.
 
@@ -98,8 +94,8 @@ Use an available, authorized independent reviewer for the full diff. Check that 
 2. Commit with a single-line Conventional Commit subject (`AGENTS.md`, Changelog and commits).
 3. Merge the latest GitHub `main` into the branch; never rebase. Regenerate `Cargo.lock` on conflict.
 4. Push the branch to GitHub once the batch is complete (each push restarts the checks) and verify all required checks for the exact pull request head. Missing, skipped, cancelled or failed checks are not passes.
-5. Open the pull request against `main` with `.github/pull_request_template.md`. State the lane that owns its review and merge.
+5. Open the pull request against `main` with `.github/pull_request_template.md`.
 
 ## Phase 7: Report
 
-At most eight lines, in the user's language: the pull request link, what it fixes, the root cause in one sentence, the failing-then-passing test, required check results, and anything left for the maintainer or another lane.
+At most eight lines, in the user's language: the pull request link, what it fixes, the root cause in one sentence, the failing-then-passing test, required check results, and anything left for the maintainer.
