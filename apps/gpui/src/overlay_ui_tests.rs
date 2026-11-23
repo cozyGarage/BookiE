@@ -39,29 +39,28 @@ fn palette_outside_click_dismisses_without_opening_the_covered_dropdown(cx: &mut
     cx.run_until_parked();
 
     view.read_with(cx, |view, _| assert!(!view.palette.open));
-    cx.update(|window, _| assert!(window.try_find_by_label("Import Navicat NCX").is_none()));
+    cx.update(|window, _| assert!(window.try_find_by_label("Import Connections…").is_none()));
 
     cx.simulate_click(trigger.center(), Default::default());
     cx.run_until_parked();
-    let item = cx.update(|window, _| window.find_by_label("Import Navicat NCX").bounds());
+    let item = cx.update(|window, _| window.find_by_label("Import Connections…").bounds());
     assert!(item.origin.x >= px(0.0));
     assert!(item.origin.x + item.size.width <= px(900.0));
-    cx.simulate_click(item.center(), Default::default());
+    cx.simulate_keystrokes("escape");
     cx.run_until_parked();
-
-    view.read_with(cx, |view, _| {
-        assert!(!view.palette.open);
-        assert_eq!(view.status, "Import Navicat NCX is not available in this prototype yet.");
-    });
+    cx.update(|window, _| assert!(window.try_find_by_label("Import Connections…").is_none()));
 
     cx.simulate_resize(size(px(800.0), px(760.0)));
     cx.run_until_parked();
     let trigger = cx.update(|window, _| window.find_by_label("Import / Export connections").bounds());
     cx.simulate_click(trigger.center(), Default::default());
     cx.run_until_parked();
-    let item = cx.update(|window, _| window.find_by_label("Import Navicat NCX").bounds());
+    let item = cx.update(|window, _| window.find_by_label("Import Connections…").bounds());
     assert!(item.origin.x >= px(0.0));
     assert!(item.origin.x + item.size.width <= px(800.0));
     assert!(item.origin.y >= px(0.0));
     assert!(item.origin.y + item.size.height <= px(760.0));
+    cx.simulate_keystrokes("escape");
+    cx.run_until_parked();
+    cx.update(|window, _| assert!(window.try_find_by_label("Import Connections…").is_none()));
 }

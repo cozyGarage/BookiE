@@ -1,20 +1,18 @@
 use serde::{Deserialize, Serialize};
 use sqlparser::ast::{
-    CopySource, CopyTarget, Cte, Delete, Expr, FromTable, FunctionArg, FunctionArgExpr, FunctionArguments,
-    GrantObjects, Insert, ObjectName, Query, SelectItem, SetExpr, Statement, TableFactor, TableObject, TableWithJoins,
-    Update, UpdateTableFromKind, UtilityOption,
+    CopySource, CopyTarget, Cte, Delete, FromTable, GrantObjects, Insert, ObjectName, Query, SetExpr, Statement,
+    TableFactor, TableObject, TableWithJoins, Update, UpdateTableFromKind, UtilityOption,
 };
 use sqlparser::dialect::{
     ClickHouseDialect, Dialect, GenericDialect, MsSqlDialect, MySqlDialect, PostgreSqlDialect, SQLiteDialect,
 };
 
-use crate::admin_functions::is_administrative_function_name;
 use crate::constant_predicate::is_constant_true;
 use crate::effects::Effects;
 use crate::effects_classification::{merge_script_class, sql_effects_from_tokens, statement_effects, truncate_facts};
 use crate::explain_options::analyze_option_enabled;
 use crate::parsed_sql::ParsedSql;
-use crate::select_writes::select_writes;
+use crate::select_writes::{SelectFacts, select_facts};
 use crate::{blast_radius, mask::SensitivePatterns, sensitive_projection};
 
 /// Coarse statement class used by policy rules.
@@ -478,6 +476,8 @@ fn update_table_names(update: &Update) -> Vec<String> {
 }
 
 pub(crate) fn classify_query(query: &Query) -> StatementDetails {
+    #[cfg(test)]
+    query_walks::record();
     let mut writes = false;
     let mut administrative = false;
     let mut contains_unscoped_dml = false;
@@ -542,118 +542,46 @@ fn classify_set_expr(body: &SetExpr) -> StatementDetails {
                 contains_unscoped_dml: left.contains_unscoped_dml || right.contains_unscoped_dml,
             }
         }
-        _ => {
-            let administrative = set_expr_administrative(body);
-            let writes = set_expr_writes(body) || administrative;
-            StatementDetails {
-                effects: if administrative {
-                    Effects::ADMIN
-                } else if writes {
-                    Effects::UNKNOWN
-                } else {
-                    Effects::READS
-                },
-                class: if administrative {
-                    StatementClass::Administrative
-                } else if writes {
-                    StatementClass::Other
-                } else {
-                    StatementClass::Select
-                },
-                tables: set_expr_tables(body),
-                has_where: true,
-                contains_unscoped_dml: false,
-            }
-        }
-    }
-}
-
-fn set_expr_administrative(body: &SetExpr) -> bool {
-    match body {
-        SetExpr::Query(query) => classify_query(query).class == StatementClass::Administrative,
-        SetExpr::SetOperation { left, right, .. } => set_expr_administrative(left) || set_expr_administrative(right),
-        SetExpr::Select(select) => select.projection.iter().any(|item| match item {
-            SelectItem::ExprWithAlias { expr, .. } | SelectItem::UnnamedExpr(expr) => expr_is_administrative(expr),
-            _ => false,
+        SetExpr::Select(select) => select_body_details(select_facts(select)),
+        SetExpr::Merge(statement) => select_body_details(SelectFacts {
+            administrative: false,
+            writes: true,
+            tables: classify_statement(statement).tables,
         }),
-        _ => false,
-    }
-}
-
-fn expr_is_administrative(expr: &Expr) -> bool {
-    match expr {
-        Expr::Function(function) => {
-            is_administrative_function(&function.name) || function_arguments_are_administrative(&function.args)
-        }
-        Expr::Subquery(query) => classify_query(query).class == StatementClass::Administrative,
-        Expr::BinaryOp { left, right, .. } => expr_is_administrative(left) || expr_is_administrative(right),
-        Expr::UnaryOp { expr, .. } | Expr::Nested(expr) => expr_is_administrative(expr),
-        Expr::Case {
-            operand,
-            conditions,
-            else_result,
-            ..
-        } => {
-            operand.as_ref().is_some_and(|expr| expr_is_administrative(expr))
-                || conditions
-                    .iter()
-                    .any(|case| expr_is_administrative(&case.condition) || expr_is_administrative(&case.result))
-                || else_result.as_ref().is_some_and(|expr| expr_is_administrative(expr))
-        }
-        _ => false,
-    }
-}
-
-fn is_administrative_function(name: &ObjectName) -> bool {
-    is_administrative_function_name(&name.to_string())
-}
-
-fn function_arguments_are_administrative(arguments: &FunctionArguments) -> bool {
-    match arguments {
-        FunctionArguments::None => false,
-        FunctionArguments::Subquery(query) => classify_query(query).class == StatementClass::Administrative,
-        FunctionArguments::List(arguments) => arguments.args.iter().any(|argument| {
-            let expression = match argument {
-                FunctionArg::Named { arg, .. } | FunctionArg::ExprNamed { arg, .. } | FunctionArg::Unnamed(arg) => arg,
-            };
-            matches!(expression, FunctionArgExpr::Expr(expr) if expr_is_administrative(expr))
+        SetExpr::Values(_) | SetExpr::Table(_) => select_body_details(SelectFacts {
+            administrative: false,
+            writes: false,
+            tables: Vec::new(),
         }),
     }
 }
 
-fn set_expr_writes(body: &SetExpr) -> bool {
-    match body {
-        SetExpr::Insert(_) | SetExpr::Update(_) | SetExpr::Delete(_) | SetExpr::Merge(_) => true,
-        SetExpr::Values(_) => false,
-        SetExpr::Query(q) => classify_query(q).class.is_write(),
-        SetExpr::SetOperation { left, right, .. } => set_expr_writes(left) || set_expr_writes(right),
-        SetExpr::Select(select) => select_writes(select),
-        SetExpr::Table(_) => false,
-    }
-}
-
-fn set_expr_tables(body: &SetExpr) -> Vec<String> {
-    match body {
-        SetExpr::Select(select) => {
-            let mut tables = Vec::new();
-            for t in &select.from {
-                tables.extend(table_factor_names(&t.relation));
-                for join in &t.joins {
-                    tables.extend(table_factor_names(&join.relation));
-                }
-            }
-            tables
-        }
-        SetExpr::Query(q) => classify_query(q).tables,
-        SetExpr::SetOperation { left, right, .. } => {
-            let mut t = set_expr_tables(left);
-            t.extend(set_expr_tables(right));
-            t
-        }
-        SetExpr::Insert(s) | SetExpr::Update(s) | SetExpr::Delete(s) | SetExpr::Merge(s) => {
-            classify_statement(s).tables
-        }
-        _ => Vec::new(),
+fn select_body_details(
+    SelectFacts {
+        administrative,
+        writes,
+        tables,
+    }: SelectFacts,
+) -> StatementDetails {
+    let writes = writes || administrative;
+    StatementDetails {
+        effects: if administrative {
+            Effects::ADMIN
+        } else if writes {
+            Effects::UNKNOWN
+        } else {
+            Effects::READS
+        },
+        class: if administrative {
+            StatementClass::Administrative
+        } else if writes {
+            StatementClass::Other
+        } else {
+            StatementClass::Select
+        },
+        tables,
+        has_where: true,
+        contains_unscoped_dml: false,
     }
 }
 
@@ -687,7 +615,7 @@ fn grant_object_names(objects: &GrantObjects) -> Vec<String> {
     }
 }
 
-fn table_factor_names(factor: &TableFactor) -> Vec<String> {
+pub(crate) fn table_factor_names(factor: &TableFactor) -> Vec<String> {
     match factor {
         TableFactor::Table { name, .. } => object_name_strings(name),
         TableFactor::Derived { subquery, .. } => classify_query(subquery).tables,
@@ -703,4 +631,31 @@ fn table_factor_names(factor: &TableFactor) -> Vec<String> {
 }
 
 #[cfg(test)]
+pub(crate) mod query_walks {
+    use std::cell::Cell;
+
+    thread_local! {
+        static WALKS: Cell<usize> = const { Cell::new(0) };
+    }
+
+    pub(crate) fn record() {
+        WALKS.with(|walks| walks.set(walks.get() + 1));
+    }
+
+    pub(crate) fn count() -> usize {
+        WALKS.with(Cell::get)
+    }
+
+    pub(crate) fn reset() {
+        WALKS.with(|walks| walks.set(0));
+    }
+}
+
+#[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod legacy_oracle_tests;
+
+#[cfg(test)]
+mod differential_tests;
