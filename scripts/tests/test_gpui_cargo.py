@@ -47,9 +47,15 @@ class GpuiCargoTests(unittest.TestCase):
             )
             return result.stdout.splitlines(), str(sccache)
 
-    def test_gpui_cargo_shares_the_repo_target_and_enables_optional_compiler_caches(self):
+    def test_gpui_cargo_uses_stable_git_common_target_and_optional_compiler_caches(self):
         output, sccache = self.run_wrapper({})
-        self.assertEqual(output[:4], [str(ROOT / "target"), sccache, sccache, sccache])
+        common_dir = subprocess.run(
+            ["git", "-C", str(ROOT), "rev-parse", "--path-format=absolute", "--git-common-dir"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        self.assertEqual(output[:4], [str(Path(common_dir).parent / "target"), sccache, sccache, sccache])
         self.assertIn(f"arg=--manifest-path", output)
         self.assertIn(f"arg={ROOT / 'apps/gpui/Cargo.toml'}", output)
 
@@ -84,6 +90,20 @@ class GpuiCargoTests(unittest.TestCase):
         args = [line.removeprefix("arg=") for line in output if line.startswith("arg=")]
         self.assertLess(args.index("--manifest-path"), args.index("--"))
         self.assertEqual(args[-2:], ["--exact", "--test-threads=1"])
+
+    def test_cargo_deny_gets_manifest_path_before_its_subcommand(self):
+        output, _ = self.run_wrapper({}, ["deny", "--config", "deny.toml", "check", "advisories", "licenses"])
+        args = [line.removeprefix("arg=") for line in output if line.startswith("arg=")]
+        self.assertEqual(args, [
+            "deny",
+            "--manifest-path",
+            str(ROOT / "apps/gpui/Cargo.toml"),
+            "--config",
+            "deny.toml",
+            "check",
+            "advisories",
+            "licenses",
+        ])
 
 
 

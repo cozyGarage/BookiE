@@ -84,7 +84,7 @@ scripts/gpui-cargo.sh deny --config deny.toml check advisories licenses
 scripts/gpui-cargo.sh run --release --locked
 ```
 
-The standalone GPUI workspace shares the repository `target` directory with the main workspace. The wrapper also uses the installed `sccache` for Rust and C/C++ compilation when available, so DuckDB's unchanged C++ sources can be reused across GPUI rebuilds and worktrees. Set `CARGO_TARGET_DIR` explicitly to use another target directory.
+The wrapper uses the primary checkout's `target` directory when run from a Git worktree, so GPUI builds reuse Cargo and DuckDB artifacts across BookiE worktrees. Outside a Git checkout it defaults to `${XDG_CACHE_HOME:-~/.cache}/bookie/gpui-target`. It also uses the installed `sccache` for Rust and C/C++ compilation when available, so unchanged DuckDB C++ sources can be reused if Cargo reruns their build. Set `CARGO_TARGET_DIR` explicitly to use another target directory.
 
 Forgejo runs the model and simulated interaction tests without a display. Native rendering and system clipboard behavior require a desktop session.
 

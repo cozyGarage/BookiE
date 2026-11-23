@@ -2,7 +2,13 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}"
+if git_common_dir="$(git -C "$ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"; then
+  default_target_dir="$(dirname "$git_common_dir")/target"
+else
+  cache_root="${XDG_CACHE_HOME:-${HOME:?HOME must be set}/.cache}"
+  default_target_dir="$cache_root/bookie/gpui-target"
+fi
+export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$default_target_dir}"
 
 if command -v sccache >/dev/null 2>&1; then
   sccache_path="$(command -v sccache)"
@@ -12,6 +18,11 @@ if command -v sccache >/dev/null 2>&1; then
 fi
 
 cargo_args=()
+if [[ "${1:-}" == "deny" ]]; then
+  cargo_args+=(deny --manifest-path "$ROOT/apps/gpui/Cargo.toml" "${@:2}")
+  exec cargo "${cargo_args[@]}"
+fi
+
 separator_seen=false
 for arg in "$@"; do
   if [[ "$arg" == "--" && "$separator_seen" == false ]]; then
