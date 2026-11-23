@@ -231,7 +231,7 @@ jobs:
         env:
           BOOKIE_CHANGE_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: git fetch --no-tags --depth=1 origin "$BOOKIE_CHANGE_BASE"
-      - name: Focused Data-lane change contracts
+      - name: Focused value-path change contracts
         if: github.event_name == 'pull_request' || github.event_name == 'push'
         env:
           BOOKIE_CHANGE_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
