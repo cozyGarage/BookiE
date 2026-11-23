@@ -389,6 +389,17 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("actions: write", cancel)
         self.assertIn("Queue wait before start", release)
 
+    def test_gpui_jobs_build_into_the_directory_they_package_and_cache(self):
+        workspace_config = (ROOT / ".cargo/config.toml").read_text()
+        self.assertIn('target-dir = "target"', workspace_config)
+        for workflow in ("release.yml", "gpui-binary.yml", "gpui-macos.yml"):
+            text = (ROOT / ".github/workflows" / workflow).read_text().split("\njobs:\n", 1)[1]
+            jobs = re.findall(r"(?ms)^  [a-z][a-z-]*:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", text)
+            gpui_jobs = [job for job in jobs if "--manifest-path apps/gpui/Cargo.toml" in job]
+            self.assertTrue(gpui_jobs, workflow)
+            for job in gpui_jobs:
+                self.assertIn("CARGO_TARGET_DIR: apps/gpui/target", job, workflow)
+
     def test_release_appimage_uses_the_arch_candidate_vendor_inputs_offline(self):
         release = (ROOT / ".github/workflows/release.yml").read_text()
         builder = (ROOT / "scripts/build-appimage.sh").read_text()
