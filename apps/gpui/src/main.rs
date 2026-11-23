@@ -146,6 +146,8 @@ struct GridView {
     viewport_rows: usize,
     detail_open: bool,
     row_detail_open: bool,
+    row_detail_filter: Entity<TextInput>,
+    row_detail_hide_null: bool,
     catalog: Catalog,
     table_sorts: Vec<(bookie_core::TableInfo, bookie_app_services::read_session::TableSort)>,
     local_order: Option<std::sync::Arc<Vec<u32>>>,
@@ -425,6 +427,13 @@ impl GridView {
         }
         let total = source.total();
         let (find, filter, editor, sql_input, value_editor) = Self::init_query_inputs(window, cx);
+        let row_detail_filter = cx.new(|cx| TextInput::new("Filter fields by name or value", cx));
+        cx.subscribe(&row_detail_filter, |_, _, event: &InputEvent, cx| {
+            if matches!(event, InputEvent::Changed) {
+                cx.notify();
+            }
+        })
+        .detach();
         let (sidebar_search, palette_input) = Self::init_chrome_inputs(window, cx);
         let (table, table_focus, table_events) = Self::init_grid_table(window, cx);
         let font_names = installed_font_names(cx);
@@ -500,6 +509,8 @@ impl GridView {
             cell_edit: panel_state::CellEditState::new(editor, value_editor),
             detail_open: false,
             row_detail_open: false,
+            row_detail_filter,
+            row_detail_hide_null: false,
             catalog: Catalog::synthetic(),
             table_sorts: Vec::new(),
             local_order: None,

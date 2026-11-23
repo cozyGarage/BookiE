@@ -309,7 +309,7 @@ impl GridView {
         theme: Theme,
         strip: Stateful<Div>,
         bars: (Option<Div>, Option<Div>, Option<Div>, Option<Div>, Option<Div>),
-        cx: &App,
+        cx: &mut Context<Self>,
     ) -> Div {
         let (filter_row, compare_bar, save_bar, banner, insert_form) = bars;
         div()
@@ -325,7 +325,7 @@ impl GridView {
             .children(banner)
             .child(self.data_table(cx))
             .children(self.detail_panel(theme))
-            .children(self.row_detail_panel(theme))
+            .children(self.row_detail_panel(theme, cx))
     }
 
     fn main_layout(
