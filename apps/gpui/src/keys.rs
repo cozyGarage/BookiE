@@ -1,7 +1,7 @@
 use bookie_gpui::font_settings;
 use bookie_gpui::keymap::{Chord, Command};
 use bookie_results::grid_cursor::{Cursor, move_cursor};
-use gpui::{App, Context, Focusable, KeyDownEvent, KeystrokeEvent, Window};
+use gpui::{App, Context, Focusable, KeyDownEvent, KeystrokeEvent, ScrollStrategy, Window};
 
 use crate::palette_state::PaletteMode;
 use crate::{GridView, Tab, palette_step};
@@ -46,7 +46,7 @@ impl GridView {
             _ => palette_step(self.palette.index, count, key == "down"),
         };
         if count > 0 {
-            self.palette.scroll.scroll_to_item(self.palette.index);
+            self.palette.scroll.scroll_to_item(self.palette.index, ScrollStrategy::Nearest);
         }
     }
 
@@ -131,7 +131,7 @@ impl GridView {
                         _ => palette_step(self.palette.index, count, key == "down"),
                     };
                     if count > 0 {
-                        self.palette.scroll.scroll_to_item(self.palette.index);
+                        self.palette.scroll.scroll_to_item(self.palette.index, ScrollStrategy::Nearest);
                     }
                     cx.stop_propagation();
                     cx.notify();
@@ -166,7 +166,11 @@ impl GridView {
             cx.notify();
             return;
         }
-        if self.focus.is_focused(window) && self.cell_edit.active.is_none() && self.compare.is_none() && self.tabs.shows_grid_for(&self.catalog.grid_table) {
+        if self.focus.is_focused(window)
+            && self.cell_edit.active.is_none()
+            && self.compare.is_none()
+            && self.tabs.shows_grid_for(&self.catalog.grid_table)
+        {
             self.grid_key(key, modifiers.shift, modifiers.control, window, cx);
         }
     }
@@ -207,6 +211,8 @@ impl GridView {
                     window.focus(&self.focus, cx);
                 }
             }
+            Command::RunAtCursor if matches!(self.tabs.current(), Tab::Query) => self.run_at_cursor(cx),
+            Command::RunAtCursor => {}
             Command::RunQuery if matches!(self.tabs.current(), Tab::Query) => self.run_query(cx),
             Command::RunQuery => {}
             Command::ToggleDetail => self.toggle_detail(),
@@ -253,14 +259,7 @@ impl GridView {
                     row: cursor.row,
                     column: projection.visible_index(cursor.column).unwrap_or(0),
                 });
-                let Some(mut next) = move_cursor(
-                    current,
-                    key,
-                    rows,
-                    projection.len(),
-                    self.viewport_rows,
-                    ctrl,
-                ) else {
+                let Some(mut next) = move_cursor(current, key, rows, projection.len(), self.viewport_rows, ctrl) else {
                     return;
                 };
                 next.column = projection.source_index(next.column).unwrap_or(0);
@@ -286,7 +285,9 @@ fn zoom_key(key: &str) -> Option<Option<i32>> {
 impl GridView {
     pub(crate) fn zoom_editor(&mut self, delta: Option<i32>, cx: &mut Context<Self>) {
         let current = self.fonts.settings.editor_size;
-        let next = delta.map_or(font_settings::DEFAULT_ZOOM_SIZE, |delta| font_settings::zoom_step(current, delta));
+        let next = delta.map_or(font_settings::DEFAULT_ZOOM_SIZE, |delta| {
+            font_settings::zoom_step(current, delta)
+        });
         if next != current {
             self.edit_fonts(|fonts| fonts.editor_size = next, cx);
         }
