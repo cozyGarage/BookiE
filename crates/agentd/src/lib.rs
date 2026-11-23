@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 use async_trait::async_trait;
 use bookie_core::{
     AuthMode, ColumnInfo, Connection, DriverError, DriverRegistry, ExecResult, ForeignKeyInfo, InboundForeignKeyInfo,
-    IndexInfo, OperationControl, QueryResult, TableInfo, TlsMode, Transaction, Value,
+    IndexInfo, OperationControl, QueryResult, SchemaTableMetadataVisitor, TableInfo, TlsMode, Transaction, Value,
 };
 use bookie_mcp::ConnectionProvider;
 use bookie_policy::{AuditState, GuardContext, PolicyConfig, PolicyGuard, Principal};
@@ -169,6 +169,18 @@ impl Connection for SessionConnection {
         control: &OperationControl,
     ) -> Result<Vec<ColumnInfo>, DriverError> {
         self.inner.fetch_columns_controlled(schema, table, control).await
+    }
+
+    async fn fetch_schema_table_metadata_controlled(
+        &self,
+        tables: &[TableInfo],
+        include_foreign_keys: bool,
+        control: &OperationControl,
+        visit: &mut SchemaTableMetadataVisitor<'_>,
+    ) -> Result<(), DriverError> {
+        self.inner
+            .fetch_schema_table_metadata_controlled(tables, include_foreign_keys, control, visit)
+            .await
     }
 
     async fn fetch_rows(

@@ -1,4 +1,114 @@
+use futures::TryStreamExt;
+
 use super::*;
+
+const SCHEMA_METADATA_SQL: &str = "WITH requested AS (
+            SELECT schema_name, table_name, is_default, ordinal
+            FROM unnest($1::text[], $2::text[], $3::boolean[])
+                 WITH ORDINALITY AS input(schema_name, table_name, is_default, ordinal)
+         ), relations AS (
+            SELECT requested.ordinal, requested.table_name, t.oid AS table_id, n.oid AS schema_id,
+                   n.nspname AS schema_name
+            FROM requested
+            JOIN pg_catalog.pg_class t ON t.relname = requested.table_name
+            JOIN pg_catalog.pg_namespace n ON n.oid = t.relnamespace
+            WHERE (requested.is_default AND pg_catalog.pg_table_is_visible(t.oid))
+               OR (NOT requested.is_default AND n.nspname = requested.schema_name)
+         ), metadata AS (
+            SELECT relations.ordinal, 1::smallint AS kind, a.attnum::integer AS row_order,
+                   a.attname::text AS name,
+                   pg_catalog.format_type(a.atttypid, a.atttypmod)::text AS value_a,
+                   NOT a.attnotnull AS nullable,
+                   EXISTS (
+                       SELECT 1 FROM pg_catalog.pg_constraint p
+                       WHERE p.conrelid = a.attrelid AND p.contype = 'p' AND a.attnum = ANY(p.conkey)
+                   ) AS primary_key,
+                   pg_catalog.pg_get_expr(d.adbin, d.adrelid)::text AS value_b,
+                   a.attidentity <> '' AS is_identity,
+                   a.attgenerated <> '' AS is_generated,
+                   pg_catalog.col_description(a.attrelid, a.attnum)::text AS value_c,
+                   CASE WHEN a.attcollation <> 0 AND a.attcollation <> ty.typcollation
+                       THEN co.collname::text END AS value_d,
+                   type_ns.nspname::text AS enum_schema,
+                   enum_ty.typname::text AS enum_name,
+                   CASE WHEN ty.typtype = 'd' THEN domain_ns.nspname::text END AS domain_schema,
+                   CASE WHEN ty.typtype = 'd' THEN ty.typname::text END AS domain_name,
+                   NULL::text AS value_e,
+                   NULL::text[] AS columns,
+                   NULL::text[] AS ref_columns
+            FROM relations
+            JOIN pg_catalog.pg_attribute a ON a.attrelid = relations.table_id
+            JOIN pg_catalog.pg_type ty ON ty.oid = a.atttypid
+            LEFT JOIN LATERAL (
+                WITH RECURSIVE type_chain(oid, typtype, typbasetype, typnamespace, typname) AS (
+                    SELECT candidate.oid, candidate.typtype, candidate.typbasetype,
+                           candidate.typnamespace, candidate.typname
+                    FROM pg_catalog.pg_type candidate
+                    WHERE candidate.oid = CASE
+                        WHEN ty.typcategory = 'A' AND EXISTS (
+                            SELECT 1 FROM pg_catalog.pg_type element
+                            WHERE element.oid = ty.typelem AND element.typtype IN ('e', 'd')
+                        ) THEN ty.typelem
+                        ELSE ty.oid
+                    END
+                    UNION ALL
+                    SELECT base.oid, base.typtype, base.typbasetype, base.typnamespace, base.typname
+                    FROM pg_catalog.pg_type base
+                    JOIN type_chain ON base.oid = type_chain.typbasetype
+                    WHERE type_chain.typtype = 'd'
+                )
+                SELECT typnamespace, typname
+                FROM type_chain
+                WHERE typtype = 'e'
+                   OR (ty.typcategory = 'A' AND oid = ty.typelem AND typtype = 'd')
+                ORDER BY CASE
+                    WHEN ty.typcategory = 'A' AND oid = ty.typelem AND typtype = 'd' THEN 0
+                    ELSE 1
+                END
+                LIMIT 1
+            ) enum_ty ON TRUE
+            LEFT JOIN pg_catalog.pg_namespace type_ns ON type_ns.oid = enum_ty.typnamespace
+            LEFT JOIN pg_catalog.pg_namespace domain_ns ON domain_ns.oid = ty.typnamespace
+            LEFT JOIN pg_catalog.pg_collation co ON co.oid = a.attcollation
+            LEFT JOIN pg_catalog.pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+            WHERE a.attnum > 0 AND NOT a.attisdropped
+              AND pg_catalog.has_schema_privilege(relations.schema_id, 'USAGE')
+              AND pg_catalog.has_column_privilege(relations.table_id, a.attnum, 'SELECT,INSERT,UPDATE,REFERENCES')
+            UNION ALL
+            SELECT relations.ordinal, 2::smallint, row_number() OVER (
+                       PARTITION BY relations.ordinal ORDER BY c.conname
+                   )::integer,
+                   c.conname::text, fn_class.relname::text,
+                   NULL::boolean, NULL::boolean, c.confdeltype::text,
+                   NULL::boolean, NULL::boolean, fn_ns.nspname::text, NULL::text,
+                   NULL::text, NULL::text, NULL::text, NULL::text,
+                   c.confupdtype::text,
+                   pg_catalog.array_agg(a.attname::text ORDER BY kf.ordinality),
+                   pg_catalog.array_agg(fa.attname::text ORDER BY kf.ordinality)
+            FROM relations
+            JOIN pg_catalog.pg_constraint c ON c.conrelid = relations.table_id AND c.contype = 'f'
+            JOIN pg_catalog.pg_class fn_class ON fn_class.oid = c.confrelid
+            JOIN pg_catalog.pg_namespace fn_ns ON fn_ns.oid = fn_class.relnamespace
+            JOIN LATERAL pg_catalog.unnest(c.conkey) WITH ORDINALITY AS kf(attnum, ordinality) ON true
+            JOIN pg_catalog.pg_attribute a ON a.attrelid = relations.table_id AND a.attnum = kf.attnum
+            JOIN LATERAL pg_catalog.unnest(c.confkey) WITH ORDINALITY AS kfr(attnum, ordinality)
+                ON kfr.ordinality = kf.ordinality
+            JOIN pg_catalog.pg_attribute fa ON fa.attrelid = c.confrelid AND fa.attnum = kfr.attnum
+            WHERE $4::boolean
+              AND pg_catalog.has_schema_privilege(relations.schema_id, 'USAGE')
+              AND pg_catalog.has_any_column_privilege(relations.table_id, 'SELECT,INSERT,UPDATE,REFERENCES')
+              AND pg_catalog.has_schema_privilege(fn_ns.oid, 'USAGE')
+              AND pg_catalog.has_any_column_privilege(fn_class.oid, 'SELECT,INSERT,UPDATE,REFERENCES')
+            GROUP BY relations.ordinal, c.conname, fn_class.relname, fn_ns.nspname, c.confdeltype, c.confupdtype
+         )
+         SELECT requested.ordinal, metadata.kind, metadata.row_order, metadata.name, metadata.value_a,
+                metadata.nullable, metadata.primary_key, metadata.value_b, metadata.is_identity,
+                metadata.is_generated, metadata.value_c, metadata.value_d, metadata.enum_schema,
+                metadata.enum_name, metadata.domain_schema, metadata.domain_name, metadata.value_e,
+                metadata.columns, metadata.ref_columns
+         FROM requested
+         LEFT JOIN metadata ON metadata.ordinal = requested.ordinal
+         ORDER BY requested.ordinal, metadata.kind, metadata.row_order";
 
 pub(crate) async fn read_list_tables_scoped(
     connection: &mut sqlx::PgConnection,
@@ -159,7 +269,85 @@ pub(crate) async fn read_fetch_columns(
         .fetch_all(&mut *connection)
         .await
         .map_err(map_sqlx_error)?;
-    rows.iter().map(column_from_row).collect()
+    rows.iter().map(|row| column_from_row_at(row, 0)).collect()
+}
+
+pub(crate) async fn read_fetch_schema_table_metadata(
+    connection: &mut sqlx::PgConnection,
+    tables: &[TableInfo],
+    include_foreign_keys: bool,
+    visit: &mut bookie_core::SchemaTableMetadataVisitor<'_>,
+) -> Result<(), DriverError> {
+    if tables.is_empty() {
+        return Ok(());
+    }
+    let schemas: Vec<_> = tables
+        .iter()
+        .map(|table| table.schema.clone().unwrap_or_default())
+        .collect();
+    let names: Vec<_> = tables.iter().map(|table| table.name.clone()).collect();
+    let defaults: Vec<_> = tables.iter().map(|table| table.schema.is_none()).collect();
+    let mut rows = sqlx::query(SCHEMA_METADATA_SQL)
+        .bind(schemas)
+        .bind(names)
+        .bind(defaults)
+        .bind(include_foreign_keys)
+        .fetch(&mut *connection);
+    let mut index = 0usize;
+    let mut columns = Vec::new();
+    let mut foreign_keys = Vec::new();
+    while let Some(row) = rows.try_next().await.map_err(map_sqlx_error)? {
+        let row_index =
+            usize::try_from(row.get::<i64, _>(0) - 1).map_err(|error| DriverError::Internal(error.to_string()))?;
+        while index < row_index {
+            if !visit_schema_table(index, &mut columns, &mut foreign_keys, visit) {
+                while rows.try_next().await.map_err(map_sqlx_error)?.is_some() {}
+                return Ok(());
+            }
+            index += 1;
+        }
+        if row.try_get::<Option<i16>, _>(1).map_err(map_sqlx_error)?.is_none() {
+            continue;
+        }
+        append_schema_metadata_row(&row, &mut columns, &mut foreign_keys)?;
+    }
+    while index < tables.len() {
+        if !visit_schema_table(index, &mut columns, &mut foreign_keys, visit) {
+            break;
+        }
+        index += 1;
+    }
+    Ok(())
+}
+
+fn visit_schema_table(
+    index: usize,
+    columns: &mut Vec<ColumnInfo>,
+    foreign_keys: &mut Vec<ForeignKeyInfo>,
+    visit: &mut bookie_core::SchemaTableMetadataVisitor<'_>,
+) -> bool {
+    visit(index, Ok((std::mem::take(columns), std::mem::take(foreign_keys))))
+}
+
+fn append_schema_metadata_row(
+    row: &sqlx::postgres::PgRow,
+    columns: &mut Vec<ColumnInfo>,
+    foreign_keys: &mut Vec<ForeignKeyInfo>,
+) -> Result<(), DriverError> {
+    match row.get::<Option<i16>, _>(1) {
+        Some(1) => columns.push(column_from_row_at(row, 3)?),
+        Some(2) => foreign_keys.push(ForeignKeyInfo {
+            name: row.get(3),
+            ref_table: row.get(4),
+            ref_schema: row.try_get(10).map_err(map_sqlx_error)?,
+            on_delete: pg_action_char_to_keyword(row.try_get::<String, _>(7).ok().as_deref().unwrap_or("a")),
+            on_update: pg_action_char_to_keyword(row.try_get::<String, _>(16).ok().as_deref().unwrap_or("a")),
+            columns: row.get(17),
+            ref_columns: row.get(18),
+        }),
+        _ => return Err(DriverError::Internal("unexpected PostgreSQL metadata row kind".into())),
+    }
+    Ok(())
 }
 
 pub(crate) fn auto_increment_and_default(raw_default: Option<String>, is_identity: bool) -> (bool, Option<String>) {
@@ -180,28 +368,28 @@ pub(crate) fn auto_increment_and_default(raw_default: Option<String>, is_identit
     (is_auto_increment, default_value)
 }
 
-fn column_from_row(r: &sqlx::postgres::PgRow) -> Result<ColumnInfo, DriverError> {
-    let raw_default: Option<String> = r.try_get::<Option<String>, _>(4).unwrap_or(None);
-    let is_identity = r.try_get::<bool, _>(5).unwrap_or(false);
-    let is_generated = r.try_get::<bool, _>(6).unwrap_or(false);
+fn column_from_row_at(r: &sqlx::postgres::PgRow, offset: usize) -> Result<ColumnInfo, DriverError> {
+    let raw_default: Option<String> = r.try_get::<Option<String>, _>(offset + 4).unwrap_or(None);
+    let is_identity = r.try_get::<bool, _>(offset + 5).unwrap_or(false);
+    let is_generated = r.try_get::<bool, _>(offset + 6).unwrap_or(false);
     let (is_auto_increment, default_value) = auto_increment_and_default(raw_default, is_identity);
-    let enum_schema = r.try_get::<Option<String>, _>(9).map_err(map_sqlx_error)?;
-    let enum_name = r.try_get::<Option<String>, _>(10).map_err(map_sqlx_error)?;
-    let domain_schema = r.try_get::<Option<String>, _>(11).map_err(map_sqlx_error)?;
-    let domain_name = r.try_get::<Option<String>, _>(12).map_err(map_sqlx_error)?;
+    let enum_schema = r.try_get::<Option<String>, _>(offset + 9).map_err(map_sqlx_error)?;
+    let enum_name = r.try_get::<Option<String>, _>(offset + 10).map_err(map_sqlx_error)?;
+    let domain_schema = r.try_get::<Option<String>, _>(offset + 11).map_err(map_sqlx_error)?;
+    let domain_name = r.try_get::<Option<String>, _>(offset + 12).map_err(map_sqlx_error)?;
     Ok(ColumnInfo {
-        name: r.get::<String, _>(0),
-        data_type: r.get::<String, _>(1),
-        nullable: r.get::<bool, _>(2),
-        primary_key: r.get::<bool, _>(3),
+        name: r.get::<String, _>(offset),
+        data_type: r.get::<String, _>(offset + 1),
+        nullable: r.get::<bool, _>(offset + 2),
+        primary_key: r.get::<bool, _>(offset + 3),
         is_auto_increment,
         default_value,
         is_generated,
         comment: r
-            .try_get::<Option<String>, _>(7)
+            .try_get::<Option<String>, _>(offset + 7)
             .unwrap_or(None)
             .filter(|c| !c.is_empty()),
-        collation: r.try_get::<Option<String>, _>(8).unwrap_or(None),
+        collation: r.try_get::<Option<String>, _>(offset + 8).unwrap_or(None),
         enum_type: enum_schema
             .zip(enum_name)
             .map(|(schema, name)| QualifiedTypeName { schema, name }),
