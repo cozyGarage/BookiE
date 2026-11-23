@@ -307,7 +307,7 @@ impl GridView {
         };
         vec![
             action("quick-switcher", "Go to table", !self.catalog.tables.is_empty()),
-            action("jump-column", "Jump to column", self.tabs.shows_grid()),
+            action("jump-column", "Jump to column", self.tabs.shows_grid_for(&self.catalog.grid_table)),
             action("shortcuts", "Keyboard shortcuts", true),
             action(
                 "save-favorite",
@@ -394,7 +394,11 @@ impl GridView {
             label: label.to_string(),
             enabled,
         };
-        vec![
+        let schema_context = self.schema_context.as_ref().map_or_else(
+            || "Choose schema or database…".to_owned(),
+            |schema| format!("Schema context: {schema}"),
+        );
+        let mut actions = vec![
             action("query", "New query tab", true),
             action("run", "Run the query", matches!(self.tabs.current(), Tab::Query)),
             action(
@@ -437,7 +441,13 @@ impl GridView {
                 &format!("Open {}", table_label(&self.catalog.grid_table)),
                 !self.catalog.tables.is_empty(),
             ),
-        ]
+        ];
+        if self.live.as_ref().is_some_and(|session| {
+            bookie_app_services::schema_context::supports_schema_context(&session.driver_id)
+        }) {
+            actions.push(action("schema-context", &schema_context, true));
+        }
+        actions
     }
 
     fn style_actions(&self) -> Vec<Action> {
@@ -457,6 +467,7 @@ impl GridView {
                 true,
             ),
             action("font", "Choose font…", true),
+            action("select-theme", "Choose colour theme…", true),
             action(
                 "theme",
                 if self.dark_mode {
@@ -655,6 +666,8 @@ impl GridView {
             "save-favorite" => self.save_favorite(cx),
             "favorites" => self.open_picker(PaletteMode::Favorites, window, cx),
             "save-filter" => self.open_picker(PaletteMode::NameFilter, window, cx),
+            "select-theme" => self.open_picker(PaletteMode::Themes, window, cx),
+            "schema-context" => self.open_picker(PaletteMode::SchemaContext, window, cx),
             "saved-filters" => self.open_picker(PaletteMode::SavedFilters, window, cx),
             "delete-saved-filter" => self.open_picker(PaletteMode::DeleteSavedFilter, window, cx),
             _ if is_edit_palette_action(id) => self.execute_edit_palette_action(id, cx),

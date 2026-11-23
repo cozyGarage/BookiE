@@ -147,6 +147,8 @@ struct GridView {
     viewport_rows: usize,
     detail_open: bool,
     row_detail_open: bool,
+    row_detail_filter: Entity<TextInput>,
+    row_detail_hide_null: bool,
     catalog: Catalog,
     table_sorts: Vec<(bookie_core::TableInfo, bookie_app_services::read_session::TableSort)>,
     local_order: Option<std::sync::Arc<Vec<u32>>>,
@@ -154,6 +156,7 @@ struct GridView {
     column_widths: Option<bookie_app_services::column_widths::ColumnWidthStore>,
     binary_modes: binary_mode::ColumnModes,
     live: Option<std::sync::Arc<bookie_gpui::live::LiveSession>>,
+    schema_context: Option<String>,
     connections: Vec<bookie_app_services::read_session::ConnectionSummary>,
     keymap: Keymap,
     dark_mode: bool,
@@ -272,6 +275,7 @@ impl GridView {
         Entity<TextInput>,
         Entity<TextInput>,
         Entity<EditorState>,
+        Entity<EditorState>,
     ) {
         let find = cx.new(|cx| TextInput::new("Find", cx));
         let filter = cx.new(|cx| TextInput::new("label contains 7", cx));
@@ -305,6 +309,8 @@ impl GridView {
         let sql_input = cx.new(|cx| {
             EditorState::new(window, cx)
                 .language("sql")
+                .line_number(true)
+                .folding(true)
                 .placeholder("SELECT … (Enter adds a line, Ctrl+Enter runs it)")
         });
         cx.subscribe(
@@ -319,7 +325,8 @@ impl GridView {
             },
         )
         .detach();
-        (find, filter, editor, sql_input)
+        let value_editor = cx.new(|cx| EditorState::new(window, cx).placeholder("Edit full value"));
+        (find, filter, editor, sql_input, value_editor)
     }
 
     fn init_chrome_inputs(window: &mut Window, cx: &mut Context<Self>) -> (Entity<TextInput>, Entity<TextInput>) {
@@ -421,7 +428,14 @@ impl GridView {
             Self::persist_window_geometry(window, cx);
         }
         let total = source.total();
-        let (find, filter, editor, sql_input) = Self::init_query_inputs(window, cx);
+        let (find, filter, editor, sql_input, value_editor) = Self::init_query_inputs(window, cx);
+        let row_detail_filter = cx.new(|cx| TextInput::new("Filter fields by name or value", cx));
+        cx.subscribe(&row_detail_filter, |_, _, event: &InputEvent, cx| {
+            if matches!(event, InputEvent::Changed) {
+                cx.notify();
+            }
+        })
+        .detach();
         let (sidebar_search, palette_input) = Self::init_chrome_inputs(window, cx);
         let (table, table_focus, table_events) = Self::init_grid_table(window, cx);
         let font_names = installed_font_names(cx);
@@ -495,14 +509,17 @@ impl GridView {
             continuous: false,
             grid_is_query: false,
             search: panel_state::SearchState::new(find, filter),
-            cell_edit: panel_state::CellEditState::new(editor),
+            cell_edit: panel_state::CellEditState::new(editor, value_editor),
             detail_open: false,
             row_detail_open: false,
+            row_detail_filter,
+            row_detail_hide_null: false,
             catalog: Catalog::synthetic(),
             table_sorts: Vec::new(),
             local_order: None,
             local_sort: None,
             live: None,
+            schema_context: None,
             keymap: Keymap::default(),
             tabs: Tabs::default(),
             window_title_tab: None,
@@ -965,8 +982,14 @@ fn main() {
         .with_assets(assets::Assets)
         .run(move |cx: &mut App| {
             text_input::bind_keys(cx);
-            ui_theme::apply_editor_size(font_settings::load().editor_size, cx);
-            Theme::named(std::env::var("BOOKIE_PROTOTYPE_THEME").ok().as_deref()).install(cx);
+            ui_theme::load_bundled_themes(cx);
+            let settings = font_settings::load();
+            ui_theme::apply_editor_size(settings.editor_size, cx);
+            match std::env::var("BOOKIE_PROTOTYPE_THEME").ok() {
+                Some(name) => Theme::named(Some(&name)).install(cx),
+                None if picker::install_theme(&settings.theme, cx) => {}
+                None => Theme::named(None).install(cx),
+            }
             let saved = if std::env::var_os("BOOKIE_PROTOTYPE_WIDTH").is_some()
                 || std::env::var_os("BOOKIE_PROTOTYPE_HEIGHT").is_some()
             {

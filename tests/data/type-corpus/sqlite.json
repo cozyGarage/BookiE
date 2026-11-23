@@ -1,0 +1,7 @@
+[
+  {"data_type": "INTEGER", "contract": "integers", "cases": [{"literal": "NULL", "cell": "NULL"}]},
+  {"data_type": "REAL", "cases": [{"literal": "1.5", "cell": "1.5"}, {"literal": "-0.25", "cell": "-0.25"}, {"literal": "0.1", "cell": "0.1"}]},
+  {"data_type": "TEXT", "contract": "texts", "cases": [{"literal": "NULL", "cell": "NULL"}]},
+  {"data_type": "BLOB", "cases": [{"literal": "X'DEADBEEF'", "cell": "<4 bytes>"}, {"literal": "X''", "cell": ""}]},
+  {"data_type": "NUMERIC", "cases": [{"literal": "42", "cell": "42"}, {"literal": "'1.25'", "cell": "1.25"}]}
+]

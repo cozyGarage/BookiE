@@ -1,0 +1,17 @@
+[
+  {"data_type": "smallint", "cases": [{"literal": "-32768", "cell": "-32768"}, {"literal": "32767", "cell": "32767"}]},
+  {"data_type": "integer", "cases": [{"literal": "-2147483648", "cell": "-2147483648"}, {"literal": "NULL", "cell": "NULL"}]},
+  {"data_type": "bigint", "contract": "integers"},
+  {"data_type": "numeric(30,8)", "cases": [{"literal": "1.23", "cell": "1.23000000"}, {"literal": "-99999999999999999999.99999999", "cell": "-99999999999999999999.99999999"}]},
+  {"data_type": "double precision", "cases": [{"literal": "0.1", "cell": "0.1"}, {"literal": "-1.5", "cell": "-1.5"}]},
+  {"data_type": "real", "cases": [{"literal": "1.5", "cell": "1.5"}]},
+  {"data_type": "boolean", "cases": [{"literal": "true", "cell": "true"}, {"literal": "false", "cell": "false"}]},
+  {"data_type": "text", "contract": "texts"},
+  {"data_type": "varchar(20)", "cases": [{"literal": "'abc'", "cell": "abc"}]},
+  {"data_type": "bytea", "cases": [{"literal": "'\\xdeadbeef'", "cell": "<4 bytes>"}]},
+  {"data_type": "date", "cases": [{"literal": "'2024-02-29'", "cell": "2024-02-29"}]},
+  {"data_type": "time", "cases": [{"literal": "'13:45:30'", "cell": "13:45:30"}]},
+  {"data_type": "timestamp", "cases": [{"literal": "'2024-02-29 13:45:30'", "cell": "2024-02-29 13:45:30"}]},
+  {"data_type": "uuid", "cases": [{"literal": "'12345678-9abc-def0-1122-334455667788'", "cell": "12345678-9abc-def0-1122-334455667788"}]},
+  {"data_type": "jsonb", "cases": [{"literal": "'{\"a\": 1}'", "cell": "{\"a\":1}"}]}
+]

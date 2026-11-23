@@ -10,6 +10,7 @@ pub struct FontSettings {
     pub ui_size: f32,
     pub editor_family: String,
     pub editor_size: f32,
+    pub theme: String,
 }
 
 impl Default for FontSettings {
@@ -19,6 +20,7 @@ impl Default for FontSettings {
             ui_size: DEFAULT_SIZE,
             editor_family: String::new(),
             editor_size: DEFAULT_SIZE,
+            theme: String::new(),
         }
     }
 }
@@ -46,6 +48,7 @@ pub fn parse(text: &str) -> FontSettings {
         ui_size: size(value.get("ui_font_size")),
         editor_family: family(value.get("buffer_font_family")),
         editor_size: size(value.get("buffer_font_size")),
+        theme: family(value.get("theme")),
     }
 }
 
@@ -55,6 +58,7 @@ pub fn to_json(settings: &FontSettings) -> String {
         "ui_font_size": settings.ui_size,
         "buffer_font_family": settings.editor_family,
         "buffer_font_size": settings.editor_size,
+        "theme": settings.theme,
     })
     .to_string()
 }
@@ -131,6 +135,7 @@ mod tests {
             ui_size: 15.0,
             editor_family: "Fira Code".into(),
             editor_size: 13.5,
+            theme: "Nord".into(),
         };
         assert_eq!(parse(&to_json(&settings)), settings);
     }

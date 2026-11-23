@@ -1,7 +1,9 @@
 use bookie_gpui::detail::{Detail, detail_of};
 use bookie_gpui::theme::{Theme, size};
 use gpui::{Div, Stateful, div, prelude::*, px, rgb};
+use gpui_component::checkbox::Checkbox;
 
+use bookie_gpui::model::{Cell, ColumnMeta};
 use crate::GridView;
 
 const PANEL_HEIGHT: f32 = 200.0;
@@ -32,7 +34,7 @@ impl GridView {
         Some((name, detail))
     }
 
-    pub(super) fn row_detail_target(&self) -> Option<Vec<(String, String)>> {
+    pub(super) fn row_detail_target(&self, filter: &str, hide_null: bool) -> Option<Vec<(usize, String, String)>> {
         if self.compare.is_some() {
             return None;
         }
@@ -48,22 +50,7 @@ impl GridView {
                 *value = edited_value.clone();
             }
         }
-        Some(
-            self.source
-                .columns()
-                .iter()
-                .enumerate()
-                .map(|(column, info)| {
-                    (
-                        info.name.clone(),
-                        row.get(column).map_or_else(
-                            || "Missing value".into(),
-                            bookie_gpui::preview::cell_preview,
-                        ),
-                    )
-                })
-                .collect(),
-        )
+        Some(filtered_fields(self.source.columns(), &row, filter, hide_null))
     }
 
     pub(super) fn detail_panel(&self, theme: Theme) -> Option<Stateful<Div>> {
@@ -97,22 +84,31 @@ impl GridView {
         )
     }
 
-    pub(super) fn row_detail_panel(&self, theme: Theme) -> Option<Stateful<Div>> {
+    pub(super) fn row_detail_panel(&self, theme: Theme, cx: &mut gpui::Context<Self>) -> Option<Stateful<Div>> {
         if !self.row_detail_open {
             return None;
         }
-        let body = self.row_detail_target().map_or_else(
+        let filter = self.row_detail_filter.read(cx).content().to_string();
+        let body = self.row_detail_target(&filter, self.row_detail_hide_null).map_or_else(
             || {
                 div()
                     .text_color(rgb(theme.muted_foreground))
                     .child("Select a row to view its values.")
             },
             |fields| {
+                if fields.is_empty() {
+                    return div()
+                        .debug_selector(|| "row-detail-empty".into())
+                        .text_color(rgb(theme.muted_foreground))
+                        .child("No fields to show. Clear the filter or turn off Hide NULL fields.");
+                }
                 div()
                     .flex()
                     .flex_col()
-                    .children(fields.into_iter().map(|(name, value)| {
+                    .children(fields.into_iter().map(|(column, name, value)| {
                         div()
+                            .id(format!("row-detail-field-{column}"))
+                            .debug_selector(move || format!("row-detail-field-{column}"))
                             .flex()
                             .items_start()
                             .gap_3()
@@ -130,9 +126,33 @@ impl GridView {
                     }))
             },
         );
+        let controls = div()
+            .tab_group()
+            .flex()
+            .items_center()
+            .gap_2()
+            .pb_2()
+            .child(
+                div()
+                    .id("row-detail-filter")
+                    .debug_selector(|| "row-detail-filter".into())
+                    .flex_1()
+                    .min_w_0()
+                    .child(self.row_detail_filter.clone()),
+            )
+            .child(div().debug_selector(|| "row-detail-hide-null".into()).child(
+                Checkbox::new("row-detail-hide-null")
+                    .label("Hide NULL fields")
+                    .checked(self.row_detail_hide_null)
+                    .on_change(cx.listener(|this, checked, _, cx| {
+                        this.row_detail_hide_null = *checked;
+                        cx.notify();
+                    })),
+            ));
         Some(
             div()
                 .id("row-detail")
+                .debug_selector(|| "row-detail".into())
                 .h(px(size::ROW_DETAIL_HEIGHT))
                 .flex_none()
                 .p_2()
@@ -146,9 +166,37 @@ impl GridView {
                         .text_color(rgb(theme.muted_foreground))
                         .child("Row details"),
                 )
+                .child(controls)
                 .child(body),
         )
     }
+}
+
+fn filtered_fields(
+    columns: &[ColumnMeta],
+    row: &[Cell],
+    filter: &str,
+    hide_null: bool,
+) -> Vec<(usize, String, String)> {
+    let filter = filter.to_lowercase();
+    columns
+        .iter()
+        .enumerate()
+        .filter_map(|(index, column)| {
+            let cell = row.get(index);
+            if hide_null && matches!(cell, Some(Cell::Null)) {
+                return None;
+            }
+            let value = cell.map_or_else(|| "Missing value".into(), bookie_gpui::preview::cell_preview);
+            if !filter.is_empty()
+                && !column.name.to_lowercase().contains(&filter)
+                && !value.to_lowercase().contains(&filter)
+            {
+                return None;
+            }
+            Some((index, column.name.clone(), value))
+        })
+        .collect()
 }
 
 fn detail_body(detail: Detail, theme: Theme) -> Div {
@@ -185,5 +233,54 @@ fn detail_body(detail: Detail, theme: Theme) -> Div {
                         .child(format!("showing {shown} of {total} bytes")),
                 )
             }),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use bookie_core::Value;
+
+    use super::filtered_fields;
+    use bookie_gpui::model::ColumnMeta;
+
+    fn column(name: &str) -> ColumnMeta {
+        ColumnMeta {
+            name: name.into(),
+            width: 100.0,
+            numeric: false,
+            data_type: String::new(),
+            primary_key: false,
+        }
+    }
+
+    #[test]
+    fn row_details_filter_names_and_display_values_without_losing_typed_nulls() {
+        let columns = [column("tag"), column("tag"), column("empty"), column("optional"), column("payload"), column("unicode")];
+        let row = [
+            Value::Text("first".into()),
+            Value::Text("second".into()),
+            Value::Text(String::new()),
+            Value::Null,
+            Value::Undecodable("numeric".into()),
+            Value::Text("Café 🧪".into()),
+        ];
+
+        assert_eq!(
+            filtered_fields(&columns, &row, "tag", false)
+                .iter()
+                .map(|(index, name, _)| (*index, name.as_str()))
+                .collect::<Vec<_>>(),
+            [(0, "tag"), (1, "tag")]
+        );
+        assert_eq!(filtered_fields(&columns, &row, "🧪", false)[0].0, 5);
+        assert_eq!(filtered_fields(&columns, &row, "CAFÉ", false)[0].0, 5);
+        assert_eq!(filtered_fields(&columns, &row, "undecodable", false)[0].0, 4);
+
+        let visible = filtered_fields(&columns, &row, "", true);
+        assert_eq!(visible.iter().map(|field| field.0).collect::<Vec<_>>(), [0, 1, 2, 4, 5]);
+        assert_eq!(visible[2].2, "");
+        assert_eq!(visible[3].2, "<undecodable numeric>");
+        assert!(filtered_fields(&columns, &row, "NULL", true).is_empty());
+        assert_eq!(filtered_fields(&columns, &row, "NULL", false)[0].0, 3);
     }
 }
