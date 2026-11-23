@@ -329,13 +329,28 @@ impl GridView {
             .children(self.fk_peek_panel(theme, cx))
     }
 
-    fn main_layout(&self, sidebar: Option<Div>, tab_row: Stateful<Div>, content: Div) -> Div {
+    fn main_layout(
+        &self,
+        sidebar: Option<Div>,
+        tab_row: Stateful<Div>,
+        bundle_bar: Option<Div>,
+        content: Div,
+    ) -> Div {
         div()
             .flex_1()
             .flex()
             .min_h_0()
             .children(sidebar)
-            .child(div().flex_1().flex().flex_col().min_w_0().child(tab_row).child(content))
+            .child(
+                div()
+                    .flex_1()
+                    .flex()
+                    .flex_col()
+                    .min_w_0()
+                    .child(tab_row)
+                    .children(bundle_bar)
+                    .child(content),
+            )
     }
 }
 
@@ -356,6 +371,7 @@ impl Render for GridView {
             .or_else(|| self.save_bar(theme, cx))
             .or_else(|| self.edits_bar(theme, cx));
         let banner = self.save_banner(theme, cx);
+        let bundle_bar = self.connection_bundle_bar(theme, cx);
         let insert_form = self
             .insert_form(theme, cx)
             .or_else(|| self.import_bar(theme, cx))
@@ -411,7 +427,7 @@ impl Render for GridView {
                 }),
             )
             .child(toolbar)
-            .child(self.main_layout(sidebar, tab_row, content))
+            .child(self.main_layout(sidebar, tab_row, bundle_bar, content))
             .children(self.row_menu_overlay())
             .child(self.status_bar(theme))
             .children(palette)
@@ -549,6 +565,7 @@ impl GridView {
             .occlude()
             .on_click(cx.listener(|this, _, window, cx| {
                 this.close_palette(window, cx);
+                cx.stop_propagation();
             }))
             .child(
                 div()

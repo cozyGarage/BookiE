@@ -39,8 +39,9 @@ class ReleasePublicationTests(unittest.TestCase):
         publish = re.search(r"(?ms)^  publish:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
 
         self.assertIn("name: GPUI Linux preview", gpui)
+        self.assertIn("CARGO_TARGET_DIR: apps/gpui/target", gpui)
         self.assertIn("cargo build --release --locked --manifest-path apps/gpui/Cargo.toml", gpui)
-        self.assertIn("install -m 0755 target/release/bookie-gpui", gpui)
+        self.assertIn("install -m 0755 apps/gpui/target/release/bookie-gpui", gpui)
         self.assertIn("glibc 2.39", gpui)
         self.assertIn('name="bookie-gpui-linux-x86_64-${VERSION}"', gpui)
         self.assertIn("needs: [prepare, appimage, arch, gpui-linux]", publish)
