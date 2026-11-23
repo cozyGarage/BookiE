@@ -259,7 +259,21 @@ class ArtifactRedirect(urllib.request.HTTPRedirectHandler):
         return result
 
 
+class UnstableReferenceInventory(ValueError):
+    pass
+
+
 def forgejo_list(api, endpoint, parameters, token, key=None):
+    for attempt in range(3):
+        try:
+            return forgejo_list_snapshot(api, endpoint, parameters, token, key)
+        except UnstableReferenceInventory:
+            if attempt == 2:
+                raise
+            time.sleep(0.25 * (attempt + 1))
+
+
+def forgejo_list_snapshot(api, endpoint, parameters, token, key):
     items = []
     page = 1
     while True:
@@ -279,14 +293,25 @@ def forgejo_list(api, endpoint, parameters, token, key=None):
                 total = int(headers['X-Total-Count'])
             except ValueError as error:
                 raise ValueError(f'Forgejo returned an invalid {endpoint} reference count') from error
-        next_page = 'rel="next"' in headers.get('Link', '') if hasattr(headers, 'get') else False
+        links = headers.get('Link', '') if hasattr(headers, 'get') else ''
+        next_page = 'rel="next"' in links
         if type(total) is int:
             if len(items) > total:
-                raise ValueError(f'Forgejo returned an inconsistent {endpoint} reference count')
-            if len(items) >= total:
+                raise UnstableReferenceInventory(
+                    f'Forgejo returned an inconsistent {endpoint} reference count')
+            if next_page:
+                page += 1
+                continue
+            if links:
+                if not page_items and len(items) < total:
+                    raise UnstableReferenceInventory(
+                        f'Forgejo returned an incomplete {endpoint} reference inventory')
+                return items
+            if len(items) == total:
                 return items
             if not page_items:
-                raise ValueError(f'Forgejo returned an incomplete {endpoint} reference inventory')
+                raise UnstableReferenceInventory(
+                    f'Forgejo returned an incomplete {endpoint} reference inventory')
         elif not next_page and len(page_items) < 50:
             return items
         page += 1

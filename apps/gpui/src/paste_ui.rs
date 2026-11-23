@@ -36,10 +36,12 @@ impl GridView {
         }]
     }
 
-    fn paste_targets(&self, text: &str) -> Result<Vec<PasteTarget>, String> {
+    fn paste_targets(&self, text: &str, cx: &App) -> Result<Vec<PasteTarget>, String> {
         let cursor = self.cell_cursor.ok_or("Click the cell to paste into first")?;
-        let columns = self.source.columns().len();
-        let displayed: Vec<usize> = (0..columns).collect();
+        let projection = self.table.read(cx).delegate().clone_projection();
+        let displayed: Vec<usize> = (0..projection.len())
+            .filter_map(|index| projection.source_index(index))
+            .collect();
         let plan = paste_plan(
             cursor.row as u32,
             cursor.column,
@@ -83,7 +85,7 @@ impl GridView {
             self.status = "The clipboard has no text to paste".into();
             return;
         };
-        let outcome = self.paste_targets(&text).and_then(|targets| staged_paste(&targets));
+        let outcome = self.paste_targets(&text, cx).and_then(|targets| staged_paste(&targets));
         match outcome {
             Ok(staged) if staged.is_empty() => self.status = "The pasted values equal the current ones".into(),
             Ok(staged) => {

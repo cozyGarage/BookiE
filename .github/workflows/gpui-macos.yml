@@ -35,6 +35,7 @@ jobs:
     timeout-minutes: 60
     env:
       CARGO_BUILD_JOBS: 2
+      CARGO_TARGET_DIR: apps/gpui/target
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
@@ -72,6 +73,7 @@ jobs:
     timeout-minutes: 60
     env:
       CARGO_BUILD_JOBS: 2
+      CARGO_TARGET_DIR: apps/gpui/target
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
