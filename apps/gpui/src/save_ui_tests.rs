@@ -394,6 +394,8 @@ fn a_cached_write_session_for_another_connection_is_never_used(cx: &mut TestAppC
 fn an_edited_cell_is_reviewed_then_saved_and_the_table_shows_the_saved_value(cx: &mut TestAppContext) {
     use bookie_gpui::model::CellText;
     let path = std::env::temp_dir().join(format!("bookie-gpui-save-{}.sqlite", uuid::Uuid::new_v4()));
+    let staged = format!("draft {}\r\nlast line", "🧪".repeat(160));
+    let replacement = format!("  {}\r\nlast line\t ", "💾".repeat(160));
     std::fs::copy(orders_fixture(), &path).unwrap();
     let table = writable_table(&path);
     cx.update(text_input::bind_keys);
@@ -422,7 +424,16 @@ fn an_edited_cell_is_reviewed_then_saved_and_the_table_shows_the_saved_value(cx:
             view.save.write = Some((id, write));
             view.cell_edit
                 .edits
-                .insert((0, 1), bookie_gpui::model::Cell::Text("Ada Lovelace".into()));
+                .insert((0, 1), bookie_gpui::model::Cell::Text(staged.clone()));
+            view.start_edit(0, 1, window, cx);
+            assert!(
+                view.cell_edit.active.as_ref().is_some_and(|editing| editing.full_value)
+            );
+            assert_eq!(view.cell_edit.value_editor.read(cx).value().as_ref(), staged);
+            view.cell_edit
+                .value_editor
+                .update(cx, |editor, cx| editor.set_value(&replacement, window, cx));
+            view.apply_active_cell_edit(window, cx);
         })
     });
 
@@ -435,11 +446,12 @@ fn an_edited_cell_is_reviewed_then_saved_and_the_table_shows_the_saved_value(cx:
             .as_ref()
             .unwrap_or_else(|| panic!("no review shown; status: {}", view.status));
         assert!(pending.plan.preview.contains("UPDATE"), "{}", pending.plan.preview);
-        assert!(
-            pending.plan.preview.contains("Ada Lovelace"),
-            "{}",
-            pending.plan.preview
-        );
+        assert!(pending
+            .plan
+            .statements
+            .iter()
+            .flat_map(|(_, params)| params)
+            .any(|value| value == &bookie_gpui::model::Cell::Text(replacement.clone())));
         assert_eq!(
             view.cell_edit.edits.len(),
             1,
@@ -456,7 +468,7 @@ fn an_edited_cell_is_reviewed_then_saved_and_the_table_shows_the_saved_value(cx:
         assert!(view.save.pending.is_none());
         assert_eq!(
             view.source.row(0)[1].display(),
-            "Ada Lovelace",
+            replacement,
             "the grid shows the saved value"
         );
     });
