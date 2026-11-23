@@ -816,14 +816,16 @@ async fn cancelled_schema_table_read_records_cancelled_audit_outcome() {
     }];
     let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
 
-    guard
-        .fetch_schema_table_metadata_controlled(&tables, false, &control, &mut |_, result| {
-            assert!(matches!(result, Err(DriverError::Cancelled)));
+    let mut visited = false;
+    let result = guard
+        .fetch_schema_table_metadata_controlled(&tables, false, &control, &mut |_, _| {
+            visited = true;
             false
         })
-        .await
-        .expect("the visitor owns the terminal table error");
+        .await;
 
+    assert!(matches!(result, Err(DriverError::Cancelled)));
+    assert!(!visited, "terminal errors propagate without invoking the visitor");
     assert_eq!(last_terminal_status(&audit), Some(AuditTerminalStatus::Cancelled));
     assert!(audit.events.lock().expect("audit events").iter().any(|event| {
         event.phase == crate::audit::AuditRecordPhase::Outcome
