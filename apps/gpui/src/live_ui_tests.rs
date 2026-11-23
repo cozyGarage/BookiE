@@ -756,6 +756,7 @@ fn switching_tables_keeps_all_view_edits_until_the_user_discards_them(cx: &mut T
                     number: 1,
                     rows: 0,
                     elapsed_ms: None,
+                    first_row_ms: None,
                 },
                 None,
             ));

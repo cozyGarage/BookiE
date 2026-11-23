@@ -90,16 +90,14 @@ impl GridView {
     }
 
     pub(crate) fn show_sessions(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(live) = &self.live {
-            if live.driver_id == "postgres" {
-                self.tabs.open_query();
-                self.sync_grid_owner();
-                self.sql_input.update(cx, |input, cx| {
-                    input.set_value(bookie_app_services::pg_sessions::SESSIONS_SQL, window, cx)
-                });
-                self.run_query(cx);
-                return;
-            }
+        if self.live.as_ref().is_some_and(|live| live.driver_id == "postgres") {
+            self.tabs.open_query();
+            self.sync_grid_owner();
+            self.sql_input.update(cx, |input, cx| {
+                input.set_value(bookie_app_services::pg_sessions::SESSIONS_SQL, window, cx)
+            });
+            self.run_query(cx);
+            return;
         }
         self.show_activity(bookie_core::ActivityQuery::Sessions, window, cx);
     }
@@ -143,7 +141,7 @@ impl GridView {
         };
         let pid = row
             .iter()
-            .find(|(k, _)| k.to_ascii_lowercase() == "pid")
+            .find(|(k, _)| k.eq_ignore_ascii_case("pid"))
             .and_then(|(_, v)| match v {
                 bookie_core::Value::Int(n) => Some(*n),
                 _ => None,
