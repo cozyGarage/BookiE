@@ -45,6 +45,7 @@ SIGNATURES = [
     ("infra", "a fixture image is missing on the executor", r"No such image:"),
     ("infra", "a fixture container exited before the tests ran", r"container \S+ exited \(\d+\)"),
     ("infra", "Docker could not bind a fixture port because it is already in use", r"(?i:port is already allocated|address already in use)"),
+    ("unknown", "bounded operation timed out; check runner pressure before treating it as a code failure", r"OperationOutcomeUnknown\s*\{\s*source:\s*TimedOut\s*\}"),
     ("code", "application crashed", r"application exited with -\d+"),
     ("code", "layout abort at startup", r"Gtk-CRITICAL.*for_size"),
     ("gui-timing", "window did not appear", r"application did not expose its expected window"),

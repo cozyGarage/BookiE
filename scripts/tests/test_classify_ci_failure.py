@@ -84,6 +84,13 @@ class ClassifyCiFailureTests(unittest.TestCase):
         text = "test ui::grid::local_sort::sorts ... FAILED\nthread 'x' panicked at src/lib.rs:10:5:\nassertion failed"
         self.assertEqual(self.tag(text), "code")
 
+    def test_a_bounded_operation_timeout_is_not_assumed_to_be_a_code_failure(self):
+        text = "thread 'x' panicked at tests/query.rs:1:1:\ncalled `Result::unwrap()` on an `Err` value: OperationOutcomeUnknown { source: TimedOut }\nJob failed"
+        tag, reason, evidence = classifier.classify_log(text)
+        self.assertEqual(tag, "unknown")
+        self.assertIn("check runner pressure", reason)
+        self.assertIn("OperationOutcomeUnknown", evidence)
+
     def test_a_compile_error_is_code(self):
         self.assertEqual(self.tag("error[E0063]: missing field `preview` in initializer"), "code")
 
