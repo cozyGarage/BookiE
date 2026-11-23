@@ -367,6 +367,8 @@ impl GridView {
             let skipped = pending.skipped.len();
             return Some(
                 div()
+                    .w_full()
+                    .debug_selector(|| "connection-import-review".into())
                     .flex()
                     .items_start()
                     .gap_3()
@@ -643,5 +645,56 @@ mod tests {
         assert_eq!(body.connections.len(), 1);
         assert!(body.secrets.is_empty());
         Ok(())
+    }
+
+    #[gpui::test]
+    fn import_review_actions_remain_visible_on_home_and_connection_tabs(cx: &mut gpui::TestAppContext) {
+        let (view, cx) = crate::ui_tests::open(cx);
+        cx.simulate_resize(gpui::size(gpui::px(1100.0), gpui::px(800.0)));
+        let connection: bundles::SavedConnection = serde_json::from_str(
+            r#"{"id":"6af4b280-82ec-4d81-b780-3878f7af1647","name":"Review fixture","driver_id":"postgres","host":"localhost","port":5432,"database":"test","username":"test"}"#,
+        )
+        .expect("valid review fixture");
+        let bytes = bundles::export_plaintext(&bundle_export(vec![connection], Vec::new()))
+            .expect("fixture serializes");
+        let bundles::ParsedBundle::Plaintext(body) = bundles::parse_bundle(&bytes).expect("fixture parses") else {
+            panic!("fixture must be a plaintext bundle");
+        };
+        let pending = PendingImport {
+            plan: bundles::plan_import(&[], &body).expect("valid review fixture"),
+            secrets: Vec::new(),
+            skipped: Vec::new(),
+        };
+
+        cx.update(|_, cx| {
+            view.update(cx, |this, cx| {
+                this.tabs.open_new_connection();
+                this.connection_bundle.pending = Some(pending);
+                cx.notify();
+            });
+        });
+        cx.run_until_parked();
+        view.read_with(cx, |this, _| {
+            assert!(this.connection_bundle.pending.is_some());
+            assert!(!this.connection_bundle.busy);
+            assert_eq!(this.tabs.current(), &bookie_gpui::shell::Tab::NewConnection);
+        });
+        assert!(cx.debug_bounds("connection-page").is_some());
+        assert!(
+            cx.debug_bounds("connection-import-review").is_some(),
+            "the import confirmation must remain visible on the New Connection tab"
+        );
+
+        cx.update(|_, cx| {
+            view.update(cx, |this, cx| {
+                this.tabs.open_home();
+                cx.notify();
+            });
+        });
+        cx.run_until_parked();
+        assert!(
+            cx.debug_bounds("connection-import-review").is_some(),
+            "the import confirmation must remain visible on the Home tab"
+        );
     }
 }
