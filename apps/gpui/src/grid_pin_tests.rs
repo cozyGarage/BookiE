@@ -13,6 +13,44 @@ use crate::{GridView, text_input};
 
 struct WideSource(Vec<ColumnMeta>);
 
+struct QuerySource {
+    inner: WideSource,
+    sql: &'static str,
+}
+
+impl ResultSource for QuerySource {
+    fn columns(&self) -> &[ColumnMeta] { self.inner.columns() }
+    fn total(&self) -> u64 { self.inner.total() }
+    fn executed_sql(&self) -> Option<&str> { Some(self.sql) }
+    fn row(&self, index: u64) -> Vec<Cell> { self.inner.row(index) }
+    fn find(&self, q: &str, cap: usize, cancel: &CancellationToken) -> Result<FindResult, &'static str> { self.inner.find(q, cap, cancel) }
+    fn filter(&self, predicate: &Predicate, cancel: &CancellationToken) -> Result<Vec<u32>, &'static str> { self.inner.filter(predicate, cancel) }
+    fn compare(&self, keyed: bool, cancel: &CancellationToken) -> Result<Diff, &'static str> { self.inner.compare(keyed, cancel) }
+}
+
+#[gpui::test]
+fn query_widths_survive_same_query_and_do_not_follow_a_different_query(cx: &mut TestAppContext) {
+    let source = |sql| Arc::new(QuerySource {
+        inner: WideSource(vec![ColumnMeta { name: "id".into(), width: 120.0, numeric: false, data_type: "integer".into(), primary_key: false }]),
+        sql,
+    });
+    cx.update(text_input::bind_keys);
+    let (view, cx) = cx.add_window_view(|window, cx| GridView::with_source(source("select id from a"), Instant::now(), window, cx));
+    cx.run_until_parked();
+    cx.update(|window, cx| view.update(cx, |view, cx| {
+        view.tabs.open_query();
+        view.grid_is_query = true;
+        view.sync_table(900.0, window, cx);
+        view.remember_grid_widths(&[gpui::px(180.0)], cx);
+        view.source = source("select id from a");
+        view.sync_table(900.0, window, cx);
+        assert_eq!(f32::from(view.table.read(cx).col_width(0).unwrap()), 180.0);
+        view.source = source("select id from b");
+        view.sync_table(900.0, window, cx);
+        assert_ne!(f32::from(view.table.read(cx).col_width(0).unwrap()), 180.0);
+    }));
+}
+
 struct BinarySource;
 
 impl ResultSource for BinarySource {
