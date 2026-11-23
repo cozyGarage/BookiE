@@ -313,6 +313,7 @@ impl GridView {
                                         format!("Go to error ({}:{})", line + 1, column + 1),
                                         theme,
                                     )
+                                    .debug_selector(|| "go-to-query-error".into())
                                     .on_click(cx.listener(
                                         move |this, _, window, cx| {
                                             if matches!(this.tabs.current(), Tab::Query)
