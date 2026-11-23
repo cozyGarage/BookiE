@@ -207,3 +207,37 @@ fn page_queries_order_text_keys_by_bytes_and_resume_after_the_last_key() {
         mssql.ends_with("ORDER BY [code] COLLATE Latin1_General_BIN2, [n] OFFSET 0 ROWS FETCH NEXT 1000 ROWS ONLY")
     );
 }
+
+#[tokio::test]
+async fn a_batched_script_commits_every_n_statements_and_leaves_commented_deletes_out_of_the_count() {
+    let result = run(
+        vec![row(1, Some("a")), row(2, Some("b")), row(3, Some("c"))],
+        vec![row(4, Some("d"))],
+    )
+    .await
+    .unwrap();
+    let script = result
+        .batched_script("postgres", None, "people", false, Some(2))
+        .unwrap();
+    let control: Vec<&str> = script
+        .lines()
+        .filter(|line| {
+            matches!(*line, "BEGIN;" | "COMMIT;") || line.starts_with("INSERT") || line.starts_with("-- DELETE")
+        })
+        .map(|line| line.split(' ').next().unwrap_or_default())
+        .collect();
+    assert_eq!(
+        control,
+        [
+            "BEGIN;", "INSERT", "INSERT", "COMMIT;", "BEGIN;", "INSERT", "--", "COMMIT;"
+        ]
+    );
+    let mysql = result.batched_script("mysql", None, "people", true, Some(10)).unwrap();
+    assert!(mysql.contains("START TRANSACTION;\n") && mysql.trim_end().ends_with("COMMIT;"));
+    assert!(
+        !result
+            .script("postgres", None, "people", true)
+            .unwrap()
+            .contains("BEGIN;")
+    );
+}

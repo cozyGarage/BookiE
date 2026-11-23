@@ -176,6 +176,17 @@ impl DataCompare {
         table: &str,
         include_deletes: bool,
     ) -> Result<String, DataCompareError> {
+        self.batched_script(driver_id, schema, table, include_deletes, None)
+    }
+
+    pub fn batched_script(
+        &self,
+        driver_id: &str,
+        schema: Option<&str>,
+        table: &str,
+        include_deletes: bool,
+        batch_rows: Option<usize>,
+    ) -> Result<String, DataCompareError> {
         if !self.complete {
             return Err(DataCompareError::TooManyDifferences(self.differences()));
         }
@@ -187,13 +198,14 @@ impl DataCompare {
         let columns = &self.layout.columns;
         let identity = self.layout.identity && driver_id == "mssql" && !self.inserts.is_empty();
         let qualified = qualified_table(driver_id, schema, table);
+        let mut batches = Batches::new(driver_id, batch_rows);
         if !self.inserts.is_empty() {
             out.push_str("\n-- Inserts\n");
             if identity {
                 out.push_str(&format!("SET IDENTITY_INSERT {qualified} ON;\n"));
             }
             for row in &self.inserts {
-                push_line(&mut out, &build_insert_literal(driver_id, schema, table, columns, row)?);
+                batches.push(&mut out, &build_insert_literal(driver_id, schema, table, columns, row)?);
             }
             if identity {
                 out.push_str(&format!("SET IDENTITY_INSERT {qualified} OFF;\n"));
@@ -203,7 +215,7 @@ impl DataCompare {
             out.push_str("\n-- Updates\n");
             for (changed, row) in &self.updates {
                 let (subset, values) = self.update_subset(changed, row);
-                push_line(
+                batches.push(
                     &mut out,
                     &build_update_literal(driver_id, schema, table, &subset, &values)?,
                 );
@@ -218,12 +230,15 @@ impl DataCompare {
             out.push_str(&format!("\n-- {title}\n"));
             for row in &self.deletes {
                 let statement = build_delete_literal(driver_id, schema, table, columns, row)?;
-                if !include_deletes {
+                if include_deletes {
+                    batches.push(&mut out, &statement);
+                } else {
                     out.push_str("-- ");
+                    push_line(&mut out, &statement);
                 }
-                push_line(&mut out, &statement);
             }
         }
+        batches.finish(&mut out);
         Ok(out)
     }
 
@@ -242,6 +257,48 @@ fn sample_value(driver_id: &str, value: &Value) -> String {
     }
     let shown: String = text.chars().take(SAMPLE_VALUE_CHARS).collect();
     format!("{shown}\u{2026}")
+}
+
+struct Batches {
+    begin: &'static str,
+    commit: &'static str,
+    every: Option<usize>,
+    count: usize,
+}
+
+impl Batches {
+    fn new(driver_id: &str, every: Option<usize>) -> Self {
+        let (begin, commit) = match driver_id {
+            "mysql" => ("START TRANSACTION;\n", "COMMIT;\n"),
+            "mssql" => ("BEGIN TRANSACTION;\n", "COMMIT TRANSACTION;\n"),
+            _ => ("BEGIN;\n", "COMMIT;\n"),
+        };
+        Self {
+            begin,
+            commit,
+            every: every.filter(|rows| *rows > 0),
+            count: 0,
+        }
+    }
+
+    fn push(&mut self, out: &mut String, statement: &str) {
+        if let Some(every) = self.every
+            && self.count.is_multiple_of(every)
+        {
+            if self.count > 0 {
+                out.push_str(self.commit);
+            }
+            out.push_str(self.begin);
+        }
+        push_line(out, statement);
+        self.count += 1;
+    }
+
+    fn finish(&self, out: &mut String) {
+        if self.every.is_some() && self.count > 0 {
+            out.push_str(self.commit);
+        }
+    }
 }
 
 fn push_line(out: &mut String, statement: &str) {
