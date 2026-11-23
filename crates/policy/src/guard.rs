@@ -5,7 +5,8 @@ use std::time::{Duration, Instant};
 use async_trait::async_trait;
 use bookie_core::{
     ColumnInfo, Connection, DriverError, Environment, ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo,
-    OperationControl, QueryResult, QueryResultBatch, ServerMessages, TableInfo, Transaction, Value, check_pre_dispatch,
+    OperationControl, QueryResult, QueryResultBatch, SchemaTableMetadataVisitor, ServerMessages, TableInfo,
+    Transaction, Value, check_pre_dispatch,
 };
 use chrono::Utc;
 use uuid::Uuid;
