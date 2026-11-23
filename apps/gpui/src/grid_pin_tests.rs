@@ -13,6 +13,56 @@ use crate::{GridView, text_input};
 
 struct WideSource(Vec<ColumnMeta>);
 
+struct BinarySource;
+
+impl ResultSource for BinarySource {
+    fn columns(&self) -> &[ColumnMeta] {
+        static COLUMNS: std::sync::OnceLock<Vec<ColumnMeta>> = std::sync::OnceLock::new();
+        COLUMNS.get_or_init(|| {
+            vec![
+                ColumnMeta {
+                    name: "name".into(),
+                    width: 120.0,
+                    numeric: false,
+                    data_type: "text".into(),
+                    primary_key: false,
+                },
+                ColumnMeta {
+                    name: "payload".into(),
+                    width: 160.0,
+                    numeric: false,
+                    data_type: "bytea".into(),
+                    primary_key: false,
+                },
+            ]
+        })
+    }
+
+    fn editable(&self) -> bool {
+        true
+    }
+
+    fn total(&self) -> u64 {
+        1
+    }
+
+    fn row(&self, _: u64) -> Vec<Cell> {
+        vec![Cell::Text("blob".into()), Cell::Bytes(vec![0, 255, 65])]
+    }
+
+    fn find(&self, _: &str, _: usize, _: &CancellationToken) -> Result<FindResult, &'static str> {
+        Err("not used by this test source")
+    }
+
+    fn filter(&self, _: &Predicate, _: &CancellationToken) -> Result<Vec<u32>, &'static str> {
+        Err("not used by this test source")
+    }
+
+    fn compare(&self, _: bool, _: &CancellationToken) -> Result<Diff, &'static str> {
+        Err("not used by this test source")
+    }
+}
+
 impl ResultSource for WideSource {
     fn columns(&self) -> &[ColumnMeta] {
         &self.0
@@ -80,6 +130,59 @@ fn hidden_middle_column_keeps_visible_cells_bound_to_their_source_columns(cx: &m
         assert_eq!(delegate.source_column(1), Some(2));
     });
     assert_eq!(label, "row-0-secret");
+}
+
+#[gpui::test]
+fn binary_display_mode_controls_preview_detail_and_edit_without_changing_value_type(cx: &mut TestAppContext) {
+    cx.update(text_input::bind_keys);
+    let source = Arc::new(BinarySource);
+    let (view, cx) = cx.add_window_view(|window, cx| GridView::with_source(source, Instant::now(), window, cx));
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+
+    let menu = cx.update(|window, _| window.find_by_label("Actions for payload").bounds());
+    cx.simulate_click(menu.center(), Default::default());
+    cx.run_until_parked();
+    let base64 = cx.update(|window, _| window.find_by_label("Display as Base64").bounds());
+    cx.simulate_click(base64.center(), Default::default());
+    cx.run_until_parked();
+
+    view.update(cx, |view, cx| {
+        assert_eq!(view.table.update(cx, |table, _| table.delegate_mut().label_of(0, 1).0), "AP9B");
+        view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 1 });
+        assert_eq!(
+            view.detail_target().map(|(_, detail)| detail),
+            Some(bookie_gpui::detail::Detail::Text("AP9B".into()))
+        );
+    });
+
+    cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(0, 1, window, cx)));
+    view.read_with(cx, |view, cx| assert_eq!(view.cell_edit.editor.read(cx).content(), "AP9B"));
+    cx.simulate_keystrokes("ctrl-a");
+    cx.simulate_input("bad=");
+    cx.simulate_keystrokes("enter");
+    view.read_with(cx, |view, _| {
+        assert!(view.cell_edit.edits.is_empty());
+        assert!(view.status.contains("not valid Base64 bytes"));
+    });
+    cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(0, 1, window, cx)));
+    cx.simulate_keystrokes("ctrl-a");
+    cx.simulate_input("AP9B");
+    cx.simulate_keystrokes("enter");
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.cell_edit.edits.get(&(0, 1)), Some(&Cell::Bytes(vec![0, 255, 65])));
+    });
+
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.source = Arc::new(BinarySource);
+            view.table_source = view.source.clone();
+            view.sync_table(900.0, window, cx);
+        })
+    });
+    view.update(cx, |view, cx| {
+        assert_eq!(view.table.update(cx, |table, _| table.delegate_mut().label_of(0, 1).0), "AP9B");
+    });
 }
 
 #[gpui::test]
