@@ -77,6 +77,7 @@ pub struct GridDelegate {
     pin_scope: Option<PinScope>,
     pinned_columns: usize,
     pin_counts: HashMap<PinScope, usize>,
+    manual_widths: HashMap<PinScope, HashMap<String, f32>>,
 }
 
 fn header_menu(
@@ -209,6 +210,13 @@ impl TableDelegate for GridDelegate {
             *width = *measured;
         }
         fill_text_columns(&mut columns, &self.numeric, self.available_width);
+        if let Some(widths) = self.pin_scope.as_ref().and_then(|scope| self.manual_widths.get(scope)) {
+            for (name, width) in &mut columns {
+                if let Some(manual) = widths.get(name) {
+                    *width = *manual;
+                }
+            }
+        }
         if columns == self.columns {
             return;
         }
@@ -507,6 +515,42 @@ impl GridDelegate {
 }
 
 impl GridView {
+    pub(crate) fn remember_grid_widths(&mut self, widths: &[gpui::Pixels], cx: &mut Context<Self>) {
+        let table = self.table.read(cx);
+        let delegate = table.delegate();
+        let Some(scope) = delegate.pin_scope.clone() else {
+            return;
+        };
+        let previous = (0..delegate.projection.len())
+            .filter_map(|index| {
+                delegate
+                    .projection
+                    .source_index(index)
+                    .map(|source| delegate.columns[source].1)
+            })
+            .collect::<Vec<_>>();
+        let current = widths.iter().map(|width| f32::from(*width)).collect::<Vec<_>>();
+        let changes = crate::column_projection::changed_widths(&delegate.projection, &previous, &current)
+            .into_iter()
+            .filter_map(|(index, width)| {
+                let name = &delegate.columns.get(index)?.0;
+                (delegate.columns.iter().filter(|(other, _)| other == name).count() == 1)
+                    .then_some((name.clone(), width))
+            })
+            .collect::<Vec<_>>();
+        self.table.update(cx, |table, cx| {
+            let delegate = table.delegate_mut();
+            let remembered = delegate.manual_widths.entry(scope).or_default();
+            for (name, width) in changes {
+                remembered.insert(name.clone(), width);
+                if let Some(column) = delegate.columns.iter_mut().find(|(column, _)| *column == name) {
+                    column.1 = width;
+                }
+            }
+            table.refresh(cx);
+        });
+    }
+
     fn pin_scope(&self) -> Option<PinScope> {
         let bookie_gpui::shell::Tab::Table(table) = self.tabs.current() else {
             return None;
@@ -651,6 +695,13 @@ impl GridView {
             *width = *measured;
         }
         fill_text_columns(&mut columns, &numeric, available_width);
+        if let Some(widths) = pin_scope.as_ref().and_then(|scope| delegate.manual_widths.get(scope)) {
+            for (name, width) in &mut columns {
+                if let Some(manual) = widths.get(name) {
+                    *width = *manual;
+                }
+            }
+        }
         let (sortable, sort) = self.sort_state();
         let editor = self.cell_edit.active.as_ref().and_then(|editing| {
             let dataset = self.dataset_index_of(editing.row)?.checked_sub(map.base)?;

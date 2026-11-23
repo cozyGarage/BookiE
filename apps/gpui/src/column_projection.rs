@@ -39,9 +39,35 @@ impl ColumnProjection {
     }
 }
 
+pub(crate) fn changed_widths(projection: &ColumnProjection, previous: &[f32], current: &[f32]) -> Vec<(usize, f32)> {
+    if previous.len() != projection.len() || current.len() != projection.len() {
+        return Vec::new();
+    }
+    previous
+        .iter()
+        .zip(current)
+        .enumerate()
+        .filter_map(|(index, (before, after))| {
+            (before.is_finite() && after.is_finite() && (before - after).abs() >= 0.5)
+                .then(|| projection.source_index(index).map(|source| (source, *after)))
+                .flatten()
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn changed_widths_map_visible_indices_to_source_columns() {
+        let projection = ColumnProjection::new(4, &HashSet::from([1]));
+        assert_eq!(
+            changed_widths(&projection, &[100.0, 80.0, 90.0], &[100.0, 120.0, 90.0]),
+            vec![(2, 120.0)]
+        );
+        assert!(changed_widths(&projection, &[100.0], &[100.0, 120.0, 90.0]).is_empty());
+    }
 
     #[test]
     fn hidden_columns_keep_stable_source_identity_and_can_be_restored() {
