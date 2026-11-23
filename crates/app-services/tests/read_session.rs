@@ -305,7 +305,7 @@ async fn a_read_command_returns_its_epoch_and_guarded_query_result() {
         panic!("query command returned a different event");
     };
     assert_eq!(epoch, Epoch(42));
-    let result = outcome.unwrap();
+    let result = outcome.unwrap().into_first();
     assert_eq!(result.rows.len(), 3);
     assert_eq!(result.rows.iter().next().unwrap()[0], Value::Int(1));
 }
@@ -366,7 +366,10 @@ async fn opening_a_file_returns_an_opaque_session_and_closing_it_retires_reads()
     let Event::QueryCompleted { outcome, .. } = receiver.try_recv().unwrap() else {
         panic!("query command returned a different event");
     };
-    assert_eq!(outcome.unwrap().rows.iter().next().unwrap()[0], Value::Int(3));
+    assert_eq!(
+        outcome.unwrap().into_first().rows.iter().next().unwrap()[0],
+        Value::Int(3)
+    );
 
     dispatch(
         DispatchContext::Sessions(&sessions),
@@ -734,5 +737,8 @@ async fn a_denied_write_command_does_not_change_the_database() {
     let Event::QueryCompleted { outcome, .. } = receiver.try_recv().unwrap() else {
         panic!("query command returned a different event");
     };
-    assert_eq!(outcome.unwrap().rows.iter().next().unwrap()[0], Value::Int(3));
+    assert_eq!(
+        outcome.unwrap().into_first().rows.iter().next().unwrap()[0],
+        Value::Int(3)
+    );
 }
