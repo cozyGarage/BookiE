@@ -96,7 +96,9 @@ fn pinned_columns_stay_visible_after_scroll_and_tab_reopen(cx: &mut TestAppConte
             .collect(),
     ));
     cx.update(text_input::bind_keys);
-    let (view, cx) = cx.add_window_view(|window, cx| GridView::with_source(source, Instant::now(), window, cx));
+    let (view, cx) = cx.add_window_view(|window, cx| {
+        GridView::with_source(source, Instant::now(), window, cx)
+    });
     cx.simulate_resize(gpui::size(gpui::px(900.0), gpui::px(760.0)));
     cx.run_until_parked();
     cx.update(|window, cx| window.render_frame(cx));
@@ -155,6 +157,69 @@ fn pinned_columns_stay_visible_after_scroll_and_tab_reopen(cx: &mut TestAppConte
         assert_eq!(table.delegate().column(1, cx).fixed, Some(ColumnFixed::Left));
         assert_eq!(table.delegate().column(2, cx).fixed, None);
     });
+}
+
+#[gpui::test]
+fn narrow_column_headers_keep_pin_actions_in_the_menu(cx: &mut TestAppContext) {
+    let source = Arc::new(WideSource(
+        (0..40)
+            .map(|index| ColumnMeta {
+                name: format!("c{index:02}"),
+                width: 56.0,
+                numeric: false,
+                data_type: "text".into(),
+                primary_key: false,
+            })
+            .collect(),
+    ));
+    cx.update(text_input::bind_keys);
+    let (view, cx) = cx.add_window_view(|window, cx| {
+        GridView::with_source(source, Instant::now(), window, cx)
+    });
+    cx.simulate_resize(gpui::size(gpui::px(1_896.0), gpui::px(1_150.0)));
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+
+    assert!(
+        cx.update(|window, _| window.try_find_by_label("Pin through c00").is_none()),
+        "a narrow header should reserve its width for the column name"
+    );
+    let name_width = cx
+        .debug_bounds("column-header-name-0")
+        .expect("column name is rendered")
+        .size
+        .width;
+    assert!(
+        name_width >= gpui::px(20.0),
+        "a short column name should retain enough width to remain recognizable: {name_width:?}"
+    );
+    let menu_bounds = cx.update(|window, _| window.find_by_label("Actions for c00").bounds());
+    cx.simulate_click(menu_bounds.center(), Default::default());
+    cx.run_until_parked();
+    assert!(
+        cx.update(|window, _| window.try_find_by_label("Pin through c00").is_some()),
+        "the column menu should retain the pin action when the header button is hidden"
+    );
+    let pin_bounds = cx.update(|window, _| window.find_by_label("Pin through c00").bounds());
+    cx.simulate_click(pin_bounds.center(), Default::default());
+    cx.run_until_parked();
+    view.read_with(cx, |view, app| {
+        assert_eq!(
+            view.table.read(app).delegate().column(0, app).fixed,
+            Some(ColumnFixed::Left)
+        );
+    });
+
+    cx.simulate_resize(gpui::size(gpui::px(800.0), gpui::px(850.0)));
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    let narrow_menu_bounds = cx.update(|window, _| window.find_by_label("Actions for c01").bounds());
+    cx.simulate_click(narrow_menu_bounds.center(), Default::default());
+    cx.run_until_parked();
+    assert!(
+        cx.update(|window, _| window.try_find_by_label("Pin through c01").is_some()),
+        "the pin action should stay reachable after the result window narrows"
+    );
 }
 
 #[gpui::test]

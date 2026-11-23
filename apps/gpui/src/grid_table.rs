@@ -86,6 +86,7 @@ fn header_menu(
     owner: Option<WeakEntity<GridView>>,
     sortable: bool,
     has_hidden: bool,
+    pin_action: Option<(gpui::Entity<TableState<GridDelegate>>, PinScope, bool)>,
     icon: impl IntoElement,
 ) -> impl IntoElement {
     use gpui_component::button::{Button, ButtonVariants};
@@ -113,6 +114,25 @@ fn header_menu(
                         let _ = owner.update(cx, |view, cx| view.show_all_hidden_columns(window, cx));
                     }));
                 }
+            }
+            if let Some((table, scope, pinned)) = pin_action
+                .as_ref()
+                .map(|(table, scope, pinned)| (table.clone(), scope.clone(), *pinned))
+            {
+                let label = if pinned {
+                    format!("Unpin from {column_name}")
+                } else {
+                    format!("Pin through {column_name}")
+                };
+                menu = menu.item(PopupMenuItem::new(label).on_click(move |_, _, cx| {
+                    let _ = table.update(cx, |table, cx| {
+                        let delegate = table.delegate_mut();
+                        delegate.pinned_columns =
+                            next_pinned_count(delegate.pinned_columns, col_ix, delegate.columns.len());
+                        delegate.pin_counts.insert(scope.clone(), delegate.pinned_columns);
+                        table.refresh(cx);
+                    });
+                }));
             }
             let Some(owner) = owner.clone().filter(|_| sortable) else {
                 return menu;
@@ -221,7 +241,8 @@ impl TableDelegate for GridDelegate {
         let source_col = self.projection.source_index(col_ix).unwrap_or(col_ix);
         let (name, width) = &self.columns[source_col];
         let mut column = Column::new(name.clone(), name.clone())
-            .width(px(*width))
+            .width(px(width.max(MIN_GRID_COLUMN_WIDTH)))
+            .min_width(px(MIN_GRID_COLUMN_WIDTH))
             .resizable(true);
         if self.sortable {
             column = match self.sort.as_ref().filter(|sort| sort.column == *name) {
@@ -255,6 +276,11 @@ impl TableDelegate for GridDelegate {
             .get(source_col)
             .map(|(kind, key)| header_kind(kind, *key))
             .unwrap_or_default();
+        let column_width = self
+            .columns
+            .get(source_col)
+            .map_or(0.0, |(_, width)| *width);
+        let show_pin_button = pin_button_visible(column_width);
         let menu = header_menu(
             col_ix,
             source_col,
@@ -262,9 +288,13 @@ impl TableDelegate for GridDelegate {
             self.owner.clone(),
             self.sortable,
             !self.hidden_columns.is_empty(),
+            self.pin_scope
+                .clone()
+                .filter(|_| !show_pin_button)
+                .map(|scope| (cx.entity(), scope, col_ix < self.pinned_columns)),
             crate::assets::icon("ellipsis", theme.muted_foreground),
         );
-        let pin = self.pin_scope.clone().map(|scope| {
+        let pin = self.pin_scope.clone().filter(|_| show_pin_button).map(|scope| {
             use gpui_component::button::{Button, ButtonVariants};
 
             let pinned = col_ix < self.pinned_columns;
@@ -304,6 +334,14 @@ impl TableDelegate for GridDelegate {
                     .min_w_0()
                     .child(
                         div()
+                            .id(("column-header-name", col_ix))
+                            .debug_selector(move || format!("column-header-name-{col_ix}"))
+                            .tooltip({
+                                let full_name = name.clone();
+                                move |window, cx| {
+                                    gpui_component::tooltip::Tooltip::new(full_name.clone()).build(window, cx)
+                                }
+                            })
                             .min_w_0()
                             .overflow_hidden()
                             .whitespace_nowrap()
@@ -837,6 +875,12 @@ impl GridView {
 }
 
 const COMPARE_CHANGE_WIDTH: f32 = 70.0;
+const MIN_GRID_COLUMN_WIDTH: f32 = 72.0;
+const PIN_BUTTON_MIN_COLUMN_WIDTH: f32 = 96.0;
+
+fn pin_button_visible(column_width: f32) -> bool {
+    column_width >= PIN_BUTTON_MIN_COLUMN_WIDTH
+}
 
 fn next_pinned_count(current: usize, clicked: usize, column_count: usize) -> usize {
     if clicked < current {
@@ -848,7 +892,7 @@ fn next_pinned_count(current: usize, clicked: usize, column_count: usize) -> usi
 
 #[cfg(test)]
 mod pin_tests {
-    use super::next_pinned_count;
+    use super::{next_pinned_count, pin_button_visible};
 
     #[test]
     fn pin_actions_keep_a_contiguous_leading_prefix() {
@@ -856,6 +900,12 @@ mod pin_tests {
         assert_eq!(next_pinned_count(3, 1, 60), 1);
         assert_eq!(next_pinned_count(3, 0, 60), 0);
         assert_eq!(next_pinned_count(3, 99, 60), 60);
+    }
+
+    #[test]
+    fn narrow_headers_move_pin_actions_into_the_menu() {
+        assert!(!pin_button_visible(56.0));
+        assert!(pin_button_visible(96.0));
     }
 }
 
