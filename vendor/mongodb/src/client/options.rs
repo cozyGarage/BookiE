@@ -1321,6 +1321,7 @@ impl Debug for TlsOptions {
             allow_invalid_hostnames,
             #[cfg(feature = "cert-key-password")]
             tls_certificate_key_file_password,
+            verify_hostname: _,
         } = self;
         let mut d = f.debug_struct("TlsOptions");
         d.field("allow_invalid_certificates", allow_invalid_certificates)
