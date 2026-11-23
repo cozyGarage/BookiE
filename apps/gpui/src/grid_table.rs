@@ -73,6 +73,7 @@ pub struct GridDelegate {
     projection: ColumnProjection,
     hidden_columns: HashSet<usize>,
     content_widths: Vec<f32>,
+    visible_rows: Range<usize>,
     available_width: f32,
     numeric: Vec<bool>,
     kinds: Vec<(String, bool)>,
@@ -190,7 +191,7 @@ impl TableDelegate for GridDelegate {
     fn fit_column(&mut self, col_ix: usize, window: &mut Window, _cx: &mut Context<TableState<Self>>) -> Option<gpui::Pixels> {
         let source_col = self.projection.source_index(col_ix)?;
         let source = self.source.as_ref()?;
-        let measured = measure_visible_columns(source, &self.map, &self.columns, &self.edits, 0, self.map.count.min(64), |text| measure_text(text, window));
+        let measured = measure_visible_columns(source, &self.map, &self.columns, &self.edits, self.visible_rows.start, self.visible_rows.len(), |text| measure_text(text, window));
         measured.get(source_col).copied().map(px)
     }
     fn perform_sort(
@@ -227,6 +228,7 @@ impl TableDelegate for GridDelegate {
         window: &mut Window,
         cx: &mut Context<TableState<Self>>,
     ) {
+        self.visible_rows = visible.clone();
         let Some(source) = &self.source else { return };
         if self.map.compare.is_some()
             || self.content_widths.len() != self.columns.len()
