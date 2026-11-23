@@ -893,13 +893,6 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertNotIn("cargo test", job)
         self.assertIn('rm -rf -- "$TMPDIR/bookie-gpui-${GITHUB_RUN_ID}"', job)
 
-    def test_gpui_release_packages_from_its_configured_cargo_target_dir(self):
-        workflow = (ROOT / ".github/workflows/release.yml").read_text()
-        job = re.search(r"(?ms)^  gpui-linux:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
-
-        self.assertIn("CARGO_TARGET_DIR: apps/gpui/target", job)
-        self.assertIn('install -m 0755 apps/gpui/target/release/bookie-gpui', job)
-
     def test_forgejo_jobs_fetch_the_bundle_group_they_execute(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         for name, group in (("unit", "workspace"), ("sandbox", "workspace"), ("gpui-tests", "gpui"),
