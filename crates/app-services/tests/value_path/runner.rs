@@ -61,10 +61,12 @@ impl Run<'_> {
 }
 
 pub fn load_corpus(engine: &str) -> Vec<TypeCases> {
-    let path = corpus_dir().join(format!("{engine}.json"));
-    let mut types: Vec<TypeCases> = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
-    let contract: serde_json::Value =
-        serde_json::from_str(&std::fs::read_to_string(corpus_dir().join("../value-contract.json")).unwrap()).unwrap();
+    let mut types: Vec<TypeCases> = serde_json::from_str(corpus(engine)).unwrap();
+    let contract: serde_json::Value = serde_json::from_str(include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../tests/data/value-contract.json"
+    )))
+    .unwrap();
     for entry in &mut types {
         let Some(list) = entry.contract.as_deref() else {
             continue;
@@ -96,8 +98,11 @@ pub fn load_known_issues() -> BTreeMap<Key, u64> {
         signature: String,
         issue: u64,
     }
-    let text = std::fs::read_to_string(corpus_dir().join("known-issues.json")).unwrap();
-    let known: Vec<Known> = serde_json::from_str(&text).unwrap();
+    let known: Vec<Known> = serde_json::from_str(include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../tests/data/type-corpus/known-issues.json"
+    )))
+    .unwrap();
     known
         .into_iter()
         .map(|entry| {
@@ -112,8 +117,22 @@ pub fn load_known_issues() -> BTreeMap<Key, u64> {
         .collect()
 }
 
-fn corpus_dir() -> std::path::PathBuf {
-    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/data/type-corpus")
+fn corpus(engine: &str) -> &'static str {
+    match engine {
+        "sqlite" => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../tests/data/type-corpus/sqlite.json"
+        )),
+        "postgres" => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../tests/data/type-corpus/postgres.json"
+        )),
+        "mysql" => include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../tests/data/type-corpus/mysql.json"
+        )),
+        _ => panic!("unknown value corpus engine {engine}"),
+    }
 }
 
 pub async fn run_engine(engine: &Engine<'_>, corpus: &[TypeCases]) -> Report {

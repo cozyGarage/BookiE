@@ -70,6 +70,25 @@ impl GridView {
             return;
         }
         if let Some(session) = self.live.clone() {
+            let schema_statement = match bookie_app_services::schema_context::schema_context_for_run(
+                &session.driver_id,
+                self.schema_context.as_deref().unwrap_or_default(),
+                true,
+            ) {
+                Ok(statement) => statement,
+                Err(bookie_app_services::schema_context::SchemaContextError::Unsupported(_)) => {
+                    self.status = "This connection does not support a schema or database context".into();
+                    return;
+                }
+                Err(bookie_app_services::schema_context::SchemaContextError::Invalid(_)) => {
+                    self.status = "Enter a valid schema or database name".into();
+                    return;
+                }
+                Err(bookie_app_services::schema_context::SchemaContextError::NeedsSession) => {
+                    self.status = "A pinned database session is required for schema context".into();
+                    return;
+                }
+            };
             self.panel.error_location = None;
             self.status = "Running…".into();
             self.begin_background(
@@ -79,8 +98,31 @@ impl GridView {
                     let statement = sql.clone();
                     move |cancel| {
                         let (started, clock) = (Instant::now(), std::time::SystemTime::now());
-                        let result =
-                            session.run_query_bound_detailed(&statement, &params, bookie_gpui::live::ROW_CAP, &cancel);
+                        let result = run_with_schema_context(
+                            schema_statement.as_deref(),
+                            &statement,
+                            |schema| {
+                                session
+                                    .run_query_bound_detailed(schema, &[], bookie_gpui::live::ROW_CAP, &cancel)
+                                    .map(|_| ())
+                            },
+                            |statement| {
+                                session.run_query_bound_detailed(
+                                    statement,
+                                    &params,
+                                    bookie_gpui::live::ROW_CAP,
+                                    &cancel,
+                                )
+                            },
+                        )
+                        .map_err(|error| match error {
+                            SchemaContextRunError::Schema(mut error) => {
+                                error.message =
+                                    format!("Could not apply the selected schema or database: {}", error.message);
+                                error
+                            }
+                            SchemaContextRunError::Query(error) => error,
+                        });
                         let (rows, error) = match &result {
                             Ok(table) => (
                                 i64::try_from(bookie_gpui::source::ResultSource::total(table)).ok(),
@@ -354,5 +396,74 @@ impl GridView {
         }
         let next = index.min(self.run_tabs.slots.len() - 1);
         self.show_run(next, self.run_tabs.slots[next].run);
+    }
+}
+
+enum SchemaContextRunError<E> {
+    Schema(E),
+    Query(E),
+}
+
+fn run_with_schema_context<T, E>(
+    schema_statement: Option<&str>,
+    sql: &str,
+    run_schema: impl FnOnce(&str) -> Result<(), E>,
+    run_sql: impl FnOnce(&str) -> Result<T, E>,
+) -> Result<T, SchemaContextRunError<E>> {
+    if let Some(schema_statement) = schema_statement {
+        run_schema(schema_statement).map_err(SchemaContextRunError::Schema)?;
+    }
+    run_sql(sql).map_err(SchemaContextRunError::Query)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{SchemaContextRunError, run_with_schema_context};
+
+    #[test]
+    fn schema_prefix_failure_stops_before_the_user_statement() {
+        let statements = std::cell::RefCell::new(Vec::new());
+        let result = run_with_schema_context(
+            Some("SET search_path TO \"billing\""),
+            "SELECT * FROM invoices",
+            |sql| {
+                statements.borrow_mut().push(sql.to_owned());
+                Err("schema change denied")
+            },
+            |sql| -> Result<(), &'static str> {
+                statements.borrow_mut().push(sql.to_owned());
+                Ok(())
+            },
+        );
+        assert!(matches!(
+            result,
+            Err(SchemaContextRunError::Schema("schema change denied"))
+        ));
+        assert_eq!(
+            statements.borrow().iter().map(String::as_str).collect::<Vec<_>>(),
+            ["SET search_path TO \"billing\""]
+        );
+    }
+
+    #[test]
+    fn successful_schema_prefix_runs_before_the_user_statement() {
+        let statements = std::cell::RefCell::new(Vec::new());
+        let result = run_with_schema_context(
+            Some("USE `billing`"),
+            "SELECT * FROM invoices",
+            |sql| -> Result<(), &'static str> {
+                statements.borrow_mut().push(sql.to_owned());
+                Ok(())
+            },
+            |sql| {
+                statements.borrow_mut().push(sql.to_owned());
+                Ok(sql.to_owned())
+            },
+        );
+        assert!(matches!(result, Ok(sql) if sql == "SELECT * FROM invoices"));
+        assert_eq!(
+            statements.borrow().iter().map(String::as_str).collect::<Vec<_>>(),
+            ["USE `billing`", "SELECT * FROM invoices"]
+        );
     }
 }
