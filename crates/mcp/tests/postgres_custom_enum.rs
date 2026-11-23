@@ -756,6 +756,7 @@ async fn five_million_row_query_keeps_process_growth_within_mcp_budget_margin() 
     assert!(result.truncated);
     assert!(result.result_sets[0].rows.len() < 500);
     let growth = peak.load(Ordering::Relaxed).saturating_sub(baseline);
+    eprintln!("MCP 5M-row RSS growth: {growth} bytes (budget: {MCP_BYTES} bytes)");
     assert!(
         growth <= MCP_BYTES + 32 * 1024 * 1024,
         "measured RSS growth: {growth} bytes"
