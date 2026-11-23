@@ -2063,8 +2063,8 @@ Packages:
 
 - `aws-lc-sys 0.47.0`
 - `constant_time_eq 0.6.1`
-- `mongodb 3.10.0`
-- `mongodb-internal-macros 3.10.0`
+- `mongodb 3.10.2`
+- `mongodb-internal-macros 3.10.2`
 - `russh 0.65.2`
 - `russh-cryptovec 0.62.0`
 - `russh-util 0.52.0`
@@ -2603,7 +2603,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 Packages:
 
-- `redis 1.8.1`
+- `redis 1.8.3`
 
 ```text
 Copyright (c) 2022 by redis-rs contributors
@@ -3602,16 +3602,6 @@ THE SOFTWARE.
 
 Packages:
 
-- `sqlx-mysql 0.9.0`
-
-```text
-../LICENSE-MIT
-```
-
-## MIT
-
-Packages:
-
 - `atomic-waker 1.1.2`
 - `futures-lite 2.6.1`
 
@@ -3667,7 +3657,11 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `sqlx 0.9.0`
+- `sqlx 0.9.1`
+- `sqlx-core 0.9.1`
+- `sqlx-mysql 0.9.1`
+- `sqlx-postgres 0.9.1`
+- `sqlx-sqlite 0.9.1`
 
 ```text
 Copyright (C) SQLx Contributors
@@ -9224,9 +9218,6 @@ Packages:
 - `scylla-cql 3.0.0`
 - `scylla-cql-core 1.10.0`
 - `scylla-macros 1.10.0`
-- `sqlx-core 0.9.0`
-- `sqlx-postgres 0.9.0`
-- `sqlx-sqlite 0.9.0`
 - `tiberius-macros 0.1.0`
 - `whoami 2.1.3`
 
