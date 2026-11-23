@@ -29,6 +29,10 @@ class ClassifyCiFailureTests(unittest.TestCase):
     def test_a_fixture_that_never_became_ready_is_infrastructure(self):
         self.assertEqual(self.tag("MySQL fixture did not become ready\nJob failed"), "infra")
 
+    def test_a_cache_helper_shell_start_timeout_is_infrastructure(self):
+        text = "AssertionError: False is not true : wrapped shell did not start\nJob failed"
+        self.assertEqual(self.tag(text), "infra")
+
     def test_a_missing_accessibility_service_binary_is_infrastructure(self):
         text = "Failed to execute program org.a11y.Bus: No such file or directory\nJob failed"
         self.assertEqual(self.tag(text), "infra")
@@ -79,6 +83,13 @@ class ClassifyCiFailureTests(unittest.TestCase):
     def test_a_failing_unit_test_is_code(self):
         text = "test ui::grid::local_sort::sorts ... FAILED\nthread 'x' panicked at src/lib.rs:10:5:\nassertion failed"
         self.assertEqual(self.tag(text), "code")
+
+    def test_a_bounded_operation_timeout_is_not_assumed_to_be_a_code_failure(self):
+        text = "thread 'x' panicked at tests/query.rs:1:1:\ncalled `Result::unwrap()` on an `Err` value: OperationOutcomeUnknown { source: TimedOut }\nJob failed"
+        tag, reason, evidence = classifier.classify_log(text)
+        self.assertEqual(tag, "unknown")
+        self.assertIn("check runner pressure", reason)
+        self.assertIn("OperationOutcomeUnknown", evidence)
 
     def test_a_compile_error_is_code(self):
         self.assertEqual(self.tag("error[E0063]: missing field `preview` in initializer"), "code")

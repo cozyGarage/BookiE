@@ -8,6 +8,15 @@ use bookie_gpui::shell::{ResultView, Run, Tab};
 use bookie_gpui::theme::{Theme, size};
 
 impl GridView {
+    pub(crate) fn toggle_results(&mut self) {
+        if self.panel.explaining {
+            self.invalidate_background();
+            self.panel.explaining = false;
+            self.status = "Explain cancelled".into();
+        }
+        self.panel.open = !self.panel.open;
+    }
+
     pub(crate) fn query_editor_toolbar(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
         div()
             .flex()
@@ -265,7 +274,7 @@ impl GridView {
                         theme.muted_foreground,
                     ))
                     .on_click(cx.listener(|this, _, _, cx| {
-                        this.panel.open = !this.panel.open;
+                        this.toggle_results();
                         cx.notify();
                     })),
             )

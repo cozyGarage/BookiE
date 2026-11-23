@@ -926,7 +926,19 @@ mod logging_tests {
     }
 }
 
+#[cfg(test)]
+mod crypto_provider_tests {
+    #[test]
+    fn gpui_initializes_rustls_before_a_tls_client_config_is_built() {
+        bookie_app_services::initialize_process_crypto();
+        let _config = rustls::ClientConfig::builder()
+            .with_root_certificates(rustls::RootCertStore::empty())
+            .with_no_client_auth();
+    }
+}
+
 fn main() {
+    bookie_app_services::initialize_process_crypto();
     let started = Instant::now();
     init_logging();
     let total = rows_from(std::env::var("BOOKIE_PROTOTYPE_ROWS").ok().as_deref());
@@ -1022,6 +1034,8 @@ mod live_ui_tests;
 #[cfg(test)]
 #[cfg(test)]
 mod overlay_ui_tests;
+#[cfg(test)]
+mod query_pane_ui_tests;
 #[cfg(test)]
 mod save_ui_tests;
 #[cfg(test)]
