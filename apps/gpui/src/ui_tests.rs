@@ -999,6 +999,9 @@ fn connection_form_keeps_actions_visible_at_two_widths(cx: &mut TestAppContext) 
         assert!(page.size.width > gpui::px(200.0));
         assert!(actions.origin.y >= page.origin.y);
         assert!(actions.origin.y + actions.size.height <= gpui::px(760.0));
+        let card = cx.debug_bounds("connection-card").expect("the form sits on a card");
+        assert!(page.origin.y >= card.origin.y && actions.origin.y <= card.origin.y + card.size.height);
+        assert!(cx.debug_bounds("Prod").is_some(), "the environment chips are in the behaviour section");
     }
 }
 

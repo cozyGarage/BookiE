@@ -211,6 +211,38 @@ pub(crate) fn choice_chip(
         .child(label)
 }
 
+pub(crate) fn section(theme: Theme, caption: &str, rows: Vec<Div>) -> Div {
+    let last = rows.len().saturating_sub(1);
+    div()
+        .flex()
+        .flex_col()
+        .gap_1()
+        .child(
+            div()
+                .text_size(px(size::TEXT_SMALL))
+                .font_weight(gpui::FontWeight::MEDIUM)
+                .text_color(rgb(theme.muted_foreground))
+                .child(caption.to_uppercase()),
+        )
+        .child(
+            div()
+                .flex()
+                .flex_col()
+                .rounded(px(size::SURFACE_RADIUS))
+                .border_1()
+                .border_color(rgb(theme.border))
+                .bg(rgb(theme.background))
+                .children(rows.into_iter().enumerate().map(|(index, row)| {
+                    let row = row.px_3().py_2();
+                    if index < last {
+                        row.border_b_1().border_color(rgb(theme.border))
+                    } else {
+                        row
+                    }
+                })),
+        )
+}
+
 pub(crate) fn choice_row(
     theme: Theme,
     label: impl Into<gpui::SharedString>,
@@ -250,54 +282,145 @@ impl GridView {
         } else {
             "New connection"
         };
+        let driver = form.selected().map(|driver| driver.label.to_string()).unwrap_or_default();
+        let mut connection = vec![
+            div().flex().flex_wrap().gap_1().children(self.driver_chips(theme, cx)),
+            field(theme, "Name", &form.name),
+        ];
+        if !file_based {
+            connection.extend(self.network_fields(theme, cx));
+        }
+        connection.push(form.validation_field(
+            theme,
+            if file_based { "File" } else { "Database" },
+            &form.database,
+            cx,
+        ));
+        let mut sections = vec![
+            section(theme, "Connection", connection),
+            section(theme, "Behaviour", self.behaviour_fields(theme, cx)),
+        ];
+        if !file_based {
+            sections.push(section(theme, "Security", self.security_fields(theme, cx)));
+            sections.push(section(theme, "SSH tunnel", self.ssh_fields(theme, cx)));
+        }
         div()
+            .relative()
             .flex_1()
             .min_h_0()
             .flex()
-            .flex_col()
+            .justify_center()
+            .items_start()
+            .p_6()
+            .bg(rgb(theme.background))
+            .child(
+                gpui::svg()
+                    .path("backdrop/contours.svg")
+                    .absolute()
+                    .top_0()
+                    .left_0()
+                    .size_full()
+                    .text_color(rgb(theme.border)),
+            )
             .child(
                 div()
-                    .id("connection-page")
-                    .debug_selector(|| "connection-page".into())
-                    .flex_1()
+                    .relative()
+                    .debug_selector(|| "connection-card".into())
+                    .w_full()
+                    .max_w(px(size::HOME_WIDTH))
+                    .max_h_full()
                     .min_h_0()
-                    .overflow_y_scroll()
-                    .p_4()
+                    .flex()
+                    .flex_col()
+                    .rounded(px(size::SURFACE_RADIUS))
+                    .border_1()
+                    .border_color(rgb(theme.border))
+                    .bg(rgb(theme.popover))
+                    .shadow_lg()
                     .child(
                         div()
-                            .w_full()
-                            .max_w(px(size::HOME_WIDTH))
+                            .px_4()
+                            .pt_4()
+                            .pb_2()
                             .flex()
                             .flex_col()
-                            .gap_3()
                             .child(div().font_weight(gpui::FontWeight::SEMIBOLD).child(title))
-                            .child(div().flex().flex_wrap().gap_1().children(self.driver_chips(theme, cx)))
-                            .child(field(theme, "Name", &form.name))
-                            .when(!file_based, |page| page.children(self.network_fields(theme, cx)))
-                            .child(form.validation_field(
-                                theme,
-                                if file_based { "File" } else { "Database" },
-                                &form.database,
-                                cx,
-                            ))
-                            .when(!file_based, |page| page.children(self.security_fields(theme, cx)))
-                            .when(!file_based, |page| page.children(self.ssh_fields(theme, cx))),
+                            .child(div().text_size(px(size::TEXT_SMALL)).text_color(rgb(theme.muted_foreground)).child(driver)),
+                    )
+                    .child(
+                        div()
+                            .id("connection-page")
+                            .debug_selector(|| "connection-page".into())
+                            .flex_1()
+                            .min_h_0()
+                            .overflow_y_scroll()
+                            .px_4()
+                            .pb_4()
+                            .flex()
+                            .flex_col()
+                            .gap_4()
+                            .children(sections),
+                    )
+                    .child(
+                        div()
+                            .debug_selector(|| "connection-actions".into())
+                            .px_4()
+                            .py_3()
+                            .border_t_1()
+                            .border_color(rgb(theme.border))
+                            .flex()
+                            .flex_wrap()
+                            .items_center()
+                            .gap_2()
+                            .child(self.test_button(theme, cx))
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .min_w_0()
+                                    .text_color(rgb(theme.muted_foreground))
+                                    .child(form.status.clone()),
+                            )
+                            .children(form.editing.map(|_| self.delete_button(theme, cx)))
+                            .child(self.save_button(theme, cx)),
                     ),
             )
-            .child(
-                div()
-                    .debug_selector(|| "connection-actions".into())
-                    .p_4()
-                    .flex()
-                    .flex_wrap()
-                    .items_center()
-                    .gap_2()
-                    .child(self.save_button(theme, cx))
-                    .child(self.test_button(theme, cx))
-                    .children(form.editing.map(|_| self.delete_button(theme, cx)))
-                    .child(self.read_only_toggle(theme, cx))
-                    .child(div().text_color(rgb(theme.muted_foreground)).child(form.status.clone())),
-            )
+    }
+
+    fn behaviour_fields(&self, theme: Theme, cx: &mut Context<Self>) -> Vec<Div> {
+        let form = &self.connection_form;
+        let environment = choice_row(
+            theme,
+            "Environment",
+            [Environment::Local, Environment::Dev, Environment::Staging, Environment::Prod]
+                .into_iter()
+                .enumerate()
+                .map(|(index, environment)| {
+                    choice_chip(
+                        ("environment", index),
+                        environment.display_name(),
+                        form.environment == environment,
+                        theme,
+                    )
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        this.connection_form.environment = environment;
+                        cx.notify();
+                    }))
+                }),
+        );
+        vec![
+            environment,
+            div()
+                .flex()
+                .items_center()
+                .gap_2()
+                .child(
+                    div()
+                        .w(px(size::SIDE_PANEL_WIDTH / 2.0))
+                        .text_color(rgb(theme.muted_foreground))
+                        .child("Access"),
+                )
+                .child(self.read_only_toggle(theme, cx)),
+        ]
     }
 
     fn network_fields(&self, theme: Theme, cx: &mut Context<Self>) -> Vec<Div> {
@@ -345,26 +468,7 @@ impl GridView {
                 }))
             }),
         );
-        let environment = choice_row(
-            theme,
-            "Environment",
-            [Environment::Local, Environment::Dev, Environment::Staging, Environment::Prod]
-                .into_iter()
-                .enumerate()
-                .map(|(index, environment)| {
-                    choice_chip(
-                        ("environment", index),
-                        environment.display_name(),
-                        form.environment == environment,
-                        theme,
-                    )
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.connection_form.environment = environment;
-                        cx.notify();
-                    }))
-                }),
-        );
-        let mut rows = vec![environment, auth, tls];
+        let mut rows = vec![auth, tls];
         if TlsMode::from_index(form.tls) != TlsMode::Disabled {
             rows.push(field(theme, "CA file", &form.tls_root));
             rows.push(form.validation_field(theme, "Client cert", &form.tls_cert, cx));
