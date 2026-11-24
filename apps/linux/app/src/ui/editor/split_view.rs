@@ -81,7 +81,7 @@ impl SplitEditorView {
 }
 
 pub(super) fn install_shortcuts(view: &sourceview5::View, sender: &ComponentSender<SqlEditor>, pane: EditorPane) {
-    let shortcuts: [EditorShortcut; 8] = [
+    let shortcuts: [EditorShortcut; 9] = [
         ("<Primary>Return", || SqlEditorInput::Run(super::RunMessage::Run)),
         ("Escape", || SqlEditorInput::Run(super::RunMessage::Cancel)),
         ("<Primary><Shift>f", || SqlEditorInput::Format),
@@ -92,6 +92,7 @@ pub(super) fn install_shortcuts(view: &sourceview5::View, sender: &ComponentSend
         ("<Primary><Shift>bracketleft", || SqlEditorInput::ToggleFold),
         ("<Primary><Shift>bracketright", || SqlEditorInput::UnfoldAll),
         ("<Primary>F2", || SqlEditorInput::ToggleBookmark),
+        ("<Primary><Alt>minus", || SqlEditorInput::GoToLastEdit),
     ];
     let controller = gtk::ShortcutController::new();
     for (trigger, input) in shortcuts {

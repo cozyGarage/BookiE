@@ -87,6 +87,7 @@ pub(crate) fn apply_font_preferences(preferences: &crate::services::preferences:
 }
 
 pub struct SqlEditor {
+    last_edit: std::rc::Rc<std::cell::Cell<Option<i32>>>,
     catalog_changes: crate::services::catalog::CatalogChanges,
     catalog_origin: Option<crate::services::catalog::CatalogOrigin>,
     navigation_origin: Option<crate::services::catalog::CatalogOrigin>,
@@ -528,6 +529,11 @@ impl SimpleComponent for SqlEditor {
             refresh_completion,
             sql_language,
         );
+        let last_edit = std::rc::Rc::new(std::cell::Cell::new(None));
+        let record_edit = last_edit.clone();
+        widgets.source_view.buffer().connect_changed(move |buffer| {
+            record_edit.set(Some(buffer.iter_at_mark(&buffer.get_insert()).offset()));
+        });
         split_view::install_shortcuts(&widgets.source_view, &sender, EditorPane::Primary);
         split_view::install_shortcuts(split_view.secondary_view(), &sender, EditorPane::Secondary);
         split_view::install_drop_target(&widgets.source_view, &sender, &drop_generation);
@@ -549,6 +555,7 @@ impl SimpleComponent for SqlEditor {
         bottom_panel::BottomPanel::install_shortcut(&root, &sender);
         error_navigation::install(&root, &sender);
         let model = SqlEditor {
+            last_edit,
             catalog_changes: Default::default(),
             catalog_origin: None,
             navigation_origin: None,
@@ -766,6 +773,15 @@ impl SimpleComponent for SqlEditor {
                 let target_chars = sql[..target].chars().count() as i32;
                 buffer.place_cursor(&buffer.iter_at_offset(target_chars));
                 self.source_view.scroll_mark_onscreen(&buffer.get_insert());
+            }
+
+            SqlEditorInput::GoToLastEdit => {
+                if let Some(offset) = self.last_edit.get() {
+                    let buffer = self.source_view.buffer();
+                    buffer.place_cursor(&buffer.iter_at_offset(offset));
+                    self.source_view.scroll_mark_onscreen(&buffer.get_insert());
+                    self.source_view.grab_focus();
+                }
             }
 
             SqlEditorInput::ToggleBookmark => {

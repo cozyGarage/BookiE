@@ -17,6 +17,7 @@ pub mod audit_view;
 pub mod busy_jobs;
 pub mod catalog;
 pub mod catalog_changes;
+pub mod closed_drafts;
 pub mod column_selection;
 pub mod column_widths;
 pub mod command_bridge;

@@ -219,6 +219,7 @@ pub struct App {
     connected: bool,
     connection_id: Option<Uuid>,
     sidebar_sizes_for: Option<Uuid>,
+    closed_drafts: Option<bookie_app_services::closed_drafts::ClosedDraftStore>,
     multi: multi_session::MultiSessionState,
     csv_import_progress: Option<crate::ui::import_dialog::ImportProgress>,
     backup_progress: Option<crate::ui::progress_dialog::CancellableDialog>,
@@ -647,6 +648,11 @@ impl SimpleComponent for App {
             connected: false,
             connection_id: None,
             sidebar_sizes_for: None,
+            closed_drafts: if cfg!(test) {
+                Some(bookie_app_services::closed_drafts::ClosedDraftStore::memory())
+            } else {
+                bookie_app_services::closed_drafts::ClosedDraftStore::open()
+            },
             multi: multi_session::MultiSessionState::default(),
             csv_import_progress: None,
             backup_progress: None,
