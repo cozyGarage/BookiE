@@ -8,6 +8,13 @@ use crate::{GridView, Tab, palette_step};
 
 impl GridView {
     pub(super) fn intercept_key(&mut self, event: &KeystrokeEvent, window: &mut Window, cx: &mut Context<Self>) {
+        if self.approval.current.is_some() {
+            if event.keystroke.key == "escape" {
+                self.answer_approval(bookie_app_services::approval_prompt::ApprovalOutcome::Deny, cx);
+            }
+            cx.stop_propagation();
+            return;
+        }
         if self.palette.open {
             let key = event.keystroke.key.as_str();
             if palette_navigation_key(key, event.keystroke.modifiers) {
@@ -120,12 +127,6 @@ impl GridView {
         let modifiers = stroke.modifiers;
         let control = control_modifier(modifiers);
         let key = stroke.key.as_str();
-        if self.approval.current.is_some() {
-            if key == "escape" {
-                self.answer_approval(bookie_app_services::approval_prompt::ApprovalOutcome::Deny, cx);
-            }
-            return;
-        }
         if self.palette.open {
             match key {
                 key if palette_navigation_key(key, modifiers) => {
