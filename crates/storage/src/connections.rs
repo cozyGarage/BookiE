@@ -256,6 +256,14 @@ pub(crate) async fn apply_import_to(
     let _guard = lock_path(path).await?;
     let mut existing = load_from(path).await?;
     for item in &plan.items {
+        let current = existing.iter().find(|saved| saved.id == item.connection.id);
+        if current != item.previous.as_ref() {
+            return Err(StorageError::Schema(
+                "saved connections changed after import review".into(),
+            ));
+        }
+    }
+    for item in &plan.items {
         existing.retain(|saved| saved.id != item.connection.id);
         existing.push(item.connection.clone());
     }
