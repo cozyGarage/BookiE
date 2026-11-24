@@ -37,8 +37,11 @@ struct PinScope {
 
 impl PinScope {
     fn width_key(&self) -> String {
-        serde_json::to_string(&(self.database.as_str(), self.schema.as_deref(), self.table.as_str()))
-            .unwrap_or_default()
+        bookie_app_services::column_widths::table_scope_key(
+            &self.database,
+            self.schema.as_deref(),
+            &self.table,
+        )
     }
 }
 
@@ -915,9 +918,10 @@ impl GridView {
             .filter(|_| !self.grid_is_query && self.compare.is_none())
             .and_then(|session| session.saved.as_ref().map(|(id, _)| (*id, session)))
             .and_then(|(id, _)| {
+                let scope = pin_scope.as_ref()?.width_key();
                 self.column_widths
                     .as_ref()
-                    .map(|store| store.hidden_columns(id, &self.catalog.grid_table.name))
+                    .map(|store| store.hidden_columns(id, &scope))
             });
         let scope_changed = delegate.pin_scope.as_ref() != pin_scope.as_ref()
             || delegate
@@ -1163,7 +1167,13 @@ impl GridView {
     }
 
     fn hide_column(&mut self, source_col: usize, name: &str, _window: &mut Window, cx: &mut Context<Self>) {
-        let columns = self.table.read(cx).delegate().columns.clone();
+        let (columns, scope_key) = {
+            let delegate = self.table.read(cx).delegate();
+            (
+                delegate.columns.clone(),
+                delegate.pin_scope.as_ref().map(PinScope::width_key),
+            )
+        };
         if columns.get(source_col).is_none_or(|(column, _)| column != name) {
             return;
         }
@@ -1181,9 +1191,10 @@ impl GridView {
         if !self.grid_is_query
             && self.compare.is_none()
             && let Some((id, _)) = self.live.as_ref().and_then(|session| session.saved.as_ref())
+            && let Some(scope_key) = &scope_key
             && let Some(store) = &self.column_widths
             && unique_name
-            && let Err(error) = store.set_hidden(*id, &self.catalog.grid_table.name, name, true)
+            && let Err(error) = store.set_hidden(*id, scope_key, name, true)
         {
             tracing::warn!(%error, "could not persist the hidden GPUI grid column");
         }
@@ -1216,10 +1227,14 @@ impl GridView {
     }
 
     fn show_all_hidden_columns(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
-        let (hidden, columns) = {
+        let (hidden, columns, scope_key) = {
             let table = self.table.read(cx);
             let delegate = table.delegate();
-            (delegate.hidden_columns.clone(), delegate.columns.clone())
+            (
+                delegate.hidden_columns.clone(),
+                delegate.columns.clone(),
+                delegate.pin_scope.as_ref().map(PinScope::width_key),
+            )
         };
         if hidden.is_empty() {
             return;
@@ -1227,6 +1242,7 @@ impl GridView {
         if !self.grid_is_query
             && self.compare.is_none()
             && let Some((id, _)) = self.live.as_ref().and_then(|session| session.saved.as_ref())
+            && let Some(scope_key) = &scope_key
             && let Some(store) = &self.column_widths
         {
             for source_col in &hidden {
@@ -1236,7 +1252,7 @@ impl GridView {
                 if columns.iter().filter(|(column, _)| column == name).count() != 1 {
                     continue;
                 }
-                if let Err(error) = store.set_hidden(*id, &self.catalog.grid_table.name, name, false) {
+                if let Err(error) = store.set_hidden(*id, scope_key, name, false) {
                     tracing::warn!(%error, column = %name, "could not restore a hidden GPUI grid column preference");
                 }
             }
@@ -1609,6 +1625,23 @@ mod tests {
             scope("a", Some("b.c"), "d").width_key()
         );
         assert_ne!(scope("a", None, "d").width_key(), scope("a", Some(""), "d").width_key());
+    }
+
+    #[test]
+    fn hidden_preferences_do_not_cross_same_named_tables_in_different_schemas() {
+        let scope = |schema: &str| PinScope {
+            connection: "connection".into(),
+            database: "sales".into(),
+            schema: Some(schema.into()),
+            table: "users".into(),
+        };
+        let public_users = scope("public");
+        let audit_users = scope("audit");
+        let public_key = public_users.width_key();
+        let audit_key = audit_users.width_key();
+        let hidden_by_scope = HashMap::from([(public_key, HashSet::from(["email"]))]);
+
+        assert!(hidden_by_scope.get(&audit_key).is_none_or(|hidden| !hidden.contains("email")));
     }
 
     #[test]

@@ -21,6 +21,10 @@ type HiddenColumns = HashMap<String, HashMap<String, Vec<String>>>;
 pub const MIN_COLUMN_WIDTH: i32 = 24;
 pub const MAX_COLUMN_WIDTH: i32 = 4000;
 
+pub fn table_scope_key(database: &str, schema: Option<&str>, table: &str) -> String {
+    serde_json::to_string(&(database, schema, table)).unwrap_or_default()
+}
+
 #[derive(Clone)]
 pub struct ColumnWidthStore {
     file: Arc<StateFile<Connections>>,
