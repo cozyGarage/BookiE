@@ -128,6 +128,49 @@ async fn pgbouncer_in_transaction_mode_works_when_it_supports_prepared_statement
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn transaction_pool_without_tracking_keeps_parameterized_writes_correct_under_load() {
+    let (_server, upstream) = start_pg().await;
+    let (_bouncer, options) = start_pgbouncer(&upstream, "transaction", 0).await;
+    let setup = connect_when_ready(&options).await;
+    setup
+        .execute("CREATE TABLE pooled_concurrent (id bigint PRIMARY KEY, note text NOT NULL)")
+        .await
+        .unwrap();
+    let barrier = Arc::new(tokio::sync::Barrier::new(4));
+    let mut tasks = Vec::new();
+    for worker in 0..4 {
+        let options = options.clone();
+        let barrier = barrier.clone();
+        tasks.push(tokio::spawn(async move {
+            let connection = connect_when_ready(&options).await;
+            tokio::time::timeout(Duration::from_secs(30), barrier.wait())
+                .await
+                .expect("clients did not reach the start barrier");
+            for row in 0..100 {
+                let id = worker * 100 + row;
+                let value = format!("value-{id}");
+                connection
+                    .execute_params(
+                        "INSERT INTO pooled_concurrent VALUES ($1, $2)",
+                        &[Value::Int(id), Value::Text(value)],
+                    )
+                    .await
+                    .unwrap();
+            }
+        }));
+    }
+    for task in tasks {
+        task.await.unwrap();
+    }
+    let result = setup
+        .query("SELECT count(*) FROM pooled_concurrent WHERE note = 'value-' || id::text")
+        .await
+        .unwrap();
+    assert_eq!(result.rows[0][0], Value::Int(400));
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn pgbouncer_in_session_mode_works() {
     let outcomes = pooled_outcomes("session", 0).await;
     assert!(all_succeeded(&outcomes), "{outcomes:#?}");
