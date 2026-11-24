@@ -140,7 +140,7 @@ async fn server_terminated_query_reports_disconnection_and_pool_recovers() {
         .expect("query task")
         .expect_err("a terminated query must not return success");
     assert!(
-        matches!(error, DriverError::Disconnected),
+        error.is_disconnect(),
         "an I/O loss must be reported as disconnected, got {error:?}"
     );
 
@@ -257,7 +257,7 @@ async fn a_disconnected_session_is_retired_without_affecting_the_shared_pool() {
         .expect("terminated session query must not hang")
         .expect("session query task");
     let error = result.expect_err("a terminated session query must not succeed");
-    assert!(matches!(error, DriverError::Disconnected), "{error:?}");
+    assert!(error.is_disconnect(), "{error:?}");
     assert!(!session.is_usable(), "a lost session must be retired");
     assert!(matches!(
         session.query_params_controlled("SELECT 1", &[], &no_timeout()).await,
@@ -306,7 +306,7 @@ async fn backend_loss_during_row_stream_fails_the_whole_query_as_disconnected() 
         .expect("query task")
         .expect_err("interrupted row stream must not return a partial result");
     assert!(
-        matches!(error, DriverError::Disconnected),
+        error.is_disconnect(),
         "mid-stream backend loss must be reported as disconnected, got {error:?}"
     );
     let recovered = connection
