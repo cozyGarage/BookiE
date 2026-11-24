@@ -1051,14 +1051,14 @@ fn cancelling_a_table_switch_keeps_the_current_table(cx: &mut TestAppContext) {
 #[gpui::test]
 fn closing_a_query_tab_with_result_edits_requires_explicit_discard(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
-    view.update(cx, |view, _cx| {
+    view.update(cx, |view, cx| {
         view.tabs.open_query();
         view.sync_grid_owner();
         view.add_run(None);
         view.run_tabs.slots[view.run_tabs.active]
             .edits
             .insert((0, 1), bookie_gpui::model::Cell::Text("result draft".into()));
-        view.close_tab(2);
+        view.close_tab(2, cx);
     });
     view.read_with(cx, |view, _| {
         assert!(
@@ -2284,4 +2284,26 @@ fn real_table_grid_keyboard_and_jump_column_follow_active_tab(cx: &mut TestAppCo
                 .any(|a| a.id == "jump-column" && a.enabled)
         );
     });
+}
+
+#[gpui::test]
+fn a_large_sequential_scan_shows_a_full_scan_chip_in_the_plan_view(cx: &mut TestAppContext) {
+    use bookie_gpui::shell::ResultView;
+    let (view, cx) = open_live(cx);
+    cx.simulate_resize(gpui::size(gpui::px(1400.0), gpui::px(900.0)));
+    view.update(cx, |view, cx| {
+        view.tabs.open_query();
+        view.sync_grid_owner();
+        view.panel.plan = bookie_app_services::explain_plan::parse_plan(
+            "Seq Scan on orders  (cost=0.00..80.00 rows=40000 width=4)\n  Filter: (customer = 'x')",
+        );
+        view.panel.view = ResultView::Plan;
+        cx.notify();
+    });
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    assert!(
+        cx.debug_bounds("plan-full-scan").is_some(),
+        "a 40,000-row sequential scan is flagged"
+    );
 }

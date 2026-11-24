@@ -414,6 +414,18 @@ impl Connection for SessionConnection {
         self.inner.list_databases_controlled(control).await
     }
 
+    async fn table_sizes(&self, schema: Option<&str>) -> Result<Vec<bookie_core::TableSize>, DriverError> {
+        self.inner.table_sizes(schema).await
+    }
+
+    async fn table_sizes_controlled(
+        &self,
+        schema: Option<&str>,
+        control: &OperationControl,
+    ) -> Result<Vec<bookie_core::TableSize>, DriverError> {
+        self.inner.table_sizes_controlled(schema, control).await
+    }
+
     async fn open_session(&self) -> Result<Box<dyn bookie_core::Session>, DriverError> {
         self.inner.open_session().await
     }

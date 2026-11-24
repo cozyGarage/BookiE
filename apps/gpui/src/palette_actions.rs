@@ -186,6 +186,11 @@ impl GridView {
             ),
             action("keyboard-shortcuts", "Edit keyboard shortcuts", true),
             action(
+                "go-to-last-edit",
+                "Go to last edit (Ctrl+Alt+-)",
+                self.last_edit.is_some(),
+            ),
+            action(
                 "wrap-text",
                 if self.wrap_text {
                     "Show cell text on one line"
@@ -624,6 +629,7 @@ impl GridView {
             "compare" => self.compare(false, cx),
             "detail" => self.toggle_detail(),
             "wrap-text" => self.wrap_text = !self.wrap_text,
+            "go-to-last-edit" => self.go_to_last_edit(window, cx),
             "keyboard-shortcuts" => self.open_settings_page(crate::keyboard_settings_ui::SettingsPage::Keyboard),
             "show-row-vertically" => self.toggle_row_detail(),
             "count-table-rows" => self.count_table_rows(cx),

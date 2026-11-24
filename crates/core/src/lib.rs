@@ -80,9 +80,9 @@ pub use pg_health::{HEALTH_ROW_LIMIT, HealthReport, hidden_schemas_param};
 pub use protobuf_wire::{MAX_PAYLOAD_BYTES as MAX_PROTOBUF_BYTES, ProtobufWireError, decode_protobuf_wire};
 pub use query::{
     ColumnInfo, ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, MAX_QUERY_CURSOR_PAGE_ROWS,
-    MAX_QUERY_RESULT_BYTES, MAX_QUERY_RESULT_CELLS, MAX_QUERY_ROWS, QualifiedTypeName, QueryCursorId, QueryCursorPage,
-    QueryResult, QueryResultBatch, QueryResultBudget, TableInfo, Value, ValueSortKind, estimated_row_size,
-    parse_partial, partial_value,
+    MAX_QUERY_RESULT_BYTES, MAX_QUERY_RESULT_CELLS, MAX_QUERY_ROWS, MAX_TABLE_SIZES, QualifiedTypeName, QueryCursorId,
+    QueryCursorPage, QueryResult, QueryResultBatch, QueryResultBudget, TableInfo, TableSize, Value, ValueSortKind,
+    estimated_row_size, parse_partial, partial_value,
 };
 pub use query_rows::{QueryRowSet, QueryRows};
 pub use registry::DriverRegistry;

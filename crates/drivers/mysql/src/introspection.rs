@@ -24,6 +24,33 @@ pub(crate) async fn read_list_collations(
         .collect())
 }
 
+pub(crate) async fn read_table_sizes(
+    connection: &mut sqlx::MySqlConnection,
+    schema: Option<&str>,
+) -> Result<Vec<bookie_core::TableSize>, DriverError> {
+    let rows = sqlx::query(
+        "SELECT CAST(table_schema AS CHAR), CAST(table_name AS CHAR),
+                CAST(COALESCE(data_length, 0) + COALESCE(index_length, 0) AS UNSIGNED)
+         FROM information_schema.tables
+         WHERE table_type = 'BASE TABLE' AND table_schema = COALESCE(?, DATABASE())
+         ORDER BY table_name
+         LIMIT ?",
+    )
+    .bind(schema)
+    .bind(u64::try_from(bookie_core::MAX_TABLE_SIZES).unwrap_or(u64::MAX))
+    .fetch_all(&mut *connection)
+    .await
+    .map_err(map_sqlx_error)?;
+    Ok(rows
+        .into_iter()
+        .map(|row| bookie_core::TableSize {
+            schema: Some(row.get::<String, _>(0)),
+            name: row.get::<String, _>(1),
+            bytes: row.get::<Option<u64>, _>(2).unwrap_or(0),
+        })
+        .collect())
+}
+
 pub(crate) async fn read_list_databases(connection: &mut sqlx::MySqlConnection) -> Result<Vec<String>, DriverError> {
     let rows = sqlx::query(
         "SELECT CAST(schema_name AS CHAR) FROM information_schema.schemata

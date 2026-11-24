@@ -223,6 +223,45 @@ impl ClickhouseConnection {
         Ok(rows.into_iter().map(|row| row.name).collect())
     }
 
+    async fn read_table_sizes(
+        &self,
+        schema: Option<&str>,
+        query_id: Option<&str>,
+    ) -> Result<Vec<bookie_core::TableSize>, DriverError> {
+        #[derive(Debug, Deserialize, clickhouse::Row)]
+        struct SizeRow {
+            database: String,
+            table: String,
+            bytes: u64,
+        }
+
+        let rows = tag_query(
+            self.client
+                .query(
+                    "SELECT database, table, sum(bytes_on_disk) AS bytes
+                 FROM system.parts
+                 WHERE active AND database = ?
+                 GROUP BY database, table
+                 ORDER BY table
+                 LIMIT ?",
+                )
+                .bind(schema.unwrap_or(self.database.as_str()))
+                .bind(u64::try_from(bookie_core::MAX_TABLE_SIZES).unwrap_or(u64::MAX)),
+            query_id,
+        )
+        .fetch_all::<SizeRow>()
+        .await
+        .map_err(map_clickhouse_error)?;
+        Ok(rows
+            .into_iter()
+            .map(|row| bookie_core::TableSize {
+                schema: Some(row.database),
+                name: row.table,
+                bytes: row.bytes,
+            })
+            .collect())
+    }
+
     async fn read_list_tables(&self, query_id: Option<&str>) -> Result<Vec<TableInfo>, DriverError> {
         #[derive(Debug, Deserialize, clickhouse::Row)]
         struct Row {
@@ -443,6 +482,20 @@ impl Connection for ClickhouseConnection {
     async fn list_databases_controlled(&self, control: &OperationControl) -> Result<Vec<String>, DriverError> {
         let query_id = new_query_id();
         self.stopped_on_server(control, &query_id, self.read_list_databases(Some(&query_id)))
+            .await
+    }
+
+    async fn table_sizes(&self, schema: Option<&str>) -> Result<Vec<bookie_core::TableSize>, DriverError> {
+        self.read_table_sizes(schema, None).await
+    }
+
+    async fn table_sizes_controlled(
+        &self,
+        schema: Option<&str>,
+        control: &OperationControl,
+    ) -> Result<Vec<bookie_core::TableSize>, DriverError> {
+        let query_id = new_query_id();
+        self.stopped_on_server(control, &query_id, self.read_table_sizes(schema, Some(&query_id)))
             .await
     }
 

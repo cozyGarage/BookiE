@@ -756,6 +756,13 @@ impl LiveSession {
         }
     }
 
+    pub fn table_sizes(&self) -> bookie_app_services::table_sizes::SizeIndex {
+        let control = OperationControl::with_timeout(Duration::from_secs(10));
+        self.runtime
+            .block_on(self.sessions.table_sizes(self.session_id, &control))
+            .unwrap_or_default()
+    }
+
     fn next_epoch(&self) -> Epoch {
         Epoch(self.epoch.fetch_add(1, Ordering::Relaxed) + 1)
     }

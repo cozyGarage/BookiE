@@ -151,7 +151,48 @@ impl App {
         sidebar_follows_connection(&self.split_view, &self.sidebar_toggle, connected);
     }
 
-    pub(super) fn repopulate_sidebar(&mut self, tables: &[TableInfo], _sender: ComponentSender<App>) {
+    pub(super) fn on_table_sizes_loaded(&mut self, id: uuid::Uuid, sizes: bookie_app_services::table_sizes::SizeIndex) {
+        if self.connection_id != Some(id) {
+            return;
+        }
+        self.sidebar_render_context.borrow_mut().sizes = sizes;
+        self.refresh_sidebar_model();
+    }
+
+    fn load_table_sizes(&mut self, sender: &ComponentSender<App>) {
+        let Some(id) = self.connection_id else {
+            return;
+        };
+        if self.sidebar_sizes_for == Some(id) {
+            return;
+        }
+        self.sidebar_sizes_for = Some(id);
+        self.sidebar_render_context.borrow_mut().sizes = Default::default();
+        let Some(origin) = crate::services::catalog::CatalogOrigin::capture(Some(id), &self.database) else {
+            return;
+        };
+        let database = self.database.clone();
+        let timeout =
+            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
+        let sender = sender.clone();
+        relm4::spawn(async move {
+            let Some(connection) = origin.connection(&database) else {
+                return;
+            };
+            let control = bookie_app_services::operation_control::bounded_with(
+                timeout,
+                tokio_util::sync::CancellationToken::new(),
+            );
+            match bookie_app_services::table_sizes::load_table_sizes(connection.as_ref(), &control).await {
+                Ok(sizes) if !sizes.is_empty() => sender.input(super::AppMsg::TableSizesLoaded(id, sizes)),
+                Ok(_) => {}
+                Err(error) => tracing::debug!(%error, "table sizes are not available for this connection"),
+            }
+        });
+    }
+
+    pub(super) fn repopulate_sidebar(&mut self, tables: &[TableInfo], sender: ComponentSender<App>) {
+        self.load_table_sizes(&sender);
         self.sidebar_tables = tables.to_vec();
         let mut nodes = build_nodes_with_temporary(tables, &self.sidebar_views, &self.sidebar_temporary_tables);
         let catalog_kinds = self
@@ -517,6 +558,7 @@ pub(super) fn row_for(
                 && !bookie_core::sql_ddl::protects_schema(driver_id, schema_name),
             hide: schema_filter_enabled,
         },
+        size: None,
     }
 }
 

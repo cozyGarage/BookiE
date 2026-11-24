@@ -26,6 +26,8 @@ mod enum_values;
 mod nested_values;
 #[path = "support/non_utf8.rs"]
 mod non_utf8;
+#[path = "support/table_sizes.rs"]
+mod table_sizes;
 #[path = "support/temporal.rs"]
 mod temporal;
 

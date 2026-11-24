@@ -47,6 +47,7 @@ pub struct SidebarRowInit {
     pub group: Option<GroupInit>,
     pub column_source: Option<super::sidebar_columns::ColumnSource>,
     pub schema_actions: SchemaCatalogActions,
+    pub size: Option<u64>,
 }
 
 fn chevron_icon(collapsed: bool) -> &'static str {
@@ -156,6 +157,7 @@ pub struct SidebarRow {
     // Keep the parented popover so shutdown can unparent it before GTK finalizes the row.
     popover: Rc<RefCell<Option<gtk::PopoverMenu>>>,
     columns: super::sidebar_columns::SidebarColumns,
+    size: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -316,6 +318,12 @@ impl FactoryComponent for SidebarRow {
                                 set_visible: self.group.as_ref().is_some_and(|group| !group.entry),
                                 set_css_classes: &["dim-label", "caption"],
                             },
+
+                            gtk::Label {
+                                set_label: self.size.as_deref().unwrap_or_default(),
+                                set_visible: self.size.is_some(),
+                                set_css_classes: &["dim-label", "caption"],
+                            },
                         },
 
                         #[name = "actions_row"]
@@ -369,6 +377,7 @@ impl FactoryComponent for SidebarRow {
             csv_button,
             new_schema_button,
             schema_actions: init.schema_actions,
+            size: init.size.map(bookie_app_services::table_sizes::size_label),
             popover: Rc::new(RefCell::new(None)),
             columns: super::sidebar_columns::SidebarColumns::new(init.column_source),
         }
@@ -788,6 +797,31 @@ mod tests {
 
     #[test]
     #[ignore = "requires an isolated GTK display"]
+    fn a_table_row_shows_its_size_and_a_row_without_one_shows_none() {
+        relm4::adw::init().unwrap();
+        let list = gtk::ListBox::new();
+        let mut factory = FactoryVecDeque::<SidebarRow>::builder().launch(list.clone()).detach();
+        for (name, size) in [("orders", Some(12 * 1024 * 1024)), ("users", None)] {
+            factory.guard().push_back(SidebarRowInit {
+                info: TableInfo {
+                    schema: Some("public".into()),
+                    name: name.into(),
+                },
+                kind: SidebarObjectKind::Table,
+                depth: 1,
+                group: None,
+                column_source: None,
+                schema_actions: SchemaCatalogActions::default(),
+                size,
+            });
+        }
+        pump();
+        assert_eq!(factory.get(0).unwrap().size.as_deref(), Some("12 MiB"));
+        assert_eq!(factory.get(1).unwrap().size, None);
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
     fn a_group_row_shows_a_chevron_that_follows_its_collapse_state() {
         relm4::adw::init().unwrap();
         let list = gtk::ListBox::new();
@@ -809,6 +843,7 @@ mod tests {
                 new_schema: false,
             }),
             schema_actions: SchemaCatalogActions::default(),
+            size: None,
         });
         factory.guard().push_back(SidebarRowInit {
             info: TableInfo {
@@ -820,6 +855,7 @@ mod tests {
             group: None,
             column_source: None,
             schema_actions: SchemaCatalogActions::default(),
+            size: None,
         });
         pump();
         let chevron_of = |index: i32| {
@@ -864,6 +900,7 @@ mod catalog_entry_tests {
                 new_schema: false,
             }),
             schema_actions: SchemaCatalogActions::default(),
+            size: None,
         });
         let context = glib::MainContext::default();
         while context.iteration(false) {}
@@ -899,6 +936,7 @@ mod responsive_layout_tests {
             }),
             column_source: None,
             schema_actions: SchemaCatalogActions::default(),
+            size: None,
         });
         let window = gtk::Window::builder()
             .default_width(width)
@@ -974,6 +1012,7 @@ mod columns_affordance_tests {
             group: None,
             column_source: None,
             schema_actions: SchemaCatalogActions::default(),
+            size: None,
         });
         while glib::MainContext::default().iteration(false) {}
         let row = list.row_at_index(0).unwrap();
@@ -1006,6 +1045,7 @@ mod columns_affordance_tests {
             }),
             column_source: None,
             schema_actions: SchemaCatalogActions::default(),
+            size: None,
         });
         factory.guard().push_back(SidebarRowInit {
             info: TableInfo {
@@ -1024,6 +1064,7 @@ mod columns_affordance_tests {
             }),
             column_source: None,
             schema_actions: SchemaCatalogActions::default(),
+            size: None,
         });
         while glib::MainContext::default().iteration(false) {}
         assert_eq!(action_button_count(list.row_at_index(1).unwrap().upcast_ref()), 2);
@@ -1052,6 +1093,7 @@ mod lazy_context_menu_tests {
             group: None,
             column_source: None,
             schema_actions: SchemaCatalogActions::default(),
+            size: None,
         });
         while glib::MainContext::default().iteration(false) {}
         assert!(factory.get(0).is_some_and(|row| row.popover.borrow().is_none()));

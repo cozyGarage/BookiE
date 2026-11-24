@@ -218,6 +218,8 @@ pub struct App {
     pending_bundle: Option<bookie_storage::EncryptedBundle>,
     connected: bool,
     connection_id: Option<Uuid>,
+    sidebar_sizes_for: Option<Uuid>,
+    closed_drafts: Option<bookie_app_services::closed_drafts::ClosedDraftStore>,
     multi: multi_session::MultiSessionState,
     csv_import_progress: Option<crate::ui::import_dialog::ImportProgress>,
     backup_progress: Option<crate::ui::progress_dialog::CancellableDialog>,
@@ -645,6 +647,12 @@ impl SimpleComponent for App {
             pending_bundle: None,
             connected: false,
             connection_id: None,
+            sidebar_sizes_for: None,
+            closed_drafts: if cfg!(test) {
+                Some(bookie_app_services::closed_drafts::ClosedDraftStore::memory())
+            } else {
+                bookie_app_services::closed_drafts::ClosedDraftStore::open()
+            },
             multi: multi_session::MultiSessionState::default(),
             csv_import_progress: None,
             backup_progress: None,
@@ -949,6 +957,7 @@ impl SimpleComponent for App {
                 let conns = connections;
                 self.on_connections_loaded(&conns, sender);
             }
+            AppMsg::TableSizesLoaded(id, sizes) => self.on_table_sizes_loaded(id, sizes),
             AppMsg::NewEditorTab => self.append_editor_tab(None, sender),
             AppMsg::OpenSqlFile => self.on_open_sql_file(sender),
             AppMsg::SqlFileOpened(file) => self.on_sql_file_opened(file, sender),

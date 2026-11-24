@@ -133,6 +133,11 @@ impl GridView {
         let modifiers = stroke.modifiers;
         let control = control_modifier(modifiers);
         let key = stroke.key.as_str();
+        if control && modifiers.alt && !modifiers.shift && key == "-" {
+            self.go_to_last_edit(window, cx);
+            cx.notify();
+            return;
+        }
         if self.palette.open {
             match key {
                 key if palette_navigation_key(key, modifiers) => {
@@ -245,7 +250,7 @@ impl GridView {
             Command::ToggleDetail => self.toggle_detail(),
             Command::CloseTab => {
                 let index = self.tabs.active;
-                self.close_tab(index);
+                self.close_tab(index, cx);
                 self.show_current_table(window, cx);
             }
             Command::ReopenTab => self.reopen_closed_tab(window, cx),

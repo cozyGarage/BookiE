@@ -1,4 +1,4 @@
-use bookie_app_services::explain_plan::{PlanNode, misestimate, parse_plan, plan_text};
+use bookie_app_services::explain_plan::{PlanNode, full_scan_rows, misestimate, parse_plan, plan_text};
 use bookie_gpui::model::CellText;
 use bookie_gpui::source::ResultSource;
 
@@ -80,6 +80,13 @@ fn plan_row(node: &PlanNode, missed: Option<f64>, heaviest: f64, theme: Theme) -
     let actual = node.actual_rows.map(|rows| format!("{rows:.0} actual"));
     let cost = node.cost.map(|cost| format!("cost {cost:.2}"));
     let stats: Vec<String> = cost.into_iter().chain(rows).chain(actual).collect();
+    let full_scan = full_scan_rows(node).map(|rows| {
+        div()
+            .debug_selector(|| "plan-full-scan".into())
+            .text_size(px(size::TEXT_SMALL))
+            .text_color(rgb(theme.warning))
+            .child(format!("Full scan of ~{rows:.0} rows"))
+    });
     let warning = missed.map(|factor| {
         div()
             .debug_selector(|| "plan-misestimate".into())
@@ -100,6 +107,7 @@ fn plan_row(node: &PlanNode, missed: Option<f64>, heaviest: f64, theme: Theme) -
                 .text_color(rgb(theme.muted_foreground))
                 .child(stats.join(" · "))
         }))
+        .children(full_scan)
         .children(warning)
         .children(node.details.iter().map(|detail| {
             div()
