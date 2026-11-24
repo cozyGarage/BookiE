@@ -295,6 +295,14 @@ pub(crate) async fn apply_import_to(
     let _guard = lock_path(path).await?;
     let mut existing = load_from(path).await?;
     for item in &plan.items {
+        let current = existing.iter().find(|saved| saved.id == item.connection.id);
+        if current != item.previous.as_ref() {
+            return Err(StorageError::Schema(
+                "saved connections changed after import review".into(),
+            ));
+        }
+    }
+    for item in &plan.items {
         existing.retain(|saved| saved.id != item.connection.id);
         existing.push(item.connection.clone());
     }
@@ -310,6 +318,32 @@ pub async fn restore_connection(previous: Option<&SavedConnection>, id: Uuid) ->
         Some(connection) => save_connections(std::slice::from_ref(connection)).await,
         None => delete_connection(id).await,
     }
+}
+
+pub async fn restore_import_if_unchanged(
+    previous: Option<&SavedConnection>,
+    applied: &SavedConnection,
+) -> Result<(), StorageError> {
+    restore_import_if_unchanged_to(&connections_path()?, previous, applied).await
+}
+
+async fn restore_import_if_unchanged_to(
+    path: &Path,
+    previous: Option<&SavedConnection>,
+    applied: &SavedConnection,
+) -> Result<(), StorageError> {
+    let _guard = lock_path(path).await?;
+    let mut existing = load_from(path).await?;
+    if existing.iter().find(|saved| saved.id == applied.id) != Some(applied) {
+        return Err(StorageError::Schema(
+            "saved connection changed before import rollback".into(),
+        ));
+    }
+    existing.retain(|saved| saved.id != applied.id);
+    if let Some(previous) = previous {
+        existing.push(previous.clone());
+    }
+    save_to_unlocked(path, &existing).await
 }
 
 async fn delete_from(path: &Path, id: Uuid) -> Result<(), StorageError> {

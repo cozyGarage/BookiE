@@ -556,7 +556,9 @@ impl TableDelegate for GridDelegate {
                 div()
                     .w_full()
                     .flex()
-                    .when_some(edited_tint, |el, tint| el.bg(tint))
+                    .when_some(edited_tint, |el, tint| {
+                        el.debug_selector(|| "edited-cell".into()).bg(tint)
+                    })
                     .child(
                         div()
                             .flex_1()

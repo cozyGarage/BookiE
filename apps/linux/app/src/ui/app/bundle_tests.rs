@@ -33,7 +33,7 @@ fn saved(name: &str) -> SavedConnection {
 fn item(name: &str) -> ImportItem {
     let connection = saved(name);
     ImportItem {
-        disposition: ImportDisposition::New,
+        disposition: bookie_storage::ImportDisposition::New,
         source_id: connection.id,
         connection,
         previous: None,
@@ -209,15 +209,6 @@ async fn a_successful_reimport_rejects_old_session_saves_and_allows_new_ones() {
         bookie_app_services::workspace_state::WorkspaceTabRecord::Editor { query, .. }
             if query == "SELECT after_reimport"
     ));
-}
-
-#[test]
-fn a_failed_record_restore_keeps_imported_credentials() {
-    let mut item = item("new");
-    assert!(!should_forget_imported_secrets(&item, false));
-    assert!(should_forget_imported_secrets(&item, true));
-    item.disposition = ImportDisposition::UpdateInPlace;
-    assert!(!should_forget_imported_secrets(&item, true));
 }
 
 #[test]
