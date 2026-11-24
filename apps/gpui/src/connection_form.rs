@@ -378,29 +378,26 @@ impl GridView {
                                     .children(sections),
                             ),
                     )
-                    .child(
-                        div()
-                            .debug_selector(|| "connection-actions".into())
-                            .px_4()
-                            .py_3()
-                            .border_t_1()
-                            .border_color(rgb(theme.border))
-                            .flex()
-                            .flex_wrap()
-                            .items_center()
-                            .gap_2()
-                            .child(self.test_button(theme, cx))
-                            .child(
-                                div()
-                                    .flex_1()
-                                    .min_w_0()
-                                    .text_color(rgb(theme.muted_foreground))
-                                    .child(form.status.clone()),
-                            )
-                            .children(form.editing.map(|_| self.delete_button(theme, cx)))
-                            .child(self.save_button(theme, cx)),
-                    ),
+                    .child(self.connection_actions(theme, cx)),
             )
+    }
+
+    fn connection_actions(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+        let form = &self.connection_form;
+        div()
+            .debug_selector(|| "connection-actions".into())
+            .px_4()
+            .py_3()
+            .border_t_1()
+            .border_color(rgb(theme.border))
+            .flex()
+            .flex_wrap()
+            .items_center()
+            .gap_2()
+            .child(self.test_button(theme, cx))
+            .child(div().flex_1().min_w_0().text_color(rgb(theme.muted_foreground)).child(form.status.clone()))
+            .children(form.editing.map(|_| self.delete_button(theme, cx)))
+            .child(self.save_button(theme, cx))
     }
 
     fn behaviour_fields(&self, theme: Theme, cx: &mut Context<Self>) -> Vec<Div> {
