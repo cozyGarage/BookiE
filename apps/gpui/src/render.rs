@@ -33,7 +33,8 @@ impl GridView {
         self.sidebar
             .collapse_when_narrow(f32::from(window.viewport_size().width));
         let sidebar_width = if self.sidebar.open { self.sidebar.width } else { 0.0 };
-        let grid_width = (f32::from(window.viewport_size().width) - sidebar_width).max(0.0);
+        let content_width = (f32::from(window.viewport_size().width) - sidebar_width).max(0.0);
+        let grid_width = (content_width - self.detail_sidebar_width(content_width)).max(0.0);
         self.sync_table((grid_width - f32::from(Scrollbar::width())).max(0.0), window, cx);
         if self.synced_width != grid_width {
             self.synced_width = grid_width;
