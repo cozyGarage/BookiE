@@ -1,8 +1,6 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-#[cfg(test)]
-use bookie_core::QueryResult;
 use bookie_core::{
     Connection, DriverError, OperationControl, QueryCursorId, QueryCursorPage, QueryResultBatch, Session,
     SessionCommitOutcome, TableInfo, Value,
@@ -10,7 +8,7 @@ use bookie_core::{
 use uuid::Uuid;
 
 use crate::connection_identity::ConnectionIdentity;
-use bookie_policy::{AuditReceipt, Audited, AuditedSession, PolicyGuard, Principal};
+use bookie_policy::{AuditReceipt, Audited, AuditedSession, PolicyGuard};
 
 pub type SharedSession = Arc<tokio::sync::Mutex<Option<SessionHandle>>>;
 
@@ -86,7 +84,11 @@ impl SessionHandle {
         }
     }
 
-    pub async fn close_cursor_with_audit(&mut self, cursor_id: QueryCursorId, control: &OperationControl) -> Audited<()> {
+    pub async fn close_cursor_with_audit(
+        &mut self,
+        cursor_id: QueryCursorId,
+        control: &OperationControl,
+    ) -> Audited<()> {
         match self {
             Self::Audited(session) => {
                 session
@@ -431,11 +433,11 @@ impl StatementTarget {
 }
 
 pub async fn open_query_cursor_on_target(
-    pub target: StatementTarget,
-    pub owned_session: bool,
-    pub sql: &str,
-    pub params: &[Value],
-    pub control: &OperationControl,
+    target: StatementTarget,
+    owned_session: bool,
+    sql: &str,
+    params: &[Value],
+    control: &OperationControl,
 ) -> Audited<Option<StatementCursor>> {
     let begin = target
         .query_with_audit("BEGIN READ ONLY ISOLATION LEVEL REPEATABLE READ", &[], control)
@@ -527,10 +529,10 @@ pub fn session_callback_matches(callback_id: Uuid, current_id: Option<Uuid>) -> 
 }
 
 pub fn open_callback_matches(
-    pub callback_id: Uuid,
-    pub pending_id: Option<Uuid>,
-    pub callback_connection_id: Uuid,
-    pub current_connection_id: Option<Uuid>,
+    callback_id: Uuid,
+    pending_id: Option<Uuid>,
+    callback_connection_id: Uuid,
+    current_connection_id: Option<Uuid>,
 ) -> bool {
     session_callback_matches(callback_id, pending_id) && Some(callback_connection_id) == current_connection_id
 }
@@ -548,14 +550,13 @@ pub fn apply_transaction_state(session: &mut EditorSession, callback_id: Uuid, t
 }
 
 pub fn can_start_session_close(
-    pub teardown_active: bool,
-    pub close_running: bool,
-    pub open_running: bool,
-    pub query_running: bool,
+    teardown_active: bool,
+    close_running: bool,
+    open_running: bool,
+    query_running: bool,
 ) -> bool {
     teardown_active && !close_running && !open_running && !query_running
 }
-
 
 pub async fn commit_session(shared: &SharedSession) -> Result<SessionCommitOutcome, DriverError> {
     let mut guard = shared.lock().await;

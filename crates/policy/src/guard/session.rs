@@ -508,10 +508,9 @@ impl Session for PolicySession {
             None => Ok(()),
         };
         let cleanup = if let Some(batch) = self.batch {
-            if !self.is_usable() && batch.read_only && !batch.wrote {
-                record_ended_read_only_batch(&self.guard, batch.id).await;
-                Ok(())
-            } else if !self.is_usable() && self.ended_by_server.get() && !batch.uncertain {
+            if (!self.is_usable() && batch.read_only && !batch.wrote)
+                || (!self.is_usable() && self.ended_by_server.get() && !batch.uncertain)
+            {
                 record_ended_read_only_batch(&self.guard, batch.id).await;
                 Ok(())
             } else if self.is_usable() && !batch.uncertain {
