@@ -695,7 +695,7 @@ impl Render for TextInput {
             .text_color(rgb(theme.foreground))
             .line_height(px(size::COMPACT_CONTROL))
             .text_size(px(size::TEXT))
-            .when(self.compact, |root| root.text_xs())
+            .when(self.compact, |root| root.text_xs().line_height(gpui::rems(1.0)))
             .child({
                 let frame = div()
                     .w_full()
