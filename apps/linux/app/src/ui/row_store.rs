@@ -25,6 +25,35 @@ pub(in crate::ui) struct ColumnProjection {
 pub(in crate::ui) struct PreparedSourceRows {
     source: Arc<QueryResult>,
     indices: Vec<usize>,
+    positions: Option<Vec<u32>>,
+}
+
+pub(in crate::ui) enum SourceOrder {
+    Identity(usize),
+    Indices(Vec<usize>),
+}
+
+impl SourceOrder {
+    fn len(&self) -> usize {
+        match self {
+            Self::Identity(count) => *count,
+            Self::Indices(indices) => indices.len(),
+        }
+    }
+
+    fn get(&self, position: usize) -> Option<usize> {
+        match self {
+            Self::Identity(count) => (position < *count).then_some(position),
+            Self::Indices(indices) => indices.get(position).copied(),
+        }
+    }
+
+    fn into_indices(self) -> Vec<usize> {
+        match self {
+            Self::Identity(count) => (0..count).collect(),
+            Self::Indices(indices) => indices,
+        }
+    }
 }
 
 impl PreparedSourceRows {
@@ -33,17 +62,58 @@ impl PreparedSourceRows {
         indices: Vec<usize>,
         cancelled: &AtomicBool,
     ) -> Option<Self> {
-        let mut seen = std::collections::HashSet::with_capacity(indices.len());
-        for &index in &indices {
-            if cancelled.load(Ordering::Relaxed) || index >= source.rows.len() || !seen.insert(index) {
+        if cancelled.load(Ordering::Relaxed) {
+            return None;
+        }
+        let mut positions = (indices.len() >= 10_000 && source.rows.len() <= u32::MAX as usize)
+            .then(|| vec![u32::MAX; source.rows.len()]);
+        let mut seen = positions
+            .is_none()
+            .then(|| std::collections::HashSet::with_capacity(indices.len()));
+        for (position, &index) in indices.iter().enumerate() {
+            if cancelled.load(Ordering::Relaxed) || index >= source.rows.len() {
+                return None;
+            }
+            let unique = if let Some(positions) = positions.as_mut() {
+                if positions[index] != u32::MAX {
+                    false
+                } else {
+                    positions[index] = position as u32;
+                    true
+                }
+            } else {
+                seen.as_mut().is_some_and(|seen| seen.insert(index))
+            };
+            if !unique {
                 return None;
             }
         }
-        Some(Self { source, indices })
+        Some(Self {
+            source,
+            indices,
+            positions,
+        })
     }
 
     pub(in crate::ui) fn indices(&self) -> &[usize] {
         &self.indices
+    }
+
+    pub(in crate::ui) fn position_of(&self, source_index: usize) -> Option<u32> {
+        if let Some(positions) = &self.positions {
+            return positions
+                .get(source_index)
+                .copied()
+                .filter(|position| *position != u32::MAX);
+        }
+        self.indices
+            .iter()
+            .position(|index| *index == source_index)
+            .map(|position| position as u32)
+    }
+
+    pub(in crate::ui) fn has_position_index(&self) -> bool {
+        self.positions.is_some()
     }
 }
 
@@ -67,6 +137,9 @@ mod imp {
     #[derive(Default)]
     pub struct RowStore {
         pub(in crate::ui) slots: RefCell<Vec<Slot>>,
+        pub(in crate::ui) source_order: RefCell<Option<SourceOrder>>,
+        pub(in crate::ui) cached_rows: RefCell<std::collections::HashMap<usize, glib::WeakRef<RowObject>>>,
+        pub(in crate::ui) object_rows: RefCell<std::collections::HashMap<usize, RowObject>>,
         pub(in crate::ui) source: RefCell<Option<Arc<QueryResult>>>,
         pub(in crate::ui) projection: RefCell<Option<ColumnProjection>>,
         pub(in crate::ui) preview_keys: RefCell<Vec<usize>>,
@@ -94,10 +167,39 @@ mod imp {
         }
 
         fn n_items(&self) -> u32 {
-            self.slots.borrow().len() as u32
+            self.obj().n_items()
         }
 
         fn item(&self, position: u32) -> Option<glib::Object> {
+            if let Some(source_index) = self
+                .source_order
+                .borrow()
+                .as_ref()
+                .and_then(|order| order.get(position as usize))
+            {
+                if let Some(row) = self.object_rows.borrow().get(&(position as usize)) {
+                    return Some(row.clone().upcast());
+                }
+                let mut cached = self.cached_rows.borrow_mut();
+                if let Some(row) = cached.get(&source_index).and_then(glib::WeakRef::upgrade) {
+                    return Some(row.upcast());
+                }
+                let source = self.source.borrow();
+                let result = source.as_ref()?;
+                let projection = self.projection.borrow();
+                let row = row_for_source(
+                    result,
+                    source_index,
+                    projection.as_ref(),
+                    &self.preview_keys.borrow(),
+                    self.preview_redis_strings.get(),
+                    self.preview_from_result.get(),
+                )?;
+                let object = glib::WeakRef::new();
+                object.set(Some(&row));
+                cached.insert(source_index, object);
+                return Some(row.upcast());
+            }
             let mut slots = self.slots.borrow_mut();
             let slot = slots.get_mut(position as usize)?;
             match slot {
@@ -195,7 +297,36 @@ impl RowStore {
         self.imp().generation.get()
     }
 
+    pub fn n_items(&self) -> u32 {
+        self.imp()
+            .source_order
+            .borrow()
+            .as_ref()
+            .map_or_else(|| self.imp().slots.borrow().len(), SourceOrder::len) as u32
+    }
+
     pub(super) fn visit_search_cells(&self, position: u32, visit: impl FnMut(usize, &Value) -> bool) -> bool {
+        if let Some(source_index) = self
+            .imp()
+            .source_order
+            .borrow()
+            .as_ref()
+            .and_then(|order| order.get(position as usize))
+        {
+            if let Some(row) = self.imp().object_rows.borrow().get(&(position as usize)) {
+                return row.visit_cells(visit);
+            }
+            if let Some(row) = self
+                .imp()
+                .cached_rows
+                .borrow()
+                .get(&source_index)
+                .and_then(glib::WeakRef::upgrade)
+            {
+                return row.visit_cells(visit);
+            }
+            return self.visit_source_cells(source_index, visit);
+        }
         let slots = self.imp().slots.borrow();
         let Some(slot) = slots.get(position as usize) else {
             return false;
@@ -361,7 +492,10 @@ impl RowStore {
 
     fn install_shared(&self, result: Arc<QueryResult>, projection: Option<ColumnProjection>, preview_keys: Vec<usize>) {
         self.detach_cached_rows();
-        *self.imp().slots.borrow_mut() = (0..result.rows.len()).map(Slot::Shared).collect();
+        *self.imp().slots.borrow_mut() = Vec::new();
+        *self.imp().source_order.borrow_mut() = Some(SourceOrder::Identity(result.rows.len()));
+        self.imp().cached_rows.borrow_mut().clear();
+        self.imp().object_rows.borrow_mut().clear();
         *self.imp().source.borrow_mut() = Some(result);
         *self.imp().projection.borrow_mut() = projection;
         *self.imp().preview_keys.borrow_mut() = preview_keys;
@@ -373,6 +507,14 @@ impl RowStore {
     }
 
     fn detach_cached_rows(&self) {
+        for row in self.imp().object_rows.borrow().values() {
+            row.detach_shared();
+        }
+        for object in self.imp().cached_rows.borrow().values() {
+            if let Some(row) = object.upgrade() {
+                row.detach_shared();
+            }
+        }
         for slot in self.imp().slots.borrow().iter() {
             match slot {
                 Slot::Cached { object, .. } => {
@@ -387,6 +529,12 @@ impl RowStore {
     }
 
     pub fn source_value_at(&self, position: u32, column: usize) -> Option<bookie_core::Value> {
+        if let Some(order) = self.imp().source_order.borrow().as_ref() {
+            if self.imp().object_rows.borrow().contains_key(&(position as usize)) {
+                return None;
+            }
+            return self.source_cell(order.get(position as usize)?, column);
+        }
         let source_index = {
             let slots = self.imp().slots.borrow();
             match slots.get(position as usize)? {
@@ -401,6 +549,11 @@ impl RowStore {
     }
 
     pub fn source_index_at(&self, position: u32) -> Option<usize> {
+        if let Some(order) = self.imp().source_order.borrow().as_ref() {
+            return (!self.imp().object_rows.borrow().contains_key(&(position as usize)))
+                .then(|| order.get(position as usize))
+                .flatten();
+        }
         match self.imp().slots.borrow().get(position as usize)? {
             Slot::Shared(index)
             | Slot::Cached {
@@ -415,6 +568,7 @@ impl RowStore {
         if order.len() != count
             || order.iter().any(|index| *index >= count)
             || order.iter().copied().collect::<std::collections::HashSet<_>>().len() != count
+            || !self.imp().object_rows.borrow().is_empty()
             || self
                 .imp()
                 .slots
@@ -427,13 +581,14 @@ impl RowStore {
         self.replace_source_rows(order)
     }
 
-    pub(in crate::ui) fn replace_prepared_source_rows(&self, order: &PreparedSourceRows) -> bool {
+    pub(in crate::ui) fn replace_prepared_source_rows(&self, order: PreparedSourceRows) -> bool {
         if !self
             .imp()
             .source
             .borrow()
             .as_ref()
             .is_some_and(|source| Arc::ptr_eq(source, &order.source))
+            || !self.imp().object_rows.borrow().is_empty()
             || self
                 .imp()
                 .slots
@@ -444,9 +599,13 @@ impl RowStore {
             return false;
         }
         let removed = self.n_items();
+        let added = order.indices.len() as u32;
         self.detach_cached_rows();
-        *self.imp().slots.borrow_mut() = order.indices.iter().copied().map(Slot::Shared).collect();
-        self.items_changed(0, removed, order.indices.len() as u32);
+        *self.imp().slots.borrow_mut() = Vec::new();
+        *self.imp().source_order.borrow_mut() = Some(SourceOrder::Indices(order.indices));
+        self.imp().cached_rows.borrow_mut().clear();
+        self.imp().object_rows.borrow_mut().clear();
+        self.items_changed(0, removed, added);
         true
     }
 
@@ -461,6 +620,7 @@ impl RowStore {
                 .collect::<std::collections::HashSet<_>>()
                 .len()
                 != source_indices.len()
+            || !self.imp().object_rows.borrow().is_empty()
             || self
                 .imp()
                 .slots
@@ -472,7 +632,10 @@ impl RowStore {
         }
         let removed = self.n_items();
         self.detach_cached_rows();
-        *self.imp().slots.borrow_mut() = source_indices.iter().copied().map(Slot::Shared).collect();
+        *self.imp().slots.borrow_mut() = Vec::new();
+        *self.imp().source_order.borrow_mut() = Some(SourceOrder::Indices(source_indices.to_vec()));
+        self.imp().cached_rows.borrow_mut().clear();
+        self.imp().object_rows.borrow_mut().clear();
         self.items_changed(0, removed, source_indices.len() as u32);
         true
     }
@@ -486,6 +649,26 @@ impl RowStore {
     }
 
     pub fn splice(&self, position: u32, removals: u32, additions: &[RowObject]) {
+        let start = (position as usize).min(self.n_items() as usize);
+        let end = (start + removals as usize).min(self.n_items() as usize);
+        if end - start == additions.len() && self.imp().source_order.borrow().is_some() {
+            let mut object_rows = self.imp().object_rows.borrow_mut();
+            let order = self.imp().source_order.borrow();
+            for row_position in start..end {
+                if let Some(source_index) = order.as_ref().and_then(|order| order.get(row_position)) {
+                    self.imp().cached_rows.borrow_mut().remove(&source_index);
+                }
+                object_rows.remove(&row_position);
+            }
+            for (offset, row) in additions.iter().enumerate() {
+                object_rows.insert(start + offset, row.clone());
+            }
+            drop(order);
+            drop(object_rows);
+            self.items_changed(position, (end - start) as u32, additions.len() as u32);
+            return;
+        }
+        self.materialize_source_order();
         let removed = {
             let mut slots = self.imp().slots.borrow_mut();
             let start = (position as usize).min(slots.len());
@@ -497,7 +680,50 @@ impl RowStore {
         self.items_changed(position, removed, additions.len() as u32);
     }
 
+    fn materialize_source_order(&self) {
+        let Some(order) = self.imp().source_order.borrow_mut().take() else {
+            return;
+        };
+        let mut object_rows = std::mem::take(&mut *self.imp().object_rows.borrow_mut());
+        let mut cached_rows = std::mem::take(&mut *self.imp().cached_rows.borrow_mut());
+        *self.imp().slots.borrow_mut() = order
+            .into_indices()
+            .into_iter()
+            .enumerate()
+            .map(|(position, source_index)| {
+                if let Some(row) = object_rows.remove(&position) {
+                    Slot::Object(row)
+                } else if let Some(object) = cached_rows.remove(&source_index) {
+                    Slot::Cached { source_index, object }
+                } else {
+                    Slot::Shared(source_index)
+                }
+            })
+            .collect();
+    }
+
     pub fn find(&self, row: &RowObject) -> Option<u32> {
+        if let Some(order) = self.imp().source_order.borrow().as_ref() {
+            return (0..order.len()).find_map(|position| {
+                if self
+                    .imp()
+                    .object_rows
+                    .borrow()
+                    .get(&position)
+                    .is_some_and(|object| object == row)
+                {
+                    return Some(position as u32);
+                }
+                let source_index = order.get(position)?;
+                self.imp()
+                    .cached_rows
+                    .borrow()
+                    .get(&source_index)
+                    .and_then(glib::WeakRef::upgrade)
+                    .filter(|cached| cached == row)
+                    .map(|_| position as u32)
+            });
+        }
         let slots = self.imp().slots.borrow();
         let position = slots.iter().position(|slot| match slot {
             Slot::Object(object) => object == row,
@@ -536,6 +762,14 @@ impl RowStore {
     }
 
     fn draft_id_at(&self, position: u32) -> Option<u64> {
+        if self.imp().source_order.borrow().is_some() {
+            return self
+                .imp()
+                .object_rows
+                .borrow()
+                .get(&(position as usize))
+                .and_then(RowObject::draft_id);
+        }
         match self.imp().slots.borrow().get(position as usize)? {
             Slot::Object(row) => row.draft_id(),
             Slot::Shared(_) | Slot::Cached { .. } => None,
@@ -543,6 +777,22 @@ impl RowStore {
     }
 
     pub(super) fn cell_at(&self, position: u32, column: usize) -> Option<Value> {
+        if let Some(order) = self.imp().source_order.borrow().as_ref() {
+            if let Some(row) = self.imp().object_rows.borrow().get(&(position as usize)) {
+                return row.cell_value_in_row(column);
+            }
+            let source_index = order.get(position as usize)?;
+            if let Some(row) = self
+                .imp()
+                .cached_rows
+                .borrow()
+                .get(&source_index)
+                .and_then(glib::WeakRef::upgrade)
+            {
+                return row.cell_value_in_row(column);
+            }
+            return self.source_cell(source_index, column);
+        }
         let source_index = match self.imp().slots.borrow().get(position as usize)? {
             Slot::Object(row) => return row.cell_value_in_row(column),
             Slot::Cached { source_index, object } => match object.upgrade() {
@@ -573,12 +823,25 @@ impl RowStore {
 
     #[cfg(test)]
     fn requested(&self) -> usize {
+        if self.imp().source_order.borrow().is_some() {
+            return self.imp().cached_rows.borrow().len();
+        }
         let slots = self.imp().slots.borrow();
         slots.iter().filter(|slot| matches!(slot, Slot::Cached { .. })).count()
     }
 
     #[cfg(test)]
     fn materialized(&self) -> usize {
+        if self.imp().source_order.borrow().is_some() {
+            return self.imp().object_rows.borrow().len()
+                + self
+                    .imp()
+                    .cached_rows
+                    .borrow()
+                    .values()
+                    .filter(|object| object.upgrade().is_some())
+                    .count();
+        }
         let slots = self.imp().slots.borrow();
         slots
             .iter()

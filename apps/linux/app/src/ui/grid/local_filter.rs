@@ -398,7 +398,7 @@ impl LocalResultView {
                 }
             }
             if let Ok(Some(order)) = planned
-                && view.apply_prepared_order(&order)
+                && view.apply_prepared_order(order)
             {
                 view.0.borrow_mut().sort = keys;
                 view.persist_settings();
@@ -450,7 +450,7 @@ impl LocalResultView {
         self.apply_order_with_selection(order, store, selection, selected);
     }
 
-    fn apply_prepared_order(&self, order: &PreparedSourceRows) -> bool {
+    fn apply_prepared_order(&self, order: PreparedSourceRows) -> bool {
         let (store, selection, source_row_count) = {
             let state = self.0.borrow();
             let Some(store) = state.store.clone() else { return false };
@@ -465,6 +465,9 @@ impl LocalResultView {
             && selection.selection().size() == u64::from(item_count);
         let previous_selection = (!all_selected).then(|| selection.selection().copy());
         let selected = (!all_selected).then(|| selected_source_rows(&store, &selection));
+        let selected_positions = selected
+            .as_ref()
+            .map(|selected| selected_prepared_positions(&order, selected));
         let syncing = self.0.borrow().selection_syncing.clone();
         syncing.set(true);
         if all_selected {
@@ -477,8 +480,8 @@ impl LocalResultView {
             if all_selected {
                 selection.set_model(Some(&store));
                 selection.select_all();
-            } else if let Some(selected) = selected.as_ref() {
-                apply_selected_order(order.indices(), &selection, selected);
+            } else if let Some(positions) = selected_positions.as_ref() {
+                selection.set_selection(positions, &gtk4::Bitset::new_range(0, store.n_items()));
             }
         } else if all_selected {
             selection.set_model(Some(&store));
@@ -510,15 +513,34 @@ impl LocalResultView {
 }
 
 fn apply_selected_order(order: &[usize], selection: &gtk4::MultiSelection, selected: &HashSet<usize>) {
+    let positions = selected_order_positions(order, selected);
+    selection.set_selection(&positions, &gtk4::Bitset::new_range(0, order.len() as u32));
+}
+
+fn selected_order_positions(order: &[usize], selected: &HashSet<usize>) -> gtk4::Bitset {
     let positions = gtk4::Bitset::new_empty();
-    if !selected.is_empty() {
-        for (position, source_index) in order.iter().enumerate() {
-            if selected.contains(source_index) {
-                positions.add(position as u32);
-            }
+    if selected.is_empty() {
+        return positions;
+    }
+    for (position, source_index) in order.iter().enumerate() {
+        if selected.contains(source_index) {
+            positions.add(position as u32);
         }
     }
-    selection.set_selection(&positions, &gtk4::Bitset::new_range(0, order.len() as u32));
+    positions
+}
+
+fn selected_prepared_positions(order: &PreparedSourceRows, selected: &HashSet<usize>) -> gtk4::Bitset {
+    if !order.has_position_index() {
+        return selected_order_positions(order.indices(), selected);
+    }
+    let positions = gtk4::Bitset::new_empty();
+    for source_index in selected {
+        if let Some(position) = order.position_of(*source_index) {
+            positions.add(position);
+        }
+    }
+    positions
 }
 
 fn restore_selection(
