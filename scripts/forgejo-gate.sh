@@ -87,6 +87,28 @@ if runs:
     print(run["status"], run["id"], run["index_in_repo"])
 ' "$sha"
 }
+cancel_superseded() {
+  [ "$target" != main ] || return 0
+  local state id
+  for state in running waiting; do
+    { api_get "$api/actions/runs?status=$state&page=1&limit=50" | python3 -c '
+import json, sys
+target, sha = sys.argv[1], sys.argv[2]
+for run in json.load(sys.stdin)["workflow_runs"]:
+    if (
+        run.get("prettyref") == target
+        and run.get("commit_sha") != sha
+        and run.get("workflow_id") == "ci.yml"
+        and run.get("status") in ("running", "waiting")
+    ):
+        print(run["id"])
+' "$target" "$sha" | while read -r id; do
+        if api_post --request POST "$api/actions/runs/$id/cancel" >/dev/null; then
+          echo "cancelled the superseded gate run (API id $id) on $target"
+        fi
+      done; } || true
+  done
+}
 after="$(latest_run_id)"
 remote_sha="$(git ls-remote "$remote" "refs/heads/$target" | cut -f1)"
 if [ "$remote_sha" != "$sha" ]; then
@@ -120,6 +142,7 @@ if [ -n "$existing_main_run" ]; then
   fi
 fi
 if [ -z "$existing_main_run" ] || { [ "$existing_status" != success ] && [ "$existing_status" != running ] && [ "$existing_status" != waiting ]; }; then
+  cancel_superseded
   dispatch_payload="$(python3 -c 'import json,sys; print(json.dumps({"ref": sys.argv[1], "inputs": {"ref": sys.argv[2]}}))' "$target" "$sha")"
   api_post --request POST --header 'Content-Type: application/json' \
     --data-binary "$dispatch_payload" "$api/actions/workflows/ci.yml/dispatches" >/dev/null
