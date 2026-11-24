@@ -1300,7 +1300,11 @@ mod pin_tests {
 }
 
 fn header_kind(data_type: &str) -> String {
-    data_type.to_uppercase()
+    if data_type.eq_ignore_ascii_case("NULL") {
+        "UNKNOWN".into()
+    } else {
+        data_type.to_uppercase()
+    }
 }
 
 const MIN_CONTENT_WIDTH: f32 = 56.0;
@@ -1533,6 +1537,11 @@ mod header_kind_tests {
         assert_eq!(header_kind("integer"), "INTEGER");
         assert_eq!(header_kind("numeric(10,2)"), "NUMERIC(10,2)");
         assert_eq!(header_kind(""), "");
+    }
+
+    #[test]
+    fn an_unknown_sqlite_expression_type_is_not_shown_as_null() {
+        assert_eq!(header_kind("NULL"), "UNKNOWN");
     }
 
     #[test]
