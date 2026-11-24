@@ -474,7 +474,7 @@ fn apply_import(pending: PendingImport) -> Result<usize, String> {
             .await
             .map_err(|_| "The import was cancelled because its audit record could not be saved".to_string())?;
         let started = Instant::now();
-        let outcome = apply_import_body(pending.body).await;
+        let outcome = apply_import_body(pending.body, pending.plan).await;
         let (status, affected) = match &outcome {
             Ok(count) => (bundles::AuditTerminalStatus::Succeeded, *count),
             Err(_) => (bundles::AuditTerminalStatus::Failed, 0),
@@ -497,8 +497,8 @@ fn apply_import(pending: PendingImport) -> Result<usize, String> {
     })
 }
 
-async fn apply_import_body(body: bundles::BundleBody) -> Result<usize, String> {
-    Box::pin(bundles::apply_import_body(&body))
+async fn apply_import_body(body: bundles::BundleBody, reviewed: bundles::ImportPlan) -> Result<usize, String> {
+    Box::pin(bundles::apply_reviewed_import_body(&body, &reviewed))
         .await
         .map(|plan| plan.items.len())
         .map_err(|error| error.to_string())
