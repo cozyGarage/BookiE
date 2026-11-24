@@ -489,6 +489,10 @@ fn narrow_column_headers_keep_pin_actions_in_the_menu(cx: &mut TestAppContext) {
     let (view, cx) = cx.add_window_view(|window, cx| GridView::with_source(source, Instant::now(), window, cx));
     cx.simulate_resize(gpui::size(gpui::px(1_896.0), gpui::px(1_150.0)));
     cx.run_until_parked();
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| view.remember_grid_widths(&[gpui::px(72.0); 40], cx));
+    });
+    cx.run_until_parked();
     cx.update(|window, cx| window.render_frame(cx));
 
     assert!(
