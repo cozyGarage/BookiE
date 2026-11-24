@@ -146,6 +146,27 @@ async fn import_rejects_a_collision_changed_after_review() {
 }
 
 #[tokio::test]
+async fn import_rejects_a_bundle_changed_after_review() {
+    use crate::connection_bundle::{BundleBody, BundleConnection, ImportApplyError, plan_import};
+
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("connections.json");
+    let incoming = sample_connection();
+    let mut body = BundleBody {
+        connections: vec![BundleConnection::from_saved(&incoming)],
+        ..Default::default()
+    };
+    let reviewed = plan_import(&[], &body).unwrap();
+    body.connections[0].host = "changed.example".into();
+
+    assert!(matches!(
+        apply_reviewed_import_body_to(&path, &body, &reviewed).await,
+        Err(ImportApplyError::StaleReview)
+    ));
+    assert!(load_from(&path).await.unwrap().is_empty());
+}
+
+#[tokio::test]
 async fn an_import_never_removes_a_connection_the_bundle_omits() {
     use crate::connection_bundle::{BundleBody, plan_import};
 

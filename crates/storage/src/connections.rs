@@ -260,9 +260,14 @@ async fn apply_import_body_checked(
     if let Some(reviewed) = reviewed {
         let unchanged = plan.items.len() == reviewed.items.len()
             && plan.items.iter().zip(&reviewed.items).all(|(current, old)| {
+                let mut connection = current.connection.clone();
+                if current.disposition == crate::connection_bundle::ImportDisposition::Remapped {
+                    connection.id = old.connection.id;
+                }
                 current.source_id == old.source_id
                     && current.disposition == old.disposition
                     && current.previous == old.previous
+                    && connection == old.connection
             });
         if !unchanged {
             return Err(crate::connection_bundle::ImportApplyError::StaleReview);
