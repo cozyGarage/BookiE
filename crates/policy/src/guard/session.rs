@@ -968,7 +968,7 @@ impl PolicySession {
 
 impl PolicySession {
     async fn approve_production_commit(
-        &self,
+        &mut self,
         sql: &str,
         control: &OperationControl,
         writes: u32,
