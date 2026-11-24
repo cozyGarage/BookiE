@@ -65,14 +65,14 @@ impl McpState {
         let status_view = view.clone();
         let status = SettingField::render(move |_, _, cx| {
             let value = status_view.read(cx).mcp.status.clone();
-            div().when_some(value, |this, value| this.id("mcp-status").child(value))
+            div().id("mcp-status").when_some(value, |this, value| this.child(value))
         });
         let token_view = view.clone();
         let tokens = SettingField::render(move |_, _, cx| token_list(token_view.clone(), Theme::current(cx), cx));
         let secret_view = view;
         let secret = SettingField::render(move |_, _, cx| {
             let plaintext = secret_view.read(cx).mcp.plaintext.clone();
-            let Some(plaintext) = plaintext else { return div() };
+            let Some(plaintext) = plaintext else { return div().id("mcp-issued-token") };
             let hide_view = secret_view.clone();
             div()
                 .id("mcp-issued-token")
@@ -152,23 +152,8 @@ fn token_row(view: Entity<GridView>, bridge: Arc<McpBridge>, token: McpToken, th
             row.child(
                 ghost(gpui::ElementId::Name(format!("mcp-revoke-{id}").into()), "Revoke", theme)
                     .on_click(move |_, _, cx| {
-                        let view = view.clone();
                         let bridge = bridge.clone();
-                        cx.spawn(async move |_, cx| {
-                            let result = cx
-                                .background_executor()
-                                .spawn(async move {
-                                    crate::resolve_ui::blocking(async move {
-                                        bookie_app_services::mcp_service::revoke_token(Some(&bridge), id).await
-                                    })
-                                })
-                                .await;
-                            view.update(cx, |this, cx| {
-                                this.mcp.status = Some(result.map_or_else(|error| error, |_| "Token revoked.".into()));
-                                cx.notify();
-                            });
-                        })
-                        .detach();
+                        view.update(cx, |this, cx| this.revoke_mcp_token(bridge, id, cx));
                     }),
             )
         })
@@ -201,6 +186,25 @@ impl GridView {
             self.mcp.status = Some("MCP server disabled.".into());
         }
         cx.notify();
+    }
+
+    fn revoke_mcp_token(&mut self, bridge: Arc<McpBridge>, id: uuid::Uuid, cx: &mut Context<Self>) {
+        let view = cx.entity();
+        cx.spawn(async move |_, cx| {
+            let result = cx
+                .background_executor()
+                .spawn(async move {
+                    crate::resolve_ui::blocking(async move {
+                        bookie_app_services::mcp_service::revoke_token(Some(&bridge), id).await
+                    })
+                })
+                .await;
+            view.update(cx, |this, cx| {
+                this.mcp.status = Some(result.map_or_else(|error| error, |_| "Token revoked.".into()));
+                cx.notify();
+            });
+        })
+        .detach();
     }
 
     pub(crate) fn issue_mcp_token(&mut self, permissions: TokenPermissions, cx: &mut Context<Self>) {
