@@ -513,7 +513,6 @@ impl Connection for PgConnection {
             return Err(DriverError::Unsupported("bounded COPY".into()));
         }
         let mut connection = acquire_controlled(&self.pool, control).await?;
-        connection.close_on_drop();
         let cancel_token = connection.cancel_token();
         let stop = Some(QueryStop {
             cancel_token: cancel_token.clone(),
@@ -530,7 +529,12 @@ impl Connection for PgConnection {
             control,
         )
         .await;
-        let (connection, result) = finish_connection(connection, result).await;
+        let (mut connection, result) = finish_connection(connection, result).await;
+        if (result.is_err() || result.as_ref().is_ok_and(|(rows, _, _)| rows.truncated))
+            && let Some(connection) = &mut connection
+        {
+            connection.close_on_drop();
+        }
         drop(connection);
         let (rows, messages, affected) = result?;
         Ok(QueryResultBatch::single(rows)

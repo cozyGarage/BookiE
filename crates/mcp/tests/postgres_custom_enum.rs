@@ -108,6 +108,54 @@ fn mcp_context(
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn repeated_small_mcp_reads_reuse_a_postgres_backend() {
+    let (_container, host, port) = start_postgres().await;
+    let connection: Arc<dyn Connection> = Arc::from(
+        PgDriver
+            .connect(ConnectOptions {
+                host: host.clone(),
+                port,
+                database: "postgres".into(),
+                username: "postgres".into(),
+                password: secrecy::SecretString::new("postgres".to_string().into()),
+                tls: TlsConfig::disabled(),
+                ..Default::default()
+            })
+            .await
+            .expect("connect PostgreSQL driver"),
+    );
+    let (connection_id, bridge, token, _directory) = mcp_context(connection, host, port, McpLimits::default());
+    bridge
+        .execute_query(&token, connection_id, "SELECT pg_backend_pid()::bigint")
+        .await
+        .expect("warm the bounded MCP read pool");
+    let mut backend_pids = std::collections::BTreeSet::new();
+
+    for _ in 0..8 {
+        let batch = bridge
+            .execute_query(&token, connection_id, "SELECT pg_backend_pid()::bigint")
+            .await
+            .expect("execute a small bounded MCP read");
+        assert!(!batch.truncated, "the one-row result should fit within the MCP budget");
+        let Some(Value::Int(pid)) = batch
+            .result_sets
+            .first()
+            .and_then(|result| result.rows.first())
+            .and_then(|row| row.first())
+        else {
+            panic!("PostgreSQL did not return a backend PID: {batch:?}");
+        };
+        backend_pids.insert(*pid);
+    }
+
+    assert!(
+        backend_pids.len() < 8,
+        "complete bounded reads opened a new backend each time: {backend_pids:?}"
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn postgres_custom_enum_labels_and_sql_null_survive_mcp_query_tool() {
     let (_container, host, port) = start_postgres().await;
     let connection = PgDriver
