@@ -123,7 +123,11 @@ pub fn defaults(profiles: &[Profile]) -> Settings {
         },
         label,
         values,
-        aggregate: if value.is_some() { Aggregate::Sum } else { Aggregate::Count },
+        aggregate: if value.is_some() {
+            Aggregate::Sum
+        } else {
+            Aggregate::Count
+        },
     }
 }
 
@@ -209,9 +213,7 @@ impl Sum {
 
     fn average(self, count: usize) -> f64 {
         match self {
-            Self::Exact(sum) => sum
-                .checked_div(Decimal::from(count))
-                .map_or(f64::NAN, decimal_f64),
+            Self::Exact(sum) => sum.checked_div(Decimal::from(count)).map_or(f64::NAN, decimal_f64),
             Self::Float(sum) => sum / count as f64,
         }
     }
@@ -228,7 +230,12 @@ struct Groups {
     totals: Totals,
 }
 
-fn group_rows(rows: &[Vec<Value>], settings: &Settings, picked: &[(usize, Option<usize>)], profiles: &[Profile]) -> Groups {
+fn group_rows(
+    rows: &[Vec<Value>],
+    settings: &Settings,
+    picked: &[(usize, Option<usize>)],
+    profiles: &[Profile],
+) -> Groups {
     let numeric = |column: usize| profiles.get(column).is_some_and(|p| p.numeric);
     let mut index: HashMap<Option<String>, usize> = HashMap::new();
     let mut labels = Vec::new();
@@ -248,7 +255,9 @@ fn group_rows(rows: &[Vec<Value>], settings: &Settings, picked: &[(usize, Option
                 total.1 += 1;
                 continue;
             };
-            let Some(value) = row.get(*column).filter(|_| numeric(*column)) else { continue };
+            let Some(value) = row.get(*column).filter(|_| numeric(*column)) else {
+                continue;
+            };
             if let Some(n) = number(value) {
                 *total = (total.0.add(value, n), total.1 + 1);
             }
@@ -303,7 +312,12 @@ pub fn compute(rows: &[Vec<Value>], profiles: &[Profile], settings: &Settings) -
     }
 }
 
-fn keep(labels: &[Option<String>], totals: &[Vec<Option<f64>>], temporal: bool, kind: Kind) -> (Vec<usize>, Option<Cut>) {
+fn keep(
+    labels: &[Option<String>],
+    totals: &[Vec<Option<f64>>],
+    temporal: bool,
+    kind: Kind,
+) -> (Vec<usize>, Option<Cut>) {
     let mut order: Vec<usize> = (0..labels.len()).collect();
     if temporal {
         order.sort_by(|&a, &b| (labels[a].is_none(), &labels[a]).cmp(&(labels[b].is_none(), &labels[b])));
@@ -319,7 +333,10 @@ fn keep(labels: &[Option<String>], totals: &[Vec<Option<f64>>], temporal: bool, 
         Some(first) => {
             let mut biggest = order.clone();
             biggest.sort_by(|&a, &b| {
-                let (a, b) = (first[a].unwrap_or(f64::NEG_INFINITY), first[b].unwrap_or(f64::NEG_INFINITY));
+                let (a, b) = (
+                    first[a].unwrap_or(f64::NEG_INFINITY),
+                    first[b].unwrap_or(f64::NEG_INFINITY),
+                );
                 b.total_cmp(&a)
             });
             let kept: HashSet<usize> = biggest[..limit].iter().copied().collect();
