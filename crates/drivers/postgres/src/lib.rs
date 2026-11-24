@@ -194,8 +194,6 @@ fn full_connect_options(opts: &ConnectOptions) -> Result<PgConnectOptions, Drive
     if opts.read_only {
         pg_opts = pg_opts.options([("default_transaction_read_only", "on")]);
     }
-    pg_opts = pg_opts.statement_cache_capacity(0);
-
     Ok(pg_opts)
 }
 

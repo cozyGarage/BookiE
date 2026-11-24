@@ -17,8 +17,7 @@ async fn settings_and_temp_tables_do_not_survive_on_a_pooled_connection() {
         .port(opts.port)
         .username(&opts.username)
         .password(opts.password.expose_secret())
-        .database(&opts.database)
-        .statement_cache_capacity(0);
+        .database(&opts.database);
     let pool = pool::options(std::time::Duration::from_secs(5))
         .max_connections(1)
         .connect_with(options)
