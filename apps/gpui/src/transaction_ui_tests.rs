@@ -24,6 +24,7 @@ fn open_transaction(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestCont
                 write,
                 shared,
                 started: Instant::now(),
+                last_activity: Instant::now(),
                 statements: 0,
             });
             view.tabs.open_query();
@@ -90,4 +91,26 @@ fn a_read_only_transaction_refuses_the_write_and_changes_nothing(cx: &mut TestAp
     write.rollback_transaction(&shared).expect("roll back");
     assert_eq!(saved_customer(&path, 1), original);
     let _ = (view, cx);
+}
+
+#[gpui::test]
+fn a_transaction_idle_for_five_minutes_shows_the_shared_warning(cx: &mut TestAppContext) {
+    let path = fixture_copy("transaction-idle");
+    let (view, cx) = saving_view(cx, &path);
+    open_transaction(&view, cx, &path);
+    view.read_with(cx, |view, _| assert_eq!(view.transaction_idle_warning(), None));
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            if let Some(transaction) = view.transaction.as_mut() {
+                transaction.last_activity = Instant::now() - std::time::Duration::from_secs(6 * 60);
+            }
+        })
+    });
+    view.read_with(cx, |view, _| {
+        let warning = view.transaction_idle_warning().expect("an idle warning");
+        assert!(warning.starts_with("Idle for 6 min"), "{warning}");
+    });
+    cx.update(|_, cx| view.update(cx, |view, cx| view.end_transaction(false, cx)));
+    wait_for(&view, cx, |view| view.status == "Transaction rolled back");
+    std::fs::remove_file(&path).ok();
 }
