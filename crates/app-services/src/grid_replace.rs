@@ -337,8 +337,8 @@ impl ReplaceReport {
         count: usize,
         row_key: &[Value],
     ) -> Result<(), ReplaceError> {
-        let retained = retained_key_bytes(row_key)
-            .saturating_add(retained_key_bytes(std::slice::from_ref(original)))
+        let retained = retained_values_bytes(row_key)
+            .saturating_add(retained_values_bytes(std::slice::from_ref(original)))
             .saturating_add(text.len())
             .saturating_add(std::mem::size_of::<ReplaceEdit>());
         if retained > MAX_REPLACE_PLAN_BYTES.saturating_sub(self.retained_bytes)
@@ -367,11 +367,11 @@ fn validate_input(query: &ReplaceQuery, replacement: &str) -> Result<(), Replace
     Ok(())
 }
 
-fn retained_key_bytes(key: &[Value]) -> usize {
-    key.iter().fold(0usize, |total, value| {
+pub(crate) fn retained_values_bytes(values: &[Value]) -> usize {
+    values.iter().fold(0usize, |total, value| {
         let heap = match value {
-            Value::Text(text) | Value::JsonText(text) | Value::Undecodable(text) => text.len(),
-            Value::Bytes(bytes) => bytes.len(),
+            Value::Text(text) | Value::JsonText(text) | Value::Undecodable(text) => text.capacity(),
+            Value::Bytes(bytes) => bytes.capacity(),
             Value::Json(value) => json_bytes(value),
             _ => 0,
         };
@@ -381,12 +381,12 @@ fn retained_key_bytes(key: &[Value]) -> usize {
 
 fn json_bytes(value: &serde_json::Value) -> usize {
     let heap = match value {
-        serde_json::Value::String(text) => text.len(),
+        serde_json::Value::String(text) => text.capacity(),
         serde_json::Value::Array(values) => values
             .iter()
             .fold(0usize, |sum, value| sum.saturating_add(json_bytes(value))),
         serde_json::Value::Object(values) => values.iter().fold(0usize, |sum, (key, value)| {
-            sum.saturating_add(key.len()).saturating_add(json_bytes(value))
+            sum.saturating_add(key.capacity()).saturating_add(json_bytes(value))
         }),
         _ => 0,
     };
