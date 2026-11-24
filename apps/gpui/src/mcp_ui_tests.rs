@@ -14,7 +14,10 @@ fn token_buttons_fit_inside_settings_at_narrow_width(cx: &mut TestAppContext) {
     let card = cx.debug_bounds("settings-card").expect("settings card is visible");
     for id in ["mcp-issue-read", "mcp-issue-write"] {
         let button = cx.debug_bounds(id).expect("token action is visible");
-        assert!(button.origin.x + button.size.width <= card.origin.x + card.size.width);
+        assert!(
+            button.origin.x + button.size.width <= card.origin.x + card.size.width,
+            "{id} {button:?} outside {card:?}"
+        );
     }
 }
 
