@@ -1,6 +1,10 @@
 use super::*;
 
 impl BrowseTab {
+    pub fn database_name(&self) -> &str {
+        &self.database_name
+    }
+
     pub fn current_offset(&self) -> u64 {
         self.current_offset
     }
