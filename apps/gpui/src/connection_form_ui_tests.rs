@@ -3,6 +3,32 @@ use gpui::TestAppContext;
 use crate::ui_tests::open;
 
 #[gpui::test]
+fn tab_moves_between_connection_fields_in_order(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.tabs.open_new_connection();
+            cx.notify();
+            let name = view.connection_form.name.read(cx).focus_handle_for_tests();
+            window.focus(&name, cx);
+        });
+    });
+    cx.run_until_parked();
+    cx.simulate_keystrokes("tab");
+    cx.update(|window, cx| {
+        assert!(view.read(cx).connection_form.host.read(cx).focus_handle_for_tests().is_focused(window));
+    });
+    cx.simulate_keystrokes("tab");
+    cx.update(|window, cx| {
+        assert!(view.read(cx).connection_form.port.read(cx).focus_handle_for_tests().is_focused(window));
+    });
+    cx.simulate_keystrokes("shift-tab");
+    cx.update(|window, cx| {
+        assert!(view.read(cx).connection_form.host.read(cx).focus_handle_for_tests().is_focused(window));
+    });
+}
+
+#[gpui::test]
 fn connection_sections_use_space_on_wide_windows_and_wrap_when_narrow(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     view.update(cx, |view, cx| {
