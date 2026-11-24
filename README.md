@@ -271,7 +271,7 @@ Read [`CONTRIBUTING.md`](CONTRIBUTING.md) and the rules in [`AGENTS.md`](AGENTS.
 
 ## Changelog
 
-Published release notes are in [`CHANGELOG.md`](CHANGELOG.md). Unreleased user-facing changes have fragments under [`changelog.d/`](changelog.d/), assembled at the release cut ([ADR 0053](docs/decisions/0053-changelog-fragments.md)).
+Published release notes are in [`CHANGELOG.md`](CHANGELOG.md). Unreleased user-facing changes have fragments under [`changelog.d/`](changelog.d/).
 
 ## License
 
