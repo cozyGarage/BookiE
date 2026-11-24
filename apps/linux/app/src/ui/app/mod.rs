@@ -1047,6 +1047,7 @@ impl SimpleComponent for App {
             AppMsg::ToggleAllSidebarGroups => self.toggle_all_sidebar_groups(),
             AppMsg::ShowErDiagram { schema } => self.on_show_er_diagram(schema),
             AppMsg::CompareSchema { schema } => self.on_compare_schema(schema, &sender),
+            AppMsg::CompareData { schema, table } => self.on_compare_data(schema, table, &sender),
             AppMsg::ExplainActiveQuery => self.on_explain_active_query(),
             AppMsg::ShowPreferences => super::preferences::present(
                 &self.window,
