@@ -734,6 +734,28 @@ impl LiveSession {
             .map_err(|error| format!("{error:?}"))
     }
 
+    pub fn server_info(&self) -> ServerInfo {
+        let control = OperationControl::with_timeout(Duration::from_secs(5));
+        let (version, round_trip) = match self
+            .runtime
+            .block_on(self.sessions.server_version(self.session_id, &control))
+        {
+            Ok((version, round_trip)) => (version, Some(round_trip)),
+            Err(_) => (None, None),
+        };
+        let details = self.saved.as_ref().and_then(|(id, _)| {
+            self.runtime
+                .block_on(bookie_app_services::connection_details::load_connection_details(*id))
+                .ok()
+                .flatten()
+        });
+        ServerInfo {
+            version,
+            round_trip,
+            details,
+        }
+    }
+
     fn next_epoch(&self) -> Epoch {
         Epoch(self.epoch.fetch_add(1, Ordering::Relaxed) + 1)
     }
@@ -744,6 +766,13 @@ impl Drop for LiveSession {
         let _inside = self.runtime.enter();
         self.sessions.close(self.session_id);
     }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ServerInfo {
+    pub version: Option<String>,
+    pub round_trip: Option<Duration>,
+    pub details: Option<bookie_app_services::connection_details::ConnectionDetails>,
 }
 
 pub struct LiveTable {

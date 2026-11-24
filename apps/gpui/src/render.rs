@@ -459,6 +459,7 @@ impl GridView {
 
 impl Render for GridView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.ensure_row_inspector(cx);
         self.sync_render_state(window, cx);
         if self.approval.current.is_some() && !self.focus.is_focused(window) {
             window.focus(&self.focus, cx);
@@ -535,7 +536,7 @@ impl Render for GridView {
             .children(self.host_key_bar(theme, cx))
             .child(self.main_layout(sidebar, tab_row, bundle_bar, content))
             .children(self.row_menu_overlay())
-            .child(self.status_bar(theme))
+            .child(self.status_bar(theme, f32::from(window.viewport_size().width)))
             .children(palette)
             .children(full_value_editor)
             .children(approval)

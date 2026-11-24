@@ -94,10 +94,9 @@ impl McpState {
         });
         let mut group = SettingGroup::new()
             .item(SettingItem::new("MCP server", enabled).description("Use BookiE's governed local MCP endpoint."))
-            .item(
-                SettingItem::new("Issue token", actions)
-                    .description("Tokens are limited to the active saved connection; plaintext is shown once."),
-            );
+            .item(SettingItem::new("Issue token", actions).description(
+                "Tokens work only with the active saved connection, and each token's text is shown once.",
+            ));
         if self.plaintext.is_some() {
             group = group.item(SettingItem::new("Issued token", secret));
         }

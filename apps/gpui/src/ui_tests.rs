@@ -1975,7 +1975,7 @@ fn settings_font_inputs_keep_editable_values_and_show_defaults(cx: &mut TestAppC
     let (view, cx) = open(cx);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
-            view.tabs.open_settings();
+            view.open_settings_page(crate::keyboard_settings_ui::SettingsPage::Fonts);
             view.edit_fonts(
                 |fonts| {
                     fonts.ui_family.clear();

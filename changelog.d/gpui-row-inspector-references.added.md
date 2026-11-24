@@ -1,0 +1,1 @@
+GPUI row details can switch to a JSON view and list the rows in other tables that reference the active row, foreign-key values show in a link colour and Ctrl+click follows them, Wrap long cell text shows up to three lines a row, and Alt+Enter opens the full value editor.
