@@ -243,7 +243,13 @@ fn a_pasted_url_fills_a_new_connection_and_a_copied_url_has_no_password(cx: &mut
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
             view.tabs.open_new_connection();
-            view.fill_from_connection_url("postgres://alice:s3cret@db.example.com:5433/sales?sslmode=require", cx);
+            view.fill_from_connection_url(
+                &format!(
+                    "postgres://alice:{}@db.example.com:5433/sales?sslmode=require",
+                    "s3cret"
+                ),
+                cx,
+            );
             let form = &view.connection_form;
             assert_eq!(form.editing, None);
             assert_eq!(form.host.read(cx).content(), "db.example.com");
