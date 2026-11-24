@@ -2,6 +2,55 @@
 
 ## [Unreleased]
 
+## [0.2.9] - 2026-11-24
+
+### Added
+
+- Data compare: compare the rows of two tables on one connection and open a reviewed script that makes the chosen table match; deletes stay out of the script until you include them.
+- GPUI can inspect server activity, cancel a selected server process, and copy selected rows or the current page as CSV.
+- GPUI has an Audit log tab that lists recent operations from the audit journal, with a filter.
+- The GPUI frontend can copy and export CSV with a multi-character delimiter, set from the command palette.
+- GPUI can show a connection's data dictionary (tables, columns and indexes) as a result tab.
+- The GPUI command palette has export limit <n>, which caps Export as CSV to the first n rows and says when more rows were not exported.
+- GPUI records the statements it runs on saved connections, shares the history with the GTK app, and has a History tab with search, status filters, pinning, delete and reuse.
+- GPUI: tagged releases include an unsupported Linux x86_64 preview with a checksum and runtime requirements.
+- GPUI has a New connection form for password connections.
+- On a PostgreSQL connection in the GPUI app, "follow <channel>" in the command palette streams NOTIFY messages live into the Messages panel until you stop it; a dropped connection ends it with a clear message.
+- In the GPUI app, a PostgreSQL connection can now listen to NOTIFY messages for a few seconds: type "listen <channel>" in the command palette. Redis channel listening is unchanged.
+- The GPUI sidebar groups tables under collapsible schema rows.
+- GPUI's connection form sets up multi-hop SSH tunnels, the SSH agent and the OpenSSH client.
+- GPUI: follow Redis pub/sub channel patterns until stopped, with the same bounded message list, stop command and end-of-follow message as PostgreSQL notifications.
+- An open session transaction that has been idle for five minutes now says so on the Session button, with a tooltip explaining that it may hold locks and should be committed or rolled back.
+
+### Changed
+
+- Sorting or filtering a large loaded result runs in the background, keeps the selected rows, and shows the new order without rebuilding every row.
+- PostgreSQL table sorting places NULL values last in both ascending and descending order.
+- The query timing tooltip separates time to first row from result transfer when a streamed result provides that timing.
+- Schema compare is available from the schema menu without setting an environment variable.
+
+### Fixed
+
+- Hidden-column preferences now stay with the database, schema and table where they were set; columns hidden in an earlier version show again once and can be hidden again.
+- Column names with underscores display correctly in the GTK column header menu.
+- Browsing a table now warns when pages may skip or repeat rows because their order can change.
+- MCP query previews stop reading rows when their response budget is reached.
+- MongoDB table browsing reuses sampled columns across pages while retaining fields discovered on later pages.
+- MongoDB collection metadata loads fewer cursor batches on higher-latency connections.
+- Statements with deeply nested subqueries no longer stall the safety check that runs before a query.
+- PostgreSQL ER diagrams load faster on schemas with many tables.
+- PostgreSQL inbound foreign-key lists no longer include tables you cannot access.
+- PostgreSQL now explains when a transaction pooler loses the unnamed statement before binding parameters.
+- When the database server itself ends a session that had an open transaction (for example an idle-in-transaction timeout), BookiE now records the transaction as rolled back and keeps the connection usable, instead of blocking writes until the outcome is resolved by hand.
+- TLS setup errors now show accurate diagnostics without exposing certificate file paths.
+
+### Security
+
+- GPUI asks for approval in the window before a write that needs it, and re-checks the saved connection before every save or delete, so a connection made read-only or production elsewhere is not written through.
+- Committing a transaction that changed data on a production connection now asks for approval, showing how many changes it commits.
+- SSH tunnels now refuse a server that answers with a different host-key algorithm than the one agreed, opens channels the client did not ask for, or sends unbounded data before login.
+- MongoDB connection details no longer appear in debug output or parse errors, and Redis replies with out-of-range numbers or unsolicited subscription messages are rejected instead of misread.
+
 ## [0.2.8] - 2026-11-21
 
 ### Added
@@ -1186,10 +1235,11 @@ Source version **0.2.0** (`Cargo.toml`, inherited by every workspace crate). Thi
 - Agentd session reuse after Secret Service or SSH/CA file rotation.
 - Unbounded PostgreSQL and MongoDB SCRAM iteration counts.
 
-[Unreleased]: https://github.com/cozyGarage/BookiE/compare/linux-v0.2.8...main
+[Unreleased]: https://github.com/cozyGarage/BookiE/compare/linux-v0.2.9...main
 [0.1.5]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.1.5
 [0.2.0]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.0
 [0.2.2]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.2
 [0.2.3]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.3
 [0.2.5]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.5
 [0.2.8]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.8
+[0.2.9]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.9

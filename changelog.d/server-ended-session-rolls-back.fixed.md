@@ -1,1 +1,0 @@
-When the database server itself ends a session that had an open transaction (for example an idle-in-transaction timeout), BookiE now records the transaction as rolled back and keeps the connection usable, instead of blocking writes until the outcome is resolved by hand.

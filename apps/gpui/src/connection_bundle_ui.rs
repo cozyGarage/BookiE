@@ -446,8 +446,23 @@ impl GridView {
     }
 }
 
+fn plan_is_current(plan: &bundles::ImportPlan, local: &[bundles::SavedConnection]) -> bool {
+    plan.items.iter().all(|item| {
+        local.iter().find(|saved| saved.id == item.connection.id) == item.previous.as_ref()
+    })
+}
+
 fn apply_import(pending: PendingImport) -> Result<usize, String> {
     runtime()?.block_on(async move {
+        let local = bundles::load_connections()
+            .await
+            .map_err(|_| "The saved connections could not be read, so nothing was imported".to_string())?;
+        if !plan_is_current(&pending.plan, &local) {
+            return Err(
+                "Saved connections changed after this import was reviewed, so nothing was imported. Choose the file again to review the current changes"
+                    .into(),
+            );
+        }
         let database = bookie_app_services::database_service::DatabaseService::new();
         let operation = uuid::Uuid::new_v4();
         let planned = pending.plan.items.len();
@@ -644,6 +659,25 @@ mod tests {
         };
         assert_eq!(body.connections.len(), 1);
         assert!(body.secrets.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn an_import_reviewed_before_a_local_change_is_refused() -> Result<(), Box<dyn std::error::Error>> {
+        let saved: bundles::SavedConnection = serde_json::from_str(
+            r#"{"id":"6af4b280-82ec-4d81-b780-3878f7af1647","name":"prod","driver_id":"postgres","host":"db","port":5432,"database":"app","username":"app"}"#,
+        )?;
+        let bytes = bundles::export_plaintext(&bundle_export(vec![saved.clone()], Vec::new()))?;
+        let bundles::ParsedBundle::Plaintext(body) = bundles::parse_bundle(&bytes)? else {
+            return Err("plaintext export was unexpectedly encrypted".into());
+        };
+        let plan = bundles::plan_import(std::slice::from_ref(&saved), &body)?;
+        assert!(plan_is_current(&plan, std::slice::from_ref(&saved)));
+
+        let mut changed = saved;
+        changed.name = "prod (locked down)".into();
+        assert!(!plan_is_current(&plan, std::slice::from_ref(&changed)));
+        assert!(!plan_is_current(&plan, &[]));
         Ok(())
     }
 
