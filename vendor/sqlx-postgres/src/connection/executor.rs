@@ -248,8 +248,23 @@ impl PgConnection {
             // patch holes created during encoding
             arguments.apply_patches(self, &metadata.parameters).await?;
 
+            // Transaction poolers may assign a different backend after the prepare Sync.
+            let param_types = if statement == StatementId::UNNAMED {
+                Some(self.resolve_types(&arguments.types).await?)
+            } else {
+                None
+            };
+
             // consume messages till `ReadyForQuery` before bind and execute
             self.wait_until_ready().await?;
+
+            if let Some(param_types) = &param_types {
+                self.inner.stream.write_msg(Parse {
+                    param_types,
+                    query: sql,
+                    statement,
+                })?;
+            }
 
             // bind to attach the arguments to the statement and create a portal
             self.inner.stream.write_msg(Bind {
