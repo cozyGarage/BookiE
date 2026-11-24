@@ -178,6 +178,8 @@ impl Chord {
     }
 }
 
+const UNBOUND: &str = "none";
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RebindError {
     Taken(Command),
@@ -242,15 +244,60 @@ impl Keymap {
         Ok(())
     }
 
+    pub fn unbind(&mut self, command: Command) {
+        self.bindings.remove(&command);
+    }
+
+    pub fn reset(&mut self, command: Command) {
+        match Keymap::default().bindings.remove(&command) {
+            Some(chord) => {
+                self.rebind_taking(command, chord);
+            }
+            None => self.unbind(command),
+        }
+    }
+
+    pub fn rebind_taking(&mut self, command: Command, chord: Chord) -> Vec<Command> {
+        let displaced: Vec<Command> = self
+            .bindings
+            .iter()
+            .filter(|(owner, bound)| **bound == chord && **owner != command)
+            .map(|(owner, _)| *owner)
+            .collect();
+        for owner in &displaced {
+            self.bindings.remove(owner);
+        }
+        self.bindings.insert(command, chord);
+        displaced
+    }
+
+    pub fn overrides_json(&self) -> String {
+        let defaults = Keymap::default();
+        let overrides: BTreeMap<&str, String> = Command::ALL
+            .into_iter()
+            .filter(|command| self.binding(*command) != defaults.binding(*command))
+            .map(|command| {
+                let text = self.binding(command).map_or_else(|| UNBOUND.to_string(), Chord::label);
+                (command.name(), text)
+            })
+            .collect();
+        serde_json::to_string(&overrides).unwrap_or_else(|_| "{}".into())
+    }
+
     pub fn from_overrides(json: &str) -> Result<Keymap, String> {
         let overrides: BTreeMap<String, String> = serde_json::from_str(json).map_err(|error| error.to_string())?;
         let mut keymap = Keymap::default();
         let mut wanted = Vec::new();
+        let mut removed = Vec::new();
         for (name, text) in overrides {
             let command = Command::parse(&name).ok_or_else(|| format!("unknown command {name}"))?;
-            wanted.push((command, Chord::parse(&text)?));
+            if text == UNBOUND {
+                removed.push(command);
+            } else {
+                wanted.push((command, Chord::parse(&text)?));
+            }
         }
-        for (command, _) in &wanted {
+        for command in wanted.iter().map(|(command, _)| command).chain(&removed) {
             keymap.bindings.remove(command);
         }
         for (command, chord) in wanted {
@@ -352,5 +399,39 @@ mod tests {
         assert!(Keymap::from_overrides(r#"{"filter":"x"}"#).is_err());
         assert!(Keymap::from_overrides("not json").is_err());
         assert_eq!(Keymap::from_overrides("{}").unwrap(), Keymap::default());
+    }
+
+    #[test]
+    fn a_shortcut_can_be_removed_reset_and_taken_from_its_holder() {
+        let mut keymap = Keymap::default();
+        keymap.unbind(Command::Filter);
+        assert_eq!(keymap.binding(Command::Filter), None);
+        keymap.reset(Command::Filter);
+        assert_eq!(
+            keymap.binding(Command::Filter),
+            Keymap::default().binding(Command::Filter)
+        );
+
+        let ctrl_b = Chord::parse("ctrl-b").unwrap();
+        assert_eq!(
+            keymap.rebind_taking(Command::Filter, ctrl_b.clone()),
+            vec![Command::ToggleSidebar]
+        );
+        assert_eq!(keymap.binding(Command::Filter), Some(&ctrl_b));
+        assert_eq!(keymap.binding(Command::ToggleSidebar), None);
+        assert_eq!(keymap.resolve(&ctrl_b), Some(Command::Filter));
+        assert!(keymap.rebind_taking(Command::Filter, ctrl_b).is_empty());
+    }
+
+    #[test]
+    fn overrides_hold_only_the_changes_and_load_back_to_the_same_map() {
+        assert_eq!(Keymap::default().overrides_json(), "{}");
+        let mut keymap = Keymap::default();
+        keymap.rebind_taking(Command::Filter, Chord::parse("ctrl-b").unwrap());
+        let json = keymap.overrides_json();
+        assert!(json.contains("\"filter\":\"ctrl-b\""), "{json}");
+        assert!(json.contains("\"toggle-sidebar\":\"none\""), "{json}");
+        assert!(!json.contains("palette"), "{json}");
+        assert_eq!(Keymap::from_overrides(&json).unwrap(), keymap);
     }
 }

@@ -15,6 +15,10 @@ impl GridView {
             cx.stop_propagation();
             return;
         }
+        if self.record_shortcut_key(&event.keystroke, cx) {
+            cx.stop_propagation();
+            return;
+        }
         if self.palette.open {
             let key = event.keystroke.key.as_str();
             if palette_navigation_key(key, event.keystroke.modifiers) {
@@ -184,7 +188,11 @@ impl GridView {
             && self.compare.is_none()
             && self.tabs.shows_grid_for(&self.catalog.grid_table)
         {
-            self.grid_key(key, modifiers.shift, control, window, cx);
+            if key == "enter" && modifiers.alt && !control && !modifiers.shift {
+                self.open_value_editor(window, cx);
+            } else {
+                self.grid_key(key, modifiers.shift, control, window, cx);
+            }
         }
     }
 

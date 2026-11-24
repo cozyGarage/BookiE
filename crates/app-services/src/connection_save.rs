@@ -206,6 +206,20 @@ fn validate_ssh(ssh: Option<&SshDraft>) -> Result<(), String> {
     Ok(())
 }
 
+pub fn draft_url(draft: &ConnectionDraft) -> Option<String> {
+    bookie_storage::connection_url(&saved_from_draft(draft, draft.id.unwrap_or_else(Uuid::nil)))
+}
+
+pub fn draft_from_url(
+    registry: &DriverRegistry,
+    text: &str,
+) -> Result<(ConnectionDraft, Option<SecretString>), String> {
+    let parsed = bookie_storage::parse_connection_url(text).map_err(|error| error.to_string())?;
+    let mut draft = draft_from_saved(&parsed.connection, registry);
+    draft.id = None;
+    Ok((draft, parsed.password))
+}
+
 pub fn saved_from_draft(draft: &ConnectionDraft, id: Uuid) -> SavedConnection {
     let name = match draft.name.trim() {
         "" => derived_name(
@@ -853,5 +867,45 @@ mod tests {
     fn the_secret_is_never_part_of_the_saved_record() {
         let saved = saved_from_draft(&draft(), Uuid::nil());
         assert!(!format!("{saved:?}").contains("secret"));
+    }
+
+    #[test]
+    fn a_pasted_url_fills_a_new_draft_and_keeps_its_password_apart() {
+        use secrecy::ExposeSecret;
+        let registry = DriverRegistry::new();
+        let (pasted, password) = draft_from_url(
+            &registry,
+            &format!(
+                "postgres://alice:{}@db.example.com:5433/sales?sslmode=require",
+                "s3cret"
+            ),
+        )
+        .unwrap();
+        assert_eq!(pasted.id, None);
+        assert_eq!(
+            (pasted.host.as_str(), pasted.port, pasted.database.as_str()),
+            ("db.example.com", 5433, "sales")
+        );
+        assert_eq!(pasted.username, "alice");
+        assert_eq!(pasted.tls_mode, TlsMode::Require);
+        assert_eq!(pasted.password.expose_secret(), "");
+        assert_eq!(
+            password.as_ref().map(|secret| secret.expose_secret().to_string()),
+            Some("s3cret".into())
+        );
+        assert!(draft_from_url(&registry, "not a url").is_err());
+    }
+
+    #[test]
+    fn a_copied_draft_url_leaves_out_the_password() {
+        let mut copied = draft();
+        copied.driver_id = "postgres".into();
+        copied.host = "db.example.com".into();
+        copied.port = 5432;
+        copied.database = "app".into();
+        copied.username = "bob".into();
+        let url = draft_url(&copied).expect("postgres has a URL");
+        assert!(url.starts_with("postgres://bob@db.example.com:5432/app"), "{url}");
+        assert!(!url.contains("secret"), "{url}");
     }
 }

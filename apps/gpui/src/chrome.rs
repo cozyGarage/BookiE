@@ -910,18 +910,22 @@ impl GridView {
                 })
             })
         });
-        let page = gpui_kit::component::setting::SettingPage::new("Appearance")
-            .default_open(true)
-            .group(
-                gpui_kit::component::setting::SettingGroup::new()
-                    .item(
-                        gpui_kit::component::setting::SettingItem::new("Colour theme", colour_theme)
-                            .description(format!("Current: {chosen}")),
-                    )
-                    .item(gpui_kit::component::setting::SettingItem::new("Dark theme", dark_mode)),
-            )
-            .group(mcp)
-            .group(fonts);
+        let keyboard = self.keyboard_group(cx.entity(), theme);
+        let pages = [
+            gpui_kit::component::setting::SettingPage::new("Appearance")
+                .default_open(true)
+                .group(
+                    gpui_kit::component::setting::SettingGroup::new()
+                        .item(
+                            gpui_kit::component::setting::SettingItem::new("Colour theme", colour_theme)
+                                .description(format!("Current: {chosen}")),
+                        )
+                        .item(gpui_kit::component::setting::SettingItem::new("Dark theme", dark_mode)),
+                ),
+            gpui_kit::component::setting::SettingPage::new("Fonts").group(fonts),
+            gpui_kit::component::setting::SettingPage::new("Keyboard").group(keyboard),
+            gpui_kit::component::setting::SettingPage::new("MCP").group(mcp),
+        ];
         div()
             .relative()
             .flex_1()
@@ -965,12 +969,19 @@ impl GridView {
                     )
                     .child(
                         div().flex_1().min_h_0().child(
-                            gpui_kit::component::setting::Settings::new("bookie-settings")
-                                .header_style(&gpui::StyleRefinement {
-                                    display: Some(gpui::Display::None),
-                                    ..Default::default()
-                                })
-                                .page(page),
+                            gpui_kit::component::setting::Settings::new((
+                                "bookie-settings",
+                                self.settings_page.1 as usize,
+                            ))
+                            .default_selected_index(gpui_kit::component::setting::SelectIndex {
+                                page_ix: self.settings_page.0 as usize,
+                                group_ix: None,
+                            })
+                            .header_style(&gpui::StyleRefinement {
+                                display: Some(gpui::Display::None),
+                                ..Default::default()
+                            })
+                            .pages(pages),
                         ),
                     ),
             )
