@@ -82,15 +82,28 @@ fn prepared_orders_reject_invalid_or_stale_sources_and_draft_rows() {
     assert!(PreparedSourceRows::checked(source.clone(), vec![3], &cancel).is_none());
     let order = PreparedSourceRows::checked(source.clone(), vec![2, 0], &cancel).unwrap();
     let wrong_store = RowStore::from_shared(shared(3));
-    assert!(!wrong_store.replace_prepared_source_rows(&order));
-    let store = RowStore::from_shared(source);
-    assert!(store.replace_prepared_source_rows(&order));
+    let wrong_order = PreparedSourceRows::checked(source.clone(), vec![2, 0], &cancel).unwrap();
+    assert!(!wrong_store.replace_prepared_source_rows(wrong_order));
+    let store = RowStore::from_shared(source.clone());
+    assert!(store.replace_prepared_source_rows(order));
     assert_eq!(store.source_index_at(0), Some(2));
     assert_eq!(store.source_index_at(1), Some(0));
     store.insert(0, &RowObject::new_draft(7, vec![Value::Int(-1)]));
-    assert!(!store.replace_prepared_source_rows(&order));
+    let draft_order = PreparedSourceRows::checked(source, vec![2, 0], &cancel).unwrap();
+    assert!(!store.replace_prepared_source_rows(draft_order));
     cancel.store(true, std::sync::atomic::Ordering::Relaxed);
     assert!(PreparedSourceRows::checked(shared(1), vec![0], &cancel).is_none());
+}
+
+#[test]
+fn prepared_order_position_index_rejects_large_duplicate_order() {
+    let source = shared(20_000);
+    let mut indices = (0..20_000).collect::<Vec<_>>();
+    indices[19_999] = 0;
+
+    assert!(
+        PreparedSourceRows::checked(source, indices, &std::sync::atomic::AtomicBool::new(false)).is_none()
+    );
 }
 
 #[test]
@@ -103,14 +116,36 @@ fn prepared_order_reuses_its_index_vector_without_per_row_slots() {
         &std::sync::atomic::AtomicBool::new(false),
     )
     .unwrap();
+    assert!(order.has_position_index());
+    assert_eq!(order.position_of(0), Some(19_999));
+    assert_eq!(order.position_of(20_000), None);
 
-    assert!(store.replace_prepared_source_rows(&order));
+    assert!(store.replace_prepared_source_rows(order));
 
     assert!(store.imp().slots.borrow().is_empty());
     assert_eq!(store.source_index_at(0), Some(19_999));
     assert_eq!(store.cell_at(0, 0), Some(Value::Int(19_999)));
-    assert_eq!(first_cell(&store, 0), Value::Int(19_999));
+    let row = store.item(0).and_downcast::<RowObject>().unwrap();
+    assert_eq!(row.cell_value(0), Value::Int(19_999));
     assert_eq!(store.materialized(), 1);
+}
+
+#[test]
+fn replacing_a_shared_row_stays_compact_until_a_row_is_inserted() {
+    let store = RowStore::from_shared(shared(3));
+    let replacement = RowObject::new(vec![Value::Int(50)]);
+
+    store.splice(1, 1, std::slice::from_ref(&replacement));
+
+    assert!(store.imp().slots.borrow().is_empty());
+    assert_eq!(store.source_index_at(1), None);
+    assert_eq!(store.cell_at(1, 0), Some(Value::Int(50)));
+    assert_eq!(store.find(&replacement), Some(1));
+
+    store.insert(0, &RowObject::new_draft(9, vec![Value::Int(-1)]));
+    assert_eq!(first_cell(&store, 0), Value::Int(-1));
+    assert_eq!(first_cell(&store, 2), Value::Int(50));
+    assert_eq!(store.source_index_at(3), Some(2));
 }
 
 #[test]
