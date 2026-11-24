@@ -529,7 +529,7 @@ fn shortcut_hint(label: &'static str, keys: &'static str, theme: Theme) -> Div {
         .items_center()
         .justify_between()
         .gap_4()
-        .w(px(320.0))
+        .w(px(size::SHORTCUT_HINT_WIDTH))
         .text_size(px(size::TEXT_SMALL))
         .child(label)
         .child(
