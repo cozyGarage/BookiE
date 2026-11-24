@@ -986,6 +986,7 @@ impl GridView {
                                 "bookie-settings",
                                 self.settings_page.1 as usize,
                             ))
+                            .sidebar_width(px(size::SETTINGS_SIDEBAR_WIDTH))
                             .default_selected_index(gpui_kit::component::setting::SelectIndex {
                                 page_ix: self.settings_page.0 as usize,
                                 group_ix: None,
