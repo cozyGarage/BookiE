@@ -516,18 +516,9 @@ async fn apply_plan(
             }
             if let Err(error) = apply_item_secrets(&item, carried.as_ref(), replace).await {
                 let credentials_uncertain = matches!(error, bookie_storage::StorageError::CredentialRollback { .. });
-                let restored = if let Some(carried) = carried.as_ref() {
-                    roll_back(&item, carried, !credentials_uncertain).await
-                } else {
-                    let restored =
-                        bookie_storage::restore_import_if_unchanged(item.previous.as_ref(), &item.connection)
-                            .await
-                            .is_ok();
-                    if !restored {
-                        tracing::warn!("rolling back an imported connection failed");
-                    }
-                    restored
-                };
+                let restored = bookie_storage::restore_import_if_unchanged(item.previous.as_ref(), &item.connection)
+                    .await
+                    .is_ok();
                 return Err(if !restored || credentials_uncertain {
                     ItemApplyFailure::ImportRecovery
                 } else {
@@ -622,27 +613,6 @@ async fn apply_item_secrets(
         replace_saved_passwords,
     )
     .await
-}
-
-/// Undo one item after a failed credential write. An entry that existed
-/// before the import is restored from its snapshot; one this import
-/// created is removed along with whatever it managed to store.
-async fn roll_back(item: &ImportItem, secrets: &bookie_storage::BundleSecrets, credentials_restored: bool) -> bool {
-    let restored = match bookie_storage::restore_import_if_unchanged(item.previous.as_ref(), &item.connection).await {
-        Ok(()) => true,
-        Err(error) => {
-            tracing::warn!(error = %error, "rolling back an imported connection failed");
-            false
-        }
-    };
-    if credentials_restored && should_forget_imported_secrets(item, restored) {
-        bookie_storage::forget_imported_bundle_secrets(item.connection.id, secrets).await;
-    }
-    restored
-}
-
-fn should_forget_imported_secrets(item: &ImportItem, restored: bool) -> bool {
-    restored && matches!(item.disposition, ImportDisposition::New | ImportDisposition::Remapped)
 }
 
 #[cfg(test)]

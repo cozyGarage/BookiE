@@ -212,15 +212,6 @@ async fn a_successful_reimport_rejects_old_session_saves_and_allows_new_ones() {
 }
 
 #[test]
-fn a_failed_record_restore_keeps_imported_credentials() {
-    let mut item = item("new");
-    assert!(!should_forget_imported_secrets(&item, false));
-    assert!(should_forget_imported_secrets(&item, true));
-    item.disposition = ImportDisposition::UpdateInPlace;
-    assert!(!should_forget_imported_secrets(&item, true));
-}
-
-#[test]
 fn a_file_that_is_not_a_bundle_is_reported_rather_than_parsed() {
     assert!(read_bundle_file(b"nonsense").is_err());
 }
