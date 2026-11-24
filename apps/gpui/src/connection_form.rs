@@ -24,6 +24,7 @@ pub(crate) struct ConnectionForm {
     pub drivers: Vec<DriverChoice>,
     pub driver: usize,
     pub read_only: bool,
+    pub environment: Environment,
     pub status: String,
     validation_error: Option<(gpui::EntityId, String)>,
     pub saving: bool,
@@ -78,6 +79,7 @@ impl ConnectionForm {
             drivers,
             driver,
             read_only: true,
+            environment: Environment::default(),
             status: String::new(),
             validation_error: None,
             saving: false,
@@ -150,7 +152,7 @@ impl ConnectionForm {
             socket_endpoint: text(&self.socket),
             ssh: self.ssh.draft(cx),
             read_only: self.read_only,
-            environment: Environment::default(),
+            environment: self.environment,
             keep_stored_password: self.editing.is_some(),
         }
     }
@@ -343,7 +345,26 @@ impl GridView {
                 }))
             }),
         );
-        let mut rows = vec![auth, tls];
+        let environment = choice_row(
+            theme,
+            "Environment",
+            [Environment::Local, Environment::Dev, Environment::Staging, Environment::Prod]
+                .into_iter()
+                .enumerate()
+                .map(|(index, environment)| {
+                    choice_chip(
+                        ("environment", index),
+                        environment.display_name(),
+                        form.environment == environment,
+                        theme,
+                    )
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        this.connection_form.environment = environment;
+                        cx.notify();
+                    }))
+                }),
+        );
+        let mut rows = vec![environment, auth, tls];
         if TlsMode::from_index(form.tls) != TlsMode::Disabled {
             rows.push(field(theme, "CA file", &form.tls_root));
             rows.push(form.validation_field(theme, "Client cert", &form.tls_cert, cx));
@@ -460,7 +481,7 @@ impl GridView {
         .detach();
     }
 
-    fn fill_connection_form(&mut self, draft: ConnectionDraft, cx: &mut Context<Self>) {
+    pub(crate) fn fill_connection_form(&mut self, draft: ConnectionDraft, cx: &mut Context<Self>) {
         let form = &mut self.connection_form;
         form.editing = draft.id;
         form.driver = form
@@ -469,6 +490,7 @@ impl GridView {
             .position(|driver| driver.id == draft.driver_id)
             .unwrap_or(form.driver);
         form.read_only = draft.read_only;
+        form.environment = draft.environment;
         form.status = String::new();
         form.kerberos = draft.auth_mode == AuthMode::Kerberos;
         form.tls = draft.tls_mode.index();

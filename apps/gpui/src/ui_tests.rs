@@ -1990,3 +1990,24 @@ fn a_double_click_on_a_table_row_opens_the_active_column_for_editing(cx: &mut Te
     });
 }
 
+
+#[gpui::test]
+fn editing_a_production_connection_keeps_it_production(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            let mut draft = view.connection_form.draft(cx);
+            draft.environment = bookie_core::Environment::Prod;
+            view.fill_connection_form(draft, cx);
+        })
+    });
+    view.read_with(cx, |view, cx| {
+        assert_eq!(view.connection_form.draft(cx).environment, bookie_core::Environment::Prod);
+    });
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| view.connection_form.environment = bookie_core::Environment::Staging)
+    });
+    view.read_with(cx, |view, cx| {
+        assert_eq!(view.connection_form.draft(cx).environment, bookie_core::Environment::Staging);
+    });
+}
