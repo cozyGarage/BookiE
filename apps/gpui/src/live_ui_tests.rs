@@ -1,6 +1,7 @@
 use std::time::Instant;
 
 use gpui::TestAppContext;
+use gpui_kit::test::TestWindowExt;
 
 use crate::GridView;
 use crate::text_input;
@@ -137,19 +138,115 @@ fn a_table_row_can_be_shown_vertically_and_counted_exactly(cx: &mut TestAppConte
             );
             view.run_palette_id("show-row-vertically", window, cx);
             assert!(view.row_detail_open);
-            let fields = view.row_detail_target().expect("selected row details");
+            let fields = view.row_detail_target("", false).expect("selected row details");
             assert_eq!(fields.len(), 5);
-            assert_eq!(fields[0].0, "id");
-            assert_eq!(fields[0].1, "1");
-            assert_eq!(fields[1].0, "customer");
-            assert_eq!(fields[1].1, "edited Ada");
+            assert_eq!(fields[0], (0, "id".into(), "1".into()));
+            assert_eq!(fields[1], (1, "customer".into(), "edited Ada".into()));
+            assert_eq!(
+                view.row_detail_target("edited", false).expect("filtered row"),
+                [fields[1].clone()]
+            );
+            assert_eq!(view.source.row(0)[1], bookie_gpui::model::Cell::Text("Ada".into()));
+            assert_eq!(
+                view.cell_edit.edits.get(&(0, 1)),
+                Some(&bookie_gpui::model::Cell::Text("edited Ada".into()))
+            );
+            view.row_detail_filter
+                .update(cx, |filter, cx| filter.set_content("edited", cx));
+            cx.notify();
+            assert_eq!(
+                view.row_detail_target("edited", false).expect("filtered fixture row"),
+                [fields[1].clone()]
+            );
             view.run_palette_id("count-table-rows", window, cx);
         });
     });
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    assert!(cx.debug_bounds("row-detail-field-1").is_some(), "staged fixture value matches");
+    assert!(cx.debug_bounds("row-detail-field-0").is_none(), "unmatched fixture field is hidden");
     cx.executor().advance_clock(std::time::Duration::from_secs(1));
     cx.run_until_parked();
     view.read_with(cx, |view, _| {
         assert_eq!(view.status, "Database table orders has 6 rows at count time")
+    });
+}
+
+#[gpui::test]
+fn row_inspector_filter_and_hide_null_are_keyboard_accessible_and_follow_the_active_row(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_resize(gpui::size(gpui::px(1100.0), gpui::px(800.0)));
+    view.update(cx, |view, cx| {
+        view.tabs.open_table(&view.catalog.grid_table);
+        view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 0 });
+        view.row_detail_open = true;
+        cx.notify();
+    });
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    view.read_with(cx, |view, _| {
+        assert!(view.row_detail_open);
+        assert_eq!(view.tabs.current(), &bookie_gpui::shell::Tab::Table(view.catalog.grid_table.clone()));
+    });
+    cx.update(|window, cx| window.render_frame(cx));
+    let wide_panel = cx.debug_bounds("row-detail").expect("row inspector is rendered");
+    let wide_filter = cx.debug_bounds("row-detail-filter").expect("field filter is rendered");
+    let wide_hide_null = cx.debug_bounds("row-detail-hide-null").expect("NULL toggle is rendered");
+    assert!(wide_panel.size.width > gpui::px(0.0));
+    assert!(wide_filter.origin.x + wide_filter.size.width <= wide_hide_null.origin.x);
+    cx.simulate_resize(gpui::size(gpui::px(500.0), gpui::px(520.0)));
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    let panel = cx.debug_bounds("row-detail").expect("row inspector remains rendered when narrow");
+    let filter_bounds = cx.debug_bounds("row-detail-filter").expect("field filter is rendered");
+    let hide_null_bounds = cx.debug_bounds("row-detail-hide-null").expect("NULL toggle is rendered");
+    assert!(filter_bounds.origin.x >= panel.origin.x);
+    assert!(filter_bounds.origin.x + filter_bounds.size.width <= hide_null_bounds.origin.x);
+    assert!(hide_null_bounds.origin.x + hide_null_bounds.size.width <= panel.origin.x + panel.size.width);
+    cx.update(|window, cx| {
+        let filter = view.read(cx).row_detail_filter.clone();
+        window.focus(&filter.read(cx).focus_handle_for_tests(), cx);
+    });
+    cx.simulate_input("Sample 0");
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    assert!(cx.debug_bounds("row-detail-field-1").is_some(), "matching value is rendered");
+    assert!(cx.debug_bounds("row-detail-field-0").is_none(), "non-matching field is hidden");
+    cx.update(|window, cx| window.focus_next(cx));
+    let keystroke = cx.update(|_, cx| {
+        gpui::Keystroke::parse_with_os("space", cx.platform_info().os).expect("space keystroke")
+    });
+    cx.simulate_event(gpui::KeyDownEvent {
+        keystroke: keystroke.clone(),
+        is_held: false,
+        prefer_character_input: false,
+    });
+    cx.simulate_event(gpui::KeyUpEvent { keystroke });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(view.row_detail_hide_null);
+        assert_eq!(view.row_detail_target("sample 0", true).expect("selected row").len(), 1);
+        assert!(view
+            .row_detail_target("", true)
+            .expect("selected row")
+            .iter()
+            .all(|(column, _, _)| *column != 2));
+    });
+    view.update(cx, |view, cx| {
+        view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 1, column: 0 });
+        cx.notify();
+    });
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    assert!(cx.debug_bounds("row-detail-field-1").is_none(), "filter follows the active row");
+    assert!(cx.debug_bounds("row-detail-empty").is_some(), "empty matches are explained");
+    view.read_with(cx, |view, _| {
+        assert!(view.row_detail_target("sample 0", true).expect("selected row").is_empty());
+        assert!(view
+            .row_detail_target("", false)
+            .expect("selected row")
+            .iter()
+            .any(|(column, _, value)| *column == 2 && value == "FALSE"));
     });
 }
 
@@ -756,6 +853,7 @@ fn switching_tables_keeps_all_view_edits_until_the_user_discards_them(cx: &mut T
                     number: 1,
                     rows: 0,
                     elapsed_ms: None,
+                    first_row_ms: None,
                 },
                 None,
             ));
@@ -1792,6 +1890,78 @@ fn switching_connection_expands_every_sidebar_schema_again(cx: &mut TestAppConte
 }
 
 #[gpui::test]
+fn narrow_grid_toolbar_keeps_actions_inside_window(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    view.update(cx, |view, cx| {
+        view.sidebar.open = true;
+        view.sidebar.width = 340.0;
+        view.search.filter_visible = true;
+        cx.notify();
+    });
+    for width in [1100.0, 900.0] {
+        cx.simulate_resize(gpui::size(gpui::px(width), gpui::px(800.0)));
+        cx.run_until_parked();
+        let actions = cx.debug_bounds("grid-actions").expect("grid actions");
+        assert!(
+            actions.origin.x + actions.size.width <= gpui::px(width),
+            "grid actions extend outside the window at {width}"
+        );
+    }
+}
+
+#[gpui::test]
+fn compact_grid_menu_preserves_grid_commands(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    view.read_with(cx, |view, _| {
+        let groups =
+            crate::menus::command_groups(view, &[&["first", "last"], &["compare", "export-csv", "continuous"]]);
+        let ids: Vec<_> = groups.iter().flatten().map(|(id, _, _)| *id).collect();
+        assert_eq!(ids, ["first", "last", "compare", "export-csv", "continuous"]);
+    });
+}
+
+#[gpui::test]
+fn tab_moves_focus_from_the_filter_field(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.search.filter_visible = true;
+            let focus = view.search.filter.read(cx).focus_handle_for_tests();
+            window.focus(&focus, cx);
+            cx.notify();
+        });
+    });
+    cx.run_until_parked();
+    let before = cx.update(|window, cx| window.focused(cx));
+    cx.simulate_keystrokes("tab");
+    cx.run_until_parked();
+    let after = cx.update(|window, cx| window.focused(cx));
+    assert_ne!(before, after, "Tab should move focus away from the filter field");
+    cx.update(|window, cx| {
+        if let Some(focus) = before.as_ref() {
+            window.focus(focus, cx);
+        }
+    });
+    cx.simulate_keystrokes("shift-tab");
+    cx.run_until_parked();
+    let previous = cx.update(|window, cx| window.focused(cx));
+    assert_ne!(before, previous, "Shift-Tab should move focus away from the filter field");
+}
+
+#[gpui::test]
+fn compact_menu_can_be_opened_from_find_with_keyboard(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_resize(gpui::size(gpui::px(720.0), gpui::px(800.0)));
+    cx.run_until_parked();
+    cx.update(|window, cx| {
+        let focus = view.read(cx).search.find.read(cx).focus_handle_for_tests();
+        window.focus(&focus, cx);
+    });
+    cx.simulate_keystrokes("tab enter down down enter");
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert_eq!(view.pager.page + 1, view.pager.pages()));
+}
+#[gpui::test]
 fn real_table_grid_keyboard_and_jump_column_follow_active_tab(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     view.update(cx, |view, _| {
@@ -1809,4 +1979,3 @@ fn real_table_grid_keyboard_and_jump_column_follow_active_tab(cx: &mut TestAppCo
         assert!(!view.palette_actions().iter().any(|a| a.id == "jump-column" && a.enabled));
     });
 }
-

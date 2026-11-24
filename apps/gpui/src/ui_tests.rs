@@ -11,6 +11,7 @@ use crate::ui_theme::ThemeExt;
 use crate::{GridView, Work};
 
 mod failed_runs;
+mod full_value_editor;
 mod themes;
 
 pub(super) fn open(cx: &mut TestAppContext) -> (gpui::Entity<GridView>, &mut VisualTestContext) {
@@ -658,20 +659,20 @@ fn a_long_sidebar_scrolls_and_reveal_brings_the_open_table_into_view(cx: &mut Te
     });
     cx.run_until_parked();
     view.read_with(cx, |view, _| {
-        assert!(
-            view.sidebar.scroll.max_offset().y > gpui::px(0.0),
-            "the tree overflows and can scroll"
-        );
+        assert!(view.sidebar.scroll.is_scrollable(), "the tree overflows and can scroll");
     });
+    assert!(cx.debug_bounds("sidebar-row-0").is_some(), "the first row is drawn");
+    assert!(
+        cx.debug_bounds("sidebar-guide-1").is_some(),
+        "nested rows draw an indent guide for each open parent"
+    );
+    assert!(
+        cx.debug_bounds("sidebar-row-72").is_none(),
+        "rows below the fold are not built"
+    );
     cx.simulate_keystrokes("ctrl-shift-l");
     cx.run_until_parked();
-    view.read_with(cx, |view, _| {
-        let (top, bottom) = (view.sidebar.scroll.top_item(), view.sidebar.scroll.bottom_item());
-        assert!(
-            top <= 72 && 72 <= bottom,
-            "row 72 (t70) is visible, saw {top}..{bottom}"
-        );
-    });
+    assert!(cx.debug_bounds("sidebar-row-72").is_some(), "row 72 (t70) is revealed");
 }
 
 #[gpui::test]
@@ -976,12 +977,17 @@ fn palette_end_keeps_the_last_command_in_view(cx: &mut TestAppContext) {
         let count = view.palette_shown(cx).len();
         assert!(count > 20);
         assert_eq!(view.palette.index, count - 1);
-        let scroll = &view.palette.scroll;
-        let item = scroll.bounds_for_item(count - 1).expect("last command was laid out");
-        let viewport = scroll.bounds();
-        assert!(item.top() + scroll.offset().y >= viewport.top());
-        assert!(item.bottom() + scroll.offset().y <= viewport.bottom());
+        assert_eq!(view.palette.scroll.is_scrolled_to_end(), Some(true));
     });
+    let count = view.read_with(cx, |view, cx| view.palette_shown(cx).len());
+    let last: &'static str = Box::leak(format!("palette-command-row-{}", count - 1).into_boxed_str());
+    let last = cx.debug_bounds(last).expect("last command is drawn");
+    let height = cx.update(|window, _| window.viewport_size().height);
+    assert!(last.bottom() <= height, "last command ends inside the window");
+    assert!(
+        cx.debug_bounds("palette-command-row-0").is_none(),
+        "commands scrolled out of view are not built"
+    );
 }
 
 #[gpui::test]
@@ -1074,7 +1080,10 @@ fn painting_a_row_reads_the_source_once_and_keeps_pending_edits_available(cx: &m
         });
     });
     cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(1, 1, window, cx)));
-    view.read_with(cx, |view, cx| assert_eq!(view.cell_edit.editor.read(cx).content(), full));
+    view.read_with(cx, |view, cx| {
+        assert!(view.cell_edit.active.as_ref().is_some_and(|editing| editing.full_value));
+        assert_eq!(view.cell_edit.value_editor.read(cx).value().as_ref(), full);
+    });
 }
 
 #[gpui::test]
@@ -1185,23 +1194,7 @@ fn rendering_oversized_pending_cells_keeps_exact_binary_json_and_edit_text(cx: &
         assert_eq!(view.cell_at(1, 3), Cell::JsonText(json));
     });
     cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(0, 1, window, cx)));
-    view.read_with(cx, |view, cx| assert_eq!(view.cell_edit.editor.read(cx).content(), text));
-}
-
-#[gpui::test]
-fn opening_a_multiline_value_preserves_it_and_reports_the_single_line_editor_limit(cx: &mut TestAppContext) {
-    let (view, cx) = open(cx);
-    let value = Cell::Text("first\nsecond".into());
-    view.update(cx, |view, _| {
-        view.cell_edit.edits.insert((0, 1), value.clone());
-    });
-    cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(0, 1, window, cx)));
-    cx.run_until_parked();
-    view.read_with(cx, |view, _| {
-        assert!(view.cell_edit.active.is_none());
-        assert_eq!(view.cell_edit.edits.get(&(0, 1)), Some(&value));
-        assert!(!view.status.is_empty());
-    });
+    view.read_with(cx, |view, cx| assert_eq!(view.cell_edit.value_editor.read(cx).value().as_ref(), text));
 }
 
 #[gpui::test]
