@@ -301,16 +301,22 @@ impl GridView {
                     ))
             })
             .child(
-                ghost("commit-transaction", "Commit", theme).on_click(cx.listener(|this, _, _, cx| {
-                    this.end_transaction(true, cx);
-                    cx.notify();
-                })),
+                ghost("commit-transaction", "Commit", theme)
+                    .border_1()
+                    .border_color(rgb(theme.border))
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.end_transaction(true, cx);
+                        cx.notify();
+                    })),
             )
             .child(
-                ghost("rollback-transaction", "Roll back", theme).on_click(cx.listener(|this, _, _, cx| {
-                    this.end_transaction(false, cx);
-                    cx.notify();
-                })),
+                ghost("rollback-transaction", "Roll back", theme)
+                    .border_1()
+                    .border_color(rgb(theme.border))
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.end_transaction(false, cx);
+                        cx.notify();
+                    })),
             )
     }
 }
