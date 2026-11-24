@@ -62,6 +62,10 @@ fn stop_cases() -> Vec<StopCase> {
         stoppable("query_result_sets_controlled", |c, control| async move {
             c.query_result_sets_controlled(ENDLESS_SELECT, &[], &control).await
         }),
+        stoppable("query_result_sets_bounded_controlled", |c, control| async move {
+            c.query_result_sets_bounded_controlled(ENDLESS_SELECT, &[], 10, 1024, &control)
+                .await
+        }),
         stoppable("execute_controlled", |c, control| async move {
             c.execute_controlled(ENDLESS_WRITE, &control).await
         }),
