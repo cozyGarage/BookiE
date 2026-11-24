@@ -202,7 +202,7 @@ pub async fn issue_token(
 
 static SERVER_FAILURE: Mutex<Option<String>> = Mutex::new(None);
 
-pub(crate) fn record_server_failure(error: &str, port: u16) {
+pub fn record_server_failure(error: &str, port: u16) {
     let message = if error.contains("in use") {
         format!(
             "Port {port} is already used by another program, so agents cannot reach BookiE. Close that program and restart BookiE."
@@ -293,8 +293,8 @@ pub fn list_tokens(bridge: Option<&Arc<McpBridge>>) -> Vec<bookie_mcp::McpToken>
 #[cfg(test)]
 mod tests {
     use super::{
-        Duration, Utc, expiry_for_choice, http_enabled, issue_token_with_store, record_server_failure, server_config,
-        server_failure,
+        Duration, Utc, expiry_for_choice, http_enabled, issue_token_with_store, record_server_failure,
+        revoke_token_with_store, server_config, server_failure,
     };
     use std::sync::Arc;
 

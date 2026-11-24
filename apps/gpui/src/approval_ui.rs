@@ -59,7 +59,12 @@ impl GridView {
                     if this.approval.serial != serial || this.approval.current.is_none() {
                         return true;
                     }
-                    if this.approval.current.as_ref().is_some_and(|open| open.respond.is_closed()) {
+                    if this
+                        .approval
+                        .current
+                        .as_ref()
+                        .is_some_and(|open| open.respond.is_closed())
+                    {
                         this.next_approval(cx);
                         return true;
                     }

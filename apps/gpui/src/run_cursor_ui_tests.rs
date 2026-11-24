@@ -1,7 +1,7 @@
 use gpui::TestAppContext;
 
-use crate::ui_tests::open;
 use super::run_target;
+use crate::ui_tests::open;
 
 const SCRIPT: &str = "SELECT 1;\nSELECT 2;\nSELECT 3;";
 
@@ -108,10 +108,15 @@ fn error_mapping_selects_multiline_identifier_in_editor(cx: &mut TestAppContext)
         let editor = view.read(cx).sql_input.clone();
         let sql = "SELECT 1;\nSELECT missing FROM t";
         let source = (sql.to_string(), 10..31);
-        let (location, token) = crate::run_cursor_ui::mapped_error_location(sql, "SELECT missing FROM t", 8, Some(&source)).unwrap();
+        let (location, token) =
+            crate::run_cursor_ui::mapped_error_location(sql, "SELECT missing FROM t", 8, Some(&source)).unwrap();
         editor.update(cx, |editor, cx| {
             editor.set_value(sql, window, cx);
-            editor.set_cursor_position(gpui_kit::component::input::Position::new(location.0, location.1), window, cx);
+            editor.set_cursor_position(
+                gpui_kit::component::input::Position::new(location.0, location.1),
+                window,
+                cx,
+            );
             editor.set_selected_range(token, cx);
             assert_eq!(editor.selected_value().as_ref(), "missing");
         });
@@ -125,8 +130,11 @@ fn clicking_go_to_error_selects_the_second_line_token(cx: &mut TestAppContext) {
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
             let sql = "SELECT 1;\nSELECT missing FROM t";
-            view.sql_input.update(cx, |editor, cx| editor.set_value(sql, window, cx));
-            view.panel.messages.push(bookie_gpui::messages::MessageKind::Error, "missing column");
+            view.sql_input
+                .update(cx, |editor, cx| editor.set_value(sql, window, cx));
+            view.panel
+                .messages
+                .push(bookie_gpui::messages::MessageKind::Error, "missing column");
             let id = view.panel.messages.entries().last().unwrap().id;
             view.panel.error_location = Some((sql.into(), 18, id, None));
             view.panel.view = bookie_gpui::shell::ResultView::Messages;
@@ -138,5 +146,7 @@ fn clicking_go_to_error_selects_the_second_line_token(cx: &mut TestAppContext) {
     let bounds = cx.debug_bounds("go-to-query-error").expect("error action is visible");
     cx.simulate_click(bounds.center(), Default::default());
     cx.run_until_parked();
-    view.read_with(cx, |view, cx| assert_eq!(view.sql_input.read(cx).selected_value().as_ref(), "missing"));
+    view.read_with(cx, |view, cx| {
+        assert_eq!(view.sql_input.read(cx).selected_value().as_ref(), "missing")
+    });
 }

@@ -81,13 +81,12 @@ impl McpState {
                 .gap_2()
                 .child(div().child(plaintext))
                 .child(
-                    ghost("mcp-hide-issued-token", "Hide", Theme::current(cx))
-                        .on_click(move |_, _, cx| {
-                            hide_view.update(cx, |this, cx| {
-                                this.mcp.plaintext = None;
-                                cx.notify();
-                            });
-                        }),
+                    ghost("mcp-hide-issued-token", "Hide", Theme::current(cx)).on_click(move |_, _, cx| {
+                        hide_view.update(cx, |this, cx| {
+                            this.mcp.plaintext = None;
+                            cx.notify();
+                        });
+                    }),
                 )
         });
         SettingGroup::new()
@@ -150,26 +149,30 @@ fn token_row(view: Entity<GridView>, bridge: Arc<McpBridge>, token: McpToken, th
             let view = view.clone();
             let bridge = bridge.clone();
             row.child(
-                ghost(gpui::ElementId::Name(format!("mcp-revoke-{id}").into()), "Revoke", theme)
-                    .on_click(move |_, _, cx| {
-                        let view = view.clone();
-                        let bridge = bridge.clone();
-                        cx.spawn(async move |_, cx| {
-                            let result = cx
-                                .background_executor()
-                                .spawn(async move {
-                                    crate::resolve_ui::blocking(async move {
-                                        bookie_app_services::mcp_service::revoke_token(Some(&bridge), id).await
-                                    })
+                ghost(
+                    gpui::ElementId::Name(format!("mcp-revoke-{id}").into()),
+                    "Revoke",
+                    theme,
+                )
+                .on_click(move |_, _, cx| {
+                    let view = view.clone();
+                    let bridge = bridge.clone();
+                    cx.spawn(async move |_, cx| {
+                        let result = cx
+                            .background_executor()
+                            .spawn(async move {
+                                crate::resolve_ui::blocking(async move {
+                                    bookie_app_services::mcp_service::revoke_token(Some(&bridge), id).await
                                 })
-                                .await;
-                            view.update(cx, |this, cx| {
-                                this.mcp.status = Some(result.map_or_else(|error| error, |_| "Token revoked.".into()));
-                                cx.notify();
-                            });
-                        })
-                        .detach();
-                    }),
+                            })
+                            .await;
+                        view.update(cx, |this, cx| {
+                            this.mcp.status = Some(result.map_or_else(|error| error, |_| "Token revoked.".into()));
+                            cx.notify();
+                        });
+                    })
+                    .detach();
+                }),
             )
         })
 }
