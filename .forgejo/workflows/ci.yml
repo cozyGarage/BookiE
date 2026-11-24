@@ -90,7 +90,7 @@ jobs:
   guards:
     needs: [pin-revision]
     runs-on: any-host
-    timeout-minutes: 90
+    timeout-minutes: 30
     defaults:
       run:
         shell: bash
@@ -116,18 +116,18 @@ jobs:
         run: |
           mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"
           cd src
-          cargo fetch --locked --manifest-path apps/linux/app/Cargo.toml
-          bash scripts/test-harness.sh
-          bash scripts/check-file-size.sh
-          bash scripts/check-bounded-operations.sh
-          bash scripts/check-panic-sites.sh
-          python3 scripts/check-crate-boundaries.py
-          python3 scripts/check-driver-id-branches.py
-          python3 scripts/check-ui-patterns.py
-          python3 scripts/check-function-size.py
-          python3 scripts/check-comment-lines.py
-          python3 scripts/release-notes.py fragments
           cargo fmt --all -- --check
+          python3 scripts/check-ui-patterns.py
+          python3 scripts/check-comment-lines.py
+          bash scripts/check-file-size.sh
+          python3 scripts/check-function-size.py
+          bash scripts/check-panic-sites.sh
+          bash scripts/check-bounded-operations.sh
+          python3 scripts/check-driver-id-branches.py
+          python3 scripts/release-notes.py fragments
+          cargo fetch --locked --manifest-path apps/linux/app/Cargo.toml
+          python3 scripts/check-crate-boundaries.py
+          bash scripts/test-harness.sh
       - name: Clean pilot scratch
         if: always()
         run: rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"
