@@ -36,6 +36,21 @@ fn open_transaction(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestCont
 }
 
 #[gpui::test]
+fn typed_transaction_end_clears_the_toolbar(cx: &mut TestAppContext) {
+    for sql in ["COMMIT", "ROLLBACK"] {
+        let path = fixture_copy("typed-transaction-end");
+        let (view, cx) = saving_view(cx, &path);
+        open_transaction(&view, cx, &path);
+        view.update(cx, |view, cx| view.run_in_transaction(sql.into(), cx));
+        wait_for(&view, cx, |view| view.transaction.is_none());
+        view.read_with(cx, |view, _| {
+            assert!(view.transaction.is_none(), "{sql} left the transaction toolbar open");
+            assert!(!view.status.contains("not committed yet"), "{}", view.status);
+        });
+    }
+}
+
+#[gpui::test]
 fn a_starting_transaction_blocks_closing_and_a_second_begin(cx: &mut TestAppContext) {
     let path = fixture_copy("transaction-starting");
     let (view, cx) = saving_view(cx, &path);

@@ -103,7 +103,7 @@ impl GridView {
                     let result = write.run_in_transaction(&shared, &sql, &cancel)?;
                     live.table_from_result(result, &sql, &cancel)
                 })();
-                let ended = ran.is_err() && !write.transaction_is_open(&shared);
+                let ended = !write.transaction_is_open(&shared);
                 let cleanup = if ended { write.close_transaction(&shared) } else { None };
                 (ran, ended, cleanup)
             }).await;
@@ -120,7 +120,8 @@ impl GridView {
                         (Err(message), Some(cleanup)) => format!(
                             "The statement failed and the transaction session ended: {message}; closing it also failed: {cleanup}"
                         ),
-                        (Ok(_), _) => String::new(),
+                        (Ok(_), None) => "The transaction ended.".into(),
+                        (Ok(_), Some(cleanup)) => format!("The transaction ended; closing its session failed: {cleanup}"),
                     };
                     cx.notify();
                     return;
@@ -134,7 +135,9 @@ impl GridView {
                     match ran {
                         Ok(table) => {
                             this.add_run(Some(Arc::new(table)));
-                            this.status = "Ran in the transaction (not committed yet)".into();
+                            if !ended {
+                                this.status = "Ran in the transaction (not committed yet)".into();
+                            }
                         }
                         Err(message) => this.status = format!("The statement failed inside the transaction: {message}"),
                     }
