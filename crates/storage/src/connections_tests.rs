@@ -87,6 +87,39 @@ async fn an_import_plan_lands_as_one_rewrite() {
 }
 
 #[tokio::test]
+async fn applying_an_import_preserves_safety_changes_made_after_review() {
+    use crate::connection_bundle::{BundleBody, BundleConnection, plan_import};
+
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("connections.json");
+    let mut existing = sample_connection();
+    existing.read_only = false;
+    existing.environment = bookie_core::Environment::Local;
+    save_to(&path, std::slice::from_ref(&existing)).await.unwrap();
+
+    let mut incoming = existing.clone();
+    incoming.name = "Renamed by bundle".into();
+    let body = BundleBody {
+        connections: vec![BundleConnection::from_saved(&incoming)],
+        ..Default::default()
+    };
+    let reviewed = plan_import(&load_from(&path).await.unwrap(), &body).unwrap();
+
+    existing.read_only = true;
+    existing.environment = bookie_core::Environment::Prod;
+    save_to(&path, std::slice::from_ref(&existing)).await.unwrap();
+    let applied = apply_import_body_to(&path, &body).await.unwrap();
+
+    let stored = load_from(&path).await.unwrap();
+    assert_eq!(stored.len(), 1);
+    assert!(!reviewed.items[0].connection.read_only);
+    assert!(applied.items[0].connection.read_only);
+    assert_eq!(stored[0].name, "Renamed by bundle");
+    assert!(stored[0].read_only);
+    assert_eq!(stored[0].environment, bookie_core::Environment::Prod);
+}
+
+#[tokio::test]
 async fn an_import_never_removes_a_connection_the_bundle_omits() {
     use crate::connection_bundle::{BundleBody, plan_import};
 

@@ -34,6 +34,12 @@ pub enum StorageError {
 
     #[error("keyring: {0}")]
     Keyring(KeyringFailure),
+
+    #[error("credential write failed ({store}); credential rollback failed ({restore})")]
+    CredentialRollback {
+        store: Box<StorageError>,
+        restore: Box<StorageError>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
