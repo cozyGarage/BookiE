@@ -252,6 +252,7 @@ impl GridView {
         if !self.live.as_ref().is_some_and(|live| Arc::ptr_eq(live, &session)) {
             self.schema_context = None;
         }
+        self.mcp.register(session.database_service());
         self.table_sorts.clear();
         self.search.server.applied.clear();
         self.search.server.shown_for = None;

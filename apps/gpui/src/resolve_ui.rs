@@ -15,7 +15,7 @@ pub(crate) struct ResolveState {
     pub reason: Option<Entity<TextInput>>,
 }
 
-fn blocking<T: Send + 'static>(
+pub(crate) fn blocking<T: Send + 'static>(
     future: impl std::future::Future<Output = Result<T, String>> + Send + 'static,
 ) -> Result<T, String> {
     tokio::runtime::Builder::new_current_thread()
