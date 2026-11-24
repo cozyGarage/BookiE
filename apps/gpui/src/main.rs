@@ -43,6 +43,7 @@ mod panel_state;
 mod params_ui;
 mod paste_ui;
 mod picker;
+mod server_filter_ui;
 mod host_key_ui;
 mod plan_view;
 mod chart_plot;
@@ -295,7 +296,7 @@ impl GridView {
         Entity<EditorState>,
         Entity<EditorState>,
     ) {
-        let find = cx.new(|cx| TextInput::new("Find", cx));
+        let find = cx.new(|cx| TextInput::new("Find in loaded rows", cx));
         let filter = cx.new(|cx| TextInput::new("label contains 7", cx));
         cx.subscribe(&find, |this, _, event: &InputEvent, cx| match event {
             InputEvent::Changed => {
@@ -1095,12 +1096,13 @@ mod host_key_ui_tests;
 #[cfg(test)]
 mod live_ui_tests;
 #[cfg(test)]
-#[cfg(test)]
 mod overlay_ui_tests;
 #[cfg(test)]
 mod query_pane_ui_tests;
 #[cfg(test)]
 mod save_ui_tests;
+#[cfg(test)]
+mod server_filter_ui_tests;
 #[cfg(test)]
 mod transaction_ui_tests;
 #[cfg(test)]

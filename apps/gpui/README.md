@@ -15,7 +15,8 @@ Settings keeps appearance controls together. Connection access stays with each c
 The window (`src/main.rs`) has:
 
 - One horizontally scrollable strip: progress, pager (First, Previous page, range, Next page, Last), Find with Previous and Next match and a "Match N of M" status, Show matching rows, Compare…, CSV clipboard export for the current page or selection, File export bar with format (CSV, TSV, JSON, JSON Lines, SQL, Markdown, HTML, XLSX) and scope choices (Selected rows, Current page, Loaded rows, Full table), and Continuous scrolling.
-- A filter row (Ctrl+F): a WHERE expression such as `label contains 7`, Apply and Clear all.
+- A WHERE row on table tabs: the clause is sent to the database through the shared browse query, so it filters the whole table, not only the loaded rows. Enter or Apply reloads the table, Clear removes the clause, and a chip shows the current sort.
+- A filter row for loaded rows (Ctrl+F): a predicate such as `label contains 7`, Apply and Clear all.
 - A compare bar with Whole row and Key: value.
 - A fourth `typed` column that cycles through every value kind (float, bytes, date, time, datetime, timestamp with time zone, decimal, UUID, JSON, raw JSON text, undecodable, NULL), searchable with Find and the filter row.
 - A virtualized grid over `uniform_list` with 36 px rows. Find, filter and compare run on the background executor; replaced work is cancelled and stale replies are discarded by generation.
