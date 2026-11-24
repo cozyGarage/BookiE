@@ -1,1 +1,1 @@
-Hide inaccessible PostgreSQL tables from inbound foreign-key metadata.
+PostgreSQL inbound foreign-key lists no longer include tables you cannot access.

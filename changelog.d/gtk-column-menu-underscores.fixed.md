@@ -1,1 +1,1 @@
-Fixed: Column names with underscores display correctly in the GTK header menu.
+Column names with underscores display correctly in the GTK column header menu.

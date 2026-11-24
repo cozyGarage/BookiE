@@ -1,1 +1,1 @@
-PostgreSQL ER diagrams read schema columns and foreign keys in one catalog round trip.
+PostgreSQL ER diagrams load faster on schemas with many tables.

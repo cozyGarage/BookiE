@@ -1,1 +1,1 @@
-GPUI can show a connection's data dictionary (tables, columns, indexes) as a result tab, through a new ReadDataDictionary command.
+GPUI can show a connection's data dictionary (tables, columns and indexes) as a result tab.
