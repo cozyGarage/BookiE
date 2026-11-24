@@ -255,6 +255,14 @@ impl ReadSessionStore {
         crate::database_backup::run_saved_backup_job(context, job, control).await
     }
 
+    pub async fn open_interactive(
+        &self,
+        id: SessionId,
+    ) -> Result<crate::interactive_session::SharedSession, DriverFailurePresentation> {
+        let session = self.get(id).ok_or(DriverFailurePresentation::Disconnected)?;
+        session.open_interactive().await
+    }
+
     pub(crate) fn get(&self, id: SessionId) -> Option<Arc<ReadSession>> {
         self.sessions
             .read()

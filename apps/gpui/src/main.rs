@@ -38,6 +38,7 @@ mod menus;
 mod new_window_ui;
 mod palette_actions;
 mod palette_state;
+mod transaction_ui;
 mod panel_state;
 mod params_ui;
 mod paste_ui;
@@ -175,6 +176,7 @@ struct GridView {
     params: params_ui::ParamsState,
     save: save_ui::SaveState,
     approval: approval_ui::ApprovalUi,
+    transaction: Option<transaction_ui::TransactionState>,
     host_key: host_key_ui::HostKeyUi,
     insert: insert_ui::InsertState,
     import: import_ui::ImportState,
@@ -490,6 +492,7 @@ impl GridView {
             params: params_ui::ParamsState::default(),
             save: save_ui::SaveState::default(),
             approval,
+            transaction: None,
             host_key,
             insert: insert_ui::InsertState::default(),
             import: import_ui::ImportState::default(),
@@ -1082,6 +1085,8 @@ mod overlay_ui_tests;
 mod query_pane_ui_tests;
 #[cfg(test)]
 mod save_ui_tests;
+#[cfg(test)]
+mod transaction_ui_tests;
 #[cfg(test)]
 mod typed_value_ui_tests;
 #[cfg(test)]
