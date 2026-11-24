@@ -216,7 +216,7 @@ CI is split into fast feedback and slower integration or acceptance checks. Read
 
 Changing this table also updates `scripts/check-ci-jobs.py` and `scripts/tests/test_ci_workflow.py` in the same change.
 
-`scripts/forgejo-gate.sh` ensures the requested commit exists on its gate ref, then dispatches `ci.yml` for that exact SHA. The workflow's push trigger is limited to `main`, so a standalone gate ref must use `workflow_dispatch`. The Debian floor package build and scenarios run for pull requests, scheduled runs and manual dispatches, but not for pushes to `main`. The Forgejo driver matrix includes every workspace driver crate, with the fixture image list checked against each driver's tests.
+`scripts/forgejo-gate.sh` ensures the requested commit exists on its gate ref, then dispatches `ci.yml` for that exact SHA. The workflow's push trigger is limited to `main`, so a standalone gate ref must use `workflow_dispatch`; for `main`, the helper reuses an exact-revision push run when one exists, avoiding a duplicate full gate. The Debian floor package build and scenarios run for pull requests, scheduled runs and manual dispatches, but not for pushes to `main`. The Forgejo driver matrix includes every workspace driver crate, with the fixture image list checked against each driver's tests.
 
 ### Pull request hygiene checks
 
