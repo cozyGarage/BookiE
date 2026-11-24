@@ -14,6 +14,15 @@ mod failed_runs;
 mod full_value_editor;
 mod themes;
 
+#[gpui::test]
+fn status_page_and_total_have_visible_spacing(cx: &mut TestAppContext) {
+    let (_view, cx) = open(cx);
+    cx.run_until_parked();
+    let page = cx.debug_bounds("status-page").expect("page count is visible");
+    let total = cx.debug_bounds("status-count").expect("total count is visible");
+    assert!(page.origin.x + page.size.width < total.origin.x, "page and total counts touch");
+}
+
 pub(super) fn open(cx: &mut TestAppContext) -> (gpui::Entity<GridView>, &mut VisualTestContext) {
     cx.update(text_input::bind_keys);
     let (view, cx) = cx.add_window_view(|window, cx| GridView::new(150_000, Instant::now(), window, cx));
