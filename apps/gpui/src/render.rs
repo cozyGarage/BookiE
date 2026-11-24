@@ -167,7 +167,7 @@ impl GridView {
     fn grid_action_buttons(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
         use gpui_component::button::{Button, ButtonVariants};
         use gpui_component::menu::DropdownMenu;
-        let compact = self.synced_width < 900.0;
+        let compact = self.synced_width < 1000.0;
         let groups =
             crate::menus::command_groups(self, &[&["first", "last"], &["compare", "export-csv", "continuous"]]);
         div()

@@ -45,6 +45,7 @@ pub mod size {
     pub const PALETTE_WIDTH: f32 = 520.0;
     pub const PALETTE_TOP: f32 = 90.0;
     pub const HOME_WIDTH: f32 = 980.0;
+    pub const SETTINGS_SIDEBAR_WIDTH: f32 = 160.0;
     pub const HOME_TOP: f32 = 96.0;
 }
 
