@@ -884,10 +884,11 @@ impl GridView {
                 })
             })
         });
-        let page = gpui_kit::component::setting::SettingPage::new("Appearance")
+        let page = gpui_kit::component::setting::SettingPage::new("Settings")
             .default_open(true)
             .group(
                 gpui_kit::component::setting::SettingGroup::new()
+                    .title("Appearance")
                     .item(
                         gpui_kit::component::setting::SettingItem::new("Colour theme", colour_theme)
                             .description(format!("Current: {chosen}")),
@@ -940,6 +941,7 @@ impl GridView {
                     .child(
                         div().flex_1().min_h_0().child(
                             gpui_kit::component::setting::Settings::new("bookie-settings")
+                                .sidebar_width(px(160.0))
                                 .header_style(&gpui::StyleRefinement {
                                     display: Some(gpui::Display::None),
                                     ..Default::default()

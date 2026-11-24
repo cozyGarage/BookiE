@@ -46,18 +46,19 @@ impl McpState {
             let theme = Theme::current(cx);
             div()
                 .flex()
-                .flex_wrap()
+                .flex_col()
+                .items_start()
                 .gap_2()
                 .child(button(
                     "mcp-issue-read",
-                    "Issue read-only token",
+                    "Read-only token",
                     actions_view.clone(),
                     TokenPermissions::ReadOnly,
                     theme,
                 ))
                 .child(button(
                     "mcp-issue-write",
-                    "Issue read-write token",
+                    "Read-write token",
                     actions_view.clone(),
                     TokenPermissions::ReadWrite,
                     theme,
@@ -91,10 +92,11 @@ impl McpState {
                         }),
                 )
         });
-        let mut group = SettingGroup::new()
+        let mut group = SettingGroup::new().title("MCP")
             .item(SettingItem::new("MCP server", enabled).description("Use BookiE's governed local MCP endpoint."))
             .item(
                 SettingItem::new("Issue token", actions)
+                    .layout(gpui::Axis::Vertical)
                     .description("Tokens are limited to the active saved connection; plaintext is shown once."),
             );
         if self.plaintext.is_some() {
