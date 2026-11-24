@@ -462,10 +462,10 @@ fn binary_display_mode_controls_preview_detail_and_edit_without_changing_value_t
     });
     cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(0, 1, window, cx)));
     cx.simulate_keystrokes("ctrl-a");
-    cx.simulate_input("AP9B");
+    cx.simulate_input("AP9C");
     cx.simulate_keystrokes("enter");
     view.read_with(cx, |view, _| {
-        assert_eq!(view.cell_edit.edits.get(&(0, 1)), Some(&Cell::Bytes(vec![0, 255, 65])));
+        assert_eq!(view.cell_edit.edits.get(&(0, 1)), Some(&Cell::Bytes(vec![0, 255, 66])));
     });
 
     cx.update(|window, cx| {
@@ -478,7 +478,7 @@ fn binary_display_mode_controls_preview_detail_and_edit_without_changing_value_t
     view.update(cx, |view, cx| {
         assert_eq!(
             view.table.update(cx, |table, _| table.delegate_mut().label_of(0, 1).0),
-            "AP9B"
+            "AP9C"
         );
     });
 }
