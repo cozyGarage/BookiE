@@ -15,6 +15,7 @@ pub(crate) struct PickerItem {
 pub(crate) enum Pick {
     Table(TableInfo),
     Column(usize),
+    ChartValue(usize),
     Command(Command),
     Favorite(String),
     DeleteFavorite(uuid::Uuid, String),
@@ -32,6 +33,25 @@ impl GridView {
             PaletteMode::Commands => Vec::new(),
             PaletteMode::Tables => self.favorite_and_table_items(needle),
             PaletteMode::Columns => self.column_items(needle),
+            PaletteMode::ChartValues => self
+                .column_items(needle)
+                .into_iter()
+                .filter_map(|mut item| {
+                    let Pick::Column(column) = item.pick else { return None };
+                    let chart = self.panel.chart.as_ref()?;
+                    if !chart.profiles.get(column).is_some_and(|profile| profile.numeric) {
+                        return None;
+                    }
+                    item.subtitle = if chart.settings.slot_of(column).is_some() {
+                        "Selected"
+                    } else {
+                        "Number"
+                    }
+                    .into();
+                    item.pick = Pick::ChartValue(column);
+                    Some(item)
+                })
+                .collect(),
             PaletteMode::Shortcuts => self.shortcut_items(needle),
             PaletteMode::Favorites | PaletteMode::DeleteFavorite => self.favorite_items(needle),
             PaletteMode::SavedFilters | PaletteMode::DeleteSavedFilter => self.saved_filter_items(needle),
@@ -248,6 +268,12 @@ impl GridView {
                 );
             }
             Pick::Theme(name) => self.choose_theme(&name, window, cx),
+            Pick::ChartValue(column) => self.edit_chart(
+                |settings| {
+                    settings.toggle_value(column);
+                },
+                cx,
+            ),
             Pick::Column(column) => {
                 let row = self.cell_cursor.map_or(0, |cursor| cursor.row);
                 self.place_cursor(Some(Cursor { row, column }));
