@@ -1214,7 +1214,10 @@ async fn execute_on(
     params: &[Value],
 ) -> Result<ExecResult, DriverError> {
     drop_guard::refuse_referenced_drop(connection, sql).await?;
-    let statement = connection.prepare(sqlx::AssertSqlSafe(sql).into_sql_str()).await.map_err(map_sqlx_error)?;
+    let statement = connection
+        .prepare(sqlx::AssertSqlSafe(sql).into_sql_str())
+        .await
+        .map_err(map_sqlx_error)?;
     check_parameter_count(&statement, params.len())?;
     drop(statement);
     let query = bind_sqlite_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params)?;
@@ -1225,7 +1228,9 @@ async fn execute_on(
 }
 
 fn check_parameter_count(statement: &sqlx::sqlite::SqliteStatement, supplied: usize) -> Result<(), DriverError> {
-    if let Some(sqlx::Either::Right(expected)) = statement.parameters() && supplied < expected {
+    if let Some(sqlx::Either::Right(expected)) = statement.parameters()
+        && supplied < expected
+    {
         return Err(DriverError::Query {
             message: format!("SQLite statement expects {expected} parameters, but {supplied} were supplied"),
             sqlstate: None,

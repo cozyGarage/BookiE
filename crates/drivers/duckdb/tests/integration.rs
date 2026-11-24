@@ -45,8 +45,14 @@ mod value_contract;
 #[tokio::test]
 async fn missing_parameter_does_not_write_null() {
     let connection = native_connection().await;
-    connection.execute("CREATE TABLE bind_guard (value VARCHAR)").await.unwrap();
-    connection.execute("INSERT INTO bind_guard VALUES ('original')").await.unwrap();
+    connection
+        .execute("CREATE TABLE bind_guard (value VARCHAR)")
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO bind_guard VALUES ('original')")
+        .await
+        .unwrap();
     assert!(connection.execute("UPDATE bind_guard SET value = ?").await.is_err());
     let rows = connection.query("SELECT value FROM bind_guard").await.unwrap();
     assert_eq!(rows.rows[0][0], Value::Text("original".into()));
