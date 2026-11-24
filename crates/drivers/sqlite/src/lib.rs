@@ -1224,7 +1224,7 @@ async fn execute_on(
     })
 }
 
-fn check_parameter_count(statement: &sqlx::sqlite::SqliteStatement<'_>, supplied: usize) -> Result<(), DriverError> {
+fn check_parameter_count(statement: &sqlx::sqlite::SqliteStatement, supplied: usize) -> Result<(), DriverError> {
     if let Some(sqlx::Either::Right(expected)) = statement.parameters() && supplied < expected {
         return Err(DriverError::Query {
             message: format!("SQLite statement expects {expected} parameters, but {supplied} were supplied"),
