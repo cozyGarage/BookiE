@@ -118,9 +118,9 @@ impl GridView {
         );
         let preview_note = truncated.then(|| {
             let message = if self.source.editable() {
-                "Previewing first 512 characters · Alt+Enter opens the full value editor (1 MiB limit)"
+                "Previewing first 512 characters · Copy the selected row for the full value · Alt+Enter opens the editor (1 MiB limit)"
             } else {
-                "Previewing first 512 characters"
+                "Previewing first 512 characters · Copy the selected row for the full value"
             };
             div()
                 .id("cell-detail-preview-note")

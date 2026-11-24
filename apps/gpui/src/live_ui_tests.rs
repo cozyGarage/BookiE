@@ -136,6 +136,13 @@ fn large_cell_details_stay_bounded_and_reject_over_limit_edits_without_copying_t
         assert!(view.cell_edit.active.is_none());
         assert!(view.status.contains("1 MiB"));
     });
+
+    view.update(cx, |view, cx| {
+        view.click_row(0, false);
+        view.copy_selection(false, cx);
+    });
+    let copied = cx.update(|_, cx| cx.read_from_clipboard().and_then(|item| item.text()));
+    assert_eq!(copied.as_deref(), Some("x".repeat(1024 * 1024 + 1).as_str()));
 }
 
 #[gpui::test]
