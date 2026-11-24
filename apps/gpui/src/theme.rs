@@ -27,6 +27,7 @@ pub mod size {
     pub const FULL_VALUE_EDITOR_WIDTH: f32 = 760.0;
     pub const APPROVAL_DIALOG_WIDTH: f32 = 560.0;
     pub const SHORTCUT_HINT_WIDTH: f32 = 320.0;
+    pub const TOOLBAR_LABELS_MIN_WIDTH: f32 = 900.0;
     pub const SHORTCUT_CHORD_WIDTH: f32 = 120.0;
     pub const FULL_VALUE_EDITOR_HEIGHT: f32 = 560.0;
     pub const TEXT: f32 = 13.0;
