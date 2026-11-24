@@ -119,6 +119,7 @@ struct OpenBatch {
     id: Uuid,
     read_only: bool,
     wrote: bool,
+    writes: u32,
     uncertain: bool,
     aborted: bool,
 }
@@ -129,6 +130,7 @@ impl OpenBatch {
             id: Uuid::new_v4(),
             read_only,
             wrote: false,
+            writes: 0,
             uncertain: false,
             aborted: false,
         }
@@ -796,6 +798,9 @@ impl PolicySession {
             return;
         };
         batch.wrote |= writes;
+        if writes {
+            batch.writes = batch.writes.saturating_add(1);
+        }
         if matches!(
             result,
             Err(DriverError::Cancelled
@@ -962,6 +967,28 @@ impl PolicySession {
 }
 
 impl PolicySession {
+    async fn approve_production_commit(
+        &mut self,
+        sql: &str,
+        control: &OperationControl,
+        writes: u32,
+    ) -> Result<(), DriverError> {
+        if writes == 0 || self.guard.ctx.environment != Environment::Prod {
+            return Ok(());
+        }
+        let noun = if writes == 1 { "write" } else { "writes" };
+        let decision = Decision::RequireApproval {
+            rule: "prod_commit_requires_approval".into(),
+            reason: format!("Commit {writes} governed {noun} on a production connection"),
+            preview: None,
+        };
+        let analysis = self.guard.analyze_statement(sql);
+        self.guard
+            .resolve_authorization(sql, analysis, decision, None, Some(control))
+            .await
+            .map(|_| ())
+    }
+
     async fn finish(
         &mut self,
         sql: &str,
@@ -976,6 +1003,7 @@ impl PolicySession {
         };
         if kind == Finish::Commit {
             self.require_writable(sql).await?;
+            self.approve_production_commit(sql, control, batch.writes).await?;
         }
         let operation = finish_operation(kind, batch.id);
         self.guard.record_intent(&operation).await.map_err(|error| {

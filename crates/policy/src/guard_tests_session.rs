@@ -5,6 +5,8 @@ use bookie_core::sql_syntax::script::LexicalSettings;
 mod blast_radius;
 #[path = "guard_tests_session/completion_metadata.rs"]
 mod completion_metadata;
+#[path = "guard_tests_session/prod_commit_approval.rs"]
+mod prod_commit_approval;
 #[path = "guard_tests_session/savepoint_recovery.rs"]
 mod savepoint_recovery;
 #[path = "guard_tests_session/transaction_blast_radius.rs"]
