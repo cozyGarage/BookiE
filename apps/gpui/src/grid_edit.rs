@@ -15,6 +15,7 @@ pub struct Editing {
     pub kind: &'static str,
     pub binary_mode: Option<crate::binary_mode::BinaryMode>,
     pub full_value: bool,
+    pub original: String,
 }
 
 const MAX_FULL_VALUE_EDIT_BYTES: usize = 1024 * 1024;
@@ -45,7 +46,7 @@ impl GridView {
         cx.notify();
     }
 
-    fn commit_edit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn commit_edit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(editing) = self.cell_edit.active.as_ref() else { return };
         if self.save.pending.is_some() || self.save.busy {
             self.status = "Save or cancel the review before editing more cells".into();
@@ -63,7 +64,7 @@ impl GridView {
             cx.notify();
             return;
         }
-        if editing.kind == "null" && text.is_empty() {
+        if text == editing.original {
             self.stop_edit(window, cx);
             return;
         }
@@ -127,7 +128,7 @@ impl GridView {
         } else {
             cell.display()
         };
-        let full_value = matches!(cell, Cell::Text(_) | Cell::JsonText(_) | Cell::Json(_))
+        let full_value = matches!(cell, Cell::Text(_) | Cell::JsonText(_) | Cell::Json(_) | Cell::Bytes(_))
             && (matches!(cell, Cell::JsonText(_) | Cell::Json(_))
                 || text.len() > 512
                 || text.contains(['\n', '\r', '\t', '\0']));
@@ -146,6 +147,7 @@ impl GridView {
             kind: cell.kind(),
             binary_mode,
             full_value,
+            original: text.clone(),
         });
         if full_value {
             self.cell_edit
