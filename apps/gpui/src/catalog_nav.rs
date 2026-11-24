@@ -255,6 +255,7 @@ impl GridView {
         }
         self.mcp.register(session.database_service());
         self.connection_info = None;
+        self.table_sizes = Default::default();
         self.table_sorts.clear();
         self.search.server.applied.clear();
         self.search.server.shown_for = None;

@@ -395,6 +395,19 @@ impl ReadSession {
         Ok((version, started.elapsed()))
     }
 
+    pub async fn table_sizes(
+        &self,
+        control: &OperationControl,
+    ) -> Result<crate::table_sizes::SizeIndex, DriverFailurePresentation> {
+        let guard = self
+            .database
+            .guard_for_generation(self.id, self.generation, Principal::human_gui())
+            .ok_or(DriverFailurePresentation::Disconnected)?;
+        crate::table_sizes::load_table_sizes(&guard, control)
+            .await
+            .map_err(|error| classify(&error))
+    }
+
     pub async fn read_structure(
         &self,
         table: &TableInfo,

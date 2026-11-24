@@ -410,7 +410,20 @@ impl GridView {
                     .whitespace_nowrap()
                     .text_ellipsis()
                     .child(label),
-            );
+            )
+            .children(match &row {
+                TreeRow::Table(table) => self.table_sizes.get(table.schema.as_deref(), &table.name).map(|bytes| {
+                    let name = table.name.clone();
+                    div()
+                        .debug_selector(move || format!("sidebar-size-{name}"))
+                        .flex_none()
+                        .pr_1()
+                        .text_size(px(size::TEXT_SMALL))
+                        .text_color(rgb(theme.muted_foreground))
+                        .child(bookie_app_services::table_sizes::size_label(bytes))
+                }),
+                _ => None,
+            });
         let line = if current {
             line.bg(rgb(theme.accent)).font_weight(gpui::FontWeight::MEDIUM)
         } else {

@@ -39,3 +39,20 @@ fn the_connection_chip_shows_the_server_version_after_it_loads(cx: &mut TestAppC
     let tooltip = view.read_with(cx, |view, _| view.connection_tooltip());
     assert!(tooltip.contains("Round trip:"), "{tooltip}");
 }
+
+#[gpui::test]
+fn sidebar_tables_show_their_size_when_the_database_reports_one(cx: &mut TestAppContext) {
+    let (view, cx) = open_live(cx);
+    cx.simulate_resize(gpui::size(gpui::px(1400.0), gpui::px(900.0)));
+    view.update(cx, |view, cx| {
+        view.table_sizes = bookie_app_services::table_sizes::SizeIndex::new(vec![bookie_core::TableSize {
+            schema: None,
+            name: "orders".into(),
+            bytes: 5 * 1024 * 1024,
+        }]);
+        cx.notify();
+    });
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    assert!(cx.debug_bounds("sidebar-size-orders").is_some(), "orders shows its size");
+}

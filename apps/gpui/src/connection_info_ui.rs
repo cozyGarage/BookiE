@@ -6,6 +6,7 @@ use crate::GridView;
 impl GridView {
     pub(crate) fn request_connection_info(&mut self, cx: &mut Context<Self>) {
         self.connection_info = None;
+        self.table_sizes = Default::default();
         let Some(session) = self.live.clone() else {
             return;
         };
@@ -13,11 +14,13 @@ impl GridView {
             let query_session = session.clone();
             let info = cx
                 .background_executor()
-                .spawn(async move { query_session.server_info() })
+                .spawn(async move { (query_session.server_info(), query_session.table_sizes()) })
                 .await;
             this.update(cx, |this, cx| {
                 if this.is_current_session(&session) {
+                    let (info, sizes) = info;
                     this.connection_info = Some(info);
+                    this.table_sizes = sizes;
                     cx.notify();
                 }
             })
