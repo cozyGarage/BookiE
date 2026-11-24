@@ -695,6 +695,7 @@ impl Render for TextInput {
             .text_color(rgb(theme.foreground))
             .line_height(px(size::COMPACT_CONTROL))
             .text_size(px(size::TEXT))
+            .when(self.compact, |root| root.text_xs())
             .child({
                 let frame = div()
                     .w_full()
@@ -703,7 +704,7 @@ impl Render for TextInput {
                     .border_1()
                     .border_color(rgb(theme.border));
                 let frame = if self.compact {
-                    frame.h_full().flex().items_center().px(px(size::XS))
+                    frame.flex().items_center()
                 } else {
                     frame.h(px(24. + 4. * 2.)).p(px(size::XS))
                 };
