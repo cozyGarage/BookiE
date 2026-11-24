@@ -259,3 +259,98 @@ fn terminal_commit_outcomes_are_not_reported_as_successful_retries(cx: &mut Test
         std::fs::remove_file(path).ok();
     }
 }
+
+#[derive(Default)]
+struct TransactionAudit(std::sync::Mutex<Vec<bookie_policy::AuditEvent>>);
+
+#[async_trait::async_trait]
+impl bookie_policy::AuditSink for TransactionAudit {
+    async fn record(&self, event: bookie_policy::AuditEvent) -> Result<(), bookie_policy::AuditError> {
+        self.0.lock().unwrap().push(event);
+        Ok(())
+    }
+}
+
+struct DenyCommit;
+
+#[async_trait::async_trait]
+impl bookie_policy::ApprovalSink for DenyCommit {
+    async fn request(&self, request: bookie_policy::ApprovalRequest) -> bookie_policy::ApprovalOutcome {
+        if request.rule == "prod_commit_requires_approval" {
+            bookie_policy::ApprovalOutcome::Deny
+        } else {
+            bookie_policy::ApprovalOutcome::AllowOnce
+        }
+    }
+}
+
+#[gpui::test]
+fn a_guarded_sqlite_denied_commit_can_be_rolled_back(cx: &mut TestAppContext) {
+    let path = fixture_copy("guarded-denied-commit");
+    let original = saved_customer(&path, 1);
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let audit = std::sync::Arc::new(TransactionAudit::default());
+    let shared = runtime.block_on(async {
+        let registry = drivers_registry::default_registry();
+        let driver = registry.get("sqlite").unwrap();
+        let raw = driver
+            .connect(bookie_core::ConnectOptions {
+                database: path.to_string_lossy().into_owned(),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        let guard = bookie_policy::PolicyGuard::new(
+            std::sync::Arc::from(raw),
+            bookie_policy::GuardContext {
+                connection_id: uuid::Uuid::new_v4(),
+                connection_name: "transaction test".into(),
+                driver_id: "sqlite".into(),
+                environment: bookie_core::Environment::Prod,
+                read_only: false,
+                principal: bookie_policy::Principal::human_gui(),
+                policy: std::sync::Arc::new(bookie_policy::PolicyConfig::default()),
+                approval: std::sync::Arc::new(DenyCommit),
+                audit: audit.clone(),
+                audit_state: std::sync::Arc::new(bookie_policy::AuditState::new()),
+            },
+        );
+        let mut session = bookie_core::Connection::open_session(&guard).await.unwrap();
+        let control = bookie_core::OperationControl::with_timeout(std::time::Duration::from_secs(10));
+        session.query_params_controlled("BEGIN", &[], &control).await.unwrap();
+        session
+            .query_params_controlled("UPDATE orders SET customer = 'Pending' WHERE id = 1", &[], &control)
+            .await
+            .unwrap();
+        std::sync::Arc::new(tokio::sync::Mutex::new(Some(
+            bookie_app_services::interactive_session::SessionHandle::plain(session),
+        )))
+    });
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.transaction = Some(crate::transaction_ui::TransactionState {
+                write: write_session(&path, false),
+                shared,
+                started: Instant::now(),
+                statements: 1,
+                finishing: false,
+                running: false,
+            });
+            view.end_transaction(true, cx);
+        })
+    });
+    wait_for(&view, cx, |view| view.status.starts_with("Commit failed:"));
+    view.read_with(cx, |view, _| assert!(view.transaction_open(), "{}", view.status));
+    cx.update(|_, cx| view.update(cx, |view, cx| view.end_transaction(false, cx)));
+    wait_for(&view, cx, |view| view.status == "Transaction rolled back");
+    view.read_with(cx, |view, _| assert_eq!(view.status, "Transaction rolled back"));
+    assert_eq!(saved_customer(&path, 1), original);
+    assert!(audit.0.lock().unwrap().iter().any(|event| event.decision_rule
+        == "prod_commit_requires_approval"
+        && event.terminal_status == bookie_policy::AuditTerminalStatus::Denied));
+    std::fs::remove_file(path).ok();
+}

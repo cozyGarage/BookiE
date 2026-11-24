@@ -1392,6 +1392,7 @@ dependencies = [
  "bookie-app-services",
  "bookie-core",
  "bookie-driver-registry",
+ "bookie-policy",
  "bookie-results",
  "chrono",
  "gpui-component",
