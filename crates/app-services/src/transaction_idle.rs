@@ -22,6 +22,10 @@ mod tests {
         assert_eq!(idle_warning(Duration::from_secs(299)), None);
         let warning = idle_warning(Duration::from_secs(300)).expect("a warning at five minutes");
         assert!(warning.starts_with("Idle for 5 min"), "{warning}");
-        assert!(idle_warning(Duration::from_secs(61 * 60)).expect("warning").contains("61 min"));
+        assert!(
+            idle_warning(Duration::from_secs(61 * 60))
+                .expect("warning")
+                .contains("61 min")
+        );
     }
 }

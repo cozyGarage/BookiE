@@ -164,6 +164,17 @@ impl Connection for CatalogConn {
         };
         self.answer(bookie_core::QueryResultBatch::single(result).with_rows_affected(self.query_rows_affected))
     }
+    async fn query_result_sets_bounded_controlled(
+        &self,
+        _: &str,
+        _: &[Value],
+        max_rows: usize,
+        max_bytes: usize,
+        _: &OperationControl,
+    ) -> Result<bookie_core::QueryResultBatch, DriverError> {
+        assert_eq!((max_rows, max_bytes), (3, 128));
+        self.answer(bookie_core::QueryResultBatch::single(empty_result()))
+    }
     async fn execute(&self, _: &str) -> Result<ExecResult, DriverError> {
         self.answer(ExecResult { rows_affected: 0 })
     }
@@ -454,6 +465,25 @@ async fn every_read_statement_form_reaches_the_driver() {
         .await
         .unwrap();
     assert_eq!(calls.load(Ordering::SeqCst), 6, "one driver call per read form");
+}
+
+#[tokio::test]
+async fn bounded_queries_are_authorized_and_writes_never_reach_the_driver() {
+    let (guard, calls, audit) = catalog_guard(false);
+    guard
+        .query_result_sets_bounded_controlled("SELECT 1", &[], 3, 128, &control())
+        .await
+        .unwrap();
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    let before = audit.events.lock().expect("events").len();
+    assert!(
+        guard
+            .query_result_sets_bounded_controlled("DELETE FROM t", &[], 3, 128, &control())
+            .await
+            .is_err()
+    );
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    assert!(audit.events.lock().expect("events").len() > before);
 }
 
 #[tokio::test]

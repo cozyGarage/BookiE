@@ -22,6 +22,7 @@ pub struct ConnectionSummary {
     pub name: String,
     pub driver_id: String,
     pub read_only: bool,
+    pub environment: bookie_core::Environment,
 }
 
 pub async fn list_saved_connections() -> Result<Vec<ConnectionSummary>, String> {
@@ -35,6 +36,7 @@ pub async fn list_saved_connections() -> Result<Vec<ConnectionSummary>, String> 
             name: saved.name,
             driver_id: saved.driver_id,
             read_only: saved.read_only,
+            environment: saved.environment,
         })
         .collect())
 }
@@ -530,7 +532,6 @@ impl ReadSession {
             crate::interactive_session::SessionHandle::Audited(session),
         ))))
     }
-
 
     pub async fn run_query(
         &self,

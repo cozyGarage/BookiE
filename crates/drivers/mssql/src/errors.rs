@@ -32,7 +32,9 @@ pub(crate) fn map_server_error(code: u32, message: &str, state: u8) -> DriverErr
         // SQL Server emits 596 after the session is killed during result
         // streaming. The socket may remain open, but the session cannot
         // deliver the rest of the result.
-        596 => DriverError::Disconnected,
+        596 => DriverError::SessionEndedByServer {
+            reason: format!("596: {message}"),
+        },
         _ => DriverError::Query {
             message: message.to_string(),
             sqlstate: Some(state.to_string()),

@@ -11,6 +11,7 @@ struct SequenceCall {
 struct Marker {
     cancels: bool,
     sequence_calls: Mutex<Vec<SequenceCall>>,
+    bounded_calls: Mutex<Vec<(String, usize, usize, OperationControl)>>,
     sequence_failure: bool,
 }
 
@@ -115,6 +116,26 @@ impl Connection for Marker {
 
     async fn query(&self, _: &str) -> Result<QueryResult, DriverError> {
         Err(DriverError::Unsupported("unused".into()))
+    }
+
+    async fn query_result_sets_bounded_controlled(
+        &self,
+        sql: &str,
+        _: &[Value],
+        max_rows: usize,
+        max_bytes: usize,
+        control: &OperationControl,
+    ) -> Result<bookie_core::QueryResultBatch, DriverError> {
+        self.bounded_calls
+            .lock()
+            .unwrap()
+            .push((sql.to_owned(), max_rows, max_bytes, control.clone()));
+        Ok(bookie_core::QueryResultBatch {
+            result_sets: Vec::new(),
+            truncated: false,
+            messages: Default::default(),
+            rows_affected: None,
+        })
     }
 
     async fn execute(&self, _: &str) -> Result<ExecResult, DriverError> {
@@ -250,6 +271,27 @@ async fn sequence_synchronization_preserves_arguments_deadline_and_cancellation(
     assert!(!forwarded.cancellation_token().is_cancelled());
     control.cancellation_token().cancel();
     assert!(forwarded.cancellation_token().is_cancelled());
+}
+
+#[tokio::test]
+async fn bounded_query_forwards_limits_and_control_to_the_driver() {
+    let marker = Arc::new(Marker::default());
+    let session = SessionConnection {
+        inner: marker.clone(),
+        _tunnel: None,
+    };
+    let control = OperationControl::with_timeout(Duration::from_secs(5));
+
+    session
+        .query_result_sets_bounded_controlled("SELECT 1", &[], 7, 4096, &control)
+        .await
+        .unwrap();
+
+    let calls = marker.bounded_calls.lock().unwrap();
+    assert_eq!(calls.len(), 1);
+    assert_eq!(calls[0].0, "SELECT 1");
+    assert_eq!((calls[0].1, calls[0].2), (7, 4096));
+    assert_eq!(calls[0].3.deadline(), control.deadline());
 }
 
 #[tokio::test]

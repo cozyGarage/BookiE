@@ -31,12 +31,6 @@ mod history_view;
 mod home_page;
 mod import_ui;
 mod insert_ui;
-mod params_ui;
-mod picker;
-mod save_ui;
-mod plan_view;
-mod transaction_ui;
-mod reveal;
 mod keys;
 mod local_sort;
 mod measure;
@@ -44,14 +38,21 @@ mod menus;
 mod new_window_ui;
 mod palette_actions;
 mod palette_state;
+mod transaction_ui;
 mod panel_state;
+mod params_ui;
 mod paste_ui;
+mod picker;
+mod host_key_ui;
+mod plan_view;
 mod query_pane;
 mod refresh_ui;
 mod render;
 mod resolve_ui;
+mod reveal;
 mod run_cursor_ui;
 mod runs;
+mod save_ui;
 mod saved_filters_ui;
 mod schema_compare_ui;
 mod schema_diagram_ui;
@@ -176,6 +177,7 @@ struct GridView {
     save: save_ui::SaveState,
     approval: approval_ui::ApprovalUi,
     transaction: Option<transaction_ui::TransactionState>,
+    host_key: host_key_ui::HostKeyUi,
     insert: insert_ui::InsertState,
     import: import_ui::ImportState,
     connection_bundle: connection_bundle_ui::BundleState,
@@ -468,6 +470,9 @@ impl GridView {
 
         let (approval, approval_inbox) = approval_ui::ApprovalUi::new();
         Self::watch_approvals(approval_inbox, cx);
+        let (host_key, host_key_inbox) = host_key_ui::HostKeyUi::new();
+        bookie_gpui::host_key::install(host_key.tx.clone());
+        Self::watch_host_keys(host_key_inbox, cx);
         GridView {
             table,
             _table_events: table_events,
@@ -485,6 +490,7 @@ impl GridView {
             save: save_ui::SaveState::default(),
             approval,
             transaction: None,
+            host_key,
             insert: insert_ui::InsertState::default(),
             import: import_ui::ImportState::default(),
             connection_bundle: connection_bundle_ui::BundleState::default(),
@@ -1065,6 +1071,8 @@ fn main() {
 mod follow_ui_tests;
 #[cfg(test)]
 mod grid_pin_tests;
+#[cfg(test)]
+mod host_key_ui_tests;
 #[cfg(test)]
 mod live_ui_tests;
 #[cfg(test)]

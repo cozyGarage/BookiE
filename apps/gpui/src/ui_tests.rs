@@ -1005,6 +1005,9 @@ fn connection_form_keeps_actions_visible_at_two_widths(cx: &mut TestAppContext) 
         assert!(page.size.width > gpui::px(200.0));
         assert!(actions.origin.y >= page.origin.y);
         assert!(actions.origin.y + actions.size.height <= gpui::px(760.0));
+        let card = cx.debug_bounds("connection-card").expect("the form sits on a card");
+        assert!(page.origin.y >= card.origin.y && actions.origin.y <= card.origin.y + card.size.height);
+        assert!(cx.debug_bounds("Prod").is_some(), "the environment chips are in the behaviour section");
     }
 }
 
@@ -1887,6 +1890,14 @@ fn the_settings_tab_opens_and_shows_the_appearance_page(cx: &mut TestAppContext)
     view.read_with(cx, |view, _| {
         assert_eq!(view.tabs.current(), &bookie_gpui::shell::Tab::Settings)
     });
+    assert!(cx.debug_bounds("settings-card").is_some(), "settings sit on a card");
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| view.open_picker(crate::palette_state::PaletteMode::Themes, window, cx))
+    });
+    view.read_with(cx, |view, _| {
+        assert!(view.palette.open);
+        assert_eq!(view.palette.mode, crate::palette_state::PaletteMode::Themes);
+    });
 }
 
 #[gpui::test]
@@ -1990,3 +2001,24 @@ fn a_double_click_on_a_table_row_opens_the_active_column_for_editing(cx: &mut Te
     });
 }
 
+
+#[gpui::test]
+fn editing_a_production_connection_keeps_it_production(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            let mut draft = view.connection_form.draft(cx);
+            draft.environment = bookie_core::Environment::Prod;
+            view.fill_connection_form(draft, cx);
+        })
+    });
+    view.read_with(cx, |view, cx| {
+        assert_eq!(view.connection_form.draft(cx).environment, bookie_core::Environment::Prod);
+    });
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| view.connection_form.environment = bookie_core::Environment::Staging)
+    });
+    view.read_with(cx, |view, cx| {
+        assert_eq!(view.connection_form.draft(cx).environment, bookie_core::Environment::Staging);
+    });
+}

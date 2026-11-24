@@ -33,6 +33,7 @@ impl GridView {
             "export-schema-diagram" => self.open_schema_diagram_bar(cx),
             "run-at-cursor" => self.run_at_cursor(cx),
             "paste-cells" => self.paste_cells(cx),
+            "paste-literal-cell" => self.paste_literal_cell(cx),
             "filter-rule" => self.open_filter_rule_bar(cx),
             "show-schema-diagram" => self.open_schema_diagram(cx),
             "check-for-updates" => self.check_for_updates_now(cx),
