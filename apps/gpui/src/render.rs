@@ -668,6 +668,7 @@ impl GridView {
             PaletteMode::Commands | PaletteMode::Shortcuts => "No matching command",
             PaletteMode::Tables => "No matching table",
             PaletteMode::Columns => "No matching column",
+            PaletteMode::ChartValues => "No matching numeric column",
             PaletteMode::Favorites | PaletteMode::DeleteFavorite => "No saved favorites",
             PaletteMode::SavedFilters | PaletteMode::DeleteSavedFilter => "No saved filters for this table",
             PaletteMode::NameFilter => "Type a name for the filter",

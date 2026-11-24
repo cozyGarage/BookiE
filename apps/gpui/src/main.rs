@@ -38,12 +38,15 @@ mod menus;
 mod new_window_ui;
 mod palette_actions;
 mod palette_state;
+mod transaction_ui;
 mod panel_state;
 mod params_ui;
 mod paste_ui;
 mod picker;
 mod host_key_ui;
 mod plan_view;
+mod chart_plot;
+mod chart_ui;
 mod query_pane;
 mod refresh_ui;
 mod render;
@@ -111,6 +114,7 @@ enum Work {
     Load,
     Scan,
     Count,
+    Chart,
 }
 
 struct Ticket {
@@ -128,6 +132,12 @@ impl Ticket {
 
     fn invalidate(&mut self) {
         self.generation += 1;
+        self.cancel.cancel();
+    }
+}
+
+impl Drop for Ticket {
+    fn drop(&mut self) {
         self.cancel.cancel();
     }
 }
@@ -175,6 +185,7 @@ struct GridView {
     params: params_ui::ParamsState,
     save: save_ui::SaveState,
     approval: approval_ui::ApprovalUi,
+    transaction: Option<transaction_ui::TransactionState>,
     host_key: host_key_ui::HostKeyUi,
     insert: insert_ui::InsertState,
     import: import_ui::ImportState,
@@ -196,6 +207,7 @@ struct GridView {
     loads: Ticket,
     scans: Ticket,
     counts: Ticket,
+    charts: Ticket,
     compare: Option<std::sync::Arc<Diff>>,
     status: String,
     selection: Option<Selection>,
@@ -490,6 +502,7 @@ impl GridView {
             params: params_ui::ParamsState::default(),
             save: save_ui::SaveState::default(),
             approval,
+            transaction: None,
             host_key,
             insert: insert_ui::InsertState::default(),
             import: import_ui::ImportState::default(),
@@ -541,6 +554,7 @@ impl GridView {
             loads: Ticket::new(),
             scans: Ticket::new(),
             counts: Ticket::new(),
+            charts: Ticket::new(),
             status: String::new(),
         }
     }
@@ -701,11 +715,13 @@ impl GridView {
             Work::Load => self.invalidate_background(),
             Work::Scan => self.invalidate_scans(),
             Work::Count => self.counts.invalidate(),
+            Work::Chart => self.charts.invalidate(),
         }
         let ticket = match work_kind {
             Work::Load => &mut self.loads,
             Work::Scan => &mut self.scans,
             Work::Count => &mut self.counts,
+            Work::Chart => &mut self.charts,
         };
         let generation = ticket.generation;
         let cancel = CancellationToken::new();
@@ -717,6 +733,7 @@ impl GridView {
                     Work::Load => this.loads.generation,
                     Work::Scan => this.scans.generation,
                     Work::Count => this.counts.generation,
+                    Work::Chart => this.charts.generation,
                 };
                 if current == generation {
                     apply(this, result);
@@ -729,9 +746,11 @@ impl GridView {
     }
 
     fn invalidate_background(&mut self) {
+        self.clear_chart();
         self.loads.invalidate();
         self.invalidate_scans();
         self.counts.invalidate();
+        self.charts.invalidate();
     }
 
     fn invalidate_scans(&mut self) {
@@ -1083,7 +1102,11 @@ mod query_pane_ui_tests;
 #[cfg(test)]
 mod save_ui_tests;
 #[cfg(test)]
+mod transaction_ui_tests;
+#[cfg(test)]
 mod typed_value_ui_tests;
+#[cfg(test)]
+mod connection_form_ui_tests;
 #[cfg(test)]
 mod ui_tests;
 #[cfg(test)]

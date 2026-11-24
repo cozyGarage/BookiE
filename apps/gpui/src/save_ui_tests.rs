@@ -56,7 +56,7 @@ fn writable_table(path: &std::path::Path) -> std::sync::Arc<bookie_gpui::live::L
     )
 }
 
-fn write_session(path: &std::path::Path, read_only: bool) -> std::sync::Arc<bookie_gpui::live::WriteSession> {
+pub(crate) fn write_session(path: &std::path::Path, read_only: bool) -> std::sync::Arc<bookie_gpui::live::WriteSession> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(1)
         .enable_all()
@@ -77,7 +77,7 @@ fn write_session(path: &std::path::Path, read_only: bool) -> std::sync::Arc<book
     ))
 }
 
-fn saved_customer(path: &std::path::Path, id: u32) -> String {
+pub(crate) fn saved_customer(path: &std::path::Path, id: u32) -> String {
     use bookie_gpui::live::{LiveSession, Origin};
     use bookie_gpui::model::CellText;
     use bookie_gpui::source::ResultSource;
@@ -88,7 +88,7 @@ fn saved_customer(path: &std::path::Path, id: u32) -> String {
     table.row(0)[0].display()
 }
 
-fn saving_view<'a>(
+pub(crate) fn saving_view<'a>(
     cx: &'a mut TestAppContext,
     path: &std::path::Path,
 ) -> (gpui::Entity<GridView>, &'a mut gpui::VisualTestContext) {
@@ -108,7 +108,7 @@ fn saving_view<'a>(
     (view, cx)
 }
 
-fn settle_saving(cx: &mut gpui::VisualTestContext) {
+pub(crate) fn settle_saving(cx: &mut gpui::VisualTestContext) {
     cx.executor().advance_clock(std::time::Duration::from_secs(1));
     cx.run_until_parked();
 }
@@ -126,7 +126,7 @@ fn read_when_written(cx: &mut gpui::VisualTestContext, path: &std::path::Path, r
     text
 }
 
-fn fixture_copy(name: &str) -> std::path::PathBuf {
+pub(crate) fn fixture_copy(name: &str) -> std::path::PathBuf {
     let path = std::env::temp_dir().join(format!("bookie-gpui-{name}-{}.sqlite", uuid::Uuid::new_v4()));
     std::fs::copy(orders_fixture(), &path).unwrap();
     path

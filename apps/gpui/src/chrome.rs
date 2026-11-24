@@ -203,6 +203,22 @@ pub(crate) fn mix(base: u32, color: u32, amount: f32) -> u32 {
 }
 
 impl GridView {
+    pub(crate) fn live_color(&self) -> Option<u32> {
+        let saved = self.live.as_ref().and_then(|live| live.saved.as_ref()).map(|(id, _)| *id);
+        self.connections
+            .iter()
+            .find(|connection| Some(connection.id) == saved)
+            .and_then(|connection| connection.color.as_deref())
+            .and_then(bookie_app_services::read_session::connection_color_rgb)
+    }
+
+    fn window_tint(&self, theme: Theme) -> u32 {
+        match self.live_color() {
+            Some(color) => mix(theme.background, color, 0.18),
+            None => environment_tint(self.live_environment(), theme),
+        }
+    }
+
     pub(crate) fn live_environment(&self) -> Environment {
         let saved = self.live.as_ref().and_then(|live| live.saved.as_ref()).map(|(id, _)| *id);
         self.connections
@@ -236,7 +252,7 @@ impl GridView {
             .h(px(TOOLBAR_HEIGHT))
             .px_2()
             .flex_none()
-            .bg(rgb(environment_tint(self.live_environment(), theme)))
+            .bg(rgb(self.window_tint(theme)))
             .border_b_1()
             .border_color(rgb(theme.border))
             .child(
@@ -379,6 +395,12 @@ impl GridView {
                 },
                 theme.muted_foreground,
             ))
+            .children(
+                matches!(row, TreeRow::Connection { .. })
+                    .then(|| self.live_color())
+                    .flatten()
+                    .map(|color| connection_dot(color, "sidebar-connection-colour")),
+            )
             .child(
                 div()
                     .flex_1()
@@ -796,6 +818,12 @@ impl GridView {
                 tab_icon_name(tab),
                 if selected { theme.info } else { theme.muted_foreground },
             ))
+            .children(
+                matches!(tab, Tab::Table(_) | Tab::Query)
+                    .then(|| self.live_color())
+                    .flatten()
+                    .map(|color| connection_dot(color, "tab-connection-colour")),
+            )
             .child(self.tab_title(tab, cx))
             .when(dirty, |el| el.child(div().text_color(rgb(theme.warning)).child("•")));
         item = if selected {
@@ -1094,6 +1122,15 @@ mod tab_dirty_tests {
         assert!(!tab_is_dirty(&Tab::Table(table("orders")), &open, 3));
         assert!(!tab_is_dirty(&Tab::Query, &open, 3));
     }
+}
+
+pub(crate) fn connection_dot(color: u32, selector: &'static str) -> Div {
+    div()
+        .debug_selector(move || selector.into())
+        .flex_none()
+        .size(px(size::SM))
+        .rounded_full()
+        .bg(rgb(color))
 }
 
 enum SidebarLine {

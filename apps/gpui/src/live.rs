@@ -260,6 +260,27 @@ impl LiveSession {
         })
     }
 
+    pub fn table_from_result(
+        self: &Arc<Self>,
+        result: QueryResult,
+        sql: &str,
+        cancellation: &CancellationToken,
+    ) -> Result<LiveTable, String> {
+        let started = std::time::Instant::now();
+        let (columns, rows, scan, truncated) = self.runtime.block_on(spooled_pages(result, ROW_CAP, cancellation))?;
+        Ok(LiveTable {
+            session: self.clone(),
+            columns,
+            rows,
+            scan,
+            truncated,
+            snapshot_consistent: false,
+            executed_sql: Some(sql.to_owned()),
+            load_elapsed: started.elapsed(),
+            table: None,
+        })
+    }
+
     pub fn data_dictionary_controlled(
         self: &Arc<Self>,
         capabilities: bookie_core::DriverCapabilities,
@@ -765,6 +786,55 @@ impl WriteSession {
             session_id: opened.session_id,
             profile: Some((connection_id, stamp)),
         })
+    }
+
+    pub fn begin_transaction(&self) -> Result<bookie_app_services::interactive_session::SharedSession, String> {
+        let shared = self
+            .runtime
+            .block_on(self.sessions.open_interactive(self.session_id))
+            .map_err(|failure| driver_failure_message(&failure))?;
+        if let Err(error) = self.run_in_transaction(&shared, "BEGIN", &CancellationToken::new()) {
+            let _ = self
+                .runtime
+                .block_on(bookie_app_services::interactive_session::close_for_teardown(shared));
+            return Err(error);
+        }
+        Ok(shared)
+    }
+
+    pub fn run_in_transaction(
+        &self,
+        shared: &bookie_app_services::interactive_session::SharedSession,
+        sql: &str,
+        cancellation: &CancellationToken,
+    ) -> Result<QueryResult, String> {
+        use bookie_core::Session as _;
+        let control = OperationControl::new(cancellation.clone(), Some(tokio::time::Instant::now() + PAGE_TIMEOUT));
+        self.runtime.block_on(async {
+            let mut guard = shared.lock().await;
+            let session = guard.as_mut().ok_or("The transaction session is closed.")?;
+            session
+                .query_params_controlled(sql, &[], &control)
+                .await
+                .map_err(|error| error.to_string())
+        })
+    }
+
+    pub fn commit_transaction(&self, shared: &bookie_app_services::interactive_session::SharedSession) -> Result<(), String> {
+        self.runtime.block_on(async {
+            bookie_app_services::interactive_session::commit_session(shared)
+                .await
+                .map_err(|error| error.to_string())?;
+            bookie_app_services::interactive_session::close_for_teardown(shared.clone())
+                .await
+                .map_err(|error| error.to_string())
+        })
+    }
+
+    pub fn rollback_transaction(&self, shared: &bookie_app_services::interactive_session::SharedSession) -> Result<(), String> {
+        self.runtime
+            .block_on(bookie_app_services::interactive_session::rollback_and_close(shared))
+            .map_err(|error| error.to_string())
     }
 
     pub fn is_current(&self) -> Result<bool, String> {
