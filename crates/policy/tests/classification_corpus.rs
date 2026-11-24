@@ -21,7 +21,7 @@ fn describe(driver: &str, sql: &str) -> String {
 #[test]
 fn the_statement_corpus_classifies_as_recorded() {
     let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/classification_corpus.txt");
-    let corpus = std::fs::read_to_string(&path).expect("classification corpus");
+    let corpus = include_str!("classification_corpus.txt");
     let actual: Vec<String> = corpus
         .lines()
         .map(|line| {
@@ -31,7 +31,11 @@ fn the_statement_corpus_classifies_as_recorded() {
             describe(driver, sql)
         })
         .collect();
-    golden::assert_golden(&path, &actual);
+    if std::env::var("BOOKIE_RECORD").as_deref() == Ok("1") {
+        golden::assert_golden(&path, &actual);
+    } else {
+        assert_eq!(actual.join("\n") + "\n", corpus);
+    }
 }
 
 #[test]
