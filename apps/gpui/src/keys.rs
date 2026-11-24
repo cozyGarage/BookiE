@@ -179,7 +179,11 @@ impl GridView {
             && self.compare.is_none()
             && self.tabs.shows_grid_for(&self.catalog.grid_table)
         {
-            self.grid_key(key, modifiers.shift, control, window, cx);
+            if key == "enter" && modifiers.alt && !control && !modifiers.shift {
+                self.open_value_editor(window, cx);
+            } else {
+                self.grid_key(key, modifiers.shift, control, window, cx);
+            }
         }
     }
 

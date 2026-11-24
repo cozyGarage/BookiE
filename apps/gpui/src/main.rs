@@ -40,6 +40,7 @@ mod menus;
 mod new_window_ui;
 mod palette_actions;
 mod palette_state;
+mod row_inspector_ui;
 mod transaction_ui;
 mod panel_state;
 mod params_ui;
@@ -125,6 +126,12 @@ struct Ticket {
     cancel: CancellationToken,
 }
 
+impl Default for Ticket {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Ticket {
     fn new() -> Self {
         Self {
@@ -166,6 +173,8 @@ struct GridView {
     pub(crate) fk_peek: Option<fk_peek_ui::FkPeekState>,
     fk_peek_work: Ticket,
     connection_info: Option<bookie_gpui::live::ServerInfo>,
+    row_inspector: row_inspector_ui::RowInspector,
+    wrap_text: bool,
     row_detail_filter: Entity<TextInput>,
     row_detail_hide_null: bool,
     catalog: Catalog,
@@ -416,7 +425,8 @@ impl GridView {
                 gpui_kit::component::table::TableEvent::SelectCell(row, column) => {
                     let column = table.read(cx).delegate().source_column(*column).unwrap_or(*column);
                     let cursor = bookie_results::grid_cursor::Cursor { row: *row, column };
-                    if this.cell_cursor == Some(cursor) {
+                    let follow = this.follows_link(column, window.modifiers());
+                    if this.cell_cursor == Some(cursor) && !follow {
                         return;
                     }
                     this.cell_cursor = Some(cursor);
@@ -425,6 +435,9 @@ impl GridView {
                         Some(selection) if selection.focus == dataset => selection.label(),
                         _ => cursor.label(&this.column_names()),
                     };
+                    if follow {
+                        this.go_to_referenced_row(cx);
+                    }
                     cx.notify();
                 }
                 gpui_kit::component::table::TableEvent::RightClickedCell(row, column) => {
@@ -561,6 +574,8 @@ impl GridView {
             fk_peek: None,
             fk_peek_work: Ticket::new(),
             connection_info: None,
+            row_inspector: Default::default(),
+            wrap_text: false,
             row_detail_filter,
             row_detail_hide_null: false,
             catalog: Catalog::synthetic(),
@@ -1145,6 +1160,8 @@ mod host_key_ui_tests;
 mod live_ui_tests;
 #[cfg(test)]
 mod status_bar_tests;
+#[cfg(test)]
+mod row_inspector_tests;
 #[cfg(test)]
 mod overlay_ui_tests;
 #[cfg(test)]

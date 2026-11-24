@@ -465,6 +465,7 @@ impl GridView {
 
 impl Render for GridView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.ensure_row_inspector(cx);
         self.sync_render_state(window, cx);
         if self.approval.current.is_some() && !self.focus.is_focused(window) {
             window.focus(&self.focus, cx);

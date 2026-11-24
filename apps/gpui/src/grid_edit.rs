@@ -96,6 +96,18 @@ impl GridView {
     }
 
     pub fn start_edit(&mut self, row: u64, column: usize, window: &mut Window, cx: &mut Context<Self>) {
+        self.start_edit_with(row, column, false, window, cx);
+    }
+
+    pub(crate) fn open_value_editor(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(cursor) = self.cell_cursor else {
+            return;
+        };
+        let source = self.source_row(self.base() + cursor.row as u64);
+        self.start_edit_with(source, cursor.column, true, window, cx);
+    }
+
+    fn start_edit_with(&mut self, row: u64, column: usize, full_editor: bool, window: &mut Window, cx: &mut Context<Self>) {
         if self.form_open() {
             self.status = "Finish or cancel the open form before editing cells".into();
             cx.notify();
@@ -139,8 +151,9 @@ impl GridView {
         } else {
             cell.display()
         };
-        let full_value = matches!(cell, Cell::Text(_) | Cell::JsonText(_) | Cell::Json(_) | Cell::Bytes(_))
-            && (matches!(cell, Cell::JsonText(_) | Cell::Json(_))
+        let full_value = matches!(cell, Cell::Text(_) | Cell::JsonText(_) | Cell::Json(_) | Cell::Bytes(_) | Cell::Null)
+            && (full_editor
+                || matches!(cell, Cell::JsonText(_) | Cell::Json(_))
                 || text.len() > 512
                 || text.contains(['\n', '\r', '\t', '\0']));
         if full_value && text.len() > MAX_FULL_VALUE_EDIT_BYTES {
