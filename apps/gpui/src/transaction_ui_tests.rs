@@ -36,6 +36,20 @@ fn open_transaction(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestCont
 }
 
 #[gpui::test]
+fn a_starting_transaction_blocks_closing_and_a_second_begin(cx: &mut TestAppContext) {
+    let path = fixture_copy("transaction-starting");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| view.update(cx, |view, cx| {
+        view.transaction_starting = true;
+        assert!(view.transaction_open());
+        view.begin_transaction(cx);
+        assert!(view.transaction_starting);
+        assert!(view.transaction.is_none());
+    }));
+    std::fs::remove_file(path).ok();
+}
+
+#[gpui::test]
 fn a_transaction_rolls_back_or_commits_and_keeps_its_query_tab_open(cx: &mut TestAppContext) {
     let path = fixture_copy("transaction");
     let (view, cx) = saving_view(cx, &path);

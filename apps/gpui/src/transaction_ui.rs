@@ -19,11 +19,11 @@ pub(crate) struct TransactionState {
 
 impl GridView {
     pub(crate) fn transaction_open(&self) -> bool {
-        self.transaction.is_some()
+        self.transaction_starting || self.transaction.is_some()
     }
 
     pub(crate) fn begin_transaction(&mut self, cx: &mut Context<Self>) {
-        if self.transaction.is_some() {
+        if self.transaction_open() {
             return;
         }
         let Some((connection_id, opened_with)) = self
@@ -36,10 +36,10 @@ impl GridView {
         };
         let approvals = self.approval.tx.clone();
         self.status = "Starting a transaction…".into();
-        self.begin_background_with_context(
-            Work::Load,
-            cx,
-            move |_| {
+        self.transaction_starting = true;
+        self.invalidate_background();
+        cx.spawn(async move |this, cx| {
+            let mut opened = Some(cx.background_executor().spawn(async move {
                 let write = Arc::new(WriteSession::open_saved(
                     connection_id,
                     approvals,
@@ -47,9 +47,11 @@ impl GridView {
                 )?);
                 let shared = write.begin_transaction()?;
                 Ok::<_, String>((write, shared))
-            },
-            |this, opened, cx| match opened {
-                Ok((write, shared)) => {
+            }).await);
+            let applied = this.update(cx, |this, cx| {
+                this.transaction_starting = false;
+                match opened.take() {
+                Some(Ok((write, shared))) => {
                     this.transaction = Some(TransactionState {
                         write,
                         shared,
@@ -62,9 +64,15 @@ impl GridView {
                     this.refresh_while_transaction_open(cx);
                     this.status = "Transaction open: statements run in it until you commit or roll back".into();
                 }
-                Err(message) => this.status = format!("Could not start a transaction: {message}"),
-            },
-        );
+                Some(Err(message)) => this.status = format!("Could not start a transaction: {message}"),
+                None => return,
+                }
+                cx.notify();
+            });
+            if applied.is_err() && let Some(Ok((write, shared))) = opened {
+                cx.background_executor().spawn(async move { write.close_transaction(&shared) }).await;
+            }
+        }).detach();
     }
 
     pub(crate) fn run_in_transaction(&mut self, sql: String, cx: &mut Context<Self>) {
