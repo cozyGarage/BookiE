@@ -258,8 +258,7 @@ impl DataCompare {
                 if include_deletes {
                     batches.push(&mut out, &statement);
                 } else {
-                    out.push_str("-- ");
-                    push_line(&mut out, &statement);
+                    push_commented(&mut out, &statement);
                 }
             }
         }
@@ -324,6 +323,15 @@ impl Batches {
             out.push_str(self.commit);
         }
     }
+}
+
+fn push_commented(out: &mut String, statement: &str) {
+    for line in statement.trim_end_matches(';').split(['\r', '\n']) {
+        out.push_str("-- ");
+        out.push_str(line);
+        out.push('\n');
+    }
+    out.insert(out.len() - 1, ';');
 }
 
 fn push_line(out: &mut String, statement: &str) {

@@ -2065,7 +2065,7 @@ Packages:
 - `constant_time_eq 0.6.1`
 - `mongodb 3.10.2`
 - `mongodb-internal-macros 3.10.2`
-- `russh 0.65.2`
+- `russh 0.65.4`
 - `russh-cryptovec 0.62.0`
 - `russh-util 0.52.0`
 - `ryu 1.0.23`
@@ -3526,7 +3526,7 @@ CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 Packages:
 
-- `rustls-webpki 0.103.16`
+- `rustls-webpki 0.103.17`
 
 ```text
 Except as otherwise noted, this project is licensed under the following
@@ -6054,7 +6054,7 @@ DEALINGS IN THE SOFTWARE.
 Packages:
 
 - `keccak 0.2.2`
-- `zeroize 1.9.1`
+- `zeroize 1.9.2`
 
 ```text
 Copyright (c) 2018-2026 The RustCrypto Project Developers
@@ -9789,7 +9789,6 @@ SOFTWARE.
 Packages:
 
 - `generic-array 0.14.7`
-- `generic-array 1.4.5`
 
 ```text
 The MIT License (MIT)

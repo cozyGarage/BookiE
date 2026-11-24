@@ -32,6 +32,7 @@ struct SessionScript {
     blast_count: Option<i64>,
     lexical_settings: Option<LexicalSettings>,
     lexical_settings_reads: std::sync::atomic::AtomicUsize,
+    honor_deadline: bool,
 }
 
 struct ScriptedSession {
@@ -46,8 +47,15 @@ impl bookie_core::Session for ScriptedSession {
         &mut self,
         sql: &str,
         _params: &[Value],
-        _control: &OperationControl,
+        control: &OperationControl,
     ) -> Result<QueryResult, DriverError> {
+        if self.script.honor_deadline
+            && control
+                .deadline()
+                .is_some_and(|deadline| deadline <= tokio::time::Instant::now())
+        {
+            return Err(DriverError::TimedOut);
+        }
         self.script.sent.lock().expect("sent lock").push(sql.to_string());
         if let Some(count) = self
             .script

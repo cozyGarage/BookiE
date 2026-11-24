@@ -257,3 +257,21 @@ async fn a_batched_script_commits_every_n_statements_and_leaves_commented_delete
             .contains("BEGIN;")
     );
 }
+
+#[tokio::test]
+async fn a_commented_delete_stays_commented_when_its_key_holds_line_breaks() {
+    let codes = vec![column("code", "text", true)];
+    let layout = plan_layout(&codes, &codes, None).unwrap();
+    let hostile = "x\n; DROP TABLE accounts; --\r; DELETE FROM accounts; --\r\nz";
+    let target = vec![vec![Value::Text(hostile.into())]];
+    let result = merge(layout, Pages(vec![Vec::new()]), Pages(vec![target]))
+        .await
+        .unwrap();
+    for driver in ["postgres", "mysql", "sqlite", "mssql"] {
+        let script = result.script(driver, None, "codes", false).unwrap();
+        let deletes = script.split("-- Deletes (commented; not executed)").nth(1).unwrap();
+        for line in deletes.split(['\n', '\r']).filter(|line| !line.is_empty()) {
+            assert!(line.starts_with("--"), "{driver}: live line {line:?}");
+        }
+    }
+}
