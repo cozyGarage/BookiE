@@ -1787,10 +1787,10 @@ impl bookie_gpui::source::ResultSource for TwoColumns {
             ["id", "customer_name"]
                 .into_iter()
                 .map(|name| bookie_gpui::model::ColumnMeta {
+                    data_type: if name == "id" { "integer" } else { "text" }.into(),
                     name: name.into(),
                     width: 150.0,
                     numeric: false,
-                    data_type: String::new(),
                     primary_key: false,
                 })
                 .collect()
@@ -1829,6 +1829,26 @@ impl bookie_gpui::source::ResultSource for TwoColumns {
     ) -> Result<bookie_gpui::model::Diff, &'static str> {
         Err("not needed")
     }
+}
+
+#[gpui::test]
+fn column_type_labels_fit_inside_the_grid_header(cx: &mut TestAppContext) {
+    cx.update(text_input::bind_keys);
+    let (_, cx) = cx.add_window_view(|window, cx| {
+        GridView::with_source(std::sync::Arc::new(TwoColumns), Instant::now(), window, cx)
+    });
+    cx.run_until_parked();
+    let header = cx
+        .debug_bounds("column-header-0")
+        .expect("first column header is rendered");
+    let kind = cx
+        .debug_bounds("column-header-kind-0")
+        .expect("first column type is rendered");
+    assert!(kind.origin.y >= header.origin.y, "type label starts inside the header");
+    assert!(
+        kind.origin.y + kind.size.height <= header.origin.y + header.size.height,
+        "type label fits inside the header row"
+    );
 }
 
 #[gpui::test]

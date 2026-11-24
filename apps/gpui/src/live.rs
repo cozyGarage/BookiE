@@ -115,6 +115,12 @@ pub struct LiveSession {
 }
 
 impl LiveSession {
+    pub fn cache_identity(&self) -> String {
+        self.saved
+            .as_ref()
+            .map_or_else(|| format!("{:?}", self.session_id), |(id, _)| id.to_string())
+    }
+
     pub fn supports_table_row_count(&self) -> bool {
         matches!(
             self.driver_id.as_str(),
