@@ -84,30 +84,37 @@ impl GridView {
             transaction.running = true;
         }
         self.status = "Running in the transaction…".into();
-        self.begin_background(
-            Work::Load,
-            cx,
-            move |cancel| {
+        self.invalidate_background();
+        let generation = self.loads.generation;
+        let cancel = CancellationToken::new();
+        self.loads.cancel = cancel.clone();
+        let owner = shared.clone();
+        cx.spawn(async move |this, cx| {
+            let ran = cx.background_executor().spawn(async move {
                 let result = write.run_in_transaction(&shared, &sql, &cancel)?;
                 live.table_from_result(result, &sql, &cancel)
-            },
-            |this, ran| {
-                if let Some(transaction) = this.transaction.as_mut() {
-                    transaction.running = false;
+            }).await;
+            this.update(cx, |this, cx| {
+                let Some(transaction) = this.transaction.as_mut().filter(|t| Arc::ptr_eq(&t.shared, &owner)) else {
+                    return;
+                };
+                transaction.running = false;
+                if ran.is_ok() {
+                    transaction.statements += 1;
+                    transaction.last_activity = Instant::now();
                 }
-                match ran {
-                    Ok(table) => {
-                        if let Some(transaction) = this.transaction.as_mut() {
-                            transaction.statements += 1;
-                            transaction.last_activity = Instant::now();
+                if this.loads.generation == generation {
+                    match ran {
+                        Ok(table) => {
+                            this.add_run(Some(Arc::new(table)));
+                            this.status = "Ran in the transaction (not committed yet)".into();
                         }
-                        this.add_run(Some(Arc::new(table)));
-                        this.status = "Ran in the transaction (not committed yet)".into();
+                        Err(message) => this.status = format!("The statement failed inside the transaction: {message}"),
                     }
-                    Err(message) => this.status = format!("The statement failed inside the transaction: {message}"),
                 }
-            },
-        );
+                cx.notify();
+            }).ok();
+        }).detach();
     }
 
     pub(crate) fn end_transaction(&mut self, commit: bool, cx: &mut Context<Self>) {

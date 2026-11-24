@@ -111,6 +111,29 @@ fn a_read_only_transaction_refuses_the_write_and_changes_nothing(cx: &mut TestAp
     let _ = (view, cx);
 }
 
+#[gpui::test]
+fn replacing_a_load_does_not_leave_a_transaction_statement_running(cx: &mut TestAppContext) {
+    let path = fixture_copy("transaction-replaced-load");
+    let (view, cx) = saving_view(cx, &path);
+    let original = saved_customer(&path, 1);
+    open_transaction(&view, cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.run_in_transaction("UPDATE orders SET customer = 'Temporary' WHERE id = 1".into(), cx);
+            assert!(view.transaction.as_ref().is_some_and(|transaction| transaction.running));
+            view.invalidate_background();
+        })
+    });
+    wait_for(&view, cx, |view| view.transaction.as_ref().is_some_and(|transaction| !transaction.running));
+    view.read_with(cx, |view, _| {
+        assert!(view.transaction.as_ref().is_some_and(|transaction| !transaction.running));
+    });
+    cx.update(|_, cx| view.update(cx, |view, cx| view.end_transaction(false, cx)));
+    wait_for(&view, cx, |view| view.status == "Transaction rolled back");
+    assert_eq!(saved_customer(&path, 1), original);
+    std::fs::remove_file(path).ok();
+}
+
 #[derive(Clone, Copy)]
 enum CommitResult {
     Denied,
