@@ -15,10 +15,9 @@ pub mod size {
     pub const TEXT_SMALL: f32 = 12.0;
     pub const SAVE_PREVIEW_MAX_HEIGHT: f32 = 160.0;
     pub const STRUCTURE_PANEL_MAX_HEIGHT: f32 = 280.0;
-    pub const ROW_DETAIL_HEIGHT: f32 = 280.0;
-    pub const ROW_DETAIL_LABEL_WIDTH: f32 = 180.0;
+    pub const DETAIL_SIDEBAR_WIDTH: f32 = 380.0;
+    pub const DETAIL_SIDEBAR_MIN_WIDTH: f32 = 240.0;
     pub const CHART_COLUMN_WIDTH: f32 = 180.0;
-    pub const FK_PEEK_MAX_HEIGHT: f32 = 220.0;
     pub const GUTTER_MARKER_WIDTH: f32 = 3.0;
     pub const FULL_VALUE_EDITOR_WIDTH: f32 = 760.0;
     pub const APPROVAL_DIALOG_WIDTH: f32 = 560.0;

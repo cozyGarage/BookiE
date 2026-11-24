@@ -180,7 +180,7 @@ impl GridView {
                 if self.row_detail_open {
                     "Hide row details"
                 } else {
-                    "Show this row vertically"
+                    "Show row details"
                 },
                 self.cell_cursor.is_some() && self.compare.is_none(),
             ),

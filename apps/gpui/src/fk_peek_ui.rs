@@ -2,7 +2,7 @@ use bookie_core::Value;
 use gpui::{Context, Div, Stateful, div, prelude::*, px, rgb};
 
 use crate::GridView;
-use bookie_gpui::theme::{Theme, size};
+use bookie_gpui::theme::Theme;
 
 #[derive(Clone, Debug)]
 pub(crate) struct FkPeekState {
@@ -21,8 +21,8 @@ impl GridView {
         Some(
             div()
                 .id("fk-peek-panel")
-                .flex_none()
-                .max_h(px(size::FK_PEEK_MAX_HEIGHT))
+                .flex_1()
+                .min_h_0()
                 .p_2()
                 .border_t_1()
                 .border_color(rgb(theme.border))
@@ -98,18 +98,11 @@ impl GridView {
                         .children(peek.fields.iter().cloned().map(|(col, val)| {
                             div()
                                 .flex()
-                                .items_start()
-                                .gap_2()
+                                .flex_col()
                                 .py_0p5()
                                 .text_xs()
-                                .child(
-                                    div()
-                                        .w(px(size::ROW_DETAIL_LABEL_WIDTH))
-                                        .flex_none()
-                                        .text_color(rgb(theme.muted_foreground))
-                                        .child(col),
-                                )
-                                .child(div().flex_1().text_color(rgb(theme.foreground)).child(val))
+                                .child(div().text_color(rgb(theme.muted_foreground)).child(col))
+                                .child(div().min_w_0().text_color(rgb(theme.foreground)).child(val))
                         })),
                 ),
         )

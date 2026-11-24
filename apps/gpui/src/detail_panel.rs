@@ -1,12 +1,11 @@
 use bookie_gpui::detail::{Detail, detail_of};
 use bookie_gpui::theme::{Theme, size};
-use gpui::{Div, Stateful, div, prelude::*, px, rgb};
+use gpui::{Div, Stateful, div, prelude::*, px, relative, rgb};
 use gpui_component::checkbox::Checkbox;
 
 use bookie_gpui::model::{Cell, ColumnMeta};
 use crate::GridView;
 
-const PANEL_HEIGHT: f32 = 200.0;
 const MONO: &str = "monospace";
 
 impl GridView {
@@ -53,6 +52,36 @@ impl GridView {
         Some(filtered_fields(self.source.columns(), &row, filter, hide_null))
     }
 
+    pub(super) fn detail_sidebar(&self, theme: Theme, cx: &mut gpui::Context<Self>) -> Option<Stateful<Div>> {
+        let panels: Vec<Stateful<Div>> = [
+            self.detail_panel(theme),
+            self.row_detail_panel(theme, cx),
+            self.fk_peek_panel(theme, cx),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
+        if panels.is_empty() {
+            return None;
+        }
+        Some(
+            div()
+                .id("detail-sidebar")
+                .debug_selector(|| "detail-sidebar".into())
+                .flex_none()
+                .w(relative(0.36))
+                .min_w(px(size::DETAIL_SIDEBAR_MIN_WIDTH))
+                .max_w(px(size::DETAIL_SIDEBAR_WIDTH))
+                .flex()
+                .flex_col()
+                .min_h_0()
+                .border_l_1()
+                .border_color(rgb(theme.border))
+                .bg(rgb(theme.muted))
+                .children(panels),
+        )
+    }
+
     pub(super) fn detail_panel(&self, theme: Theme) -> Option<Stateful<Div>> {
         if !self.detail_open {
             return None;
@@ -72,12 +101,10 @@ impl GridView {
         Some(
             div()
                 .id("cell-detail")
-                .h(px(PANEL_HEIGHT))
-                .flex_none()
+                .debug_selector(|| "cell-detail".into())
+                .flex_1()
+                .min_h_0()
                 .p_2()
-                .border_t_1()
-                .border_color(rgb(theme.border))
-                .bg(rgb(theme.muted))
                 .overflow_y_scroll()
                 .child(header)
                 .child(body),
@@ -110,19 +137,17 @@ impl GridView {
                             .id(format!("row-detail-field-{column}"))
                             .debug_selector(move || format!("row-detail-field-{column}"))
                             .flex()
-                            .items_start()
-                            .gap_3()
+                            .flex_col()
                             .py_1()
                             .border_b_1()
                             .border_color(rgb(theme.border))
                             .child(
                                 div()
-                                    .w(px(size::ROW_DETAIL_LABEL_WIDTH))
-                                    .flex_none()
+                                    .text_size(px(size::TEXT_SMALL))
                                     .text_color(rgb(theme.muted_foreground))
                                     .child(name),
                             )
-                            .child(div().flex_1().min_w_0().child(value))
+                            .child(div().min_w_0().child(value))
                     }))
             },
         );
@@ -153,12 +178,9 @@ impl GridView {
             div()
                 .id("row-detail")
                 .debug_selector(|| "row-detail".into())
-                .h(px(size::ROW_DETAIL_HEIGHT))
-                .flex_none()
+                .flex_1()
+                .min_h_0()
                 .p_2()
-                .border_t_1()
-                .border_color(rgb(theme.border))
-                .bg(rgb(theme.muted))
                 .overflow_y_scroll()
                 .child(
                     div()
