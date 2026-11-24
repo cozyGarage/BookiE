@@ -265,7 +265,10 @@ impl GridView {
             (true, true) => format!("{} rows", thousands(self.dataset_count())),
             (false, _) => theme_name.to_string(),
         };
-        let sql = (grid && !compact).then(|| self.source.executed_sql()).flatten().map(str::to_owned);
+        let sql = (grid && !compact)
+            .then(|| self.source.executed_sql())
+            .flatten()
+            .map(str::to_owned);
         let elapsed = grid
             .then(|| self.source.load_elapsed())
             .flatten()
@@ -273,13 +276,30 @@ impl GridView {
         let details = sql.map(|sql| {
             use gpui_component::button::{Button, ButtonVariants};
             let full = sql.clone();
-            div().flex().flex_none().items_center().gap_1()
-                .child(div().id("result-sql-preview").max_w(px(size::STATUS_SQL_PREVIEW_WIDTH))
-                    .overflow_hidden().whitespace_nowrap().text_ellipsis()
-                    .tooltip(move |window, cx| gpui_component::tooltip::Tooltip::new(full.clone()).build(window, cx))
-                    .child(sql.clone()))
-                .child(Button::new("copy-result-sql").ghost().compact().label("Copy SQL")
-                    .on_click(move |_, _, cx| cx.write_to_clipboard(gpui::ClipboardItem::new_string(sql.clone()))))
+            div()
+                .flex()
+                .flex_none()
+                .items_center()
+                .gap_1()
+                .child(
+                    div()
+                        .id("result-sql-preview")
+                        .max_w(px(size::STATUS_SQL_PREVIEW_WIDTH))
+                        .overflow_hidden()
+                        .whitespace_nowrap()
+                        .text_ellipsis()
+                        .tooltip(move |window, cx| {
+                            gpui_component::tooltip::Tooltip::new(full.clone()).build(window, cx)
+                        })
+                        .child(sql.clone()),
+                )
+                .child(
+                    Button::new("copy-result-sql")
+                        .ghost()
+                        .compact()
+                        .label("Copy SQL")
+                        .on_click(move |_, _, cx| cx.write_to_clipboard(gpui::ClipboardItem::new_string(sql.clone()))),
+                )
         });
         let connection_tooltip = self.connection_tooltip();
         let connection = div()
@@ -290,7 +310,9 @@ impl GridView {
             .overflow_hidden()
             .whitespace_nowrap()
             .text_ellipsis()
-            .tooltip(move |window, cx| gpui_component::tooltip::Tooltip::new(connection_tooltip.clone()).build(window, cx))
+            .tooltip(move |window, cx| {
+                gpui_component::tooltip::Tooltip::new(connection_tooltip.clone()).build(window, cx)
+            })
             .child(self.connection_chip_text());
         let full_status = self.status.clone();
         let status = div()
@@ -303,7 +325,9 @@ impl GridView {
             .text_ellipsis()
             .text_color(rgb(theme.foreground))
             .when(!self.status.is_empty(), |status| {
-                status.tooltip(move |window, cx| gpui_component::tooltip::Tooltip::new(full_status.clone()).build(window, cx))
+                status.tooltip(move |window, cx| {
+                    gpui_component::tooltip::Tooltip::new(full_status.clone()).build(window, cx)
+                })
             })
             .child(self.status.clone());
         div()

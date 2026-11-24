@@ -10,7 +10,8 @@ fn a_closed_query_comes_back_from_the_draft_store_when_no_closed_tab_is_left(cx:
         view.update(cx, |view, cx| {
             view.tabs.open_query();
             view.sync_grid_owner();
-            view.sql_input.update(cx, |input, cx| input.set_value("SELECT 'kept' AS draft", window, cx));
+            view.sql_input
+                .update(cx, |input, cx| input.set_value("SELECT 'kept' AS draft", window, cx));
             let index = view.tabs.active;
             view.close_tab(index, cx);
             assert_eq!(view.closed_drafts.as_ref().map(|drafts| drafts.len()), Some(1));
@@ -42,7 +43,9 @@ fn go_to_last_edit_returns_the_caret_to_where_the_query_was_last_changed(cx: &mu
     let edited = view.read_with(cx, |view, cx| view.sql_input.read(cx).cursor_position());
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
-            view.sql_input.update(cx, |input, cx| input.set_cursor_position(Position::new(0, 0), window, cx));
+            view.sql_input.update(cx, |input, cx| {
+                input.set_cursor_position(Position::new(0, 0), window, cx)
+            });
             view.run_palette_id("go-to-last-edit", window, cx);
         })
     });

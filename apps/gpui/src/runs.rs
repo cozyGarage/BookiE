@@ -94,7 +94,11 @@ impl GridView {
             self.status = "Parameters are not supported inside a transaction yet".into();
             return;
         }
-        if self.schema_context.as_deref().is_some_and(|schema| !schema.trim().is_empty()) {
+        if self
+            .schema_context
+            .as_deref()
+            .is_some_and(|schema| !schema.trim().is_empty())
+        {
             self.status =
                 "Clear the schema context before running in a transaction; it is not applied inside a transaction yet"
                     .into();

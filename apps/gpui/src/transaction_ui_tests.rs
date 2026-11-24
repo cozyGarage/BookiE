@@ -54,13 +54,15 @@ fn typed_transaction_end_clears_the_toolbar(cx: &mut TestAppContext) {
 fn a_starting_transaction_blocks_closing_and_a_second_begin(cx: &mut TestAppContext) {
     let path = fixture_copy("transaction-starting");
     let (view, cx) = saving_view(cx, &path);
-    cx.update(|_, cx| view.update(cx, |view, cx| {
-        view.transaction_starting = true;
-        assert!(view.transaction_open());
-        view.begin_transaction(cx);
-        assert!(view.transaction_starting);
-        assert!(view.transaction.is_none());
-    }));
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.transaction_starting = true;
+            assert!(view.transaction_open());
+            view.begin_transaction(cx);
+            assert!(view.transaction_starting);
+            assert!(view.transaction.is_none());
+        })
+    });
     std::fs::remove_file(path).ok();
 }
 
@@ -153,9 +155,17 @@ fn replacing_a_load_does_not_leave_a_transaction_statement_running(cx: &mut Test
             view.invalidate_background();
         })
     });
-    wait_for(&view, cx, |view| view.transaction.as_ref().is_some_and(|transaction| !transaction.running));
+    wait_for(&view, cx, |view| {
+        view.transaction
+            .as_ref()
+            .is_some_and(|transaction| !transaction.running)
+    });
     view.read_with(cx, |view, _| {
-        assert!(view.transaction.as_ref().is_some_and(|transaction| !transaction.running));
+        assert!(
+            view.transaction
+                .as_ref()
+                .is_some_and(|transaction| !transaction.running)
+        );
     });
     cx.update(|_, cx| view.update(cx, |view, cx| view.end_transaction(false, cx)));
     wait_for(&view, cx, |view| view.status == "Transaction rolled back");
@@ -350,7 +360,13 @@ fn a_transaction_statement_is_refused_while_a_schema_context_is_set(cx: &mut Tes
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
             view.schema_context = Some("main".into());
-            view.run_sql_with_mapping("UPDATE orders SET customer = 'Elsewhere' WHERE id = 1".into(), Vec::new(), None, None, cx);
+            view.run_sql_with_mapping(
+                "UPDATE orders SET customer = 'Elsewhere' WHERE id = 1".into(),
+                Vec::new(),
+                None,
+                None,
+                cx,
+            );
             let transaction = view.transaction.as_ref().expect("still open");
             assert!(!transaction.running, "{}", view.status);
             assert_eq!(transaction.statements, 0);

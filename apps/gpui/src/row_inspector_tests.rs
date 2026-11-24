@@ -32,7 +32,10 @@ fn add_notes(path: &std::path::Path) {
         .expect("create the child table");
     write
         .apply(
-            &[("INSERT INTO notes(order_id, body) VALUES (1, 'first'), (1, 'second'), (2, 'other')".into(), Vec::new())],
+            &[(
+                "INSERT INTO notes(order_id, body) VALUES (1, 'first'), (1, 'second'), (2, 'other')".into(),
+                Vec::new(),
+            )],
             &[],
             &cancel,
         )
@@ -74,7 +77,9 @@ fn row_details_switch_to_a_json_view_of_the_row(cx: &mut TestAppContext) {
         cx.notify();
     });
     cx.run_until_parked();
-    let json = view.read_with(cx, |view, _| view.row_detail_json_text()).expect("a row is active");
+    let json = view
+        .read_with(cx, |view, _| view.row_detail_json_text())
+        .expect("a row is active");
     let parsed: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
     assert_eq!(parsed["id"], serde_json::json!(1), "{json}");
     assert!(json.contains('\n'), "pretty printed: {json}");

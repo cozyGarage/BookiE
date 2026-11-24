@@ -11,7 +11,10 @@ impl GridView {
         };
         let draft = ClosedDraft {
             sql: self.sql_input.read(cx).value().to_string(),
-            connection: self.live.as_ref().and_then(|live| live.saved.as_ref().map(|(id, _)| *id)),
+            connection: self
+                .live
+                .as_ref()
+                .and_then(|live| live.saved.as_ref().map(|(id, _)| *id)),
         };
         if let Err(error) = drafts.remember(draft) {
             tracing::warn!(%error, "could not keep the closed query draft");
@@ -30,7 +33,8 @@ impl GridView {
         };
         self.tabs.open_query();
         self.sync_grid_owner();
-        self.sql_input.update(cx, |input, cx| input.set_value(draft.sql, window, cx));
+        self.sql_input
+            .update(cx, |input, cx| input.set_value(draft.sql, window, cx));
         self.status = "Reopened the last closed query".into();
         true
     }

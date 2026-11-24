@@ -3,8 +3,8 @@ use bookie_gpui::theme::{Theme, size};
 use gpui::{Div, Stateful, div, prelude::*, px, relative, rgb};
 use gpui_component::checkbox::Checkbox;
 
-use bookie_gpui::model::{Cell, ColumnMeta};
 use crate::GridView;
+use bookie_gpui::model::{Cell, ColumnMeta};
 
 const MONO: &str = "monospace";
 
@@ -117,58 +117,68 @@ impl GridView {
         }
         let filter = self.row_detail_filter.read(cx).content().to_string();
         let json = self.row_inspector.json;
-        let fields_body = (!json).then(|| self.row_detail_target(&filter, self.row_detail_hide_null).map_or_else(
-            || {
-                div()
-                    .text_color(rgb(theme.muted_foreground))
-                    .child("Select a row to view its values.")
-            },
-            |fields| {
-                if fields.is_empty() {
-                    return div()
-                        .debug_selector(|| "row-detail-empty".into())
+        let fields_body = (!json).then(|| {
+            self.row_detail_target(&filter, self.row_detail_hide_null).map_or_else(
+                || {
+                    div()
                         .text_color(rgb(theme.muted_foreground))
-                        .child("No fields to show. Clear the filter or turn off Hide NULL fields.");
-                }
-                div()
-                    .flex()
-                    .flex_col()
-                    .children(fields.into_iter().map(|(column, name, value)| {
-                        div()
-                            .id(format!("row-detail-field-{column}"))
-                            .debug_selector(move || format!("row-detail-field-{column}"))
-                            .flex()
-                            .flex_col()
-                            .py_1()
-                            .border_b_1()
-                            .border_color(rgb(theme.border))
-                            .child(
-                                div()
-                                    .text_size(px(size::TEXT_SMALL))
-                                    .text_color(rgb(theme.muted_foreground))
-                                    .child(name),
-                            )
-                            .child(div().min_w_0().child(value))
-                    }))
-            },
-        ));
+                        .child("Select a row to view its values.")
+                },
+                |fields| {
+                    if fields.is_empty() {
+                        return div()
+                            .debug_selector(|| "row-detail-empty".into())
+                            .text_color(rgb(theme.muted_foreground))
+                            .child("No fields to show. Clear the filter or turn off Hide NULL fields.");
+                    }
+                    div()
+                        .flex()
+                        .flex_col()
+                        .children(fields.into_iter().map(|(column, name, value)| {
+                            div()
+                                .id(format!("row-detail-field-{column}"))
+                                .debug_selector(move || format!("row-detail-field-{column}"))
+                                .flex()
+                                .flex_col()
+                                .py_1()
+                                .border_b_1()
+                                .border_color(rgb(theme.border))
+                                .child(
+                                    div()
+                                        .text_size(px(size::TEXT_SMALL))
+                                        .text_color(rgb(theme.muted_foreground))
+                                        .child(name),
+                                )
+                                .child(div().min_w_0().child(value))
+                        }))
+                },
+            )
+        });
         let json_body = json.then(|| {
             div()
                 .debug_selector(|| "row-detail-json".into())
                 .font_family(MONO)
                 .whitespace_normal()
-                .child(self.row_detail_json_text().unwrap_or_else(|| "Select a row to view its values.".into()))
+                .child(
+                    self.row_detail_json_text()
+                        .unwrap_or_else(|| "Select a row to view its values.".into()),
+                )
         });
         let view_switch = div()
             .flex()
             .gap_1()
             .pb_2()
             .children([("Fields", false), ("JSON", true)].into_iter().map(|(label, as_json)| {
-                crate::connection_form::choice_chip(("row-detail-view", usize::from(as_json)), label, json == as_json, theme)
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.row_inspector.json = as_json;
-                        cx.notify();
-                    }))
+                crate::connection_form::choice_chip(
+                    ("row-detail-view", usize::from(as_json)),
+                    label,
+                    json == as_json,
+                    theme,
+                )
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    this.row_inspector.json = as_json;
+                    cx.notify();
+                }))
             }));
         let controls = div()
             .tab_group()
@@ -184,15 +194,17 @@ impl GridView {
                     .min_w_0()
                     .child(self.row_detail_filter.clone()),
             )
-            .child(div().debug_selector(|| "row-detail-hide-null".into()).child(
-                Checkbox::new("row-detail-hide-null")
-                    .label("Hide NULL fields")
-                    .checked(self.row_detail_hide_null)
-                    .on_change(cx.listener(|this, checked, _, cx| {
-                        this.row_detail_hide_null = *checked;
-                        cx.notify();
-                    })),
-            ));
+            .child(
+                div().debug_selector(|| "row-detail-hide-null".into()).child(
+                    Checkbox::new("row-detail-hide-null")
+                        .label("Hide NULL fields")
+                        .checked(self.row_detail_hide_null)
+                        .on_change(cx.listener(|this, checked, _, cx| {
+                            this.row_detail_hide_null = *checked;
+                            cx.notify();
+                        })),
+                ),
+            );
         Some(
             div()
                 .id("row-detail")
@@ -251,7 +263,13 @@ impl GridView {
                         .border_b_1()
                         .border_color(rgb(theme.border))
                         .when(clickable, |row| row.cursor_pointer().text_color(rgb(theme.info)))
-                        .child(div().min_w_0().overflow_hidden().text_ellipsis().child(reference.label.clone()))
+                        .child(
+                            div()
+                                .min_w_0()
+                                .overflow_hidden()
+                                .text_ellipsis()
+                                .child(reference.label.clone()),
+                        )
                         .child(
                             div()
                                 .flex_none()
@@ -352,7 +370,14 @@ mod tests {
 
     #[test]
     fn row_details_filter_names_and_display_values_without_losing_typed_nulls() {
-        let columns = [column("tag"), column("tag"), column("empty"), column("optional"), column("payload"), column("unicode")];
+        let columns = [
+            column("tag"),
+            column("tag"),
+            column("empty"),
+            column("optional"),
+            column("payload"),
+            column("unicode"),
+        ];
         let row = [
             Value::Text("first".into()),
             Value::Text("second".into()),

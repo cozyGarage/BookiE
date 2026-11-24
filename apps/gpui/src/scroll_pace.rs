@@ -44,7 +44,10 @@ impl GridView {
         } else {
             String::new()
         };
-        let _ = writeln!(std::io::stdout(), "PROTOTYPE_SCROLL_DONE steps={steps} elapsed_ms={elapsed}{frames}");
+        let _ = writeln!(
+            std::io::stdout(),
+            "PROTOTYPE_SCROLL_DONE steps={steps} elapsed_ms={elapsed}{frames}"
+        );
     }
 
     pub(crate) fn start_autoscroll(&mut self, steps: u32, cx: &mut Context<Self>) {

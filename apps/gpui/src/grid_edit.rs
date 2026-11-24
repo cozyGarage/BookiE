@@ -47,7 +47,9 @@ impl GridView {
     }
 
     pub(crate) fn commit_edit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(editing) = self.cell_edit.active.as_ref() else { return };
+        let Some(editing) = self.cell_edit.active.as_ref() else {
+            return;
+        };
         if self.save.pending.is_some() || self.save.busy {
             self.status = "Save or cancel the review before editing more cells".into();
             self.stop_edit(window, cx);
@@ -68,9 +70,10 @@ impl GridView {
             self.stop_edit(window, cx);
             return;
         }
-        let parsed = editing
-            .binary_mode
-            .map_or_else(|| parse_edit(editing.kind, &text), |mode| crate::binary_mode::parse_edit(&text, mode));
+        let parsed = editing.binary_mode.map_or_else(
+            || parse_edit(editing.kind, &text),
+            |mode| crate::binary_mode::parse_edit(&text, mode),
+        );
         match parsed {
             Ok(cell) => {
                 let key = (editing.row, editing.column);
@@ -107,7 +110,14 @@ impl GridView {
         self.start_edit_with(source, cursor.column, true, window, cx);
     }
 
-    fn start_edit_with(&mut self, row: u64, column: usize, full_editor: bool, window: &mut Window, cx: &mut Context<Self>) {
+    fn start_edit_with(
+        &mut self,
+        row: u64,
+        column: usize,
+        full_editor: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         if self.form_open() {
             self.status = "Finish or cancel the open form before editing cells".into();
             cx.notify();
@@ -151,20 +161,19 @@ impl GridView {
         } else {
             cell.display()
         };
-        let full_value = matches!(cell, Cell::Text(_) | Cell::JsonText(_) | Cell::Json(_) | Cell::Bytes(_) | Cell::Null)
-            && (full_editor
-                || matches!(cell, Cell::JsonText(_) | Cell::Json(_))
-                || text.len() > 512
-                || text.contains(['\n', '\r', '\t', '\0']));
+        let full_value = matches!(
+            cell,
+            Cell::Text(_) | Cell::JsonText(_) | Cell::Json(_) | Cell::Bytes(_) | Cell::Null
+        ) && (full_editor
+            || matches!(cell, Cell::JsonText(_) | Cell::Json(_))
+            || text.len() > 512
+            || text.contains(['\n', '\r', '\t', '\0']));
         if full_value && text.len() > MAX_FULL_VALUE_EDIT_BYTES {
             self.status = "This value exceeds the 1 MiB full-value editor limit".into();
             cx.notify();
             return;
         }
-        let is_numeric = crate::right_aligned(
-            self.source.columns().get(column).map_or(false, |c| c.numeric),
-            &cell,
-        );
+        let is_numeric = crate::right_aligned(self.source.columns().get(column).map_or(false, |c| c.numeric), &cell);
         self.cell_edit.active = Some(Editing {
             row,
             column,
@@ -181,7 +190,11 @@ impl GridView {
         } else {
             self.cell_edit.editor.update(cx, |editor, cx| {
                 editor.set_text_align(
-                    if is_numeric { gpui::TextAlign::Right } else { gpui::TextAlign::Left },
+                    if is_numeric {
+                        gpui::TextAlign::Right
+                    } else {
+                        gpui::TextAlign::Left
+                    },
                     cx,
                 );
                 editor.set_content(&text, cx);
@@ -192,7 +205,8 @@ impl GridView {
     }
 
     pub fn cell_at(&self, row: u64, column: usize) -> Cell {
-        self.cell_edit.edits
+        self.cell_edit
+            .edits
             .get(&(row, column))
             .cloned()
             .unwrap_or_else(|| self.source.row(row).swap_remove(column))

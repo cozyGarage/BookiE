@@ -155,14 +155,17 @@ impl GridView {
         rows.push(choice_row(
             theme,
             "Client",
-            [("ssh-built-in", "Built in", false), ("ssh-openssh", "System OpenSSH", true)]
-                .into_iter()
-                .map(|(id, label, openssh)| {
-                    choice_chip(id, label, ssh.openssh == openssh, theme).on_click(cx.listener(move |this, _, _, cx| {
-                        this.connection_form.ssh.openssh = openssh;
-                        cx.notify();
-                    }))
-                }),
+            [
+                ("ssh-built-in", "Built in", false),
+                ("ssh-openssh", "System OpenSSH", true),
+            ]
+            .into_iter()
+            .map(|(id, label, openssh)| {
+                choice_chip(id, label, ssh.openssh == openssh, theme).on_click(cx.listener(move |this, _, _, cx| {
+                    this.connection_form.ssh.openssh = openssh;
+                    cx.notify();
+                }))
+            }),
         ));
         for (index, jump) in ssh.jumps.iter().enumerate() {
             rows.extend(self.hop_rows(jump, Which::Jump(index), &format!("Jump {}", index + 1), theme, cx));
@@ -174,11 +177,15 @@ impl GridView {
             rows.push(choice_row(
                 theme,
                 "Jump hosts",
-                [choice_chip("ssh-add-jump", "Add jump host", false, theme).on_click(cx.listener(|this, _, _, cx| {
-                    let jump = HopForm::new(cx);
-                    this.connection_form.ssh.jumps.push(jump);
-                    cx.notify();
-                }))],
+                [
+                    choice_chip("ssh-add-jump", "Add jump host", false, theme).on_click(cx.listener(
+                        |this, _, _, cx| {
+                            let jump = HopForm::new(cx);
+                            this.connection_form.ssh.jumps.push(jump);
+                            cx.notify();
+                        },
+                    )),
+                ],
             ));
         }
         rows
@@ -281,7 +288,9 @@ mod tests {
         });
         cx.run_until_parked();
         assert!(cx.debug_bounds("Add jump host").is_some());
-        let openssh = cx.debug_bounds("System OpenSSH").expect("System OpenSSH choice is rendered");
+        let openssh = cx
+            .debug_bounds("System OpenSSH")
+            .expect("System OpenSSH choice is rendered");
         cx.simulate_click(openssh.center(), Default::default());
         cx.run_until_parked();
         view.read_with(cx, |view, _| assert!(view.connection_form.ssh.openssh));

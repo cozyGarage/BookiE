@@ -111,7 +111,7 @@ jobs:
 
   guards:
     name: Workflow and source guards
-    timeout-minutes: 90
+    timeout-minutes: 30
     runs-on: ubuntu-24.04
     needs: [pin-revision, ensure-ci-gtk-image]
     container:
@@ -375,7 +375,6 @@ jobs:
           retention-days: 1
 
   gpui-build:
-    if: github.event_name != 'push'
     name: Build GPUI test bundle
     timeout-minutes: 45
     runs-on: ubuntu-24.04
@@ -414,7 +413,6 @@ jobs:
           retention-days: 1
 
   gpui-tests:
-    if: github.event_name != 'push'
     name: GPUI model and simulated interaction tests
     runs-on: ubuntu-24.04
     needs: [pin-revision, ensure-ci-gtk-image, gpui-build]

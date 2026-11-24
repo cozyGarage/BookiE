@@ -52,9 +52,7 @@ impl ResultSource for FitSource {
 }
 
 #[gpui::test]
-fn multiline_and_large_binary_edits_use_full_value_editor_without_staging_unchanged_values(
-    cx: &mut TestAppContext,
-) {
+fn multiline_and_large_binary_edits_use_full_value_editor_without_staging_unchanged_values(cx: &mut TestAppContext) {
     let source = Arc::new(FitSource {
         columns: vec![
             ColumnMeta {
@@ -487,7 +485,10 @@ fn binary_display_mode_controls_preview_detail_and_edit_without_changing_value_t
 fn an_untouched_multiline_or_large_binary_edit_stages_nothing(cx: &mut TestAppContext) {
     cx.update(text_input::bind_keys);
     let cases = [
-        (b"first line\nsecond line".to_vec(), crate::binary_mode::BinaryMode::Utf8),
+        (
+            b"first line\nsecond line".to_vec(),
+            crate::binary_mode::BinaryMode::Utf8,
+        ),
         (vec![7; 4096], crate::binary_mode::BinaryMode::Hex),
     ];
     for (bytes, mode) in cases {
@@ -497,7 +498,10 @@ fn an_untouched_multiline_or_large_binary_edit_stages_nothing(cx: &mut TestAppCo
         view.update(cx, |view, cx| view.set_binary_mode(1, mode, cx));
         cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(0, 1, window, cx)));
         view.read_with(cx, |view, _| {
-            assert!(view.cell_edit.active.as_ref().is_some_and(|editing| editing.full_value), "{mode:?}");
+            assert!(
+                view.cell_edit.active.as_ref().is_some_and(|editing| editing.full_value),
+                "{mode:?}"
+            );
         });
         cx.update(|window, cx| view.update(cx, |view, cx| view.commit_edit(window, cx)));
         view.read_with(cx, |view, _| {

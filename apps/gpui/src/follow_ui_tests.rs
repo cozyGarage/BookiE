@@ -23,13 +23,24 @@ fn a_follow_collects_messages_ignores_a_stale_run_and_ends_with_its_reason(cx: &
     });
     view.read_with(cx, |view, _| {
         assert_eq!(view.panel.follow.as_ref().map(|state| state.received), Some(2));
-        let lines: Vec<&str> = view.panel.messages.entries().iter().map(|entry| entry.text.as_str()).collect();
-        assert!(lines.contains(&"jobs · one") && lines.contains(&"jobs · two"), "{lines:?}");
+        let lines: Vec<&str> = view
+            .panel
+            .messages
+            .entries()
+            .iter()
+            .map(|entry| entry.text.as_str())
+            .collect();
+        assert!(
+            lines.contains(&"jobs · one") && lines.contains(&"jobs · two"),
+            "{lines:?}"
+        );
         assert!(!lines.iter().any(|line| line.contains("stale")), "{lines:?}");
         assert_eq!(view.status, "Following jobs · 2 messages");
     });
     cx.update(|_, cx| view.update(cx, |view, cx| view.apply_follow_event(FollowEvent::Ended(1, Ok(9)), cx)));
-    view.read_with(cx, |view, _| assert!(view.panel.follow.is_some(), "an end from an older follow is ignored"));
+    view.read_with(cx, |view, _| {
+        assert!(view.panel.follow.is_some(), "an end from an older follow is ignored")
+    });
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
             view.apply_follow_event(FollowEvent::Ended(2, Err("connection closed unexpectedly".into())), cx)
@@ -39,6 +50,10 @@ fn a_follow_collects_messages_ignores_a_stale_run_and_ends_with_its_reason(cx: &
         assert!(view.panel.follow.is_none(), "an ended follow leaves no state behind");
         let last = view.panel.messages.entries().last().expect("a closing line");
         assert_eq!(last.kind, bookie_gpui::messages::MessageKind::Error);
-        assert!(last.text.contains("ended: connection closed unexpectedly"), "{}", last.text);
+        assert!(
+            last.text.contains("ended: connection closed unexpectedly"),
+            "{}",
+            last.text
+        );
     });
 }

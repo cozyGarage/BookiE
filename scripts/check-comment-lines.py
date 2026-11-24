@@ -41,6 +41,10 @@ def problems(counts, baselines):
         allowed = baselines.get(path, 0)
         if count > allowed:
             found.append(f"{path}: {count} comment lines, baseline {allowed}. Express the intent in names and types instead")
+    for path, allowed in sorted(baselines.items()):
+        count = counts.get(path, 0)
+        if count < allowed:
+            found.append(f"{path}: {count} comment lines, baseline {allowed}. Lower the baseline with --update")
     return found
 
 

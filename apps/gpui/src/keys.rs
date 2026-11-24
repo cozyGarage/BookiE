@@ -58,7 +58,9 @@ impl GridView {
             _ => palette_step(self.palette.index, count, key == "down"),
         };
         if count > 0 {
-            self.palette.scroll.scroll_to_item(self.palette.index, ScrollStrategy::Nearest);
+            self.palette
+                .scroll
+                .scroll_to_item(self.palette.index, ScrollStrategy::Nearest);
         }
     }
 
@@ -131,12 +133,6 @@ impl GridView {
         let modifiers = stroke.modifiers;
         let control = control_modifier(modifiers);
         let key = stroke.key.as_str();
-        if self.approval.current.is_some() {
-            if key == "escape" {
-                self.answer_approval(bookie_app_services::approval_prompt::ApprovalOutcome::Deny, cx);
-            }
-            return;
-        }
         if control && modifiers.alt && !modifiers.shift && key == "-" {
             self.go_to_last_edit(window, cx);
             cx.notify();
@@ -155,7 +151,9 @@ impl GridView {
                         _ => palette_step(self.palette.index, count, key == "down"),
                     };
                     if count > 0 {
-                        self.palette.scroll.scroll_to_item(self.palette.index, ScrollStrategy::Nearest);
+                        self.palette
+                            .scroll
+                            .scroll_to_item(self.palette.index, ScrollStrategy::Nearest);
                     }
                     cx.stop_propagation();
                     cx.notify();
@@ -227,7 +225,13 @@ impl GridView {
             Command::CopyCells if self.focus.is_focused(window) => self.copy_selection(false, cx),
             Command::CopyCellsWithHeaders if self.focus.is_focused(window) => self.copy_selection(true, cx),
             Command::CopyCells | Command::CopyCellsWithHeaders => {}
-            Command::PasteCells if self.focus.is_focused(window) && self.tabs.shows_grid_for(&self.catalog.grid_table) && self.cell_edit.active.is_none() => self.paste_cells(cx),
+            Command::PasteCells
+                if self.focus.is_focused(window)
+                    && self.tabs.shows_grid_for(&self.catalog.grid_table)
+                    && self.cell_edit.active.is_none() =>
+            {
+                self.paste_cells(cx)
+            }
             Command::PasteCells => {}
             Command::ToggleSidebar => self.sidebar.open = !self.sidebar.open,
             Command::NewQuery => {

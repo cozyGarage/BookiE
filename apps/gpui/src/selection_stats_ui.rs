@@ -38,19 +38,23 @@ impl GridView {
     pub(crate) fn selection_stats_segment(&self, theme: Theme) -> Option<Div> {
         let items = self.selection_stat_items();
         (!items.is_empty()).then(|| {
-            div().flex().items_center().gap_2().children(items.into_iter().enumerate().map(|(index, (label, value))| {
-                let copied = value.clone();
-                div()
-                    .id(("selection-stat", index))
-                    .debug_selector(move || format!("selection-stat-{label}"))
-                    .cursor_pointer()
-                    .hover(move |style| style.text_color(rgb(theme.foreground)))
-                    .tooltip(move |window, cx| {
-                        gpui_component::tooltip::Tooltip::new(format!("Copy {label}")).build(window, cx)
-                    })
-                    .on_click(move |_, _, cx| cx.write_to_clipboard(ClipboardItem::new_string(copied.clone())))
-                    .child(format!("{label} {value}"))
-            }))
+            div()
+                .flex()
+                .items_center()
+                .gap_2()
+                .children(items.into_iter().enumerate().map(|(index, (label, value))| {
+                    let copied = value.clone();
+                    div()
+                        .id(("selection-stat", index))
+                        .debug_selector(move || format!("selection-stat-{label}"))
+                        .cursor_pointer()
+                        .hover(move |style| style.text_color(rgb(theme.foreground)))
+                        .tooltip(move |window, cx| {
+                            gpui_component::tooltip::Tooltip::new(format!("Copy {label}")).build(window, cx)
+                        })
+                        .on_click(move |_, _, cx| cx.write_to_clipboard(ClipboardItem::new_string(copied.clone())))
+                        .child(format!("{label} {value}"))
+                }))
         })
     }
 

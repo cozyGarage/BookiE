@@ -15,20 +15,29 @@ fn a_recorded_shortcut_replaces_the_old_one_and_names_the_command_it_takes_from(
     let (view, cx) = open(cx);
     record(&view, cx, Command::Filter, "ctrl-g");
     view.read_with(cx, |view, _| {
-        assert_eq!(view.keymap.binding(Command::Filter), Some(&Chord::parse("ctrl-g").unwrap()));
+        assert_eq!(
+            view.keymap.binding(Command::Filter),
+            Some(&Chord::parse("ctrl-g").unwrap())
+        );
         assert_eq!(view.recording_shortcut, None);
     });
 
     record(&view, cx, Command::Filter, "ctrl-b");
     view.read_with(cx, |view, _| {
-        assert_eq!(view.keymap.binding(Command::Filter), Some(&Chord::parse("ctrl-b").unwrap()));
+        assert_eq!(
+            view.keymap.binding(Command::Filter),
+            Some(&Chord::parse("ctrl-b").unwrap())
+        );
         assert_eq!(view.keymap.binding(Command::ToggleSidebar), None);
         assert!(view.status.contains(Command::ToggleSidebar.title()), "{}", view.status);
     });
 
     record(&view, cx, Command::Filter, "escape");
     view.read_with(cx, |view, _| {
-        assert_eq!(view.keymap.binding(Command::Filter), Some(&Chord::parse("ctrl-b").unwrap()));
+        assert_eq!(
+            view.keymap.binding(Command::Filter),
+            Some(&Chord::parse("ctrl-b").unwrap())
+        );
         assert_eq!(view.status, "Shortcut unchanged");
     });
 
@@ -49,6 +58,9 @@ fn the_palette_opens_settings_on_the_keyboard_page(cx: &mut TestAppContext) {
     cx.run_until_parked();
     cx.update(|window, cx| window.render_frame(cx));
     assert!(cx.debug_bounds("settings-card").is_some(), "the settings page is shown");
-    assert!(cx.debug_bounds("shortcut-filter").is_some(), "the keyboard page lists every shortcut");
+    assert!(
+        cx.debug_bounds("shortcut-filter").is_some(),
+        "the keyboard page lists every shortcut"
+    );
     assert!(cx.debug_bounds("shortcut-palette").is_some());
 }
