@@ -38,23 +38,42 @@ pub(super) fn open(cx: &mut TestAppContext) -> (gpui::Entity<GridView>, &mut Vis
 }
 
 #[gpui::test]
-fn opening_the_filter_keeps_grid_controls_on_one_line_at_default_width(cx: &mut TestAppContext) {
+fn find_scope_and_grid_controls_fit_at_default_and_compact_widths(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
-    cx.simulate_resize(gpui::size(gpui::px(1100.0), gpui::px(800.0)));
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
             view.search.filter_visible = true;
             cx.notify();
         })
     });
-    cx.run_until_parked();
-    let pager = cx.debug_bounds("grid-pager").expect("pager is rendered");
-    let actions = cx.debug_bounds("grid-actions").expect("actions are rendered");
-    assert!(
-        pager.origin.y < actions.origin.y + actions.size.height
-            && actions.origin.y < pager.origin.y + pager.size.height,
-        "pager and grid actions should share a row"
-    );
+    for width in [1100.0, 720.0] {
+        cx.simulate_resize(gpui::size(gpui::px(width), gpui::px(800.0)));
+        cx.run_until_parked();
+        let controls = cx.debug_bounds("grid-controls").expect("grid controls are rendered");
+        let field = cx.debug_bounds("grid-find-field").expect("Find field is rendered");
+        assert!(field.size.width >= gpui::px(160.0), "Find scope must fit at {width}px");
+        assert!(
+            field.origin.x >= controls.origin.x
+                && field.origin.x + field.size.width <= controls.origin.x + controls.size.width,
+            "Find field should remain visible without horizontal scrolling at {width}px"
+        );
+        let previous = cx
+            .debug_bounds("find-prev")
+            .expect("previous match control is rendered");
+        assert!(
+            field.origin.x + field.size.width <= previous.origin.x,
+            "Find field should not overlap its navigation control at {width}px"
+        );
+        if width == 1100.0 {
+            let pager = cx.debug_bounds("grid-pager").expect("pager is rendered");
+            let actions = cx.debug_bounds("grid-actions").expect("actions are rendered");
+            assert!(
+                pager.origin.y < actions.origin.y + actions.size.height
+                    && actions.origin.y < pager.origin.y + pager.size.height,
+                "pager and grid actions should share a row"
+            );
+        }
+    }
 }
 
 #[gpui::test]
