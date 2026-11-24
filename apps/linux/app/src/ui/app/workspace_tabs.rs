@@ -612,6 +612,7 @@ impl App {
         };
         let owner = self.detach_tab_session(id);
         if let (Some(owner), Some(descriptor)) = (owner, describe_closed_tab(&mut removed, preview)) {
+            remember_closed_editor(self.closed_drafts.as_ref(), &descriptor, owner);
             push_closed_tab(&self.closed_tabs_stack, owner, descriptor);
         }
         // Drop any close-after-save / window-close-after-save intent
@@ -936,6 +937,27 @@ fn browse_tab_tooltip(schema: Option<&str>, table: &str, label: &str) -> Option<
     if qualified == label { None } else { Some(qualified) }
 }
 
+fn remember_closed_editor(
+    drafts: Option<&bookie_app_services::closed_drafts::ClosedDraftStore>,
+    descriptor: &ClosedTabDescriptor,
+    owner: Uuid,
+) {
+    let (Some(drafts), ClosedTabDescriptor::Editor { query }) = (drafts, descriptor) else {
+        return;
+    };
+    let draft = bookie_app_services::closed_drafts::ClosedDraft {
+        sql: query.clone(),
+        connection: Some(owner),
+    };
+    if let Err(error) = drafts.remember(draft) {
+        tracing::warn!(%error, "could not keep the closed query draft");
+    }
+}
+
+fn stored_draft(drafts: Option<&bookie_app_services::closed_drafts::ClosedDraftStore>) -> Option<String> {
+    drafts.and_then(|drafts| drafts.take_latest()).map(|draft| draft.sql)
+}
+
 fn push_closed_tab(
     stack: &std::rc::Rc<std::cell::RefCell<std::collections::VecDeque<(Uuid, ClosedTabDescriptor)>>>,
     owner: Uuid,
@@ -956,11 +978,17 @@ impl App {
         let descriptor =
             bookie_app_services::window_sessions::take_latest_for(&mut self.closed_tabs_stack.borrow_mut(), front);
         let Some(descriptor) = descriptor else {
-            self.show_toast(&bookie_app_services::tr!("No recently closed tab"));
+            match stored_draft(self.closed_drafts.as_ref()) {
+                Some(sql) => self.append_editor_tab(Some(sql), sender),
+                None => self.show_toast(&bookie_app_services::tr!("No recently closed tab")),
+            }
             return;
         };
         match descriptor {
             ClosedTabDescriptor::Editor { query } => {
+                if let Some(drafts) = &self.closed_drafts {
+                    drafts.forget_latest_if(&query);
+                }
                 let initial = if query.is_empty() { None } else { Some(query) };
                 self.append_editor_tab(initial, sender);
             }
@@ -1120,4 +1148,35 @@ fn rename_shortcut(view: &adw::TabView, sender: &ComponentSender<App>) -> gtk::S
         Some(action),
     ));
     controller
+}
+
+#[cfg(test)]
+mod closed_draft_tests {
+    use super::*;
+    use bookie_app_services::closed_drafts::ClosedDraftStore;
+
+    #[test]
+    fn a_closed_editor_query_is_kept_and_comes_back_when_no_closed_tab_is_left() {
+        let drafts = ClosedDraftStore::memory();
+        let owner = Uuid::new_v4();
+        remember_closed_editor(
+            Some(&drafts),
+            &ClosedTabDescriptor::Editor {
+                query: "SELECT kept".into(),
+            },
+            owner,
+        );
+        remember_closed_editor(
+            Some(&drafts),
+            &ClosedTabDescriptor::Structure {
+                schema: None,
+                table: "t".into(),
+            },
+            owner,
+        );
+        assert_eq!(drafts.len(), 1, "only editor tabs carry a draft");
+        assert_eq!(stored_draft(Some(&drafts)), Some("SELECT kept".into()));
+        assert_eq!(stored_draft(Some(&drafts)), None);
+        assert_eq!(stored_draft(None), None);
+    }
 }

@@ -25,9 +25,9 @@ pub use connection_bundle::{
     BUNDLE_EXCLUDED_FIELDS, BUNDLE_FORMAT, BUNDLE_INCLUDED_FIELDS, BUNDLE_VERSION, BundleBody, BundleConnection,
     BundleError, BundleExport, BundleOrganization, BundleSecrets, BundleSshSecret, BundleSshSecretKind,
     EncryptedBundle, ImportApplyError, ImportDisposition, ImportItem, ImportPlan, MAX_BUNDLE_BYTES,
-    MAX_BUNDLE_CONNECTIONS, MAX_SSH_HOPS as BUNDLE_MAX_SSH_HOPS, ParsedBundle, apply_import_body, bundle_organization,
-    collect_bundle_secrets, export_encrypted, export_plaintext, forget_imported_bundle_secrets,
-    forget_imported_secrets, parse_bundle, plan_import, store_bundle_secrets,
+    MAX_BUNDLE_CONNECTIONS, MAX_SSH_HOPS as BUNDLE_MAX_SSH_HOPS, ParsedBundle, apply_import_body,
+    apply_reviewed_import_body, bundle_organization, collect_bundle_secrets, export_encrypted, export_plaintext,
+    forget_imported_bundle_secrets, forget_imported_secrets, parse_bundle, plan_import, store_bundle_secrets,
 };
 pub use connection_color::{
     CONNECTION_COLORS, CONNECTION_STRIP_CLASSES, connection_color, connection_color_css_class, connection_color_rgb,
@@ -46,10 +46,11 @@ pub use connection_organization::{
     connection_matches_filter, join_group_path, load_organization, parse_group_path, save_organization,
     validate_group_path,
 };
-pub use connection_url::{ParsedConnectionUrl, parse_connection_url};
+pub use connection_url::{ParsedConnectionUrl, connection_url, parse_connection_url};
 pub use connections::{
     SavedConnection, SavedSshAuth, SavedSshConfig, SshClient, apply_import, delete_connection, duplicate_connection,
-    load_connections, restore_connection, save_connections, touch_last_opened, update_connection,
+    load_connections, restore_connection, restore_import_if_unchanged, save_connections, touch_last_opened,
+    update_connection,
 };
 pub use error::{KeyringFailure, StorageError};
 pub use favorites::{

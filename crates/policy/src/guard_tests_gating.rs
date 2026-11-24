@@ -1366,3 +1366,45 @@ async fn an_already_cancelled_control_refuses_the_version_request_before_it_is_a
     assert!(matches!(result, Err(DriverError::Cancelled)), "{result:?}");
     assert!(audit.events.lock().expect("audit events").is_empty());
 }
+
+#[tokio::test]
+async fn table_sizes_is_a_governed_read_with_its_own_audit_record() {
+    let audit = Arc::new(SequenceAuditSink::new(vec![]));
+    let guard = PolicyGuard::new(
+        connection(Arc::new(AtomicUsize::new(0)), Arc::new(AtomicUsize::new(0))),
+        context(
+            Principal::human_gui(),
+            Environment::Local,
+            PolicyConfig::default(),
+            Arc::new(AutoApproveSink),
+            audit.clone(),
+            Arc::new(AuditState::new()),
+        ),
+    );
+
+    let error = guard
+        .table_sizes(Some("public"))
+        .await
+        .expect_err("the stub driver has no table sizes");
+    assert!(matches!(error, DriverError::Unsupported(_)), "{error}");
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
+    let controlled_error = guard
+        .table_sizes_controlled(None, &control)
+        .await
+        .expect_err("the stub driver still has no table sizes through the controlled path");
+    assert!(
+        matches!(controlled_error, DriverError::Unsupported(_)),
+        "{controlled_error}"
+    );
+
+    let expected_hash = audit.hash_sql("TABLE SIZES").await.unwrap().value;
+    let events = audit.events.lock().expect("event lock");
+    assert_eq!(
+        events
+            .iter()
+            .filter(|event| event.decision_rule == "metadata_read" && event.sql_hash == expected_hash)
+            .count(),
+        2,
+        "plain and controlled table size reads must both be audited"
+    );
+}

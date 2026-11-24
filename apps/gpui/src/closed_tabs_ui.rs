@@ -100,9 +100,14 @@ impl GridView {
 
     pub(crate) fn reopen_closed_tab(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(tab) = self.search.closed.take() else {
-            self.status = "There is no closed tab to reopen".into();
+            if !self.restore_query_draft(window, cx) {
+                self.status = "There is no closed tab to reopen".into();
+            }
             return;
         };
+        if tab == Tab::Query {
+            self.forget_reopened_draft(cx);
+        }
         match tab {
             Tab::Table(table) => self.open_table_named(&table, window, cx),
             Tab::Query => self.tabs.open_query(),

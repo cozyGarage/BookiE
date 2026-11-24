@@ -33,7 +33,8 @@ impl GridView {
         self.sidebar
             .collapse_when_narrow(f32::from(window.viewport_size().width));
         let sidebar_width = if self.sidebar.open { self.sidebar.width } else { 0.0 };
-        let grid_width = (f32::from(window.viewport_size().width) - sidebar_width).max(0.0);
+        let content_width = (f32::from(window.viewport_size().width) - sidebar_width).max(0.0);
+        let grid_width = (content_width - self.detail_sidebar_width(content_width)).max(0.0);
         self.sync_table((grid_width - f32::from(Scrollbar::width())).max(0.0), window, cx);
         if self.synced_width != grid_width {
             self.synced_width = grid_width;
@@ -178,10 +179,12 @@ impl GridView {
                 div()
                     .w(px(size::FIND_WIDTH))
                     .flex_none()
+                    .debug_selector(|| "grid-find-field".into())
                     .child(self.search.find.clone()),
             )
             .child(
                 icon_button("find-prev", "chevron-up", "Previous match", false, theme)
+                    .debug_selector(|| "find-prev".into())
                     .on_click(cx.listener(|this, _, _, cx| this.run_find(false, cx))),
             )
             .child(
@@ -458,6 +461,7 @@ impl GridView {
 
 impl Render for GridView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.ensure_row_inspector(cx);
         self.sync_render_state(window, cx);
         if self.approval.current.is_some() && !self.focus.is_focused(window) {
             window.focus(&self.focus, cx);
@@ -534,7 +538,7 @@ impl Render for GridView {
             .children(self.host_key_bar(theme, cx))
             .child(self.main_layout(sidebar, tab_row, bundle_bar, content))
             .children(self.row_menu_overlay())
-            .child(self.status_bar(theme))
+            .child(self.status_bar(theme, f32::from(window.viewport_size().width)))
             .children(palette)
             .children(full_value_editor)
             .children(approval)

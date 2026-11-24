@@ -21,6 +21,7 @@ pub(super) struct SidebarRenderContext {
     pub(super) driver_id: String,
     pub(super) schema_filter_enabled: bool,
     pub(super) column_source: Option<crate::ui::sidebar_columns::ColumnSource>,
+    pub(super) sizes: bookie_app_services::table_sizes::SizeIndex,
 }
 
 pub(super) struct SidebarParts {
@@ -153,7 +154,7 @@ fn bind_list_item(object: &gtk::glib::Object, binding: &SidebarBinding) {
     };
     expander.set_list_row(Some(&tree_row));
     let context = binding.render_context.borrow();
-    let init = super::sidebar_state::row_for(
+    let mut init = super::sidebar_state::row_for(
         &node,
         &binding.collapsed.borrow(),
         !binding.search.text().trim().is_empty(),
@@ -161,6 +162,9 @@ fn bind_list_item(object: &gtk::glib::Object, binding: &SidebarBinding) {
         &context.driver_id,
         context.column_source.clone(),
     );
+    if init.kind == crate::ui::sidebar_row::SidebarObjectKind::Table {
+        init.size = context.sizes.get(init.info.schema.as_deref(), &init.info.name);
+    }
     if let Some(factory) = binding.row_factories.borrow_mut().get_mut(item) {
         let mut guard = factory.guard();
         guard.clear();

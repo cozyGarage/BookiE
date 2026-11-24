@@ -231,9 +231,48 @@ pub(crate) async fn apply_import_body_to(
     path: &Path,
     body: &crate::connection_bundle::BundleBody,
 ) -> Result<crate::connection_bundle::ImportPlan, crate::connection_bundle::ImportApplyError> {
+    apply_import_body_checked(path, body, None).await
+}
+
+pub async fn apply_reviewed_import_body(
+    body: &crate::connection_bundle::BundleBody,
+    reviewed: &crate::connection_bundle::ImportPlan,
+) -> Result<crate::connection_bundle::ImportPlan, crate::connection_bundle::ImportApplyError> {
+    apply_reviewed_import_body_to(&connections_path()?, body, reviewed).await
+}
+
+pub(crate) async fn apply_reviewed_import_body_to(
+    path: &Path,
+    body: &crate::connection_bundle::BundleBody,
+    reviewed: &crate::connection_bundle::ImportPlan,
+) -> Result<crate::connection_bundle::ImportPlan, crate::connection_bundle::ImportApplyError> {
+    apply_import_body_checked(path, body, Some(reviewed)).await
+}
+
+async fn apply_import_body_checked(
+    path: &Path,
+    body: &crate::connection_bundle::BundleBody,
+    reviewed: Option<&crate::connection_bundle::ImportPlan>,
+) -> Result<crate::connection_bundle::ImportPlan, crate::connection_bundle::ImportApplyError> {
     let _guard = lock_path(path).await?;
     let existing = load_from(path).await?;
     let plan = crate::connection_bundle::plan_import(&existing, body)?;
+    if let Some(reviewed) = reviewed {
+        let unchanged = plan.items.len() == reviewed.items.len()
+            && plan.items.iter().zip(&reviewed.items).all(|(current, old)| {
+                let mut connection = current.connection.clone();
+                if current.disposition == crate::connection_bundle::ImportDisposition::Remapped {
+                    connection.id = old.connection.id;
+                }
+                current.source_id == old.source_id
+                    && current.disposition == old.disposition
+                    && current.previous == old.previous
+                    && connection == old.connection
+            });
+        if !unchanged {
+            return Err(crate::connection_bundle::ImportApplyError::StaleReview);
+        }
+    }
     let mut updated = existing.clone();
     for item in &plan.items {
         updated.retain(|saved| saved.id != item.connection.id);
@@ -256,6 +295,14 @@ pub(crate) async fn apply_import_to(
     let _guard = lock_path(path).await?;
     let mut existing = load_from(path).await?;
     for item in &plan.items {
+        let current = existing.iter().find(|saved| saved.id == item.connection.id);
+        if current != item.previous.as_ref() {
+            return Err(StorageError::Schema(
+                "saved connections changed after import review".into(),
+            ));
+        }
+    }
+    for item in &plan.items {
         existing.retain(|saved| saved.id != item.connection.id);
         existing.push(item.connection.clone());
     }
@@ -271,6 +318,32 @@ pub async fn restore_connection(previous: Option<&SavedConnection>, id: Uuid) ->
         Some(connection) => save_connections(std::slice::from_ref(connection)).await,
         None => delete_connection(id).await,
     }
+}
+
+pub async fn restore_import_if_unchanged(
+    previous: Option<&SavedConnection>,
+    applied: &SavedConnection,
+) -> Result<(), StorageError> {
+    restore_import_if_unchanged_to(&connections_path()?, previous, applied).await
+}
+
+async fn restore_import_if_unchanged_to(
+    path: &Path,
+    previous: Option<&SavedConnection>,
+    applied: &SavedConnection,
+) -> Result<(), StorageError> {
+    let _guard = lock_path(path).await?;
+    let mut existing = load_from(path).await?;
+    if existing.iter().find(|saved| saved.id == applied.id) != Some(applied) {
+        return Err(StorageError::Schema(
+            "saved connection changed before import rollback".into(),
+        ));
+    }
+    existing.retain(|saved| saved.id != applied.id);
+    if let Some(previous) = previous {
+        existing.push(previous.clone());
+    }
+    save_to_unlocked(path, &existing).await
 }
 
 async fn delete_from(path: &Path, id: Uuid) -> Result<(), StorageError> {

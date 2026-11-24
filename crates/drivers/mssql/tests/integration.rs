@@ -37,6 +37,8 @@ mod shared_container;
 mod single_precision;
 #[path = "support/sql_variant.rs"]
 mod sql_variant;
+#[path = "support/table_sizes.rs"]
+mod table_sizes;
 #[path = "support/temporal_boundaries.rs"]
 mod temporal_boundaries;
 #[path = "support/transaction_cleanup.rs"]

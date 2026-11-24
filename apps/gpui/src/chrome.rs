@@ -417,12 +417,17 @@ impl GridView {
         theme: Theme,
         cx: &mut Context<Self>,
     ) -> Stateful<Div> {
+        let fields_chevron = |table: &bookie_core::TableInfo| {
+            self.live
+                .is_some()
+                .then(|| self.sidebar.fields.iter().any(|(open, _)| open == table))
+        };
         let (label, chevron) = match &row {
             TreeRow::Connection { open } => (self.catalog.connection.clone(), Some(*open)),
             TreeRow::Database { open } => (self.catalog.database.clone(), Some(*open)),
             TreeRow::Schema { name, open, .. } => (name.clone(), Some(*open)),
-            TreeRow::Table(table) if depth >= 3 => (table.name.clone(), None),
-            TreeRow::Table(table) => (table_label(table), None),
+            TreeRow::Table(table) if depth >= 3 => (table.name.clone(), fields_chevron(table)),
+            TreeRow::Table(table) => (table_label(table), fields_chevron(table)),
         };
         let current = matches!(&row, TreeRow::Table(table) if open_table == &Tab::Table(table.clone()));
         let line = div()
@@ -465,7 +470,20 @@ impl GridView {
                     .whitespace_nowrap()
                     .text_ellipsis()
                     .child(label),
-            );
+            )
+            .children(match &row {
+                TreeRow::Table(table) => self.table_sizes.get(table.schema.as_deref(), &table.name).map(|bytes| {
+                    let name = table.name.clone();
+                    div()
+                        .debug_selector(move || format!("sidebar-size-{name}"))
+                        .flex_none()
+                        .pr_1()
+                        .text_size(px(size::TEXT_SMALL))
+                        .text_color(rgb(theme.muted_foreground))
+                        .child(bookie_app_services::table_sizes::size_label(bytes))
+                }),
+                _ => None,
+            });
         let line = if current {
             line.bg(rgb(theme.accent)).font_weight(gpui::FontWeight::MEDIUM)
         } else {
@@ -829,7 +847,7 @@ fn tab_close_button(index: usize, theme: Theme, cx: &mut Context<GridView>) -> S
         .on_mouse_down(
             gpui::MouseButton::Left,
             cx.listener(move |this, _: &MouseDownEvent, window, cx| {
-                this.close_tab(index);
+                this.close_tab(index, cx);
                 this.show_current_table(window, cx);
                 cx.stop_propagation();
                 cx.notify();
@@ -938,18 +956,22 @@ impl GridView {
                 })
             })
         });
-        let page = gpui_kit::component::setting::SettingPage::new("Appearance")
-            .default_open(true)
-            .group(
-                gpui_kit::component::setting::SettingGroup::new()
-                    .item(
-                        gpui_kit::component::setting::SettingItem::new("Colour theme", colour_theme)
-                            .description(format!("Current: {chosen}")),
-                    )
-                    .item(gpui_kit::component::setting::SettingItem::new("Dark theme", dark_mode)),
-            )
-            .group(mcp)
-            .group(fonts);
+        let keyboard = self.keyboard_group(cx.entity(), theme);
+        let pages = [
+            gpui_kit::component::setting::SettingPage::new("Appearance")
+                .default_open(true)
+                .group(
+                    gpui_kit::component::setting::SettingGroup::new()
+                        .item(
+                            gpui_kit::component::setting::SettingItem::new("Colour theme", colour_theme)
+                                .description(format!("Current: {chosen}")),
+                        )
+                        .item(gpui_kit::component::setting::SettingItem::new("Dark theme", dark_mode)),
+                ),
+            gpui_kit::component::setting::SettingPage::new("Fonts").group(fonts),
+            gpui_kit::component::setting::SettingPage::new("Keyboard").group(keyboard),
+            gpui_kit::component::setting::SettingPage::new("MCP").group(mcp),
+        ];
         div()
             .relative()
             .flex_1()
@@ -993,12 +1015,19 @@ impl GridView {
                     )
                     .child(
                         div().flex_1().min_h_0().child(
-                            gpui_kit::component::setting::Settings::new("bookie-settings")
-                                .header_style(&gpui::StyleRefinement {
-                                    display: Some(gpui::Display::None),
-                                    ..Default::default()
-                                })
-                                .page(page),
+                            gpui_kit::component::setting::Settings::new((
+                                "bookie-settings",
+                                self.settings_page.1 as usize,
+                            ))
+                            .default_selected_index(gpui_kit::component::setting::SelectIndex {
+                                page_ix: self.settings_page.0 as usize,
+                                group_ix: None,
+                            })
+                            .header_style(&gpui::StyleRefinement {
+                                display: Some(gpui::Display::None),
+                                ..Default::default()
+                            })
+                            .pages(pages),
                         ),
                     ),
             )

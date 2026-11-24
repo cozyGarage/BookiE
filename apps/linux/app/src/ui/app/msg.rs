@@ -79,6 +79,7 @@ pub enum AppMsg {
     RowOpStarted,
     ReloadConnections,
     ConnectionsLoaded(Vec<SavedConnection>),
+    TableSizesLoaded(Uuid, bookie_app_services::table_sizes::SizeIndex),
     OpenSaved(SavedConnection),
     FocusWorkingSession(Uuid),
     LoadDatabases,

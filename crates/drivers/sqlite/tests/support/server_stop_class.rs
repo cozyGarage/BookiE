@@ -175,6 +175,10 @@ const BOUNDED: &[(&str, &str)] = &[
         "fetch_view_editability_controlled",
         "SQLite views are not editable; no statement is sent",
     ),
+    (
+        "table_sizes_controlled",
+        "SQLite reports no table sizes; no statement is sent",
+    ),
     ("fetch_enum_labels_controlled", "SQLite has no enum types"),
     (
         "begin_controlled",

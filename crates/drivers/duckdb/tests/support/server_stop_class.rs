@@ -155,6 +155,10 @@ const BOUNDED: &[(&str, &str)] = &[
         "fetch_view_editability_controlled",
         "DuckDB views are not editable; no statement is sent",
     ),
+    (
+        "table_sizes_controlled",
+        "DuckDB reports no table sizes; no statement is sent",
+    ),
     ("fetch_enum_labels_controlled", "no statement is sent"),
     (
         "begin_controlled",

@@ -219,6 +219,16 @@ pub trait Connection: Send + Sync {
     async fn list_databases(&self) -> Result<Vec<String>, DriverError> {
         Err(DriverError::Unsupported("listing databases".into()))
     }
+    async fn table_sizes(&self, _schema: Option<&str>) -> Result<Vec<crate::TableSize>, DriverError> {
+        Err(DriverError::Unsupported("table sizes".into()))
+    }
+    async fn table_sizes_controlled(
+        &self,
+        schema: Option<&str>,
+        control: &OperationControl,
+    ) -> Result<Vec<crate::TableSize>, DriverError> {
+        run_controlled(self.table_sizes(schema), control).await
+    }
     async fn list_databases_controlled(&self, control: &OperationControl) -> Result<Vec<String>, DriverError> {
         run_controlled(self.list_databases(), control).await
     }

@@ -260,6 +260,22 @@ impl Connection for PgConnection {
         stoppable!(self, control, |connection| read_list_databases(&mut connection))
     }
 
+    async fn table_sizes(&self, schema: Option<&str>) -> Result<Vec<bookie_core::TableSize>, DriverError> {
+        let mut connection = self.pool.acquire().await.map_err(map_sqlx_error)?;
+        introspection::read_table_sizes(&mut connection, schema).await
+    }
+
+    async fn table_sizes_controlled(
+        &self,
+        schema: Option<&str>,
+        control: &OperationControl,
+    ) -> Result<Vec<bookie_core::TableSize>, DriverError> {
+        stoppable!(self, control, |connection| introspection::read_table_sizes(
+            &mut connection,
+            schema
+        ))
+    }
+
     async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
         self.list_tables_excluding(&[]).await
     }

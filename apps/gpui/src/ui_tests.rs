@@ -38,23 +38,40 @@ pub(super) fn open(cx: &mut TestAppContext) -> (gpui::Entity<GridView>, &mut Vis
 }
 
 #[gpui::test]
-fn opening_the_filter_keeps_grid_controls_on_one_line_at_default_width(cx: &mut TestAppContext) {
+fn find_scope_and_grid_controls_fit_at_default_and_compact_widths(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
-    cx.simulate_resize(gpui::size(gpui::px(1100.0), gpui::px(800.0)));
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
             view.search.filter_visible = true;
             cx.notify();
         })
     });
-    cx.run_until_parked();
-    let pager = cx.debug_bounds("grid-pager").expect("pager is rendered");
-    let actions = cx.debug_bounds("grid-actions").expect("actions are rendered");
-    assert!(
-        pager.origin.y < actions.origin.y + actions.size.height
-            && actions.origin.y < pager.origin.y + pager.size.height,
-        "pager and grid actions should share a row"
-    );
+    for width in [1100.0, 720.0] {
+        cx.simulate_resize(gpui::size(gpui::px(width), gpui::px(800.0)));
+        cx.run_until_parked();
+        let field = cx.debug_bounds("grid-find-field").expect("Find field is rendered");
+        assert!(field.size.width >= gpui::px(160.0), "Find scope must fit at {width}px");
+        assert!(
+            field.origin.x >= gpui::px(0.0) && field.origin.x + field.size.width <= gpui::px(width),
+            "Find field should remain visible without horizontal scrolling at {width}px"
+        );
+        let previous = cx
+            .debug_bounds("find-prev")
+            .expect("previous match control is rendered");
+        assert!(
+            field.origin.x + field.size.width <= previous.origin.x,
+            "Find field should not overlap its navigation control at {width}px"
+        );
+        if width == 1100.0 {
+            let pager = cx.debug_bounds("grid-pager").expect("pager is rendered");
+            let actions = cx.debug_bounds("grid-actions").expect("actions are rendered");
+            assert!(
+                pager.origin.y < actions.origin.y + actions.size.height
+                    && actions.origin.y < pager.origin.y + pager.size.height,
+                "pager and grid actions should share a row"
+            );
+        }
+    }
 }
 
 #[gpui::test]
@@ -72,6 +89,30 @@ fn a_valid_edit_is_applied_to_the_typed_cell_and_marked(cx: &mut TestAppContext)
         assert!(view.cell_edit.active.is_none());
         assert!(view.status.contains("edited in this view only"));
     });
+}
+
+#[gpui::test]
+fn a_staged_edit_tints_its_cell_and_shows_the_pending_bar_until_discarded(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    assert!(cx.debug_bounds("pending-edits-bar").is_none());
+    assert!(cx.debug_bounds("edited-cell").is_none());
+    cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(2, 3, window, cx)));
+    cx.simulate_keystrokes("ctrl-a");
+    cx.simulate_input("2026-02-03");
+    cx.simulate_keystrokes("enter");
+    assert!(
+        cx.debug_bounds("pending-edits-bar").is_some(),
+        "the bar offers Preview SQL and Discard"
+    );
+    assert!(cx.debug_bounds("edited-cell").is_some(), "the changed cell is tinted");
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.discard_view_edits();
+            cx.notify();
+        })
+    });
+    assert!(cx.debug_bounds("pending-edits-bar").is_none());
+    assert!(cx.debug_bounds("edited-cell").is_none());
 }
 
 #[gpui::test]
@@ -1588,10 +1629,10 @@ fn closing_query_tab_releases_its_runs_and_keeps_table_edits(cx: &mut TestAppCon
     });
     cx.simulate_keystrokes("ctrl-t");
     cx.update(|_, cx| {
-        view.update(cx, |view, _| {
+        view.update(cx, |view, cx| {
             view.add_run(None);
             let index = view.tabs.active;
-            view.close_tab(index);
+            view.close_tab(index, cx);
             assert!(view.run_tabs.slots.is_empty());
             assert!(view.run_tabs.slots.is_empty());
             assert_eq!(view.cell_at(1, 1), Cell::Text("table".into()));
@@ -1614,12 +1655,12 @@ fn closing_an_inactive_query_tab_preserves_the_table(cx: &mut TestAppContext) {
     });
     cx.simulate_keystrokes("ctrl-t");
     cx.update(|_, cx| {
-        view.update(cx, |view, _| {
+        view.update(cx, |view, cx| {
             let query = view.tabs.active;
             view.tabs
                 .open_table(&bookie_gpui::shell::table_info(bookie_gpui::shell::DATA_TABLE));
             view.sync_grid_owner();
-            view.close_tab(query);
+            view.close_tab(query, cx);
             assert!(view.run_tabs.slots.is_empty());
             assert_eq!(view.cell_at(1, 1), Cell::Text("table".into()));
         })
@@ -1636,11 +1677,11 @@ fn closing_query_from_home_restores_the_table_owner(cx: &mut TestAppContext) {
     });
     cx.simulate_keystrokes("ctrl-t");
     cx.update(|_, cx| {
-        view.update(cx, |view, _| {
+        view.update(cx, |view, cx| {
             let query = view.tabs.active;
             view.tabs.open_home();
             view.sync_grid_owner();
-            view.close_tab(query);
+            view.close_tab(query, cx);
             view.tabs
                 .open_table(&bookie_gpui::shell::table_info(bookie_gpui::shell::DATA_TABLE));
             view.sync_grid_owner();
@@ -1663,7 +1704,7 @@ fn closing_query_from_home_discards_its_pending_result(cx: &mut TestAppContext) 
             view.tabs.open_home();
             view.sync_grid_owner();
             assert!(cancel.is_cancelled());
-            view.close_tab(query);
+            view.close_tab(query, cx);
             assert!(view.panel.error_location.is_none());
         })
     });
@@ -1975,7 +2016,7 @@ fn settings_font_inputs_keep_editable_values_and_show_defaults(cx: &mut TestAppC
     let (view, cx) = open(cx);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
-            view.tabs.open_settings();
+            view.open_settings_page(crate::keyboard_settings_ui::SettingsPage::Fonts);
             view.edit_fonts(
                 |fonts| {
                     fonts.ui_family.clear();

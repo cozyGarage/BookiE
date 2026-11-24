@@ -116,6 +116,7 @@ pub enum SqlEditorInput {
     JumpStatement {
         forward: bool,
     },
+    GoToLastEdit,
     ToggleBookmark,
     JumpBookmark {
         forward: bool,

@@ -83,14 +83,40 @@ pub fn detail_of(cell: &Cell) -> Detail {
                 Detail::Json { pretty: text }
             }
         }
-        Cell::JsonText(text) => Detail::Text(text.clone()),
-        other => Detail::Text(other.display()),
+        Cell::JsonText(text) => Detail::Text(bounded_text(text.clone())),
+        other => Detail::Text(bounded_text(other.display())),
     }
+}
+
+fn bounded_text(mut text: String) -> String {
+    if text.len() > MAX_PRETTY_BYTES {
+        let mut end = MAX_PRETTY_BYTES;
+        while !text.is_char_boundary(end) {
+            end -= 1;
+        }
+        text.truncate(end);
+        text.push('…');
+    }
+    text
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn huge_text_is_cut_at_a_character_boundary_for_the_detail_panel() {
+        let text = "é".repeat(MAX_PRETTY_BYTES);
+        let Detail::Text(shown) = detail_of(&Cell::Text(text.into())) else {
+            panic!("text stays text")
+        };
+        assert!(shown.len() <= MAX_PRETTY_BYTES + '…'.len_utf8());
+        assert!(shown.ends_with('…'));
+        let Detail::Text(short) = detail_of(&Cell::Text("short".into())) else {
+            panic!("text stays text")
+        };
+        assert_eq!(short, "short");
+    }
 
     #[test]
     fn retained_json_has_bounded_detail_and_keeps_its_value() {

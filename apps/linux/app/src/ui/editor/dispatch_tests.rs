@@ -495,6 +495,38 @@ fn assert_bookmark_shortcut_scrolls_originating_pane(secondary_pane: bool) {
 
 #[test]
 #[ignore = "requires an isolated GTK display"]
+fn ctrl_alt_minus_returns_the_caret_to_the_last_edit() {
+    let fixture = EditorFixture::new();
+    let buffer = fixture.controller.model().source_view.buffer();
+    let view = fixture.controller.model().source_view.clone();
+    buffer.set_text(
+        &(0..20)
+            .map(|line| format!("SELECT {line};"))
+            .collect::<Vec<_>>()
+            .join("\n"),
+    );
+    buffer.place_cursor(&buffer.iter_at_line(5).unwrap());
+    buffer.insert_at_cursor("/* edited */ ");
+    let edited = buffer.iter_at_mark(&buffer.get_insert()).offset();
+    buffer.place_cursor(&buffer.start_iter());
+
+    let window = gtk::Window::builder()
+        .default_width(900)
+        .default_height(400)
+        .child(fixture.controller.widget())
+        .build();
+    window.present();
+    spin_until(|| view.is_mapped() && view.height() > 0);
+    assert!(view.grab_focus());
+    spin_until(|| view.has_focus());
+
+    fixture.shortcut("<Primary><Alt>minus", false);
+    spin_until(|| buffer.iter_at_mark(&buffer.get_insert()).offset() == edited);
+    window.close();
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
 fn editor_waits_for_its_session_before_accepting_any_run_input() {
     let fixture = EditorFixture::new();
     let (release, wait) = oneshot::channel();
