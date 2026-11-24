@@ -900,6 +900,7 @@ async fn stream_counted_bounded(
         .prepare(sqlx::AssertSqlSafe(sql).into_sql_str())
         .await
         .map_err(map_sqlx_error)?;
+    check_parameter_count(&statement, 0)?;
     let columns = result_columns(connection, statement.columns(), sql).await;
     drop(statement);
     if columns.is_empty() {
@@ -1174,6 +1175,7 @@ async fn params_into_result_bounded(
         .prepare(sqlx::AssertSqlSafe(sql).into_sql_str())
         .await
         .map_err(map_sqlx_error)?;
+    check_parameter_count(&statement, params.len())?;
     let columns = result_columns(connection, statement.columns(), sql).await;
     drop(statement);
     let query = bind_sqlite_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params)?;
@@ -1212,11 +1214,26 @@ async fn execute_on(
     params: &[Value],
 ) -> Result<ExecResult, DriverError> {
     drop_guard::refuse_referenced_drop(connection, sql).await?;
+    let statement = connection.prepare(sqlx::AssertSqlSafe(sql).into_sql_str()).await.map_err(map_sqlx_error)?;
+    check_parameter_count(&statement, params.len())?;
+    drop(statement);
     let query = bind_sqlite_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params)?;
     let result = query.execute(connection).await.map_err(map_sqlx_error)?;
     Ok(ExecResult {
         rows_affected: result.rows_affected(),
     })
+}
+
+fn check_parameter_count(statement: &sqlx::sqlite::SqliteStatement, supplied: usize) -> Result<(), DriverError> {
+    if let Some(sqlx::Either::Right(expected)) = statement.parameters() && supplied < expected {
+        return Err(DriverError::Query {
+            message: format!("SQLite statement expects {expected} parameters, but {supplied} were supplied"),
+            sqlstate: None,
+            position: None,
+            hint: None,
+        });
+    }
+    Ok(())
 }
 
 async fn acquire_controlled(
