@@ -1,7 +1,7 @@
 use bookie_core::DriverError;
 
 pub use crate::tls_failure::TlsFailureKind;
-use crate::tls_failure::classify_tls_failure;
+use crate::tls_failure::{classify_tls_failure, redacted_tls_detail};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DriverFailurePresentation {
@@ -55,7 +55,7 @@ pub fn classify(error: &DriverError) -> DriverFailurePresentation {
         DriverError::AuthFailed => DriverFailurePresentation::AuthFailed,
         DriverError::Tls(detail) => DriverFailurePresentation::Tls {
             detail: detail.clone(),
-            kind: classify_tls_failure(detail),
+            kind: classify_tls_failure(&redacted_tls_detail(detail)),
         },
         DriverError::Query {
             message,

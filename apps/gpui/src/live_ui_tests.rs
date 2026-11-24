@@ -1001,6 +1001,28 @@ fn closing_a_result_with_pending_edits_requires_explicit_discard(cx: &mut TestAp
 }
 
 #[gpui::test]
+fn buffered_result_load_time_is_not_reported_as_time_to_first_row(cx: &mut TestAppContext) {
+    use bookie_gpui::live::{LiveTable, Origin};
+
+    let source = LiveTable::load(
+        &Origin::File(orders_fixture()),
+        &table_info("orders"),
+        100,
+    )
+    .expect("load SQLite fixture");
+    assert!(bookie_gpui::source::ResultSource::load_elapsed(&source).is_some());
+
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.tabs.open_query();
+            view.add_run(Some(std::sync::Arc::new(source)));
+            assert_eq!(view.run_tabs.slots.last().map(|slot| slot.run.first_row_ms), Some(None));
+        });
+    });
+}
+
+#[gpui::test]
 fn a_connection_that_cannot_be_opened_keeps_the_synthetic_view_and_says_why(cx: &mut TestAppContext) {
     use bookie_gpui::live::Origin;
     let (view, cx) = open(cx);

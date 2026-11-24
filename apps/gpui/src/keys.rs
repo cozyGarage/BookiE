@@ -10,7 +10,7 @@ impl GridView {
     pub(super) fn intercept_key(&mut self, event: &KeystrokeEvent, window: &mut Window, cx: &mut Context<Self>) {
         if self.palette.open {
             let key = event.keystroke.key.as_str();
-            if matches!(key, "up" | "down" | "home" | "end" | "pageup" | "pagedown") {
+            if palette_navigation_key(key, event.keystroke.modifiers) {
                 self.move_palette_selection(key, cx);
                 cx.stop_propagation();
                 cx.notify();
@@ -122,7 +122,7 @@ impl GridView {
         let key = stroke.key.as_str();
         if self.palette.open {
             match key {
-                "down" | "up" | "home" | "end" | "pageup" | "pagedown" => {
+                key if palette_navigation_key(key, modifiers) => {
                     let count = self.palette_len(cx);
                     self.palette.index = self.palette.index.min(count.saturating_sub(1));
                     self.palette.index = match key {
@@ -277,6 +277,11 @@ impl GridView {
 
 fn control_modifier(modifiers: gpui::Modifiers) -> bool {
     modifiers.control || (cfg!(target_os = "macos") && modifiers.platform)
+}
+
+fn palette_navigation_key(key: &str, modifiers: gpui::Modifiers) -> bool {
+    matches!(key, "up" | "down" | "home" | "end" | "pageup" | "pagedown")
+        && !(modifiers.shift || modifiers.control || modifiers.alt || modifiers.platform)
 }
 
 fn zoom_key(key: &str) -> Option<Option<i32>> {

@@ -497,6 +497,28 @@ fn the_palette_filters_runs_and_closes_on_escape(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn modified_home_and_end_select_text_in_the_palette_input(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-shift-p");
+    cx.simulate_input("sample");
+    cx.simulate_keystrokes("shift-home");
+    cx.simulate_input("start");
+    view.read_with(cx, |view, cx| {
+        assert_eq!(view.palette.input.read(cx).content(), "start");
+    });
+
+    cx.update(|_, cx| {
+        let input = view.read(cx).palette.input.clone();
+        input.update(cx, |input, cx| input.set_content("sample", cx));
+    });
+    cx.simulate_keystrokes("ctrl-a left shift-end");
+    cx.simulate_input("end");
+    view.read_with(cx, |view, cx| {
+        assert_eq!(view.palette.input.read(cx).content(), "end");
+    });
+}
+
+#[gpui::test]
 fn the_quick_switcher_lists_tables_filters_them_and_opens_the_chosen_one(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.simulate_keystrokes("ctrl-p");

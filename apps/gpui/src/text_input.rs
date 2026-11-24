@@ -30,6 +30,8 @@ actions!(
         SelectAll,
         Home,
         End,
+        SelectHome,
+        SelectEnd,
         Paste,
         Cut,
         Copy,
@@ -86,6 +88,8 @@ pub fn bind_keys(cx: &mut App) {
         KeyBinding::new("ctrl-x", Cut, Some("TextInput")),
         KeyBinding::new("home", Home, Some("TextInput")),
         KeyBinding::new("end", End, Some("TextInput")),
+        KeyBinding::new("shift-home", SelectHome, Some("TextInput")),
+        KeyBinding::new("shift-end", SelectEnd, Some("TextInput")),
         KeyBinding::new("enter", Submit, Some("TextInput")),
         KeyBinding::new("escape", Cancel, Some("TextInput")),
         KeyBinding::new("tab", FocusNext, Some("TextInput")),
@@ -230,6 +234,14 @@ impl TextInput {
 
     fn end(&mut self, _: &End, _: &mut Window, cx: &mut Context<Self>) {
         self.move_to(self.content.len(), cx);
+    }
+
+    fn select_home(&mut self, _: &SelectHome, _: &mut Window, cx: &mut Context<Self>) {
+        self.select_to(0, cx);
+    }
+
+    fn select_end(&mut self, _: &SelectEnd, _: &mut Window, cx: &mut Context<Self>) {
+        self.select_to(self.content.len(), cx);
     }
 
     fn backspace(&mut self, _: &Backspace, window: &mut Window, cx: &mut Context<Self>) {
@@ -659,6 +671,8 @@ impl Render for TextInput {
             .on_action(cx.listener(Self::select_all))
             .on_action(cx.listener(Self::home))
             .on_action(cx.listener(Self::end))
+            .on_action(cx.listener(Self::select_home))
+            .on_action(cx.listener(Self::select_end))
             .on_action(cx.listener(Self::submit))
             .on_action(cx.listener(Self::cancel))
             .on_action(cx.listener(Self::paste))
