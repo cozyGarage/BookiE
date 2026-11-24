@@ -23,8 +23,7 @@ fn settings_show_mcp_controls_and_refuse_start_without_a_saved_connection(cx: &m
     let (view, cx) = crate::ui_tests::open(cx);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
-            view.tabs.open_settings();
-            view.sync_grid_owner();
+            view.open_settings_page(crate::keyboard_settings_ui::SettingsPage::Mcp);
             view.set_mcp_enabled(true, cx);
             cx.notify();
         });

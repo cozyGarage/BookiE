@@ -48,6 +48,14 @@ config = pathlib.Path(sys.argv[sys.argv.index('--config') + 1]).read_text()
 if 'header = "Authorization: token fixture-token"' not in config:
     raise SystemExit('gate authorization header missing from curl config')
 url = sys.argv[-1]
+if url.endswith('/cancel'):
+    with open(os.environ['GATE_TEST_CANCEL_FILE'], 'a') as stream:
+        stream.write(url + '\\n')
+    raise SystemExit(0)
+if 'actions/runs?status=' in url:
+    state = url.split('status=', 1)[1].split('&', 1)[0]
+    print(json.dumps({'workflow_runs': [run for run in data.get('stale_runs', []) if run['status'] == state]}))
+    raise SystemExit(0)
 if '/actions/workflows/ci.yml/dispatches' in url:
     payload = json.loads(sys.argv[sys.argv.index('--data-binary') + 1])
     pathlib.Path(os.environ['GATE_TEST_DISPATCH_FILE']).write_text(json.dumps(payload))
@@ -86,7 +94,7 @@ else:
 
 
 def gate(tasks, initial_status='failure', dispatch_capture=None, target='subject', remote_sha=None,
-         timeout_minutes='1', main_push_runs=None):
+         timeout_minutes='1', main_push_runs=None, stale_runs=None, cancel_capture=None):
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         tools = root / 'bin'
@@ -100,12 +108,15 @@ def gate(tasks, initial_status='failure', dispatch_capture=None, target='subject
                 'initial_status': initial_status, 'tasks': tasks, 'logs': 'compile failed: fixture error'}
         if main_push_runs is not None:
             data['main_push_runs'] = main_push_runs
+        if stale_runs is not None:
+            data['stale_runs'] = stale_runs
         fixture.write_text(json.dumps(data))
         token = root / 'token'
         token.write_text('fixture-token')
         env = dict(os.environ, PATH=str(tools) + os.pathsep + os.environ['PATH'],
                    GATE_TEST_HEAD=HEAD, GATE_TEST_FIXTURE=str(fixture), FORGEJO_TOKEN_FILE=str(token),
                    GATE_TEST_DISPATCH_FILE=str(root / 'dispatch.json'),
+                   GATE_TEST_CANCEL_FILE=str(root / 'cancelled.txt'),
                    FORGEJO_GATE_LOCK=str(root / 'gate.lock'), FORGEJO_GATE_LOCK_DIR=str(root / 'locks'),
                    FORGEJO_GATE_TIMEOUT_MINUTES=timeout_minutes)
         if remote_sha is not None:
@@ -116,6 +127,8 @@ def gate(tasks, initial_status='failure', dispatch_capture=None, target='subject
             dispatch_capture.update(json.loads((root / 'dispatch.json').read_text()))
         if dispatch_capture is not None:
             dispatch_capture['dispatched'] = (root / 'dispatch.json').exists()
+        if cancel_capture is not None and (root / 'cancelled.txt').exists():
+            cancel_capture.extend((root / 'cancelled.txt').read_text().split())
         return result
 
 
@@ -145,6 +158,33 @@ class ForgejoGateTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(dispatch, {'ref': 'subject', 'inputs': {'ref': HEAD}, 'dispatched': True})
         self.assertIn('passed for ' + HEAD, result.stdout)
+
+    def test_gate_cancels_earlier_runs_of_the_same_branch_only(self):
+        def run(run_id, branch, sha, state):
+            return {'id': run_id, 'prettyref': branch, 'commit_sha': sha, 'workflow_id': 'ci.yml', 'status': state}
+        cancelled = []
+        result = gate([], initial_status='success', cancel_capture=cancelled, stale_runs=[
+            run(700, 'subject', 'b' * 40, 'running'),
+            run(701, 'subject', 'c' * 40, 'waiting'),
+            run(702, 'other-branch', 'b' * 40, 'running'),
+            run(703, 'subject', HEAD, 'running'),
+        ])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual([url.rsplit('/', 2)[-2] for url in cancelled], ['700', '701'])
+        self.assertIn('cancelled the superseded gate run (API id 700) on subject', result.stdout)
+
+    def test_gate_never_cancels_runs_for_forgejo_main(self):
+        cancelled = []
+        gate([], target='main', remote_sha=HEAD, cancel_capture=cancelled, stale_runs=[
+            {'id': 700, 'prettyref': 'main', 'commit_sha': 'b' * 40, 'workflow_id': 'ci.yml', 'status': 'running'}])
+        self.assertEqual(cancelled, [])
+
+    def test_gate_without_earlier_runs_cancels_nothing_and_still_dispatches(self):
+        cancelled, dispatch = [], {}
+        result = gate([], initial_status='success', cancel_capture=cancelled, dispatch_capture=dispatch)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(cancelled, [])
+        self.assertTrue(dispatch['dispatched'])
 
     def test_gate_refuses_to_move_forgejo_main(self):
         result = gate([], target='main', remote_sha='b' * 40)

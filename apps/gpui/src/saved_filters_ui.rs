@@ -139,7 +139,8 @@ impl GridView {
         };
         let columns = self.source.columns();
         let Some(index) = columns.iter().position(|meta| meta.name == column) else {
-            self.status = format!("The filter \u{201c}{name}\u{201d} names the column {column}, which this table does not have");
+            self.status =
+                format!("The filter \u{201c}{name}\u{201d} names the column {column}, which this table does not have");
             return;
         };
         if text.len() > 256 {
@@ -148,7 +149,9 @@ impl GridView {
         }
         let line = format!("{column} {} {text}", operator_word(op));
         self.search.filter_visible = true;
-        self.search.filter.update(cx, |input, cx| input.set_content_quiet(&line, cx));
+        self.search
+            .filter
+            .update(cx, |input, cx| input.set_content_quiet(&line, cx));
         let predicate = Predicate {
             column: index,
             op: model_op(op),

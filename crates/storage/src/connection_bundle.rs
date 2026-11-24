@@ -107,6 +107,8 @@ pub enum BundleError {
 
 #[derive(Debug, thiserror::Error)]
 pub enum ImportApplyError {
+    #[error("saved connections changed after review; choose the file again")]
+    StaleReview,
     #[error(transparent)]
     Bundle(#[from] BundleError),
     #[error(transparent)]
@@ -117,6 +119,13 @@ pub enum ImportApplyError {
 
 pub async fn apply_import_body(body: &BundleBody) -> Result<ImportPlan, ImportApplyError> {
     crate::connections::apply_import_body(body).await
+}
+
+pub async fn apply_reviewed_import_body(
+    body: &BundleBody,
+    reviewed: &ImportPlan,
+) -> Result<ImportPlan, ImportApplyError> {
+    crate::connections::apply_reviewed_import_body(body, reviewed).await
 }
 
 pub(crate) async fn store_import_secrets(plan: &ImportPlan, secrets: &[BundleSecrets]) -> Result<(), StorageError> {

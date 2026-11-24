@@ -176,7 +176,12 @@ async fn store_bundle_secrets_with<S: BundleSecretStore>(
         }
         touched.push((key.clone(), old_value.clone()));
         if let Err(error) = store.store(target, key, value, label).await {
-            restore(store, target, &touched, label).await;
+            if let Err(restore) = restore(store, target, &touched, label).await {
+                return Err(StorageError::CredentialRollback {
+                    store: Box::new(error),
+                    restore: Box::new(restore),
+                });
+            }
             return Err(error);
         }
     }
@@ -215,16 +220,20 @@ async fn restore<S: BundleSecretStore>(
     target: Uuid,
     touched: &[(SecretKey, Option<SecretString>)],
     label: &str,
-) {
+) -> Result<(), StorageError> {
+    let mut failure = None;
     for (key, old_value) in touched.iter().rev() {
         let outcome = match old_value {
             Some(value) => store.store(target, key, value, label).await,
             None => store.delete(target, key).await,
         };
-        if let Err(error) = outcome {
-            tracing::warn!(error = %error, "restoring a partially written bundle credential failed");
+        if let Err(error) = outcome
+            && failure.is_none()
+        {
+            failure = Some(error);
         }
     }
+    failure.map_or(Ok(()), Err)
 }
 
 async fn restore_import<S: BundleSecretStore>(
@@ -315,6 +324,34 @@ mod tests {
             self.values.lock().unwrap().remove(key);
             Ok(())
         }
+    }
+
+    #[tokio::test]
+    async fn a_failed_single_bundle_credential_rollback_is_reported() {
+        let target = Uuid::new_v4();
+        let hop_id = Uuid::new_v4();
+        let store = FakeStore::default();
+        store.seed(SecretKey::DatabasePassword, "old");
+        store.seed(
+            SecretKey::SshHopPassword {
+                hop_id,
+                credential_revision: 0,
+            },
+            "old-hop",
+        );
+        store.fail_calls.lock().unwrap().insert(2);
+        let mut carried = BundleSecrets::new(target, Some(SecretString::new("new".into())), None, None);
+        carried.set_ssh_hop_secrets(vec![BundleSshSecret::new(
+            hop_id,
+            0,
+            BundleSshSecretKind::Password,
+            SecretString::new("new-hop".into()),
+        )]);
+
+        assert!(matches!(
+            store_bundle_secrets_with(&store, target, &carried, "bundle-test", true).await,
+            Err(StorageError::CredentialRollback { .. })
+        ));
     }
 
     #[tokio::test]

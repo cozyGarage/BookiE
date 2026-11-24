@@ -19,7 +19,6 @@ on:
       - "apps/gpui/Cargo.lock"
       - "docs/decisions/0052-gpui-is-the-cross-platform-frontend.md"
       - "docs/platforms.md"
-      - "changelog.d/gpui-linux-preview.added.md"
       - "scripts/tests/test_release_publication.py"
       - "scripts/validate-release-recovery.py"
       - "scripts/validate_release_inputs.py"

@@ -60,7 +60,7 @@ index 3c2f516..fea836f 100644
                  next_statement_id: StatementId::NAMED_START,
                  cache_statement: StatementCache::new(options.statement_cache_capacity),
 diff --git a/src/connection/executor.rs b/src/connection/executor.rs
-index 387160a..ba5a40d 100644
+index 387160a..0a9b222 100644
 --- a/src/connection/executor.rs
 +++ b/src/connection/executor.rs
 @@ -95,7 +95,7 @@ async fn prepare(
@@ -80,7 +80,32 @@ index 387160a..ba5a40d 100644
      ) -> Result<(PgValueFormat, Arc<PgStatementMetadata>), Error> {
          let metadata: Arc<PgStatementMetadata>;
  
-@@ -257,7 +258,7 @@ impl PgConnection {
+@@ -247,9 +248,24 @@ impl PgConnection {
+             // patch holes created during encoding
+             arguments.apply_patches(self, &metadata.parameters).await?;
+ 
++            // Transaction poolers may assign a different backend after the prepare Sync.
++            let param_types = if statement == StatementId::UNNAMED {
++                Some(self.resolve_types(&arguments.types).await?)
++            } else {
++                None
++            };
++
+             // consume messages till `ReadyForQuery` before bind and execute
+             self.wait_until_ready().await?;
+ 
++            if let Some(param_types) = &param_types {
++                self.inner.stream.write_msg(Parse {
++                    param_types,
++                    query: sql,
++                    statement,
++                })?;
++            }
++
+             // bind to attach the arguments to the statement and create a portal
+             self.inner.stream.write_msg(Bind {
+                 portal: PortalId::UNNAMED,
+@@ -257,7 +273,7 @@ impl PgConnection {
                  formats: &[PgValueFormat::Binary],
                  num_params,
                  params: &arguments.buffer,
@@ -89,7 +114,7 @@ index 387160a..ba5a40d 100644
              })?;
  
              // executes the portal up to the passed limit
-@@ -289,7 +290,7 @@ impl PgConnection {
+@@ -289,7 +305,7 @@ impl PgConnection {
              self.write_sync();
  
              // prepared statements are binary
@@ -98,7 +123,7 @@ index 387160a..ba5a40d 100644
          } else {
              // Query will trigger a ReadyForQuery
              self.queue_simple_query(sql)?;
-@@ -315,12 +316,24 @@ impl PgConnection {
+@@ -315,12 +331,24 @@ impl PgConnection {
      ) -> Result<impl Stream<Item = Result<Either<PgQueryResult, PgRow>, Error>> + 'e, Error> {
          let mut logger = QueryLogger::new(query, self.inner.log_settings.clone());
          let sql = logger.sql().as_str();
@@ -124,7 +149,7 @@ index 387160a..ba5a40d 100644
              .await?;
  
          let mut message = match self.inner.stream.recv().await {
-@@ -347,6 +360,7 @@ impl PgConnection {
+@@ -347,6 +375,7 @@ impl PgConnection {
                              arguments.as_mut(),
                              persistent,
                              metadata_opt.clone(),

@@ -74,7 +74,9 @@ impl McpState {
         let secret_view = view;
         let secret = SettingField::render(move |_, _, cx| {
             let plaintext = secret_view.read(cx).mcp.plaintext.clone();
-            let Some(plaintext) = plaintext else { return div().id("mcp-issued-token") };
+            let Some(plaintext) = plaintext else {
+                return div().id("mcp-issued-token");
+            };
             let hide_view = secret_view.clone();
             div()
                 .id("mcp-issued-token")
@@ -83,21 +85,22 @@ impl McpState {
                 .gap_2()
                 .child(div().child(plaintext))
                 .child(
-                    ghost("mcp-hide-issued-token", "Hide", Theme::current(cx))
-                        .on_click(move |_, _, cx| {
-                            hide_view.update(cx, |this, cx| {
-                                this.mcp.plaintext = None;
-                                cx.notify();
-                            });
-                        }),
+                    ghost("mcp-hide-issued-token", "Hide", Theme::current(cx)).on_click(move |_, _, cx| {
+                        hide_view.update(cx, |this, cx| {
+                            this.mcp.plaintext = None;
+                            cx.notify();
+                        });
+                    }),
                 )
         });
-        let mut group = SettingGroup::new().title("MCP")
+        let mut group = SettingGroup::new()
             .item(SettingItem::new("MCP server", enabled).description("Use BookiE's governed local MCP endpoint."))
             .item(
                 SettingItem::new("Issue token", actions)
                     .layout(gpui::Axis::Vertical)
-                    .description("Tokens are limited to the active saved connection; plaintext is shown once."),
+                    .description(
+                        "Tokens work only with the active saved connection, and each token's text is shown once.",
+                    ),
             );
         if self.plaintext.is_some() {
             group = group.item(SettingItem::new("Issued token", secret));
@@ -157,11 +160,15 @@ fn token_row(view: Entity<GridView>, bridge: Arc<McpBridge>, token: McpToken, th
             let view = view.clone();
             let bridge = bridge.clone();
             row.child(
-                ghost(gpui::ElementId::Name(format!("mcp-revoke-{id}").into()), "Revoke", theme)
-                    .on_click(move |_, _, cx| {
-                        let bridge = bridge.clone();
-                        view.update(cx, |this, cx| this.revoke_mcp_token(bridge, id, cx));
-                    }),
+                ghost(
+                    gpui::ElementId::Name(format!("mcp-revoke-{id}").into()),
+                    "Revoke",
+                    theme,
+                )
+                .on_click(move |_, _, cx| {
+                    let bridge = bridge.clone();
+                    view.update(cx, |this, cx| this.revoke_mcp_token(bridge, id, cx));
+                }),
             )
         })
 }

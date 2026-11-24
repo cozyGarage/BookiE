@@ -132,10 +132,9 @@ fn a_table_row_can_be_shown_vertically_and_counted_exactly(cx: &mut TestAppConte
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
             view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 0 });
-            view.cell_edit.edits.insert(
-                (0, 1),
-                bookie_gpui::model::Cell::Text("edited Ada".into()),
-            );
+            view.cell_edit
+                .edits
+                .insert((0, 1), bookie_gpui::model::Cell::Text("edited Ada".into()));
             view.run_palette_id("show-row-vertically", window, cx);
             assert!(view.row_detail_open);
             let fields = view.row_detail_target("", false).expect("selected row details");
@@ -163,8 +162,14 @@ fn a_table_row_can_be_shown_vertically_and_counted_exactly(cx: &mut TestAppConte
     });
     cx.run_until_parked();
     cx.update(|window, cx| window.render_frame(cx));
-    assert!(cx.debug_bounds("row-detail-field-1").is_some(), "staged fixture value matches");
-    assert!(cx.debug_bounds("row-detail-field-0").is_none(), "unmatched fixture field is hidden");
+    assert!(
+        cx.debug_bounds("row-detail-field-1").is_some(),
+        "staged fixture value matches"
+    );
+    assert!(
+        cx.debug_bounds("row-detail-field-0").is_none(),
+        "unmatched fixture field is hidden"
+    );
     cx.executor().advance_clock(std::time::Duration::from_secs(1));
     cx.run_until_parked();
     view.read_with(cx, |view, _| {
@@ -191,7 +196,10 @@ fn cell_and_row_details_open_in_a_sidebar_right_of_the_grid(cx: &mut TestAppCont
         let panel = cx
             .debug_bounds(if row_detail { "row-detail" } else { "cell-detail" })
             .expect("detail panel is rendered");
-        assert!(sidebar.origin.x >= grid.origin.x + grid.size.width, "{row_detail}: {sidebar:?} {grid:?}");
+        assert!(
+            sidebar.origin.x >= grid.origin.x + grid.size.width,
+            "{row_detail}: {sidebar:?} {grid:?}"
+        );
         assert!(sidebar.origin.y <= grid.origin.y, "{row_detail}: {sidebar:?} {grid:?}");
         assert!(
             sidebar.origin.y + sidebar.size.height >= grid.origin.y + grid.size.height,
@@ -223,20 +231,29 @@ fn row_inspector_filter_and_hide_null_are_keyboard_accessible_and_follow_the_act
     cx.update(|window, cx| window.render_frame(cx));
     view.read_with(cx, |view, _| {
         assert!(view.row_detail_open);
-        assert_eq!(view.tabs.current(), &bookie_gpui::shell::Tab::Table(view.catalog.grid_table.clone()));
+        assert_eq!(
+            view.tabs.current(),
+            &bookie_gpui::shell::Tab::Table(view.catalog.grid_table.clone())
+        );
     });
     cx.update(|window, cx| window.render_frame(cx));
     let wide_panel = cx.debug_bounds("row-detail").expect("row inspector is rendered");
     let wide_filter = cx.debug_bounds("row-detail-filter").expect("field filter is rendered");
-    let wide_hide_null = cx.debug_bounds("row-detail-hide-null").expect("NULL toggle is rendered");
+    let wide_hide_null = cx
+        .debug_bounds("row-detail-hide-null")
+        .expect("NULL toggle is rendered");
     assert!(wide_panel.size.width > gpui::px(0.0));
     assert!(wide_filter.origin.x + wide_filter.size.width <= wide_hide_null.origin.x);
     cx.simulate_resize(gpui::size(gpui::px(500.0), gpui::px(520.0)));
     cx.run_until_parked();
     cx.update(|window, cx| window.render_frame(cx));
-    let panel = cx.debug_bounds("row-detail").expect("row inspector remains rendered when narrow");
+    let panel = cx
+        .debug_bounds("row-detail")
+        .expect("row inspector remains rendered when narrow");
     let filter_bounds = cx.debug_bounds("row-detail-filter").expect("field filter is rendered");
-    let hide_null_bounds = cx.debug_bounds("row-detail-hide-null").expect("NULL toggle is rendered");
+    let hide_null_bounds = cx
+        .debug_bounds("row-detail-hide-null")
+        .expect("NULL toggle is rendered");
     assert!(filter_bounds.origin.x >= panel.origin.x);
     assert!(filter_bounds.origin.x + filter_bounds.size.width <= hide_null_bounds.origin.x);
     assert!(hide_null_bounds.origin.x + hide_null_bounds.size.width <= panel.origin.x + panel.size.width);
@@ -247,12 +264,17 @@ fn row_inspector_filter_and_hide_null_are_keyboard_accessible_and_follow_the_act
     cx.simulate_input("Sample 0");
     cx.run_until_parked();
     cx.update(|window, cx| window.render_frame(cx));
-    assert!(cx.debug_bounds("row-detail-field-1").is_some(), "matching value is rendered");
-    assert!(cx.debug_bounds("row-detail-field-0").is_none(), "non-matching field is hidden");
+    assert!(
+        cx.debug_bounds("row-detail-field-1").is_some(),
+        "matching value is rendered"
+    );
+    assert!(
+        cx.debug_bounds("row-detail-field-0").is_none(),
+        "non-matching field is hidden"
+    );
     cx.update(|window, cx| window.focus_next(cx));
-    let keystroke = cx.update(|_, cx| {
-        gpui::Keystroke::parse_with_os("space", cx.platform_info().os).expect("space keystroke")
-    });
+    let keystroke =
+        cx.update(|_, cx| gpui::Keystroke::parse_with_os("space", cx.platform_info().os).expect("space keystroke"));
     cx.simulate_event(gpui::KeyDownEvent {
         keystroke: keystroke.clone(),
         is_held: false,
@@ -263,11 +285,12 @@ fn row_inspector_filter_and_hide_null_are_keyboard_accessible_and_follow_the_act
     view.read_with(cx, |view, _| {
         assert!(view.row_detail_hide_null);
         assert_eq!(view.row_detail_target("sample 0", true).expect("selected row").len(), 1);
-        assert!(view
-            .row_detail_target("", true)
-            .expect("selected row")
-            .iter()
-            .all(|(column, _, _)| *column != 2));
+        assert!(
+            view.row_detail_target("", true)
+                .expect("selected row")
+                .iter()
+                .all(|(column, _, _)| *column != 2)
+        );
     });
     view.update(cx, |view, cx| {
         view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 1, column: 0 });
@@ -275,15 +298,26 @@ fn row_inspector_filter_and_hide_null_are_keyboard_accessible_and_follow_the_act
     });
     cx.run_until_parked();
     cx.update(|window, cx| window.render_frame(cx));
-    assert!(cx.debug_bounds("row-detail-field-1").is_none(), "filter follows the active row");
-    assert!(cx.debug_bounds("row-detail-empty").is_some(), "empty matches are explained");
+    assert!(
+        cx.debug_bounds("row-detail-field-1").is_none(),
+        "filter follows the active row"
+    );
+    assert!(
+        cx.debug_bounds("row-detail-empty").is_some(),
+        "empty matches are explained"
+    );
     view.read_with(cx, |view, _| {
-        assert!(view.row_detail_target("sample 0", true).expect("selected row").is_empty());
-        assert!(view
-            .row_detail_target("", false)
-            .expect("selected row")
-            .iter()
-            .any(|(column, _, value)| *column == 2 && value == "FALSE"));
+        assert!(
+            view.row_detail_target("sample 0", true)
+                .expect("selected row")
+                .is_empty()
+        );
+        assert!(
+            view.row_detail_target("", false)
+                .expect("selected row")
+                .iter()
+                .any(|(column, _, value)| *column == 2 && value == "FALSE")
+        );
     });
 }
 
@@ -309,15 +343,16 @@ fn a_selected_table_row_copies_as_tsv_csv_json_and_insert(cx: &mut TestAppContex
         view
     });
     view.update(cx, |view, _| view.click_row(0, false));
-    let copied = |cx: &mut gpui::VisualTestContext| {
-        cx.update(|_, cx| cx.read_from_clipboard().and_then(|item| item.text()))
-    };
+    let copied =
+        |cx: &mut gpui::VisualTestContext| cx.update(|_, cx| cx.read_from_clipboard().and_then(|item| item.text()));
 
     cx.update(|_, cx| view.update(cx, |view, cx| view.copy_selection(false, cx)));
     assert!(copied(cx).is_some_and(|text| text.starts_with("1\tAda\t10.5\t1\tfirst")));
     cx.update(|_, cx| view.update(cx, |view, cx| view.copy_selection_as(CopyFormat::Csv, cx)));
     assert!(copied(cx).is_some_and(|text| {
-        text.lines().nth(1).is_some_and(|row| row.starts_with("1,Ada,10.5,1,first"))
+        text.lines()
+            .nth(1)
+            .is_some_and(|row| row.starts_with("1,Ada,10.5,1,first"))
     }));
     cx.update(|_, cx| view.update(cx, |view, cx| view.copy_selection_as(CopyFormat::Json, cx)));
     let json: serde_json::Value = serde_json::from_str(&copied(cx).expect("JSON clipboard")).expect("valid JSON");
@@ -625,7 +660,11 @@ fn every_statement_is_logged_and_a_refused_one_opens_the_messages_view(cx: &mut 
             "{}",
             entries[1].text
         );
-        assert_eq!(view.run_tabs.slots.len(), 2, "a refused statement has a failed result tab");
+        assert_eq!(
+            view.run_tabs.slots.len(),
+            2,
+            "a refused statement has a failed result tab"
+        );
         assert!(view.run_tabs.slots[1].failure.is_some());
         assert_eq!(view.source.total(), 0);
     });
@@ -646,6 +685,8 @@ fn connecting_from_the_home_page_swaps_the_synthetic_grid_for_the_first_table(cx
     view.read_with(cx, |view, _| {
         assert!(view.live.is_some(), "{}", view.status);
         assert_eq!(view.catalog.tables, [table_info("customers"), table_info("orders")]);
+        assert_eq!(view.catalog.connection, "sqlite · orders.sqlite");
+        assert_eq!(view.catalog.database, "main");
         assert_eq!(view.catalog.grid_table, table_info("customers"));
         assert_eq!(view.source.total(), 2);
         assert_eq!(
@@ -767,7 +808,8 @@ fn connecting_does_not_discard_an_active_cell_editor(cx: &mut TestAppContext) {
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
             view.start_edit(0, 1, window, cx);
-            view.cell_edit.editor
+            view.cell_edit
+                .editor
                 .update(cx, |editor, cx| editor.set_content("draft text", cx));
             view.connect(bookie_gpui::live::Origin::File("/missing/bookie.db".into()), cx);
         });
@@ -789,7 +831,8 @@ fn a_late_connection_does_not_replace_a_cell_editor(cx: &mut TestAppContext) {
         view.update(cx, |view, cx| {
             view.connect(origin, cx);
             view.start_edit(0, 1, window, cx);
-            view.cell_edit.editor
+            view.cell_edit
+                .editor
                 .update(cx, |editor, cx| editor.set_content("late draft", cx));
         });
     });
@@ -810,9 +853,11 @@ fn connecting_keeps_view_edits_until_the_user_discards_them(cx: &mut TestAppCont
     let origin = bookie_gpui::live::Origin::File(fixture.0.clone());
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
-            view.cell_edit.edits
+            view.cell_edit
+                .edits
                 .insert((0, 1), bookie_gpui::model::Cell::Text("active".into()));
-            view.cell_edit.table
+            view.cell_edit
+                .table
                 .insert((1, 1), bookie_gpui::model::Cell::Text("table".into()));
             view.run_tabs.slots[0]
                 .edits
@@ -825,7 +870,11 @@ fn connecting_keeps_view_edits_until_the_user_discards_them(cx: &mut TestAppCont
     view.read_with(cx, |view, _| {
         assert!(view.live.is_none());
         assert_eq!(
-            (view.cell_edit.edits.len(), view.cell_edit.table.len(), view.run_tabs.slots[0].edits.len()),
+            (
+                view.cell_edit.edits.len(),
+                view.cell_edit.table.len(),
+                view.run_tabs.slots[0].edits.len()
+            ),
             (1, 1, 1)
         );
         assert!(view.status.contains("Discard all view-only edits"));
@@ -851,7 +900,8 @@ fn a_late_connection_does_not_discard_a_new_view_edit(cx: &mut TestAppContext) {
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
             view.connect(origin, cx);
-            view.cell_edit.edits
+            view.cell_edit
+                .edits
                 .insert((0, 1), bookie_gpui::model::Cell::Text("late edit".into()));
         });
     });
@@ -881,9 +931,11 @@ fn switching_tables_keeps_all_view_edits_until_the_user_discards_them(cx: &mut T
     cx.run_until_parked();
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
-            view.cell_edit.edits
+            view.cell_edit
+                .edits
                 .insert((0, 1), bookie_gpui::model::Cell::Text("table draft".into()));
-            view.cell_edit.table
+            view.cell_edit
+                .table
                 .insert((1, 1), bookie_gpui::model::Cell::Text("saved table draft".into()));
             view.run_tabs.slots.push(crate::runs::RunSlot::new(
                 bookie_gpui::shell::Run {
@@ -926,7 +978,8 @@ fn a_late_table_load_does_not_discard_a_new_view_edit(cx: &mut TestAppContext) {
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
             view.open_table_named(&table_info("beta"), window, cx);
-            view.cell_edit.edits
+            view.cell_edit
+                .edits
                 .insert((0, 1), bookie_gpui::model::Cell::Text("late table draft".into()));
         });
     });
@@ -1026,7 +1079,8 @@ fn closing_a_result_with_pending_edits_requires_explicit_discard(cx: &mut TestAp
         view.tabs.open_query();
         view.sync_grid_owner();
         view.add_run(None);
-        view.cell_edit.edits
+        view.cell_edit
+            .edits
             .insert((0, 1), bookie_gpui::model::Cell::Text("result draft".into()));
         view.close_run(view.run_tabs.active);
     });
@@ -1041,12 +1095,8 @@ fn closing_a_result_with_pending_edits_requires_explicit_discard(cx: &mut TestAp
 fn buffered_result_load_time_is_not_reported_as_time_to_first_row(cx: &mut TestAppContext) {
     use bookie_gpui::live::{LiveTable, Origin};
 
-    let source = LiveTable::load(
-        &Origin::File(orders_fixture()),
-        &table_info("orders"),
-        100,
-    )
-    .expect("load SQLite fixture");
+    let source =
+        LiveTable::load(&Origin::File(orders_fixture()), &table_info("orders"), 100).expect("load SQLite fixture");
     assert!(bookie_gpui::source::ResultSource::load_elapsed(&source).is_some());
 
     let (view, cx) = open(cx);
@@ -1611,7 +1661,9 @@ fn follow_palette_uses_the_connected_engine_limits(cx: &mut TestAppContext) {
         let input = view.read(cx).palette.input.clone();
         input.update(cx, |input, cx| input.set_content(&format!("follow {long}"), cx));
     });
-    view.read_with(cx, |view, _| assert_eq!(view.palette.follow.as_deref(), Some(long.as_str())));
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.palette.follow.as_deref(), Some(long.as_str()))
+    });
     view.update(cx, |view, _| {
         view.live = Some(view.live.as_ref().unwrap().with_driver_id("postgres"));
     });
@@ -2012,7 +2064,9 @@ fn approval_actions_remain_visible_without_a_result_grid(cx: &mut TestAppContext
         });
         cx.run_until_parked();
         cx.update(|window, cx| window.render_frame(cx));
-        view.read_with(cx, |view, _| assert!(view.approval.current.is_some(), "approval disappeared"));
+        view.read_with(cx, |view, _| {
+            assert!(view.approval.current.is_some(), "approval disappeared")
+        });
         assert!(cx.debug_bounds("deny-write").is_some(), "approval action is not drawn");
     }
     view.update(cx, |view, cx| {
@@ -2021,8 +2075,36 @@ fn approval_actions_remain_visible_without_a_result_grid(cx: &mut TestAppContext
     });
     cx.run_until_parked();
     cx.update(|window, cx| window.render_frame(cx));
-    let bounds = cx.debug_bounds("deny-write").expect("approval action is visible on home");
+    let bounds = cx
+        .debug_bounds("deny-write")
+        .expect("approval action is visible on home");
     cx.simulate_click(bounds.center(), Default::default());
+    cx.run_until_parked();
+    assert_eq!(answer.try_recv().ok(), Some(ApprovalOutcome::Deny));
+}
+
+#[gpui::test]
+fn escape_denies_a_pending_approval_and_other_keys_leave_it_open(cx: &mut TestAppContext) {
+    use bookie_app_services::approval_prompt::{ApprovalOutcome, PendingApproval, sample_request};
+    let (view, cx) = open(cx);
+    let (respond, mut answer) = tokio::sync::oneshot::channel();
+    let tx = view.read_with(cx, |view, _| view.approval.tx.clone());
+    assert!(
+        tx.send(PendingApproval {
+            request: sample_request("UPDATE t SET a = 1"),
+            respond
+        })
+        .is_ok()
+    );
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    cx.simulate_keystrokes("a enter space");
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(view.approval.current.is_some(), "a stray key answered the prompt")
+    });
+    assert!(answer.try_recv().is_err());
+    cx.simulate_keystrokes("escape");
     cx.run_until_parked();
     assert_eq!(answer.try_recv().ok(), Some(ApprovalOutcome::Deny));
 }
@@ -2041,7 +2123,9 @@ fn an_approval_request_shows_a_prompt_and_the_answer_reaches_the_sink(cx: &mut T
         .is_ok()
     );
     cx.run_until_parked();
-    view.read_with(cx, |view, _| assert!(view.approval.current.is_some(), "the prompt is shown"));
+    view.read_with(cx, |view, _| {
+        assert!(view.approval.current.is_some(), "the prompt is shown")
+    });
     cx.update(|_, cx| view.update(cx, |view, cx| view.answer_approval(ApprovalOutcome::AllowOnce, cx)));
     assert_eq!(answer.try_recv().ok(), Some(ApprovalOutcome::AllowOnce));
     view.read_with(cx, |view, _| assert!(view.approval.current.is_none()));
@@ -2073,7 +2157,11 @@ fn a_prompt_the_sink_gave_up_on_disappears_and_the_next_one_is_shown(cx: &mut Te
     cx.run_until_parked();
     view.read_with(cx, |view, _| {
         let shown = view.approval.current.as_ref().map(|open| open.request.sql.clone());
-        assert_eq!(shown.as_deref(), Some("DELETE FROM b"), "the abandoned question gave way to the next");
+        assert_eq!(
+            shown.as_deref(),
+            Some("DELETE FROM b"),
+            "the abandoned question gave way to the next"
+        );
     });
 }
 
@@ -2082,7 +2170,9 @@ fn switching_connection_expands_every_sidebar_schema_again(cx: &mut TestAppConte
     let (view, cx) = open(cx);
     connect_and_settle(&view, cx, orders_fixture());
     view.update(cx, |view, _| view.sidebar.collapsed_schemas.toggle("main"));
-    view.read_with(cx, |view, _| assert!(view.sidebar.collapsed_schemas.is_collapsed("main")));
+    view.read_with(cx, |view, _| {
+        assert!(view.sidebar.collapsed_schemas.is_collapsed("main"))
+    });
     let other = sqlite_fixture(&["create table t (a integer)"]);
     connect_and_settle(&view, cx, other.0.clone());
     view.read_with(cx, |view, _| {
@@ -2149,7 +2239,10 @@ fn tab_moves_focus_from_the_filter_field(cx: &mut TestAppContext) {
     cx.simulate_keystrokes("shift-tab");
     cx.run_until_parked();
     let previous = cx.update(|window, cx| window.focused(cx));
-    assert_ne!(before, previous, "Shift-Tab should move focus away from the filter field");
+    assert_ne!(
+        before, previous,
+        "Shift-Tab should move focus away from the filter field"
+    );
 }
 
 #[gpui::test]
@@ -2176,10 +2269,19 @@ fn real_table_grid_keyboard_and_jump_column_follow_active_tab(cx: &mut TestAppCo
     cx.simulate_keystrokes("down space shift-down");
     view.read_with(cx, |view, _| {
         assert_eq!(view.selection.map(|s| s.count()), Some(2));
-        assert!(view.palette_actions().iter().any(|a| a.id == "jump-column" && a.enabled));
+        assert!(
+            view.palette_actions()
+                .iter()
+                .any(|a| a.id == "jump-column" && a.enabled)
+        );
     });
     view.update(cx, |view, _| view.tabs.open_home());
     view.read_with(cx, |view, _| {
-        assert!(!view.palette_actions().iter().any(|a| a.id == "jump-column" && a.enabled));
+        assert!(
+            !view
+                .palette_actions()
+                .iter()
+                .any(|a| a.id == "jump-column" && a.enabled)
+        );
     });
 }

@@ -7,13 +7,16 @@ mod audit_page;
 mod backup_ui;
 mod binary_mode;
 mod catalog_nav;
+mod chart_plot;
+mod chart_ui;
 mod chrome;
 mod closed_tabs_ui;
 mod column_projection;
+mod connection_bundle_ui;
 mod connection_form;
+mod connection_info_ui;
 mod copy_selection;
 mod detail_panel;
-mod connection_bundle_ui;
 mod diagram_scene;
 mod diagram_ui;
 mod edit_history;
@@ -29,31 +32,29 @@ mod grid_table;
 mod health_ui;
 mod history_view;
 mod home_page;
+mod host_key_ui;
 mod import_ui;
 mod insert_ui;
+mod keyboard_settings_ui;
 mod keys;
 mod local_sort;
-mod measure;
 mod mcp_ui;
+mod measure;
 mod menus;
 mod new_window_ui;
 mod palette_actions;
 mod palette_state;
-mod transaction_ui;
 mod panel_state;
 mod params_ui;
 mod paste_ui;
 mod picker;
-mod server_filter_ui;
-mod host_key_ui;
 mod plan_view;
-mod chart_plot;
-mod chart_ui;
 mod query_pane;
 mod refresh_ui;
 mod render;
 mod resolve_ui;
 mod reveal;
+mod row_inspector_ui;
 mod run_cursor_ui;
 mod runs;
 mod save_ui;
@@ -62,6 +63,7 @@ mod schema_compare_ui;
 mod schema_diagram_ui;
 mod scroll_pace;
 mod selection_stats_ui;
+mod server_filter_ui;
 mod services;
 mod set_cells_ui;
 mod sidebar_catalog;
@@ -72,6 +74,7 @@ mod ssh_form;
 mod structure_ui;
 mod tables_export_ui;
 mod text_input;
+mod transaction_ui;
 mod ui_theme;
 mod update_ui;
 mod value_search_ui;
@@ -124,6 +127,12 @@ struct Ticket {
     cancel: CancellationToken,
 }
 
+impl Default for Ticket {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Ticket {
     fn new() -> Self {
         Self {
@@ -164,6 +173,11 @@ struct GridView {
     row_detail_open: bool,
     pub(crate) fk_peek: Option<fk_peek_ui::FkPeekState>,
     fk_peek_work: Ticket,
+    connection_info: Option<bookie_gpui::live::ServerInfo>,
+    row_inspector: row_inspector_ui::RowInspector,
+    wrap_text: bool,
+    recording_shortcut: Option<bookie_gpui::keymap::Command>,
+    settings_page: (keyboard_settings_ui::SettingsPage, u64),
     row_detail_filter: Entity<TextInput>,
     row_detail_hide_null: bool,
     catalog: Catalog,
@@ -414,7 +428,8 @@ impl GridView {
                 gpui_kit::component::table::TableEvent::SelectCell(row, column) => {
                     let column = table.read(cx).delegate().source_column(*column).unwrap_or(*column);
                     let cursor = bookie_results::grid_cursor::Cursor { row: *row, column };
-                    if this.cell_cursor == Some(cursor) {
+                    let follow = this.follows_link(column, window.modifiers());
+                    if this.cell_cursor == Some(cursor) && !follow {
                         return;
                     }
                     this.cell_cursor = Some(cursor);
@@ -423,6 +438,9 @@ impl GridView {
                         Some(selection) if selection.focus == dataset => selection.label(),
                         _ => cursor.label(&this.column_names()),
                     };
+                    if follow {
+                        this.go_to_referenced_row(cx);
+                    }
                     cx.notify();
                 }
                 gpui_kit::component::table::TableEvent::RightClickedCell(row, column) => {
@@ -450,22 +468,28 @@ impl GridView {
     fn guard_transaction_close(window: &mut Window, cx: &mut Context<Self>) {
         let owner = cx.weak_entity();
         window.on_window_should_close(cx, move |_, cx| {
-            owner.update(cx, |view, cx| {
-                if view.transaction_open() {
-                    view.status = "Commit or roll back the transaction before closing the window".into();
-                    cx.notify();
-                    false
-                } else {
-                    true
-                }
-            }).unwrap_or(true)
+            owner
+                .update(cx, |view, cx| {
+                    if view.transaction_open() {
+                        view.status = "Commit or roll back the transaction before closing the window".into();
+                        cx.notify();
+                        false
+                    } else {
+                        true
+                    }
+                })
+                .unwrap_or(true)
         });
     }
 
     fn init_font_inputs(saved: &font_settings::FontSettings, cx: &mut Context<Self>) -> [Entity<TextInput>; 2] {
         let inputs = [cx.new(|cx| TextInput::new("", cx)), cx.new(|cx| TextInput::new("", cx))];
         for (index, input) in inputs.iter().enumerate() {
-            let value = if index == 0 { &saved.ui_family } else { &saved.editor_family };
+            let value = if index == 0 {
+                &saved.ui_family
+            } else {
+                &saved.editor_family
+            };
             input.update(cx, |input, cx| input.set_content_quiet(value, cx));
             cx.subscribe(input, move |this, input, event: &InputEvent, cx| {
                 if matches!(event, InputEvent::Changed) {
@@ -558,6 +582,11 @@ impl GridView {
             row_detail_open: false,
             fk_peek: None,
             fk_peek_work: Ticket::new(),
+            connection_info: None,
+            row_inspector: Default::default(),
+            wrap_text: false,
+            recording_shortcut: None,
+            settings_page: (keyboard_settings_ui::SettingsPage::Appearance, 0),
             row_detail_filter,
             row_detail_hide_null: false,
             catalog: Catalog::synthetic(),
@@ -1035,6 +1064,14 @@ mod crypto_provider_tests {
             .with_root_certificates(rustls::RootCertStore::empty())
             .with_no_client_auth();
     }
+
+    #[test]
+    fn main_initializes_the_crypto_provider_first() {
+        let source = include_str!("main.rs");
+        let body = source.split("\nfn main() {\n").nth(1).expect("main exists");
+        let first = body.lines().next().expect("main has a body").trim();
+        assert_eq!(first, "bookie_app_services::initialize_process_crypto();");
+    }
 }
 
 fn main() {
@@ -1106,6 +1143,7 @@ fn main() {
                         }
                         None => GridView::new(total, started, window, cx),
                     });
+                    view.update(cx, |view, cx| view.request_connection_info(cx));
                     let focus = view.read(cx).focus.clone();
                     focus.focus(window, cx);
                     view.update(cx, |view, cx| {
@@ -1132,11 +1170,15 @@ fn main() {
 }
 
 #[cfg(test)]
+mod connection_form_ui_tests;
+#[cfg(test)]
 mod follow_ui_tests;
 #[cfg(test)]
 mod grid_pin_tests;
 #[cfg(test)]
 mod host_key_ui_tests;
+#[cfg(test)]
+mod keyboard_settings_tests;
 #[cfg(test)]
 mod live_ui_tests;
 #[cfg(test)]
@@ -1144,15 +1186,17 @@ mod overlay_ui_tests;
 #[cfg(test)]
 mod query_pane_ui_tests;
 #[cfg(test)]
+mod row_inspector_tests;
+#[cfg(test)]
 mod save_ui_tests;
 #[cfg(test)]
 mod server_filter_ui_tests;
 #[cfg(test)]
+mod status_bar_tests;
+#[cfg(test)]
 mod transaction_ui_tests;
 #[cfg(test)]
 mod typed_value_ui_tests;
-#[cfg(test)]
-mod connection_form_ui_tests;
 #[cfg(test)]
 mod ui_tests;
 #[cfg(test)]

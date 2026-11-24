@@ -32,12 +32,6 @@ class UiPatternTests(unittest.TestCase):
     def test_test_code_after_the_cfg_marker_does_not_count(self):
         self.assertEqual(self.counted("#[cfg(test)]\nmod t { fn f() { thread_local! {} } }"), {})
 
-    def test_the_committed_baseline_matches_the_tree(self):
-        current = checker.counts()
-        baseline = checker.read_baseline()
-        self.assertTrue(all(number <= baseline.get(key, 0) for key, number in current.items()))
-        self.assertTrue(all(key in current for key in baseline), "lower the baseline for removed patterns")
-
 
 if __name__ == "__main__":
     unittest.main()

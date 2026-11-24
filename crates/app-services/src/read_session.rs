@@ -379,6 +379,22 @@ impl ReadSession {
             .map_err(|error| classify(&error))
     }
 
+    pub async fn server_version(
+        &self,
+        control: &OperationControl,
+    ) -> Result<(Option<String>, std::time::Duration), DriverFailurePresentation> {
+        let guard = self
+            .database
+            .guard_for_generation(self.id, self.generation, Principal::human_gui())
+            .ok_or(DriverFailurePresentation::Disconnected)?;
+        let started = std::time::Instant::now();
+        let version = guard
+            .server_version_controlled(control)
+            .await
+            .map_err(|error| classify(&error))?;
+        Ok((version, started.elapsed()))
+    }
+
     pub async fn read_structure(
         &self,
         table: &TableInfo,

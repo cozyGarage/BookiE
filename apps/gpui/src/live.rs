@@ -71,7 +71,9 @@ impl From<bookie_app_services::driver_error_presentation::DriverFailurePresentat
             _ => None,
         };
         let hint = match &failure {
-            bookie_app_services::driver_error_presentation::DriverFailurePresentation::Query { hint, .. } => hint.clone(),
+            bookie_app_services::driver_error_presentation::DriverFailurePresentation::Query { hint, .. } => {
+                hint.clone()
+            }
             _ => None,
         };
         Self {
@@ -130,6 +132,14 @@ impl LiveSession {
             self.driver_id.as_str(),
             "cassandra" | "clickhouse" | "duckdb" | "mssql" | "mysql" | "oracle" | "postgres" | "sqlite"
         )
+    }
+
+    pub fn database_label(&self) -> &str {
+        if self.driver_id == "sqlite" {
+            "main"
+        } else {
+            &self.label
+        }
     }
 
     pub fn open(origin: &Origin) -> Result<Arc<LiveSession>, String> {
@@ -235,6 +245,22 @@ impl LiveSession {
             .map_err(|error| error.message)
     }
 
+    fn name_the_read_path(&self, mut failure: QueryFailure) -> QueryFailure {
+        if self.writable.is_none() {
+            return failure;
+        }
+        if !failure.message.starts_with("Blocked by policy:") {
+            return failure;
+        }
+        if failure.message.contains("marked read-only") {
+            failure.message =
+                "Query tabs only read. To change data, press Begin transaction, run the statement, then Commit.".into();
+        } else if failure.message.contains("could not be parsed (typo?)") {
+            failure.message = "This statement could not be parsed (typo?).".into();
+        }
+        failure
+    }
+
     pub fn run_query_bound_detailed(
         self: &Arc<Self>,
         sql: &str,
@@ -247,15 +273,19 @@ impl LiveSession {
         }
         let epoch = self.next_epoch();
         let started = std::time::Instant::now();
-        let (columns, rows, scan, truncated, messages) = self.runtime.block_on(query_pages(
-            &self.sessions,
-            self.session_id,
-            (sql, params),
-            max_rows,
-            cancellation,
-            epoch,
-            &self.epoch,
-        ))?;
+        let (columns, rows, scan, truncated, messages) = self
+            .runtime
+            .block_on(query_pages(
+                &self.sessions,
+                self.session_id,
+                (sql, params),
+                max_rows,
+                cancellation,
+                epoch,
+                &self.epoch,
+            ))
+            .map_err(QueryFailure::from)
+            .map_err(|failure| self.name_the_read_path(failure))?;
         Ok(LiveTable {
             session: self.clone(),
             columns,
@@ -617,9 +647,7 @@ impl LiveSession {
         };
         let mut loaded = self.run_query_bound(&query.sql, &query.params, max_rows, cancellation)?;
         for column in &mut loaded.columns {
-            column.primary_key = columns
-                .iter()
-                .any(|info| info.primary_key && info.name == column.name);
+            column.primary_key = columns.iter().any(|info| info.primary_key && info.name == column.name);
         }
         loaded.executed_sql = None;
         loaded.table = Some(table);
@@ -706,6 +734,28 @@ impl LiveSession {
             .map_err(|error| format!("{error:?}"))
     }
 
+    pub fn server_info(&self) -> ServerInfo {
+        let control = OperationControl::with_timeout(Duration::from_secs(5));
+        let (version, round_trip) = match self
+            .runtime
+            .block_on(self.sessions.server_version(self.session_id, &control))
+        {
+            Ok((version, round_trip)) => (version, Some(round_trip)),
+            Err(_) => (None, None),
+        };
+        let details = self.saved.as_ref().and_then(|(id, _)| {
+            self.runtime
+                .block_on(bookie_app_services::connection_details::load_connection_details(*id))
+                .ok()
+                .flatten()
+        });
+        ServerInfo {
+            version,
+            round_trip,
+            details,
+        }
+    }
+
     fn next_epoch(&self) -> Epoch {
         Epoch(self.epoch.fetch_add(1, Ordering::Relaxed) + 1)
     }
@@ -716,6 +766,13 @@ impl Drop for LiveSession {
         let _inside = self.runtime.enter();
         self.sessions.close(self.session_id);
     }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ServerInfo {
+    pub version: Option<String>,
+    pub round_trip: Option<Duration>,
+    pub details: Option<bookie_app_services::connection_details::ConnectionDetails>,
 }
 
 pub struct LiveTable {
@@ -907,18 +964,30 @@ impl WriteSession {
     pub fn transaction_is_open(&self, shared: &bookie_app_services::interactive_session::SharedSession) -> bool {
         use bookie_core::Session as _;
         self.runtime.block_on(async {
-            shared.lock().await.as_ref().is_some_and(|session| session.is_usable() && session.transaction_open())
+            shared
+                .lock()
+                .await
+                .as_ref()
+                .is_some_and(|session| session.is_usable() && session.transaction_open())
         })
     }
 
-    pub fn close_transaction(&self, shared: &bookie_app_services::interactive_session::SharedSession) -> Option<String> {
+    pub fn close_transaction(
+        &self,
+        shared: &bookie_app_services::interactive_session::SharedSession,
+    ) -> Option<String> {
         self.runtime
-            .block_on(bookie_app_services::interactive_session::close_for_teardown(shared.clone()))
+            .block_on(bookie_app_services::interactive_session::close_for_teardown(
+                shared.clone(),
+            ))
             .err()
             .map(|error| error.to_string())
     }
 
-    pub fn rollback_transaction(&self, shared: &bookie_app_services::interactive_session::SharedSession) -> Result<(), String> {
+    pub fn rollback_transaction(
+        &self,
+        shared: &bookie_app_services::interactive_session::SharedSession,
+    ) -> Result<(), String> {
         self.runtime
             .block_on(bookie_app_services::interactive_session::rollback_and_close(shared))
             .map_err(|error| error.to_string())
@@ -1250,11 +1319,22 @@ async fn query_pages(
     cancellation: &CancellationToken,
     epoch: Epoch,
     current_epoch: &AtomicU64,
-) -> Result<(Vec<ColumnMeta>, QueryRows, ScanSource, bool, bookie_core::ServerMessages), QueryFailure> {
+) -> Result<
+    (
+        Vec<ColumnMeta>,
+        QueryRows,
+        ScanSource,
+        bool,
+        bookie_core::ServerMessages,
+    ),
+    QueryFailure,
+> {
     let control = OperationControl::new(cancellation.clone(), Some(tokio::time::Instant::now() + PAGE_TIMEOUT));
     let mut batch = bridge_query_detailed(sessions, session_id, (sql, params), &control, epoch, current_epoch).await?;
     let messages = std::mem::take(&mut batch.messages);
-    let (columns, rows, scan, truncated) = spooled_pages(batch.into_first(), max_rows, cancellation).await.map_err(QueryFailure::from)?;
+    let (columns, rows, scan, truncated) = spooled_pages(batch.into_first(), max_rows, cancellation)
+        .await
+        .map_err(QueryFailure::from)?;
     Ok((columns, rows, scan, truncated, messages))
 }
 
@@ -1304,11 +1384,7 @@ async fn spooled_pages(
     let page_size = PAGE_ROWS as usize;
     let mut rows = result.rows.iter();
     for page_index in 0..result.rows.len().div_ceil(page_size) {
-        let page_rows = rows
-            .by_ref()
-            .take(page_size)
-            .map(|row| row.to_vec())
-            .collect();
+        let page_rows = rows.by_ref().take(page_size).map(|row| row.to_vec()).collect();
         let page = QueryResult {
             columns: infos.clone(),
             rows: QueryRows::from_rows(page_rows),

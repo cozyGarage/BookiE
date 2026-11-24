@@ -184,6 +184,16 @@ impl GridView {
                 },
                 self.cell_cursor.is_some() && self.compare.is_none(),
             ),
+            action("keyboard-shortcuts", "Edit keyboard shortcuts", true),
+            action(
+                "wrap-text",
+                if self.wrap_text {
+                    "Show cell text on one line"
+                } else {
+                    "Wrap long cell text"
+                },
+                true,
+            ),
             action(
                 "count-table-rows",
                 "Count rows in database table",
@@ -332,7 +342,11 @@ impl GridView {
         };
         vec![
             action("quick-switcher", "Go to table", !self.catalog.tables.is_empty()),
-            action("jump-column", "Jump to column", self.tabs.shows_grid_for(&self.catalog.grid_table)),
+            action(
+                "jump-column",
+                "Jump to column",
+                self.tabs.shows_grid_for(&self.catalog.grid_table),
+            ),
             action("shortcuts", "Keyboard shortcuts", true),
             action(
                 "save-favorite",
@@ -486,9 +500,11 @@ impl GridView {
                 !self.catalog.tables.is_empty(),
             ),
         ];
-        if self.live.as_ref().is_some_and(|session| {
-            bookie_app_services::schema_context::supports_schema_context(&session.driver_id)
-        }) {
+        if self
+            .live
+            .as_ref()
+            .is_some_and(|session| bookie_app_services::schema_context::supports_schema_context(&session.driver_id))
+        {
             actions.push(action("schema-context", &schema_context, true));
         }
         actions
@@ -607,6 +623,8 @@ impl GridView {
             "clear-filter" => self.clear_filter(),
             "compare" => self.compare(false, cx),
             "detail" => self.toggle_detail(),
+            "wrap-text" => self.wrap_text = !self.wrap_text,
+            "keyboard-shortcuts" => self.open_settings_page(crate::keyboard_settings_ui::SettingsPage::Keyboard),
             "show-row-vertically" => self.toggle_row_detail(),
             "count-table-rows" => self.count_table_rows(cx),
             "continuous" => {

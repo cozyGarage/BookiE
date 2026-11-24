@@ -8,6 +8,17 @@ use crate::{GridView, Tab, palette_step};
 
 impl GridView {
     pub(super) fn intercept_key(&mut self, event: &KeystrokeEvent, window: &mut Window, cx: &mut Context<Self>) {
+        if self.approval.current.is_some() {
+            if event.keystroke.key == "escape" {
+                self.answer_approval(bookie_app_services::approval_prompt::ApprovalOutcome::Deny, cx);
+            }
+            cx.stop_propagation();
+            return;
+        }
+        if self.record_shortcut_key(&event.keystroke, cx) {
+            cx.stop_propagation();
+            return;
+        }
         if self.palette.open {
             let key = event.keystroke.key.as_str();
             if palette_navigation_key(key, event.keystroke.modifiers) {
@@ -47,7 +58,9 @@ impl GridView {
             _ => palette_step(self.palette.index, count, key == "down"),
         };
         if count > 0 {
-            self.palette.scroll.scroll_to_item(self.palette.index, ScrollStrategy::Nearest);
+            self.palette
+                .scroll
+                .scroll_to_item(self.palette.index, ScrollStrategy::Nearest);
         }
     }
 
@@ -133,7 +146,9 @@ impl GridView {
                         _ => palette_step(self.palette.index, count, key == "down"),
                     };
                     if count > 0 {
-                        self.palette.scroll.scroll_to_item(self.palette.index, ScrollStrategy::Nearest);
+                        self.palette
+                            .scroll
+                            .scroll_to_item(self.palette.index, ScrollStrategy::Nearest);
                     }
                     cx.stop_propagation();
                     cx.notify();
@@ -173,7 +188,11 @@ impl GridView {
             && self.compare.is_none()
             && self.tabs.shows_grid_for(&self.catalog.grid_table)
         {
-            self.grid_key(key, modifiers.shift, control, window, cx);
+            if key == "enter" && modifiers.alt && !control && !modifiers.shift {
+                self.open_value_editor(window, cx);
+            } else {
+                self.grid_key(key, modifiers.shift, control, window, cx);
+            }
         }
     }
 
@@ -201,7 +220,13 @@ impl GridView {
             Command::CopyCells if self.focus.is_focused(window) => self.copy_selection(false, cx),
             Command::CopyCellsWithHeaders if self.focus.is_focused(window) => self.copy_selection(true, cx),
             Command::CopyCells | Command::CopyCellsWithHeaders => {}
-            Command::PasteCells if self.focus.is_focused(window) && self.tabs.shows_grid_for(&self.catalog.grid_table) && self.cell_edit.active.is_none() => self.paste_cells(cx),
+            Command::PasteCells
+                if self.focus.is_focused(window)
+                    && self.tabs.shows_grid_for(&self.catalog.grid_table)
+                    && self.cell_edit.active.is_none() =>
+            {
+                self.paste_cells(cx)
+            }
             Command::PasteCells => {}
             Command::ToggleSidebar => self.sidebar.open = !self.sidebar.open,
             Command::NewQuery => {

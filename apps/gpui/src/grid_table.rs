@@ -6,7 +6,7 @@ use std::{
 
 use gpui::{App, Context, IntoElement, WeakEntity, Window, div, prelude::*, px};
 use gpui_kit::component::Sizable;
-use gpui_kit::component::scroll::Scrollbar;
+use gpui_kit::component::scroll::{Scrollbar, ScrollbarMode};
 use gpui_kit::component::table::{Column, ColumnSort, DataTable, TableDelegate, TableState};
 use sha2::{Digest, Sha256};
 
@@ -37,11 +37,7 @@ struct PinScope {
 
 impl PinScope {
     fn width_key(&self) -> String {
-        bookie_app_services::column_widths::table_scope_key(
-            &self.database,
-            self.schema.as_deref(),
-            &self.table,
-        )
+        bookie_app_services::column_widths::table_scope_key(&self.database, self.schema.as_deref(), &self.table)
     }
 }
 
@@ -148,6 +144,7 @@ pub struct GridDelegate {
     numeric: Vec<bool>,
     kinds: Vec<(String, bool)>,
     binary_modes: Vec<crate::binary_mode::BinaryMode>,
+    cell_style: (Vec<bool>, bool),
     source: Option<Source>,
     map: RowMap,
     cached: Option<(usize, Vec<(String, bool)>)>,
@@ -554,17 +551,22 @@ impl TableDelegate for GridDelegate {
             }
             _ => {
                 let (text, right) = self.label_of(row_ix, source_col);
+                let link = self.cell_style.0.get(source_col).copied().unwrap_or(false);
+                let wrap = self.cell_style.1;
                 div()
                     .w_full()
                     .flex()
-                    .when_some(edited_tint, |el, tint| el.bg(tint))
+                    .when_some(edited_tint, |el, tint| {
+                        el.debug_selector(|| "edited-cell".into()).bg(tint)
+                    })
                     .child(
                         div()
                             .flex_1()
                             .min_w_0()
                             .overflow_hidden()
-                            .whitespace_nowrap()
-                            .text_ellipsis()
+                            .when(!wrap, |cell| cell.whitespace_nowrap().text_ellipsis())
+                            .when(wrap, |cell| cell.line_clamp(bookie_gpui::theme::size::WRAP_LINES))
+                            .when(link, |cell| cell.text_color(gpui::rgb(Theme::current(cx).info)))
                             .when(right, |cell| cell.text_right())
                             .child(text),
                     )
@@ -972,6 +974,15 @@ impl GridView {
         (sortable, sort)
     }
 
+    fn grid_binary_modes(&self, capacity: usize) -> Vec<crate::binary_mode::BinaryMode> {
+        let mut binary_modes = Vec::with_capacity(capacity);
+        if self.compare.is_some() {
+            binary_modes.push(crate::binary_mode::BinaryMode::Hex);
+        }
+        binary_modes.extend((0..self.source.columns().len()).map(|column| self.binary_mode_for_column(column)));
+        binary_modes
+    }
+
     pub(crate) fn sync_table(&self, available_width: f32, window: &mut Window, cx: &mut Context<Self>) {
         let (mut columns, numeric, kinds) = self.grid_columns();
         let map = self.row_map();
@@ -1015,11 +1026,8 @@ impl GridView {
             }
         }
         let (sortable, sort) = self.sort_state();
-        let mut binary_modes = Vec::with_capacity(kinds.len());
-        if self.compare.is_some() {
-            binary_modes.push(crate::binary_mode::BinaryMode::Hex);
-        }
-        binary_modes.extend((0..self.source.columns().len()).map(|column| self.binary_mode_for_column(column)));
+        let cell_style = (self.link_columns(), self.wrap_text);
+        let binary_modes = self.grid_binary_modes(kinds.len());
         let editor = self.cell_edit.active.as_ref().and_then(|editing| {
             if editing.full_value {
                 return None;
@@ -1073,9 +1081,11 @@ impl GridView {
                 && delegate.pin_scope == pin_scope
                 && delegate.width_scope == width_scope
                 && delegate.pinned_columns == pinned_columns
+                && delegate.cell_style == cell_style
             {
                 return;
             }
+            delegate.cell_style = cell_style;
             delegate.columns = columns;
             delegate.hidden_columns = hidden_columns;
             delegate.projection = projection;
@@ -1127,7 +1137,11 @@ impl GridView {
                                 DataTable::new(&self.table)
                                     .scrollbar_visible(false, false)
                                     .stripe(true)
-                                    .xsmall()
+                                    .with_size(if self.wrap_text {
+                                        gpui_component::Size::Size(px(bookie_gpui::theme::size::WRAPPED_ROW_HEIGHT))
+                                    } else {
+                                        gpui_component::Size::XSmall
+                                    })
                                     .header_row_height(px(bookie_gpui::theme::size::GRID_HEADER)),
                             ),
                     )
@@ -1140,6 +1154,7 @@ impl GridView {
                             .child(
                                 Scrollbar::horizontal(&horizontal_scroll)
                                     .id("grid-horizontal-scrollbar")
+                                    .mode(ScrollbarMode::Always)
                                     .viewport_from_layout(),
                             ),
                     ),
@@ -1304,7 +1319,11 @@ mod pin_tests {
 }
 
 fn header_kind(data_type: &str) -> String {
-    data_type.to_uppercase()
+    if data_type.eq_ignore_ascii_case("NULL") {
+        "UNKNOWN".into()
+    } else {
+        data_type.to_uppercase()
+    }
 }
 
 const MIN_CONTENT_WIDTH: f32 = 56.0;
@@ -1540,6 +1559,11 @@ mod header_kind_tests {
     }
 
     #[test]
+    fn an_unknown_sqlite_expression_type_is_not_shown_as_null() {
+        assert_eq!(header_kind("NULL"), "UNKNOWN");
+    }
+
+    #[test]
     fn fitted_width_accounts_for_inline_type_and_primary_key_icon() {
         let kind = ("numeric(38,18)".to_owned(), true);
         let width = measure_header_width("id", Some(&kind), true, &mut |text| text.len() as f32 * 8.0 + 12.0);
@@ -1641,7 +1665,11 @@ mod tests {
         let audit_key = audit_users.width_key();
         let hidden_by_scope = HashMap::from([(public_key, HashSet::from(["email"]))]);
 
-        assert!(hidden_by_scope.get(&audit_key).is_none_or(|hidden| !hidden.contains("email")));
+        assert!(
+            hidden_by_scope
+                .get(&audit_key)
+                .is_none_or(|hidden| !hidden.contains("email"))
+        );
     }
 
     #[test]

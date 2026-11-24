@@ -31,19 +31,27 @@ async fn run_statements(
         if stop_requested() {
             return Err(stopped(tx, idx).await);
         }
-        let query = match drop_guard::refuse_referenced_drop(&mut tx, sql)
-            .await
-            .and_then(|()| bind_sqlite_params(sqlx::query(sqlx::AssertSqlSafe(sql.as_str())), params))
-        {
-            Ok(query) => query,
-            Err(error) => {
-                let _ = rollback_transaction(tx).await;
-                return Err(DriverError::Transaction {
-                    statement_index: idx,
-                    source: Box::new(error),
-                });
-            }
-        };
+        let checked = async {
+            drop_guard::refuse_referenced_drop(&mut tx, sql).await?;
+            let statement = (&mut *tx)
+                .prepare(sqlx::AssertSqlSafe(sql.as_str()).into_sql_str())
+                .await
+                .map_err(map_sqlx_error)?;
+            check_parameter_count(&statement, params.len())?;
+            Ok::<(), DriverError>(())
+        }
+        .await;
+        let query =
+            match checked.and_then(|()| bind_sqlite_params(sqlx::query(sqlx::AssertSqlSafe(sql.as_str())), params)) {
+                Ok(query) => query,
+                Err(error) => {
+                    let _ = rollback_transaction(tx).await;
+                    return Err(DriverError::Transaction {
+                        statement_index: idx,
+                        source: Box::new(error),
+                    });
+                }
+            };
         match query.execute(&mut *tx).await {
             Ok(result) => {
                 let total = result.rows_affected();

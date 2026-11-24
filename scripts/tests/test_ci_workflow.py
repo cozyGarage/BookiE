@@ -1866,7 +1866,7 @@ class CiWorkflowTests(unittest.TestCase):
     def test_push_requires_t0_and_pull_request_requires_the_full_gate(self):
         self.assertEqual(
             checker.PUSH_REQUIRED,
-            {"pin-revision", "guards", "clippy", "test-build", "unit", "sandbox", "widgets"},
+            {"pin-revision", "guards", "clippy", "test-build", "unit", "sandbox", "widgets", "gpui-build", "gpui-tests"},
         )
         success = {name: {"result": "success"} for name in checker.REQUIRED}
         for name in checker.REQUIRED:
@@ -1964,7 +1964,7 @@ class CiWorkflowTests(unittest.TestCase):
         full_profile = "github.event_name != 'push'"
 
         self.assertIn(full_profile, github_job)
-        self.assertEqual(forgejo_jobs.count(f"if: {full_profile}"), 3)
+        self.assertEqual(forgejo_jobs.count(f"if: {full_profile}"), 2)
         self.assertIn("linux-build", checker.OPTIONAL_ON_PUSH)
         self.assertIn("distro-floor-scenarios", checker.OPTIONAL_ON_PUSH)
 
