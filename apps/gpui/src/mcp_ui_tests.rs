@@ -6,7 +6,7 @@ fn token_buttons_fit_inside_settings_at_narrow_width(cx: &mut TestAppContext) {
     let (view, cx) = crate::ui_tests::open(cx);
     cx.simulate_resize(gpui::size(gpui::px(800.0), gpui::px(900.0)));
     view.update(cx, |view, cx| {
-        view.tabs.open_settings();
+        view.open_settings_page(crate::keyboard_settings_ui::SettingsPage::Mcp);
         cx.notify();
     });
     cx.run_until_parked();
