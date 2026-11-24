@@ -385,12 +385,17 @@ impl GridView {
         theme: Theme,
         cx: &mut Context<Self>,
     ) -> Stateful<Div> {
+        let fields_chevron = |table: &bookie_core::TableInfo| {
+            self.live
+                .is_some()
+                .then(|| self.sidebar.fields.iter().any(|(open, _)| open == table))
+        };
         let (label, chevron) = match &row {
             TreeRow::Connection { open } => (self.catalog.connection.clone(), Some(*open)),
             TreeRow::Database { open } => (self.catalog.database.clone(), Some(*open)),
             TreeRow::Schema { name, open, .. } => (name.clone(), Some(*open)),
-            TreeRow::Table(table) if depth >= 3 => (table.name.clone(), None),
-            TreeRow::Table(table) => (table_label(table), None),
+            TreeRow::Table(table) if depth >= 3 => (table.name.clone(), fields_chevron(table)),
+            TreeRow::Table(table) => (table_label(table), fields_chevron(table)),
         };
         let current = matches!(&row, TreeRow::Table(table) if open_table == &Tab::Table(table.clone()));
         let line = div()
