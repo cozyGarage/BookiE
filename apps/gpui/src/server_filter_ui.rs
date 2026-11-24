@@ -131,8 +131,9 @@ impl GridView {
                 if !where_sql.is_empty() {
                     this.search.server.applied.push((identity.clone(), where_sql.clone()));
                 }
+                let sort_unchanged = this.local_sort == keep_local_sort;
                 this.show_loaded_table(identity, source);
-                if let (Some(order), Some(sort)) = (order, keep_local_sort) {
+                if let (true, Some(order), Some(sort)) = (sort_unchanged, order, keep_local_sort) {
                     this.local_order = Some(std::sync::Arc::new(order));
                     this.local_sort = Some(sort);
                     this.pager = this.pager.with_total(this.dataset_count());

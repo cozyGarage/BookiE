@@ -2028,6 +2028,30 @@ fn approval_actions_remain_visible_without_a_result_grid(cx: &mut TestAppContext
 }
 
 #[gpui::test]
+fn escape_denies_a_pending_approval_and_other_keys_leave_it_open(cx: &mut TestAppContext) {
+    use bookie_app_services::approval_prompt::{ApprovalOutcome, PendingApproval, sample_request};
+    let (view, cx) = open(cx);
+    let (respond, mut answer) = tokio::sync::oneshot::channel();
+    let tx = view.read_with(cx, |view, _| view.approval.tx.clone());
+    assert!(
+        tx.send(PendingApproval {
+            request: sample_request("UPDATE t SET a = 1"),
+            respond
+        })
+        .is_ok()
+    );
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    cx.simulate_keystrokes("a enter space");
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert!(view.approval.current.is_some(), "a stray key answered the prompt"));
+    assert!(answer.try_recv().is_err());
+    cx.simulate_keystrokes("escape");
+    cx.run_until_parked();
+    assert_eq!(answer.try_recv().ok(), Some(ApprovalOutcome::Deny));
+}
+
+#[gpui::test]
 fn an_approval_request_shows_a_prompt_and_the_answer_reaches_the_sink(cx: &mut TestAppContext) {
     use bookie_app_services::approval_prompt::{ApprovalOutcome, PendingApproval, sample_request};
     let (view, cx) = open(cx);

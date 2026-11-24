@@ -239,6 +239,9 @@ impl LiveSession {
         if self.writable.is_none() {
             return failure;
         }
+        if !failure.message.starts_with("Blocked by policy:") {
+            return failure;
+        }
         if failure.message.contains("marked read-only") {
             failure.message =
                 "Query tabs only read. To change data, press Begin transaction, run the statement, then Commit."

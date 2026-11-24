@@ -466,6 +466,9 @@ impl GridView {
 impl Render for GridView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.sync_render_state(window, cx);
+        if self.approval.current.is_some() && !self.focus.is_focused(window) {
+            window.focus(&self.focus, cx);
+        }
         let theme = Theme::current(cx);
         let strip = self.grid_control_strip(theme, cx);
         let filter_row = self.filter_rows(self.grid_filter_row(theme, cx), theme, cx);

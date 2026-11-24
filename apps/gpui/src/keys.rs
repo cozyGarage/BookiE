@@ -120,6 +120,12 @@ impl GridView {
         let modifiers = stroke.modifiers;
         let control = control_modifier(modifiers);
         let key = stroke.key.as_str();
+        if self.approval.current.is_some() {
+            if key == "escape" {
+                self.answer_approval(bookie_app_services::approval_prompt::ApprovalOutcome::Deny, cx);
+            }
+            return;
+        }
         if self.palette.open {
             match key {
                 key if palette_navigation_key(key, modifiers) => {
