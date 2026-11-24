@@ -24,10 +24,10 @@ pub use audit_journal::{AuditJournal, AuditJournalRecovery, LegacyJournalRotatio
 pub use connection_bundle::{
     BUNDLE_EXCLUDED_FIELDS, BUNDLE_FORMAT, BUNDLE_INCLUDED_FIELDS, BUNDLE_VERSION, BundleBody, BundleConnection,
     BundleError, BundleExport, BundleOrganization, BundleSecrets, BundleSshSecret, BundleSshSecretKind,
-    EncryptedBundle, ImportDisposition, ImportItem, ImportPlan, MAX_BUNDLE_BYTES, MAX_BUNDLE_CONNECTIONS,
-    MAX_SSH_HOPS as BUNDLE_MAX_SSH_HOPS, ParsedBundle, bundle_organization, collect_bundle_secrets, export_encrypted,
-    export_plaintext, forget_imported_bundle_secrets, forget_imported_secrets, parse_bundle, plan_import,
-    store_bundle_secrets,
+    EncryptedBundle, ImportApplyError, ImportDisposition, ImportItem, ImportPlan, MAX_BUNDLE_BYTES,
+    MAX_BUNDLE_CONNECTIONS, MAX_SSH_HOPS as BUNDLE_MAX_SSH_HOPS, ParsedBundle, apply_import_body, bundle_organization,
+    collect_bundle_secrets, export_encrypted, export_plaintext, forget_imported_bundle_secrets,
+    forget_imported_secrets, parse_bundle, plan_import, store_bundle_secrets,
 };
 pub use connection_color::{
     CONNECTION_COLORS, CONNECTION_STRIP_CLASSES, connection_color, connection_color_css_class, connection_color_rgb,

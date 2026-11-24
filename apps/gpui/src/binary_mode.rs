@@ -39,6 +39,14 @@ impl BinaryMode {
     }
 }
 
+pub(crate) fn edit_text_len(bytes: usize, mode: BinaryMode) -> usize {
+    match mode {
+        BinaryMode::Hex => bytes.saturating_mul(2).saturating_add(2),
+        BinaryMode::Utf8 => bytes,
+        BinaryMode::Base64 => bytes.div_ceil(3).saturating_mul(4),
+    }
+}
+
 pub(crate) fn is_binary_type(data_type: &str) -> bool {
     let kind = data_type.to_ascii_lowercase();
     kind.contains("byte") || kind.contains("blob") || kind.contains("binary") || kind == "image"
@@ -173,5 +181,13 @@ mod tests {
             assert!(is_binary_type(kind), "{kind}");
         }
         assert!(!is_binary_type("text"));
+    }
+
+    #[test]
+    fn edit_text_size_matches_each_binary_display_mode() {
+        assert_eq!(super::edit_text_len(3, BinaryMode::Hex), 8);
+        assert_eq!(super::edit_text_len(3, BinaryMode::Utf8), 3);
+        assert_eq!(super::edit_text_len(3, BinaryMode::Base64), 4);
+        assert_eq!(super::edit_text_len(usize::MAX, BinaryMode::Hex), usize::MAX);
     }
 }

@@ -107,6 +107,55 @@ pub(super) async fn store_bundle_secrets(
     store_bundle_secrets_with(&Keyring, target, secrets, label, replace_existing).await
 }
 
+pub(super) async fn store_import_secrets(
+    plan: &crate::connection_bundle::ImportPlan,
+    secrets: &[BundleSecrets],
+) -> Result<(), StorageError> {
+    let imports = plan.items.iter().filter_map(|item| {
+        secrets
+            .iter()
+            .find(|secret| secret.connection_id == item.source_id)
+            .map(|secret| (item.connection.id, secret, item.connection.name.as_str()))
+    });
+    store_import_secrets_with(&Keyring, imports).await
+}
+
+async fn store_import_secrets_with<'a, S: BundleSecretStore>(
+    store: &S,
+    imports: impl IntoIterator<Item = (Uuid, &'a BundleSecrets, &'a str)>,
+) -> Result<(), StorageError> {
+    let entries = imports
+        .into_iter()
+        .flat_map(|(target, secrets, label)| {
+            entries(secrets)
+                .into_iter()
+                .map(move |(key, value)| (target, key, value, label))
+        })
+        .collect::<Vec<_>>();
+    let mut previous = Vec::with_capacity(entries.len());
+    for (target, key, _, _) in &entries {
+        previous.push((*target, key.clone(), store.load(*target, key).await?));
+    }
+
+    let mut touched = Vec::new();
+    for ((target, key, value, label), (_, _, old_value)) in entries.iter().zip(&previous) {
+        if !super::should_write(old_value.clone(), false) {
+            continue;
+        }
+        touched.push((*target, key.clone(), old_value.clone(), (*label).to_owned()));
+        if let Err(error) = store.store(*target, key, value, label).await {
+            if let Err(restore) = restore_import(store, &touched).await {
+                return Err(StorageError::CredentialRollback {
+                    store: Box::new(error),
+                    restore: Box::new(restore),
+                });
+            }
+            return Err(error);
+        }
+    }
+    Ok(())
+}
+
 async fn store_bundle_secrets_with<S: BundleSecretStore>(
     store: &S,
     target: Uuid,
@@ -178,6 +227,25 @@ async fn restore<S: BundleSecretStore>(
     }
 }
 
+async fn restore_import<S: BundleSecretStore>(
+    store: &S,
+    touched: &[(Uuid, SecretKey, Option<SecretString>, String)],
+) -> Result<(), StorageError> {
+    let mut failure = None;
+    for (target, key, old_value, label) in touched.iter().rev() {
+        let outcome = match old_value {
+            Some(value) => store.store(*target, key, value, label).await,
+            None => store.delete(*target, key).await,
+        };
+        if let Err(error) = outcome
+            && failure.is_none()
+        {
+            failure = Some(error);
+        }
+    }
+    failure.map_or(Ok(()), Err)
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 mod tests {
@@ -195,6 +263,8 @@ mod tests {
     struct FakeStore {
         values: Mutex<HashMap<SecretKey, SecretString>>,
         write_calls: AtomicUsize,
+        fail_calls: Mutex<std::collections::HashSet<usize>>,
+        fail_delete: Mutex<bool>,
     }
 
     impl FakeStore {
@@ -230,7 +300,8 @@ mod tests {
             value: &SecretString,
             _label: &str,
         ) -> Result<(), crate::error::StorageError> {
-            if self.write_calls.fetch_add(1, Ordering::SeqCst) == 1 {
+            let call = self.write_calls.fetch_add(1, Ordering::SeqCst);
+            if call == 1 || self.fail_calls.lock().unwrap().contains(&call) {
                 return Err(crate::error::StorageError::Keyring(crate::KeyringFailure::Unavailable));
             }
             self.values.lock().unwrap().insert(key.clone(), value.clone());
@@ -238,6 +309,9 @@ mod tests {
         }
 
         async fn delete(&self, _target: Uuid, key: &SecretKey) -> Result<(), crate::error::StorageError> {
+            if *self.fail_delete.lock().unwrap() {
+                return Err(crate::error::StorageError::Keyring(crate::KeyringFailure::Unavailable));
+            }
             self.values.lock().unwrap().remove(key);
             Ok(())
         }
@@ -274,5 +348,61 @@ mod tests {
         assert!(result.is_err());
         assert_eq!(store.value(&database_key).as_deref(), Some("old-database-secret"));
         assert_eq!(store.value(&hop_key).as_deref(), Some("old-hop-secret"));
+    }
+
+    #[tokio::test]
+    async fn a_later_connection_secret_failure_restores_earlier_imported_credentials() {
+        let first = Uuid::new_v4();
+        let second = Uuid::new_v4();
+        let first_secret = BundleSecrets::new(
+            Uuid::new_v4(),
+            Some(SecretString::new("first-secret".to_owned().into())),
+            None,
+            None,
+        );
+        let second_secret = BundleSecrets::new(
+            Uuid::new_v4(),
+            Some(SecretString::new("second-secret".to_owned().into())),
+            None,
+            None,
+        );
+        let store = FakeStore::default();
+
+        let result = store_import_secrets_with(
+            &store,
+            [(first, &first_secret, "first"), (second, &second_secret, "second")],
+        )
+        .await;
+
+        assert!(result.is_err());
+        assert_eq!(store.value(&SecretKey::DatabasePassword), None);
+    }
+
+    #[tokio::test]
+    async fn a_failed_credential_rollback_is_reported() {
+        let first = Uuid::new_v4();
+        let second = Uuid::new_v4();
+        let first_secret = BundleSecrets::new(
+            Uuid::new_v4(),
+            Some(SecretString::new("first-secret".to_owned().into())),
+            None,
+            None,
+        );
+        let second_secret = BundleSecrets::new(
+            Uuid::new_v4(),
+            Some(SecretString::new("second-secret".to_owned().into())),
+            None,
+            None,
+        );
+        let store = FakeStore::default();
+        *store.fail_delete.lock().unwrap() = true;
+
+        let result = store_import_secrets_with(
+            &store,
+            [(first, &first_secret, "first"), (second, &second_secret, "second")],
+        )
+        .await;
+
+        assert!(matches!(result, Err(StorageError::CredentialRollback { .. })));
     }
 }

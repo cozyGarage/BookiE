@@ -377,6 +377,7 @@ impl GridView {
             Ok(done) => done,
             Err(message) => {
                 self.save.busy = false;
+                self.save.checks.clear();
                 self.status = format!("Could not open a connection for saving: {message}");
                 self.show_banner(self.status.clone(), true, cx);
                 return;
@@ -403,6 +404,7 @@ impl GridView {
             }
             Err(failure) => {
                 self.save.busy = false;
+                self.save.checks.clear();
                 self.status = format!("Could not save: {}", with_resolve_hint(&failure.message));
                 self.show_banner(self.status.clone(), true, cx);
             }

@@ -15,7 +15,7 @@ pub(crate) struct BundleState {
 
 pub(crate) struct PendingImport {
     plan: bundles::ImportPlan,
-    secrets: Vec<bundles::BundleSecrets>,
+    body: bundles::BundleBody,
     skipped: Vec<String>,
 }
 
@@ -108,7 +108,7 @@ fn plan_body(body: bundles::BundleBody, skipped: Vec<String>) -> Result<Prepared
     let plan = bundles::plan_import(&local, &body).map_err(|error| error.to_string())?;
     Ok(PreparedImport::Review(PendingImport {
         plan,
-        secrets: body.secrets,
+        body,
         skipped,
     }))
 }
@@ -463,10 +463,10 @@ fn apply_import(pending: PendingImport) -> Result<usize, String> {
             .await
             .map_err(|_| "The import was cancelled because its audit record could not be saved".to_string())?;
         let started = Instant::now();
-        let outcome = apply_items(pending).await;
+        let outcome = apply_import_body(pending.body).await;
         let (status, affected) = match &outcome {
             Ok(count) => (bundles::AuditTerminalStatus::Succeeded, *count),
-            Err((count, _)) => (bundles::AuditTerminalStatus::Failed, *count),
+            Err(_) => (bundles::AuditTerminalStatus::Failed, 0),
         };
         if database
             .audit_administrative_action(
@@ -482,45 +482,15 @@ fn apply_import(pending: PendingImport) -> Result<usize, String> {
         {
             return Err("The import finished, but its audit outcome could not be saved".into());
         }
-        outcome.map_err(|(count, error)| format!("Imported {count} connection(s); {error}"))
+        outcome.map_err(|error| format!("The connection import was not applied: {error}"))
     })
 }
 
-async fn apply_items(pending: PendingImport) -> Result<usize, (usize, String)> {
-    let mut imported = 0;
-    for item in pending.plan.items {
-        let carried = pending
-            .secrets
-            .iter()
-            .find(|secret| secret.connection_id == item.source_id);
-        let single = bundles::ImportPlan {
-            items: vec![item.clone()],
-        };
-        if let Err(error) = bundles::apply_import(&single).await {
-            return Err((imported, format!("the connection could not be saved: {error}")));
-        }
-        if let Some(secrets) = carried {
-            if bundles::store_bundle_secrets(item.connection.id, secrets, &item.connection.name, false)
-                .await
-                .is_err()
-            {
-                let restored = bundles::restore_connection(item.previous.as_ref(), item.connection.id)
-                    .await
-                    .is_ok();
-                if restored
-                    && matches!(
-                        item.disposition,
-                        bundles::ImportDisposition::New | bundles::ImportDisposition::Remapped
-                    )
-                {
-                    bundles::forget_imported_bundle_secrets(item.connection.id, secrets).await;
-                }
-                return Err((imported, "a saved credential could not be stored".into()));
-            }
-        }
-        imported += 1;
-    }
-    Ok(imported)
+async fn apply_import_body(body: bundles::BundleBody) -> Result<usize, String> {
+    Box::pin(bundles::apply_import_body(&body))
+        .await
+        .map(|plan| plan.items.len())
+        .map_err(|error| error.to_string())
 }
 
 fn export_connections(path: PathBuf) -> Result<usize, String> {
@@ -662,7 +632,7 @@ mod tests {
         };
         let pending = PendingImport {
             plan: bundles::plan_import(&[], &body).expect("valid review fixture"),
-            secrets: Vec::new(),
+            body,
             skipped: Vec::new(),
         };
 

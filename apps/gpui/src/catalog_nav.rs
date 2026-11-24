@@ -359,6 +359,7 @@ impl GridView {
     pub(super) fn discard_view_edits(&mut self) {
         self.edits_changed();
         self.reset_edit_history();
+        self.save.checks.clear();
         self.cell_edit.active = None;
         self.cell_edit.edits.clear();
         self.cell_edit.table.clear();

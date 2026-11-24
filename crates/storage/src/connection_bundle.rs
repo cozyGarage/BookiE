@@ -16,6 +16,7 @@ use crate::connection_bundle_crypto::{
 };
 use crate::connection_organization::ConnectionOrganization;
 use crate::connections::{SavedConnection, SavedSshConfig};
+use crate::error::StorageError;
 
 #[path = "connection_bundle_secret_transaction.rs"]
 mod secret_transaction;
@@ -102,6 +103,24 @@ pub enum BundleError {
     EmptyPassphrase,
     #[error("the saved password for connection {0} could not be read")]
     SecretUnavailable(Uuid),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ImportApplyError {
+    #[error(transparent)]
+    Bundle(#[from] BundleError),
+    #[error(transparent)]
+    Storage(#[from] StorageError),
+    #[error("credential storage failed ({store}); restoring saved connections also failed ({restore})")]
+    Rollback { store: StorageError, restore: StorageError },
+}
+
+pub async fn apply_import_body(body: &BundleBody) -> Result<ImportPlan, ImportApplyError> {
+    crate::connections::apply_import_body(body).await
+}
+
+pub(crate) async fn store_import_secrets(plan: &ImportPlan, secrets: &[BundleSecrets]) -> Result<(), StorageError> {
+    secret_transaction::store_import_secrets(plan, secrets).await
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

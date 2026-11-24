@@ -31,6 +31,9 @@ impl ResultSource for FitSource {
     fn total(&self) -> u64 {
         1
     }
+    fn editable(&self) -> bool {
+        true
+    }
     fn row(&self, _: u64) -> Vec<Cell> {
         self.row.clone()
     }
@@ -46,6 +49,84 @@ impl ResultSource for FitSource {
     fn compare(&self, _: bool, _: &CancellationToken) -> Result<Diff, &'static str> {
         Err("unused")
     }
+}
+
+#[gpui::test]
+fn multiline_and_large_binary_edits_use_full_value_editor_without_staging_unchanged_values(
+    cx: &mut TestAppContext,
+) {
+    let source = Arc::new(FitSource {
+        columns: vec![
+            ColumnMeta {
+                name: "id".into(),
+                width: 120.0,
+                numeric: true,
+                data_type: "integer".into(),
+                primary_key: true,
+            },
+            ColumnMeta {
+                name: "payload".into(),
+                width: 120.0,
+                numeric: false,
+                data_type: "bytea".into(),
+                primary_key: false,
+            },
+            ColumnMeta {
+                name: "large_payload".into(),
+                width: 120.0,
+                numeric: false,
+                data_type: "bytea".into(),
+                primary_key: false,
+            },
+            ColumnMeta {
+                name: "oversized_payload".into(),
+                width: 120.0,
+                numeric: false,
+                data_type: "bytea".into(),
+                primary_key: false,
+            },
+        ],
+        row: vec![
+            Cell::Int(1),
+            Cell::Bytes(b"first\nsecond".to_vec()),
+            Cell::Bytes(vec![b'x'; 513]),
+            Cell::Bytes(vec![b'y'; 524_288]),
+        ],
+    });
+    cx.update(text_input::bind_keys);
+    let (view, cx) = cx.add_window_view(|window, cx| GridView::with_source(source, Instant::now(), window, cx));
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.set_binary_mode(1, crate::binary_mode::BinaryMode::Utf8, cx);
+            view.start_edit(0, 1, window, cx);
+        });
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, cx| {
+        let editing = view.cell_edit.active.as_ref().expect("binary cell is being edited");
+        assert_eq!(editing.binary_mode, Some(crate::binary_mode::BinaryMode::Utf8));
+        assert!(editing.full_value);
+        assert_eq!(view.cell_edit.value_editor.read(cx).value().as_ref(), "first\nsecond");
+    });
+    cx.update(|window, cx| view.update(cx, |view, cx| view.apply_active_cell_edit(window, cx)));
+    view.read_with(cx, |view, _| assert!(view.cell_edit.edits.is_empty()));
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.set_binary_mode(2, crate::binary_mode::BinaryMode::Utf8, cx);
+            view.start_edit(0, 2, window, cx);
+        });
+    });
+    view.read_with(cx, |view, cx| {
+        assert!(view.cell_edit.active.as_ref().is_some_and(|editing| editing.full_value));
+        assert_eq!(view.cell_edit.value_editor.read(cx).value().len(), 513);
+    });
+    cx.update(|window, cx| view.update(cx, |view, cx| view.apply_active_cell_edit(window, cx)));
+    view.read_with(cx, |view, _| assert!(view.cell_edit.edits.is_empty()));
+    cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(0, 3, window, cx)));
+    view.read_with(cx, |view, _| {
+        assert!(view.cell_edit.active.is_none());
+        assert!(view.status.contains("1 MiB"));
+    });
 }
 
 #[gpui::test]

@@ -2051,6 +2051,32 @@ fn a_saved_edit_is_verified_by_re_reading_the_row(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn failed_save_and_discard_clear_verification_records(cx: &mut TestAppContext) {
+    let path = fixture_copy("failed-save-check");
+    let (view, cx) = saving_view(cx, &path);
+    let check = bookie_gpui::save_check::CellCheck {
+        key: vec![bookie_gpui::model::Cell::Int(1)],
+        column: 1,
+        value: bookie_gpui::model::Cell::Text("stale".into()),
+    };
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.save.checks = vec![check.clone()];
+            view.finish_save(uuid::Uuid::new_v4(), "Saved".into(), Err("offline".into()), cx);
+        });
+    });
+    view.read_with(cx, |view, _| assert!(view.save.checks.is_empty()));
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.save.checks = vec![check];
+            view.discard_view_edits();
+        });
+    });
+    view.read_with(cx, |view, _| assert!(view.save.checks.is_empty()));
+    std::fs::remove_file(path).ok();
+}
+
+#[gpui::test]
 fn paste_into_a_read_only_query_result_does_not_stage_edits(cx: &mut TestAppContext) {
     use bookie_gpui::live::{LiveSession, Origin};
 
