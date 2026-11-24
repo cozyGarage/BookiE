@@ -1,11 +1,15 @@
 use std::time::Instant;
 
 use gpui::TestAppContext;
+use gpui_kit::test::TestWindowExt;
 
 use crate::GridView;
 use crate::live_ui_tests::open_live;
 use crate::text_input;
 use bookie_core::TableInfo;
+
+#[path = "paste_literal_save_tests.rs"]
+mod paste_literal_save_tests;
 
 struct TestDirectory(std::path::PathBuf);
 
@@ -1986,7 +1990,7 @@ fn grid_paste_shortcut_stages_clipboard_values(cx: &mut TestAppContext) {
             view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 1 });
         });
     });
-    cx.simulate_keystrokes("ctrl-v");
+    cx.simulate_keystrokes("secondary-v");
     view.read_with(cx, |view, _| {
         assert_eq!(view.cell_edit.edits.get(&(0, 1)), Some(&bookie_gpui::model::Cell::Text("Shortcut value".into())), "{}", view.status);
     });
@@ -2007,10 +2011,42 @@ fn paste_shortcut_in_filter_does_not_edit_grid(cx: &mut TestAppContext) {
             window.focus(&view.search.filter.read(cx).focus_handle(cx), cx);
         });
     });
-    cx.simulate_keystrokes("ctrl-v");
+    cx.simulate_keystrokes("secondary-v");
     view.read_with(cx, |view, cx| {
         assert!(view.cell_edit.edits.is_empty());
         assert_eq!(view.search.filter.read(cx).content().to_string(), "filter text");
+    });
+    std::fs::remove_file(path).ok();
+}
+
+#[gpui::test]
+fn paste_into_a_read_only_query_result_does_not_stage_edits(cx: &mut TestAppContext) {
+    use bookie_gpui::live::{LiveSession, Origin};
+
+    let path = fixture_copy("paste-read-only-query");
+    let session = LiveSession::open(&Origin::File(path.clone())).expect("open SQLite fixture");
+    let result = std::sync::Arc::new(
+        session
+            .run_query("SELECT customer FROM orders", 100)
+            .expect("query result"),
+    );
+    cx.update(text_input::bind_keys);
+    let (view, cx) = cx.add_window_view(|window, cx| {
+        GridView::with_source(result.clone(), Instant::now(), window, cx)
+    });
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    view.read_with(cx, |view, _| assert!(!view.source.editable()));
+    cx.update(|_, cx| {
+        cx.write_to_clipboard(gpui::ClipboardItem::new_string("not editable".into()));
+        view.update(cx, |view, cx| {
+            view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 0 });
+            view.paste_cells(cx);
+        });
+    });
+    view.read_with(cx, |view, _| {
+        assert!(view.cell_edit.edits.is_empty(), "{}", view.status);
+        assert!(view.status.contains("cannot be edited"), "{}", view.status);
     });
     std::fs::remove_file(path).ok();
 }
