@@ -332,7 +332,11 @@ impl GridView {
         };
         vec![
             action("quick-switcher", "Go to table", !self.catalog.tables.is_empty()),
-            action("jump-column", "Jump to column", self.tabs.shows_grid_for(&self.catalog.grid_table)),
+            action(
+                "jump-column",
+                "Jump to column",
+                self.tabs.shows_grid_for(&self.catalog.grid_table),
+            ),
             action("shortcuts", "Keyboard shortcuts", true),
             action(
                 "save-favorite",
@@ -486,9 +490,11 @@ impl GridView {
                 !self.catalog.tables.is_empty(),
             ),
         ];
-        if self.live.as_ref().is_some_and(|session| {
-            bookie_app_services::schema_context::supports_schema_context(&session.driver_id)
-        }) {
+        if self
+            .live
+            .as_ref()
+            .is_some_and(|session| bookie_app_services::schema_context::supports_schema_context(&session.driver_id))
+        {
             actions.push(action("schema-context", &schema_context, true));
         }
         actions

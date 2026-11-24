@@ -216,7 +216,10 @@ pub fn parse_predicate(input: &str, columns: &[ColumnMeta]) -> Result<Predicate,
     let Some((_, column, rest)) = matched else {
         let name = input.split(' ').next().unwrap_or("");
         let names: Vec<&str> = columns.iter().map(|column| column.name.as_str()).collect();
-        return Err(format!("There is no column named {name}. Columns: {}", names.join(", ")));
+        return Err(format!(
+            "There is no column named {name}. Columns: {}",
+            names.join(", ")
+        ));
     };
     let (operator, text) = rest.split_once(' ').unwrap_or((rest, ""));
     let op = Op::parse(operator).ok_or_else(|| format!("Use contains, = or != after the column, {example}"))?;

@@ -3,8 +3,8 @@ use bookie_gpui::theme::{Theme, size};
 use gpui::{Div, Stateful, div, prelude::*, px, relative, rgb};
 use gpui_component::checkbox::Checkbox;
 
-use bookie_gpui::model::{Cell, ColumnMeta};
 use crate::GridView;
+use bookie_gpui::model::{Cell, ColumnMeta};
 
 const MONO: &str = "monospace";
 
@@ -165,15 +165,17 @@ impl GridView {
                     .min_w_0()
                     .child(self.row_detail_filter.clone()),
             )
-            .child(div().debug_selector(|| "row-detail-hide-null".into()).child(
-                Checkbox::new("row-detail-hide-null")
-                    .label("Hide NULL fields")
-                    .checked(self.row_detail_hide_null)
-                    .on_change(cx.listener(|this, checked, _, cx| {
-                        this.row_detail_hide_null = *checked;
-                        cx.notify();
-                    })),
-            ));
+            .child(
+                div().debug_selector(|| "row-detail-hide-null".into()).child(
+                    Checkbox::new("row-detail-hide-null")
+                        .label("Hide NULL fields")
+                        .checked(self.row_detail_hide_null)
+                        .on_change(cx.listener(|this, checked, _, cx| {
+                            this.row_detail_hide_null = *checked;
+                            cx.notify();
+                        })),
+                ),
+            );
         Some(
             div()
                 .id("row-detail")
@@ -277,7 +279,14 @@ mod tests {
 
     #[test]
     fn row_details_filter_names_and_display_values_without_losing_typed_nulls() {
-        let columns = [column("tag"), column("tag"), column("empty"), column("optional"), column("payload"), column("unicode")];
+        let columns = [
+            column("tag"),
+            column("tag"),
+            column("empty"),
+            column("optional"),
+            column("payload"),
+            column("unicode"),
+        ];
         let row = [
             Value::Text("first".into()),
             Value::Text("second".into()),

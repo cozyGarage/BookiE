@@ -37,11 +37,7 @@ struct PinScope {
 
 impl PinScope {
     fn width_key(&self) -> String {
-        bookie_app_services::column_widths::table_scope_key(
-            &self.database,
-            self.schema.as_deref(),
-            &self.table,
-        )
+        bookie_app_services::column_widths::table_scope_key(&self.database, self.schema.as_deref(), &self.table)
     }
 }
 
@@ -1641,7 +1637,11 @@ mod tests {
         let audit_key = audit_users.width_key();
         let hidden_by_scope = HashMap::from([(public_key, HashSet::from(["email"]))]);
 
-        assert!(hidden_by_scope.get(&audit_key).is_none_or(|hidden| !hidden.contains("email")));
+        assert!(
+            hidden_by_scope
+                .get(&audit_key)
+                .is_none_or(|hidden| !hidden.contains("email"))
+        );
     }
 
     #[test]

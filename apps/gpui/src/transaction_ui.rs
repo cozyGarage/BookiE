@@ -39,40 +39,49 @@ impl GridView {
         self.transaction_starting = true;
         self.invalidate_background();
         cx.spawn(async move |this, cx| {
-            let mut opened = Some(cx.background_executor().spawn(async move {
-                let write = Arc::new(WriteSession::open_saved(
-                    connection_id,
-                    approvals,
-                    opened_with.as_deref(),
-                )?);
-                let shared = write.begin_transaction()?;
-                Ok::<_, String>((write, shared))
-            }).await);
+            let mut opened = Some(
+                cx.background_executor()
+                    .spawn(async move {
+                        let write = Arc::new(WriteSession::open_saved(
+                            connection_id,
+                            approvals,
+                            opened_with.as_deref(),
+                        )?);
+                        let shared = write.begin_transaction()?;
+                        Ok::<_, String>((write, shared))
+                    })
+                    .await,
+            );
             let applied = this.update(cx, |this, cx| {
                 this.transaction_starting = false;
                 match opened.take() {
-                Some(Ok((write, shared))) => {
-                    this.transaction = Some(TransactionState {
-                        write,
-                        shared,
-                        started: Instant::now(),
-                        last_activity: Instant::now(),
-                        statements: 0,
-                        finishing: false,
-                        running: false,
-                    });
-                    this.refresh_while_transaction_open(cx);
-                    this.status = "Transaction open: statements run in it until you commit or roll back".into();
-                }
-                Some(Err(message)) => this.status = format!("Could not start a transaction: {message}"),
-                None => return,
+                    Some(Ok((write, shared))) => {
+                        this.transaction = Some(TransactionState {
+                            write,
+                            shared,
+                            started: Instant::now(),
+                            last_activity: Instant::now(),
+                            statements: 0,
+                            finishing: false,
+                            running: false,
+                        });
+                        this.refresh_while_transaction_open(cx);
+                        this.status = "Transaction open: statements run in it until you commit or roll back".into();
+                    }
+                    Some(Err(message)) => this.status = format!("Could not start a transaction: {message}"),
+                    None => return,
                 }
                 cx.notify();
             });
-            if applied.is_err() && let Some(Ok((write, shared))) = opened {
-                cx.background_executor().spawn(async move { write.close_transaction(&shared) }).await;
+            if applied.is_err()
+                && let Some(Ok((write, shared))) = opened
+            {
+                cx.background_executor()
+                    .spawn(async move { write.close_transaction(&shared) })
+                    .await;
             }
-        }).detach();
+        })
+        .detach();
     }
 
     pub(crate) fn run_in_transaction(&mut self, sql: String, cx: &mut Context<Self>) {
@@ -261,7 +270,11 @@ impl GridView {
             .gap_2()
             .child({
                 let warning = self.transaction_idle_warning();
-                let color = if warning.is_some() { theme.destructive } else { theme.warning };
+                let color = if warning.is_some() {
+                    theme.destructive
+                } else {
+                    theme.warning
+                };
                 div()
                     .id("transaction-badge")
                     .debug_selector(|| "transaction-badge".into())
@@ -280,16 +293,24 @@ impl GridView {
                         elapsed / 60,
                         elapsed % 60,
                         transaction.statements,
-                        if self.transaction_idle_warning().is_some() { " · idle" } else { "" }
+                        if self.transaction_idle_warning().is_some() {
+                            " · idle"
+                        } else {
+                            ""
+                        }
                     ))
             })
-            .child(ghost("commit-transaction", "Commit", theme).on_click(cx.listener(|this, _, _, cx| {
-                this.end_transaction(true, cx);
-                cx.notify();
-            })))
-            .child(ghost("rollback-transaction", "Roll back", theme).on_click(cx.listener(|this, _, _, cx| {
-                this.end_transaction(false, cx);
-                cx.notify();
-            })))
+            .child(
+                ghost("commit-transaction", "Commit", theme).on_click(cx.listener(|this, _, _, cx| {
+                    this.end_transaction(true, cx);
+                    cx.notify();
+                })),
+            )
+            .child(
+                ghost("rollback-transaction", "Roll back", theme).on_click(cx.listener(|this, _, _, cx| {
+                    this.end_transaction(false, cx);
+                    cx.notify();
+                })),
+            )
     }
 }
