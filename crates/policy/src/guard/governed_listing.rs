@@ -28,6 +28,37 @@ impl PolicyGuard {
         result
     }
 
+    pub(super) async fn governed_table_sizes(
+        &self,
+        schema: Option<&str>,
+    ) -> Result<Vec<bookie_core::TableSize>, DriverError> {
+        let operation = self.metadata_operation("TABLE SIZES", Vec::new());
+        self.prepare_governed_read(&operation).await?;
+        let start = Instant::now();
+        let result = self.caught_read("TABLE SIZES", self.inner.table_sizes(schema)).await;
+        let rows = result.as_ref().ok().map(|sizes| sizes.len() as u64);
+        self.audit_read_result(&operation, start, &result, rows).await?;
+        result
+    }
+
+    pub(super) async fn governed_table_sizes_controlled(
+        &self,
+        schema: Option<&str>,
+        control: &OperationControl,
+    ) -> Result<Vec<bookie_core::TableSize>, DriverError> {
+        check_pre_dispatch(control)?;
+        let operation = self.metadata_operation("TABLE SIZES", Vec::new());
+        self.prepare_governed_read(&operation).await?;
+        let start = Instant::now();
+        let result = self
+            .caught_read("TABLE SIZES", self.inner.table_sizes_controlled(schema, control))
+            .await;
+        let rows = result.as_ref().ok().map(|sizes| sizes.len() as u64);
+        self.audit_controlled_read_result(&operation, start, &result, rows)
+            .await?;
+        result
+    }
+
     pub(super) async fn governed_list_databases(&self) -> Result<Vec<String>, DriverError> {
         let operation = self.metadata_operation("LIST DATABASES", Vec::new());
         self.prepare_governed_read(&operation).await?;

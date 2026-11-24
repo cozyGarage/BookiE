@@ -33,6 +33,18 @@ impl Connection for PolicyGuard {
         self.governed_list_databases_controlled(control).await
     }
 
+    async fn table_sizes(&self, schema: Option<&str>) -> Result<Vec<bookie_core::TableSize>, DriverError> {
+        self.governed_table_sizes(schema).await
+    }
+
+    async fn table_sizes_controlled(
+        &self,
+        schema: Option<&str>,
+        control: &OperationControl,
+    ) -> Result<Vec<bookie_core::TableSize>, DriverError> {
+        self.governed_table_sizes_controlled(schema, control).await
+    }
+
     async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
         self.governed_list_tables().await
     }

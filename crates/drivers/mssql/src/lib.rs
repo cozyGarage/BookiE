@@ -481,6 +481,36 @@ impl Connection for MssqlConnection {
         Ok(result.rows.iter().filter_map(|row| as_text(row.first())).collect())
     }
 
+    async fn table_sizes(&self, schema: Option<&str>) -> Result<Vec<bookie_core::TableSize>, DriverError> {
+        let sql = "SELECT TOP (10000) s.name, t.name, CAST(SUM(a.used_pages) AS bigint) * 8192
+             FROM sys.tables t
+             JOIN sys.schemas s ON s.schema_id = t.schema_id
+             JOIN sys.partitions p ON p.object_id = t.object_id
+             JOIN sys.allocation_units a ON a.container_id = p.partition_id
+             WHERE (@P1 IS NULL OR s.name = @P1)
+             GROUP BY s.name, t.name
+             ORDER BY s.name, t.name";
+        let schema = schema.map_or(Value::Null, |schema| Value::Text(schema.to_string()));
+        let mut client = self.client().await?;
+        let result = self
+            .query_result(&mut client, sql, &[schema], bookie_core::MAX_TABLE_SIZES)
+            .await?;
+        Ok(result
+            .rows
+            .iter()
+            .filter_map(|row| {
+                Some(bookie_core::TableSize {
+                    schema: as_text(row.first()),
+                    name: as_text(row.get(1))?,
+                    bytes: match row.get(2) {
+                        Some(Value::Int(bytes)) => u64::try_from(*bytes).unwrap_or(0),
+                        _ => 0,
+                    },
+                })
+            })
+            .collect())
+    }
+
     async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
         self.list_relations("sys.tables").await
     }

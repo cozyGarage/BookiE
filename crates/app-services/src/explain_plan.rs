@@ -173,7 +173,11 @@ mod tests {
         let analyzed = parse_plan(
             "Gather  (cost=0.00..90.00 rows=10 width=4) (actual time=0.1..9.0 rows=2 loops=1)\n  ->  Parallel Seq Scan on big  (cost=0.00..80.00 rows=50 width=4) (actual time=0.01..5.00 rows=40000 loops=1)\n  ->  Seq Scan on small  (cost=0.00..1.00 rows=999 width=4)",
         );
-        assert_eq!(full_scan_rows(&analyzed[1]), Some(40000.0), "actual rows win over the estimate");
+        assert_eq!(
+            full_scan_rows(&analyzed[1]),
+            Some(40000.0),
+            "actual rows win over the estimate"
+        );
         assert_eq!(full_scan_rows(&analyzed[2]), None, "below the threshold");
         let sqlite = parse_plan("2 | 0 | 0 | SCAN orders");
         assert_eq!(full_scan_rows(&sqlite[0]), None, "SQLite plans carry no row counts");

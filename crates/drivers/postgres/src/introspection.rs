@@ -164,6 +164,43 @@ pub(crate) async fn read_list_collations(
         .collect())
 }
 
+pub(crate) const TABLE_SIZES_SQL: &str = "SELECT n.nspname, c.relname,
+        (c.relpages::bigint + COALESCE(t.relpages, 0)::bigint
+         + COALESCE((SELECT sum(i.relpages)::bigint FROM pg_catalog.pg_index x
+                     JOIN pg_catalog.pg_class i ON i.oid = x.indexrelid
+                     WHERE x.indrelid = c.oid), 0))
+        * current_setting('block_size')::bigint
+     FROM pg_catalog.pg_class c
+     JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+     LEFT JOIN pg_catalog.pg_class t ON t.oid = c.reltoastrelid
+     WHERE c.relkind IN ('r', 'p', 'm')
+       AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+       AND n.nspname NOT LIKE 'pg\\_toast%' AND n.nspname NOT LIKE 'pg\\_temp\\_%'
+       AND ($1::text IS NULL OR n.nspname = $1)
+       AND pg_catalog.has_table_privilege(c.oid, 'SELECT')
+     ORDER BY n.nspname, c.relname
+     LIMIT $2";
+
+pub(crate) async fn read_table_sizes(
+    connection: &mut sqlx::PgConnection,
+    schema: Option<&str>,
+) -> Result<Vec<bookie_core::TableSize>, DriverError> {
+    let rows = sqlx::query(TABLE_SIZES_SQL)
+        .bind(schema)
+        .bind(i64::try_from(bookie_core::MAX_TABLE_SIZES).unwrap_or(i64::MAX))
+        .fetch_all(&mut *connection)
+        .await
+        .map_err(map_sqlx_error)?;
+    Ok(rows
+        .into_iter()
+        .map(|row| bookie_core::TableSize {
+            schema: Some(row.get::<String, _>(0)),
+            name: row.get::<String, _>(1),
+            bytes: u64::try_from(row.get::<Option<i64>, _>(2).unwrap_or(0)).unwrap_or(0),
+        })
+        .collect())
+}
+
 pub(crate) async fn read_list_databases(connection: &mut sqlx::PgConnection) -> Result<Vec<String>, DriverError> {
     let rows = sqlx::query(
         "SELECT datname FROM pg_catalog.pg_database

@@ -55,6 +55,15 @@ pub struct ForeignKeyInfo {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TableSize {
+    pub schema: Option<String>,
+    pub name: String,
+    pub bytes: u64,
+}
+
+pub const MAX_TABLE_SIZES: usize = 10_000;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InboundForeignKeyInfo {
     pub name: String,
     pub source_schema: Option<String>,
