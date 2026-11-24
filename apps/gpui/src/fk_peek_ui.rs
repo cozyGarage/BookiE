@@ -69,10 +69,10 @@ impl GridView {
                                         .bg(rgb(theme.accent))
                                         .text_xs()
                                         .cursor_pointer()
-                                        .child("Open in new tab")
+                                        .child("Run in query results")
                                         .on_click(cx.listener(move |this, _, _, cx| {
+                                            this.clear_fk_peek();
                                             this.run_sql_with(sql.clone(), params.clone(), cx);
-                                            this.fk_peek = None;
                                             cx.notify();
                                         })),
                                 )
@@ -84,7 +84,7 @@ impl GridView {
                                         .cursor_pointer()
                                         .child(crate::assets::icon("x", theme.muted_foreground))
                                         .on_click(cx.listener(|this, _, _, cx| {
-                                            this.fk_peek = None;
+                                            this.clear_fk_peek();
                                             cx.notify();
                                         })),
                                 ),

@@ -5,6 +5,7 @@ pub(crate) struct RunSlot {
     pub edits: grid_edit::Edits,
     pub source: Option<Source>,
     pub failure: Option<String>,
+    pub cancel_process: bool,
 }
 
 impl RunSlot {
@@ -14,7 +15,25 @@ impl RunSlot {
             edits: grid_edit::Edits::new(),
             source,
             failure: None,
+            cancel_process: false,
         }
+    }
+}
+
+fn original_error_location(
+    mapping: Option<(String, bookie_core::NamedParameters)>,
+    sql: &str,
+    position: Option<usize>,
+) -> (String, Option<usize>) {
+    match mapping {
+        Some((original, map)) if map.sql == sql => {
+            let position = position
+                .and_then(|position| map.source_byte_for_position(&original, position))
+                .map(|byte| original[..byte].chars().count() + 1);
+            (original, position)
+        }
+        Some((original, _)) => (original, None),
+        None => (sql.to_string(), position),
     }
 }
 
@@ -92,6 +111,7 @@ impl GridView {
         mapping: Option<(String, bookie_core::NamedParameters)>,
         cx: &mut Context<Self>,
     ) {
+        let cancel_process = std::mem::take(&mut self.pending_cancel_process);
         if self.save.busy {
             self.status = "A save is running; wait for it to finish first".into();
             return;
@@ -165,14 +185,14 @@ impl GridView {
                         (statement, source, mapping, started.elapsed(), result)
                     }
                 },
-                |this, (sql, source, mapping, elapsed, result)| match result {
+                move |this, (sql, source, mapping, elapsed, result)| match result {
                     Ok(table) => {
                         this.panel.error_location = None;
                         let (rows, truncated) = (bookie_gpui::source::ResultSource::total(&table), table.truncated);
                         this.panel.messages.statement_ok(&sql, rows, truncated, elapsed);
                         this.panel.messages.server_messages(&table.messages);
                         this.show_plan_of(&table);
-                        this.add_run(Some(std::sync::Arc::new(table)));
+                        this.add_run_with_cancel_process(Some(std::sync::Arc::new(table)), cancel_process);
                         if let Some(slot) = this.run_tabs.slots.last_mut() {
                             slot.run.elapsed_ms = Some(u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX));
                         }
@@ -185,17 +205,7 @@ impl GridView {
                         };
                         this.panel.messages.statement_failed(&sql, &detail, elapsed);
                         this.add_failed_run(detail, elapsed);
-                        let (original, position) = match mapping {
-                            Some((original, map)) if map.sql == sql => {
-                                let mapped = error
-                                    .position
-                                    .and_then(|position| map.source_byte_for_position(&original, position))
-                                    .map(|byte| original[..byte].chars().count() + 1);
-                                (original, mapped)
-                            }
-                            Some((original, _)) => (original, None),
-                            None => (sql.clone(), error.position),
-                        };
+                        let (original, position) = original_error_location(mapping, &sql, error.position);
                         this.panel.error_location = position
                             .zip(this.panel.messages.entries().last())
                             .map(|(position, message)| (original, position, message.id, source));
@@ -243,12 +253,18 @@ impl GridView {
     }
 
     pub(crate) fn add_run(&mut self, source: Option<Source>) {
+        self.add_run_with_cancel_process(source, false);
+    }
+
+    fn add_run_with_cancel_process(&mut self, source: Option<Source>, cancel_process: bool) {
         let mut run = next_run(self.run_tabs.next_number);
         if let Some(source) = &source {
             run.rows = source.total();
         }
         self.run_tabs.next_number += 1;
-        self.run_tabs.slots.push(RunSlot::new(run, source));
+        let mut slot = RunSlot::new(run, source);
+        slot.cancel_process = cancel_process;
+        self.run_tabs.slots.push(slot);
         self.activate_run(self.run_tabs.slots.len() - 1);
     }
 
@@ -312,6 +328,9 @@ impl GridView {
                 return;
             }
         };
+        if query {
+            self.clear_fk_peek();
+        }
         if query == self.grid_is_query {
             return;
         }
