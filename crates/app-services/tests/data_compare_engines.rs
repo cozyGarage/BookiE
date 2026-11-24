@@ -158,6 +158,24 @@ async fn round_trip(engine: Engine, connection: Box<dyn Connection>) {
     assert!(events.iter().any(|event| event.phase == AuditRecordPhase::Outcome));
 }
 
+async fn assert_text_keyset_boundary(connection: &dyn Connection, engine: &Engine, create: &str, trailing_key: &str) {
+    for table in ["src", "dst"] {
+        connection.execute(&create.replace("{table}", table)).await.unwrap();
+    }
+    let mut codes: Vec<_> = (0..999).map(|index| format!("a{index:04}")).collect();
+    codes.extend(["a©".to_owned(), trailing_key.to_owned()]);
+    let rows: Vec<_> = codes
+        .into_iter()
+        .map(|code| vec![Value::Text(code), Value::Int(0), Value::Null, Value::Float(0.0)])
+        .collect();
+    insert(engine.driver_id, connection, "src", &rows).await;
+    insert(engine.driver_id, connection, "dst", &rows).await;
+
+    let result = compare(engine, connection).await;
+    assert!(result.is_identical(), "{:?}", result.counts);
+    assert_eq!(result.counts.same, 1_001);
+}
+
 #[tokio::test]
 #[ignore = "requires Docker; run cargo test -p bookie-app-services --test data_compare_engines -- --include-ignored"]
 async fn postgres_round_trip_makes_the_tables_identical() {
@@ -221,6 +239,40 @@ async fn mysql_round_trip_makes_the_tables_identical() {
 }
 
 #[tokio::test]
+#[ignore = "requires Docker; run cargo test -p bookie-app-services --test data_compare_engines -- --include-ignored"]
+async fn mysql_latin1_keyset_pages_do_not_skip_after_a_multibyte_key() {
+    let container = testcontainers_modules::mysql::Mysql::default()
+        .with_tag("8.4.13")
+        .with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test")
+        .with_cmd([
+            "--mysql-native-password=ON",
+            "--authentication-policy=mysql_native_password",
+        ])
+        .with_startup_timeout(std::time::Duration::from_secs(180))
+        .start()
+        .await
+        .unwrap();
+    let connection = drivers_mysql::MysqlDriver
+        .connect(ConnectOptions {
+            host: container.get_host().await.unwrap().to_string(),
+            port: container.get_host_port_ipv4(3306).await.unwrap(),
+            database: "test".into(),
+            username: "root".into(),
+            password: SecretString::from("bookie_test"),
+            tls: TlsConfig::disabled(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let engine = Engine {
+        driver_id: "mysql",
+        schema: Some("test"),
+        create: "CREATE TABLE {table} (code VARCHAR(20) CHARACTER SET latin1 NOT NULL, n INT NOT NULL, note TEXT, price DOUBLE, PRIMARY KEY (code, n))",
+    };
+    assert_text_keyset_boundary(connection.as_ref(), &engine, engine.create, "a®").await;
+}
+
+#[tokio::test]
 async fn sqlite_round_trip_makes_the_tables_identical() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("compare.db");
@@ -279,4 +331,51 @@ async fn sql_server_round_trip_makes_the_tables_identical() {
         create: "CREATE TABLE {table} (code NVARCHAR(20) NOT NULL, n INT NOT NULL, note NVARCHAR(200), price FLOAT, PRIMARY KEY (code, n))",
     };
     round_trip(engine, connection.expect("SQL Server accepts a login")).await;
+}
+
+#[tokio::test]
+#[ignore = "requires Docker; run cargo test -p bookie-app-services --test data_compare_engines -- --include-ignored"]
+async fn sql_server_varchar_keyset_pages_use_unicode_binary_order() {
+    let container = testcontainers_modules::mssql_server::MssqlServer::default()
+        .with_accept_eula()
+        .with_tag("2022-CU23-ubuntu-22.04")
+        .with_startup_timeout(std::time::Duration::from_secs(180))
+        .start()
+        .await
+        .unwrap();
+    let options = ConnectOptions {
+        host: container.get_host().await.unwrap().to_string(),
+        port: container.get_host_port_ipv4(1433).await.unwrap(),
+        database: "master".into(),
+        username: "sa".into(),
+        password: SecretString::new(
+            testcontainers_modules::mssql_server::MssqlServer::DEFAULT_SA_PASSWORD
+                .to_string()
+                .into(),
+        ),
+        tls: TlsConfig::disabled(),
+        ..Default::default()
+    };
+    let mut connection = None;
+    for _ in 0..60 {
+        if let Ok(opened) = drivers_mssql::MssqlDriver.connect(options.clone()).await
+            && opened.query("SELECT 1").await.is_ok()
+        {
+            connection = Some(opened);
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+    }
+    let engine = Engine {
+        driver_id: "mssql",
+        schema: Some("dbo"),
+        create: "CREATE TABLE {table} (code VARCHAR(20) COLLATE Latin1_General_100_BIN2 NOT NULL, n INT NOT NULL, note NVARCHAR(200), price FLOAT, PRIMARY KEY (code, n))",
+    };
+    assert_text_keyset_boundary(
+        connection.as_ref().expect("SQL Server accepts a login").as_ref(),
+        &engine,
+        engine.create,
+        "a€",
+    )
+    .await;
 }
