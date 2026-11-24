@@ -120,6 +120,32 @@ async fn applying_an_import_preserves_safety_changes_made_after_review() {
 }
 
 #[tokio::test]
+async fn import_rejects_a_collision_changed_after_review() {
+    use crate::connection_bundle::{BundleBody, BundleConnection, ImportApplyError, plan_import};
+
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("connections.json");
+    let incoming = sample_connection();
+    let mut existing = incoming.clone();
+    existing.host = "other.example".into();
+    save_to(&path, std::slice::from_ref(&existing)).await.unwrap();
+    let body = BundleBody {
+        connections: vec![BundleConnection::from_saved(&incoming)],
+        ..Default::default()
+    };
+    let reviewed = plan_import(&[existing], &body).unwrap();
+    let mut concurrent = incoming.clone();
+    concurrent.name = "Changed after review".into();
+    save_to(&path, std::slice::from_ref(&concurrent)).await.unwrap();
+
+    assert!(matches!(
+        apply_reviewed_import_body_to(&path, &body, &reviewed).await,
+        Err(ImportApplyError::StaleReview)
+    ));
+    assert_eq!(load_from(&path).await.unwrap(), vec![concurrent]);
+}
+
+#[tokio::test]
 async fn an_import_never_removes_a_connection_the_bundle_omits() {
     use crate::connection_bundle::{BundleBody, plan_import};
 
