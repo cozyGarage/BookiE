@@ -125,12 +125,7 @@ mod tests {
     #[test]
     fn a_session_ended_by_the_server_counts_as_a_disconnect() {
         assert!(DriverError::Disconnected.is_disconnect());
-        assert!(
-            DriverError::SessionEndedByServer {
-                reason: "25P03".into()
-            }
-            .is_disconnect()
-        );
+        assert!(DriverError::SessionEndedByServer { reason: "25P03".into() }.is_disconnect());
         assert!(!DriverError::TimedOut.is_disconnect());
     }
 

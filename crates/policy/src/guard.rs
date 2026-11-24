@@ -1153,9 +1153,7 @@ fn error_category(error: &DriverError) -> AuditErrorCategory {
         DriverError::ConnectionRefused
         | DriverError::DatabaseFileNotFound(_)
         | DriverError::Disconnected
-        | DriverError::SessionEndedByServer { .. } => {
-            AuditErrorCategory::Connection
-        }
+        | DriverError::SessionEndedByServer { .. } => AuditErrorCategory::Connection,
         DriverError::AuthFailed | DriverError::IntegratedAuth(_) => AuditErrorCategory::Authentication,
         DriverError::Tls(_) => AuditErrorCategory::Tls,
         DriverError::Query { .. } => AuditErrorCategory::Query,

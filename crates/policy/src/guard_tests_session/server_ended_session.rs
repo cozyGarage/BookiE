@@ -3,7 +3,9 @@ use super::*;
 async fn written_transaction_then(h: &Harness, last: &str) -> Result<QueryResult, DriverError> {
     let mut session = h.guard.open_session().await.expect("open session");
     run(&mut session, "BEGIN").await.expect("begin");
-    run(&mut session, "UPDATE items SET v = 1 WHERE id = 1").await.expect("write");
+    run(&mut session, "UPDATE items SET v = 1 WHERE id = 1")
+        .await
+        .expect("write");
     let result = run(&mut session, last).await;
     let _ = session.close().await;
     result
@@ -25,8 +27,14 @@ async fn a_server_ended_session_inside_a_written_transaction_records_a_rollback_
 
     let result = written_transaction_then(&h, "SELECT 1").await;
 
-    assert!(matches!(result, Err(DriverError::SessionEndedByServer { .. })), "{result:?}");
-    assert!(!h.audit_state.governed_writes_disabled(), "nothing was committed, so writes stay available");
+    assert!(
+        matches!(result, Err(DriverError::SessionEndedByServer { .. })),
+        "{result:?}"
+    );
+    assert!(
+        !h.audit_state.governed_writes_disabled(),
+        "nothing was committed, so writes stay available"
+    );
     let rollbacks = rollback_outcomes(&h);
     assert_eq!(rollbacks.len(), 1, "{rollbacks:?}");
     assert_eq!(rollbacks[0].transaction_outcome, AuditTransactionOutcome::RolledBack);
