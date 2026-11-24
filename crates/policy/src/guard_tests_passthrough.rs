@@ -40,6 +40,7 @@ impl Transaction for FakeTx {
 
 struct CatalogConn {
     calls: Arc<AtomicUsize>,
+    bounded_calls: Arc<AtomicUsize>,
     fail: bool,
     exclusion_scopes: ExclusionScopes,
     query_rows_affected: Option<u64>,
@@ -173,6 +174,7 @@ impl Connection for CatalogConn {
         _: &OperationControl,
     ) -> Result<bookie_core::QueryResultBatch, DriverError> {
         assert_eq!((max_rows, max_bytes), (3, 128));
+        self.bounded_calls.fetch_add(1, Ordering::SeqCst);
         self.answer(bookie_core::QueryResultBatch::single(empty_result()))
     }
     async fn execute(&self, _: &str) -> Result<ExecResult, DriverError> {
@@ -264,6 +266,7 @@ fn catalog_guard_with_transaction_error(
     let guard = PolicyGuard::new(
         Arc::new(CatalogConn {
             calls: calls.clone(),
+            bounded_calls: Arc::new(AtomicUsize::new(0)),
             fail,
             exclusion_scopes: Arc::new(std::sync::Mutex::new(Vec::new())),
             query_rows_affected,
@@ -285,6 +288,7 @@ fn catalog_guard_with_scopes(exclusion_scopes: ExclusionScopes) -> PolicyGuard {
     PolicyGuard::new(
         Arc::new(CatalogConn {
             calls: Arc::new(AtomicUsize::new(0)),
+            bounded_calls: Arc::new(AtomicUsize::new(0)),
             fail: false,
             exclusion_scopes,
             query_rows_affected: None,
@@ -469,7 +473,27 @@ async fn every_read_statement_form_reaches_the_driver() {
 
 #[tokio::test]
 async fn bounded_queries_are_authorized_and_writes_never_reach_the_driver() {
-    let (guard, calls, audit) = catalog_guard(false);
+    let calls = Arc::new(AtomicUsize::new(0));
+    let bounded_calls = Arc::new(AtomicUsize::new(0));
+    let audit = Arc::new(SequenceAuditSink::new(vec![]));
+    let guard = PolicyGuard::new(
+        Arc::new(CatalogConn {
+            calls: calls.clone(),
+            bounded_calls: bounded_calls.clone(),
+            fail: false,
+            exclusion_scopes: Arc::new(std::sync::Mutex::new(Vec::new())),
+            query_rows_affected: None,
+            transaction_error: Arc::new(std::sync::Mutex::new(None)),
+        }),
+        context(
+            Principal::human_gui(),
+            Environment::Prod,
+            PolicyConfig::default(),
+            Arc::new(AutoApproveSink),
+            audit.clone(),
+            Arc::new(AuditState::new()),
+        ),
+    );
     guard
         .query_result_sets_bounded_controlled("SELECT 1", &[], 3, 128, &control())
         .await
@@ -482,7 +506,11 @@ async fn bounded_queries_are_authorized_and_writes_never_reach_the_driver() {
             .await
             .is_err()
     );
-    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        bounded_calls.load(Ordering::SeqCst),
+        1,
+        "only the bounded read was dispatched"
+    );
     assert!(audit.events.lock().expect("events").len() > before);
 }
 
@@ -654,6 +682,7 @@ async fn beginning_a_transaction_does_not_grant_write_authority() {
         let guard = PolicyGuard::new(
             Arc::new(CatalogConn {
                 calls: calls.clone(),
+                bounded_calls: Arc::new(AtomicUsize::new(0)),
                 fail: false,
                 exclusion_scopes: Arc::new(std::sync::Mutex::new(Vec::new())),
                 query_rows_affected: None,
