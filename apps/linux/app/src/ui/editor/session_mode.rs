@@ -7,8 +7,8 @@ use relm4::{adw, gtk};
 use uuid::Uuid;
 
 use crate::services::database_service::ConnectionIdentity;
-use bookie_policy::{Audited, PolicyGuard, Principal};
 pub(crate) use bookie_app_services::interactive_session::*;
+use bookie_policy::{PolicyGuard, Principal};
 
 use super::{SqlEditor, SqlEditorInput};
 
@@ -554,11 +554,9 @@ impl SqlEditor {
     }
 }
 
-
 pub(crate) fn close_detached(shared: SharedSession) {
     relm4::spawn(close_detached_session(shared));
 }
-
 
 fn session_open_message(error: &DriverError) -> String {
     match error {

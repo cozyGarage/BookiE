@@ -102,6 +102,10 @@ fn append_table_context_sections(menu: &gtk::gio::Menu) {
         Some(&bookie_app_services::tr!("Show ER Diagram")),
         Some("sidebar-row.show-diagram"),
     );
+    structure_section.append(
+        Some(&bookie_app_services::tr!("Compare Data with\u{2026}")),
+        Some("sidebar-row.compare-data"),
+    );
     menu.append_section(None, &structure_section);
     let mutate_section = gtk::gio::Menu::new();
     mutate_section.append(
@@ -172,6 +176,7 @@ pub enum SidebarRowMsg {
     HideSchema,
     ShowDiagram,
     CompareSchema,
+    CompareData,
     NewSchema,
     DropSchema,
 }
@@ -183,6 +188,10 @@ pub enum SidebarRowOutput {
     },
     CompareSchema {
         schema: Option<String>,
+    },
+    CompareData {
+        schema: Option<String>,
+        name: String,
     },
     NewTable {
         schema: Option<String>,
@@ -443,6 +452,7 @@ impl FactoryComponent for SidebarRow {
             SidebarRowMsg::HideSchema => SidebarRowOutput::HideSchema(schema.unwrap_or_default()),
             SidebarRowMsg::ShowDiagram => SidebarRowOutput::ShowDiagram { schema },
             SidebarRowMsg::CompareSchema => SidebarRowOutput::CompareSchema { schema },
+            SidebarRowMsg::CompareData => SidebarRowOutput::CompareData { schema, name },
             SidebarRowMsg::NewSchema => SidebarRowOutput::NewSchema,
             SidebarRowMsg::DropSchema => SidebarRowOutput::DropSchema {
                 schema: schema.unwrap_or(name),
@@ -490,6 +500,10 @@ impl SidebarRow {
         let diagram_action = gtk::gio::ActionEntry::builder("show-diagram")
             .activate(move |_, _, _| sender_diagram.input(SidebarRowMsg::ShowDiagram))
             .build();
+        let sender_compare = sender.clone();
+        let compare_action = gtk::gio::ActionEntry::builder("compare-data")
+            .activate(move |_, _, _| sender_compare.input(SidebarRowMsg::CompareData))
+            .build();
         let sender_drop = sender.clone();
         let sender_import = sender.clone();
         let import_action = gtk::gio::ActionEntry::builder("import-csv")
@@ -512,6 +526,7 @@ impl SidebarRow {
             show_create_action,
             join_action,
             diagram_action,
+            compare_action,
             import_action,
             rename_action,
             truncate_action,

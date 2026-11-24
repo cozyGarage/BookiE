@@ -186,7 +186,14 @@ impl GridView {
             self.status = "The selected result cannot be edited".into();
             return;
         }
-        let Some(text) = cx.read_from_clipboard().and_then(|item| item.text()) else {
+        let Some(text) = cx.read_from_clipboard().and_then(|item| {
+            item.text().or_else(|| {
+                item.entries()
+                    .iter()
+                    .any(|entry| matches!(entry, gpui::ClipboardEntry::String(_)))
+                    .then(String::new)
+            })
+        }) else {
             self.status = "The clipboard has no text to paste".into();
             return;
         };

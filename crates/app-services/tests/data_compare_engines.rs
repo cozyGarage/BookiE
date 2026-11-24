@@ -1,11 +1,14 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
+use async_trait::async_trait;
 use bookie_app_services::data_compare::{DataCompare, TableSide, compare_tables};
 use bookie_core::sql_literal::render_sql_literal;
 use bookie_core::{ConnectOptions, Connection, DatabaseDriver, OperationControl, TlsConfig, Value};
-use bookie_policy::{GuardContext, NullAuditSink, PolicyConfig, PolicyGuard, Principal};
+use bookie_policy::{
+    AuditError, AuditEvent, AuditRecordPhase, AuditSink, GuardContext, PolicyConfig, PolicyGuard, Principal,
+};
 use secrecy::SecretString;
 use testcontainers::ImageExt;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
@@ -20,7 +23,18 @@ struct Engine {
     create: &'static str,
 }
 
-fn guarded(driver_id: &str, connection: Arc<dyn Connection>) -> PolicyGuard {
+#[derive(Default)]
+struct MemoryAudit(Mutex<Vec<AuditEvent>>);
+
+#[async_trait]
+impl AuditSink for MemoryAudit {
+    async fn record(&self, event: AuditEvent) -> Result<(), AuditError> {
+        self.0.lock().unwrap().push(event);
+        Ok(())
+    }
+}
+
+fn guarded(driver_id: &str, connection: Arc<dyn Connection>, audit: Arc<MemoryAudit>) -> PolicyGuard {
     PolicyGuard::new(
         connection,
         GuardContext {
@@ -32,7 +46,7 @@ fn guarded(driver_id: &str, connection: Arc<dyn Connection>) -> PolicyGuard {
             principal: Principal::human_gui(),
             policy: Arc::new(PolicyConfig::default()),
             approval: Arc::new(bookie_policy::AutoApproveSink),
-            audit: Arc::new(NullAuditSink),
+            audit,
             audit_state: Arc::new(bookie_policy::AuditState::new()),
         },
     )
@@ -124,7 +138,8 @@ async fn round_trip(engine: Engine, connection: Box<dyn Connection>) {
     assert_eq!(before.counts.delete, 20);
     assert_eq!(before.counts.same, (ROWS - 50 - 63) as u64);
 
-    let guard = guarded(engine.driver_id, connection.clone());
+    let audit = Arc::new(MemoryAudit::default());
+    let guard = guarded(engine.driver_id, connection.clone(), audit.clone());
     let without_deletes = before.script(engine.driver_id, engine.schema, "dst", false).unwrap();
     run_script(&engine, &guard, &without_deletes).await;
     let middle = compare(&engine, connection.as_ref()).await;
@@ -138,6 +153,9 @@ async fn round_trip(engine: Engine, connection: Box<dyn Connection>) {
     let after = compare(&engine, connection.as_ref()).await;
     assert!(after.is_identical(), "{:?}", after.counts);
     assert_eq!(after.counts.same, ROWS as u64);
+    let events = audit.0.lock().unwrap();
+    assert!(events.iter().any(|event| event.phase == AuditRecordPhase::Intent));
+    assert!(events.iter().any(|event| event.phase == AuditRecordPhase::Outcome));
 }
 
 #[tokio::test]
