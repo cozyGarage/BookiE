@@ -95,6 +95,10 @@ impl ReadSessionStore {
         self
     }
 
+    pub fn database_service(&self) -> &Arc<crate::database_service::DatabaseService> {
+        &self.database
+    }
+
     pub async fn open_saved(&self, id: Uuid, control: &OperationControl) -> Result<OpenedSession, String> {
         let saved = bookie_storage::load_connections()
             .await

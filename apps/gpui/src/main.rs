@@ -20,6 +20,7 @@ mod history_view;
 mod keys;
 mod measure;
 mod menus;
+mod mcp_ui;
 mod palette_actions;
 mod palette_state;
 mod edit_history;
@@ -175,6 +176,7 @@ struct GridView {
     history: Vec<bookie_app_services::statement_history::RecentStatement>,
     history_page: history_view::HistoryPage,
     audit_page: audit_page::AuditPage,
+    mcp: mcp_ui::McpState,
     panel: panel_state::PanelState,
     fonts: panel_state::FontState,
     font_inputs: [Entity<TextInput>; 2],
@@ -475,6 +477,7 @@ impl GridView {
             history: Vec::new(),
             history_page: history_view::HistoryPage::new(cx),
             audit_page: audit_page::AuditPage::new(cx),
+            mcp: mcp_ui::McpState::default(),
             panel: panel_state::PanelState::new(DEFAULT_RESULT_RATIO),
             fonts: panel_state::FontState::new(saved_fonts, default_font(&font_names).into(), font_names),
             font_inputs,

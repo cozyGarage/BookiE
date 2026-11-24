@@ -29,6 +29,7 @@ bookie-ssh = { path = "../ssh" }
 bookie-pg-sessions = { path = "../pg-sessions" }
 bookie-checks = { path = "../checks" }
 bookie-kafka-browser = { path = "../kafka-browser" }
+bookie-mcp = { path = "../mcp" }
 chrono.workspace = true
 quick-xml = "0.42"
 gettext-rs = { version = "0.8", features = ["gettext-system"] }

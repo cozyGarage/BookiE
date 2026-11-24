@@ -246,6 +246,7 @@ impl GridView {
     }
 
     fn attach_session(&mut self, session: Arc<LiveSession>, table: TableInfo) {
+        self.mcp.register(session.database_service());
         self.table_sorts.clear();
         self.edits_changed();
         self.reset_edit_history();

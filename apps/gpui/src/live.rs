@@ -115,6 +115,10 @@ pub struct LiveSession {
 }
 
 impl LiveSession {
+    pub fn database_service(&self) -> &Arc<DatabaseService> {
+        self.sessions.database_service()
+    }
+
     pub fn supports_table_row_count(&self) -> bool {
         matches!(
             self.driver_id.as_str(),

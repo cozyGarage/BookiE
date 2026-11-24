@@ -35,6 +35,7 @@ pub mod data_dictionary;
 pub mod database_backup;
 pub mod database_file;
 pub mod database_service;
+pub mod mcp_service;
 pub mod database_subscription;
 pub mod decoded_preview;
 pub mod dial_identity;
