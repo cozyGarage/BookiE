@@ -231,9 +231,48 @@ pub(crate) async fn apply_import_body_to(
     path: &Path,
     body: &crate::connection_bundle::BundleBody,
 ) -> Result<crate::connection_bundle::ImportPlan, crate::connection_bundle::ImportApplyError> {
+    apply_import_body_checked(path, body, None).await
+}
+
+pub async fn apply_reviewed_import_body(
+    body: &crate::connection_bundle::BundleBody,
+    reviewed: &crate::connection_bundle::ImportPlan,
+) -> Result<crate::connection_bundle::ImportPlan, crate::connection_bundle::ImportApplyError> {
+    apply_reviewed_import_body_to(&connections_path()?, body, reviewed).await
+}
+
+pub(crate) async fn apply_reviewed_import_body_to(
+    path: &Path,
+    body: &crate::connection_bundle::BundleBody,
+    reviewed: &crate::connection_bundle::ImportPlan,
+) -> Result<crate::connection_bundle::ImportPlan, crate::connection_bundle::ImportApplyError> {
+    apply_import_body_checked(path, body, Some(reviewed)).await
+}
+
+async fn apply_import_body_checked(
+    path: &Path,
+    body: &crate::connection_bundle::BundleBody,
+    reviewed: Option<&crate::connection_bundle::ImportPlan>,
+) -> Result<crate::connection_bundle::ImportPlan, crate::connection_bundle::ImportApplyError> {
     let _guard = lock_path(path).await?;
     let existing = load_from(path).await?;
     let plan = crate::connection_bundle::plan_import(&existing, body)?;
+    if let Some(reviewed) = reviewed {
+        let unchanged = plan.items.len() == reviewed.items.len()
+            && plan.items.iter().zip(&reviewed.items).all(|(current, old)| {
+                let mut connection = current.connection.clone();
+                if current.disposition == crate::connection_bundle::ImportDisposition::Remapped {
+                    connection.id = old.connection.id;
+                }
+                current.source_id == old.source_id
+                    && current.disposition == old.disposition
+                    && current.previous == old.previous
+                    && connection == old.connection
+            });
+        if !unchanged {
+            return Err(crate::connection_bundle::ImportApplyError::StaleReview);
+        }
+    }
     let mut updated = existing.clone();
     for item in &plan.items {
         updated.retain(|saved| saved.id != item.connection.id);
