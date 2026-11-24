@@ -104,6 +104,14 @@ def gate(tasks, initial_status='failure', dispatch_capture=None, target='subject
 
 
 class ForgejoGateTests(unittest.TestCase):
+    def test_failed_run_waits_for_the_final_regression_gate(self):
+        result = gate([
+            {'id': 101, 'status': 'failure', 'name': 'driver'},
+            {'id': 102, 'status': 'blocked', 'name': 'Forgejo regression gate'},
+        ])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('passed for ' + HEAD, result.stdout)
+
     def test_docs_only_gate_uses_the_forgejo_main_branch(self):
         script = (ROOT / "scripts/forgejo-gate.sh").read_text()
         self.assertIn('git fetch --quiet "$remote" main', script)

@@ -38,6 +38,7 @@ fn driver_code(error: &DriverError) -> &'static str {
         DriverError::Tls(_) => "tls",
         DriverError::Query { .. } => "query",
         DriverError::Disconnected => "disconnected",
+        DriverError::SessionEndedByServer { .. } => "session_ended_by_server",
         DriverError::ReadOnly => "read_only",
         DriverError::PolicyDenied(_) => "policy_denied",
         DriverError::Unsupported(_) => "unsupported",

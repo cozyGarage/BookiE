@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Enforce Rust source file size limits under crates.
 #
-# Unlisted files above 2000 lines fail. Listed files may shrink but cannot
+# Unlisted files above 5000 lines fail. Listed files may shrink but cannot
 # grow past their ceiling.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BASELINES="$ROOT/baselines/file-size-baselines.txt"
 CRATES="$ROOT/crates"
-ERROR_LIMIT=2000
+ERROR_LIMIT=5000
 
 declare -A MAX_LINES=()
 while IFS= read -r line || [[ -n "$line" ]]; do

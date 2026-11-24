@@ -13,9 +13,21 @@ pub struct Editing {
     pub row: u64,
     pub column: usize,
     pub kind: &'static str,
+    pub binary_mode: Option<crate::binary_mode::BinaryMode>,
+    pub full_value: bool,
 }
 
+const MAX_FULL_VALUE_EDIT_BYTES: usize = 1024 * 1024;
+
 impl GridView {
+    pub(crate) fn apply_active_cell_edit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.commit_edit(window, cx);
+    }
+
+    pub(crate) fn cancel_active_cell_edit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.stop_edit(window, cx);
+    }
+
     pub fn on_editor_event(&mut self, event: &InputEvent, window: &mut Window, cx: &mut Context<Self>) {
         match event {
             InputEvent::Submit => self.commit_edit(window, cx),
@@ -40,12 +52,25 @@ impl GridView {
             self.stop_edit(window, cx);
             return;
         }
-        let text = self.cell_edit.editor.read(cx).content().to_string();
+        let full_value = editing.full_value;
+        let text = if full_value {
+            self.cell_edit.value_editor.read(cx).value().to_string()
+        } else {
+            self.cell_edit.editor.read(cx).content().to_string()
+        };
+        if full_value && text.len() > MAX_FULL_VALUE_EDIT_BYTES {
+            self.status = "This value exceeds the 1 MiB full-value editor limit".into();
+            cx.notify();
+            return;
+        }
         if editing.kind == "null" && text.is_empty() {
             self.stop_edit(window, cx);
             return;
         }
-        match parse_edit(editing.kind, &text) {
+        let parsed = editing
+            .binary_mode
+            .map_or_else(|| parse_edit(editing.kind, &text), |mode| crate::binary_mode::parse_edit(&text, mode));
+        match parsed {
             Ok(cell) => {
                 let key = (editing.row, editing.column);
                 self.record_edit(key, cell);
@@ -87,13 +112,27 @@ impl GridView {
             cx.notify();
             return;
         }
+        let binary_mode = matches!(cell, Cell::Bytes(_)).then(|| self.binary_mode_for_column(column));
         let text = if matches!(cell, Cell::Null) {
             String::new()
+        } else if let (Cell::Bytes(bytes), Some(mode)) = (&cell, binary_mode) {
+            match crate::binary_mode::edit_text(bytes, mode) {
+                Ok(text) => text,
+                Err(reason) => {
+                    self.status = reason.into();
+                    cx.notify();
+                    return;
+                }
+            }
         } else {
             cell.display()
         };
-        if text.contains('\n') {
-            self.status = "Multiline values cannot be edited in this single-line prototype".into();
+        let full_value = matches!(cell, Cell::Text(_) | Cell::JsonText(_) | Cell::Json(_))
+            && (matches!(cell, Cell::JsonText(_) | Cell::Json(_))
+                || text.len() > 512
+                || text.contains(['\n', '\r', '\t', '\0']));
+        if full_value && text.len() > MAX_FULL_VALUE_EDIT_BYTES {
+            self.status = "This value exceeds the 1 MiB full-value editor limit".into();
             cx.notify();
             return;
         }
@@ -105,15 +144,24 @@ impl GridView {
             row,
             column,
             kind: cell.kind(),
+            binary_mode,
+            full_value,
         });
-        self.cell_edit.editor.update(cx, |editor, cx| {
-            editor.set_text_align(
-                if is_numeric { gpui::TextAlign::Right } else { gpui::TextAlign::Left },
-                cx,
-            );
-            editor.set_content(&text, cx);
-        });
-        window.focus(&self.cell_edit.editor.read(cx).focus_handle(cx), cx);
+        if full_value {
+            self.cell_edit
+                .value_editor
+                .update(cx, |editor, cx| editor.set_value(&text, window, cx));
+            window.focus(&self.cell_edit.value_editor.read(cx).focus_handle(cx), cx);
+        } else {
+            self.cell_edit.editor.update(cx, |editor, cx| {
+                editor.set_text_align(
+                    if is_numeric { gpui::TextAlign::Right } else { gpui::TextAlign::Left },
+                    cx,
+                );
+                editor.set_content(&text, cx);
+            });
+            window.focus(&self.cell_edit.editor.read(cx).focus_handle(cx), cx);
+        }
         cx.notify();
     }
 

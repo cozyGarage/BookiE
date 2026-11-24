@@ -26,7 +26,9 @@ pub(crate) fn map_sqlx_error(err: sqlx::Error) -> DriverError {
         Database(e) => {
             let sqlstate = e.code().map(|c| c.to_string());
             if is_server_disconnect_sqlstate(sqlstate.as_deref()) {
-                DriverError::Disconnected
+                DriverError::SessionEndedByServer {
+                    reason: format!("{}: {}", sqlstate.as_deref().unwrap_or_default(), e.message()),
+                }
             } else {
                 DriverError::Query {
                     message: with_pooler_hint(e.message(), sqlstate.as_deref()),
