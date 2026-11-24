@@ -646,6 +646,8 @@ fn connecting_from_the_home_page_swaps_the_synthetic_grid_for_the_first_table(cx
     view.read_with(cx, |view, _| {
         assert!(view.live.is_some(), "{}", view.status);
         assert_eq!(view.catalog.tables, [table_info("customers"), table_info("orders")]);
+        assert_eq!(view.catalog.connection, "sqlite · orders.sqlite");
+        assert_eq!(view.catalog.database, "main");
         assert_eq!(view.catalog.grid_table, table_info("customers"));
         assert_eq!(view.source.total(), 2);
         assert_eq!(
