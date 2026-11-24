@@ -421,7 +421,7 @@ impl GridView {
                 let selected = form.color.as_deref() == name;
                 let chip = choice_chip(("connection-colour", index), label, selected, theme);
                 let chip = match name.and_then(bookie_app_services::read_session::connection_color_rgb) {
-                    Some(color) => chip.child(div().size(px(size::SM)).rounded(px(2.0)).bg(rgb(color))),
+                    Some(color) => chip.child(div().size(px(size::SM)).rounded(px(size::OPTICAL)).bg(rgb(color))),
                     None => chip,
                 };
                 chip.on_click(cx.listener(move |this, _, _, cx| {
