@@ -957,6 +957,7 @@ impl GridView {
             })
         });
         let keyboard = self.keyboard_group(cx.entity(), theme);
+        let themes = self.theme_group(cx.entity(), theme, cx);
         let pages = [
             gpui_kit::component::setting::SettingPage::new("Appearance")
                 .default_open(true)
@@ -967,7 +968,8 @@ impl GridView {
                                 .description(format!("Current: {chosen}")),
                         )
                         .item(gpui_kit::component::setting::SettingItem::new("Dark theme", dark_mode)),
-                ),
+                )
+                .group(themes),
             gpui_kit::component::setting::SettingPage::new("Fonts").group(fonts),
             gpui_kit::component::setting::SettingPage::new("Keyboard").group(keyboard),
             gpui_kit::component::setting::SettingPage::new("MCP").group(mcp),

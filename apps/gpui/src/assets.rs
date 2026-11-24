@@ -11,6 +11,7 @@ macro_rules! icons {
 }
 
 icons!(
+    "check",
     "key-round",
     "info",
     "chevron-left",

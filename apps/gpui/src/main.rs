@@ -75,6 +75,7 @@ mod ssh_form;
 mod structure_ui;
 mod tables_export_ui;
 mod text_input;
+mod theme_settings_ui;
 mod transaction_ui;
 mod ui_theme;
 mod update_ui;
