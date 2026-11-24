@@ -1,8 +1,12 @@
 use std::rc::Rc;
+use std::sync::Arc;
 
 use bookie_app_services::result_chart::{ChartData, Kind};
 use bookie_gpui::theme::size;
-use gpui::{AnyElement, App, Bounds, Corners, ElementId, Hsla, Pixels, Point, SharedString, TextAlign, Window, point, px};
+use gpui::{
+    AnyElement, App, Bounds, Corners, ElementId, Hsla, IntoElement, Pixels, Point, SharedString, TextAlign, Window,
+    point, px,
+};
 use gpui_kit::component::ActiveTheme;
 use gpui_kit::component::plot::label::{PlotLabel, TEXT_GAP, Text, measure_text_width, truncate_text_to_width};
 use gpui_kit::component::plot::shape::Line;
@@ -32,7 +36,10 @@ pub(crate) struct Frame {
 
 impl Frame {
     pub fn new(height: f32, font: f32, ticks: &[f64]) -> Self {
-        let (lo, hi) = (ticks.first().copied().unwrap_or(0.), ticks.last().copied().unwrap_or(1.));
+        let (lo, hi) = (
+            ticks.first().copied().unwrap_or(0.),
+            ticks.last().copied().unwrap_or(1.),
+        );
         let top = font / 2. + TEXT_GAP;
         Self {
             top,
@@ -80,7 +87,7 @@ pub(crate) fn number(value: f64, decimals: usize) -> String {
 
 #[derive(IntoPlot)]
 pub(crate) struct ResultPlot {
-    pub data: Rc<ChartData>,
+    pub data: Arc<ChartData>,
     pub kind: Kind,
     pub labels: Rc<[SharedString]>,
     pub names: Rc<[SharedString]>,
@@ -102,7 +109,10 @@ impl ResultPlot {
         let count = self.data.series.len();
         let (width, gap) = bar_layout(step, count);
         let span = width * count as f32 + gap * (count.max(1) - 1) as f32;
-        (step * (group as f32 + 0.5) - span / 2. + series as f32 * (width + gap), width)
+        (
+            step * (group as f32 + 0.5) - span / 2. + series as f32 * (width + gap),
+            width,
+        )
     }
 
     fn paint_bars(&self, frame: &Frame, step: f32, bounds: &Bounds<Pixels>, window: &mut Window) {
@@ -205,7 +215,10 @@ impl Plot for ResultPlot {
             .stroke(grid)
             .dash_array(&[px(size::XS), px(size::OPTICAL)])
             .paint(&bounds, window);
-        let (first, last) = (self.ticks.first().copied().unwrap_or(0.), self.ticks.last().copied().unwrap_or(0.));
+        let (first, last) = (
+            self.ticks.first().copied().unwrap_or(0.),
+            self.ticks.last().copied().unwrap_or(0.),
+        );
         let base = frame.y(0f64.clamp(first, last.max(first)));
         let line = Bounds::new(
             bounds.origin + point(px(0.), px(base)),
@@ -230,7 +243,11 @@ impl Plot for ResultPlot {
         }
         let step = self.step(&bounds);
         let group = nearest(position.x.as_f32(), step, groups);
-        Some(TooltipState::new(group, point(px(step * (group as f32 + 0.5)), position.y), vec![]))
+        Some(TooltipState::new(
+            group,
+            point(px(step * (group as f32 + 0.5)), position.y),
+            vec![],
+        ))
     }
 
     fn tooltip(
@@ -255,15 +272,20 @@ impl Plot for ResultPlot {
             .title(label);
         if self.kind == Kind::Line {
             let background = cx.theme().background;
-            let dots = self.data.series.iter().zip(self.colors.iter()).filter_map(|(series, color)| {
-                let y = frame.y((*series.values.get(group)?)?);
-                Some(
-                    Dot::new(point(state.cross_line.x, px(y)))
-                        .size(px(HOVER_DOT))
-                        .stroke(*color)
-                        .fill(background),
-                )
-            });
+            let dots = self
+                .data
+                .series
+                .iter()
+                .zip(self.colors.iter())
+                .filter_map(|(series, color)| {
+                    let y = frame.y((*series.values.get(group)?)?);
+                    Some(
+                        Dot::new(point(state.cross_line.x, px(y)))
+                            .size(px(HOVER_DOT))
+                            .stroke(*color)
+                            .fill(background),
+                    )
+                });
             tooltip = tooltip.dots(dots.collect::<Vec<_>>());
         }
         for ((series, name), color) in self.data.series.iter().zip(self.names.iter()).zip(self.colors.iter()) {
@@ -298,7 +320,9 @@ impl Plot for ValueAxis {
             .zip(self.labels.iter())
             .map(|(tick, label)| {
                 let at = point(px(right), px(frame.y(*tick) - font / 2.));
-                Text::new(label.clone(), at, color).font_size(self.font).align(TextAlign::Right)
+                Text::new(label.clone(), at, color)
+                    .font_size(self.font)
+                    .align(TextAlign::Right)
             })
             .collect();
         PlotLabel::new(texts).paint(&bounds, window, cx);

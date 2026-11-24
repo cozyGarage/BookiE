@@ -1,7 +1,9 @@
 use std::rc::Rc;
+use std::sync::Arc;
 
-use bookie_app_services::result_chart::{self, Aggregate, ChartData, Kind, Profile, Settings, nice_ticks, tick_format};
-use bookie_gpui::model::Cell;
+use bookie_app_services::result_chart::{self, Aggregate, Kind, Settings, nice_ticks, tick_format};
+use bookie_gpui::chart_source::{ChartState, MAX_CHART_BYTES};
+use bookie_gpui::preview::text_preview;
 use bookie_gpui::shell::ResultView;
 use bookie_gpui::theme::{Theme, size};
 use gpui::{Hsla, SharedString};
@@ -12,53 +14,75 @@ use crate::chart_plot::{CHAR_WIDTH, ResultPlot, ValueAxis, min_width, number};
 
 const TICKS: usize = 5;
 
-pub(crate) struct ChartState {
-    pub settings: Settings,
-    pub profiles: Vec<Profile>,
-    pub columns: Vec<String>,
-    pub rows: Vec<Vec<Cell>>,
-    pub data: Rc<ChartData>,
-}
-
-impl ChartState {
-    pub(crate) fn from_rows(columns: Vec<bookie_core::ColumnInfo>, rows: Vec<Vec<Cell>>) -> Self {
-        let profiles = result_chart::profile(&columns, &rows);
-        let settings = result_chart::defaults(&profiles);
-        let data = Rc::new(result_chart::compute(&rows, &profiles, &settings));
-        Self {
-            settings,
-            profiles,
-            columns: columns.into_iter().map(|column| column.name).collect(),
-            rows,
-            data,
-        }
-    }
-
-    pub(crate) fn change(&mut self, edit: impl FnOnce(&mut Settings)) {
-        edit(&mut self.settings);
-        self.data = Rc::new(result_chart::compute(&self.rows, &self.profiles, &self.settings));
-    }
-}
-
 impl GridView {
-    pub(crate) fn show_chart(&mut self) {
-        let columns = column_infos_for(self.source.columns());
-        let total = self.source.total().min(result_chart::MAX_ROWS as u64);
-        let rows = (0..total).map(|index| self.source.row(index)).collect();
-        self.panel.chart = Some(ChartState::from_rows(columns, rows));
-        self.panel.view = ResultView::Chart;
+    pub(crate) fn clear_chart(&mut self) {
+        self.panel.chart = None;
+        self.panel.chart_loading = false;
+        self.panel.chart_error = None;
+        if self.panel.view == ResultView::Chart {
+            self.panel.view = ResultView::Table;
+        }
     }
 
-    fn edit_chart(&mut self, edit: impl FnOnce(&mut Settings), cx: &mut Context<Self>) {
-        if let Some(chart) = self.panel.chart.as_mut() {
-            chart.change(edit);
+    pub(crate) fn show_chart(&mut self, cx: &mut Context<Self>) {
+        self.panel.view = ResultView::Chart;
+        if self.panel.chart.is_some() || self.panel.chart_loading {
+            return;
         }
+        self.panel.chart_error = None;
+        let source = self.source.clone();
+        self.begin_background(
+            Work::Chart,
+            cx,
+            move |cancel| ChartState::load(source.as_ref(), &cancel),
+            |this, result| {
+                this.panel.chart_loading = false;
+                match result {
+                    Ok(chart) => this.panel.chart = Some(chart),
+                    Err(error) => this.panel.chart_error = Some(error.message()),
+                }
+            },
+        );
+        self.panel.chart_loading = true;
+    }
+
+    pub(crate) fn edit_chart(&mut self, edit: impl FnOnce(&mut Settings), cx: &mut Context<Self>) {
+        let Some(chart) = self.panel.chart.as_mut() else { return };
+        edit(&mut chart.settings);
+        let rows = chart.rows.clone();
+        let profiles = chart.profiles.clone();
+        let settings = chart.settings.clone();
+        let rows_cut = chart.data.rows_cut;
+        self.begin_background(
+            Work::Chart,
+            cx,
+            move |cancel| {
+                if cancel.is_cancelled() {
+                    return None;
+                }
+                let mut data = result_chart::compute(&rows, &profiles, &settings);
+                data.rows_cut = rows_cut;
+                (!cancel.is_cancelled()).then_some(data)
+            },
+            |this, data| {
+                this.panel.chart_loading = false;
+                if let (Some(chart), Some(data)) = (this.panel.chart.as_mut(), data) {
+                    chart.data = Arc::new(data);
+                }
+            },
+        );
+        self.panel.chart_loading = true;
         cx.notify();
     }
 
     pub(crate) fn chart_body(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
         let Some(chart) = self.panel.chart.as_ref() else {
-            return div().flex_1().p_4().child("Choose Chart to plot this result");
+            let message = if self.panel.chart_loading {
+                "Preparing chart…"
+            } else {
+                self.panel.chart_error.unwrap_or("Choose Chart to plot this result")
+            };
+            return div().flex_1().p_4().child(message);
         };
         div()
             .flex_1()
@@ -66,16 +90,26 @@ impl GridView {
             .flex()
             .flex_col()
             .child(self.chart_controls(chart, theme, cx))
+            .child(
+                div()
+                    .debug_selector(|| "chart-coverage".into())
+                    .px_2()
+                    .py_1()
+                    .text_size(px(size::TEXT_SMALL))
+                    .text_color(rgb(theme.muted_foreground))
+                    .child(chart_coverage(chart, self.panel.chart_loading)),
+            )
             .child(chart_plot_area(chart, theme, cx))
     }
 
     fn chart_controls(&self, chart: &ChartState, theme: Theme, cx: &mut Context<Self>) -> Div {
         let settings = &chart.settings;
         let pick = |id: gpui::ElementId, label: &str, on: bool| chip(id, label, on, theme);
-        let kinds = [("chart-bars", "Bars", Kind::Bars), ("chart-line", "Line", Kind::Line)].map(|(id, label, kind)| {
-            pick(id.into(), label, settings.kind == kind)
-                .on_click(cx.listener(move |this, _, _, cx| this.edit_chart(|s| s.kind = kind, cx)))
-        });
+        let kinds =
+            [("chart-bars", "Bars", Kind::Bars), ("chart-line", "Line", Kind::Line)].map(|(id, label, kind)| {
+                pick(id.into(), label, settings.kind == kind)
+                    .on_click(cx.listener(move |this, _, _, cx| this.edit_chart(|s| s.kind = kind, cx)))
+            });
         let aggregates = [
             ("chart-sum", "Sum", Aggregate::Sum),
             ("chart-count", "Count", Aggregate::Count),
@@ -86,27 +120,34 @@ impl GridView {
                 .on_click(cx.listener(move |this, _, _, cx| this.edit_chart(|s| s.aggregate = aggregate, cx)))
         });
         let columns = chart.columns.len().max(1);
-        let label_name = chart.columns.get(settings.label).cloned().unwrap_or_default();
-        let label = pick("chart-label".into(), &format!("Label: {label_name}"), false).on_click(cx.listener(
-            move |this, _, _, cx| this.edit_chart(|s| s.label = (s.label + 1) % columns, cx),
-        ));
-        let values = chart
-            .profiles
-            .iter()
-            .enumerate()
-            .filter(|(_, profile)| profile.numeric)
-            .map(|(column, _)| {
-                let name = chart.columns.get(column).cloned().unwrap_or_default();
-                pick(("chart-value", column).into(), &name, settings.slot_of(column).is_some())
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.edit_chart(
-                            |s| {
-                                s.toggle_value(column);
-                            },
-                            cx,
-                        )
-                    }))
-            });
+        let label_name = chart
+            .columns
+            .get(settings.label)
+            .map(|name| text_preview(name))
+            .unwrap_or_default();
+        let label = pick("chart-label".into(), &format!("Label: {label_name}"), false)
+            .on_click(cx.listener(move |this, _, _, cx| this.edit_chart(|s| s.label = (s.label + 1) % columns, cx)));
+        let values = settings.picked().map(|(_, column)| {
+            let name = chart
+                .columns
+                .get(column)
+                .map(|name| text_preview(name))
+                .unwrap_or_default();
+            pick(
+                ("chart-value", column).into(),
+                &name,
+                settings.slot_of(column).is_some(),
+            )
+            .debug_selector(move || format!("chart-value-{column}").into())
+            .on_click(cx.listener(move |this, _, _, cx| {
+                this.edit_chart(
+                    |s| {
+                        s.toggle_value(column);
+                    },
+                    cx,
+                )
+            }))
+        });
         div()
             .flex()
             .flex_wrap()
@@ -119,9 +160,40 @@ impl GridView {
             .children(aggregates)
             .child(div().w(px(size::SM)))
             .child(label)
-            .child(div().text_color(rgb(theme.muted_foreground)).child("Values:"))
+            .child(
+                pick("chart-values".into(), "Values…", false)
+                    .debug_selector(|| "chart-values-picker".into())
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        this.open_picker(crate::palette_state::PaletteMode::ChartValues, window, cx);
+                    })),
+            )
             .children(values)
     }
+}
+
+fn chart_coverage(chart: &ChartState, loading: bool) -> String {
+    let data = &chart.data;
+    let mut text = format!(
+        "{} of {} groups · {} of {} retained rows",
+        data.labels.len(),
+        data.groups,
+        data.rows,
+        chart.total,
+    );
+    if data.rows_cut {
+        text.push_str(&format!(
+            " · Sampled ({} rows / estimated {} MiB)",
+            result_chart::MAX_ROWS,
+            MAX_CHART_BYTES / (1024 * 1024)
+        ));
+    }
+    if chart.incomplete {
+        text.push_str(" · Query result is incomplete");
+    }
+    if loading {
+        text.push_str(" · Updating chart…");
+    }
+    text
 }
 
 fn chip(id: gpui::ElementId, label: &str, on: bool, theme: Theme) -> Stateful<Div> {
@@ -130,6 +202,10 @@ fn chip(id: gpui::ElementId, label: &str, on: bool, theme: Theme) -> Stateful<Di
         .flex()
         .items_center()
         .h(px(size::COMPACT_CONTROL))
+        .max_w(px(size::CHART_COLUMN_WIDTH))
+        .overflow_hidden()
+        .whitespace_nowrap()
+        .text_ellipsis()
         .px_2()
         .rounded(px(size::CONTROL_RADIUS))
         .border_1()
@@ -144,7 +220,16 @@ fn chip(id: gpui::ElementId, label: &str, on: bool, theme: Theme) -> Stateful<Di
 fn chart_plot_area(chart: &ChartState, theme: Theme, cx: &App) -> Div {
     let data = chart.data.clone();
     let kind = chart.settings.kind;
-    let note = |text: &str| div().flex_1().p_4().text_color(rgb(theme.muted_foreground)).child(text.to_string());
+    let note = |text: &str| {
+        div()
+            .flex_1()
+            .p_4()
+            .text_color(rgb(theme.muted_foreground))
+            .child(text.to_string())
+    };
+    if data.rows == 0 {
+        return note("No rows are available within the chart preview limits");
+    }
     if data.series.is_empty() {
         return note("Pick a number column under Values to plot it");
     }
@@ -172,15 +257,25 @@ fn chart_plot_area(chart: &ChartState, theme: Theme, cx: &App) -> Div {
         .fold(0.0, f32::max)
         + 12.0;
     let component = cx.theme();
-    let palette = [component.chart_1, component.chart_2, component.chart_3, component.chart_4, component.chart_5];
-    let colors: Rc<[Hsla]> = data.series.iter().map(|series| palette[series.slot % palette.len()]).collect();
+    let palette = [
+        component.chart_1,
+        component.chart_2,
+        component.chart_3,
+        component.chart_4,
+        component.chart_5,
+    ];
+    let colors: Rc<[Hsla]> = data
+        .series
+        .iter()
+        .map(|series| palette[series.slot % palette.len()])
+        .collect();
     let names: Rc<[SharedString]> = data
         .series
         .iter()
         .map(|series| {
             series
                 .column
-                .and_then(|column| chart.columns.get(column).cloned())
+                .and_then(|column| chart.columns.get(column).map(|name| text_preview(name)))
                 .unwrap_or_else(|| "Rows".into())
                 .into()
         })
@@ -188,7 +283,7 @@ fn chart_plot_area(chart: &ChartState, theme: Theme, cx: &App) -> Div {
     let labels: Rc<[SharedString]> = data
         .labels
         .iter()
-        .map(|label| label.clone().unwrap_or_else(|| "NULL".into()).into())
+        .map(|label| label.as_deref().map_or_else(|| "NULL".into(), text_preview).into())
         .collect();
     let width = min_width(labels.len(), data.series.len(), kind);
     let legend = (names.len() > 1).then(|| {
@@ -204,7 +299,7 @@ fn chart_plot_area(chart: &ChartState, theme: Theme, cx: &App) -> Div {
                     .flex()
                     .items_center()
                     .gap_1()
-                    .child(div().size(px(size::SM)).rounded(px(2.0)).bg(*color))
+                    .child(div().size(px(size::SM)).rounded(px(size::OPTICAL)).bg(*color))
                     .child(name.clone())
             }))
     });
@@ -222,31 +317,25 @@ fn chart_plot_area(chart: &ChartState, theme: Theme, cx: &App) -> Div {
         labels: tick_labels,
         font,
     };
-    div()
-        .flex_1()
-        .min_h_0()
-        .flex()
-        .flex_col()
-        .children(legend)
-        .child(
-            div()
-                .flex_1()
-                .min_h_0()
-                .flex()
-                .pr_4()
-                .pb_2()
-                .child(div().flex_none().w(px(gutter)).h_full().child(axis))
-                .child(
-                    div()
-                        .id("chart-plot")
-                        .debug_selector(|| "chart-plot".into())
-                        .flex_1()
-                        .min_w_0()
-                        .h_full()
-                        .overflow_x_scroll()
-                        .child(div().h_full().w_full().min_w(px(width)).child(plot)),
-                ),
-        )
+    div().flex_1().min_h_0().flex().flex_col().children(legend).child(
+        div()
+            .flex_1()
+            .min_h_0()
+            .flex()
+            .pr_4()
+            .pb_2()
+            .child(div().flex_none().w(px(gutter)).h_full().child(axis))
+            .child(
+                div()
+                    .id("chart-plot")
+                    .debug_selector(|| "chart-plot".into())
+                    .flex_1()
+                    .min_w_0()
+                    .h_full()
+                    .overflow_x_scroll()
+                    .child(div().h_full().w_full().min_w(px(width)).child(plot)),
+            ),
+    )
 }
 
 #[cfg(test)]

@@ -287,7 +287,7 @@ impl GridView {
         };
         button.on_click(cx.listener(move |this, _, _, cx| {
             if view == ResultView::Chart {
-                this.show_chart();
+                this.show_chart(cx);
             }
             this.panel.view = view;
             cx.notify();
