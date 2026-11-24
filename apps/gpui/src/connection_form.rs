@@ -25,6 +25,7 @@ pub(crate) struct ConnectionForm {
     pub driver: usize,
     pub read_only: bool,
     pub environment: Environment,
+    pub color: Option<String>,
     pub status: String,
     validation_error: Option<(gpui::EntityId, String)>,
     pub saving: bool,
@@ -80,6 +81,7 @@ impl ConnectionForm {
             driver,
             read_only: true,
             environment: Environment::default(),
+            color: None,
             status: String::new(),
             validation_error: None,
             saving: false,
@@ -407,8 +409,30 @@ impl GridView {
                     }))
                 }),
         );
+        let swatches = std::iter::once((None, "None")).chain(
+            bookie_app_services::read_session::CONNECTION_COLORS
+                .iter()
+                .map(|name| (Some(*name), *name)),
+        );
+        let colour = choice_row(
+            theme,
+            "Colour",
+            swatches.enumerate().map(|(index, (name, label))| {
+                let selected = form.color.as_deref() == name;
+                let chip = choice_chip(("connection-colour", index), label, selected, theme);
+                let chip = match name.and_then(bookie_app_services::read_session::connection_color_rgb) {
+                    Some(color) => chip.child(div().size(px(size::SM)).rounded(px(2.0)).bg(rgb(color))),
+                    None => chip,
+                };
+                chip.on_click(cx.listener(move |this, _, _, cx| {
+                    this.connection_form.color = name.map(str::to_owned);
+                    cx.notify();
+                }))
+            }),
+        );
         vec![
             environment,
+            colour,
             div()
                 .flex()
                 .items_center()
@@ -607,6 +631,10 @@ impl GridView {
     pub(crate) fn fill_connection_form(&mut self, draft: ConnectionDraft, cx: &mut Context<Self>) {
         let form = &mut self.connection_form;
         form.editing = draft.id;
+        form.color = draft
+            .id
+            .and_then(|id| self.connections.iter().find(|connection| connection.id == id))
+            .and_then(|connection| connection.color.clone());
         form.driver = form
             .drivers
             .iter()
@@ -801,6 +829,7 @@ impl GridView {
         if !self.validate_connection(&draft, window, cx) {
             return;
         }
+        let color = self.connection_form.color.clone();
         self.connection_form.saving = true;
         self.connection_form.status = "Saving…".into();
         cx.notify();
@@ -812,7 +841,14 @@ impl GridView {
                         .enable_all()
                         .build()
                         .map_err(|error| error.to_string())?;
-                    runtime.block_on(connection_save::save(draft))
+                    let saved = runtime.block_on(connection_save::save(draft))?;
+                    if let Err(error) = runtime.block_on(bookie_app_services::read_session::set_connection_color(
+                        saved.id,
+                        color.as_deref(),
+                    )) {
+                        tracing::warn!(%error, "the connection colour was not saved");
+                    }
+                    Ok::<_, String>(saved)
                 })
                 .await;
             let _ = this.update(cx, |this, cx| {
