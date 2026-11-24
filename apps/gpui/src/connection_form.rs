@@ -507,26 +507,7 @@ impl GridView {
                 }))
             }),
         );
-        let environment = choice_row(
-            theme,
-            "Environment",
-            [Environment::Local, Environment::Dev, Environment::Staging, Environment::Prod]
-                .into_iter()
-                .enumerate()
-                .map(|(index, environment)| {
-                    choice_chip(
-                        ("environment", index),
-                        environment.display_name(),
-                        form.environment == environment,
-                        theme,
-                    )
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.connection_form.environment = environment;
-                        cx.notify();
-                    }))
-                }),
-        );
-        let mut rows = vec![environment, auth, tls];
+        let mut rows = vec![auth, tls];
         if TlsMode::from_index(form.tls) != TlsMode::Disabled {
             rows.push(field(theme, "CA file", &form.tls_root));
             rows.push(form.validation_field(theme, "Client cert", &form.tls_cert, cx));
