@@ -162,25 +162,20 @@ mod tests {
         assert_eq!(clock.label_at(start), "Session");
         clock.set_open(true, start);
         assert_eq!(
-            clock.label_at(start + Duration::from_secs(59)),
-            "Session · transaction open"
-        );
-        assert_eq!(
-            clock.label_at(start + Duration::from_secs(60)),
-            "Session · transaction open · 1 minute"
-        );
-        assert_eq!(
             clock.label_at(start + Duration::from_secs(75 * 60)),
-            "Session · transaction open · 1 hour 15 minutes"
+            "Session · transaction open · 1 hour 15 minutes · idle"
         );
-        assert_eq!(
-            clock.label_at(start + Duration::from_secs(61 * 60)),
-            "Session · transaction open · 1 hour 1 minute"
-        );
-        assert_eq!(
-            clock.label_at(start + Duration::from_secs(120 * 60)),
-            "Session · transaction open · 2 hours"
-        );
+        for (seconds, expected) in [
+            (59, "Session · transaction open"),
+            (60, "Session · transaction open · 1 minute"),
+            (61 * 60, "Session · transaction open · 1 hour 1 minute"),
+            (75 * 60, "Session · transaction open · 1 hour 15 minutes"),
+            (120 * 60, "Session · transaction open · 2 hours"),
+        ] {
+            let now = start + Duration::from_secs(seconds);
+            clock.set_open(true, now);
+            assert_eq!(clock.label_at(now), expected);
+        }
     }
 
     #[test]

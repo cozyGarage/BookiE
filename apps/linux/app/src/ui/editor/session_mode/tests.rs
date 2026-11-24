@@ -1,12 +1,8 @@
 use super::*;
 use std::sync::Arc;
 
-use async_trait::async_trait;
-use bookie_core::{
-    Connection, DriverError, OperationControl, QueryCursorId, QueryCursorPage, QueryResult, QueryResultBatch, Session,
-    SessionCommitOutcome, TableInfo, Value,
-};
-use bookie_policy::{AuditReceipt, Audited, AuditedSession, PolicyGuard, Principal};
+use bookie_core::{Connection, DriverError, OperationControl, QueryResult, Session, SessionCommitOutcome, Value};
+use bookie_policy::{PolicyGuard, Principal};
 use std::cell::Cell;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
