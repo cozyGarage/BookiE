@@ -538,7 +538,7 @@ impl Render for GridView {
             .children(self.host_key_bar(theme, cx))
             .child(self.main_layout(sidebar, tab_row, bundle_bar, content))
             .children(self.row_menu_overlay())
-            .child(self.status_bar(theme, f32::from(window.viewport_size().width)))
+            .child(self.status_bar(theme, f32::from(window.viewport_size().width), cx))
             .children(palette)
             .children(full_value_editor)
             .children(approval)
