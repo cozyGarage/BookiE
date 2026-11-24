@@ -54,7 +54,10 @@ pub(crate) fn with_pooler_hint(message: &str, sqlstate: Option<&str>) -> String 
     let prepared_statement_conflict = matches!(sqlstate, Some("42P05" | "26000")) && message.contains("\"sqlx_s_");
     let unsupported_binary_bind =
         sqlstate == Some("22P03") && message.starts_with("incorrect binary data format in bind parameter ");
-    if prepared_statement_conflict || unsupported_binary_bind {
+    let unnamed_statement_mismatch = sqlstate == Some("08P01")
+        && message.starts_with("bind message supplies ")
+        && message.contains(" parameters, but prepared statement \"\" requires ");
+    if prepared_statement_conflict || unsupported_binary_bind || unnamed_statement_mismatch {
         return format!(
             "{message} (the server connection may be behind a pooler in transaction mode: enable its prepared statement support, for example PgBouncer max_prepared_statements, or use session pooling)"
         );
