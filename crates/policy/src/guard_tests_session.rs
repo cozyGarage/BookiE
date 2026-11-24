@@ -5,8 +5,12 @@ use bookie_core::sql_syntax::script::LexicalSettings;
 mod blast_radius;
 #[path = "guard_tests_session/completion_metadata.rs"]
 mod completion_metadata;
+#[path = "guard_tests_session/prod_commit_approval.rs"]
+mod prod_commit_approval;
 #[path = "guard_tests_session/savepoint_recovery.rs"]
 mod savepoint_recovery;
+#[path = "guard_tests_session/server_ended_session.rs"]
+mod server_ended_session;
 #[path = "guard_tests_session/transaction_blast_radius.rs"]
 mod transaction_blast_radius;
 
@@ -16,6 +20,7 @@ struct SessionScript {
     lose_on: Option<&'static str>,
     fail_once_on: Option<&'static str>,
     disconnect_on: Option<&'static str>,
+    server_ended_on: Option<&'static str>,
     query_error_on: Option<&'static str>,
     panic_on_close: bool,
     panic_on_status: bool,
@@ -55,6 +60,11 @@ impl bookie_core::Session for ScriptedSession {
         }
         if self.script.disconnect_on == Some(sql) {
             return Err(DriverError::Disconnected);
+        }
+        if self.script.server_ended_on == Some(sql) {
+            return Err(DriverError::SessionEndedByServer {
+                reason: "25P03: terminating connection due to idle-in-transaction timeout".into(),
+            });
         }
         if self.script.query_error_on == Some(sql) {
             return Err(DriverError::Query {

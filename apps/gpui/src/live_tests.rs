@@ -72,7 +72,7 @@
         let file = FixtureFile(std::env::temp_dir().join(format!("bookie-gpui-stale-{}.sqlite", uuid::Uuid::new_v4())));
         std::fs::copy(source, &file.0).unwrap();
         let runtime = tokio::runtime::Runtime::new().unwrap();
-        let database = Arc::new(DatabaseService::new_isolated());
+        let database = Arc::new(bookie_app_services::database_service::DatabaseService::new_isolated());
         let sessions = ReadSessionStore::new(Arc::new(drivers_registry::default_registry()), database.clone());
         let control = OperationControl::with_timeout(Duration::from_secs(5));
         let opened = runtime.block_on(sessions.open_file(&file.0, &control)).unwrap();

@@ -442,6 +442,27 @@ impl Connection for SqliteConnection {
         Ok(bookie_core::QueryResultBatch::single(result).with_rows_affected(changed))
     }
 
+    async fn query_result_sets_bounded_controlled(
+        &self,
+        sql: &str,
+        params: &[Value],
+        max_rows: usize,
+        max_bytes: usize,
+        control: &OperationControl,
+    ) -> Result<bookie_core::QueryResultBatch, DriverError> {
+        let mut connection = acquire_controlled(&self.pool, control).await?;
+        let handle = InterruptHandle::of(&mut connection).await?;
+        let result = run_server_cancellable(
+            params_into_result_bounded(&mut connection, sql, params, max_rows, max_bytes),
+            request_interrupt(&handle),
+            confirms_cancellation,
+            control,
+        )
+        .await;
+        release_connection(connection, &result).await;
+        result.map(bookie_core::QueryResultBatch::single)
+    }
+
     async fn execute(&self, sql: &str) -> Result<ExecResult, DriverError> {
         self.execute_params(sql, &[]).await
     }
@@ -865,6 +886,15 @@ async fn stream_counted(
     sql: &str,
     limit: usize,
 ) -> Result<(QueryResult, Option<u64>), DriverError> {
+    stream_counted_bounded(connection, sql, limit, bookie_core::MAX_QUERY_RESULT_BYTES).await
+}
+
+async fn stream_counted_bounded(
+    connection: &mut SqlxSqliteConnection,
+    sql: &str,
+    limit: usize,
+    max_bytes: usize,
+) -> Result<(QueryResult, Option<u64>), DriverError> {
     drop_guard::refuse_referenced_drop(connection, sql).await?;
     let statement = connection
         .prepare(sqlx::AssertSqlSafe(sql).into_sql_str())
@@ -887,7 +917,7 @@ async fn stream_counted(
     let mut stream = sqlx::query(sqlx::AssertSqlSafe(sql)).fetch(&mut *connection);
     let mut rows = QueryRows::with_capacity(limit.min(1024), 0);
     let mut decoded = Vec::with_capacity(columns.len());
-    let mut budget = QueryResultBudget::default();
+    let mut budget = QueryResultBudget::with_limits(limit, max_bytes);
     let mut truncated = false;
     while let Some(row_result) = stream.next().await {
         let row = row_result.map_err(map_sqlx_error)?;
@@ -1125,6 +1155,21 @@ async fn params_into_result(
     if params.is_empty() {
         return stream_into_result(connection, sql, limit).await;
     }
+    params_into_result_bounded(connection, sql, params, limit, bookie_core::MAX_QUERY_RESULT_BYTES).await
+}
+
+async fn params_into_result_bounded(
+    connection: &mut SqlxSqliteConnection,
+    sql: &str,
+    params: &[Value],
+    limit: usize,
+    max_bytes: usize,
+) -> Result<QueryResult, DriverError> {
+    if params.is_empty() {
+        return stream_counted_bounded(connection, sql, limit, max_bytes)
+            .await
+            .map(|(result, _)| result);
+    }
     let statement = connection
         .prepare(sqlx::AssertSqlSafe(sql).into_sql_str())
         .await
@@ -1135,7 +1180,7 @@ async fn params_into_result(
     let mut stream = query.fetch(&mut *connection);
     let mut rows = QueryRows::with_capacity(limit.min(1024), 0);
     let mut decoded = Vec::with_capacity(columns.len());
-    let mut budget = QueryResultBudget::default();
+    let mut budget = QueryResultBudget::with_limits(limit, max_bytes);
     let mut truncated = false;
     while let Some(row_result) = stream.next().await {
         let row = row_result.map_err(map_sqlx_error)?;

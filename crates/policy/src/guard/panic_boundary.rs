@@ -50,7 +50,7 @@ impl PolicyGuard {
     }
 
     fn report_if_disconnected<T>(&self, operation: &'static str, result: &Result<T, DriverError>) {
-        if !matches!(result, Err(DriverError::Disconnected)) {
+        if !result.as_ref().err().is_some_and(DriverError::is_disconnect) {
             return;
         }
         if let Some(fault) = &self.fault {

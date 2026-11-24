@@ -6,7 +6,10 @@ pub(crate) const SQL: [&str; 3] = [
     "FROM synthetic_rows",
     "ORDER BY value;",
 ];
-use gpui::{Context, Decorations, Div, MouseDownEvent, Stateful, Window, WindowControls, div, prelude::*, px, rgb};
+use gpui::{
+    Context, Decorations, Div, MouseDownEvent, ScrollStrategy, Stateful, Window, WindowControls, div, prelude::*, px,
+    rgb, uniform_list,
+};
 
 use crate::assets::icon;
 use crate::ui_theme::ThemeExt;
@@ -368,6 +371,9 @@ impl GridView {
         let current = matches!(&row, TreeRow::Table(table) if open_table == &Tab::Table(table.clone()));
         let line = div()
             .id(("tree", index))
+            .debug_selector(move || format!("sidebar-row-{index}"))
+            .relative()
+            .children(indent_guides(depth, theme))
             .flex()
             .items_center()
             .h(px(size::TREE_ROW))
@@ -428,7 +434,7 @@ impl GridView {
         }
     }
 
-    fn sidebar_tree_view(&self, theme: Theme, search: &str, cx: &mut Context<Self>) -> Stateful<Div> {
+    fn sidebar_lines(&self, search: &str) -> Vec<SidebarLine> {
         let filter = SidebarFilter {
             regex: self.sidebar.regex,
             active_only: self.sidebar.active_only,
@@ -441,32 +447,40 @@ impl GridView {
             filter,
             &self.sidebar.collapsed_schemas,
         );
-        let open_table = self.tabs.current().clone();
-        let pending = self.sidebar.reveal.borrow().clone();
-        let mut tree: Vec<gpui::AnyElement> = Vec::new();
+        let mut lines = Vec::with_capacity(rows.len());
         for (index, (depth, row)) in rows.into_iter().enumerate() {
             let table = match &row {
                 TreeRow::Table(table) => Some(table.clone()),
                 _ => None,
             };
-            if table.is_some() && table == pending {
-                self.sidebar.scroll.scroll_to_item(tree.len());
-                self.sidebar.reveal.borrow_mut().take();
-            }
-            tree.push(
-                self.sidebar_tree_row(index, depth, row, &open_table, theme, cx)
-                    .into_any_element(),
-            );
+            lines.push(SidebarLine::Tree { index, depth, row });
             if let Some(table) = table {
-                tree.extend(
-                    self.field_rows(&table, depth, theme)
-                        .into_iter()
-                        .map(IntoElement::into_any_element),
-                );
+                let fields = self.field_count(&table);
+                let table = std::rc::Rc::new(table);
+                lines.extend((0..fields).map(|field| SidebarLine::Field {
+                    table: table.clone(),
+                    depth,
+                    field,
+                }));
             }
         }
         if search.trim().is_empty() {
-            tree.extend(self.catalog_rows(theme, cx));
+            lines.extend(self.catalog_lines().into_iter().map(SidebarLine::Catalog));
+        }
+        lines
+    }
+
+    fn sidebar_tree_view(&self, theme: Theme, search: &str, cx: &mut Context<Self>) -> Div {
+        let lines = std::rc::Rc::new(self.sidebar_lines(search));
+        let pending = self.sidebar.reveal.borrow_mut().take();
+        if let Some(pending) = pending {
+            match lines
+                .iter()
+                .position(|line| matches!(line, SidebarLine::Tree { row: TreeRow::Table(table), .. } if *table == pending))
+            {
+                Some(position) => self.sidebar.scroll.scroll_to_item(position, ScrollStrategy::Nearest),
+                None => *self.sidebar.reveal.borrow_mut() = Some(pending),
+            }
         }
         let empty = (!search.trim().is_empty() && self.sidebar_matches(search) == 0).then(|| {
             div()
@@ -474,16 +488,36 @@ impl GridView {
                 .text_color(rgb(theme.muted_foreground))
                 .child("No matching table")
         });
+        let count = lines.len();
+        let list = uniform_list(
+            "sidebar-tree",
+            count,
+            cx.processor(move |this, range: std::ops::Range<usize>, _window, cx| {
+                let open_table = this.tabs.current().clone();
+                range
+                    .filter_map(|position| match &lines[position] {
+                        SidebarLine::Tree { index, depth, row } => Some(
+                            this.sidebar_tree_row(*index, *depth, row.clone(), &open_table, theme, cx)
+                                .into_any_element(),
+                        ),
+                        SidebarLine::Field { table, depth, field } => this
+                            .field_row(table, *depth, *field, theme)
+                            .map(IntoElement::into_any_element),
+                        SidebarLine::Catalog(line) => Some(this.catalog_line(line, theme, cx)),
+                    })
+                    .collect()
+            }),
+        )
+        .track_scroll(&self.sidebar.scroll)
+        .flex_1()
+        .min_h_0()
+        .px_2();
         div()
-            .id("sidebar-tree")
-            .flex_1()
-            .min_h_0()
-            .overflow_y_scroll()
-            .track_scroll(&self.sidebar.scroll)
             .flex()
             .flex_col()
-            .px_2()
-            .children(tree)
+            .flex_1()
+            .min_h_0()
+            .child(list)
             .children(empty)
     }
 
@@ -837,24 +871,83 @@ impl GridView {
                 view.update(cx, |this, _| this.dark_mode = on);
             },
         );
+        let chosen = if self.fonts.settings.theme.is_empty() {
+            if Theme::current(cx).dark { crate::picker::BUILT_IN_DARK } else { crate::picker::BUILT_IN_LIGHT }.to_string()
+        } else {
+            self.fonts.settings.theme.clone()
+        };
+        let picker_view = cx.entity();
+        let colour_theme = gpui_kit::component::setting::SettingField::render(move |_, _, _| {
+            let view = picker_view.clone();
+            ghost("choose-theme", "Choose…", theme).on_click(move |_, window, cx| {
+                view.update(cx, |this, cx| {
+                    this.open_picker(crate::palette_state::PaletteMode::Themes, window, cx);
+                    cx.notify();
+                })
+            })
+        });
         let page = gpui_kit::component::setting::SettingPage::new("Appearance")
             .default_open(true)
             .group(
                 gpui_kit::component::setting::SettingGroup::new()
+                    .item(
+                        gpui_kit::component::setting::SettingItem::new("Colour theme", colour_theme)
+                            .description(format!("Current: {chosen}")),
+                    )
                     .item(gpui_kit::component::setting::SettingItem::new("Dark theme", dark_mode)),
             )
             .group(fonts);
         div()
+            .relative()
             .flex_1()
             .min_h_0()
+            .flex()
+            .justify_center()
+            .items_start()
+            .p_6()
             .bg(rgb(theme.background))
             .child(
-                gpui_kit::component::setting::Settings::new("bookie-settings")
-                    .header_style(&gpui::StyleRefinement {
-                        display: Some(gpui::Display::None),
-                        ..Default::default()
-                    })
-                    .page(page),
+                gpui::svg()
+                    .path("backdrop/contours.svg")
+                    .absolute()
+                    .top_0()
+                    .left_0()
+                    .size_full()
+                    .text_color(rgb(theme.border)),
+            )
+            .child(
+                div()
+                    .relative()
+                    .debug_selector(|| "settings-card".into())
+                    .w_full()
+                    .max_w(px(size::HOME_WIDTH))
+                    .h_full()
+                    .min_h_0()
+                    .flex()
+                    .flex_col()
+                    .rounded(px(size::SURFACE_RADIUS))
+                    .border_1()
+                    .border_color(rgb(theme.border))
+                    .bg(rgb(theme.popover))
+                    .shadow_lg()
+                    .child(
+                        div()
+                            .px_4()
+                            .pt_4()
+                            .pb_2()
+                            .font_weight(gpui::FontWeight::SEMIBOLD)
+                            .child("Settings"),
+                    )
+                    .child(
+                        div().flex_1().min_h_0().child(
+                            gpui_kit::component::setting::Settings::new("bookie-settings")
+                                .header_style(&gpui::StyleRefinement {
+                                    display: Some(gpui::Display::None),
+                                    ..Default::default()
+                                })
+                                .page(page),
+                        ),
+                    ),
             )
     }
 
@@ -1038,4 +1131,36 @@ pub(crate) fn connection_dot(color: u32, selector: &'static str) -> Div {
         .size(px(size::SM))
         .rounded_full()
         .bg(rgb(color))
+}
+
+enum SidebarLine {
+    Tree { index: usize, depth: usize, row: TreeRow },
+    Field { table: std::rc::Rc<bookie_core::TableInfo>, depth: usize, field: usize },
+    Catalog(crate::sidebar_catalog::CatalogLine),
+}
+
+pub(crate) fn guide_left(level: usize) -> f32 {
+    8.0 + 14.0 * level as f32 + size::ICON / 2.0
+}
+
+pub(crate) fn indent_guides(depth: usize, theme: Theme) -> impl Iterator<Item = Div> {
+    (0..depth).map(move |level| {
+        div()
+            .debug_selector(move || format!("sidebar-guide-{level}"))
+            .absolute()
+            .top_0()
+            .bottom_0()
+            .left(px(guide_left(level)))
+            .w(px(1.0))
+            .bg(rgb(theme.border))
+    })
+}
+
+#[cfg(test)]
+mod guide_tests {
+    #[test]
+    fn a_guide_runs_under_the_centre_of_its_parent_chevron() {
+        assert_eq!(super::guide_left(0), 15.0);
+        assert_eq!(super::guide_left(2), 43.0);
+    }
 }

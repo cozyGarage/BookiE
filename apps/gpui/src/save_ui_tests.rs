@@ -1,11 +1,15 @@
 use std::time::Instant;
 
 use gpui::TestAppContext;
+use gpui_kit::test::TestWindowExt;
 
 use crate::GridView;
 use crate::live_ui_tests::open_live;
 use crate::text_input;
 use bookie_core::TableInfo;
+
+#[path = "paste_literal_save_tests.rs"]
+mod paste_literal_save_tests;
 
 struct TestDirectory(std::path::PathBuf);
 
@@ -394,6 +398,8 @@ fn a_cached_write_session_for_another_connection_is_never_used(cx: &mut TestAppC
 fn an_edited_cell_is_reviewed_then_saved_and_the_table_shows_the_saved_value(cx: &mut TestAppContext) {
     use bookie_gpui::model::CellText;
     let path = std::env::temp_dir().join(format!("bookie-gpui-save-{}.sqlite", uuid::Uuid::new_v4()));
+    let staged = format!("draft {}\r\nlast line", "🧪".repeat(160));
+    let replacement = "first\tsecond\r\nthird 💾".to_string();
     std::fs::copy(orders_fixture(), &path).unwrap();
     let table = writable_table(&path);
     cx.update(text_input::bind_keys);
@@ -412,8 +418,8 @@ fn an_edited_cell_is_reviewed_then_saved_and_the_table_shows_the_saved_value(cx:
     };
     settle(cx);
     let write = write_session(&path, false);
-    cx.update(|_, cx| {
-        view.update(cx, |view, _| {
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
             let id = view
                 .live
                 .as_ref()
@@ -422,9 +428,46 @@ fn an_edited_cell_is_reviewed_then_saved_and_the_table_shows_the_saved_value(cx:
             view.save.write = Some((id, write));
             view.cell_edit
                 .edits
-                .insert((0, 1), bookie_gpui::model::Cell::Text("Ada Lovelace".into()));
+                .insert((0, 1), bookie_gpui::model::Cell::Text(staged.clone()));
+            view.start_edit(0, 1, window, cx);
+            assert!(
+                view.cell_edit.active.as_ref().is_some_and(|editing| editing.full_value)
+            );
+            assert_eq!(view.cell_edit.value_editor.read(cx).value().as_ref(), staged);
         })
     });
+    cx.run_until_parked();
+    cx.update(|_, cx| cx.write_to_clipboard(gpui::ClipboardItem::new_string(replacement.clone())));
+    let select_all_and_paste = if cfg!(target_os = "macos") {
+        "cmd-a cmd-v"
+    } else {
+        "ctrl-a ctrl-v"
+    };
+    cx.simulate_keystrokes(select_all_and_paste);
+    cx.run_until_parked();
+    view.read_with(cx, |view, cx| {
+        assert_eq!(view.cell_edit.value_editor.read(cx).value().as_ref(), replacement);
+    });
+    cx.update(|window, cx| view.update(cx, |view, cx| view.apply_active_cell_edit(window, cx)));
+
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.cell_edit.edits.insert(
+                (1, 1),
+                bookie_gpui::model::Cell::Text("temporary\nvalue".into()),
+            );
+            view.start_edit(1, 1, window, cx);
+            assert!(view.cell_edit.active.as_ref().is_some_and(|editing| editing.full_value));
+            assert_eq!(view.cell_edit.value_editor.read(cx).value().as_ref(), "temporary\nvalue");
+        });
+    });
+    cx.run_until_parked();
+    cx.simulate_keystrokes("ctrl-a backspace");
+    cx.run_until_parked();
+    view.read_with(cx, |view, cx| {
+        assert_eq!(view.cell_edit.value_editor.read(cx).value().as_ref(), "");
+    });
+    cx.update(|window, cx| view.update(cx, |view, cx| view.apply_active_cell_edit(window, cx)));
 
     cx.simulate_keystrokes("ctrl-s");
     settle(cx);
@@ -435,14 +478,15 @@ fn an_edited_cell_is_reviewed_then_saved_and_the_table_shows_the_saved_value(cx:
             .as_ref()
             .unwrap_or_else(|| panic!("no review shown; status: {}", view.status));
         assert!(pending.plan.preview.contains("UPDATE"), "{}", pending.plan.preview);
-        assert!(
-            pending.plan.preview.contains("Ada Lovelace"),
-            "{}",
-            pending.plan.preview
-        );
+        assert!(pending
+            .plan
+            .statements
+            .iter()
+            .flat_map(|(_, params)| params)
+            .any(|value| value == &bookie_gpui::model::Cell::Text(replacement.clone())));
         assert_eq!(
             view.cell_edit.edits.len(),
-            1,
+            2,
             "nothing is saved before the user confirms"
         );
     });
@@ -450,16 +494,19 @@ fn an_edited_cell_is_reviewed_then_saved_and_the_table_shows_the_saved_value(cx:
     cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_save(cx)));
     settle(cx);
     view.read_with(cx, |view, _| {
-        assert_eq!(view.save.banner, Some(("Saved 1 change(s)".to_string(), false)));
+        assert_eq!(view.save.banner, Some(("Saved 2 change(s)".to_string(), false)));
         assert!(view.source.origin().contains("editable"), "{}", view.source.origin());
         assert!(view.cell_edit.edits.is_empty());
         assert!(view.save.pending.is_none());
         assert_eq!(
             view.source.row(0)[1].display(),
-            "Ada Lovelace",
+            replacement,
             "the grid shows the saved value"
         );
+        assert_eq!(view.source.row(1)[1].display(), "", "the empty clipboard value is saved");
     });
+    assert_eq!(saved_customer(&path, 1), replacement);
+    assert_eq!(saved_customer(&path, 2), "");
     std::fs::remove_file(&path).ok();
 }
 
@@ -1389,6 +1436,41 @@ fn the_selected_rows_are_summarised_per_numeric_column(cx: &mut TestAppContext) 
 }
 
 #[gpui::test]
+fn the_status_bar_sums_the_cursor_column_of_the_selected_rows(cx: &mut TestAppContext) {
+    let path = fixture_copy("selection-status-stats");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.selection = Some(crate::Selection { anchor: 0, focus: 2 });
+            view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 0 });
+        })
+    });
+    view.read_with(cx, |view, _| {
+        let items = view.selection_stat_items();
+        assert_eq!(
+            items,
+            vec![
+                ("Count", "3".to_string()),
+                ("Sum", "6".to_string()),
+                ("Avg", "2".to_string()),
+                ("Min", "1".to_string()),
+                ("Max", "3".to_string()),
+            ]
+        );
+    });
+    cx.update(|_, cx| view.update(cx, |_, cx| cx.notify()));
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("selection-stat-Sum").is_some(), "the sum is drawn in the status bar");
+
+    cx.update(|_, cx| view.update(cx, |view, _| view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 1 })));
+    view.read_with(cx, |view, _| assert!(view.selection_stat_items().is_empty(), "a text column has no stats"));
+
+    cx.update(|_, cx| view.update(cx, |view, _| view.selection = Some(crate::Selection { anchor: 1, focus: 1 })));
+    view.read_with(cx, |view, _| assert!(view.selection_stat_items().is_empty(), "one row is not summarised"));
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
 fn health_reports_are_offered_only_on_postgres(cx: &mut TestAppContext) {
     let path = fixture_copy("health-sqlite");
     let (view, cx) = saving_view(cx, &path);
@@ -1908,7 +1990,7 @@ fn grid_paste_shortcut_stages_clipboard_values(cx: &mut TestAppContext) {
             view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 1 });
         });
     });
-    cx.simulate_keystrokes("ctrl-v");
+    cx.simulate_keystrokes("secondary-v");
     view.read_with(cx, |view, _| {
         assert_eq!(view.cell_edit.edits.get(&(0, 1)), Some(&bookie_gpui::model::Cell::Text("Shortcut value".into())), "{}", view.status);
     });
@@ -1929,10 +2011,42 @@ fn paste_shortcut_in_filter_does_not_edit_grid(cx: &mut TestAppContext) {
             window.focus(&view.search.filter.read(cx).focus_handle(cx), cx);
         });
     });
-    cx.simulate_keystrokes("ctrl-v");
+    cx.simulate_keystrokes("secondary-v");
     view.read_with(cx, |view, cx| {
         assert!(view.cell_edit.edits.is_empty());
         assert_eq!(view.search.filter.read(cx).content().to_string(), "filter text");
+    });
+    std::fs::remove_file(path).ok();
+}
+
+#[gpui::test]
+fn paste_into_a_read_only_query_result_does_not_stage_edits(cx: &mut TestAppContext) {
+    use bookie_gpui::live::{LiveSession, Origin};
+
+    let path = fixture_copy("paste-read-only-query");
+    let session = LiveSession::open(&Origin::File(path.clone())).expect("open SQLite fixture");
+    let result = std::sync::Arc::new(
+        session
+            .run_query("SELECT customer FROM orders", 100)
+            .expect("query result"),
+    );
+    cx.update(text_input::bind_keys);
+    let (view, cx) = cx.add_window_view(|window, cx| {
+        GridView::with_source(result.clone(), Instant::now(), window, cx)
+    });
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    view.read_with(cx, |view, _| assert!(!view.source.editable()));
+    cx.update(|_, cx| {
+        cx.write_to_clipboard(gpui::ClipboardItem::new_string("not editable".into()));
+        view.update(cx, |view, cx| {
+            view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 0 });
+            view.paste_cells(cx);
+        });
+    });
+    view.read_with(cx, |view, _| {
+        assert!(view.cell_edit.edits.is_empty(), "{}", view.status);
+        assert!(view.status.contains("cannot be edited"), "{}", view.status);
     });
     std::fs::remove_file(path).ok();
 }

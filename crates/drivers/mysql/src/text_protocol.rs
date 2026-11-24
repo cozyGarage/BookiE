@@ -54,6 +54,52 @@ pub(crate) async fn text_protocol(
     })
 }
 
+pub(crate) async fn bounded_text_protocol(
+    connection: &mut PoolConnection<MySql>,
+    sql: &str,
+    max_rows: usize,
+    max_bytes: usize,
+) -> Result<QueryResultBatch, DriverError> {
+    use sqlx::Either;
+    let mut stream = sqlx::raw_sql(sqlx::AssertSqlSafe(sql.to_string())).fetch_many(&mut **connection);
+    let mut result_sets = Vec::new();
+    let mut current = None;
+    let mut budget = QueryResultBudget::with_limits(max_rows, max_bytes);
+    let mut retained_rows = 0;
+    let mut truncated = false;
+    let mut decoded = Vec::new();
+    while let Some(item) = stream.try_next().await.map_err(crate::map_sqlx_error)? {
+        match item {
+            Either::Right(row) => collect_row(
+                row,
+                &mut current,
+                &result_sets,
+                &mut budget,
+                &mut retained_rows,
+                &mut truncated,
+                &mut decoded,
+            )?,
+            Either::Left(_) => finish_result_set(&mut current, &mut result_sets, &mut truncated),
+        }
+        if truncated {
+            break;
+        }
+    }
+    finish_result_set(&mut current, &mut result_sets, &mut truncated);
+    drop(stream);
+    if !truncated {
+        crate::forget_statements_after_use(connection, sql)
+            .await
+            .map_err(crate::map_sqlx_error)?;
+    }
+    Ok(QueryResultBatch {
+        result_sets,
+        truncated,
+        messages: ServerMessages::default(),
+        rows_affected: None,
+    })
+}
+
 fn collect_row(
     row: MySqlRow,
     current: &mut Option<QueryResult>,

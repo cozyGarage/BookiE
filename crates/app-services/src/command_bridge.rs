@@ -90,7 +90,7 @@ pub enum Event {
     },
     QueryCompleted {
         epoch: Epoch,
-        outcome: Result<QueryResult, DriverFailurePresentation>,
+        outcome: Result<bookie_core::QueryResultBatch, DriverFailurePresentation>,
     },
     PageRead {
         epoch: Epoch,
@@ -494,8 +494,7 @@ async fn dispatch_query(
     sink: &dyn EventSink,
 ) -> Result<(), DispatchError> {
     let outcome = match sessions.get(session_id) {
-        Some(session) if params.is_empty() => session.run_query(&sql, control).await,
-        Some(session) => session.run_query_params(&sql, &params, control).await,
+        Some(session) => session.run_query_batch(&sql, &params, control).await,
         None => Err(DriverFailurePresentation::Disconnected),
     };
     sink.try_emit(Event::QueryCompleted { epoch, outcome })?;
@@ -514,6 +513,38 @@ mod tests {
         };
 
         assert!(event.into_current(Epoch(4)).is_none());
+    }
+
+    #[test]
+    fn query_events_keep_server_messages_and_discard_stale_outcomes() {
+        let mut messages = bookie_core::ServerMessages::default();
+        messages.push(bookie_core::ServerMessage::new(
+            bookie_core::MessageSeverity::Notice,
+            None,
+            "server notice",
+        ));
+        let result = QueryResult {
+            columns: Vec::new(),
+            rows: Default::default(),
+            truncated: false,
+        };
+        let batch = bookie_core::QueryResultBatch::single(result).with_messages(messages);
+        let event = Event::QueryCompleted {
+            epoch: Epoch(3),
+            outcome: Ok(batch.clone()),
+        };
+        let Some(Event::QueryCompleted {
+            outcome: Ok(current), ..
+        }) = event.into_current(Epoch(3))
+        else {
+            panic!("current query outcome was dropped");
+        };
+        assert_eq!(current.messages.iter().next().unwrap().text, "server notice");
+        let stale = Event::QueryCompleted {
+            epoch: Epoch(3),
+            outcome: Ok(batch),
+        };
+        assert!(stale.into_current(Epoch(4)).is_none());
     }
 
     #[test]
