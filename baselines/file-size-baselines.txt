@@ -1,2 +1,2 @@
-# Ratchet ceilings for existing Rust sources above 2000 lines.
+# Ratchet ceilings for existing Rust sources above the error limit in scripts/check-file-size.sh.
 # Lower a ceiling when a listed file shrinks. Do not raise ceilings.
