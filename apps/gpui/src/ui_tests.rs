@@ -75,6 +75,30 @@ fn a_valid_edit_is_applied_to_the_typed_cell_and_marked(cx: &mut TestAppContext)
 }
 
 #[gpui::test]
+fn a_staged_edit_tints_its_cell_and_shows_the_pending_bar_until_discarded(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    assert!(cx.debug_bounds("pending-edits-bar").is_none());
+    assert!(cx.debug_bounds("edited-cell").is_none());
+    cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(2, 3, window, cx)));
+    cx.simulate_keystrokes("ctrl-a");
+    cx.simulate_input("2026-02-03");
+    cx.simulate_keystrokes("enter");
+    assert!(
+        cx.debug_bounds("pending-edits-bar").is_some(),
+        "the bar offers Preview SQL and Discard"
+    );
+    assert!(cx.debug_bounds("edited-cell").is_some(), "the changed cell is tinted");
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.discard_view_edits();
+            cx.notify();
+        })
+    });
+    assert!(cx.debug_bounds("pending-edits-bar").is_none());
+    assert!(cx.debug_bounds("edited-cell").is_none());
+}
+
+#[gpui::test]
 fn undo_and_redo_step_through_the_staged_edits_of_a_cell(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     let edit = |cx: &mut gpui::VisualTestContext, text: &str| {
