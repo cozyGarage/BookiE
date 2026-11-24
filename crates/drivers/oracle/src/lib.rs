@@ -225,7 +225,10 @@ where
     let result = work();
     if matches!(
         &result,
-        Err(DriverError::TimedOut | DriverError::Disconnected | DriverError::OperationOutcomeUnknown { .. })
+        Err(DriverError::TimedOut
+            | DriverError::Disconnected
+            | DriverError::SessionEndedByServer { .. }
+            | DriverError::OperationOutcomeUnknown { .. })
     ) {
         lifecycle.retire();
     }
@@ -286,6 +289,9 @@ where
 fn map_error(error: oracledb::Error) -> DriverError {
     match error.kind() {
         ErrorKind::DbError(db) if matches!(db.code(), 1017 | 28000 | 1005) => DriverError::AuthFailed,
+        ErrorKind::DbError(db) if matches!(db.code(), 28 | 1092 | 2396) => DriverError::SessionEndedByServer {
+            reason: db.message().to_string(),
+        },
         ErrorKind::DbError(db) => DriverError::Query {
             message: db.message().to_string(),
             sqlstate: Some(format!("ORA-{:05}", db.code())),

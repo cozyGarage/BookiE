@@ -35,6 +35,8 @@ actions!(
         Copy,
         Submit,
         Cancel,
+        FocusNext,
+        FocusPrevious,
     ]
 );
 
@@ -86,8 +88,18 @@ pub fn bind_keys(cx: &mut App) {
         KeyBinding::new("end", End, Some("TextInput")),
         KeyBinding::new("enter", Submit, Some("TextInput")),
         KeyBinding::new("escape", Cancel, Some("TextInput")),
+        KeyBinding::new("tab", FocusNext, Some("TextInput")),
+        KeyBinding::new("shift-tab", FocusPrevious, Some("TextInput")),
         KeyBinding::new("ctrl-enter", gpui::NoAction, Some("Input")),
     ]);
+    if cfg!(target_os = "macos") {
+        cx.bind_keys([
+            KeyBinding::new("cmd-a", SelectAll, Some("TextInput")),
+            KeyBinding::new("cmd-v", Paste, Some("TextInput")),
+            KeyBinding::new("cmd-c", Copy, Some("TextInput")),
+            KeyBinding::new("cmd-x", Cut, Some("TextInput")),
+        ]);
+    }
 }
 
 impl TextInput {
@@ -652,6 +664,8 @@ impl Render for TextInput {
             .on_action(cx.listener(Self::paste))
             .on_action(cx.listener(Self::cut))
             .on_action(cx.listener(Self::copy))
+            .on_action(|_: &FocusNext, window, cx| window.focus_next(cx))
+            .on_action(|_: &FocusPrevious, window, cx| window.focus_prev(cx))
             .on_mouse_down(MouseButton::Left, cx.listener(Self::on_mouse_down))
             .on_mouse_up(MouseButton::Left, cx.listener(Self::on_mouse_up))
             .on_mouse_up_out(MouseButton::Left, cx.listener(Self::on_mouse_up))

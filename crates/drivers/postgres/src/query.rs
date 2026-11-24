@@ -48,7 +48,7 @@ pub(super) async fn query_connection_with_rows_affected(
     params: &[Value],
     stop: Option<QueryStop>,
 ) -> Result<(QueryResult, Option<u64>), DriverError> {
-    let result = query_attempt(connection, sql, params, stop.clone()).await;
+    let result = query_attempt(connection, sql, params, stop.clone(), None).await;
     if result.as_ref().is_err_and(is_stale_type_cache_error) {
         connection.clear_cached_statements().await.map_err(map_sqlx_error)?;
         return query_connection_once_with_rows_affected(connection, sql, params, stop).await;
@@ -86,9 +86,30 @@ pub(super) async fn query_connection_once_unlogged(
     params: &[Value],
     stop: Option<QueryStop>,
 ) -> Result<(QueryResult, Option<u64>), DriverError> {
-    query_attempt(connection, sql, params, stop)
+    query_attempt(connection, sql, params, stop, None)
         .await
         .map_err(QueryFailure::into_driver)
+}
+
+pub(super) async fn query_connection_bounded(
+    connection: &mut PoolConnection<Postgres>,
+    sql: &str,
+    params: &[Value],
+    stop: Option<QueryStop>,
+    max_rows: usize,
+    max_bytes: usize,
+) -> Result<(QueryResult, Option<u64>), DriverError> {
+    let limits = Some((max_rows, max_bytes));
+    let result = query_attempt(connection, sql, params, stop.clone(), limits).await;
+    let result = if result.as_ref().is_err_and(is_stale_type_cache_error) {
+        connection.clear_cached_statements().await.map_err(map_sqlx_error)?;
+        query_attempt(connection, sql, params, stop, limits).await
+    } else {
+        result
+    }
+    .map_err(QueryFailure::into_driver);
+    log_undecodable(&result);
+    result
 }
 
 fn log_undecodable(result: &Result<(QueryResult, Option<u64>), DriverError>) {
@@ -103,6 +124,7 @@ async fn query_attempt(
     sql: &str,
     params: &[Value],
     stop: Option<QueryStop>,
+    limits: Option<(usize, usize)>,
 ) -> Result<(QueryResult, Option<u64>), QueryFailure> {
     let description = if needs_text_type_inference(params) {
         Some(describe_query_parameters(connection, sql, params).await?)
@@ -129,7 +151,7 @@ async fn query_attempt(
         connection.set_next_query_result_format(sql, sqlx::postgres::PgValueFormat::Text);
     }
     let (mut result, rows_affected, mut type_infos, mut column_origins) =
-        collect_query_rows_with_affected_count(connection, sql, params, inferred_text_types, stop).await?;
+        collect_query_rows_with_affected_count(connection, sql, params, inferred_text_types, stop, limits).await?;
     if result.columns.is_empty() && result.rows.is_empty() {
         if let Some(description) = description {
             result.columns = description.columns;
@@ -157,6 +179,7 @@ async fn collect_query_rows_with_affected_count(
     params: &[Value],
     inferred_text_types: &[Option<PgTypeInfo>],
     stop: Option<QueryStop>,
+    limits: Option<(usize, usize)>,
 ) -> Result<(QueryResult, Option<u64>, Vec<PgTypeInfo>, Vec<Option<(i64, i16)>>), QueryFailure> {
     let rows_affected = Mutex::new(None);
     #[expect(deprecated, reason = "PostgreSQL command tags accompany RETURNING rows")]
@@ -172,7 +195,11 @@ async fn collect_query_rows_with_affected_count(
                 Either::Right(row) => std::future::ready(Ok(Some(row))),
             }),
     );
-    let (result, type_infos, column_origins) = collect_query_rows(&mut stream, MAX_QUERY_ROWS).await?;
+    let (result, type_infos, column_origins) = collect_query_rows(
+        &mut stream,
+        limits.unwrap_or((MAX_QUERY_ROWS, bookie_core::MAX_QUERY_RESULT_BYTES)),
+    )
+    .await?;
     if result.truncated {
         stop_server_query(stop, &mut stream).await;
     }
@@ -310,7 +337,8 @@ async fn stream_into_result_once(
     }
     drop(statement);
     let mut stream = sqlx::query(sqlx::AssertSqlSafe(sql)).fetch(&mut **connection);
-    let (mut result, mut type_infos, mut column_origins) = collect_query_rows(&mut stream, limit).await?;
+    let (mut result, mut type_infos, mut column_origins) =
+        collect_query_rows(&mut stream, (limit, bookie_core::MAX_QUERY_RESULT_BYTES)).await?;
     if result.truncated {
         stop_server_query(stop, &mut stream).await;
     }
@@ -489,7 +517,7 @@ async fn refresh_enum_type_names(
 
 async fn collect_query_rows<S>(
     stream: &mut S,
-    limit: usize,
+    limits: (usize, usize),
 ) -> Result<(QueryResult, Vec<PgTypeInfo>, Vec<Option<(i64, i16)>>), QueryFailure>
 where
     S: futures::Stream<Item = Result<PgRow, sqlx::Error>> + Unpin,
@@ -498,9 +526,10 @@ where
     let mut type_infos = Vec::new();
     let mut column_origins = Vec::new();
     let mut type_names = Vec::new();
+    let (limit, max_bytes) = limits;
     let mut rows = QueryRows::with_capacity(limit.min(1024), 0);
     let mut decoded = Vec::with_capacity(columns.len());
-    let mut budget = QueryResultBudget::default();
+    let mut budget = QueryResultBudget::with_limits(limit, max_bytes);
     let mut truncated = false;
     while let Some(row_result) = stream.next().await {
         let row = row_result.map_err(|error| {
