@@ -244,7 +244,7 @@ impl GridView {
             .id("grid-controls")
             .flex()
             .min_w_0()
-            .overflow_x_scroll()
+            .flex_wrap()
             .items_center()
             .gap_1()
             .px_2()
