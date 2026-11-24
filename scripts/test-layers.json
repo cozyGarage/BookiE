@@ -744,7 +744,9 @@
     "test-build",
     "unit",
     "sandbox",
-    "widgets"
+    "widgets",
+    "gpui-build",
+    "gpui-tests"
   ],
   "gate_jobs": {
   "pin-revision": {
@@ -767,7 +769,7 @@
       "pin-revision"
     ],
     "timeout_minutes": 45,
-    "condition": "github.event_name != 'push'",
+    "condition": null,
     "matrix": {}
   },
   "linux-build": {
@@ -784,7 +786,7 @@
       "pin-revision"
     ],
     "timeout_minutes": 45,
-    "condition": "github.event_name != 'push'",
+    "condition": null,
     "matrix": {}
   },
   "clippy": {
