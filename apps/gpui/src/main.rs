@@ -43,6 +43,7 @@ mod panel_state;
 mod params_ui;
 mod paste_ui;
 mod picker;
+mod server_filter_ui;
 mod host_key_ui;
 mod plan_view;
 mod chart_plot;
@@ -295,7 +296,7 @@ impl GridView {
         Entity<EditorState>,
         Entity<EditorState>,
     ) {
-        let find = cx.new(|cx| TextInput::new("Find", cx));
+        let find = cx.new(|cx| TextInput::new("Find in loaded rows", cx));
         let filter = cx.new(|cx| TextInput::new("label contains 7", cx));
         cx.subscribe(&find, |this, _, event: &InputEvent, cx| match event {
             InputEvent::Changed => {
@@ -402,6 +403,9 @@ impl GridView {
             &table,
             window,
             |this: &mut Self, table, event: &gpui_kit::component::table::TableEvent, window, cx| match event {
+                gpui_kit::component::table::TableEvent::ColumnWidthsChanged(widths) => {
+                    this.remember_grid_widths(widths, cx);
+                }
                 gpui_kit::component::table::TableEvent::SelectCell(row, column) => {
                     let column = table.read(cx).delegate().source_column(*column).unwrap_or(*column);
                     let cursor = bookie_results::grid_cursor::Cursor { row: *row, column };
@@ -727,6 +731,16 @@ impl GridView {
         work: impl FnOnce(CancellationToken) -> T + Send + 'static,
         apply: impl FnOnce(&mut Self, T) + 'static,
     ) {
+        self.begin_background_with_context(work_kind, cx, work, move |this, result, _| apply(this, result));
+    }
+
+    fn begin_background_with_context<T: Send + 'static>(
+        &mut self,
+        work_kind: Work,
+        cx: &mut Context<Self>,
+        work: impl FnOnce(CancellationToken) -> T + Send + 'static,
+        apply: impl FnOnce(&mut Self, T, &mut Context<Self>) + 'static,
+    ) {
         match work_kind {
             Work::Load => self.invalidate_background(),
             Work::Scan => self.invalidate_scans(),
@@ -752,7 +766,7 @@ impl GridView {
                     Work::Chart => this.charts.generation,
                 };
                 if current == generation {
-                    apply(this, result);
+                    apply(this, result, cx);
                     cx.notify();
                 }
             })
@@ -1111,12 +1125,13 @@ mod host_key_ui_tests;
 #[cfg(test)]
 mod live_ui_tests;
 #[cfg(test)]
-#[cfg(test)]
 mod overlay_ui_tests;
 #[cfg(test)]
 mod query_pane_ui_tests;
 #[cfg(test)]
 mod save_ui_tests;
+#[cfg(test)]
+mod server_filter_ui_tests;
 #[cfg(test)]
 mod transaction_ui_tests;
 #[cfg(test)]

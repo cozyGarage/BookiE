@@ -24,6 +24,7 @@ fn open_transaction(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestCont
                 write,
                 shared,
                 started: Instant::now(),
+                last_activity: Instant::now(),
                 statements: 0,
                 finishing: false,
                 running: false,
@@ -184,6 +185,7 @@ fn a_denied_commit_keeps_the_transaction_available_for_rollback(cx: &mut TestApp
                 write: write_session(&path, false),
                 shared,
                 started: Instant::now(),
+                last_activity: Instant::now(),
                 statements: 1,
                 finishing: false,
                 running: false,
@@ -242,6 +244,7 @@ fn terminal_commit_outcomes_are_not_reported_as_successful_retries(cx: &mut Test
                     write: write_session(&path, false),
                     shared: shared.clone(),
                     started: Instant::now(),
+                    last_activity: Instant::now(),
                     statements: 1,
                     finishing: false,
                     running: false,
@@ -262,4 +265,26 @@ fn terminal_commit_outcomes_are_not_reported_as_successful_retries(cx: &mut Test
         );
         std::fs::remove_file(path).ok();
     }
+}
+
+#[gpui::test]
+fn a_transaction_idle_for_five_minutes_shows_the_shared_warning(cx: &mut TestAppContext) {
+    let path = fixture_copy("transaction-idle");
+    let (view, cx) = saving_view(cx, &path);
+    open_transaction(&view, cx, &path);
+    view.read_with(cx, |view, _| assert_eq!(view.transaction_idle_warning(), None));
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            if let Some(transaction) = view.transaction.as_mut() {
+                transaction.last_activity = Instant::now() - std::time::Duration::from_secs(6 * 60);
+            }
+        })
+    });
+    view.read_with(cx, |view, _| {
+        let warning = view.transaction_idle_warning().expect("an idle warning");
+        assert!(warning.starts_with("Idle for 6 min"), "{warning}");
+    });
+    cx.update(|_, cx| view.update(cx, |view, cx| view.end_transaction(false, cx)));
+    wait_for(&view, cx, |view| view.status == "Transaction rolled back");
+    std::fs::remove_file(&path).ok();
 }
