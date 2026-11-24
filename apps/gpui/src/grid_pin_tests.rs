@@ -18,6 +18,21 @@ struct QuerySource {
     sql: &'static str,
 }
 
+struct FitSource {
+    columns: Vec<ColumnMeta>,
+    row: Vec<Cell>,
+}
+
+impl ResultSource for FitSource {
+    fn columns(&self) -> &[ColumnMeta] { &self.columns }
+    fn total(&self) -> u64 { 1 }
+    fn row(&self, _: u64) -> Vec<Cell> { self.row.clone() }
+    fn row_ref(&self, _: u64) -> Option<&[Cell]> { Some(&self.row) }
+    fn find(&self, _: &str, _: usize, _: &CancellationToken) -> Result<FindResult, &'static str> { Err("unused") }
+    fn filter(&self, _: &Predicate, _: &CancellationToken) -> Result<Vec<u32>, &'static str> { Err("unused") }
+    fn compare(&self, _: bool, _: &CancellationToken) -> Result<Diff, &'static str> { Err("unused") }
+}
+
 impl ResultSource for QuerySource {
     fn columns(&self) -> &[ColumnMeta] { self.inner.columns() }
     fn total(&self) -> u64 { self.inner.total() }
@@ -48,6 +63,39 @@ fn query_widths_survive_same_query_and_do_not_follow_a_different_query(cx: &mut 
         view.source = source("select id from b");
         view.sync_table(900.0, window, cx);
         assert_ne!(f32::from(view.table.read(cx).col_width(0).unwrap()), 180.0);
+    }));
+}
+
+#[gpui::test]
+fn fitting_a_column_includes_its_type_header(cx: &mut TestAppContext) {
+    let source = Arc::new(FitSource {
+        columns: vec![ColumnMeta {
+            name: "id".into(),
+            width: 56.0,
+            numeric: false,
+            data_type: "varchar_with_a_long_type_name_that_exceeds_the_sample_cell".into(),
+            primary_key: false,
+        }],
+        row: vec![Cell::Text("x".into())],
+    });
+    cx.update(text_input::bind_keys);
+    let (view, cx) = cx.add_window_view(|window, cx| GridView::with_source(source, Instant::now(), window, cx));
+    cx.simulate_resize(gpui::size(gpui::px(900.0), gpui::px(760.0)));
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    let menu = cx.update(|window, _| window.find_by_label("Actions for id").bounds());
+    cx.simulate_click(menu.center(), Default::default());
+    cx.run_until_parked();
+    cx.update(|window, _| {
+        assert!(window.try_find_by_label("Fit column to content").is_some());
+        assert!(window.try_find_by_label("Reset column widths").is_some());
+    });
+    cx.simulate_keystrokes("down down enter");
+    cx.run_until_parked();
+
+    cx.update(|_, cx| view.read_with(cx, |view, cx| {
+        let width = f32::from(view.table.read(cx).col_width(0).expect("fitted column width"));
+        assert!(width > 200.0, "type header should fit without ellipsis: {width}");
     }));
 }
 

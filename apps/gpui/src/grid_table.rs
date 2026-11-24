@@ -92,6 +92,18 @@ fn remember_width_scope(
     widths.entry(scope).or_default().insert(column, width);
 }
 
+fn unique_column_indices(columns: &[(String, f32)]) -> HashSet<usize> {
+    let mut counts = HashMap::with_capacity(columns.len());
+    for (name, _) in columns {
+        *counts.entry(name.as_str()).or_insert(0) += 1;
+    }
+    columns
+        .iter()
+        .enumerate()
+        .filter_map(|(index, (name, _))| (counts.get(name.as_str()) == Some(&1)).then_some(index))
+        .collect()
+}
+
 impl PartialEq for RowMap {
     fn eq(&self, other: &Self) -> bool {
         self.base == other.base
@@ -662,12 +674,9 @@ impl GridView {
         ) else {
             return saved_widths;
         };
-        let mut counts = HashMap::new();
-        for (name, _) in columns.iter() {
-            *counts.entry(name.clone()).or_insert(0usize) += 1;
-        }
-        for (name, width) in columns {
-            if counts.get(name) == Some(&1)
+        let unique_columns = unique_column_indices(columns);
+        for (index, (name, width)) in columns.iter_mut().enumerate() {
+            if unique_columns.contains(&index)
                 && let Some(saved) = store.load(*id, &scope.width_key(), name)
             {
                 *width = saved as f32;
@@ -701,6 +710,7 @@ impl GridView {
         let Some(scope) = delegate.width_scope.clone() else {
             return;
         };
+        let unique_columns = unique_column_indices(&delegate.columns);
         let previous = (0..delegate.projection.len())
             .filter_map(|index| {
                 delegate
@@ -714,8 +724,7 @@ impl GridView {
             .into_iter()
             .filter_map(|(index, width)| {
                 let name = &delegate.columns.get(index)?.0;
-                (delegate.columns.iter().filter(|(other, _)| other == name).count() == 1)
-                    .then_some((name.clone(), width))
+                unique_columns.contains(&index).then_some((name.clone(), width))
             })
             .collect::<Vec<_>>();
         if !self.grid_is_query
@@ -1560,6 +1569,12 @@ mod tests {
             scope("a", Some("b.c"), "d").width_key()
         );
         assert_ne!(scope("a", None, "d").width_key(), scope("a", Some(""), "d").width_key());
+    }
+
+    #[test]
+    fn saved_widths_skip_ambiguous_duplicate_names() {
+        let columns = vec![("id".into(), 80.0), ("id".into(), 100.0), ("name".into(), 120.0)];
+        assert_eq!(unique_column_indices(&columns), HashSet::from([2]));
     }
 
     #[gpui::test]
