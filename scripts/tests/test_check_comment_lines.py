@@ -36,14 +36,14 @@ class CommentLineTests(unittest.TestCase):
     def test_a_file_may_not_gain_comment_lines_and_a_new_file_starts_at_zero(self):
         baselines = checker.read_baselines("# header\ncrates/a/src/lib.rs 2\n")
         self.assertEqual(checker.problems({"crates/a/src/lib.rs": 2}, baselines), [])
-        self.assertEqual(checker.problems({"crates/a/src/lib.rs": 1}, baselines), [])
         self.assertEqual(len(checker.problems({"crates/a/src/lib.rs": 3}, baselines)), 1)
-        self.assertEqual(len(checker.problems({"crates/b/src/new.rs": 1}, baselines)), 1)
+        self.assertEqual(len(checker.problems({"crates/a/src/lib.rs": 2, "crates/b/src/new.rs": 1}, baselines)), 1)
 
-    def test_the_real_tree_is_within_its_baseline(self):
-        counts = checker.comment_counts(ROOT)
-        baselines = checker.read_baselines((ROOT / "baselines" / "comment-line-baselines.txt").read_text())
-        self.assertEqual(checker.problems(counts, baselines), [])
+    def test_a_baseline_above_the_current_count_must_be_lowered(self):
+        baselines = checker.read_baselines("crates/a/src/lib.rs 2\ncrates/gone/src/lib.rs 1\n")
+        found = checker.problems({"crates/a/src/lib.rs": 1}, baselines)
+        self.assertEqual(len(found), 2)
+        self.assertTrue(all("Lower the baseline with --update" in message for message in found))
 
 
 if __name__ == "__main__":

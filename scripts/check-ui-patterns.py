@@ -78,6 +78,11 @@ def main() -> int:
         for key, number in current.items()
         if number > baseline.get(key, 0)
     ]
+    problems += [
+        f"{key}: {current.get(key, 0)} (baseline {number}); lower the baseline with --update"
+        for key, number in baseline.items()
+        if current.get(key, 0) < number
+    ]
     for problem in problems:
         print(f"error: {problem}", file=sys.stderr)
     if problems:

@@ -67,6 +67,11 @@ def main() -> int:
         for name, number in current.items()
         if number > baseline.get(name, 0)
     ]
+    problems += [
+        f"{name} has {current.get(name, 0)} engine-id branches (baseline {number}); lower the baseline with --update"
+        for name, number in baseline.items()
+        if current.get(name, 0) < number
+    ]
     for problem in problems:
         print(f"error: {problem}", file=sys.stderr)
     if problems:
