@@ -1087,6 +1087,8 @@ mod transaction_ui_tests;
 #[cfg(test)]
 mod typed_value_ui_tests;
 #[cfg(test)]
+mod connection_form_ui_tests;
+#[cfg(test)]
 mod ui_tests;
 #[cfg(test)]
 mod window_identity_tests;

@@ -69,6 +69,7 @@ async fn listing_saved_connections_emits_only_the_current_summary_fields() {
             driver_id: connection.driver_id,
             read_only: connection.read_only,
             environment: connection.environment,
+            color: None,
         }]
     );
 }
