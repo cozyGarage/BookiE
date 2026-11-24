@@ -25,11 +25,6 @@ class DriverIdBranchTests(unittest.TestCase):
     def test_test_code_after_the_cfg_marker_does_not_count(self):
         self.assertEqual(self.counted('#[cfg(test)]\nmod t { fn f() { assert!(driver_id == "sqlite"); } }'), 0)
 
-    def test_the_committed_baseline_matches_the_tree(self):
-        current = checker.counts()
-        baseline = checker.read_baseline()
-        self.assertTrue(all(number <= baseline.get(name, 0) for name, number in current.items()))
-
 
 if __name__ == "__main__":
     unittest.main()

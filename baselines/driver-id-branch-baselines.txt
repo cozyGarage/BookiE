@@ -13,6 +13,6 @@ apps/linux/app/src/ui/export_dialog.rs 1
 apps/linux/app/src/ui/structure_tab/columns.rs 2
 apps/linux/app/src/ui/structure_tab/fks.rs 2
 crates/app-services/src/browse_query/order.rs 1
-crates/app-services/src/browse_query.rs 5
+crates/app-services/src/browse_query.rs 4
 crates/app-services/src/catalog_changes.rs 1
 crates/app-services/src/database_backup.rs 1

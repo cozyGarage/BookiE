@@ -3,7 +3,6 @@ apps/linux/app/src/config.rs 5
 apps/linux/app/src/lib.rs 9
 apps/linux/app/src/logging.rs 3
 apps/linux/app/src/services/gtk_approval.rs 4
-apps/linux/app/src/services/mcp_service.rs 3
 apps/linux/app/src/services/preferences.rs 3
 apps/linux/app/src/services/single_instance.rs 4
 apps/linux/app/src/services/window_registry.rs 1
@@ -24,7 +23,7 @@ apps/linux/app/src/ui/app/status_pages.rs 4
 apps/linux/app/src/ui/app/structure.rs 13
 apps/linux/app/src/ui/app/workspace_chrome.rs 4
 apps/linux/app/src/ui/app/workspace_tabs.rs 36
-apps/linux/app/src/ui/browse_tab/chrome.rs 18
+apps/linux/app/src/ui/browse_tab/chrome.rs 16
 apps/linux/app/src/ui/browse_tab/grid_render.rs 12
 apps/linux/app/src/ui/browse_tab/mod.rs 20
 apps/linux/app/src/ui/browse_tab/row_ops.rs 55
