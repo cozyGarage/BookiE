@@ -8,6 +8,13 @@ use crate::{GridView, Tab, palette_step};
 
 impl GridView {
     pub(super) fn intercept_key(&mut self, event: &KeystrokeEvent, window: &mut Window, cx: &mut Context<Self>) {
+        if self.approval.current.is_some() {
+            if event.keystroke.key == "escape" {
+                self.answer_approval(bookie_app_services::approval_prompt::ApprovalOutcome::Deny, cx);
+            }
+            cx.stop_propagation();
+            return;
+        }
         if self.record_shortcut_key(&event.keystroke, cx) {
             cx.stop_propagation();
             return;
