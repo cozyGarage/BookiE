@@ -90,7 +90,7 @@ fn json_text_preview(text: &str) -> String {
     }
 }
 
-fn text_preview(text: &str) -> String {
+pub fn text_preview(text: &str) -> String {
     let end = text
         .char_indices()
         .nth(MAX_CHARS)
