@@ -46,6 +46,7 @@ impl McpState {
             let theme = Theme::current(cx);
             div()
                 .flex()
+                .flex_wrap()
                 .gap_2()
                 .child(button(
                     "mcp-issue-read",
@@ -90,15 +91,19 @@ impl McpState {
                         }),
                 )
         });
-        SettingGroup::new()
+        let mut group = SettingGroup::new()
             .item(SettingItem::new("MCP server", enabled).description("Use BookiE's governed local MCP endpoint."))
             .item(
                 SettingItem::new("Issue token", actions)
                     .description("Tokens are limited to the active saved connection; plaintext is shown once."),
-            )
-            .item(SettingItem::new("Issued token", secret))
-            .item(SettingItem::new("Token status", status))
-            .item(SettingItem::new("Active tokens", tokens))
+            );
+        if self.plaintext.is_some() {
+            group = group.item(SettingItem::new("Issued token", secret));
+        }
+        if self.status.is_some() {
+            group = group.item(SettingItem::new("Token status", status));
+        }
+        group.item(SettingItem::new("Active tokens", tokens))
     }
 }
 
@@ -200,6 +205,9 @@ impl GridView {
                 })
                 .await;
             view.update(cx, |this, cx| {
+                if result.is_ok() {
+                    this.mcp.plaintext = None;
+                }
                 this.mcp.status = Some(result.map_or_else(|error| error, |_| "Token revoked.".into()));
                 cx.notify();
             });

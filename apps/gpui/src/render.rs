@@ -206,21 +206,15 @@ impl GridView {
             .when(!compact, |actions| {
                 actions
                     .child(
-                        icon_button("compare", "arrow-left-right", "Compare", false, theme)
+                        button("compare", "Compare", theme)
                             .on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))),
                     )
                     .child(
-                        icon_button(
-                            "export",
-                            "download",
-                            "Export current page or selection as CSV",
-                            false,
-                            theme,
-                        )
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            this.export_selection_or_page(cx);
-                            cx.notify();
-                        })),
+                        button("export", "Export CSV", theme)
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.export_selection_or_page(cx);
+                                cx.notify();
+                            })),
                     )
                     .child(
                         icon_button(
