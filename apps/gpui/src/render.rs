@@ -179,10 +179,12 @@ impl GridView {
                 div()
                     .w(px(size::FIND_WIDTH))
                     .flex_none()
+                    .debug_selector(|| "grid-find-field".into())
                     .child(self.search.find.clone()),
             )
             .child(
                 icon_button("find-prev", "chevron-up", "Previous match", false, theme)
+                    .debug_selector(|| "find-prev".into())
                     .on_click(cx.listener(|this, _, _, cx| this.run_find(false, cx))),
             )
             .child(
