@@ -842,33 +842,53 @@ impl GridView {
                         .build()
                         .map_err(|error| error.to_string())?;
                     let saved = runtime.block_on(connection_save::save(draft))?;
-                    if let Err(error) = runtime.block_on(bookie_app_services::read_session::set_connection_color(
+                    let color_saved = runtime.block_on(bookie_app_services::read_session::set_connection_color(
                         saved.id,
                         color.as_deref(),
-                    )) {
+                    )).map_err(|error| {
                         tracing::warn!(%error, "the connection colour was not saved");
-                    }
-                    Ok::<_, String>(saved)
+                    }).is_ok();
+                    let hops = saved.ssh.as_ref().map_or_else(Vec::new, |ssh| {
+                        ssh.flatten_hops().iter().map(|hop| hop.hop_id).collect()
+                    });
+                    Ok::<_, String>((saved.id, saved.name, hops, color_saved))
                 })
                 .await;
             let _ = this.update(cx, |this, cx| {
-                this.connection_form.saving = false;
-                match result {
-                    Ok(saved) => {
-                        this.connection_form.status = format!("Saved {}", saved.name);
-                        this.connection_form
-                            .password
-                            .update(cx, |input, cx| input.set_content("", cx));
-                        if let Ok(list) = bookie_gpui::live::saved_connections() {
-                            this.connections = list;
-                        }
-                    }
-                    Err(message) => this.connection_form.status = message,
-                }
+                this.finish_connection_save(result, cx);
                 cx.notify();
             });
         })
         .detach();
+    }
+
+    pub(crate) fn finish_connection_save(
+        &mut self,
+        result: Result<(uuid::Uuid, String, Vec<uuid::Uuid>, bool), String>,
+        cx: &mut Context<Self>,
+    ) {
+        self.connection_form.saving = false;
+        match result {
+            Ok((id, name, hops, color_saved)) => {
+                self.connection_form.editing = Some(id);
+                if let Some((head, jumps)) = hops.split_first() {
+                    self.connection_form.ssh.head.hop_id = Some(*head);
+                    for (form, id) in self.connection_form.ssh.jumps.iter_mut().zip(jumps) {
+                        form.hop_id = Some(*id);
+                    }
+                }
+                self.connection_form.status = if color_saved {
+                    format!("Saved {name}")
+                } else {
+                    format!("Saved {name}, but the colour was not saved. Try saving again.")
+                };
+                self.connection_form.password.update(cx, |input, cx| input.set_content("", cx));
+                if let Ok(list) = bookie_gpui::live::saved_connections() {
+                    self.connections = list;
+                }
+            }
+            Err(message) => self.connection_form.status = message,
+        }
     }
 }
 
