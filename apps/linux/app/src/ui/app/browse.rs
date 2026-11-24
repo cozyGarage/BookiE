@@ -218,7 +218,7 @@ impl App {
                 .zip(self.persistence.column_widths.as_ref())
                 .map(|(connection_id, store)| {
                     hidden_columns_for_browse_table(
-                        &store,
+                        store,
                         connection_id,
                         &page.database_name,
                         page.schema.as_deref(),
