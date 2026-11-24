@@ -485,7 +485,20 @@ impl GridView {
         {
             self.result_summary_body(&slot.run)
         } else if self.run_tabs.slots.is_empty() {
-            div().flex_1().p_4().child("No results")
+            div()
+                .id("results-empty")
+                .flex_1()
+                .flex()
+                .flex_col()
+                .items_center()
+                .justify_center()
+                .gap_1()
+                .p_4()
+                .text_color(rgb(theme.muted_foreground))
+                .child(div().pb_2().child("Run a query to see results"))
+                .child(shortcut_hint("Run the selection or statement", "Ctrl+Enter", theme))
+                .child(shortcut_hint("Run all statements", "Ctrl+Shift+Enter", theme))
+                .child(shortcut_hint("Command palette", "Ctrl+Shift+P", theme))
         } else {
             grid
         }
@@ -508,4 +521,25 @@ impl GridView {
             .floor()
             .max(1.0) as usize
     }
+}
+
+fn shortcut_hint(label: &'static str, keys: &'static str, theme: Theme) -> Div {
+    div()
+        .flex()
+        .items_center()
+        .justify_between()
+        .gap_4()
+        .w(px(320.0))
+        .text_size(px(size::TEXT_SMALL))
+        .child(label)
+        .child(
+            div()
+                .px_2()
+                .py_1()
+                .rounded(px(size::CONTROL_RADIUS))
+                .border_1()
+                .border_color(rgb(theme.border))
+                .bg(rgb(theme.chrome))
+                .child(keys),
+        )
 }
