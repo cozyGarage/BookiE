@@ -128,7 +128,7 @@ impl DataCompare {
     }
 
     pub fn is_identical(&self) -> bool {
-        self.counts.insert == 0 && self.counts.update == 0 && self.counts.delete == 0
+        self.unknown_cells == 0 && self.counts.insert == 0 && self.counts.update == 0 && self.counts.delete == 0
     }
 
     pub fn sample_lines(&self, driver_id: &str) -> Vec<String> {
@@ -209,6 +209,12 @@ impl DataCompare {
             return Err(DataCompareError::TooManyDifferences(self.differences()));
         }
         let mut out = String::from("-- Data compare: review before running. Nothing has been applied.\n");
+        if self.unknown_cells > 0 {
+            out.push_str(&format!(
+                "-- {} cell(s) could not be compared; the script does not synchronize those values.\n",
+                self.unknown_cells
+            ));
+        }
         if self.is_identical() {
             out.push_str("-- The tables match, so there is nothing to change.\n");
             return Ok(out);
@@ -543,15 +549,21 @@ pub async fn merge<S: RowSource, T: RowSource>(
 
 fn classify_pair(result: &mut DataCompare, source: Vec<Value>, target: &[Value]) {
     let mut changed = Vec::new();
+    let mut unknown = false;
     for index in result.layout.key_len()..result.layout.width() {
         match compare_cell(&source[index], &target[index]) {
             Cell::Same => {}
             Cell::Different => changed.push(index),
-            Cell::Unknown => result.unknown_cells += 1,
+            Cell::Unknown => {
+                result.unknown_cells += 1;
+                unknown = true;
+            }
         }
     }
     if changed.is_empty() {
-        result.counts.same += 1;
+        if !unknown {
+            result.counts.same += 1;
+        }
         return;
     }
     result.record(Change::Update, source, changed);

@@ -3,6 +3,9 @@ use super::*;
 pub(crate) fn map_sqlx_error(err: sqlx::Error) -> DriverError {
     use sqlx::Error::*;
     match err {
+        Database(e) if server_ended_session(e.as_ref()) => DriverError::SessionEndedByServer {
+            reason: e.message().to_string(),
+        },
         Database(e) => DriverError::Query {
             message: e.message().to_string(),
             sqlstate: e.code().map(|c| c.to_string()),
@@ -24,6 +27,12 @@ pub(crate) fn map_sqlx_error(err: sqlx::Error) -> DriverError {
         PoolClosed | PoolTimedOut => DriverError::Disconnected,
         other => DriverError::Internal(format!("{other}")),
     }
+}
+
+fn server_ended_session(error: &dyn sqlx::error::DatabaseError) -> bool {
+    error
+        .try_downcast_ref::<sqlx::mysql::MySqlDatabaseError>()
+        .is_some_and(|error| matches!(error.number(), 1053 | 1927 | 4031))
 }
 
 pub(crate) fn map_sqlx_connect_error(err: sqlx::Error) -> DriverError {
