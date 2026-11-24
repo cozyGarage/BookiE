@@ -298,10 +298,7 @@ impl GridView {
             &form.database,
             cx,
         ));
-        let mut sections = vec![
-            section(theme, "Connection", connection),
-            section(theme, "Behaviour", self.behaviour_fields(theme, cx)),
-        ];
+        let mut sections = vec![section(theme, "Behaviour", self.behaviour_fields(theme, cx))];
         if !file_based {
             sections.push(section(theme, "Security", self.security_fields(theme, cx)));
             sections.push(section(theme, "SSH tunnel", self.ssh_fields(theme, cx)));
@@ -329,7 +326,7 @@ impl GridView {
                     .relative()
                     .debug_selector(|| "connection-card".into())
                     .w_full()
-                    .max_w(px(size::HOME_WIDTH))
+                    .max_w(px(size::HOME_WIDTH * 1.5))
                     .max_h_full()
                     .min_h_0()
                     .flex()
@@ -359,33 +356,48 @@ impl GridView {
                             .px_4()
                             .pb_4()
                             .flex()
-                            .flex_col()
-                            .gap_4()
-                            .children(sections),
-                    )
-                    .child(
-                        div()
-                            .debug_selector(|| "connection-actions".into())
-                            .px_4()
-                            .py_3()
-                            .border_t_1()
-                            .border_color(rgb(theme.border))
-                            .flex()
                             .flex_wrap()
-                            .items_center()
-                            .gap_2()
-                            .child(self.test_button(theme, cx))
+                            .gap_4()
                             .child(
                                 div()
-                                    .flex_1()
-                                    .min_w_0()
-                                    .text_color(rgb(theme.muted_foreground))
-                                    .child(form.status.clone()),
+                                    .debug_selector(|| "connection-main-section".into())
+                                    .w(px(size::HOME_WIDTH / 2.0))
+                                    .max_w_full()
+                                    .flex_grow(1.0)
+                                    .child(section(theme, "Connection", connection)),
                             )
-                            .children(form.editing.map(|_| self.delete_button(theme, cx)))
-                            .child(self.save_button(theme, cx)),
-                    ),
+                            .child(
+                                div()
+                                    .debug_selector(|| "connection-options-section".into())
+                                    .w(px(size::HOME_WIDTH / 2.0))
+                                    .max_w_full()
+                                    .flex_grow(1.0)
+                                    .flex()
+                                    .flex_col()
+                                    .gap_4()
+                                    .children(sections),
+                            ),
+                    )
+                    .child(self.connection_actions(theme, cx)),
             )
+    }
+
+    fn connection_actions(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+        let form = &self.connection_form;
+        div()
+            .debug_selector(|| "connection-actions".into())
+            .px_4()
+            .py_3()
+            .border_t_1()
+            .border_color(rgb(theme.border))
+            .flex()
+            .flex_wrap()
+            .items_center()
+            .gap_2()
+            .child(self.test_button(theme, cx))
+            .child(div().flex_1().min_w_0().text_color(rgb(theme.muted_foreground)).child(form.status.clone()))
+            .children(form.editing.map(|_| self.delete_button(theme, cx)))
+            .child(self.save_button(theme, cx))
     }
 
     fn behaviour_fields(&self, theme: Theme, cx: &mut Context<Self>) -> Vec<Div> {
@@ -492,26 +504,7 @@ impl GridView {
                 }))
             }),
         );
-        let environment = choice_row(
-            theme,
-            "Environment",
-            [Environment::Local, Environment::Dev, Environment::Staging, Environment::Prod]
-                .into_iter()
-                .enumerate()
-                .map(|(index, environment)| {
-                    choice_chip(
-                        ("environment", index),
-                        environment.display_name(),
-                        form.environment == environment,
-                        theme,
-                    )
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.connection_form.environment = environment;
-                        cx.notify();
-                    }))
-                }),
-        );
-        let mut rows = vec![environment, auth, tls];
+        let mut rows = vec![auth, tls];
         if TlsMode::from_index(form.tls) != TlsMode::Disabled {
             rows.push(field(theme, "CA file", &form.tls_root));
             rows.push(form.validation_field(theme, "Client cert", &form.tls_cert, cx));
