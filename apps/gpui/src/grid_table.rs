@@ -417,10 +417,10 @@ impl TableDelegate for GridDelegate {
             .get(source_col)
             .map(|(name, _)| name.clone())
             .unwrap_or_default();
-        let kind = self
+        let (kind, key) = self
             .kinds
             .get(source_col)
-            .map(|(kind, key)| header_kind(kind, *key))
+            .map(|(kind, key)| (header_kind(kind), *key))
             .unwrap_or_default();
         let binary = self
             .kinds
@@ -472,15 +472,16 @@ impl TableDelegate for GridDelegate {
             .size_full()
             .min_w_0()
             .flex()
-            .justify_center()
+            .items_center()
             .overflow_hidden()
-            .flex_col()
             .child(
                 div()
                     .flex()
+                    .flex_1()
                     .items_center()
-                    .justify_between()
+                    .gap_1()
                     .min_w_0()
+                    .children(key.then(|| crate::assets::icon("key-round", theme.warning)))
                     .child(
                         div()
                             .id(("column-header-name", col_ix))
@@ -491,27 +492,29 @@ impl TableDelegate for GridDelegate {
                                     gpui_component::tooltip::Tooltip::new(full_name.clone()).build(window, cx)
                                 }
                             })
-                            .min_w_0()
+                            .flex_none()
+                            .max_w_full()
                             .overflow_hidden()
                             .whitespace_nowrap()
                             .text_ellipsis()
                             .child(name),
                     )
-                    .child(menu)
-                    .children(pin),
+                    .when(!kind.is_empty(), |el| {
+                        el.child(
+                            div()
+                                .debug_selector(move || format!("column-header-type-{col_ix}"))
+                                .min_w_0()
+                                .overflow_hidden()
+                                .whitespace_nowrap()
+                                .text_ellipsis()
+                                .text_xs()
+                                .text_color(gpui::rgb(theme.muted_foreground))
+                                .child(kind),
+                        )
+                    }),
             )
-            .when(!kind.is_empty(), |el| {
-                el.child(
-                    div()
-                        .debug_selector(move || format!("column-header-kind-{col_ix}"))
-                        .overflow_hidden()
-                        .whitespace_nowrap()
-                        .text_ellipsis()
-                        .text_xs()
-                        .text_color(gpui::rgb(theme.muted_foreground))
-                        .child(kind),
-                )
-            })
+            .child(menu)
+            .children(pin)
     }
 
     fn render_td(
@@ -1264,13 +1267,8 @@ mod pin_tests {
     }
 }
 
-fn header_kind(data_type: &str, primary_key: bool) -> String {
-    match (data_type.is_empty(), primary_key) {
-        (true, false) => String::new(),
-        (true, true) => "PK".into(),
-        (false, false) => data_type.into(),
-        (false, true) => format!("{data_type} · PK"),
-    }
+fn header_kind(data_type: &str) -> String {
+    data_type.to_uppercase()
 }
 
 const MIN_CONTENT_WIDTH: f32 = 56.0;
@@ -1351,13 +1349,17 @@ fn measure_visible_columns(
 }
 
 fn measure_header_width(name: &str, kind: Option<&(String, bool)>, measure: &mut impl FnMut(&str) -> f32) -> f32 {
-    let name_width = measure(name);
-    let kind_width = kind
-        .map(|(data_type, primary_key)| header_kind(data_type, *primary_key))
-        .filter(|kind| !kind.is_empty())
-        .map(|kind| measure(&kind))
-        .unwrap_or_default();
-    name_width.max(kind_width).max(MIN_CONTENT_WIDTH).min(MAX_CONTENT_WIDTH)
+    let mut width = measure(name) + 4.0;
+    if let Some((data_type, primary_key)) = kind {
+        let kind = header_kind(data_type);
+        if !kind.is_empty() {
+            width += measure(&kind) - 8.0;
+        }
+        if *primary_key {
+            width += 18.0;
+        }
+    }
+    width.max(MIN_CONTENT_WIDTH).min(MAX_CONTENT_WIDTH)
 }
 
 fn measure_text(text: &str, window: &Window) -> f32 {
@@ -1476,19 +1478,18 @@ mod header_kind_tests {
     use super::{header_kind, measure_header_width};
 
     #[test]
-    fn a_header_shows_the_type_and_marks_the_primary_key() {
-        assert_eq!(header_kind("integer", true), "integer · PK");
-        assert_eq!(header_kind("text", false), "text");
-        assert_eq!(header_kind("", true), "PK");
-        assert_eq!(header_kind("", false), "");
+    fn a_header_type_reads_in_capitals_like_a_label() {
+        assert_eq!(header_kind("integer"), "INTEGER");
+        assert_eq!(header_kind("numeric(10,2)"), "NUMERIC(10,2)");
+        assert_eq!(header_kind(""), "");
     }
 
     #[test]
-    fn fitted_width_accounts_for_the_type_line_and_primary_key_marker() {
+    fn fitted_width_accounts_for_inline_type_and_primary_key_icon() {
         let kind = ("numeric(38,18)".to_owned(), true);
-        let width = measure_header_width("id", Some(&kind), &mut |text| text.len() as f32 * 8.0);
+        let width = measure_header_width("id", Some(&kind), &mut |text| text.len() as f32 * 8.0 + 12.0);
 
-        assert_eq!(width, "numeric(38,18) · PK".len() as f32 * 8.0);
+        assert_eq!(width, ("id".len() + "NUMERIC(38,18)".len()) as f32 * 8.0 + 38.0);
     }
 }
 

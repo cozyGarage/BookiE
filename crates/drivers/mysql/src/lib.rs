@@ -418,6 +418,66 @@ impl Connection for MysqlConnection {
         result
     }
 
+    async fn query_result_sets_bounded_controlled(
+        &self,
+        sql: &str,
+        params: &[Value],
+        max_rows: usize,
+        max_bytes: usize,
+        control: &OperationControl,
+    ) -> Result<QueryResultBatch, DriverError> {
+        let mut connection = acquire_controlled(&self.pool, control).await?;
+        connection.close_on_drop();
+        let connection_id = connection_id_controlled(&mut connection, control).await?;
+        warnings::discard(&mut connection);
+        let mut result = if params.is_empty() && is_call_statement(sql) {
+            run_server_cancellable(
+                text_protocol::bounded_text_protocol(&mut connection, sql, max_rows, max_bytes),
+                request_cancellation(&self.cancellation_pool, connection_id),
+                confirms_cancellation,
+                control,
+            )
+            .await
+        } else {
+            run_server_cancellable(
+                params_into_result_bounded(&mut connection, sql, params, max_rows, max_bytes, true),
+                request_cancellation(&self.cancellation_pool, connection_id),
+                confirms_cancellation,
+                control,
+            )
+            .await
+            .map(QueryResultBatch::single)
+        };
+        if params.is_empty() && result.as_ref().is_err_and(session::needs_text_protocol) {
+            result = run_server_cancellable(
+                text_protocol::bounded_text_protocol(&mut connection, sql, max_rows, max_bytes),
+                request_cancellation(&self.cancellation_pool, connection_id),
+                confirms_cancellation,
+                control,
+            )
+            .await;
+        }
+        let mut batch = result?;
+        let messages = if batch.truncated {
+            let _ = tokio::time::timeout(
+                bookie_core::CANCELLATION_DISPATCH_TIMEOUT,
+                request_cancellation(&self.cancellation_pool, connection_id),
+            )
+            .await;
+            let mut messages = bookie_core::ServerMessages::default();
+            messages.push(bookie_core::ServerMessage::new(
+                bookie_core::MessageSeverity::Info,
+                None,
+                "Server warnings may be incomplete because the result was truncated.",
+            ));
+            messages
+        } else {
+            warnings::collect(&mut connection).await
+        };
+        batch.messages.extend(messages);
+        Ok(batch)
+    }
+
     async fn execute(&self, sql: &str) -> Result<ExecResult, DriverError> {
         let res = sqlx::query(sqlx::AssertSqlSafe(sql))
             .execute(&self.pool)
@@ -891,6 +951,25 @@ async fn params_into_result(
     params: &[Value],
     limit: usize,
 ) -> Result<QueryResult, DriverError> {
+    params_into_result_bounded(
+        connection,
+        sql,
+        params,
+        limit,
+        bookie_core::MAX_QUERY_RESULT_BYTES,
+        false,
+    )
+    .await
+}
+
+async fn params_into_result_bounded(
+    connection: &mut sqlx::MySqlConnection,
+    sql: &str,
+    params: &[Value],
+    limit: usize,
+    max_bytes: usize,
+    retire_on_truncation: bool,
+) -> Result<QueryResult, DriverError> {
     let statement = connection
         .prepare(sqlx::AssertSqlSafe(sql).into_sql_str())
         .await
@@ -900,7 +979,7 @@ async fn params_into_result(
     let mut stream = query.fetch(&mut *connection);
     let mut rows = QueryRows::with_capacity(limit.min(1024), 0);
     let mut decoded = Vec::with_capacity(columns.len());
-    let mut budget = QueryResultBudget::default();
+    let mut budget = QueryResultBudget::with_limits(limit, max_bytes);
     let mut truncated = false;
     while let Some(row_result) = stream.next().await {
         let row = row_result.map_err(map_sqlx_error)?;
@@ -921,9 +1000,11 @@ async fn params_into_result(
         rows.push_row(&mut decoded);
     }
     drop(stream);
-    forget_statements_after_use(&mut *connection, sql)
-        .await
-        .map_err(map_sqlx_error)?;
+    if !truncated || !retire_on_truncation {
+        forget_statements_after_use(&mut *connection, sql)
+            .await
+            .map_err(map_sqlx_error)?;
+    }
     Ok(QueryResult {
         columns,
         rows,

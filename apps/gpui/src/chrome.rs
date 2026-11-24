@@ -1,3 +1,4 @@
+use bookie_core::Environment;
 use bookie_gpui::font_settings;
 use bookie_gpui::shell::{SidebarFilter, Tab, TreeRow, table_label, tree_rows_grouped, tree_rows_in};
 pub(crate) const SQL: [&str; 3] = [
@@ -164,6 +165,68 @@ fn toolbar_icon(id: &'static str, name: &'static str, label: &'static str, theme
 }
 
 
+pub(crate) fn environment_color(environment: Environment, theme: Theme) -> Option<u32> {
+    match environment {
+        Environment::Local => None,
+        Environment::Dev => Some(theme.info),
+        Environment::Staging => Some(theme.warning),
+        Environment::Prod => Some(theme.destructive),
+    }
+}
+
+pub(crate) fn environment_tint(environment: Environment, theme: Theme) -> u32 {
+    environment_color(environment, theme).map_or(theme.background, |color| mix(theme.background, color, 0.18))
+}
+
+fn environment_chip(environment: Environment, theme: Theme) -> Option<Div> {
+    environment_color(environment, theme).map(|color| {
+        div()
+            .debug_selector(|| "environment-chip".into())
+            .px_2()
+            .rounded(px(theme.radius))
+            .border_1()
+            .border_color(rgb(color))
+            .text_size(px(size::TEXT_SMALL))
+            .font_weight(gpui::FontWeight::SEMIBOLD)
+            .text_color(rgb(color))
+            .child(environment.display_name().to_uppercase())
+    })
+}
+
+pub(crate) fn mix(base: u32, color: u32, amount: f32) -> u32 {
+    let channel = |value: u32, shift: u32| ((value >> shift) & 0xff) as f32;
+    let blend = |shift: u32| {
+        let mixed = channel(base, shift) + (channel(color, shift) - channel(base, shift)) * amount.clamp(0.0, 1.0);
+        (mixed.round() as u32) << shift
+    };
+    blend(16) | blend(8) | blend(0)
+}
+
+impl GridView {
+    pub(crate) fn live_environment(&self) -> Environment {
+        let saved = self.live.as_ref().and_then(|live| live.saved.as_ref()).map(|(id, _)| *id);
+        self.connections
+            .iter()
+            .find(|connection| Some(connection.id) == saved)
+            .map_or(Environment::Local, |connection| connection.environment)
+    }
+}
+
+#[cfg(test)]
+mod environment_tests {
+    use super::*;
+
+    #[test]
+    fn a_tint_moves_part_of_the_way_towards_the_environment_colour() {
+        assert_eq!(mix(0xffffff, 0x000000, 0.5), 0x808080);
+        assert_eq!(mix(0x102030, 0x102030, 0.7), 0x102030);
+        let theme = Theme::light();
+        assert_eq!(environment_tint(Environment::Local, theme), theme.background);
+        assert_ne!(environment_tint(Environment::Prod, theme), theme.background);
+        assert_eq!(environment_color(Environment::Prod, theme), Some(theme.destructive));
+    }
+}
+
 impl GridView {
     pub fn toolbar(&self, theme: Theme, window: &Window, cx: &mut Context<Self>) -> Div {
         div()
@@ -173,7 +236,7 @@ impl GridView {
             .h(px(TOOLBAR_HEIGHT))
             .px_2()
             .flex_none()
-            .bg(rgb(theme.background))
+            .bg(rgb(environment_tint(self.live_environment(), theme)))
             .border_b_1()
             .border_color(rgb(theme.border))
             .child(
@@ -182,6 +245,7 @@ impl GridView {
                     .items_center()
                     .gap_1()
                     .children((!self.sidebar.open).then(|| expand_sidebar_button(theme, cx)))
+                    .children(environment_chip(self.live_environment(), theme))
                     .child(
                         toolbar_icon("new-connection", "database", "Connections", theme).on_click(cx.listener(
                             |this, _, _, cx| {
@@ -779,24 +843,83 @@ impl GridView {
                 view.update(cx, |this, _| this.dark_mode = on);
             },
         );
+        let chosen = if self.fonts.settings.theme.is_empty() {
+            if Theme::current(cx).dark { crate::picker::BUILT_IN_DARK } else { crate::picker::BUILT_IN_LIGHT }.to_string()
+        } else {
+            self.fonts.settings.theme.clone()
+        };
+        let picker_view = cx.entity();
+        let colour_theme = gpui_kit::component::setting::SettingField::render(move |_, _, _| {
+            let view = picker_view.clone();
+            ghost("choose-theme", "Choose…", theme).on_click(move |_, window, cx| {
+                view.update(cx, |this, cx| {
+                    this.open_picker(crate::palette_state::PaletteMode::Themes, window, cx);
+                    cx.notify();
+                })
+            })
+        });
         let page = gpui_kit::component::setting::SettingPage::new("Appearance")
             .default_open(true)
             .group(
                 gpui_kit::component::setting::SettingGroup::new()
+                    .item(
+                        gpui_kit::component::setting::SettingItem::new("Colour theme", colour_theme)
+                            .description(format!("Current: {chosen}")),
+                    )
                     .item(gpui_kit::component::setting::SettingItem::new("Dark theme", dark_mode)),
             )
             .group(fonts);
         div()
+            .relative()
             .flex_1()
             .min_h_0()
+            .flex()
+            .justify_center()
+            .items_start()
+            .p_6()
             .bg(rgb(theme.background))
             .child(
-                gpui_kit::component::setting::Settings::new("bookie-settings")
-                    .header_style(&gpui::StyleRefinement {
-                        display: Some(gpui::Display::None),
-                        ..Default::default()
-                    })
-                    .page(page),
+                gpui::svg()
+                    .path("backdrop/contours.svg")
+                    .absolute()
+                    .top_0()
+                    .left_0()
+                    .size_full()
+                    .text_color(rgb(theme.border)),
+            )
+            .child(
+                div()
+                    .relative()
+                    .debug_selector(|| "settings-card".into())
+                    .w_full()
+                    .max_w(px(size::HOME_WIDTH))
+                    .h_full()
+                    .min_h_0()
+                    .flex()
+                    .flex_col()
+                    .rounded(px(size::SURFACE_RADIUS))
+                    .border_1()
+                    .border_color(rgb(theme.border))
+                    .bg(rgb(theme.popover))
+                    .shadow_lg()
+                    .child(
+                        div()
+                            .px_4()
+                            .pt_4()
+                            .pb_2()
+                            .font_weight(gpui::FontWeight::SEMIBOLD)
+                            .child("Settings"),
+                    )
+                    .child(
+                        div().flex_1().min_h_0().child(
+                            gpui_kit::component::setting::Settings::new("bookie-settings")
+                                .header_style(&gpui::StyleRefinement {
+                                    display: Some(gpui::Display::None),
+                                    ..Default::default()
+                                })
+                                .page(page),
+                        ),
+                    ),
             )
     }
 

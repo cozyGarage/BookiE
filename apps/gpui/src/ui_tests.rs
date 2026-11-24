@@ -1005,6 +1005,9 @@ fn connection_form_keeps_actions_visible_at_two_widths(cx: &mut TestAppContext) 
         assert!(page.size.width > gpui::px(200.0));
         assert!(actions.origin.y >= page.origin.y);
         assert!(actions.origin.y + actions.size.height <= gpui::px(760.0));
+        let card = cx.debug_bounds("connection-card").expect("the form sits on a card");
+        assert!(page.origin.y >= card.origin.y && actions.origin.y <= card.origin.y + card.size.height);
+        assert!(cx.debug_bounds("Prod").is_some(), "the environment chips are in the behaviour section");
     }
 }
 
@@ -1832,7 +1835,7 @@ impl bookie_gpui::source::ResultSource for TwoColumns {
 }
 
 #[gpui::test]
-fn column_type_labels_fit_inside_the_grid_header(cx: &mut TestAppContext) {
+fn column_type_labels_share_the_header_row(cx: &mut TestAppContext) {
     cx.update(text_input::bind_keys);
     let (_, cx) = cx.add_window_view(|window, cx| {
         GridView::with_source(std::sync::Arc::new(TwoColumns), Instant::now(), window, cx)
@@ -1842,13 +1845,15 @@ fn column_type_labels_fit_inside_the_grid_header(cx: &mut TestAppContext) {
         .debug_bounds("column-header-0")
         .expect("first column header is rendered");
     let kind = cx
-        .debug_bounds("column-header-kind-0")
+        .debug_bounds("column-header-type-0")
         .expect("first column type is rendered");
-    assert!(kind.origin.y >= header.origin.y, "type label starts inside the header");
-    assert!(
-        kind.origin.y + kind.size.height <= header.origin.y + header.size.height,
-        "type label fits inside the header row"
-    );
+    let name = cx
+        .debug_bounds("column-header-name-0")
+        .expect("first column name is rendered");
+    let kind_center = f32::from(kind.origin.y + kind.size.height / 2.0);
+    let name_center = f32::from(name.origin.y + name.size.height / 2.0);
+    assert!((kind_center - name_center).abs() < 1.0, "type and name share one header row");
+    assert!(header.size.height >= gpui::px(32.0));
 }
 
 #[gpui::test]
@@ -1906,6 +1911,14 @@ fn the_settings_tab_opens_and_shows_the_appearance_page(cx: &mut TestAppContext)
     cx.run_until_parked();
     view.read_with(cx, |view, _| {
         assert_eq!(view.tabs.current(), &bookie_gpui::shell::Tab::Settings)
+    });
+    assert!(cx.debug_bounds("settings-card").is_some(), "settings sit on a card");
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| view.open_picker(crate::palette_state::PaletteMode::Themes, window, cx))
+    });
+    view.read_with(cx, |view, _| {
+        assert!(view.palette.open);
+        assert_eq!(view.palette.mode, crate::palette_state::PaletteMode::Themes);
     });
 }
 
@@ -2010,3 +2023,24 @@ fn a_double_click_on_a_table_row_opens_the_active_column_for_editing(cx: &mut Te
     });
 }
 
+
+#[gpui::test]
+fn editing_a_production_connection_keeps_it_production(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            let mut draft = view.connection_form.draft(cx);
+            draft.environment = bookie_core::Environment::Prod;
+            view.fill_connection_form(draft, cx);
+        })
+    });
+    view.read_with(cx, |view, cx| {
+        assert_eq!(view.connection_form.draft(cx).environment, bookie_core::Environment::Prod);
+    });
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| view.connection_form.environment = bookie_core::Environment::Staging)
+    });
+    view.read_with(cx, |view, cx| {
+        assert_eq!(view.connection_form.draft(cx).environment, bookie_core::Environment::Staging);
+    });
+}
