@@ -122,7 +122,7 @@ async fn null_outside_the_key_equals_null_and_differs_from_a_value() {
 }
 
 #[tokio::test]
-async fn typed_equality_keeps_signed_zero_and_nan_and_skips_undecodable_cells() {
+async fn typed_equality_keeps_signed_zero_and_nan_and_excludes_unknown_rows_from_same_count() {
     let floats = vec![column("id", "integer", true), column("x", "double precision", false)];
     let layout = plan_layout(&floats, &floats, None).unwrap();
     let source = vec![
@@ -138,8 +138,24 @@ async fn typed_equality_keeps_signed_zero_and_nan_and_skips_undecodable_cells() 
     let result = merge(layout, Pages(vec![source]), Pages(vec![target])).await.unwrap();
     assert_eq!(
         (result.counts.same, result.counts.update, result.unknown_cells),
-        (2, 1, 1)
+        (1, 1, 1)
     );
+}
+
+#[tokio::test]
+async fn undecodable_cells_do_not_claim_identical_tables_or_a_complete_script() {
+    let columns = vec![column("id", "integer", true), column("x", "double precision", false)];
+    let layout = plan_layout(&columns, &columns, None).unwrap();
+    let source = vec![vec![Value::Int(1), Value::Undecodable("numeric".into())]];
+    let target = vec![vec![Value::Int(1), Value::Float(1.0)]];
+    let result = merge(layout, Pages(vec![source]), Pages(vec![target])).await.unwrap();
+
+    assert_eq!(result.unknown_cells, 1);
+    assert_eq!(result.counts.same, 0);
+    assert!(!result.is_identical());
+    let script = result.script("postgres", None, "measurements", false).unwrap();
+    assert!(script.contains("1 cell(s) could not be compared"));
+    assert!(!script.contains("The tables match"));
 }
 
 #[test]
