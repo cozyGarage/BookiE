@@ -795,7 +795,7 @@ impl GridView {
                     .debug_selector(|| "settings-card".into())
                     .w_full()
                     .max_w(px(size::HOME_WIDTH))
-                    .max_h_full()
+                    .h_full()
                     .min_h_0()
                     .flex()
                     .flex_col()
