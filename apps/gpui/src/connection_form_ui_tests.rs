@@ -190,3 +190,27 @@ fn connection_save_reports_partial_success_and_reuses_the_saved_identity(cx: &mu
         })
     });
 }
+
+#[gpui::test]
+fn the_toolbar_labels_its_left_actions_when_wide_and_new_connection_opens_the_form(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_resize(gpui::size(gpui::px(1100.0), gpui::px(760.0)));
+    cx.run_until_parked();
+    let wide = cx
+        .debug_bounds("new-connection")
+        .expect("the wide toolbar draws the button");
+    cx.simulate_resize(gpui::size(gpui::px(700.0), gpui::px(760.0)));
+    cx.run_until_parked();
+    let narrow = cx
+        .debug_bounds("new-connection")
+        .expect("the narrow toolbar draws the button");
+    assert!(
+        wide.size.width > narrow.size.width,
+        "labels widen the button at wide sizes"
+    );
+    cx.simulate_click(narrow.center(), Default::default());
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(matches!(view.tabs.current(), bookie_gpui::shell::Tab::NewConnection));
+    });
+}

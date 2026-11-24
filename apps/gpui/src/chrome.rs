@@ -159,9 +159,34 @@ pub(crate) fn ghost_icon(
         .child(icon(name, theme.muted_foreground))
 }
 
+fn toolbar_labelled(
+    id: &'static str,
+    name: &'static str,
+    text: &'static str,
+    tooltip: &'static str,
+    theme: Theme,
+) -> Stateful<Div> {
+    div()
+        .id(id)
+        .debug_selector(move || id.into())
+        .tooltip(tip(tooltip))
+        .flex()
+        .items_center()
+        .gap_1()
+        .px_2()
+        .h(px(size::SMALL_CONTROL))
+        .rounded(px(theme.radius))
+        .cursor_pointer()
+        .text_color(rgb(theme.foreground))
+        .hover(move |style| style.bg(rgb(theme.accent)))
+        .child(icon(name, theme.muted_foreground))
+        .child(text)
+}
+
 fn toolbar_icon(id: &'static str, name: &'static str, label: &'static str, theme: Theme) -> Stateful<Div> {
     div()
         .id(id)
+        .debug_selector(move || id.into())
         .tooltip(tip(label))
         .flex()
         .items_center()
@@ -262,6 +287,7 @@ mod environment_tests {
 
 impl GridView {
     pub fn toolbar(&self, theme: Theme, window: &Window, cx: &mut Context<Self>) -> Div {
+        let labelled = f32::from(window.viewport_size().width) >= size::TOOLBAR_LABELS_MIN_WIDTH;
         div()
             .flex()
             .items_center()
@@ -280,30 +306,36 @@ impl GridView {
                     .children((!self.sidebar.open).then(|| expand_sidebar_button(theme, cx)))
                     .children(environment_chip(self.live_environment(), theme))
                     .child(
-                        toolbar_icon("new-connection", "database", "Connections", theme).on_click(cx.listener(
-                            |this, _, _, cx| {
-                                this.tabs.open_home();
-                                this.sync_grid_owner();
-                                this.reload_history(cx);
-                                cx.notify();
-                            },
-                        )),
+                        (if labelled {
+                            toolbar_labelled("new-connection", "database", "New connection", "New connection", theme)
+                        } else {
+                            toolbar_icon("new-connection", "database", "New connection", theme)
+                        })
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.connection_form.editing = None;
+                            this.tabs.open_new_connection();
+                            this.sync_grid_owner();
+                            cx.notify();
+                        })),
                     )
                     .child(
-                        toolbar_icon("new-query", "file-plus", "New query", theme).on_click(cx.listener(
-                            |this, _, window, cx| {
-                                this.tabs.open_query();
-                                this.sync_grid_owner();
-                                if this.live.is_some() {
-                                    this.focus_editor = true;
-                                } else {
-                                    window.focus(&this.focus, cx);
-                                }
-                                cx.notify();
-                            },
-                        )),
+                        (if labelled {
+                            toolbar_labelled("new-query", "file-plus", "New query", "New query", theme)
+                        } else {
+                            toolbar_icon("new-query", "file-plus", "New query", theme)
+                        })
+                        .on_click(cx.listener(|this, _, window, cx| {
+                            this.tabs.open_query();
+                            this.sync_grid_owner();
+                            if this.live.is_some() {
+                                this.focus_editor = true;
+                            } else {
+                                window.focus(&this.focus, cx);
+                            }
+                            cx.notify();
+                        })),
                     )
-                    .child(self.toolbar_import_export_menu(theme, cx)),
+                    .child(self.toolbar_import_export_menu(labelled, theme, cx)),
             )
             .child(self.toolbar_right(theme, window, cx))
     }
@@ -538,7 +570,7 @@ impl GridView {
         div().flex().flex_col().flex_1().min_h_0().child(list).children(empty)
     }
 
-    fn toolbar_import_export_menu(&self, theme: Theme, cx: &mut Context<Self>) -> impl IntoElement {
+    fn toolbar_import_export_menu(&self, labelled: bool, theme: Theme, cx: &mut Context<Self>) -> impl IntoElement {
         use gpui_component::button::{Button, ButtonVariants};
         use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
 
@@ -549,6 +581,7 @@ impl GridView {
             .tooltip("Import / Export connections")
             .accessibility_label("Import / Export connections")
             .child(icon("arrow-down-up", theme.muted_foreground))
+            .children(labelled.then(|| div().child("Import / Export")))
             .dropdown_menu(move |mut menu, _, _| {
                 for (id, label) in [
                     ("import-connections", "Import Connections…"),
