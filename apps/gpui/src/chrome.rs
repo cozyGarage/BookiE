@@ -11,9 +11,9 @@ use gpui::{
     rgb, uniform_list,
 };
 
+use crate::GridView;
 use crate::assets::icon;
 use crate::ui_theme::ThemeExt;
-use crate::GridView;
 use bookie_gpui::theme::{Theme, size};
 
 pub(crate) const TOOLBAR_HEIGHT: f32 = 40.0;
@@ -34,7 +34,12 @@ pub(crate) fn ghost(id: impl Into<gpui::ElementId>, label: impl Into<String>, th
         .child(label.into())
 }
 
-pub(crate) fn primary_button(id: &'static str, label: &'static str, tip_text: &'static str, theme: Theme) -> Stateful<Div> {
+pub(crate) fn primary_button(
+    id: &'static str,
+    label: &'static str,
+    tip_text: &'static str,
+    theme: Theme,
+) -> Stateful<Div> {
     div()
         .id(id)
         .tooltip(tip(tip_text))
@@ -133,7 +138,12 @@ fn toolbar_window_controls(decorations: Decorations, supported: WindowControls) 
     }
 }
 
-pub(crate) fn ghost_icon(id: impl Into<gpui::ElementId>, name: &'static str, label: &'static str, theme: Theme) -> Stateful<Div> {
+pub(crate) fn ghost_icon(
+    id: impl Into<gpui::ElementId>,
+    name: &'static str,
+    label: &'static str,
+    theme: Theme,
+) -> Stateful<Div> {
     div()
         .id(id)
         .tooltip(tip(label))
@@ -163,7 +173,6 @@ fn toolbar_icon(id: &'static str, name: &'static str, label: &'static str, theme
         .hover(move |style| style.bg(rgb(theme.accent)))
         .child(icon(name, theme.muted_foreground))
 }
-
 
 pub(crate) fn environment_color(environment: Environment, theme: Theme) -> Option<u32> {
     match environment {
@@ -204,7 +213,11 @@ pub(crate) fn mix(base: u32, color: u32, amount: f32) -> u32 {
 
 impl GridView {
     pub(crate) fn live_color(&self) -> Option<u32> {
-        let saved = self.live.as_ref().and_then(|live| live.saved.as_ref()).map(|(id, _)| *id);
+        let saved = self
+            .live
+            .as_ref()
+            .and_then(|live| live.saved.as_ref())
+            .map(|(id, _)| *id);
         self.connections
             .iter()
             .find(|connection| Some(connection.id) == saved)
@@ -220,7 +233,11 @@ impl GridView {
     }
 
     pub(crate) fn live_environment(&self) -> Environment {
-        let saved = self.live.as_ref().and_then(|live| live.saved.as_ref()).map(|(id, _)| *id);
+        let saved = self
+            .live
+            .as_ref()
+            .and_then(|live| live.saved.as_ref())
+            .map(|(id, _)| *id);
         self.connections
             .iter()
             .find(|connection| Some(connection.id) == saved)
@@ -337,19 +354,25 @@ impl GridView {
                 })),
             )
             .when(controls.minimize, |this| {
-                this.child(window_button("win-min", "minus", "Minimize", theme).on_click(cx.listener(|_, _, window, _| {
-                    window.minimize_window();
-                })))
+                this.child(
+                    window_button("win-min", "minus", "Minimize", theme).on_click(cx.listener(|_, _, window, _| {
+                        window.minimize_window();
+                    })),
+                )
             })
             .when(controls.maximize, |this| {
-                this.child(window_button("win-max", "square", "Maximize", theme).on_click(cx.listener(|_, _, window, _| {
-                    window.zoom_window();
-                })))
+                this.child(
+                    window_button("win-max", "square", "Maximize", theme).on_click(cx.listener(|_, _, window, _| {
+                        window.zoom_window();
+                    })),
+                )
             })
             .when(controls.close, |this| {
-                this.child(window_button("win-close", "x", "Close", theme).on_click(cx.listener(|_, _, window, _| {
-                    window.remove_window();
-                })))
+                this.child(
+                    window_button("win-close", "x", "Close", theme).on_click(cx.listener(|_, _, window, _| {
+                        window.remove_window();
+                    })),
+                )
             })
     }
 
@@ -475,10 +498,9 @@ impl GridView {
         let lines = std::rc::Rc::new(self.sidebar_lines(search));
         let pending = self.sidebar.reveal.borrow_mut().take();
         if let Some(pending) = pending {
-            match lines
-                .iter()
-                .position(|line| matches!(line, SidebarLine::Tree { row: TreeRow::Table(table), .. } if *table == pending))
-            {
+            match lines.iter().position(
+                |line| matches!(line, SidebarLine::Tree { row: TreeRow::Table(table), .. } if *table == pending),
+            ) {
                 Some(position) => self.sidebar.scroll.scroll_to_item(position, ScrollStrategy::Nearest),
                 None => *self.sidebar.reveal.borrow_mut() = Some(pending),
             }
@@ -513,13 +535,7 @@ impl GridView {
         .flex_1()
         .min_h_0()
         .px_2();
-        div()
-            .flex()
-            .flex_col()
-            .flex_1()
-            .min_h_0()
-            .child(list)
-            .children(empty)
+        div().flex().flex_col().flex_1().min_h_0().child(list).children(empty)
     }
 
     fn toolbar_import_export_menu(&self, theme: Theme, cx: &mut Context<Self>) -> impl IntoElement {
@@ -870,7 +886,12 @@ impl GridView {
             },
         );
         let chosen = if self.fonts.settings.theme.is_empty() {
-            if Theme::current(cx).dark { crate::picker::BUILT_IN_DARK } else { crate::picker::BUILT_IN_LIGHT }.to_string()
+            if Theme::current(cx).dark {
+                crate::picker::BUILT_IN_DARK
+            } else {
+                crate::picker::BUILT_IN_LIGHT
+            }
+            .to_string()
         } else {
             self.fonts.settings.theme.clone()
         };
@@ -1003,10 +1024,11 @@ impl GridView {
 
     pub fn edit_fonts(&mut self, edit: impl FnOnce(&mut font_settings::FontSettings), cx: &mut Context<Self>) {
         edit(&mut self.fonts.settings);
-        for (input, value) in self.font_inputs.iter().zip([
-            &self.fonts.settings.ui_family,
-            &self.fonts.settings.editor_family,
-        ]) {
+        for (input, value) in self
+            .font_inputs
+            .iter()
+            .zip([&self.fonts.settings.ui_family, &self.fonts.settings.editor_family])
+        {
             if input.read(cx).content() != value {
                 input.update(cx, |input, cx| input.set_content_quiet(value, cx));
             }
@@ -1059,7 +1081,6 @@ impl GridView {
                 )),
         )
     }
-
 }
 
 fn tab_is_dirty(tab: &Tab, grid_table: &bookie_core::TableInfo, pending_edits: usize) -> bool {
@@ -1133,8 +1154,16 @@ pub(crate) fn connection_dot(color: u32, selector: &'static str) -> Div {
 }
 
 enum SidebarLine {
-    Tree { index: usize, depth: usize, row: TreeRow },
-    Field { table: std::rc::Rc<bookie_core::TableInfo>, depth: usize, field: usize },
+    Tree {
+        index: usize,
+        depth: usize,
+        row: TreeRow,
+    },
+    Field {
+        table: std::rc::Rc<bookie_core::TableInfo>,
+        depth: usize,
+        field: usize,
+    },
     Catalog(crate::sidebar_catalog::CatalogLine),
 }
 

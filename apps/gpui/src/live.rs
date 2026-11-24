@@ -71,7 +71,9 @@ impl From<bookie_app_services::driver_error_presentation::DriverFailurePresentat
             _ => None,
         };
         let hint = match &failure {
-            bookie_app_services::driver_error_presentation::DriverFailurePresentation::Query { hint, .. } => hint.clone(),
+            bookie_app_services::driver_error_presentation::DriverFailurePresentation::Query { hint, .. } => {
+                hint.clone()
+            }
             _ => None,
         };
         Self {
@@ -252,8 +254,7 @@ impl LiveSession {
         }
         if failure.message.contains("marked read-only") {
             failure.message =
-                "Query tabs only read. To change data, press Begin transaction, run the statement, then Commit."
-                    .into();
+                "Query tabs only read. To change data, press Begin transaction, run the statement, then Commit.".into();
         } else if failure.message.contains("could not be parsed (typo?)") {
             failure.message = "This statement could not be parsed (typo?).".into();
         }
@@ -646,9 +647,7 @@ impl LiveSession {
         };
         let mut loaded = self.run_query_bound(&query.sql, &query.params, max_rows, cancellation)?;
         for column in &mut loaded.columns {
-            column.primary_key = columns
-                .iter()
-                .any(|info| info.primary_key && info.name == column.name);
+            column.primary_key = columns.iter().any(|info| info.primary_key && info.name == column.name);
         }
         loaded.executed_sql = None;
         loaded.table = Some(table);
@@ -936,18 +935,30 @@ impl WriteSession {
     pub fn transaction_is_open(&self, shared: &bookie_app_services::interactive_session::SharedSession) -> bool {
         use bookie_core::Session as _;
         self.runtime.block_on(async {
-            shared.lock().await.as_ref().is_some_and(|session| session.is_usable() && session.transaction_open())
+            shared
+                .lock()
+                .await
+                .as_ref()
+                .is_some_and(|session| session.is_usable() && session.transaction_open())
         })
     }
 
-    pub fn close_transaction(&self, shared: &bookie_app_services::interactive_session::SharedSession) -> Option<String> {
+    pub fn close_transaction(
+        &self,
+        shared: &bookie_app_services::interactive_session::SharedSession,
+    ) -> Option<String> {
         self.runtime
-            .block_on(bookie_app_services::interactive_session::close_for_teardown(shared.clone()))
+            .block_on(bookie_app_services::interactive_session::close_for_teardown(
+                shared.clone(),
+            ))
             .err()
             .map(|error| error.to_string())
     }
 
-    pub fn rollback_transaction(&self, shared: &bookie_app_services::interactive_session::SharedSession) -> Result<(), String> {
+    pub fn rollback_transaction(
+        &self,
+        shared: &bookie_app_services::interactive_session::SharedSession,
+    ) -> Result<(), String> {
         self.runtime
             .block_on(bookie_app_services::interactive_session::rollback_and_close(shared))
             .map_err(|error| error.to_string())
@@ -1279,11 +1290,22 @@ async fn query_pages(
     cancellation: &CancellationToken,
     epoch: Epoch,
     current_epoch: &AtomicU64,
-) -> Result<(Vec<ColumnMeta>, QueryRows, ScanSource, bool, bookie_core::ServerMessages), QueryFailure> {
+) -> Result<
+    (
+        Vec<ColumnMeta>,
+        QueryRows,
+        ScanSource,
+        bool,
+        bookie_core::ServerMessages,
+    ),
+    QueryFailure,
+> {
     let control = OperationControl::new(cancellation.clone(), Some(tokio::time::Instant::now() + PAGE_TIMEOUT));
     let mut batch = bridge_query_detailed(sessions, session_id, (sql, params), &control, epoch, current_epoch).await?;
     let messages = std::mem::take(&mut batch.messages);
-    let (columns, rows, scan, truncated) = spooled_pages(batch.into_first(), max_rows, cancellation).await.map_err(QueryFailure::from)?;
+    let (columns, rows, scan, truncated) = spooled_pages(batch.into_first(), max_rows, cancellation)
+        .await
+        .map_err(QueryFailure::from)?;
     Ok((columns, rows, scan, truncated, messages))
 }
 
@@ -1333,11 +1355,7 @@ async fn spooled_pages(
     let page_size = PAGE_ROWS as usize;
     let mut rows = result.rows.iter();
     for page_index in 0..result.rows.len().div_ceil(page_size) {
-        let page_rows = rows
-            .by_ref()
-            .take(page_size)
-            .map(|row| row.to_vec())
-            .collect();
+        let page_rows = rows.by_ref().take(page_size).map(|row| row.to_vec()).collect();
         let page = QueryResult {
             columns: infos.clone(),
             rows: QueryRows::from_rows(page_rows),

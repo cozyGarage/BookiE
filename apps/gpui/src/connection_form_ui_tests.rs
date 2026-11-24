@@ -16,15 +16,36 @@ fn tab_moves_between_connection_fields_in_order(cx: &mut TestAppContext) {
     cx.run_until_parked();
     cx.simulate_keystrokes("tab");
     cx.update(|window, cx| {
-        assert!(view.read(cx).connection_form.host.read(cx).focus_handle_for_tests().is_focused(window));
+        assert!(
+            view.read(cx)
+                .connection_form
+                .host
+                .read(cx)
+                .focus_handle_for_tests()
+                .is_focused(window)
+        );
     });
     cx.simulate_keystrokes("tab");
     cx.update(|window, cx| {
-        assert!(view.read(cx).connection_form.port.read(cx).focus_handle_for_tests().is_focused(window));
+        assert!(
+            view.read(cx)
+                .connection_form
+                .port
+                .read(cx)
+                .focus_handle_for_tests()
+                .is_focused(window)
+        );
     });
     cx.simulate_keystrokes("shift-tab");
     cx.update(|window, cx| {
-        assert!(view.read(cx).connection_form.host.read(cx).focus_handle_for_tests().is_focused(window));
+        assert!(
+            view.read(cx)
+                .connection_form
+                .host
+                .read(cx)
+                .focus_handle_for_tests()
+                .is_focused(window)
+        );
     });
 }
 
@@ -40,10 +61,17 @@ fn connection_sections_use_space_on_wide_windows_and_wrap_when_narrow(cx: &mut T
         cx.run_until_parked();
         if beside {
             let card = cx.debug_bounds("connection-card").expect("connection form visible");
-            assert!(card.size.width > gpui::px(1100.0), "wide window should use more of its content area");
+            assert!(
+                card.size.width > gpui::px(1100.0),
+                "wide window should use more of its content area"
+            );
         }
-        let connection = cx.debug_bounds("connection-main-section").expect("connection fields visible");
-        let options = cx.debug_bounds("connection-options-section").expect("connection options visible");
+        let connection = cx
+            .debug_bounds("connection-main-section")
+            .expect("connection fields visible");
+        let options = cx
+            .debug_bounds("connection-options-section")
+            .expect("connection options visible");
         let page = cx.debug_bounds("connection-page").expect("connection form visible");
         assert!(connection.origin.x + connection.size.width <= page.origin.x + page.size.width);
         assert!(options.origin.x + options.size.width <= page.origin.x + page.size.width);
@@ -66,13 +94,18 @@ fn connection_form_keeps_actions_visible_at_two_widths(cx: &mut TestAppContext) 
         cx.simulate_resize(gpui::size(gpui::px(width), gpui::px(760.0)));
         cx.run_until_parked();
         let page = cx.debug_bounds("connection-page").expect("connection form is rendered");
-        let actions = cx.debug_bounds("connection-actions").expect("connection actions are rendered");
+        let actions = cx
+            .debug_bounds("connection-actions")
+            .expect("connection actions are rendered");
         assert!(page.size.width > gpui::px(200.0));
         assert!(actions.origin.y >= page.origin.y);
         assert!(actions.origin.y + actions.size.height <= gpui::px(760.0));
         let card = cx.debug_bounds("connection-card").expect("the form sits on a card");
         assert!(page.origin.y >= card.origin.y && actions.origin.y <= card.origin.y + card.size.height);
-        assert!(cx.debug_bounds("Prod").is_some(), "the environment chips are in the behaviour section");
+        assert!(
+            cx.debug_bounds("Prod").is_some(),
+            "the environment chips are in the behaviour section"
+        );
     }
 }
 
@@ -87,13 +120,21 @@ fn editing_a_production_connection_keeps_it_production(cx: &mut TestAppContext) 
         })
     });
     view.read_with(cx, |view, cx| {
-        assert_eq!(view.connection_form.draft(cx).environment, bookie_core::Environment::Prod);
+        assert_eq!(
+            view.connection_form.draft(cx).environment,
+            bookie_core::Environment::Prod
+        );
     });
     cx.update(|_, cx| {
-        view.update(cx, |view, _| view.connection_form.environment = bookie_core::Environment::Staging)
+        view.update(cx, |view, _| {
+            view.connection_form.environment = bookie_core::Environment::Staging
+        })
     });
     view.read_with(cx, |view, cx| {
-        assert_eq!(view.connection_form.draft(cx).environment, bookie_core::Environment::Staging);
+        assert_eq!(
+            view.connection_form.draft(cx).environment,
+            bookie_core::Environment::Staging
+        );
     });
 }
 
@@ -103,14 +144,15 @@ fn editing_a_coloured_connection_shows_its_colour_and_clearing_drops_it(cx: &mut
     let id = uuid::Uuid::from_u128(3704);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
-            view.connections.push(bookie_app_services::read_session::ConnectionSummary {
-                id,
-                name: "orders".into(),
-                driver_id: "postgres".into(),
-                read_only: false,
-                environment: bookie_core::Environment::Local,
-                color: Some("teal".into()),
-            });
+            view.connections
+                .push(bookie_app_services::read_session::ConnectionSummary {
+                    id,
+                    name: "orders".into(),
+                    driver_id: "postgres".into(),
+                    read_only: false,
+                    environment: bookie_core::Environment::Local,
+                    color: Some("teal".into()),
+                });
             let mut draft = view.connection_form.draft(cx);
             draft.id = Some(id);
             view.fill_connection_form(draft, cx);
