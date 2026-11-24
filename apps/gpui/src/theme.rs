@@ -8,7 +8,7 @@ pub mod size {
     pub const XL: f32 = 24.0;
     pub const COMPACT_CONTROL: f32 = 24.0;
     pub const SMALL_CONTROL: f32 = 28.0;
-    pub const GRID_HEADER: f32 = 40.0;
+    pub const GRID_HEADER: f32 = 32.0;
     pub const FORM_CONTROL: f32 = 32.0;
     pub const CONTROL_RADIUS: f32 = 4.0;
     pub const SURFACE_RADIUS: f32 = 6.0;
