@@ -34,7 +34,7 @@ impl GridView {
         };
         let approvals = self.approval.tx.clone();
         self.status = "Starting a transaction…".into();
-        self.begin_background(
+        self.begin_background_with_context(
             Work::Load,
             cx,
             move |_| {
@@ -42,7 +42,7 @@ impl GridView {
                 let shared = write.begin_transaction()?;
                 Ok::<_, String>((write, shared))
             },
-            |this, opened| match opened {
+            |this, opened, cx| match opened {
                 Ok((write, shared)) => {
                     this.transaction = Some(TransactionState {
                         write,

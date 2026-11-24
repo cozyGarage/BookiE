@@ -715,6 +715,16 @@ impl GridView {
         work: impl FnOnce(CancellationToken) -> T + Send + 'static,
         apply: impl FnOnce(&mut Self, T) + 'static,
     ) {
+        self.begin_background_with_context(work_kind, cx, work, move |this, result, _| apply(this, result));
+    }
+
+    fn begin_background_with_context<T: Send + 'static>(
+        &mut self,
+        work_kind: Work,
+        cx: &mut Context<Self>,
+        work: impl FnOnce(CancellationToken) -> T + Send + 'static,
+        apply: impl FnOnce(&mut Self, T, &mut Context<Self>) + 'static,
+    ) {
         match work_kind {
             Work::Load => self.invalidate_background(),
             Work::Scan => self.invalidate_scans(),
@@ -740,7 +750,7 @@ impl GridView {
                     Work::Chart => this.charts.generation,
                 };
                 if current == generation {
-                    apply(this, result);
+                    apply(this, result, cx);
                     cx.notify();
                 }
             })
