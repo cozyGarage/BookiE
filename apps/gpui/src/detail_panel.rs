@@ -21,7 +21,11 @@ impl GridView {
 
     pub(super) fn detail_target(&self) -> Option<(String, Detail)> {
         let cursor = self.cell_cursor?;
-        let source = self.source_row(self.base() + cursor.row as u64);
+        let dataset_index = self.base().checked_add(u64::try_from(cursor.row).ok()?)?;
+        if dataset_index >= self.dataset_count() {
+            return None;
+        }
+        let source = self.source_row(dataset_index);
         let name = self.source.columns().get(cursor.column)?.name.clone();
         let cell = self.cell_at(source, cursor.column);
         let detail = match (&cell, self.binary_mode_for_column(cursor.column)) {
@@ -50,6 +54,13 @@ impl GridView {
             }
         }
         Some(filtered_fields(self.source.columns(), &row, filter, hide_null))
+    }
+
+    pub(super) fn detail_sidebar_width(&self, available: f32) -> f32 {
+        if !(self.detail_open || self.row_detail_open || self.fk_peek.is_some()) {
+            return 0.0;
+        }
+        (available * 0.36).clamp(size::DETAIL_SIDEBAR_MIN_WIDTH, size::DETAIL_SIDEBAR_WIDTH)
     }
 
     pub(super) fn detail_sidebar(&self, theme: Theme, cx: &mut gpui::Context<Self>) -> Option<Stateful<Div>> {

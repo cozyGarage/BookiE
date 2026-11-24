@@ -467,6 +467,7 @@ impl GridView {
         };
         Some(
             div()
+                .debug_selector(|| "pending-edits-bar".into())
                 .flex()
                 .items_center()
                 .gap_2()
