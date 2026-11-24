@@ -48,6 +48,47 @@ impl ResultSource for FitSource {
     }
 }
 
+#[gpui::test]
+fn automatic_primary_key_width_leaves_room_for_the_inline_type_and_controls(cx: &mut TestAppContext) {
+    let source = Arc::new(FitSource {
+        columns: vec![ColumnMeta {
+            name: "id".into(),
+            width: 72.0,
+            numeric: true,
+            data_type: "integer".into(),
+            primary_key: true,
+        }],
+        row: vec![Cell::Int(1)],
+    });
+    cx.update(text_input::bind_keys);
+    let (_, cx) = cx.add_window_view(|window, cx| GridView::with_source(source, Instant::now(), window, cx));
+    cx.run_until_parked();
+    let type_bounds = cx.debug_bounds("column-header-type-0").expect("inline type");
+    let text_width = cx.update(|window, _| {
+        let style = window.text_style();
+        window
+            .text_system()
+            .shape_line(
+                "INTEGER".into(),
+                gpui::px(bookie_gpui::theme::size::TEXT_SMALL),
+                &[gpui::TextRun {
+                    len: "INTEGER".len(),
+                    font: style.font(),
+                    color: style.color,
+                    background_color: None,
+                    underline: None,
+                    strikethrough: None,
+                }],
+                None,
+            )
+            .width
+    });
+    assert!(
+        type_bounds.size.width >= text_width,
+        "the type must remain readable beside header actions"
+    );
+}
+
 impl ResultSource for QuerySource {
     fn columns(&self) -> &[ColumnMeta] {
         self.inner.columns()

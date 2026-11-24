@@ -277,7 +277,7 @@ impl TableDelegate for GridDelegate {
             source,
             &self.map,
             &self.columns,
-            &self.kinds,
+            HeaderSizing::new(&self.kinds, self.pin_scope.is_some()),
             &self.edits,
             self.visible_rows.start,
             self.visible_rows.len(),
@@ -330,7 +330,7 @@ impl TableDelegate for GridDelegate {
             source,
             &self.map,
             &self.columns,
-            &self.kinds,
+            HeaderSizing::new(&self.kinds, self.pin_scope.is_some()),
             &self.edits,
             visible.start,
             visible.len(),
@@ -981,7 +981,7 @@ impl GridView {
                 &self.source,
                 &map,
                 &columns,
-                &kinds,
+                HeaderSizing::new(&kinds, pin_scope.is_some()),
                 &self.cell_edit.edits,
                 start,
                 self.viewport_rows,
@@ -1285,6 +1285,17 @@ const MIN_CONTENT_WIDTH: f32 = 56.0;
 const MAX_CONTENT_WIDTH: f32 = 360.0;
 const MAX_MEASURE_CELLS: usize = 2048;
 
+struct HeaderSizing<'a> {
+    kinds: &'a [(String, bool)],
+    pinnable: bool,
+}
+
+impl<'a> HeaderSizing<'a> {
+    fn new(kinds: &'a [(String, bool)], pinnable: bool) -> Self {
+        Self { kinds, pinnable }
+    }
+}
+
 fn fill_text_columns(columns: &mut [(String, f32)], numeric: &[bool], available_width: f32) {
     if !available_width.is_finite() || available_width <= 0.0 {
         return;
@@ -1319,7 +1330,7 @@ fn measure_visible_columns(
     source: &Source,
     map: &RowMap,
     columns: &[(String, f32)],
-    kinds: &[(String, bool)],
+    header: HeaderSizing<'_>,
     edits: &Edits,
     start: usize,
     viewport_rows: usize,
@@ -1328,7 +1339,7 @@ fn measure_visible_columns(
     let mut widths: Vec<f32> = columns
         .iter()
         .enumerate()
-        .map(|(index, (name, _))| measure_header_width(name, kinds.get(index), &mut measure))
+        .map(|(index, (name, _))| measure_header_width(name, header.kinds.get(index), header.pinnable, &mut measure))
         .collect();
     if columns.is_empty() || map.compare.is_some() {
         return widths;
@@ -1358,8 +1369,16 @@ fn measure_visible_columns(
     widths
 }
 
-fn measure_header_width(name: &str, kind: Option<&(String, bool)>, measure: &mut impl FnMut(&str) -> f32) -> f32 {
-    let mut width = measure(name);
+fn measure_header_width(
+    name: &str,
+    kind: Option<&(String, bool)>,
+    pinnable: bool,
+    measure: &mut impl FnMut(&str) -> f32,
+) -> f32 {
+    let mut width = measure(name) + size::COMPACT_CONTROL;
+    if pinnable {
+        width += size::COMPACT_CONTROL;
+    }
     if let Some((data_type, primary_key)) = kind {
         let kind = header_kind(data_type);
         if !kind.is_empty() {
@@ -1497,9 +1516,9 @@ mod header_kind_tests {
     #[test]
     fn fitted_width_accounts_for_inline_type_and_primary_key_icon() {
         let kind = ("numeric(38,18)".to_owned(), true);
-        let width = measure_header_width("id", Some(&kind), &mut |text| text.len() as f32 * 8.0 + 12.0);
+        let width = measure_header_width("id", Some(&kind), true, &mut |text| text.len() as f32 * 8.0 + 12.0);
 
-        assert_eq!(width, ("id".len() + "NUMERIC(38,18)".len()) as f32 * 8.0 + 34.0);
+        assert_eq!(width, ("id".len() + "NUMERIC(38,18)".len()) as f32 * 8.0 + 82.0);
     }
 }
 
@@ -1728,7 +1747,10 @@ mod tests {
                 ..Default::default()
             },
             &columns,
-            &[],
+            HeaderSizing {
+                kinds: &[],
+                pinnable: false,
+            },
             &Edits::default(),
             0,
             20,
