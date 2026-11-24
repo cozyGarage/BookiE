@@ -33,7 +33,7 @@ pub mod size {
     pub const SPLITTER: f32 = 5.0;
     pub const MENU_WIDTH: f32 = 220.0;
     pub const SIDE_PANEL_WIDTH: f32 = 300.0;
-    pub const FIND_WIDTH: f32 = 110.0;
+    pub const FIND_WIDTH: f32 = 160.0;
     pub const FILTER_WIDTH: f32 = 420.0;
     pub const PALETTE_WIDTH: f32 = 520.0;
     pub const PALETTE_TOP: f32 = 90.0;
