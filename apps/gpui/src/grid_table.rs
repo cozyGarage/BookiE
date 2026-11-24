@@ -166,17 +166,22 @@ fn header_menu(
     has_hidden: bool,
     binary: bool,
     pin_action: Option<(gpui::Entity<TableState<GridDelegate>>, PinScope, bool)>,
-    icon: impl IntoElement,
+    color: u32,
 ) -> impl IntoElement {
     use gpui_component::button::{Button, ButtonVariants};
     use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
 
     Button::new(format!("column-menu-{col_ix}"))
         .ghost()
+        .small()
         .compact()
         .tooltip(format!("Actions for {column_name}"))
         .accessibility_label(format!("Actions for {column_name}"))
-        .child(icon)
+        .icon(
+            gpui_component::Icon::default()
+                .path("icons/ellipsis.svg")
+                .text_color(gpui::rgb(color)),
+        )
         .dropdown_menu(move |menu, _, _| {
             let copy_name = column_name.clone();
             let mut menu =
@@ -440,7 +445,7 @@ impl TableDelegate for GridDelegate {
                 .clone()
                 .filter(|_| !show_pin_button)
                 .map(|scope| (cx.entity(), scope, col_ix < self.pinned_columns)),
-            crate::assets::icon("ellipsis", theme.muted_foreground),
+            theme.muted_foreground,
         );
         let pin = self.pin_scope.clone().filter(|_| show_pin_button).map(|scope| {
             use gpui_component::button::{Button, ButtonVariants};
@@ -455,6 +460,7 @@ impl TableDelegate for GridDelegate {
             };
             Button::new(format!("pin-column-{col_ix}"))
                 .ghost()
+                .small()
                 .compact()
                 .tooltip(label.clone())
                 .accessibility_label(label.clone())
@@ -465,7 +471,11 @@ impl TableDelegate for GridDelegate {
                     delegate.pin_counts.insert(scope.clone(), delegate.pinned_columns);
                     table.refresh(cx);
                 }))
-                .child(crate::assets::icon("pin", color))
+                .icon(
+                    gpui_component::Icon::default()
+                        .path("icons/pin.svg")
+                        .text_color(gpui::rgb(color)),
+                )
         });
         div()
             .debug_selector(move || format!("column-header-{col_ix}"))

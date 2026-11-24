@@ -64,6 +64,11 @@ fn automatic_primary_key_width_leaves_room_for_the_inline_type_and_controls(cx: 
     let (_, cx) = cx.add_window_view(|window, cx| GridView::with_source(source, Instant::now(), window, cx));
     cx.run_until_parked();
     let type_bounds = cx.debug_bounds("column-header-type-0").expect("inline type");
+    let action_bounds = cx.update(|window, _| window.find_by_label("Actions for id").bounds());
+    assert!(
+        action_bounds.size.width <= gpui::px(bookie_gpui::theme::size::COMPACT_CONTROL),
+        "header actions must use the compact control size"
+    );
     let text_width = cx.update(|window, _| {
         let style = window.text_style();
         window
