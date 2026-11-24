@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 use crate::services::database_service::ConnectionIdentity;
 pub(crate) use bookie_app_services::interactive_session::*;
-use bookie_policy::{Audited, PolicyGuard, Principal};
+use bookie_policy::{PolicyGuard, Principal};
 
 use super::{SqlEditor, SqlEditorInput};
 
