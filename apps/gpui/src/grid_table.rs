@@ -46,6 +46,18 @@ fn query_width_identity(sql: &str, columns: &[bookie_gpui::model::ColumnMeta]) -
     serde_json::to_string(&(sql, shape)).ok()
 }
 
+fn unique_column_indices(columns: &[(String, f32)]) -> HashSet<usize> {
+    let mut counts = HashMap::with_capacity(columns.len());
+    for (name, _) in columns {
+        *counts.entry(name.as_str()).or_insert(0) += 1;
+    }
+    columns
+        .iter()
+        .enumerate()
+        .filter_map(|(index, (name, _))| (counts.get(name.as_str()) == Some(&1)).then_some(index))
+        .collect()
+}
+
 impl PartialEq for RowMap {
     fn eq(&self, other: &Self) -> bool {
         self.base == other.base
@@ -205,7 +217,9 @@ impl TableDelegate for GridDelegate {
         let source_col = self.projection.source_index(col_ix)?;
         let source = self.source.as_ref()?;
         let measured = measure_visible_columns(source, &self.map, &self.columns, &self.edits, self.visible_rows.start, self.visible_rows.len(), |text| measure_text(text, window));
-        measured.get(source_col).copied().map(px)
+        let kind = self.kinds.get(source_col).map(|(kind, key)| header_kind(kind, *key))?;
+        let header_width = measure_text(&kind, window);
+        measured.get(source_col).copied().map(|width| px(width.max(header_width)))
     }
     fn perform_sort(
         &mut self,
@@ -610,6 +624,7 @@ impl GridView {
         let Some(scope) = delegate.width_scope.clone() else {
             return;
         };
+        let unique_columns = unique_column_indices(&delegate.columns);
         let previous = (0..delegate.projection.len())
             .filter_map(|index| {
                 delegate
@@ -623,8 +638,7 @@ impl GridView {
             .into_iter()
             .filter_map(|(index, width)| {
                 let name = &delegate.columns.get(index)?.0;
-                (delegate.columns.iter().filter(|(other, _)| other == name).count() == 1)
-                    .then_some((name.clone(), width))
+                unique_columns.contains(&index).then_some((name.clone(), width))
             })
             .collect::<Vec<_>>();
         if !self.grid_is_query && self.compare.is_none()
@@ -844,6 +858,32 @@ impl GridView {
         (sortable, sort)
     }
 
+    fn apply_saved_column_widths(
+        &self,
+        pin_scope: Option<&PinScope>,
+        columns: &mut [(String, f32)],
+    ) -> HashMap<String, f32> {
+        if self.grid_is_query || self.compare.is_some() {
+            return HashMap::new();
+        }
+        let Some(scope) = pin_scope else { return HashMap::new() };
+        let Some((id, _)) = self.live.as_ref().and_then(|session| session.saved.as_ref()) else {
+            return HashMap::new();
+        };
+        let Some(store) = &self.column_widths else { return HashMap::new() };
+        let unique_columns = unique_column_indices(columns);
+        let mut saved = HashMap::new();
+        for (index, (name, width)) in columns.iter_mut().enumerate() {
+            if unique_columns.contains(&index)
+                && let Some(value) = store.load(*id, &scope.width_key(), name)
+            {
+                *width = value as f32;
+                saved.insert(name.clone(), *width);
+            }
+        }
+        saved
+    }
+
     pub(crate) fn sync_table(&self, available_width: f32, window: &mut Window, cx: &mut Context<Self>) {
         let (mut columns, numeric, kinds) = self.grid_columns();
         let map = self.row_map();
@@ -877,22 +917,7 @@ impl GridView {
             *width = *measured;
         }
         fill_text_columns(&mut columns, &numeric, available_width);
-        let mut saved_widths = HashMap::new();
-        if !self.grid_is_query && self.compare.is_none()
-            && let Some(scope) = &pin_scope
-            && let Some((id, _)) = self.live.as_ref().and_then(|session| session.saved.as_ref())
-            && let Some(store) = &self.column_widths
-        {
-            let names = columns.iter().map(|(name, _)| name.clone()).collect::<Vec<_>>();
-            for (name, width) in &mut columns {
-                if names.iter().filter(|other| *other == name).count() == 1
-                    && let Some(saved) = store.load(*id, &scope.width_key(), name)
-                {
-                    *width = saved as f32;
-                    saved_widths.insert(name.clone(), *width);
-                }
-            }
-        }
+        let saved_widths = self.apply_saved_column_widths(pin_scope.as_ref(), &mut columns);
         if let Some(widths) = width_scope.as_ref().and_then(|scope| delegate.manual_widths.get(scope)) {
             for (name, width) in &mut columns {
                 if let Some(manual) = widths.get(name) {
@@ -1412,6 +1437,12 @@ mod tests {
         };
         assert_ne!(scope("a.b", Some("c"), "d").width_key(), scope("a", Some("b.c"), "d").width_key());
         assert_ne!(scope("a", None, "d").width_key(), scope("a", Some(""), "d").width_key());
+    }
+
+    #[test]
+    fn saved_widths_skip_ambiguous_duplicate_names() {
+        let columns = vec![("id".into(), 80.0), ("id".into(), 100.0), ("name".into(), 120.0)];
+        assert_eq!(unique_column_indices(&columns), HashSet::from([2]));
     }
 
     #[gpui::test]
