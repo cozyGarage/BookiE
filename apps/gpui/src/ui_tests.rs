@@ -1853,7 +1853,11 @@ fn column_type_labels_share_the_header_row(cx: &mut TestAppContext) {
     let kind_center = f32::from(kind.origin.y + kind.size.height / 2.0);
     let name_center = f32::from(name.origin.y + name.size.height / 2.0);
     assert!((kind_center - name_center).abs() < 1.0, "type and name share one header row");
-    assert!(header.size.height >= gpui::px(32.0));
+    assert!(kind.origin.y >= header.origin.y, "type label starts inside the header");
+    assert!(
+        kind.origin.y + kind.size.height <= header.origin.y + header.size.height,
+        "type label fits inside the header"
+    );
 }
 
 #[gpui::test]

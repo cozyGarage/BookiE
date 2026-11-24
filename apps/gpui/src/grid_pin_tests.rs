@@ -16,6 +16,7 @@ struct WideSource(Vec<ColumnMeta>);
 struct QuerySource {
     inner: WideSource,
     sql: &'static str,
+    sql_reads: Arc<std::sync::atomic::AtomicUsize>,
 }
 
 struct FitSource {
@@ -24,46 +25,118 @@ struct FitSource {
 }
 
 impl ResultSource for FitSource {
-    fn columns(&self) -> &[ColumnMeta] { &self.columns }
-    fn total(&self) -> u64 { 1 }
-    fn row(&self, _: u64) -> Vec<Cell> { self.row.clone() }
-    fn row_ref(&self, _: u64) -> Option<&[Cell]> { Some(&self.row) }
-    fn find(&self, _: &str, _: usize, _: &CancellationToken) -> Result<FindResult, &'static str> { Err("unused") }
-    fn filter(&self, _: &Predicate, _: &CancellationToken) -> Result<Vec<u32>, &'static str> { Err("unused") }
-    fn compare(&self, _: bool, _: &CancellationToken) -> Result<Diff, &'static str> { Err("unused") }
+    fn columns(&self) -> &[ColumnMeta] {
+        &self.columns
+    }
+    fn total(&self) -> u64 {
+        1
+    }
+    fn row(&self, _: u64) -> Vec<Cell> {
+        self.row.clone()
+    }
+    fn row_ref(&self, _: u64) -> Option<&[Cell]> {
+        Some(&self.row)
+    }
+    fn find(&self, _: &str, _: usize, _: &CancellationToken) -> Result<FindResult, &'static str> {
+        Err("unused")
+    }
+    fn filter(&self, _: &Predicate, _: &CancellationToken) -> Result<Vec<u32>, &'static str> {
+        Err("unused")
+    }
+    fn compare(&self, _: bool, _: &CancellationToken) -> Result<Diff, &'static str> {
+        Err("unused")
+    }
 }
 
 impl ResultSource for QuerySource {
-    fn columns(&self) -> &[ColumnMeta] { self.inner.columns() }
-    fn total(&self) -> u64 { self.inner.total() }
-    fn executed_sql(&self) -> Option<&str> { Some(self.sql) }
-    fn row(&self, index: u64) -> Vec<Cell> { self.inner.row(index) }
-    fn find(&self, q: &str, cap: usize, cancel: &CancellationToken) -> Result<FindResult, &'static str> { self.inner.find(q, cap, cancel) }
-    fn filter(&self, predicate: &Predicate, cancel: &CancellationToken) -> Result<Vec<u32>, &'static str> { self.inner.filter(predicate, cancel) }
-    fn compare(&self, keyed: bool, cancel: &CancellationToken) -> Result<Diff, &'static str> { self.inner.compare(keyed, cancel) }
+    fn columns(&self) -> &[ColumnMeta] {
+        self.inner.columns()
+    }
+    fn total(&self) -> u64 {
+        self.inner.total()
+    }
+    fn executed_sql(&self) -> Option<&str> {
+        self.sql_reads.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        Some(self.sql)
+    }
+    fn row(&self, index: u64) -> Vec<Cell> {
+        self.inner.row(index)
+    }
+    fn find(&self, q: &str, cap: usize, cancel: &CancellationToken) -> Result<FindResult, &'static str> {
+        self.inner.find(q, cap, cancel)
+    }
+    fn filter(&self, predicate: &Predicate, cancel: &CancellationToken) -> Result<Vec<u32>, &'static str> {
+        self.inner.filter(predicate, cancel)
+    }
+    fn compare(&self, keyed: bool, cancel: &CancellationToken) -> Result<Diff, &'static str> {
+        self.inner.compare(keyed, cancel)
+    }
 }
 
 #[gpui::test]
 fn query_widths_survive_same_query_and_do_not_follow_a_different_query(cx: &mut TestAppContext) {
-    let source = |sql| Arc::new(QuerySource {
-        inner: WideSource(vec![ColumnMeta { name: "id".into(), width: 120.0, numeric: false, data_type: "integer".into(), primary_key: false }]),
-        sql,
+    let source = |sql| {
+        Arc::new(QuerySource {
+            inner: WideSource(vec![ColumnMeta {
+                name: "id".into(),
+                width: 120.0,
+                numeric: false,
+                data_type: "integer".into(),
+                primary_key: false,
+            }]),
+            sql,
+            sql_reads: Arc::default(),
+        })
+    };
+    cx.update(text_input::bind_keys);
+    let (view, cx) =
+        cx.add_window_view(|window, cx| GridView::with_source(source("select id from a"), Instant::now(), window, cx));
+    cx.run_until_parked();
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.tabs.open_query();
+            view.grid_is_query = true;
+            view.sync_table(900.0, window, cx);
+            view.remember_grid_widths(&[gpui::px(180.0)], cx);
+            view.source = source("select id from a");
+            view.sync_table(900.0, window, cx);
+            assert_eq!(f32::from(view.table.read(cx).col_width(0).unwrap()), 180.0);
+            view.source = source("select id from b");
+            view.sync_table(900.0, window, cx);
+            assert_ne!(f32::from(view.table.read(cx).col_width(0).unwrap()), 180.0);
+        })
+    });
+}
+
+#[gpui::test]
+fn rendering_the_same_query_result_reuses_its_width_identity(cx: &mut TestAppContext) {
+    let reads = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let source = Arc::new(QuerySource {
+        inner: WideSource(vec![ColumnMeta {
+            name: "id".into(),
+            width: 120.0,
+            numeric: true,
+            data_type: "integer".into(),
+            primary_key: false,
+        }]),
+        sql: "select id from a",
+        sql_reads: reads.clone(),
     });
     cx.update(text_input::bind_keys);
-    let (view, cx) = cx.add_window_view(|window, cx| GridView::with_source(source("select id from a"), Instant::now(), window, cx));
+    let (view, cx) = cx.add_window_view(|window, cx| GridView::with_source(source, Instant::now(), window, cx));
     cx.run_until_parked();
-    cx.update(|window, cx| view.update(cx, |view, cx| {
-        view.tabs.open_query();
-        view.grid_is_query = true;
-        view.sync_table(900.0, window, cx);
-        view.remember_grid_widths(&[gpui::px(180.0)], cx);
-        view.source = source("select id from a");
-        view.sync_table(900.0, window, cx);
-        assert_eq!(f32::from(view.table.read(cx).col_width(0).unwrap()), 180.0);
-        view.source = source("select id from b");
-        view.sync_table(900.0, window, cx);
-        assert_ne!(f32::from(view.table.read(cx).col_width(0).unwrap()), 180.0);
-    }));
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.tabs.open_query();
+            view.grid_is_query = true;
+            view.sync_table(900.0, window, cx);
+            let before = reads.load(std::sync::atomic::Ordering::Relaxed);
+            for _ in 0..5 {
+                view.sync_table(900.0, window, cx);
+            }
+            assert_eq!(reads.load(std::sync::atomic::Ordering::Relaxed), before);
+        })
+    });
 }
 
 #[gpui::test]
@@ -93,10 +166,12 @@ fn fitting_a_column_includes_its_type_header(cx: &mut TestAppContext) {
     cx.simulate_keystrokes("down down enter");
     cx.run_until_parked();
 
-    cx.update(|_, cx| view.read_with(cx, |view, cx| {
-        let width = f32::from(view.table.read(cx).col_width(0).expect("fitted column width"));
-        assert!(width > 200.0, "type header should fit without ellipsis: {width}");
-    }));
+    cx.update(|_, cx| {
+        view.read_with(cx, |view, cx| {
+            let width = f32::from(view.table.read(cx).col_width(0).expect("fitted column width"));
+            assert!(width > 200.0, "type header should fit without ellipsis: {width}");
+        })
+    });
 }
 
 struct BinarySource;
@@ -207,7 +282,9 @@ fn hidden_middle_column_keeps_visible_cells_bound_to_their_source_columns(cx: &m
     });
     cx.run_until_parked();
     cx.update(|window, cx| window.render_frame(cx));
-    let label = view.update(cx, |view, cx| view.table.update(cx, |table, _| table.delegate_mut().label_of(0, 2).0));
+    let label = view.update(cx, |view, cx| {
+        view.table.update(cx, |table, _| table.delegate_mut().label_of(0, 2).0)
+    });
     view.read_with(cx, |view, app| {
         let table = view.table.read(app);
         let delegate = table.delegate();
@@ -234,7 +311,10 @@ fn binary_display_mode_controls_preview_detail_and_edit_without_changing_value_t
     cx.run_until_parked();
 
     view.update(cx, |view, cx| {
-        assert_eq!(view.table.update(cx, |table, _| table.delegate_mut().label_of(0, 1).0), "AP9B");
+        assert_eq!(
+            view.table.update(cx, |table, _| table.delegate_mut().label_of(0, 1).0),
+            "AP9B"
+        );
         view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 1 });
         assert_eq!(
             view.detail_target().map(|(_, detail)| detail),
@@ -243,7 +323,9 @@ fn binary_display_mode_controls_preview_detail_and_edit_without_changing_value_t
     });
 
     cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(0, 1, window, cx)));
-    view.read_with(cx, |view, cx| assert_eq!(view.cell_edit.editor.read(cx).content(), "AP9B"));
+    view.read_with(cx, |view, cx| {
+        assert_eq!(view.cell_edit.editor.read(cx).content(), "AP9B")
+    });
     cx.simulate_keystrokes("ctrl-a");
     cx.simulate_input("bad=");
     cx.simulate_keystrokes("enter");
@@ -267,7 +349,10 @@ fn binary_display_mode_controls_preview_detail_and_edit_without_changing_value_t
         })
     });
     view.update(cx, |view, cx| {
-        assert_eq!(view.table.update(cx, |table, _| table.delegate_mut().label_of(0, 1).0), "AP9B");
+        assert_eq!(
+            view.table.update(cx, |table, _| table.delegate_mut().label_of(0, 1).0),
+            "AP9B"
+        );
     });
 }
 
@@ -285,9 +370,7 @@ fn pinned_columns_stay_visible_after_scroll_and_tab_reopen(cx: &mut TestAppConte
             .collect(),
     ));
     cx.update(text_input::bind_keys);
-    let (view, cx) = cx.add_window_view(|window, cx| {
-        GridView::with_source(source, Instant::now(), window, cx)
-    });
+    let (view, cx) = cx.add_window_view(|window, cx| GridView::with_source(source, Instant::now(), window, cx));
     cx.simulate_resize(gpui::size(gpui::px(900.0), gpui::px(760.0)));
     cx.run_until_parked();
     cx.update(|window, cx| window.render_frame(cx));
@@ -362,9 +445,7 @@ fn narrow_column_headers_keep_pin_actions_in_the_menu(cx: &mut TestAppContext) {
             .collect(),
     ));
     cx.update(text_input::bind_keys);
-    let (view, cx) = cx.add_window_view(|window, cx| {
-        GridView::with_source(source, Instant::now(), window, cx)
-    });
+    let (view, cx) = cx.add_window_view(|window, cx| GridView::with_source(source, Instant::now(), window, cx));
     cx.simulate_resize(gpui::size(gpui::px(1_896.0), gpui::px(1_150.0)));
     cx.run_until_parked();
     cx.update(|window, cx| window.render_frame(cx));
@@ -443,7 +524,8 @@ fn result_grid_scrollbars_reserve_space_and_keep_the_last_cell_visible(cx: &mut 
     assert!(viewport.origin.y + viewport.size.height <= horizontal_gutter.origin.y);
 
     view.update(cx, |view, cx| {
-        view.table.update(cx, |table, cx| table.set_selected_cell(4_999, 59, cx));
+        view.table
+            .update(cx, |table, cx| table.set_selected_cell(4_999, 59, cx));
     });
     cx.run_until_parked();
     cx.update(|window, cx| window.render_frame(cx));

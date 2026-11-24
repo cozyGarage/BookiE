@@ -17,7 +17,7 @@ use crate::ui_theme::ThemeExt;
 use bookie_gpui::model::{Cell, Diff};
 use bookie_gpui::preview::cell_preview;
 use bookie_gpui::source::Source;
-use bookie_gpui::theme::Theme;
+use bookie_gpui::theme::{Theme, size};
 
 #[derive(Default)]
 pub struct RowMap {
@@ -826,18 +826,28 @@ impl GridView {
         })
     }
 
-    fn width_scope(&self) -> Option<WidthScope> {
+    fn width_scope(&self, delegate: &GridDelegate) -> Option<WidthScope> {
         if self.compare.is_some() {
             return None;
         }
         if !self.grid_is_query {
             return self.pin_scope().map(WidthScope::Table);
         }
-        let sql = self.source.executed_sql()?;
+        let identity = match &delegate.width_scope {
+            Some(WidthScope::Query { identity, .. })
+                if delegate
+                    .source
+                    .as_ref()
+                    .is_some_and(|source| Arc::ptr_eq(source, &self.source)) =>
+            {
+                identity.clone()
+            }
+            _ => query_width_identity(self.source.executed_sql()?, self.source.columns()),
+        };
         Some(WidthScope::Query {
             connection: self.connection_identity(),
             database: self.catalog.database.clone(),
-            identity: query_width_identity(sql, self.source.columns()),
+            identity,
         })
     }
 
@@ -952,9 +962,9 @@ impl GridView {
         let (mut columns, numeric, kinds) = self.grid_columns();
         let map = self.row_map();
         let pin_scope = self.pin_scope();
-        let width_scope = self.width_scope();
         let table = self.table.read(cx);
         let delegate = table.delegate();
+        let width_scope = self.width_scope(delegate);
         let (hidden_columns, projection) = self.column_projection(&columns, delegate, &pin_scope);
         let widths_match = delegate
             .source
@@ -1349,14 +1359,14 @@ fn measure_visible_columns(
 }
 
 fn measure_header_width(name: &str, kind: Option<&(String, bool)>, measure: &mut impl FnMut(&str) -> f32) -> f32 {
-    let mut width = measure(name) + 4.0;
+    let mut width = measure(name);
     if let Some((data_type, primary_key)) = kind {
         let kind = header_kind(data_type);
         if !kind.is_empty() {
-            width += measure(&kind) - 8.0;
+            width += measure(&kind) - size::MD + size::XS;
         }
         if *primary_key {
-            width += 18.0;
+            width += size::ICON + size::XS;
         }
     }
     width.max(MIN_CONTENT_WIDTH).min(MAX_CONTENT_WIDTH)
@@ -1387,7 +1397,7 @@ fn measure_text(text: &str, window: &Window) -> f32 {
             .text_system()
             .shape_line(text.into(), style.font_size.to_pixels(window.rem_size()), &[run], None)
             .width,
-    ) + 12.0
+    ) + size::MD
 }
 
 fn labels(cells: &[Cell], numeric: &[bool], binary_modes: &[crate::binary_mode::BinaryMode]) -> Vec<(String, bool)> {
@@ -1489,7 +1499,7 @@ mod header_kind_tests {
         let kind = ("numeric(38,18)".to_owned(), true);
         let width = measure_header_width("id", Some(&kind), &mut |text| text.len() as f32 * 8.0 + 12.0);
 
-        assert_eq!(width, ("id".len() + "NUMERIC(38,18)".len()) as f32 * 8.0 + 38.0);
+        assert_eq!(width, ("id".len() + "NUMERIC(38,18)".len()) as f32 * 8.0 + 34.0);
     }
 }
 
