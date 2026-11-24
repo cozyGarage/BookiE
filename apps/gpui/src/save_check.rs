@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
-use crate::model::{Cell, CellText, ColumnMeta};
+use bookie_results::value_exact::exact_equal;
+
+use crate::model::{Cell, ColumnMeta};
 use crate::source::ResultSource;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -18,17 +20,28 @@ pub struct SaveCheck {
 }
 
 pub fn key_columns(columns: &[ColumnMeta]) -> Vec<usize> {
-    columns.iter().enumerate().filter(|(_, column)| column.primary_key).map(|(at, _)| at).collect()
+    columns
+        .iter()
+        .enumerate()
+        .filter(|(_, column)| column.primary_key)
+        .map(|(at, _)| at)
+        .collect()
 }
 
-pub fn cell_checks<'a>(keys: &[usize], edits: impl IntoIterator<Item = (&'a [Cell], usize, &'a Cell)>) -> Vec<CellCheck> {
+pub fn cell_checks<'a>(
+    keys: &[usize],
+    edits: impl IntoIterator<Item = (&'a [Cell], usize, &'a Cell)>,
+) -> Vec<CellCheck> {
     if keys.is_empty() {
         return Vec::new();
     }
     edits
         .into_iter()
         .map(|(row, column, value)| CellCheck {
-            key: keys.iter().map(|at| row.get(*at).cloned().unwrap_or(Cell::Null)).collect(),
+            key: keys
+                .iter()
+                .map(|at| row.get(*at).cloned().unwrap_or(Cell::Null))
+                .collect(),
             column,
             value: value.clone(),
         })
@@ -61,8 +74,10 @@ pub fn verify(source: &dyn ResultSource, keys: &[usize], checks: &[CellCheck]) -
             continue;
         };
         for check in found {
-            let read = row.get(check.column).unwrap_or(&Cell::Null);
-            if *read == check.value || read.display() == check.value.display() {
+            if row
+                .get(check.column)
+                .is_some_and(|read| exact_equal(read, &check.value))
+            {
                 result.matched += 1;
             } else {
                 result.differ += 1;
@@ -82,7 +97,10 @@ impl SaveCheck {
             ));
         }
         (self.unseen > 0).then(|| {
-            format!("{} saved row(s) are not in the reloaded rows, so they were not checked.", self.unseen)
+            format!(
+                "{} saved row(s) are not in the reloaded rows, so they were not checked.",
+                self.unseen
+            )
         })
     }
 }
