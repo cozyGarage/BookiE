@@ -276,6 +276,7 @@ mod tests {
         view.update(cx, |view, cx| {
             view.tabs.open_new_connection();
             view.connection_form.ssh.on = true;
+            view.connection_form.ssh_open = true;
             cx.notify();
         });
         cx.run_until_parked();

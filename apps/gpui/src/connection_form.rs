@@ -39,6 +39,8 @@ pub(crate) struct ConnectionForm {
     pub tls_key: Entity<TextInput>,
     pub socket: Entity<TextInput>,
     pub ssh: crate::ssh_form::SshForm,
+    pub security_open: bool,
+    pub ssh_open: bool,
 }
 
 impl ConnectionForm {
@@ -90,6 +92,8 @@ impl ConnectionForm {
             editing: None,
             kerberos: false,
             tls: TlsMode::default().index(),
+            security_open: false,
+            ssh_open: false,
             tls_root: input("CA certificate file (optional)", cx),
             tls_cert: input("Client certificate file (optional)", cx),
             tls_key: input("Client key file (optional)", cx),
@@ -245,6 +249,53 @@ pub(crate) fn section(theme: Theme, caption: &str, rows: Vec<Div>) -> Div {
         )
 }
 
+pub(crate) fn collapsible_section(
+    theme: Theme,
+    id: &'static str,
+    caption: &str,
+    summary: String,
+    rows: Option<Vec<Div>>,
+    on_toggle: impl Fn(&gpui::ClickEvent, &mut Window, &mut gpui::App) + 'static,
+) -> Div {
+    let open = rows.is_some();
+    let header = div()
+        .id(format!("{id}-toggle"))
+        .debug_selector(move || format!("{id}-toggle"))
+        .flex()
+        .items_center()
+        .gap_1()
+        .cursor_pointer()
+        .text_size(px(size::TEXT_SMALL))
+        .text_color(rgb(theme.muted_foreground))
+        .child(crate::assets::icon(
+            if open { "chevron-down" } else { "chevron-right" },
+            theme.muted_foreground,
+        ))
+        .child(div().font_weight(gpui::FontWeight::MEDIUM).child(caption.to_uppercase()))
+        .child(div().child(format!("· {summary}")))
+        .on_click(on_toggle);
+    let body = rows.map(|rows| {
+        let last = rows.len().saturating_sub(1);
+        div()
+            .debug_selector(move || format!("{id}-fields"))
+            .flex()
+            .flex_col()
+            .rounded(px(size::SURFACE_RADIUS))
+            .border_1()
+            .border_color(rgb(theme.border))
+            .bg(rgb(theme.background))
+            .children(rows.into_iter().enumerate().map(|(index, row)| {
+                let row = row.px_3().py_2();
+                if index < last {
+                    row.border_b_1().border_color(rgb(theme.border))
+                } else {
+                    row
+                }
+            }))
+    });
+    div().flex().flex_col().gap_1().child(header).children(body)
+}
+
 pub(crate) fn choice_row(
     theme: Theme,
     label: impl Into<gpui::SharedString>,
@@ -300,8 +351,8 @@ impl GridView {
         ));
         let mut sections = vec![section(theme, "Behaviour", self.behaviour_fields(theme, cx))];
         if !file_based {
-            sections.push(section(theme, "Security", self.security_fields(theme, cx)));
-            sections.push(section(theme, "SSH tunnel", self.ssh_fields(theme, cx)));
+            sections.push(self.security_section(theme, cx));
+            sections.push(self.ssh_section(theme, cx));
         }
         div()
             .relative()
@@ -382,6 +433,99 @@ impl GridView {
             )
     }
 
+    fn security_section(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+        let form = &self.connection_form;
+        let mut summary = TlsMode::from_index(form.tls).label().to_string();
+        if form.kerberos {
+            summary.push_str(" · Kerberos");
+        }
+        let rows = form.security_open.then(|| self.security_fields(theme, cx));
+        collapsible_section(
+            theme,
+            "connection-security",
+            "Security",
+            summary,
+            rows,
+            cx.listener(|this, _, _, cx| {
+                this.connection_form.security_open = !this.connection_form.security_open;
+                cx.notify();
+            }),
+        )
+    }
+
+    fn ssh_section(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+        let form = &self.connection_form;
+        let summary = match (form.ssh.on, form.ssh.jumps.len()) {
+            (false, _) => "Off".to_string(),
+            (true, 0) => "1 hop".to_string(),
+            (true, jumps) => format!("{} hops", jumps + 1),
+        };
+        let rows = form.ssh_open.then(|| self.ssh_fields(theme, cx));
+        collapsible_section(
+            theme,
+            "connection-ssh",
+            "SSH tunnel",
+            summary,
+            rows,
+            cx.listener(|this, _, _, cx| {
+                this.connection_form.ssh_open = !this.connection_form.ssh_open;
+                cx.notify();
+            }),
+        )
+    }
+
+    pub(crate) fn fill_from_connection_url(&mut self, text: &str, cx: &mut Context<Self>) {
+        let registry = drivers_registry::default_registry();
+        match connection_save::draft_from_url(&registry, text) {
+            Ok((mut draft, password)) => {
+                draft.id = self.connection_form.editing;
+                self.fill_connection_form(draft, cx);
+                if let Some(password) = password {
+                    use secrecy::ExposeSecret;
+                    self.connection_form
+                        .password
+                        .update(cx, |input, cx| input.set_content(password.expose_secret(), cx));
+                }
+                self.connection_form.status = "Filled from the connection URL. Review it, then save.".into();
+            }
+            Err(message) => self.connection_form.status = format!("Could not read the connection URL: {message}"),
+        }
+        cx.notify();
+    }
+
+    pub(crate) fn connection_url_for_form(&self, cx: &gpui::App) -> Option<String> {
+        connection_save::draft_url(&self.connection_form.draft(cx))
+    }
+
+    fn url_buttons(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+        div()
+            .flex()
+            .gap_2()
+            .child(outline_button("paste-connection-url", "Paste URL", theme).on_click(cx.listener(
+                |this, _, _, cx| {
+                    match cx.read_from_clipboard().and_then(|item| item.text()) {
+                        Some(text) => this.fill_from_connection_url(&text, cx),
+                        None => {
+                            this.connection_form.status = "The clipboard has no connection URL.".into();
+                            cx.notify();
+                        }
+                    }
+                },
+            )))
+            .child(outline_button("copy-connection-url", "Copy as URL", theme).on_click(cx.listener(
+                |this, _, _, cx| {
+                    this.connection_form.status = match this.connection_url_for_form(cx) {
+                        Some(url) => {
+                            cx.write_to_clipboard(gpui::ClipboardItem::new_string(url));
+                            "Copied the connection URL without its password.".into()
+                        }
+                        None => "This connection type has no URL form.".into(),
+                    };
+                    cx.notify();
+                },
+            )))
+    }
+
     fn connection_actions(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
         let form = &self.connection_form;
         div()
@@ -395,6 +539,7 @@ impl GridView {
             .items_center()
             .gap_2()
             .child(self.test_button(theme, cx))
+            .child(self.url_buttons(theme, cx))
             .child(div().flex_1().min_w_0().text_color(rgb(theme.muted_foreground)).child(form.status.clone()))
             .children(form.editing.map(|_| self.delete_button(theme, cx)))
             .child(self.save_button(theme, cx))
@@ -639,6 +784,13 @@ impl GridView {
         form.kerberos = draft.auth_mode == AuthMode::Kerberos;
         form.tls = draft.tls_mode.index();
         form.ssh.fill(draft.ssh.as_ref(), cx);
+        form.ssh_open = draft.ssh.is_some();
+        form.security_open = draft.auth_mode == AuthMode::Kerberos
+            || !draft.tls_root_cert.trim().is_empty()
+            || !draft.tls_client_cert.trim().is_empty()
+            || !draft.tls_client_key.trim().is_empty()
+            || !draft.socket_endpoint.trim().is_empty()
+            || matches!(draft.tls_mode, TlsMode::Prefer | TlsMode::Require | TlsMode::VerifyCa);
         let port = draft.port.to_string();
         for (input, text) in [
             (&form.name, draft.name.as_str()),
@@ -683,6 +835,7 @@ impl GridView {
             } else if !draft.socket_endpoint.trim().is_empty()
                 && !bookie_app_services::connection_form::socket_path_is_absolute(draft.socket_endpoint.trim())
             {
+                self.connection_form.security_open = true;
                 let input = &self.connection_form.socket;
                 self.connection_form.validation_error = Some((input.entity_id(), message.clone()));
                 window.focus(&input.read(cx).focus_handle(cx), cx);
@@ -691,6 +844,7 @@ impl GridView {
                 self.connection_form.validation_error = Some((input.entity_id(), message.clone()));
                 window.focus(&input.read(cx).focus_handle(cx), cx);
             } else if draft.tls_client_cert.trim().is_empty() != draft.tls_client_key.trim().is_empty() {
+                self.connection_form.security_open = true;
                 let input = if draft.tls_client_cert.trim().is_empty() {
                     &self.connection_form.tls_cert
                 } else {
@@ -715,6 +869,7 @@ impl GridView {
                         None
                     };
                     if let Some(invalid) = invalid {
+                        self.connection_form.ssh_open = true;
                         self.connection_form.validation_error = Some((invalid.entity_id(), message.clone()));
                         window.focus(&invalid.read(cx).focus_handle(cx), cx);
                         break;

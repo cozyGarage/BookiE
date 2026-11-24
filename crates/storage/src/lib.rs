@@ -46,7 +46,7 @@ pub use connection_organization::{
     connection_matches_filter, join_group_path, load_organization, parse_group_path, save_organization,
     validate_group_path,
 };
-pub use connection_url::{ParsedConnectionUrl, parse_connection_url};
+pub use connection_url::{ParsedConnectionUrl, connection_url, parse_connection_url};
 pub use connections::{
     SavedConnection, SavedSshAuth, SavedSshConfig, SshClient, apply_import, delete_connection, duplicate_connection,
     load_connections, restore_connection, save_connections, touch_last_opened, update_connection,

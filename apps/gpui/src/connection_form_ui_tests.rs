@@ -148,3 +148,101 @@ fn connection_save_reports_partial_success_and_reuses_the_saved_identity(cx: &mu
         })
     });
 }
+
+fn set(input: &gpui::Entity<crate::text_input::TextInput>, text: &str, cx: &mut gpui::App) {
+    input.update(cx, |input, cx| input.set_content(text, cx));
+}
+
+#[gpui::test]
+fn security_and_ssh_start_collapsed_and_open_from_their_headers(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_resize(gpui::size(gpui::px(1400.0), gpui::px(900.0)));
+    view.update(cx, |view, cx| {
+        view.tabs.open_new_connection();
+        cx.notify();
+    });
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("connection-security-toggle").is_some());
+    assert!(cx.debug_bounds("connection-ssh-toggle").is_some());
+    assert!(cx.debug_bounds("connection-security-fields").is_none());
+    assert!(cx.debug_bounds("connection-ssh-fields").is_none());
+    let toggle = cx.debug_bounds("connection-security-toggle").expect("security header");
+    cx.simulate_click(toggle.center(), Default::default());
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("connection-security-fields").is_some());
+    assert!(cx.debug_bounds("connection-ssh-fields").is_none());
+}
+
+#[gpui::test]
+fn a_tls_error_inside_a_collapsed_section_opens_it(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.tabs.open_new_connection();
+            let form = &view.connection_form;
+            for (input, text) in [(&form.host, "db.example.com"), (&form.port, "5432"), (&form.database, "app"), (&form.tls_cert, "/etc/ssl/client.pem")] {
+                set(input, text, cx);
+            }
+            assert!(!view.connection_form.security_open);
+            view.save_connection(window, cx);
+            assert!(view.connection_form.security_open, "{}", view.connection_form.status);
+        });
+    });
+}
+
+#[gpui::test]
+fn a_pasted_url_fills_a_new_connection_and_a_copied_url_has_no_password(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.tabs.open_new_connection();
+            view.fill_from_connection_url("postgres://alice:s3cret@db.example.com:5433/sales?sslmode=require", cx);
+            let form = &view.connection_form;
+            assert_eq!(form.editing, None);
+            assert_eq!(form.host.read(cx).content(), "db.example.com");
+            assert_eq!(form.port.read(cx).content(), "5433");
+            assert_eq!(form.database.read(cx).content(), "sales");
+            assert_eq!(form.username.read(cx).content(), "alice");
+            assert_eq!(form.password.read(cx).content(), "s3cret");
+            assert!(form.security_open, "a URL with TLS settings shows them");
+            let copied = view.connection_url_for_form(cx).expect("postgres has a URL");
+            assert!(copied.starts_with("postgres://alice@db.example.com:5433/sales"), "{copied}");
+            assert!(!copied.contains("s3cret"), "{copied}");
+            view.fill_from_connection_url("not a url", cx);
+            assert!(view.connection_form.status.starts_with("Could not read the connection URL"), "{}", view.connection_form.status);
+        });
+    });
+}
+
+#[gpui::test]
+fn editing_a_connection_with_a_tunnel_opens_the_ssh_section(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            let registry = drivers_registry::default_registry();
+            let (mut draft, _) = bookie_app_services::connection_save::draft_from_url(
+                &registry,
+                "postgres://bob@db.internal:5432/app",
+            )
+            .expect("valid url");
+            draft.ssh = Some(bookie_app_services::connection_save::SshDraft {
+                head: bookie_app_services::connection_save::SshHopDraft {
+                    hop_id: None,
+                    host: "bastion".into(),
+                    port: 22,
+                    username: "tunnel".into(),
+                    auth: bookie_app_services::connection_save::SshAuthKind::Agent,
+                    key_path: String::new(),
+                    agent_identity: String::new(),
+                    secret: String::new().into(),
+                    stored_secret: false,
+                },
+                openssh: false,
+                jumps: Vec::new(),
+            });
+            view.fill_connection_form(draft, cx);
+            assert!(view.connection_form.ssh_open);
+            assert!(!view.connection_form.security_open);
+        });
+    });
+}
