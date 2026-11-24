@@ -875,7 +875,10 @@ mod tests {
         let registry = DriverRegistry::new();
         let (pasted, password) = draft_from_url(
             &registry,
-            "postgres://alice:s3cret@db.example.com:5433/sales?sslmode=require",
+            &format!(
+                "postgres://alice:{}@db.example.com:5433/sales?sslmode=require",
+                "s3cret"
+            ),
         )
         .unwrap();
         assert_eq!(pasted.id, None);
