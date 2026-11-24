@@ -340,15 +340,13 @@ mod tests {
             "old-hop",
         );
         store.fail_calls.lock().unwrap().insert(2);
-        let carried =
-            BundleSecrets::new(target, Some(SecretString::new("new".into())), None, None).with_ssh_hops(vec![
-                BundleSshSecret::new(
-                    hop_id,
-                    0,
-                    BundleSshSecretKind::Password,
-                    SecretString::new("new-hop".into()),
-                ),
-            ]);
+        let mut carried = BundleSecrets::new(target, Some(SecretString::new("new".into())), None, None);
+        carried.set_ssh_hop_secrets(vec![BundleSshSecret::new(
+            hop_id,
+            0,
+            BundleSshSecretKind::Password,
+            SecretString::new("new-hop".into()),
+        )]);
 
         assert!(matches!(
             store_bundle_secrets_with(&store, target, &carried, "bundle-test", true).await,
