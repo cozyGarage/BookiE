@@ -110,6 +110,40 @@ async fn stale_import_plan_does_not_overwrite_a_concurrent_edit() {
 }
 
 #[tokio::test]
+async fn failed_import_rollback_preserves_a_later_edit() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("connections.json");
+    let original = sample_connection();
+    let mut applied = original.clone();
+    applied.name = "Imported".into();
+    let mut concurrent = applied.clone();
+    concurrent.read_only = true;
+    save_to(&path, std::slice::from_ref(&concurrent)).await.unwrap();
+
+    assert!(
+        restore_import_if_unchanged_to(&path, Some(&original), &applied)
+            .await
+            .is_err()
+    );
+    assert_eq!(load_from(&path).await.unwrap(), vec![concurrent]);
+}
+
+#[tokio::test]
+async fn failed_import_rollback_restores_an_unchanged_record() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("connections.json");
+    let original = sample_connection();
+    let mut applied = original.clone();
+    applied.name = "Imported".into();
+    save_to(&path, std::slice::from_ref(&applied)).await.unwrap();
+
+    restore_import_if_unchanged_to(&path, Some(&original), &applied)
+        .await
+        .unwrap();
+    assert_eq!(load_from(&path).await.unwrap(), vec![original]);
+}
+
+#[tokio::test]
 async fn applying_an_import_preserves_safety_changes_made_after_review() {
     use crate::connection_bundle::{BundleBody, BundleConnection, plan_import};
 

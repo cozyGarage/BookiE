@@ -514,18 +514,25 @@ async fn apply_plan(
             if bookie_storage::apply_import(&single_item).await.is_err() {
                 return Err(ItemApplyFailure::ConnectionSave);
             }
-            if apply_item_secrets(&item, carried.as_ref(), replace).await.is_err() {
-                if let Some(carried) = carried.as_ref() {
-                    roll_back(&item, carried).await;
+            if let Err(error) = apply_item_secrets(&item, carried.as_ref(), replace).await {
+                let credentials_uncertain = matches!(error, bookie_storage::StorageError::CredentialRollback { .. });
+                let restored = if let Some(carried) = carried.as_ref() {
+                    roll_back(&item, carried, !credentials_uncertain).await
                 } else {
-                    let restored = bookie_storage::restore_connection(item.previous.as_ref(), item.connection.id)
-                        .await
-                        .is_ok();
+                    let restored =
+                        bookie_storage::restore_import_if_unchanged(item.previous.as_ref(), &item.connection)
+                            .await
+                            .is_ok();
                     if !restored {
                         tracing::warn!("rolling back an imported connection failed");
                     }
-                }
-                return Err(ItemApplyFailure::CredentialStore);
+                    restored
+                };
+                return Err(if !restored || credentials_uncertain {
+                    ItemApplyFailure::ImportRecovery
+                } else {
+                    ItemApplyFailure::CredentialStore
+                });
             }
             Ok(())
         },
@@ -545,6 +552,14 @@ async fn apply_plan(
             affected_count: imported,
         });
     }
+    if failure == Some(ItemApplyFailure::ImportRecovery) {
+        return Err(ImportFailure {
+            message: bookie_app_services::tr!(
+                "The import failed and could not be fully rolled back. Check the saved connection and credentials before using it."
+            ),
+            affected_count: imported,
+        });
+    }
     Ok((imported, planned))
 }
 
@@ -552,6 +567,7 @@ async fn apply_plan(
 enum ItemApplyFailure {
     ConnectionSave,
     CredentialStore,
+    ImportRecovery,
     WorkspaceSaveRecovery,
 }
 
@@ -611,17 +627,18 @@ async fn apply_item_secrets(
 /// Undo one item after a failed credential write. An entry that existed
 /// before the import is restored from its snapshot; one this import
 /// created is removed along with whatever it managed to store.
-async fn roll_back(item: &ImportItem, secrets: &bookie_storage::BundleSecrets) {
-    let restored = match bookie_storage::restore_connection(item.previous.as_ref(), item.connection.id).await {
+async fn roll_back(item: &ImportItem, secrets: &bookie_storage::BundleSecrets, credentials_restored: bool) -> bool {
+    let restored = match bookie_storage::restore_import_if_unchanged(item.previous.as_ref(), &item.connection).await {
         Ok(()) => true,
         Err(error) => {
             tracing::warn!(error = %error, "rolling back an imported connection failed");
             false
         }
     };
-    if should_forget_imported_secrets(item, restored) {
+    if credentials_restored && should_forget_imported_secrets(item, restored) {
         bookie_storage::forget_imported_bundle_secrets(item.connection.id, secrets).await;
     }
+    restored
 }
 
 fn should_forget_imported_secrets(item: &ImportItem, restored: bool) -> bool {
