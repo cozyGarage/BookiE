@@ -38,6 +38,15 @@ pub(crate) fn build_tree(nodes: &[PlanNode]) -> gtk::Widget {
             )));
             row.append(&bar);
         }
+        if let Some(rows) = bookie_app_services::explain_plan::full_scan_rows(node) {
+            let label = gtk::Label::builder()
+                .label(bookie_app_services::tr!("Full scan of ~{rows} rows").replace("{rows}", &format!("{rows:.0}")))
+                .xalign(0.0)
+                .build();
+            label.add_css_class("warning");
+            label.add_css_class("caption");
+            row.append(&label);
+        }
         for detail in &node.details {
             let label = gtk::Label::builder()
                 .label(detail)

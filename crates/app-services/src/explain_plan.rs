@@ -117,6 +117,15 @@ pub fn misestimate(nodes: &[PlanNode], index: usize) -> Option<f64> {
     (!(actual < estimated && stopped)).then_some(factor)
 }
 
+pub const FULL_SCAN_ROWS: f64 = 1_000.0;
+
+pub fn full_scan_rows(node: &PlanNode) -> Option<f64> {
+    let title = node.title.trim_start().to_ascii_lowercase();
+    let whole_table = title.starts_with("seq scan") || title.starts_with("parallel seq scan");
+    let rows = node.actual_rows.or(node.rows)?;
+    (whole_table && rows >= FULL_SCAN_ROWS).then_some(rows)
+}
+
 pub fn plan_text(columns: &[String], rows: &[Vec<String>]) -> String {
     if rows.is_empty() {
         return String::from("(empty plan)");
@@ -154,6 +163,20 @@ mod tests {
         assert_eq!(nodes[0].details, ["Hash Cond: (a.id = b.id)"]);
         assert_eq!(nodes[1].details, ["Filter: (x > 1)"]);
         assert!(nodes[3].details.contains(&"Planning Time: 0.1 ms".to_string()));
+    }
+
+    #[test]
+    fn whole_table_scans_of_a_thousand_rows_or_more_are_flagged() {
+        let nodes = parse_plan(POSTGRES);
+        assert_eq!(full_scan_rows(&nodes[1]), Some(1000.0), "Seq Scan on a, 1000 rows");
+        assert_eq!(full_scan_rows(&nodes[3]), None, "an index scan is not a full scan");
+        let analyzed = parse_plan(
+            "Gather  (cost=0.00..90.00 rows=10 width=4) (actual time=0.1..9.0 rows=2 loops=1)\n  ->  Parallel Seq Scan on big  (cost=0.00..80.00 rows=50 width=4) (actual time=0.01..5.00 rows=40000 loops=1)\n  ->  Seq Scan on small  (cost=0.00..1.00 rows=999 width=4)",
+        );
+        assert_eq!(full_scan_rows(&analyzed[1]), Some(40000.0), "actual rows win over the estimate");
+        assert_eq!(full_scan_rows(&analyzed[2]), None, "below the threshold");
+        let sqlite = parse_plan("2 | 0 | 0 | SCAN orders");
+        assert_eq!(full_scan_rows(&sqlite[0]), None, "SQLite plans carry no row counts");
     }
 
     #[test]
