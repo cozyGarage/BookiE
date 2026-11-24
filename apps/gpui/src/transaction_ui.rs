@@ -118,7 +118,7 @@ impl GridView {
         let (write, shared) = (transaction.write.clone(), transaction.shared.clone());
         self.status = if commit { "Committing…" } else { "Rolling back…" }.into();
         cx.spawn(async move |this, cx| {
-            let (result, open) = cx
+            let (result, open, cleanup) = cx
                 .background_executor()
                 .spawn(async move {
                     let result = if commit {
@@ -132,7 +132,13 @@ impl GridView {
                             .map_err(bookie_core::DriverError::Internal)
                     };
                     let open = write.transaction_is_open(&shared);
-                    (result, open)
+                    let keep = commit && open && matches!(&result, Err(bookie_core::DriverError::PolicyDenied(_)));
+                    let cleanup = if result.is_err() && !keep {
+                        write.close_transaction(&shared)
+                    } else {
+                        None
+                    };
+                    (result, open, cleanup)
                 })
                 .await;
             this.update(cx, |this, cx| {
@@ -161,6 +167,10 @@ impl GridView {
                         this.transaction = None;
                         this.status =
                             format!("Transaction outcome may be unknown: {error}; check the database before retrying");
+                        if let Some(cleanup) = cleanup {
+                            this.status
+                                .push_str(&format!("; closing the session failed: {cleanup}"));
+                        }
                     }
                 }
                 cx.notify();

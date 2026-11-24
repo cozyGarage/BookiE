@@ -32,7 +32,6 @@ gpui-component = { version = "=0.10.0", features = ["tree-sitter-sql"] }
 rfd = "=0.18.0"
 
 [dev-dependencies]
-bookie-policy = { path = "../../crates/policy" }
 async-trait = "0.1"
 bookie-app-services = { path = "../../crates/app-services", features = ["test-support"] }
 gpui = { package = "gpui-pre", version = "=0.3.12", features = ["test-support"] }

@@ -842,6 +842,13 @@ impl WriteSession {
         })
     }
 
+    pub fn close_transaction(&self, shared: &bookie_app_services::interactive_session::SharedSession) -> Option<String> {
+        self.runtime
+            .block_on(bookie_app_services::interactive_session::close_for_teardown(shared.clone()))
+            .err()
+            .map(|error| error.to_string())
+    }
+
     pub fn rollback_transaction(&self, shared: &bookie_app_services::interactive_session::SharedSession) -> Result<(), String> {
         self.runtime
             .block_on(bookie_app_services::interactive_session::rollback_and_close(shared))
