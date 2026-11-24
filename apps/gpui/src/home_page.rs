@@ -302,6 +302,7 @@ impl GridView {
                 },
             ))
             .children(details)
+            .children(self.selection_stats_segment(theme))
             .children(elapsed.map(|time| div().child(time)))
             .when(self.tabs.shows_grid_for(&self.catalog.grid_table), |bar| bar.child(format!("Page: {} rows", self.pager.rows)))
             .child(right)
