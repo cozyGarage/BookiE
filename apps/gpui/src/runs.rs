@@ -70,6 +70,20 @@ impl GridView {
         self.run_sql_with_mapping(sql, params, source, None, cx);
     }
 
+    fn run_sql_in_open_transaction(&mut self, sql: String, unparameterized: bool, cx: &mut Context<Self>) {
+        if !unparameterized {
+            self.status = "Parameters are not supported inside a transaction yet".into();
+            return;
+        }
+        if self.schema_context.as_deref().is_some_and(|schema| !schema.trim().is_empty()) {
+            self.status =
+                "Clear the schema context before running in a transaction; it is not applied inside a transaction yet"
+                    .into();
+            return;
+        }
+        self.run_in_transaction(sql, cx);
+    }
+
     pub(crate) fn run_sql_with_mapping(
         &mut self,
         sql: String,
@@ -83,12 +97,7 @@ impl GridView {
             return;
         }
         if self.transaction_open() {
-            if !params.is_empty() || mapping.is_some() {
-                self.status = "Parameters are not supported inside a transaction yet".into();
-                return;
-            }
-            let _ = source;
-            self.run_in_transaction(sql, cx);
+            self.run_sql_in_open_transaction(sql, params.is_empty() && mapping.is_none(), cx);
             return;
         }
         if let Some(session) = self.live.clone() {

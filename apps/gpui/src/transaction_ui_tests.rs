@@ -325,3 +325,25 @@ fn a_transaction_idle_for_five_minutes_shows_the_shared_warning(cx: &mut TestApp
     wait_for(&view, cx, |view| view.status == "Transaction rolled back");
     std::fs::remove_file(&path).ok();
 }
+
+#[gpui::test]
+fn a_transaction_statement_is_refused_while_a_schema_context_is_set(cx: &mut TestAppContext) {
+    let path = fixture_copy("transaction-schema-context");
+    let (view, cx) = saving_view(cx, &path);
+    let original = saved_customer(&path, 1);
+    open_transaction(&view, cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.schema_context = Some("main".into());
+            view.run_sql_with_mapping("UPDATE orders SET customer = 'Elsewhere' WHERE id = 1".into(), Vec::new(), None, None, cx);
+            let transaction = view.transaction.as_ref().expect("still open");
+            assert!(!transaction.running, "{}", view.status);
+            assert_eq!(transaction.statements, 0);
+            assert!(view.status.contains("schema"), "{}", view.status);
+        })
+    });
+    cx.update(|_, cx| view.update(cx, |view, cx| view.end_transaction(false, cx)));
+    wait_for(&view, cx, |view| view.status == "Transaction rolled back");
+    assert_eq!(saved_customer(&path, 1), original);
+    std::fs::remove_file(path).ok();
+}
