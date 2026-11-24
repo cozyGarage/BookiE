@@ -17,6 +17,7 @@ mod detail_panel;
 mod connection_bundle_ui;
 mod diagram_scene;
 mod diagram_ui;
+mod drafts_ui;
 mod edit_history;
 mod export_file_ui;
 mod favorites_ui;
@@ -174,6 +175,8 @@ struct GridView {
     pub(crate) fk_peek: Option<fk_peek_ui::FkPeekState>,
     fk_peek_work: Ticket,
     connection_info: Option<bookie_gpui::live::ServerInfo>,
+    closed_drafts: Option<bookie_app_services::closed_drafts::ClosedDraftStore>,
+    last_edit: Option<gpui_kit::component::input::Position>,
     table_sizes: bookie_app_services::table_sizes::SizeIndex,
     row_inspector: row_inspector_ui::RowInspector,
     wrap_text: bool,
@@ -354,7 +357,10 @@ impl GridView {
         });
         cx.subscribe(
             &sql_input,
-            |this, _, event: &gpui_kit::component::input::InputEvent, cx| {
+            |this, input, event: &gpui_kit::component::input::InputEvent, cx| {
+                if matches!(event, gpui_kit::component::input::InputEvent::Change) {
+                    this.last_edit = Some(input.read(cx).cursor_position());
+                }
                 if matches!(
                     event,
                     gpui_kit::component::input::InputEvent::PressEnter { secondary: true, .. }
@@ -578,6 +584,12 @@ impl GridView {
             fk_peek: None,
             fk_peek_work: Ticket::new(),
             connection_info: None,
+            closed_drafts: if cfg!(test) {
+                Some(bookie_app_services::closed_drafts::ClosedDraftStore::memory())
+            } else {
+                bookie_app_services::closed_drafts::ClosedDraftStore::open()
+            },
+            last_edit: None,
             table_sizes: Default::default(),
             row_inspector: Default::default(),
             wrap_text: false,
@@ -1167,6 +1179,8 @@ mod host_key_ui_tests;
 mod live_ui_tests;
 #[cfg(test)]
 mod status_bar_tests;
+#[cfg(test)]
+mod drafts_ui_tests;
 #[cfg(test)]
 mod row_inspector_tests;
 #[cfg(test)]

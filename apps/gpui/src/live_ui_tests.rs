@@ -998,14 +998,14 @@ fn cancelling_a_table_switch_keeps_the_current_table(cx: &mut TestAppContext) {
 #[gpui::test]
 fn closing_a_query_tab_with_result_edits_requires_explicit_discard(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
-    view.update(cx, |view, _cx| {
+    view.update(cx, |view, cx| {
         view.tabs.open_query();
         view.sync_grid_owner();
         view.add_run(None);
         view.run_tabs.slots[view.run_tabs.active]
             .edits
             .insert((0, 1), bookie_gpui::model::Cell::Text("result draft".into()));
-        view.close_tab(2);
+        view.close_tab(2, cx);
     });
     view.read_with(cx, |view, _| {
         assert!(

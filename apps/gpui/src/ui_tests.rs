@@ -1559,10 +1559,10 @@ fn closing_query_tab_releases_its_runs_and_keeps_table_edits(cx: &mut TestAppCon
     });
     cx.simulate_keystrokes("ctrl-t");
     cx.update(|_, cx| {
-        view.update(cx, |view, _| {
+        view.update(cx, |view, cx| {
             view.add_run(None);
             let index = view.tabs.active;
-            view.close_tab(index);
+            view.close_tab(index, cx);
             assert!(view.run_tabs.slots.is_empty());
             assert!(view.run_tabs.slots.is_empty());
             assert_eq!(view.cell_at(1, 1), Cell::Text("table".into()));
@@ -1585,12 +1585,12 @@ fn closing_an_inactive_query_tab_preserves_the_table(cx: &mut TestAppContext) {
     });
     cx.simulate_keystrokes("ctrl-t");
     cx.update(|_, cx| {
-        view.update(cx, |view, _| {
+        view.update(cx, |view, cx| {
             let query = view.tabs.active;
             view.tabs
                 .open_table(&bookie_gpui::shell::table_info(bookie_gpui::shell::DATA_TABLE));
             view.sync_grid_owner();
-            view.close_tab(query);
+            view.close_tab(query, cx);
             assert!(view.run_tabs.slots.is_empty());
             assert_eq!(view.cell_at(1, 1), Cell::Text("table".into()));
         })
@@ -1607,11 +1607,11 @@ fn closing_query_from_home_restores_the_table_owner(cx: &mut TestAppContext) {
     });
     cx.simulate_keystrokes("ctrl-t");
     cx.update(|_, cx| {
-        view.update(cx, |view, _| {
+        view.update(cx, |view, cx| {
             let query = view.tabs.active;
             view.tabs.open_home();
             view.sync_grid_owner();
-            view.close_tab(query);
+            view.close_tab(query, cx);
             view.tabs
                 .open_table(&bookie_gpui::shell::table_info(bookie_gpui::shell::DATA_TABLE));
             view.sync_grid_owner();
@@ -1634,7 +1634,7 @@ fn closing_query_from_home_discards_its_pending_result(cx: &mut TestAppContext) 
             view.tabs.open_home();
             view.sync_grid_owner();
             assert!(cancel.is_cancelled());
-            view.close_tab(query);
+            view.close_tab(query, cx);
             assert!(view.panel.error_location.is_none());
         })
     });

@@ -793,7 +793,7 @@ fn tab_close_button(index: usize, theme: Theme, cx: &mut Context<GridView>) -> S
         .on_mouse_down(
             gpui::MouseButton::Left,
             cx.listener(move |this, _: &MouseDownEvent, window, cx| {
-                this.close_tab(index);
+                this.close_tab(index, cx);
                 this.show_current_table(window, cx);
                 cx.stop_propagation();
                 cx.notify();
