@@ -88,16 +88,18 @@ impl GridView {
         let Some(path) = bookie_app_services::config_io::xdg_config_path("gpui-keymap.json") else {
             return;
         };
-        if let Err(error) = bookie_app_services::config_io::atomic_write_bytes(&path, self.keymap.overrides_json().as_bytes()) {
+        if let Err(error) =
+            bookie_app_services::config_io::atomic_write_bytes(&path, self.keymap.overrides_json().as_bytes())
+        {
             tracing::warn!(%error, "could not save keyboard shortcuts");
             self.status = format!("Could not save keyboard shortcuts: {error}");
         }
     }
 
     pub(crate) fn keyboard_group(&self, view: Entity<Self>, theme: Theme) -> SettingGroup {
-        Command::ALL.into_iter().fold(
-            SettingGroup::new().title("Keyboard shortcuts"),
-            |group, command| {
+        Command::ALL
+            .into_iter()
+            .fold(SettingGroup::new().title("Keyboard shortcuts"), |group, command| {
                 let view = view.clone();
                 group.item(SettingItem::new(
                     command.title(),
@@ -136,7 +138,6 @@ impl GridView {
                             ))
                     }),
                 ))
-            },
-        )
+            })
     }
 }

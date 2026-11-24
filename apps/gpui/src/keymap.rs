@@ -407,10 +407,16 @@ mod tests {
         keymap.unbind(Command::Filter);
         assert_eq!(keymap.binding(Command::Filter), None);
         keymap.reset(Command::Filter);
-        assert_eq!(keymap.binding(Command::Filter), Keymap::default().binding(Command::Filter));
+        assert_eq!(
+            keymap.binding(Command::Filter),
+            Keymap::default().binding(Command::Filter)
+        );
 
         let ctrl_b = Chord::parse("ctrl-b").unwrap();
-        assert_eq!(keymap.rebind_taking(Command::Filter, ctrl_b.clone()), vec![Command::ToggleSidebar]);
+        assert_eq!(
+            keymap.rebind_taking(Command::Filter, ctrl_b.clone()),
+            vec![Command::ToggleSidebar]
+        );
         assert_eq!(keymap.binding(Command::Filter), Some(&ctrl_b));
         assert_eq!(keymap.binding(Command::ToggleSidebar), None);
         assert_eq!(keymap.resolve(&ctrl_b), Some(Command::Filter));

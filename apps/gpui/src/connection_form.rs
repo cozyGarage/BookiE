@@ -213,7 +213,9 @@ pub(crate) fn choice_chip(
         .cursor_pointer()
         .border_1()
         .border_color(rgb(if selected { theme.foreground } else { theme.border }))
-        .when(selected, |chip| chip.bg(rgb(theme.foreground)).text_color(rgb(theme.background)))
+        .when(selected, |chip| {
+            chip.bg(rgb(theme.foreground)).text_color(rgb(theme.background))
+        })
         .child(label)
 }
 
@@ -271,7 +273,11 @@ pub(crate) fn collapsible_section(
             if open { "chevron-down" } else { "chevron-right" },
             theme.muted_foreground,
         ))
-        .child(div().font_weight(gpui::FontWeight::MEDIUM).child(caption.to_uppercase()))
+        .child(
+            div()
+                .font_weight(gpui::FontWeight::MEDIUM)
+                .child(caption.to_uppercase()),
+        )
         .child(div().child(format!("· {summary}")))
         .on_click(on_toggle);
     let body = rows.map(|rows| {
@@ -335,7 +341,10 @@ impl GridView {
         } else {
             "New connection"
         };
-        let driver = form.selected().map(|driver| driver.label.to_string()).unwrap_or_default();
+        let driver = form
+            .selected()
+            .map(|driver| driver.label.to_string())
+            .unwrap_or_default();
         let mut connection = vec![
             div().flex().flex_wrap().gap_1().children(self.driver_chips(theme, cx)),
             field(theme, "Name", &form.name),
@@ -343,12 +352,7 @@ impl GridView {
         if !file_based {
             connection.extend(self.network_fields(theme, cx));
         }
-        connection.push(form.validation_field(
-            theme,
-            if file_based { "File" } else { "Database" },
-            &form.database,
-            cx,
-        ));
+        connection.push(form.validation_field(theme, if file_based { "File" } else { "Database" }, &form.database, cx));
         let mut sections = vec![section(theme, "Behaviour", self.behaviour_fields(theme, cx))];
         if !file_based {
             sections.push(self.security_section(theme, cx));
@@ -395,7 +399,12 @@ impl GridView {
                             .flex()
                             .flex_col()
                             .child(div().font_weight(gpui::FontWeight::SEMIBOLD).child(title))
-                            .child(div().text_size(px(size::TEXT_SMALL)).text_color(rgb(theme.muted_foreground)).child(driver)),
+                            .child(
+                                div()
+                                    .text_size(px(size::TEXT_SMALL))
+                                    .text_color(rgb(theme.muted_foreground))
+                                    .child(driver),
+                            ),
                     )
                     .child(
                         div()
@@ -501,8 +510,8 @@ impl GridView {
         div()
             .flex()
             .gap_2()
-            .child(outline_button("paste-connection-url", "Paste URL", theme).on_click(cx.listener(
-                |this, _, _, cx| {
+            .child(
+                outline_button("paste-connection-url", "Paste URL", theme).on_click(cx.listener(|this, _, _, cx| {
                     match cx.read_from_clipboard().and_then(|item| item.text()) {
                         Some(text) => this.fill_from_connection_url(&text, cx),
                         None => {
@@ -510,10 +519,10 @@ impl GridView {
                             cx.notify();
                         }
                     }
-                },
-            )))
-            .child(outline_button("copy-connection-url", "Copy as URL", theme).on_click(cx.listener(
-                |this, _, _, cx| {
+                })),
+            )
+            .child(
+                outline_button("copy-connection-url", "Copy as URL", theme).on_click(cx.listener(|this, _, _, cx| {
                     this.connection_form.status = match this.connection_url_for_form(cx) {
                         Some(url) => {
                             cx.write_to_clipboard(gpui::ClipboardItem::new_string(url));
@@ -522,8 +531,8 @@ impl GridView {
                         None => "This connection type has no URL form.".into(),
                     };
                     cx.notify();
-                },
-            )))
+                })),
+            )
     }
 
     fn connection_actions(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
@@ -540,7 +549,13 @@ impl GridView {
             .gap_2()
             .child(self.test_button(theme, cx))
             .child(self.url_buttons(theme, cx))
-            .child(div().flex_1().min_w_0().text_color(rgb(theme.muted_foreground)).child(form.status.clone()))
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .text_color(rgb(theme.muted_foreground))
+                    .child(form.status.clone()),
+            )
             .children(form.editing.map(|_| self.delete_button(theme, cx)))
             .child(self.save_button(theme, cx))
     }
@@ -550,21 +565,26 @@ impl GridView {
         let environment = choice_row(
             theme,
             "Environment",
-            [Environment::Local, Environment::Dev, Environment::Staging, Environment::Prod]
-                .into_iter()
-                .enumerate()
-                .map(|(index, environment)| {
-                    choice_chip(
-                        ("environment", index),
-                        environment.display_name(),
-                        form.environment == environment,
-                        theme,
-                    )
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.connection_form.environment = environment;
-                        cx.notify();
-                    }))
-                }),
+            [
+                Environment::Local,
+                Environment::Dev,
+                Environment::Staging,
+                Environment::Prod,
+            ]
+            .into_iter()
+            .enumerate()
+            .map(|(index, environment)| {
+                choice_chip(
+                    ("environment", index),
+                    environment.display_name(),
+                    form.environment == environment,
+                    theme,
+                )
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    this.connection_form.environment = environment;
+                    cx.notify();
+                }))
+            }),
         );
         let swatches = std::iter::once((None, "None")).chain(
             bookie_app_services::read_session::CONNECTION_COLORS
@@ -990,12 +1010,15 @@ impl GridView {
                         .build()
                         .map_err(|error| error.to_string())?;
                     let saved = runtime.block_on(connection_save::save(draft))?;
-                    let color_saved = runtime.block_on(bookie_app_services::read_session::set_connection_color(
-                        saved.id,
-                        color.as_deref(),
-                    )).map_err(|error| {
-                        tracing::warn!(%error, "the connection colour was not saved");
-                    }).is_ok();
+                    let color_saved = runtime
+                        .block_on(bookie_app_services::read_session::set_connection_color(
+                            saved.id,
+                            color.as_deref(),
+                        ))
+                        .map_err(|error| {
+                            tracing::warn!(%error, "the connection colour was not saved");
+                        })
+                        .is_ok();
                     let hops = saved.ssh.as_ref().map_or_else(Vec::new, |ssh| {
                         ssh.flatten_hops().iter().map(|hop| hop.hop_id).collect()
                     });
@@ -1030,7 +1053,9 @@ impl GridView {
                 } else {
                     format!("Saved {name}, but the colour was not saved. Try saving again.")
                 };
-                self.connection_form.password.update(cx, |input, cx| input.set_content("", cx));
+                self.connection_form
+                    .password
+                    .update(cx, |input, cx| input.set_content("", cx));
                 if let Ok(list) = bookie_gpui::live::saved_connections() {
                     self.connections = list;
                 }
@@ -1049,7 +1074,10 @@ mod choice_style_tests {
         for theme in [Theme::light(), Theme::dark()] {
             let mut selected = choice_chip("selected", "Selected", true, theme);
             let mut unselected = choice_chip("unselected", "Unselected", false, theme);
-            assert_eq!(selected.style().background, Some(gpui::Fill::from(gpui::Hsla::from(rgb(theme.foreground)))));
+            assert_eq!(
+                selected.style().background,
+                Some(gpui::Fill::from(gpui::Hsla::from(rgb(theme.foreground))))
+            );
             assert!(unselected.style().background.is_none());
         }
     }

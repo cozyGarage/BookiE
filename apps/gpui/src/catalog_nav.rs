@@ -17,10 +17,17 @@ fn result_column_index(columns: &[ColumnMeta], index: usize, name: &str) -> Opti
 
 impl GridView {
     pub(crate) fn table_sort(&self, table: &TableInfo) -> Option<&bookie_app_services::read_session::TableSort> {
-        self.table_sorts.iter().find(|(identity, _)| identity == table).map(|(_, sort)| sort)
+        self.table_sorts
+            .iter()
+            .find(|(identity, _)| identity == table)
+            .map(|(_, sort)| sort)
     }
 
-    pub(crate) fn remember_table_sort(&mut self, table: &TableInfo, sort: Option<bookie_app_services::read_session::TableSort>) {
+    pub(crate) fn remember_table_sort(
+        &mut self,
+        table: &TableInfo,
+        sort: Option<bookie_app_services::read_session::TableSort>,
+    ) {
         self.table_sorts.retain(|(identity, _)| identity != table);
         if let Some(sort) = sort {
             self.table_sorts.push((table.clone(), sort));
@@ -94,7 +101,10 @@ impl GridView {
         cx: &mut Context<Self>,
     ) {
         let needs_local_sort = self.grid_is_query
-            || self.live.as_ref().is_some_and(|session| session.driver_id != "postgres");
+            || self
+                .live
+                .as_ref()
+                .is_some_and(|session| session.driver_id != "postgres");
         if needs_local_sort {
             self.sort_current_result(column_index, column, ascending, cx);
         } else {
@@ -170,7 +180,10 @@ impl GridView {
             move |this, result| {
                 if this.compare.is_some()
                     || (!this.grid_is_query
-                        && !this.live.as_ref().is_some_and(|session| session.driver_id != "postgres"))
+                        && !this
+                            .live
+                            .as_ref()
+                            .is_some_and(|session| session.driver_id != "postgres"))
                     || !std::sync::Arc::ptr_eq(&this.source, &source_for_apply)
                 {
                     return;
@@ -206,7 +219,11 @@ impl GridView {
         let current_session = session.clone();
         let current_table = table.clone();
         let where_sql = self.table_where(&table);
-        let scope = if where_sql.is_empty() { "" } else { " matching the WHERE filter" };
+        let scope = if where_sql.is_empty() {
+            ""
+        } else {
+            " matching the WHERE filter"
+        };
         self.status = format!("Counting all rows in {}…", table.name);
         self.begin_background(
             Work::Count,
@@ -265,7 +282,7 @@ impl GridView {
         self.close_structure_bar();
         self.catalog = Catalog {
             connection: format!("{} · {}", session.driver_id, session.label),
-            database: session.label.clone(),
+            database: session.database_label().into(),
             tables: session.tables.clone(),
             grid_table: table,
         };
@@ -487,7 +504,10 @@ fn open_first_table(
     if cancellation.is_cancelled() {
         return Err("The operation was cancelled.".into());
     }
-    match prefer.and_then(|wanted| session.tables.iter().find(|table| *table == wanted)).or(session.tables.first()) {
+    match prefer
+        .and_then(|wanted| session.tables.iter().find(|table| *table == wanted))
+        .or(session.tables.first())
+    {
         Some(first) => Ok(Opened::Table(Arc::new(session.load_table_controlled(
             first,
             ROW_CAP,

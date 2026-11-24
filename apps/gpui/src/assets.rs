@@ -55,7 +55,10 @@ icons!(
     "shield",
 );
 
-const BACKDROP: (&str, &[u8]) = ("backdrop/contours.svg", include_bytes!("../assets/backdrop/contours.svg"));
+const BACKDROP: (&str, &[u8]) = (
+    "backdrop/contours.svg",
+    include_bytes!("../assets/backdrop/contours.svg"),
+);
 
 pub struct Assets;
 

@@ -37,11 +37,7 @@ struct PinScope {
 
 impl PinScope {
     fn width_key(&self) -> String {
-        bookie_app_services::column_widths::table_scope_key(
-            &self.database,
-            self.schema.as_deref(),
-            &self.table,
-        )
+        bookie_app_services::column_widths::table_scope_key(&self.database, self.schema.as_deref(), &self.table)
     }
 }
 
@@ -1320,7 +1316,11 @@ mod pin_tests {
 }
 
 fn header_kind(data_type: &str) -> String {
-    data_type.to_uppercase()
+    if data_type.eq_ignore_ascii_case("NULL") {
+        "UNKNOWN".into()
+    } else {
+        data_type.to_uppercase()
+    }
 }
 
 const MIN_CONTENT_WIDTH: f32 = 56.0;
@@ -1556,6 +1556,11 @@ mod header_kind_tests {
     }
 
     #[test]
+    fn an_unknown_sqlite_expression_type_is_not_shown_as_null() {
+        assert_eq!(header_kind("NULL"), "UNKNOWN");
+    }
+
+    #[test]
     fn fitted_width_accounts_for_inline_type_and_primary_key_icon() {
         let kind = ("numeric(38,18)".to_owned(), true);
         let width = measure_header_width("id", Some(&kind), true, &mut |text| text.len() as f32 * 8.0 + 12.0);
@@ -1657,7 +1662,11 @@ mod tests {
         let audit_key = audit_users.width_key();
         let hidden_by_scope = HashMap::from([(public_key, HashSet::from(["email"]))]);
 
-        assert!(hidden_by_scope.get(&audit_key).is_none_or(|hidden| !hidden.contains("email")));
+        assert!(
+            hidden_by_scope
+                .get(&audit_key)
+                .is_none_or(|hidden| !hidden.contains("email"))
+        );
     }
 
     #[test]

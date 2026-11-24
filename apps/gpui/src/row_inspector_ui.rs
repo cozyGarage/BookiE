@@ -86,7 +86,12 @@ impl GridView {
         let Some(live) = self.live.clone() else {
             return;
         };
-        let Some(keys) = self.row_inspector.keys.clone().filter(|keys| keys.table == self.catalog.grid_table) else {
+        let Some(keys) = self
+            .row_inspector
+            .keys
+            .clone()
+            .filter(|keys| keys.table == self.catalog.grid_table)
+        else {
             return;
         };
         if !self.row_detail_open || self.grid_is_query || keys.referenced_by.is_empty() {
@@ -159,7 +164,12 @@ impl GridView {
     }
 
     pub(crate) fn link_columns(&self) -> Vec<bool> {
-        let Some(keys) = self.row_inspector.keys.as_ref().filter(|keys| keys.table == self.catalog.grid_table) else {
+        let Some(keys) = self
+            .row_inspector
+            .keys
+            .as_ref()
+            .filter(|keys| keys.table == self.catalog.grid_table)
+        else {
             return Vec::new();
         };
         if self.grid_is_query || self.compare.is_some() {
@@ -207,10 +217,19 @@ fn count_references(
                     let count = live
                         .run_query_bound(&probe, &probe_params, REFERENCE_COUNT_CAP as u64 + 1, cancel)
                         .map(|table| {
-                            let rows = usize::try_from(bookie_gpui::source::ResultSource::total(&table)).unwrap_or(usize::MAX);
-                            (rows.min(REFERENCE_COUNT_CAP), rows > REFERENCE_COUNT_CAP || table.truncated)
+                            let rows =
+                                usize::try_from(bookie_gpui::source::ResultSource::total(&table)).unwrap_or(usize::MAX);
+                            (
+                                rows.min(REFERENCE_COUNT_CAP),
+                                rows > REFERENCE_COUNT_CAP || table.truncated,
+                            )
                         });
-                    ReferenceCount { label, count, sql, params }
+                    ReferenceCount {
+                        label,
+                        count,
+                        sql,
+                        params,
+                    }
                 }
                 Err(message) => ReferenceCount {
                     label,
