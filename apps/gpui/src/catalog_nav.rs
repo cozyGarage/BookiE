@@ -264,7 +264,7 @@ impl GridView {
         self.close_structure_bar();
         self.catalog = Catalog {
             connection: format!("{} · {}", session.driver_id, session.label),
-            database: session.label.clone(),
+            database: session.database_label().into(),
             tables: session.tables.clone(),
             grid_table: table,
         };

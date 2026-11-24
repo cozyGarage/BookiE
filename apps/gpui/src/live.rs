@@ -132,6 +132,14 @@ impl LiveSession {
         )
     }
 
+    pub fn database_label(&self) -> &str {
+        if self.driver_id == "sqlite" {
+            "main"
+        } else {
+            &self.label
+        }
+    }
+
     pub fn open(origin: &Origin) -> Result<Arc<LiveSession>, String> {
         Self::open_controlled(origin, &CancellationToken::new())
     }
