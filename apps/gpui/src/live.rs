@@ -237,7 +237,7 @@ impl LiveSession {
         }
         let epoch = self.next_epoch();
         let started = std::time::Instant::now();
-        let (columns, rows, scan, truncated) = self.runtime.block_on(query_pages(
+        let (columns, rows, scan, truncated, messages) = self.runtime.block_on(query_pages(
             &self.sessions,
             self.session_id,
             (sql, params),
@@ -253,6 +253,7 @@ impl LiveSession {
             scan,
             truncated,
             snapshot_consistent: false,
+            messages,
             executed_sql: Some(sql.to_owned()),
             load_elapsed: started.elapsed(),
             table: None,
@@ -281,6 +282,7 @@ impl LiveSession {
             scan,
             truncated,
             snapshot_consistent: false,
+            messages: Default::default(),
             executed_sql: None,
             load_elapsed: started.elapsed(),
             table: None,
@@ -526,6 +528,7 @@ impl LiveSession {
             scan,
             truncated,
             snapshot_consistent: self.supports_snapshot_cursor,
+            messages: Default::default(),
             executed_sql: None,
             load_elapsed: started.elapsed(),
             table: Some(table.clone()),
@@ -631,6 +634,7 @@ pub struct LiveTable {
     scan: ScanSource,
     pub truncated: bool,
     snapshot_consistent: bool,
+    pub messages: bookie_core::ServerMessages,
     executed_sql: Option<String>,
     load_elapsed: Duration,
     table: Option<TableInfo>,
@@ -1089,10 +1093,12 @@ async fn query_pages(
     cancellation: &CancellationToken,
     epoch: Epoch,
     current_epoch: &AtomicU64,
-) -> Result<Pages, QueryFailure> {
+) -> Result<(Vec<ColumnMeta>, QueryRows, ScanSource, bool, bookie_core::ServerMessages), QueryFailure> {
     let control = OperationControl::new(cancellation.clone(), Some(tokio::time::Instant::now() + PAGE_TIMEOUT));
-    let result = bridge_query_detailed(sessions, session_id, (sql, params), &control, epoch, current_epoch).await?;
-    spooled_pages(result, max_rows, cancellation).await.map_err(Into::into)
+    let mut batch = bridge_query_detailed(sessions, session_id, (sql, params), &control, epoch, current_epoch).await?;
+    let messages = std::mem::take(&mut batch.messages);
+    let (columns, rows, scan, truncated) = spooled_pages(batch.into_first(), max_rows, cancellation).await.map_err(QueryFailure::from)?;
+    Ok((columns, rows, scan, truncated, messages))
 }
 
 async fn dictionary_pages(
@@ -1171,6 +1177,7 @@ async fn bridge_query(
 ) -> Result<QueryResult, String> {
     bridge_query_detailed(sessions, session_id, (sql, params), control, epoch, current_epoch)
         .await
+        .map(|batch| batch.into_first())
         .map_err(|error| error.message)
 }
 
@@ -1181,7 +1188,7 @@ async fn bridge_query_detailed(
     control: &OperationControl,
     epoch: Epoch,
     current_epoch: &AtomicU64,
-) -> Result<QueryResult, QueryFailure> {
+) -> Result<bookie_core::QueryResultBatch, QueryFailure> {
     let event = dispatch_read(
         DispatchContext::Sessions(sessions),
         Command::RunQuery {

@@ -1,6 +1,8 @@
 use super::*;
+use crate::assets::icon;
 use crate::chrome::{STATUS_HEIGHT, TAB_HEIGHT, TOOLBAR_HEIGHT};
 use crate::palette_state::PaletteMode;
+use gpui::uniform_list;
 use gpui_kit::component::scroll::Scrollbar;
 
 impl GridView {
@@ -96,32 +98,35 @@ impl GridView {
 
     fn grid_pager_buttons(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
         let (progress, range_label) = self.pager_labels();
+        let compact = self.synced_width < 900.0;
         let pager = div()
             .flex()
             .flex_none()
             .debug_selector(|| "grid-pager".into())
             .items_center()
             .gap_1()
-            .child(div().child(progress));
+            .when(!compact, |pager| pager.child(div().child(progress)));
         if self.continuous {
             return pager.child(div().child(range_label));
         }
         pager
+            .when(!compact, |pager| {
+                pager.child(
+                    icon_button("first", "chevrons-left", "First page", false, theme).on_click(
+                        cx.listener(|this, _, _, cx| {
+                            this.pager.first();
+                            cx.notify();
+                        }),
+                    ),
+                )
+            })
             .child(
-                icon_button("first", "chevrons-left", "First page", false, theme).on_click(cx.listener(
-                    |this, _, _, cx| {
-                        this.pager.first();
-                        cx.notify();
-                    },
-                )),
-            )
-            .child(
-                icon_button("prev", "chevron-left", "Previous page", false, theme).on_click(cx.listener(
-                    |this, _, _, cx| {
+                icon_button("prev", "chevron-left", "Previous page", false, theme).on_click(
+                    cx.listener(|this, _, _, cx| {
                         this.pager.previous();
                         cx.notify();
-                    },
-                )),
+                    }),
+                ),
             )
             .child(div().child(range_label))
             .child(self.page_size_button(theme, cx))
@@ -139,24 +144,33 @@ impl GridView {
                 })),
             )
             .child(
-                icon_button("next", "chevron-right", "Next page", false, theme).on_click(cx.listener(
-                    |this, _, _, cx| {
+                icon_button("next", "chevron-right", "Next page", false, theme).on_click(
+                    cx.listener(|this, _, _, cx| {
                         this.pager.next();
                         cx.notify();
-                    },
-                )),
+                    }),
+                ),
             )
-            .child(
-                icon_button("last", "chevrons-right", "Last page", false, theme).on_click(cx.listener(
-                    |this, _, _, cx| {
-                        this.pager.last();
-                        cx.notify();
-                    },
-                )),
-            )
+            .when(!compact, |pager| {
+                pager.child(
+                    icon_button("last", "chevrons-right", "Last page", false, theme).on_click(
+                        cx.listener(|this, _, _, cx| {
+                            this.pager.last();
+                            cx.notify();
+                        }),
+                    ),
+                )
+            })
     }
 
     fn grid_action_buttons(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+        use gpui_component::button::{Button, ButtonVariants};
+        use gpui_component::menu::DropdownMenu;
+        let compact = self.synced_width < 900.0;
+        let groups = crate::menus::command_groups(
+            self,
+            &[&["first", "last"], &["compare", "export-csv", "continuous"]],
+        );
         div()
             .flex()
             .debug_selector(|| "grid-actions".into())
@@ -177,44 +191,63 @@ impl GridView {
                     .on_click(cx.listener(|this, _, _, cx| this.run_find(true, cx))),
             )
             .child(
-                icon_button("show", "sliders-horizontal", "Show matching rows only", false, theme).on_click(
-                    cx.listener(|this, _, _, cx| {
-                        this.show_matching(cx);
-                        cx.notify();
-                    }),
-                ),
-            )
-            .child(
-                icon_button("compare", "arrow-left-right", "Compare", false, theme)
-                    .on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))),
-            )
-            .child(
                 icon_button(
-                    "export",
-                    "download",
-                    "Export current page or selection as CSV",
+                    "show",
+                    "sliders-horizontal",
+                    "Show matching rows only",
                     false,
                     theme,
                 )
                 .on_click(cx.listener(|this, _, _, cx| {
-                    this.export_selection_or_page(cx);
+                    this.show_matching(cx);
                     cx.notify();
                 })),
             )
-            .child(
-                icon_button(
-                    "continuous",
-                    "chevrons-down-up",
-                    "Scroll continuously",
-                    self.continuous,
-                    theme,
+            .when(!compact, |actions| {
+                actions
+                    .child(
+                        icon_button("compare", "arrow-left-right", "Compare", false, theme)
+                            .on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))),
+                    )
+                    .child(
+                        icon_button(
+                            "export",
+                            "download",
+                            "Export current page or selection as CSV",
+                            false,
+                            theme,
+                        )
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.export_selection_or_page(cx);
+                            cx.notify();
+                        })),
+                    )
+                    .child(
+                        icon_button(
+                            "continuous",
+                            "chevrons-down-up",
+                            "Scroll continuously",
+                            self.continuous,
+                            theme,
+                        )
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.continuous = !this.continuous;
+                            this.scroll.scroll_to_item_strict(0, ScrollStrategy::Top);
+                            cx.notify();
+                        })),
+                    )
+            })
+            .when(compact, |actions| {
+                actions.child(
+                    Button::new("grid-more")
+                        .ghost()
+                        .compact()
+                        .tooltip("More grid actions")
+                        .accessibility_label("More grid actions")
+                        .child(icon("ellipsis", theme.muted_foreground))
+                        .dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), groups)),
                 )
-                .on_click(cx.listener(|this, _, _, cx| {
-                    this.continuous = !this.continuous;
-                    this.scroll.scroll_to_item_strict(0, ScrollStrategy::Top);
-                    cx.notify();
-                })),
-            )
+            })
     }
 
     fn grid_control_strip(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
@@ -309,7 +342,7 @@ impl GridView {
         theme: Theme,
         strip: Stateful<Div>,
         bars: (Option<Div>, Option<Div>, Option<Div>, Option<Div>, Option<Div>),
-        cx: &App,
+        cx: &mut Context<Self>,
     ) -> Div {
         let (filter_row, compare_bar, save_bar, banner, insert_form) = bars;
         div()
@@ -325,7 +358,8 @@ impl GridView {
             .children(banner)
             .child(self.data_table(cx))
             .children(self.detail_panel(theme))
-            .children(self.row_detail_panel(theme))
+            .children(self.row_detail_panel(theme, cx))
+            .children(self.fk_peek_panel(theme, cx))
     }
 
     fn main_layout(
@@ -351,6 +385,84 @@ impl GridView {
                     .child(content),
             )
     }
+
+    fn full_value_editor_overlay(&self, theme: Theme, cx: &mut Context<Self>) -> Option<gpui::AnyElement> {
+        let editing = self.cell_edit.active.as_ref().filter(|editing| editing.full_value)?;
+        let column = self
+            .source
+            .columns()
+            .get(editing.column)
+            .map_or("value", |column| column.name.as_str())
+            .to_string();
+        Some(
+            div()
+                .id("full-value-editor-overlay")
+                .absolute()
+                .top_0()
+                .left_0()
+                .size_full()
+                .flex()
+                .justify_center()
+                .items_center()
+                .bg(gpui::rgba(0x00000088))
+                .occlude()
+                .child(
+                    div()
+                        .id("full-value-editor-dialog")
+                        .debug_selector(|| "full-value-editor-dialog".into())
+                        .w(px(size::FULL_VALUE_EDITOR_WIDTH))
+                        .max_w(gpui::relative(0.92))
+                        .h(px(size::FULL_VALUE_EDITOR_HEIGHT))
+                        .max_h(gpui::relative(0.9))
+                        .flex()
+                        .flex_col()
+                        .min_h_0()
+                        .p_3()
+                        .gap_2()
+                        .bg(rgb(theme.background))
+                        .border_1()
+                        .border_color(rgb(theme.border))
+                        .rounded(px(theme.radius))
+                        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                        .child(
+                            div()
+                                .flex()
+                                .items_center()
+                                .justify_between()
+                                .child(div().font_weight(gpui::FontWeight::SEMIBOLD).child(format!("Edit {column}")))
+                                .child(div().text_color(rgb(theme.muted_foreground)).child("Full value")),
+                        )
+                        .child(
+                            div()
+                                .id("full-value-editor-input")
+                                .flex_1()
+                                .min_h_0()
+                                .border_1()
+                                .border_color(rgb(theme.border))
+                                .child(gpui_kit::component::input::Editor::new(&self.cell_edit.value_editor).h(gpui::relative(1.0))),
+                        )
+                        .child(
+                            div()
+                                .flex()
+                                .items_center()
+                                .justify_between()
+                                .child(div().min_w_0().text_color(rgb(theme.muted_foreground)).child(self.status.clone()))
+                                .child(
+                                    div()
+                                        .flex()
+                                        .gap_2()
+                                        .child(button("cancel-full-value", "Cancel", theme).on_click(cx.listener(
+                                            |this, _, window, cx| this.cancel_active_cell_edit(window, cx),
+                                        )))
+                                        .child(button("apply-full-value", "Apply", theme).on_click(cx.listener(
+                                            |this, _, window, cx| this.apply_active_cell_edit(window, cx),
+                                        ))),
+                                ),
+                        ),
+                )
+                .into_any_element(),
+        )
+    }
 }
 
 impl Render for GridView {
@@ -365,6 +477,7 @@ impl Render for GridView {
         } else {
             None
         };
+        let full_value_editor = self.full_value_editor_overlay(theme, cx);
         let save_bar = self.approval_bar(theme, cx).or_else(|| self.save_bar(theme, cx)).or_else(|| self.edits_bar(theme, cx));
         let banner = self.save_banner(theme, cx);
         let bundle_bar = self.connection_bundle_bar(theme, cx);
@@ -427,6 +540,7 @@ impl Render for GridView {
             .children(self.row_menu_overlay())
             .child(self.status_bar(theme))
             .children(palette)
+            .children(full_value_editor)
     }
 }
 
@@ -441,35 +555,51 @@ pub(crate) fn progress_text(title: &str, rows: u64, partial: bool, pages: u64) -
 }
 
 impl GridView {
-    fn command_rows(&self, theme: &Theme, cx: &mut Context<Self>) -> Vec<gpui::Stateful<Div>> {
-        let actions = self.palette_actions();
-        let shown = palette_matches(self.palette.input.read(cx).content(), &actions);
+    fn command_rows(
+        &self,
+        actions: &[Action],
+        shown: &[usize],
+        range: std::ops::Range<usize>,
+        theme: &Theme,
+        cx: &mut Context<Self>,
+    ) -> Vec<gpui::Stateful<Div>> {
         let selected = self.palette.index.min(shown.len().saturating_sub(1));
-        shown
+        shown[range.clone()]
             .iter()
-            .enumerate()
-            .map(|(position, index)| {
+            .zip(range)
+            .map(|(index, position)| {
                 let action = &actions[*index];
-                let shortcut = bookie_gpui::keymap::Command::ALL.into_iter()
+                let shortcut = bookie_gpui::keymap::Command::ALL
+                    .into_iter()
                     .find(|command| command.name() == action.id || command.title() == action.label)
                     .and_then(|command| self.keymap.binding(command))
                     .map(bookie_gpui::keymap::Chord::label);
                 let row = div()
                     .id(("palette-command-row", position))
                     .debug_selector(move || format!("palette-command-row-{position}").into())
-                    .px_2().py_1().rounded_md().flex().justify_between().gap_2()
+                    .px_2()
+                    .py_1()
+                    .rounded_md()
+                    .flex()
+                    .justify_between()
+                    .gap_2()
                     .cursor_pointer()
                     .child(action.label.clone())
-                    .child(div().flex().gap_2().text_color(rgb(theme.muted_foreground))
-                        .child(bookie_gpui::palette::group(action.id))
-                        .children(shortcut.map(|keys| div().child(keys))));
+                    .child(
+                        div()
+                            .flex()
+                            .gap_2()
+                            .text_color(rgb(theme.muted_foreground))
+                            .child(bookie_gpui::palette::group(action.id))
+                            .children(shortcut.map(|keys| div().child(keys))),
+                    );
                 let hover = theme.active_row;
-                let row = row
-                    .hover(move |style| style.bg(rgb(hover)))
-                    .on_click(cx.listener(move |this, _, window, cx| {
-                        this.palette.index = position;
-                        this.run_palette(window, cx);
-                    }));
+                let row =
+                    row.hover(move |style| style.bg(rgb(hover)))
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            this.palette.index = position;
+                            this.run_palette(window, cx);
+                        }));
                 if position == selected {
                     row.bg(rgb(theme.active_row))
                 } else {
@@ -479,13 +609,18 @@ impl GridView {
             .collect()
     }
 
-    fn picker_rows(&self, theme: &Theme, cx: &mut Context<Self>) -> Vec<gpui::Stateful<Div>> {
-        let shown = self.picker_items(cx);
+    fn picker_rows(
+        &self,
+        shown: &[crate::picker::PickerItem],
+        range: std::ops::Range<usize>,
+        theme: &Theme,
+        cx: &mut Context<Self>,
+    ) -> Vec<gpui::Stateful<Div>> {
         let selected = self.palette.index.min(shown.len().saturating_sub(1));
-        shown
-            .into_iter()
-            .enumerate()
-            .map(|(position, item)| {
+        shown[range.clone()]
+            .iter()
+            .zip(range)
+            .map(|(item, position)| {
                 let mut row = div()
                     .id(("palette-picker-row", position))
                     .px_2()
@@ -501,9 +636,15 @@ impl GridView {
                             .overflow_hidden()
                             .whitespace_nowrap()
                             .text_ellipsis()
-                            .child(item.title),
+                            .child(item.title.clone()),
                     )
-                    .child(div().text_color(rgb(theme.muted_foreground)).child(item.subtitle));
+                    .child(
+                        div()
+                            .flex_none()
+                            .whitespace_nowrap()
+                            .text_color(rgb(theme.muted_foreground))
+                            .child(item.subtitle.clone()),
+                    );
                 let hover = theme.active_row;
                 row = row
                     .hover(move |style| style.bg(rgb(hover)))
@@ -522,24 +663,36 @@ impl GridView {
 
     fn palette_overlay(&self, window: &Window, cx: &mut Context<Self>) -> gpui::Stateful<Div> {
         let theme = Theme::current(cx);
-        let (rows, empty_text) = match self.palette.mode {
-            PaletteMode::Commands => (self.command_rows(&theme, cx), "No matching command"),
-            PaletteMode::Tables => (self.picker_rows(&theme, cx), "No matching table"),
-            PaletteMode::Columns => (self.picker_rows(&theme, cx), "No matching column"),
-            PaletteMode::Shortcuts => (self.picker_rows(&theme, cx), "No matching command"),
-            PaletteMode::Favorites | PaletteMode::DeleteFavorite => {
-                (self.picker_rows(&theme, cx), "No saved favorites")
-            }
-            PaletteMode::SavedFilters | PaletteMode::DeleteSavedFilter => {
-                (self.picker_rows(&theme, cx), "No saved filters for this table")
-            }
-            PaletteMode::NameFilter => (self.picker_rows(&theme, cx), "Type a name for the filter"),
-            PaletteMode::SchemaContext => (self.picker_rows(&theme, cx), "Enter a valid schema or database name"),
-            PaletteMode::Themes => (self.picker_rows(&theme, cx), "No matching theme"),
+        let empty_text = match self.palette.mode {
+            PaletteMode::Commands | PaletteMode::Shortcuts => "No matching command",
+            PaletteMode::Tables => "No matching table",
+            PaletteMode::Columns => "No matching column",
+            PaletteMode::Favorites | PaletteMode::DeleteFavorite => "No saved favorites",
+            PaletteMode::SavedFilters | PaletteMode::DeleteSavedFilter => "No saved filters for this table",
+            PaletteMode::NameFilter => "Type a name for the filter",
+            PaletteMode::SchemaContext => "Enter a valid schema or database name",
+            PaletteMode::Themes => "No matching theme",
         };
-        let empty = rows
-            .is_empty()
-            .then(|| div().px_2().text_color(rgb(theme.muted_foreground)).child(empty_text));
+        let (count, list) = if self.palette.mode == PaletteMode::Commands {
+            let actions = self.palette_actions();
+            let shown = palette_matches(self.palette.input.read(cx).content(), &actions);
+            let count = shown.len();
+            let rows = cx.processor(move |this, range: std::ops::Range<usize>, _window, cx| {
+                let theme = Theme::current(cx);
+                this.command_rows(&actions, &shown, range, &theme, cx)
+            });
+            (count, uniform_list("palette-results", count, rows))
+        } else {
+            let shown = self.picker_items(cx);
+            let count = shown.len();
+            let rows = cx.processor(move |this, range: std::ops::Range<usize>, _window, cx| {
+                let theme = Theme::current(cx);
+                this.picker_rows(&shown, range, &theme, cx)
+            });
+            (count, uniform_list("palette-results", count, rows))
+        };
+        let empty = (count == 0).then(|| div().px_2().text_color(rgb(theme.muted_foreground)).child(empty_text));
+        let max_height = (window.viewport_size().height - px(size::PALETTE_TOP + size::FORM_CONTROL + 40.0)).max(px(0.0));
         div()
             .id("palette-overlay")
             .absolute()
@@ -572,9 +725,11 @@ impl GridView {
                     .on_click(cx.listener(|_, _, _, cx| cx.stop_propagation()))
                     .child(self.palette.input.clone())
                     .child(
-                        div().id("palette-results").max_h((window.viewport_size().height - px(size::PALETTE_TOP + size::FORM_CONTROL + 40.0)).max(px(0.0))).overflow_y_scroll()
-                            .track_scroll(&self.palette.scroll).children(rows).children(empty),
-                    ),
+                        list.with_sizing_behavior(gpui::ListSizingBehavior::Infer)
+                            .max_h(max_height)
+                            .track_scroll(&self.palette.scroll),
+                    )
+                    .children(empty),
             )
     }
 }
