@@ -522,6 +522,17 @@ impl ReadSession {
             .map_err(|error| classify(&error))
     }
 
+    pub async fn open_interactive(&self) -> Result<crate::interactive_session::SharedSession, DriverFailurePresentation> {
+        let guard = self
+            .database
+            .guard_for_generation(self.id, self.generation, Principal::human_gui())
+            .ok_or(DriverFailurePresentation::Disconnected)?;
+        let session = guard.open_session_with_audit().await.map_err(|error| classify(&error))?;
+        Ok(Arc::new(tokio::sync::Mutex::new(Some(
+            crate::interactive_session::SessionHandle::Audited(session),
+        ))))
+    }
+
     pub async fn run_query(
         &self,
         sql: &str,
@@ -676,5 +687,98 @@ mod table_select_tests {
             table_select(&table(Some("s"), "log"), &[]),
             r#"SELECT * FROM "s"."log""#
         );
+    }
+
+    mod interactive {
+        use std::time::Duration;
+
+        use bookie_core::{ConnectOptions, DatabaseDriver, DriverRegistry, OperationControl, Session};
+
+        use super::super::*;
+        use crate::interactive_session::{SharedSession, commit_session, rollback_and_close};
+
+        async fn fixture() -> (tempfile::TempDir, std::path::PathBuf, Box<dyn bookie_core::Connection>, SavedConnection) {
+            let directory = tempfile::tempdir().unwrap();
+            let path = directory.path().join("interactive.db");
+            std::fs::File::create(&path).unwrap();
+            let writer = drivers_sqlite::SqliteDriver
+                .connect(ConnectOptions {
+                    database: path.to_string_lossy().into_owned(),
+                    ..ConnectOptions::default()
+                })
+                .await
+                .unwrap();
+            writer.execute("CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)").await.unwrap();
+            writer.execute("INSERT INTO items VALUES (1, 'a')").await.unwrap();
+            let mut saved = crate::open_request::file_connection(&crate::open_request::classify_file(&path).unwrap());
+            saved.read_only = false;
+            (directory, path, writer, saved)
+        }
+
+        fn registry() -> Arc<DriverRegistry> {
+            let mut registry = DriverRegistry::new();
+            registry.register(Arc::new(drivers_sqlite::SqliteDriver));
+            Arc::new(registry)
+        }
+
+        async fn name(writer: &dyn bookie_core::Connection) -> bookie_core::Value {
+            let rows = writer.query("SELECT name FROM items WHERE id = 1").await.unwrap();
+            rows.rows[0][0].clone()
+        }
+
+        async fn run(shared: &SharedSession, sql: &str) -> Result<(), bookie_core::DriverError> {
+            let control = OperationControl::with_timeout(Duration::from_secs(5));
+            let mut guard = shared.lock().await;
+            let session = guard.as_mut().expect("open session");
+            session.query_params_controlled(sql, &[], &control).await.map(|_| ())
+        }
+
+        #[tokio::test]
+        async fn a_read_session_transaction_refuses_writes_and_changes_nothing() {
+            let (_directory, _path, writer, saved) = fixture().await;
+            let session = ReadSession::open_controlled(
+                saved,
+                registry(),
+                Arc::new(DatabaseService::new_isolated()),
+                CancellationToken::new(),
+            )
+            .await
+            .unwrap();
+            let shared = session.open_interactive().await.unwrap();
+            for sql in ["UPDATE items SET name = 'x'", "DELETE FROM items", "INSERT INTO items VALUES (2, 'b')"] {
+                assert!(run(&shared, sql).await.is_err(), "write accepted on a read session: {sql}");
+            }
+            assert_eq!(name(writer.as_ref()).await, bookie_core::Value::Text("a".into()));
+            let _ = rollback_and_close(&shared).await;
+        }
+
+        #[tokio::test]
+        async fn a_writable_transaction_rolls_back_and_commits_through_the_guard() {
+            let (_directory, _path, writer, saved) = fixture().await;
+            let session = ReadSession::open_writable_controlled(
+                saved,
+                registry(),
+                Arc::new(DatabaseService::new_isolated()),
+                CancellationToken::new(),
+            )
+            .await
+            .unwrap();
+
+            let shared = session.open_interactive().await.unwrap();
+            run(&shared, "BEGIN").await.unwrap();
+            run(&shared, "UPDATE items SET name = 'rolled back'").await.unwrap();
+            rollback_and_close(&shared).await.unwrap();
+            assert_eq!(name(writer.as_ref()).await, bookie_core::Value::Text("a".into()));
+
+            let shared = session.open_interactive().await.unwrap();
+            run(&shared, "BEGIN").await.unwrap();
+            run(&shared, "UPDATE items SET name = 'committed'").await.unwrap();
+            commit_session(&shared).await.unwrap();
+            assert_eq!(name(writer.as_ref()).await, bookie_core::Value::Text("committed".into()));
+            assert!(
+                run(&shared, "BEGIN; UPDATE items SET name = 'hidden'").await.is_err(),
+                "transaction control hidden in a batch is refused"
+            );
+        }
     }
 }
