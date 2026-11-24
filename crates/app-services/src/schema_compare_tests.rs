@@ -219,3 +219,12 @@ fn a_table_with_no_columns_read_is_ignored_on_both_sides() {
     let result = compare(&[], &[empty]);
     assert!(result.is_identical());
 }
+
+#[test]
+fn a_commented_statement_stays_commented_across_bare_carriage_returns() {
+    let mut out = String::new();
+    append_statement(&mut out, "DROP TABLE \"a\r; DROP TABLE accounts; --\";", true);
+    for line in out.split(['\n', '\r']).filter(|line| !line.is_empty()) {
+        assert!(line.starts_with("--"), "live line {line:?}");
+    }
+}
