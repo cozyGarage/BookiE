@@ -313,7 +313,7 @@ impl PgSession {
             control,
         )
         .await;
-        if !matches!(result, Err(DriverError::Disconnected)) {
+        if !result.as_ref().err().is_some_and(DriverError::is_disconnect) {
             self.connection = Some(connection);
         }
         result.map(|copied| {
@@ -341,7 +341,7 @@ impl PgSession {
             .ok_or_else(|| DriverError::Internal("the session's connection was lost".into()))?;
         let (connection, result) = controlled_query_with_messages(connection, sql, params, true, true, control).await;
         self.connection = connection;
-        if matches!(result, Err(DriverError::Disconnected)) {
+        if result.as_ref().err().is_some_and(DriverError::is_disconnect) {
             // A lost backend also loses session-local state. Do not let the
             // single-slot pool silently replace it and masquerade as the same
             // session on the next statement.

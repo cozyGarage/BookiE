@@ -168,7 +168,7 @@ impl bookie_core::Session for MysqlSession {
         let result = run_controlled_setup(session_lexical_settings(&mut **connection), control)
             .await
             .and_then(|settings| settings);
-        if matches!(result, Err(DriverError::Disconnected))
+        if result.as_ref().err().is_some_and(DriverError::is_disconnect)
             && let Some(connection) = self.connection.take()
         {
             let _ = connection.close().await;
@@ -204,7 +204,7 @@ impl MysqlSession {
         let timestamp_is_utc = match run_controlled_setup(timezone_is_utc(&mut *connection), control).await {
             Ok(Ok(timestamp_is_utc)) => timestamp_is_utc,
             Ok(Err(error)) | Err(error) => {
-                if matches!(error, DriverError::Disconnected) {
+                if error.is_disconnect() {
                     let _ = connection.close().await;
                 } else {
                     self.connection = Some(connection);
@@ -228,7 +228,7 @@ impl MysqlSession {
         }
         if matches!(result, Err(DriverError::OperationOutcomeUnknown { .. })) {
             let _ = connection.detach().close_hard().await;
-        } else if matches!(result, Err(DriverError::Disconnected)) {
+        } else if result.as_ref().err().is_some_and(DriverError::is_disconnect) {
             // Do not let the one-slot pool reconnect behind this session
             // handle after its server-side state has disappeared.
             let _ = connection.close().await;
