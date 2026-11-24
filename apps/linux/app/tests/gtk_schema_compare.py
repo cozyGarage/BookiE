@@ -113,7 +113,7 @@ def scenarios(ui):
         try:
             ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
             ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
-            invoke_row_action("dc_target", "sidebar-row.compare-data")
+            invoke_row_action(f"{DATA_SCHEMA}.dc_target", "sidebar-row.compare-data")
             ui.wait_for_node(name="Compare data")
             ui.invoke(ui.wait_for_node(name="Compare", role=ui.pyatspi.ROLE_PUSH_BUTTON))
             ui.wait_for_node_containing("1 same, 1 to insert, 1 to update and 1 to delete")

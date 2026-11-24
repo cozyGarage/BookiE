@@ -363,6 +363,7 @@ impl App {
             tab_id,
             schema: schema.clone(),
             table: table.clone(),
+            database_name: self.active_database_name(),
             driver_id,
             parse_hooks,
             browse_filters,

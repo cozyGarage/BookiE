@@ -203,7 +203,7 @@ async fn the_script_leaves_deletes_commented_until_opted_in() {
 }
 
 #[test]
-fn page_queries_order_text_keys_by_bytes_and_resume_after_the_last_key() {
+fn page_queries_use_matching_text_order_and_resume_after_the_last_key() {
     let columns = vec![
         column("code", "varchar(10)", true),
         column("n", "integer", true),
@@ -217,11 +217,67 @@ fn page_queries_order_text_keys_by_bytes_and_resume_after_the_last_key() {
     );
     assert_eq!(params, [after[0].clone(), after[0].clone(), after[1].clone()]);
     let (mysql, _) = page_query("mysql", None, "t", &columns, 2, None);
-    assert!(mysql.ends_with("ORDER BY CAST(`code` AS BINARY), `n` LIMIT 1000"));
+    assert!(mysql.ends_with("ORDER BY CAST(CONVERT(`code` USING utf8mb4) AS BINARY), `n` LIMIT 1000"));
     let (mssql, _) = page_query("mssql", None, "t", &columns, 2, None);
-    assert!(
-        mssql.ends_with("ORDER BY [code] COLLATE Latin1_General_BIN2, [n] OFFSET 0 ROWS FETCH NEXT 1000 ROWS ONLY")
-    );
+    assert!(mssql.ends_with(
+        "ORDER BY CONVERT(nvarchar(max), [code]) COLLATE Latin1_General_100_BIN2, [n] OFFSET 0 ROWS FETCH NEXT 1000 ROWS ONLY"
+    ));
+}
+
+#[test]
+fn text_keyset_boundaries_use_the_same_unicode_order_on_both_sides() {
+    let columns = vec![column("code", "varchar(10)", true), column("n", "integer", true)];
+    let after = [Value::Text("a©".into()), Value::Int(7)];
+
+    let (mysql, _) = page_query("mysql", None, "t", &columns, 2, Some(&after));
+    assert!(mysql.contains("CAST(CONVERT(`code` USING utf8mb4) AS BINARY) > CAST(CONVERT(? USING utf8mb4) AS BINARY)"));
+    assert!(mysql.ends_with("ORDER BY CAST(CONVERT(`code` USING utf8mb4) AS BINARY), `n` LIMIT 1000"));
+
+    let (mssql, _) = page_query("mssql", None, "t", &columns, 2, Some(&after));
+    assert!(mssql.contains(
+        "CONVERT(nvarchar(max), [code]) COLLATE Latin1_General_100_BIN2 > CONVERT(nvarchar(max), @P1) COLLATE Latin1_General_100_BIN2"
+    ));
+    assert!(mssql.ends_with(
+        "ORDER BY CONVERT(nvarchar(max), [code]) COLLATE Latin1_General_100_BIN2, [n] OFFSET 0 ROWS FETCH NEXT 1000 ROWS ONLY"
+    ));
+}
+
+#[tokio::test]
+async fn a_difference_plan_stops_at_its_retained_byte_budget() {
+    let columns = vec![column("id", "integer", true), column("payload", "text", false)];
+    let layout = plan_layout(&columns, &columns, None).unwrap();
+    let payload = "x".repeat(MAX_PLAN_BYTES + 1);
+    let source = Pages(vec![vec![vec![Value::Int(1), Value::Text(payload)]]]);
+    let result = merge(layout, source, Pages(Vec::new())).await.unwrap();
+
+    assert_eq!(result.counts.insert, 1);
+    assert!(!result.complete);
+    assert!(matches!(
+        result.script("sqlite", None, "items", true),
+        Err(DataCompareError::TooManyDifferences(1))
+    ));
+}
+
+#[tokio::test]
+async fn a_difference_plan_stops_at_its_retained_row_budget() {
+    let source = (0..=MAX_PLAN_ROWS as i64)
+        .map(|id| vec![Value::Int(id), Value::Text(String::new())])
+        .collect();
+    let columns = vec![column("id", "integer", true), column("payload", "text", false)];
+    let result = merge(
+        plan_layout(&columns, &columns, None).unwrap(),
+        Pages(vec![source]),
+        Pages(Vec::new()),
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(result.counts.insert, MAX_PLAN_ROWS as u64 + 1);
+    assert!(!result.complete);
+    assert!(matches!(
+        result.script("sqlite", None, "items", true),
+        Err(DataCompareError::TooManyDifferences(count)) if count == MAX_PLAN_ROWS as u64 + 1
+    ));
 }
 
 #[tokio::test]
@@ -256,4 +312,22 @@ async fn a_batched_script_commits_every_n_statements_and_leaves_commented_delete
             .unwrap()
             .contains("BEGIN;")
     );
+}
+
+#[tokio::test]
+async fn a_commented_delete_stays_commented_when_its_key_holds_line_breaks() {
+    let codes = vec![column("code", "text", true)];
+    let layout = plan_layout(&codes, &codes, None).unwrap();
+    let hostile = "x\n; DROP TABLE accounts; --\r; DELETE FROM accounts; --\r\nz";
+    let target = vec![vec![Value::Text(hostile.into())]];
+    let result = merge(layout, Pages(vec![Vec::new()]), Pages(vec![target]))
+        .await
+        .unwrap();
+    for driver in ["postgres", "mysql", "sqlite", "mssql"] {
+        let script = result.script(driver, None, "codes", false).unwrap();
+        let deletes = script.split("-- Deletes (commented; not executed)").nth(1).unwrap();
+        for line in deletes.split(['\n', '\r']).filter(|line| !line.is_empty()) {
+            assert!(line.starts_with("--"), "{driver}: live line {line:?}");
+        }
+    }
 }

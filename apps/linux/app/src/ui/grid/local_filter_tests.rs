@@ -702,7 +702,7 @@ fn large_sort_replacement_keeps_newest_order_and_selection() {
         &std::sync::atomic::AtomicBool::new(false),
     )
     .unwrap();
-    assert!(!failed_view.apply_prepared_order(&order));
+    assert!(!failed_view.apply_prepared_order(order));
     assert_eq!(failed_store.source_index_at(24), Some(23));
     let selected = failed_selection.selection();
     assert_eq!(selected.size(), 1);
@@ -710,7 +710,13 @@ fn large_sort_replacement_keeps_newest_order_and_selection() {
     assert_eq!(failed_store.source_index_at(selected.nth(0)), Some(23));
     failed_selection.select_all();
     let selected_count = failed_selection.selection().size();
-    assert!(!failed_view.apply_prepared_order(&order));
+    let second_order = crate::ui::row_store::PreparedSourceRows::checked(
+        result.clone(),
+        (0..20_000).rev().collect(),
+        &std::sync::atomic::AtomicBool::new(false),
+    )
+    .unwrap();
+    assert!(!failed_view.apply_prepared_order(second_order));
     assert_eq!(failed_selection.selection().size(), selected_count);
 
     let all_store = crate::ui::row_store::RowStore::from_shared(result.clone());
@@ -724,7 +730,7 @@ fn large_sort_replacement_keeps_newest_order_and_selection() {
         &std::sync::atomic::AtomicBool::new(false),
     )
     .unwrap();
-    assert!(all_view.apply_prepared_order(&reversed));
+    assert!(all_view.apply_prepared_order(reversed));
     let all_selected = all_selection.selection();
     assert_eq!(all_selected.size(), 20_000);
     assert!(all_selected.contains(0));
@@ -760,7 +766,7 @@ fn million_row_select_all_sort_application_profile() {
     )
     .unwrap();
     let started = std::time::Instant::now();
-    assert!(view.apply_prepared_order(&order));
+    assert!(view.apply_prepared_order(order));
     eprintln!("million-row select-all apply: {:?}", started.elapsed());
     assert_eq!(selection.selection().size(), row_count as u64);
     assert_eq!(store.source_index_at(0), Some(row_count - 1));

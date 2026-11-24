@@ -130,3 +130,50 @@ async fn a_production_commit_without_writes_and_a_local_commit_do_not_ask() {
         run(&mut session, sql).await.expect(sql);
     }
 }
+
+struct SlowCommitApproval;
+
+#[async_trait]
+impl ApprovalSink for SlowCommitApproval {
+    async fn request(&self, request: ApprovalRequest) -> ApprovalOutcome {
+        if request.rule == "prod_commit_requires_approval" {
+            tokio::time::sleep(Duration::from_secs(60)).await;
+        }
+        ApprovalOutcome::AllowOnce
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_production_commit_approved_after_its_timeout_still_commits() {
+    let (mut h, _) = prod_harness(ApprovalOutcome::AllowOnce);
+    let mut ctx = context(
+        Principal::human_gui(),
+        Environment::Prod,
+        PolicyConfig::default(),
+        Arc::new(SlowCommitApproval),
+        h.audit.clone(),
+        h.audit_state.clone(),
+    );
+    ctx.driver_id = "postgres".into();
+    h.script = Arc::new(SessionScript {
+        honor_deadline: true,
+        ..SessionScript::default()
+    });
+    let inner: Arc<dyn Connection> = Arc::new(SessionConn {
+        script: h.script.clone(),
+    });
+    h.guard = PolicyGuard::new(inner, ctx);
+    let mut session = h.guard.open_session().await.expect("open session");
+    run(&mut session, "BEGIN").await.expect("begin");
+    run(&mut session, "UPDATE items SET v = 1 WHERE id = 1")
+        .await
+        .expect("write");
+
+    session
+        .query_params_controlled("COMMIT", &[], &OperationControl::with_timeout(Duration::from_secs(30)))
+        .await
+        .expect("the approval wait does not count against the commit timeout");
+
+    assert!(sent(&h).iter().any(|sql| sql == "COMMIT"), "{:?}", sent(&h));
+    assert!(!session.transaction_open());
+}

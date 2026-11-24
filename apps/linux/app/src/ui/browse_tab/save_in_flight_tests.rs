@@ -69,6 +69,7 @@ pub(super) fn launch_for_driver(
             tab_id: id,
             schema: schema.map(str::to_owned),
             table: "notes".into(),
+            database_name: "test".into(),
             driver_id: driver_id.into(),
             parse_hooks: bookie_app_services::value_input::ParseHooks::without_driver(
                 bookie_core::EnumInputStyle::RawValue,

@@ -34,6 +34,7 @@ mod insert_ui;
 mod keys;
 mod local_sort;
 mod measure;
+mod mcp_ui;
 mod menus;
 mod new_window_ui;
 mod palette_actions;
@@ -162,6 +163,7 @@ struct GridView {
     detail_open: bool,
     row_detail_open: bool,
     pub(crate) fk_peek: Option<fk_peek_ui::FkPeekState>,
+    fk_peek_work: Ticket,
     row_detail_filter: Entity<TextInput>,
     row_detail_hide_null: bool,
     catalog: Catalog,
@@ -200,6 +202,7 @@ struct GridView {
     history: Vec<bookie_app_services::statement_history::RecentStatement>,
     history_page: history_view::HistoryPage,
     audit_page: audit_page::AuditPage,
+    mcp: mcp_ui::McpState,
     panel: panel_state::PanelState,
     fonts: panel_state::FontState,
     font_inputs: [Entity<TextInput>; 2],
@@ -210,6 +213,7 @@ struct GridView {
     scans: Ticket,
     counts: Ticket,
     charts: Ticket,
+    pending_cancel_process: bool,
     compare: Option<std::sync::Arc<Diff>>,
     status: String,
     selection: Option<Selection>,
@@ -458,31 +462,10 @@ impl GridView {
         });
     }
 
-    fn with_source(source: Source, started: Instant, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        Self::guard_transaction_close(window, cx);
-        if !cfg!(test) {
-            Self::persist_window_geometry(window, cx);
-        }
-        let total = source.total();
-        let (find, filter, editor, sql_input, value_editor) = Self::init_query_inputs(window, cx);
-        let row_detail_filter = cx.new(|cx| TextInput::new("Filter fields by name or value", cx));
-        cx.subscribe(&row_detail_filter, |_, _, event: &InputEvent, cx| {
-            if matches!(event, InputEvent::Changed) {
-                cx.notify();
-            }
-        })
-        .detach();
-        let (sidebar_search, palette_input) = Self::init_chrome_inputs(window, cx);
-        let (table, table_focus, table_events) = Self::init_grid_table(window, cx);
-        let font_names = installed_font_names(cx);
-        let saved_fonts = font_settings::load();
-        let font_inputs = [cx.new(|cx| TextInput::new("", cx)), cx.new(|cx| TextInput::new("", cx))];
-        for (index, input) in font_inputs.iter().enumerate() {
-            let value = if index == 0 {
-                &saved_fonts.ui_family
-            } else {
-                &saved_fonts.editor_family
-            };
+    fn init_font_inputs(saved: &font_settings::FontSettings, cx: &mut Context<Self>) -> [Entity<TextInput>; 2] {
+        let inputs = [cx.new(|cx| TextInput::new("", cx)), cx.new(|cx| TextInput::new("", cx))];
+        for (index, input) in inputs.iter().enumerate() {
+            let value = if index == 0 { &saved.ui_family } else { &saved.editor_family };
             input.update(cx, |input, cx| input.set_content_quiet(value, cx));
             cx.subscribe(input, move |this, input, event: &InputEvent, cx| {
                 if matches!(event, InputEvent::Changed) {
@@ -501,12 +484,30 @@ impl GridView {
             })
             .detach();
         }
+        inputs
+    }
 
-        let (approval, approval_inbox) = approval_ui::ApprovalUi::new();
-        Self::watch_approvals(approval_inbox, cx);
-        let (host_key, host_key_inbox) = host_key_ui::HostKeyUi::new();
-        bookie_gpui::host_key::install(host_key.tx.clone());
-        Self::watch_host_keys(host_key_inbox, cx);
+    fn with_source(source: Source, started: Instant, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        Self::guard_transaction_close(window, cx);
+        if !cfg!(test) {
+            Self::persist_window_geometry(window, cx);
+        }
+        let total = source.total();
+        let (find, filter, editor, sql_input, value_editor) = Self::init_query_inputs(window, cx);
+        let row_detail_filter = cx.new(|cx| TextInput::new("Filter fields by name or value", cx));
+        cx.subscribe(&row_detail_filter, |_, _, event: &InputEvent, cx| {
+            if matches!(event, InputEvent::Changed) {
+                cx.notify();
+            }
+        })
+        .detach();
+        let (sidebar_search, palette_input) = Self::init_chrome_inputs(window, cx);
+        let (table, table_focus, table_events) = Self::init_grid_table(window, cx);
+        let font_names = installed_font_names(cx);
+        let saved_fonts = font_settings::load();
+        let font_inputs = Self::init_font_inputs(&saved_fonts, cx);
+
+        let (approval, host_key) = Self::install_prompts(cx);
         GridView {
             table,
             _table_events: table_events,
@@ -537,6 +538,7 @@ impl GridView {
             history: Vec::new(),
             history_page: history_view::HistoryPage::new(cx),
             audit_page: audit_page::AuditPage::new(cx),
+            mcp: mcp_ui::McpState::default(),
             panel: panel_state::PanelState::new(DEFAULT_RESULT_RATIO),
             fonts: panel_state::FontState::new(saved_fonts, default_font(&font_names).into(), font_names),
             font_inputs,
@@ -555,6 +557,7 @@ impl GridView {
             detail_open: false,
             row_detail_open: false,
             fk_peek: None,
+            fk_peek_work: Ticket::new(),
             row_detail_filter,
             row_detail_hide_null: false,
             catalog: Catalog::synthetic(),
@@ -577,8 +580,18 @@ impl GridView {
             scans: Ticket::new(),
             counts: Ticket::new(),
             charts: Ticket::new(),
+            pending_cancel_process: false,
             status: String::new(),
         }
+    }
+
+    fn install_prompts(cx: &mut Context<Self>) -> (approval_ui::ApprovalUi, host_key_ui::HostKeyUi) {
+        let (approval, approval_inbox) = approval_ui::ApprovalUi::new();
+        Self::watch_approvals(approval_inbox, cx);
+        let (host_key, host_key_inbox) = host_key_ui::HostKeyUi::new();
+        bookie_gpui::host_key::install(host_key.tx.clone());
+        Self::watch_host_keys(host_key_inbox, cx);
+        (approval, host_key)
     }
 
     fn persist_window_geometry(window: &mut Window, cx: &mut Context<Self>) {

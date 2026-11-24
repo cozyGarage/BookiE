@@ -427,8 +427,11 @@ impl Connection for MysqlConnection {
         control: &OperationControl,
     ) -> Result<QueryResultBatch, DriverError> {
         let mut connection = acquire_controlled(&self.pool, control).await?;
-        connection.close_on_drop();
-        let connection_id = connection_id_controlled(&mut connection, control).await?;
+        let connection_id = connection_id_controlled(&mut connection, control).await;
+        if connection_id.is_err() {
+            connection.close_on_drop();
+        }
+        let connection_id = connection_id?;
         warnings::discard(&mut connection);
         let mut result = if params.is_empty() && is_call_statement(sql) {
             run_server_cancellable(
@@ -457,8 +460,12 @@ impl Connection for MysqlConnection {
             )
             .await;
         }
+        if result.is_err() {
+            connection.close_on_drop();
+        }
         let mut batch = result?;
         let messages = if batch.truncated {
+            connection.close_on_drop();
             let _ = tokio::time::timeout(
                 bookie_core::CANCELLATION_DISPATCH_TIMEOUT,
                 request_cancellation(&self.cancellation_pool, connection_id),

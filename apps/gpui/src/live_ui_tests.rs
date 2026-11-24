@@ -1001,6 +1001,28 @@ fn closing_a_result_with_pending_edits_requires_explicit_discard(cx: &mut TestAp
 }
 
 #[gpui::test]
+fn buffered_result_load_time_is_not_reported_as_time_to_first_row(cx: &mut TestAppContext) {
+    use bookie_gpui::live::{LiveTable, Origin};
+
+    let source = LiveTable::load(
+        &Origin::File(orders_fixture()),
+        &table_info("orders"),
+        100,
+    )
+    .expect("load SQLite fixture");
+    assert!(bookie_gpui::source::ResultSource::load_elapsed(&source).is_some());
+
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.tabs.open_query();
+            view.add_run(Some(std::sync::Arc::new(source)));
+            assert_eq!(view.run_tabs.slots.last().map(|slot| slot.run.first_row_ms), Some(None));
+        });
+    });
+}
+
+#[gpui::test]
 fn a_connection_that_cannot_be_opened_keeps_the_synthetic_view_and_says_why(cx: &mut TestAppContext) {
     use bookie_gpui::live::Origin;
     let (view, cx) = open(cx);
@@ -1644,6 +1666,85 @@ fn activity_query_execution_sets_sql_and_switches_tab(cx: &mut TestAppContext) {
             assert!(matches!(view.tabs.current(), crate::Tab::Query));
         });
     }
+}
+
+#[gpui::test]
+fn process_cancellation_is_available_only_for_marked_activity_results(cx: &mut TestAppContext) {
+    let (view, cx) = open_live(cx);
+    view.update(cx, |view, _| {
+        view.add_run(None);
+        let session = view.live.as_ref().unwrap().with_driver_id("postgres");
+        view.live = Some(session);
+    });
+    view.read_with(cx, |view, _| {
+        let cancel = view
+            .palette_actions()
+            .into_iter()
+            .find(|action| action.id == "cancel-process")
+            .unwrap();
+        assert!(
+            !cancel.enabled,
+            "a regular table result must not expose process cancellation"
+        );
+    });
+
+    view.update(cx, |view, _| {
+        view.grid_is_query = true;
+        view.run_tabs.slots[view.run_tabs.active].cancel_process = true;
+    });
+    view.read_with(cx, |view, _| {
+        let cancel = view
+            .palette_actions()
+            .into_iter()
+            .find(|action| action.id == "cancel-process")
+            .unwrap();
+        assert!(
+            cancel.enabled,
+            "the generated process activity result enables cancellation"
+        );
+    });
+
+    view.update(cx, |view, _| {
+        view.run_tabs.slots[view.run_tabs.active].cancel_process = false;
+        assert!(
+            !view
+                .palette_actions()
+                .into_iter()
+                .find(|action| action.id == "cancel-process")
+                .unwrap()
+                .enabled
+        );
+        view.grid_is_query = false;
+    });
+}
+
+#[gpui::test]
+fn clearing_a_foreign_key_peek_cancels_work_and_rejects_stale_context(cx: &mut TestAppContext) {
+    let (view, cx) = open_live(cx);
+    view.update(cx, |view, _| {
+        let session = view.live.as_ref().unwrap().clone();
+        let table = view.catalog.grid_table.clone();
+        let generation = view.fk_peek_work.generation;
+        let cancel = view.fk_peek_work.cancel.clone();
+        assert!(view.fk_peek_response_is_current(generation, &session, &table));
+
+        view.fk_peek = Some(crate::fk_peek_ui::FkPeekState {
+            table: "customers".into(),
+            fields: Vec::new(),
+            sql: "SELECT 1".into(),
+            params: Vec::new(),
+        });
+        view.clear_fk_peek();
+
+        assert!(cancel.is_cancelled());
+        assert!(view.fk_peek.is_none());
+        assert!(!view.fk_peek_response_is_current(generation, &session, &table));
+
+        let other_table = table_info("customers");
+        assert!(!view.fk_peek_response_is_current(generation + 1, &session, &other_table));
+        view.grid_is_query = true;
+        assert!(!view.fk_peek_response_is_current(generation + 1, &session, &table));
+    });
 }
 
 #[gpui::test]

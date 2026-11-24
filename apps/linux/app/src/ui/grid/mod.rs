@@ -221,6 +221,7 @@ pub struct TabGridContext {
     pub column_selection: ColumnSelectionHandle,
     pub set_cells_enabled: bool,
     pub column_selection_chrome: Option<gtk4::Box>,
+    pub hidden_column_scope: Option<String>,
 }
 
 pub type AmbiguousKeys =
@@ -398,7 +399,8 @@ pub fn build_column_view(
         columns.iter().map(|column| column.name.clone()).collect(),
         connection_id
             .zip(column_widths.clone())
-            .map(|(id, store)| (id, table.to_string(), store)),
+            .zip(tab_ctx.hidden_column_scope.clone())
+            .map(|((id, store), scope)| (id, scope, store)),
     );
     column_order::install(
         &column_view,

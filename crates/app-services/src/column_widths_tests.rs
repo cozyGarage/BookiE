@@ -56,6 +56,24 @@ fn hidden_columns_are_remembered_per_connection_and_table() {
 }
 
 #[test]
+fn hidden_columns_for_same_table_name_are_isolated_by_database_and_schema() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = store_in(&dir);
+    let connection = Uuid::new_v4();
+    let scope = |database: &str, schema: Option<&str>| table_scope_key(database, schema, "users");
+    let public_users = scope("sales", Some("public"));
+    let audit_users = scope("sales", Some("audit"));
+    let other_database_users = scope("warehouse", Some("public"));
+
+    store.set_hidden(connection, &public_users, "email", true).unwrap();
+
+    assert!(store.hidden_columns(connection, &public_users).contains("email"));
+    assert!(store.hidden_columns(connection, &audit_users).is_empty());
+    assert!(store.hidden_columns(connection, &other_database_users).is_empty());
+    assert!(store.hidden_columns(Uuid::new_v4(), &public_users).is_empty());
+}
+
+#[test]
 fn showing_a_column_again_removes_it_from_the_hidden_set() {
     let dir = tempfile::tempdir().unwrap();
     let id = Uuid::new_v4();

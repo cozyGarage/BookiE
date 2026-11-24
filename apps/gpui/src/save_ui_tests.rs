@@ -462,7 +462,11 @@ fn an_edited_cell_is_reviewed_then_saved_and_the_table_shows_the_saved_value(cx:
         });
     });
     cx.run_until_parked();
-    cx.simulate_keystrokes("ctrl-a backspace");
+    cx.simulate_keystrokes(if cfg!(target_os = "macos") {
+        "cmd-a backspace"
+    } else {
+        "ctrl-a backspace"
+    });
     cx.run_until_parked();
     view.read_with(cx, |view, cx| {
         assert_eq!(view.cell_edit.value_editor.read(cx).value().as_ref(), "");

@@ -66,6 +66,40 @@ async fn a_controlled_simple_select_stays_within_its_mariadb_statement_budget() 
     .await;
 }
 
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn repeated_complete_bounded_reads_reuse_a_mysql_backend() {
+    let (_container, options) = crate::start_mysql().await;
+    let connection = crate::connect(options).await;
+    let control = OperationControl::new(CancellationToken::new(), None);
+    connection
+        .query_result_sets_bounded_controlled("SELECT CONNECTION_ID()", &[], 10, 1024, &control)
+        .await
+        .expect("warm the bounded MySQL read pool");
+    let mut backend_ids = std::collections::BTreeSet::new();
+
+    for _ in 0..8 {
+        let batch = connection
+            .query_result_sets_bounded_controlled("SELECT CONNECTION_ID()", &[], 10, 1024, &control)
+            .await
+            .expect("execute a complete bounded MySQL read");
+        let Some(Value::Int(id)) = batch
+            .result_sets
+            .first()
+            .and_then(|result| result.rows.first())
+            .and_then(|row| row.first())
+        else {
+            panic!("MySQL did not return a connection ID: {batch:?}");
+        };
+        backend_ids.insert(*id);
+    }
+
+    assert!(
+        backend_ids.len() < 8,
+        "complete bounded reads opened a new backend each time: {backend_ids:?}"
+    );
+}
+
 async fn assert_controlled_select_budget(host: String, port: u16) {
     let admin_options = ConnectOptions {
         host,

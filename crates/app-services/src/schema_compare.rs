@@ -178,7 +178,7 @@ fn append_statement(out: &mut String, statement: &str, commented: bool) {
         out.push_str(";\n");
         return;
     }
-    let mut lines = statement.lines().peekable();
+    let mut lines = statement.split(['\r', '\n']).filter(|line| !line.is_empty()).peekable();
     while let Some(line) = lines.next() {
         out.push_str("-- ");
         out.push_str(line);

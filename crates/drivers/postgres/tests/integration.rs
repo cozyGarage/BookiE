@@ -360,7 +360,7 @@ async fn an_idle_transaction_timeout_retires_its_dedicated_session() {
         .await
         .unwrap_err();
 
-    assert!(matches!(error, DriverError::Disconnected), "{error:?}");
+    assert!(matches!(error, DriverError::SessionEndedByServer { .. }), "{error:?}");
     assert!(!session.is_usable());
     session.close().await.unwrap();
 }

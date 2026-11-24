@@ -249,9 +249,11 @@ impl GridView {
     }
 
     fn attach_session(&mut self, session: Arc<LiveSession>, table: TableInfo) {
+        self.clear_fk_peek();
         if !self.live.as_ref().is_some_and(|live| Arc::ptr_eq(live, &session)) {
             self.schema_context = None;
         }
+        self.mcp.register(session.database_service());
         self.table_sorts.clear();
         self.search.server.applied.clear();
         self.search.server.shown_for = None;
@@ -290,6 +292,7 @@ impl GridView {
             cx.notify();
             return;
         }
+        self.clear_fk_peek();
         self.status = "Connecting…".into();
         self.search.origin = Some(origin.clone());
         self.begin_background(
@@ -385,6 +388,7 @@ impl GridView {
             cx.notify();
             return;
         }
+        self.clear_fk_peek();
         self.status = format!("Loading {}…", table_label(table));
         let wanted = table.clone();
         let sort = self.table_sort(&wanted).cloned();
@@ -432,6 +436,7 @@ impl GridView {
         if self.reject_view_edits() {
             return;
         }
+        self.clear_fk_peek();
         self.edits_changed();
         self.reset_edit_history();
         self.close_insert_form();

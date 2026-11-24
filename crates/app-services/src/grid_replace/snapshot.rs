@@ -1,6 +1,6 @@
 use bookie_core::Value;
 
-use super::{MAX_REPLACE_SNAPSHOT_BYTES, MAX_REPLACE_SNAPSHOT_ROWS, ReplaceError, retained_key_bytes};
+use super::{MAX_REPLACE_SNAPSHOT_BYTES, MAX_REPLACE_SNAPSHOT_ROWS, ReplaceError, retained_values_bytes};
 
 pub struct SnapshotRow {
     pub position: u32,
@@ -46,7 +46,7 @@ impl ReplaceSnapshot {
             return Err(ReplaceError::Cancelled);
         }
         let previous_bytes = self.bytes;
-        let row_bytes = retained_key_bytes(key)
+        let row_bytes = retained_values_bytes(key)
             .saturating_add(std::mem::size_of::<SnapshotRow>())
             .saturating_mul(2);
         if row_bytes > MAX_REPLACE_SNAPSHOT_BYTES.saturating_sub(self.bytes) {
@@ -68,7 +68,7 @@ impl ReplaceSnapshot {
                 cancelled = true;
                 return;
             }
-            let cell_bytes = retained_key_bytes(std::slice::from_ref(value))
+            let cell_bytes = retained_values_bytes(std::slice::from_ref(value))
                 .saturating_add(std::mem::size_of::<(usize, Value)>())
                 .saturating_mul(2);
             if cell_bytes > MAX_REPLACE_SNAPSHOT_BYTES.saturating_sub(self.bytes) {

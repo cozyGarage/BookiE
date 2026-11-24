@@ -983,9 +983,9 @@ impl PolicySession {
         sql: &str,
         control: &OperationControl,
         writes: u32,
-    ) -> Result<(), DriverError> {
+    ) -> Result<OperationControl, DriverError> {
         if writes == 0 || self.guard.ctx.environment != Environment::Prod {
-            return Ok(());
+            return Ok(control.clone());
         }
         let noun = if writes == 1 { "write" } else { "writes" };
         let decision = Decision::RequireApproval {
@@ -997,7 +997,7 @@ impl PolicySession {
         self.guard
             .resolve_authorization(sql, analysis, decision, None, Some(control))
             .await
-            .map(|_| ())
+            .map(|authorization| authorization.rearm(control))
     }
 
     async fn finish(
@@ -1012,10 +1012,14 @@ impl PolicySession {
                 .refuse_policy(sql, "missing_transaction", "no transaction is open on this session")
                 .await;
         };
-        if kind == Finish::Commit {
+        let rearmed;
+        let control = if kind == Finish::Commit {
             self.require_writable(sql).await?;
-            self.approve_production_commit(sql, control, batch.writes).await?;
-        }
+            rearmed = self.approve_production_commit(sql, control, batch.writes).await?;
+            &rearmed
+        } else {
+            control
+        };
         let operation = finish_operation(kind, batch.id);
         self.guard.record_intent(&operation).await.map_err(|error| {
             DriverError::PolicyDenied(format!(

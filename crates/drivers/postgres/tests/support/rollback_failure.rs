@@ -88,11 +88,8 @@ async fn a_batch_reports_rollback_failure_after_postgres_terminates_its_backend(
             rollback_error,
         } => {
             assert_eq!(statement_index, 1);
-            assert!(matches!(source.as_ref(), DriverError::Disconnected), "{source:?}");
-            assert!(
-                matches!(rollback_error.as_ref(), DriverError::Disconnected),
-                "{rollback_error:?}"
-            );
+            assert!(source.is_disconnect(), "{source:?}");
+            assert!(rollback_error.is_disconnect(), "{rollback_error:?}");
         }
         other => panic!("expected rollback failure with unknown outcome, got {other:?}"),
     }

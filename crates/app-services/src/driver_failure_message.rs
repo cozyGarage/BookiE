@@ -78,7 +78,7 @@ fn tls_message(kind: TlsFailureKind, detail: &str) -> String {
             .replace("{detail}", &redacted_tls_detail(detail));
         }
         TlsFailureKind::Other => crate::tr!(
-            "TLS handshake failed: {detail}. Check the server certificate, the certificate authority file and the TLS mode."
+            "TLS connection failed: {detail}. Check the server certificate, the certificate authority file and the TLS mode."
         )
         .replace("{detail}", &redacted_tls_detail(detail)),
     };
@@ -152,5 +152,28 @@ pub fn keyring_message(failure: &bookie_storage::KeyringFailure) -> String {
         KeyringFailure::Other(detail) => {
             crate::tr!("The keyring could not be used: {detail}").replace("{detail}", detail)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_ca_path_does_not_change_tls_classification_or_claim_a_handshake() {
+        let error = bookie_core::DriverError::Tls("could not load CA file /etc/ssl/expired.pem".into());
+        let presentation = crate::driver_error_presentation::classify(&error);
+        let message = driver_failure_message(&presentation);
+
+        assert!(matches!(
+            presentation,
+            DriverFailurePresentation::Tls {
+                kind: TlsFailureKind::Other,
+                ..
+            }
+        ));
+        assert!(message.contains("TLS connection failed"), "{message}");
+        assert!(!message.contains("handshake"), "{message}");
+        assert!(message.contains("<path>"), "{message}");
     }
 }

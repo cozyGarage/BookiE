@@ -3,8 +3,6 @@
 
 [advisories]
 ignore = [
-    # No fixed release. rsa 0.10.0-rc.18 via russh, ssh-key, and sqlx-mysql.
-    "RUSTSEC-2023-0071",
     # chrono unmaintained, no safe upgrade: see deny.toml.
     "RUSTSEC-2026-0543",
 ]

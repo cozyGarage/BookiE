@@ -8,6 +8,7 @@ use bookie_core::{ColumnInfo, Connection, DriverError, OperationControl, Value, 
 pub const PAGE_ROWS: usize = 1_000;
 pub const SAMPLE_ROWS: usize = 200;
 pub const MAX_PLAN_ROWS: usize = 50_000;
+const MAX_PLAN_BYTES: usize = crate::grid_replace::MAX_REPLACE_PLAN_BYTES;
 const SAMPLE_VALUE_CHARS: usize = 80;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -52,7 +53,7 @@ pub enum DataCompareError {
     UncomparableKey(Side),
     #[error("the {0:?} read was truncated")]
     Truncated(Side),
-    #[error("{0} differences are too many for one script")]
+    #[error("the difference plan exceeds its row or byte budget ({0} differences)")]
     TooManyDifferences(u64),
     #[error(transparent)]
     Driver(#[from] DriverError),
@@ -110,6 +111,7 @@ pub struct DataCompare {
     inserts: Vec<Vec<Value>>,
     updates: Vec<(Vec<usize>, Vec<Value>)>,
     deletes: Vec<Vec<Value>>,
+    retained_bytes: usize,
     complete: bool,
 }
 
@@ -123,6 +125,7 @@ impl DataCompare {
             inserts: Vec::new(),
             updates: Vec::new(),
             deletes: Vec::new(),
+            retained_bytes: 0,
             complete: true,
         }
     }
@@ -165,8 +168,34 @@ impl DataCompare {
             Change::Update => self.counts.update += 1,
             Change::Delete => self.counts.delete += 1,
         }
-        let key_len = self.layout.key_len();
+        if !self.complete || self.differences() > MAX_PLAN_ROWS as u64 {
+            self.complete = false;
+            return;
+        }
+        let sample_bytes = if self.sample.len() < SAMPLE_ROWS {
+            self.sample_bytes(&row, &changed)
+        } else {
+            0
+        };
+        let plan_bytes = retained_row_bytes(&row, row.capacity()).saturating_add(if change == Change::Update {
+            std::mem::size_of::<Vec<usize>>()
+                .saturating_add(changed.len().saturating_mul(std::mem::size_of::<usize>()))
+                .saturating_add(
+                    changed
+                        .capacity()
+                        .saturating_sub(changed.len())
+                        .saturating_mul(std::mem::size_of::<usize>()),
+                )
+        } else {
+            0
+        });
+        let retained_bytes = sample_bytes.saturating_add(plan_bytes);
+        if retained_bytes > MAX_PLAN_BYTES.saturating_sub(self.retained_bytes) {
+            self.complete = false;
+            return;
+        }
         if self.sample.len() < SAMPLE_ROWS {
+            let key_len = self.layout.key_len();
             self.sample.push(SampleRow {
                 change,
                 key: row[..key_len].to_vec(),
@@ -176,15 +205,28 @@ impl DataCompare {
                     .collect(),
             });
         }
-        if !self.complete || self.differences() > MAX_PLAN_ROWS as u64 {
-            self.complete = false;
-            return;
-        }
+        self.retained_bytes += retained_bytes;
         match change {
             Change::Insert => self.inserts.push(row),
             Change::Update => self.updates.push((changed, row)),
             Change::Delete => self.deletes.push(row),
         }
+    }
+
+    fn sample_bytes(&self, row: &[Value], changed: &[usize]) -> usize {
+        let key_len = self.layout.key_len();
+        retained_row_bytes(&row[..key_len], key_len)
+            .saturating_add(std::mem::size_of::<SampleRow>())
+            .saturating_add(changed.len().saturating_mul(std::mem::size_of::<String>()))
+            .saturating_add(
+                changed
+                    .iter()
+                    .map(|index| {
+                        let name = &self.layout.columns[*index].name;
+                        name.capacity()
+                    })
+                    .fold(0usize, usize::saturating_add),
+            )
     }
 
     pub fn script(
@@ -258,8 +300,7 @@ impl DataCompare {
                 if include_deletes {
                     batches.push(&mut out, &statement);
                 } else {
-                    out.push_str("-- ");
-                    push_line(&mut out, &statement);
+                    push_commented(&mut out, &statement);
                 }
             }
         }
@@ -324,6 +365,15 @@ impl Batches {
             out.push_str(self.commit);
         }
     }
+}
+
+fn push_commented(out: &mut String, statement: &str) {
+    for line in statement.trim_end_matches(';').split(['\r', '\n']) {
+        out.push_str("-- ");
+        out.push_str(line);
+        out.push('\n');
+    }
+    out.insert(out.len() - 1, ';');
 }
 
 fn push_line(out: &mut String, statement: &str) {
@@ -652,19 +702,35 @@ fn order_term(driver_id: &str, column: &ColumnInfo) -> String {
     let text = is_text(&column.data_type);
     match driver_id {
         "postgres" if text => format!("{quoted} COLLATE \"C\""),
-        "mysql" if text => format!("CAST({quoted} AS BINARY)"),
+        "mysql" if text => format!("CAST(CONVERT({quoted} USING utf8mb4) AS BINARY)"),
         "sqlite" => format!("{quoted} COLLATE BINARY"),
-        "mssql" if text => format!("{quoted} COLLATE Latin1_General_BIN2"),
+        "mssql" if text => format!("CONVERT(nvarchar(max), {quoted}) COLLATE Latin1_General_100_BIN2"),
         _ => quoted,
     }
 }
 
 fn param_term(driver_id: &str, column: &ColumnInfo, index: usize) -> String {
     let placeholder = placeholder_for(driver_id, index);
-    if Dialect::from_id(driver_id) == Some(Dialect::Mysql) && is_text(&column.data_type) {
-        return format!("CAST({placeholder} AS BINARY)");
+    if is_text(&column.data_type) {
+        match driver_id {
+            "mysql" => return format!("CAST(CONVERT({placeholder} USING utf8mb4) AS BINARY)"),
+            "mssql" => {
+                return format!("CONVERT(nvarchar(max), {placeholder}) COLLATE Latin1_General_100_BIN2");
+            }
+            _ => {}
+        }
     }
     placeholder
+}
+
+fn retained_row_bytes(row: &[Value], capacity: usize) -> usize {
+    std::mem::size_of::<Vec<Value>>()
+        .saturating_add(crate::grid_replace::retained_values_bytes(row))
+        .saturating_add(
+            capacity
+                .saturating_sub(row.len())
+                .saturating_mul(std::mem::size_of::<Value>()),
+        )
 }
 
 pub fn page_query(
