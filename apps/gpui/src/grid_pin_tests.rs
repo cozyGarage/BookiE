@@ -301,7 +301,7 @@ fn fitting_a_column_includes_its_type_header(cx: &mut TestAppContext) {
     });
 }
 
-struct BinarySource;
+struct BinarySource(Vec<u8>);
 
 impl ResultSource for BinarySource {
     fn columns(&self) -> &[ColumnMeta] {
@@ -335,7 +335,7 @@ impl ResultSource for BinarySource {
     }
 
     fn row(&self, _: u64) -> Vec<Cell> {
-        vec![Cell::Text("blob".into()), Cell::Bytes(vec![0, 255, 65])]
+        vec![Cell::Text("blob".into()), Cell::Bytes(self.0.clone())]
     }
 
     fn find(&self, _: &str, _: usize, _: &CancellationToken) -> Result<FindResult, &'static str> {
@@ -425,7 +425,7 @@ fn hidden_middle_column_keeps_visible_cells_bound_to_their_source_columns(cx: &m
 #[gpui::test]
 fn binary_display_mode_controls_preview_detail_and_edit_without_changing_value_type(cx: &mut TestAppContext) {
     cx.update(text_input::bind_keys);
-    let source = Arc::new(BinarySource);
+    let source = Arc::new(BinarySource(vec![0, 255, 65]));
     let (view, cx) = cx.add_window_view(|window, cx| GridView::with_source(source, Instant::now(), window, cx));
     cx.run_until_parked();
     cx.update(|window, cx| window.render_frame(cx));
@@ -470,7 +470,7 @@ fn binary_display_mode_controls_preview_detail_and_edit_without_changing_value_t
 
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
-            view.source = Arc::new(BinarySource);
+            view.source = Arc::new(BinarySource(vec![0, 255, 65]));
             view.table_source = view.source.clone();
             view.sync_table(900.0, window, cx);
         })
@@ -481,6 +481,29 @@ fn binary_display_mode_controls_preview_detail_and_edit_without_changing_value_t
             "AP9C"
         );
     });
+}
+
+#[gpui::test]
+fn an_untouched_multiline_or_large_binary_edit_stages_nothing(cx: &mut TestAppContext) {
+    cx.update(text_input::bind_keys);
+    let cases = [
+        (b"first line\nsecond line".to_vec(), crate::binary_mode::BinaryMode::Utf8),
+        (vec![7; 4096], crate::binary_mode::BinaryMode::Hex),
+    ];
+    for (bytes, mode) in cases {
+        let source = Arc::new(BinarySource(bytes));
+        let (view, cx) = cx.add_window_view(|window, cx| GridView::with_source(source, Instant::now(), window, cx));
+        cx.run_until_parked();
+        view.update(cx, |view, cx| view.set_binary_mode(1, mode, cx));
+        cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(0, 1, window, cx)));
+        view.read_with(cx, |view, _| {
+            assert!(view.cell_edit.active.as_ref().is_some_and(|editing| editing.full_value), "{mode:?}");
+        });
+        cx.update(|window, cx| view.update(cx, |view, cx| view.commit_edit(window, cx)));
+        view.read_with(cx, |view, _| {
+            assert!(view.cell_edit.edits.is_empty(), "{mode:?}: {:?}", view.cell_edit.edits);
+        });
+    }
 }
 
 #[gpui::test]
