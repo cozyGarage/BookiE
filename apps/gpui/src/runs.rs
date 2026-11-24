@@ -60,11 +60,24 @@ impl GridView {
         self.run_sql_with_source(sql, params, None, cx);
     }
 
-    pub(crate) fn run_sql_with_source(&mut self, sql: String, params: Vec<bookie_core::Value>, source: Option<(String, std::ops::Range<usize>)>, cx: &mut Context<Self>) {
+    pub(crate) fn run_sql_with_source(
+        &mut self,
+        sql: String,
+        params: Vec<bookie_core::Value>,
+        source: Option<(String, std::ops::Range<usize>)>,
+        cx: &mut Context<Self>,
+    ) {
         self.run_sql_with_mapping(sql, params, source, None, cx);
     }
 
-    pub(crate) fn run_sql_with_mapping(&mut self, sql: String, params: Vec<bookie_core::Value>, source: Option<(String, std::ops::Range<usize>)>, mapping: Option<(String, bookie_core::NamedParameters)>, cx: &mut Context<Self>) {
+    pub(crate) fn run_sql_with_mapping(
+        &mut self,
+        sql: String,
+        params: Vec<bookie_core::Value>,
+        source: Option<(String, std::ops::Range<usize>)>,
+        mapping: Option<(String, bookie_core::NamedParameters)>,
+        cx: &mut Context<Self>,
+    ) {
         if self.save.busy {
             self.status = "A save is running; wait for it to finish first".into();
             return;
@@ -139,6 +152,7 @@ impl GridView {
                         this.panel.error_location = None;
                         let (rows, truncated) = (bookie_gpui::source::ResultSource::total(&table), table.truncated);
                         this.panel.messages.statement_ok(&sql, rows, truncated, elapsed);
+                        this.panel.messages.server_messages(&table.messages);
                         this.show_plan_of(&table);
                         this.add_run(Some(std::sync::Arc::new(table)));
                         if let Some(slot) = this.run_tabs.slots.last_mut() {
@@ -155,14 +169,17 @@ impl GridView {
                         this.add_failed_run(detail, elapsed);
                         let (original, position) = match mapping {
                             Some((original, map)) if map.sql == sql => {
-                                let mapped = error.position.and_then(|position| map.source_byte_for_position(&original, position))
+                                let mapped = error
+                                    .position
+                                    .and_then(|position| map.source_byte_for_position(&original, position))
                                     .map(|byte| original[..byte].chars().count() + 1);
                                 (original, mapped)
                             }
                             Some((original, _)) => (original, None),
                             None => (sql.clone(), error.position),
                         };
-                        this.panel.error_location = position.zip(this.panel.messages.entries().last())
+                        this.panel.error_location = position
+                            .zip(this.panel.messages.entries().last())
                             .map(|(position, message)| (original, position, message.id, source));
                         this.panel.view = ResultView::Messages;
                         this.status = error.message;
@@ -211,6 +228,9 @@ impl GridView {
         let mut run = next_run(self.run_tabs.next_number);
         if let Some(source) = &source {
             run.rows = source.total();
+            run.first_row_ms = source
+                .load_elapsed()
+                .map(|d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX));
         }
         self.run_tabs.next_number += 1;
         self.run_tabs.slots.push(RunSlot::new(run, source));

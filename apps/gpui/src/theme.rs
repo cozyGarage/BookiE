@@ -8,7 +8,7 @@ pub mod size {
     pub const XL: f32 = 24.0;
     pub const COMPACT_CONTROL: f32 = 24.0;
     pub const SMALL_CONTROL: f32 = 28.0;
-    pub const GRID_HEADER: f32 = 40.0;
+    pub const GRID_HEADER: f32 = 32.0;
     pub const FORM_CONTROL: f32 = 32.0;
     pub const CONTROL_RADIUS: f32 = 4.0;
     pub const SURFACE_RADIUS: f32 = 6.0;
@@ -17,6 +17,10 @@ pub mod size {
     pub const STRUCTURE_PANEL_MAX_HEIGHT: f32 = 280.0;
     pub const ROW_DETAIL_HEIGHT: f32 = 280.0;
     pub const ROW_DETAIL_LABEL_WIDTH: f32 = 180.0;
+    pub const FK_PEEK_MAX_HEIGHT: f32 = 220.0;
+    pub const GUTTER_MARKER_WIDTH: f32 = 3.0;
+    pub const FULL_VALUE_EDITOR_WIDTH: f32 = 760.0;
+    pub const FULL_VALUE_EDITOR_HEIGHT: f32 = 560.0;
     pub const TEXT: f32 = 13.0;
     pub const STAT_TEXT: f32 = 22.0;
     pub const TREE_ROW: f32 = 26.0;

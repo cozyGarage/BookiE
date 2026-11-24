@@ -9,6 +9,7 @@ const REFRESH_SECONDS: u32 = 30;
 #[derive(Default)]
 struct Inner {
     since: Cell<Option<Instant>>,
+    last_activity: Cell<Option<Instant>>,
     timer_running: Cell<bool>,
 }
 
@@ -22,6 +23,12 @@ impl TransactionClock {
             (false, _) => self.0.since.set(None),
             _ => {}
         }
+        self.0.last_activity.set(open.then_some(now));
+    }
+
+    pub(super) fn idle_warning_at(&self, now: Instant) -> Option<String> {
+        let last = self.0.last_activity.get()?;
+        bookie_app_services::transaction_idle::idle_warning(now.saturating_duration_since(last))
     }
 
     pub(super) fn is_open(&self) -> bool {
@@ -31,13 +38,26 @@ impl TransactionClock {
     pub(super) fn label_at(&self, now: Instant) -> String {
         match self.0.since.get() {
             None => bookie_app_services::tr!("Session"),
-            Some(since) => open_label(now.saturating_duration_since(since)),
+            Some(since) => {
+                let label = open_label(now.saturating_duration_since(since));
+                match self.idle_warning_at(now) {
+                    Some(_) => format!("{label} · {}", bookie_app_services::tr!("idle")),
+                    None => label,
+                }
+            }
         }
     }
 
     pub(super) fn reset(&self, button: &gtk::ToggleButton) {
         self.0.since.set(None);
+        self.0.last_activity.set(None);
+        button.set_tooltip_text(None);
         button.set_label(&bookie_app_services::tr!("Session"));
+    }
+
+    fn paint(&self, button: &gtk::ToggleButton, now: Instant) {
+        button.set_label(&self.label_at(now));
+        button.set_tooltip_text(self.idle_warning_at(now).as_deref());
     }
 
     fn claim_timer(&self) -> bool {
@@ -45,7 +65,7 @@ impl TransactionClock {
     }
 
     pub(super) fn show(&self, button: &gtk::ToggleButton) {
-        button.set_label(&self.label_at(Instant::now()));
+        self.paint(button, Instant::now());
         if !self.claim_timer() {
             return;
         }
@@ -55,7 +75,7 @@ impl TransactionClock {
                 clock.0.timer_running.set(false);
                 return glib::ControlFlow::Break;
             };
-            button.set_label(&clock.label_at(Instant::now()));
+            clock.paint(&button, Instant::now());
             glib::ControlFlow::Continue
         });
     }
@@ -109,6 +129,20 @@ mod tests {
         assert!(retired_session_message(true).contains("transaction was open"));
         assert!(retired_session_message(true).contains("uncommitted changes should not have been saved"));
         assert!(!retired_session_message(false).contains("transaction"));
+    }
+
+    #[test]
+    fn the_clock_warns_after_five_idle_minutes_and_a_statement_resets_it() {
+        let clock = TransactionClock::default();
+        let start = Instant::now();
+        clock.set_open(true, start);
+        assert_eq!(clock.idle_warning_at(start + Duration::from_secs(299)), None);
+        assert!(clock.idle_warning_at(start + Duration::from_secs(300)).is_some());
+        assert!(clock.label_at(start + Duration::from_secs(300)).ends_with("idle"));
+        clock.set_open(true, start + Duration::from_secs(300));
+        assert_eq!(clock.idle_warning_at(start + Duration::from_secs(301)), None);
+        clock.set_open(false, start + Duration::from_secs(302));
+        assert_eq!(clock.idle_warning_at(start + Duration::from_secs(900)), None);
     }
 
     #[test]

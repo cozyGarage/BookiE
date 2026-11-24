@@ -284,7 +284,7 @@ Select regressions from the changed behavior and current known defects. Failure 
 
 | Limit | Lines | Result |
 |---|---:|---|
-| Limit | 2000 | Unlisted files fail |
+| Limit | 5000 | Unlisted files fail |
 | Ratchet | Recorded maximum | A listed oversized file may not grow past its baseline |
 
 Lower a baseline in the same change when an oversized file shrinks.

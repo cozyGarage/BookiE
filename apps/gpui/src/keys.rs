@@ -1,7 +1,7 @@
 use bookie_gpui::font_settings;
 use bookie_gpui::keymap::{Chord, Command};
 use bookie_results::grid_cursor::{Cursor, move_cursor};
-use gpui::{App, Context, Focusable, KeyDownEvent, KeystrokeEvent, Window};
+use gpui::{App, Context, Focusable, KeyDownEvent, KeystrokeEvent, ScrollStrategy, Window};
 
 use crate::palette_state::PaletteMode;
 use crate::{GridView, Tab, palette_step};
@@ -18,7 +18,8 @@ impl GridView {
             return;
         }
         let modifiers = event.keystroke.modifiers;
-        if !self.grid_key_ready(window, modifiers.control || modifiers.alt) {
+        let control = control_modifier(modifiers);
+        if !self.grid_key_ready(window, control || modifiers.alt) {
             return;
         }
         let key = event.keystroke.key.as_str();
@@ -28,7 +29,7 @@ impl GridView {
             cx.notify();
             return;
         }
-        let plain = !(modifiers.shift || modifiers.control || modifiers.alt);
+        let plain = !(modifiers.shift || control || modifiers.alt);
         if plain && self.cross_page_edge(key) {
             cx.stop_propagation();
             cx.notify();
@@ -46,7 +47,7 @@ impl GridView {
             _ => palette_step(self.palette.index, count, key == "down"),
         };
         if count > 0 {
-            self.palette.scroll.scroll_to_item(self.palette.index);
+            self.palette.scroll.scroll_to_item(self.palette.index, ScrollStrategy::Nearest);
         }
     }
 
@@ -117,6 +118,7 @@ impl GridView {
     pub(super) fn key_down(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         let stroke = &event.keystroke;
         let modifiers = stroke.modifiers;
+        let control = control_modifier(modifiers);
         let key = stroke.key.as_str();
         if self.palette.open {
             match key {
@@ -131,7 +133,7 @@ impl GridView {
                         _ => palette_step(self.palette.index, count, key == "down"),
                     };
                     if count > 0 {
-                        self.palette.scroll.scroll_to_item(self.palette.index);
+                        self.palette.scroll.scroll_to_item(self.palette.index, ScrollStrategy::Nearest);
                     }
                     cx.stop_propagation();
                     cx.notify();
@@ -142,7 +144,7 @@ impl GridView {
             return;
         }
         if self.focus.is_focused(window)
-            && !modifiers.control
+            && !control
             && matches!(
                 key,
                 "up" | "down" | "left" | "right" | "home" | "end" | "pageup" | "pagedown"
@@ -150,24 +152,28 @@ impl GridView {
         {
             return;
         }
-        if modifiers.control && matches!(self.tabs.current(), Tab::Query) {
+        if control && matches!(self.tabs.current(), Tab::Query) {
             if let Some(delta) = zoom_key(key) {
                 self.zoom_editor(delta, cx);
                 return;
             }
         }
-        let chord = Chord::new(modifiers.control, modifiers.shift, modifiers.alt, key);
+        let chord = Chord::new(control, modifiers.shift, modifiers.alt, key);
         if let Some(command) = self.keymap.resolve(&chord) {
             self.run_command(command, window, cx);
             cx.notify();
             return;
         }
-        if modifiers.control && !matches!(key, "home" | "end") {
+        if control && !matches!(key, "home" | "end") {
             cx.notify();
             return;
         }
-        if self.focus.is_focused(window) && self.cell_edit.active.is_none() && self.compare.is_none() && self.tabs.shows_grid_for(&self.catalog.grid_table) {
-            self.grid_key(key, modifiers.shift, modifiers.control, window, cx);
+        if self.focus.is_focused(window)
+            && self.cell_edit.active.is_none()
+            && self.compare.is_none()
+            && self.tabs.shows_grid_for(&self.catalog.grid_table)
+        {
+            self.grid_key(key, modifiers.shift, control, window, cx);
         }
     }
 
@@ -207,6 +213,8 @@ impl GridView {
                     window.focus(&self.focus, cx);
                 }
             }
+            Command::RunAtCursor if matches!(self.tabs.current(), Tab::Query) => self.run_at_cursor(cx),
+            Command::RunAtCursor => {}
             Command::RunQuery if matches!(self.tabs.current(), Tab::Query) => self.run_query(cx),
             Command::RunQuery => {}
             Command::ToggleDetail => self.toggle_detail(),
@@ -253,14 +261,7 @@ impl GridView {
                     row: cursor.row,
                     column: projection.visible_index(cursor.column).unwrap_or(0),
                 });
-                let Some(mut next) = move_cursor(
-                    current,
-                    key,
-                    rows,
-                    projection.len(),
-                    self.viewport_rows,
-                    ctrl,
-                ) else {
+                let Some(mut next) = move_cursor(current, key, rows, projection.len(), self.viewport_rows, ctrl) else {
                     return;
                 };
                 next.column = projection.source_index(next.column).unwrap_or(0);
@@ -272,6 +273,10 @@ impl GridView {
         }
         cx.notify();
     }
+}
+
+fn control_modifier(modifiers: gpui::Modifiers) -> bool {
+    modifiers.control || (cfg!(target_os = "macos") && modifiers.platform)
 }
 
 fn zoom_key(key: &str) -> Option<Option<i32>> {
@@ -286,7 +291,9 @@ fn zoom_key(key: &str) -> Option<Option<i32>> {
 impl GridView {
     pub(crate) fn zoom_editor(&mut self, delta: Option<i32>, cx: &mut Context<Self>) {
         let current = self.fonts.settings.editor_size;
-        let next = delta.map_or(font_settings::DEFAULT_ZOOM_SIZE, |delta| font_settings::zoom_step(current, delta));
+        let next = delta.map_or(font_settings::DEFAULT_ZOOM_SIZE, |delta| {
+            font_settings::zoom_step(current, delta)
+        });
         if next != current {
             self.edit_fonts(|fonts| fonts.editor_size = next, cx);
         }
