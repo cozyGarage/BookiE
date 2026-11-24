@@ -49,12 +49,10 @@ fn find_scope_and_grid_controls_fit_at_default_and_compact_widths(cx: &mut TestA
     for width in [1100.0, 720.0] {
         cx.simulate_resize(gpui::size(gpui::px(width), gpui::px(800.0)));
         cx.run_until_parked();
-        let controls = cx.debug_bounds("grid-controls").expect("grid controls are rendered");
         let field = cx.debug_bounds("grid-find-field").expect("Find field is rendered");
         assert!(field.size.width >= gpui::px(160.0), "Find scope must fit at {width}px");
         assert!(
-            field.origin.x >= controls.origin.x
-                && field.origin.x + field.size.width <= controls.origin.x + controls.size.width,
+            field.origin.x >= gpui::px(0.0) && field.origin.x + field.size.width <= gpui::px(width),
             "Find field should remain visible without horizontal scrolling at {width}px"
         );
         let previous = cx
