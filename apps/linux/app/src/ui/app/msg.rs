@@ -199,6 +199,10 @@ pub enum AppMsg {
     CompareSchema {
         schema: Option<String>,
     },
+    CompareData {
+        schema: Option<String>,
+        table: String,
+    },
     ShowErDiagram {
         schema: Option<String>,
     },

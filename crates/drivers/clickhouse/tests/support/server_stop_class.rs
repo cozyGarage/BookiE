@@ -135,6 +135,14 @@ fn stop_cases() -> Vec<StopCase> {
             |c, control| async move { c.query_result_sets_controlled(READ, &[], &control).await },
         ),
         sends(
+            "query_result_sets_bounded_controlled",
+            b"stop_class_marker",
+            |c, control| async move {
+                c.query_result_sets_bounded_controlled(READ, &[], 10, 1024, &control)
+                    .await
+            },
+        ),
+        sends(
             "execute_controlled",
             b"INSERT INTO stop_class_rows",
             |c, control| async move { c.execute_controlled(WRITE, &control).await },

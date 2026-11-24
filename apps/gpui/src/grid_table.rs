@@ -8,6 +8,7 @@ use gpui::{App, Context, IntoElement, WeakEntity, Window, div, prelude::*, px};
 use gpui_kit::component::Sizable;
 use gpui_kit::component::scroll::Scrollbar;
 use gpui_kit::component::table::{Column, ColumnSort, DataTable, TableDelegate, TableState};
+use sha2::{Digest, Sha256};
 
 use crate::GridView;
 use crate::column_projection::ColumnProjection;
@@ -16,7 +17,7 @@ use crate::ui_theme::ThemeExt;
 use bookie_gpui::model::{Cell, Diff};
 use bookie_gpui::preview::cell_preview;
 use bookie_gpui::source::Source;
-use bookie_gpui::theme::Theme;
+use bookie_gpui::theme::{Theme, size};
 
 #[derive(Default)]
 pub struct RowMap {
@@ -32,6 +33,75 @@ struct PinScope {
     database: String,
     schema: Option<String>,
     table: String,
+}
+
+impl PinScope {
+    fn width_key(&self) -> String {
+        serde_json::to_string(&(self.database.as_str(), self.schema.as_deref(), self.table.as_str()))
+            .unwrap_or_default()
+    }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+enum WidthScope {
+    Table(PinScope),
+    Query {
+        connection: String,
+        database: String,
+        identity: String,
+    },
+}
+
+const MAX_MANUAL_WIDTH_SCOPES: usize = 128;
+
+fn query_width_identity(sql: &str, columns: &[bookie_gpui::model::ColumnMeta]) -> String {
+    let mut hasher = Sha256::new();
+    hash_width_identity_part(&mut hasher, sql.as_bytes());
+    hasher.update((columns.len() as u64).to_be_bytes());
+    for column in columns {
+        hash_width_identity_part(&mut hasher, column.name.as_bytes());
+        hash_width_identity_part(&mut hasher, column.data_type.as_bytes());
+    }
+    let mut identity = String::with_capacity(70);
+    identity.push_str("query:");
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    for byte in hasher.finalize() {
+        identity.push(HEX[(byte >> 4) as usize] as char);
+        identity.push(HEX[(byte & 0x0f) as usize] as char);
+    }
+    identity
+}
+
+fn hash_width_identity_part(hasher: &mut Sha256, value: &[u8]) {
+    hasher.update((value.len() as u64).to_be_bytes());
+    hasher.update(value);
+}
+
+fn remember_width_scope(
+    widths: &mut HashMap<WidthScope, HashMap<String, f32>>,
+    scope: WidthScope,
+    column: String,
+    width: f32,
+) {
+    if !widths.contains_key(&scope)
+        && widths.len() >= MAX_MANUAL_WIDTH_SCOPES
+        && let Some(evicted) = widths.keys().next().cloned()
+    {
+        widths.remove(&evicted);
+    }
+    widths.entry(scope).or_default().insert(column, width);
+}
+
+fn unique_column_indices(columns: &[(String, f32)]) -> HashSet<usize> {
+    let mut counts = HashMap::with_capacity(columns.len());
+    for (name, _) in columns {
+        *counts.entry(name.as_str()).or_insert(0) += 1;
+    }
+    columns
+        .iter()
+        .enumerate()
+        .filter_map(|(index, (name, _))| (counts.get(name.as_str()) == Some(&1)).then_some(index))
+        .collect()
 }
 
 impl PartialEq for RowMap {
@@ -70,6 +140,7 @@ pub struct GridDelegate {
     projection: ColumnProjection,
     hidden_columns: HashSet<usize>,
     content_widths: Vec<f32>,
+    visible_rows: Range<usize>,
     available_width: f32,
     numeric: Vec<bool>,
     kinds: Vec<(String, bool)>,
@@ -80,8 +151,10 @@ pub struct GridDelegate {
     edits: Edits,
     editor: Option<(usize, usize, gpui::AnyView)>,
     pin_scope: Option<PinScope>,
+    width_scope: Option<WidthScope>,
     pinned_columns: usize,
     pin_counts: HashMap<PinScope, usize>,
+    manual_widths: HashMap<WidthScope, HashMap<String, f32>>,
 }
 
 fn header_menu(
@@ -93,23 +166,45 @@ fn header_menu(
     has_hidden: bool,
     binary: bool,
     pin_action: Option<(gpui::Entity<TableState<GridDelegate>>, PinScope, bool)>,
-    icon: impl IntoElement,
+    color: u32,
 ) -> impl IntoElement {
     use gpui_component::button::{Button, ButtonVariants};
     use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
 
     Button::new(format!("column-menu-{col_ix}"))
         .ghost()
+        .small()
         .compact()
         .tooltip(format!("Actions for {column_name}"))
         .accessibility_label(format!("Actions for {column_name}"))
-        .child(icon)
+        .icon(
+            gpui_component::Icon::default()
+                .path("icons/ellipsis.svg")
+                .text_color(gpui::rgb(color)),
+        )
         .dropdown_menu(move |menu, _, _| {
             let copy_name = column_name.clone();
             let mut menu =
                 menu.item(PopupMenuItem::new("Copy column name").on_click(move |_, _, cx| {
                     cx.write_to_clipboard(gpui::ClipboardItem::new_string(copy_name.clone()))
                 }));
+            if let Some(owner) = owner.clone() {
+                let fit_owner = owner.clone();
+                menu = menu.item(
+                    PopupMenuItem::new("Fit column to content").on_click(move |_, window, cx| {
+                        let _ = fit_owner.update(cx, |view, cx| {
+                            view.table.update(cx, |table, cx| {
+                                table.fit_col(col_ix, window, cx);
+                            });
+                        });
+                    }),
+                );
+                menu = menu.item(
+                    PopupMenuItem::new("Reset column widths").on_click(move |_, window, cx| {
+                        let _ = owner.update(cx, |view, cx| view.reset_grid_widths(window, cx));
+                    }),
+                );
+            }
             if let Some(owner) = owner.clone() {
                 let column = column_name.clone();
                 let hide_owner = owner.clone();
@@ -175,6 +270,26 @@ fn header_menu(
 }
 
 impl TableDelegate for GridDelegate {
+    fn fit_column(
+        &mut self,
+        col_ix: usize,
+        window: &mut Window,
+        _cx: &mut Context<TableState<Self>>,
+    ) -> Option<gpui::Pixels> {
+        let source_col = self.projection.source_index(col_ix)?;
+        let source = self.source.as_ref()?;
+        let measured = measure_visible_columns(
+            source,
+            &self.map,
+            &self.columns,
+            HeaderSizing::new(&self.kinds, self.pin_scope.is_some()),
+            &self.edits,
+            self.visible_rows.start,
+            self.visible_rows.len(),
+            |text| measure_text(text, window),
+        );
+        measured.get(source_col).copied().map(px)
+    }
     fn perform_sort(
         &mut self,
         col_ix: usize,
@@ -204,6 +319,7 @@ impl TableDelegate for GridDelegate {
     }
 
     fn visible_rows_changed(&mut self, visible: Range<usize>, window: &mut Window, cx: &mut Context<TableState<Self>>) {
+        self.visible_rows = visible.clone();
         let Some(source) = &self.source else { return };
         if self.map.compare.is_some()
             || self.content_widths.len() != self.columns.len()
@@ -219,6 +335,7 @@ impl TableDelegate for GridDelegate {
             source,
             &self.map,
             &self.columns,
+            HeaderSizing::new(&self.kinds, self.pin_scope.is_some()),
             &self.edits,
             visible.start,
             visible.len(),
@@ -232,6 +349,17 @@ impl TableDelegate for GridDelegate {
             *width = *measured;
         }
         fill_text_columns(&mut columns, &self.numeric, self.available_width);
+        if let Some(widths) = self
+            .width_scope
+            .as_ref()
+            .and_then(|scope| self.manual_widths.get(scope))
+        {
+            for (name, width) in &mut columns {
+                if let Some(manual) = widths.get(name) {
+                    *width = *manual;
+                }
+            }
+        }
         if columns == self.columns {
             return;
         }
@@ -303,10 +431,7 @@ impl TableDelegate for GridDelegate {
             .kinds
             .get(source_col)
             .is_some_and(|(kind, _)| crate::binary_mode::is_binary_type(kind));
-        let column_width = self
-            .columns
-            .get(source_col)
-            .map_or(0.0, |(_, width)| *width);
+        let column_width = self.columns.get(source_col).map_or(0.0, |(_, width)| *width);
         let show_pin_button = pin_button_visible(column_width);
         let menu = header_menu(
             col_ix,
@@ -320,7 +445,7 @@ impl TableDelegate for GridDelegate {
                 .clone()
                 .filter(|_| !show_pin_button)
                 .map(|scope| (cx.entity(), scope, col_ix < self.pinned_columns)),
-            crate::assets::icon("ellipsis", theme.muted_foreground),
+            theme.muted_foreground,
         );
         let pin = self.pin_scope.clone().filter(|_| show_pin_button).map(|scope| {
             use gpui_component::button::{Button, ButtonVariants};
@@ -335,6 +460,7 @@ impl TableDelegate for GridDelegate {
             };
             Button::new(format!("pin-column-{col_ix}"))
                 .ghost()
+                .small()
                 .compact()
                 .tooltip(label.clone())
                 .accessibility_label(label.clone())
@@ -345,9 +471,14 @@ impl TableDelegate for GridDelegate {
                     delegate.pin_counts.insert(scope.clone(), delegate.pinned_columns);
                     table.refresh(cx);
                 }))
-                .child(crate::assets::icon("pin", color))
+                .icon(
+                    gpui_component::Icon::default()
+                        .path("icons/pin.svg")
+                        .text_color(gpui::rgb(color)),
+                )
         });
         div()
+            .debug_selector(move || format!("column-header-{col_ix}"))
             .size_full()
             .min_w_0()
             .flex()
@@ -518,10 +649,7 @@ impl GridDelegate {
                 let cell = self.edits.get(&(index, col_ix)).unwrap_or(cell);
                 let right = crate::right_aligned(self.numeric.get(col_ix).copied().unwrap_or(false), cell);
                 (
-                    crate::binary_mode::preview(
-                        cell,
-                        self.binary_modes.get(col_ix).copied().unwrap_or_default(),
-                    ),
+                    crate::binary_mode::preview(cell, self.binary_modes.get(col_ix).copied().unwrap_or_default()),
                     right,
                 )
             });
@@ -547,6 +675,95 @@ impl GridDelegate {
 }
 
 impl GridView {
+    fn load_remembered_widths(&self, columns: &mut [(String, f32)], scope: Option<&PinScope>) -> HashMap<String, f32> {
+        let mut saved_widths = HashMap::new();
+        if self.grid_is_query || self.compare.is_some() {
+            return saved_widths;
+        }
+        let (Some(scope), Some((id, _)), Some(store)) = (
+            scope,
+            self.live.as_ref().and_then(|session| session.saved.as_ref()),
+            self.column_widths.as_ref(),
+        ) else {
+            return saved_widths;
+        };
+        let unique_columns = unique_column_indices(columns);
+        for (index, (name, width)) in columns.iter_mut().enumerate() {
+            if unique_columns.contains(&index)
+                && let Some(saved) = store.load(*id, &scope.width_key(), name)
+            {
+                *width = saved as f32;
+                saved_widths.insert(name.clone(), *width);
+            }
+        }
+        saved_widths
+    }
+
+    fn reset_grid_widths(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(scope) = self.table.read(cx).delegate().width_scope.clone() else {
+            return;
+        };
+        if let WidthScope::Table(scope) = &scope
+            && let Some((id, _)) = self.live.as_ref().and_then(|session| session.saved.as_ref())
+            && let Some(store) = &self.column_widths
+            && let Err(error) = store.forget_widths(*id, &scope.width_key())
+        {
+            tracing::warn!(%error, "could not reset grid column widths");
+        }
+        self.table.update(cx, |table, _| {
+            table.delegate_mut().manual_widths.remove(&scope);
+        });
+        let available_width = self.table.read(cx).delegate().available_width;
+        self.sync_table(available_width, window, cx);
+        cx.notify();
+    }
+    pub(crate) fn remember_grid_widths(&mut self, widths: &[gpui::Pixels], cx: &mut Context<Self>) {
+        let table = self.table.read(cx);
+        let delegate = table.delegate();
+        let Some(scope) = delegate.width_scope.clone() else {
+            return;
+        };
+        let unique_columns = unique_column_indices(&delegate.columns);
+        let previous = (0..delegate.projection.len())
+            .filter_map(|index| {
+                delegate
+                    .projection
+                    .source_index(index)
+                    .map(|source| delegate.columns[source].1)
+            })
+            .collect::<Vec<_>>();
+        let current = widths.iter().map(|width| f32::from(*width)).collect::<Vec<_>>();
+        let changes = crate::column_projection::changed_widths(&delegate.projection, &previous, &current)
+            .into_iter()
+            .filter_map(|(index, width)| {
+                let name = &delegate.columns.get(index)?.0;
+                unique_columns.contains(&index).then_some((name.clone(), width))
+            })
+            .collect::<Vec<_>>();
+        if !self.grid_is_query
+            && self.compare.is_none()
+            && let WidthScope::Table(table_scope) = &scope
+            && let Some((id, _)) = self.live.as_ref().and_then(|session| session.saved.as_ref())
+            && let Some(store) = &self.column_widths
+        {
+            for (name, width) in &changes {
+                if let Err(error) = store.save(*id, &table_scope.width_key(), name, width.round() as i32) {
+                    tracing::warn!(%error, "could not persist grid column width");
+                }
+            }
+        }
+        self.table.update(cx, |table, cx| {
+            let delegate = table.delegate_mut();
+            for (name, width) in changes {
+                remember_width_scope(&mut delegate.manual_widths, scope.clone(), name.clone(), width);
+                if let Some(column) = delegate.columns.iter_mut().find(|(column, _)| *column == name) {
+                    column.1 = width;
+                }
+            }
+            table.refresh(cx);
+        });
+    }
+
     pub(crate) fn binary_mode_for_column(&self, column: usize) -> crate::binary_mode::BinaryMode {
         let Some(meta) = self.source.columns().get(column) else {
             return crate::binary_mode::BinaryMode::Hex;
@@ -554,7 +771,10 @@ impl GridView {
         if !crate::binary_mode::is_binary_type(&meta.data_type) {
             return crate::binary_mode::BinaryMode::Hex;
         }
-        let occurrence = self.source.columns()[..column].iter().filter(|item| item.name == meta.name).count();
+        let occurrence = self.source.columns()[..column]
+            .iter()
+            .filter(|item| item.name == meta.name)
+            .count();
         self.binary_modes
             .get(&(self.binary_scope(), meta.name.clone(), occurrence))
             .copied()
@@ -568,11 +788,16 @@ impl GridView {
         cx: &mut Context<Self>,
     ) {
         let column = source_column.saturating_sub(usize::from(self.compare.is_some()));
-        let Some(meta) = self.source.columns().get(column) else { return };
+        let Some(meta) = self.source.columns().get(column) else {
+            return;
+        };
         if !crate::binary_mode::is_binary_type(&meta.data_type) {
             return;
         }
-        let occurrence = self.source.columns()[..column].iter().filter(|item| item.name == meta.name).count();
+        let occurrence = self.source.columns()[..column]
+            .iter()
+            .filter(|item| item.name == meta.name)
+            .count();
         let scope = self.binary_scope();
         self.binary_modes.insert((scope, meta.name.clone(), occurrence), mode);
         cx.notify();
@@ -588,17 +813,15 @@ impl GridView {
             };
         }
         crate::binary_mode::Scope::Query {
-            connection: self.live.as_ref().map_or_else(
-                || self.catalog.connection.clone(),
-                |session| {
-                    session.saved.as_ref().map_or_else(
-                        || format!("{}:{}", session.driver_id, session.label),
-                        |(id, _)| id.to_string(),
-                    )
-                },
-            ),
+            connection: self.connection_identity(),
             database: self.catalog.database.clone(),
         }
+    }
+
+    fn connection_identity(&self) -> String {
+        self.live
+            .as_ref()
+            .map_or_else(|| self.catalog.connection.clone(), |session| session.cache_identity())
     }
 
     fn pin_scope(&self) -> Option<PinScope> {
@@ -606,18 +829,35 @@ impl GridView {
             return None;
         };
         Some(PinScope {
-            connection: self.live.as_ref().map_or_else(
-                || self.catalog.connection.clone(),
-                |session| {
-                    session.saved.as_ref().map_or_else(
-                        || format!("{}:{}", session.driver_id, session.label),
-                        |(id, _)| id.to_string(),
-                    )
-                },
-            ),
+            connection: self.connection_identity(),
             database: self.catalog.database.clone(),
             schema: table.schema.clone(),
             table: table.name.clone(),
+        })
+    }
+
+    fn width_scope(&self, delegate: &GridDelegate) -> Option<WidthScope> {
+        if self.compare.is_some() {
+            return None;
+        }
+        if !self.grid_is_query {
+            return self.pin_scope().map(WidthScope::Table);
+        }
+        let identity = match &delegate.width_scope {
+            Some(WidthScope::Query { identity, .. })
+                if delegate
+                    .source
+                    .as_ref()
+                    .is_some_and(|source| Arc::ptr_eq(source, &self.source)) =>
+            {
+                identity.clone()
+            }
+            _ => query_width_identity(self.source.executed_sql()?, self.source.columns()),
+        };
+        Some(WidthScope::Query {
+            connection: self.connection_identity(),
+            database: self.catalog.database.clone(),
+            identity,
         })
     }
 
@@ -734,6 +974,7 @@ impl GridView {
         let pin_scope = self.pin_scope();
         let table = self.table.read(cx);
         let delegate = table.delegate();
+        let width_scope = self.width_scope(delegate);
         let (hidden_columns, projection) = self.column_projection(&columns, delegate, &pin_scope);
         let widths_match = delegate
             .source
@@ -750,6 +991,7 @@ impl GridView {
                 &self.source,
                 &map,
                 &columns,
+                HeaderSizing::new(&kinds, pin_scope.is_some()),
                 &self.cell_edit.edits,
                 start,
                 self.viewport_rows,
@@ -760,6 +1002,14 @@ impl GridView {
             *width = *measured;
         }
         fill_text_columns(&mut columns, &numeric, available_width);
+        let saved_widths = self.load_remembered_widths(&mut columns, pin_scope.as_ref());
+        if let Some(widths) = width_scope.as_ref().and_then(|scope| delegate.manual_widths.get(scope)) {
+            for (name, width) in &mut columns {
+                if let Some(manual) = widths.get(name) {
+                    *width = *manual;
+                }
+            }
+        }
         let (sortable, sort) = self.sort_state();
         let mut binary_modes = Vec::with_capacity(kinds.len());
         if self.compare.is_some() {
@@ -791,6 +1041,11 @@ impl GridView {
             }
             let delegate = table.delegate_mut();
             delegate.cached = None;
+            if let Some(scope) = &width_scope {
+                for (name, width) in saved_widths {
+                    remember_width_scope(&mut delegate.manual_widths, scope.clone(), name, width);
+                }
+            }
             delegate.content_widths = content_widths;
             delegate.available_width = available_width;
             let pinned_columns = pin_scope
@@ -812,6 +1067,7 @@ impl GridView {
                 &binary_modes,
             ) && delegate.projection == projection
                 && delegate.pin_scope == pin_scope
+                && delegate.width_scope == width_scope
                 && delegate.pinned_columns == pinned_columns
             {
                 return;
@@ -829,6 +1085,7 @@ impl GridView {
             delegate.edits = self.cell_edit.edits.clone();
             delegate.editor = editor;
             delegate.pin_scope = pin_scope;
+            delegate.width_scope = width_scope;
             delegate.pinned_columns = pinned_columns;
             table.refresh(cx);
         });
@@ -1038,6 +1295,17 @@ const MIN_CONTENT_WIDTH: f32 = 56.0;
 const MAX_CONTENT_WIDTH: f32 = 360.0;
 const MAX_MEASURE_CELLS: usize = 2048;
 
+struct HeaderSizing<'a> {
+    kinds: &'a [(String, bool)],
+    pinnable: bool,
+}
+
+impl<'a> HeaderSizing<'a> {
+    fn new(kinds: &'a [(String, bool)], pinnable: bool) -> Self {
+        Self { kinds, pinnable }
+    }
+}
+
 fn fill_text_columns(columns: &mut [(String, f32)], numeric: &[bool], available_width: f32) {
     if !available_width.is_finite() || available_width <= 0.0 {
         return;
@@ -1072,6 +1340,7 @@ fn measure_visible_columns(
     source: &Source,
     map: &RowMap,
     columns: &[(String, f32)],
+    header: HeaderSizing<'_>,
     edits: &Edits,
     start: usize,
     viewport_rows: usize,
@@ -1079,7 +1348,8 @@ fn measure_visible_columns(
 ) -> Vec<f32> {
     let mut widths: Vec<f32> = columns
         .iter()
-        .map(|(name, _)| measure(name).max(MIN_CONTENT_WIDTH).min(MAX_CONTENT_WIDTH))
+        .enumerate()
+        .map(|(index, (name, _))| measure_header_width(name, header.kinds.get(index), header.pinnable, &mut measure))
         .collect();
     if columns.is_empty() || map.compare.is_some() {
         return widths;
@@ -1109,6 +1379,28 @@ fn measure_visible_columns(
     widths
 }
 
+fn measure_header_width(
+    name: &str,
+    kind: Option<&(String, bool)>,
+    pinnable: bool,
+    measure: &mut impl FnMut(&str) -> f32,
+) -> f32 {
+    let mut width = measure(name) + size::COMPACT_CONTROL;
+    if pinnable {
+        width += size::COMPACT_CONTROL;
+    }
+    if let Some((data_type, primary_key)) = kind {
+        let kind = header_kind(data_type);
+        if !kind.is_empty() {
+            width += measure(&kind) - size::MD + size::XS;
+        }
+        if *primary_key {
+            width += size::ICON + size::XS;
+        }
+    }
+    width.max(MIN_CONTENT_WIDTH).min(MAX_CONTENT_WIDTH)
+}
+
 fn measure_text(text: &str, window: &Window) -> f32 {
     if text.is_empty() {
         return 0.0;
@@ -1134,7 +1426,7 @@ fn measure_text(text: &str, window: &Window) -> f32 {
             .text_system()
             .shape_line(text.into(), style.font_size.to_pixels(window.rem_size()), &[run], None)
             .width,
-    ) + 12.0
+    ) + size::MD
 }
 
 fn labels(cells: &[Cell], numeric: &[bool], binary_modes: &[crate::binary_mode::BinaryMode]) -> Vec<(String, bool)> {
@@ -1143,7 +1435,10 @@ fn labels(cells: &[Cell], numeric: &[bool], binary_modes: &[crate::binary_mode::
         .enumerate()
         .map(|(column, cell)| {
             let right = crate::right_aligned(numeric.get(column).copied().unwrap_or(false), cell);
-            (crate::binary_mode::preview(cell, binary_modes.get(column).copied().unwrap_or_default()), right)
+            (
+                crate::binary_mode::preview(cell, binary_modes.get(column).copied().unwrap_or_default()),
+                right,
+            )
         })
         .collect()
 }
@@ -1219,13 +1514,21 @@ pub fn cursor_at(cell: Option<(usize, usize)>) -> Option<bookie_results::grid_cu
 
 #[cfg(test)]
 mod header_kind_tests {
-    use super::header_kind;
+    use super::{header_kind, measure_header_width};
 
     #[test]
     fn a_header_type_reads_in_capitals_like_a_label() {
         assert_eq!(header_kind("integer"), "INTEGER");
         assert_eq!(header_kind("numeric(10,2)"), "NUMERIC(10,2)");
         assert_eq!(header_kind(""), "");
+    }
+
+    #[test]
+    fn fitted_width_accounts_for_inline_type_and_primary_key_icon() {
+        let kind = ("numeric(38,18)".to_owned(), true);
+        let width = measure_header_width("id", Some(&kind), true, &mut |text| text.len() as f32 * 8.0 + 12.0);
+
+        assert_eq!(width, ("id".len() + "NUMERIC(38,18)".len()) as f32 * 8.0 + 82.0);
     }
 }
 
@@ -1237,6 +1540,82 @@ mod tests {
     use bookie_gpui::model::Cell;
     use bookie_gpui::source::{ResultSource, Synthetic};
     use bookie_results::grid_cursor::Cursor;
+
+    #[test]
+    fn query_width_identity_is_bounded_and_depends_on_executed_sql_and_result_shape() {
+        let column = |name: &str, data_type: &str| bookie_gpui::model::ColumnMeta {
+            name: name.into(),
+            data_type: data_type.into(),
+            width: 100.0,
+            numeric: false,
+            primary_key: false,
+        };
+        let columns = [column("id", "integer")];
+        let original = query_width_identity("select id from a", &columns);
+        assert!(original.len() <= 70);
+        assert_eq!(original, query_width_identity("select id from a", &columns));
+        assert_ne!(original, query_width_identity("select id from b", &columns));
+        assert_ne!(
+            original,
+            query_width_identity("select id from a", &[column("id", "text")])
+        );
+        assert_ne!(
+            original,
+            query_width_identity("select id from a", &[column("name", "integer")])
+        );
+        assert!(query_width_identity(&"x".repeat(1_000_000), &columns).len() <= 70);
+    }
+
+    #[test]
+    fn query_width_scope_never_aliases_a_table_scope() {
+        let table = WidthScope::Table(PinScope {
+            connection: "connection".into(),
+            database: "database".into(),
+            schema: None,
+            table: "query:abc".into(),
+        });
+        let query = WidthScope::Query {
+            connection: "connection".into(),
+            database: "database".into(),
+            identity: "abc".into(),
+        };
+        assert_ne!(table, query);
+    }
+
+    #[test]
+    fn remembered_width_scopes_are_bounded() {
+        let mut widths = HashMap::new();
+        for index in 0..MAX_MANUAL_WIDTH_SCOPES + 4 {
+            let scope = WidthScope::Query {
+                connection: "connection".into(),
+                database: "database".into(),
+                identity: index.to_string(),
+            };
+            remember_width_scope(&mut widths, scope, "id".into(), 100.0);
+        }
+        assert_eq!(widths.len(), MAX_MANUAL_WIDTH_SCOPES);
+    }
+
+    #[test]
+    fn width_keys_distinguish_database_schema_and_delimiters() {
+        let scope = |database: &str, schema: Option<&str>, table: &str| PinScope {
+            connection: "connection".into(),
+            database: database.into(),
+            schema: schema.map(str::to_owned),
+            table: table.into(),
+        };
+        assert_ne!(
+            scope("a.b", Some("c"), "d").width_key(),
+            scope("a", Some("b.c"), "d").width_key()
+        );
+        assert_ne!(scope("a", None, "d").width_key(), scope("a", Some(""), "d").width_key());
+    }
+
+    #[test]
+    fn saved_widths_skip_ambiguous_duplicate_names() {
+        let columns = vec![("id".into(), 80.0), ("id".into(), 100.0), ("name".into(), 120.0)];
+        assert_eq!(unique_column_indices(&columns), HashSet::from([2]));
+    }
 
     #[gpui::test]
     fn header_sort_indicator_matches_the_applied_sort(cx: &mut gpui::TestAppContext) {
@@ -1378,6 +1757,10 @@ mod tests {
                 ..Default::default()
             },
             &columns,
+            HeaderSizing {
+                kinds: &[],
+                pinnable: false,
+            },
             &Edits::default(),
             0,
             20,

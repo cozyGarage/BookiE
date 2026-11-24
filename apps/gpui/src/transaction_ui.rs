@@ -11,6 +11,7 @@ pub(crate) struct TransactionState {
     pub write: Arc<WriteSession>,
     pub shared: SharedSession,
     pub started: Instant,
+    pub last_activity: Instant,
     pub statements: usize,
 }
 
@@ -33,7 +34,7 @@ impl GridView {
         };
         let approvals = self.approval.tx.clone();
         self.status = "Starting a transaction…".into();
-        self.begin_background(
+        self.begin_background_with_context(
             Work::Load,
             cx,
             move |_| {
@@ -41,14 +42,16 @@ impl GridView {
                 let shared = write.begin_transaction()?;
                 Ok::<_, String>((write, shared))
             },
-            |this, opened| match opened {
+            |this, opened, cx| match opened {
                 Ok((write, shared)) => {
                     this.transaction = Some(TransactionState {
                         write,
                         shared,
                         started: Instant::now(),
+                        last_activity: Instant::now(),
                         statements: 0,
                     });
+                    this.refresh_while_transaction_open(cx);
                     this.status = "Transaction open: statements run in it until you commit or roll back".into();
                 }
                 Err(message) => this.status = format!("Could not start a transaction: {message}"),
@@ -73,6 +76,7 @@ impl GridView {
                 Ok(table) => {
                     if let Some(transaction) = this.transaction.as_mut() {
                         transaction.statements += 1;
+                        transaction.last_activity = Instant::now();
                     }
                     this.add_run(Some(Arc::new(table)));
                     this.status = "Ran in the transaction (not committed yet)".into();
@@ -108,6 +112,30 @@ impl GridView {
         );
     }
 
+    fn refresh_while_transaction_open(&self, cx: &mut Context<Self>) {
+        cx.spawn(async move |this, cx| {
+            loop {
+                cx.background_executor().timer(std::time::Duration::from_secs(30)).await;
+                let open = this
+                    .update(cx, |this, cx| {
+                        cx.notify();
+                        this.transaction.is_some()
+                    })
+                    .unwrap_or(false);
+                if !open {
+                    break;
+                }
+            }
+        })
+        .detach();
+    }
+
+    pub(crate) fn transaction_idle_warning(&self) -> Option<String> {
+        self.transaction.as_ref().and_then(|transaction| {
+            bookie_app_services::transaction_idle::idle_warning(transaction.last_activity.elapsed())
+        })
+    }
+
     pub(crate) fn transaction_controls(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
         let Some(transaction) = self.transaction.as_ref() else {
             return div().child(ghost("begin-transaction", "Begin transaction", theme).on_click(cx.listener(
@@ -122,21 +150,30 @@ impl GridView {
             .flex()
             .items_center()
             .gap_2()
-            .child(
+            .child({
+                let warning = self.transaction_idle_warning();
+                let color = if warning.is_some() { theme.destructive } else { theme.warning };
                 div()
+                    .id("transaction-badge")
                     .debug_selector(|| "transaction-badge".into())
                     .px_2()
                     .rounded(px(theme.radius))
                     .border_1()
-                    .border_color(rgb(theme.warning))
-                    .text_color(rgb(theme.warning))
+                    .border_color(rgb(color))
+                    .text_color(rgb(color))
+                    .when_some(warning, |badge, warning| {
+                        badge.tooltip(move |window, cx| {
+                            gpui_component::tooltip::Tooltip::new(warning.clone()).build(window, cx)
+                        })
+                    })
                     .child(format!(
-                        "Transaction · {}:{:02} · {} run",
+                        "Transaction · {}:{:02} · {} run{}",
                         elapsed / 60,
                         elapsed % 60,
-                        transaction.statements
-                    )),
-            )
+                        transaction.statements,
+                        if self.transaction_idle_warning().is_some() { " · idle" } else { "" }
+                    ))
+            })
             .child(ghost("commit-transaction", "Commit", theme).on_click(cx.listener(|this, _, _, cx| {
                 this.end_transaction(true, cx);
                 cx.notify();

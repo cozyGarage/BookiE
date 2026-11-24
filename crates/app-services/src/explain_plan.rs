@@ -157,17 +157,45 @@ mod tests {
     }
 
     #[test]
-    fn an_analyzed_plan_flags_tenfold_row_misses_except_under_a_limit() {
-        let plan = "Limit  (cost=0.00..1.00 rows=10 width=4) (actual time=0.01..0.02 rows=10 loops=1)\n  ->  Seq Scan on a  (cost=0.00..60.00 rows=1000 width=4) (actual time=0.01..0.02 rows=10 loops=1)\nHash Join  (cost=10.00..120.50 rows=5 width=8) (actual time=1.00..9.00 rows=5000 loops=1)\n  ->  Seq Scan on b  (cost=0.00..60.00 rows=100 width=4) (actual time=0.01..0.20 rows=120 loops=1)\n  ->  Seq Scan on c  (cost=0.00..60.00 rows=100 width=4) (never executed)";
+    fn an_analyzed_plan_flags_tenfold_row_misses() {
+        let plan = "Hash Join  (cost=10.00..120.50 rows=5 width=8) (actual time=1.00..9.00 rows=5000 loops=1)\n  ->  Seq Scan on b  (cost=0.00..60.00 rows=100 width=4) (actual time=0.01..0.20 rows=120 loops=1)\n  ->  Seq Scan on c  (cost=0.00..60.00 rows=100 width=4) (never executed)";
         let nodes = parse_plan(plan);
-        assert_eq!(nodes[1].rows, Some(1000.0));
-        assert_eq!(nodes[1].actual_rows, Some(10.0));
-        assert_eq!(misestimate(&nodes, 1), None, "a scan cut short by its Limit is expected");
-        assert_eq!(misestimate(&nodes, 2), Some(1000.0), "5 estimated, 5000 actual");
-        assert_eq!(misestimate(&nodes, 3), None, "within ten times");
-        assert_eq!(nodes[4].actual_rows, None);
-        assert_eq!(misestimate(&nodes, 4), None, "a node that never ran has nothing to compare");
+        assert_eq!(nodes.len(), 3);
+        assert_eq!(misestimate(&nodes, 0), Some(1000.0), "5 estimated, 5000 actual");
+        assert_eq!(misestimate(&nodes, 1), None, "within ten times");
+        assert_eq!(nodes[2].actual_rows, None);
+        assert_eq!(
+            misestimate(&nodes, 2),
+            None,
+            "a node that never ran has nothing to compare"
+        );
         assert_eq!(misestimate(&nodes, 99), None);
+    }
+
+    #[test]
+    fn a_limit_suppresses_only_overestimates_of_its_own_descendants() {
+        let plan = "Append  (cost=0.00..100.00 rows=20 width=4) (actual time=0.01..1.00 rows=20 loops=1)\n  ->  Limit  (cost=0.00..1.00 rows=10 width=4) (actual time=0.01..0.02 rows=10 loops=1)\n        ->  Seq Scan on a  (cost=0.00..60.00 rows=1000 width=4) (actual time=0.01..0.02 rows=10 loops=1)\n  ->  Seq Scan on b  (cost=0.00..60.00 rows=1000 width=4) (actual time=0.01..0.02 rows=10 loops=1)";
+        let mut nodes = parse_plan(plan);
+        assert_eq!(nodes.len(), 4);
+        assert_eq!(nodes[2].rows, Some(1000.0));
+        assert_eq!(nodes[2].actual_rows, Some(10.0));
+        assert_eq!(
+            misestimate(&nodes, 2),
+            None,
+            "a scan cut short by its Limit is expected"
+        );
+        assert_eq!(
+            misestimate(&nodes, 3),
+            Some(100.0),
+            "a sibling is not cut short by that Limit"
+        );
+        nodes[2].rows = Some(1.0);
+        nodes[2].actual_rows = Some(100.0);
+        assert_eq!(
+            misestimate(&nodes, 2),
+            Some(100.0),
+            "a Limit does not explain excess rows"
+        );
     }
 
     #[test]

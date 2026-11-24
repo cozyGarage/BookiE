@@ -376,6 +376,7 @@ fn map_sidebar_output(output: SidebarRowOutput) -> AppMsg {
         SidebarRowOutput::TableFromCsv { schema } => AppMsg::CreateTableFromCsv { schema },
         SidebarRowOutput::ShowDiagram { schema } => AppMsg::ShowErDiagram { schema },
         SidebarRowOutput::CompareSchema { schema } => AppMsg::CompareSchema { schema },
+        SidebarRowOutput::CompareData { schema, name } => AppMsg::CompareData { schema, table: name },
         SidebarRowOutput::HideSchema(schema) => AppMsg::HideSidebarSchema(schema),
         SidebarRowOutput::NewSchema => AppMsg::CatalogDdl(crate::ui::app::msg::CatalogDdlMsg::NewSchemaPrompt),
         SidebarRowOutput::DropSchema { schema } => {

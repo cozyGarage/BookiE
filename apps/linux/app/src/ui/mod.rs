@@ -11,6 +11,7 @@ mod connection_row;
 mod context_menu;
 mod count_format;
 mod custom_delimiter;
+mod data_compare;
 mod diagram;
 mod dialog_shell;
 mod dialog_zoom;

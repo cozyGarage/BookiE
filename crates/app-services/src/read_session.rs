@@ -546,12 +546,17 @@ impl ReadSession {
             .map_err(|error| classify(&error))
     }
 
-    pub async fn open_interactive(&self) -> Result<crate::interactive_session::SharedSession, DriverFailurePresentation> {
+    pub async fn open_interactive(
+        &self,
+    ) -> Result<crate::interactive_session::SharedSession, DriverFailurePresentation> {
         let guard = self
             .database
             .guard_for_generation(self.id, self.generation, Principal::human_gui())
             .ok_or(DriverFailurePresentation::Disconnected)?;
-        let session = guard.open_session_with_audit().await.map_err(|error| classify(&error))?;
+        let session = guard
+            .open_session_with_audit()
+            .await
+            .map_err(|error| classify(&error))?;
         Ok(Arc::new(tokio::sync::Mutex::new(Some(
             crate::interactive_session::SessionHandle::Audited(session),
         ))))
@@ -721,7 +726,12 @@ mod table_select_tests {
         use super::super::*;
         use crate::interactive_session::{SharedSession, commit_session, rollback_and_close};
 
-        async fn fixture() -> (tempfile::TempDir, std::path::PathBuf, Box<dyn bookie_core::Connection>, SavedConnection) {
+        async fn fixture() -> (
+            tempfile::TempDir,
+            std::path::PathBuf,
+            Box<dyn bookie_core::Connection>,
+            SavedConnection,
+        ) {
             let directory = tempfile::tempdir().unwrap();
             let path = directory.path().join("interactive.db");
             std::fs::File::create(&path).unwrap();
@@ -732,7 +742,10 @@ mod table_select_tests {
                 })
                 .await
                 .unwrap();
-            writer.execute("CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)").await.unwrap();
+            writer
+                .execute("CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)")
+                .await
+                .unwrap();
             writer.execute("INSERT INTO items VALUES (1, 'a')").await.unwrap();
             let mut saved = crate::open_request::file_connection(&crate::open_request::classify_file(&path).unwrap());
             saved.read_only = false;
@@ -769,8 +782,15 @@ mod table_select_tests {
             .await
             .unwrap();
             let shared = session.open_interactive().await.unwrap();
-            for sql in ["UPDATE items SET name = 'x'", "DELETE FROM items", "INSERT INTO items VALUES (2, 'b')"] {
-                assert!(run(&shared, sql).await.is_err(), "write accepted on a read session: {sql}");
+            for sql in [
+                "UPDATE items SET name = 'x'",
+                "DELETE FROM items",
+                "INSERT INTO items VALUES (2, 'b')",
+            ] {
+                assert!(
+                    run(&shared, sql).await.is_err(),
+                    "write accepted on a read session: {sql}"
+                );
             }
             assert_eq!(name(writer.as_ref()).await, bookie_core::Value::Text("a".into()));
             let _ = rollback_and_close(&shared).await;
@@ -790,17 +810,26 @@ mod table_select_tests {
 
             let shared = session.open_interactive().await.unwrap();
             run(&shared, "BEGIN").await.unwrap();
-            run(&shared, "UPDATE items SET name = 'rolled back'").await.unwrap();
+            run(&shared, "UPDATE items SET name = 'rolled back' WHERE id = 1")
+                .await
+                .unwrap();
             rollback_and_close(&shared).await.unwrap();
             assert_eq!(name(writer.as_ref()).await, bookie_core::Value::Text("a".into()));
 
             let shared = session.open_interactive().await.unwrap();
             run(&shared, "BEGIN").await.unwrap();
-            run(&shared, "UPDATE items SET name = 'committed'").await.unwrap();
+            run(&shared, "UPDATE items SET name = 'committed' WHERE id = 1")
+                .await
+                .unwrap();
             commit_session(&shared).await.unwrap();
-            assert_eq!(name(writer.as_ref()).await, bookie_core::Value::Text("committed".into()));
+            assert_eq!(
+                name(writer.as_ref()).await,
+                bookie_core::Value::Text("committed".into())
+            );
             assert!(
-                run(&shared, "BEGIN; UPDATE items SET name = 'hidden'").await.is_err(),
+                run(&shared, "BEGIN; UPDATE items SET name = 'hidden' WHERE id = 1")
+                    .await
+                    .is_err(),
                 "transaction control hidden in a batch is refused"
             );
         }

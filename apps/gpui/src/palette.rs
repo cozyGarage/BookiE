@@ -11,7 +11,7 @@ pub fn group(id: &str) -> &'static str {
         | "add-foreign-key" | "drop-foreign-key" | "show-structure" | "show-create-table" | "empty-table"
         | "drop-table" => "Structure",
         "save-changes" | "undo-edit" | "redo-edit" | "delete-rows" | "insert-row" | "filter" | "find"
-        | "save-filter" | "saved-filters" | "delete-saved-filter" => "Data",
+        | "save-filter" | "saved-filters" | "delete-saved-filter" | "where" | "clear-where" => "Data",
         _ => "Workspace",
     }
 }
