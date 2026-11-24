@@ -128,6 +128,9 @@ impl GridView {
                         )
                         .child(
                             div()
+                                .id("approval-detail")
+                                .max_h(px(size::SAVE_PREVIEW_MAX_HEIGHT))
+                                .overflow_y_scroll()
                                 .text_size(px(size::TEXT_SMALL))
                                 .text_color(rgb(theme.muted_foreground))
                                 .child(approval_detail(request)),
