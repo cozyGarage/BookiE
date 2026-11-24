@@ -286,6 +286,7 @@ impl GridView {
             .flex()
             .items_center()
             .justify_between()
+            .gap_2()
             .flex_none()
             .h(px(STATUS_HEIGHT))
             .px_3()
@@ -316,7 +317,7 @@ impl GridView {
             .children(details)
             .children(self.selection_stats_segment(theme))
             .children(elapsed.map(|time| div().flex_none().child(time)))
-            .when(self.tabs.shows_grid_for(&self.catalog.grid_table), |bar| bar.child(div().flex_none().child(format!("Page: {} rows", self.pager.rows))))
-            .child(div().flex_none().child(right))
+            .when(self.tabs.shows_grid_for(&self.catalog.grid_table), |bar| bar.child(div().debug_selector(|| "status-page".into()).flex_none().child(format!("Page: {} rows", self.pager.rows))))
+            .child(div().debug_selector(|| "status-count".into()).flex_none().child(right))
     }
 }
