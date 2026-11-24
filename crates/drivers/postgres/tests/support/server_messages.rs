@@ -172,3 +172,23 @@ async fn a_failed_statement_does_not_leave_notices_for_the_next_one() {
         .unwrap();
     assert!(next.messages.is_empty());
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn bounded_query_stops_at_row_and_byte_budgets_and_connection_remains_usable() {
+    let (_container, options) = start_pg().await;
+    let connection = connect(options).await;
+    let batch = connection
+        .query_result_sets_bounded_controlled("SELECT n FROM generate_series(1, 100) AS n", &[], 3, 4096, &control())
+        .await
+        .unwrap();
+    assert!(batch.truncated);
+    assert_eq!(batch.result_sets[0].rows.len(), 3);
+    let small = connection
+        .query_result_sets_bounded_controlled("SELECT repeat('x', 1024)", &[], 3, 32, &control())
+        .await
+        .unwrap();
+    assert!(small.truncated);
+    assert!(small.result_sets[0].rows.is_empty());
+    assert_eq!(connection.query("SELECT 1").await.unwrap().rows.len(), 1);
+}
