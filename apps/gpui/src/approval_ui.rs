@@ -155,6 +155,7 @@ fn approval_actions(theme: Theme, cx: &mut Context<GridView>) -> Div {
         )
         .child(
             ghost("deny-write", "Deny", theme)
+                .debug_selector(|| "deny-write".into())
                 .on_click(cx.listener(|this, _, _, cx| this.answer_approval(ApprovalOutcome::Deny, cx))),
         )
         .child(

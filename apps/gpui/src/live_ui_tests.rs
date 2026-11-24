@@ -1975,6 +1975,7 @@ fn approval_actions_remain_visible_without_a_result_grid(cx: &mut TestAppContext
         });
         cx.run_until_parked();
         cx.update(|window, cx| window.render_frame(cx));
+        view.read_with(cx, |view, _| assert!(view.approval.current.is_some(), "approval disappeared"));
         assert!(cx.debug_bounds("deny-write").is_some(), "approval action is not drawn");
     }
     view.update(cx, |view, cx| {
@@ -1983,9 +1984,7 @@ fn approval_actions_remain_visible_without_a_result_grid(cx: &mut TestAppContext
     });
     cx.run_until_parked();
     cx.update(|window, cx| window.render_frame(cx));
-    let bounds = cx
-        .debug_bounds("deny-write")
-        .expect("approval action is visible on home");
+    let bounds = cx.debug_bounds("deny-write").expect("approval action is visible on home");
     cx.simulate_click(bounds.center(), Default::default());
     cx.run_until_parked();
     assert_eq!(answer.try_recv().ok(), Some(ApprovalOutcome::Deny));
