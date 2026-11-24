@@ -246,9 +246,6 @@ impl GridView {
         let mut run = next_run(self.run_tabs.next_number);
         if let Some(source) = &source {
             run.rows = source.total();
-            run.first_row_ms = source
-                .load_elapsed()
-                .map(|d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX));
         }
         self.run_tabs.next_number += 1;
         self.run_tabs.slots.push(RunSlot::new(run, source));

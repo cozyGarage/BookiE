@@ -1531,6 +1531,12 @@ fn column_width(name: &str, data_type: &str) -> f32 {
         272.0
     } else if lower.contains("uuid") {
         300.0
+    } else if lower.starts_with("numeric")
+        || lower.starts_with("decimal")
+        || lower.starts_with("number")
+        || lower.contains("money")
+    {
+        200.0
     } else if lower.contains("bool") {
         88.0
     } else if lower.contains("json") {
@@ -1572,6 +1578,13 @@ mod column_meta_tests {
         });
 
         assert!(column.width >= 200.0, "{}", column.width);
+    }
+
+    #[test]
+    fn numeric_decimal_and_money_columns_keep_the_wide_default() {
+        for data_type in ["numeric(20,6)", "decimal(20,6)", "money"] {
+            assert!(column_width("amount", data_type) >= 200.0, "{data_type}");
+        }
     }
 
     #[test]
