@@ -393,6 +393,9 @@ impl GridView {
                 gpui_kit::component::table::TableEvent::SelectCell(row, column) => {
                     let column = table.read(cx).delegate().source_column(*column).unwrap_or(*column);
                     let cursor = bookie_results::grid_cursor::Cursor { row: *row, column };
+                    if this.cell_cursor == Some(cursor) {
+                        return;
+                    }
                     this.cell_cursor = Some(cursor);
                     let dataset = this.base() + *row as u64;
                     this.status = match this.selection {
