@@ -20,6 +20,11 @@ impl RunSlot {
 
 impl GridView {
     pub(crate) fn run_query(&mut self, cx: &mut Context<Self>) {
+        if self.full_value.is_some() {
+            self.status = "Apply or cancel the full-value edit before running a query".into();
+            cx.notify();
+            return;
+        }
         let sql = self.sql_input.read(cx).value().to_string();
         if self.live.is_some() && sql.trim().is_empty() {
             self.status = "Type a statement first".into();
@@ -190,6 +195,10 @@ impl GridView {
     }
 
     pub(crate) fn close_tab(&mut self, index: usize) {
+        if self.full_value.is_some() {
+            self.status = "Apply or cancel the full-value edit before closing a tab".into();
+            return;
+        }
         let closing_query = matches!(self.tabs.items.get(index), Some(Tab::Query));
         if closing_query && self.query_has_view_edits() && self.reject_view_edits() {
             return;
@@ -280,7 +289,7 @@ impl GridView {
         let Some(run) = self.run_tabs.slots.get(index).map(|slot| slot.run) else {
             return;
         };
-        if index != self.run_tabs.active && self.cell_edit.active.is_some() {
+        if index != self.run_tabs.active && (self.cell_edit.active.is_some() || self.full_value.is_some()) {
             self.status = "Finish or discard the active cell edit using Commands before switching results.".into();
             return;
         }

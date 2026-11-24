@@ -30,6 +30,10 @@ impl TypedSource {
 }
 
 impl ResultSource for TypedSource {
+    fn editable(&self) -> bool {
+        true
+    }
+
     fn columns(&self) -> &[ColumnMeta] {
         &self.columns
     }
@@ -53,6 +57,55 @@ impl ResultSource for TypedSource {
     fn compare(&self, _: bool, _: &CancellationToken) -> Result<Diff, &'static str> {
         Err("not used by this test source")
     }
+}
+
+#[gpui::test]
+fn full_value_null_text_is_not_changed_by_apply(cx: &mut TestAppContext) {
+    cx.update(text_input::bind_keys);
+    let mut source = TypedSource::new(vec![Value::Null]);
+    source.columns[0].data_type = "text".into();
+    let (view, cx) =
+        cx.add_window_view(|window, cx| GridView::with_source(Arc::new(source), Instant::now(), window, cx));
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.open_full_value(0, 0, &Cell::Null, window, cx);
+            assert!(view.full_value.is_some());
+            view.apply_full_value(cx);
+            assert!(!view.cell_edit.edits.contains_key(&(0, 0)));
+        })
+    });
+}
+
+#[gpui::test]
+fn full_value_null_text_can_be_explicitly_changed_to_empty(cx: &mut TestAppContext) {
+    cx.update(text_input::bind_keys);
+    let mut source = TypedSource::new(vec![Value::Null]);
+    source.columns[0].data_type = "text".into();
+    let (view, cx) = cx.add_window_view(|window, cx| GridView::with_source(Arc::new(source), Instant::now(), window, cx));
+    cx.update(|window, cx| view.update(cx, |view, cx| {
+        view.open_full_value(0, 0, &Cell::Null, window, cx);
+        view.select_empty_full_value(cx);
+        view.apply_full_value(cx);
+        assert_eq!(view.cell_edit.edits.get(&(0, 0)), Some(&Cell::Text(String::new())));
+    }));
+}
+
+#[gpui::test]
+fn full_value_null_json_can_become_json_null(cx: &mut TestAppContext) {
+    cx.update(text_input::bind_keys);
+    let mut source = TypedSource::new(vec![Value::Null]);
+    source.columns[0].data_type = "jsonb".into();
+    let (view, cx) =
+        cx.add_window_view(|window, cx| GridView::with_source(Arc::new(source), Instant::now(), window, cx));
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.open_full_value(0, 0, &Cell::Null, window, cx);
+            let input = view.full_value.as_ref().unwrap().input.clone();
+            input.update(cx, |input, cx| input.set_value("null", window, cx));
+            view.apply_full_value(cx);
+            assert_eq!(view.cell_edit.edits.get(&(0, 0)), Some(&Cell::JsonText("null".into())));
+        })
+    });
 }
 
 #[gpui::test]
@@ -121,12 +174,21 @@ fn every_column_header_of_a_wide_result_is_drawn(cx: &mut TestAppContext) {
             .map(|index| match window.try_find(("col-header", index)) {
                 Some(header) => {
                     let bounds = header.bounds();
-                    format!("{index}: visible={} x={:?} w={:?}", header.visible(), bounds.origin.x, bounds.size.width)
+                    format!(
+                        "{index}: visible={} x={:?} w={:?}",
+                        header.visible(),
+                        bounds.origin.x,
+                        bounds.size.width
+                    )
                 }
                 None => format!("{index}: absent"),
             })
             .collect();
         let drawn = |line: &String| line.contains("visible=true") && !line.contains("w=0px");
-        assert!(report.iter().all(drawn), "column headers not drawn:\n{}", report.join("\n"));
+        assert!(
+            report.iter().all(drawn),
+            "column headers not drawn:\n{}",
+            report.join("\n")
+        );
     });
 }

@@ -83,7 +83,7 @@ impl GridView {
             self.status = "A save is already running or waiting for your review".into();
             return None;
         }
-        if self.cell_edit.active.is_some() {
+        if self.cell_edit.active.is_some() || self.full_value.is_some() {
             self.status = "Finish editing the cell first".into();
             return None;
         }

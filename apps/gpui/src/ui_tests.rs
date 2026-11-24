@@ -1188,7 +1188,7 @@ fn rendering_oversized_pending_cells_keeps_exact_binary_json_and_edit_text(cx: &
 }
 
 #[gpui::test]
-fn opening_a_multiline_value_preserves_it_and_reports_the_single_line_editor_limit(cx: &mut TestAppContext) {
+fn opening_a_multiline_value_preserves_the_staged_value(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     let value = Cell::Text("first\nsecond".into());
     view.update(cx, |view, _| {
@@ -1196,11 +1196,185 @@ fn opening_a_multiline_value_preserves_it_and_reports_the_single_line_editor_lim
     });
     cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(0, 1, window, cx)));
     cx.run_until_parked();
-    view.read_with(cx, |view, _| {
+    view.read_with(cx, |view, cx| {
         assert!(view.cell_edit.active.is_none());
         assert_eq!(view.cell_edit.edits.get(&(0, 1)), Some(&value));
-        assert!(!view.status.is_empty());
+        assert_eq!(view.full_value.as_ref().unwrap().input.read(cx).value().as_ref(), "first\nsecond");
     });
+}
+
+#[gpui::test]
+fn full_value_apply_stages_exact_multiline_text(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|window, cx| view.update(cx, |view, cx| {
+        view.start_edit(0, 1, window, cx);
+        view.open_full_value(0, 1, &Cell::Text("old\nvalue".into()), window, cx);
+        let input = view.full_value.as_ref().unwrap().input.clone();
+        input.update(cx, |input, cx| input.set_value("new\r\nvalue", window, cx));
+        view.apply_full_value(cx);
+        assert_eq!(view.cell_edit.edits.get(&(0, 1)), Some(&Cell::Text("new\r\nvalue".into())));
+    }));
+}
+
+#[gpui::test]
+fn full_value_apply_unchanged_does_not_add_an_edit(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|window, cx| view.update(cx, |view, cx| {
+        let original = view.cell_at(0, 1);
+        view.open_full_value(0, 1, &original, window, cx);
+        view.apply_full_value(cx);
+        assert!(!view.cell_edit.edits.contains_key(&(0, 1)));
+    }));
+}
+
+#[gpui::test]
+fn full_value_invalid_json_does_not_stage_a_change(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|window, cx| view.update(cx, |view, cx| {
+        let original = Cell::JsonText("{\"ok\": true}".into());
+        view.cell_edit.edits.insert((0, 3), original.clone());
+        view.open_full_value(0, 3, &original, window, cx);
+        let input = view.full_value.as_ref().unwrap().input.clone();
+        input.update(cx, |input, cx| input.set_value("{", window, cx));
+        view.apply_full_value(cx);
+        assert_eq!(view.cell_edit.edits.get(&(0, 3)), Some(&original));
+        assert!(view.full_value.is_some());
+    }));
+}
+
+#[gpui::test]
+fn full_value_refuses_oversized_text_without_staging(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|window, cx| view.update(cx, |view, cx| {
+        let oversized = Cell::Text("x".repeat(bookie_gpui::full_value::MAX_EDIT_BYTES + 1));
+        view.open_full_value(0, 1, &oversized, window, cx);
+        assert!(view.full_value.is_none());
+        assert!(!view.cell_edit.edits.contains_key(&(0, 1)));
+        assert!(view.status.contains("limit"));
+    }));
+}
+
+#[gpui::test]
+fn full_value_refuses_unsupported_binary_cells(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|window, cx| view.update(cx, |view, cx| {
+        view.open_full_value(0, 3, &Cell::Bytes(vec![0, 255]), window, cx);
+        assert!(view.full_value.is_none());
+        assert!(!view.cell_edit.edits.contains_key(&(0, 3)));
+    }));
+}
+
+#[gpui::test]
+fn cancelling_full_value_preserves_a_prior_staged_edit(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|window, cx| view.update(cx, |view, cx| {
+        let original = Cell::Text("previous\nedit".into());
+        view.cell_edit.edits.insert((0, 1), original.clone());
+        view.open_full_value(0, 1, &original, window, cx);
+        let input = view.full_value.as_ref().unwrap().input.clone();
+        input.update(cx, |input, cx| input.set_value("discard me", window, cx));
+        view.cancel_full_value(cx);
+        assert_eq!(view.cell_edit.edits.get(&(0, 1)), Some(&original));
+        assert!(view.full_value.is_none());
+    }));
+}
+
+#[gpui::test]
+fn full_value_rejects_apply_after_tab_changes(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|window, cx| view.update(cx, |view, cx| {
+        view.open_full_value(0, 1, &Cell::Text("original".into()), window, cx);
+        let input = view.full_value.as_ref().unwrap().input.clone();
+        input.update(cx, |input, cx| input.set_value("changed", window, cx));
+        view.tabs.open_new_connection();
+        view.apply_full_value(cx);
+        assert!(!view.cell_edit.edits.contains_key(&(0, 1)));
+        assert!(view.full_value.is_none());
+    }));
+}
+
+#[gpui::test]
+fn full_value_refuses_null_without_a_column_type(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|window, cx| view.update(cx, |view, cx| {
+        view.open_full_value(0, 1, &Cell::Null, window, cx);
+        // The synthetic column has no database type, so NULL must be refused.
+        assert!(view.full_value.is_none());
+        assert!(!view.cell_edit.edits.contains_key(&(0, 1)));
+    }));
+}
+
+#[gpui::test]
+fn full_value_blocks_query_replacement_until_cancelled(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|window, cx| view.update(cx, |view, cx| {
+        view.open_full_value(0, 1, &Cell::Text("original".into()), window, cx);
+        view.run_query(cx);
+        assert!(view.full_value.is_some());
+        assert!(view.status.contains("cancel"));
+        view.cancel_full_value(cx);
+    }));
+}
+
+#[gpui::test]
+fn full_value_blocks_tab_close_until_cancelled(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|window, cx| view.update(cx, |view, cx| {
+        view.open_full_value(0, 1, &Cell::Text("original".into()), window, cx);
+        let count = view.tabs.items.len();
+        view.close_tab(view.tabs.active);
+        assert_eq!(view.tabs.items.len(), count);
+        assert!(view.full_value.is_some());
+    }));
+}
+
+#[gpui::test]
+fn full_value_counts_as_an_unsaved_view_edit(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|window, cx| view.update(cx, |view, cx| {
+        view.open_full_value(0, 1, &Cell::Text("original".into()), window, cx);
+        assert!(view.has_view_edits());
+        assert!(view.reject_view_edits());
+        view.cancel_full_value(cx);
+        assert!(!view.has_view_edits());
+    }));
+}
+
+#[gpui::test]
+fn full_value_applying_empty_text_keeps_it_distinct_from_null(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|window, cx| view.update(cx, |view, cx| {
+        view.open_full_value(0, 1, &Cell::Text("previous".into()), window, cx);
+        let input = view.full_value.as_ref().unwrap().input.clone();
+        input.update(cx, |input, cx| input.set_value("", window, cx));
+        view.apply_full_value(cx);
+        assert_eq!(view.cell_edit.edits.get(&(0, 1)), Some(&Cell::Text(String::new())));
+    }));
+}
+
+#[gpui::test]
+fn full_value_applying_json_null_stages_json_not_sql_null(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|window, cx| view.update(cx, |view, cx| {
+        view.open_full_value(0, 3, &Cell::JsonText("{}".into()), window, cx);
+        let input = view.full_value.as_ref().unwrap().input.clone();
+        input.update(cx, |input, cx| input.set_value("null", window, cx));
+        view.apply_full_value(cx);
+        assert_eq!(view.cell_edit.edits.get(&(0, 3)), Some(&Cell::JsonText("null".into())));
+    }));
+}
+
+#[gpui::test]
+fn full_value_rejects_an_oversized_input_before_apply(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|window, cx| view.update(cx, |view, cx| {
+        view.open_full_value(0, 1, &Cell::Text("original".into()), window, cx);
+        let input = view.full_value.as_ref().unwrap().input.clone();
+        input.update(cx, |input, cx| input.set_value("x".repeat(bookie_gpui::full_value::MAX_EDIT_BYTES + 1), window, cx));
+        view.apply_full_value(cx);
+        assert!(!view.cell_edit.edits.contains_key(&(0, 1)));
+        assert!(view.full_value.is_some());
+    }));
 }
 
 #[gpui::test]

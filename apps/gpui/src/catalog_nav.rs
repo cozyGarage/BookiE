@@ -326,6 +326,7 @@ impl GridView {
 
     pub(super) fn has_view_edits(&self) -> bool {
         self.cell_edit.active.is_some()
+            || self.full_value.is_some()
             || !self.cell_edit.edits.is_empty()
             || !self.cell_edit.table.is_empty()
             || self.run_tabs.slots.iter().any(|slot| !slot.edits.is_empty())
@@ -347,6 +348,7 @@ impl GridView {
         self.edits_changed();
         self.reset_edit_history();
         self.cell_edit.active = None;
+        self.full_value = None;
         self.cell_edit.edits.clear();
         self.cell_edit.table.clear();
         for slot in &mut self.run_tabs.slots {

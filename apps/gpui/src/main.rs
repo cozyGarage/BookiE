@@ -11,6 +11,7 @@ mod query_pane;
 mod connection_form;
 mod copy_selection;
 mod detail_panel;
+mod full_value_ui;
 mod find_filter;
 mod grid_edit;
 mod grid_table;
@@ -144,6 +145,7 @@ struct GridView {
     cell_cursor: Option<Cursor>,
     viewport_rows: usize,
     detail_open: bool,
+    full_value: Option<full_value_ui::FullValueEditor>,
     row_detail_open: bool,
     catalog: Catalog,
     table_sorts: Vec<(bookie_core::TableInfo, bookie_app_services::read_session::TableSort)>,
@@ -491,6 +493,7 @@ impl GridView {
             search: panel_state::SearchState::new(find, filter),
             cell_edit: panel_state::CellEditState::new(editor),
             detail_open: false,
+            full_value: None,
             row_detail_open: false,
             catalog: Catalog::synthetic(),
             table_sorts: Vec::new(),

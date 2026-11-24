@@ -93,8 +93,7 @@ impl GridView {
             cell.display()
         };
         if text.contains('\n') {
-            self.status = "Multiline values cannot be edited in this single-line prototype".into();
-            cx.notify();
+            self.open_full_value(row, column, &cell, window, cx);
             return;
         }
         let is_numeric = crate::right_aligned(

@@ -231,6 +231,7 @@ impl GridView {
             ),
             action("clear-selection", "Clear row selection", self.selection.is_some()),
             action("edit", "Edit the active cell", self.cell_cursor.is_some()),
+            action("edit-full-value", "Edit full value", self.cell_cursor.is_some()),
             action(
                 "discard-view-edits",
                 "Discard all view-only edits",
@@ -575,6 +576,7 @@ impl GridView {
             "discard-view-edits" => self.discard_view_edits(),
             "clear-selection" => self.selection = None,
             "edit" => self.grid_key("enter", false, false, window, cx),
+            "edit-full-value" => self.open_selected_full_value(window, cx),
             _ => return false,
         }
         true
