@@ -52,6 +52,7 @@ if '/actions/workflows/ci.yml/dispatches' in url:
     payload = json.loads(sys.argv[sys.argv.index('--data-binary') + 1])
     pathlib.Path(os.environ['GATE_TEST_DISPATCH_FILE']).write_text(json.dumps(payload))
     data['run'] = dict(data['run'], id=data['run']['id'] + 1, index_in_repo=data['run']['index_in_repo'] + 1)
+    data.pop('main_push_runs', None)
     fixture.write_text(json.dumps(data))
     print('{}')
     raise SystemExit(0)
@@ -66,6 +67,15 @@ elif '/actions/runs/' in sys.argv[-1] and '/jobs' in sys.argv[-1]:
 else:
     if 'limit=1' in url:
         run = data['run']
+    elif 'main_push_runs' in data:
+        state = fixture.with_suffix('.main-polls')
+        polls = int(state.read_text()) if state.exists() else 0
+        state.write_text(str(polls + 1))
+        run = data['main_push_runs']
+        if polls > 0:
+            run = [dict(item, status='success') if item.get('status') == 'running' else item for item in run]
+        print(json.dumps({'workflow_runs': run}))
+        raise SystemExit(0)
     else:
         state = fixture.with_suffix('.polls')
         polls = int(state.read_text()) if state.exists() else 0
@@ -76,7 +86,7 @@ else:
 
 
 def gate(tasks, initial_status='failure', dispatch_capture=None, target='subject', remote_sha=None,
-         timeout_minutes='1'):
+         timeout_minutes='1', main_push_runs=None):
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         tools = root / 'bin'
@@ -86,7 +96,11 @@ def gate(tasks, initial_status='failure', dispatch_capture=None, target='subject
             path.write_text(source)
             path.chmod(0o755)
         fixture = root / 'fixture.json'
-        fixture.write_text(json.dumps({'run': {'id': 928, 'index_in_repo': 927, 'commit_sha': HEAD, 'workflow_id': 'ci.yml'}, 'initial_status': initial_status, 'tasks': tasks, 'logs': 'compile failed: fixture error'}))
+        data = {'run': {'id': 928, 'index_in_repo': 927, 'commit_sha': HEAD, 'workflow_id': 'ci.yml'},
+                'initial_status': initial_status, 'tasks': tasks, 'logs': 'compile failed: fixture error'}
+        if main_push_runs is not None:
+            data['main_push_runs'] = main_push_runs
+        fixture.write_text(json.dumps(data))
         token = root / 'token'
         token.write_text('fixture-token')
         env = dict(os.environ, PATH=str(tools) + os.pathsep + os.environ['PATH'],
@@ -98,8 +112,10 @@ def gate(tasks, initial_status='failure', dispatch_capture=None, target='subject
             env['GATE_TEST_REMOTE_SHA'] = remote_sha
         result = subprocess.run(['bash', str(ROOT / 'scripts/forgejo-gate.sh'), 'subject', target],
                                 cwd=root, env=env, capture_output=True, text=True, timeout=10)
-        if dispatch_capture is not None:
+        if dispatch_capture is not None and (root / 'dispatch.json').exists():
             dispatch_capture.update(json.loads((root / 'dispatch.json').read_text()))
+        if dispatch_capture is not None:
+            dispatch_capture['dispatched'] = (root / 'dispatch.json').exists()
         return result
 
 
@@ -127,13 +143,31 @@ class ForgejoGateTests(unittest.TestCase):
         dispatch = {}
         result = gate([], initial_status='success', dispatch_capture=dispatch)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(dispatch, {'ref': 'subject', 'inputs': {'ref': HEAD}})
+        self.assertEqual(dispatch, {'ref': 'subject', 'inputs': {'ref': HEAD}, 'dispatched': True})
         self.assertIn('passed for ' + HEAD, result.stdout)
 
     def test_gate_refuses_to_move_forgejo_main(self):
         result = gate([], target='main', remote_sha='b' * 40)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn('refusing to update protected Forgejo main', result.stderr)
+
+    def test_main_gate_reuses_the_push_run_for_the_same_revision(self):
+        run = {'id': 928, 'index_in_repo': 927, 'commit_sha': HEAD, 'workflow_id': 'ci.yml',
+               'prettyref': 'main', 'event': 'push', 'status': 'running'}
+        dispatch = {}
+        result = gate([], initial_status='success', dispatch_capture=dispatch, target='main', remote_sha=HEAD,
+                      main_push_runs=[run])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('reusing Forgejo main push run 927', result.stdout)
+        self.assertNotIn('lab-ci', result.stdout)
+        self.assertFalse(dispatch['dispatched'])
+
+    def test_main_gate_dispatches_when_no_push_run_appears(self):
+        dispatch = {}
+        result = gate([], initial_status='success', dispatch_capture=dispatch, target='main', remote_sha=HEAD,
+                      main_push_runs=[])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(dispatch, {'ref': 'main', 'inputs': {'ref': HEAD}, 'dispatched': True})
 
     def test_a_matching_retry_waits_when_api_id_differs_from_run_number(self):
         result = gate([{'run_number': 927, 'head_sha': HEAD, 'status': 'running', 'name': 'widgets'}])
