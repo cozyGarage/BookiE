@@ -256,6 +256,11 @@ impl BrowseTab {
             column_selection: self.column_selection.clone(),
             set_cells_enabled: self.allows_keyed_row_mutations(),
             column_selection_chrome: None,
+            hidden_column_scope: Some(bookie_app_services::column_widths::table_scope_key(
+                &self.database_name,
+                self.schema.as_deref(),
+                &self.table,
+            )),
         };
         let (column_view, selection) = build_column_view(
             &result,

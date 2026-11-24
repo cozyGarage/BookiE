@@ -140,6 +140,20 @@ mod tests {
         assert_eq!(visible_flags(&names, &everything), vec![true, true, true]);
     }
 
+    #[test]
+    fn hidden_preferences_do_not_cross_same_named_tables_in_different_schemas() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = ColumnWidthStore::load_in(dir.path());
+        let connection = uuid::Uuid::new_v4();
+        let public_users = bookie_app_services::column_widths::table_scope_key("sales", Some("public"), "users");
+        let audit_users = bookie_app_services::column_widths::table_scope_key("sales", Some("audit"), "users");
+
+        store.set_hidden(connection, &public_users, "email", true).unwrap();
+
+        assert!(store.hidden_columns(connection, &public_users).contains("email"));
+        assert!(store.hidden_columns(connection, &audit_users).is_empty());
+    }
+
     fn visible_flags(names: &[String], hidden: &HashSet<String>) -> Vec<bool> {
         let kept = names.iter().filter(|name| !hidden.contains(*name)).count();
         names.iter().map(|name| kept == 0 || !hidden.contains(name)).collect()
