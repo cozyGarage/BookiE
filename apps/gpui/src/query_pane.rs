@@ -86,6 +86,8 @@ impl GridView {
                     .text_color(rgb(theme.muted_foreground))
                     .child(self.catalog.connection.clone()),
             )
+            .child(div().flex_1())
+            .child(self.transaction_controls(theme, cx))
     }
 
     pub(crate) fn query_editor_pane(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
