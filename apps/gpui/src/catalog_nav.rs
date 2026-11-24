@@ -254,6 +254,7 @@ impl GridView {
             self.schema_context = None;
         }
         self.mcp.register(session.database_service());
+        self.connection_info = None;
         self.table_sorts.clear();
         self.search.server.applied.clear();
         self.search.server.shown_for = None;
@@ -295,12 +296,15 @@ impl GridView {
         self.clear_fk_peek();
         self.status = "Connecting…".into();
         self.search.origin = Some(origin.clone());
-        self.begin_background(
+        self.begin_background_with_context(
             Work::Load,
             cx,
             move |cancel| open_first_table(&origin, prefer.as_ref(), &cancel),
-            |this, opened| match opened {
-                Ok(table) => this.connect_live(table),
+            |this, opened, cx| match opened {
+                Ok(table) => {
+                    this.connect_live(table);
+                    this.request_connection_info(cx);
+                }
                 Err(message) => this.status = message,
             },
         );

@@ -256,68 +256,90 @@ impl GridView {
             ))
     }
 
-    pub fn status_bar(&self, theme: Theme) -> Div {
-        let right = if self.tabs.shows_grid_for(&self.catalog.grid_table) {
-            format!(
-                "{} rows · {}",
-                thousands(self.dataset_count()),
-                if theme.dark { "dark" } else { "light" }
-            )
-        } else {
-            if theme.dark { "dark".into() } else { "light".into() }
+    pub fn status_bar(&self, theme: Theme, window_width: f32) -> Stateful<Div> {
+        let compact = window_width < size::STATUS_COMPACT_WIDTH;
+        let grid = self.tabs.shows_grid_for(&self.catalog.grid_table);
+        let theme_name = if theme.dark { "dark" } else { "light" };
+        let rows = match (grid, compact) {
+            (true, false) => format!("{} rows · {theme_name}", thousands(self.dataset_count())),
+            (true, true) => format!("{} rows", thousands(self.dataset_count())),
+            (false, _) => theme_name.to_string(),
         };
-        let sql = self.tabs.shows_grid_for(&self.catalog.grid_table)
-            .then(|| self.source.executed_sql()).flatten().map(str::to_owned);
-        let elapsed = self.tabs.shows_grid_for(&self.catalog.grid_table)
-            .then(|| self.source.load_elapsed()).flatten()
+        let sql = (grid && !compact).then(|| self.source.executed_sql()).flatten().map(str::to_owned);
+        let elapsed = grid
+            .then(|| self.source.load_elapsed())
+            .flatten()
             .map(bookie_gpui::messages::format_elapsed);
         let details = sql.map(|sql| {
             use gpui_component::button::{Button, ButtonVariants};
             let full = sql.clone();
-            div().flex().items_center().min_w_0().gap_1()
-                .child(div().id("result-sql-preview").min_w_0().max_w(px(size::HOME_WIDTH / 2.0))
+            div().flex().flex_none().items_center().gap_1()
+                .child(div().id("result-sql-preview").max_w(px(size::STATUS_SQL_PREVIEW_WIDTH))
                     .overflow_hidden().whitespace_nowrap().text_ellipsis()
                     .tooltip(move |window, cx| gpui_component::tooltip::Tooltip::new(full.clone()).build(window, cx))
                     .child(sql.clone()))
                 .child(Button::new("copy-result-sql").ghost().compact().label("Copy SQL")
                     .on_click(move |_, _, cx| cx.write_to_clipboard(gpui::ClipboardItem::new_string(sql.clone()))))
         });
+        let connection_tooltip = self.connection_tooltip();
+        let connection = div()
+            .id("status-connection")
+            .debug_selector(|| "status-connection".into())
+            .min_w_0()
+            .max_w(px(size::STATUS_CONNECTION_WIDTH))
+            .overflow_hidden()
+            .whitespace_nowrap()
+            .text_ellipsis()
+            .tooltip(move |window, cx| gpui_component::tooltip::Tooltip::new(connection_tooltip.clone()).build(window, cx))
+            .child(self.connection_chip_text());
+        let full_status = self.status.clone();
+        let status = div()
+            .id("status-text")
+            .debug_selector(|| "status-text".into())
+            .flex_1()
+            .min_w_0()
+            .overflow_hidden()
+            .whitespace_nowrap()
+            .text_ellipsis()
+            .text_color(rgb(theme.foreground))
+            .when(!self.status.is_empty(), |status| {
+                status.tooltip(move |window, cx| gpui_component::tooltip::Tooltip::new(full_status.clone()).build(window, cx))
+            })
+            .child(self.status.clone());
         div()
+            .id("status-bar")
+            .debug_selector(|| "status-bar".into())
             .flex()
             .items_center()
-            .justify_between()
             .gap_2()
             .flex_none()
             .h(px(STATUS_HEIGHT))
             .px_3()
+            .overflow_hidden()
             .bg(rgb(theme.chrome))
             .border_t_1()
             .border_color(rgb(theme.border))
             .text_size(px(size::TEXT_SMALL))
             .text_color(rgb(theme.muted_foreground))
-            .child(div().flex().flex_1().min_w_0().overflow_hidden().items_center().gap_2().child(div().flex_none().child(self.source.origin())).when(
-                !self.status.is_empty(),
-                |row| {
-                    let full = self.status.clone();
-                    row.child(div().flex_none().child("·")).child(
-                        div()
-                            .id("status-text")
-                            .min_w_0()
-                            .overflow_hidden()
-                            .whitespace_nowrap()
-                            .text_ellipsis()
-                            .text_color(rgb(theme.foreground))
-                            .tooltip(move |window, cx| {
-                                gpui_component::tooltip::Tooltip::new(full.clone()).build(window, cx)
-                            })
-                            .child(self.status.clone()),
-                    )
-                },
-            ))
+            .child(connection)
+            .child(status)
             .children(details)
-            .children(self.selection_stats_segment(theme))
+            .when(!compact, |bar| bar.children(self.selection_stats_segment(theme)))
             .children(elapsed.map(|time| div().flex_none().child(time)))
-            .when(self.tabs.shows_grid_for(&self.catalog.grid_table), |bar| bar.child(div().debug_selector(|| "status-page".into()).flex_none().child(format!("Page: {} rows", self.pager.rows))))
-            .child(div().debug_selector(|| "status-count".into()).flex_none().child(right))
+            .when(grid, |bar| {
+                bar.child(
+                    div()
+                        .debug_selector(|| "status-page".into())
+                        .flex_none()
+                        .child(format!("Page: {} rows", self.pager.rows)),
+                )
+            })
+            .child(
+                div()
+                    .id("status-count")
+                    .debug_selector(|| "status-count".into())
+                    .flex_none()
+                    .child(rows),
+            )
     }
 }

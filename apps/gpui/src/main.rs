@@ -11,6 +11,7 @@ mod chrome;
 mod closed_tabs_ui;
 mod column_projection;
 mod connection_form;
+mod connection_info_ui;
 mod copy_selection;
 mod detail_panel;
 mod connection_bundle_ui;
@@ -164,6 +165,7 @@ struct GridView {
     row_detail_open: bool,
     pub(crate) fk_peek: Option<fk_peek_ui::FkPeekState>,
     fk_peek_work: Ticket,
+    connection_info: Option<bookie_gpui::live::ServerInfo>,
     row_detail_filter: Entity<TextInput>,
     row_detail_hide_null: bool,
     catalog: Catalog,
@@ -558,6 +560,7 @@ impl GridView {
             row_detail_open: false,
             fk_peek: None,
             fk_peek_work: Ticket::new(),
+            connection_info: None,
             row_detail_filter,
             row_detail_hide_null: false,
             catalog: Catalog::synthetic(),
@@ -1106,6 +1109,7 @@ fn main() {
                         }
                         None => GridView::new(total, started, window, cx),
                     });
+                    view.update(cx, |view, cx| view.request_connection_info(cx));
                     let focus = view.read(cx).focus.clone();
                     focus.focus(window, cx);
                     view.update(cx, |view, cx| {
@@ -1139,6 +1143,8 @@ mod grid_pin_tests;
 mod host_key_ui_tests;
 #[cfg(test)]
 mod live_ui_tests;
+#[cfg(test)]
+mod status_bar_tests;
 #[cfg(test)]
 mod overlay_ui_tests;
 #[cfg(test)]

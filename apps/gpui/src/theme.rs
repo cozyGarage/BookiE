@@ -16,6 +16,9 @@ pub mod size {
     pub const SAVE_PREVIEW_MAX_HEIGHT: f32 = 160.0;
     pub const STRUCTURE_PANEL_MAX_HEIGHT: f32 = 280.0;
     pub const DETAIL_SIDEBAR_WIDTH: f32 = 380.0;
+    pub const STATUS_COMPACT_WIDTH: f32 = 1000.0;
+    pub const STATUS_CONNECTION_WIDTH: f32 = 360.0;
+    pub const STATUS_SQL_PREVIEW_WIDTH: f32 = 320.0;
     pub const DETAIL_SIDEBAR_MIN_WIDTH: f32 = 240.0;
     pub const CHART_COLUMN_WIDTH: f32 = 180.0;
     pub const GUTTER_MARKER_WIDTH: f32 = 3.0;
