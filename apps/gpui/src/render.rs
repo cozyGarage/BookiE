@@ -345,21 +345,25 @@ impl GridView {
         cx: &mut Context<Self>,
     ) -> Div {
         let (filter_row, compare_bar, save_bar, banner, insert_form) = bars;
-        div()
+        let grid = div()
             .flex_1()
             .flex()
             .flex_col()
             .min_h_0()
+            .min_w_0()
             .child(strip)
             .children(filter_row)
             .children(compare_bar)
             .children(save_bar)
             .children(insert_form)
             .children(banner)
-            .child(self.data_table(cx))
-            .children(self.detail_panel(theme))
-            .children(self.row_detail_panel(theme, cx))
-            .children(self.fk_peek_panel(theme, cx))
+            .child(self.data_table(cx));
+        div()
+            .flex_1()
+            .flex()
+            .min_h_0()
+            .child(grid)
+            .children(self.detail_sidebar(theme, cx))
     }
 
     fn main_layout(

@@ -173,6 +173,43 @@ fn a_table_row_can_be_shown_vertically_and_counted_exactly(cx: &mut TestAppConte
 }
 
 #[gpui::test]
+fn cell_and_row_details_open_in_a_sidebar_right_of_the_grid(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_resize(gpui::size(gpui::px(1200.0), gpui::px(800.0)));
+    for row_detail in [false, true] {
+        view.update(cx, |view, cx| {
+            view.tabs.open_table(&view.catalog.grid_table);
+            view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 0 });
+            view.detail_open = !row_detail;
+            view.row_detail_open = row_detail;
+            cx.notify();
+        });
+        cx.run_until_parked();
+        cx.update(|window, cx| window.render_frame(cx));
+        let grid = cx.debug_bounds("grid-table-viewport").expect("grid is rendered");
+        let sidebar = cx.debug_bounds("detail-sidebar").expect("detail sidebar is rendered");
+        let panel = cx
+            .debug_bounds(if row_detail { "row-detail" } else { "cell-detail" })
+            .expect("detail panel is rendered");
+        assert!(sidebar.origin.x >= grid.origin.x + grid.size.width, "{row_detail}: {sidebar:?} {grid:?}");
+        assert!(sidebar.origin.y <= grid.origin.y, "{row_detail}: {sidebar:?} {grid:?}");
+        assert!(
+            sidebar.origin.y + sidebar.size.height >= grid.origin.y + grid.size.height,
+            "{row_detail}: {sidebar:?} {grid:?}"
+        );
+        assert!(panel.origin.x >= sidebar.origin.x && panel.size.width <= sidebar.size.width);
+    }
+    view.update(cx, |view, cx| {
+        view.detail_open = false;
+        view.row_detail_open = false;
+        cx.notify();
+    });
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    assert!(cx.debug_bounds("detail-sidebar").is_none());
+}
+
+#[gpui::test]
 fn row_inspector_filter_and_hide_null_are_keyboard_accessible_and_follow_the_active_row(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.simulate_resize(gpui::size(gpui::px(1100.0), gpui::px(800.0)));
