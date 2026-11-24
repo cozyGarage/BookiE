@@ -54,6 +54,7 @@ pub struct TextInput {
     last_bounds: Option<Bounds<Pixels>>,
     is_selecting: bool,
     masked: bool,
+    compact: bool,
 }
 
 fn compute_x_offset(align: gpui::TextAlign, bounds: Bounds<Pixels>, line_width: Pixels) -> Pixels {
@@ -133,6 +134,7 @@ impl TextInput {
             last_bounds: None,
             is_selecting: false,
             masked: false,
+            compact: false,
         }
     }
 
@@ -155,6 +157,11 @@ impl TextInput {
             index -= 1;
         }
         index
+    }
+
+    pub fn compact(mut self) -> Self {
+        self.compact = true;
+        self
     }
 
     pub fn set_text_align(&mut self, text_align: gpui::TextAlign, cx: &mut Context<Self>) {
@@ -688,17 +695,20 @@ impl Render for TextInput {
             .text_color(rgb(theme.foreground))
             .line_height(px(size::COMPACT_CONTROL))
             .text_size(px(size::TEXT))
-            .child(
-                div()
-                    .h(px(24. + 4. * 2.))
+            .child({
+                let frame = div()
                     .w_full()
-                    .p(px(size::XS))
                     .bg(rgb(theme.background))
                     .rounded(px(size::CONTROL_RADIUS))
                     .border_1()
-                    .border_color(rgb(theme.border))
-                    .child(TextElement { input: cx.entity() }),
-            )
+                    .border_color(rgb(theme.border));
+                let frame = if self.compact {
+                    frame.h_full().flex().items_center().px(px(size::XS))
+                } else {
+                    frame.h(px(24. + 4. * 2.)).p(px(size::XS))
+                };
+                frame.child(TextElement { input: cx.entity() })
+            })
     }
 }
 

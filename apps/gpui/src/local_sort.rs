@@ -6,6 +6,19 @@ use tokio_util::sync::CancellationToken;
 
 pub(crate) const MAX_LOCAL_SORT_ROWS: u64 = 100_000;
 
+pub(crate) fn resort_loaded(
+    source: &dyn ResultSource,
+    sort: &bookie_app_services::read_session::TableSort,
+    cancel: &CancellationToken,
+) -> Option<Vec<u32>> {
+    let column = source.columns().iter().position(|column| column.name == sort.column)?;
+    if source.is_partial() || source.total() > MAX_LOCAL_SORT_ROWS {
+        return None;
+    }
+    let indices = (0..source.total() as u32).collect();
+    sorted_source_indices(source, indices, column, sort.ascending, cancel).ok()
+}
+
 pub(crate) fn sorted_source_indices(
     source: &dyn ResultSource,
     source_indices: Vec<u32>,

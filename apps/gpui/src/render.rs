@@ -206,21 +206,15 @@ impl GridView {
             .when(!compact, |actions| {
                 actions
                     .child(
-                        icon_button("compare", "arrow-left-right", "Compare", false, theme)
+                        button("compare", "Compare", theme)
                             .on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))),
                     )
                     .child(
-                        icon_button(
-                            "export",
-                            "download",
-                            "Export current page or selection as CSV",
-                            false,
-                            theme,
-                        )
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            this.export_selection_or_page(cx);
-                            cx.notify();
-                        })),
+                        button("export", "Export CSV", theme)
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.export_selection_or_page(cx);
+                                cx.notify();
+                            })),
                     )
                     .child(
                         icon_button(
@@ -478,6 +472,7 @@ impl Render for GridView {
             None
         };
         let full_value_editor = self.full_value_editor_overlay(theme, cx);
+        let approval = self.approval_overlay(theme, cx);
         let save_bar = self.save_bar(theme, cx).or_else(|| self.edits_bar(theme, cx));
         let banner = self.save_banner(theme, cx);
         let bundle_bar = self.connection_bundle_bar(theme, cx);
@@ -537,12 +532,12 @@ impl Render for GridView {
             )
             .child(toolbar)
             .children(self.host_key_bar(theme, cx))
-            .children(self.approval_bar(theme, cx))
             .child(self.main_layout(sidebar, tab_row, bundle_bar, content))
             .children(self.row_menu_overlay())
             .child(self.status_bar(theme))
             .children(palette)
             .children(full_value_editor)
+            .children(approval)
     }
 }
 

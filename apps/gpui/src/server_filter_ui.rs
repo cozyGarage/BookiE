@@ -97,17 +97,23 @@ impl GridView {
         }
         let table = self.catalog.grid_table.clone();
         let sort = self.table_sort(&table).cloned();
+        let local_sort = self.local_sort.clone();
+        let keep_local_sort = local_sort.clone();
         let current_session = session.clone();
         self.status = format!("Loading {} from the server…", table_label(&table));
         self.begin_background(
             Work::Load,
             cx,
             move |cancel| {
-                crate::catalog_nav::load(&session, &table, sort.as_ref(), &where_sql, &cancel)
-                    .map(|loaded| (loaded, where_sql))
+                let (identity, source) =
+                    crate::catalog_nav::load(&session, &table, sort.as_ref(), &where_sql, &cancel)?;
+                let order = local_sort
+                    .as_ref()
+                    .and_then(|sort| crate::local_sort::resort_loaded(source.as_ref(), sort, &cancel));
+                Ok::<_, String>(((identity, source), where_sql, order))
             },
             move |this, result| {
-                let ((identity, source), where_sql) = match result {
+                let ((identity, source), where_sql, order) = match result {
                     Ok(loaded) => loaded,
                     Err(message) => {
                         this.status = format!("Could not apply the WHERE filter: {message}");
@@ -126,6 +132,11 @@ impl GridView {
                     this.search.server.applied.push((identity.clone(), where_sql.clone()));
                 }
                 this.show_loaded_table(identity, source);
+                if let (Some(order), Some(sort)) = (order, keep_local_sort) {
+                    this.local_order = Some(std::sync::Arc::new(order));
+                    this.local_sort = Some(sort);
+                    this.pager = this.pager.with_total(this.dataset_count());
+                }
                 this.status = if where_sql.is_empty() {
                     "Showing the table without a WHERE filter".into()
                 } else {

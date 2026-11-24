@@ -21,6 +21,7 @@ pub mod size {
     pub const FK_PEEK_MAX_HEIGHT: f32 = 220.0;
     pub const GUTTER_MARKER_WIDTH: f32 = 3.0;
     pub const FULL_VALUE_EDITOR_WIDTH: f32 = 760.0;
+    pub const APPROVAL_DIALOG_WIDTH: f32 = 560.0;
     pub const FULL_VALUE_EDITOR_HEIGHT: f32 = 560.0;
     pub const TEXT: f32 = 13.0;
     pub const STAT_TEXT: f32 = 22.0;

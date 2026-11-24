@@ -294,17 +294,29 @@ impl GridView {
             .border_color(rgb(theme.border))
             .text_size(px(size::TEXT_SMALL))
             .text_color(rgb(theme.muted_foreground))
-            .child(div().flex().min_w_0().overflow_hidden().items_center().gap_2().child(self.source.origin()).when(
+            .child(div().flex().flex_1().min_w_0().overflow_hidden().items_center().gap_2().child(div().flex_none().child(self.source.origin())).when(
                 !self.status.is_empty(),
                 |row| {
-                    row.child(div().child("·"))
-                        .child(div().text_color(rgb(theme.foreground)).child(self.status.clone()))
+                    let full = self.status.clone();
+                    row.child(div().flex_none().child("·")).child(
+                        div()
+                            .id("status-text")
+                            .min_w_0()
+                            .overflow_hidden()
+                            .whitespace_nowrap()
+                            .text_ellipsis()
+                            .text_color(rgb(theme.foreground))
+                            .tooltip(move |window, cx| {
+                                gpui_component::tooltip::Tooltip::new(full.clone()).build(window, cx)
+                            })
+                            .child(self.status.clone()),
+                    )
                 },
             ))
             .children(details)
             .children(self.selection_stats_segment(theme))
-            .children(elapsed.map(|time| div().child(time)))
-            .when(self.tabs.shows_grid_for(&self.catalog.grid_table), |bar| bar.child(format!("Page: {} rows", self.pager.rows)))
-            .child(right)
+            .children(elapsed.map(|time| div().flex_none().child(time)))
+            .when(self.tabs.shows_grid_for(&self.catalog.grid_table), |bar| bar.child(div().flex_none().child(format!("Page: {} rows", self.pager.rows))))
+            .child(div().flex_none().child(right))
     }
 }
