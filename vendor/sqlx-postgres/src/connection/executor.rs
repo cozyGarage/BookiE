@@ -95,7 +95,7 @@ async fn prepare(
     // Resolving custom-type OIDs above goes through the simple query protocol, which
     // destroys the unnamed prepared statement. Re-parse it so the Bind that follows can
     // reference it; named (persistent) statements are unaffected. See #4305.
-    if !persistent && ran_catalog_query {
+    if id == StatementId::UNNAMED && ran_catalog_query {
         conn.inner.stream.write_msg(Parse {
             param_types: &param_types,
             query: sql,

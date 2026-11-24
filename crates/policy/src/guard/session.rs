@@ -17,6 +17,7 @@ pub(crate) struct PolicySession {
     batch: Option<OpenBatch>,
     cursor: Option<ActiveCursor>,
     retired: Cell<bool>,
+    ended_by_server: Cell<bool>,
     extra: ExtraSets,
 }
 
@@ -119,6 +120,7 @@ struct OpenBatch {
     id: Uuid,
     read_only: bool,
     wrote: bool,
+    writes: u32,
     uncertain: bool,
     aborted: bool,
 }
@@ -129,6 +131,7 @@ impl OpenBatch {
             id: Uuid::new_v4(),
             read_only,
             wrote: false,
+            writes: 0,
             uncertain: false,
             aborted: false,
         }
@@ -149,6 +152,7 @@ impl PolicyGuard {
             batch: None,
             cursor: None,
             retired: Cell::new(false),
+            ended_by_server: Cell::new(false),
             extra: ExtraSets::default(),
         })
     }
@@ -507,6 +511,9 @@ impl Session for PolicySession {
             if !self.is_usable() && batch.read_only && !batch.wrote {
                 record_ended_read_only_batch(&self.guard, batch.id).await;
                 Ok(())
+            } else if !self.is_usable() && self.ended_by_server.get() && !batch.uncertain {
+                record_ended_read_only_batch(&self.guard, batch.id).await;
+                Ok(())
             } else if self.is_usable() && !batch.uncertain {
                 let control = OperationControl::with_timeout(CLOSE_ROLLBACK_TIMEOUT);
                 let rollback = self.finish("ROLLBACK", &control, Finish::Rollback, false).await;
@@ -628,10 +635,8 @@ impl PolicySession {
     }
 
     fn note_cursor_error(&mut self, error: &DriverError) {
-        if matches!(
-            error,
-            DriverError::Disconnected | DriverError::OperationOutcomeUnknown { .. }
-        ) {
+        self.note_lost_session(error);
+        if matches!(error, DriverError::OperationOutcomeUnknown { .. }) {
             self.retired.set(true);
         }
         let Some(batch) = self.batch.as_mut() else {
@@ -780,8 +785,17 @@ impl PolicySession {
     }
 
     fn note_disconnect<T>(&mut self, result: &Result<T, DriverError>) {
-        if matches!(result, Err(DriverError::Disconnected)) {
+        if let Err(error) = result {
+            self.note_lost_session(error);
+        }
+    }
+
+    fn note_lost_session(&self, error: &DriverError) {
+        if error.is_disconnect() {
             self.retired.set(true);
+        }
+        if matches!(error, DriverError::SessionEndedByServer { .. }) {
+            self.ended_by_server.set(true);
         }
     }
 
@@ -796,6 +810,9 @@ impl PolicySession {
             return;
         };
         batch.wrote |= writes;
+        if writes {
+            batch.writes = batch.writes.saturating_add(1);
+        }
         if matches!(
             result,
             Err(DriverError::Cancelled
@@ -962,6 +979,28 @@ impl PolicySession {
 }
 
 impl PolicySession {
+    async fn approve_production_commit(
+        &mut self,
+        sql: &str,
+        control: &OperationControl,
+        writes: u32,
+    ) -> Result<(), DriverError> {
+        if writes == 0 || self.guard.ctx.environment != Environment::Prod {
+            return Ok(());
+        }
+        let noun = if writes == 1 { "write" } else { "writes" };
+        let decision = Decision::RequireApproval {
+            rule: "prod_commit_requires_approval".into(),
+            reason: format!("Commit {writes} governed {noun} on a production connection"),
+            preview: None,
+        };
+        let analysis = self.guard.analyze_statement(sql);
+        self.guard
+            .resolve_authorization(sql, analysis, decision, None, Some(control))
+            .await
+            .map(|_| ())
+    }
+
     async fn finish(
         &mut self,
         sql: &str,
@@ -976,6 +1015,7 @@ impl PolicySession {
         };
         if kind == Finish::Commit {
             self.require_writable(sql).await?;
+            self.approve_production_commit(sql, control, batch.writes).await?;
         }
         let operation = finish_operation(kind, batch.id);
         self.guard.record_intent(&operation).await.map_err(|error| {
@@ -990,8 +1030,8 @@ impl PolicySession {
             .guard
             .caught_write(operation.sql, self.inner.query_params_controlled(sql, &[], control))
             .await;
-        if matches!(result, Err(DriverError::Disconnected)) {
-            self.retired.set(true);
+        if let Err(error) = &result {
+            self.note_lost_session(error);
         }
         let (mut terminal_status, mut transaction_outcome, error_category, mut ambiguous) =
             finish_outcome(kind, batch.aborted, &result);

@@ -427,6 +427,19 @@ impl Connection for SessionConnection {
         self.inner.query_result_sets_controlled(sql, params, control).await
     }
 
+    async fn query_result_sets_bounded_controlled(
+        &self,
+        sql: &str,
+        params: &[Value],
+        max_rows: usize,
+        max_bytes: usize,
+        control: &OperationControl,
+    ) -> Result<bookie_core::QueryResultBatch, DriverError> {
+        self.inner
+            .query_result_sets_bounded_controlled(sql, params, max_rows, max_bytes, control)
+            .await
+    }
+
     async fn execute_in_transaction_checked(
         &self,
         statements: &[(String, Vec<Value>)],

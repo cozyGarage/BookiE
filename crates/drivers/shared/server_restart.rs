@@ -40,7 +40,10 @@ where
 
 fn is_startup_transient(error: &DriverError) -> bool {
     match error {
-        DriverError::ConnectionRefused | DriverError::Disconnected | DriverError::TimedOut => true,
+        DriverError::ConnectionRefused
+        | DriverError::Disconnected
+        | DriverError::SessionEndedByServer { .. }
+        | DriverError::TimedOut => true,
         DriverError::Query { message, .. } => message.to_ascii_lowercase().contains("broken pipe"),
         _ => false,
     }

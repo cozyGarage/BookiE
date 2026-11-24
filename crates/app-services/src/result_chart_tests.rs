@@ -65,10 +65,7 @@ fn labels_that_dont_repeat_plot_their_own_values() {
         aggregate: Aggregate::Count,
         ..defaults(&profiles)
     };
-    assert_eq!(
-        compute(&rows, &profiles, &settings).series[0].values,
-        [Some(3.), Some(4.)]
-    );
+    assert_eq!(compute(&rows, &profiles, &settings).series[0].values, [Some(3.), Some(4.)]);
 }
 
 #[test]
@@ -102,21 +99,14 @@ fn a_primary_key_is_not_a_measure() {
 #[test]
 fn a_key_labels_its_measure_when_nothing_else_can() {
     let rows = [vec![n(1), n(4)], vec![n(2), n(9)]];
-    let settings = defaults(&profile(
-        &columns(&[("customer_id", "INTEGER"), ("orders", "BIGINT")]),
-        &rows,
-    ));
+    let settings = defaults(&profile(&columns(&[("customer_id", "INTEGER"), ("orders", "BIGINT")]), &rows));
     assert_eq!((settings.label, values(&settings)), (0, vec![1]));
 }
 
 #[test]
 fn dates_draw_a_line_and_sort_in_time() {
     let day = |m, d| Value::Date(NaiveDate::from_ymd_opt(2026, m, d).unwrap());
-    let rows = [
-        vec![day(3, 2), n(5)],
-        vec![day(1, 15), n(2)],
-        vec![t("2026-02-01"), n(4)],
-    ];
+    let rows = [vec![day(3, 2), n(5)], vec![day(1, 15), n(2)], vec![t("2026-02-01"), n(4)]];
     let profiles = profile(&columns(&[("day", ""), ("total", "")]), &rows);
     assert!(profiles[0].temporal);
     let settings = defaults(&profiles);
@@ -130,10 +120,7 @@ fn dates_draw_a_line_and_sort_in_time() {
 #[test]
 fn numbers_come_from_typed_values_never_from_text() {
     let rows = [vec![t("a"), d("1.50"), t("1000")], vec![t("b"), d("2.25"), t("2000")]];
-    let profiles = profile(
-        &columns(&[("name", "text"), ("price", "numeric"), ("zip", "numeric")]),
-        &rows,
-    );
+    let profiles = profile(&columns(&[("name", "text"), ("price", "numeric"), ("zip", "numeric")]), &rows);
     assert!(profiles[1].numeric && !profiles[2].numeric);
     assert_eq!(values(&defaults(&profiles)), [1]);
 }
@@ -143,15 +130,9 @@ fn decimals_sum_and_average_exactly() {
     let rows = [vec![t("a"), d("0.1")], vec![t("a"), d("0.2")], vec![t("b"), d("1")]];
     let profiles = profile(&columns(&[("name", "text"), ("price", "numeric")]), &rows);
     let mut settings = defaults(&profiles);
-    assert_eq!(
-        compute(&rows, &profiles, &settings).series[0].values,
-        [Some(0.3), Some(1.)]
-    );
+    assert_eq!(compute(&rows, &profiles, &settings).series[0].values, [Some(0.3), Some(1.)]);
     settings.aggregate = Aggregate::Average;
-    assert_eq!(
-        compute(&rows, &profiles, &settings).series[0].values,
-        [Some(0.15), Some(1.)]
-    );
+    assert_eq!(compute(&rows, &profiles, &settings).series[0].values, [Some(0.15), Some(1.)]);
 }
 
 #[test]
@@ -219,29 +200,21 @@ fn a_label_with_only_null_values_plots_a_gap_and_nulls_do_not_make_a_column_nume
     assert_eq!(values(&settings), [1]);
     assert_eq!(compute(&rows, &profiles, &settings).series[0].values, [None, Some(2.)]);
     settings.aggregate = Aggregate::Count;
-    assert_eq!(
-        compute(&rows, &profiles, &settings).series[0].values,
-        [Some(0.), Some(1.)]
-    );
+    assert_eq!(compute(&rows, &profiles, &settings).series[0].values, [Some(0.), Some(1.)]);
 }
 
 #[test]
 fn many_bars_keep_the_biggest_in_the_results_order() {
     let rows: Vec<_> = (0..250).map(|i| vec![t(&format!("l{i}")), n(i)]).collect();
     let data = chart(&[("label", "TEXT"), ("n", "INTEGER")], &rows);
-    assert_eq!(
-        (data.labels.len(), data.groups, data.cut),
-        (MAX_BARS, 250, Some(Cut::Top))
-    );
+    assert_eq!((data.labels.len(), data.groups, data.cut), (MAX_BARS, 250, Some(Cut::Top)));
     assert_eq!(data.labels.first().unwrap().as_deref(), Some("l50"));
     assert_eq!(data.labels.last().unwrap().as_deref(), Some("l249"));
 }
 
 #[test]
 fn many_points_keep_the_first_and_many_rows_are_capped() {
-    let rows: Vec<_> = (0..MAX_ROWS as i64 + 5)
-        .map(|i| vec![t(&format!("l{i}")), n(i)])
-        .collect();
+    let rows: Vec<_> = (0..MAX_ROWS as i64 + 5).map(|i| vec![t(&format!("l{i}")), n(i)]).collect();
     let profiles = profile(&columns(&[("label", "TEXT"), ("n", "INTEGER")]), &rows);
     let settings = Settings {
         kind: Kind::Line,

@@ -90,6 +90,7 @@ impl McpToolError {
             | DriverError::DatabaseFileNotFound(_)
             | DriverError::AuthFailed
             | DriverError::Disconnected
+            | DriverError::SessionEndedByServer { .. }
             | DriverError::Internal(_)
             | DriverError::IntegratedAuth(_)
             | DriverError::Tls(_) => (
