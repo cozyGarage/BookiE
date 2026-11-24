@@ -14,6 +14,18 @@ fn pooler_symptoms_get_a_hint_and_other_errors_are_left_alone() {
     }
     let binary_bind = with_pooler_hint("incorrect binary data format in bind parameter 1", Some("22P03"));
     assert!(binary_bind.contains("max_prepared_statements"), "{binary_bind}");
+    let unnamed_bind = with_pooler_hint(
+        "bind message supplies 2 parameters, but prepared statement \"\" requires 0",
+        Some("08P01"),
+    );
+    assert!(unnamed_bind.contains("max_prepared_statements"), "{unnamed_bind}");
+    assert_eq!(
+        with_pooler_hint(
+            "bind message supplies 2 parameters, but prepared statement \"q\" requires 0",
+            Some("08P01")
+        ),
+        "bind message supplies 2 parameters, but prepared statement \"q\" requires 0"
+    );
     assert_eq!(
         with_pooler_hint("invalid binary representation", Some("22P03")),
         "invalid binary representation"
