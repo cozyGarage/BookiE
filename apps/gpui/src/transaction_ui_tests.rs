@@ -39,15 +39,13 @@ fn open_transaction(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestCont
 fn a_starting_transaction_blocks_closing_and_a_second_begin(cx: &mut TestAppContext) {
     let path = fixture_copy("transaction-starting");
     let (view, cx) = saving_view(cx, &path);
-    cx.update(|_, cx| {
-        view.update(cx, |view, cx| {
-            view.transaction_starting = true;
-            assert!(view.transaction_open());
-            view.begin_transaction(cx);
-            assert!(view.transaction_starting);
-            assert!(view.transaction.is_none());
-        })
-    });
+    cx.update(|_, cx| view.update(cx, |view, cx| {
+        view.transaction_starting = true;
+        assert!(view.transaction_open());
+        view.begin_transaction(cx);
+        assert!(view.transaction_starting);
+        assert!(view.transaction.is_none());
+    }));
     std::fs::remove_file(path).ok();
 }
 
@@ -140,17 +138,9 @@ fn replacing_a_load_does_not_leave_a_transaction_statement_running(cx: &mut Test
             view.invalidate_background();
         })
     });
-    wait_for(&view, cx, |view| {
-        view.transaction
-            .as_ref()
-            .is_some_and(|transaction| !transaction.running)
-    });
+    wait_for(&view, cx, |view| view.transaction.as_ref().is_some_and(|transaction| !transaction.running));
     view.read_with(cx, |view, _| {
-        assert!(
-            view.transaction
-                .as_ref()
-                .is_some_and(|transaction| !transaction.running)
-        );
+        assert!(view.transaction.as_ref().is_some_and(|transaction| !transaction.running));
     });
     cx.update(|_, cx| view.update(cx, |view, cx| view.end_transaction(false, cx)));
     wait_for(&view, cx, |view| view.status == "Transaction rolled back");

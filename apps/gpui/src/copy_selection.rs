@@ -79,10 +79,7 @@ impl GridView {
         match self.palette.delimiter.clone() {
             Some((_, Ok(delimiter))) => self.set_csv_delimiter_to(Some(delimiter)),
             Some((_, Err(error))) => {
-                self.status = format!(
-                    "CSV delimiter refused: {}",
-                    bookie_gpui::csv_delimiter::error_label(error)
-                );
+                self.status = format!("CSV delimiter refused: {}", bookie_gpui::csv_delimiter::error_label(error));
             }
             None => {}
         }
@@ -170,9 +167,7 @@ impl GridView {
                 cx.write_to_clipboard(ClipboardItem::new_string(copied.text));
                 let noun = if count == 1 { "row" } else { "rows" };
                 self.status = if cut {
-                    format!(
-                        "Exported the first {count} {noun} as CSV to clipboard (export limit reached, more rows were not exported)"
-                    )
+                    format!("Exported the first {count} {noun} as CSV to clipboard (export limit reached, more rows were not exported)")
                 } else {
                     format!("Exported {count} {noun} as CSV to clipboard")
                 };

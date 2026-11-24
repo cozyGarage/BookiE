@@ -121,21 +121,12 @@ fn every_column_header_of_a_wide_result_is_drawn(cx: &mut TestAppContext) {
             .map(|index| match window.try_find(("col-header", index)) {
                 Some(header) => {
                     let bounds = header.bounds();
-                    format!(
-                        "{index}: visible={} x={:?} w={:?}",
-                        header.visible(),
-                        bounds.origin.x,
-                        bounds.size.width
-                    )
+                    format!("{index}: visible={} x={:?} w={:?}", header.visible(), bounds.origin.x, bounds.size.width)
                 }
                 None => format!("{index}: absent"),
             })
             .collect();
         let drawn = |line: &String| line.contains("visible=true") && !line.contains("w=0px");
-        assert!(
-            report.iter().all(drawn),
-            "column headers not drawn:\n{}",
-            report.join("\n")
-        );
+        assert!(report.iter().all(drawn), "column headers not drawn:\n{}", report.join("\n"));
     });
 }

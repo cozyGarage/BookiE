@@ -132,10 +132,7 @@ impl GridView {
         cx: &mut Context<Self>,
     ) {
         cx.spawn(async move |this, cx| {
-            let done = cx
-                .background_executor()
-                .spawn(async move { block_on_history(work) })
-                .await;
+            let done = cx.background_executor().spawn(async move { block_on_history(work) }).await;
             let _ = this.update(cx, |this, cx| {
                 if let Err(message) = done {
                     this.status = message;
@@ -150,19 +147,11 @@ impl GridView {
     fn reuse_statement(&mut self, query: &str, window: &mut Window, cx: &mut Context<Self>) {
         self.tabs.open_query();
         self.sync_grid_owner();
-        self.sql_input
-            .update(cx, |input, cx| input.set_value(query, window, cx));
+        self.sql_input.update(cx, |input, cx| input.set_value(query, window, cx));
         cx.notify();
     }
 
-    fn history_status_chip(
-        &self,
-        id: &'static str,
-        label: &'static str,
-        status: StatusFilter,
-        theme: Theme,
-        cx: &mut Context<Self>,
-    ) -> Stateful<Div> {
+    fn history_status_chip(&self, id: &'static str, label: &'static str, status: StatusFilter, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
         choice_chip(id, label, self.history_page.status == status, theme).on_click(cx.listener(
             move |this, _, _, cx| {
                 this.history_page.status = status;
@@ -171,14 +160,7 @@ impl GridView {
         ))
     }
 
-    fn history_window_chip(
-        &self,
-        id: &'static str,
-        label: &'static str,
-        window: TimeWindow,
-        theme: Theme,
-        cx: &mut Context<Self>,
-    ) -> Stateful<Div> {
+    fn history_window_chip(&self, id: &'static str, label: &'static str, window: TimeWindow, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
         choice_chip(id, label, self.history_page.window == window, theme).on_click(cx.listener(
             move |this, _, _, cx| {
                 this.history_page.window = window;
@@ -189,23 +171,16 @@ impl GridView {
 
     fn history_row(&self, index: usize, row: &HistoryRow, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
         let (id, pinned, query) = (row.id, row.pinned, row.query.clone());
-        let dot = if row.succeeded {
-            theme.success
-        } else {
-            theme.destructive
-        };
-        let pin = ghost_icon(
-            ("history-pin", index),
-            "pin",
-            if pinned { "Unpin" } else { "Pin" },
-            theme,
-        )
-        .when(pinned, |button| button.bg(rgb(theme.active_row)))
-        .on_click(cx.listener(move |this, _, _, cx| {
-            this.change_history(statement_history::set_pinned(id, !pinned), cx);
-        }));
+        let dot = if row.succeeded { theme.success } else { theme.destructive };
+        let pin = ghost_icon(("history-pin", index), "pin", if pinned { "Unpin" } else { "Pin" }, theme)
+            .when(pinned, |button| button.bg(rgb(theme.active_row)))
+            .on_click(cx.listener(move |this, _, _, cx| {
+                this.change_history(statement_history::set_pinned(id, !pinned), cx);
+            }));
         let delete = ghost_icon(("history-delete", index), "trash-2", "Delete", theme)
-            .on_click(cx.listener(move |this, _, _, cx| this.change_history(statement_history::delete(id), cx)));
+            .on_click(cx.listener(
+            move |this, _, _, cx| this.change_history(statement_history::delete(id), cx),
+        ));
         div()
             .id(("history-row", index))
             .flex()
@@ -297,14 +272,7 @@ impl GridView {
             .child(div().h(px(size::FORM_CONTROL)).child(self.history_page.search.clone()))
             .child(filters)
             .child(windows)
-            .child(
-                div()
-                    .id("history-list")
-                    .flex_1()
-                    .min_h_0()
-                    .overflow_y_scroll()
-                    .child(body),
-            )
+            .child(div().id("history-list").flex_1().min_h_0().overflow_y_scroll().child(body))
     }
 }
 

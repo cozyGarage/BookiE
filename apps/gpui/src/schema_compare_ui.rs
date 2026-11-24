@@ -32,12 +32,16 @@ impl GridView {
                         return Err("Cancelled".to_string());
                     }
                     let columns = live.table_columns(table)?;
-                    let foreign_keys =
-                        if live.driver_id == "postgres" || live.driver_id == "mysql" || live.driver_id == "sqlite" {
-                            live.table_structure(table).map(|s| s.foreign_keys).unwrap_or_default()
-                        } else {
-                            Vec::new()
-                        };
+                    let foreign_keys = if live.driver_id == "postgres"
+                        || live.driver_id == "mysql"
+                        || live.driver_id == "sqlite"
+                    {
+                        live.table_structure(table)
+                            .map(|s| s.foreign_keys)
+                            .unwrap_or_default()
+                    } else {
+                        Vec::new()
+                    };
                     all_tables.push(TableRead {
                         schema: table.schema.clone(),
                         name: table.name.clone(),

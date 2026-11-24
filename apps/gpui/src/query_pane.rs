@@ -33,8 +33,7 @@ impl GridView {
         let settings = bookie_core::sql_syntax::script::LexicalSettings::default_for(grammar);
         let formatted = bookie_core::sql_format::format_script(&text, grammar, settings);
         if formatted != text {
-            self.sql_input
-                .update(cx, |input, cx| input.set_value(formatted, window, cx));
+            self.sql_input.update(cx, |input, cx| input.set_value(formatted, window, cx));
             self.status = "Formatted the SQL".into();
         }
     }
@@ -51,46 +50,32 @@ impl GridView {
             .border_b_1()
             .border_color(rgb(theme.border))
             .child(
-                primary_button(
-                    "run-statement",
-                    "Run",
-                    "Run the selection or the statement at the cursor (Ctrl+Enter)",
-                    theme,
-                )
-                .on_click(cx.listener(|this, _, _, cx| {
-                    this.run_at_cursor(cx);
-                    cx.notify();
-                })),
+                primary_button("run-statement", "Run", "Run the selection or the statement at the cursor (Ctrl+Enter)", theme)
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.run_at_cursor(cx);
+                        cx.notify();
+                    })),
             )
             .child(
                 ghost("run-query", "Run all", theme)
-                    .tooltip(|window, cx| {
-                        gpui_component::tooltip::Tooltip::new("Run every statement (Ctrl+Shift+Enter)")
-                            .build(window, cx)
-                    })
+                    .tooltip(|window, cx| gpui_component::tooltip::Tooltip::new("Run every statement (Ctrl+Shift+Enter)").build(window, cx))
                     .on_click(cx.listener(|this, _, _, cx| {
                         this.run_query(cx);
                         cx.notify();
                     })),
             )
-            .child(
-                ghost("explain-query", "Explain", theme).on_click(cx.listener(|this, _, _, cx| {
-                    this.explain_query(cx);
-                    cx.notify();
-                })),
-            )
-            .child(
-                ghost("format-query", "Format", theme).on_click(cx.listener(|this, _, window, cx| {
-                    this.format_query(window, cx);
-                    cx.notify();
-                })),
-            )
-            .child(
-                ghost("save-query", "Save", theme).on_click(cx.listener(|this, _, _, cx| {
-                    this.save_favorite(cx);
-                    cx.notify();
-                })),
-            )
+            .child(ghost("explain-query", "Explain", theme).on_click(cx.listener(|this, _, _, cx| {
+                this.explain_query(cx);
+                cx.notify();
+            })))
+            .child(ghost("format-query", "Format", theme).on_click(cx.listener(|this, _, window, cx| {
+                this.format_query(window, cx);
+                cx.notify();
+            })))
+            .child(ghost("save-query", "Save", theme).on_click(cx.listener(|this, _, _, cx| {
+                this.save_favorite(cx);
+                cx.notify();
+            })))
             .child(div().flex_1())
             .child(
                 div()

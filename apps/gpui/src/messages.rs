@@ -41,11 +41,7 @@ impl MessageLog {
         let view = bookie_app_services::server_messages_view::MessagesView::new(messages);
         for row in view.rows() {
             let code = row.code.as_ref().map(|code| format!(" [{code}]")).unwrap_or_default();
-            let kind = if row.severity == bookie_core::MessageSeverity::Error {
-                MessageKind::Error
-            } else {
-                MessageKind::Info
-            };
+            let kind = if row.severity == bookie_core::MessageSeverity::Error { MessageKind::Error } else { MessageKind::Info };
             self.push(kind, format!("{}{code}: {}", row.severity_label, row.text));
         }
         if let Some(omitted) = view.omitted_notice() {
@@ -96,16 +92,8 @@ mod tests {
     #[test]
     fn server_messages_keep_severity_code_and_omission_notice() {
         let mut messages = bookie_core::ServerMessages::default();
-        messages.push(bookie_core::ServerMessage::new(
-            bookie_core::MessageSeverity::Warning,
-            Some("01000".into()),
-            "careful",
-        ));
-        messages.push(bookie_core::ServerMessage::new(
-            bookie_core::MessageSeverity::Error,
-            None,
-            "failed",
-        ));
+        messages.push(bookie_core::ServerMessage::new(bookie_core::MessageSeverity::Warning, Some("01000".into()), "careful"));
+        messages.push(bookie_core::ServerMessage::new(bookie_core::MessageSeverity::Error, None, "failed"));
         messages.record_omitted(2);
         let mut log = MessageLog::default();
         log.server_messages(&messages);

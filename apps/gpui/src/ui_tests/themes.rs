@@ -2,7 +2,7 @@ use gpui::TestAppContext;
 
 use crate::ui_theme::ThemeExt;
 
-use super::{PaletteMode, open};
+use super::{open, PaletteMode};
 
 #[gpui::test]
 fn the_theme_picker_lists_bundled_themes_and_installs_the_chosen_one(cx: &mut TestAppContext) {

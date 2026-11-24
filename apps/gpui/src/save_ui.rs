@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
+use bookie_app_services::csv_import_plan::plan_csv_import;
 use bookie_app_services::cell_save_plan::{
     CellChange, CellSavePlan, SaveTarget, plan_cell_saves, plan_row_deletes, plan_row_insert_named,
 };
-use bookie_app_services::csv_import_plan::plan_csv_import;
 use bookie_gpui::live::{LiveSession, SaveFailure, WriteSession};
 use bookie_gpui::save_check::{CellCheck, cell_checks, key_columns, verify};
 
@@ -347,11 +347,7 @@ impl GridView {
                 .spawn(async move {
                     let write = match write.filter(|write| write.is_current().unwrap_or(false)) {
                         Some(write) => write,
-                        None => Arc::new(WriteSession::open_saved(
-                            connection_id,
-                            approvals,
-                            opened_with.as_deref(),
-                        )?),
+                        None => Arc::new(WriteSession::open_saved(connection_id, approvals, opened_with.as_deref())?),
                     };
                     let applied = write.apply(&statements, &expect_one, &tokio_util::sync::CancellationToken::new());
                     Ok::<_, String>((write, applied))
@@ -366,32 +362,16 @@ impl GridView {
         .detach();
     }
 
-    fn reload_after_save_or_reconnect(
-        &mut self,
-        connection_id: uuid::Uuid,
-        text: String,
-        reconnect: Option<bookie_core::TableInfo>,
-        cx: &mut Context<Self>,
-    ) {
+    fn reload_after_save_or_reconnect(&mut self, connection_id: uuid::Uuid, text: String, reconnect: Option<bookie_core::TableInfo>, cx: &mut Context<Self>) {
         if let Some(table) = reconnect {
             self.status = text;
-            self.connect_preferring(
-                bookie_gpui::live::Origin::Saved(connection_id.to_string()),
-                Some(table),
-                cx,
-            );
+            self.connect_preferring(bookie_gpui::live::Origin::Saved(connection_id.to_string()), Some(table), cx);
         } else {
             self.reload_after_save(text, cx);
         }
     }
 
-    pub(crate) fn finish_save(
-        &mut self,
-        connection_id: uuid::Uuid,
-        done: String,
-        result: SaveOutcome,
-        cx: &mut Context<Self>,
-    ) {
+    pub(crate) fn finish_save(&mut self, connection_id: uuid::Uuid, done: String, result: SaveOutcome, cx: &mut Context<Self>) {
         let reconnect = self.save.reconnect_after.take();
         let (write, applied) = match result {
             Ok(done) => done,
@@ -486,12 +466,10 @@ impl GridView {
                         .on_click(cx.listener(|this, _, _, cx| this.request_save(cx))),
                     )
                 })
-                .child(
-                    ghost("discard-pending-edits", "Discard", theme).on_click(cx.listener(|this, _, _, cx| {
-                        this.discard_view_edits();
-                        cx.notify();
-                    })),
-                ),
+                .child(ghost("discard-pending-edits", "Discard", theme).on_click(cx.listener(|this, _, _, cx| {
+                    this.discard_view_edits();
+                    cx.notify();
+                }))),
         )
     }
 
@@ -572,7 +550,11 @@ pub(crate) fn with_resolve_hint(message: &str) -> String {
     }
 }
 
-fn plan_file_import(target: SaveTarget<'_>, driver_id: &str, file: &std::path::Path) -> Result<CellSavePlan, String> {
+fn plan_file_import(
+    target: SaveTarget<'_>,
+    driver_id: &str,
+    file: &std::path::Path,
+) -> Result<CellSavePlan, String> {
     let capabilities = drivers_registry::default_registry()
         .get(driver_id)
         .map(|driver| driver.capabilities())
@@ -588,10 +570,7 @@ fn plan_file_import(target: SaveTarget<'_>, driver_id: &str, file: &std::path::P
     let filled = if plan.filled_by_database.is_empty() {
         String::new()
     } else {
-        format!(
-            "\nNot imported, the database fills them: {}",
-            plan.filled_by_database.join(", ")
-        )
+        format!("\nNot imported, the database fills them: {}", plan.filled_by_database.join(", "))
     };
     let too_big = if plan.approvable {
         String::new()
@@ -602,10 +581,7 @@ fn plan_file_import(target: SaveTarget<'_>, driver_id: &str, file: &std::path::P
     let ignored = if plan.ignored_fields.is_empty() {
         String::new()
     } else {
-        format!(
-            "\nIgnored fields with no matching column: {}",
-            plan.ignored_fields.join(", ")
-        )
+        format!("\nIgnored fields with no matching column: {}", plan.ignored_fields.join(", "))
     };
     let preview = format!(
         "{} row(s) from the file{cut}\nColumns: {}{ignored}{filled}{too_big}\n\n{}",
@@ -619,3 +595,4 @@ fn plan_file_import(target: SaveTarget<'_>, driver_id: &str, file: &std::path::P
         preview,
     })
 }
+

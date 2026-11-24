@@ -21,12 +21,7 @@ pub(crate) fn run_target(text: &str, driver: &str, cursor: usize, selection: Ran
         .ok_or_else(|| "The cursor is not inside a complete statement".into())
 }
 
-pub(crate) fn run_source_range(
-    text: &str,
-    driver: &str,
-    cursor: usize,
-    selection: Range<usize>,
-) -> Option<Range<usize>> {
+pub(crate) fn run_source_range(text: &str, driver: &str, cursor: usize, selection: Range<usize>) -> Option<Range<usize>> {
     if selection.start < selection.end {
         let selected = text.get(selection.clone())?;
         let leading = selected.len() - selected.trim_start().len();
@@ -47,12 +42,7 @@ pub(crate) fn error_location(editor: &str, submitted: &str, position: usize) -> 
     Some((u32::try_from(line).ok()?, u32::try_from(column).ok()?))
 }
 
-pub(crate) fn mapped_error_location(
-    editor: &str,
-    sql: &str,
-    position: usize,
-    source: Option<&(String, Range<usize>)>,
-) -> Option<((u32, u32), Range<usize>)> {
+pub(crate) fn mapped_error_location(editor: &str, sql: &str, position: usize, source: Option<&(String, Range<usize>)>) -> Option<((u32, u32), Range<usize>)> {
     let start = match source {
         Some((snapshot, range)) if editor == snapshot && snapshot.get(range.clone()) == Some(sql) => range.start,
         None if editor == sql => 0,
@@ -70,10 +60,7 @@ pub(crate) fn error_token(sql: &str, position: usize) -> Option<Range<usize>> {
     if ch == ':' && !sql[..offset].ends_with(':') {
         let rest = &sql[offset + 1..];
         if rest.chars().next().is_some_and(|c| c.is_ascii_alphabetic() || c == '_') {
-            let length = rest
-                .bytes()
-                .take_while(|b| b.is_ascii_alphanumeric() || *b == b'_')
-                .count();
+            let length = rest.bytes().take_while(|b| b.is_ascii_alphanumeric() || *b == b'_').count();
             return Some(offset..offset + 1 + length);
         }
     }
@@ -116,9 +103,7 @@ impl GridView {
         let range = run_source_range(&text, &driver, cursor, selection.clone());
         match run_target(&text, &driver, cursor, selection) {
             Ok(sql) if bookie_app_services::query_parameters::statement_names(&sql, &driver).is_empty() => {
-                let source = range
-                    .filter(|range| text.get(range.clone()) == Some(sql.as_str()))
-                    .map(|range| (text, range));
+                let source = range.filter(|range| text.get(range.clone()) == Some(sql.as_str())).map(|range| (text, range));
                 self.run_sql_with_source(sql, Vec::new(), source, cx);
             }
             Ok(sql) => self.run_with_parameters(sql, cx),

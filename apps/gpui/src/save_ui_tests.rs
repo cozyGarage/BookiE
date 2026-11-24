@@ -15,7 +15,10 @@ struct TestDirectory(std::path::PathBuf);
 
 impl TestDirectory {
     fn new(name: &str) -> Self {
-        let path = std::env::temp_dir().join(format!("bookie-gpui-{name}-{}", uuid::Uuid::new_v4()));
+        let path = std::env::temp_dir().join(format!(
+            "bookie-gpui-{name}-{}",
+            uuid::Uuid::new_v4()
+        ));
         std::fs::create_dir(&path).expect("create a private test directory");
         Self(path)
     }
@@ -53,10 +56,7 @@ fn writable_table(path: &std::path::Path) -> std::sync::Arc<bookie_gpui::live::L
     )
 }
 
-pub(crate) fn write_session(
-    path: &std::path::Path,
-    read_only: bool,
-) -> std::sync::Arc<bookie_gpui::live::WriteSession> {
+pub(crate) fn write_session(path: &std::path::Path, read_only: bool) -> std::sync::Arc<bookie_gpui::live::WriteSession> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(1)
         .enable_all()
@@ -185,18 +185,10 @@ fn a_save_with_an_unknown_outcome_shows_an_error_instead_of_success(cx: &mut Tes
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
             let id = view.live.as_ref().and_then(|live| live.writable).unwrap();
-            view.finish_save(
-                id,
-                "Saved".into(),
-                Ok((
-                    write,
-                    Err(bookie_gpui::live::SaveFailure {
-                        message: "acknowledgement lost".into(),
-                        outcome_unknown: true,
-                    }),
-                )),
-                cx,
-            );
+            view.finish_save(id, "Saved".into(), Ok((write, Err(bookie_gpui::live::SaveFailure {
+                message: "acknowledgement lost".into(),
+                outcome_unknown: true,
+            }))), cx);
         })
     });
     view.read_with(cx, |view, _| {
@@ -438,7 +430,9 @@ fn an_edited_cell_is_reviewed_then_saved_and_the_table_shows_the_saved_value(cx:
                 .edits
                 .insert((0, 1), bookie_gpui::model::Cell::Text(staged.clone()));
             view.start_edit(0, 1, window, cx);
-            assert!(view.cell_edit.active.as_ref().is_some_and(|editing| editing.full_value));
+            assert!(
+                view.cell_edit.active.as_ref().is_some_and(|editing| editing.full_value)
+            );
             assert_eq!(view.cell_edit.value_editor.read(cx).value().as_ref(), staged);
         })
     });
@@ -458,15 +452,13 @@ fn an_edited_cell_is_reviewed_then_saved_and_the_table_shows_the_saved_value(cx:
 
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
-            view.cell_edit
-                .edits
-                .insert((1, 1), bookie_gpui::model::Cell::Text("temporary\nvalue".into()));
+            view.cell_edit.edits.insert(
+                (1, 1),
+                bookie_gpui::model::Cell::Text("temporary\nvalue".into()),
+            );
             view.start_edit(1, 1, window, cx);
             assert!(view.cell_edit.active.as_ref().is_some_and(|editing| editing.full_value));
-            assert_eq!(
-                view.cell_edit.value_editor.read(cx).value().as_ref(),
-                "temporary\nvalue"
-            );
+            assert_eq!(view.cell_edit.value_editor.read(cx).value().as_ref(), "temporary\nvalue");
         });
     });
     cx.run_until_parked();
@@ -486,14 +478,12 @@ fn an_edited_cell_is_reviewed_then_saved_and_the_table_shows_the_saved_value(cx:
             .as_ref()
             .unwrap_or_else(|| panic!("no review shown; status: {}", view.status));
         assert!(pending.plan.preview.contains("UPDATE"), "{}", pending.plan.preview);
-        assert!(
-            pending
-                .plan
-                .statements
-                .iter()
-                .flat_map(|(_, params)| params)
-                .any(|value| value == &bookie_gpui::model::Cell::Text(replacement.clone()))
-        );
+        assert!(pending
+            .plan
+            .statements
+            .iter()
+            .flat_map(|(_, params)| params)
+            .any(|value| value == &bookie_gpui::model::Cell::Text(replacement.clone())));
         assert_eq!(
             view.cell_edit.edits.len(),
             2,
@@ -513,11 +503,7 @@ fn an_edited_cell_is_reviewed_then_saved_and_the_table_shows_the_saved_value(cx:
             replacement,
             "the grid shows the saved value"
         );
-        assert_eq!(
-            view.source.row(1)[1].display(),
-            "",
-            "the empty clipboard value is saved"
-        );
+        assert_eq!(view.source.row(1)[1].display(), "", "the empty clipboard value is saved");
     });
     assert_eq!(saved_customer(&path, 1), replacement);
     assert_eq!(saved_customer(&path, 2), "");
@@ -859,11 +845,7 @@ fn set_import_path(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestConte
     let text = path.display().to_string();
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
-            let input = view
-                .import
-                .input
-                .clone()
-                .expect("the path field exists once the bar opened");
+            let input = view.import.input.clone().expect("the path field exists once the bar opened");
             input.update(cx, |input, cx| input.set_content(&text, cx));
         })
     });
@@ -894,16 +876,8 @@ fn a_csv_file_is_reviewed_then_imported_in_one_transaction_and_the_table_shows_t
             .unwrap_or_else(|| panic!("no review: {}", view.status));
         assert_eq!(pending.title, "Import 2 row(s) into orders?");
         assert_eq!(pending.confirm, "Import");
-        assert!(
-            pending.plan.preview.contains("customer, total"),
-            "{}",
-            pending.plan.preview
-        );
-        assert!(
-            pending.plan.preview.contains("ignored"),
-            "the unmatched field is reported: {}",
-            pending.plan.preview
-        );
+        assert!(pending.plan.preview.contains("customer, total"), "{}", pending.plan.preview);
+        assert!(pending.plan.preview.contains("ignored"), "the unmatched field is reported: {}", pending.plan.preview);
     });
     assert_eq!(order_count(&path), "6", "nothing is imported before the user confirms");
 
@@ -938,11 +912,7 @@ fn a_missing_or_unmatched_file_stops_the_review_keeps_the_bar_and_locks_editing(
     cx.update(|_, cx| view.update(cx, |view, cx| view.review_import(cx)));
     settle_saving(cx);
     view.read_with(cx, |view, _| {
-        assert!(
-            view.status.contains("no column of this table matches"),
-            "{}",
-            view.status
-        );
+        assert!(view.status.contains("no column of this table matches"), "{}", view.status);
     });
 
     cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(0, 1, window, cx)));
@@ -976,11 +946,7 @@ fn scalar_text(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext, 
 }
 
 fn table_columns_of(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext) -> String {
-    scalar_text(
-        view,
-        cx,
-        "SELECT COALESCE(group_concat(name), '') FROM pragma_table_info('orders')",
-    )
+    scalar_text(view, cx, "SELECT COALESCE(group_concat(name), '') FROM pragma_table_info('orders')")
 }
 
 #[gpui::test]
@@ -1008,33 +974,17 @@ fn a_column_is_added_renamed_and_dropped_only_after_each_change_is_reviewed(cx: 
         cx.update(|_, cx| view.update(cx, |view, cx| view.review_structure(cx)));
         settle_saving(cx);
         view.read_with(cx, |view, _| {
-            let pending = view
-                .save
-                .pending
-                .as_ref()
-                .unwrap_or_else(|| panic!("no review: {}", view.status));
-            assert!(
-                pending.title.contains(text.split_whitespace().next().unwrap()),
-                "{}",
-                pending.title
-            );
+            let pending = view.save.pending.as_ref().unwrap_or_else(|| panic!("no review: {}", view.status));
+            assert!(pending.title.contains(text.split_whitespace().next().unwrap()), "{}", pending.title);
             assert_ne!(pending.confirm, "Apply", "the button says what it does");
             assert!(pending.plan.preview.contains("ALTER TABLE"), "{}", pending.plan.preview);
         });
-        assert_eq!(
-            table_columns_of(&view, cx),
-            prior,
-            "nothing changes before the user confirms"
-        );
+        assert_eq!(table_columns_of(&view, cx), prior, "nothing changes before the user confirms");
         cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_save(cx)));
         settle_saving(cx);
         view.read_with(cx, |view, _| {
             assert!(!view.structure.open, "the bar closes once applied");
-            assert!(
-                view.save.banner.as_ref().is_some_and(|(_, error)| !error),
-                "{:?}",
-                view.save.banner
-            );
+            assert!(view.save.banner.as_ref().is_some_and(|(_, error)| !error), "{:?}", view.save.banner);
         });
         let columns = table_columns_of(&view, cx);
         prior = columns.clone();
@@ -1080,11 +1030,7 @@ fn a_save_that_finishes_after_the_reload_was_cancelled_still_frees_every_write_f
     });
     settle_saving(cx);
     view.read_with(cx, |view, _| {
-        assert!(
-            !view.save.busy,
-            "the write is done, so the save is no longer running: {}",
-            view.status
-        );
+        assert!(!view.save.busy, "the write is done, so the save is no longer running: {}", view.status);
     });
     std::fs::remove_file(&path).ok();
 }
@@ -1129,23 +1075,11 @@ fn a_unique_index_is_reviewed_created_then_dropped_by_its_live_name_only_on_conf
     cx.update(|_, cx| view.update(cx, |view, cx| view.review_structure(cx)));
     settle_saving(cx);
     view.read_with(cx, |view, _| {
-        let pending = view
-            .save
-            .pending
-            .as_ref()
-            .unwrap_or_else(|| panic!("no review: {}", view.status));
+        let pending = view.save.pending.as_ref().unwrap_or_else(|| panic!("no review: {}", view.status));
         assert_eq!(pending.title, "Create unique index by_customer on orders?");
-        assert!(
-            pending.plan.preview.contains("CREATE UNIQUE INDEX"),
-            "{}",
-            pending.plan.preview
-        );
+        assert!(pending.plan.preview.contains("CREATE UNIQUE INDEX"), "{}", pending.plan.preview);
     });
-    assert_eq!(
-        orders_indexes_of(&view, cx),
-        "",
-        "nothing is created before the user confirms"
-    );
+    assert_eq!(orders_indexes_of(&view, cx), "", "nothing is created before the user confirms");
     cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_save(cx)));
     settle_saving(cx);
     assert_eq!(orders_indexes_of(&view, cx), "by_customer");
@@ -1162,19 +1096,11 @@ fn a_unique_index_is_reviewed_created_then_dropped_by_its_live_name_only_on_conf
     cx.update(|_, cx| view.update(cx, |view, cx| view.review_structure(cx)));
     settle_saving(cx);
     view.read_with(cx, |view, _| {
-        let pending = view
-            .save
-            .pending
-            .as_ref()
-            .unwrap_or_else(|| panic!("no review: {}", view.status));
+        let pending = view.save.pending.as_ref().unwrap_or_else(|| panic!("no review: {}", view.status));
         assert_eq!(pending.title, "Drop index BY_CUSTOMER on orders?");
         assert!(pending.plan.preview.contains("by_customer"), "{}", pending.plan.preview);
     });
-    assert_eq!(
-        orders_indexes_of(&view, cx),
-        "by_customer",
-        "nothing is dropped before the user confirms"
-    );
+    assert_eq!(orders_indexes_of(&view, cx), "by_customer", "nothing is dropped before the user confirms");
     cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_save(cx)));
     settle_saving(cx);
     assert_eq!(orders_indexes_of(&view, cx), "");
@@ -1188,27 +1114,14 @@ fn the_structure_panel_lists_columns_indexes_and_keys_of_the_open_table_and_clos
     cx.update(|_, cx| view.update(cx, |view, cx| view.show_structure(cx)));
     settle_saving(cx);
     view.read_with(cx, |view, _| {
-        let text = view
-            .structure
-            .info
-            .as_deref()
-            .unwrap_or_else(|| panic!("no panel: {}", view.status));
+        let text = view.structure.info.as_deref().unwrap_or_else(|| panic!("no panel: {}", view.status));
         assert!(text.starts_with("Columns ("), "{text}");
         assert!(text.contains("customer"), "{text}");
         assert!(text.contains("Indexes (") && text.contains("Foreign keys ("), "{text}");
         assert!(!view.structure_info_enabled(), "one panel at a time");
     });
-    cx.update(|_, cx| {
-        view.update(cx, |view, cx| {
-            view.open_structure_bar(
-                bookie_app_services::structure_change_plan::StructureChangeKind::AddColumn,
-                cx,
-            )
-        })
-    });
-    view.read_with(cx, |view, _| {
-        assert!(view.structure.info.is_none(), "a change bar replaces the panel")
-    });
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_structure_bar(bookie_app_services::structure_change_plan::StructureChangeKind::AddColumn, cx)));
+    view.read_with(cx, |view, _| assert!(view.structure.info.is_none(), "a change bar replaces the panel"));
     std::fs::remove_file(&path).ok();
 }
 
@@ -1223,11 +1136,7 @@ fn only_a_table_rename_asks_for_a_reconnect_after_it_is_applied(cx: &mut TestApp
         cx.update(|_, cx| view.update(cx, |view, cx| view.review_structure(cx)));
         settle_saving(cx);
         view.read_with(cx, |view, _| {
-            let pending = view
-                .save
-                .pending
-                .as_ref()
-                .unwrap_or_else(|| panic!("no review: {}", view.status));
+            let pending = view.save.pending.as_ref().unwrap_or_else(|| panic!("no review: {}", view.status));
             assert_eq!(pending.reconnect.is_some(), expected, "{}", pending.title);
             assert!(!expected || pending.reconnect.as_ref().is_some_and(|table| table.name == "invoices"));
         });
@@ -1252,8 +1161,7 @@ fn resolving_an_outcome_is_offered_for_a_writable_connection_and_not_while_the_p
 
 #[test]
 fn a_blocked_save_points_to_the_resolve_action_and_other_errors_are_left_alone() {
-    let blocked =
-        "Blocked by policy: governed writes are disabled because a prior audit outcome could not be persisted";
+    let blocked = "Blocked by policy: governed writes are disabled because a prior audit outcome could not be persisted";
     assert!(crate::save_ui::with_resolve_hint(blocked).contains("Resolve unknown write outcome"));
     assert_eq!(crate::save_ui::with_resolve_hint("duplicate key"), "duplicate key");
 }
@@ -1262,12 +1170,7 @@ fn set_export_path(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestConte
     let text = path.display().to_string();
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
-            let input = view
-                .export
-                .file
-                .input
-                .clone()
-                .expect("the path field exists once the bar opened");
+            let input = view.export.file.input.clone().expect("the path field exists once the bar opened");
             input.update(cx, |input, cx| input.set_content(&text, cx));
         })
     });
@@ -1287,11 +1190,9 @@ fn export_uses_the_selected_scope_and_format_and_never_overwrites_a_file(cx: &mu
     let (view, cx) = saving_view(cx, &path);
     let directory = std::env::temp_dir().join(format!("bookie-export-{}", std::process::id()));
     std::fs::create_dir_all(&directory).unwrap();
-    cx.update(|_, cx| {
-        view.update(cx, |view, _| {
-            view.selection = Some(bookie_gpui::selection::Selection { anchor: 0, focus: 0 });
-        })
-    });
+    cx.update(|_, cx| view.update(cx, |view, _| {
+        view.selection = Some(bookie_gpui::selection::Selection { anchor: 0, focus: 0 });
+    }));
     cx.update(|_, cx| view.update(cx, |view, cx| view.open_export_file_bar(cx)));
     view.read_with(cx, |view, _| assert!(view.export.file.open));
 
@@ -1304,16 +1205,12 @@ fn export_uses_the_selected_scope_and_format_and_never_overwrites_a_file(cx: &mu
     assert_eq!(written.lines().count(), 1, "selected rows only: {written}");
     let value: serde_json::Value = serde_json::from_str(written.lines().next().unwrap()).unwrap();
     assert!(value["id"].is_number(), "JSON keeps the database number type: {value}");
-    view.read_with(cx, |view, _| {
-        assert!(!view.export.file.open && view.status.starts_with("Wrote 1 row(s)"))
-    });
+    view.read_with(cx, |view, _| assert!(!view.export.file.open && view.status.starts_with("Wrote 1 row(s)")));
 
     cx.update(|_, cx| view.update(cx, |view, cx| view.open_export_file_bar(cx)));
-    cx.update(|_, cx| {
-        view.update(cx, |view, _| {
-            view.export.file.scope = crate::export_file_ui::ExportScope::CurrentPage;
-        })
-    });
+    cx.update(|_, cx| view.update(cx, |view, _| {
+        view.export.file.scope = crate::export_file_ui::ExportScope::CurrentPage;
+    }));
     set_export_format(&view, cx, bookie_core::export::ResultFormat::JsonLines);
     let page = directory.join("page");
     set_export_path(&view, cx, &page);
@@ -1322,9 +1219,7 @@ fn export_uses_the_selected_scope_and_format_and_never_overwrites_a_file(cx: &mu
     let written = read_when_written(cx, &page_path, |text| text.lines().count() >= 6);
     assert_eq!(written.lines().count(), 6, "{written}");
     assert!(written.lines().next().unwrap().starts_with('{'), "{written}");
-    view.read_with(cx, |view, _| {
-        assert!(!view.export.file.open && view.status.starts_with("Wrote 6 row(s)"))
-    });
+    view.read_with(cx, |view, _| assert!(!view.export.file.open && view.status.starts_with("Wrote 6 row(s)")));
 
     cx.update(|_, cx| view.update(cx, |view, cx| view.open_export_file_bar(cx)));
     set_export_format(&view, cx, bookie_core::export::ResultFormat::Sql);
@@ -1368,11 +1263,7 @@ fn dropping_the_table_needs_its_exact_name_then_reviews_the_statement_and_reconn
     cx.update(|_, cx| view.update(cx, |view, cx| view.review_structure(cx)));
     settle_saving(cx);
     view.read_with(cx, |view, _| {
-        let pending = view
-            .save
-            .pending
-            .as_ref()
-            .unwrap_or_else(|| panic!("no review: {}", view.status));
+        let pending = view.save.pending.as_ref().unwrap_or_else(|| panic!("no review: {}", view.status));
         assert_eq!(pending.confirm, "Drop table");
         assert!(pending.plan.preview.contains("DROP TABLE"), "{}", pending.plan.preview);
         assert!(pending.reconnect.is_some(), "the open table is gone afterwards");
@@ -1388,11 +1279,7 @@ fn show_create_table_fills_the_panel_with_a_create_statement(cx: &mut TestAppCon
     cx.update(|_, cx| view.update(cx, |view, cx| view.show_create_table(cx)));
     settle_saving(cx);
     view.read_with(cx, |view, _| {
-        let text = view
-            .structure
-            .info
-            .as_deref()
-            .unwrap_or_else(|| panic!("no panel: {}", view.status));
+        let text = view.structure.info.as_deref().unwrap_or_else(|| panic!("no panel: {}", view.status));
         assert!(text.starts_with("CREATE TABLE"), "{text}");
         assert!(text.contains("customer"), "{text}");
     });
@@ -1408,9 +1295,7 @@ fn a_filter_is_saved_by_name_applied_again_and_deleted_and_an_unshowable_one_say
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
             view.search.saved = crate::saved_filters_ui::SavedFilters::at(store.clone());
-            view.search
-                .filter
-                .update(cx, |input, cx| input.set_content("customer = Ada", cx));
+            view.search.filter.update(cx, |input, cx| input.set_content("customer = Ada", cx));
             view.save_current_filter_as("only ada", cx);
         })
     });
@@ -1433,12 +1318,7 @@ fn a_filter_is_saved_by_name_applied_again_and_deleted_and_an_unshowable_one_say
     });
 
     let unshowable = bookie_app_services::named_filter_presets::NamedFilterPresetsStore::load_at(store.clone());
-    let id = view.read_with(cx, |view, _| {
-        view.live
-            .as_ref()
-            .and_then(|live| live.saved.as_ref().map(|(id, _)| *id))
-            .unwrap()
-    });
+    let id = view.read_with(cx, |view, _| view.live.as_ref().and_then(|live| live.saved.as_ref().map(|(id, _)| *id)).unwrap());
     let between = bookie_core::FilterSet {
         rules: vec![bookie_core::FilterRule {
             column: "total".into(),
@@ -1455,9 +1335,7 @@ fn a_filter_is_saved_by_name_applied_again_and_deleted_and_an_unshowable_one_say
             view.apply_saved_filter("range", cx);
         })
     });
-    view.read_with(cx, |view, _| {
-        assert!(view.status.contains("cannot show yet"), "{}", view.status)
-    });
+    view.read_with(cx, |view, _| assert!(view.status.contains("cannot show yet"), "{}", view.status));
 
     cx.update(|_, cx| view.update(cx, |view, cx| view.delete_saved_filter("only ada", cx)));
     view.read_with(cx, |view, _| {
@@ -1495,12 +1373,7 @@ fn a_saved_filter_keeps_the_trailing_space_of_its_text(cx: &mut TestAppContext) 
     });
     settle_saving(cx);
     view.read_with(cx, |view, _| {
-        assert_eq!(
-            view.dataset_count(),
-            0,
-            "\"Ada \" with its space matches no row: {}",
-            view.status
-        );
+        assert_eq!(view.dataset_count(), 0, "\"Ada \" with its space matches no row: {}", view.status);
     });
     std::fs::remove_file(&store).ok();
     std::fs::remove_file(&path).ok();
@@ -1556,16 +1429,8 @@ fn the_selected_rows_are_summarised_per_numeric_column(cx: &mut TestAppContext) 
         })
     });
     view.read_with(cx, |view, _| {
-        assert!(
-            view.status.contains("id: count 3, min 1, max 3, sum 6"),
-            "{}",
-            view.status
-        );
-        assert!(
-            !view.status.contains("customer"),
-            "text columns are not summarised: {}",
-            view.status
-        );
+        assert!(view.status.contains("id: count 3, min 1, max 3, sum 6"), "{}", view.status);
+        assert!(!view.status.contains("customer"), "text columns are not summarised: {}", view.status);
     });
     std::fs::remove_file(&path).ok();
 }
@@ -1595,28 +1460,13 @@ fn the_status_bar_sums_the_cursor_column_of_the_selected_rows(cx: &mut TestAppCo
     });
     cx.update(|_, cx| view.update(cx, |_, cx| cx.notify()));
     cx.run_until_parked();
-    assert!(
-        cx.debug_bounds("selection-stat-Sum").is_some(),
-        "the sum is drawn in the status bar"
-    );
+    assert!(cx.debug_bounds("selection-stat-Sum").is_some(), "the sum is drawn in the status bar");
 
-    cx.update(|_, cx| {
-        view.update(cx, |view, _| {
-            view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 1 })
-        })
-    });
-    view.read_with(cx, |view, _| {
-        assert!(view.selection_stat_items().is_empty(), "a text column has no stats")
-    });
+    cx.update(|_, cx| view.update(cx, |view, _| view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 1 })));
+    view.read_with(cx, |view, _| assert!(view.selection_stat_items().is_empty(), "a text column has no stats"));
 
-    cx.update(|_, cx| {
-        view.update(cx, |view, _| {
-            view.selection = Some(crate::Selection { anchor: 1, focus: 1 })
-        })
-    });
-    view.read_with(cx, |view, _| {
-        assert!(view.selection_stat_items().is_empty(), "one row is not summarised")
-    });
+    cx.update(|_, cx| view.update(cx, |view, _| view.selection = Some(crate::Selection { anchor: 1, focus: 1 })));
+    view.read_with(cx, |view, _| assert!(view.selection_stat_items().is_empty(), "one row is not summarised"));
     std::fs::remove_file(&path).ok();
 }
 
@@ -1631,9 +1481,7 @@ fn health_reports_are_offered_only_on_postgres(cx: &mut TestAppContext) {
             view.show_health_report(bookie_core::HealthReport::TableVacuum, cx);
         })
     });
-    view.read_with(cx, |view, _| {
-        assert!(view.status.contains("PostgreSQL"), "{}", view.status)
-    });
+    view.read_with(cx, |view, _| assert!(view.status.contains("PostgreSQL"), "{}", view.status));
     std::fs::remove_file(&path).ok();
 }
 
@@ -1644,31 +1492,15 @@ fn searching_every_table_for_a_value_reports_the_matching_rows_in_messages(cx: &
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
             view.open_value_search_bar(cx);
-            let input = view
-                .search
-                .values
-                .input
-                .clone()
-                .expect("the field exists once the bar opened");
+            let input = view.search.values.input.clone().expect("the field exists once the bar opened");
             input.update(cx, |input, cx| input.set_content("Ada", cx));
             view.run_value_search(cx);
         })
     });
     settle_saving(cx);
     view.read_with(cx, |view, _| {
-        let lines: Vec<&str> = view
-            .panel
-            .messages
-            .entries()
-            .iter()
-            .map(|entry| entry.text.as_str())
-            .collect();
-        assert!(
-            lines
-                .iter()
-                .any(|line| line.contains("orders") && line.contains("matching row(s)")),
-            "{lines:?}"
-        );
+        let lines: Vec<&str> = view.panel.messages.entries().iter().map(|entry| entry.text.as_str()).collect();
+        assert!(lines.iter().any(|line| line.contains("orders") && line.contains("matching row(s)")), "{lines:?}");
         assert!(!view.search.values.open);
     });
     std::fs::remove_file(&path).ok();
@@ -1686,12 +1518,7 @@ fn the_schema_diagram_is_written_to_a_new_file_in_the_format_of_its_extension(cx
         cx.update(|_, cx| {
             view.update(cx, |view, cx| {
                 view.open_schema_diagram_bar(cx);
-                let input = view
-                    .search
-                    .diagram
-                    .input
-                    .clone()
-                    .expect("the field exists once the bar opened");
+                let input = view.search.diagram.input.clone().expect("the field exists once the bar opened");
                 input.update(cx, |input, cx| input.set_content(&text, cx));
                 view.write_schema_diagram(cx);
             })
@@ -1707,9 +1534,7 @@ fn the_schema_diagram_is_written_to_a_new_file_in_the_format_of_its_extension(cx
     view.read_with(cx, |view, _| assert!(!view.search.diagram.open, "{}", view.status));
 
     type_path(&view, cx, &target);
-    view.read_with(cx, |view, _| {
-        assert!(view.status.contains("already exists"), "{}", view.status)
-    });
+    view.read_with(cx, |view, _| assert!(view.status.contains("already exists"), "{}", view.status));
     type_path(&view, cx, &directory.join("schema.png"));
     view.read_with(cx, |view, _| assert!(view.status.contains(".mmd"), "{}", view.status));
     std::fs::remove_dir_all(&directory).ok();
@@ -1729,12 +1554,7 @@ fn pasting_clipboard_rows_stages_them_down_the_column_from_the_active_cell(cx: &
     });
     view.read_with(cx, |view, _| {
         let edits = &view.cell_edit.edits;
-        assert_eq!(
-            edits.get(&(0, 1)),
-            Some(&bookie_gpui::model::Cell::Text("Zed".into())),
-            "{}",
-            view.status
-        );
+        assert_eq!(edits.get(&(0, 1)), Some(&bookie_gpui::model::Cell::Text("Zed".into())), "{}", view.status);
         assert_eq!(edits.get(&(1, 1)), Some(&bookie_gpui::model::Cell::Text("Yan".into())));
         assert_eq!(edits.len(), 2);
     });
@@ -1761,11 +1581,7 @@ fn a_structured_rule_filters_the_table_into_a_result(cx: &mut TestAppContext) {
             view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 1 });
             view.open_filter_rule_bar(cx);
             let column = view.search.rule.column.clone().expect("column field");
-            assert_eq!(
-                column.read(cx).content().to_string(),
-                "customer",
-                "the active column is prefilled"
-            );
+            assert_eq!(column.read(cx).content().to_string(), "customer", "the active column is prefilled");
             let value = view.search.rule.value.clone().expect("value field");
             value.update(cx, |input, cx| input.set_content("Ada", cx));
             view.run_filter_rule(cx);
@@ -1787,12 +1603,7 @@ fn the_schema_diagram_opens_in_its_own_tab_with_one_card_per_table(cx: &mut Test
     cx.update(|_, cx| view.update(cx, |view, cx| view.open_schema_diagram(cx)));
     settle_saving(cx);
     view.read_with(cx, |view, _| {
-        assert_eq!(
-            *view.tabs.current(),
-            bookie_gpui::shell::Tab::Diagram,
-            "{}",
-            view.status
-        );
+        assert_eq!(*view.tabs.current(), bookie_gpui::shell::Tab::Diagram, "{}", view.status);
         let diagram = view.search.diagram.view.as_ref().expect("a diagram was built");
         assert_eq!(diagram.scene.cards.len(), 2, "orders and customers");
         assert!(!diagram.needs_fit, "the first frame fits the diagram to the window");
@@ -1847,37 +1658,23 @@ fn refreshing_reloads_the_table_but_never_throws_pending_edits_away(cx: &mut Tes
 fn refresh_reuses_the_table_sort_and_keeps_rows_if_reload_fails(cx: &mut TestAppContext) {
     let path = fixture_copy("refresh-sorted-table");
     let (view, cx) = saving_view(cx, &path);
-    cx.update(|_, cx| {
-        view.update(cx, |view, cx| {
-            let table = view.catalog.grid_table.clone();
-            view.remember_table_sort(
-                &table,
-                Some(bookie_app_services::read_session::TableSort {
-                    column: "customer".into(),
-                    ascending: false,
-                }),
-            );
-            view.refresh_table(cx);
-        })
-    });
+    cx.update(|_, cx| view.update(cx, |view, cx| {
+        let table = view.catalog.grid_table.clone();
+        view.remember_table_sort(&table, Some(bookie_app_services::read_session::TableSort {
+            column: "customer".into(), ascending: false,
+        }));
+        view.refresh_table(cx);
+    }));
     settle_saving(cx);
     view.read_with(cx, |view, _| {
-        assert!(
-            view.status.contains("Server-side table sorting is not available"),
-            "{}",
-            view.status
-        );
+        assert!(view.status.contains("Server-side table sorting is not available"), "{}", view.status);
         assert_eq!(view.dataset_count(), 6, "failed reload keeps the existing rows");
         assert_eq!(view.table_sort(&view.catalog.grid_table).unwrap().column, "customer");
     });
     cx.update(|_, cx| view.update(cx, |view, cx| view.reload_after_save("Saved".into(), cx)));
     settle_saving(cx);
     view.read_with(cx, |view, _| {
-        assert!(
-            view.status.contains("Server-side table sorting is not available"),
-            "{}",
-            view.status
-        );
+        assert!(view.status.contains("Server-side table sorting is not available"), "{}", view.status);
         assert_eq!(view.dataset_count(), 6);
     });
     let orders = bookie_gpui::shell::table_info("orders");
@@ -1892,21 +1689,12 @@ fn refresh_reuses_the_table_sort_and_keeps_rows_if_reload_fails(cx: &mut TestApp
     cx.update(|window, cx| view.update(cx, |view, cx| view.open_table_named(&orders, window, cx)));
     settle_saving(cx);
     view.read_with(cx, |view, _| {
-        assert_eq!(
-            view.catalog.grid_table, customers,
-            "failed reload keeps the previous table"
-        );
-        assert!(
-            view.status.contains("Server-side table sorting is not available"),
-            "{}",
-            view.status
-        );
+        assert_eq!(view.catalog.grid_table, customers, "failed reload keeps the previous table");
+        assert!(view.status.contains("Server-side table sorting is not available"), "{}", view.status);
     });
-    cx.update(|_, cx| {
-        view.update(cx, |view, _| {
-            view.remember_table_sort(&orders, None);
-        })
-    });
+    cx.update(|_, cx| view.update(cx, |view, _| {
+        view.remember_table_sort(&orders, None);
+    }));
     cx.update(|window, cx| view.update(cx, |view, cx| view.open_table_named(&orders, window, cx)));
     settle_saving(cx);
     view.read_with(cx, |view, _| {
@@ -1925,34 +1713,27 @@ fn a_sql_file_opens_into_the_editor_and_the_editor_text_saves_to_a_new_file(cx: 
     let script = directory.join("in.sql");
     std::fs::write(&script, "SELECT 'from file';\n").unwrap();
 
-    let type_path =
-        |view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext, saving: bool, file: &std::path::Path| {
-            let text = file.display().to_string();
-            cx.update(|_, cx| {
-                view.update(cx, |view, cx| {
-                    view.open_sql_file_bar(saving, cx);
-                    let input = view.search.sql_file.input.clone().expect("the path field");
-                    input.update(cx, |input, cx| input.set_content(&text, cx));
-                    view.run_sql_file(cx);
-                })
-            });
-            settle_saving(cx);
-        };
+    let type_path = |view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext, saving: bool, file: &std::path::Path| {
+        let text = file.display().to_string();
+        cx.update(|_, cx| {
+            view.update(cx, |view, cx| {
+                view.open_sql_file_bar(saving, cx);
+                let input = view.search.sql_file.input.clone().expect("the path field");
+                input.update(cx, |input, cx| input.set_content(&text, cx));
+                view.run_sql_file(cx);
+            })
+        });
+        settle_saving(cx);
+    };
     type_path(&view, cx, false, &script);
     cx.update(|window, cx| view.update(cx, |view, cx| view.apply_opened_sql(window, cx)));
     view.read_with(cx, |view, cx| {
-        assert_eq!(
-            view.sql_input.read(cx).value().to_string(),
-            "SELECT 'from file';\n",
-            "{}",
-            view.status
-        );
+        assert_eq!(view.sql_input.read(cx).value().to_string(), "SELECT 'from file';\n", "{}", view.status);
     });
 
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
-            view.sql_input
-                .update(cx, |input, cx| input.set_value("SELECT 'edited';", window, cx));
+            view.sql_input.update(cx, |input, cx| input.set_value("SELECT 'edited';", window, cx));
         })
     });
     let saved = directory.join("out");
@@ -1960,9 +1741,7 @@ fn a_sql_file_opens_into_the_editor_and_the_editor_text_saves_to_a_new_file(cx: 
     let out = directory.join("out.sql");
     assert_eq!(read_when_written(cx, &out, |text| !text.is_empty()), "SELECT 'edited';");
     type_path(&view, cx, true, &directory.join("out.sql"));
-    view.read_with(cx, |view, _| {
-        assert!(view.status.contains("already exists"), "{}", view.status)
-    });
+    view.read_with(cx, |view, _| assert!(view.status.contains("already exists"), "{}", view.status));
     std::fs::remove_dir_all(&directory).ok();
     std::fs::remove_file(&path).ok();
 }
@@ -1985,10 +1764,7 @@ fn a_closed_tab_can_be_reopened(cx: &mut TestAppContext) {
     cx.update(|window, cx| view.update(cx, |view, cx| view.reopen_closed_tab(window, cx)));
     view.read_with(cx, |view, _| {
         assert_eq!(*view.tabs.current(), bookie_gpui::shell::Tab::Query);
-        assert!(
-            view.closed_tab_actions().iter().all(|action| !action.enabled),
-            "the entry is used up"
-        );
+        assert!(view.closed_tab_actions().iter().all(|action| !action.enabled), "the entry is used up");
     });
     std::fs::remove_file(&path).ok();
 }
@@ -2003,9 +1779,7 @@ fn closing_a_table_tab_loads_the_table_that_becomes_active(cx: &mut TestAppConte
     };
     cx.update(|window, cx| view.update(cx, |view, cx| view.open_table_named(&customers, window, cx)));
     settle_saving(cx);
-    view.read_with(cx, |view, _| {
-        assert_eq!(view.catalog.grid_table, customers, "{}", view.status)
-    });
+    view.read_with(cx, |view, _| assert_eq!(view.catalog.grid_table, customers, "{}", view.status));
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
             let index = view.tabs.active;
@@ -2019,10 +1793,7 @@ fn closing_a_table_tab_loads_the_table_that_becomes_active(cx: &mut TestAppConte
             panic!("a table tab is active");
         };
         assert_eq!(shown.name, "orders");
-        assert_eq!(
-            view.catalog.grid_table, shown,
-            "the grid now holds the table whose tab is shown"
-        );
+        assert_eq!(view.catalog.grid_table, shown, "the grid now holds the table whose tab is shown");
     });
     std::fs::remove_file(&path).ok();
 }
@@ -2050,10 +1821,7 @@ fn reconnecting_refreshes_the_table_list_and_never_with_pending_edits(cx: &mut T
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
-            assert!(
-                view.reconnect_actions().iter().all(|action| !action.enabled),
-                "no origin is known yet"
-            );
+            assert!(view.reconnect_actions().iter().all(|action| !action.enabled), "no origin is known yet");
             view.search.origin = Some(bookie_gpui::live::Origin::File(path.clone()));
             assert!(view.reconnect_actions().iter().all(|action| action.enabled));
         })
@@ -2085,20 +1853,13 @@ fn disconnecting_is_refused_while_edits_are_pending_and_offered_only_when_connec
     let path = fixture_copy("disconnect");
     let (view, cx) = saving_view(cx, &path);
     view.read_with(cx, |view, _| {
-        assert!(
-            view.disconnect_actions().iter().all(|action| action.enabled),
-            "a connection is open"
-        );
+        assert!(view.disconnect_actions().iter().all(|action| action.enabled), "a connection is open");
     });
     queue_edit(&view, cx, "pending");
     cx.update(|_, cx| view.update(cx, |view, cx| view.disconnect(cx)));
     view.read_with(cx, |view, _| {
         assert!(view.status.contains("pending edits"), "{}", view.status);
-        assert_eq!(
-            view.cell_edit.edits.len(),
-            1,
-            "the edit is kept and the app is still running"
-        );
+        assert_eq!(view.cell_edit.edits.len(), 1, "the edit is kept and the app is still running");
     });
     std::fs::remove_file(&path).ok();
 }
@@ -2106,17 +1867,13 @@ fn disconnecting_is_refused_while_edits_are_pending_and_offered_only_when_connec
 #[test]
 fn a_decision_made_elsewhere_is_reported_as_such_and_other_failures_keep_their_text() {
     use bookie_app_services::unknown_outcomes::{OutcomeDecision, UnknownOutcomeError};
-    let status =
-        |result: Result<(), UnknownOutcomeError>, decision| crate::resolve_ui::decision_status(&result, decision);
+    let status = |result: Result<(), UnknownOutcomeError>, decision| crate::resolve_ui::decision_status(&result, decision);
     assert_eq!(
         status(Err(UnknownOutcomeError::NoLongerUnresolved), OutcomeDecision::Committed),
         "That write was already decided elsewhere; the list was reloaded"
     );
     assert_eq!(
-        status(
-            Err(UnknownOutcomeError::Rejected("a reason is required".into())),
-            OutcomeDecision::Committed
-        ),
+        status(Err(UnknownOutcomeError::Rejected("a reason is required".into())), OutcomeDecision::Committed),
         "Could not record the decision: a reason is required"
     );
     assert!(status(Ok(()), OutcomeDecision::StillUnknown).contains("still unknown"));
@@ -2131,10 +1888,12 @@ fn showing_referencing_rows_runs_the_child_query_and_a_plain_column_opens_nothin
     let cancel = tokio_util::sync::CancellationToken::new();
     write
         .apply(
-            &[(
-                "CREATE TABLE notes(id INTEGER PRIMARY KEY, order_id INTEGER REFERENCES orders(id), body TEXT)".into(),
-                Vec::new(),
-            )],
+            &[
+                (
+                    "CREATE TABLE notes(id INTEGER PRIMARY KEY, order_id INTEGER REFERENCES orders(id), body TEXT)".into(),
+                    Vec::new(),
+                ),
+            ],
             &[],
             &cancel,
         )
@@ -2142,10 +1901,7 @@ fn showing_referencing_rows_runs_the_child_query_and_a_plain_column_opens_nothin
         .expect("create the child table");
     write
         .apply(
-            &[(
-                "INSERT INTO notes(order_id, body) VALUES (1, 'first note'), (1, 'second note')".into(),
-                Vec::new(),
-            )],
+            &[("INSERT INTO notes(order_id, body) VALUES (1, 'first note'), (1, 'second note')".into(), Vec::new())],
             &[],
             &cancel,
         )
@@ -2173,11 +1929,7 @@ fn showing_referencing_rows_runs_the_child_query_and_a_plain_column_opens_nothin
     cx.update(|_, cx| view.update(cx, |view, cx| view.show_referencing_rows(cx)));
     settle_saving(cx);
     view.read_with(cx, |view, _| {
-        assert!(
-            view.status.contains("2 rows"),
-            "the two child rows ran as a query: {}",
-            view.status
-        );
+        assert!(view.status.contains("2 rows"), "the two child rows ran as a query: {}", view.status);
     });
     std::fs::remove_file(&path).ok();
 }
@@ -2240,12 +1992,7 @@ fn grid_paste_shortcut_stages_clipboard_values(cx: &mut TestAppContext) {
     });
     cx.simulate_keystrokes("secondary-v");
     view.read_with(cx, |view, _| {
-        assert_eq!(
-            view.cell_edit.edits.get(&(0, 1)),
-            Some(&bookie_gpui::model::Cell::Text("Shortcut value".into())),
-            "{}",
-            view.status
-        );
+        assert_eq!(view.cell_edit.edits.get(&(0, 1)), Some(&bookie_gpui::model::Cell::Text("Shortcut value".into())), "{}", view.status);
     });
     std::fs::remove_file(path).ok();
 }
@@ -2286,25 +2033,17 @@ fn a_saved_edit_is_verified_by_re_reading_the_row(cx: &mut TestAppContext) {
     queue_edit(&view, cx, "Verified");
     cx.simulate_keystrokes("secondary-s");
     settle_saving(cx);
-    view.read_with(cx, |view, _| {
-        assert_eq!(view.save.pending.as_ref().map(|p| p.checks.len()), Some(1))
-    });
+    view.read_with(cx, |view, _| assert_eq!(view.save.pending.as_ref().map(|p| p.checks.len()), Some(1)));
     cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_save(cx)));
     for _ in 0..200 {
         settle_saving(cx);
-        if view.read_with(cx, |view, _| {
-            view.status.contains("verified") || view.status.contains("Could not")
-        }) {
+        if view.read_with(cx, |view, _| view.status.contains("verified") || view.status.contains("Could not")) {
             break;
         }
         std::thread::sleep(std::time::Duration::from_millis(50));
     }
     view.read_with(cx, |view, _| {
-        assert!(
-            view.status.contains("verified by re-reading the rows"),
-            "{}",
-            view.status
-        );
+        assert!(view.status.contains("verified by re-reading the rows"), "{}", view.status);
         assert!(view.save.checks.is_empty(), "the checks are used once");
     });
     assert_eq!(saved_customer(&path, 1), "Verified");
@@ -2323,7 +2062,9 @@ fn paste_into_a_read_only_query_result_does_not_stage_edits(cx: &mut TestAppCont
             .expect("query result"),
     );
     cx.update(text_input::bind_keys);
-    let (view, cx) = cx.add_window_view(|window, cx| GridView::with_source(result.clone(), Instant::now(), window, cx));
+    let (view, cx) = cx.add_window_view(|window, cx| {
+        GridView::with_source(result.clone(), Instant::now(), window, cx)
+    });
     cx.run_until_parked();
     cx.update(|window, cx| window.render_frame(cx));
     view.read_with(cx, |view, _| assert!(!view.source.editable()));

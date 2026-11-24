@@ -34,25 +34,13 @@ mod tests {
         assert_eq!(parse_command("export limit 250").unwrap().1, Ok(250));
         assert_eq!(parse_command("Export Limit  7 ").unwrap().1, Ok(7));
         for bad in ["0", "-1", "1.5", "ten", "99999999999999999999999"] {
-            assert_eq!(
-                parse_command(&format!("export limit {bad}")).unwrap().1,
-                Err(()),
-                "{bad}"
-            );
+            assert_eq!(parse_command(&format!("export limit {bad}")).unwrap().1, Err(()), "{bad}");
         }
     }
 
     #[test]
     fn other_text_is_not_the_command() {
-        for typed in [
-            "",
-            "export",
-            "export limit",
-            "export limit ",
-            "export csv",
-            "export limits 5",
-            "é",
-        ] {
+        for typed in ["", "export", "export limit", "export limit ", "export csv", "export limits 5", "é"] {
             assert!(parse_command(typed).is_none(), "{typed:?}");
         }
     }

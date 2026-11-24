@@ -7,15 +7,13 @@ mod audit_page;
 mod backup_ui;
 mod binary_mode;
 mod catalog_nav;
-mod chart_plot;
-mod chart_ui;
 mod chrome;
 mod closed_tabs_ui;
 mod column_projection;
-mod connection_bundle_ui;
 mod connection_form;
 mod copy_selection;
 mod detail_panel;
+mod connection_bundle_ui;
 mod diagram_scene;
 mod diagram_ui;
 mod edit_history;
@@ -31,22 +29,26 @@ mod grid_table;
 mod health_ui;
 mod history_view;
 mod home_page;
-mod host_key_ui;
 mod import_ui;
 mod insert_ui;
 mod keys;
 mod local_sort;
-mod mcp_ui;
 mod measure;
+mod mcp_ui;
 mod menus;
 mod new_window_ui;
 mod palette_actions;
 mod palette_state;
+mod transaction_ui;
 mod panel_state;
 mod params_ui;
 mod paste_ui;
 mod picker;
+mod server_filter_ui;
+mod host_key_ui;
 mod plan_view;
+mod chart_plot;
+mod chart_ui;
 mod query_pane;
 mod refresh_ui;
 mod render;
@@ -60,7 +62,6 @@ mod schema_compare_ui;
 mod schema_diagram_ui;
 mod scroll_pace;
 mod selection_stats_ui;
-mod server_filter_ui;
 mod services;
 mod set_cells_ui;
 mod sidebar_catalog;
@@ -71,7 +72,6 @@ mod ssh_form;
 mod structure_ui;
 mod tables_export_ui;
 mod text_input;
-mod transaction_ui;
 mod ui_theme;
 mod update_ui;
 mod value_search_ui;
@@ -448,17 +448,15 @@ impl GridView {
     fn guard_transaction_close(window: &mut Window, cx: &mut Context<Self>) {
         let owner = cx.weak_entity();
         window.on_window_should_close(cx, move |_, cx| {
-            owner
-                .update(cx, |view, cx| {
-                    if view.transaction_open() {
-                        view.status = "Commit or roll back the transaction before closing the window".into();
-                        cx.notify();
-                        false
-                    } else {
-                        true
-                    }
-                })
-                .unwrap_or(true)
+            owner.update(cx, |view, cx| {
+                if view.transaction_open() {
+                    view.status = "Commit or roll back the transaction before closing the window".into();
+                    cx.notify();
+                    false
+                } else {
+                    true
+                }
+            }).unwrap_or(true)
         });
     }
 
@@ -1129,8 +1127,6 @@ fn main() {
 }
 
 #[cfg(test)]
-mod connection_form_ui_tests;
-#[cfg(test)]
 mod follow_ui_tests;
 #[cfg(test)]
 mod grid_pin_tests;
@@ -1150,6 +1146,8 @@ mod server_filter_ui_tests;
 mod transaction_ui_tests;
 #[cfg(test)]
 mod typed_value_ui_tests;
+#[cfg(test)]
+mod connection_form_ui_tests;
 #[cfg(test)]
 mod ui_tests;
 #[cfg(test)]

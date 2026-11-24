@@ -29,12 +29,10 @@ pub(super) fn open(cx: &mut TestAppContext) -> (gpui::Entity<GridView>, &mut Vis
 fn opening_the_filter_keeps_grid_controls_on_one_line_at_default_width(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.simulate_resize(gpui::size(gpui::px(1100.0), gpui::px(800.0)));
-    cx.update(|_, cx| {
-        view.update(cx, |view, cx| {
-            view.search.filter_visible = true;
-            cx.notify();
-        })
-    });
+    cx.update(|_, cx| view.update(cx, |view, cx| {
+        view.search.filter_visible = true;
+        cx.notify();
+    }));
     cx.run_until_parked();
     let pager = cx.debug_bounds("grid-pager").expect("pager is rendered");
     let actions = cx.debug_bounds("grid-actions").expect("actions are rendered");
@@ -185,17 +183,12 @@ fn the_undo_history_is_bounded_by_count_and_by_size(cx: &mut TestAppContext) {
 fn confirming_an_untouched_null_cell_keeps_it_null(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     let row = view
-        .read_with(cx, |view, _| {
-            (0..12).find(|row| matches!(view.cell_at(*row, 2), Cell::Null))
-        })
+        .read_with(cx, |view, _| (0..12).find(|row| matches!(view.cell_at(*row, 2), Cell::Null)))
         .expect("the synthetic data has a NULL state");
     cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(row, 2, window, cx)));
     cx.simulate_keystrokes("enter");
     view.read_with(cx, |view, _| {
-        assert!(
-            view.cell_edit.edits.is_empty(),
-            "Enter on an untouched NULL staged an edit"
-        );
+        assert!(view.cell_edit.edits.is_empty(), "Enter on an untouched NULL staged an edit");
         assert!(view.cell_edit.active.is_none());
     });
 }
@@ -258,9 +251,7 @@ fn an_invalid_edit_is_refused_and_keeps_the_editor_open(cx: &mut TestAppContext)
         assert_eq!(view.status, "Not applied: not a date");
     });
     cx.simulate_keystrokes("escape");
-    view.read_with(cx, |view, _| {
-        assert!(view.cell_edit.active.is_none() && view.cell_edit.edits.is_empty())
-    });
+    view.read_with(cx, |view, _| assert!(view.cell_edit.active.is_none() && view.cell_edit.edits.is_empty()));
 }
 
 #[gpui::test]
@@ -295,17 +286,13 @@ fn changing_find_text_discards_a_pending_search_result(cx: &mut TestAppContext) 
     let (view, cx) = open(cx);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
-            view.search
-                .find
-                .update(cx, |input, cx| input.set_content("Sample 7", cx));
+            view.search.find.update(cx, |input, cx| input.set_content("Sample 7", cx));
             view.run_find(true, cx);
         });
     });
     let cancel = view.read_with(cx, |view, _| view.scans.cancel.clone());
     view.update(cx, |view, cx| {
-        view.search
-            .find
-            .update(cx, |input, cx| input.set_content("new search", cx))
+        view.search.find.update(cx, |input, cx| input.set_content("new search", cx))
     });
     cx.executor().advance_clock(std::time::Duration::from_secs(1));
     cx.run_until_parked();
@@ -325,9 +312,7 @@ fn starting_a_find_does_not_discard_a_pending_load(cx: &mut TestAppContext) {
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
             view.begin_background(Work::Load, cx, |_| (), move |_, ()| mark.set(true));
-            view.search
-                .find
-                .update(cx, |input, cx| input.set_content("Sample 7", cx));
+            view.search.find.update(cx, |input, cx| input.set_content("Sample 7", cx));
             view.run_find(true, cx);
             assert!(!view.loads.cancel.is_cancelled(), "a find must not cancel the load");
         });
@@ -344,8 +329,7 @@ fn applying_a_filter_does_not_discard_a_pending_load(cx: &mut TestAppContext) {
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
             view.begin_background(Work::Load, cx, |_| (), move |_, ()| mark.set(true));
-            view.search
-                .filter
+            view.search.filter
                 .update(cx, |input, cx| input.set_content("label contains 7", cx));
             view.apply_filter(cx);
             assert!(!view.loads.cancel.is_cancelled(), "a filter must not cancel the load");
@@ -378,16 +362,14 @@ fn changing_filter_text_discards_a_pending_filter(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
-            view.search
-                .filter
+            view.search.filter
                 .update(cx, |input, cx| input.set_content("label contains 7", cx));
             view.apply_filter(cx);
         });
     });
     let cancel = view.read_with(cx, |view, _| view.scans.cancel.clone());
     view.update(cx, |view, cx| {
-        view.search
-            .filter
+        view.search.filter
             .update(cx, |input, cx| input.set_content("label contains 8", cx))
     });
     cx.executor().advance_clock(std::time::Duration::from_secs(1));
@@ -968,9 +950,7 @@ fn the_palette_opens_one_new_connection_tab_with_the_default_port(cx: &mut TestA
         assert!(draft.read_only);
     });
     view.update(cx, |view, cx| {
-        view.connection_form
-            .port
-            .update(cx, |input, cx| input.set_content("not-a-port", cx));
+        view.connection_form.port.update(cx, |input, cx| input.set_content("not-a-port", cx));
         assert_eq!(view.connection_form.draft(cx).port, 0);
     });
     let sqlite = view.read_with(cx, |view, _| {
@@ -1196,9 +1176,7 @@ fn rendering_oversized_pending_cells_keeps_exact_binary_json_and_edit_text(cx: &
         assert_eq!(view.cell_at(1, 3), Cell::JsonText(json));
     });
     cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(0, 1, window, cx)));
-    view.read_with(cx, |view, cx| {
-        assert_eq!(view.cell_edit.value_editor.read(cx).value().as_ref(), text)
-    });
+    view.read_with(cx, |view, cx| assert_eq!(view.cell_edit.value_editor.read(cx).value().as_ref(), text));
 }
 
 #[gpui::test]
@@ -1229,9 +1207,7 @@ fn platform_input_flattens_newlines_like_single_line_paste(cx: &mut TestAppConte
     });
     cx.simulate_input("first\nsecond");
     cx.run_until_parked();
-    view.read_with(cx, |view, cx| {
-        assert_eq!(view.search.find.read(cx).content(), "first second")
-    });
+    view.read_with(cx, |view, cx| assert_eq!(view.search.find.read(cx).content(), "first second"));
     cx.update(|window, cx| {
         let input = view.read(cx).search.find.clone();
         input.update(cx, |input, cx| {
@@ -1395,8 +1371,7 @@ fn switching_grid_tabs_keeps_an_active_cell_editor_open(cx: &mut TestAppContext)
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
             view.start_edit(0, 1, window, cx);
-            view.cell_edit
-                .editor
+            view.cell_edit.editor
                 .update(cx, |editor, cx| editor.set_content("cell draft", cx));
             view.tabs.open_query();
             view.sync_grid_owner();
@@ -1423,8 +1398,7 @@ fn switching_results_keeps_an_active_cell_editor_open(cx: &mut TestAppContext) {
             view.add_run(None);
             view.add_run(None);
             view.start_edit(0, 1, window, cx);
-            view.cell_edit
-                .editor
+            view.cell_edit.editor
                 .update(cx, |editor, cx| editor.set_content("result draft", cx));
             let active_run = view.run_tabs.active;
             view.select_run(0);
@@ -1857,10 +1831,7 @@ fn column_type_labels_share_the_header_row(cx: &mut TestAppContext) {
         .expect("first column name is rendered");
     let kind_center = f32::from(kind.origin.y + kind.size.height / 2.0);
     let name_center = f32::from(name.origin.y + name.size.height / 2.0);
-    assert!(
-        (kind_center - name_center).abs() < 1.0,
-        "type and name share one header row"
-    );
+    assert!((kind_center - name_center).abs() < 1.0, "type and name share one header row");
     assert!(kind.origin.y >= header.origin.y, "type label starts inside the header");
     assert!(
         kind.origin.y + kind.size.height <= header.origin.y + header.size.height,
@@ -1926,9 +1897,7 @@ fn the_settings_tab_opens_and_shows_the_appearance_page(cx: &mut TestAppContext)
     });
     assert!(cx.debug_bounds("settings-card").is_some(), "settings sit on a card");
     cx.update(|window, cx| {
-        view.update(cx, |view, cx| {
-            view.open_picker(crate::palette_state::PaletteMode::Themes, window, cx)
-        })
+        view.update(cx, |view, cx| view.open_picker(crate::palette_state::PaletteMode::Themes, window, cx))
     });
     view.read_with(cx, |view, _| {
         assert!(view.palette.open);
@@ -1942,13 +1911,10 @@ fn settings_font_inputs_keep_editable_values_and_show_defaults(cx: &mut TestAppC
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
             view.tabs.open_settings();
-            view.edit_fonts(
-                |fonts| {
-                    fonts.ui_family.clear();
-                    fonts.editor_family.clear();
-                },
-                cx,
-            );
+            view.edit_fonts(|fonts| {
+                fonts.ui_family.clear();
+                fonts.editor_family.clear();
+            }, cx);
             cx.notify();
         });
     });
@@ -2007,9 +1973,7 @@ fn a_search_typed_on_one_tab_is_not_left_in_the_find_box_of_the_next(cx: &mut Te
     let (view, cx) = open(cx);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
-            view.search
-                .find
-                .update(cx, |find, cx| find.set_content("Sample 99999", cx))
+            view.search.find.update(cx, |find, cx| find.set_content("Sample 99999", cx))
         })
     });
     cx.run_until_parked();
@@ -2037,11 +2001,7 @@ fn a_double_click_on_a_table_row_opens_the_active_column_for_editing(cx: &mut Te
         })
     });
     view.read_with(cx, |view, _| {
-        let editing = view
-            .cell_edit
-            .active
-            .as_ref()
-            .expect("the double-clicked row opens its editor");
+        let editing = view.cell_edit.active.as_ref().expect("the double-clicked row opens its editor");
         assert_eq!((editing.row, editing.column), (1, 1));
     });
 }

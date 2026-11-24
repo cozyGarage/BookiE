@@ -6,12 +6,7 @@ fn hiding_results_cancels_explain_and_drops_its_late_result(cx: &mut TestAppCont
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
             view.panel.explaining = true;
-            view.begin_background(
-                crate::Work::Load,
-                cx,
-                |_| (),
-                |view, ()| view.status = "stale plan".into(),
-            );
+            view.begin_background(crate::Work::Load, cx, |_| (), |view, ()| view.status = "stale plan".into());
             let cancel = view.loads.cancel.clone();
             view.toggle_results();
             assert!(cancel.is_cancelled());
@@ -32,8 +27,7 @@ fn format_rewrites_the_editor_with_the_shared_formatter_and_leaves_empty_text_al
         view.update(cx, |view, cx| {
             view.tabs.open_query();
             view.sync_grid_owner();
-            view.sql_input
-                .update(cx, |input, cx| input.set_value(original, window, cx));
+            view.sql_input.update(cx, |input, cx| input.set_value(original, window, cx));
             view.format_query(window, cx);
         })
     });

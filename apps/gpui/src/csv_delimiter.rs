@@ -33,10 +33,7 @@ mod tests {
         assert_eq!(ok("csv delimiter ||"), "||");
         assert_eq!(ok("CSV Delimiter ::"), "::");
         assert_eq!(ok("csv delimiter  |"), " |");
-        assert_eq!(
-            parse_command("csv delimiter 'x").unwrap().1,
-            Err(CustomDelimiterError::Quote)
-        );
+        assert_eq!(parse_command("csv delimiter 'x").unwrap().1, Err(CustomDelimiterError::Quote));
         assert_eq!(
             parse_command("csv delimiter 123456789").unwrap().1,
             Err(CustomDelimiterError::TooLong)

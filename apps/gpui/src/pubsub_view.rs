@@ -22,8 +22,7 @@ pub fn subscription_message(
 
 pub fn parse_pattern(text: &str) -> Option<String> {
     let text = text.trim();
-    (!text.is_empty() && text.chars().count() <= 256 && !text.contains(char::is_whitespace) && !text.contains('\0'))
-        .then(|| text.to_string())
+    (!text.is_empty() && text.chars().count() <= 256 && !text.contains(char::is_whitespace) && !text.contains('\0')).then(|| text.to_string())
 }
 
 fn channel_after<'a>(text: &'a str, word: &str) -> Option<&'a str> {
@@ -42,8 +41,7 @@ pub fn parse_channel(text: &str) -> Option<String> {
 }
 
 fn postgres_channel(name: &str) -> Option<String> {
-    (!name.is_empty() && name.len() <= 63 && !name.contains(char::is_whitespace) && !name.contains('\0'))
-        .then(|| name.to_string())
+    (!name.is_empty() && name.len() <= 63 && !name.contains(char::is_whitespace) && !name.contains('\0')).then(|| name.to_string())
 }
 
 pub fn parse_follow(driver: &str, text: &str) -> Option<String> {
@@ -57,12 +55,12 @@ pub fn parse_follow(driver: &str, text: &str) -> Option<String> {
 
 pub fn message_line(message: &bookie_app_services::read_session_store::SubscriptionMessage) -> String {
     let payload: String = message.payload.chars().take(SHOWN_PAYLOAD_CHARS).collect();
-    let cut = if message.payload_bytes > message.payload.len() || message.payload.chars().count() > SHOWN_PAYLOAD_CHARS
-    {
-        " …"
-    } else {
-        ""
-    };
+    let cut =
+        if message.payload_bytes > message.payload.len() || message.payload.chars().count() > SHOWN_PAYLOAD_CHARS {
+            " …"
+        } else {
+            ""
+        };
     format!("{} · {payload}{cut}", message.channel)
 }
 
@@ -101,25 +99,11 @@ mod tests {
     #[test]
     fn follow_takes_the_follow_word_and_one_short_name() {
         assert_eq!(parse_follow("postgres", "follow jobs"), Some("jobs".into()));
-        assert_eq!(
-            parse_follow("postgres", "  FOLLOW   orders_changed "),
-            Some("orders_changed".into())
-        );
-        for bad in [
-            "jobs",
-            "follow",
-            "follow ",
-            "follow two words",
-            "listen jobs",
-            "unfollow jobs",
-        ] {
+        assert_eq!(parse_follow("postgres", "  FOLLOW   orders_changed "), Some("orders_changed".into()));
+        for bad in ["jobs", "follow", "follow ", "follow two words", "listen jobs", "unfollow jobs"] {
             assert_eq!(parse_follow("postgres", bad), None, "{bad}");
         }
-        assert_eq!(
-            parse_channel("follow jobs"),
-            None,
-            "listen and follow are different commands"
-        );
+        assert_eq!(parse_channel("follow jobs"), None, "listen and follow are different commands");
         assert_eq!(parse_follow("redis", "follow news.*"), Some("news.*".into()));
     }
 
