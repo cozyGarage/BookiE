@@ -27,21 +27,32 @@ impl GridView {
         let Some((row, column)) = self.active_row_with_names() else {
             return;
         };
+        self.clear_fk_peek();
+        let generation = self.fk_peek_work.generation;
+        let cancel = CancellationToken::new();
+        self.fk_peek_work.cancel = cancel.clone();
         let table = self.catalog.grid_table.clone();
+        let query_table = table.clone();
+        let current_session = live.clone();
         self.status = "Peeking foreign key…".into();
         cx.spawn(async move |this, cx| {
+            let query_session = live.clone();
             let found = cx
                 .background_executor()
                 .spawn(async move {
                     use bookie_gpui::source::ResultSource;
-                    let structure = live.table_structure(&table)?;
+                    let structure = query_session.table_structure(&query_table)?;
+                    if cancel.is_cancelled() {
+                        return Err("Foreign-key peek was cancelled".into());
+                    }
                     let mut targets =
-                        reference_targets(&structure.foreign_keys, table.schema.as_deref(), &column, &row)?;
+                        reference_targets(&structure.foreign_keys, query_table.schema.as_deref(), &column, &row)?;
                     let target = targets.remove(0);
-                    let (sql, params) = target_statement(&live, &target)?;
-                    let peek_sql = format!("{sql} LIMIT 1");
-                    let cancel = tokio_util::sync::CancellationToken::new();
-                    let live_table = live.run_query_bound(&peek_sql, &params, 1, &cancel)?;
+                    let (sql, params) = target_statement(&query_session, &target)?;
+                    if cancel.is_cancelled() {
+                        return Err("Foreign-key peek was cancelled".into());
+                    }
+                    let live_table = query_session.run_query_bound(&sql, &params, 1, &cancel)?;
                     let cols = live_table.columns();
                     let first_row = live_table.row(0);
                     let fields: Vec<(String, String)> = cols
@@ -58,6 +69,9 @@ impl GridView {
                 })
                 .await;
             this.update(cx, |this, cx| {
+                if !this.fk_peek_response_is_current(generation, &current_session, &table) {
+                    return;
+                }
                 match found {
                     Ok((table_name, fields, sql, params)) => {
                         this.fk_peek = Some(crate::fk_peek_ui::FkPeekState {
@@ -75,6 +89,23 @@ impl GridView {
             .ok();
         })
         .detach();
+    }
+
+    pub(crate) fn clear_fk_peek(&mut self) {
+        self.fk_peek_work.invalidate();
+        self.fk_peek = None;
+    }
+
+    pub(crate) fn fk_peek_response_is_current(
+        &self,
+        generation: u64,
+        session: &std::sync::Arc<bookie_gpui::live::LiveSession>,
+        table: &TableInfo,
+    ) -> bool {
+        self.fk_peek_work.generation == generation
+            && self.is_current_session(session)
+            && self.catalog.grid_table == *table
+            && !self.grid_is_query
     }
 
     pub(crate) fn show_referencing_rows(&mut self, cx: &mut Context<Self>) {

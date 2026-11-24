@@ -303,7 +303,13 @@ impl GridView {
                 "Cancel selected server process (PolicyGuard governed)",
                 self.live
                     .as_ref()
-                    .is_some_and(|l| l.driver_id == "postgres" || l.driver_id == "mysql"),
+                    .is_some_and(|l| l.driver_id == "postgres" || l.driver_id == "mysql")
+                    && self.grid_is_query
+                    && self
+                        .run_tabs
+                        .slots
+                        .get(self.run_tabs.active)
+                        .is_some_and(|slot| slot.cancel_process),
             ),
             action("status", "Show connection and tunnel status", self.live.is_some()),
         ]

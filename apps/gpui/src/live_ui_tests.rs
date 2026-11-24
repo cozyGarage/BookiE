@@ -1647,6 +1647,85 @@ fn activity_query_execution_sets_sql_and_switches_tab(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn process_cancellation_is_available_only_for_marked_activity_results(cx: &mut TestAppContext) {
+    let (view, cx) = open_live(cx);
+    view.update(cx, |view, _| {
+        view.add_run(None);
+        let session = view.live.as_ref().unwrap().with_driver_id("postgres");
+        view.live = Some(session);
+    });
+    view.read_with(cx, |view, _| {
+        let cancel = view
+            .palette_actions()
+            .into_iter()
+            .find(|action| action.id == "cancel-process")
+            .unwrap();
+        assert!(
+            !cancel.enabled,
+            "a regular table result must not expose process cancellation"
+        );
+    });
+
+    view.update(cx, |view, _| {
+        view.grid_is_query = true;
+        view.run_tabs.slots[view.run_tabs.active].cancel_process = true;
+    });
+    view.read_with(cx, |view, _| {
+        let cancel = view
+            .palette_actions()
+            .into_iter()
+            .find(|action| action.id == "cancel-process")
+            .unwrap();
+        assert!(
+            cancel.enabled,
+            "the generated process activity result enables cancellation"
+        );
+    });
+
+    view.update(cx, |view, _| {
+        view.run_tabs.slots[view.run_tabs.active].cancel_process = false;
+        assert!(
+            !view
+                .palette_actions()
+                .into_iter()
+                .find(|action| action.id == "cancel-process")
+                .unwrap()
+                .enabled
+        );
+        view.grid_is_query = false;
+    });
+}
+
+#[gpui::test]
+fn clearing_a_foreign_key_peek_cancels_work_and_rejects_stale_context(cx: &mut TestAppContext) {
+    let (view, cx) = open_live(cx);
+    view.update(cx, |view, _| {
+        let session = view.live.as_ref().unwrap().clone();
+        let table = view.catalog.grid_table.clone();
+        let generation = view.fk_peek_work.generation;
+        let cancel = view.fk_peek_work.cancel.clone();
+        assert!(view.fk_peek_response_is_current(generation, &session, &table));
+
+        view.fk_peek = Some(crate::fk_peek_ui::FkPeekState {
+            table: "customers".into(),
+            fields: Vec::new(),
+            sql: "SELECT 1".into(),
+            params: Vec::new(),
+        });
+        view.clear_fk_peek();
+
+        assert!(cancel.is_cancelled());
+        assert!(view.fk_peek.is_none());
+        assert!(!view.fk_peek_response_is_current(generation, &session, &table));
+
+        let other_table = table_info("customers");
+        assert!(!view.fk_peek_response_is_current(generation + 1, &session, &other_table));
+        view.grid_is_query = true;
+        assert!(!view.fk_peek_response_is_current(generation + 1, &session, &table));
+    });
+}
+
+#[gpui::test]
 fn export_selection_or_page_copies_csv_to_clipboard(cx: &mut TestAppContext) {
     let (view, cx) = open_live(cx);
 
