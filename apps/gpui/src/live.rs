@@ -274,6 +274,7 @@ impl LiveSession {
             rows,
             scan,
             truncated,
+            messages: Default::default(),
             snapshot_consistent: false,
             executed_sql: Some(sql.to_owned()),
             load_elapsed: started.elapsed(),
