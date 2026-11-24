@@ -285,7 +285,8 @@ impl GridView {
                                 cx.notify();
                             },
                         )),
-                    ),
+                    )
+                    .child(self.toolbar_import_export_menu(theme, cx)),
             )
             .child(self.toolbar_right(theme, window, cx))
     }
@@ -521,7 +522,7 @@ impl GridView {
             .children(empty)
     }
 
-    fn sidebar_import_export_button(&self, theme: Theme, cx: &mut Context<Self>) -> impl IntoElement {
+    fn toolbar_import_export_menu(&self, theme: Theme, cx: &mut Context<Self>) -> impl IntoElement {
         use gpui_component::button::{Button, ButtonVariants};
         use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
 
@@ -529,12 +530,9 @@ impl GridView {
         Button::new("import-export-menu")
             .ghost()
             .compact()
-            .w_full()
-            .justify_start()
             .tooltip("Import / Export connections")
             .accessibility_label("Import / Export connections")
             .child(icon("arrow-down-up", theme.muted_foreground))
-            .children((self.sidebar.width >= 320.0).then(|| div().flex_1().min_w_0().child("Import / Export")))
             .dropdown_menu(move |mut menu, _, _| {
                 for (id, label) in [
                     ("import-connections", "Import Connections…"),
@@ -596,14 +594,13 @@ impl GridView {
         div()
             .flex()
             .items_center()
-            .justify_between()
+            .justify_end()
             .min_h(px(size::LIST_ROW))
             .py_1()
             .px_2()
             .border_b_1()
             .border_color(rgb(theme.border))
             .text_color(rgb(theme.muted_foreground))
-            .child(self.sidebar_import_export_button(theme, cx))
             .child(self.sidebar_header_action_icons(theme, cx))
     }
 

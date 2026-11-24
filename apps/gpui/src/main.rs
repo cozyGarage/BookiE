@@ -325,7 +325,7 @@ impl GridView {
             InputEvent::Cancel => {}
         })
         .detach();
-        let editor = cx.new(|cx| TextInput::new("", cx));
+        let editor = cx.new(|cx| TextInput::new("", cx).compact());
         cx.subscribe_in(&editor, window, |this, _, event: &InputEvent, window, cx| {
             this.on_editor_event(event, window, cx);
         })

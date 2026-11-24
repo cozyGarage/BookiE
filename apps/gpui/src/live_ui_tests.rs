@@ -1967,6 +1967,33 @@ fn an_approval_request_shows_a_prompt_and_the_answer_reaches_the_sink(cx: &mut T
 }
 
 #[gpui::test]
+fn the_approval_prompt_is_visible_without_a_result_grid(cx: &mut TestAppContext) {
+    use bookie_app_services::approval_prompt::{PendingApproval, sample_request};
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.tabs.open_settings();
+            view.sync_grid_owner();
+            cx.notify();
+        });
+    });
+    let (respond, _answer) = tokio::sync::oneshot::channel();
+    let tx = view.read_with(cx, |view, _| view.approval.tx.clone());
+    assert!(
+        tx.send(PendingApproval {
+            request: sample_request("UPDATE customers SET name = 'x' WHERE id = 1"),
+            respond,
+        })
+        .is_ok()
+    );
+    cx.run_until_parked();
+    assert!(
+        cx.debug_bounds("approval-dialog").is_some(),
+        "the approval dialog is an overlay, so it shows on a page with no grid"
+    );
+}
+
+#[gpui::test]
 fn a_prompt_the_sink_gave_up_on_disappears_and_the_next_one_is_shown(cx: &mut TestAppContext) {
     use bookie_app_services::approval_prompt::{PendingApproval, sample_request};
     let (view, cx) = open(cx);

@@ -478,7 +478,8 @@ impl Render for GridView {
             None
         };
         let full_value_editor = self.full_value_editor_overlay(theme, cx);
-        let save_bar = self.approval_bar(theme, cx).or_else(|| self.save_bar(theme, cx)).or_else(|| self.edits_bar(theme, cx));
+        let approval = self.approval_overlay(theme, cx);
+        let save_bar = self.save_bar(theme, cx).or_else(|| self.edits_bar(theme, cx));
         let banner = self.save_banner(theme, cx);
         let bundle_bar = self.connection_bundle_bar(theme, cx);
         let insert_form = self
@@ -542,6 +543,7 @@ impl Render for GridView {
             .child(self.status_bar(theme))
             .children(palette)
             .children(full_value_editor)
+            .children(approval)
     }
 }
 

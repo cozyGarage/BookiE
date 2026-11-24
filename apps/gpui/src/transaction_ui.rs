@@ -98,14 +98,33 @@ impl GridView {
         self.loads.cancel = cancel.clone();
         let owner = shared.clone();
         cx.spawn(async move |this, cx| {
-            let ran = cx.background_executor().spawn(async move {
-                let result = write.run_in_transaction(&shared, &sql, &cancel)?;
-                live.table_from_result(result, &sql, &cancel)
+            let (ran, ended, cleanup) = cx.background_executor().spawn(async move {
+                let ran = (|| -> Result<_, String> {
+                    let result = write.run_in_transaction(&shared, &sql, &cancel)?;
+                    live.table_from_result(result, &sql, &cancel)
+                })();
+                let ended = ran.is_err() && !write.transaction_is_open(&shared);
+                let cleanup = if ended { write.close_transaction(&shared) } else { None };
+                (ran, ended, cleanup)
             }).await;
             this.update(cx, |this, cx| {
                 let Some(transaction) = this.transaction.as_mut().filter(|t| Arc::ptr_eq(&t.shared, &owner)) else {
                     return;
                 };
+                if ended {
+                    this.transaction = None;
+                    this.status = match (&ran, cleanup) {
+                        (Err(message), None) => format!(
+                            "The statement failed and the transaction session ended, so it was rolled back: {message}"
+                        ),
+                        (Err(message), Some(cleanup)) => format!(
+                            "The statement failed and the transaction session ended: {message}; closing it also failed: {cleanup}"
+                        ),
+                        (Ok(_), _) => String::new(),
+                    };
+                    cx.notify();
+                    return;
+                }
                 transaction.running = false;
                 if ran.is_ok() {
                     transaction.statements += 1;
