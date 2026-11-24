@@ -486,7 +486,7 @@ impl GridView {
             self.result_summary_body(&slot.run)
         } else if self.run_tabs.slots.is_empty() {
             div()
-                .id("results-empty")
+                .debug_selector(|| "results-empty".into())
                 .flex_1()
                 .flex()
                 .flex_col()
