@@ -8,6 +8,10 @@ use crate::{GridView, Tab, palette_step};
 
 impl GridView {
     pub(super) fn intercept_key(&mut self, event: &KeystrokeEvent, window: &mut Window, cx: &mut Context<Self>) {
+        if self.record_shortcut_key(&event.keystroke, cx) {
+            cx.stop_propagation();
+            return;
+        }
         if self.palette.open {
             let key = event.keystroke.key.as_str();
             if palette_navigation_key(key, event.keystroke.modifiers) {

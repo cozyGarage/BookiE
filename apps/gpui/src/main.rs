@@ -32,6 +32,7 @@ mod history_view;
 mod home_page;
 mod import_ui;
 mod insert_ui;
+mod keyboard_settings_ui;
 mod keys;
 mod local_sort;
 mod measure;
@@ -175,6 +176,8 @@ struct GridView {
     connection_info: Option<bookie_gpui::live::ServerInfo>,
     row_inspector: row_inspector_ui::RowInspector,
     wrap_text: bool,
+    recording_shortcut: Option<bookie_gpui::keymap::Command>,
+    settings_page: (keyboard_settings_ui::SettingsPage, u64),
     row_detail_filter: Entity<TextInput>,
     row_detail_hide_null: bool,
     catalog: Catalog,
@@ -576,6 +579,8 @@ impl GridView {
             connection_info: None,
             row_inspector: Default::default(),
             wrap_text: false,
+            recording_shortcut: None,
+            settings_page: (keyboard_settings_ui::SettingsPage::Appearance, 0),
             row_detail_filter,
             row_detail_hide_null: false,
             catalog: Catalog::synthetic(),
@@ -1162,6 +1167,8 @@ mod live_ui_tests;
 mod status_bar_tests;
 #[cfg(test)]
 mod row_inspector_tests;
+#[cfg(test)]
+mod keyboard_settings_tests;
 #[cfg(test)]
 mod overlay_ui_tests;
 #[cfg(test)]
