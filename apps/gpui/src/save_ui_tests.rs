@@ -1979,3 +1979,34 @@ fn paste_shortcut_in_filter_does_not_edit_grid(cx: &mut TestAppContext) {
     });
     std::fs::remove_file(path).ok();
 }
+
+#[gpui::test]
+fn a_saved_edit_is_verified_by_re_reading_the_row(cx: &mut TestAppContext) {
+    let path = fixture_copy("save-check");
+    let (view, cx) = saving_view(cx, &path);
+    let write = write_session(&path, false);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            let id = view.live.as_ref().and_then(|live| live.writable).expect("writable");
+            view.save.write = Some((id, write));
+        })
+    });
+    queue_edit(&view, cx, "Verified");
+    cx.simulate_keystrokes("ctrl-s");
+    settle_saving(cx);
+    view.read_with(cx, |view, _| assert_eq!(view.save.pending.as_ref().map(|p| p.checks.len()), Some(1)));
+    cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_save(cx)));
+    for _ in 0..200 {
+        settle_saving(cx);
+        if view.read_with(cx, |view, _| view.status.contains("verified") || view.status.contains("Could not")) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    view.read_with(cx, |view, _| {
+        assert!(view.status.contains("verified by re-reading the rows"), "{}", view.status);
+        assert!(view.save.checks.is_empty(), "the checks are used once");
+    });
+    assert_eq!(saved_customer(&path, 1), "Verified");
+    std::fs::remove_file(&path).ok();
+}

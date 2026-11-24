@@ -5,6 +5,7 @@ use bookie_app_services::cell_save_plan::{
     CellChange, CellSavePlan, SaveTarget, plan_cell_saves, plan_row_deletes, plan_row_insert_named,
 };
 use bookie_gpui::live::{LiveSession, SaveFailure, WriteSession};
+use bookie_gpui::save_check::{CellCheck, cell_checks, key_columns, verify};
 
 use super::*;
 use crate::chrome::{ghost, primary_button};
@@ -20,6 +21,7 @@ pub(crate) struct SaveState {
     pub banner: Option<(String, bool)>,
     pub banner_serial: u64,
     pub reconnect_after: Option<bookie_core::TableInfo>,
+    pub checks: Vec<CellCheck>,
 }
 
 pub(crate) struct PendingSave {
@@ -31,6 +33,7 @@ pub(crate) struct PendingSave {
     pub reconnect: Option<bookie_core::TableInfo>,
     pub generation: u64,
     pub table: bookie_core::TableInfo,
+    pub checks: Vec<CellCheck>,
 }
 
 pub(crate) enum SaveRequest {
@@ -170,6 +173,15 @@ impl GridView {
         let generation = self.save.generation;
         let table = self.catalog.grid_table.clone();
         let grid_columns = self.column_names();
+        let checks = match &request {
+            SaveRequest::Edits(changes) => cell_checks(
+                &key_columns(self.source.columns()),
+                changes
+                    .iter()
+                    .map(|change| (&change.original_row[..], change.column, &change.new_value)),
+            ),
+            _ => Vec::new(),
+        };
         self.status = "Preparing the changes…".into();
         cx.spawn(async move |this, cx| {
             let planned_table = table.clone();
@@ -206,7 +218,7 @@ impl GridView {
                 })
                 .await;
             this.update(cx, |this, cx| {
-                this.receive_plan(planned, labels, (generation, planned_table));
+                this.receive_plan(planned, labels, (generation, planned_table), checks);
                 cx.notify();
             })
             .ok();
@@ -219,6 +231,7 @@ impl GridView {
         planned: Result<CellSavePlan, String>,
         labels: ReviewLabels,
         (generation, table): (u64, bookie_core::TableInfo),
+        checks: Vec<CellCheck>,
     ) {
         self.save.busy = false;
         if self.save.generation != generation {
@@ -243,6 +256,7 @@ impl GridView {
                     reconnect: labels.reconnect,
                     generation,
                     table,
+                    checks,
                 });
             }
             Err(message) => self.status = format!("Cannot save: {message}"),
@@ -267,6 +281,21 @@ impl GridView {
             .ok();
         })
         .detach();
+    }
+
+    pub(crate) fn report_save_check(&mut self, checks: &[CellCheck]) {
+        if checks.is_empty() {
+            return;
+        }
+        let keys = key_columns(self.source.columns());
+        match verify(self.source.as_ref(), &keys, checks).warning() {
+            Some(warning) => {
+                self.status = format!("{}. {warning}", self.status);
+                self.save.banner_serial += 1;
+                self.save.banner = Some((self.status.clone(), true));
+            }
+            None => self.status = format!("{}, verified by re-reading the rows", self.status),
+        }
     }
 
     pub(crate) fn dismiss_save_banner(&mut self, cx: &mut Context<Self>) {
@@ -300,6 +329,7 @@ impl GridView {
         }
         self.save.busy = true;
         self.save.reconnect_after = pending.reconnect.clone();
+        self.save.checks = pending.checks;
         self.status = "Saving…".into();
         let write = self
             .save
