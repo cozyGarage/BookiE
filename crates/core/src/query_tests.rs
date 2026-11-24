@@ -233,6 +233,35 @@ fn first_result_keeps_truncation_from_either_batch_or_result_set() {
 }
 
 #[test]
+fn caller_budget_stops_before_decoding_when_row_or_byte_limit_is_exhausted() {
+    let mut rows = QueryResultBudget::with_limits(1, usize::MAX);
+    assert!(rows.admit(&[]));
+    let mut decoded = Vec::new();
+    let admitted = rows
+        .decode_and_admit_row_into(0, 0, &mut decoded, |_| -> Result<(), ()> {
+            panic!("row beyond the limit was decoded")
+        })
+        .unwrap();
+    assert!(!admitted);
+    let mut bytes = QueryResultBudget::with_limits(10, 0);
+    assert!(!bytes.admit(&[]));
+    let mut capped = QueryResultBudget::with_limits(usize::MAX, usize::MAX);
+    capped.rows = MAX_QUERY_ROWS;
+    assert!(!capped.admit(&[]));
+}
+
+#[test]
+fn caller_byte_budget_accepts_exact_boundary_and_rejects_the_next_row() {
+    let row = [Value::Text("exact".into())];
+    let row_bytes = super::estimated_row_size(&row);
+    let mut budget = QueryResultBudget::with_limits(10, row_bytes);
+    assert!(budget.admit(&row));
+    assert!(!budget.admit(&row));
+    let mut too_small = QueryResultBudget::with_limits(10, row_bytes - 1);
+    assert!(!too_small.admit(&row));
+}
+
+#[test]
 fn result_budget_counts_admitted_rows_to_the_limit() {
     let mut budget = QueryResultBudget {
         rows: MAX_QUERY_ROWS - 1,

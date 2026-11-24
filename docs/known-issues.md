@@ -51,5 +51,7 @@ This page is an index of ledger IDs to issues. Do not track evidence, owners or 
 | CI-4 | [#573](https://github.com/cozyGarage/BookiE/issues/573) |
 | DICT-1 | [#3097](https://github.com/cozyGarage/BookiE/issues/3097) |
 | CAT-1 | [#3583](https://github.com/cozyGarage/BookiE/issues/3583) |
+| GPUI-2 | [#3804](https://github.com/cozyGarage/BookiE/issues/3804) |
+| GPUI-3 | [#3805](https://github.com/cozyGarage/BookiE/issues/3805) |
 
 When you finish a row, close or move the GitHub issue on the project. Remove its index line in the same docs change.

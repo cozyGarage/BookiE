@@ -28,7 +28,10 @@ async fn connect_deadline_drops_the_in_flight_connect_future() {
 
 #[test]
 fn terminal_session_kill_is_disconnected_but_sql_errors_are_preserved() {
-    assert!(matches!(map_server_error(596, "killed", 1), DriverError::Disconnected));
+    assert!(matches!(
+        map_server_error(596, "killed", 1),
+        DriverError::SessionEndedByServer { .. }
+    ));
     assert!(matches!(
         map_server_error(18456, "login failed", 1),
         DriverError::AuthFailed
