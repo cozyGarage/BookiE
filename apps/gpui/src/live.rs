@@ -121,6 +121,10 @@ impl LiveSession {
             .map_or_else(|| format!("{:?}", self.session_id), |(id, _)| id.to_string())
     }
 
+    pub fn database_service(&self) -> &Arc<bookie_app_services::database_service::DatabaseService> {
+        self.sessions.database_service()
+    }
+
     pub fn supports_table_row_count(&self) -> bool {
         matches!(
             self.driver_id.as_str(),

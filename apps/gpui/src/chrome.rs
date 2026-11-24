@@ -862,6 +862,7 @@ impl GridView {
     pub fn settings_page(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
         let view = cx.entity();
         let fonts = self.font_group(view.clone(), cx);
+        let mcp = self.mcp.group(view.clone());
         let dark_mode = gpui_kit::component::setting::SettingField::switch(
             |cx| Theme::current(cx).dark,
             move |on, cx| {
@@ -896,6 +897,7 @@ impl GridView {
                     )
                     .item(gpui_kit::component::setting::SettingItem::new("Dark theme", dark_mode)),
             )
+            .group(mcp)
             .group(fonts);
         div()
             .relative()

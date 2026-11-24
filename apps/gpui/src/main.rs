@@ -34,6 +34,7 @@ mod insert_ui;
 mod keys;
 mod local_sort;
 mod measure;
+mod mcp_ui;
 mod menus;
 mod new_window_ui;
 mod palette_actions;
@@ -200,6 +201,7 @@ struct GridView {
     history: Vec<bookie_app_services::statement_history::RecentStatement>,
     history_page: history_view::HistoryPage,
     audit_page: audit_page::AuditPage,
+    mcp: mcp_ui::McpState,
     panel: panel_state::PanelState,
     fonts: panel_state::FontState,
     font_inputs: [Entity<TextInput>; 2],
@@ -502,11 +504,7 @@ impl GridView {
             .detach();
         }
 
-        let (approval, approval_inbox) = approval_ui::ApprovalUi::new();
-        Self::watch_approvals(approval_inbox, cx);
-        let (host_key, host_key_inbox) = host_key_ui::HostKeyUi::new();
-        bookie_gpui::host_key::install(host_key.tx.clone());
-        Self::watch_host_keys(host_key_inbox, cx);
+        let (approval, host_key) = Self::install_prompts(cx);
         GridView {
             table,
             _table_events: table_events,
@@ -537,6 +535,7 @@ impl GridView {
             history: Vec::new(),
             history_page: history_view::HistoryPage::new(cx),
             audit_page: audit_page::AuditPage::new(cx),
+            mcp: mcp_ui::McpState::default(),
             panel: panel_state::PanelState::new(DEFAULT_RESULT_RATIO),
             fonts: panel_state::FontState::new(saved_fonts, default_font(&font_names).into(), font_names),
             font_inputs,
@@ -579,6 +578,15 @@ impl GridView {
             charts: Ticket::new(),
             status: String::new(),
         }
+    }
+
+    fn install_prompts(cx: &mut Context<Self>) -> (approval_ui::ApprovalUi, host_key_ui::HostKeyUi) {
+        let (approval, approval_inbox) = approval_ui::ApprovalUi::new();
+        Self::watch_approvals(approval_inbox, cx);
+        let (host_key, host_key_inbox) = host_key_ui::HostKeyUi::new();
+        bookie_gpui::host_key::install(host_key.tx.clone());
+        Self::watch_host_keys(host_key_inbox, cx);
+        (approval, host_key)
     }
 
     fn persist_window_geometry(window: &mut Window, cx: &mut Context<Self>) {

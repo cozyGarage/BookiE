@@ -158,6 +158,7 @@ flowchart TB
     app_services --> transport
     app_services --> ssh
     app_services --> dump
+    app_services --> mcp
     results --> core
     pg_sessions --> core
     app --> transport
@@ -193,7 +194,7 @@ flowchart TB
 | `bookie-core` | Domain types, driver traits, values, filters, transactions, registry. No workspace dependency. |
 | `bookie-policy` | Classify, rules, approval, masking, blast radius, audit types, `PolicyGuard`. Production dependency: `core`. |
 | `bookie-results` | Pure result logic (compare, filter, find, predicate, scan, spool, exact values, sidebar tree). Depends only on `core` ([ADR 0037](docs/decisions/0037-results-crate-split.md)). |
-| `bookie-app-services` | GTK-free application state and service logic used by the desktop app. Depends on `core`, `results`, `dump`, `policy`, `storage` and `transport`. |
+| `bookie-app-services` | GTK-free application state and service logic used by the desktop app. Depends on `core`, `results`, `dump`, `mcp`, `policy`, `storage` and `transport`. |
 | `bookie-storage` | Saved connections, Secret Service, query history, audit journal. |
 | `bookie-ssh` | Built-in `russh` tunnels and optional system OpenSSH backend. |
 | `bookie-transport` | Saved-connection → dial options, SSH chain, tunnel, TLS service identity. |
@@ -285,7 +286,7 @@ bookie-agentd ────┘
 
 bookie-release-tests ──► mcp, policy, storage, transport, ssh, drivers, core
 bookie-driver-tls-tests ──► transport, ssh, drivers, core
-bookie-app-services ──► results, dump, policy, storage, transport, core
+bookie-app-services ──► results, dump, mcp, policy, storage, transport, core
 bookie-results ──► core
 
 bookie-mcp        ──► policy, storage, core
