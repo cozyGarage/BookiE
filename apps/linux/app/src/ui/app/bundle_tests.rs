@@ -33,7 +33,7 @@ fn saved(name: &str) -> SavedConnection {
 fn item(name: &str) -> ImportItem {
     let connection = saved(name);
     ImportItem {
-        disposition: ImportDisposition::New,
+        disposition: bookie_storage::ImportDisposition::New,
         source_id: connection.id,
         connection,
         previous: None,

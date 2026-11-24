@@ -3,9 +3,7 @@ use std::future::Future;
 use relm4::ComponentSender;
 use relm4::gtk::prelude::FileExt;
 
-use bookie_storage::{
-    BundleError, BundleExport, ImportDisposition, ImportItem, ImportPlan, ParsedBundle, SavedConnection,
-};
+use bookie_storage::{BundleError, BundleExport, ImportItem, ImportPlan, ParsedBundle, SavedConnection};
 use uuid::Uuid;
 
 use crate::ui::connection_bundle::{
