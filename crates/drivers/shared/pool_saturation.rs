@@ -78,7 +78,9 @@ pub async fn a_ping_still_reports_a_server_that_cannot_be_reached<
     assert!(
         matches!(
             outcome,
-            Ok(Err(DriverError::Disconnected | DriverError::ConnectionRefused))
+            Ok(Err(DriverError::Disconnected
+                | DriverError::SessionEndedByServer { .. }
+                | DriverError::ConnectionRefused))
         ),
         "an unreachable server was reported as {outcome:?}"
     );

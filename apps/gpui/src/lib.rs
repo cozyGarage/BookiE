@@ -5,6 +5,7 @@ pub mod detail;
 pub mod edit;
 pub mod export_limit;
 pub mod font_settings;
+pub mod host_key;
 pub mod keymap;
 pub mod live;
 pub mod messages;
