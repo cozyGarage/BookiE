@@ -1,4 +1,5 @@
 #![recursion_limit = "256"]
+pub mod chart_source;
 pub mod core_bridge;
 pub mod csv_delimiter;
 pub mod detail;

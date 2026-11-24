@@ -30,7 +30,8 @@ pub use connection_bundle::{
     store_bundle_secrets,
 };
 pub use connection_color::{
-    CONNECTION_COLORS, CONNECTION_STRIP_CLASSES, connection_color, connection_color_css_class, connection_strip_class,
+    CONNECTION_COLORS, CONNECTION_STRIP_CLASSES, connection_color, connection_color_css_class, connection_color_rgb,
+    connection_strip_class,
 };
 pub use connection_import_another_redis::{MAX_ANOTHER_REDIS_BYTES, parse_another_redis_connections};
 pub use connection_import_datagrip::{MAX_DATAGRIP_BYTES, parse_datagrip_data_sources};
