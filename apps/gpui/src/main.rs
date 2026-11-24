@@ -14,10 +14,12 @@ mod closed_tabs_ui;
 mod column_projection;
 mod connection_bundle_ui;
 mod connection_form;
+mod connection_info_ui;
 mod copy_selection;
 mod detail_panel;
 mod diagram_scene;
 mod diagram_ui;
+mod drafts_ui;
 mod edit_history;
 mod export_file_ui;
 mod favorites_ui;
@@ -34,6 +36,7 @@ mod home_page;
 mod host_key_ui;
 mod import_ui;
 mod insert_ui;
+mod keyboard_settings_ui;
 mod keys;
 mod local_sort;
 mod mcp_ui;
@@ -52,6 +55,7 @@ mod refresh_ui;
 mod render;
 mod resolve_ui;
 mod reveal;
+mod row_inspector_ui;
 mod run_cursor_ui;
 mod runs;
 mod save_ui;
@@ -124,6 +128,12 @@ struct Ticket {
     cancel: CancellationToken,
 }
 
+impl Default for Ticket {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Ticket {
     fn new() -> Self {
         Self {
@@ -164,6 +174,14 @@ struct GridView {
     row_detail_open: bool,
     pub(crate) fk_peek: Option<fk_peek_ui::FkPeekState>,
     fk_peek_work: Ticket,
+    connection_info: Option<bookie_gpui::live::ServerInfo>,
+    closed_drafts: Option<bookie_app_services::closed_drafts::ClosedDraftStore>,
+    last_edit: Option<gpui_kit::component::input::Position>,
+    table_sizes: bookie_app_services::table_sizes::SizeIndex,
+    row_inspector: row_inspector_ui::RowInspector,
+    wrap_text: bool,
+    recording_shortcut: Option<bookie_gpui::keymap::Command>,
+    settings_page: (keyboard_settings_ui::SettingsPage, u64),
     row_detail_filter: Entity<TextInput>,
     row_detail_hide_null: bool,
     catalog: Catalog,
@@ -339,7 +357,10 @@ impl GridView {
         });
         cx.subscribe(
             &sql_input,
-            |this, _, event: &gpui_kit::component::input::InputEvent, cx| {
+            |this, input, event: &gpui_kit::component::input::InputEvent, cx| {
+                if matches!(event, gpui_kit::component::input::InputEvent::Change) {
+                    this.last_edit = Some(input.read(cx).cursor_position());
+                }
                 if matches!(
                     event,
                     gpui_kit::component::input::InputEvent::PressEnter { secondary: true, .. }
@@ -414,7 +435,8 @@ impl GridView {
                 gpui_kit::component::table::TableEvent::SelectCell(row, column) => {
                     let column = table.read(cx).delegate().source_column(*column).unwrap_or(*column);
                     let cursor = bookie_results::grid_cursor::Cursor { row: *row, column };
-                    if this.cell_cursor == Some(cursor) {
+                    let follow = this.follows_link(column, window.modifiers());
+                    if this.cell_cursor == Some(cursor) && !follow {
                         return;
                     }
                     this.cell_cursor = Some(cursor);
@@ -423,6 +445,9 @@ impl GridView {
                         Some(selection) if selection.focus == dataset => selection.label(),
                         _ => cursor.label(&this.column_names()),
                     };
+                    if follow {
+                        this.go_to_referenced_row(cx);
+                    }
                     cx.notify();
                 }
                 gpui_kit::component::table::TableEvent::RightClickedCell(row, column) => {
@@ -564,6 +589,18 @@ impl GridView {
             row_detail_open: false,
             fk_peek: None,
             fk_peek_work: Ticket::new(),
+            connection_info: None,
+            closed_drafts: if cfg!(test) {
+                Some(bookie_app_services::closed_drafts::ClosedDraftStore::memory())
+            } else {
+                bookie_app_services::closed_drafts::ClosedDraftStore::open()
+            },
+            last_edit: None,
+            table_sizes: Default::default(),
+            row_inspector: Default::default(),
+            wrap_text: false,
+            recording_shortcut: None,
+            settings_page: (keyboard_settings_ui::SettingsPage::Appearance, 0),
             row_detail_filter,
             row_detail_hide_null: false,
             catalog: Catalog::synthetic(),
@@ -1041,6 +1078,14 @@ mod crypto_provider_tests {
             .with_root_certificates(rustls::RootCertStore::empty())
             .with_no_client_auth();
     }
+
+    #[test]
+    fn main_initializes_the_crypto_provider_first() {
+        let source = include_str!("main.rs");
+        let body = source.split("\nfn main() {\n").nth(1).expect("main exists");
+        let first = body.lines().next().expect("main has a body").trim();
+        assert_eq!(first, "bookie_app_services::initialize_process_crypto();");
+    }
 }
 
 fn main() {
@@ -1112,6 +1157,7 @@ fn main() {
                         }
                         None => GridView::new(total, started, window, cx),
                     });
+                    view.update(cx, |view, cx| view.request_connection_info(cx));
                     let focus = view.read(cx).focus.clone();
                     focus.focus(window, cx);
                     view.update(cx, |view, cx| {
@@ -1140,11 +1186,15 @@ fn main() {
 #[cfg(test)]
 mod connection_form_ui_tests;
 #[cfg(test)]
+mod drafts_ui_tests;
+#[cfg(test)]
 mod follow_ui_tests;
 #[cfg(test)]
 mod grid_pin_tests;
 #[cfg(test)]
 mod host_key_ui_tests;
+#[cfg(test)]
+mod keyboard_settings_tests;
 #[cfg(test)]
 mod live_ui_tests;
 #[cfg(test)]
@@ -1152,9 +1202,13 @@ mod overlay_ui_tests;
 #[cfg(test)]
 mod query_pane_ui_tests;
 #[cfg(test)]
+mod row_inspector_tests;
+#[cfg(test)]
 mod save_ui_tests;
 #[cfg(test)]
 mod server_filter_ui_tests;
+#[cfg(test)]
+mod status_bar_tests;
 #[cfg(test)]
 mod transaction_ui_tests;
 #[cfg(test)]

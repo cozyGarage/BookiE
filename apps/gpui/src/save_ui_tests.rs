@@ -1980,7 +1980,7 @@ fn a_closed_tab_can_be_reopened(cx: &mut TestAppContext) {
             assert!(view.closed_tab_actions().iter().all(|action| !action.enabled));
             view.tabs.open_query();
             let index = view.tabs.active;
-            view.close_tab(index);
+            view.close_tab(index, cx);
             assert!(view.closed_tab_actions().iter().all(|action| action.enabled));
             assert_ne!(*view.tabs.current(), bookie_gpui::shell::Tab::Query);
             cx.notify();
@@ -2013,7 +2013,7 @@ fn closing_a_table_tab_loads_the_table_that_becomes_active(cx: &mut TestAppConte
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
             let index = view.tabs.active;
-            view.close_tab(index);
+            view.close_tab(index, cx);
             view.show_current_table(window, cx);
         })
     });

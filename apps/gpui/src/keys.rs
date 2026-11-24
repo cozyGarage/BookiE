@@ -15,6 +15,10 @@ impl GridView {
             cx.stop_propagation();
             return;
         }
+        if self.record_shortcut_key(&event.keystroke, cx) {
+            cx.stop_propagation();
+            return;
+        }
         if self.palette.open {
             let key = event.keystroke.key.as_str();
             if palette_navigation_key(key, event.keystroke.modifiers) {
@@ -129,6 +133,11 @@ impl GridView {
         let modifiers = stroke.modifiers;
         let control = control_modifier(modifiers);
         let key = stroke.key.as_str();
+        if control && modifiers.alt && !modifiers.shift && key == "-" {
+            self.go_to_last_edit(window, cx);
+            cx.notify();
+            return;
+        }
         if self.palette.open {
             match key {
                 key if palette_navigation_key(key, modifiers) => {
@@ -184,7 +193,11 @@ impl GridView {
             && self.compare.is_none()
             && self.tabs.shows_grid_for(&self.catalog.grid_table)
         {
-            self.grid_key(key, modifiers.shift, control, window, cx);
+            if key == "enter" && modifiers.alt && !control && !modifiers.shift {
+                self.open_value_editor(window, cx);
+            } else {
+                self.grid_key(key, modifiers.shift, control, window, cx);
+            }
         }
     }
 
@@ -237,7 +250,7 @@ impl GridView {
             Command::ToggleDetail => self.toggle_detail(),
             Command::CloseTab => {
                 let index = self.tabs.active;
-                self.close_tab(index);
+                self.close_tab(index, cx);
                 self.show_current_table(window, cx);
             }
             Command::ReopenTab => self.reopen_closed_tab(window, cx),

@@ -1115,6 +1115,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::editor::dispatch_tests::ctrl_alt_minus_returns_the_caret_to_the_last_edit"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::editor::bookmarks::tests::toggle_jump_and_clear_move_source_marks_with_the_cursor"
     ],
     [
@@ -2166,6 +2171,11 @@
       "bookie-app",
       "--lib",
       "ui::sidebar_row::tests::a_group_row_shows_a_chevron_that_follows_its_collapse_state"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::sidebar_row::tests::a_table_row_shows_its_size_and_a_row_without_one_shows_none"
     ],
     [
       "bookie-app",

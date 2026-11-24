@@ -87,6 +87,63 @@ async fn an_import_plan_lands_as_one_rewrite() {
 }
 
 #[tokio::test]
+async fn stale_import_plan_does_not_overwrite_a_concurrent_edit() {
+    use crate::connection_bundle::{BundleBody, BundleConnection, plan_import};
+
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("connections.json");
+    let original = sample_connection();
+    save_to(&path, std::slice::from_ref(&original)).await.unwrap();
+    let mut incoming = original.clone();
+    incoming.name = "Imported".into();
+    let body = BundleBody {
+        connections: vec![BundleConnection::from_saved(&incoming)],
+        ..Default::default()
+    };
+    let reviewed = plan_import(std::slice::from_ref(&original), &body).unwrap();
+    let mut concurrent = original;
+    concurrent.read_only = true;
+    save_to(&path, std::slice::from_ref(&concurrent)).await.unwrap();
+
+    assert!(apply_import_to(&path, &reviewed).await.is_err());
+    assert_eq!(load_from(&path).await.unwrap(), vec![concurrent]);
+}
+
+#[tokio::test]
+async fn failed_import_rollback_preserves_a_later_edit() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("connections.json");
+    let original = sample_connection();
+    let mut applied = original.clone();
+    applied.name = "Imported".into();
+    let mut concurrent = applied.clone();
+    concurrent.read_only = true;
+    save_to(&path, std::slice::from_ref(&concurrent)).await.unwrap();
+
+    assert!(
+        restore_import_if_unchanged_to(&path, Some(&original), &applied)
+            .await
+            .is_err()
+    );
+    assert_eq!(load_from(&path).await.unwrap(), vec![concurrent]);
+}
+
+#[tokio::test]
+async fn failed_import_rollback_restores_an_unchanged_record() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("connections.json");
+    let original = sample_connection();
+    let mut applied = original.clone();
+    applied.name = "Imported".into();
+    save_to(&path, std::slice::from_ref(&applied)).await.unwrap();
+
+    restore_import_if_unchanged_to(&path, Some(&original), &applied)
+        .await
+        .unwrap();
+    assert_eq!(load_from(&path).await.unwrap(), vec![original]);
+}
+
+#[tokio::test]
 async fn applying_an_import_preserves_safety_changes_made_after_review() {
     use crate::connection_bundle::{BundleBody, BundleConnection, plan_import};
 
@@ -117,6 +174,78 @@ async fn applying_an_import_preserves_safety_changes_made_after_review() {
     assert_eq!(stored[0].name, "Renamed by bundle");
     assert!(stored[0].read_only);
     assert_eq!(stored[0].environment, bookie_core::Environment::Prod);
+}
+
+#[tokio::test]
+async fn import_rejects_a_collision_changed_after_review() {
+    use crate::connection_bundle::{BundleBody, BundleConnection, ImportApplyError, plan_import};
+
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("connections.json");
+    let incoming = sample_connection();
+    let mut existing = incoming.clone();
+    existing.host = "other.example".into();
+    save_to(&path, std::slice::from_ref(&existing)).await.unwrap();
+    let body = BundleBody {
+        connections: vec![BundleConnection::from_saved(&incoming)],
+        ..Default::default()
+    };
+    let reviewed = plan_import(&[existing], &body).unwrap();
+    let mut concurrent = incoming.clone();
+    concurrent.name = "Changed after review".into();
+    save_to(&path, std::slice::from_ref(&concurrent)).await.unwrap();
+
+    assert!(matches!(
+        apply_reviewed_import_body_to(&path, &body, &reviewed).await,
+        Err(ImportApplyError::StaleReview)
+    ));
+    assert_eq!(load_from(&path).await.unwrap(), vec![concurrent]);
+}
+
+#[tokio::test]
+async fn import_rejects_a_bundle_changed_after_review() {
+    use crate::connection_bundle::{BundleBody, BundleConnection, ImportApplyError, plan_import};
+
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("connections.json");
+    let incoming = sample_connection();
+    let mut body = BundleBody {
+        connections: vec![BundleConnection::from_saved(&incoming)],
+        ..Default::default()
+    };
+    let reviewed = plan_import(&[], &body).unwrap();
+    body.connections[0].host = "changed.example".into();
+
+    assert!(matches!(
+        apply_reviewed_import_body_to(&path, &body, &reviewed).await,
+        Err(ImportApplyError::StaleReview)
+    ));
+    assert!(load_from(&path).await.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn unchanged_review_imports_a_remapped_connection() {
+    use crate::connection_bundle::{BundleBody, BundleConnection, ImportDisposition, plan_import};
+
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("connections.json");
+    let incoming = sample_connection();
+    let mut existing = incoming.clone();
+    existing.host = "other.example".into();
+    save_to(&path, std::slice::from_ref(&existing)).await.unwrap();
+    let body = BundleBody {
+        connections: vec![BundleConnection::from_saved(&incoming)],
+        ..Default::default()
+    };
+    let reviewed = plan_import(std::slice::from_ref(&existing), &body).unwrap();
+    assert_eq!(reviewed.items[0].disposition, ImportDisposition::Remapped);
+
+    let applied = apply_reviewed_import_body_to(&path, &body, &reviewed).await.unwrap();
+    let stored = load_from(&path).await.unwrap();
+    assert_eq!(stored.len(), 2);
+    assert!(stored.contains(&existing));
+    assert_ne!(applied.items[0].connection.id, existing.id);
+    assert!(stored.contains(&applied.items[0].connection));
 }
 
 #[tokio::test]

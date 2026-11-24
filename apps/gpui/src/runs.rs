@@ -286,7 +286,7 @@ impl GridView {
         }
     }
 
-    pub(crate) fn close_tab(&mut self, index: usize) {
+    pub(crate) fn close_tab(&mut self, index: usize, cx: &gpui::App) {
         let closing_query = matches!(self.tabs.items.get(index), Some(Tab::Query));
         if closing_query && self.transaction_open() {
             self.status = "Commit or roll back the open transaction before closing the query tab".into();
@@ -294,6 +294,9 @@ impl GridView {
         }
         if closing_query && self.query_has_view_edits() && self.reject_view_edits() {
             return;
+        }
+        if closing_query {
+            self.remember_query_draft(cx);
         }
         self.remember_closed_tab(index);
         self.tabs.close(index);

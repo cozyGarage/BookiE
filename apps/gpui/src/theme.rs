@@ -16,12 +16,18 @@ pub mod size {
     pub const SAVE_PREVIEW_MAX_HEIGHT: f32 = 160.0;
     pub const STRUCTURE_PANEL_MAX_HEIGHT: f32 = 280.0;
     pub const DETAIL_SIDEBAR_WIDTH: f32 = 380.0;
+    pub const STATUS_COMPACT_WIDTH: f32 = 1000.0;
+    pub const WRAP_LINES: usize = 3;
+    pub const WRAPPED_ROW_HEIGHT: f32 = 62.0;
+    pub const STATUS_CONNECTION_WIDTH: f32 = 360.0;
+    pub const STATUS_SQL_PREVIEW_WIDTH: f32 = 320.0;
     pub const DETAIL_SIDEBAR_MIN_WIDTH: f32 = 240.0;
     pub const CHART_COLUMN_WIDTH: f32 = 180.0;
     pub const GUTTER_MARKER_WIDTH: f32 = 3.0;
     pub const FULL_VALUE_EDITOR_WIDTH: f32 = 760.0;
     pub const APPROVAL_DIALOG_WIDTH: f32 = 560.0;
     pub const SHORTCUT_HINT_WIDTH: f32 = 320.0;
+    pub const SHORTCUT_CHORD_WIDTH: f32 = 120.0;
     pub const FULL_VALUE_EDITOR_HEIGHT: f32 = 560.0;
     pub const TEXT: f32 = 13.0;
     pub const STAT_TEXT: f32 = 22.0;
@@ -33,7 +39,7 @@ pub mod size {
     pub const SPLITTER: f32 = 5.0;
     pub const MENU_WIDTH: f32 = 220.0;
     pub const SIDE_PANEL_WIDTH: f32 = 300.0;
-    pub const FIND_WIDTH: f32 = 110.0;
+    pub const FIND_WIDTH: f32 = 160.0;
     pub const FILTER_WIDTH: f32 = 420.0;
     pub const PALETTE_WIDTH: f32 = 520.0;
     pub const PALETTE_TOP: f32 = 90.0;

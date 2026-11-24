@@ -256,26 +256,24 @@ impl GridView {
             ))
     }
 
-    pub fn status_bar(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
-        let shows_grid = self.tabs.shows_grid_for(&self.catalog.grid_table);
-        let right = if shows_grid {
-            footer_counts(self.dataset_count(), self.source.columns().len(), theme.dark)
-        } else {
-            if theme.dark { "dark".into() } else { "light".into() }
+    pub fn status_bar(&self, theme: Theme, window_width: f32, cx: &mut Context<Self>) -> Stateful<Div> {
+        let compact = window_width < size::STATUS_COMPACT_WIDTH;
+        let grid = self.tabs.shows_grid_for(&self.catalog.grid_table);
+        let theme_name = if theme.dark { "dark" } else { "light" };
+        let rows = match (grid, compact) {
+            (true, false) => footer_counts(self.dataset_count(), self.source.columns().len(), theme.dark),
+            (true, true) => format!("{} rows", thousands(self.dataset_count())),
+            (false, _) => theme_name.to_string(),
         };
-        let sql = self
-            .tabs
-            .shows_grid_for(&self.catalog.grid_table)
+        let sql = (grid && !compact)
             .then(|| self.source.executed_sql())
             .flatten()
             .map(str::to_owned);
-        let elapsed = self
-            .tabs
-            .shows_grid_for(&self.catalog.grid_table)
+        let elapsed = grid
             .then(|| self.source.load_elapsed())
             .flatten()
             .map(bookie_gpui::messages::format_elapsed);
-        let count_rows = (shows_grid && !self.grid_is_query && self.source.is_partial()).then(|| {
+        let count_rows = (grid && !self.grid_is_query && self.source.is_partial()).then(|| {
             use gpui_component::button::{Button, ButtonVariants};
             Button::new("count-rows")
                 .ghost()
@@ -289,14 +287,13 @@ impl GridView {
             let full = sql.clone();
             div()
                 .flex()
+                .flex_none()
                 .items_center()
-                .min_w_0()
                 .gap_1()
                 .child(
                     div()
                         .id("result-sql-preview")
-                        .min_w_0()
-                        .max_w(px(size::HOME_WIDTH / 2.0))
+                        .max_w(px(size::STATUS_SQL_PREVIEW_WIDTH))
                         .overflow_hidden()
                         .whitespace_nowrap()
                         .text_ellipsis()
@@ -313,50 +310,57 @@ impl GridView {
                         .on_click(move |_, _, cx| cx.write_to_clipboard(gpui::ClipboardItem::new_string(sql.clone()))),
                 )
         });
+        let connection_tooltip = self.connection_tooltip();
+        let connection = div()
+            .id("status-connection")
+            .debug_selector(|| "status-connection".into())
+            .min_w_0()
+            .max_w(px(size::STATUS_CONNECTION_WIDTH))
+            .overflow_hidden()
+            .whitespace_nowrap()
+            .text_ellipsis()
+            .tooltip(move |window, cx| {
+                gpui_component::tooltip::Tooltip::new(connection_tooltip.clone()).build(window, cx)
+            })
+            .child(self.connection_chip_text());
+        let full_status = self.status.clone();
+        let status = div()
+            .id("status-text")
+            .debug_selector(|| "status-text".into())
+            .flex_1()
+            .min_w_0()
+            .overflow_hidden()
+            .whitespace_nowrap()
+            .text_ellipsis()
+            .text_color(rgb(theme.foreground))
+            .when(!self.status.is_empty(), |status| {
+                status.tooltip(move |window, cx| {
+                    gpui_component::tooltip::Tooltip::new(full_status.clone()).build(window, cx)
+                })
+            })
+            .child(self.status.clone());
         div()
+            .id("status-bar")
+            .debug_selector(|| "status-bar".into())
             .flex()
             .items_center()
-            .justify_between()
             .gap_2()
             .flex_none()
             .h(px(STATUS_HEIGHT))
             .px_3()
+            .overflow_hidden()
             .bg(rgb(theme.chrome))
             .border_t_1()
             .border_color(rgb(theme.border))
             .text_size(px(size::TEXT_SMALL))
             .text_color(rgb(theme.muted_foreground))
-            .child(
-                div()
-                    .flex()
-                    .flex_1()
-                    .min_w_0()
-                    .overflow_hidden()
-                    .items_center()
-                    .gap_2()
-                    .child(div().flex_none().child(self.source.origin()))
-                    .when(!self.status.is_empty(), |row| {
-                        let full = self.status.clone();
-                        row.child(div().flex_none().child("·")).child(
-                            div()
-                                .id("status-text")
-                                .min_w_0()
-                                .overflow_hidden()
-                                .whitespace_nowrap()
-                                .text_ellipsis()
-                                .text_color(rgb(theme.foreground))
-                                .tooltip(move |window, cx| {
-                                    gpui_component::tooltip::Tooltip::new(full.clone()).build(window, cx)
-                                })
-                                .child(self.status.clone()),
-                        )
-                    }),
-            )
+            .child(connection)
+            .child(status)
             .children(details)
             .children(count_rows)
-            .children(self.selection_stats_segment(theme))
+            .when(!compact, |bar| bar.children(self.selection_stats_segment(theme)))
             .children(elapsed.map(|time| div().flex_none().child(time)))
-            .when(self.tabs.shows_grid_for(&self.catalog.grid_table), |bar| {
+            .when(grid, |bar| {
                 bar.child(
                     div()
                         .debug_selector(|| "status-page".into())
@@ -364,7 +368,13 @@ impl GridView {
                         .child(format!("Page: {} rows", self.pager.rows)),
                 )
             })
-            .child(div().debug_selector(|| "status-count".into()).flex_none().child(right))
+            .child(
+                div()
+                    .id("status-count")
+                    .debug_selector(|| "status-count".into())
+                    .flex_none()
+                    .child(rows),
+            )
     }
 }
 

@@ -308,3 +308,52 @@ fn a_draft_for_a_remote_host_is_production_and_one_for_this_machine_is_local() {
         assert_eq!(draft(local).environment, Environment::Local, "{local}");
     }
 }
+
+#[test]
+fn a_copied_url_never_carries_the_password_and_parses_back_to_the_same_connection() {
+    for url in [
+        "postgres://alice:s3cret@db.example.com:5433/sales?sslmode=verify-ca",
+        "mysql://ro%40ops:pw@10.0.0.5:3307/shop%20db?ssl-mode=REQUIRED",
+        "postgres://bob@localhost/app?host=/var/run/postgresql",
+        "mysql://root@localhost/app?socket=/run/mysqld/mysqld.sock",
+        "mssql://sa:pw@sql.example.com/master",
+        "mongodb://reader:pw@[::1]:27018/admin?tls=true",
+        "redis://cache.example.com:6380/0",
+    ] {
+        let parsed = parse_connection_url(url).unwrap();
+        let copied = connection_url(&parsed.connection).expect("network driver has a URL");
+        assert!(!copied.contains("s3cret") && !copied.contains(":pw@"), "{copied}");
+        let again = parse_connection_url(&copied).unwrap();
+        assert!(again.password.is_none(), "{copied}");
+        let (before, after) = (&parsed.connection, &again.connection);
+        assert_eq!(
+            (
+                &before.driver_id,
+                &before.host,
+                before.port,
+                &before.database,
+                &before.username
+            ),
+            (
+                &after.driver_id,
+                &after.host,
+                after.port,
+                &after.database,
+                &after.username
+            ),
+            "{copied}"
+        );
+        assert_eq!(
+            (before.tls_mode, &before.socket_dir, &before.socket_path),
+            (after.tls_mode, &after.socket_dir, &after.socket_path),
+            "{copied}"
+        );
+    }
+}
+
+#[test]
+fn a_file_database_has_no_connection_url() {
+    let mut connection = parse_connection_url("postgres://localhost/app").unwrap().connection;
+    connection.driver_id = "sqlite".into();
+    assert_eq!(connection_url(&connection), None);
+}

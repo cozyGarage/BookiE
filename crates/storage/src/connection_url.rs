@@ -37,6 +37,72 @@ pub struct ParsedConnectionUrl {
     pub password: Option<SecretString>,
 }
 
+pub fn connection_url(saved: &SavedConnection) -> Option<String> {
+    let (scheme, _, _) = SCHEMES.iter().find(|(_, driver, _)| *driver == saved.driver_id)?;
+    let user = if saved.username.is_empty() {
+        String::new()
+    } else {
+        format!("{}@", encode_component(&saved.username, false))
+    };
+    let host = if saved.host.contains(':') {
+        format!("[{}]", saved.host)
+    } else {
+        saved.host.clone()
+    };
+    let option = match (saved.driver_id.as_str(), &saved.socket_dir, &saved.socket_path) {
+        ("postgres", Some(dir), _) => Some(format!("host={}", encode_component(&dir.display().to_string(), true))),
+        ("mysql", _, Some(path)) => Some(format!(
+            "socket={}",
+            encode_component(&path.display().to_string(), true)
+        )),
+        _ => tls_option(saved),
+    };
+    let query = option.map(|option| format!("?{option}")).unwrap_or_default();
+    Some(format!(
+        "{scheme}://{user}{host}:{}/{}{query}",
+        saved.port,
+        encode_component(&saved.database, false)
+    ))
+}
+
+fn tls_option(saved: &SavedConnection) -> Option<String> {
+    let mode = saved.tls_mode.unwrap_or(if saved.use_tls {
+        TlsMode::VerifyFull
+    } else {
+        TlsMode::Disabled
+    });
+    let value = match (saved.driver_id.as_str(), mode) {
+        ("postgres", TlsMode::Disabled) => "sslmode=disable",
+        ("postgres", TlsMode::Prefer) => "sslmode=prefer",
+        ("postgres", TlsMode::Require) => "sslmode=require",
+        ("postgres", TlsMode::VerifyCa) => "sslmode=verify-ca",
+        ("postgres", TlsMode::VerifyFull) => "sslmode=verify-full",
+        ("mysql", TlsMode::Disabled) => "ssl-mode=DISABLED",
+        ("mysql", TlsMode::Prefer) => "ssl-mode=PREFERRED",
+        ("mysql", TlsMode::Require) => "ssl-mode=REQUIRED",
+        ("mysql", TlsMode::VerifyCa) => "ssl-mode=VERIFY_CA",
+        ("mysql", TlsMode::VerifyFull) => "ssl-mode=VERIFY_IDENTITY",
+        ("mongodb", TlsMode::Disabled) => "tls=false",
+        ("mongodb", TlsMode::VerifyFull) => "tls=true",
+        _ => return None,
+    };
+    Some(value.to_string())
+}
+
+fn encode_component(value: &str, keep_slash: bool) -> String {
+    let mut out = String::with_capacity(value.len());
+    for byte in value.bytes() {
+        let plain =
+            byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~') || (keep_slash && byte == b'/');
+        if plain {
+            out.push(char::from(byte));
+        } else {
+            out.push_str(&format!("%{byte:02X}"));
+        }
+    }
+    out
+}
+
 pub fn parse_connection_url(input: &str) -> Result<ParsedConnectionUrl, StorageError> {
     let raw = input.trim();
     if raw.is_empty() {

@@ -82,14 +82,14 @@ fn a_transaction_rolls_back_or_commits_and_keeps_its_query_tab_open(cx: &mut Tes
         view.transaction.as_ref().is_some_and(|t| t.statements == 1)
     });
     cx.update(|_, cx| {
-        view.update(cx, |view, _| {
+        view.update(cx, |view, cx| {
             let index = view
                 .tabs
                 .items
                 .iter()
                 .position(|tab| *tab == bookie_gpui::shell::Tab::Query)
                 .expect("a query tab");
-            view.close_tab(index);
+            view.close_tab(index, cx);
             assert!(
                 view.tabs.items.contains(&bookie_gpui::shell::Tab::Query),
                 "{}",

@@ -267,6 +267,24 @@ impl ReadSessionStore {
         session.open_interactive().await
     }
 
+    pub async fn server_version(
+        &self,
+        id: SessionId,
+        control: &OperationControl,
+    ) -> Result<(Option<String>, std::time::Duration), DriverFailurePresentation> {
+        let session = self.get(id).ok_or(DriverFailurePresentation::Disconnected)?;
+        session.server_version(control).await
+    }
+
+    pub async fn table_sizes(
+        &self,
+        id: SessionId,
+        control: &OperationControl,
+    ) -> Result<crate::table_sizes::SizeIndex, DriverFailurePresentation> {
+        let session = self.get(id).ok_or(DriverFailurePresentation::Disconnected)?;
+        session.table_sizes(control).await
+    }
+
     pub(crate) fn get(&self, id: SessionId) -> Option<Arc<ReadSession>> {
         self.sessions
             .read()
