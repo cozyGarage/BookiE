@@ -11,6 +11,7 @@ use super::{App, AppMsg, ExportFormat, OpenMode};
 use crate::services::read_scopes::ReadScope;
 
 struct PreparedBrowsePage {
+    database_name: String,
     schema: Option<String>,
     table: String,
     request: BrowsePageRequest,
@@ -185,6 +186,7 @@ impl App {
         let controller = tabs.get(&tab_id).and_then(|t| t.browse_controller())?;
         let model = controller.model();
         Some(PreparedBrowsePage {
+            database_name: model.database_name().to_string(),
             schema: model.schema().map(str::to_owned),
             table: model.table().to_string(),
             request: model.begin_page_request(),
@@ -214,7 +216,15 @@ impl App {
             self.resolve_tab_connection(tab_id)
                 .ok()
                 .zip(self.persistence.column_widths.as_ref())
-                .map(|(connection_id, store)| store.hidden_columns(connection_id, &page.table))
+                .map(|(connection_id, store)| {
+                    hidden_columns_for_browse_table(
+                        &store,
+                        connection_id,
+                        &page.database_name,
+                        page.schema.as_deref(),
+                        &page.table,
+                    )
+                })
                 .unwrap_or_default()
         };
         let supports_reverse_keyset = self
@@ -1043,6 +1053,17 @@ impl App {
     }
 }
 
+fn hidden_columns_for_browse_table(
+    store: &bookie_app_services::column_widths::ColumnWidthStore,
+    connection_id: Uuid,
+    database_name: &str,
+    schema: Option<&str>,
+    table: &str,
+) -> std::collections::HashSet<String> {
+    let scope = bookie_app_services::column_widths::table_scope_key(database_name, schema, table);
+    store.hidden_columns(connection_id, &scope)
+}
+
 fn dispatch_page_load_failure(
     sender: &ComponentSender<App>,
     tab_id: Uuid,
@@ -1283,12 +1304,44 @@ mod tests {
     use relm4::adw::prelude::*;
 
     use super::{
-        RefreshDecision, browse_cell_value_query, columns_read_is_current, connect_refresh_response, refresh_decision,
-        row_count_from_result, single_cell_value,
+        PageQuery, RefreshDecision, browse_cell_value_query, columns_read_is_current, connect_refresh_response,
+        hidden_columns_for_browse_table, refresh_decision, row_count_from_result, single_cell_value,
     };
     use crate::services::read_scopes::{ReadScope, ReadScopes};
-    use bookie_core::{ColumnInfo, QueryResult, Value};
+    use bookie_core::{ColumnInfo, FilterSet, QueryResult, Value};
     use uuid::Uuid;
+
+    #[test]
+    fn refreshed_browse_reads_hidden_columns_from_the_full_table_scope() {
+        let directory = tempfile::tempdir().unwrap();
+        let store = bookie_app_services::column_widths::ColumnWidthStore::load_in(directory.path());
+        let connection = Uuid::new_v4();
+        let scope = bookie_app_services::column_widths::table_scope_key("bookie_test", Some("public"), "people");
+        store.set_hidden(connection, &scope, "profile", true).unwrap();
+
+        let hidden = hidden_columns_for_browse_table(&store, connection, "bookie_test", Some("public"), "people");
+        let columns = [
+            column_named("id", true),
+            column_named("name", false),
+            column_named("profile", false),
+        ];
+        let target = crate::services::browse_query::BrowseTarget {
+            driver_id: "postgres",
+            schema: Some("public"),
+            table: "people",
+            columns: &columns,
+            filter: &FilterSet::default(),
+            hidden_columns: Some(&hidden),
+            long_text_preview: false,
+            supports_reverse_keyset: false,
+        };
+        let query = match target.page_by_row_id(0, 100, None, None).unwrap() {
+            PageQuery::Sql(query) => query,
+            PageQuery::Native => panic!("ordinary PostgreSQL browse should build a projected query"),
+        };
+
+        assert_eq!(query.projected_columns, Some(vec![0, 1]));
+    }
 
     #[test]
     #[ignore = "requires an isolated GTK display"]
@@ -1433,11 +1486,15 @@ mod tests {
     }
 
     fn column() -> ColumnInfo {
+        column_named("payload", false)
+    }
+
+    fn column_named(name: &str, primary_key: bool) -> ColumnInfo {
         ColumnInfo {
-            name: "payload".into(),
-            data_type: "bytea".into(),
-            nullable: true,
-            primary_key: false,
+            name: name.into(),
+            data_type: "text".into(),
+            nullable: !primary_key,
+            primary_key,
             is_auto_increment: false,
             default_value: None,
             is_generated: false,
