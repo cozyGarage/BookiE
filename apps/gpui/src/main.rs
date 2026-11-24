@@ -435,7 +435,23 @@ impl GridView {
         (table, table_focus, table_events)
     }
 
+    fn guard_transaction_close(window: &mut Window, cx: &mut Context<Self>) {
+        let owner = cx.weak_entity();
+        window.on_window_should_close(cx, move |_, cx| {
+            owner.update(cx, |view, cx| {
+                if view.transaction_open() {
+                    view.status = "Commit or roll back the transaction before closing the window".into();
+                    cx.notify();
+                    false
+                } else {
+                    true
+                }
+            }).unwrap_or(true)
+        });
+    }
+
     fn with_source(source: Source, started: Instant, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        Self::guard_transaction_close(window, cx);
         if !cfg!(test) {
             Self::persist_window_geometry(window, cx);
         }

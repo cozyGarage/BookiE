@@ -276,6 +276,11 @@ impl GridView {
     }
 
     pub(super) fn connect_preferring(&mut self, origin: Origin, prefer: Option<TableInfo>, cx: &mut Context<Self>) {
+        if self.transaction_open() {
+            self.status = "Commit or roll back the transaction before switching connections".into();
+            cx.notify();
+            return;
+        }
         if self.reject_view_edits() {
             cx.notify();
             return;
@@ -294,7 +299,7 @@ impl GridView {
     }
 
     fn connect_live(&mut self, opened: Opened) {
-        if self.reject_view_edits() {
+        if self.transaction_open() || self.reject_view_edits() {
             return;
         }
         self.cell_edit.edits.clear();

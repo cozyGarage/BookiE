@@ -820,14 +820,24 @@ impl WriteSession {
         })
     }
 
-    pub fn commit_transaction(&self, shared: &bookie_app_services::interactive_session::SharedSession) -> Result<(), String> {
+    pub fn commit_transaction(
+        &self,
+        shared: &bookie_app_services::interactive_session::SharedSession,
+    ) -> Result<(bookie_core::SessionCommitOutcome, Option<String>), bookie_core::DriverError> {
         self.runtime.block_on(async {
-            bookie_app_services::interactive_session::commit_session(shared)
+            let outcome = bookie_app_services::interactive_session::commit_session(shared).await?;
+            let close_error = bookie_app_services::interactive_session::close_for_teardown(shared.clone())
                 .await
-                .map_err(|error| error.to_string())?;
-            bookie_app_services::interactive_session::close_for_teardown(shared.clone())
-                .await
-                .map_err(|error| error.to_string())
+                .err()
+                .map(|error| error.to_string());
+            Ok((outcome, close_error))
+        })
+    }
+
+    pub fn transaction_is_open(&self, shared: &bookie_app_services::interactive_session::SharedSession) -> bool {
+        use bookie_core::Session as _;
+        self.runtime.block_on(async {
+            shared.lock().await.as_ref().is_some_and(|session| session.is_usable() && session.transaction_open())
         })
     }
 
