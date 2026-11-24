@@ -162,11 +162,19 @@ mod tests {
         let nodes = parse_plan(plan);
         assert_eq!(nodes[1].rows, Some(1000.0));
         assert_eq!(nodes[1].actual_rows, Some(10.0));
-        assert_eq!(misestimate(&nodes, 1), None, "a scan cut short by its Limit is expected");
+        assert_eq!(
+            misestimate(&nodes, 1),
+            None,
+            "a scan cut short by its Limit is expected"
+        );
         assert_eq!(misestimate(&nodes, 2), Some(1000.0), "5 estimated, 5000 actual");
         assert_eq!(misestimate(&nodes, 3), None, "within ten times");
         assert_eq!(nodes[4].actual_rows, None);
-        assert_eq!(misestimate(&nodes, 4), None, "a node that never ran has nothing to compare");
+        assert_eq!(
+            misestimate(&nodes, 4),
+            None,
+            "a node that never ran has nothing to compare"
+        );
         assert_eq!(misestimate(&nodes, 99), None);
     }
 
