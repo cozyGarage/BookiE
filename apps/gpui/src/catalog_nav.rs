@@ -400,6 +400,7 @@ impl GridView {
             return;
         };
         self.cell_edit.edits.clear();
+        let checks = std::mem::take(&mut self.save.checks);
         let wanted = self.catalog.grid_table.clone();
         let sort = self.table_sort(&wanted).cloned();
         let where_sql = self.table_where(&wanted);
@@ -413,6 +414,7 @@ impl GridView {
                     Ok((name, table)) => {
                         this.show_loaded_table(name, table);
                         this.status = done;
+                        this.report_save_check(&checks);
                     }
                     Err(message) => this.status = format!("{done}, but the table could not be reloaded: {message}"),
                 }
