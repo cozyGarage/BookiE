@@ -78,6 +78,9 @@ fn stop_cases() -> Vec<StopCase> {
             b"system.databases",
             |c, control| async move { c.list_databases_controlled(&control).await },
         ),
+        sends("table_sizes_controlled", b"system.parts", |c, control| async move {
+            c.table_sizes_controlled(None, &control).await
+        }),
         sends("list_tables_controlled", b"system.tables", |c, control| async move {
             c.list_tables_controlled(&control).await
         }),

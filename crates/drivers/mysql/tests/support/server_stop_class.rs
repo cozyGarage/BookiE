@@ -187,6 +187,11 @@ fn table_metadata_cases() -> Vec<StopCase> {
                     .await
             },
         ),
+        sends(
+            "table_sizes_controlled",
+            b"information_schema.tables",
+            |c, control| async move { c.table_sizes_controlled(None, &control).await },
+        ),
         sends_nothing("fetch_enum_labels_controlled", |c, control| async move {
             c.fetch_enum_labels_controlled("stop", "mood", &control).await
         }),
