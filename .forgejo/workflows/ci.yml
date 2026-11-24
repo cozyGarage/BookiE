@@ -142,7 +142,6 @@ jobs:
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
   gpui-tests:
-    if: github.event_name != 'push'
     runs-on: any-host
     needs: [pin-revision, gpui-build]
     timeout-minutes: 45
@@ -440,7 +439,6 @@ jobs:
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
   gpui-build:
-    if: github.event_name != 'push'
     runs-on: build-host
     needs: [pin-revision]
     timeout-minutes: 45
