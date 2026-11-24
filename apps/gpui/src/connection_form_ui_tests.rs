@@ -3,6 +3,33 @@ use gpui::TestAppContext;
 use crate::ui_tests::open;
 
 #[gpui::test]
+fn connection_sections_use_space_on_wide_windows_and_wrap_when_narrow(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    view.update(cx, |view, cx| {
+        view.tabs.open_new_connection();
+        cx.notify();
+    });
+    for (width, beside) in [(1896.0, true), (1100.0, false), (900.0, false), (720.0, false)] {
+        cx.simulate_resize(gpui::size(gpui::px(width), gpui::px(760.0)));
+        cx.run_until_parked();
+        if beside {
+            let card = cx.debug_bounds("connection-card").expect("connection form visible");
+            assert!(card.size.width > gpui::px(1100.0), "wide window should use more of its content area");
+        }
+        let connection = cx.debug_bounds("connection-main-section").expect("connection fields visible");
+        let options = cx.debug_bounds("connection-options-section").expect("connection options visible");
+        let page = cx.debug_bounds("connection-page").expect("connection form visible");
+        assert!(connection.origin.x + connection.size.width <= page.origin.x + page.size.width);
+        assert!(options.origin.x + options.size.width <= page.origin.x + page.size.width);
+        if beside {
+            assert!(options.origin.x >= connection.origin.x + connection.size.width);
+        } else {
+            assert!(options.origin.y >= connection.origin.y + connection.size.height);
+        }
+    }
+}
+
+#[gpui::test]
 fn connection_form_keeps_actions_visible_at_two_widths(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     view.update(cx, |view, cx| {

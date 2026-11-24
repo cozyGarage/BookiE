@@ -298,10 +298,7 @@ impl GridView {
             &form.database,
             cx,
         ));
-        let mut sections = vec![
-            section(theme, "Connection", connection),
-            section(theme, "Behaviour", self.behaviour_fields(theme, cx)),
-        ];
+        let mut sections = vec![section(theme, "Behaviour", self.behaviour_fields(theme, cx))];
         if !file_based {
             sections.push(section(theme, "Security", self.security_fields(theme, cx)));
             sections.push(section(theme, "SSH tunnel", self.ssh_fields(theme, cx)));
@@ -329,7 +326,7 @@ impl GridView {
                     .relative()
                     .debug_selector(|| "connection-card".into())
                     .w_full()
-                    .max_w(px(size::HOME_WIDTH))
+                    .max_w(px(size::HOME_WIDTH * 1.5))
                     .max_h_full()
                     .min_h_0()
                     .flex()
@@ -359,9 +356,27 @@ impl GridView {
                             .px_4()
                             .pb_4()
                             .flex()
-                            .flex_col()
+                            .flex_wrap()
                             .gap_4()
-                            .children(sections),
+                            .child(
+                                div()
+                                    .debug_selector(|| "connection-main-section".into())
+                                    .w(px(size::HOME_WIDTH / 2.0))
+                                    .max_w_full()
+                                    .flex_grow(1.0)
+                                    .child(section(theme, "Connection", connection)),
+                            )
+                            .child(
+                                div()
+                                    .debug_selector(|| "connection-options-section".into())
+                                    .w(px(size::HOME_WIDTH / 2.0))
+                                    .max_w_full()
+                                    .flex_grow(1.0)
+                                    .flex()
+                                    .flex_col()
+                                    .gap_4()
+                                    .children(sections),
+                            ),
                     )
                     .child(
                         div()
