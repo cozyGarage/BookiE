@@ -23,15 +23,26 @@ pub struct ConnectionSummary {
     pub driver_id: String,
     pub read_only: bool,
     pub environment: bookie_core::Environment,
+    pub color: Option<String>,
 }
 
 pub async fn list_saved_connections() -> Result<Vec<ConnectionSummary>, String> {
     let saved = bookie_storage::load_connections()
         .await
         .map_err(|error| error.to_string())?;
+    let organization = bookie_storage::load_organization().await.unwrap_or_else(|error| {
+        tracing::warn!(%error, "connection colours unavailable");
+        bookie_storage::ConnectionOrganizationIndex::default()
+    });
     Ok(saved
         .into_iter()
         .map(|saved| ConnectionSummary {
+            color: organization
+                .get(saved.id)
+                .color
+                .as_deref()
+                .and_then(bookie_storage::connection_color)
+                .map(str::to_owned),
             id: saved.id,
             name: saved.name,
             driver_id: saved.driver_id,
@@ -39,6 +50,19 @@ pub async fn list_saved_connections() -> Result<Vec<ConnectionSummary>, String> 
             environment: saved.environment,
         })
         .collect())
+}
+
+pub use bookie_storage::{CONNECTION_COLORS, connection_color_rgb};
+
+pub async fn set_connection_color(id: Uuid, color: Option<&str>) -> Result<(), String> {
+    let mut organization = bookie_storage::load_organization()
+        .await
+        .map_err(|error| error.to_string())?;
+    let updated = organization.get(id).with_color(color);
+    organization.set(id, updated).map_err(|error| error.to_string())?;
+    bookie_storage::save_organization(&organization)
+        .await
+        .map_err(|error| error.to_string())
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]

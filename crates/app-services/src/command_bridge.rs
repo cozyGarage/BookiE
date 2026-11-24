@@ -526,6 +526,7 @@ mod tests {
                 driver_id: "sqlite".into(),
                 read_only: true,
                 environment: bookie_core::Environment::Local,
+                color: None,
             }]),
         };
 
