@@ -105,28 +105,42 @@ fn selection_and_copy_keep_every_core_value_variant(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
-fn every_column_header_of_a_wide_result_is_drawn(cx: &mut TestAppContext) {
-    use gpui_kit::test::TestWindowExt;
+fn short_headers_keep_room_for_names_and_actions_in_wide_results(cx: &mut TestAppContext) {
+    use gpui_kit::test::{TestQueryExt, TestWindowExt};
 
-    let columns = 7;
-    let source = Arc::new(TypedSource::new(vec![Value::Null; columns]));
+    let columns = 40;
+    let mut source = TypedSource::new(vec![Value::Text("wide".into()); columns]);
+    for (index, column) in source.columns.iter_mut().enumerate() {
+        column.name = format!("c{:02}", index + 1);
+        column.width = 56.0;
+    }
+    let source = Arc::new(source);
     cx.update(text_input::bind_keys);
-    let (_view, cx) = cx.add_window_view(|window, cx| GridView::with_source(source, Instant::now(), window, cx));
-    cx.simulate_resize(gpui::size(gpui::px(2_600.0), gpui::px(1_000.0)));
-    cx.run_until_parked();
-    cx.update(|window, cx| {
-        window.render_frame(cx);
-        window.render_frame(cx);
-        let report: Vec<String> = (0..columns)
-            .map(|index| match window.try_find(("col-header", index)) {
-                Some(header) => {
-                    let bounds = header.bounds();
-                    format!("{index}: visible={} x={:?} w={:?}", header.visible(), bounds.origin.x, bounds.size.width)
-                }
-                None => format!("{index}: absent"),
-            })
-            .collect();
-        let drawn = |line: &String| line.contains("visible=true") && !line.contains("w=0px");
-        assert!(report.iter().all(drawn), "column headers not drawn:\n{}", report.join("\n"));
-    });
+    let (view, cx) = cx.add_window_view(|window, cx| GridView::with_source(source, Instant::now(), window, cx));
+
+    for (width, height) in [(1_896.0, 1_150.0), (900.0, 760.0)] {
+        cx.simulate_resize(gpui::size(gpui::px(width), gpui::px(height)));
+        cx.run_until_parked();
+        view.update(cx, |view, cx| view.table.update(cx, |table, cx| table.scroll_to_col(0, cx)));
+        cx.run_until_parked();
+        cx.update(|window, cx| {
+            window.render_frame(cx);
+            window.render_frame(cx);
+            let name = window.find(("column-name", 0usize));
+            assert!(name.visible());
+            assert!(name.bounds().size.width >= gpui::px(20.0), "short header has no readable space");
+            assert!(window.try_find_by_label("Actions for c01").is_some());
+        });
+
+        view.update(cx, |view, cx| view.table.update(cx, |table, cx| table.scroll_to_col(39, cx)));
+        cx.run_until_parked();
+        cx.update(|window, cx| {
+            window.render_frame(cx);
+            window.render_frame(cx);
+            let name = window.find(("column-name", 39usize));
+            assert!(name.visible(), "last header is not reachable after scrolling");
+            assert!(name.bounds().size.width >= gpui::px(20.0), "scrolled short header is not readable");
+            assert!(window.try_find_by_label("Actions for c40").is_some());
+        });
+    }
 }

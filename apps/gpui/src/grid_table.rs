@@ -84,6 +84,7 @@ fn header_menu(
     source_col: usize,
     column_name: String,
     owner: Option<WeakEntity<GridView>>,
+    pin: Option<(WeakEntity<GridView>, PinScope, bool, usize)>,
     sortable: bool,
     has_hidden: bool,
     icon: impl IntoElement,
@@ -113,6 +114,24 @@ fn header_menu(
                         let _ = owner.update(cx, |view, cx| view.show_all_hidden_columns(window, cx));
                     }));
                 }
+            }
+            if let Some((owner, scope, pinned, column_count)) = pin.as_ref() {
+                let owner = owner.clone();
+                let scope = scope.clone();
+                let label = if *pinned { "Unpin from" } else { "Pin through" };
+                let column_count = *column_count;
+                let action = format!("{label} {column_name}");
+                menu = menu.item(PopupMenuItem::new(action).on_click(move |_, _, cx| {
+                    let _ = owner.update(cx, |view, cx| {
+                        view.table.update(cx, |table, cx| {
+                            let delegate = table.delegate_mut();
+                            delegate.pinned_columns =
+                                next_pinned_count(delegate.pinned_columns, col_ix, column_count);
+                            delegate.pin_counts.insert(scope.clone(), delegate.pinned_columns);
+                            table.refresh(cx);
+                        });
+                    });
+                }));
             }
             let Some(owner) = owner.clone().filter(|_| sortable) else {
                 return menu;
@@ -260,35 +279,16 @@ impl TableDelegate for GridDelegate {
             source_col,
             name.clone(),
             self.owner.clone(),
+            self.pin_scope.clone().and_then(|scope| {
+                self.owner
+                    .clone()
+                    .map(|owner| (owner, scope, col_ix < self.pinned_columns, self.columns.len()))
+            }),
             self.sortable,
             !self.hidden_columns.is_empty(),
             crate::assets::icon("ellipsis", theme.muted_foreground),
         );
-        let pin = self.pin_scope.clone().map(|scope| {
-            use gpui_component::button::{Button, ButtonVariants};
-
-            let pinned = col_ix < self.pinned_columns;
-            let action = if pinned { "Unpin from" } else { "Pin through" };
-            let label = format!("{action} {name}");
-            let color = if pinned {
-                theme.foreground
-            } else {
-                theme.muted_foreground
-            };
-            Button::new(format!("pin-column-{col_ix}"))
-                .ghost()
-                .compact()
-                .tooltip(label.clone())
-                .accessibility_label(label.clone())
-                .on_click(cx.listener(move |table, _, _, cx| {
-                    let delegate = table.delegate_mut();
-                    delegate.pinned_columns =
-                        next_pinned_count(delegate.pinned_columns, col_ix, delegate.columns.len());
-                    delegate.pin_counts.insert(scope.clone(), delegate.pinned_columns);
-                    table.refresh(cx);
-                }))
-                .child(crate::assets::icon("pin", color))
-        });
+        let full_name = name.clone();
         div()
             .size_full()
             .min_w_0()
@@ -304,14 +304,17 @@ impl TableDelegate for GridDelegate {
                     .min_w_0()
                     .child(
                         div()
+                            .id(("column-name", col_ix))
                             .min_w_0()
                             .overflow_hidden()
                             .whitespace_nowrap()
                             .text_ellipsis()
+                            .tooltip(move |window, cx| {
+                                gpui_component::tooltip::Tooltip::new(full_name.clone()).build(window, cx)
+                            })
                             .child(name),
                     )
                     .child(menu)
-                    .children(pin),
             )
             .when(!kind.is_empty(), |el| {
                 el.child(
