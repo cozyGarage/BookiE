@@ -37,6 +37,11 @@ impl GridView {
     }
 
     pub(crate) fn disconnect(&mut self, cx: &mut Context<Self>) {
+        if self.transaction_open() {
+            self.status = "Commit or roll back the transaction before disconnecting".into();
+            cx.notify();
+            return;
+        }
         if self.live.is_none() {
             self.status = "There is no connection to disconnect".into();
             return;

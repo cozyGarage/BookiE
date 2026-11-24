@@ -187,6 +187,7 @@ struct GridView {
     save: save_ui::SaveState,
     approval: approval_ui::ApprovalUi,
     transaction: Option<transaction_ui::TransactionState>,
+    transaction_starting: bool,
     host_key: host_key_ui::HostKeyUi,
     insert: insert_ui::InsertState,
     import: import_ui::ImportState,
@@ -442,7 +443,23 @@ impl GridView {
         (table, table_focus, table_events)
     }
 
+    fn guard_transaction_close(window: &mut Window, cx: &mut Context<Self>) {
+        let owner = cx.weak_entity();
+        window.on_window_should_close(cx, move |_, cx| {
+            owner.update(cx, |view, cx| {
+                if view.transaction_open() {
+                    view.status = "Commit or roll back the transaction before closing the window".into();
+                    cx.notify();
+                    false
+                } else {
+                    true
+                }
+            }).unwrap_or(true)
+        });
+    }
+
     fn with_source(source: Source, started: Instant, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        Self::guard_transaction_close(window, cx);
         if !cfg!(test) {
             Self::persist_window_geometry(window, cx);
         }
@@ -507,6 +524,7 @@ impl GridView {
             save: save_ui::SaveState::default(),
             approval,
             transaction: None,
+            transaction_starting: false,
             host_key,
             insert: insert_ui::InsertState::default(),
             import: import_ui::ImportState::default(),
