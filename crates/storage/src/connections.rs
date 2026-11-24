@@ -221,6 +221,34 @@ pub async fn apply_import(plan: &crate::connection_bundle::ImportPlan) -> Result
     apply_import_to(&connections_path()?, plan).await
 }
 
+pub async fn apply_import_body(
+    body: &crate::connection_bundle::BundleBody,
+) -> Result<crate::connection_bundle::ImportPlan, crate::connection_bundle::ImportApplyError> {
+    apply_import_body_to(&connections_path()?, body).await
+}
+
+pub(crate) async fn apply_import_body_to(
+    path: &Path,
+    body: &crate::connection_bundle::BundleBody,
+) -> Result<crate::connection_bundle::ImportPlan, crate::connection_bundle::ImportApplyError> {
+    let _guard = lock_path(path).await?;
+    let existing = load_from(path).await?;
+    let plan = crate::connection_bundle::plan_import(&existing, body)?;
+    let mut updated = existing.clone();
+    for item in &plan.items {
+        updated.retain(|saved| saved.id != item.connection.id);
+        updated.push(item.connection.clone());
+    }
+    save_to_unlocked(path, &updated).await?;
+    if let Err(store) = crate::connection_bundle::store_import_secrets(&plan, &body.secrets).await {
+        if let Err(restore) = save_to_unlocked(path, &existing).await {
+            return Err(crate::connection_bundle::ImportApplyError::Rollback { store, restore });
+        }
+        return Err(store.into());
+    }
+    Ok(plan)
+}
+
 pub(crate) async fn apply_import_to(
     path: &Path,
     plan: &crate::connection_bundle::ImportPlan,

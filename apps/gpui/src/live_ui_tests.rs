@@ -1947,6 +1947,50 @@ fn switching_connection_drops_the_previous_sidebar_fields(cx: &mut TestAppContex
 }
 
 #[gpui::test]
+fn approval_actions_remain_visible_without_a_result_grid(cx: &mut TestAppContext) {
+    use bookie_app_services::approval_prompt::{ApprovalOutcome, PendingApproval, sample_request};
+    use bookie_gpui::shell::ResultView;
+    let (view, cx) = open(cx);
+    let (respond, mut answer) = tokio::sync::oneshot::channel();
+    let tx = view.read_with(cx, |view, _| view.approval.tx.clone());
+    assert!(
+        tx.send(PendingApproval {
+            request: sample_request("UPDATE t SET a = 1"),
+            respond
+        })
+        .is_ok()
+    );
+    cx.run_until_parked();
+    for result_view in [
+        ResultView::Table,
+        ResultView::Messages,
+        ResultView::Summary,
+        ResultView::Chart,
+        ResultView::Plan,
+    ] {
+        view.update(cx, |view, cx| {
+            view.tabs.open_query();
+            view.panel.view = result_view;
+            cx.notify();
+        });
+        cx.run_until_parked();
+        cx.update(|window, cx| window.render_frame(cx));
+        view.read_with(cx, |view, _| assert!(view.approval.current.is_some(), "approval disappeared"));
+        assert!(cx.debug_bounds("deny-write").is_some(), "approval action is not drawn");
+    }
+    view.update(cx, |view, cx| {
+        view.tabs.open_home();
+        cx.notify();
+    });
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    let bounds = cx.debug_bounds("deny-write").expect("approval action is visible on home");
+    cx.simulate_click(bounds.center(), Default::default());
+    cx.run_until_parked();
+    assert_eq!(answer.try_recv().ok(), Some(ApprovalOutcome::Deny));
+}
+
+#[gpui::test]
 fn an_approval_request_shows_a_prompt_and_the_answer_reaches_the_sink(cx: &mut TestAppContext) {
     use bookie_app_services::approval_prompt::{ApprovalOutcome, PendingApproval, sample_request};
     let (view, cx) = open(cx);
@@ -1964,33 +2008,6 @@ fn an_approval_request_shows_a_prompt_and_the_answer_reaches_the_sink(cx: &mut T
     cx.update(|_, cx| view.update(cx, |view, cx| view.answer_approval(ApprovalOutcome::AllowOnce, cx)));
     assert_eq!(answer.try_recv().ok(), Some(ApprovalOutcome::AllowOnce));
     view.read_with(cx, |view, _| assert!(view.approval.current.is_none()));
-}
-
-#[gpui::test]
-fn the_approval_prompt_is_visible_without_a_result_grid(cx: &mut TestAppContext) {
-    use bookie_app_services::approval_prompt::{PendingApproval, sample_request};
-    let (view, cx) = open(cx);
-    cx.update(|_, cx| {
-        view.update(cx, |view, cx| {
-            view.tabs.open_settings();
-            view.sync_grid_owner();
-            cx.notify();
-        });
-    });
-    let (respond, _answer) = tokio::sync::oneshot::channel();
-    let tx = view.read_with(cx, |view, _| view.approval.tx.clone());
-    assert!(
-        tx.send(PendingApproval {
-            request: sample_request("UPDATE customers SET name = 'x' WHERE id = 1"),
-            respond,
-        })
-        .is_ok()
-    );
-    cx.run_until_parked();
-    assert!(
-        cx.debug_bounds("approval-dialog").is_some(),
-        "the approval dialog is an overlay, so it shows on a page with no grid"
-    );
 }
 
 #[gpui::test]

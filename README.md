@@ -15,7 +15,6 @@ BookiE is a free, open-source database client focused on Linux first, built for 
 </p>
 
 <p align="center">
-  <img src="docs/brand/badges/badge-gtk4.svg" alt="Linux First">
   <img src="docs/brand/badges/badge-policy.svg" alt="PolicyGuard Safety">
   <img src="docs/brand/badges/badge-keyring.svg" alt="Secret Service">
   <img src="docs/brand/badges/badge-mcp.svg" alt="Model Context Protocol">
@@ -41,8 +40,8 @@ BookiE is a free, open-source database client focused on Linux first, built for 
 
 | | |
 |---|---|
-| Platform | Linux first, with a flagship GTK4 and libadwaita desktop interface. Cross-platform GPUI desktop frontend in active parallel development ([ADR 0052](docs/decisions/0052-gpui-is-the-cross-platform-frontend.md)). |
-| Databases | **11 engines**: PostgreSQL, MySQL, MariaDB, SQLite, SQL Server, and ClickHouse (Stable). DuckDB (built in), MongoDB, and Redis (Experimental). Read-only Oracle Database and Cassandra / ScyllaDB drivers (Experimental). See the [driver maturity table](docs/adding-drivers.md#driver-maturity). |
+| Platform | Linux first, with a GTK4 desktop interface. Cross-platform GPUI desktop frontend in active parallel development. |
+| Databases | **11 engines**: PostgreSQL, MySQL, MariaDB, SQLite, SQL Server, and ClickHouse. DuckDB, MongoDB, and Redis. Read-only Oracle Database and Cassandra / ScyllaDB drivers (Experimental). See the [driver maturity table](docs/adding-drivers.md#driver-maturity). |
 | Cost | Free and open source under [AGPL-3.0-or-later](LICENSE). No accounts, subscriptions, license keys, paid tiers, or remote entitlement checks. |
 | Credentials | Securely stored in the system keyring (Secret Service via `oo7`). Plaintext files never hold passwords or passphrases. |
 | Safety & Governance | Every operation passes local `PolicyGuard` checks and writes to a local, hash-chained audit journal. Destructive actions require explicit confirmation or terminal code approval (`approve <code>`). |
@@ -272,7 +271,7 @@ Read [`CONTRIBUTING.md`](CONTRIBUTING.md) and the rules in [`AGENTS.md`](AGENTS.
 
 ## Changelog
 
-Published release notes are in [`CHANGELOG.md`](CHANGELOG.md). Unreleased user-facing changes have fragments under [`changelog.d/`](changelog.d/), assembled at the release cut ([ADR 0053](docs/decisions/0053-changelog-fragments.md)).
+Published release notes are in [`CHANGELOG.md`](CHANGELOG.md). Unreleased user-facing changes have fragments under [`changelog.d/`](changelog.d/).
 
 ## License
 

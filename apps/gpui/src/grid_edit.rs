@@ -74,6 +74,10 @@ impl GridView {
         match parsed {
             Ok(cell) => {
                 let key = (editing.row, editing.column);
+                if self.cell_at(key.0, key.1) == cell {
+                    self.stop_edit(window, cx);
+                    return;
+                }
                 self.record_edit(key, cell);
                 self.edits_changed();
                 let count = self.cell_edit.edits.len();
@@ -114,6 +118,13 @@ impl GridView {
             return;
         }
         let binary_mode = matches!(cell, Cell::Bytes(_)).then(|| self.binary_mode_for_column(column));
+        if let (Cell::Bytes(bytes), Some(mode)) = (&cell, binary_mode)
+            && crate::binary_mode::edit_text_len(bytes.len(), mode) > MAX_FULL_VALUE_EDIT_BYTES
+        {
+            self.status = "This value exceeds the 1 MiB full-value editor limit".into();
+            cx.notify();
+            return;
+        }
         let text = if matches!(cell, Cell::Null) {
             String::new()
         } else if let (Cell::Bytes(bytes), Some(mode)) = (&cell, binary_mode) {
