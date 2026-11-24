@@ -87,6 +87,29 @@ async fn an_import_plan_lands_as_one_rewrite() {
 }
 
 #[tokio::test]
+async fn stale_import_plan_does_not_overwrite_a_concurrent_edit() {
+    use crate::connection_bundle::{BundleBody, BundleConnection, plan_import};
+
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("connections.json");
+    let original = sample_connection();
+    save_to(&path, std::slice::from_ref(&original)).await.unwrap();
+    let mut incoming = original.clone();
+    incoming.name = "Imported".into();
+    let body = BundleBody {
+        connections: vec![BundleConnection::from_saved(&incoming)],
+        ..Default::default()
+    };
+    let reviewed = plan_import(std::slice::from_ref(&original), &body).unwrap();
+    let mut concurrent = original;
+    concurrent.read_only = true;
+    save_to(&path, std::slice::from_ref(&concurrent)).await.unwrap();
+
+    assert!(apply_import_to(&path, &reviewed).await.is_err());
+    assert_eq!(load_from(&path).await.unwrap(), vec![concurrent]);
+}
+
+#[tokio::test]
 async fn applying_an_import_preserves_safety_changes_made_after_review() {
     use crate::connection_bundle::{BundleBody, BundleConnection, plan_import};
 
