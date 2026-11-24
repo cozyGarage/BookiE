@@ -13,7 +13,11 @@ impl ApprovalSink for CommitAnswer {
             .lock()
             .expect("request lock")
             .push((request.rule, request.reason));
-        if is_commit { self.commit } else { ApprovalOutcome::AllowOnce }
+        if is_commit {
+            self.commit
+        } else {
+            ApprovalOutcome::AllowOnce
+        }
     }
 }
 
@@ -64,16 +68,27 @@ async fn a_denied_production_commit_is_not_sent_and_the_transaction_stays_open()
     let (h, answer) = prod_harness(ApprovalOutcome::Deny);
     let mut session = h.guard.open_session().await.expect("open session");
     run(&mut session, "BEGIN").await.expect("begin");
-    run(&mut session, "UPDATE items SET v = 1 WHERE id = 1").await.expect("approved write");
-    run(&mut session, "UPDATE items SET v = 2 WHERE id = 2").await.expect("approved write");
+    run(&mut session, "UPDATE items SET v = 1 WHERE id = 1")
+        .await
+        .expect("approved write");
+    run(&mut session, "UPDATE items SET v = 2 WHERE id = 2")
+        .await
+        .expect("approved write");
 
-    let error = run(&mut session, "COMMIT").await.expect_err("a denied commit must not run");
+    let error = run(&mut session, "COMMIT")
+        .await
+        .expect_err("a denied commit must not run");
 
     assert!(matches!(error, DriverError::PolicyDenied(_)), "{error:?}");
     assert!(!sent(&h).iter().any(|sql| sql == "COMMIT"), "{:?}", sent(&h));
     assert!(session.transaction_open(), "the person can still roll back");
-    assert_eq!(commit_requests(&answer), ["Commit 2 governed writes on a production connection"]);
-    run(&mut session, "ROLLBACK").await.expect("roll back after the refusal");
+    assert_eq!(
+        commit_requests(&answer),
+        ["Commit 2 governed writes on a production connection"]
+    );
+    run(&mut session, "ROLLBACK")
+        .await
+        .expect("roll back after the refusal");
     assert!(!session.transaction_open());
 }
 
@@ -82,12 +97,17 @@ async fn an_approved_production_commit_runs_once_the_person_agrees() {
     let (h, answer) = prod_harness(ApprovalOutcome::AllowOnce);
     let mut session = h.guard.open_session().await.expect("open session");
     run(&mut session, "BEGIN").await.expect("begin");
-    run(&mut session, "UPDATE items SET v = 1 WHERE id = 1").await.expect("approved write");
+    run(&mut session, "UPDATE items SET v = 1 WHERE id = 1")
+        .await
+        .expect("approved write");
 
     run(&mut session, "COMMIT").await.expect("approved commit");
 
     assert!(sent(&h).iter().any(|sql| sql == "COMMIT"));
-    assert_eq!(commit_requests(&answer), ["Commit 1 governed write on a production connection"]);
+    assert_eq!(
+        commit_requests(&answer),
+        ["Commit 1 governed write on a production connection"]
+    );
     let commits = outcomes_of(&h.audit, AuditOperationClass::TransactionCommit);
     assert_eq!(commits.len(), 1);
     assert_eq!(commits[0].transaction_outcome, AuditTransactionOutcome::Committed);
@@ -99,7 +119,9 @@ async fn a_production_commit_without_writes_and_a_local_commit_do_not_ask() {
     let mut session = h.guard.open_session().await.expect("open session");
     run(&mut session, "BEGIN").await.expect("begin");
     run(&mut session, "SELECT 1").await.expect("read");
-    run(&mut session, "COMMIT").await.expect("a read-only transaction commits without a prompt");
+    run(&mut session, "COMMIT")
+        .await
+        .expect("a read-only transaction commits without a prompt");
     assert!(commit_requests(&answer).is_empty());
 
     let local = harness(SessionScript::default(), false);
