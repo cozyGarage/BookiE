@@ -1041,6 +1041,14 @@ mod crypto_provider_tests {
             .with_root_certificates(rustls::RootCertStore::empty())
             .with_no_client_auth();
     }
+
+    #[test]
+    fn main_initializes_the_crypto_provider_first() {
+        let source = include_str!("main.rs");
+        let body = source.split("\nfn main() {\n").nth(1).expect("main exists");
+        let first = body.lines().next().expect("main has a body").trim();
+        assert_eq!(first, "bookie_app_services::initialize_process_crypto();");
+    }
 }
 
 fn main() {
