@@ -1974,6 +1974,7 @@ fn approval_actions_remain_visible_without_a_result_grid(cx: &mut TestAppContext
             cx.notify();
         });
         cx.run_until_parked();
+        cx.update(|window, cx| window.render_frame(cx));
         assert!(cx.debug_bounds("deny-write").is_some(), "approval action is not drawn");
     }
     view.update(cx, |view, cx| {
@@ -1981,6 +1982,7 @@ fn approval_actions_remain_visible_without_a_result_grid(cx: &mut TestAppContext
         cx.notify();
     });
     cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
     let bounds = cx
         .debug_bounds("deny-write")
         .expect("approval action is visible on home");
