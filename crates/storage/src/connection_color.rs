@@ -53,9 +53,40 @@ const CONNECTION_COLOR_CLASSES: &[(&str, &str)] = &[
     ("brown", "tp-color-brown"),
 ];
 
+const CONNECTION_COLOR_RGB: &[(&str, u32)] = &[
+    ("blue", 0x3584e4),
+    ("teal", 0x2190a4),
+    ("green", 0x3a944a),
+    ("yellow", 0xc88800),
+    ("orange", 0xed5b00),
+    ("red", 0xe62d42),
+    ("purple", 0x9141ac),
+    ("brown", 0x986a44),
+];
+
+pub fn connection_color_rgb(name: &str) -> Option<u32> {
+    let known = connection_color(name)?;
+    CONNECTION_COLOR_RGB
+        .iter()
+        .find(|(color, _)| *color == known)
+        .map(|(_, rgb)| *rgb)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_palette_colour_has_the_rgb_the_gtk_stylesheet_paints() {
+        let css = include_str!("../../../apps/linux/data/resources/style.css");
+        for name in CONNECTION_COLORS {
+            let rgb = connection_color_rgb(name).expect("an rgb for every palette colour");
+            let rule = format!(".tp-color-{name} {{ background-color: #{rgb:06x}; }}");
+            assert!(css.contains(&rule), "{rule}");
+        }
+        assert_eq!(connection_color_rgb("Teal "), Some(0x2190a4));
+        assert_eq!(connection_color_rgb("#ff0000"), None);
+    }
 
     #[test]
     fn every_palette_colour_has_a_strip_class() {
