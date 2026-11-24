@@ -1,8 +1,6 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-#[cfg(test)]
-use bookie_core::QueryResult;
 use bookie_core::{
     Connection, DriverError, OperationControl, QueryCursorId, QueryCursorPage, QueryResultBatch, Session,
     SessionCommitOutcome, TableInfo, Value,
