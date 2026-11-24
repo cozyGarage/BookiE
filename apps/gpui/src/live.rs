@@ -235,6 +235,20 @@ impl LiveSession {
             .map_err(|error| error.message)
     }
 
+    fn name_the_read_path(&self, mut failure: QueryFailure) -> QueryFailure {
+        if self.writable.is_none() {
+            return failure;
+        }
+        if failure.message.contains("marked read-only") {
+            failure.message =
+                "Query tabs only read. To change data, press Begin transaction, run the statement, then Commit."
+                    .into();
+        } else if failure.message.contains("could not be parsed (typo?)") {
+            failure.message = "This statement could not be parsed (typo?).".into();
+        }
+        failure
+    }
+
     pub fn run_query_bound_detailed(
         self: &Arc<Self>,
         sql: &str,
@@ -247,15 +261,19 @@ impl LiveSession {
         }
         let epoch = self.next_epoch();
         let started = std::time::Instant::now();
-        let (columns, rows, scan, truncated, messages) = self.runtime.block_on(query_pages(
-            &self.sessions,
-            self.session_id,
-            (sql, params),
-            max_rows,
-            cancellation,
-            epoch,
-            &self.epoch,
-        ))?;
+        let (columns, rows, scan, truncated, messages) = self
+            .runtime
+            .block_on(query_pages(
+                &self.sessions,
+                self.session_id,
+                (sql, params),
+                max_rows,
+                cancellation,
+                epoch,
+                &self.epoch,
+            ))
+            .map_err(QueryFailure::from)
+            .map_err(|failure| self.name_the_read_path(failure))?;
         Ok(LiveTable {
             session: self.clone(),
             columns,
