@@ -256,13 +256,10 @@ impl GridView {
             ))
     }
 
-    pub fn status_bar(&self, theme: Theme) -> Div {
-        let right = if self.tabs.shows_grid_for(&self.catalog.grid_table) {
-            format!(
-                "{} rows · {}",
-                thousands(self.dataset_count()),
-                if theme.dark { "dark" } else { "light" }
-            )
+    pub fn status_bar(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+        let shows_grid = self.tabs.shows_grid_for(&self.catalog.grid_table);
+        let right = if shows_grid {
+            footer_counts(self.dataset_count(), self.source.columns().len(), theme.dark)
         } else {
             if theme.dark { "dark".into() } else { "light".into() }
         };
@@ -278,6 +275,15 @@ impl GridView {
             .then(|| self.source.load_elapsed())
             .flatten()
             .map(bookie_gpui::messages::format_elapsed);
+        let count_rows = (shows_grid && !self.grid_is_query && self.source.is_partial()).then(|| {
+            use gpui_component::button::{Button, ButtonVariants};
+            Button::new("count-rows")
+                .ghost()
+                .compact()
+                .label("Count rows")
+                .tooltip("Count the rows of this table in the database")
+                .on_click(cx.listener(|this, _, _, cx| this.count_table_rows(cx)))
+        });
         let details = sql.map(|sql| {
             use gpui_component::button::{Button, ButtonVariants};
             let full = sql.clone();
@@ -347,6 +353,7 @@ impl GridView {
                     }),
             )
             .children(details)
+            .children(count_rows)
             .children(self.selection_stats_segment(theme))
             .children(elapsed.map(|time| div().flex_none().child(time)))
             .when(self.tabs.shows_grid_for(&self.catalog.grid_table), |bar| {
@@ -358,5 +365,26 @@ impl GridView {
                 )
             })
             .child(div().debug_selector(|| "status-count".into()).flex_none().child(right))
+    }
+}
+
+fn footer_counts(rows: u64, columns: usize, dark: bool) -> String {
+    format!(
+        "{} rows · {} {} · {}",
+        thousands(rows),
+        columns,
+        if columns == 1 { "column" } else { "columns" },
+        if dark { "dark" } else { "light" }
+    )
+}
+
+#[cfg(test)]
+mod footer_tests {
+    use super::footer_counts;
+
+    #[test]
+    fn the_footer_counts_rows_and_columns_and_names_the_theme() {
+        assert_eq!(footer_counts(1234, 8, false), "1,234 rows · 8 columns · light");
+        assert_eq!(footer_counts(0, 1, true), "0 rows · 1 column · dark");
     }
 }
