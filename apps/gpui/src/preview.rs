@@ -1,6 +1,6 @@
 use crate::model::{Cell, CellText};
 
-const MAX_CHARS: usize = 512;
+pub(crate) const MAX_CHARS: usize = 512;
 
 pub fn cell_preview(cell: &Cell) -> String {
     match cell {
@@ -39,9 +39,9 @@ impl std::io::Write for JsonPreview {
     }
 }
 
-pub(crate) fn bounded_json(value: &serde_json::Value, limit: usize, pretty: bool) -> (String, bool) {
+pub fn bounded_json(value: &serde_json::Value, limit: usize, pretty: bool) -> (String, bool) {
     let mut output = JsonPreview {
-        bytes: Vec::with_capacity(limit),
+        bytes: Vec::with_capacity(limit.min(4096)),
         limit,
     };
     let result = if pretty {

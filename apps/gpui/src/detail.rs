@@ -2,7 +2,7 @@ use crate::model::{Cell, CellText};
 
 pub const HEX_BYTES_PER_LINE: usize = 16;
 pub const MAX_HEX_BYTES: usize = 4096;
-pub const MAX_PRETTY_BYTES: usize = 64 * 1024;
+pub const MAX_PRETTY_BYTES: usize = 4096;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HexLine {
@@ -24,6 +24,7 @@ pub enum Detail {
         pretty: String,
     },
     Text(String),
+    TruncatedText(String),
 }
 
 pub fn hex_lines(bytes: &[u8]) -> Vec<HexLine> {
@@ -77,27 +78,27 @@ pub fn detail_of(cell: &Cell) -> Detail {
         Cell::Bytes(bytes) => hex_detail(bytes),
         Cell::Json(value) => {
             let (text, truncated) = crate::preview::bounded_json(value, MAX_PRETTY_BYTES, true);
-            if truncated {
-                Detail::Text(format!("{text}…"))
-            } else {
-                Detail::Json { pretty: text }
+            match bounded_text(&text) {
+                Detail::Text(pretty) if !truncated => Detail::Json { pretty },
+                Detail::Text(preview) => Detail::TruncatedText(preview),
+                detail => detail,
             }
         }
-        Cell::JsonText(text) => Detail::Text(bounded_text(text.clone())),
-        other => Detail::Text(bounded_text(other.display())),
+        Cell::Text(text) | Cell::JsonText(text) => bounded_text(text),
+        other => bounded_text(&other.display()),
     }
 }
 
-fn bounded_text(mut text: String) -> String {
-    if text.len() > MAX_PRETTY_BYTES {
-        let mut end = MAX_PRETTY_BYTES;
-        while !text.is_char_boundary(end) {
-            end -= 1;
-        }
-        text.truncate(end);
-        text.push('…');
+fn bounded_text(text: &str) -> Detail {
+    let end = text
+        .char_indices()
+        .nth(crate::preview::MAX_CHARS)
+        .map_or(text.len(), |(index, _)| index);
+    if end < text.len() {
+        Detail::TruncatedText(text[..end].to_owned())
+    } else {
+        Detail::Text(text.to_owned())
     }
-    text
 }
 
 #[cfg(test)]
@@ -105,13 +106,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn huge_text_is_cut_at_a_character_boundary_for_the_detail_panel() {
-        let text = "é".repeat(MAX_PRETTY_BYTES);
-        let Detail::Text(shown) = detail_of(&Cell::Text(text.into())) else {
-            panic!("text stays text")
+    fn huge_text_detail_uses_a_character_bounded_preview_without_changing_the_value() {
+        let value = Cell::Text("é".repeat(crate::preview::MAX_CHARS + 1));
+        let Detail::TruncatedText(shown) = detail_of(&value) else {
+            panic!("large text stays a bounded preview")
         };
-        assert!(shown.len() <= MAX_PRETTY_BYTES + '…'.len_utf8());
-        assert!(shown.ends_with('…'));
+        assert_eq!(shown.chars().count(), crate::preview::MAX_CHARS);
+        assert_eq!(shown, "é".repeat(crate::preview::MAX_CHARS));
+        assert_eq!(value, Cell::Text("é".repeat(crate::preview::MAX_CHARS + 1)));
         let Detail::Text(short) = detail_of(&Cell::Text("short".into())) else {
             panic!("text stays text")
         };
@@ -122,11 +124,10 @@ mod tests {
     fn retained_json_has_bounded_detail_and_keeps_its_value() {
         let value = bookie_core::Value::Json(Box::new(serde_json::json!({"text": "💾".repeat(100_000)})));
         let cell = value.clone();
-        let Detail::Text(text) = detail_of(&cell) else {
+        let Detail::TruncatedText(text) = detail_of(&cell) else {
             panic!("large JSON is bounded")
         };
-        assert!(text.len() <= MAX_PRETTY_BYTES + '…'.len_utf8());
-        assert!(text.ends_with('…'));
+        assert_eq!(text.chars().count(), crate::preview::MAX_CHARS);
         assert_eq!(cell, value);
         let small = bookie_core::Value::Json(Box::new(serde_json::json!({"n": 1})));
         assert!(matches!(detail_of(&small), Detail::Json { .. }));
@@ -218,6 +219,17 @@ mod tests {
     fn json_text_detail_preserves_duplicate_keys_and_original_bytes() {
         let raw = r#"{"a":1, "a":2}"#;
         assert_eq!(detail_of(&Cell::JsonText(raw.into())), Detail::Text(raw.into()));
+    }
+
+    #[test]
+    fn large_json_text_detail_is_bounded_without_reformatting_the_source() {
+        let raw = format!("{{\"value\":\"{}\"}}", "é".repeat(crate::preview::MAX_CHARS));
+        let cell = Cell::JsonText(raw.clone());
+        let Detail::TruncatedText(preview) = detail_of(&cell) else {
+            panic!("large JSON text is previewed")
+        };
+        assert_eq!(preview.chars().count(), crate::preview::MAX_CHARS);
+        assert_eq!(cell, Cell::JsonText(raw));
     }
 
     #[test]
