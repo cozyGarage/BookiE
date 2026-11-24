@@ -254,6 +254,7 @@ impl GridView {
         }
         self.table_sorts.clear();
         self.search.server.applied.clear();
+        self.search.server.shown_for = None;
         self.edits_changed();
         self.reset_edit_history();
         self.close_insert_form();

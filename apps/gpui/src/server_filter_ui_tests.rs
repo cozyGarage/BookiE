@@ -85,3 +85,29 @@ fn the_row_count_respects_the_where_filter(cx: &mut TestAppContext) {
         assert!(view.status.contains(" 2 rows"), "{}", view.status);
     });
 }
+
+#[gpui::test]
+fn changing_connection_clears_where_text_for_the_same_table(cx: &mut TestAppContext) {
+    let (view, cx) = open_first_two_orders(cx);
+    submit_where(&view, cx, "id = 6");
+
+    let table = std::sync::Arc::new(
+        LiveTable::load(
+            &Origin::File(orders_fixture()),
+            &TableInfo {
+                schema: None,
+                name: "orders".into(),
+            },
+            2,
+        )
+        .expect("load second connection"),
+    );
+    cx.update(|_window, cx| view.update(cx, |view, _| view.attach_live(table)));
+    cx.update(|_, cx| view.update(cx, |view, cx| view.prepare_server_filter(cx)));
+
+    view.read_with(cx, |view, cx| {
+        assert!(view.table_where(&view.catalog.grid_table).is_empty());
+        let input = view.search.server.input.as_ref().expect("filter input");
+        assert!(input.read(cx).content().is_empty());
+    });
+}
