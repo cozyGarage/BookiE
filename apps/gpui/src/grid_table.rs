@@ -6,7 +6,7 @@ use std::{
 
 use gpui::{App, Context, IntoElement, WeakEntity, Window, div, prelude::*, px};
 use gpui_kit::component::Sizable;
-use gpui_kit::component::scroll::Scrollbar;
+use gpui_kit::component::scroll::{Scrollbar, ScrollbarMode};
 use gpui_kit::component::table::{Column, ColumnSort, DataTable, TableDelegate, TableState};
 use sha2::{Digest, Sha256};
 
@@ -1136,6 +1136,7 @@ impl GridView {
                             .child(
                                 Scrollbar::horizontal(&horizontal_scroll)
                                     .id("grid-horizontal-scrollbar")
+                                    .mode(ScrollbarMode::Always)
                                     .viewport_from_layout(),
                             ),
                     ),
