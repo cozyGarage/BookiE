@@ -2655,7 +2655,9 @@ fn cancelling_a_process_asks_first_and_escape_keeps_it_running(cx: &mut TestAppC
         assert!(view.cancel_confirm.is_none());
         assert_ne!(view.status, "Left the server process running");
     });
+}
 
+#[gpui::test]
 fn switching_to_home_or_settings_does_not_cancel_running_work(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     connect_and_settle(&view, cx, orders_fixture());
