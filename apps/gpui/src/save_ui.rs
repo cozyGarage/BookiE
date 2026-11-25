@@ -43,6 +43,7 @@ pub(crate) enum SaveRequest {
     Insert(Vec<(String, String)>),
     Import(std::path::PathBuf),
     Structure(bookie_app_services::structure_change_plan::StructureChangeKind, String),
+    DiagramForeignKey(bookie_core::ForeignKeyInfo),
 }
 
 pub(crate) struct ReviewLabels {
@@ -207,6 +208,20 @@ impl GridView {
                             plan_row_insert_named(target, &named).map_err(|error| error.to_string())
                         }
                         SaveRequest::Import(file) => plan_file_import(target, &live.driver_id, &file),
+                        SaveRequest::DiagramForeignKey(key) => {
+                            let referenced = live.table_columns(&bookie_core::TableInfo {
+                                schema: key.ref_schema.clone(),
+                                name: key.ref_table.clone(),
+                            })?;
+                            let plan =
+                                bookie_app_services::structure_change_plan::plan_foreign_key(target, key, &referenced)
+                                    .map_err(|error| error.to_string())?;
+                            Ok(CellSavePlan {
+                                statements: plan.statements,
+                                expect_one: Vec::new(),
+                                preview: plan.preview,
+                            })
+                        }
                         SaveRequest::Structure(kind, text) => {
                             let structure = if kind.needs_structure() {
                                 live.table_structure(&table)?

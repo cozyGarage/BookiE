@@ -3,6 +3,7 @@ use bookie_app_services::er_diagram::placement::{self, CardPlacement};
 use bookie_app_services::er_diagram::scene::Rect;
 use bookie_app_services::er_diagram::zoom;
 use bookie_app_services::er_diagram::{DiagramTable, SchemaDiagram};
+use bookie_core::TableInfo;
 use gpui::{MouseDownEvent, PathBuilder, canvas, point};
 use std::collections::BTreeSet;
 
@@ -88,6 +89,7 @@ impl GridView {
         state.loading = false;
         state.failure = None;
         state.find = None;
+        state.relationship = None;
         state.scroll = Default::default();
     }
 
@@ -102,6 +104,7 @@ impl GridView {
         if state.scope != scope {
             state.view = None;
         }
+        state.relationship = None;
         state.scope.clone_from(&scope);
         state.loading = true;
         state.failure = None;
@@ -506,7 +509,7 @@ impl GridView {
             .child(body)
     }
 
-    fn diagram_inspector(&self, view: &DiagramView, theme: Theme, cx: &mut Context<Self>) -> Div {
+    fn diagram_inspector(&self, view: &DiagramView, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
         let find = self.search.diagram.find.as_ref();
         let input = find.map_or("", |input| input.read(cx).content());
         let selected = view.selected.and_then(|index| view.diagram.tables.get(index));
@@ -525,6 +528,9 @@ impl GridView {
             .children(find.cloned());
         if let Some(table) = selected {
             inspector = inspector.child(self.diagram_card_actions(view, table, theme, cx));
+        }
+        if let Some(draft) = self.diagram_relationship_editor(view, theme, cx) {
+            return inspector.child(draft);
         }
         let matches = self.diagram_matches(input.trim());
         inspector.child(
@@ -554,6 +560,10 @@ impl GridView {
             name: table.name.clone(),
         };
         let open_data = target.clone();
+        let can_add_relationship = self.live.as_ref().is_some_and(|live| {
+            live.writable.is_some() && bookie_core::sql_dialect::alters_foreign_keys(&live.driver_id)
+        });
+        let relationship_source = target.clone();
         div()
             .flex()
             .flex_col()
@@ -577,10 +587,16 @@ impl GridView {
                     .child(
                         compact_button(ButtonKind::Ghost, "diagram-open-structure", "Structure", theme).on_click(
                             cx.listener(move |this, _, window, cx| {
-                                this.open_table_with_structure(&target, true, window, cx)
+                                this.open_table_for(&target, crate::catalog_nav::TableOpenAction::Structure, window, cx)
                             }),
                         ),
                     )
+                    .children(can_add_relationship.then(|| {
+                        compact_button(ButtonKind::Ghost, "diagram-add-relationship", "Add relationship", theme)
+                            .on_click(cx.listener(move |this, _, window, cx| {
+                                this.begin_diagram_relationship(relationship_source.clone(), window, cx);
+                            }))
+                    }))
                     .child(
                         compact_button(
                             ButtonKind::Ghost,

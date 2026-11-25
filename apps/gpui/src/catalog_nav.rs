@@ -15,6 +15,12 @@ fn result_column_index(columns: &[ColumnMeta], index: usize, name: &str) -> Opti
     (column.name == name).then_some(index)
 }
 
+pub(crate) enum TableOpenAction {
+    Data,
+    Structure,
+    ForeignKey(bookie_core::ForeignKeyInfo),
+}
+
 impl GridView {
     pub(crate) fn table_sort(&self, table: &TableInfo) -> Option<&bookie_app_services::read_session::TableSort> {
         self.table_sorts
@@ -400,13 +406,13 @@ impl GridView {
     }
 
     pub(super) fn open_table_named(&mut self, table: &TableInfo, window: &mut Window, cx: &mut Context<Self>) {
-        self.open_table_with_structure(table, false, window, cx);
+        self.open_table_for(table, TableOpenAction::Data, window, cx);
     }
 
-    pub(crate) fn open_table_with_structure(
+    pub(crate) fn open_table_for(
         &mut self,
         table: &TableInfo,
-        structure: bool,
+        action: TableOpenAction,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
@@ -416,11 +422,9 @@ impl GridView {
         let Some(session) = self.live.clone().filter(|_| table != &self.catalog.grid_table) else {
             self.tabs.open_table(table);
             self.sync_grid_owner();
-            if self.tabs.shows_grid_for(&self.catalog.grid_table) {
+            if matches!(self.tabs.current(), Tab::Table(table) if *table == self.catalog.grid_table) {
                 window.focus(&self.focus, cx);
-                if structure {
-                    self.show_structure(cx);
-                }
+                self.complete_table_open(action, cx);
             }
             return;
         };
@@ -440,13 +444,23 @@ impl GridView {
             move |this, loaded, cx| match loaded {
                 Ok((name, table)) => {
                     this.show_loaded_table(name.clone(), table);
-                    if structure && this.catalog.grid_table == name && this.tabs.shows_grid_for(&name) {
-                        this.show_structure(cx);
+                    if this.catalog.grid_table == name
+                        && matches!(this.tabs.current(), Tab::Table(table) if *table == name)
+                    {
+                        this.complete_table_open(action, cx);
                     }
                 }
                 Err(message) => this.status = message,
             },
         );
+    }
+
+    fn complete_table_open(&mut self, action: TableOpenAction, cx: &mut Context<Self>) {
+        match action {
+            TableOpenAction::Data => {}
+            TableOpenAction::Structure => self.show_structure(cx),
+            TableOpenAction::ForeignKey(key) => self.review_diagram_foreign_key(key, cx),
+        }
     }
 
     pub(crate) fn reload_after_save(&mut self, done: String, cx: &mut Context<Self>) {

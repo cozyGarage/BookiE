@@ -211,6 +211,27 @@ impl GridView {
         self.prepare(live, SaveRequest::Structure(kind, text), labels, cx);
     }
 
+    pub(crate) fn review_diagram_foreign_key(&mut self, key: bookie_core::ForeignKeyInfo, cx: &mut Context<Self>) {
+        if self.transaction_open() || self.reject_view_edits() {
+            cx.notify();
+            return;
+        }
+        let Some(live) = self.save_session() else {
+            cx.notify();
+            return;
+        };
+        let table = table_label(&self.catalog.grid_table);
+        let labels = ReviewLabels {
+            title: format!("Add foreign key {} on {table}?", key.name),
+            done: format!("Added foreign key {} on {table}", key.name),
+            review: "Review the relationship change, then apply or cancel".into(),
+            confirm: "Add foreign key",
+            note: Some("The database checks existing rows and may block writes while validating the new constraint."),
+            reconnect: None,
+        };
+        self.prepare(live, SaveRequest::DiagramForeignKey(key), labels, cx);
+    }
+
     pub(crate) fn structure_bar(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Div> {
         let input = self.structure.input.clone()?;
         let kind = self.structure.kind?;

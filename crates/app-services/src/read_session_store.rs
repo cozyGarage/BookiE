@@ -183,12 +183,8 @@ impl ReadSessionStore {
             .registry
             .get(&session.driver_id)
             .ok_or_else(|| DriverError::Unsupported("the database driver is not available".into()))?;
-        let tables: Vec<_> = session
-            .tables
-            .iter()
-            .filter(|table| scope.is_none_or(|schema| table.schema.as_deref() == Some(schema)))
-            .cloned()
-            .collect();
+        let mut tables = crate::catalog::list_tables_excluding(&guard, &[], control).await?;
+        tables.retain(|table| scope.is_none_or(|schema| table.schema.as_deref() == Some(schema)));
         crate::er_diagram::read::read_schema(&guard, scope, &tables, driver.capabilities(), control, |_, _| {}).await
     }
 
