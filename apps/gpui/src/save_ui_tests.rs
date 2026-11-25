@@ -1,7 +1,7 @@
 use std::time::Instant;
 
 use gpui::TestAppContext;
-use gpui_kit::test::TestWindowExt;
+use gpui_kit::test::{TestQueryExt, TestWindowExt};
 
 use crate::GridView;
 use crate::live_ui_tests::open_live;
@@ -2228,6 +2228,86 @@ fn paste_skips_a_hidden_middle_column(cx: &mut TestAppContext) {
     let original = writable_table(&orders_fixture());
     assert_eq!(saved.row(0)[2], original.row(0)[2]);
     assert_eq!(saved.row(0)[3], original.row(0)[3]);
+    std::fs::remove_file(path).ok();
+}
+
+#[gpui::test]
+fn paste_after_a_hidden_column_uses_the_clicked_pinned_scrolled_column(cx: &mut TestAppContext) {
+    use bookie_gpui::model::CellText;
+    use bookie_gpui::source::ResultSource;
+    use gpui_kit::component::table::{ColumnFixed, TableDelegate};
+
+    let path = fixture_copy("paste-hidden-pinned-scroll");
+    let (view, cx) = saving_view(cx, &path);
+    cx.simulate_resize(gpui::size(gpui::px(350.0), gpui::px(720.0)));
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+
+    let menu = cx.update(|window, _| window.find_by_label("Actions for id").bounds());
+    cx.simulate_click(menu.center(), Default::default());
+    cx.run_until_parked();
+    let pin = cx.update(|window, _| window.find_by_label("Pin through id").bounds());
+    cx.simulate_click(pin.center(), Default::default());
+    cx.run_until_parked();
+    view.read_with(cx, |view, app| {
+        assert_eq!(
+            view.table.read(app).delegate().column(0, app).fixed,
+            Some(ColumnFixed::Left)
+        );
+    });
+
+    cx.update(|window, cx| view.update(cx, |view, cx| view.hide_column(2, "total", window, cx)));
+    cx.run_until_parked();
+    view.update(cx, |view, cx| {
+        view.table.update(cx, |table, cx| table.scroll_to_col(2, cx))
+    });
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    cx.update(|window, _| {
+        assert!(
+            window.find(("col-header", 0usize)).visible(),
+            "pinned column is outside the viewport"
+        );
+        assert!(
+            window.find(("col-header", 2usize)).visible(),
+            "scrolled column is outside the viewport"
+        );
+    });
+
+    let cell = cx.update(|window, _| window.find("table-cell-0:2").bounds());
+    cx.simulate_click(cell.center(), Default::default());
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.cell_cursor.map(|cursor| cursor.column), Some(3));
+    });
+
+    let write = write_session(&path, false);
+    cx.update(|_, cx| cx.write_to_clipboard(gpui::ClipboardItem::new_string("0\tpasted note".into())));
+    view.update(cx, |view, cx| {
+        let id = view
+            .live
+            .as_ref()
+            .and_then(|live| live.writable)
+            .expect("writable connection");
+        view.save.write = Some((id, write));
+    });
+    cx.simulate_keystrokes("secondary-v");
+    view.read_with(cx, |view, _| {
+        assert!(view.cell_edit.edits.contains_key(&(0, 3)), "{}", view.status);
+        assert!(view.cell_edit.edits.contains_key(&(0, 4)), "{}", view.status);
+        assert!(!view.cell_edit.edits.contains_key(&(0, 2)), "hidden column changed");
+    });
+
+    cx.simulate_keystrokes("ctrl-s");
+    settle_saving(cx);
+    view.read_with(cx, |view, _| assert!(view.save.pending.is_some(), "{}", view.status));
+    cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_save(cx)));
+    settle_saving(cx);
+    let saved = writable_table(&path).row(0);
+    let original = writable_table(&orders_fixture()).row(0);
+    assert_eq!(saved[3].display(), "0");
+    assert_eq!(saved[4].display(), "pasted note");
+    assert_eq!(saved[2], original[2]);
     std::fs::remove_file(path).ok();
 }
 
