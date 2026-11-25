@@ -54,6 +54,37 @@ fn the_connection_chip_shows_the_server_version_after_it_loads(cx: &mut TestAppC
 }
 
 #[gpui::test]
+fn an_empty_query_does_not_display_the_previous_table(cx: &mut TestAppContext) {
+    let (view, cx) = open_live(cx);
+    let table_origin = view.read_with(cx, |view, _| view.source.origin());
+    view.update(cx, |view, cx| {
+        view.tabs.open_query();
+        view.sync_grid_owner();
+        cx.notify();
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.source.origin(), "Query");
+        assert!(view.status.is_empty());
+        assert_eq!(view.dataset_count(), 0);
+    });
+    cx.update(|window, cx| window.render_frame(cx));
+    assert!(cx.debug_bounds("status-page").is_none());
+    view.update(cx, |view, cx| {
+        let index = view
+            .tabs
+            .items
+            .iter()
+            .position(|tab| matches!(tab, bookie_gpui::shell::Tab::Table(_)))
+            .unwrap();
+        view.tabs.active = index;
+        view.sync_grid_owner();
+        cx.notify();
+    });
+    view.read_with(cx, |view, _| assert_eq!(view.source.origin(), table_origin));
+}
+
+#[gpui::test]
 fn sidebar_tables_show_their_size_when_the_database_reports_one(cx: &mut TestAppContext) {
     let (view, cx) = open_live(cx);
     cx.simulate_resize(gpui::size(gpui::px(1400.0), gpui::px(900.0)));

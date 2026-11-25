@@ -249,7 +249,8 @@ impl GridView {
 
     pub fn status_bar(&self, theme: Theme, window_width: f32, cx: &mut Context<Self>) -> Stateful<Div> {
         let compact = window_width < size::STATUS_COMPACT_WIDTH;
-        let grid = self.tabs.shows_grid_for(&self.catalog.grid_table);
+        let grid = self.tabs.shows_grid_for(&self.catalog.grid_table)
+            && (!self.grid_is_query || !self.run_tabs.slots.is_empty());
         let theme_name = if theme.dark { "dark" } else { "light" };
         let rows = match (grid, compact) {
             (true, false) => footer_counts(self.dataset_count(), self.source.columns().len(), theme.dark),
