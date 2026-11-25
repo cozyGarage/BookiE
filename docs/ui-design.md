@@ -44,6 +44,8 @@ This section is the one source for where a GPUI surface opens. Other documents l
 | Destructive actions: drop or empty a table, delete rows, drop a column | A centred dialog that names the object, shows the SQL and has no default button. A Prod connection also asks for approval. |
 | Pending edits | A slim marker in the grid strip with the count, Save and Discard. It describes state, so it is not a dialog. |
 | Messages: saved, imported, failed, unknown write outcome, transaction left open | The notification centre: an indicator with a count at the bottom right of the status bar that opens the list. |
+| A warning before a write runs, such as "will change N rows" | Inside the dialog that reviews the write. |
+| The result of a run: rows affected, lines changed, time taken | The status line of that result, as today. |
 
 The notification centre:
 
