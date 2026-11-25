@@ -537,6 +537,8 @@ impl GridView {
     }
 
     fn with_source(source: Source, started: Instant, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        #[cfg(test)]
+        test_config::isolate();
         Self::guard_transaction_close(window, cx);
         if !cfg!(test) {
             Self::persist_window_geometry(window, cx);
@@ -1207,6 +1209,8 @@ mod save_ui_tests;
 mod server_filter_ui_tests;
 #[cfg(test)]
 mod status_bar_tests;
+#[cfg(test)]
+mod test_config;
 #[cfg(test)]
 mod transaction_ui_tests;
 #[cfg(test)]

@@ -11,6 +11,7 @@ pub(crate) enum NoticeKind {
     Success,
     Error,
     UnknownOutcome,
+    IdleTransaction,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -187,6 +188,29 @@ impl GridView {
                 cx.notify();
             }))
         });
+        let transaction_actions = (notice.kind == NoticeKind::IdleTransaction).then(|| {
+            div()
+                .flex()
+                .gap_1()
+                .child(
+                    compact_button(ButtonKind::Ghost, ("commit-notice", id as usize), "Commit", theme).on_click(
+                        cx.listener(|this, _, _, cx| {
+                            this.notices.open = false;
+                            this.end_transaction(true, cx);
+                            cx.notify();
+                        }),
+                    ),
+                )
+                .child(
+                    compact_button(ButtonKind::Ghost, ("rollback-notice", id as usize), "Roll back", theme).on_click(
+                        cx.listener(|this, _, _, cx| {
+                            this.notices.open = false;
+                            this.end_transaction(false, cx);
+                            cx.notify();
+                        }),
+                    ),
+                )
+        });
         div()
             .debug_selector(move || format!("notice-{id}"))
             .flex()
@@ -204,6 +228,7 @@ impl GridView {
                     .child(notice.text.clone()),
             )
             .children(resolve)
+            .children(transaction_actions)
             .child(
                 compact_icon_button(("dismiss-notice", id as usize), "x", "Dismiss", theme)
                     .debug_selector(move || format!("dismiss-notice-{id}"))

@@ -326,10 +326,11 @@ impl GridView {
     }
 
     pub(crate) fn sync_grid_owner(&mut self) {
-        self.tab_scroll.scroll_to_item(self.tabs.active);
+        self.tab_scroll.scroll_to_item(strip_position(self.tabs.active));
         let query = match self.tabs.current() {
             Tab::Query => true,
             Tab::Table(name) if *name == self.catalog.grid_table => false,
+            Tab::Home | Tab::Settings => return,
             _ => {
                 self.invalidate_background();
                 return;
@@ -354,7 +355,7 @@ impl GridView {
                 _ => false,
             }) {
                 self.tabs.active = index;
-                self.tab_scroll.scroll_to_item(index);
+                self.tab_scroll.scroll_to_item(strip_position(index));
             }
             return;
         }
@@ -532,4 +533,8 @@ mod tests {
             ["USE `billing`", "SELECT * FROM invoices"]
         );
     }
+}
+
+fn strip_position(tab_index: usize) -> usize {
+    tab_index.saturating_sub(1)
 }

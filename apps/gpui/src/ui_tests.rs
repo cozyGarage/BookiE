@@ -1751,8 +1751,9 @@ fn closing_query_from_home_discards_its_pending_result(cx: &mut TestAppContext) 
             view.panel.error_location = Some(("SELECT missing".into(), 8, 0, None));
             view.tabs.open_home();
             view.sync_grid_owner();
-            assert!(cancel.is_cancelled());
+            assert!(!cancel.is_cancelled(), "going to Home leaves the work running");
             view.close_tab(query, cx);
+            assert!(cancel.is_cancelled(), "closing the query discards its pending result");
             assert!(view.panel.error_location.is_none());
         })
     });
@@ -2231,4 +2232,33 @@ fn the_palette_opens_the_notification_list(cx: &mut TestAppContext) {
     cx.run_until_parked();
     view.read_with(cx, |view, _| assert!(view.notices.open));
     assert!(cx.debug_bounds("notifications-list").is_some());
+}
+
+#[gpui::test]
+fn home_opens_from_the_top_bar_and_is_not_a_tab(cx: &mut TestAppContext) {
+    use bookie_gpui::shell::Tab;
+    let (view, cx) = open(cx);
+    cx.simulate_resize(gpui::size(gpui::px(1400.0), gpui::px(800.0)));
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("tab-0").is_none(), "Home is not drawn in the tab strip");
+    assert!(cx.debug_bounds("tab-1").is_some(), "work tabs are still drawn");
+    let toolbar = cx.debug_bounds("main-toolbar").expect("the top bar is drawn");
+    let home = cx.debug_bounds("home-button").expect("the top bar has a Home button");
+    assert!(
+        home.origin.x <= toolbar.origin.x + gpui::px(16.0),
+        "Home sits at the far left of the top bar"
+    );
+    cx.simulate_click(home.center(), Default::default());
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert_eq!(view.tabs.current(), &Tab::Home));
+    view.update(cx, |view, cx| {
+        view.tabs.active = 1;
+        view.tabs.close(1);
+        cx.notify();
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.tabs.current(), &Tab::Home, "with no work tabs left, Home shows");
+    });
+    assert!(cx.debug_bounds("tab-0").is_none());
 }

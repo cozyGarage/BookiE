@@ -486,3 +486,22 @@ fn four_part_names_are_only_linked_servers_on_sql_server() {
         );
     }
 }
+
+#[test]
+fn cancelling_a_server_process_needs_human_approval_on_prod() {
+    use bookie_core::Environment;
+    let policy = PolicyConfig::default().for_environment(Environment::Prod);
+    for (sql, driver_id) in [
+        ("SELECT pg_cancel_backend(4242);", "postgres"),
+        ("SELECT pg_terminate_backend(4242);", "postgres"),
+        ("KILL QUERY 4242;", "mysql"),
+    ] {
+        let facts = classify(sql, driver_id);
+        assert_eq!(facts.class, StatementClass::Administrative, "{driver_id}: {sql}");
+        let decision = evaluate(&Principal::human_gui(), Environment::Prod, &facts, false, &policy, None);
+        assert!(
+            matches!(decision, Decision::RequireApproval { .. }),
+            "{driver_id} must ask a person before {sql}, got {decision:?}"
+        );
+    }
+}
