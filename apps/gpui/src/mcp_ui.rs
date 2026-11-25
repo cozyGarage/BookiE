@@ -8,7 +8,7 @@ use gpui::{Context, Div, Entity, Stateful, div, prelude::*};
 use gpui_kit::component::setting::{SettingField, SettingGroup, SettingItem};
 
 use crate::GridView;
-use crate::chrome::{ghost, primary_button};
+use crate::surfaces::{ButtonKind, button};
 use crate::ui_theme::ThemeExt;
 
 #[derive(Default)]
@@ -49,14 +49,16 @@ impl McpState {
                 .flex_col()
                 .items_start()
                 .gap_2()
-                .child(button(
+                .child(issue_token_button(
+                    ButtonKind::Primary,
                     "mcp-issue-read",
                     "Read-only token",
                     actions_view.clone(),
                     TokenPermissions::ReadOnly,
                     theme,
                 ))
-                .child(button(
+                .child(issue_token_button(
+                    ButtonKind::Ghost,
                     "mcp-issue-write",
                     "Read-write token",
                     actions_view.clone(),
@@ -85,12 +87,14 @@ impl McpState {
                 .gap_2()
                 .child(div().child(plaintext))
                 .child(
-                    ghost("mcp-hide-issued-token", "Hide", Theme::current(cx)).on_click(move |_, _, cx| {
-                        hide_view.update(cx, |this, cx| {
-                            this.mcp.plaintext = None;
-                            cx.notify();
-                        });
-                    }),
+                    button(ButtonKind::Ghost, "mcp-hide-issued-token", "Hide", Theme::current(cx)).on_click(
+                        move |_, _, cx| {
+                            hide_view.update(cx, |this, cx| {
+                                this.mcp.plaintext = None;
+                                cx.notify();
+                            });
+                        },
+                    ),
                 )
         });
         let mut group = SettingGroup::new()
@@ -112,14 +116,15 @@ impl McpState {
     }
 }
 
-fn button(
+fn issue_token_button(
+    kind: ButtonKind,
     id: &'static str,
     label: &'static str,
     view: Entity<GridView>,
     permissions: TokenPermissions,
     theme: Theme,
 ) -> Stateful<Div> {
-    primary_button(id, label, label, theme)
+    button(kind, id, label, theme)
         .debug_selector(move || id.into())
         .on_click(move |_, _, cx| {
             view.update(cx, |this, cx| this.issue_mcp_token(permissions, cx));
@@ -160,7 +165,8 @@ fn token_row(view: Entity<GridView>, bridge: Arc<McpBridge>, token: McpToken, th
             let view = view.clone();
             let bridge = bridge.clone();
             row.child(
-                ghost(
+                button(
+                    ButtonKind::Destructive,
                     gpui::ElementId::Name(format!("mcp-revoke-{id}").into()),
                     "Revoke",
                     theme,

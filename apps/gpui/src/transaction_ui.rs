@@ -5,7 +5,7 @@ use bookie_app_services::interactive_session::SharedSession;
 use bookie_gpui::live::WriteSession;
 
 use super::*;
-use crate::chrome::ghost;
+use crate::surfaces::{ButtonKind, button};
 
 pub(crate) struct TransactionState {
     pub write: Arc<WriteSession>,
@@ -257,10 +257,12 @@ impl GridView {
     pub(crate) fn transaction_controls(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
         let Some(transaction) = self.transaction.as_ref() else {
             return div().child(
-                ghost("begin-transaction", "Begin transaction", theme).on_click(cx.listener(|this, _, _, cx| {
-                    this.begin_transaction(cx);
-                    cx.notify();
-                })),
+                button(ButtonKind::Ghost, "begin-transaction", "Begin transaction", theme).on_click(cx.listener(
+                    |this, _, _, cx| {
+                        this.begin_transaction(cx);
+                        cx.notify();
+                    },
+                )),
             );
         };
         let elapsed = transaction.started.elapsed().as_secs();
@@ -301,22 +303,20 @@ impl GridView {
                     ))
             })
             .child(
-                ghost("commit-transaction", "Commit", theme)
-                    .border_1()
-                    .border_color(rgb(theme.border))
-                    .on_click(cx.listener(|this, _, _, cx| {
+                button(ButtonKind::Ghost, "commit-transaction", "Commit", theme).on_click(cx.listener(
+                    |this, _, _, cx| {
                         this.end_transaction(true, cx);
                         cx.notify();
-                    })),
+                    },
+                )),
             )
             .child(
-                ghost("rollback-transaction", "Roll back", theme)
-                    .border_1()
-                    .border_color(rgb(theme.border))
-                    .on_click(cx.listener(|this, _, _, cx| {
+                button(ButtonKind::Ghost, "rollback-transaction", "Roll back", theme).on_click(cx.listener(
+                    |this, _, _, cx| {
                         this.end_transaction(false, cx);
                         cx.notify();
-                    })),
+                    },
+                )),
             )
     }
 }

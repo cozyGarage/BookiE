@@ -8,7 +8,8 @@ use bookie_gpui::live::{LiveSession, SaveFailure, WriteSession};
 use bookie_gpui::save_check::{CellCheck, cell_checks, key_columns, verify};
 
 use super::*;
-use crate::chrome::{ghost, primary_button};
+use crate::chrome::tip;
+use crate::surfaces::{ButtonKind, button, task_bar_frame, task_title};
 
 type SaveOutcome = Result<(Arc<WriteSession>, Result<Vec<u64>, SaveFailure>), String>;
 
@@ -434,22 +435,15 @@ impl GridView {
     pub(crate) fn save_banner(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Div> {
         let (text, is_error) = self.save.banner.clone()?;
         Some(
-            div()
-                .flex()
-                .items_center()
-                .gap_2()
-                .px_2()
-                .py_1()
-                .flex_none()
-                .bg(rgb(theme.chrome))
-                .border_b_1()
-                .border_color(rgb(theme.border))
+            task_bar_frame(theme)
                 .when(is_error, |row| row.text_color(rgb(theme.destructive)))
                 .child(div().flex_1().min_w_0().child(text))
                 .child(
-                    ghost("dismiss-save-banner", "Dismiss", theme).on_click(cx.listener(|this, _, _, cx| {
-                        this.dismiss_save_banner(cx);
-                    })),
+                    button(ButtonKind::Ghost, "dismiss-save-banner", "Dismiss", theme).on_click(cx.listener(
+                        |this, _, _, cx| {
+                            this.dismiss_save_banner(cx);
+                        },
+                    )),
                 ),
         )
     }
@@ -466,34 +460,23 @@ impl GridView {
             format!("{count} edit(s) in this view only; nothing is saved")
         };
         Some(
-            div()
+            task_bar_frame(theme)
                 .debug_selector(|| "pending-edits-bar".into())
-                .flex()
-                .items_center()
-                .gap_2()
-                .px_2()
-                .py_1()
-                .flex_none()
-                .bg(rgb(theme.chrome))
-                .border_b_1()
-                .border_color(rgb(theme.border))
                 .child(div().flex_1().min_w_0().child(label))
                 .when(can_save, |bar| {
                     bar.child(
-                        primary_button(
-                            "preview-pending-sql",
-                            "Preview SQL",
-                            "Review the statements, then save or cancel",
-                            theme,
-                        )
-                        .on_click(cx.listener(|this, _, _, cx| this.request_save(cx))),
+                        button(ButtonKind::Primary, "preview-pending-sql", "Preview SQL", theme)
+                            .tooltip(tip("Review the statements, then save or cancel"))
+                            .on_click(cx.listener(|this, _, _, cx| this.request_save(cx))),
                     )
                 })
                 .child(
-                    ghost("discard-pending-edits", "Discard", theme).on_click(cx.listener(|this, _, _, cx| {
-                        this.discard_view_edits();
-                        cx.notify();
-                    })),
+                    button(ButtonKind::Ghost, "discard-pending-edits", "Discard", theme).on_click(cx.listener(
+                        |this, _, _, cx| {
+                            this.discard_view_edits();
+                            cx.notify();
+                        },
+                    )),
                 ),
         )
     }
@@ -501,32 +484,23 @@ impl GridView {
     pub(crate) fn save_bar(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Div> {
         let pending = self.save.pending.as_ref()?;
         Some(
-            div()
-                .flex()
+            task_bar_frame(theme)
                 .flex_col()
+                .items_stretch()
                 .gap_2()
-                .p_2()
-                .flex_none()
-                .bg(rgb(theme.chrome))
-                .border_b_1()
-                .border_color(rgb(theme.border))
                 .child(
                     div()
                         .flex()
                         .items_center()
-                        .gap_2()
-                        .child(div().font_weight(gpui::FontWeight::MEDIUM).child(pending.title.clone()))
+                        .gap_3()
+                        .child(task_title(pending.title.clone()))
                         .child(
-                            primary_button(
-                                "confirm-save",
-                                pending.confirm,
-                                "Run these statements in one transaction",
-                                theme,
-                            )
-                            .on_click(cx.listener(|this, _, _, cx| this.confirm_save(cx))),
+                            button(ButtonKind::Primary, "confirm-save", pending.confirm, theme)
+                                .tooltip(tip("Run these statements in one transaction"))
+                                .on_click(cx.listener(|this, _, _, cx| this.confirm_save(cx))),
                         )
                         .child(
-                            ghost("cancel-save", "Cancel", theme)
+                            button(ButtonKind::Ghost, "cancel-save", "Cancel", theme)
                                 .on_click(cx.listener(|this, _, _, cx| this.cancel_save(cx))),
                         ),
                 )

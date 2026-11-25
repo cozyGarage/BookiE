@@ -6,6 +6,7 @@ use crate::GridView;
 use crate::assets::icon;
 use crate::chrome::one_line;
 use crate::history_view::block_on_history;
+use crate::surfaces::{ListState, list_state};
 use crate::text_input::{InputEvent, TextInput};
 
 const RECENT_RECORDS: usize = 1_000;
@@ -151,17 +152,11 @@ impl GridView {
         let query = self.audit_page.search.read(_cx).content().to_string();
         let rows = shown(&self.audit_page.rows, &query);
         let body = if let Some(error) = &self.audit_page.error {
-            div().p_4().text_color(rgb(theme.warning)).child(error.clone())
+            list_state(ListState::Failed(error), theme)
         } else if self.audit_page.loading && self.audit_page.rows.is_empty() {
-            div()
-                .p_4()
-                .text_color(rgb(theme.muted_foreground))
-                .child("Reading the audit journal…")
+            list_state(ListState::Loading("Reading the audit journal…"), theme)
         } else if rows.is_empty() {
-            div()
-                .p_4()
-                .text_color(rgb(theme.muted_foreground))
-                .child("No operations match")
+            list_state(ListState::Empty("No operations match"), theme)
         } else {
             div().flex().flex_col().gap_1().children(
                 rows.iter()

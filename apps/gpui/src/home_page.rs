@@ -2,7 +2,8 @@ use bookie_gpui::messages::MessageKind;
 use gpui::{Context, Div, Stateful, div, prelude::*, px, rgb};
 
 use crate::assets::icon;
-use crate::chrome::{STATUS_HEIGHT, ghost, ghost_icon, one_line};
+use crate::chrome::{STATUS_HEIGHT, one_line, tip};
+use crate::surfaces::{ButtonKind, button, compact_button, icon_button, section_header};
 use crate::{GridView, thousands};
 use bookie_gpui::shell::table_label;
 use bookie_gpui::theme::{Theme, size};
@@ -18,13 +19,11 @@ pub(crate) fn card(theme: Theme) -> Div {
 }
 
 pub(crate) fn card_title(text: &str, theme: Theme) -> Div {
-    div()
+    section_header(text.to_string(), theme)
         .px_4()
         .py_3()
         .border_b_1()
         .border_color(rgb(theme.border))
-        .font_weight(gpui::FontWeight::SEMIBOLD)
-        .child(text.to_string())
 }
 
 pub(crate) fn home_stat_card(label: &str, icon_name: &'static str, value: &str, theme: Theme) -> Div {
@@ -116,7 +115,8 @@ impl GridView {
                         .items_center()
                         .child(
                             div().flex_1().child(
-                                ghost(
+                                button(
+                                    ButtonKind::Ghost,
                                     ("saved-connection", index),
                                     format!("{} · {}", saved.name, saved.driver_id),
                                     theme,
@@ -128,7 +128,7 @@ impl GridView {
                             ),
                         )
                         .child(
-                            ghost_icon(
+                            icon_button(
                                 ("edit-connection", index),
                                 "sliders-horizontal",
                                 "Edit connection",
@@ -141,7 +141,8 @@ impl GridView {
                 }))
                 .when(!self.catalog.tables.is_empty(), |section| {
                     section.child(
-                        ghost(
+                        button(
+                            ButtonKind::Ghost,
                             "quick-open",
                             format!(
                                 "{} → {}",
@@ -274,16 +275,11 @@ impl GridView {
             .flatten()
             .map(bookie_gpui::messages::format_elapsed);
         let count_rows = (grid && !self.grid_is_query && self.source.is_partial()).then(|| {
-            use gpui_component::button::{Button, ButtonVariants};
-            Button::new("count-rows")
-                .ghost()
-                .compact()
-                .label("Count rows")
-                .tooltip("Count the rows of this table in the database")
+            compact_button(ButtonKind::Ghost, "count-rows", "Count rows", theme)
+                .tooltip(tip("Count the rows of this table in the database"))
                 .on_click(cx.listener(|this, _, _, cx| this.count_table_rows(cx)))
         });
         let details = sql.map(|sql| {
-            use gpui_component::button::{Button, ButtonVariants};
             let full = sql.clone();
             div()
                 .flex()
@@ -303,10 +299,7 @@ impl GridView {
                         .child(sql.clone()),
                 )
                 .child(
-                    Button::new("copy-result-sql")
-                        .ghost()
-                        .compact()
-                        .label("Copy SQL")
+                    compact_button(ButtonKind::Ghost, "copy-result-sql", "Copy SQL", theme)
                         .on_click(move |_, _, cx| cx.write_to_clipboard(gpui::ClipboardItem::new_string(sql.clone()))),
                 )
         });

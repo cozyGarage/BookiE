@@ -56,7 +56,7 @@ impl GridView {
                         }
                         let view = view.clone();
                         let option = option.clone();
-                        crate::chrome::ghost(("use-theme", index), "Use", theme)
+                        crate::surfaces::button(crate::surfaces::ButtonKind::Ghost, ("use-theme", index), "Use", theme)
                             .debug_selector(move || selector.clone())
                             .on_click(move |_, window, cx| {
                                 view.update(cx, |this, cx| {

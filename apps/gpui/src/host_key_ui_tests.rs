@@ -66,3 +66,22 @@ fn an_abandoned_connection_attempt_removes_its_prompt_and_shows_the_next(cx: &mu
         assert_eq!(shown.as_deref(), Some("second:22"));
     });
 }
+
+#[gpui::test]
+fn the_host_key_dialog_offers_trust_before_cancel(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    let (question, _answer) = pending("db.example:22");
+    let tx = view.read_with(cx, |view, _| view.host_key.tx.clone());
+    assert!(tx.send(question).is_ok());
+    cx.run_until_parked();
+    let dialog = cx
+        .debug_bounds("host-key-dialog")
+        .expect("the host key prompt is a dialog");
+    let trust = cx.debug_bounds("trust-host-key").expect("Trust is drawn");
+    let cancel = cx.debug_bounds("refuse-host-key").expect("Cancel is drawn");
+    assert!(dialog.contains(&trust.center()) && dialog.contains(&cancel.center()));
+    assert!(
+        trust.origin.x + trust.size.width <= cancel.origin.x,
+        "the primary action comes before Cancel"
+    );
+}

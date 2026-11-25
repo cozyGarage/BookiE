@@ -3,7 +3,7 @@ use bookie_app_services::unknown_outcomes::{
 };
 
 use super::*;
-use crate::chrome::ghost;
+use crate::surfaces::{ButtonKind, button, task_bar_frame, task_title};
 
 #[derive(Default)]
 pub(crate) struct ResolveState {
@@ -195,7 +195,8 @@ impl GridView {
                     .items_center()
                     .gap_3()
                     .child(
-                        ghost(
+                        button(
+                            ButtonKind::Ghost,
                             "resolve-checked",
                             format!("{mark} I checked the database myself"),
                             theme,
@@ -206,14 +207,16 @@ impl GridView {
                         })),
                     )
                     .child(
-                        ghost("resolve-confirm", "Confirm", theme)
+                        button(ButtonKind::Primary, "resolve-confirm", "Confirm", theme)
                             .on_click(cx.listener(move |this, _, _, cx| this.decide_outcome(decision, cx))),
                     )
                     .child(
-                        ghost("resolve-back", "Back", theme).on_click(cx.listener(|this, _, _, cx| {
-                            this.resolve.choice = None;
-                            cx.notify();
-                        })),
+                        button(ButtonKind::Ghost, "resolve-back", "Back", theme).on_click(cx.listener(
+                            |this, _, _, cx| {
+                                this.resolve.choice = None;
+                                cx.notify();
+                            },
+                        )),
                     ),
             )
     }
@@ -225,15 +228,15 @@ impl GridView {
             .gap_3()
             .child(div().flex_1().min_w_0().child(reason))
             .child(
-                ghost("resolve-committed", "It was applied", theme)
+                button(ButtonKind::Ghost, "resolve-committed", "It was applied", theme)
                     .on_click(cx.listener(|this, _, _, cx| this.choose_outcome(OutcomeDecision::Committed, cx))),
             )
             .child(
-                ghost("resolve-rolled-back", "It was not applied", theme)
+                button(ButtonKind::Ghost, "resolve-rolled-back", "It was not applied", theme)
                     .on_click(cx.listener(|this, _, _, cx| this.choose_outcome(OutcomeDecision::RolledBack, cx))),
             )
             .child(
-                ghost("resolve-unknown", "Still unknown", theme)
+                button(ButtonKind::Ghost, "resolve-unknown", "Still unknown", theme)
                     .on_click(cx.listener(|this, _, _, cx| this.decide_outcome(OutcomeDecision::StillUnknown, cx))),
             )
     }
@@ -252,26 +255,23 @@ impl GridView {
             self.resolve.items.len()
         );
         Some(
-            div()
-                .flex()
+            task_bar_frame(theme)
                 .flex_col()
+                .items_stretch()
                 .gap_2()
-                .p_2()
-                .flex_none()
-                .bg(rgb(theme.chrome))
-                .border_b_1()
-                .border_color(rgb(theme.border))
                 .child(
                     div()
                         .flex()
                         .items_center()
                         .gap_3()
-                        .child(div().font_weight(gpui::FontWeight::MEDIUM).flex_1().child(heading))
+                        .child(task_title(heading).flex_1())
                         .child(
-                            ghost("close-resolve", "Close", theme).on_click(cx.listener(|this, _, _, cx| {
-                                this.close_resolve_panel();
-                                cx.notify();
-                            })),
+                            button(ButtonKind::Ghost, "close-resolve", "Close", theme).on_click(cx.listener(
+                                |this, _, _, cx| {
+                                    this.close_resolve_panel();
+                                    cx.notify();
+                                },
+                            )),
                         ),
                 )
                 .child(

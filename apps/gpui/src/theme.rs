@@ -8,6 +8,10 @@ pub mod size {
     pub const XL: f32 = 24.0;
     pub const COMPACT_CONTROL: f32 = 24.0;
     pub const SMALL_CONTROL: f32 = 28.0;
+    pub const SEGMENT: f32 = 20.0;
+    pub const BADGE: f32 = 20.0;
+    pub const BUTTON_MIN_WIDTH: f32 = 80.0;
+    pub const BUTTON_MAX_WIDTH: f32 = 240.0;
     pub const GRID_HEADER: f32 = 32.0;
     pub const FORM_CONTROL: f32 = 32.0;
     pub const CONTROL_RADIUS: f32 = 4.0;
@@ -29,6 +33,7 @@ pub mod size {
     pub const SHORTCUT_HINT_WIDTH: f32 = 320.0;
     pub const TOOLBAR_LABELS_MIN_WIDTH: f32 = 900.0;
     pub const SHORTCUT_CHORD_WIDTH: f32 = 120.0;
+    pub const FIND_MIN_WIDTH: f32 = 72.0;
     pub const FULL_VALUE_EDITOR_HEIGHT: f32 = 560.0;
     pub const TEXT: f32 = 13.0;
     pub const STAT_TEXT: f32 = 22.0;

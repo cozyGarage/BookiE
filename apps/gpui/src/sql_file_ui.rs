@@ -4,7 +4,7 @@ use bookie_app_services::sql_file::{file_error_message, read_sql_file, save_sql_
 
 use super::*;
 use crate::backup_ui::absolute_path;
-use crate::chrome::ghost;
+use crate::surfaces::{ButtonKind, button, task_bar};
 
 pub(crate) fn sql_file_destination(typed: &str) -> Result<PathBuf, String> {
     let typed = typed.trim();
@@ -163,30 +163,24 @@ impl GridView {
         }
         let saving = self.search.sql_file.saving;
         Some(
-            div()
-                .flex()
-                .items_center()
-                .gap_3()
-                .p_2()
-                .flex_none()
-                .bg(rgb(theme.chrome))
-                .border_b_1()
-                .border_color(rgb(theme.border))
-                .child(div().font_weight(gpui::FontWeight::MEDIUM).child(if saving {
-                    "Save SQL file"
-                } else {
-                    "Open SQL file"
-                }))
+            task_bar(if saving { "Save SQL file" } else { "Open SQL file" }, theme)
                 .child(div().flex_1().min_w_0().child(input))
                 .child(
-                    ghost("run-sql-file", if saving { "Save" } else { "Open" }, theme)
-                        .on_click(cx.listener(|this, _, _, cx| this.run_sql_file(cx))),
+                    button(
+                        ButtonKind::Primary,
+                        "run-sql-file",
+                        if saving { "Save" } else { "Open" },
+                        theme,
+                    )
+                    .on_click(cx.listener(|this, _, _, cx| this.run_sql_file(cx))),
                 )
                 .child(
-                    ghost("cancel-sql-file", "Cancel", theme).on_click(cx.listener(|this, _, _, cx| {
-                        this.search.sql_file.open = false;
-                        cx.notify();
-                    })),
+                    button(ButtonKind::Ghost, "cancel-sql-file", "Cancel", theme).on_click(cx.listener(
+                        |this, _, _, cx| {
+                            this.search.sql_file.open = false;
+                            cx.notify();
+                        },
+                    )),
                 ),
         )
     }

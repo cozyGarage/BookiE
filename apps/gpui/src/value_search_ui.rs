@@ -4,7 +4,7 @@ use bookie_core::SearchMode;
 use bookie_gpui::messages::MessageKind;
 
 use super::*;
-use crate::chrome::ghost;
+use crate::surfaces::{ButtonKind, button, task_bar};
 
 fn first_match(outcome: &TableOutcome) -> Option<String> {
     let hit = outcome.hits.first()?;
@@ -163,36 +163,27 @@ impl GridView {
             "Contains"
         };
         Some(
-            div()
-                .flex()
-                .items_center()
-                .gap_3()
-                .p_2()
-                .flex_none()
-                .bg(rgb(theme.chrome))
-                .border_b_1()
-                .border_color(rgb(theme.border))
-                .child(
-                    div()
-                        .font_weight(gpui::FontWeight::MEDIUM)
-                        .child("Search database values"),
-                )
+            task_bar("Search database values", theme)
                 .child(div().flex_1().min_w_0().child(input))
                 .child(
-                    ghost("value-search-mode", mode, theme).on_click(cx.listener(|this, _, _, cx| {
-                        this.search.values.exact = !this.search.values.exact;
-                        cx.notify();
-                    })),
+                    button(ButtonKind::Ghost, "value-search-mode", mode, theme).on_click(cx.listener(
+                        |this, _, _, cx| {
+                            this.search.values.exact = !this.search.values.exact;
+                            cx.notify();
+                        },
+                    )),
                 )
                 .child(
-                    ghost("run-value-search", "Search", theme)
+                    button(ButtonKind::Primary, "run-value-search", "Search", theme)
                         .on_click(cx.listener(|this, _, _, cx| this.run_value_search(cx))),
                 )
                 .child(
-                    ghost("cancel-value-search", "Cancel", theme).on_click(cx.listener(|this, _, _, cx| {
-                        this.search.values.open = false;
-                        cx.notify();
-                    })),
+                    button(ButtonKind::Ghost, "cancel-value-search", "Cancel", theme).on_click(cx.listener(
+                        |this, _, _, cx| {
+                            this.search.values.open = false;
+                            cx.notify();
+                        },
+                    )),
                 ),
         )
     }

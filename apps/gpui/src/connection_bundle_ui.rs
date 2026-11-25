@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use super::*;
-use crate::chrome::ghost;
+use crate::surfaces::{ButtonKind, button, task_bar_frame};
 use bookie_app_services::connection_bundle as bundles;
 use gpui_component::scroll::ScrollableElement;
 
@@ -362,17 +362,10 @@ impl GridView {
             let count = pending.plan.items.len();
             let skipped = pending.skipped.len();
             return Some(
-                div()
+                task_bar_frame(theme)
                     .w_full()
                     .debug_selector(|| "connection-import-review".into())
-                    .flex()
                     .items_start()
-                    .gap_3()
-                    .p_2()
-                    .flex_none()
-                    .bg(rgb(theme.chrome))
-                    .border_b_1()
-                    .border_color(rgb(theme.border))
                     .child(
                         div()
                             .flex_1()
@@ -406,11 +399,11 @@ impl GridView {
                             }),
                     )
                     .child(
-                        ghost("confirm-connection-import", "Import", theme)
+                        button(ButtonKind::Primary, "confirm-connection-import", "Import", theme)
                             .on_click(cx.listener(|this, _, _, cx| this.apply_connection_import(cx))),
                     )
                     .child(
-                        ghost("cancel-connection-import", "Cancel", theme)
+                        button(ButtonKind::Ghost, "cancel-connection-import", "Cancel", theme)
                             .on_click(cx.listener(|this, _, _, cx| this.cancel_connection_import(cx))),
                     ),
             );
@@ -418,22 +411,14 @@ impl GridView {
         if self.connection_bundle.encrypted.is_some() {
             let input = self.connection_bundle.passphrase.clone()?;
             return Some(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap_3()
-                    .p_2()
-                    .flex_none()
-                    .bg(rgb(theme.chrome))
-                    .border_b_1()
-                    .border_color(rgb(theme.border))
+                task_bar_frame(theme)
                     .child(div().flex_1().child(input))
                     .child(
-                        ghost("unlock-connection-import", "Review", theme)
+                        button(ButtonKind::Primary, "unlock-connection-import", "Review", theme)
                             .on_click(cx.listener(|this, _, _, cx| this.unlock_connection_import(cx))),
                     )
                     .child(
-                        ghost("cancel-connection-import", "Cancel", theme)
+                        button(ButtonKind::Ghost, "cancel-connection-import", "Cancel", theme)
                             .on_click(cx.listener(|this, _, _, cx| this.cancel_connection_import(cx))),
                     ),
             );

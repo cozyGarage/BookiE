@@ -6,7 +6,7 @@ use bookie_core::export::{ResultExport, ResultFormat, SqlTarget, offered_formats
 use tokio_util::sync::CancellationToken;
 
 use super::*;
-use crate::chrome::ghost;
+use crate::surfaces::{ButtonKind, button, task_bar, unavailable_button};
 
 const EXPORT_PAGE_ROWS: u64 = 128;
 
@@ -288,6 +288,7 @@ impl GridView {
         }
         use gpui_component::button::{Button, ButtonVariants};
         use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
+        use gpui_kit::component::Sizable as _;
 
         let scope_owner = cx.entity().downgrade();
         let format_owner = cx.entity().downgrade();
@@ -306,23 +307,11 @@ impl GridView {
             format!("table {}", table_label(&self.catalog.grid_table))
         };
         Some(
-            div()
-                .flex()
-                .items_center()
-                .gap_3()
-                .p_2()
-                .flex_none()
-                .bg(rgb(theme.chrome))
-                .border_b_1()
-                .border_color(rgb(theme.border))
-                .child(
-                    div()
-                        .font_weight(gpui::FontWeight::MEDIUM)
-                        .child(format!("Export {source_label}")),
-                )
+            task_bar(format!("Export {source_label}"), theme)
                 .child(
                     Button::new("export-scope")
                         .ghost()
+                        .small()
                         .compact()
                         .accessibility_label("Export row scope")
                         .child(scope_label)
@@ -344,6 +333,7 @@ impl GridView {
                 .child(
                     Button::new("export-format")
                         .ghost()
+                        .small()
                         .compact()
                         .accessibility_label("Export file format")
                         .child(format_label)
@@ -363,23 +353,25 @@ impl GridView {
                         }),
                 )
                 .child(div().flex_1().min_w_0().child(input))
-                .child(
-                    ghost(
+                .child(if self.export.file.cancel.is_some() {
+                    unavailable_button(
+                        ButtonKind::Primary,
                         "write-export-file",
-                        if self.export.file.cancel.is_some() {
-                            "Writing…"
-                        } else {
-                            "Export"
-                        },
+                        "Writing…",
+                        "The export file is being written",
                         theme,
                     )
-                    .on_click(cx.listener(|this, _, _, cx| this.write_export_file(cx))),
-                )
+                } else {
+                    button(ButtonKind::Primary, "write-export-file", "Export", theme)
+                        .on_click(cx.listener(|this, _, _, cx| this.write_export_file(cx)))
+                })
                 .child(
-                    ghost("cancel-export-file", "Cancel", theme).on_click(cx.listener(|this, _, _, cx| {
-                        this.close_export_file_bar();
-                        cx.notify();
-                    })),
+                    button(ButtonKind::Ghost, "cancel-export-file", "Cancel", theme).on_click(cx.listener(
+                        |this, _, _, cx| {
+                            this.close_export_file_bar();
+                            cx.notify();
+                        },
+                    )),
                 ),
         )
     }

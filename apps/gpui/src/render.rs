@@ -2,6 +2,9 @@ use super::*;
 use crate::assets::icon;
 use crate::chrome::{STATUS_HEIGHT, TAB_HEIGHT, TOOLBAR_HEIGHT};
 use crate::palette_state::PaletteMode;
+use crate::surfaces::{
+    Bar, ButtonKind, button, compact_button, compact_icon_button, dialog_surface, scrim, toggle_icon_button,
+};
 use gpui::uniform_list;
 use gpui_kit::component::scroll::Scrollbar;
 
@@ -90,7 +93,13 @@ impl GridView {
     }
 
     fn page_size_button(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
-        button("page-size", format!("{} rows", self.pager.rows), theme).on_click(cx.listener(|this, _, _, cx| {
+        compact_button(
+            ButtonKind::Ghost,
+            "page-size",
+            format!("{} rows", self.pager.rows),
+            theme,
+        )
+        .on_click(cx.listener(|this, _, _, cx| {
             let index = PAGE_SIZES.iter().position(|size| *size == this.pager.rows).unwrap_or(0);
             this.pager = this.pager.resized(PAGE_SIZES[(index + 1) % PAGE_SIZES.len()]);
             cx.notify();
@@ -113,7 +122,7 @@ impl GridView {
         pager
             .when(!compact, |pager| {
                 pager.child(
-                    icon_button("first", "chevrons-left", "First page", false, theme).on_click(cx.listener(
+                    compact_icon_button("first", "chevrons-left", "First page", theme).on_click(cx.listener(
                         |this, _, _, cx| {
                             this.pager.first();
                             cx.notify();
@@ -122,7 +131,7 @@ impl GridView {
                 )
             })
             .child(
-                icon_button("prev", "chevron-left", "Previous page", false, theme).on_click(cx.listener(
+                compact_icon_button("prev", "chevron-left", "Previous page", theme).on_click(cx.listener(
                     |this, _, _, cx| {
                         this.pager.previous();
                         cx.notify();
@@ -132,11 +141,12 @@ impl GridView {
             .child(div().child(range_label))
             .child(self.page_size_button(theme, cx))
             .child(
-                icon_button(
+                toggle_icon_button(
                     "load-more",
                     "arrow-down-up",
                     "Append the next page instead of replacing the current one",
                     self.pager.append,
+                    Bar::Compact,
                     theme,
                 )
                 .on_click(cx.listener(|this, _, _, cx| {
@@ -145,7 +155,7 @@ impl GridView {
                 })),
             )
             .child(
-                icon_button("next", "chevron-right", "Next page", false, theme).on_click(cx.listener(
+                compact_icon_button("next", "chevron-right", "Next page", theme).on_click(cx.listener(
                     |this, _, _, cx| {
                         this.pager.next();
                         cx.notify();
@@ -154,7 +164,7 @@ impl GridView {
             )
             .when(!compact, |pager| {
                 pager.child(
-                    icon_button("last", "chevrons-right", "Last page", false, theme).on_click(cx.listener(
+                    compact_icon_button("last", "chevrons-right", "Last page", theme).on_click(cx.listener(
                         |this, _, _, cx| {
                             this.pager.last();
                             cx.notify();
@@ -167,32 +177,35 @@ impl GridView {
     fn grid_action_buttons(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
         use gpui_component::button::{Button, ButtonVariants};
         use gpui_component::menu::DropdownMenu;
+        use gpui_kit::component::Sizable as _;
         let compact = self.synced_width < 1000.0;
         let groups =
             crate::menus::command_groups(self, &[&["first", "last"], &["compare", "export-csv", "continuous"]]);
         div()
             .flex()
+            .flex_1()
+            .min_w_0()
             .debug_selector(|| "grid-actions".into())
             .items_center()
             .gap_1()
             .child(
                 div()
-                    .w(px(size::FIND_WIDTH))
-                    .flex_none()
+                    .flex_1()
+                    .min_w(px(size::FIND_MIN_WIDTH))
+                    .max_w(px(size::FIND_WIDTH))
                     .debug_selector(|| "grid-find-field".into())
                     .child(self.search.find.clone()),
             )
             .child(
-                icon_button("find-prev", "chevron-up", "Previous match", false, theme)
-                    .debug_selector(|| "find-prev".into())
+                compact_icon_button("find-prev", "chevron-up", "Previous match", theme)
                     .on_click(cx.listener(|this, _, _, cx| this.run_find(false, cx))),
             )
             .child(
-                icon_button("find-next", "chevron-down", "Next match", false, theme)
+                compact_icon_button("find-next", "chevron-down", "Next match", theme)
                     .on_click(cx.listener(|this, _, _, cx| this.run_find(true, cx))),
             )
             .child(
-                icon_button("show", "sliders-horizontal", "Show matching rows only", false, theme).on_click(
+                compact_icon_button("show", "sliders-horizontal", "Show matching rows only", theme).on_click(
                     cx.listener(|this, _, _, cx| {
                         this.show_matching(cx);
                         cx.notify();
@@ -202,21 +215,24 @@ impl GridView {
             .when(!compact, |actions| {
                 actions
                     .child(
-                        button("compare", "Compare", theme)
+                        compact_button(ButtonKind::Ghost, "compare", "Compare", theme)
                             .on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))),
                     )
                     .child(
-                        button("export", "Export CSV", theme).on_click(cx.listener(|this, _, _, cx| {
-                            this.export_selection_or_page(cx);
-                            cx.notify();
-                        })),
+                        compact_button(ButtonKind::Ghost, "export", "Export CSV", theme).on_click(cx.listener(
+                            |this, _, _, cx| {
+                                this.export_selection_or_page(cx);
+                                cx.notify();
+                            },
+                        )),
                     )
                     .child(
-                        icon_button(
+                        toggle_icon_button(
                             "continuous",
                             "chevrons-down-up",
                             "Scroll continuously",
                             self.continuous,
+                            Bar::Compact,
                             theme,
                         )
                         .on_click(cx.listener(|this, _, _, cx| {
@@ -230,6 +246,7 @@ impl GridView {
                 actions.child(
                     Button::new("grid-more")
                         .ghost()
+                        .small()
                         .compact()
                         .tooltip("More grid actions")
                         .accessibility_label("More grid actions")
@@ -266,9 +283,12 @@ impl GridView {
                 .pb_2()
                 .child(div().child("Filter loaded rows"))
                 .child(div().w(px(size::FILTER_WIDTH)).child(self.search.filter.clone()))
-                .child(button("apply", "Apply", theme).on_click(cx.listener(|this, _, _, cx| this.apply_filter(cx))))
                 .child(
-                    button("clear", "Clear all", theme).on_click(cx.listener(|this, _, _, cx| {
+                    button(ButtonKind::Primary, "apply", "Apply", theme)
+                        .on_click(cx.listener(|this, _, _, cx| this.apply_filter(cx))),
+                )
+                .child(
+                    button(ButtonKind::Ghost, "clear", "Clear all", theme).on_click(cx.listener(|this, _, _, cx| {
                         this.clear_filter();
                         cx.notify();
                     })),
@@ -312,16 +332,20 @@ impl GridView {
                 .pb_2()
                 .child(div().child(format!("COMPARE {summary}{capped}")))
                 .child(
-                    button("whole", "Whole row", theme).on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))),
+                    button(ButtonKind::Ghost, "whole", "Whole row", theme)
+                        .on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))),
                 )
                 .child(
-                    button("keyed", "Key: value", theme).on_click(cx.listener(|this, _, _, cx| this.compare(true, cx))),
+                    button(ButtonKind::Ghost, "keyed", "Key: value", theme)
+                        .on_click(cx.listener(|this, _, _, cx| this.compare(true, cx))),
                 )
                 .child(
-                    button("close-compare", "Close", theme).on_click(cx.listener(|this, _, _, cx| {
-                        this.compare = None;
-                        cx.notify();
-                    })),
+                    button(ButtonKind::Ghost, "close-compare", "Close", theme).on_click(cx.listener(
+                        |this, _, _, cx| {
+                            this.compare = None;
+                            cx.notify();
+                        },
+                    )),
                 )
         })
     }
@@ -377,34 +401,19 @@ impl GridView {
             .map_or("value", |column| column.name.as_str())
             .to_string();
         Some(
-            div()
+            scrim(theme)
                 .id("full-value-editor-overlay")
-                .absolute()
-                .top_0()
-                .left_0()
-                .size_full()
-                .flex()
-                .justify_center()
-                .items_center()
-                .bg(gpui::rgba(0x00000088))
                 .occlude()
                 .child(
-                    div()
+                    dialog_surface(size::FULL_VALUE_EDITOR_WIDTH, theme)
                         .id("full-value-editor-dialog")
                         .debug_selector(|| "full-value-editor-dialog".into())
-                        .w(px(size::FULL_VALUE_EDITOR_WIDTH))
                         .max_w(gpui::relative(0.92))
                         .h(px(size::FULL_VALUE_EDITOR_HEIGHT))
                         .max_h(gpui::relative(0.9))
-                        .flex()
-                        .flex_col()
                         .min_h_0()
                         .p_3()
                         .gap_2()
-                        .bg(rgb(theme.background))
-                        .border_1()
-                        .border_color(rgb(theme.border))
-                        .rounded(px(theme.radius))
                         .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                         .child(
                             div()
@@ -445,12 +454,21 @@ impl GridView {
                                     div()
                                         .flex()
                                         .gap_2()
-                                        .child(button("cancel-full-value", "Cancel", theme).on_click(
-                                            cx.listener(|this, _, window, cx| this.cancel_active_cell_edit(window, cx)),
-                                        ))
-                                        .child(button("apply-full-value", "Apply", theme).on_click(
-                                            cx.listener(|this, _, window, cx| this.apply_active_cell_edit(window, cx)),
-                                        )),
+                                        .debug_selector(|| "full-value-actions".into())
+                                        .child(
+                                            button(ButtonKind::Primary, "apply-full-value", "Apply", theme).on_click(
+                                                cx.listener(|this, _, window, cx| {
+                                                    this.apply_active_cell_edit(window, cx)
+                                                }),
+                                            ),
+                                        )
+                                        .child(
+                                            button(ButtonKind::Ghost, "cancel-full-value", "Cancel", theme).on_click(
+                                                cx.listener(|this, _, window, cx| {
+                                                    this.cancel_active_cell_edit(window, cx)
+                                                }),
+                                            ),
+                                        ),
                                 ),
                         ),
                 )
@@ -477,6 +495,7 @@ impl Render for GridView {
         };
         let full_value_editor = self.full_value_editor_overlay(theme, cx);
         let approval = self.approval_overlay(theme, cx);
+        let host_key = self.host_key_overlay(theme, cx);
         let save_bar = self.save_bar(theme, cx).or_else(|| self.edits_bar(theme, cx));
         let banner = self.save_banner(theme, cx);
         let bundle_bar = self.connection_bundle_bar(theme, cx);
@@ -535,13 +554,13 @@ impl Render for GridView {
                 }),
             )
             .child(toolbar)
-            .children(self.host_key_bar(theme, cx))
             .child(self.main_layout(sidebar, tab_row, bundle_bar, content))
             .children(self.row_menu_overlay())
             .child(self.status_bar(theme, f32::from(window.viewport_size().width), cx))
             .children(palette)
             .children(full_value_editor)
             .children(approval)
+            .children(host_key)
     }
 }
 
@@ -696,14 +715,8 @@ impl GridView {
         let empty = (count == 0).then(|| div().px_2().text_color(rgb(theme.muted_foreground)).child(empty_text));
         let max_height =
             (window.viewport_size().height - px(size::PALETTE_TOP + size::FORM_CONTROL + 40.0)).max(px(0.0));
-        div()
+        scrim(theme)
             .id("palette-overlay")
-            .absolute()
-            .top_0()
-            .left_0()
-            .size_full()
-            .flex()
-            .justify_center()
             .items_start()
             .occlude()
             .on_click(cx.listener(|this, _, window, cx| {
@@ -711,20 +724,11 @@ impl GridView {
                 cx.stop_propagation();
             }))
             .child(
-                div()
+                dialog_surface(size::PALETTE_WIDTH, theme)
                     .id("palette-surface")
-                    .w_full()
-                    .max_w(px(size::PALETTE_WIDTH))
                     .mt(px(size::PALETTE_TOP))
                     .p_2()
                     .gap_1()
-                    .flex()
-                    .flex_col()
-                    .rounded(px(size::SURFACE_RADIUS))
-                    .border_1()
-                    .border_color(rgb(theme.border))
-                    .bg(rgb(theme.background))
-                    .shadow_lg()
                     .on_click(cx.listener(|_, _, _, cx| cx.stop_propagation()))
                     .child(self.palette.input.clone())
                     .child(

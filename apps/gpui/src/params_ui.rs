@@ -4,7 +4,8 @@ use bookie_app_services::query_parameters::{bind_statement, collect_values, stat
 use bookie_core::ParameterKind;
 
 use super::*;
-use crate::chrome::{ghost, tip};
+use crate::chrome::tip;
+use crate::surfaces::{ButtonKind, button, task_bar};
 
 pub(crate) struct ParamRow {
     pub name: String,
@@ -116,7 +117,7 @@ impl GridView {
                             .child(format!(":{}", row.name)),
                     )
                     .child(
-                        ghost(("param-kind", index), row.kind.label(), theme)
+                        button(ButtonKind::Ghost, ("param-kind", index), row.kind.label(), theme)
                             .tooltip(tip("Change how this value is typed"))
                             .on_click(cx.listener(move |this, _, _, cx| this.cycle_param_kind(index, cx))),
                     )
@@ -124,25 +125,14 @@ impl GridView {
             })
             .collect();
         Some(
-            div()
-                .flex()
-                .flex_wrap()
-                .items_center()
-                .gap_3()
-                .px_2()
-                .py_1()
-                .flex_none()
-                .bg(rgb(theme.chrome))
-                .border_b_1()
-                .border_color(rgb(theme.border))
-                .child(div().font_weight(gpui::FontWeight::MEDIUM).child("Parameters"))
-                .children(fields)
-                .child(
-                    div()
-                        .text_size(px(size::TEXT_SMALL))
-                        .text_color(rgb(theme.muted_foreground))
-                        .child("Auto reads numbers and true/false; choose Text to keep values like 007. Press Enter or Run."),
-                ),
+            task_bar("Parameters", theme).flex_wrap().children(fields).child(
+                div()
+                    .text_size(px(size::TEXT_SMALL))
+                    .text_color(rgb(theme.muted_foreground))
+                    .child(
+                        "Auto reads numbers and true/false; choose Text to keep values like 007. Press Enter or Run.",
+                    ),
+            ),
         )
     }
 }

@@ -1,7 +1,8 @@
 use bookie_core::Value;
-use gpui::{Context, Div, Stateful, div, prelude::*, px, rgb};
+use gpui::{Context, Div, Stateful, div, prelude::*, rgb};
 
 use crate::GridView;
+use crate::surfaces::{ButtonKind, compact_button, compact_icon_button};
 use bookie_gpui::theme::Theme;
 
 #[derive(Clone, Debug)]
@@ -61,33 +62,19 @@ impl GridView {
                                 .items_center()
                                 .gap_2()
                                 .child(
-                                    div()
-                                        .id("open-fk-tab")
-                                        .px_2()
-                                        .py_0p5()
-                                        .rounded(px(theme.radius))
-                                        .bg(rgb(theme.accent))
-                                        .text_xs()
-                                        .cursor_pointer()
-                                        .child("Run in query results")
+                                    compact_button(ButtonKind::Ghost, "open-fk-tab", "Run in query results", theme)
                                         .on_click(cx.listener(move |this, _, _, cx| {
                                             this.clear_fk_peek();
                                             this.run_sql_with(sql.clone(), params.clone(), cx);
                                             cx.notify();
                                         })),
                                 )
-                                .child(
-                                    div()
-                                        .id("close-fk-peek")
-                                        .px_1()
-                                        .rounded(px(theme.radius))
-                                        .cursor_pointer()
-                                        .child(crate::assets::icon("x", theme.muted_foreground))
-                                        .on_click(cx.listener(|this, _, _, cx| {
-                                            this.clear_fk_peek();
-                                            cx.notify();
-                                        })),
-                                ),
+                                .child(compact_icon_button("close-fk-peek", "x", "Close", theme).on_click(
+                                    cx.listener(|this, _, _, cx| {
+                                        this.clear_fk_peek();
+                                        cx.notify();
+                                    }),
+                                )),
                         ),
                 )
                 .child(

@@ -2,7 +2,8 @@ use bookie_gpui::messages::MessageKind;
 use gpui::{Context, Div, MouseDownEvent, Stateful, Window, div, prelude::*, px, rgb};
 
 use crate::assets::icon;
-use crate::chrome::{SQL, TOOLBAR_HEIGHT, ghost, ghost_icon, primary_button};
+use crate::chrome::{SQL, TOOLBAR_HEIGHT, tip};
+use crate::surfaces::{ButtonKind, button, compact_icon_button, icon_button, segment, segmented};
 use crate::{GridView, thousands};
 use bookie_gpui::shell::{ResultView, Run, Tab};
 use bookie_gpui::theme::{Theme, size};
@@ -51,42 +52,37 @@ impl GridView {
             .border_b_1()
             .border_color(rgb(theme.border))
             .child(
-                primary_button(
-                    "run-statement",
-                    "Run",
-                    "Run the selection or the statement at the cursor (Ctrl+Enter)",
-                    theme,
-                )
-                .on_click(cx.listener(|this, _, _, cx| {
-                    this.run_at_cursor(cx);
-                    cx.notify();
-                })),
+                button(ButtonKind::Primary, "run-statement", "Run", theme)
+                    .tooltip(tip("Run the selection or the statement at the cursor (Ctrl+Enter)"))
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.run_at_cursor(cx);
+                        cx.notify();
+                    })),
             )
             .child(
-                ghost("run-query", "Run all", theme)
-                    .tooltip(|window, cx| {
-                        gpui_component::tooltip::Tooltip::new("Run every statement (Ctrl+Shift+Enter)")
-                            .build(window, cx)
-                    })
+                button(ButtonKind::Ghost, "run-query", "Run all", theme)
+                    .tooltip(tip("Run every statement (Ctrl+Shift+Enter)"))
                     .on_click(cx.listener(|this, _, _, cx| {
                         this.run_query(cx);
                         cx.notify();
                     })),
             )
             .child(
-                ghost("explain-query", "Explain", theme).on_click(cx.listener(|this, _, _, cx| {
+                button(ButtonKind::Ghost, "explain-query", "Explain", theme).on_click(cx.listener(|this, _, _, cx| {
                     this.explain_query(cx);
                     cx.notify();
                 })),
             )
             .child(
-                ghost("format-query", "Format", theme).on_click(cx.listener(|this, _, window, cx| {
-                    this.format_query(window, cx);
-                    cx.notify();
-                })),
+                button(ButtonKind::Ghost, "format-query", "Format", theme).on_click(cx.listener(
+                    |this, _, window, cx| {
+                        this.format_query(window, cx);
+                        cx.notify();
+                    },
+                )),
             )
             .child(
-                ghost("save-query", "Save", theme).on_click(cx.listener(|this, _, _, cx| {
+                button(ButtonKind::Ghost, "save-query", "Save", theme).on_click(cx.listener(|this, _, _, cx| {
                     this.save_favorite(cx);
                     cx.notify();
                 })),
@@ -228,46 +224,23 @@ impl GridView {
         theme: Theme,
         cx: &mut Context<Self>,
     ) -> Stateful<Div> {
-        let tab = div()
-            .id(("run", index))
-            .flex()
-            .items_center()
-            .flex_none()
-            .h(px(size::SMALL_CONTROL))
-            .px_2()
-            .rounded(px(theme.radius))
-            .border_1()
-            .cursor_pointer()
-            .child(match (self.run_tabs.slots[index].failure.is_some(), run.measured()) {
-                (true, _) => format!("{} · failed", run.label()),
-                (false, Some(took)) => format!("{} · {} rows · {took}", run.label(), thousands(run.rows)),
-                (false, None) => format!("{} · {} rows", run.label(), thousands(run.rows)),
-            })
-            .child(
-                div()
-                    .id(("close-run", index))
-                    .px_1()
-                    .rounded(px(theme.radius))
-                    .hover(move |style| style.bg(rgb(theme.muted)))
-                    .on_mouse_down(
-                        gpui::MouseButton::Left,
-                        cx.listener(move |this, _: &MouseDownEvent, _, cx| {
-                            this.close_run(index);
-                            cx.stop_propagation();
-                            cx.notify();
-                        }),
-                    )
-                    .child(icon("x", theme.muted_foreground)),
-            );
-        let tab = if active {
-            tab.border_color(rgb(theme.border))
-                .bg(rgb(theme.background))
-                .shadow_sm()
-        } else {
-            tab.border_color(rgb(theme.muted))
-                .text_color(rgb(theme.muted_foreground))
-                .hover(move |style| style.bg(rgb(theme.accent)))
+        let label = match (self.run_tabs.slots[index].failure.is_some(), run.measured()) {
+            (true, _) => format!("{} · failed", run.label()),
+            (false, Some(took)) => format!("{} · {} rows · {took}", run.label(), thousands(run.rows)),
+            (false, None) => format!("{} · {} rows", run.label(), thousands(run.rows)),
         };
+        let tab = segment(("run", index), label, active, theme).flex_none().child(
+            compact_icon_button(("close-run", index), "x", "Close result", theme)
+                .size(px(size::LG))
+                .on_mouse_down(
+                    gpui::MouseButton::Left,
+                    cx.listener(move |this, _: &MouseDownEvent, _, cx| {
+                        this.close_run(index);
+                        cx.stop_propagation();
+                        cx.notify();
+                    }),
+                ),
+        );
         let tab = if let Some(tip) = run.tooltip() {
             tab.tooltip(move |window, cx| gpui_component::tooltip::Tooltip::new(tip.clone()).build(window, cx))
         } else {
@@ -287,22 +260,7 @@ impl GridView {
         theme: Theme,
         cx: &mut Context<Self>,
     ) -> Stateful<Div> {
-        let selected = self.panel.view == view;
-        let button = div()
-            .id(id)
-            .flex()
-            .items_center()
-            .h(px(size::COMPACT_CONTROL))
-            .px_2()
-            .rounded(px(theme.radius))
-            .cursor_pointer()
-            .child(label);
-        let button = if selected {
-            button.bg(rgb(theme.accent)).text_color(rgb(theme.foreground))
-        } else {
-            button.text_color(rgb(theme.muted_foreground))
-        };
-        button.on_click(cx.listener(move |this, _, _, cx| {
+        segment(id, label, self.panel.view == view, theme).on_click(cx.listener(move |this, _, _, cx| {
             if view == ResultView::Chart {
                 this.show_chart(cx);
             }
@@ -317,7 +275,20 @@ impl GridView {
             .slots
             .iter()
             .enumerate()
-            .map(|(index, slot)| self.result_tab_item(index, &slot.run, index == self.run_tabs.active, theme, cx));
+            .map(|(index, slot)| self.result_tab_item(index, &slot.run, index == self.run_tabs.active, theme, cx))
+            .collect::<Vec<_>>();
+        let empty = run_tabs.is_empty();
+        let mut views = vec![
+            self.result_view_switch("view-table", "Table Data", ResultView::Table, theme, cx),
+            self.result_view_switch("view-summary", "Summary", ResultView::Summary, theme, cx),
+            self.result_view_switch("view-messages", "Messages", ResultView::Messages, theme, cx),
+        ];
+        if !self.panel.plan.is_empty() {
+            views.push(self.result_view_switch("view-plan", "Plan", ResultView::Plan, theme, cx));
+        }
+        if !self.run_tabs.slots.is_empty() {
+            views.push(self.result_view_switch("view-chart", "Chart", ResultView::Chart, theme, cx));
+        }
         div()
             .flex()
             .items_center()
@@ -331,41 +302,42 @@ impl GridView {
             .child(icon("pin", theme.muted_foreground))
             .child(div().w(px(size::HAIRLINE)).h(px(size::LG)).bg(rgb(theme.border)))
             .child(
-                div()
-                    .id("result-runs")
-                    .flex()
-                    .flex_1()
-                    .min_w_0()
-                    .gap_1()
-                    .overflow_x_scroll()
-                    .track_scroll(&self.run_tabs.scroll)
-                    .children(run_tabs),
+                segmented(
+                    [div()
+                        .id("result-runs")
+                        .flex()
+                        .min_w_0()
+                        .gap(px(size::OPTICAL))
+                        .overflow_x_scroll()
+                        .track_scroll(&self.run_tabs.scroll)
+                        .children(run_tabs)],
+                    theme,
+                )
+                .flex_initial()
+                .min_w_0()
+                .when(empty, |runs| runs.p_0()),
             )
-            .child(self.result_view_switch("view-table", "Table Data", ResultView::Table, theme, cx))
-            .child(self.result_view_switch("view-summary", "Summary", ResultView::Summary, theme, cx))
-            .child(self.result_view_switch("view-messages", "Messages", ResultView::Messages, theme, cx))
-            .children(
-                (!self.panel.plan.is_empty())
-                    .then(|| self.result_view_switch("view-plan", "Plan", ResultView::Plan, theme, cx)),
-            )
-            .children(
-                (!self.run_tabs.slots.is_empty())
-                    .then(|| self.result_view_switch("view-chart", "Chart", ResultView::Chart, theme, cx)),
-            )
+            .child(div().flex_1())
+            .child(segmented(views, theme))
             .child(
-                ghost("toggle-results", "", theme)
-                    .child(icon(
-                        if self.panel.open {
-                            "chevron-down"
-                        } else {
-                            "chevron-right"
-                        },
-                        theme.muted_foreground,
-                    ))
-                    .on_click(cx.listener(|this, _, _, cx| {
-                        this.toggle_results();
-                        cx.notify();
-                    })),
+                icon_button(
+                    "toggle-results",
+                    if self.panel.open {
+                        "chevron-down"
+                    } else {
+                        "chevron-right"
+                    },
+                    if self.panel.open {
+                        "Hide results"
+                    } else {
+                        "Show results"
+                    },
+                    theme,
+                )
+                .on_click(cx.listener(|this, _, _, cx| {
+                    this.toggle_results();
+                    cx.notify();
+                })),
             )
     }
 
@@ -404,7 +376,8 @@ impl GridView {
                                 .as_ref()
                                 .map_or_else(|| sql.clone(), |(snapshot, _)| snapshot.clone());
                             Some({
-                                ghost(
+                                button(
+                                    ButtonKind::Ghost,
                                     "go-to-query-error",
                                     format!("Go to error ({}:{})", line + 1, column + 1),
                                     theme,

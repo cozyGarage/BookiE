@@ -448,34 +448,22 @@ impl TableDelegate for GridDelegate {
             theme.muted_foreground,
         );
         let pin = self.pin_scope.clone().filter(|_| show_pin_button).map(|scope| {
-            use gpui_component::button::{Button, ButtonVariants};
-
             let pinned = col_ix < self.pinned_columns;
             let action = if pinned { "Unpin from" } else { "Pin through" };
-            let label = format!("{action} {name}");
-            let color = if pinned {
-                theme.foreground
-            } else {
-                theme.muted_foreground
-            };
-            Button::new(format!("pin-column-{col_ix}"))
-                .ghost()
-                .small()
-                .compact()
-                .tooltip(label.clone())
-                .accessibility_label(label.clone())
-                .on_click(cx.listener(move |table, _, _, cx| {
-                    let delegate = table.delegate_mut();
-                    delegate.pinned_columns =
-                        next_pinned_count(delegate.pinned_columns, col_ix, delegate.columns.len());
-                    delegate.pin_counts.insert(scope.clone(), delegate.pinned_columns);
-                    table.refresh(cx);
-                }))
-                .icon(
-                    gpui_component::Icon::default()
-                        .path("icons/pin.svg")
-                        .text_color(gpui::rgb(color)),
-                )
+            crate::surfaces::toggle_icon_button(
+                format!("pin-column-{col_ix}"),
+                "pin",
+                format!("{action} {name}"),
+                pinned,
+                crate::surfaces::Bar::Compact,
+                theme,
+            )
+            .on_click(cx.listener(move |table, _, _, cx| {
+                let delegate = table.delegate_mut();
+                delegate.pinned_columns = next_pinned_count(delegate.pinned_columns, col_ix, delegate.columns.len());
+                delegate.pin_counts.insert(scope.clone(), delegate.pinned_columns);
+                table.refresh(cx);
+            }))
         });
         div()
             .debug_selector(move || format!("column-header-{col_ix}"))

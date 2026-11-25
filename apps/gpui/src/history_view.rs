@@ -6,8 +6,9 @@ use gpui::{Context, Div, Entity, Stateful, Window, div, prelude::*, px, rgb};
 
 use crate::GridView;
 use crate::assets::icon;
-use crate::chrome::{ghost_icon, one_line};
-use crate::connection_form::{choice_chip, choice_row};
+use crate::chrome::one_line;
+use crate::connection_form::choice_row;
+use crate::surfaces::{Bar, ListState, icon_button, list_state, segment, toggle_icon_button};
 use crate::text_input::{InputEvent, TextInput};
 
 static PRUNED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
@@ -163,12 +164,10 @@ impl GridView {
         theme: Theme,
         cx: &mut Context<Self>,
     ) -> Stateful<Div> {
-        choice_chip(id, label, self.history_page.status == status, theme).on_click(cx.listener(
-            move |this, _, _, cx| {
-                this.history_page.status = status;
-                this.reload_history_page(cx);
-            },
-        ))
+        segment(id, label, self.history_page.status == status, theme).on_click(cx.listener(move |this, _, _, cx| {
+            this.history_page.status = status;
+            this.reload_history_page(cx);
+        }))
     }
 
     fn history_window_chip(
@@ -179,12 +178,10 @@ impl GridView {
         theme: Theme,
         cx: &mut Context<Self>,
     ) -> Stateful<Div> {
-        choice_chip(id, label, self.history_page.window == window, theme).on_click(cx.listener(
-            move |this, _, _, cx| {
-                this.history_page.window = window;
-                this.reload_history_page(cx);
-            },
-        ))
+        segment(id, label, self.history_page.window == window, theme).on_click(cx.listener(move |this, _, _, cx| {
+            this.history_page.window = window;
+            this.reload_history_page(cx);
+        }))
     }
 
     fn history_row(&self, index: usize, row: &HistoryRow, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
@@ -194,17 +191,18 @@ impl GridView {
         } else {
             theme.destructive
         };
-        let pin = ghost_icon(
+        let pin = toggle_icon_button(
             ("history-pin", index),
             "pin",
             if pinned { "Unpin" } else { "Pin" },
+            pinned,
+            Bar::Small,
             theme,
         )
-        .when(pinned, |button| button.bg(rgb(theme.active_row)))
         .on_click(cx.listener(move |this, _, _, cx| {
             this.change_history(statement_history::set_pinned(id, !pinned), cx);
         }));
-        let delete = ghost_icon(("history-delete", index), "trash-2", "Delete", theme)
+        let delete = icon_button(("history-delete", index), "trash-2", "Delete", theme)
             .on_click(cx.listener(move |this, _, _, cx| this.change_history(statement_history::delete(id), cx)));
         div()
             .id(("history-row", index))
@@ -279,10 +277,7 @@ impl GridView {
             ],
         );
         let body = if rows.is_empty() {
-            div()
-                .p_4()
-                .text_color(rgb(theme.muted_foreground))
-                .child("No statements match")
+            list_state(ListState::Empty("No statements match"), theme)
         } else {
             div().flex().flex_col().gap_1().children(rows)
         };

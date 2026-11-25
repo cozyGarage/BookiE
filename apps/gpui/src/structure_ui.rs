@@ -1,8 +1,8 @@
 use bookie_app_services::structure_change_plan::StructureChangeKind;
 
 use super::*;
-use crate::chrome::ghost;
 use crate::save_ui::{ReviewLabels, SaveRequest};
+use crate::surfaces::{ButtonKind, button, task_bar, task_bar_frame};
 
 #[derive(Default)]
 pub(crate) struct StructureState {
@@ -127,15 +127,8 @@ impl GridView {
     pub(crate) fn structure_info_panel(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Div> {
         let text = self.structure.info.clone()?;
         Some(
-            div()
-                .flex()
+            task_bar_frame(theme)
                 .items_start()
-                .gap_3()
-                .p_2()
-                .flex_none()
-                .bg(rgb(theme.chrome))
-                .border_b_1()
-                .border_color(rgb(theme.border))
                 .child(
                     div()
                         .id("structure-info")
@@ -147,10 +140,12 @@ impl GridView {
                         .child(text),
                 )
                 .child(
-                    ghost("close-structure-info", "Close", theme).on_click(cx.listener(|this, _, _, cx| {
-                        this.structure.info = None;
-                        cx.notify();
-                    })),
+                    button(ButtonKind::Ghost, "close-structure-info", "Close", theme).on_click(cx.listener(
+                        |this, _, _, cx| {
+                            this.structure.info = None;
+                            cx.notify();
+                        },
+                    )),
                 ),
         )
     }
@@ -222,23 +217,14 @@ impl GridView {
             return None;
         }
         Some(
-            div()
-                .flex()
-                .items_center()
-                .gap_3()
-                .p_2()
-                .flex_none()
-                .bg(rgb(theme.chrome))
-                .border_b_1()
-                .border_color(rgb(theme.border))
-                .child(div().font_weight(gpui::FontWeight::MEDIUM).child(kind.title()))
+            task_bar(kind.title(), theme)
                 .child(div().flex_1().min_w_0().child(input))
                 .child(
-                    ghost("review-structure", "Review", theme)
+                    button(ButtonKind::Primary, "review-structure", "Review", theme)
                         .on_click(cx.listener(|this, _, _, cx| this.review_structure(cx))),
                 )
                 .child(
-                    ghost("cancel-structure", "Cancel", theme)
+                    button(ButtonKind::Ghost, "cancel-structure", "Cancel", theme)
                         .on_click(cx.listener(|this, _, _, cx| this.cancel_structure_bar(cx))),
                 ),
         )

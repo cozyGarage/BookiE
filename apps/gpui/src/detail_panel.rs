@@ -4,6 +4,7 @@ use gpui::{Div, Stateful, div, prelude::*, px, relative, rgb};
 use gpui_component::checkbox::Checkbox;
 
 use crate::GridView;
+use crate::surfaces::{section_header, segment, segmented};
 use bookie_gpui::model::{Cell, ColumnMeta};
 
 const MONO: &str = "monospace";
@@ -175,22 +176,17 @@ impl GridView {
                         .unwrap_or_else(|| "Select a row to view its values.".into()),
                 )
         });
-        let view_switch = div()
-            .flex()
-            .gap_1()
-            .pb_2()
-            .children([("Fields", false), ("JSON", true)].into_iter().map(|(label, as_json)| {
-                crate::connection_form::choice_chip(
-                    ("row-detail-view", usize::from(as_json)),
-                    label,
-                    json == as_json,
-                    theme,
-                )
-                .on_click(cx.listener(move |this, _, _, cx| {
-                    this.row_inspector.json = as_json;
-                    cx.notify();
-                }))
-            }));
+        let view_switch = div().flex().pb_2().child(segmented(
+            [("Fields", false), ("JSON", true)].into_iter().map(|(label, as_json)| {
+                segment(("row-detail-view", usize::from(as_json)), label, json == as_json, theme).on_click(cx.listener(
+                    move |this, _, _, cx| {
+                        this.row_inspector.json = as_json;
+                        cx.notify();
+                    },
+                ))
+            }),
+            theme,
+        ));
         let controls = div()
             .tab_group()
             .flex()
@@ -224,12 +220,7 @@ impl GridView {
                 .min_h_0()
                 .p_2()
                 .overflow_y_scroll()
-                .child(
-                    div()
-                        .pb_1()
-                        .text_color(rgb(theme.muted_foreground))
-                        .child("Row details"),
-                )
+                .child(section_header("Row details", theme).pb_1())
                 .child(view_switch)
                 .when(!json, |panel| panel.child(controls))
                 .children(fields_body)
@@ -252,13 +243,7 @@ impl GridView {
                 .pt_3()
                 .flex()
                 .flex_col()
-                .child(
-                    div()
-                        .pb_1()
-                        .text_size(px(size::TEXT_SMALL))
-                        .text_color(rgb(theme.muted_foreground))
-                        .child("Referenced by"),
-                )
+                .child(section_header("Referenced by", theme).pb_1())
                 .when(rows.is_empty(), |section| {
                     section.child(div().text_color(rgb(theme.muted_foreground)).child("Counting…"))
                 })
