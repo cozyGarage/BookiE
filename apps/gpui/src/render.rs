@@ -230,6 +230,20 @@ impl GridView {
                             }))
                         })
                     })
+                    .children(
+                        (self.can_save_edits()
+                            && self.cell_edit.edits.is_empty()
+                            && self.compare.is_none()
+                            && !self.form_open())
+                        .then(|| {
+                            button("add-row", "Add row", theme)
+                                .debug_selector(|| "add-row".into())
+                                .on_click(cx.listener(|this, _, _, cx| {
+                                    this.execute_edit_palette_action("insert-row", cx);
+                                    cx.notify();
+                                }))
+                        }),
+                    )
                     .child(
                         button("jump-column", "Go to column", theme)
                             .debug_selector(|| "jump-column".into())
