@@ -161,6 +161,9 @@ fn table_metadata_cases() -> Vec<StopCase> {
                     .await
             },
         ),
+        sends("table_sizes_controlled", b"reltoastrelid", |c, control| async move {
+            c.table_sizes_controlled(None, &control).await
+        }),
         sends(
             "fetch_enum_labels_controlled",
             b"enumsortorder",
