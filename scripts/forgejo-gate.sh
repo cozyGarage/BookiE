@@ -70,23 +70,6 @@ runs = json.load(sys.stdin)["workflow_runs"]
 print(runs[0]["id"] if runs else 0)
 '
 }
-matching_main_push_run() {
-  api_get "$api/actions/runs?page=1&limit=50" | python3 -c '
-import json, sys
-sha = sys.argv[1]
-runs = json.load(sys.stdin)["workflow_runs"]
-runs = [
-    run for run in runs
-    if run.get("commit_sha") == sha
-    and run.get("workflow_id") == "ci.yml"
-    and run.get("prettyref") == "main"
-    and run.get("event") == "push"
-]
-if runs:
-    run = max(runs, key=lambda item: item["id"])
-    print(run["status"], run["id"], run["index_in_repo"])
-' "$sha"
-}
 cancel_superseded() {
   [ "$target" != main ] || return 0
   local state id
@@ -122,31 +105,10 @@ if [ "$remote_sha" != "$sha" ]; then
     sleep 10
   done
 fi
-existing_main_run=""
-if [ "$target" = main ]; then
-  for attempt in 1 2 3 4 5 6; do
-    existing_main_run="$(matching_main_push_run "$sha")"
-    [ -n "$existing_main_run" ] && break
-    [ "$attempt" -eq 6 ] || sleep 5
-  done
-fi
-if [ -n "$existing_main_run" ]; then
-  read -r existing_status existing_id existing_number <<<"$existing_main_run"
-  if [ "$existing_status" = success ]; then
-    echo "Forgejo main run $existing_number (API id $existing_id) already passed for $sha"
-    exit 0
-  fi
-  if [ "$existing_status" = running ] || [ "$existing_status" = waiting ]; then
-    after=$((existing_id - 1))
-    echo "reusing Forgejo main push run $existing_number (API id $existing_id) for $sha"
-  fi
-fi
-if [ -z "$existing_main_run" ] || { [ "$existing_status" != success ] && [ "$existing_status" != running ] && [ "$existing_status" != waiting ]; }; then
-  cancel_superseded
-  dispatch_payload="$(python3 -c 'import json,sys; print(json.dumps({"ref": sys.argv[1], "inputs": {"ref": sys.argv[2]}}))' "$target" "$sha")"
-  api_post --request POST --header 'Content-Type: application/json' \
-    --data-binary "$dispatch_payload" "$api/actions/workflows/ci.yml/dispatches" >/dev/null
-fi
+cancel_superseded
+dispatch_payload="$(python3 -c 'import json,sys; print(json.dumps({"ref": sys.argv[1], "inputs": {"ref": sys.argv[2]}}))' "$target" "$sha")"
+api_post --request POST --header 'Content-Type: application/json' \
+  --data-binary "$dispatch_payload" "$api/actions/workflows/ci.yml/dispatches" >/dev/null
 deadline=$((SECONDS + timeout_minutes * 60))
 observed_run_id=0
 observed_run_number=0

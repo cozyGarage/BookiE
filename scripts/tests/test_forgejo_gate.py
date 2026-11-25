@@ -206,16 +206,15 @@ class ForgejoGateTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn('refusing to update protected Forgejo main', result.stderr)
 
-    def test_main_gate_reuses_the_push_run_for_the_same_revision(self):
+    def test_main_gate_dispatches_a_full_run_even_if_the_push_run_succeeded(self):
         run = {'id': 928, 'index_in_repo': 927, 'commit_sha': HEAD, 'workflow_id': 'ci.yml',
-               'prettyref': 'main', 'event': 'push', 'status': 'running'}
+               'prettyref': 'main', 'event': 'push', 'status': 'success'}
         dispatch = {}
         result = gate([], initial_status='success', dispatch_capture=dispatch, target='main', remote_sha=HEAD,
                       main_push_runs=[run])
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn('reusing Forgejo main push run 927', result.stdout)
-        self.assertNotIn('lab-ci', result.stdout)
-        self.assertFalse(dispatch['dispatched'])
+        self.assertEqual(dispatch, {'ref': 'main', 'inputs': {'ref': HEAD}, 'dispatched': True})
+        self.assertNotIn('reusing Forgejo main push run', result.stdout)
 
     def test_main_gate_dispatches_when_no_push_run_appears(self):
         dispatch = {}
