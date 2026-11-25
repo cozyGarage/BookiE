@@ -553,9 +553,26 @@ impl TableDelegate for GridDelegate {
                 let (text, right) = self.label_of(row_ix, source_col);
                 let link = self.cell_style.0.get(source_col).copied().unwrap_or(false);
                 let wrap = self.cell_style.1;
+                let checked = self
+                    .map
+                    .compare
+                    .is_none()
+                    .then(|| self.boolean_at(row_ix, source_col))
+                    .flatten();
                 div()
                     .w_full()
                     .flex()
+                    .items_center()
+                    .gap_1()
+                    .when_some(checked, |el, on| {
+                        let theme = Theme::current(cx);
+                        let (name, color) = if on {
+                            ("square-check", theme.info)
+                        } else {
+                            ("square", theme.muted_foreground)
+                        };
+                        el.child(crate::assets::icon(name, color))
+                    })
                     .when_some(edited_tint, |el, tint| {
                         el.debug_selector(|| "edited-cell".into()).bg(tint)
                     })
@@ -643,6 +660,15 @@ impl GridDelegate {
             || self.edits != *edits
             || self.editor.as_ref().map(|(row, column, _)| (*row, *column))
                 != editor.as_ref().map(|(row, column, _)| (*row, *column))
+    }
+
+    fn boolean_at(&self, row_ix: usize, col_ix: usize) -> Option<bool> {
+        let index = self.map.source_row(row_ix)?;
+        let cells = self.source.as_ref()?.row_ref(index)?;
+        match self.edits.get(&(index, col_ix)).or_else(|| cells.get(col_ix))? {
+            Cell::Bool(value) => Some(*value),
+            _ => None,
+        }
     }
 
     pub(crate) fn label_of(&mut self, row_ix: usize, col_ix: usize) -> (String, bool) {
