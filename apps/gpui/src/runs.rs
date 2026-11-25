@@ -330,6 +330,7 @@ impl GridView {
         let query = match self.tabs.current() {
             Tab::Query => true,
             Tab::Table(name) if *name == self.catalog.grid_table => false,
+            Tab::Home | Tab::Settings => return,
             _ => {
                 self.invalidate_background();
                 return;
