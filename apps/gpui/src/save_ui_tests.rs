@@ -662,6 +662,41 @@ fn keys_do_not_reach_the_grid_behind_the_review(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn the_window_does_not_close_over_pending_edits_or_a_running_save(cx: &mut TestAppContext) {
+    let path = fixture_copy("close-guard");
+    let (view, cx) = saving_view(cx, &path);
+    view.read_with(cx, |view, _| assert_eq!(view.close_blocker(), None));
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.cell_edit
+                .edits
+                .insert((0, 1), bookie_gpui::model::Cell::Text("Changed".into()));
+        })
+    });
+    view.read_with(cx, |view, _| {
+        assert_eq!(
+            view.close_blocker(),
+            Some("Save or discard the pending changes before closing the window")
+        );
+    });
+    cx.update(|_, cx| view.update(cx, |view, _| view.save.busy = true));
+    view.read_with(cx, |view, _| {
+        assert_eq!(
+            view.close_blocker(),
+            Some("A save is running; wait for it to finish before closing the window")
+        );
+    });
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.save.busy = false;
+            view.discard_view_edits();
+        })
+    });
+    view.read_with(cx, |view, _| assert_eq!(view.close_blocker(), None));
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
 fn deleting_is_refused_in_compare_mode_where_rows_are_not_dataset_rows(cx: &mut TestAppContext) {
     let path = fixture_copy("delete-compare");
     let (view, cx) = saving_view(cx, &path);
