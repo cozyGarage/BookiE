@@ -1944,6 +1944,24 @@ fn the_schema_diagram_opens_in_its_own_tab_with_one_card_per_table(cx: &mut Test
 }
 
 #[gpui::test]
+fn closing_a_loading_schema_diagram_does_not_reopen_its_tab(cx: &mut TestAppContext) {
+    let path = fixture_copy("diagram-close");
+    let (view, cx) = saving_view(cx, &path);
+    view.update(cx, |view, cx| {
+        view.open_schema_diagram(cx);
+        assert!(view.search.diagram.loading);
+        assert_eq!(*view.tabs.current(), bookie_gpui::shell::Tab::Diagram);
+        view.close_tab(view.tabs.active, cx);
+    });
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert!(!view.tabs.items.contains(&bookie_gpui::shell::Tab::Diagram));
+        assert!(view.search.diagram.view.is_none());
+    });
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
 fn backups_are_offered_only_on_postgres_and_a_refused_bar_stays_closed(cx: &mut TestAppContext) {
     let path = fixture_copy("backup-sqlite");
     let (view, cx) = saving_view(cx, &path);

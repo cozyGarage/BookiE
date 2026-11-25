@@ -270,6 +270,7 @@ impl GridView {
         self.row_inspector.reset();
         if !self.live.as_ref().is_some_and(|live| Arc::ptr_eq(live, &session)) {
             self.schema_context = None;
+            self.reset_diagram();
         }
         self.mcp.register(session.database_service());
         self.connection_info = None;
@@ -399,6 +400,16 @@ impl GridView {
     }
 
     pub(super) fn open_table_named(&mut self, table: &TableInfo, window: &mut Window, cx: &mut Context<Self>) {
+        self.open_table_with_structure(table, false, window, cx);
+    }
+
+    pub(crate) fn open_table_with_structure(
+        &mut self,
+        table: &TableInfo,
+        structure: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         if self.catalog.tables.is_empty() {
             return;
         }
@@ -407,6 +418,9 @@ impl GridView {
             self.sync_grid_owner();
             if self.tabs.shows_grid_for(&self.catalog.grid_table) {
                 window.focus(&self.focus, cx);
+                if structure {
+                    self.show_structure(cx);
+                }
             }
             return;
         };
@@ -419,12 +433,17 @@ impl GridView {
         let wanted = table.clone();
         let sort = self.table_sort(&wanted).cloned();
         let where_sql = self.table_where(&wanted);
-        self.begin_background(
+        self.begin_background_with_context(
             Work::Load,
             cx,
             move |cancel| load(&session, &wanted, sort.as_ref(), &where_sql, &cancel),
-            move |this, loaded| match loaded {
-                Ok((name, table)) => this.show_loaded_table(name, table),
+            move |this, loaded, cx| match loaded {
+                Ok((name, table)) => {
+                    this.show_loaded_table(name.clone(), table);
+                    if structure && this.catalog.grid_table == name && this.tabs.shows_grid_for(&name) {
+                        this.show_structure(cx);
+                    }
+                }
                 Err(message) => this.status = message,
             },
         );

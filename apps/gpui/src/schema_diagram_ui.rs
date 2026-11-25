@@ -39,6 +39,12 @@ fn write_new_file(path: &Path, text: &str) -> Result<(), String> {
 
 #[derive(Default)]
 pub(crate) struct SchemaDiagramState {
+    pub request: crate::Ticket,
+    pub loading: bool,
+    pub failure: Option<String>,
+    pub scope: Option<String>,
+    pub find: Option<Entity<TextInput>>,
+    pub scroll: gpui::ScrollHandle,
     pub view: Option<crate::diagram_ui::DiagramView>,
     pub open: bool,
     pub focus: bool,
@@ -107,20 +113,29 @@ impl GridView {
         let Some((path, format)) = self.diagram_destination(&typed) else {
             return;
         };
-        self.status = "Reading every table…".into();
+        self.status = "Reading schema…".into();
+        let scope = (self.tabs.current() == &Tab::Diagram)
+            .then(|| self.search.diagram.scope.clone())
+            .flatten();
         let shown = path.display().to_string();
         self.begin_background(
             Work::Load,
             cx,
             move |cancel| {
-                let diagram = session.schema_diagram(&cancel)?;
+                let read = session.schema_diagram(scope.as_deref(), &cancel)?;
+                let incomplete = read.truncated() || !read.skipped.is_empty();
+                let diagram = SchemaDiagram::build(read.reads);
                 write_new_file(&path, &diagram_text(format, &diagram))?;
-                Ok::<usize, String>(diagram.tables.len())
+                Ok::<_, String>((diagram.tables.len(), read.total_tables, incomplete))
             },
             move |this, result| match result {
-                Ok(tables) => {
+                Ok((tables, total, incomplete)) => {
                     this.search.diagram.open = false;
-                    this.status = format!("Wrote the diagram of {tables} table(s) to {shown}");
+                    this.status = if incomplete {
+                        format!("Wrote a partial diagram ({tables} of {total} tables) to {shown}")
+                    } else {
+                        format!("Wrote the diagram of {tables} table(s) to {shown}")
+                    };
                 }
                 Err(message) => this.status = format!("Could not export the diagram: {message}"),
             },

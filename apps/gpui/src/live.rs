@@ -7,7 +7,7 @@ use std::time::Duration;
 use bookie_app_services::command_bridge::{ChannelEventSink, Command, DispatchContext, Epoch, Event, dispatch};
 use bookie_app_services::database_service::ConnectionOverview;
 use bookie_app_services::driver_failure_message::driver_failure_message;
-use bookie_app_services::er_diagram::{SchemaDiagram, TableRead, read::MAX_TABLES as MAX_DIAGRAM_TABLES};
+use bookie_app_services::er_diagram::read::SchemaRead;
 use bookie_app_services::read_session::ConnectionSummary;
 use bookie_app_services::read_session_store::{
     OpenedSession, ReadSessionStore, SessionId, SubscriptionRequest, SubscriptionSample, SubscriptionSampler,
@@ -673,31 +673,35 @@ impl LiveSession {
         run_backup_on(&self.runtime, &self.sessions, self.session_id, job, cancellation)
     }
 
-    pub fn schema_diagram(&self, cancellation: &CancellationToken) -> Result<SchemaDiagram, String> {
-        let supports_keys = drivers_registry::default_registry()
-            .get(&self.driver_id)
-            .is_some_and(|driver| driver.capabilities().supports_foreign_key_metadata);
-        let mut tables: Vec<&TableInfo> = self.tables.iter().collect();
-        tables.sort_unstable_by(|a, b| a.name.cmp(&b.name).then_with(|| a.schema.cmp(&b.schema)));
-        tables.truncate(MAX_DIAGRAM_TABLES);
-        let mut reads = Vec::new();
-        for table in tables {
-            if cancellation.is_cancelled() {
-                return Err("Canceled the export".into());
-            }
-            let foreign_keys = if supports_keys {
-                self.table_structure(table)?.foreign_keys
-            } else {
-                Vec::new()
-            };
-            reads.push(TableRead {
-                schema: table.schema.clone(),
-                name: table.name.clone(),
-                columns: self.table_columns(table)?,
-                foreign_keys,
-            });
-        }
-        Ok(SchemaDiagram::build(reads))
+    pub fn diagram_layout_path(&self, scope: Option<&str>) -> Option<std::path::PathBuf> {
+        let identity = self.cache_identity();
+        let config = self
+            .stamp
+            .as_deref()
+            .and_then(|stamp| serde_json::from_str::<serde_json::Value>(stamp).ok());
+        let target = config.as_ref().map(|config| {
+            [
+                "driver_id",
+                "host",
+                "port",
+                "database",
+                "socket_dir",
+                "socket_path",
+                "ssh",
+                "attached_databases",
+            ]
+            .map(|field| config.get(field))
+        });
+        let key = serde_json::to_vec(&(identity, target, scope)).ok()?;
+        let id = uuid::Uuid::new_v5(&uuid::Uuid::NAMESPACE_OID, &key);
+        bookie_app_services::config_io::xdg_config_path(&format!("diagram-layouts/{id}.json"))
+    }
+
+    pub fn schema_diagram(&self, scope: Option<&str>, cancellation: &CancellationToken) -> Result<SchemaRead, String> {
+        let control = bookie_app_services::operation_control::bounded_with(30, cancellation.clone());
+        self.runtime
+            .block_on(self.sessions.read_schema_diagram(self.session_id, scope, &control))
+            .map_err(|error| driver_failure_message(&bookie_app_services::driver_error_presentation::classify(&error)))
     }
 
     pub fn search_values(

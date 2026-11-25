@@ -83,6 +83,7 @@ impl GridView {
         self.status = format!("Reading the structure of {}…", table.name);
         cx.spawn(async move |this, cx| {
             let asked = table.clone();
+            let owning_connection = live.clone();
             let read = cx
                 .background_executor()
                 .spawn(async move {
@@ -107,7 +108,7 @@ impl GridView {
                 })
                 .await;
             this.update(cx, |this, cx| {
-                if this.catalog.grid_table != asked {
+                if !this.is_current_session(&owning_connection) || this.catalog.grid_table != asked {
                     return;
                 }
                 match read {

@@ -45,6 +45,9 @@ impl GridView {
     }
 
     fn drag_resize(&mut self, event: &gpui::MouseMoveEvent, window: &mut Window, cx: &mut Context<Self>) {
+        if self.tabs.current() == &Tab::Diagram {
+            self.drag_diagram_card(event, cx);
+        }
         if self.sidebar.resizing {
             self.sidebar.width = f32::from(event.position.x).clamp(260.0, 480.0);
             cx.notify();
@@ -642,6 +645,7 @@ impl Render for GridView {
             .on_mouse_up(
                 MouseButton::Left,
                 cx.listener(|this, _: &gpui::MouseUpEvent, _, cx| {
+                    this.end_diagram_gesture();
                     let was_resizing =
                         std::mem::take(&mut this.sidebar.resizing) | std::mem::take(&mut this.panel.resizing);
                     if was_resizing {
