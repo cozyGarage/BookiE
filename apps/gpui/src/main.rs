@@ -478,16 +478,30 @@ impl GridView {
         (table, table_focus, table_events)
     }
 
+    fn close_blocker(&self) -> Option<&'static str> {
+        if self.transaction_open() {
+            Some("Commit or roll back the transaction before closing the window")
+        } else if self.save.busy {
+            Some("A save is running; wait for it to finish before closing the window")
+        } else if !self.cell_edit.edits.is_empty() {
+            Some("Save or discard the pending changes before closing the window")
+        } else {
+            None
+        }
+    }
+
     fn guard_transaction_close(window: &mut Window, cx: &mut Context<Self>) {
         let owner = cx.weak_entity();
         window.on_window_should_close(cx, move |_, cx| {
             owner
-                .update(cx, |view, cx| {
-                    if view.transaction_open() {
-                        view.status = "Commit or roll back the transaction before closing the window".into();
+                .update(cx, |view, cx| match view.close_blocker() {
+                    Some(reason) => {
+                        view.status = reason.into();
                         cx.notify();
                         false
-                    } else {
+                    }
+                    None => {
+                        view.remember_open_query_draft(cx);
                         true
                     }
                 })
@@ -525,6 +539,8 @@ impl GridView {
     }
 
     fn with_source(source: Source, started: Instant, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        #[cfg(test)]
+        test_config::isolate();
         Self::guard_transaction_close(window, cx);
         if !cfg!(test) {
             Self::persist_window_geometry(window, cx);
@@ -1196,6 +1212,8 @@ mod save_ui_tests;
 mod server_filter_ui_tests;
 #[cfg(test)]
 mod status_bar_tests;
+#[cfg(test)]
+mod test_config;
 #[cfg(test)]
 mod transaction_ui_tests;
 #[cfg(test)]

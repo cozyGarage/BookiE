@@ -391,6 +391,15 @@ fn csv_escaping() {
     assert_eq!(csv_field("line\n"), "\"line\n\"");
 }
 
+#[test]
+fn csv_fields_that_a_spreadsheet_would_run_as_formulas_are_neutralised() {
+    for text in ["=cmd|' /C calc'!A0", "+1+1", "@SUM(A1)", "-2+3"] {
+        let field = csv_field(text);
+        assert!(field.starts_with("\"'"), "{text} was exported as {field}");
+    }
+    assert_eq!(csv_field(""), "\"\"");
+}
+
 fn sample_new_entry() -> NewEntry {
     NewEntry {
         query: "SELECT 1".into(),

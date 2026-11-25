@@ -600,12 +600,15 @@ impl HistoryStore {
 }
 
 fn csv_field(s: &str) -> String {
-    if s.contains(',') || s.contains('"') || s.contains('\n') || s.contains('\r') {
-        let escaped = s.replace('"', "\"\"");
-        format!("\"{escaped}\"")
-    } else {
-        s.to_string()
+    let mut field = Vec::with_capacity(s.len() + 2);
+    let row = [bookie_core::Value::Text(s.to_owned())];
+    if bookie_core::export::write_csv_row_with_options(&mut field, &row, &bookie_core::export::CsvOptions::default())
+        .is_err()
+    {
+        return String::new();
     }
+    field.pop();
+    String::from_utf8(field).unwrap_or_default()
 }
 
 fn comment_text(text: &str) -> String {

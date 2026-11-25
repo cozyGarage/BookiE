@@ -1,7 +1,5 @@
 use bookie_app_services::foreign_key_nav::{ReferencedRowTarget, referencing_targets};
 use bookie_app_services::result_copy::{self, CopyContext, CopyFormat};
-use bookie_core::filter::build_filter_where;
-use bookie_core::sql_dialect::qualified_table;
 use bookie_core::{ForeignKeyInfo, InboundForeignKeyInfo, TableInfo, Value};
 use gpui::Context;
 use tokio_util::sync::CancellationToken;
@@ -33,6 +31,16 @@ pub(crate) struct RowInspector {
     pub references: Vec<ReferenceCount>,
     references_for: Option<(TableInfo, u64)>,
     work: Ticket,
+}
+
+impl RowInspector {
+    pub(crate) fn reset(&mut self) {
+        self.keys = None;
+        self.keys_requested = None;
+        self.references.clear();
+        self.references_for = None;
+        self.work.invalidate();
+    }
 }
 
 impl GridView {
@@ -253,13 +261,10 @@ fn reference_statements(
         name: target.table.clone(),
     };
     let columns = live.table_columns(&table)?;
-    let (clause, params) = build_filter_where(&live.driver_id, &columns, &target.filter)
-        .map_err(|error| error.to_string())?
-        .ok_or_else(|| "The foreign key gave no condition".to_string())?;
-    let qualified = qualified_table(&live.driver_id, target.schema.as_deref(), &target.table);
+    let statements = target.statements(&live.driver_id, &columns)?;
     Ok((
-        (format!("SELECT * FROM {qualified} WHERE {clause}"), params.clone()),
-        (format!("SELECT 1 FROM {qualified} WHERE {clause}"), params),
+        (statements.select, statements.params.clone()),
+        (statements.exists, statements.params),
     ))
 }
 

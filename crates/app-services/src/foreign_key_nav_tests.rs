@@ -219,3 +219,49 @@ fn referencing_targets_refusals_on_empty_null_or_missing() {
     assert!(referencing_targets(&keys, &row(&[("other", Value::Int(1))])).is_err());
     assert!(referencing_targets(&keys, &row(&[("id", Value::Null)])).is_err());
 }
+
+#[test]
+fn a_target_builds_the_select_and_the_existence_probe_with_bound_values() {
+    let keys = [foreign_key(&["customer_id"], &["id"], Some("sales"))];
+    let target = reference_targets(
+        &keys,
+        Some("public"),
+        "customer_id",
+        &row(&[("customer_id", Value::Int(42))]),
+    )
+    .unwrap();
+    let columns = [bookie_core::ColumnInfo {
+        name: "id".into(),
+        data_type: "integer".into(),
+        nullable: false,
+        primary_key: true,
+        is_auto_increment: false,
+        default_value: None,
+        is_generated: false,
+        comment: None,
+        collation: None,
+        enum_type: None,
+        domain_type: None,
+    }];
+    let statements = target[0].statements("postgres", &columns).unwrap();
+    assert!(statements.select.starts_with("SELECT * FROM "), "{}", statements.select);
+    assert!(statements.select.contains("customers"), "{}", statements.select);
+    assert!(statements.exists.starts_with("SELECT 1 FROM "), "{}", statements.exists);
+    assert!(statements.select.contains("WHERE"), "{}", statements.select);
+    assert_eq!(statements.params.len(), 1);
+    assert!(!statements.select.contains("42"), "the value is bound, not inlined");
+}
+
+#[test]
+fn a_target_without_a_condition_is_refused() {
+    let target = ReferencedRowTarget {
+        foreign_key: "fk".into(),
+        schema: None,
+        table: "customers".into(),
+        filter: FilterSet::default(),
+    };
+    assert_eq!(
+        target.statements("postgres", &[]).unwrap_err(),
+        "The foreign key gave no condition"
+    );
+}

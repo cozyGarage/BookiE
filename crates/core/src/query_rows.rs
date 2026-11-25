@@ -131,6 +131,24 @@ impl QueryRows {
         }
     }
 
+    pub fn retain_leading_cells(&mut self, cells: usize) {
+        let total = self.values.len();
+        let mut old = std::mem::take(&mut self.values).into_iter();
+        let mut values = Vec::with_capacity(total);
+        for row in 0..self.starts.len() {
+            let start = self.starts[row];
+            let end = self.starts.get(row + 1).copied().unwrap_or(total);
+            let len = end - start;
+            let kept = len.min(cells);
+            self.starts[row] = values.len();
+            values.extend(old.by_ref().take(kept));
+            for _ in kept..len {
+                old.next();
+            }
+        }
+        self.values = values;
+    }
+
     pub fn clear(&mut self) {
         self.values.clear();
         self.starts.clear();

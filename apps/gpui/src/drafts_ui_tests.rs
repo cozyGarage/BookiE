@@ -54,3 +54,25 @@ fn go_to_last_edit_returns_the_caret_to_where_the_query_was_last_changed(cx: &mu
     assert_eq!(now, edited);
     assert_eq!(edited, Position::new(1, 7), "the caret sits after the typed character");
 }
+
+#[gpui::test]
+fn closing_the_window_keeps_the_query_text_for_reopen_but_not_an_empty_editor(cx: &mut TestAppContext) {
+    let (view, cx) = open_live(cx);
+    let store = view.read_with(cx, |view, _| view.closed_drafts.clone().expect("a draft store"));
+    assert!(cx.simulate_close());
+    assert_eq!(store.len(), 0, "an empty editor leaves no draft");
+    let (view, cx) = open_live(cx);
+    let store = view.read_with(cx, |view, _| view.closed_drafts.clone().expect("a draft store"));
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.sql_input
+                .update(cx, |input, cx| input.set_value("SELECT 'before quit'", window, cx));
+        })
+    });
+    assert!(cx.simulate_close());
+    assert_eq!(store.len(), 1);
+    assert_eq!(
+        store.take_latest().map(|draft| draft.sql).as_deref(),
+        Some("SELECT 'before quit'")
+    );
+}

@@ -35,7 +35,8 @@ This section is the one source for where a GPUI surface opens. Other documents l
 
 | Content | Surface |
 | --- | --- |
-| Work: tables, queries, Home, Settings, history, audit, diagram, server views | A tab in the editor area. |
+| Work: tables, queries, Settings, history, audit, diagram, server views | A tab in the editor area. |
+| Home | The house button at the far left of the top bar shows Home in the editor area. It is not a tab, and it shows when no work tab is open. |
 | Cell and row details, foreign-key peek | The right detail sidebar. |
 | Commands | The command palette, anchored to the top of the window. |
 | New connection, edit connection | A centred dialog. Test results show inside it. |

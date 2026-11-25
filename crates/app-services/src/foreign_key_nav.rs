@@ -1,4 +1,6 @@
-use bookie_core::{FilterSet, ForeignKeyInfo, InboundForeignKeyInfo, Value};
+use bookie_core::filter::build_filter_where;
+use bookie_core::sql_dialect::qualified_table;
+use bookie_core::{ColumnInfo, FilterSet, ForeignKeyInfo, InboundForeignKeyInfo, Value};
 
 #[derive(Debug)]
 pub struct ReferencedRowTarget {
@@ -6,6 +8,27 @@ pub struct ReferencedRowTarget {
     pub schema: Option<String>,
     pub table: String,
     pub filter: FilterSet,
+}
+
+#[derive(Debug)]
+pub struct ReferencedRowStatements {
+    pub select: String,
+    pub exists: String,
+    pub params: Vec<Value>,
+}
+
+impl ReferencedRowTarget {
+    pub fn statements(&self, driver_id: &str, columns: &[ColumnInfo]) -> Result<ReferencedRowStatements, String> {
+        let (clause, params) = build_filter_where(driver_id, columns, &self.filter)
+            .map_err(|error| error.to_string())?
+            .ok_or_else(|| "The foreign key gave no condition".to_string())?;
+        let qualified = qualified_table(driver_id, self.schema.as_deref(), &self.table);
+        Ok(ReferencedRowStatements {
+            select: format!("SELECT * FROM {qualified} WHERE {clause}"),
+            exists: format!("SELECT 1 FROM {qualified} WHERE {clause}"),
+            params,
+        })
+    }
 }
 
 pub fn reference_targets(

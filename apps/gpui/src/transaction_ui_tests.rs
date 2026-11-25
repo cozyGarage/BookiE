@@ -261,7 +261,9 @@ fn a_denied_commit_keeps_the_transaction_available_for_rollback(cx: &mut TestApp
     });
     wait_for(&view, cx, |view| view.status.starts_with("Commit failed:"));
     view.read_with(cx, |view, _| {
-        assert!(view.transaction_open(), "denied commit must keep rollback available")
+        assert!(view.transaction_open(), "denied commit must keep rollback available");
+        let notice = view.notices.items.first().expect("a failed commit leaves a notice");
+        assert!(notice.text.starts_with("Commit failed:") && !notice.read);
     });
     assert!(!cx.simulate_close(), "an open transaction must prevent window close");
     cx.update(|_, cx| view.update(cx, |view, cx| view.disconnect(cx)));
@@ -284,12 +286,22 @@ fn a_denied_commit_keeps_the_transaction_available_for_rollback(cx: &mut TestApp
 
 #[gpui::test]
 fn terminal_commit_outcomes_are_not_reported_as_successful_retries(cx: &mut TestAppContext) {
-    for (result, expected) in [
-        (CommitResult::RolledBack, "Transaction rolled back by the server"),
-        (CommitResult::Unknown, "Transaction outcome may be unknown"),
+    use crate::notifications::NoticeKind;
+    for (result, expected, notice) in [
+        (
+            CommitResult::RolledBack,
+            "Transaction rolled back by the server",
+            Some(NoticeKind::Error),
+        ),
+        (
+            CommitResult::Unknown,
+            "Transaction outcome may be unknown",
+            Some(NoticeKind::UnknownOutcome),
+        ),
         (
             CommitResult::CommittedCloseFails,
             "Transaction committed; closing the session failed",
+            None,
         ),
     ] {
         let path = fixture_copy("transaction-outcome");
@@ -320,6 +332,8 @@ fn terminal_commit_outcomes_are_not_reported_as_successful_retries(cx: &mut Test
         view.read_with(cx, |view, _| {
             assert!(view.status.starts_with(expected), "{}", view.status);
             assert!(!view.transaction_open());
+            assert_eq!(view.notices.items.first().map(|item| item.kind), notice);
+            assert!(view.notices.items.iter().all(|item| !item.read));
         });
         assert!(
             shared.try_lock().unwrap().is_none(),
@@ -346,8 +360,28 @@ fn a_transaction_idle_for_five_minutes_shows_the_shared_warning(cx: &mut TestApp
         let warning = view.transaction_idle_warning().expect("an idle warning");
         assert!(warning.starts_with("Idle for 6 min"), "{warning}");
     });
+    cx.update(|_, cx| view.update(cx, |view, cx| view.sync_idle_notice(cx)));
+    cx.update(|_, cx| view.update(cx, |view, cx| view.sync_idle_notice(cx)));
+    view.read_with(cx, |view, _| {
+        let idle: Vec<_> = view
+            .notices
+            .items
+            .iter()
+            .filter(|notice| notice.kind == crate::notifications::NoticeKind::IdleTransaction)
+            .collect();
+        assert_eq!(idle.len(), 1, "one unread notice, not one per refresh");
+        assert!(!idle[0].read);
+    });
+    cx.update(|_, cx| view.update(cx, |view, cx| view.status = "Clicked a cell".into()));
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.notices.unread(), 1, "a status change keeps it")
+    });
     cx.update(|_, cx| view.update(cx, |view, cx| view.end_transaction(false, cx)));
     wait_for(&view, cx, |view| view.status == "Transaction rolled back");
+    cx.update(|_, cx| view.update(cx, |view, cx| view.sync_idle_notice(cx)));
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.notices.unread(), 0, "ending the transaction resolves the notice")
+    });
     std::fs::remove_file(&path).ok();
 }
 

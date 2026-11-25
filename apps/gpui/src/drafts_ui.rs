@@ -21,6 +21,12 @@ impl GridView {
         }
     }
 
+    pub(crate) fn remember_open_query_draft(&mut self, cx: &App) {
+        if !self.sql_input.read(cx).value().trim().is_empty() {
+            self.remember_query_draft(cx);
+        }
+    }
+
     pub(crate) fn forget_reopened_draft(&mut self, cx: &App) {
         if let Some(drafts) = &self.closed_drafts {
             drafts.forget_latest_if(self.sql_input.read(cx).value().as_ref());

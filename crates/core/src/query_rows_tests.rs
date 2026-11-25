@@ -233,3 +233,23 @@ fn wide_rows_and_exact_typed_values_survive_flattening() {
     assert_eq!(rows[1], typed);
     assert_eq!(rows.into_rows(), vec![expected, typed]);
 }
+
+#[test]
+fn retaining_leading_cells_trims_every_row_in_one_pass() {
+    let mut rows = QueryRows::from_rows(vec![
+        vec![Value::Int(1), Value::Text("a".into()), Value::Int(10)],
+        Vec::new(),
+        vec![Value::Int(2)],
+        vec![Value::Int(3), Value::Text("c".into()), Value::Int(30), Value::Int(31)],
+    ]);
+    rows.reverse();
+
+    rows.retain_leading_cells(2);
+
+    assert_eq!(rows.len(), 4);
+    assert_eq!(rows.cell_count(), 5);
+    assert_eq!(rows[0], [Value::Int(3), Value::Text("c".into())]);
+    assert_eq!(rows[1], [Value::Int(2)]);
+    assert!(rows[2].is_empty());
+    assert_eq!(rows[3], [Value::Int(1), Value::Text("a".into())]);
+}

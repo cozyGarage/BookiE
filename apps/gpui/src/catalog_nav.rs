@@ -267,6 +267,7 @@ impl GridView {
 
     fn attach_session(&mut self, session: Arc<LiveSession>, table: TableInfo) {
         self.clear_fk_peek();
+        self.row_inspector.reset();
         if !self.live.as_ref().is_some_and(|live| Arc::ptr_eq(live, &session)) {
             self.schema_context = None;
         }
