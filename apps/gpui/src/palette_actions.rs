@@ -364,7 +364,7 @@ impl GridView {
             ),
             action(
                 "import-csv",
-                "Import CSV or Excel file…",
+                "Import file…",
                 self.can_save_edits() && self.cell_edit.edits.is_empty() && self.compare.is_none() && !self.form_open(),
             ),
             action(
