@@ -212,7 +212,7 @@ async fn an_approved_scope_spends_exactly_its_row_budget() {
 }
 
 #[tokio::test]
-async fn sequence_sync_failure_reports_rows_already_committed() {
+async fn sequence_sync_failure_surfaces_when_the_import_finishes_and_reports_rows_already_committed() {
     let (connection, _batches) = BulkConn::open(usize::MAX);
     let (guard, audit, _state) = approved_guard(connection, Uuid::new_v4());
     let mut request = request(2);
@@ -220,18 +220,15 @@ async fn sequence_sync_failure_reports_rows_already_committed() {
     let mut scope = guard.begin_bulk_insert(request).await.expect("scope");
     let rows = rows(2);
 
-    let error = guard
+    guard
         .execute_bulk_batch(&mut scope, batch(INSERT, "people", &rows), &control())
         .await
-        .expect_err("sequence failure follows the committed insert");
+        .expect("the insert commits; the sequence is synced when the import finishes");
     assert_eq!(scope.committed_rows(), 2);
-    assert_eq!(
-        guard
-            .finish_bulk_insert(&mut scope, BulkInsertEnd::Failed(&error))
-            .await
-            .expect("audit finish"),
-        2
-    );
+    guard
+        .finish_bulk_insert(&mut scope, BulkInsertEnd::Completed)
+        .await
+        .expect_err("the sequence sync failure surfaces at the end");
     assert!(
         events(&audit)
             .iter()

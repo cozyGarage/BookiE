@@ -670,17 +670,15 @@ impl ImportRun {
             Err(BatchStop::Failed(error)) => BulkInsertEnd::Failed(error),
         };
         let cancelled = matches!(outcome, Err(BatchStop::Cancelled));
-        let committed = self
-            .guard
-            .finish_bulk_insert(&mut scope, end)
-            .await
-            .unwrap_or_else(|_| scope.committed_rows());
+        let finished = self.guard.finish_bulk_insert(&mut scope, end).await;
+        let committed = finished.as_ref().map_or_else(|_| scope.committed_rows(), |rows| *rows);
+        let finish_error = finished.err().map(|error| error_text::driver_message(&error));
         CsvImportReport {
             schema: self.schema.clone(),
             table: self.table,
             committed,
             total,
-            error: stop_message(outcome),
+            error: stop_message(outcome).or(finish_error),
             skipped: skips.total(),
             skipped_summary: skips.summary(),
             updates_existing_rows: self.updates_existing_rows,
