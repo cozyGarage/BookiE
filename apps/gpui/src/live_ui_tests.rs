@@ -2303,6 +2303,25 @@ fn the_labelled_add_row_button_is_absent_without_a_writable_table(cx: &mut TestA
 }
 
 #[gpui::test]
+fn the_labelled_refresh_button_reloads_a_live_table_and_is_absent_without_a_connection(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_resize(gpui::size(gpui::px(1400.0), gpui::px(800.0)));
+    cx.run_until_parked();
+    assert!(
+        cx.debug_bounds("refresh-table").is_none(),
+        "no live table, nothing to refresh"
+    );
+    connect_and_settle(&view, cx, orders_fixture());
+    let button = cx
+        .debug_bounds("refresh-table")
+        .expect("a live table shows the Refresh button");
+    cx.simulate_click(button.center(), Default::default());
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert_eq!(view.status, "Refreshed the table"));
+}
+
+#[gpui::test]
 fn narrow_grid_toolbar_keeps_actions_inside_window(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     view.update(cx, |view, cx| {
