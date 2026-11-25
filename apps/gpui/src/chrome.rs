@@ -501,17 +501,86 @@ impl GridView {
             )
     }
 
+    fn sidebar_connection_switcher(&self, theme: Theme, cx: &mut Context<Self>) -> impl IntoElement {
+        use gpui_component::button::{Button, ButtonVariants};
+        use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
+        use gpui_kit::component::Sizable as _;
+
+        let active = self.live.as_deref().and_then(|live| live.saved.as_ref());
+        let active_id = active.map(|(id, _)| *id);
+        let name = active.map_or("Connections", |(_, name)| name.as_str());
+        let connected = self.live.is_some();
+        let status = connection_status(connected);
+        let owner = cx.entity().downgrade();
+        let entries: Vec<_> = self
+            .connections
+            .iter()
+            .map(|saved| (saved.id, saved.name.clone()))
+            .collect();
+
+        Button::new("sidebar-connection-switcher")
+            .debug_selector(|| "sidebar-connection-switcher".into())
+            .ghost()
+            .small()
+            .compact()
+            .w_full()
+            .accessibility_label(format!("{name}, {status}. Choose connection"))
+            .tooltip(format!("{name} · {status}"))
+            .child(connection_status_dot(connected, theme))
+            .child(div().flex_1().min_w_0().truncate().child(name.to_owned()))
+            .child(div().flex_none().child(icon("chevron-down", theme.muted_foreground)))
+            .dropdown_menu(move |mut menu, _, _| {
+                for (id, name) in &entries {
+                    let (id, owner) = (*id, owner.clone());
+                    let connected = active_id == Some(id);
+                    let label = format!("{name} · {}", connection_status(connected));
+                    menu = menu.item(
+                        PopupMenuItem::element(move |_, _| {
+                            div()
+                                .debug_selector(|| "sidebar-connection-entry".into())
+                                .flex()
+                                .items_center()
+                                .gap_2()
+                                .child(connection_status_dot(connected, theme))
+                                .child(div().min_w_0().truncate().child(label.clone()))
+                        })
+                        .checked(connected)
+                        .on_click(move |_, _, cx| {
+                            if !connected {
+                                let _ = owner.update(cx, |this, cx| {
+                                    this.connect(bookie_gpui::live::Origin::Saved(id.to_string()), cx);
+                                });
+                            }
+                        }),
+                    );
+                }
+                if !entries.is_empty() {
+                    menu = menu.separator();
+                }
+                let owner = owner.clone();
+                menu.item(PopupMenuItem::new("New connection").on_click(move |_, window, cx| {
+                    let _ = owner.update(cx, |this, cx| this.run_palette_id("new-connection", window, cx));
+                }))
+            })
+    }
+
     fn sidebar_header(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
         div()
             .flex()
             .items_center()
-            .justify_end()
+            .gap_1()
             .min_h(px(size::LIST_ROW))
             .py_1()
             .px_2()
             .border_b_1()
             .border_color(rgb(theme.border))
             .text_color(rgb(theme.muted_foreground))
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .child(self.sidebar_connection_switcher(theme, cx)),
+            )
             .child(self.sidebar_header_action_icons(theme, cx))
     }
 
@@ -1072,6 +1141,26 @@ mod tab_dirty_tests {
         assert!(!tab_is_dirty(&Tab::Table(table("orders")), &open, 3));
         assert!(!tab_is_dirty(&Tab::Query, &open, 3));
     }
+}
+
+fn connection_status(connected: bool) -> &'static str {
+    if connected { "Connected" } else { "Disconnected" }
+}
+
+fn connection_status_dot(connected: bool, theme: Theme) -> Div {
+    let color = if connected {
+        theme.success
+    } else {
+        theme.muted_foreground
+    };
+    connection_dot(
+        color,
+        if connected {
+            "connection-connected"
+        } else {
+            "connection-disconnected"
+        },
+    )
 }
 
 pub(crate) fn connection_dot(color: u32, selector: &'static str) -> Div {
