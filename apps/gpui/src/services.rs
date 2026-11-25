@@ -156,7 +156,7 @@ impl GridView {
             self.status = "No process PID found in selected row".into();
             return;
         };
-        self.cancel_server_process(pid, cx);
+        self.ask_to_cancel_process(pid, cx);
     }
 }
 
