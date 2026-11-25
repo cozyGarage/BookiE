@@ -1073,22 +1073,17 @@ fn the_overflow_menu_lists_commands_by_group_and_runs_them(cx: &mut TestAppConte
 }
 
 #[gpui::test]
-fn the_palette_opens_one_new_connection_tab_with_the_default_port(cx: &mut TestAppContext) {
+fn the_palette_opens_the_new_connection_dialog_with_the_default_port(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
+    let tabs_before = view.read_with(cx, |view, _| view.tabs.clone());
     for _ in 0..2 {
         cx.simulate_keystrokes("ctrl-shift-p");
         cx.simulate_input("new connection");
         cx.simulate_keystrokes("enter");
     }
     view.read_with(cx, |view, cx| {
-        let tabs = view
-            .tabs
-            .items
-            .iter()
-            .filter(|tab| **tab == bookie_gpui::shell::Tab::NewConnection)
-            .count();
-        assert_eq!(tabs, 1);
-        assert_eq!(view.tabs.current(), &bookie_gpui::shell::Tab::NewConnection);
+        assert!(view.connection_form.open);
+        assert_eq!(view.tabs, tabs_before, "the form opens no tab");
         let draft = view.connection_form.draft(cx);
         assert_eq!((draft.driver_id.as_str(), draft.port), ("postgres", 5432));
         assert!(!draft.capabilities.is_file_based);

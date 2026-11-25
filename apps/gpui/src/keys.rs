@@ -28,6 +28,13 @@ impl GridView {
             }
             return;
         }
+        if self.connection_form.open {
+            if event.keystroke.key == "escape" {
+                self.close_connection_dialog(cx);
+                cx.stop_propagation();
+            }
+            return;
+        }
         let modifiers = event.keystroke.modifiers;
         let control = control_modifier(modifiers);
         if !self.grid_key_ready(window, control || modifiers.alt) {

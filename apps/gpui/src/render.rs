@@ -11,7 +11,7 @@ use gpui_kit::component::scroll::Scrollbar;
 impl GridView {
     fn sync_render_state(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let tab = self.tabs.current();
-        window.set_window_title(&format!("{} — BookiE", self.tab_title(tab, cx)));
+        window.set_window_title(&format!("{} — BookiE", tab.title()));
         self.window_title_tab = Some(tab.clone());
         if self.keystroke_hook.is_none() {
             let view = cx.entity();
@@ -562,6 +562,13 @@ impl Render for GridView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.ensure_row_inspector(cx);
         self.sync_render_state(window, cx);
+        if std::mem::take(&mut self.connection_form.focus_on_open) {
+            let name = gpui::Focusable::focus_handle(self.connection_form.name.read(cx), cx);
+            window.focus(&name, cx);
+        }
+        if std::mem::take(&mut self.connection_form.restore_focus) {
+            window.focus(&self.focus, cx);
+        }
         if self.approval.current.is_some() && !self.focus.is_focused(window) {
             window.focus(&self.focus, cx);
         }
@@ -577,6 +584,7 @@ impl Render for GridView {
         let full_value_editor = self.full_value_editor_overlay(theme, cx);
         let approval = self.approval_overlay(theme, cx);
         let host_key = self.host_key_overlay(theme, cx);
+        let connection_dialog = self.connection_form.open.then(|| self.connection_dialog(theme, cx));
         let bar_dialog = self
             .import_bar(theme, cx)
             .or_else(|| self.export_file_bar(theme, cx))
@@ -599,7 +607,6 @@ impl Render for GridView {
         let content = match self.tabs.current().clone() {
             Tab::Home => self.home_page(theme, cx),
             Tab::Settings => self.settings_page(theme, cx),
-            Tab::NewConnection => self.connection_page(theme, cx),
             Tab::History => self.history_page(theme, cx),
             Tab::AuditLog => self.audit_page(theme, cx),
             Tab::Diagram => self.diagram_page(theme, cx),
@@ -644,6 +651,7 @@ impl Render for GridView {
             .children(palette)
             .children(full_value_editor)
             .children(bar_dialog)
+            .children(connection_dialog)
             .children(approval)
             .children(host_key)
     }

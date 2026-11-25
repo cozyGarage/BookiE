@@ -759,7 +759,7 @@ impl GridView {
             "export-connections" => self.pick_connection_export(cx),
             "new-connection" => {
                 self.connection_form.editing = None;
-                self.tabs.open_new_connection();
+                self.open_connection_dialog(cx);
                 self.sync_grid_owner();
             }
             "audit" => {

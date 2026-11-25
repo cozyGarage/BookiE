@@ -114,7 +114,6 @@ impl GridView {
             Tab::Settings => self.tabs.open_settings(),
             Tab::History => self.tabs.open_history(),
             Tab::AuditLog => self.tabs.open_audit_log(),
-            Tab::NewConnection => self.tabs.open_new_connection(),
             Tab::Diagram => self.open_schema_diagram(cx),
             Tab::Home => return,
         }

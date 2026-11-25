@@ -278,7 +278,7 @@ mod tests {
         let (view, cx) = crate::ui_tests::open(cx);
         cx.simulate_resize(gpui::size(gpui::px(1100.0), gpui::px(1600.0)));
         view.update(cx, |view, cx| {
-            view.tabs.open_new_connection();
+            view.open_connection_dialog(cx);
             view.connection_form.ssh.on = true;
             view.connection_form.ssh_open = true;
             cx.notify();
