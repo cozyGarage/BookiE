@@ -315,7 +315,8 @@ impl GridView {
                 gpui_component::tooltip::Tooltip::new(connection_tooltip.clone()).build(window, cx)
             })
             .child(self.connection_chip_text());
-        let full_status = self.status.clone();
+        let shown_status = footer_status(self.save.banner.as_ref(), &self.status);
+        let full_status = shown_status.clone();
         let status = div()
             .id("status-text")
             .debug_selector(|| "status-text".into())
@@ -325,12 +326,12 @@ impl GridView {
             .whitespace_nowrap()
             .text_ellipsis()
             .text_color(rgb(theme.foreground))
-            .when(!self.status.is_empty(), |status| {
+            .when(!shown_status.is_empty(), |status| {
                 status.tooltip(move |window, cx| {
                     gpui_component::tooltip::Tooltip::new(full_status.clone()).build(window, cx)
                 })
             })
-            .child(self.status.clone());
+            .child(shown_status);
         div()
             .id("status-bar")
             .debug_selector(|| "status-bar".into())
@@ -373,6 +374,27 @@ fn home_stat_counts(
         .collect::<std::collections::HashSet<_>>()
         .len();
     (connections.len(), usize::from(live_driver.is_some()), database_types)
+}
+
+fn footer_status(banner: Option<&(String, bool)>, status: &str) -> String {
+    match banner {
+        Some((text, false)) => text.clone(),
+        _ => status.to_owned(),
+    }
+}
+
+#[cfg(test)]
+mod footer_status_tests {
+    use super::footer_status;
+
+    #[test]
+    fn a_success_message_takes_the_footer_and_an_error_leaves_it_to_its_banner() {
+        let saved = ("Saved 2 change(s)".to_string(), false);
+        let failed = ("Could not save".to_string(), true);
+        assert_eq!(footer_status(Some(&saved), "Row 1, Id"), "Saved 2 change(s)");
+        assert_eq!(footer_status(Some(&failed), "Row 1, Id"), "Row 1, Id");
+        assert_eq!(footer_status(None, "Row 1, Id"), "Row 1, Id");
+    }
 }
 
 fn footer_counts(rows: u64, columns: usize) -> String {
