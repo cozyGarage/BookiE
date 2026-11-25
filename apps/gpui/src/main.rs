@@ -10,6 +10,7 @@ mod catalog_nav;
 mod chart_plot;
 mod chart_ui;
 mod chrome;
+mod close_confirm_ui;
 mod closed_tabs_ui;
 mod column_projection;
 mod connection_bundle_ui;
@@ -236,6 +237,7 @@ struct GridView {
     counts: Ticket,
     charts: Ticket,
     pending_cancel_process: bool,
+    close_confirm: bool,
     compare: Option<std::sync::Arc<Diff>>,
     status: String,
     selection: Option<Selection>,
@@ -481,8 +483,6 @@ impl GridView {
             Some("Commit or roll back the transaction before closing the window")
         } else if self.save.busy {
             Some("A save is running; wait for it to finish before closing the window")
-        } else if !self.cell_edit.edits.is_empty() {
-            Some("Save or discard the pending changes before closing the window")
         } else {
             None
         }
@@ -495,6 +495,11 @@ impl GridView {
                 .update(cx, |view, cx| match view.close_blocker() {
                     Some(reason) => {
                         view.status = reason.into();
+                        cx.notify();
+                        false
+                    }
+                    None if view.needs_close_confirmation() => {
+                        view.close_confirm = true;
                         cx.notify();
                         false
                     }
@@ -645,6 +650,7 @@ impl GridView {
             counts: Ticket::new(),
             charts: Ticket::new(),
             pending_cancel_process: false,
+            close_confirm: false,
             status: String::new(),
         }
     }

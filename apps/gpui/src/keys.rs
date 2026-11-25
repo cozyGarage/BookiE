@@ -15,6 +15,13 @@ impl GridView {
             cx.stop_propagation();
             return;
         }
+        if self.close_confirm {
+            if event.keystroke.key == "escape" {
+                self.keep_editing(cx);
+            }
+            cx.stop_propagation();
+            return;
+        }
         if self.record_shortcut_key(&event.keystroke, cx) {
             cx.stop_propagation();
             return;
