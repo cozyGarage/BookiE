@@ -6,6 +6,17 @@ pub struct WindowGeometry {
     pub y: f32,
 }
 
+pub fn initial_size(available_width: f32, available_height: f32) -> (f32, f32) {
+    (
+        initial_dimension(available_width, 720.0, 1920.0),
+        initial_dimension(available_height, 480.0, 1200.0),
+    )
+}
+
+fn initial_dimension(available: f32, minimum: f32, maximum: f32) -> f32 {
+    (available * 0.85).clamp(minimum.min(available), maximum.min(available))
+}
+
 impl WindowGeometry {
     pub fn visible_on(self, x: f32, y: f32, width: f32, height: f32) -> bool {
         let overlap_width = (self.x + self.width).min(x + width) - self.x.max(x);
@@ -67,6 +78,13 @@ impl WindowGeometry {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn first_window_size_uses_available_display_space_without_exceeding_it() {
+        assert_eq!(initial_size(2_000.0, 1_200.0), (1_700.0, 1_020.0));
+        assert_eq!(initial_size(4_000.0, 2_000.0), (1_920.0, 1_200.0));
+        assert_eq!(initial_size(700.0, 500.0), (700.0, 480.0));
+    }
 
     #[test]
     fn invalid_geometry_is_rejected() {

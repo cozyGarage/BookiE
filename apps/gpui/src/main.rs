@@ -1071,6 +1071,8 @@ fn main() {
     let autoscroll: u32 = env_number("BOOKIE_PROTOTYPE_AUTOSCROLL").unwrap_or(0);
     let width: f32 = env_number("BOOKIE_PROTOTYPE_WIDTH").unwrap_or(1100.0);
     let height: f32 = env_number("BOOKIE_PROTOTYPE_HEIGHT").unwrap_or(800.0);
+    let explicit_window_size =
+        std::env::var_os("BOOKIE_PROTOTYPE_WIDTH").is_some() || std::env::var_os("BOOKIE_PROTOTYPE_HEIGHT").is_some();
     gpui_platform::application()
         .with_assets(assets::Assets)
         .run(move |cx: &mut App| {
@@ -1083,9 +1085,7 @@ fn main() {
                 None if picker::install_theme(&settings.theme, cx) => {}
                 None => Theme::named(None).install(cx),
             }
-            let saved = if std::env::var_os("BOOKIE_PROTOTYPE_WIDTH").is_some()
-                || std::env::var_os("BOOKIE_PROTOTYPE_HEIGHT").is_some()
-            {
+            let saved = if explicit_window_size {
                 None
             } else {
                 bookie_gpui::window_geometry::WindowGeometry::load()
@@ -1098,8 +1098,23 @@ fn main() {
                     saved.visible_on(x, y, bounds.size.width.into(), bounds.size.height.into())
                 })
             });
+            let initial_window_size = if explicit_window_size {
+                size(px(width), px(height))
+            } else {
+                cx.primary_display().map_or_else(
+                    || size(px(width), px(height)),
+                    |display| {
+                        let display_size = display.bounds().size;
+                        let (width, height) = bookie_gpui::window_geometry::initial_size(
+                            f32::from(display_size.width),
+                            f32::from(display_size.height),
+                        );
+                        size(px(width), px(height))
+                    },
+                )
+            };
             let bounds = saved.map_or_else(
-                || Bounds::centered(None, size(px(width), px(height)), cx),
+                || Bounds::centered(None, initial_window_size, cx),
                 |saved| {
                     Bounds::new(
                         gpui::point(px(saved.x), px(saved.y)),
