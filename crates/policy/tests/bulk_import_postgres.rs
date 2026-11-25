@@ -388,7 +388,6 @@ async fn a_cancelled_import_still_moves_the_sequence_past_the_rows_that_committe
 async fn a_slow_write_outlives_the_read_deadline_and_a_slow_read_does_not() {
     let (_container, opts) = start_pg().await;
     let raw = PgDriver.connect(opts.clone()).await.unwrap();
-    raw.execute("CREATE TABLE slow (n integer)").await.unwrap();
     let audit = Arc::new(CapturingAudit {
         events: Mutex::new(Vec::new()),
     });
@@ -404,13 +403,16 @@ async fn a_slow_write_outlives_the_read_deadline_and_a_slow_read_does_not() {
     );
 
     let write = guard
-        .execute_controlled("INSERT INTO slow SELECT g FROM generate_series(1, 5000000) g", &short())
+        .execute_controlled(
+            "CREATE TABLE slow_copy AS SELECT g FROM generate_series(1, 5000000) g",
+            &short(),
+        )
         .await;
     assert!(
         write.is_ok(),
         "a write is not cancelled by the read deadline: {write:?}"
     );
     let checker = PgDriver.connect(opts).await.unwrap();
-    let count = checker.query("SELECT count(*)::text FROM slow").await.unwrap();
+    let count = checker.query("SELECT count(*)::text FROM slow_copy").await.unwrap();
     assert_eq!(count.rows, vec![vec![Value::Text("5000000".into())]]);
 }
