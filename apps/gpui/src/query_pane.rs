@@ -388,8 +388,6 @@ impl GridView {
             .bg(rgb(theme.chrome))
             .border_y_1()
             .border_color(rgb(theme.border))
-            .child(icon("pin", theme.muted_foreground))
-            .child(div().w(px(size::HAIRLINE)).h(px(size::LG)).bg(rgb(theme.border)))
             .child(
                 div()
                     .id("result-runs")

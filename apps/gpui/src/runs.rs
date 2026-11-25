@@ -369,7 +369,8 @@ impl GridView {
             if let Some(run) = self.run_tabs.slots.get(self.run_tabs.active).map(|slot| slot.run) {
                 self.show_run(self.run_tabs.active, run);
             } else {
-                self.source = self.table_source.clone();
+                self.source = std::sync::Arc::new(crate::catalog_nav::EmptySource("Query".into()));
+                self.status.clear();
                 self.set_mode(Mode::All);
             }
         } else {
@@ -451,7 +452,7 @@ impl GridView {
         self.cell_edit.edits.clear();
         self.reset_edit_history();
         if self.run_tabs.slots.is_empty() {
-            self.source = self.table_source.clone();
+            self.source = std::sync::Arc::new(crate::catalog_nav::EmptySource("Query".into()));
             self.cell_edit.active = None;
             self.compare = None;
             self.search.cursor = MatchCursor::default();
