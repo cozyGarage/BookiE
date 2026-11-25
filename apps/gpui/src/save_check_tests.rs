@@ -116,6 +116,27 @@ fn a_row_missing_from_the_reload_is_counted_as_unchecked_not_as_verified() {
 }
 
 #[test]
+fn a_decimal_padded_to_the_column_scale_is_still_the_saved_value() {
+    let source = table(vec![vec![
+        Cell::Int(1),
+        Cell::Decimal(rust_decimal::Decimal::new(9950, 2)),
+    ]]);
+    let check = CellCheck {
+        key: vec![Cell::Int(1)],
+        column: 1,
+        value: Cell::Decimal(rust_decimal::Decimal::new(995, 1)),
+    };
+    assert_eq!(
+        verify(source.as_ref(), &[0], &[check]),
+        SaveCheck {
+            matched: 1,
+            differ: 0,
+            unseen: 0
+        }
+    );
+}
+
+#[test]
 fn displayed_text_and_numeric_equality_do_not_prove_an_exact_save() {
     let pairs = [
         (Cell::Text("7".into()), Cell::Int(7)),

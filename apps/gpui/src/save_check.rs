@@ -52,6 +52,11 @@ fn fingerprint<'a>(cells: impl Iterator<Item = &'a Cell>) -> String {
     format!("{:?}", cells.collect::<Vec<_>>())
 }
 
+fn read_back_equal(read: &Cell, written: &Cell) -> bool {
+    exact_equal(read, written)
+        || matches!((read, written), (Cell::Decimal(r), Cell::Decimal(w)) if r == w && r.scale() >= w.scale())
+}
+
 pub fn verify(source: &dyn ResultSource, keys: &[usize], checks: &[CellCheck]) -> SaveCheck {
     let mut wanted: HashMap<String, Vec<&CellCheck>> = HashMap::new();
     for check in checks {
@@ -76,7 +81,7 @@ pub fn verify(source: &dyn ResultSource, keys: &[usize], checks: &[CellCheck]) -
         for check in found {
             if row
                 .get(check.column)
-                .is_some_and(|read| exact_equal(read, &check.value))
+                .is_some_and(|read| read_back_equal(read, &check.value))
             {
                 result.matched += 1;
             } else {
