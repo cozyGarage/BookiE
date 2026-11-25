@@ -180,10 +180,6 @@ while true; do
       report="$(api_get "$api/actions/runs/$run_id/jobs" | python3 -c '
 import json, sys
 jobs = json.load(sys.stdin)
-final = next((job for job in jobs if job.get("name") == "Forgejo regression gate"), None)
-if final and final.get("status") in ("blocked", "waiting", "running"):
-    print("RUNNING")
-    sys.exit(0)
 by_name = {}
 for job in jobs:
     for name in (job["name"], job["name"].split(" (", 1)[0]):
