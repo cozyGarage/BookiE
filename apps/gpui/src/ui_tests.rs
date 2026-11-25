@@ -15,14 +15,17 @@ mod full_value_editor;
 mod themes;
 
 #[gpui::test]
-fn status_page_and_total_have_visible_spacing(cx: &mut TestAppContext) {
+fn the_footer_shows_the_total_once_and_leaves_the_page_size_to_the_strip(cx: &mut TestAppContext) {
     let (_view, cx) = open(cx);
     cx.run_until_parked();
-    let page = cx.debug_bounds("status-page").expect("page count is visible");
-    let total = cx.debug_bounds("status-count").expect("total count is visible");
+    assert!(cx.debug_bounds("status-count").is_some(), "total count is visible");
     assert!(
-        page.origin.x + page.size.width < total.origin.x,
-        "page and total counts touch"
+        cx.debug_bounds("status-page").is_none(),
+        "page size is not repeated in the footer"
+    );
+    assert!(
+        cx.debug_bounds("page-size").is_some(),
+        "the strip carries the page size"
     );
 }
 

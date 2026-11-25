@@ -352,14 +352,6 @@ impl GridView {
             .children(count_rows)
             .when(!compact, |bar| bar.children(self.selection_stats_segment(theme)))
             .children(elapsed.map(|time| div().flex_none().child(time)))
-            .when(grid, |bar| {
-                bar.child(
-                    div()
-                        .debug_selector(|| "status-page".into())
-                        .flex_none()
-                        .child(format!("Page: {} rows", self.pager.rows)),
-                )
-            })
             .child(
                 div()
                     .id("status-count")
