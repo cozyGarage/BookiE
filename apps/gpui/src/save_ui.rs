@@ -432,7 +432,7 @@ impl GridView {
     }
 
     pub(crate) fn save_banner(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Div> {
-        let (text, is_error) = self.save.banner.clone()?;
+        let (text, is_error) = self.save.banner.clone().filter(|(_, is_error)| *is_error)?;
         Some(
             div()
                 .flex()
