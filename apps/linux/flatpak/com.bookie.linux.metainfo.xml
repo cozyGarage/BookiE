@@ -70,6 +70,9 @@
   </keywords>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="0.2.10" type="stable" date="2026-11-25">
+      <description><p>Release after 0.2.9: table sizes in the sidebar and whole-table scan warnings in query plans, closed query tabs that keep their SQL, PgBouncer transaction pool support for parameterized PostgreSQL queries, a SQLite fix for missing bind values, and a more coherent GPUI preview with dialogs for connections, saving, import and export, a notification centre, Excel import and every bundled color theme.</p></description>
+    </release>
     <release version="0.2.9" type="stable" date="2026-11-24">
       <description><p>Release after 0.2.8: data compare between two tables with a reviewed sync script, approval before committing changes on production connections, schema compare in the schema menu, an idle warning for open session transactions, faster sorting of large results, an unsupported GPUI preview build, and fixes for SSH tunnel hardening, TLS diagnostics, PostgreSQL poolers, MongoDB metadata, MCP read budgets and hidden-column preferences.</p></description>
     </release>

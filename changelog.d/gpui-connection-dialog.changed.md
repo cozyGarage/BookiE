@@ -1,1 +1,0 @@
-GPUI's New connection and Edit connection open as a centred dialog over the current tab instead of a new tab; Escape or Cancel closes it, and a successful save closes it and reports in the status bar.
