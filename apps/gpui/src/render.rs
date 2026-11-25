@@ -168,8 +168,13 @@ impl GridView {
         use gpui_component::button::{Button, ButtonVariants};
         use gpui_component::menu::DropdownMenu;
         let compact = self.synced_width < 1000.0;
-        let groups =
-            crate::menus::command_groups(self, &[&["first", "last"], &["compare", "export-csv", "continuous"]]);
+        let groups = crate::menus::command_groups(
+            self,
+            &[
+                &["first", "last"],
+                &["jump-column", "refresh-table", "compare", "export-csv", "continuous"],
+            ],
+        );
         div()
             .flex()
             .debug_selector(|| "grid-actions".into())
@@ -201,6 +206,22 @@ impl GridView {
             )
             .when(!compact, |actions| {
                 actions
+                    .children((self.live.is_some() && !self.grid_is_query).then(|| {
+                        button("refresh-table", "Refresh", theme)
+                            .debug_selector(|| "refresh-table".into())
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.refresh_table(cx);
+                                cx.notify();
+                            }))
+                    }))
+                    .child(
+                        button("jump-column", "Go to column", theme)
+                            .debug_selector(|| "jump-column".into())
+                            .on_click(cx.listener(|this, _, window, cx| {
+                                this.open_picker(crate::palette_state::PaletteMode::Columns, window, cx);
+                                cx.notify();
+                            })),
+                    )
                     .child(
                         button("compare", "Compare", theme)
                             .on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))),

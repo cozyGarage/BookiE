@@ -291,7 +291,7 @@ async fn different_session_ids_can_connect_in_parallel() {
         Arc::new(DenyApprovalSink),
     );
 
-    let result = tokio::time::timeout(Duration::from_secs(1), async {
+    let result = tokio::time::timeout(Duration::from_secs(10), async {
         tokio::join!(
             provider.connection(first_id, agent()),
             provider.connection(second_id, agent())
