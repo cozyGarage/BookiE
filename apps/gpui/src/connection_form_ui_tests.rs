@@ -3,6 +3,25 @@ use gpui::TestAppContext;
 use crate::ui_tests::open;
 
 #[gpui::test]
+fn the_connection_form_sets_and_clears_color_with_swatches(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    view.update(cx, |view, cx| view.open_connection_dialog(cx));
+    cx.run_until_parked();
+    let swatch = cx.debug_bounds("swatch-teal").expect("the teal swatch is visible");
+    assert!(cx.debug_bounds("teal").is_none(), "the color is presented as a swatch");
+    cx.simulate_click(swatch.center(), Default::default());
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.connection_form.color.as_deref(), Some("teal"))
+    });
+
+    let clear = cx.debug_bounds("swatch-No color").expect("the clear swatch is visible");
+    cx.simulate_click(clear.center(), Default::default());
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert_eq!(view.connection_form.color, None));
+}
+
+#[gpui::test]
 fn tab_moves_between_connection_fields_in_order(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.update(|window, cx| {

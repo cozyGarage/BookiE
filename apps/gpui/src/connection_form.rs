@@ -566,27 +566,7 @@ impl GridView {
                 }))
             }),
         );
-        let swatches = std::iter::once((None, "None")).chain(
-            bookie_app_services::read_session::CONNECTION_COLORS
-                .iter()
-                .map(|name| (Some(*name), *name)),
-        );
-        let colour = choice_row(
-            theme,
-            "Color",
-            swatches.enumerate().map(|(index, (name, label))| {
-                let selected = form.color.as_deref() == name;
-                let chip = segment(("connection-colour", index), label, selected, theme);
-                let chip = match name.and_then(bookie_app_services::read_session::connection_color_rgb) {
-                    Some(color) => chip.child(div().size(px(size::SM)).rounded(px(size::OPTICAL)).bg(rgb(color))),
-                    None => chip,
-                };
-                chip.on_click(cx.listener(move |this, _, _, cx| {
-                    this.connection_form.color = name.map(str::to_owned);
-                    cx.notify();
-                }))
-            }),
-        );
+        let colour = self.connection_color_row(theme, cx);
         vec![
             environment,
             colour,
@@ -602,6 +582,57 @@ impl GridView {
                 )
                 .child(self.read_only_toggle(theme, cx)),
         ]
+    }
+
+    fn connection_color_row(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+        use gpui_component::button::{Button, ButtonVariants};
+        use gpui_kit::component::{Selectable as _, Sizable as _};
+
+        let swatches = std::iter::once(None).chain(
+            bookie_app_services::read_session::CONNECTION_COLORS
+                .iter()
+                .copied()
+                .map(Some),
+        );
+        div()
+            .flex()
+            .items_center()
+            .gap_2()
+            .child(
+                div()
+                    .w(px(size::SIDE_PANEL_WIDTH / 2.0))
+                    .text_color(rgb(theme.muted_foreground))
+                    .child("Color"),
+            )
+            .child(
+                div()
+                    .flex()
+                    .flex_1()
+                    .min_w_0()
+                    .flex_wrap()
+                    .gap_1()
+                    .children(swatches.enumerate().map(|(index, name)| {
+                        let label = name.unwrap_or("No color");
+                        let swatch = match name.and_then(bookie_app_services::read_session::connection_color_rgb) {
+                            Some(color) => crate::chrome::connection_dot(color, "connection-swatch").into_any_element(),
+                            None => crate::assets::icon("x", theme.muted_foreground).into_any_element(),
+                        };
+                        Button::new(("connection-colour", index))
+                            .debug_selector(move || format!("swatch-{label}"))
+                            .ghost()
+                            .small()
+                            .compact()
+                            .w(px(size::SMALL_CONTROL))
+                            .selected(self.connection_form.color.as_deref() == name)
+                            .accessibility_label(label)
+                            .tooltip(label)
+                            .child(swatch)
+                            .on_click(cx.listener(move |this, _, _, cx| {
+                                this.connection_form.color = name.map(str::to_owned);
+                                cx.notify();
+                            }))
+                    })),
+            )
     }
 
     fn network_fields(&self, theme: Theme, cx: &mut Context<Self>) -> Vec<Div> {

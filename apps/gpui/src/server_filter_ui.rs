@@ -1,7 +1,7 @@
 use bookie_core::TableInfo;
 
 use super::*;
-use crate::surfaces::{ButtonKind, button};
+use crate::surfaces::{ButtonKind, compact_button, tooltip_view};
 
 const PLACEHOLDER: &str = "e.g. created_at > now() - interval '1 day'";
 
@@ -10,6 +10,7 @@ pub(crate) struct ServerFilterState {
     pub input: Option<Entity<TextInput>>,
     pub applied: Vec<(TableInfo, String)>,
     pub shown_for: Option<TableInfo>,
+    visible: bool,
 }
 
 impl GridView {
@@ -67,7 +68,11 @@ impl GridView {
 
     pub(crate) fn focus_where(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         match self.search.server.input.clone().filter(|_| self.shows_server_filter()) {
-            Some(input) => window.focus(&input.read(cx).focus_handle(cx), cx),
+            Some(input) => {
+                self.search.server.visible = true;
+                window.focus(&input.read(cx).focus_handle(cx), cx);
+                cx.notify();
+            }
             None => self.status = "Open a table to filter it on the server".into(),
         }
     }
@@ -154,50 +159,75 @@ impl GridView {
             .map(|sort| sort_chip_text(&sort.column, sort.ascending))
     }
 
-    pub(crate) fn filter_rows(&self, local: Option<Div>, theme: Theme, cx: &mut Context<Self>) -> Option<Div> {
-        let server = self
-            .search
-            .server
-            .input
-            .clone()
-            .filter(|_| self.shows_server_filter())
-            .map(|input| {
-                div()
-                    .flex()
-                    .items_center()
-                    .gap_2()
-                    .px_2()
-                    .pb_2()
-                    .child(div().font_family("monospace").child("WHERE"))
-                    .child(div().flex_1().min_w_0().font_family("monospace").child(input))
-                    .child(
-                        button(ButtonKind::Primary, "apply-where", "Apply", theme).on_click(cx.listener(
-                            |this, _, _, cx| {
-                                this.apply_where(cx);
-                                cx.notify();
-                            },
-                        )),
-                    )
-                    .child(
-                        button(ButtonKind::Ghost, "clear-where", "Clear", theme).on_click(cx.listener(
-                            |this, _, _, cx| {
-                                this.clear_where(cx);
-                                cx.notify();
-                            },
-                        )),
-                    )
-                    .children(self.sort_chip().map(|text| {
-                        div()
-                            .debug_selector(|| "sort-chip".into())
-                            .px_2()
-                            .rounded(px(size::CONTROL_RADIUS))
-                            .border_1()
-                            .border_color(rgb(theme.border))
-                            .text_color(rgb(theme.muted_foreground))
-                            .child(text)
-                    }))
-            });
-        (server.is_some() || local.is_some()).then(|| div().flex().flex_col().children(server).children(local))
+    pub(crate) fn where_toggle(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Stateful<Div>> {
+        if !self.shows_server_filter() {
+            return None;
+        }
+        let applied = !self.table_where(&self.catalog.grid_table).is_empty();
+        Some(
+            compact_button(
+                ButtonKind::Ghost,
+                "toggle-where",
+                if applied { "WHERE active" } else { "WHERE" },
+                theme,
+            )
+            .tooltip(tooltip_view("Filter this table on the server".into()))
+            .on_click(cx.listener(|this, _, window, cx| {
+                if this.search.server.visible {
+                    this.search.server.visible = false;
+                    window.focus(&this.focus, cx);
+                    cx.notify();
+                } else {
+                    this.focus_where(window, cx);
+                }
+            })),
+        )
+    }
+
+    pub(crate) fn server_filter_row(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Div> {
+        if !self.shows_server_filter() || !self.search.server.visible {
+            return None;
+        }
+        let input = self.search.server.input.clone()?;
+        Some(
+            div()
+                .debug_selector(|| "server-filter-row".into())
+                .flex_none()
+                .flex()
+                .items_center()
+                .gap_2()
+                .px_2()
+                .py_1()
+                .child(div().flex_none().font_family("monospace").child("WHERE"))
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .max_w(px(size::FILTER_WIDTH))
+                        .font_family("monospace")
+                        .child(input),
+                )
+                .child(
+                    compact_button(ButtonKind::Primary, "apply-where", "Apply", theme)
+                        .on_click(cx.listener(|this, _, _, cx| this.apply_where(cx))),
+                )
+                .child(
+                    compact_button(ButtonKind::Ghost, "clear-where", "Clear", theme)
+                        .on_click(cx.listener(|this, _, _, cx| this.clear_where(cx))),
+                )
+                .children(self.sort_chip().map(|text| {
+                    let tooltip = tooltip_view(text.clone().into());
+                    div()
+                        .id("sort-chip")
+                        .debug_selector(|| "sort-chip".into())
+                        .min_w_0()
+                        .max_w(px(size::FIND_WIDTH))
+                        .truncate()
+                        .text_color(rgb(theme.muted_foreground))
+                        .tooltip(tooltip)
+                        .child(text)
+                })),
+        )
     }
 }
 
