@@ -58,7 +58,7 @@ This page describes user-visible behavior and limits in the current source. Curr
 ## Platforms and packaging
 
 - Native builds require GTK 4.24, libadwaita 1.10 and GtkSourceView 5.22 or newer ([ADR 0021](decisions/0021-toolkit-floor.md)). Older toolkit stacks are unsupported for native packages.
-- The shipped product is the Linux GTK 4 and libadwaita client. Windows and macOS have no shipped package. [ADR 0052](decisions/0052-gpui-is-the-cross-platform-frontend.md) chooses GPUI as the cross-platform frontend and keeps GTK in parallel; GPUI is not packaged or released until that ADR's conditions hold. See [platforms](platforms.md) for Arch and AppImage install paths.
+- The current primary release is the Linux GTK 4 and libadwaita client; Windows and macOS have no supported package. GPUI is the primary frontend for new product work, while GTK is historical maintenance. GPUI is not a supported release until it passes installed accessibility, packaging, security and manual acceptance gates ([ADR 0058](decisions/0058-gpui-primary-gtk-historical.md)). See [platforms](platforms.md) for current install paths.
 
 ## Operation outcomes
 

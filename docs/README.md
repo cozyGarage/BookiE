@@ -2,6 +2,8 @@
 
 Rules for contributors are in [AGENTS.md](../AGENTS.md). Accepted ADRs define architecture and behavior; the public issue tracker owns selected work and acceptance criteria.
 
+Frontend direction, GTK's historical maintenance scope, and the GPUI release and artifact cutover gate are defined by [ADR 0058](decisions/0058-gpui-primary-gtk-historical.md).
+
 ## Documents by audience
 
 | Audience | Documents |
