@@ -90,11 +90,14 @@ impl GridView {
     }
 
     fn page_size_button(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
-        button("page-size", format!("{} rows", self.pager.rows), theme).on_click(cx.listener(|this, _, _, cx| {
-            let index = PAGE_SIZES.iter().position(|size| *size == this.pager.rows).unwrap_or(0);
-            this.pager = this.pager.resized(PAGE_SIZES[(index + 1) % PAGE_SIZES.len()]);
-            cx.notify();
-        }))
+        button("page-size", format!("{} / page", thousands(self.pager.rows)), theme)
+            .debug_selector(|| "page-size".into())
+            .tooltip(crate::chrome::tip("Rows per page (click to change)"))
+            .on_click(cx.listener(|this, _, _, cx| {
+                let index = PAGE_SIZES.iter().position(|size| *size == this.pager.rows).unwrap_or(0);
+                this.pager = this.pager.resized(PAGE_SIZES[(index + 1) % PAGE_SIZES.len()]);
+                cx.notify();
+            }))
     }
 
     fn grid_pager_buttons(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
@@ -172,7 +175,7 @@ impl GridView {
             self,
             &[
                 &["first", "last"],
-                &["jump-column", "refresh-table", "compare", "export-csv", "continuous"],
+                &["jump-column", "refresh-table", "export-csv", "continuous"],
             ],
         );
         div()
@@ -252,10 +255,10 @@ impl GridView {
                                 cx.notify();
                             })),
                     )
-                    .child(
+                    .children(self.live.is_none().then(|| {
                         button("compare", "Compare", theme)
-                            .on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))),
-                    )
+                            .on_click(cx.listener(|this, _, _, cx| this.compare(false, cx)))
+                    }))
                     .child(
                         button("export", "Export CSV", theme).on_click(cx.listener(|this, _, _, cx| {
                             this.export_selection_or_page(cx);
