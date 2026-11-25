@@ -129,6 +129,10 @@ impl GridView {
     }
 
     pub(super) fn key_down(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
+        if self.approval.current.is_some() {
+            cx.stop_propagation();
+            return;
+        }
         let stroke = &event.keystroke;
         let modifiers = stroke.modifiers;
         let control = control_modifier(modifiers);
