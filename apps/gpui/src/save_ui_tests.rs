@@ -264,7 +264,7 @@ fn a_grid_switch_is_refused_while_a_save_is_running_so_no_other_tabs_edits_are_t
         })
     });
     view.read_with(cx, |view, _| {
-        assert_eq!(view.status, "Finish or cancel the save before switching grids.");
+        assert_eq!(view.status, "Finish or cancel the save before switching grids");
         assert!(
             matches!(view.tabs.current(), bookie_gpui::shell::Tab::Table(_)),
             "the table grid stays in front while its save runs"
@@ -307,7 +307,7 @@ fn selected_rows_are_reviewed_then_deleted_and_the_table_reloads_without_them(cx
         assert_eq!(pending.confirm, "Delete", "the button says what it will do");
         assert_eq!(
             pending.note,
-            Some("Rows that depend on these (foreign keys, triggers) may be affected too."),
+            Some("Rows that depend on these (foreign keys, triggers) may be affected too"),
             "the note must not claim approvals are unavailable now that the prompt exists"
         );
         assert!(pending.plan.preview.contains("DELETE"), "{}", pending.plan.preview);

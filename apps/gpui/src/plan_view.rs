@@ -98,7 +98,7 @@ fn plan_row(node: &PlanNode, missed: Option<f64>, heaviest: f64, theme: Theme) -
         .flex()
         .flex_col()
         .gap_1()
-        .ml(px(18.0 * node.depth as f32))
+        .ml(px(size::TREE_INDENT * node.depth as f32))
         .child(div().font_weight(gpui::FontWeight::MEDIUM).child(node.title.clone()))
         .children(bar)
         .children((!stats.is_empty()).then(|| {

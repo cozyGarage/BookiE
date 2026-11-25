@@ -13,7 +13,7 @@
 1. A user-facing change adds one file `changelog.d/<slug>.<category>.md` in the same commit. `<category>` is one of `added`, `changed`, `deprecated`, `removed`, `fixed`, `security`. The file holds one line of user impact, with the wording rules of `AGENTS.md`. A change with no user impact adds no file.
 2. Each change owns its own file, so concurrent changes do not conflict.
 3. `scripts/release-notes.py` validates fragments (`fragments`), and at release assembles them into the `CHANGELOG.md` section and deletes them (`release`). The release is cut locally and committed; no workflow assembles notes from history.
-4. A change to a product the release does not ship, such as GPUI before the conditions in [ADR 0052](0052-gpui-is-the-cross-platform-frontend.md) hold, adds no fragment.
+4. A change to a product the release does not ship adds no fragment. Tagged releases ship the GPUI preview under [ADR 0052](0052-gpui-is-the-cross-platform-frontend.md), so a user-visible GPUI change adds a fragment whose line starts with `GPUI` (amended 2026-11-25).
 5. The `Release-Note:` trailer and its pull request body check are retired. Preflight validates fragments; contributor docs and the pull request template describe fragments only.
 
 ## Rationale

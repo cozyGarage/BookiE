@@ -35,7 +35,7 @@ impl GridView {
         vec![
             Action {
                 id: "paste-cells",
-                label: "Paste cells from the clipboard at the active cell".to_string(),
+                label: "Paste cells at the active cell".to_string(),
                 enabled,
             },
             Action {

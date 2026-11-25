@@ -43,14 +43,14 @@ impl GridView {
                     use bookie_gpui::source::ResultSource;
                     let structure = query_session.table_structure(&query_table)?;
                     if cancel.is_cancelled() {
-                        return Err("Foreign-key peek was cancelled".into());
+                        return Err("Canceled the foreign key peek".into());
                     }
                     let mut targets =
                         reference_targets(&structure.foreign_keys, query_table.schema.as_deref(), &column, &row)?;
                     let target = targets.remove(0);
                     let (sql, params) = target_statement(&query_session, &target)?;
                     if cancel.is_cancelled() {
-                        return Err("Foreign-key peek was cancelled".into());
+                        return Err("Canceled the foreign key peek".into());
                     }
                     let live_table = query_session.run_query_bound(&sql, &params, 1, &cancel)?;
                     let cols = live_table.columns();

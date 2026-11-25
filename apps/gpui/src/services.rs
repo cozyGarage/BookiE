@@ -68,7 +68,7 @@ impl GridView {
 
     pub(crate) fn show_status(&mut self) {
         let Some(live) = self.live.clone() else {
-            self.status = "No active database connection.".into();
+            self.status = "No active database connection".into();
             return;
         };
         let overview = match live.overview() {
@@ -124,18 +124,18 @@ impl GridView {
 
     pub(crate) fn cancel_server_process(&mut self, pid: i64, cx: &mut Context<Self>) {
         let Some(live) = self.live.as_ref() else {
-            self.status = "No active database connection.".into();
+            self.status = "No active database connection".into();
             return;
         };
         let sql = match live.driver_id.as_str() {
             "postgres" => format!("SELECT pg_cancel_backend({pid});"),
             "mysql" => format!("KILL QUERY {pid};"),
             _ => {
-                self.status = "Cancelling processes is not supported for this database engine.".into();
+                self.status = "Canceling processes is not supported for this database engine".into();
                 return;
             }
         };
-        self.status = format!("Cancelling server process {pid}…");
+        self.status = format!("Canceling server process {pid}…");
         self.run_sql(sql, cx);
     }
 

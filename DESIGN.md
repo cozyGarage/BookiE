@@ -22,15 +22,15 @@ Token values follow the [dbx](https://github.com/t8y2/dbx) desktop styles (`apps
 | Bars (toolbar, tab bar) | `#f5f5f5` | `#1b1b1e` |
 | Border | `#e5e5e5` | `#6e6e72` at 28% |
 | Text | `#0a0a0a` | `#d7d7db` |
-| Muted text | `#737373` | `#97989d` |
+| Muted text | `#6b6b6b` | `#97989d` |
 | Muted fill | `#f5f5f5` | `#2a2a2d` |
 | Filled button, its text | `#171717`, `#fafafa` | `#d0d0d6`, `#131416` |
 | Hover and selected fill | `#f5f5f5` | `#2e2f33` |
 | Success | `#16a34a` | `#4ade80` |
-| Warning | `#d97706` | `#fbbf24` |
+| Warning | `#b45309` | `#fbbf24` |
 | Info | `#2563eb` | `#60a5fa` |
-| Destructive | `#e7000b` | `#f3625f` |
-| Focus ring | `#a1a1a1` | `#85868b` |
+| Destructive | `#b91c1c` | `#f3625f` |
+| Focus ring | `#8a8a8a` | `#85868b` |
 
 Status tints are the colour mixed into the background at 12% (light) or 16% (dark). The connection-environment palette is the only literal colour set in widget code: blue `#3584e4`, teal `#2190a4`, green `#3a944a`, yellow `#c88800`, orange `#ed5b00`, red `#e62d42`, pink `#d56199`, purple `#9141ac`, slate `#6f8396`.
 

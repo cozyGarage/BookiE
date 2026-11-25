@@ -39,28 +39,44 @@ fn palette_outside_click_dismisses_without_opening_the_covered_dropdown(cx: &mut
     cx.run_until_parked();
 
     view.read_with(cx, |view, _| assert!(!view.palette.open));
-    cx.update(|window, _| assert!(window.try_find_by_label("Import Connections…").is_none()));
+    cx.update(|window, _| assert!(window.try_find_by_label("Import connections…").is_none()));
 
     cx.simulate_click(trigger.center(), Default::default());
     cx.run_until_parked();
-    let item = cx.update(|window, _| window.find_by_label("Import Connections…").bounds());
+    let item = cx.update(|window, _| window.find_by_label("Import connections…").bounds());
     assert!(item.origin.x >= px(0.0));
     assert!(item.origin.x + item.size.width <= px(900.0));
     cx.simulate_keystrokes("escape");
     cx.run_until_parked();
-    cx.update(|window, _| assert!(window.try_find_by_label("Import Connections…").is_none()));
+    cx.update(|window, _| assert!(window.try_find_by_label("Import connections…").is_none()));
 
     cx.simulate_resize(size(px(800.0), px(760.0)));
     cx.run_until_parked();
     let trigger = cx.update(|window, _| window.find_by_label("Import / Export").bounds());
     cx.simulate_click(trigger.center(), Default::default());
     cx.run_until_parked();
-    let item = cx.update(|window, _| window.find_by_label("Import Connections…").bounds());
+    let item = cx.update(|window, _| window.find_by_label("Import connections…").bounds());
     assert!(item.origin.x >= px(0.0));
     assert!(item.origin.x + item.size.width <= px(800.0));
     assert!(item.origin.y >= px(0.0));
     assert!(item.origin.y + item.size.height <= px(760.0));
     cx.simulate_keystrokes("escape");
     cx.run_until_parked();
-    cx.update(|window, _| assert!(window.try_find_by_label("Import Connections…").is_none()));
+    cx.update(|window, _| assert!(window.try_find_by_label("Import connections…").is_none()));
+}
+
+#[gpui::test]
+fn the_palette_stops_above_the_status_bar_in_a_short_window(cx: &mut TestAppContext) {
+    let (_view, cx) = crate::ui_tests::open(cx);
+    cx.simulate_resize(size(px(900.0), px(420.0)));
+    cx.simulate_keystrokes("ctrl-shift-p");
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    let surface = cx.debug_bounds("palette-surface").expect("the palette is drawn");
+    let limit = px(420.0 - crate::chrome::STATUS_HEIGHT - bookie_gpui::theme::size::PALETTE_TOP / 2.0);
+    assert!(
+        surface.origin.y + surface.size.height <= limit,
+        "palette bottom {:?} passes {limit:?}",
+        surface.origin.y + surface.size.height
+    );
 }

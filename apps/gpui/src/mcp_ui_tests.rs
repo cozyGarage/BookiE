@@ -44,7 +44,7 @@ fn settings_show_mcp_controls_and_refuse_start_without_a_saved_connection(cx: &m
         assert!(!view.mcp.enabled());
         assert_eq!(
             view.mcp.status.as_deref(),
-            Some("Connect to a saved database before enabling MCP.")
+            Some("Connect to a saved database before enabling MCP")
         );
     });
 }
@@ -61,7 +61,7 @@ fn token_issue_requires_an_enabled_server_and_does_not_retain_plaintext(cx: &mut
     view.read_with(cx, |view, _| {
         assert_eq!(
             view.mcp.status.as_deref(),
-            Some("Enable the MCP server before issuing a token.")
+            Some("Enable the MCP server before issuing a token")
         );
         assert!(view.mcp.plaintext.is_none());
     });

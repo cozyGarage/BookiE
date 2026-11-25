@@ -174,3 +174,22 @@ fn opening_a_multiline_value_preserves_it_in_the_full_value_editor(cx: &mut Test
         assert_eq!(view.cell_edit.value_editor.read(cx).value().as_ref(), "first\nsecond");
     });
 }
+
+#[gpui::test]
+fn the_full_value_editor_offers_apply_before_cancel(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.cell_edit.edits.insert((2, 1), Cell::Text("first\nsecond".into()));
+            view.start_edit(2, 1, window, cx);
+        });
+    });
+    cx.run_until_parked();
+    let apply = cx.debug_bounds("apply-full-value").expect("Apply is drawn");
+    let cancel = cx.debug_bounds("cancel-full-value").expect("Cancel is drawn");
+    assert!(
+        apply.origin.x + apply.size.width <= cancel.origin.x,
+        "the primary action comes before Cancel"
+    );
+    assert_eq!(apply.size.width, cancel.size.width, "paired buttons share a width");
+}

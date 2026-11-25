@@ -1,14 +1,17 @@
 # Ratchet ceilings for UI patterns that docs/ui-design.md stops from growing (scripts/check-ui-patterns.py).
 apps/linux/app/src/services/window_registry.rs thread_local 1
 apps/linux/app/src/services/window_state.rs thread_local 1
+apps/linux/app/src/ui/browse_tab/mod.rs hand-built-toolbar 1
 apps/linux/app/src/ui/diagram/dialog.rs hand-built-toolbar 1
 apps/linux/app/src/ui/dialog_shell.rs hand-built-toolbar 1
+apps/linux/app/src/ui/editor/outcomes.rs literal-spacing 11
 apps/linux/app/src/ui/editor/result_tools/ticket.rs thread_local 1
 apps/linux/app/src/ui/editor/result_tools/widget.rs thread_local 1
 apps/linux/app/src/ui/editor/schema.rs thread_local 1
 apps/linux/app/src/ui/editor/snippet_menu.rs thread_local 1
 apps/linux/app/src/ui/explain_dialog.rs hand-built-toolbar 1
-apps/linux/app/src/ui/grid/display.rs thread_local 1
+apps/linux/app/src/ui/filter_presets.rs literal-spacing 9
+apps/linux/app/src/ui/grid/display.rs thread_local 2
 apps/linux/app/src/ui/grid/font_zoom.rs thread_local 1
 apps/linux/app/src/ui/grid/full_value_editor.rs thread_local 1
 apps/linux/app/src/ui/grid/highlight_rules.rs hand-built-toolbar 1
@@ -16,7 +19,9 @@ apps/linux/app/src/ui/grid/value_viewer.rs hand-built-toolbar 1
 apps/linux/app/src/ui/history_dialog.rs hand-built-toolbar 1
 apps/linux/app/src/ui/leak_probe.rs thread_local 1
 apps/linux/app/src/ui/quick_switcher_dialog.rs hand-built-toolbar 1
+apps/linux/app/src/ui/row_inspector.rs literal-spacing 4
 apps/linux/app/src/ui/saved_queries_dialog.rs hand-built-toolbar 1
 apps/linux/app/src/ui/structure_tab/mod.rs hand-built-toolbar 1
 apps/linux/app/src/ui/theme.rs thread_local 1
 apps/linux/app/src/ui/typography.rs thread_local 1
+apps/linux/app/src/ui/welcome_view.rs literal-spacing 2

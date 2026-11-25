@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
 use super::*;
-use crate::chrome::ghost;
 use crate::save_ui::{ReviewLabels, SaveRequest};
+use crate::surfaces::{ButtonKind, button, task_bar};
 
 pub(crate) const IMPORT_ROW_CAP: usize = 1_000;
 
@@ -34,10 +34,10 @@ impl GridView {
         }
         let input = self.import.input.get_or_insert_with(|| {
             let input = cx.new(|cx| TextInput::new("Path of a .csv file", cx));
-            cx.subscribe(&input, |this, _, event: &InputEvent, cx| {
-                if matches!(event, InputEvent::Submit) {
-                    this.review_import(cx);
-                }
+            cx.subscribe(&input, |this, _, event: &InputEvent, cx| match event {
+                InputEvent::Submit => this.review_import(cx),
+                InputEvent::Cancel => this.cancel_import_bar(cx),
+                InputEvent::Changed => {}
             })
             .detach();
             input
@@ -54,7 +54,7 @@ impl GridView {
 
     pub(crate) fn cancel_import_bar(&mut self, cx: &mut Context<Self>) {
         self.close_import_bar();
-        self.status = "Cancelled the import".into();
+        self.status = "Canceled the import".into();
         cx.notify();
     }
 
@@ -90,23 +90,14 @@ impl GridView {
             return None;
         }
         Some(
-            div()
-                .flex()
-                .items_center()
-                .gap_3()
-                .p_2()
-                .flex_none()
-                .bg(rgb(theme.chrome))
-                .border_b_1()
-                .border_color(rgb(theme.border))
-                .child(div().font_weight(gpui::FontWeight::MEDIUM).child("Import CSV"))
+            task_bar("Import CSV", theme)
                 .child(div().flex_1().min_w_0().child(input))
                 .child(
-                    ghost("review-import", "Review", theme)
+                    button(ButtonKind::Primary, "review-import", "Review", theme)
                         .on_click(cx.listener(|this, _, _, cx| this.review_import(cx))),
                 )
                 .child(
-                    ghost("cancel-import", "Cancel", theme)
+                    button(ButtonKind::Ghost, "cancel-import", "Cancel", theme)
                         .on_click(cx.listener(|this, _, _, cx| this.cancel_import_bar(cx))),
                 ),
         )

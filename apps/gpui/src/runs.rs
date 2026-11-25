@@ -344,9 +344,9 @@ impl GridView {
         let saving = self.save.busy || self.save.pending.is_some() || self.form_open();
         if saving || self.cell_edit.active.is_some() {
             self.status = if saving {
-                "Finish or cancel the save before switching grids.".into()
+                "Finish or cancel the save before switching grids".into()
             } else {
-                "Finish or discard the active cell edit using Commands before switching grids.".into()
+                "Finish or discard the active cell edit using Commands before switching grids".into()
             };
             if let Some(index) = self.tabs.items.iter().position(|tab| match (self.grid_is_query, tab) {
                 (true, Tab::Query) => true,
@@ -389,7 +389,7 @@ impl GridView {
             return;
         };
         if index != self.run_tabs.active && self.cell_edit.active.is_some() {
-            self.status = "Finish or discard the active cell edit using Commands before switching results.".into();
+            self.status = "Finish or discard the active cell edit using Commands before switching results".into();
             return;
         }
         self.invalidate_background();

@@ -181,9 +181,9 @@ fn connection_save_reports_partial_success_and_reuses_the_saved_identity(cx: &mu
             assert_eq!(view.connection_form.ssh.jumps[0].hop_id, Some(jump));
             assert_eq!(view.connection_form.draft(cx).id, Some(id));
             assert!(view.connection_form.draft(cx).keep_stored_password);
-            assert!(view.connection_form.status.contains("colour"));
+            assert!(view.connection_form.status.contains("color"));
             view.finish_connection_save(Ok((id, "orders".into(), vec![], true)), cx);
-            assert!(!view.connection_form.status.contains("colour"));
+            assert!(!view.connection_form.status.contains("color"));
             view.finish_connection_save(Err("Connection save failed".into()), cx);
             assert!(view.connection_form.status.contains("failed"));
             assert_eq!(view.connection_form.editing, Some(id));
