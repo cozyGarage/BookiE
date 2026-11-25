@@ -1180,6 +1180,7 @@ fn error_category(error: &DriverError) -> AuditErrorCategory {
 mod administrative;
 mod audit_receipt;
 mod bulk;
+mod bulk_multirow;
 mod connection;
 mod excluded_catalog;
 mod governed_listing;
