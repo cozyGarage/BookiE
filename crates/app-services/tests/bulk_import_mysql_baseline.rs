@@ -1,6 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! The MySQL half of the 100,000-row import baseline for #3741 (PostgreSQL and SQLite sit next to
-//! their own tests). Run with `--ignored --nocapture`; it needs Docker and prints the time.
+//! their own tests). It needs Docker and prints the time. Run the baseline on its own
+//! (`-- --ignored --nocapture a_hundred`) on an idle machine: running it next to the other
+//! ignored test in this file makes the number meaningless.
 
 use std::sync::Arc;
 
