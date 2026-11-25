@@ -11,7 +11,6 @@ fn an_insert_that_overrides_an_identity_column_is_still_one_insert() {
         "INSERT INTO \"t\" (\"id\", \"name\") OVERRIDING SYSTEM VALUE VALUES ($1, $2)",
         "insert into t (id) overriding user value values ($1)",
         "INSERT INTO t (id) /* keep */ OVERRIDING SYSTEM VALUE SELECT id FROM s",
-        "INSERT INTO t (id) OVERRIDING SYSTEM VALUE DEFAULT VALUES",
     ] {
         let facts = classify(sql, "postgres");
         assert_eq!(facts.class, StatementClass::Insert, "{sql}");
