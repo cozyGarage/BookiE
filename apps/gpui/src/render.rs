@@ -187,6 +187,17 @@ impl GridView {
         )
     }
 
+    fn export_button(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
+        compact_button(ButtonKind::Ghost, "export", "Export…", theme)
+            .tooltip(crate::surfaces::tooltip_view(
+                "Export to a file and choose its format".into(),
+            ))
+            .on_click(cx.listener(|this, _, _, cx| {
+                this.open_export_file_bar(cx);
+                cx.notify();
+            }))
+    }
+
     fn grid_action_buttons(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
         use gpui_component::button::{Button, ButtonVariants};
         use gpui_component::menu::DropdownMenu;
@@ -271,16 +282,7 @@ impl GridView {
                         compact_button(ButtonKind::Ghost, "compare", "Compare", theme)
                             .on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))),
                     )
-                    .child(
-                        compact_button(ButtonKind::Ghost, "export", "Export…", theme)
-                            .tooltip(crate::surfaces::tooltip_view(
-                                "Export to a file and choose its format".into(),
-                            ))
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                this.open_export_file_bar(cx);
-                                cx.notify();
-                            })),
-                    )
+                    .child(self.export_button(theme, cx))
                     .child(
                         toggle_icon_button(
                             "continuous",
