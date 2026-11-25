@@ -206,12 +206,16 @@ impl GridView {
                             Some(error) => format!("{message}; closing the session failed: {error}"),
                             None => message.into(),
                         };
+                        if matches!(outcome, Some(bookie_core::SessionCommitOutcome::RolledBack)) {
+                            this.push_notice(this.status.clone(), crate::notifications::NoticeKind::Error, cx);
+                        }
                     }
                     Err(bookie_core::DriverError::PolicyDenied(message)) if commit && open => {
                         if let Some(transaction) = this.transaction.as_mut() {
                             transaction.finishing = false;
                         }
                         this.status = format!("Commit failed: {message}");
+                        this.push_notice(this.status.clone(), crate::notifications::NoticeKind::Error, cx);
                     }
                     Err(error) => {
                         this.transaction = None;
@@ -221,6 +225,11 @@ impl GridView {
                             this.status
                                 .push_str(&format!("; closing the session failed: {cleanup}"));
                         }
+                        this.push_notice(
+                            this.status.clone(),
+                            crate::notifications::NoticeKind::UnknownOutcome,
+                            cx,
+                        );
                     }
                 }
                 cx.notify();

@@ -261,7 +261,9 @@ fn a_denied_commit_keeps_the_transaction_available_for_rollback(cx: &mut TestApp
     });
     wait_for(&view, cx, |view| view.status.starts_with("Commit failed:"));
     view.read_with(cx, |view, _| {
-        assert!(view.transaction_open(), "denied commit must keep rollback available")
+        assert!(view.transaction_open(), "denied commit must keep rollback available");
+        let notice = view.notices.items.first().expect("a failed commit leaves a notice");
+        assert!(notice.text.starts_with("Commit failed:") && !notice.read);
     });
     assert!(!cx.simulate_close(), "an open transaction must prevent window close");
     cx.update(|_, cx| view.update(cx, |view, cx| view.disconnect(cx)));
@@ -284,12 +286,22 @@ fn a_denied_commit_keeps_the_transaction_available_for_rollback(cx: &mut TestApp
 
 #[gpui::test]
 fn terminal_commit_outcomes_are_not_reported_as_successful_retries(cx: &mut TestAppContext) {
-    for (result, expected) in [
-        (CommitResult::RolledBack, "Transaction rolled back by the server"),
-        (CommitResult::Unknown, "Transaction outcome may be unknown"),
+    use crate::notifications::NoticeKind;
+    for (result, expected, notice) in [
+        (
+            CommitResult::RolledBack,
+            "Transaction rolled back by the server",
+            Some(NoticeKind::Error),
+        ),
+        (
+            CommitResult::Unknown,
+            "Transaction outcome may be unknown",
+            Some(NoticeKind::UnknownOutcome),
+        ),
         (
             CommitResult::CommittedCloseFails,
             "Transaction committed; closing the session failed",
+            None,
         ),
     ] {
         let path = fixture_copy("transaction-outcome");
@@ -320,6 +332,8 @@ fn terminal_commit_outcomes_are_not_reported_as_successful_retries(cx: &mut Test
         view.read_with(cx, |view, _| {
             assert!(view.status.starts_with(expected), "{}", view.status);
             assert!(!view.transaction_open());
+            assert_eq!(view.notices.items.first().map(|item| item.kind), notice);
+            assert!(view.notices.items.iter().all(|item| !item.read));
         });
         assert!(
             shared.try_lock().unwrap().is_none(),
