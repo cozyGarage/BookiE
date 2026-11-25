@@ -2606,3 +2606,17 @@ fn the_grid_strip_has_one_export_menu_for_files_and_the_clipboard(cx: &mut TestA
         assert!(view.formats_for(100, true).len() > 1, "more than one format is offered");
     });
 }
+
+#[gpui::test]
+fn canceling_export_file_setup_preserves_the_previous_status(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| view.update(cx, |view, _| view.status = "Query completed".into()));
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_export_file_bar(cx)));
+    view.read_with(cx, |view, _| assert!(view.export.file.open));
+
+    cx.update(|_, cx| view.update(cx, |view, _| view.close_export_file_bar()));
+    view.read_with(cx, |view, _| {
+        assert!(!view.export.file.open);
+        assert_eq!(view.status, "Query completed");
+    });
+}
