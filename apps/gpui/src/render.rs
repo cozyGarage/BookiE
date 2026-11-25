@@ -713,8 +713,7 @@ impl GridView {
             (count, uniform_list("palette-results", count, rows))
         };
         let empty = (count == 0).then(|| div().px_2().text_color(rgb(theme.muted_foreground)).child(empty_text));
-        let max_height =
-            (window.viewport_size().height - px(size::PALETTE_TOP + size::FORM_CONTROL + 40.0)).max(px(0.0));
+        let max_height = (window.viewport_size().height - px(size::PALETTE_TOP * 1.5 + STATUS_HEIGHT)).max(px(0.0));
         scrim(theme)
             .id("palette-overlay")
             .items_start()
@@ -726,14 +725,17 @@ impl GridView {
             .child(
                 dialog_surface(size::PALETTE_WIDTH, theme)
                     .id("palette-surface")
+                    .debug_selector(|| "palette-surface".into())
                     .mt(px(size::PALETTE_TOP))
+                    .max_h(max_height)
+                    .overflow_hidden()
                     .p_2()
                     .gap_1()
                     .on_click(cx.listener(|_, _, _, cx| cx.stop_propagation()))
                     .child(self.palette.input.clone())
                     .child(
                         list.with_sizing_behavior(gpui::ListSizingBehavior::Infer)
-                            .max_h(max_height)
+                            .min_h_0()
                             .track_scroll(&self.palette.scroll),
                     )
                     .children(empty),

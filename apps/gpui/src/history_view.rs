@@ -20,7 +20,25 @@ pub(crate) struct HistoryPage {
     pub status: StatusFilter,
     pub window: TimeWindow,
     pub rows: Vec<HistoryRow>,
+    pub load: HistoryLoad,
     generation: u64,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(crate) enum HistoryLoad {
+    #[default]
+    Loading,
+    Ready,
+    Failed(String),
+}
+
+pub(crate) fn history_state(load: &HistoryLoad, empty: bool) -> Option<ListState<'_>> {
+    match load {
+        HistoryLoad::Loading if empty => Some(ListState::Loading("Loading history…")),
+        HistoryLoad::Failed(message) => Some(ListState::Failed(message)),
+        _ if empty => Some(ListState::Empty("No statements match")),
+        _ => None,
+    }
 }
 
 impl HistoryPage {
@@ -37,6 +55,7 @@ impl HistoryPage {
             status: StatusFilter::All,
             window: TimeWindow::Any,
             rows: Vec::new(),
+            load: HistoryLoad::Loading,
             generation: 0,
         }
     }
@@ -118,8 +137,11 @@ impl GridView {
                     return;
                 }
                 match rows {
-                    Ok(rows) => this.history_page.rows = pinned_first(rows),
-                    Err(message) => this.status = message,
+                    Ok(rows) => {
+                        this.history_page.rows = pinned_first(rows);
+                        this.history_page.load = HistoryLoad::Ready;
+                    }
+                    Err(message) => this.history_page.load = HistoryLoad::Failed(message),
                 }
                 cx.notify();
             });
@@ -276,10 +298,9 @@ impl GridView {
                 self.history_window_chip("history-month", "30 days", TimeWindow::Month, theme, cx),
             ],
         );
-        let body = if rows.is_empty() {
-            list_state(ListState::Empty("No statements match"), theme)
-        } else {
-            div().flex().flex_col().gap_1().children(rows)
+        let body = match history_state(&self.history_page.load, rows.is_empty()) {
+            Some(state) => list_state(state, theme),
+            None => div().flex().flex_col().gap_1().children(rows),
         };
         div()
             .flex_1()
@@ -317,6 +338,24 @@ mod tests {
             succeeded: true,
             pinned,
         }
+    }
+
+    #[test]
+    fn the_history_list_says_when_it_is_loading_failed_or_empty() {
+        assert_eq!(
+            history_state(&HistoryLoad::Loading, true),
+            Some(ListState::Loading("Loading history…"))
+        );
+        assert_eq!(history_state(&HistoryLoad::Loading, false), None);
+        assert_eq!(
+            history_state(&HistoryLoad::Failed("disk full".into()), false),
+            Some(ListState::Failed("disk full"))
+        );
+        assert_eq!(
+            history_state(&HistoryLoad::Ready, true),
+            Some(ListState::Empty("No statements match"))
+        );
+        assert_eq!(history_state(&HistoryLoad::Ready, false), None);
     }
 
     #[test]

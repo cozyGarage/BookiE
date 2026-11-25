@@ -17,8 +17,8 @@ use crate::surfaces::{Bar, ButtonKind, badge, button, compact_icon_button, icon_
 use crate::ui_theme::ThemeExt;
 use bookie_gpui::theme::{Theme, size};
 
-pub(crate) const TOOLBAR_HEIGHT: f32 = 40.0;
-pub(crate) const TAB_HEIGHT: f32 = 32.0;
+pub(crate) const TOOLBAR_HEIGHT: f32 = 36.0;
+pub(crate) const TAB_HEIGHT: f32 = 28.0;
 pub(crate) const STATUS_HEIGHT: f32 = 24.0;
 
 pub(crate) fn tip(label: &'static str) -> impl Fn(&mut gpui::Window, &mut gpui::App) -> gpui::AnyView + 'static {
@@ -142,6 +142,7 @@ impl GridView {
     pub fn toolbar(&self, theme: Theme, window: &Window, cx: &mut Context<Self>) -> Div {
         let labelled = f32::from(window.viewport_size().width) >= size::TOOLBAR_LABELS_MIN_WIDTH;
         div()
+            .debug_selector(|| "main-toolbar".into())
             .flex()
             .items_center()
             .justify_between()
@@ -507,20 +508,16 @@ impl GridView {
                 ),
             )
             .child(
-                compact_icon_button("header-new-folder", "folder-plus", "New folder", theme).on_click(cx.listener(
-                    |this, _, _, cx| {
-                        this.status = "Folder organization is coming soon".into();
-                        cx.notify();
-                    },
-                )),
-            )
-            .child(
-                compact_icon_button("header-refresh", "refresh-cw", "Refresh", theme).on_click(cx.listener(
-                    |this, _, _, cx| {
-                        this.status = "Refreshed catalog schema".into();
-                        cx.notify();
-                    },
-                )),
+                compact_icon_button(
+                    "header-refresh",
+                    "refresh-cw",
+                    "Reconnect and refresh the table list",
+                    theme,
+                )
+                .on_click(cx.listener(|this, _, _, cx| {
+                    this.reconnect_now(cx);
+                    cx.notify();
+                })),
             )
             .child(
                 compact_icon_button("collapse-sidebar", "chevrons-left", "Collapse sidebar", theme).on_click(
@@ -679,6 +676,7 @@ impl GridView {
             .map(|(index, tab)| self.render_tab_item(index, tab, active, theme, cx));
         div()
             .id("workspace-tabs")
+            .debug_selector(|| "workspace-tabs".into())
             .flex()
             .items_center()
             .flex_none()

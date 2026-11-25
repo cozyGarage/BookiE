@@ -1,9 +1,8 @@
 use bookie_gpui::messages::MessageKind;
 use gpui::{Context, Div, MouseDownEvent, Stateful, Window, div, prelude::*, px, rgb};
 
-use crate::assets::icon;
 use crate::chrome::{SQL, TOOLBAR_HEIGHT, tip};
-use crate::surfaces::{ButtonKind, button, compact_icon_button, icon_button, segment, segmented};
+use crate::surfaces::{ButtonKind, button, compact_icon_button, segment, segmented};
 use crate::{GridView, thousands};
 use bookie_gpui::shell::{ResultView, Run, Tab};
 use bookie_gpui::theme::{Theme, size};
@@ -290,6 +289,7 @@ impl GridView {
             views.push(self.result_view_switch("view-chart", "Chart", ResultView::Chart, theme, cx));
         }
         div()
+            .debug_selector(|| "results-header".into())
             .flex()
             .items_center()
             .gap_1()
@@ -299,8 +299,6 @@ impl GridView {
             .bg(rgb(theme.chrome))
             .border_y_1()
             .border_color(rgb(theme.border))
-            .child(icon("pin", theme.muted_foreground))
-            .child(div().w(px(size::HAIRLINE)).h(px(size::LG)).bg(rgb(theme.border)))
             .child(
                 segmented(
                     [div()
@@ -320,7 +318,7 @@ impl GridView {
             .child(div().flex_1())
             .child(segmented(views, theme))
             .child(
-                icon_button(
+                compact_icon_button(
                     "toggle-results",
                     if self.panel.open {
                         "chevron-down"

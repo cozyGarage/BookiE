@@ -64,3 +64,29 @@ fn palette_outside_click_dismisses_without_opening_the_covered_dropdown(cx: &mut
     cx.run_until_parked();
     cx.update(|window, _| assert!(window.try_find_by_label("Import Connections…").is_none()));
 }
+
+#[gpui::test]
+fn the_palette_stops_above_the_status_bar_in_a_short_window(cx: &mut TestAppContext) {
+    let (_view, cx) = crate::ui_tests::open(cx);
+    cx.simulate_resize(size(px(900.0), px(420.0)));
+    cx.simulate_keystrokes("ctrl-shift-p");
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    let surface = cx.debug_bounds("palette-surface").expect("the palette is drawn");
+    let limit = px(420.0 - crate::chrome::STATUS_HEIGHT - bookie_gpui::theme::size::PALETTE_TOP / 2.0);
+    assert!(
+        surface.origin.y + surface.size.height <= limit,
+        "palette bottom {:?} passes {limit:?}",
+        surface.origin.y + surface.size.height
+    );
+}
+
+#[gpui::test]
+fn the_sidebar_refresh_reconnects_instead_of_claiming_a_refresh(cx: &mut TestAppContext) {
+    let (view, cx) = crate::ui_tests::open(cx);
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("header-new-folder").is_none());
+    let refresh = cx.debug_bounds("header-refresh").expect("the refresh button is drawn");
+    cx.simulate_click(refresh.center(), Default::default());
+    view.read_with(cx, |view, _| assert_ne!(view.status, "Refreshed catalog schema"));
+}

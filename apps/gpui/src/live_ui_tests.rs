@@ -1,7 +1,7 @@
 use std::time::Instant;
 
 use gpui::TestAppContext;
-use gpui_kit::test::TestWindowExt;
+use gpui_kit::test::{TestQueryExt, TestWindowExt};
 
 use crate::GridView;
 use crate::text_input;
@@ -2306,4 +2306,44 @@ fn a_large_sequential_scan_shows_a_full_scan_chip_in_the_plan_view(cx: &mut Test
         cx.debug_bounds("plan-full-scan").is_some(),
         "a 40,000-row sequential scan is flagged"
     );
+}
+
+#[gpui::test]
+fn every_control_in_a_bar_has_the_bar_height(cx: &mut TestAppContext) {
+    use bookie_gpui::theme::size;
+    use gpui::px;
+    let (_view, cx) = open(cx);
+    for width in [1500.0, 760.0] {
+        cx.simulate_resize(gpui::size(px(width), px(800.0)));
+        cx.run_until_parked();
+        let toolbar = cx.debug_bounds("main-toolbar").expect("the toolbar is drawn");
+        assert_eq!(toolbar.size.height, px(crate::chrome::TOOLBAR_HEIGHT));
+        assert_eq!(toolbar.size.height, px(size::SMALL_CONTROL + 2.0 * size::XS));
+        let tabs = cx.debug_bounds("workspace-tabs").expect("the tab strip is drawn");
+        assert_eq!(tabs.size.height, px(crate::chrome::TAB_HEIGHT));
+        for id in [
+            "first",
+            "prev",
+            "load-more",
+            "next",
+            "last",
+            "find-prev",
+            "find-next",
+            "show",
+        ] {
+            if let Some(control) = cx.debug_bounds(id) {
+                assert_eq!(control.size.height, px(size::COMPACT_CONTROL), "{id} at {width}");
+            }
+        }
+        if let Some(more) =
+            cx.update(|window, _| window.try_find_by_label("More grid actions").map(|node| node.bounds()))
+        {
+            assert_eq!(more.size.height, px(size::COMPACT_CONTROL), "More at {width}");
+        }
+    }
+    cx.simulate_keystrokes("ctrl-t ctrl-enter");
+    cx.run_until_parked();
+    let toggle = cx.debug_bounds("toggle-results").expect("the results toggle is drawn");
+    assert_eq!(toggle.size.height, px(size::COMPACT_CONTROL));
+    assert!(cx.debug_bounds("results-header").is_some());
 }
