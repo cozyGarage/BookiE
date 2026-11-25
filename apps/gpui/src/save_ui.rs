@@ -432,7 +432,7 @@ impl GridView {
     }
 
     pub(crate) fn save_banner(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Div> {
-        let (text, is_error) = self.save.banner.clone()?;
+        let (text, is_error) = self.save.banner.clone().filter(|(_, is_error)| *is_error)?;
         Some(
             div()
                 .flex()
@@ -545,8 +545,34 @@ impl GridView {
                         .text_size(px(size::TEXT_SMALL))
                         .text_color(rgb(theme.muted_foreground))
                         .child(pending.plan.preview.clone()),
-                ),
+                )
+                .children(preview_overflows(&pending.plan.preview).then(|| {
+                    div()
+                        .debug_selector(|| "save-preview-more".into())
+                        .text_size(px(size::TEXT_SMALL))
+                        .text_color(rgb(theme.muted_foreground))
+                        .child(format!(
+                            "{} lines; scroll the preview for the rest",
+                            pending.plan.preview.lines().count()
+                        ))
+                })),
         )
+    }
+}
+
+fn preview_overflows(preview: &str) -> bool {
+    preview.lines().count() as f32 * size::SAVE_PREVIEW_LINE_HEIGHT > size::SAVE_PREVIEW_MAX_HEIGHT
+}
+
+#[cfg(test)]
+mod preview_tests {
+    use super::preview_overflows;
+
+    #[test]
+    fn a_short_preview_needs_no_scroll_cue_and_a_long_one_does() {
+        assert!(!preview_overflows("UPDATE t SET a = ? WHERE id = ?"));
+        let long = (0..12).map(|n| format!("{n}: value")).collect::<Vec<_>>().join("\n");
+        assert!(preview_overflows(&long));
     }
 }
 
