@@ -120,6 +120,11 @@ impl GridView {
         if self.continuous {
             return pager.child(div().child(range_label));
         }
+        if self.pager.pages() <= 1 {
+            return pager
+                .when(compact, |pager| pager.child(div().child(range_label.clone())))
+                .child(self.page_size_button(theme, cx));
+        }
         pager
             .when(!compact, |pager| {
                 pager.child(
@@ -132,7 +137,7 @@ impl GridView {
                 )
             })
             .child(
-                compact_icon_button("prev", "chevron-left", "Previous page", theme).on_click(cx.listener(
+                compact_icon_button("pager-prev", "chevron-left", "Previous page", theme).on_click(cx.listener(
                     |this, _, _, cx| {
                         this.pager.previous();
                         cx.notify();

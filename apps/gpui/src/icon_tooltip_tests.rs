@@ -80,7 +80,7 @@ fn every_icon_only_control_in_the_grid_bar_has_a_tooltip(cx: &mut TestAppContext
     assert_tooltips(
         cx,
         &[
-            ("prev", "prev tooltip: Previous page"),
+            ("pager-prev", "pager-prev tooltip: Previous page"),
             ("next", "next tooltip: Next page"),
             (
                 "load-more",
@@ -102,7 +102,7 @@ const KEYBOARD_PATHS: &[(&str, &str)] = &[
     ("sidebar-filter", "sidebar-regex"),
     ("sidebar-active-only", "sidebar-active-only"),
     ("first", "first"),
-    ("prev", "previous"),
+    ("pager-prev", "previous"),
     ("next", "next"),
     ("last", "last"),
     ("load-more", "append-pages"),

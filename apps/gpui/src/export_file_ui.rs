@@ -106,12 +106,19 @@ impl GridView {
             self.source.is_partial(),
             self.export.limit,
         );
-        options.push((ExportScope::Loaded, loaded_label));
-        if full_result_available(
+        let full_available = full_result_available(
             self.grid_is_query,
             self.source.is_partial(),
             self.source.snapshot_consistent(),
-        ) {
+        );
+        let same_as_full = full_available
+            && matches!(self.mode, crate::Mode::All)
+            && loaded == self.source.total()
+            && self.export.file.scope != ExportScope::Loaded;
+        if !same_as_full {
+            options.push((ExportScope::Loaded, loaded_label));
+        }
+        if full_available {
             options.push((
                 ExportScope::Full,
                 row_scope_label("Full result", self.source.total(), false, self.export.limit),
