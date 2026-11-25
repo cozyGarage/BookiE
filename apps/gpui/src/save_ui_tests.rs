@@ -876,7 +876,7 @@ fn set_import_path(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestConte
 #[gpui::test]
 fn an_excel_file_is_reviewed_like_a_csv_file(cx: &mut TestAppContext) {
     let path = fixture_copy("import-excel");
-    let workbook = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/import_two_rows.xlsx");
+    let workbook = orders_fixture().with_file_name("import_two_rows.xlsx");
     let (view, cx) = saving_view(cx, &path);
     let write = write_session(&path, false);
     cx.update(|_, cx| {
