@@ -64,18 +64,18 @@ fn values_tuple(statement: &str) -> Option<(usize, usize)> {
     None
 }
 
-fn shifted(tuple: &str, offset: usize) -> String {
+fn shifted(tuple: &str, offset: usize, marker: u8) -> String {
     let mut out = String::with_capacity(tuple.len() + 8);
     let bytes = tuple.as_bytes();
     let mut at = 0;
     while at < bytes.len() {
-        if bytes[at] == b'$' && bytes.get(at + 1).is_some_and(u8::is_ascii_digit) {
+        if bytes[at] == marker && bytes.get(at + 1).is_some_and(u8::is_ascii_digit) {
             let mut end = at + 1;
             while bytes.get(end).is_some_and(u8::is_ascii_digit) {
                 end += 1;
             }
             let number: usize = tuple[at + 1..end].parse().unwrap_or(0);
-            out.push('$');
+            out.push(char::from(marker));
             out.push_str(&(number + offset).to_string());
             at = end;
         } else {
@@ -87,9 +87,25 @@ fn shifted(tuple: &str, offset: usize) -> String {
     out
 }
 
-fn placeholder_count(tuple: &str, numbered: bool) -> usize {
-    let marker = if numbered { b'$' } else { b'?' };
-    tuple.bytes().filter(|byte| *byte == marker).count()
+fn placeholder_numbers(tuple: &str, marker: u8) -> (usize, Vec<usize>) {
+    let bytes = tuple.as_bytes();
+    let mut count = 0;
+    let mut numbers = Vec::new();
+    let mut at = 0;
+    while at < bytes.len() {
+        if bytes[at] == marker {
+            count += 1;
+            let mut end = at + 1;
+            while bytes.get(end).is_some_and(u8::is_ascii_digit) {
+                end += 1;
+            }
+            if end > at + 1 {
+                numbers.push(tuple[at + 1..end].parse().unwrap_or(0));
+            }
+        }
+        at += 1;
+    }
+    (count, numbers)
 }
 
 pub(super) fn multi_row_statements(
@@ -97,15 +113,22 @@ pub(super) fn multi_row_statements(
     driver_id: &str,
     rows: &[Vec<Value>],
 ) -> Option<Vec<(String, Vec<Value>)>> {
-    let numbered = match driver_id {
-        "postgres" => true,
-        "mysql" | "sqlite" => false,
+    let marker = match driver_id {
+        "postgres" => b'$',
+        "mysql" | "sqlite" => b'?',
         _ => return None,
     };
     let (open, close) = values_tuple(statement)?;
     let tuple = &statement[open..close];
     let width = rows.first()?.len();
-    if width == 0 || rows.iter().any(|row| row.len() != width) || placeholder_count(tuple, numbered) != width {
+    if width == 0 || rows.iter().any(|row| row.len() != width) {
+        return None;
+    }
+    let (count, mut numbers) = placeholder_numbers(tuple, marker);
+    let numbered = !numbers.is_empty();
+    numbers.sort_unstable();
+    let in_order = numbers.iter().copied().eq(1..=width);
+    if count != width || (numbered && !in_order) || (!numbered && marker == b'$') {
         return None;
     }
     let per_statement = (MAX_BIND_PARAMETERS / width).max(1);
@@ -119,7 +142,7 @@ pub(super) fn multi_row_statements(
                         sql.push_str(", ");
                     }
                     if numbered {
-                        sql.push_str(&shifted(tuple, index * width));
+                        sql.push_str(&shifted(tuple, index * width, marker));
                     } else {
                         sql.push_str(tuple);
                     }
@@ -200,6 +223,18 @@ mod tests {
                 "INSERT INTO `t` (`a`, `b`) VALUES (?, ?), (?, ?), (?, ?)"
             );
         }
+    }
+
+    #[test]
+    fn numbered_question_marks_are_shifted_so_each_row_binds_its_own_values() {
+        let statements = multi_row_statements("INSERT INTO t (a, b) VALUES (?1, ?2)", "sqlite", &rows(2, 2)).unwrap();
+        assert_eq!(statements[0].0, "INSERT INTO t (a, b) VALUES (?1, ?2), (?3, ?4)");
+    }
+
+    #[test]
+    fn numbering_that_is_not_one_to_width_is_refused() {
+        assert!(multi_row_statements("INSERT INTO t (a, b) VALUES (?2, ?3)", "sqlite", &rows(2, 2)).is_none());
+        assert!(multi_row_statements("INSERT INTO t (a, b) VALUES ($1, $3)", "postgres", &rows(2, 2)).is_none());
     }
 
     #[test]

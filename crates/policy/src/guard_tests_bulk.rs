@@ -201,7 +201,7 @@ async fn an_approved_scope_spends_exactly_its_row_budget() {
 
     assert_eq!((first, second), (3, 3));
     assert_eq!(scope.remaining_rows(), 0);
-    assert_eq!(*batches.lock().expect("batch lock"), vec![3, 3]);
+    assert_eq!(*batches.lock().expect("batch lock"), vec![1, 1]);
     assert_eq!(
         guard
             .finish_bulk_insert(&mut scope, BulkInsertEnd::Completed)
@@ -275,7 +275,7 @@ async fn a_batch_past_the_row_budget_is_denied_and_never_reaches_the_driver() {
     assert!(
         matches!(error, DriverError::PolicyDenied(ref message) if message.contains("more rows than were approved"))
     );
-    assert_eq!(*batches.lock().expect("batch lock"), vec![3]);
+    assert_eq!(*batches.lock().expect("batch lock"), vec![1]);
     end_quietly(&guard, &mut scope).await;
 }
 
@@ -378,7 +378,7 @@ async fn a_scope_is_denied_once_the_import_has_ended() {
         .expect_err("a finished import cannot be resumed");
 
     assert!(matches!(error, DriverError::PolicyDenied(ref message) if message.contains("already been spent")));
-    assert_eq!(*batches.lock().expect("batch lock"), vec![2]);
+    assert_eq!(*batches.lock().expect("batch lock"), vec![1]);
 }
 
 #[tokio::test]
@@ -507,7 +507,7 @@ async fn a_failure_mid_import_stops_it_and_writes_one_terminal_record_with_the_c
         .expect("finish");
 
     assert_eq!(committed, 3);
-    assert_eq!(*batches.lock().expect("batch lock"), vec![3]);
+    assert_eq!(*batches.lock().expect("batch lock"), vec![1]);
     let events = events(&audit);
     assert_eq!(events.len(), 2);
     assert_eq!(events[1].terminal_status, AuditTerminalStatus::Failed);
@@ -966,7 +966,8 @@ async fn an_upsert_is_accepted_as_one_insert_shape_in_every_supported_dialect() 
             .finish_bulk_insert(&mut scope, BulkInsertEnd::Completed)
             .await
             .expect("finish");
-        assert_eq!(*batches.lock().expect("batch lock"), vec![2], "{driver}");
+        let statements = if driver == "duckdb" { 2 } else { 1 };
+        assert_eq!(*batches.lock().expect("batch lock"), vec![statements], "{driver}");
     }
 }
 
