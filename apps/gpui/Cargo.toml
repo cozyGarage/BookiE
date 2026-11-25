@@ -7,6 +7,9 @@ publish = false
 
 [workspace]
 
+[profile.release]
+strip = "symbols"
+
 [dependencies]
 bookie-core = { path = "../../crates/core" }
 bookie-results = { path = "../../crates/results" }

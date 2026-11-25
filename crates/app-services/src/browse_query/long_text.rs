@@ -117,8 +117,8 @@ pub fn mark_partial_cells(result: &mut QueryResult, preview_columns: &[usize]) {
                 *cell = partial;
             }
         }
-        result.rows.truncate_row(row_index, visible);
     }
+    result.rows.retain_leading_cells(visible);
     result.columns.truncate(visible);
 }
 
