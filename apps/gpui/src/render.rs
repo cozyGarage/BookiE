@@ -626,7 +626,7 @@ fn bar_dialog(theme: Theme, bar: Div) -> Stateful<Div> {
             div()
                 .id("bar-dialog")
                 .debug_selector(|| "bar-dialog".into())
-                .w(px(size::FULL_VALUE_EDITOR_WIDTH))
+                .w(px(size::BAR_DIALOG_WIDTH))
                 .max_w(gpui::relative(0.92))
                 .max_h(gpui::relative(0.9))
                 .overflow_hidden()

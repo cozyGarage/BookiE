@@ -25,6 +25,7 @@ pub mod size {
     pub const CHART_COLUMN_WIDTH: f32 = 180.0;
     pub const GUTTER_MARKER_WIDTH: f32 = 3.0;
     pub const FULL_VALUE_EDITOR_WIDTH: f32 = 760.0;
+    pub const BAR_DIALOG_WIDTH: f32 = 1040.0;
     pub const APPROVAL_DIALOG_WIDTH: f32 = 560.0;
     pub const SHORTCUT_HINT_WIDTH: f32 = 320.0;
     pub const TOOLBAR_LABELS_MIN_WIDTH: f32 = 900.0;
