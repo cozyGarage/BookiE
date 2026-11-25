@@ -100,6 +100,7 @@ impl GridView {
                     .items_center()
                     .gap_1()
                     .min_w_0()
+                    .overflow_hidden()
                     .h(px(size::SMALL_CONTROL))
                     .px_2()
                     .rounded(px(theme.radius))

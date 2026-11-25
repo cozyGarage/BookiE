@@ -562,8 +562,6 @@ impl TableDelegate for GridDelegate {
                 div()
                     .w_full()
                     .flex()
-                    .items_center()
-                    .gap_1()
                     .when_some(checked, |el, on| {
                         let theme = Theme::current(cx);
                         let (name, color) = if on {
@@ -571,7 +569,7 @@ impl TableDelegate for GridDelegate {
                         } else {
                             ("square", theme.muted_foreground)
                         };
-                        el.child(crate::assets::icon(name, color))
+                        el.items_center().gap_1().child(crate::assets::icon(name, color))
                     })
                     .when_some(edited_tint, |el, tint| {
                         el.debug_selector(|| "edited-cell".into()).bg(tint)
