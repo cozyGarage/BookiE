@@ -613,12 +613,8 @@ fn pinning_a_leading_column_keeps_the_last_cell_inside_the_scroll_viewport(cx: &
 
     view.update(cx, |view, cx| {
         view.table.update(cx, |table, _| {
-            // Match dragging the horizontal scrollbar to its maximum offset.
-            // `scroll_to_col` uses a separate target calculation and does not
-            // exercise the scrollbar's full scroll range.
-            table
-                .horizontal_scroll_handle
-                .set_offset(gpui::point(gpui::px(-10_000.0), gpui::px(0.0)));
+            let offset_past_scroll_end = gpui::point(gpui::px(-10_000.0), gpui::px(0.0));
+            table.horizontal_scroll_handle.set_offset(offset_past_scroll_end);
         })
     });
     cx.run_until_parked();

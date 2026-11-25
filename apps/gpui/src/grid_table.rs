@@ -1184,9 +1184,6 @@ impl GridView {
                             .debug_selector(|| "grid-horizontal-scrollbar-gutter".into())
                             .h(gutter)
                             .flex_none()
-                            // Match the table's scrollable viewport, which begins after pinned
-                            // leading columns. A full-width track lets a drag consume the pinned
-                            // region as scroll range.
                             .pl(pinned_width)
                             .child(
                                 div()
