@@ -83,14 +83,16 @@ struct Authorization {
     approval_outcome: AuditApprovalOutcome,
     preview_state: AuditPreviewState,
     approval_wait: Duration,
+    runs_past_the_read_deadline: bool,
 }
 
 impl Authorization {
     fn rearm(&self, control: &OperationControl) -> OperationControl {
-        OperationControl::new(
-            control.cancellation_token().clone(),
-            control.deadline().map(|deadline| deadline + self.approval_wait),
-        )
+        let deadline = control
+            .deadline()
+            .filter(|_| !self.runs_past_the_read_deadline)
+            .map(|deadline| deadline + self.approval_wait);
+        OperationControl::new(control.cancellation_token().clone(), deadline)
     }
 }
 
@@ -307,6 +309,8 @@ impl PolicyGuard {
         control: Option<&OperationControl>,
     ) -> Result<Authorization, DriverError> {
         let facts = &analysis.facts;
+        let runs_past_the_read_deadline = !matches!(self.ctx.principal, Principal::Agent { .. })
+            && (facts.writes() || facts.class == StatementClass::Unparseable);
         let decision = match decision {
             Decision::RequireApproval { .. }
                 if matches!(self.ctx.principal, Principal::Agent { .. })
@@ -328,6 +332,7 @@ impl PolicyGuard {
                 approval_outcome: AuditApprovalOutcome::NotRequired,
                 preview_state: AuditPreviewState::NotRequested,
                 approval_wait: Duration::ZERO,
+                runs_past_the_read_deadline,
             }),
             Decision::Deny { ref message, .. } => {
                 let operation = self.operation(
@@ -426,6 +431,7 @@ impl PolicyGuard {
                             approval_outcome: approved_audit_outcome(outcome),
                             preview_state,
                             approval_wait: approval_started.elapsed(),
+                            runs_past_the_read_deadline,
                         })
                     }
                     ApprovalOutcome::Deny => {
