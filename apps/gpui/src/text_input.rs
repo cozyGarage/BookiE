@@ -704,6 +704,8 @@ impl Render for TextInput {
             .child({
                 let frame = div()
                     .w_full()
+                    .min_w_0()
+                    .overflow_hidden()
                     .bg(rgb(theme.background))
                     .rounded(px(size::CONTROL_RADIUS))
                     .border_1()
