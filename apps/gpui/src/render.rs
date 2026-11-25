@@ -183,7 +183,7 @@ impl GridView {
             self,
             &[
                 &["first", "last"],
-                &["refresh-table", "compare", "export-file", "continuous"],
+                &["jump-column", "refresh-table", "compare", "export-file", "continuous"],
             ],
         );
         div()
@@ -229,6 +229,44 @@ impl GridView {
                                 cx.notify();
                             }))
                     }))
+                    .children({
+                        let hidden = self.table.read(cx).delegate().hidden_column_count();
+                        (hidden > 0).then(|| {
+                            let total = self.source.columns().len();
+                            compact_button(
+                                ButtonKind::Ghost,
+                                "show-hidden-columns",
+                                format!("Columns {}/{}", total - hidden, total),
+                                theme,
+                            )
+                            .on_click(cx.listener(|this, _, window, cx| {
+                                this.show_all_hidden_columns(window, cx);
+                                cx.notify();
+                            }))
+                        })
+                    })
+                    .children(
+                        (self.can_save_edits()
+                            && self.cell_edit.edits.is_empty()
+                            && self.compare.is_none()
+                            && !self.form_open())
+                        .then(|| {
+                            compact_button(ButtonKind::Ghost, "add-row", "Add row", theme).on_click(cx.listener(
+                                |this, _, _, cx| {
+                                    this.execute_edit_palette_action("insert-row", cx);
+                                    cx.notify();
+                                },
+                            ))
+                        }),
+                    )
+                    .child(
+                        compact_button(ButtonKind::Ghost, "jump-column", "Go to column", theme).on_click(cx.listener(
+                            |this, _, window, cx| {
+                                this.open_picker(crate::palette_state::PaletteMode::Columns, window, cx);
+                                cx.notify();
+                            },
+                        )),
+                    )
                     .child(
                         compact_button(ButtonKind::Ghost, "compare", "Compare", theme)
                             .on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))),

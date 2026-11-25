@@ -164,6 +164,8 @@ pub(crate) fn icon_label_button(
         .aria_label(tooltip)
         .tooltip(tooltip_view(tooltip.into()))
         .flex()
+        .flex_none()
+        .whitespace_nowrap()
         .items_center()
         .gap_1()
         .px_2()

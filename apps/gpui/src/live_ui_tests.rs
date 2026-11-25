@@ -2290,6 +2290,19 @@ fn switching_connection_expands_every_sidebar_schema_again(cx: &mut TestAppConte
 }
 
 #[gpui::test]
+fn the_labelled_add_row_button_is_absent_without_a_writable_table(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_resize(gpui::size(gpui::px(1400.0), gpui::px(800.0)));
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("add-row").is_none(), "no live table, nothing to add to");
+    connect_and_settle(&view, cx, orders_fixture());
+    assert!(
+        cx.debug_bounds("add-row").is_none(),
+        "a file opened read-only offers no Add row"
+    );
+}
+
+#[gpui::test]
 fn the_labelled_refresh_button_reloads_a_live_table_and_is_absent_without_a_connection(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.simulate_resize(gpui::size(gpui::px(1400.0), gpui::px(800.0)));
@@ -2306,6 +2319,19 @@ fn the_labelled_refresh_button_reloads_a_live_table_and_is_absent_without_a_conn
     cx.executor().advance_clock(std::time::Duration::from_secs(1));
     cx.run_until_parked();
     view.read_with(cx, |view, _| assert_eq!(view.status, "Refreshed the table"));
+}
+
+#[gpui::test]
+fn the_schema_chip_is_offered_only_where_the_engine_has_a_schema_context(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    connect_and_settle(&view, cx, orders_fixture());
+    cx.simulate_keystrokes("ctrl-t");
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("query-connection-chip").is_some());
+    assert!(
+        cx.debug_bounds("query-schema-chip").is_none(),
+        "SQLite has no schema or database context to choose"
+    );
 }
 
 #[gpui::test]
@@ -2333,9 +2359,9 @@ fn compact_grid_menu_preserves_grid_commands(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     view.read_with(cx, |view, _| {
         let groups =
-            crate::menus::command_groups(view, &[&["first", "last"], &["compare", "export-csv", "continuous"]]);
+            crate::menus::command_groups(view, &[&["first", "last"], &["compare", "export-file", "continuous"]]);
         let ids: Vec<_> = groups.iter().flatten().map(|(id, _, _)| *id).collect();
-        assert_eq!(ids, ["first", "last", "compare", "export-csv", "continuous"]);
+        assert_eq!(ids, ["first", "last", "compare", "export-file", "continuous"]);
     });
 }
 
