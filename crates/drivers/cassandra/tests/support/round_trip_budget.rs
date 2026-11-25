@@ -14,6 +14,17 @@ async fn a_simple_select_stays_within_its_server_command_budget() {
     let warmup = connection.query(query).await.expect("warm BookiE connection");
     assert_eq!(warmup.rows, vec![vec![Value::Text("one".into())]]);
 
+    let mut make_audit_dir = container
+        .exec(ExecCommand::new(["mkdir", "-p", "/opt/cassandra/logs/audit"]))
+        .await
+        .expect("create Cassandra audit log directory");
+    let audit_dir_output = make_audit_dir.stdout_to_vec().await.expect("audit directory output");
+    assert_eq!(
+        make_audit_dir.exit_code().await.expect("audit directory exit code"),
+        Some(0),
+        "create Cassandra audit log directory: {audit_dir_output:?}"
+    );
+
     let mut enable = container
         .exec(ExecCommand::new([
             "nodetool",
@@ -23,7 +34,7 @@ async fn a_simple_select_stays_within_its_server_command_budget() {
             "--included-categories",
             "QUERY",
             "--logger",
-            "FileAuditLogger",
+            "BinAuditLogger",
         ]))
         .await
         .expect("enable Cassandra audit log");
@@ -37,8 +48,22 @@ async fn a_simple_select_stays_within_its_server_command_budget() {
     let result = connection.query(query).await.expect("run measured SELECT");
     assert_eq!(result.rows, vec![vec![Value::Text("one".into())]]);
 
-    let output = String::from_utf8(container.stdout_to_vec().await.expect("Cassandra server logs"))
-        .expect("UTF-8 Cassandra server logs");
+    let mut audit_log = container
+        .exec(ExecCommand::new([
+            "/opt/cassandra/tools/bin/auditlogviewer",
+            "/opt/cassandra/logs/audit",
+        ]))
+        .await
+        .expect("read Cassandra audit log");
+    let output = String::from_utf8(audit_log.stdout_to_vec().await.expect("audit log output"))
+        .expect("UTF-8 Cassandra audit log");
+    let error = String::from_utf8(audit_log.stderr_to_vec().await.expect("audit log error"))
+        .expect("UTF-8 Cassandra audit log error");
+    assert_eq!(
+        audit_log.exit_code().await.expect("audit log exit code"),
+        Some(0),
+        "decode Cassandra audit log: {output}\n{error}"
+    );
     let statements = output
         .lines()
         .filter(|line| {
