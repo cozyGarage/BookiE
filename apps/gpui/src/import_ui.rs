@@ -34,10 +34,10 @@ impl GridView {
         }
         let input = self.import.input.get_or_insert_with(|| {
             let input = cx.new(|cx| TextInput::new("Path of a .csv file", cx));
-            cx.subscribe(&input, |this, _, event: &InputEvent, cx| {
-                if matches!(event, InputEvent::Submit) {
-                    this.review_import(cx);
-                }
+            cx.subscribe(&input, |this, _, event: &InputEvent, cx| match event {
+                InputEvent::Submit => this.review_import(cx),
+                InputEvent::Cancel => this.cancel_import_bar(cx),
+                InputEvent::Changed => {}
             })
             .detach();
             input

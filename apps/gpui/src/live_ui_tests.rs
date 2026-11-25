@@ -2352,6 +2352,28 @@ fn the_pager_arrows_appear_only_when_there_is_more_than_one_page(cx: &mut TestAp
 }
 
 #[gpui::test]
+fn the_export_bar_opens_as_a_dialog_and_the_grid_does_not_move(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_resize(gpui::size(gpui::px(1400.0), gpui::px(800.0)));
+    cx.run_until_parked();
+    connect_and_settle(&view, cx, orders_fixture());
+    let before = cx.debug_bounds("grid-actions").expect("the strip is drawn");
+    assert!(cx.debug_bounds("bar-dialog").is_none());
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_export_file_bar(cx)));
+    cx.run_until_parked();
+    let dialog = cx.debug_bounds("bar-dialog").expect("the export bar is a dialog");
+    let after = cx.debug_bounds("grid-actions").expect("the strip is still drawn");
+    assert_eq!(
+        before.origin.y, after.origin.y,
+        "opening the export dialog moved the grid"
+    );
+    assert!(dialog.size.width <= gpui::px(1400.0), "the dialog fits the window");
+    cx.update(|_, cx| view.update(cx, |view, _| view.close_export_file_bar()));
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("bar-dialog").is_none(), "closing removes the dialog");
+}
+
+#[gpui::test]
 fn narrow_grid_toolbar_keeps_actions_inside_window(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     view.update(cx, |view, cx| {

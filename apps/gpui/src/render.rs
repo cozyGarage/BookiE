@@ -538,12 +538,15 @@ impl Render for GridView {
         };
         let full_value_editor = self.full_value_editor_overlay(theme, cx);
         let approval = self.approval_overlay(theme, cx);
+        let bar_dialog = self
+            .import_bar(theme, cx)
+            .or_else(|| self.export_file_bar(theme, cx))
+            .map(|bar| bar_dialog(theme, bar));
         let save_bar = self.save_bar(theme, cx).or_else(|| self.edits_bar(theme, cx));
         let banner = self.save_banner(theme, cx);
         let bundle_bar = self.connection_bundle_bar(theme, cx);
         let insert_form = self
             .insert_form(theme, cx)
-            .or_else(|| self.import_bar(theme, cx))
             .or_else(|| self.structure_bar(theme, cx))
             .or_else(|| self.structure_info_panel(theme, cx))
             .or_else(|| self.resolve_panel(theme, cx))
@@ -602,8 +605,39 @@ impl Render for GridView {
             .child(self.status_bar(theme, f32::from(window.viewport_size().width), cx))
             .children(palette)
             .children(full_value_editor)
+            .children(bar_dialog)
             .children(approval)
     }
+}
+
+fn bar_dialog(theme: Theme, bar: Div) -> Stateful<Div> {
+    div()
+        .id("bar-dialog-scrim")
+        .absolute()
+        .top_0()
+        .left_0()
+        .size_full()
+        .flex()
+        .justify_center()
+        .items_center()
+        .bg(gpui::rgba(0x00000066))
+        .occlude()
+        .child(
+            div()
+                .id("bar-dialog")
+                .debug_selector(|| "bar-dialog".into())
+                .w(px(size::FULL_VALUE_EDITOR_WIDTH))
+                .max_w(gpui::relative(0.92))
+                .max_h(gpui::relative(0.9))
+                .overflow_hidden()
+                .bg(rgb(theme.background))
+                .border_1()
+                .border_color(rgb(theme.border))
+                .rounded(px(theme.radius))
+                .shadow_lg()
+                .on_mouse_down(gpui::MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .child(bar),
+        )
 }
 
 pub(crate) fn progress_text(title: &str, rows: u64, partial: bool, pages: u64) -> String {
