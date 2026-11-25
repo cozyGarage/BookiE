@@ -2295,7 +2295,11 @@ fn the_labelled_add_row_button_opens_the_row_form_only_for_an_editable_table(cx:
     cx.simulate_resize(gpui::size(gpui::px(1400.0), gpui::px(800.0)));
     cx.run_until_parked();
     assert!(cx.debug_bounds("add-row").is_none(), "no live table, nothing to add to");
-    connect_and_settle(&view, cx, orders_fixture());
+    let editable = sqlite_fixture(&[
+        "create table t (id integer primary key, a text)",
+        "insert into t values (1, 'x')",
+    ]);
+    connect_and_settle(&view, cx, editable.0.clone());
     let button = cx.debug_bounds("add-row").expect("an editable table shows Add row");
     cx.simulate_click(button.center(), Default::default());
     cx.run_until_parked();
