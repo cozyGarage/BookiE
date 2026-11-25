@@ -125,8 +125,43 @@ impl GridView {
                             .child(self.catalog.connection.clone()),
                     ),
             )
+            .children(self.schema_context_chip(theme, cx))
             .child(div().flex_1())
             .child(self.transaction_controls(theme, cx))
+    }
+
+    fn schema_context_chip(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Stateful<Div>> {
+        let session = self.live.as_ref()?;
+        if !bookie_app_services::schema_context::supports_schema_context(&session.driver_id) {
+            return None;
+        }
+        let label = self.schema_context.clone().unwrap_or_else(|| "schema".to_owned());
+        Some(
+            div()
+                .id("query-schema-chip")
+                .debug_selector(|| "query-schema-chip".into())
+                .flex()
+                .items_center()
+                .min_w_0()
+                .overflow_hidden()
+                .h(px(size::SMALL_CONTROL))
+                .px_2()
+                .rounded(px(theme.radius))
+                .border_1()
+                .border_color(rgb(theme.border))
+                .cursor_pointer()
+                .text_color(rgb(theme.muted_foreground))
+                .hover(move |style| style.bg(rgb(theme.accent)))
+                .tooltip(|window, cx| {
+                    gpui_component::tooltip::Tooltip::new("Choose the schema or database queries run in")
+                        .build(window, cx)
+                })
+                .on_click(cx.listener(|this, _, window, cx| {
+                    this.open_picker(crate::palette_state::PaletteMode::SchemaContext, window, cx);
+                    cx.notify();
+                }))
+                .child(div().whitespace_nowrap().text_ellipsis().child(label)),
+        )
     }
 
     pub(crate) fn query_editor_pane(&self, theme: Theme, cx: &mut Context<Self>) -> Div {

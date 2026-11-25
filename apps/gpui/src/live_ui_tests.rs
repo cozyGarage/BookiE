@@ -2290,6 +2290,19 @@ fn switching_connection_expands_every_sidebar_schema_again(cx: &mut TestAppConte
 }
 
 #[gpui::test]
+fn the_schema_chip_is_offered_only_where_the_engine_has_a_schema_context(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    connect_and_settle(&view, cx, orders_fixture());
+    cx.simulate_keystrokes("ctrl-t");
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("query-connection-chip").is_some());
+    assert!(
+        cx.debug_bounds("query-schema-chip").is_none(),
+        "SQLite has no schema or database context to choose"
+    );
+}
+
+#[gpui::test]
 fn narrow_grid_toolbar_keeps_actions_inside_window(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     view.update(cx, |view, cx| {
