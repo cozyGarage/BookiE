@@ -43,6 +43,11 @@ pub fn plan_csv_import(
     row_cap: usize,
 ) -> Result<CsvImportPlan, CsvImportError> {
     let bytes = read_import_file(path).map_err(|error| CsvImportError::File(error.to_string()))?;
+    let bytes = if bookie_core::import::is_xlsx(&bytes) {
+        bookie_core::import::xlsx_to_csv(&bytes).map_err(|error| CsvImportError::File(error.to_string()))?
+    } else {
+        bytes
+    };
     let options = CsvImportOptions::from(detect_format(&bytes));
     let mut sheet =
         read_csv(&bytes, &options, Some(row_cap + 1)).map_err(|error| CsvImportError::File(error.to_string()))?;
