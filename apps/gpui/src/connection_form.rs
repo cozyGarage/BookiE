@@ -516,26 +516,28 @@ impl GridView {
 
     fn connection_actions(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
         let form = &self.connection_form;
-        div()
-            .debug_selector(|| "connection-actions".into())
-            .px_4()
-            .py_3()
-            .border_t_1()
-            .border_color(rgb(theme.border))
+        let status = (!form.status.is_empty()).then(|| {
+            div()
+                .id("connection-form-status")
+                .debug_selector(|| "connection-form-status".into())
+                .w_full()
+                .max_h(px(size::FORM_CONTROL * 2.0))
+                .overflow_y_scroll()
+                .text_color(rgb(theme.muted_foreground))
+                .child(form.status.clone())
+        });
+        let auxiliary = div()
             .flex()
             .flex_wrap()
             .items_center()
             .gap_2()
             .child(self.test_button(theme, cx))
-            .child(self.url_buttons(theme, cx))
-            .child(
-                div()
-                    .flex_1()
-                    .min_w_0()
-                    .text_color(rgb(theme.muted_foreground))
-                    .child(form.status.clone()),
-            )
-            .children(form.editing.map(|_| self.delete_button(theme, cx)))
+            .child(self.url_buttons(theme, cx));
+        let commit = div()
+            .flex()
+            .flex_wrap()
+            .items_center()
+            .gap_2()
             .child(self.save_button(theme, cx))
             .children(form.editing.is_none().then(|| self.connect_button(theme, cx)))
             .child(if form.saving {
@@ -550,6 +552,28 @@ impl GridView {
                 button(ButtonKind::Ghost, "cancel-connection", "Cancel", theme)
                     .on_click(cx.listener(|this, _, _, cx| this.close_connection_dialog(cx)))
             })
+            .children(form.editing.map(|_| self.delete_button(theme, cx)));
+        div()
+            .debug_selector(|| "connection-actions".into())
+            .flex_none()
+            .flex()
+            .flex_col()
+            .gap_2()
+            .px_4()
+            .py_3()
+            .border_t_1()
+            .border_color(rgb(theme.border))
+            .children(status)
+            .child(
+                div()
+                    .flex()
+                    .flex_wrap()
+                    .items_center()
+                    .justify_between()
+                    .gap_2()
+                    .child(auxiliary)
+                    .child(commit),
+            )
     }
 
     fn behaviour_fields(&self, theme: Theme, cx: &mut Context<Self>) -> Vec<Div> {
