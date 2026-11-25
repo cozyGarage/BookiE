@@ -183,7 +183,7 @@ impl GridView {
             self,
             &[
                 &["first", "last"],
-                &["refresh-table", "compare", "export-csv", "continuous"],
+                &["refresh-table", "compare", "export-file", "continuous"],
             ],
         );
         div()
@@ -220,8 +220,10 @@ impl GridView {
             .when(!compact, |actions| {
                 actions
                     .children((self.live.is_some() && !self.grid_is_query).then(|| {
-                        button("refresh-table", "Refresh", theme)
-                            .debug_selector(|| "refresh-table".into())
+                        compact_button(ButtonKind::Ghost, "refresh-table", "Refresh", theme)
+                            .tooltip(crate::surfaces::tooltip_view(
+                                "Refresh the table from the database".into(),
+                            ))
                             .on_click(cx.listener(|this, _, _, cx| {
                                 this.refresh_table(cx);
                                 cx.notify();
@@ -232,12 +234,14 @@ impl GridView {
                             .on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))),
                     )
                     .child(
-                        compact_button(ButtonKind::Ghost, "export", "Export CSV", theme).on_click(cx.listener(
-                            |this, _, _, cx| {
-                                this.export_selection_or_page(cx);
+                        compact_button(ButtonKind::Ghost, "export", "Export…", theme)
+                            .tooltip(crate::surfaces::tooltip_view(
+                                "Export to a file and choose its format".into(),
+                            ))
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.open_export_file_bar(cx);
                                 cx.notify();
-                            },
-                        )),
+                            })),
                     )
                     .child(
                         toggle_icon_button(

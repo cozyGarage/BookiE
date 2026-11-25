@@ -2472,3 +2472,17 @@ fn every_control_in_a_bar_has_the_bar_height(cx: &mut TestAppContext) {
     assert_eq!(toggle.size.height, px(size::COMPACT_CONTROL));
     assert!(cx.debug_bounds("results-header").is_some());
 }
+
+#[gpui::test]
+fn the_grid_export_button_opens_the_file_export_with_a_format_choice(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_resize(gpui::size(gpui::px(1500.0), gpui::px(800.0)));
+    cx.run_until_parked();
+    let export = cx.debug_bounds("export").expect("the export button is drawn");
+    cx.simulate_click(export.center(), Default::default());
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(view.export.file.open, "the export bar opens");
+        assert!(view.formats_for(100, true).len() > 1, "more than one format is offered");
+    });
+}

@@ -273,7 +273,7 @@ impl GridView {
         Some((path, (!self.grid_is_query).then(|| self.catalog.grid_table.clone())))
     }
 
-    fn formats_for(&self, rows: u64, has_table: bool) -> Vec<ResultFormat> {
+    pub(crate) fn formats_for(&self, rows: u64, has_table: bool) -> Vec<ResultFormat> {
         let driver_id = self
             .live
             .as_ref()
