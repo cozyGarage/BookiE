@@ -116,6 +116,21 @@ fn a_staged_edit_tints_its_cell_and_shows_the_pending_bar_until_discarded(cx: &m
 }
 
 #[gpui::test]
+fn the_query_toolbar_connection_chip_opens_the_connection_status(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-t");
+    cx.run_until_parked();
+    let chip = cx
+        .debug_bounds("query-connection-chip")
+        .expect("the connection chip is drawn in the query toolbar");
+    cx.simulate_click(chip.center(), Default::default());
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.status, "No active database connection.");
+    });
+}
+
+#[gpui::test]
 fn undo_and_redo_step_through_the_staged_edits_of_a_cell(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     let edit = |cx: &mut gpui::VisualTestContext, text: &str| {
