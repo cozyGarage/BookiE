@@ -201,6 +201,22 @@ impl GridView {
             )
             .when(!compact, |actions| {
                 actions
+                    .children({
+                        let hidden = self.table.read(cx).delegate().hidden_column_count();
+                        (hidden > 0).then(|| {
+                            let total = self.source.columns().len();
+                            button(
+                                "show-hidden-columns",
+                                format!("Columns {}/{}", total - hidden, total),
+                                theme,
+                            )
+                            .debug_selector(|| "show-hidden-columns".into())
+                            .on_click(cx.listener(|this, _, window, cx| {
+                                this.show_all_hidden_columns(window, cx);
+                                cx.notify();
+                            }))
+                        })
+                    })
                     .child(
                         button("compare", "Compare", theme)
                             .on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))),
