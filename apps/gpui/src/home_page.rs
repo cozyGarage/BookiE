@@ -70,30 +70,29 @@ pub(crate) fn home_shortcut(
 }
 
 impl GridView {
-    pub(crate) fn home_stats_row(&self, theme: Theme) -> Div {
+    pub(crate) fn home_counts(&self) -> (usize, usize, usize) {
         let unique_drivers = self
             .connections
             .iter()
             .map(|c| c.driver_id.as_str())
             .chain(self.live.as_ref().map(|l| l.driver_id.as_str()))
             .collect::<std::collections::HashSet<_>>()
-            .len()
-            .max(1);
+            .len();
+        (self.connections.len(), usize::from(self.live.is_some()), unique_drivers)
+    }
+
+    pub(crate) fn home_stats_row(&self, theme: Theme) -> Div {
+        let (connections, connected, unique_drivers) = self.home_counts();
         div()
             .flex()
             .gap_4()
             .child(home_stat_card(
                 "Connections",
                 "database",
-                &self.connections.len().max(1).to_string(),
+                &connections.to_string(),
                 theme,
             ))
-            .child(home_stat_card(
-                "Connected",
-                "play",
-                &usize::from(self.live.is_some() || self.connections.is_empty()).to_string(),
-                theme,
-            ))
+            .child(home_stat_card("Connected", "play", &connected.to_string(), theme))
             .child(home_stat_card(
                 "Database Types",
                 "package",
@@ -257,15 +256,24 @@ impl GridView {
             ))
     }
 
+    pub(crate) fn status_shows_grid(&self) -> bool {
+        self.on_table_tab()
+            || (self.tabs.current() == &bookie_gpui::shell::Tab::Query && !self.run_tabs.slots.is_empty())
+    }
+
+    pub(crate) fn status_count_text(&self, dark: bool, compact: bool) -> String {
+        match (self.status_shows_grid(), compact) {
+            (true, false) => footer_counts(self.dataset_count(), self.source.columns().len(), dark),
+            (true, true) => format!("{} rows", thousands(self.dataset_count())),
+            (false, _) => String::new(),
+        }
+    }
+
     pub fn status_bar(&self, theme: Theme, window_width: f32, cx: &mut Context<Self>) -> Stateful<Div> {
         let compact = window_width < size::STATUS_COMPACT_WIDTH;
-        let grid = self.tabs.shows_grid_for(&self.catalog.grid_table);
-        let theme_name = if theme.dark { "dark" } else { "light" };
-        let rows = match (grid, compact) {
-            (true, false) => footer_counts(self.dataset_count(), self.source.columns().len(), theme.dark),
-            (true, true) => format!("{} rows", thousands(self.dataset_count())),
-            (false, _) => theme_name.to_string(),
-        };
+        let table_tab = self.on_table_tab();
+        let grid = self.status_shows_grid();
+        let rows = self.status_count_text(theme.dark, compact);
         let sql = (grid && !compact)
             .then(|| self.source.executed_sql())
             .flatten()
@@ -353,7 +361,7 @@ impl GridView {
             .children(count_rows)
             .when(!compact, |bar| bar.children(self.selection_stats_segment(theme)))
             .children(elapsed.map(|time| div().flex_none().child(time)))
-            .when(grid, |bar| {
+            .when(table_tab, |bar| {
                 bar.child(
                     div()
                         .debug_selector(|| "status-page".into())

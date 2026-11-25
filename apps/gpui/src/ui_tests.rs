@@ -2120,3 +2120,21 @@ fn a_double_click_on_a_table_row_opens_the_active_column_for_editing(cx: &mut Te
         assert_eq!((editing.row, editing.column), (1, 1));
     });
 }
+
+#[gpui::test]
+fn home_counts_are_zero_without_connections(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    view.update(cx, |view, _| {
+        view.connections.clear();
+        assert_eq!(view.home_counts(), (0, 0, 0), "nothing saved and nothing connected");
+    });
+}
+
+#[gpui::test]
+fn home_counts_follow_a_live_session(cx: &mut TestAppContext) {
+    let (view, cx) = crate::live_ui_tests::open_live(cx);
+    view.update(cx, |view, _| {
+        view.connections.clear();
+        assert_eq!(view.home_counts(), (0, 1, 1), "one live session of one driver");
+    });
+}
