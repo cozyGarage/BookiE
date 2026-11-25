@@ -129,6 +129,28 @@ fn connection_form_keeps_actions_visible_at_two_widths(cx: &mut TestAppContext) 
 }
 
 #[gpui::test]
+fn long_connection_test_status_has_its_own_line_above_the_actions(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    view.update(cx, |view, cx| {
+        view.open_connection_dialog(cx);
+        view.connection_form.status = "Could not verify the PostgreSQL server certificate. ".repeat(15);
+        cx.notify();
+    });
+    for width in [720.0, 900.0, 1500.0] {
+        cx.simulate_resize(gpui::size(gpui::px(width), gpui::px(760.0)));
+        cx.run_until_parked();
+        let status = cx
+            .debug_bounds("connection-form-status")
+            .expect("the result is visible");
+        let test = cx.debug_bounds("test-connection").expect("Test is visible");
+        let connect = cx.debug_bounds("connect-connection").expect("Connect is visible");
+        assert!(status.size.width > gpui::px(300.0));
+        assert!(status.bottom() <= test.top() && status.bottom() <= connect.top());
+        assert!(test.bottom() <= gpui::px(760.0) && connect.bottom() <= gpui::px(760.0));
+    }
+}
+
+#[gpui::test]
 fn editing_a_production_connection_keeps_it_production(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.update(|_, cx| {
