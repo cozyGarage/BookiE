@@ -498,7 +498,10 @@ impl GridView {
                         cx.notify();
                         false
                     }
-                    None => true,
+                    None => {
+                        view.remember_open_query_draft(cx);
+                        true
+                    }
                 })
                 .unwrap_or(true)
         });
