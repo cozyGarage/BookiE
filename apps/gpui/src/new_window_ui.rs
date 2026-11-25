@@ -51,6 +51,7 @@ impl GridView {
             cx.notify();
             return;
         }
+        self.remember_open_query_draft(cx);
         match std::env::current_exe().and_then(|executable| new_window_command(&executable).spawn()) {
             Ok(_) => cx.quit(),
             Err(error) => {
