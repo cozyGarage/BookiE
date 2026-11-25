@@ -4,7 +4,8 @@ use std::time::Duration;
 use bookie_app_services::approval_prompt::{ApprovalInbox, ApprovalOutcome, PendingApproval, prompt_channel};
 
 use super::*;
-use crate::chrome::{ghost, primary_button};
+use crate::chrome::tip;
+use crate::surfaces::{ButtonKind, button, dialog_surface, scrim};
 
 pub(crate) struct ApprovalUi {
     pub tx: tokio::sync::mpsc::UnboundedSender<PendingApproval>,
@@ -99,61 +100,43 @@ impl GridView {
     pub(crate) fn approval_overlay(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Stateful<Div>> {
         let request = &self.approval.current.as_ref()?.request;
         Some(
-            div()
-                .id("approval-overlay")
-                .absolute()
-                .top_0()
-                .left_0()
-                .size_full()
-                .flex()
-                .justify_center()
-                .items_center()
-                .bg(gpui::rgba(0x00000088))
-                .occlude()
-                .child(
-                    div()
-                        .id("approval-dialog")
-                        .debug_selector(|| "approval-dialog".into())
-                        .w(px(size::APPROVAL_DIALOG_WIDTH))
-                        .max_w(gpui::relative(0.92))
-                        .max_h(gpui::relative(0.9))
-                        .flex()
-                        .flex_col()
-                        .gap_2()
-                        .p_3()
-                        .bg(rgb(theme.background))
-                        .border_1()
-                        .border_color(rgb(theme.destructive))
-                        .rounded(px(theme.radius))
-                        .on_mouse_down(gpui::MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                        .child(
-                            div()
-                                .font_weight(gpui::FontWeight::SEMIBOLD)
-                                .child("This write needs your approval"),
-                        )
-                        .child(
-                            div()
-                                .id("approval-detail")
-                                .max_h(px(size::SAVE_PREVIEW_MAX_HEIGHT))
-                                .overflow_y_scroll()
-                                .text_size(px(size::TEXT_SMALL))
-                                .text_color(rgb(theme.muted_foreground))
-                                .child(approval_detail(request)),
-                        )
-                        .child(
-                            div()
-                                .id("approval-sql")
-                                .max_h(px(size::SAVE_PREVIEW_MAX_HEIGHT))
-                                .overflow_y_scroll()
-                                .p_2()
-                                .bg(rgb(theme.chrome))
-                                .rounded(px(theme.radius))
-                                .font_family("monospace")
-                                .text_size(px(size::TEXT_SMALL))
-                                .child(request.sql.clone()),
-                        )
-                        .child(approval_actions(theme, cx)),
-                ),
+            scrim(theme).id("approval-overlay").occlude().child(
+                dialog_surface(size::APPROVAL_DIALOG_WIDTH, theme)
+                    .id("approval-dialog")
+                    .debug_selector(|| "approval-dialog".into())
+                    .max_w(gpui::relative(0.92))
+                    .max_h(gpui::relative(0.9))
+                    .gap_2()
+                    .p_3()
+                    .on_mouse_down(gpui::MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .child(
+                        div()
+                            .font_weight(gpui::FontWeight::SEMIBOLD)
+                            .child("This write needs your approval"),
+                    )
+                    .child(
+                        div()
+                            .id("approval-detail")
+                            .max_h(px(size::SAVE_PREVIEW_MAX_HEIGHT))
+                            .overflow_y_scroll()
+                            .text_size(px(size::TEXT_SMALL))
+                            .text_color(rgb(theme.muted_foreground))
+                            .child(approval_detail(request)),
+                    )
+                    .child(
+                        div()
+                            .id("approval-sql")
+                            .max_h(px(size::SAVE_PREVIEW_MAX_HEIGHT))
+                            .overflow_y_scroll()
+                            .p_2()
+                            .bg(rgb(theme.chrome))
+                            .rounded(px(theme.radius))
+                            .font_family("monospace")
+                            .text_size(px(size::TEXT_SMALL))
+                            .child(request.sql.clone()),
+                    )
+                    .child(approval_actions(theme, cx)),
+            ),
         )
     }
 }
@@ -185,12 +168,14 @@ fn approval_actions(theme: Theme, cx: &mut Context<GridView>) -> Div {
         .justify_end()
         .gap_2()
         .child(
-            ghost("deny-write", "Deny", theme)
-                .debug_selector(|| "deny-write".into())
-                .on_click(cx.listener(|this, _, _, cx| this.answer_approval(ApprovalOutcome::Deny, cx))),
+            button(ButtonKind::Primary, "approve-write", "Approve once", theme)
+                .debug_selector(|| "approve-write".into())
+                .tooltip(tip("Run this statement once"))
+                .on_click(cx.listener(|this, _, _, cx| this.answer_approval(ApprovalOutcome::AllowOnce, cx))),
         )
         .child(
-            primary_button("approve-write", "Approve once", "Run this statement once", theme)
-                .on_click(cx.listener(|this, _, _, cx| this.answer_approval(ApprovalOutcome::AllowOnce, cx))),
+            button(ButtonKind::Ghost, "deny-write", "Deny", theme)
+                .debug_selector(|| "deny-write".into())
+                .on_click(cx.listener(|this, _, _, cx| this.answer_approval(ApprovalOutcome::Deny, cx))),
         )
 }

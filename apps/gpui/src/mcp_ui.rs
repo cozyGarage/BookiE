@@ -8,7 +8,7 @@ use gpui::{Context, Div, Entity, Stateful, div, prelude::*};
 use gpui_kit::component::setting::{SettingField, SettingGroup, SettingItem};
 
 use crate::GridView;
-use crate::chrome::{ghost, primary_button};
+use crate::surfaces::{ButtonKind, button};
 use crate::ui_theme::ThemeExt;
 
 #[derive(Default)]
@@ -49,14 +49,16 @@ impl McpState {
                 .flex_col()
                 .items_start()
                 .gap_2()
-                .child(button(
+                .child(issue_token_button(
+                    ButtonKind::Primary,
                     "mcp-issue-read",
                     "Read-only token",
                     actions_view.clone(),
                     TokenPermissions::ReadOnly,
                     theme,
                 ))
-                .child(button(
+                .child(issue_token_button(
+                    ButtonKind::Ghost,
                     "mcp-issue-write",
                     "Read-write token",
                     actions_view.clone(),
@@ -85,16 +87,18 @@ impl McpState {
                 .gap_2()
                 .child(div().child(plaintext))
                 .child(
-                    ghost("mcp-hide-issued-token", "Hide", Theme::current(cx)).on_click(move |_, _, cx| {
-                        hide_view.update(cx, |this, cx| {
-                            this.mcp.plaintext = None;
-                            cx.notify();
-                        });
-                    }),
+                    button(ButtonKind::Ghost, "mcp-hide-issued-token", "Hide", Theme::current(cx)).on_click(
+                        move |_, _, cx| {
+                            hide_view.update(cx, |this, cx| {
+                                this.mcp.plaintext = None;
+                                cx.notify();
+                            });
+                        },
+                    ),
                 )
         });
         let mut group = SettingGroup::new()
-            .item(SettingItem::new("MCP server", enabled).description("Use BookiE's governed local MCP endpoint."))
+            .item(SettingItem::new("MCP server", enabled).description("Use BookiE's governed local MCP endpoint"))
             .item(
                 SettingItem::new("Issue token", actions)
                     .layout(gpui::Axis::Vertical)
@@ -112,14 +116,15 @@ impl McpState {
     }
 }
 
-fn button(
+fn issue_token_button(
+    kind: ButtonKind,
     id: &'static str,
     label: &'static str,
     view: Entity<GridView>,
     permissions: TokenPermissions,
     theme: Theme,
 ) -> Stateful<Div> {
-    primary_button(id, label, label, theme)
+    button(kind, id, label, theme)
         .debug_selector(move || id.into())
         .on_click(move |_, _, cx| {
             view.update(cx, |this, cx| this.issue_mcp_token(permissions, cx));
@@ -128,7 +133,7 @@ fn button(
 
 fn token_list(view: Entity<GridView>, theme: Theme, cx: &gpui::App) -> Div {
     let Some(bridge) = view.read(cx).mcp.bridge() else {
-        return div().child("Start the MCP server to manage tokens.");
+        return div().child("Start the MCP server to manage tokens");
     };
     let mut tokens = bridge.tokens().list();
     tokens.sort_by(|left, right| left.name.cmp(&right.name));
@@ -160,7 +165,8 @@ fn token_row(view: Entity<GridView>, bridge: Arc<McpBridge>, token: McpToken, th
             let view = view.clone();
             let bridge = bridge.clone();
             row.child(
-                ghost(
+                button(
+                    ButtonKind::Destructive,
                     gpui::ElementId::Name(format!("mcp-revoke-{id}").into()),
                     "Revoke",
                     theme,
@@ -180,7 +186,7 @@ impl GridView {
         }
         if enabled {
             let Some(database) = self.live.as_ref().map(|live| live.database_service().clone()) else {
-                self.mcp.status = Some("Connect to a saved database before enabling MCP.".into());
+                self.mcp.status = Some("Connect to a saved database before enabling MCP".into());
                 cx.notify();
                 return;
             };
@@ -189,15 +195,15 @@ impl GridView {
                 self.mcp.connections.clone(),
             );
             self.mcp.status = Some(if self.mcp.enabled() {
-                "MCP server enabled.".into()
+                "MCP server enabled".into()
             } else {
-                "MCP server could not start; check the audit and policy configuration.".into()
+                "MCP server could not start; check the audit and policy configuration".into()
             });
         } else {
             if let Some(server) = self.mcp.server.take() {
                 server.shutdown();
             }
-            self.mcp.status = Some("MCP server disabled.".into());
+            self.mcp.status = Some("MCP server disabled".into());
         }
         cx.notify();
     }
@@ -217,7 +223,7 @@ impl GridView {
                 if result.is_ok() {
                     this.mcp.plaintext = None;
                 }
-                this.mcp.status = Some(result.map_or_else(|error| error, |_| "Token revoked.".into()));
+                this.mcp.status = Some(result.map_or_else(|error| error, |_| "Token revoked".into()));
                 cx.notify();
             });
         })
@@ -226,7 +232,7 @@ impl GridView {
 
     pub(crate) fn issue_mcp_token(&mut self, permissions: TokenPermissions, cx: &mut Context<Self>) {
         let Some(bridge) = self.mcp.bridge() else {
-            self.mcp.status = Some("Enable the MCP server before issuing a token.".into());
+            self.mcp.status = Some("Enable the MCP server before issuing a token".into());
             cx.notify();
             return;
         };
@@ -236,7 +242,7 @@ impl GridView {
             .and_then(|live| live.saved.as_ref())
             .map(|(id, _)| *id)
         else {
-            self.mcp.status = Some("A saved database connection is required to issue a token.".into());
+            self.mcp.status = Some("A saved database connection is required to issue a token".into());
             cx.notify();
             return;
         };
@@ -264,9 +270,9 @@ impl GridView {
                     Ok(issued) => {
                         this.mcp.plaintext = Some(issued.plaintext);
                         this.mcp.status = Some(if issued.keyring_saved {
-                            "Token issued and saved to the keyring.".into()
+                            "Token issued and saved to the keyring".into()
                         } else {
-                            "Token issued; keyring storage was unavailable.".into()
+                            "Token issued; keyring storage was unavailable".into()
                         });
                     }
                     Err(error) => this.mcp.status = Some(format!("Could not issue token: {error}")),

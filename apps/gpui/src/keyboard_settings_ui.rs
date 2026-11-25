@@ -4,7 +4,7 @@ use gpui::{Context, Entity, Keystroke, Window, div, prelude::*};
 use gpui_kit::component::setting::{SettingField, SettingGroup, SettingItem};
 
 use crate::GridView;
-use crate::chrome::ghost;
+use crate::surfaces::{ButtonKind, button};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum SettingsPage {
@@ -125,17 +125,34 @@ impl GridView {
                                     .min_w(gpui::px(bookie_gpui::theme::size::SHORTCUT_CHORD_WIDTH))
                                     .child(label),
                             )
-                            .child(ghost(("record-shortcut", command as usize), "Record", theme).on_click(
-                                move |_, window, cx| {
+                            .child(
+                                button(
+                                    ButtonKind::Ghost,
+                                    ("record-shortcut", command as usize),
+                                    "Record",
+                                    theme,
+                                )
+                                .on_click(move |_, window, cx| {
                                     record.update(cx, |this, cx| this.start_recording_shortcut(command, window, cx));
-                                },
-                            ))
-                            .child(ghost(("remove-shortcut", command as usize), "Remove", theme).on_click(
-                                move |_, _, cx| remove.update(cx, |this, cx| this.remove_shortcut(command, cx)),
-                            ))
-                            .child(ghost(("reset-shortcut", command as usize), "Reset", theme).on_click(
-                                move |_, _, cx| reset.update(cx, |this, cx| this.reset_shortcut(command, cx)),
-                            ))
+                                }),
+                            )
+                            .child(
+                                button(
+                                    ButtonKind::Ghost,
+                                    ("remove-shortcut", command as usize),
+                                    "Remove",
+                                    theme,
+                                )
+                                .on_click(move |_, _, cx| {
+                                    remove.update(cx, |this, cx| this.remove_shortcut(command, cx))
+                                }),
+                            )
+                            .child(
+                                button(ButtonKind::Ghost, ("reset-shortcut", command as usize), "Reset", theme)
+                                    .on_click(move |_, _, cx| {
+                                        reset.update(cx, |this, cx| this.reset_shortcut(command, cx))
+                                    }),
+                            )
                     }),
                 ))
             })

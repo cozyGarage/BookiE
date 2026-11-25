@@ -448,10 +448,9 @@ impl TableDelegate for GridDelegate {
             theme.muted_foreground,
         );
         let pin = self.pin_scope.clone().filter(|_| show_pin_button).map(|scope| {
-            use gpui_component::button::{Button, ButtonVariants};
-
             let pinned = col_ix < self.pinned_columns;
             let action = if pinned { "Unpin from" } else { "Pin through" };
+            use gpui_component::button::{Button, ButtonVariants};
             let label = format!("{action} {name}");
             let color = if pinned {
                 theme.foreground
@@ -463,7 +462,7 @@ impl TableDelegate for GridDelegate {
                 .small()
                 .compact()
                 .tooltip(label.clone())
-                .accessibility_label(label.clone())
+                .accessibility_label(label)
                 .on_click(cx.listener(move |table, _, _, cx| {
                     let delegate = table.delegate_mut();
                     delegate.pinned_columns =
@@ -518,7 +517,7 @@ impl TableDelegate for GridDelegate {
                                 .overflow_hidden()
                                 .whitespace_nowrap()
                                 .text_ellipsis()
-                                .text_xs()
+                                .text_size(px(bookie_gpui::theme::size::TEXT_SMALL))
                                 .text_color(gpui::rgb(theme.muted_foreground))
                                 .child(kind),
                         )
@@ -566,7 +565,7 @@ impl TableDelegate for GridDelegate {
                     .when_some(checked, |el, on| {
                         let theme = Theme::current(cx);
                         let (name, color) = if on {
-                            ("square-check", theme.info)
+                            ("square-check", theme.foreground)
                         } else {
                             ("square", theme.muted_foreground)
                         };
@@ -582,7 +581,9 @@ impl TableDelegate for GridDelegate {
                             .overflow_hidden()
                             .when(!wrap, |cell| cell.whitespace_nowrap().text_ellipsis())
                             .when(wrap, |cell| cell.line_clamp(bookie_gpui::theme::size::WRAP_LINES))
-                            .when(link, |cell| cell.text_color(gpui::rgb(Theme::current(cx).info)))
+                            .when(link, |cell| {
+                                cell.text_color(gpui::rgb(crate::surfaces::link_colour(Theme::current(cx))))
+                            })
                             .when(right, |cell| cell.text_right())
                             .child(text),
                     )
@@ -1237,7 +1238,7 @@ impl GridView {
         }
         let projection = ColumnProjection::new(columns.len(), &hidden);
         if projection.len() <= 1 {
-            self.status = "At least one column must remain visible.".into();
+            self.status = "At least one column must remain visible".into();
             return;
         }
         hidden.insert(source_col);

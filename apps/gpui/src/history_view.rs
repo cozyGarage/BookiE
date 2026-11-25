@@ -6,8 +6,9 @@ use gpui::{Context, Div, Entity, Stateful, Window, div, prelude::*, px, rgb};
 
 use crate::GridView;
 use crate::assets::icon;
-use crate::chrome::{ghost_icon, one_line};
-use crate::connection_form::{choice_chip, choice_row};
+use crate::chrome::one_line;
+use crate::connection_form::choice_row;
+use crate::surfaces::{Bar, ListState, icon_button, list_state, segment, toggle_icon_button};
 use crate::text_input::{InputEvent, TextInput};
 
 static PRUNED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
@@ -19,7 +20,25 @@ pub(crate) struct HistoryPage {
     pub status: StatusFilter,
     pub window: TimeWindow,
     pub rows: Vec<HistoryRow>,
+    pub load: HistoryLoad,
     generation: u64,
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(crate) enum HistoryLoad {
+    #[default]
+    Loading,
+    Ready,
+    Failed(String),
+}
+
+pub(crate) fn history_state(load: &HistoryLoad, empty: bool) -> Option<ListState<'_>> {
+    match load {
+        HistoryLoad::Loading if empty => Some(ListState::Loading("Loading history…")),
+        HistoryLoad::Failed(message) => Some(ListState::Failed(message)),
+        _ if empty => Some(ListState::Empty("No statements match")),
+        _ => None,
+    }
 }
 
 impl HistoryPage {
@@ -36,6 +55,7 @@ impl HistoryPage {
             status: StatusFilter::All,
             window: TimeWindow::Any,
             rows: Vec::new(),
+            load: HistoryLoad::Loading,
             generation: 0,
         }
     }
@@ -117,8 +137,11 @@ impl GridView {
                     return;
                 }
                 match rows {
-                    Ok(rows) => this.history_page.rows = pinned_first(rows),
-                    Err(message) => this.status = message,
+                    Ok(rows) => {
+                        this.history_page.rows = pinned_first(rows);
+                        this.history_page.load = HistoryLoad::Ready;
+                    }
+                    Err(message) => this.history_page.load = HistoryLoad::Failed(message),
                 }
                 cx.notify();
             });
@@ -163,12 +186,10 @@ impl GridView {
         theme: Theme,
         cx: &mut Context<Self>,
     ) -> Stateful<Div> {
-        choice_chip(id, label, self.history_page.status == status, theme).on_click(cx.listener(
-            move |this, _, _, cx| {
-                this.history_page.status = status;
-                this.reload_history_page(cx);
-            },
-        ))
+        segment(id, label, self.history_page.status == status, theme).on_click(cx.listener(move |this, _, _, cx| {
+            this.history_page.status = status;
+            this.reload_history_page(cx);
+        }))
     }
 
     fn history_window_chip(
@@ -179,12 +200,10 @@ impl GridView {
         theme: Theme,
         cx: &mut Context<Self>,
     ) -> Stateful<Div> {
-        choice_chip(id, label, self.history_page.window == window, theme).on_click(cx.listener(
-            move |this, _, _, cx| {
-                this.history_page.window = window;
-                this.reload_history_page(cx);
-            },
-        ))
+        segment(id, label, self.history_page.window == window, theme).on_click(cx.listener(move |this, _, _, cx| {
+            this.history_page.window = window;
+            this.reload_history_page(cx);
+        }))
     }
 
     fn history_row(&self, index: usize, row: &HistoryRow, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
@@ -194,17 +213,18 @@ impl GridView {
         } else {
             theme.destructive
         };
-        let pin = ghost_icon(
+        let pin = toggle_icon_button(
             ("history-pin", index),
             "pin",
             if pinned { "Unpin" } else { "Pin" },
+            pinned,
+            Bar::Small,
             theme,
         )
-        .when(pinned, |button| button.bg(rgb(theme.active_row)))
         .on_click(cx.listener(move |this, _, _, cx| {
             this.change_history(statement_history::set_pinned(id, !pinned), cx);
         }));
-        let delete = ghost_icon(("history-delete", index), "trash-2", "Delete", theme)
+        let delete = icon_button(("history-delete", index), "trash-2", "Delete", theme)
             .on_click(cx.listener(move |this, _, _, cx| this.change_history(statement_history::delete(id), cx)));
         div()
             .id(("history-row", index))
@@ -265,7 +285,7 @@ impl GridView {
                 self.history_status_chip("history-all", "All", StatusFilter::All, theme, cx),
                 self.history_status_chip("history-ok", "Succeeded", StatusFilter::Succeeded, theme, cx),
                 self.history_status_chip("history-failed", "Failed", StatusFilter::Failed, theme, cx),
-                self.history_status_chip("history-cancelled", "Cancelled", StatusFilter::Cancelled, theme, cx),
+                self.history_status_chip("history-cancelled", "Canceled", StatusFilter::Cancelled, theme, cx),
             ],
         );
         let windows = choice_row(
@@ -278,13 +298,9 @@ impl GridView {
                 self.history_window_chip("history-month", "30 days", TimeWindow::Month, theme, cx),
             ],
         );
-        let body = if rows.is_empty() {
-            div()
-                .p_4()
-                .text_color(rgb(theme.muted_foreground))
-                .child("No statements match")
-        } else {
-            div().flex().flex_col().gap_1().children(rows)
+        let body = match history_state(&self.history_page.load, rows.is_empty()) {
+            Some(state) => list_state(state, theme),
+            None => div().flex().flex_col().gap_1().children(rows),
         };
         div()
             .flex_1()
@@ -322,6 +338,24 @@ mod tests {
             succeeded: true,
             pinned,
         }
+    }
+
+    #[test]
+    fn the_history_list_says_when_it_is_loading_failed_or_empty() {
+        assert_eq!(
+            history_state(&HistoryLoad::Loading, true),
+            Some(ListState::Loading("Loading history…"))
+        );
+        assert_eq!(history_state(&HistoryLoad::Loading, false), None);
+        assert_eq!(
+            history_state(&HistoryLoad::Failed("disk full".into()), false),
+            Some(ListState::Failed("disk full"))
+        );
+        assert_eq!(
+            history_state(&HistoryLoad::Ready, true),
+            Some(ListState::Empty("No statements match"))
+        );
+        assert_eq!(history_state(&HistoryLoad::Ready, false), None);
     }
 
     #[test]

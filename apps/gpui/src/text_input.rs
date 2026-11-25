@@ -7,7 +7,7 @@ use gpui::{
     App, Bounds, ClipboardItem, Context, CursorStyle, ElementId, ElementInputHandler, Entity, EntityInputHandler,
     EventEmitter, FocusHandle, Focusable, GlobalElementId, KeyBinding, LayoutId, MouseButton, MouseDownEvent,
     MouseMoveEvent, MouseUpEvent, PaintQuad, Pixels, Point, ShapedLine, SharedString, Style, TextRun, UTF16Selection,
-    UnderlineStyle, Window, actions, div, fill, hsla, point, prelude::*, px, relative, rgb, rgba, size,
+    UnderlineStyle, Window, actions, div, fill, point, prelude::*, px, relative, rgb, size,
 };
 use unicode_segmentation::*;
 
@@ -594,7 +594,10 @@ impl Element for TextElement {
         let style = window.text_style();
 
         let (display_text, text_color) = if content.is_empty() {
-            (input.placeholder.clone(), hsla(0., 0., 0.7, 0.45))
+            (
+                input.placeholder.clone(),
+                gpui::Hsla::from(rgb(bookie_gpui::theme::Theme::current(cx).muted_foreground)),
+            )
         } else {
             (content, style.color)
         };
@@ -609,9 +612,8 @@ impl Element for TextElement {
         let line = window.text_system().shape_line(display_text, font_size, &runs, None);
 
         let x_offset = compute_x_offset(input.text_align, bounds, line.width);
-        let theme_fg = bookie_gpui::theme::Theme::current(cx).foreground;
-        let (selection, cursor) =
-            compute_selection_and_cursor(&selected_range, cursor, bounds, x_offset, &line, theme_fg);
+        let theme = bookie_gpui::theme::Theme::current(cx);
+        let (selection, cursor) = compute_selection_and_cursor(&selected_range, cursor, bounds, x_offset, &line, theme);
         PrepaintState {
             line: Some(line),
             cursor,
@@ -695,10 +697,15 @@ impl Render for TextInput {
             .text_color(rgb(theme.foreground))
             .line_height(px(size::COMPACT_CONTROL))
             .text_size(px(size::TEXT))
-            .when(self.compact, |root| root.text_xs().line_height(gpui::rems(1.0)))
+            .when(self.compact, |root| {
+                root.text_size(px(size::TEXT_SMALL))
+                    .line_height(px(size::COMPACT_CONTROL))
+            })
             .child({
                 let frame = div()
                     .w_full()
+                    .min_w_0()
+                    .overflow_hidden()
                     .bg(rgb(theme.background))
                     .rounded(px(size::CONTROL_RADIUS))
                     .border_1()
@@ -706,7 +713,7 @@ impl Render for TextInput {
                 let frame = if self.compact {
                     frame.flex().items_center()
                 } else {
-                    frame.h(px(24. + 4. * 2.)).p(px(size::XS))
+                    frame.h(px(size::FORM_CONTROL)).p(px(size::XS))
                 };
                 frame.child(TextElement { input: cx.entity() })
             })
@@ -767,7 +774,7 @@ fn compute_selection_and_cursor(
     bounds: Bounds<Pixels>,
     x_offset: Pixels,
     line: &ShapedLine,
-    theme_fg: u32,
+    theme: bookie_gpui::theme::Theme,
 ) -> (Option<PaintQuad>, Option<PaintQuad>) {
     if selected_range.is_empty() {
         let cursor_pos = line.x_for_index(cursor);
@@ -778,7 +785,7 @@ fn compute_selection_and_cursor(
                     point(bounds.left() + x_offset + cursor_pos, bounds.top()),
                     size(px(size::OPTICAL), bounds.bottom() - bounds.top()),
                 ),
-                rgb(theme_fg),
+                rgb(theme.foreground),
             )),
         )
     } else {
@@ -794,7 +801,7 @@ fn compute_selection_and_cursor(
                         bounds.bottom(),
                     ),
                 ),
-                rgba(0x5b8cff55),
+                rgb(theme.active_row),
             )),
             None,
         )

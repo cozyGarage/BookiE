@@ -44,7 +44,7 @@ impl GridView {
         self.table.update(cx, |table, cx| table.refresh(cx));
         let column = column.to_owned();
         let Some(session) = self.live.clone().filter(|session| session.driver_id == "postgres") else {
-            self.status = "Server-side table sorting is not available for this connection.".into();
+            self.status = "Server-side table sorting is not available for this connection".into();
             return;
         };
         let Tab::Table(table) = self.tabs.current().clone() else {
@@ -254,7 +254,7 @@ impl GridView {
     pub(super) fn attach_live(&mut self, table: Arc<LiveTable>) {
         let session = table.session().clone();
         let Some(identity) = table.table_info().cloned() else {
-            self.status = "The loaded result has no table identity.".into();
+            self.status = "The loaded result has no table identity".into();
             return;
         };
         self.tabs.items[1] = Tab::Table(identity.clone());
@@ -377,7 +377,7 @@ impl GridView {
         if !self.has_view_edits() {
             return false;
         }
-        self.status = "Discard all view-only edits using Commands before closing or switching.".into();
+        self.status = "Discard all view-only edits using Commands before closing or switching".into();
         true
     }
 
@@ -391,7 +391,7 @@ impl GridView {
         for slot in &mut self.run_tabs.slots {
             slot.edits.clear();
         }
-        self.status = "Discarded all view-only edits.".into();
+        self.status = "Discarded all view-only edits".into();
     }
 
     pub(super) fn open_table_named(&mut self, table: &TableInfo, window: &mut Window, cx: &mut Context<Self>) {
@@ -503,7 +503,7 @@ fn open_first_table(
 ) -> Result<Opened, String> {
     let session = LiveSession::open_controlled(origin, cancellation)?;
     if cancellation.is_cancelled() {
-        return Err("The operation was cancelled.".into());
+        return Err("Canceled the operation".into());
     }
     match prefer
         .and_then(|wanted| session.tables.iter().find(|table| *table == wanted))

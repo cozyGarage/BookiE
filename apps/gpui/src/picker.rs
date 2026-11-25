@@ -121,10 +121,7 @@ impl GridView {
             .filter_map(|(position, command)| {
                 let score = bookie_gpui::palette::fuzzy_score(needle, command.title());
                 (score > 0).then(|| {
-                    let keys = self
-                        .keymap
-                        .binding(command)
-                        .map_or_else(|| "unbound".into(), Chord::label);
+                    let keys = self.keymap.binding(command).map_or_else(|| "None".into(), Chord::label);
                     let item = PickerItem {
                         title: command.title().into(),
                         subtitle: keys,
@@ -378,14 +375,19 @@ pub(crate) fn install_theme(name: &str, cx: &mut App) -> bool {
 }
 
 impl GridView {
-    fn choose_theme(&mut self, name: &str, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn choose_theme(&mut self, name: &str, window: &mut Window, cx: &mut Context<Self>) {
         if !install_theme(name, cx) {
             self.status = format!("Theme {name} is not available");
             return;
         }
         self.dark_mode = Theme::current(cx).dark;
         self.fonts.settings.theme = name.to_string();
-        self.status = match bookie_gpui::font_settings::save(&self.fonts.settings) {
+        let saved = if cfg!(test) {
+            Ok(())
+        } else {
+            bookie_gpui::font_settings::save(&self.fonts.settings)
+        };
+        self.status = match saved {
             Ok(()) => format!("Theme: {name}"),
             Err(error) => format!("Theme: {name} (not saved: {error})"),
         };

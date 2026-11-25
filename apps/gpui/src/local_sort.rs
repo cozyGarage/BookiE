@@ -30,7 +30,7 @@ pub(crate) fn sorted_source_indices(
     let mut kind = None;
     for index in source_indices {
         if cancel.is_cancelled() {
-            return Err("the operation was cancelled");
+            return Err("canceled the operation");
         }
         let value = source
             .row_ref(u64::from(index))
@@ -52,7 +52,7 @@ pub(crate) fn sorted_source_indices(
     }
     values.sort_by(|(_, left), (_, right)| compare_values(left, right, ascending));
     if cancel.is_cancelled() {
-        return Err("the operation was cancelled");
+        return Err("canceled the operation");
     }
     Ok(values.into_iter().map(|(index, _)| index).collect())
 }
@@ -174,7 +174,7 @@ mod tests {
         cancel.cancel();
         assert_eq!(
             sorted_source_indices(&source, vec![0], 0, true, &cancel),
-            Err("the operation was cancelled")
+            Err("canceled the operation")
         );
         assert!(sorted_source_indices(&source, vec![0], 1, true, &CancellationToken::new()).is_err());
     }

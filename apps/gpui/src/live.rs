@@ -254,9 +254,9 @@ impl LiveSession {
         }
         if failure.message.contains("marked read-only") {
             failure.message =
-                "Query tabs only read. To change data, press Begin transaction, run the statement, then Commit.".into();
+                "Query tabs only read. To change data, press Begin transaction, run the statement, then Commit".into();
         } else if failure.message.contains("could not be parsed (typo?)") {
-            failure.message = "This statement could not be parsed (typo?).".into();
+            failure.message = "This statement could not be parsed (typo?)".into();
         }
         failure
     }
@@ -269,7 +269,7 @@ impl LiveSession {
         cancellation: &CancellationToken,
     ) -> Result<LiveTable, QueryFailure> {
         if max_rows == 0 || max_rows > ROW_CAP {
-            return Err(format!("Row limit must be between 1 and {ROW_CAP}.").into());
+            return Err(format!("Row limit must be between 1 and {ROW_CAP}").into());
         }
         let epoch = self.next_epoch();
         let started = std::time::Instant::now();
@@ -365,7 +365,7 @@ impl LiveSession {
             &self.epoch,
         ))?;
         let Event::ConnectionStatusRead { outcome, .. } = event else {
-            return Err("The command bridge returned an unexpected event.".into());
+            return Err("The command bridge returned an unexpected event".into());
         };
         Ok(outcome)
     }
@@ -377,7 +377,7 @@ impl LiveSession {
         cancellation: &CancellationToken,
     ) -> Result<u64, String> {
         if !self.supports_table_row_count() {
-            return Err("Exact row counts are not available for this database type.".into());
+            return Err("Exact row counts are not available for this database type".into());
         }
         let (sql, params) = if where_sql.trim().is_empty() {
             (table_count_sql(&self.driver_id, table), Vec::new())
@@ -401,20 +401,20 @@ impl LiveSession {
             &self.epoch,
         ))?;
         let Some(row) = result.rows.first().filter(|row| row.len() == 1) else {
-            return Err("The database did not return one exact row count.".into());
+            return Err("The database did not return one exact row count".into());
         };
         if result.truncated || result.rows.len() != 1 {
-            return Err("The database did not return one exact row count.".into());
+            return Err("The database did not return one exact row count".into());
         }
         match &row[0] {
-            bookie_core::Value::Int(count) => u64::try_from(*count).map_err(|_| "The row count was negative.".into()),
+            bookie_core::Value::Int(count) => u64::try_from(*count).map_err(|_| "The row count was negative".into()),
             bookie_core::Value::Decimal(count) if count.scale() == 0 => {
-                u64::try_from(count.mantissa()).map_err(|_| "The row count is outside the supported range.".into())
+                u64::try_from(count.mantissa()).map_err(|_| "The row count is outside the supported range".into())
             }
             bookie_core::Value::Text(count) => count
                 .parse::<u64>()
-                .map_err(|_| "The database returned an invalid row count.".into()),
-            _ => Err("The database returned an unsupported row count value.".into()),
+                .map_err(|_| "The database returned an invalid row count".into()),
+            _ => Err("The database returned an unsupported row count value".into()),
         }
     }
 
@@ -433,7 +433,7 @@ impl LiveSession {
             &self.epoch,
         ))?;
         let Event::ColumnsRead { outcome, .. } = event else {
-            return Err("The command bridge returned an unexpected event.".into());
+            return Err("The command bridge returned an unexpected event".into());
         };
         outcome.map_err(|failure| driver_failure_message(&failure))
     }
@@ -461,7 +461,7 @@ impl LiveSession {
             &self.epoch,
         ))?;
         let Event::StructureRead { outcome, .. } = event else {
-            return Err("The command bridge returned an unexpected event.".into());
+            return Err("The command bridge returned an unexpected event".into());
         };
         outcome.map_err(|failure| driver_failure_message(&failure))
     }
@@ -490,7 +490,7 @@ impl LiveSession {
             &self.epoch,
         ))?;
         let Event::CatalogRead { outcome, .. } = event else {
-            return Err("The command bridge returned an unexpected event.".into());
+            return Err("The command bridge returned an unexpected event".into());
         };
         outcome.map_err(|failure| driver_failure_message(&failure))
     }
@@ -538,7 +538,7 @@ impl LiveSession {
             &self.epoch,
         ))?;
         let Event::SubscriptionSampled { outcome, .. } = event else {
-            return Err("The command bridge returned an unexpected event.".into());
+            return Err("The command bridge returned an unexpected event".into());
         };
         outcome.map_err(|failure| driver_failure_message(&failure))
     }
@@ -564,7 +564,7 @@ impl LiveSession {
         cancellation: &CancellationToken,
     ) -> Result<LiveTable, String> {
         if max_rows == 0 || max_rows > ROW_CAP {
-            return Err(format!("Row limit must be between 1 and {ROW_CAP}."));
+            return Err(format!("Row limit must be between 1 and {ROW_CAP}"));
         }
         let table = find_table(&self.tables, table)?.clone();
         let key: Vec<String> = self
@@ -578,7 +578,7 @@ impl LiveSession {
             })
             .unwrap_or_default();
         if sort.is_some() && !self.supports_snapshot_cursor {
-            return Err("Server-side table sorting is not available for this connection.".into());
+            return Err("Server-side table sorting is not available for this connection".into());
         }
         let epoch = self.next_epoch();
         let started = std::time::Instant::now();
@@ -621,7 +621,7 @@ impl LiveSession {
             return self.load_table_sorted_controlled(table, max_rows, sort, cancellation);
         }
         if matches!(self.driver_id.as_str(), "mongodb" | "redis") {
-            return Err("WHERE filters need a SQL database.".into());
+            return Err("WHERE filters need a SQL database".into());
         }
         let table = find_table(&self.tables, table)?;
         let columns = self.table_columns(&table)?;
@@ -630,7 +630,7 @@ impl LiveSession {
                 columns
                     .iter()
                     .position(|column| column.name == sort.column)
-                    .ok_or("The requested sort column no longer exists.")?,
+                    .ok_or("The requested sort column no longer exists")?,
                 sort.ascending,
             )),
             None => None,
@@ -643,7 +643,7 @@ impl LiveSession {
             None,
         )?;
         let bookie_app_services::browse_query::PageQuery::Sql(query) = page else {
-            return Err("The WHERE filter could not be sent to the database.".into());
+            return Err("The WHERE filter could not be sent to the database".into());
         };
         let mut loaded = self.run_query_bound(&query.sql, &query.params, max_rows, cancellation)?;
         for column in &mut loaded.columns {
@@ -691,7 +691,7 @@ impl LiveSession {
         let mut reads = Vec::new();
         for table in tables {
             if cancellation.is_cancelled() {
-                return Err("The export was cancelled.".into());
+                return Err("Canceled the export".into());
             }
             let foreign_keys = if supports_keys {
                 self.table_structure(table)?.foreign_keys
@@ -870,7 +870,7 @@ async fn open_session(origin: &Origin, cancellation: CancellationToken) -> Resul
     )
     .await?;
     let Event::SessionOpened { outcome, .. } = event else {
-        return Err("The command bridge returned an unexpected event.".into());
+        return Err("The command bridge returned an unexpected event".into());
     };
     Ok((sessions, outcome?, Some(identity), writable, stamp))
 }
@@ -946,7 +946,7 @@ impl WriteSession {
         let control = OperationControl::new(cancellation.clone(), Some(tokio::time::Instant::now() + PAGE_TIMEOUT));
         self.runtime.block_on(async {
             let mut guard = shared.lock().await;
-            let session = guard.as_mut().ok_or("The transaction session is closed.")?;
+            let session = guard.as_mut().ok_or("The transaction session is closed")?;
             session
                 .query_params_controlled(sql, &[], &control)
                 .await
@@ -1252,7 +1252,7 @@ async fn collect_pages(
             infos.clone_from(&page.columns);
         }
         if cancellation.is_cancelled() {
-            return Err("The operation was cancelled.".into());
+            return Err("Canceled the operation".into());
         }
         let incomplete = bound_page(&mut page, &mut budget);
         let count = page.rows.len() as u64;
@@ -1264,7 +1264,7 @@ async fn collect_pages(
             .await
             .map_err(|error| error.to_string())?;
         if cancellation.is_cancelled() {
-            return Err("The operation was cancelled.".into());
+            return Err("Canceled the operation".into());
         }
         page_index += 1;
         if incomplete {
@@ -1367,7 +1367,7 @@ async fn dictionary_pages(
     )
     .await?;
     let Event::DataDictionaryRead { outcome, .. } = event else {
-        return Err("The command bridge returned an unexpected event.".into());
+        return Err("The command bridge returned an unexpected event".into());
     };
     let result = outcome.map_err(|failure| driver_failure_message(&failure))?;
     spooled_pages(result, ROW_CAP, cancellation).await
@@ -1379,7 +1379,7 @@ async fn spooled_pages(
     cancellation: &CancellationToken,
 ) -> Result<Pages, String> {
     if cancellation.is_cancelled() {
-        return Err("The operation was cancelled.".into());
+        return Err("Canceled the operation".into());
     }
     let spool = crate::source::spool_manager()
         .create()
@@ -1443,7 +1443,7 @@ async fn bridge_query_detailed(
     )
     .await?;
     let Event::QueryCompleted { outcome, .. } = event else {
-        return Err("The command bridge returned an unexpected event.".into());
+        return Err("The command bridge returned an unexpected event".into());
     };
     outcome.map_err(Into::into)
 }
@@ -1473,7 +1473,7 @@ async fn bridge_read_page(
     )
     .await?;
     let Event::PageRead { outcome, .. } = event else {
-        return Err("The command bridge returned an unexpected event.".into());
+        return Err("The command bridge returned an unexpected event".into());
     };
     outcome.map_err(|failure| driver_failure_message(&failure))
 }
@@ -1486,7 +1486,7 @@ async fn dispatch_read(
     current_epoch: &AtomicU64,
 ) -> Result<Event, String> {
     if current_epoch.load(Ordering::Relaxed) != epoch.0 {
-        return Err("The request was superseded.".into());
+        return Err("The request was superseded".into());
     }
     let (sender, mut receiver) = tokio::sync::mpsc::channel(1);
     let sink = ChannelEventSink::new(sender);
@@ -1510,7 +1510,7 @@ fn keep_current_event(context: DispatchContext<'_>, event: Event, current: Epoch
     {
         sessions.close(opened.session_id);
     }
-    Err("The request was superseded.".into())
+    Err("The request was superseded".into())
 }
 
 async fn bridge_saved_connections(
@@ -1527,7 +1527,7 @@ async fn bridge_saved_connections(
     )
     .await?;
     let Event::SavedConnectionsListed { outcome, .. } = event else {
-        return Err("The command bridge returned an unexpected event.".into());
+        return Err("The command bridge returned an unexpected event".into());
     };
     outcome
 }
@@ -1819,7 +1819,7 @@ impl SearchSource for BridgeSource<'_> {
         .await
         .map_err(search_error)?;
         let Event::ColumnsRead { outcome, .. } = event else {
-            return Err(search_error("The command bridge returned an unexpected event.".into()));
+            return Err(search_error("The command bridge returned an unexpected event".into()));
         };
         outcome.map_err(|failure| search_error(driver_failure_message(&failure)))
     }
@@ -1856,7 +1856,7 @@ fn search_error(message: String) -> DriverError {
 
 fn backup_failure_text(error: &DriverError) -> String {
     match error {
-        DriverError::Cancelled => "Cancelled. Nothing was changed.".into(),
+        DriverError::Cancelled => "Canceled; nothing was changed".into(),
         error => bookie_app_services::database_backup::backup_error_text(error),
     }
 }

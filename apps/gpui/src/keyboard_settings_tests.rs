@@ -64,3 +64,31 @@ fn the_palette_opens_settings_on_the_keyboard_page(cx: &mut TestAppContext) {
     );
     assert!(cx.debug_bounds("shortcut-palette").is_some());
 }
+
+#[gpui::test]
+fn the_appearance_page_lists_every_theme_and_applies_one_on_click(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_resize(gpui::size(gpui::px(1400.0), gpui::px(2400.0)));
+    cx.update(|_, cx| crate::ui_theme::load_bundled_themes(cx));
+    view.update(cx, |view, cx| {
+        view.open_settings_page(crate::keyboard_settings_ui::SettingsPage::Appearance);
+        cx.notify();
+    });
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    let names = cx.update(|_, cx| crate::GridView::theme_names(cx));
+    assert_eq!(names.len(), 20, "two built-in themes and 18 bundled ones: {names:?}");
+    assert!(
+        cx.debug_bounds("theme-option-BookiE Light").is_some(),
+        "the current theme is listed"
+    );
+    let nord = cx
+        .debug_bounds("theme-option-Nord")
+        .expect("Nord is listed with a Use button");
+    cx.simulate_click(nord.center(), Default::default());
+    cx.run_until_parked();
+    view.read_with(cx, |view, cx| {
+        assert_eq!(view.fonts.settings.theme, "Nord");
+        assert!(<bookie_gpui::theme::Theme as crate::ui_theme::ThemeExt>::current(cx).dark);
+    });
+}

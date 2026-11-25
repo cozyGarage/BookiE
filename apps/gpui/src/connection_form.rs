@@ -4,6 +4,7 @@ use gpui::{Context, Div, Entity, Focusable, Stateful, Window, div, prelude::*, p
 use secrecy::SecretString;
 
 use crate::GridView;
+use crate::surfaces::{ButtonKind, button, section_header, segment, segmented, unavailable_button};
 use crate::text_input::TextInput;
 use bookie_gpui::theme::{Theme, size};
 
@@ -178,60 +179,13 @@ pub(crate) fn field(theme: Theme, label: impl Into<gpui::SharedString>, input: &
         .child(div().flex_1().h(px(size::FORM_CONTROL)).child(input.clone()))
 }
 
-fn outline_button(id: &'static str, label: &'static str, theme: Theme) -> Stateful<Div> {
-    div()
-        .id(id)
-        .flex()
-        .items_center()
-        .h(px(size::SMALL_CONTROL))
-        .px_3()
-        .rounded(px(theme.radius))
-        .border_1()
-        .border_color(rgb(theme.border))
-        .cursor_pointer()
-        .child(label)
-}
-
-pub(crate) fn note(theme: Theme, text: &str) -> Div {
-    div().text_color(rgb(theme.muted_foreground)).child(text.to_string())
-}
-
-pub(crate) fn choice_chip(
-    id: impl Into<gpui::ElementId>,
-    label: &'static str,
-    selected: bool,
-    theme: Theme,
-) -> Stateful<Div> {
-    div()
-        .id(id)
-        .debug_selector(move || label.into())
-        .flex()
-        .items_center()
-        .h(px(size::SMALL_CONTROL))
-        .px_2()
-        .rounded(px(theme.radius))
-        .cursor_pointer()
-        .border_1()
-        .border_color(rgb(if selected { theme.foreground } else { theme.border }))
-        .when(selected, |chip| {
-            chip.bg(rgb(theme.foreground)).text_color(rgb(theme.background))
-        })
-        .child(label)
-}
-
 pub(crate) fn section(theme: Theme, caption: &str, rows: Vec<Div>) -> Div {
     let last = rows.len().saturating_sub(1);
     div()
         .flex()
         .flex_col()
         .gap_1()
-        .child(
-            div()
-                .text_size(px(size::TEXT_SMALL))
-                .font_weight(gpui::FontWeight::MEDIUM)
-                .text_color(rgb(theme.muted_foreground))
-                .child(caption.to_uppercase()),
-        )
+        .child(section_header(caption.to_string(), theme))
         .child(
             div()
                 .flex()
@@ -273,11 +227,7 @@ pub(crate) fn collapsible_section(
             if open { "chevron-down" } else { "chevron-right" },
             theme.muted_foreground,
         ))
-        .child(
-            div()
-                .font_weight(gpui::FontWeight::MEDIUM)
-                .child(caption.to_uppercase()),
-        )
+        .child(div().font_weight(gpui::FontWeight::MEDIUM).child(caption.to_string()))
         .child(div().child(format!("· {summary}")))
         .on_click(on_toggle);
     let body = rows.map(|rows| {
@@ -302,11 +252,7 @@ pub(crate) fn collapsible_section(
     div().flex().flex_col().gap_1().child(header).children(body)
 }
 
-pub(crate) fn choice_row(
-    theme: Theme,
-    label: impl Into<gpui::SharedString>,
-    chips: impl IntoIterator<Item = Stateful<Div>>,
-) -> Div {
+pub(crate) fn labelled_row(theme: Theme, label: impl Into<gpui::SharedString>, control: impl IntoElement) -> Div {
     div()
         .flex()
         .items_center()
@@ -317,7 +263,19 @@ pub(crate) fn choice_row(
                 .text_color(rgb(theme.muted_foreground))
                 .child(gpui::SharedString::from(label.into())),
         )
-        .child(div().flex_1().min_w_0().flex().flex_wrap().gap_1().children(chips))
+        .child(div().flex_1().min_w_0().flex().child(control))
+}
+
+pub(crate) fn choice_row(
+    theme: Theme,
+    label: impl Into<gpui::SharedString>,
+    choices: impl IntoIterator<Item = Stateful<Div>>,
+) -> Div {
+    labelled_row(
+        theme,
+        label,
+        segmented(choices, theme).flex_shrink(1.0).flex_wrap().h_auto(),
+    )
 }
 
 impl GridView {
@@ -346,14 +304,14 @@ impl GridView {
             .map(|driver| driver.label.to_string())
             .unwrap_or_default();
         let mut connection = vec![
-            div().flex().flex_wrap().gap_1().children(self.driver_chips(theme, cx)),
+            segmented(self.driver_chips(theme, cx), theme).flex_wrap().h_auto(),
             field(theme, "Name", &form.name),
         ];
         if !file_based {
             connection.extend(self.network_fields(theme, cx));
         }
         connection.push(form.validation_field(theme, if file_based { "File" } else { "Database" }, &form.database, cx));
-        let mut sections = vec![section(theme, "Behaviour", self.behaviour_fields(theme, cx))];
+        let mut sections = vec![section(theme, "Behavior", self.behaviour_fields(theme, cx))];
         if !file_based {
             sections.push(self.security_section(theme, cx));
             sections.push(self.ssh_section(theme, cx));
@@ -390,7 +348,6 @@ impl GridView {
                     .border_1()
                     .border_color(rgb(theme.border))
                     .bg(rgb(theme.popover))
-                    .shadow_lg()
                     .child(
                         div()
                             .px_4()
@@ -495,7 +452,7 @@ impl GridView {
                         .password
                         .update(cx, |input, cx| input.set_content(password.expose_secret(), cx));
                 }
-                self.connection_form.status = "Filled from the connection URL. Review it, then save.".into();
+                self.connection_form.status = "Filled from the connection URL. Review it, then save".into();
             }
             Err(message) => self.connection_form.status = format!("Could not read the connection URL: {message}"),
         }
@@ -511,27 +468,29 @@ impl GridView {
             .flex()
             .gap_2()
             .child(
-                outline_button("paste-connection-url", "Paste URL", theme).on_click(cx.listener(|this, _, _, cx| {
-                    match cx.read_from_clipboard().and_then(|item| item.text()) {
+                button(ButtonKind::Ghost, "paste-connection-url", "Paste URL", theme).on_click(cx.listener(
+                    |this, _, _, cx| match cx.read_from_clipboard().and_then(|item| item.text()) {
                         Some(text) => this.fill_from_connection_url(&text, cx),
                         None => {
-                            this.connection_form.status = "The clipboard has no connection URL.".into();
+                            this.connection_form.status = "The clipboard has no connection URL".into();
                             cx.notify();
                         }
-                    }
-                })),
+                    },
+                )),
             )
             .child(
-                outline_button("copy-connection-url", "Copy as URL", theme).on_click(cx.listener(|this, _, _, cx| {
-                    this.connection_form.status = match this.connection_url_for_form(cx) {
-                        Some(url) => {
-                            cx.write_to_clipboard(gpui::ClipboardItem::new_string(url));
-                            "Copied the connection URL without its password.".into()
-                        }
-                        None => "This connection type has no URL form.".into(),
-                    };
-                    cx.notify();
-                })),
+                button(ButtonKind::Ghost, "copy-connection-url", "Copy as URL", theme).on_click(cx.listener(
+                    |this, _, _, cx| {
+                        this.connection_form.status = match this.connection_url_for_form(cx) {
+                            Some(url) => {
+                                cx.write_to_clipboard(gpui::ClipboardItem::new_string(url));
+                                "Copied the connection URL without its password".into()
+                            }
+                            None => "This connection type has no URL form".into(),
+                        };
+                        cx.notify();
+                    },
+                )),
             )
     }
 
@@ -574,7 +533,7 @@ impl GridView {
             .into_iter()
             .enumerate()
             .map(|(index, environment)| {
-                choice_chip(
+                segment(
                     ("environment", index),
                     environment.display_name(),
                     form.environment == environment,
@@ -593,10 +552,10 @@ impl GridView {
         );
         let colour = choice_row(
             theme,
-            "Colour",
+            "Color",
             swatches.enumerate().map(|(index, (name, label))| {
                 let selected = form.color.as_deref() == name;
-                let chip = choice_chip(("connection-colour", index), label, selected, theme);
+                let chip = segment(("connection-colour", index), label, selected, theme);
                 let chip = match name.and_then(bookie_app_services::read_session::connection_color_rgb) {
                     Some(color) => chip.child(div().size(px(size::SM)).rounded(px(size::OPTICAL)).bg(rgb(color))),
                     None => chip,
@@ -646,7 +605,7 @@ impl GridView {
                 .into_iter()
                 .enumerate()
                 .map(|(index, (label, selected))| {
-                    choice_chip(("auth", index), label, selected, theme).on_click(cx.listener(move |this, _, _, cx| {
+                    segment(("auth", index), label, selected, theme).on_click(cx.listener(move |this, _, _, cx| {
                         this.connection_form.kerberos = index == 1;
                         cx.notify();
                     }))
@@ -656,7 +615,7 @@ impl GridView {
             theme,
             "TLS",
             TlsMode::ALL.into_iter().map(|mode| {
-                choice_chip(
+                segment(
                     ("tls", mode.index() as usize),
                     mode.label(),
                     form.tls == mode.index(),
@@ -688,7 +647,7 @@ impl GridView {
             .enumerate()
             .map(|(index, driver)| {
                 let port = driver.port;
-                choice_chip(("driver", index), driver.label, index == form.driver, theme).on_click(cx.listener(
+                segment(("driver", index), driver.label, index == form.driver, theme).on_click(cx.listener(
                     move |this, _, _, cx| {
                         this.connection_form.driver = index;
                         this.clear_resolved_connection_error(cx);
@@ -704,37 +663,42 @@ impl GridView {
     }
 
     fn save_button(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
-        let busy = self.connection_form.saving;
-        div()
-            .id("save-connection")
-            .flex()
-            .items_center()
-            .h(px(size::SMALL_CONTROL))
-            .px_3()
-            .rounded(px(theme.radius))
-            .bg(rgb(theme.foreground))
-            .text_color(rgb(theme.background))
-            .when(!busy, |button| button.cursor_pointer())
-            .child(if busy { "Saving…" } else { "Save" })
-            .on_click(cx.listener(|this, _, window, cx| {
-                this.save_connection(window, cx);
-            }))
+        if self.connection_form.saving {
+            return unavailable_button(
+                ButtonKind::Primary,
+                "save-connection",
+                "Saving…",
+                "The connection is being saved",
+                theme,
+            );
+        }
+        button(ButtonKind::Primary, "save-connection", "Save", theme).on_click(cx.listener(|this, _, window, cx| {
+            this.save_connection(window, cx);
+        }))
     }
 
     fn test_button(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
-        let busy = self.connection_form.testing;
-        outline_button("test-connection", if busy { "Testing…" } else { "Test" }, theme)
+        if self.connection_form.testing {
+            return unavailable_button(
+                ButtonKind::Ghost,
+                "test-connection",
+                "Testing…",
+                "The connection is being tested",
+                theme,
+            );
+        }
+        button(ButtonKind::Ghost, "test-connection", "Test", theme)
             .on_click(cx.listener(|this, _, window, cx| this.test_connection(window, cx)))
     }
 
     fn delete_button(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
         let confirm = self.connection_form.confirm_delete;
-        outline_button(
+        button(
+            ButtonKind::Destructive,
             "delete-connection",
             if confirm { "Confirm delete" } else { "Delete" },
             theme,
         )
-        .text_color(rgb(theme.destructive))
         .on_click(cx.listener(|this, _, _, cx| this.delete_connection(cx)))
     }
 
@@ -775,7 +739,7 @@ impl GridView {
             let _ = this.update(cx, |this, cx| {
                 match draft {
                     Ok(Some(draft)) => this.fill_connection_form(draft, cx),
-                    Ok(None) => this.connection_form.status = "That connection no longer exists.".into(),
+                    Ok(None) => this.connection_form.status = "That connection no longer exists".into(),
                     Err(message) => this.connection_form.status = message,
                 }
                 this.tabs.open_new_connection();
@@ -948,7 +912,7 @@ impl GridView {
         };
         if !std::mem::replace(&mut self.connection_form.confirm_delete, true) {
             self.connection_form.status =
-                "Click Delete again to remove this connection and its stored passwords.".into();
+                "Click Delete again to remove this connection and its stored passwords".into();
             cx.notify();
             return;
         }
@@ -977,9 +941,9 @@ impl GridView {
             Ok(deleted) => {
                 self.connection_form.editing = None;
                 self.connection_form.status = if deleted.credential_failure {
-                    "Deleted; some stored credentials could not be removed.".into()
+                    "Deleted; some stored credentials could not be removed".into()
                 } else {
-                    "Deleted.".into()
+                    "Deleted".into()
                 };
                 if let Ok(list) = bookie_gpui::live::saved_connections() {
                     self.connections = list;
@@ -1051,7 +1015,7 @@ impl GridView {
                 self.connection_form.status = if color_saved {
                     format!("Saved {name}")
                 } else {
-                    format!("Saved {name}, but the colour was not saved. Try saving again.")
+                    format!("Saved {name}, but the color was not saved. Try saving again")
                 };
                 self.connection_form
                     .password
@@ -1061,24 +1025,6 @@ impl GridView {
                 }
             }
             Err(message) => self.connection_form.status = message,
-        }
-    }
-}
-
-#[cfg(test)]
-mod choice_style_tests {
-    use super::*;
-
-    #[test]
-    fn selected_choice_has_a_visible_fill() {
-        for theme in [Theme::light(), Theme::dark()] {
-            let mut selected = choice_chip("selected", "Selected", true, theme);
-            let mut unselected = choice_chip("unselected", "Unselected", false, theme);
-            assert_eq!(
-                selected.style().background,
-                Some(gpui::Fill::from(gpui::Hsla::from(rgb(theme.foreground))))
-            );
-            assert!(unselected.style().background.is_none());
         }
     }
 }
