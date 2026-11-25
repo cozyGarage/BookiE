@@ -298,9 +298,7 @@ async fn a_hundred_thousand_row_import_lands_complete_and_reports_its_time() {
     assert_eq!(result.rows, vec![vec![Value::Text(BASELINE_ROWS.to_string())]]);
 }
 
-#[tokio::test]
-#[ignore = "requires docker"]
-async fn an_import_with_explicit_keys_leaves_the_sequence_at_the_largest_key() {
+async fn next_generated_id_after_importing_1200_explicit_keys(batches_to_run: usize, cancel: bool) -> String {
     let (_container, opts) = start_pg().await;
     let raw = PgDriver.connect(opts.clone()).await.unwrap();
     raw.execute("CREATE TABLE import_seq (id bigserial PRIMARY KEY, name text NOT NULL)")
@@ -337,7 +335,7 @@ async fn an_import_with_explicit_keys_leaves_the_sequence_at_the_largest_key() {
         })
         .await
         .unwrap();
-    for rows in plan.batches(500) {
+    for rows in plan.batches(500).take(batches_to_run) {
         guard
             .execute_bulk_batch(
                 &mut scope,
@@ -361,5 +359,26 @@ async fn an_import_with_explicit_keys_leaves_the_sequence_at_the_largest_key() {
         .query("INSERT INTO import_seq (name) VALUES ('generated') RETURNING id::text")
         .await
         .unwrap();
-    assert_eq!(next.rows, vec![vec![Value::Text("1201".into())]]);
+    match &next.rows[0][0] {
+        Value::Text(id) => id.clone(),
+        other => panic!("unexpected id value {other:?}"),
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn an_import_with_explicit_keys_leaves_the_sequence_at_the_largest_key() {
+    assert_eq!(
+        next_generated_id_after_importing_1200_explicit_keys(3, false).await,
+        "1201"
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_cancelled_import_still_moves_the_sequence_past_the_rows_that_committed() {
+    assert_eq!(
+        next_generated_id_after_importing_1200_explicit_keys(1, true).await,
+        "501"
+    );
 }

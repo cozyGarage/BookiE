@@ -333,7 +333,6 @@ impl PolicyGuard {
         }
         let rows = statements.len() as u64;
         scope.committed += rows;
-        self.synchronize_import_sequences(scope).await?;
         Ok(rows)
     }
 
@@ -382,7 +381,6 @@ impl PolicyGuard {
         let written = remaining.len() as u64;
         scope.committed += written;
         scope.skipped += skipped.len() as u64;
-        self.synchronize_import_sequences(scope).await?;
         Ok(BulkBatchOutcome { written, skipped })
     }
 
@@ -412,6 +410,11 @@ impl PolicyGuard {
     ) -> Result<u64, DriverError> {
         scope.open = false;
         let committed = scope.committed;
+        let sequence_sync = if committed > 0 {
+            self.synchronize_import_sequences(scope).await
+        } else {
+            Ok(())
+        };
         let (terminal_status, transaction_outcome, error_category) = bulk_terminal(end, committed);
         if terminal_status == AuditTerminalStatus::Unknown {
             self.ctx.audit_state.disable_governed_writes();
@@ -435,6 +438,7 @@ impl PolicyGuard {
             )
             .await;
         self.handle_write_outcome_failure(audit_result)?;
+        sequence_sync?;
         Ok(committed)
     }
 
