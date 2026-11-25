@@ -2616,3 +2616,21 @@ fn closing_over_pending_edits_asks_and_escape_keeps_the_window(cx: &mut TestAppC
     assert!(cx.debug_bounds("close-confirm-dialog").is_none());
     std::fs::remove_file(&path).ok();
 }
+
+#[gpui::test]
+fn edits_held_by_another_run_tab_also_ask_before_the_window_closes(cx: &mut TestAppContext) {
+    let path = fixture_copy("close-confirm-run-tab");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.add_run(None);
+            view.run_tabs.slots[0]
+                .edits
+                .insert((0, 1), bookie_gpui::model::Cell::Text("In a run tab".into()));
+        })
+    });
+    view.read_with(cx, |view, _| assert!(view.cell_edit.edits.is_empty()));
+    assert!(!cx.simulate_close(), "edits in a run tab must not be dropped silently");
+    view.read_with(cx, |view, _| assert!(view.close_confirm));
+    std::fs::remove_file(&path).ok();
+}

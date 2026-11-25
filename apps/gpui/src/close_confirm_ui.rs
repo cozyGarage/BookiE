@@ -3,7 +3,13 @@ use crate::surfaces::{ButtonKind, button, dialog_surface, scrim};
 
 impl GridView {
     pub(crate) fn needs_close_confirmation(&self) -> bool {
-        !self.cell_edit.edits.is_empty()
+        self.has_view_edits()
+    }
+
+    fn pending_edit_count(&self) -> usize {
+        self.cell_edit.edits.len()
+            + self.cell_edit.table.len()
+            + self.run_tabs.slots.iter().map(|slot| slot.edits.len()).sum::<usize>()
     }
 
     pub(crate) fn keep_editing(&mut self, cx: &mut Context<Self>) {
@@ -24,7 +30,7 @@ impl GridView {
         if !self.close_confirm {
             return None;
         }
-        let count = self.cell_edit.edits.len();
+        let count = self.pending_edit_count().max(1);
         Some(
             scrim(theme).id("close-confirm-overlay").occlude().child(
                 dialog_surface(size::APPROVAL_DIALOG_WIDTH, theme)
