@@ -263,7 +263,6 @@ impl GridView {
 
     pub fn status_bar(&self, theme: Theme, window_width: f32, cx: &mut Context<Self>) -> Stateful<Div> {
         let compact = window_width < size::STATUS_COMPACT_WIDTH;
-        let table_tab = self.on_table_tab();
         let grid = self.status_shows_grid();
         let rows = self.status_count_text(compact);
         let sql = (grid && !compact)
@@ -353,14 +352,6 @@ impl GridView {
             .children(count_rows)
             .when(!compact, |bar| bar.children(self.selection_stats_segment(theme)))
             .children(elapsed.map(|time| div().flex_none().child(time)))
-            .when(table_tab, |bar| {
-                bar.child(
-                    div()
-                        .debug_selector(|| "status-page".into())
-                        .flex_none()
-                        .child(format!("Page: {} rows", self.pager.rows)),
-                )
-            })
             .child(
                 div()
                     .id("status-count")

@@ -96,9 +96,10 @@ impl GridView {
         compact_button(
             ButtonKind::Ghost,
             "page-size",
-            format!("{} rows", self.pager.rows),
+            format!("{} / page", thousands(self.pager.rows)),
             theme,
         )
+        .tooltip(crate::surfaces::tooltip_view("Rows per page; click to change".into()))
         .on_click(cx.listener(|this, _, _, cx| {
             let index = PAGE_SIZES.iter().position(|size| *size == this.pager.rows).unwrap_or(0);
             this.pager = this.pager.resized(PAGE_SIZES[(index + 1) % PAGE_SIZES.len()]);
@@ -218,7 +219,13 @@ impl GridView {
             self,
             &[
                 &["first", "last"],
-                &["jump-column", "refresh-table", "compare", "export-file", "continuous"],
+                &[
+                    "jump-column",
+                    "refresh-table",
+                    "export-file",
+                    "export-csv",
+                    "continuous",
+                ],
             ],
         );
         div()
@@ -289,10 +296,10 @@ impl GridView {
                             },
                         )),
                     )
-                    .child(
+                    .children(self.live.is_none().then(|| {
                         compact_button(ButtonKind::Ghost, "compare", "Compare", theme)
-                            .on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))),
-                    )
+                            .on_click(cx.listener(|this, _, _, cx| this.compare(false, cx)))
+                    }))
                     .child(self.export_button(theme, cx))
                     .child(self.copy_csv_button(theme, cx))
                     .child(
