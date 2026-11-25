@@ -223,3 +223,77 @@ async fn a_denied_upsert_changes_nothing_and_leaves_a_denied_audit_record() {
     assert_eq!(events.len(), 1);
     assert_eq!(events[0].terminal_status, AuditTerminalStatus::Denied);
 }
+
+const BASELINE_ROWS: usize = 100_000;
+
+#[tokio::test]
+#[ignore = "requires docker; prints the import baseline measured for #3741"]
+async fn a_hundred_thousand_row_import_lands_complete_and_reports_its_time() {
+    let (_container, opts) = start_pg().await;
+    let raw = PgDriver.connect(opts.clone()).await.unwrap();
+    raw.execute("CREATE TABLE import_bulk (id bigint PRIMARY KEY, name text NOT NULL, amount numeric(10,2))")
+        .await
+        .unwrap();
+    let mut csv = String::from("id,name,amount\n");
+    for id in 1..=BASELINE_ROWS {
+        csv.push_str(&format!("{id},name {id},{}.25\n", id % 1000));
+    }
+    let options = CsvImportOptions::default();
+    let sheet = read_csv(csv.as_bytes(), &options, None).unwrap();
+    let columns = raw.fetch_columns(None, "import_bulk").await.unwrap();
+    let target = ImportTarget {
+        driver_id: "postgres",
+        capabilities: PgDriver.capabilities(),
+        schema: None,
+        table: "import_bulk",
+        columns: &columns,
+        mapping: &[Some(0), Some(1), Some(2)],
+    };
+    let plan = build_insert_plan(&target, &sheet, &options).unwrap();
+    assert_eq!(plan.row_count() as usize, BASELINE_ROWS);
+    let audit = Arc::new(CapturingAudit {
+        events: Mutex::new(Vec::new()),
+    });
+    let guard = guard_for(raw, Environment::Local, Arc::new(AutoApproveSink), audit);
+    let mut scope = guard
+        .begin_bulk_insert(BulkInsertRequest {
+            schema: None,
+            table: "import_bulk".into(),
+            statement: plan.statement.clone(),
+            row_budget: plan.row_count(),
+            sequence_columns: Vec::new(),
+        })
+        .await
+        .unwrap();
+    let started = std::time::Instant::now();
+    let mut batches = 0_u32;
+    for rows in plan.batches(bookie_core::import::DEFAULT_IMPORT_BATCH_ROWS) {
+        guard
+            .execute_bulk_batch(
+                &mut scope,
+                BulkBatch {
+                    schema: None,
+                    table: "import_bulk",
+                    statement: &plan.statement,
+                    rows,
+                },
+                &control(),
+            )
+            .await
+            .unwrap();
+        batches += 1;
+    }
+    let elapsed = started.elapsed();
+    guard
+        .finish_bulk_insert(&mut scope, BulkInsertEnd::Completed)
+        .await
+        .unwrap();
+    println!(
+        "import baseline: {BASELINE_ROWS} rows in {batches} batches took {:.2?} ({:.0} rows/s)",
+        elapsed,
+        BASELINE_ROWS as f64 / elapsed.as_secs_f64()
+    );
+    let checker = PgDriver.connect(opts).await.unwrap();
+    let result = checker.query("SELECT count(*)::text FROM import_bulk").await.unwrap();
+    assert_eq!(result.rows, vec![vec![Value::Text(BASELINE_ROWS.to_string())]]);
+}
