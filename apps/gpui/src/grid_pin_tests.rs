@@ -586,6 +586,82 @@ fn pinned_columns_stay_visible_after_scroll_and_tab_reopen(cx: &mut TestAppConte
 }
 
 #[gpui::test]
+fn pinning_a_leading_column_keeps_the_last_cell_inside_the_scroll_viewport(cx: &mut TestAppContext) {
+    let source = Arc::new(WideSource(
+        (0..41)
+            .map(|index| ColumnMeta {
+                name: format!("column_{index}"),
+                width: 150.0,
+                numeric: false,
+                data_type: "text".into(),
+                primary_key: index == 0,
+            })
+            .collect(),
+    ));
+    cx.update(text_input::bind_keys);
+    let (view, cx) = cx.add_window_view(|window, cx| GridView::with_source(source, Instant::now(), window, cx));
+    cx.simulate_resize(gpui::size(gpui::px(900.0), gpui::px(760.0)));
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+
+    let menu_bounds = cx.update(|window, _| window.find_by_label("Actions for column_0").bounds());
+    cx.simulate_click(menu_bounds.center(), Default::default());
+    cx.run_until_parked();
+    let pin_bounds = cx.update(|window, _| window.find_by_label("Pin through column_0").bounds());
+    cx.simulate_click(pin_bounds.center(), Default::default());
+    cx.run_until_parked();
+
+    view.update(cx, |view, cx| {
+        view.table.update(cx, |table, _| {
+            // Match dragging the horizontal scrollbar to its maximum offset.
+            // `scroll_to_col` uses a separate target calculation and does not
+            // exercise the scrollbar's full scroll range.
+            table
+                .horizontal_scroll_handle
+                .set_offset(gpui::point(gpui::px(-10_000.0), gpui::px(0.0)));
+        })
+    });
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+
+    let viewport = cx
+        .debug_bounds("grid-table-viewport")
+        .expect("table viewport is rendered");
+    let horizontal_scrollbar = cx
+        .debug_bounds("grid-horizontal-scrollbar-track")
+        .expect("horizontal scrollbar track is rendered");
+    let vertical_gutter = cx
+        .debug_bounds("grid-vertical-scrollbar-gutter")
+        .expect("vertical scrollbar gutter is rendered");
+    cx.update(|window, _| {
+        let pinned = window.find(("col-header", 0usize)).bounds();
+        let last_header = window.find(("col-header", 40usize)).bounds();
+        let last_cell = window.find("table-cell-0:40").bounds();
+        let visible_right = vertical_gutter.origin.x;
+        assert!(
+            pinned.origin.x >= viewport.origin.x
+                && pinned.origin.x + pinned.size.width <= visible_right,
+            "pinned leading header is outside the grid viewport: {pinned:?}, viewport: {viewport:?}"
+        );
+        let pinned_right = pinned.origin.x + pinned.size.width;
+        assert!(
+            horizontal_scrollbar.origin.x >= pinned_right - gpui::px(1.0)
+                && horizontal_scrollbar.origin.x <= pinned_right + gpui::px(1.0),
+            "scrollbar track should start after the pinned leading columns: track={:?}, pinned right={pinned_right:?}",
+            horizontal_scrollbar.origin.x
+        );
+        assert!(
+            last_header.origin.x + last_header.size.width <= visible_right,
+            "pinned leading column leaves the last header clipped: {last_header:?}, visible right edge: {visible_right:?}"
+        );
+        assert!(
+            last_cell.origin.x + last_cell.size.width <= visible_right,
+            "pinned leading column leaves the last cell clipped: {last_cell:?}, visible right edge: {visible_right:?}"
+        );
+    });
+}
+
+#[gpui::test]
 fn narrow_column_headers_keep_pin_actions_in_the_menu(cx: &mut TestAppContext) {
     let source = Arc::new(WideSource(
         (0..40)

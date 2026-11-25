@@ -1135,11 +1135,15 @@ impl GridView {
     }
 
     pub(crate) fn data_table(&self, cx: &App) -> impl IntoElement {
-        let (vertical_scroll, horizontal_scroll) = {
+        let (vertical_scroll, horizontal_scroll, pinned_width) = {
             let table = self.table.read(cx);
+            let pinned_width = (0..table.delegate().pinned_columns)
+                .filter_map(|column| table.col_width(column))
+                .fold(px(0.0), |width, column_width| width + column_width);
             (
                 table.vertical_scroll_handle.clone(),
                 table.horizontal_scroll_handle.clone(),
+                pinned_width,
             )
         };
         let gutter = Scrollbar::width();
@@ -1180,11 +1184,20 @@ impl GridView {
                             .debug_selector(|| "grid-horizontal-scrollbar-gutter".into())
                             .h(gutter)
                             .flex_none()
+                            // Match the table's scrollable viewport, which begins after pinned
+                            // leading columns. A full-width track lets a drag consume the pinned
+                            // region as scroll range.
+                            .pl(pinned_width)
                             .child(
-                                Scrollbar::horizontal(&horizontal_scroll)
-                                    .id("grid-horizontal-scrollbar")
-                                    .mode(ScrollbarMode::Always)
-                                    .viewport_from_layout(),
+                                div()
+                                    .size_full()
+                                    .debug_selector(|| "grid-horizontal-scrollbar-track".into())
+                                    .child(
+                                        Scrollbar::horizontal(&horizontal_scroll)
+                                            .id("grid-horizontal-scrollbar")
+                                            .mode(ScrollbarMode::Always)
+                                            .viewport_from_layout(),
+                                    ),
                             ),
                     ),
             )
