@@ -72,3 +72,47 @@ fn sidebar_tables_show_their_size_when_the_database_reports_one(cx: &mut TestApp
         "orders shows its size"
     );
 }
+
+#[gpui::test]
+fn a_query_tab_without_results_shows_the_connection_not_the_table(cx: &mut TestAppContext) {
+    let (view, cx) = open_live(cx);
+    view.update(cx, |view, cx| {
+        view.tabs.open_query();
+        view.sync_grid_owner();
+        cx.notify();
+    });
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    assert!(cx.debug_bounds("status-page").is_none(), "no page size on a query tab");
+    let (chip, connection) = view.read_with(cx, |view, _| {
+        (view.connection_chip_text(), view.catalog.connection.clone())
+    });
+    assert_eq!(
+        chip, connection,
+        "a query tab shows the connection, not the table's origin"
+    );
+    let rows = view.read_with(cx, |view, _| view.status_count_text(false, false));
+    assert!(!rows.contains("rows"), "no row count before a query ran: {rows}");
+}
+
+#[gpui::test]
+fn the_empty_results_keycaps_line_up_in_one_column(cx: &mut TestAppContext) {
+    let (view, cx) = open_live(cx);
+    cx.simulate_resize(gpui::size(gpui::px(1400.0), gpui::px(900.0)));
+    view.update(cx, |view, cx| {
+        view.tabs.open_query();
+        view.sync_grid_owner();
+        cx.notify();
+    });
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    let caps: Vec<_> = ["Ctrl+Enter", "Ctrl+Shift+Enter", "Ctrl+Shift+P"]
+        .into_iter()
+        .map(|keys| bounds(cx, Box::leak(format!("shortcut-keycap-{keys}").into_boxed_str())))
+        .collect();
+    assert!(
+        caps.windows(2)
+            .all(|pair| pair[0].origin.x == pair[1].origin.x && pair[0].size.width == pair[1].size.width),
+        "{caps:?}"
+    );
+}

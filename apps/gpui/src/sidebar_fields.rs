@@ -62,7 +62,7 @@ impl GridView {
 
     pub(crate) fn field_row(&self, table: &TableInfo, depth: usize, index: usize, theme: Theme) -> Option<Div> {
         let (_, state) = self.sidebar.fields.iter().find(|(open, _)| open == table)?;
-        let indent = size::SM + size::LG * (depth + 1) as f32;
+        let indent = crate::chrome::tree_indent((depth + 1) as f32);
         let line = |marker: Option<&'static str>, name: String, detail: String, dim: bool| {
             div()
                 .relative()

@@ -438,7 +438,7 @@ impl GridView {
             .flex()
             .items_center()
             .h(px(size::TREE_ROW))
-            .pl(px(8.0 + 14.0 * depth as f32))
+            .pl(px(tree_indent(depth as f32)))
             .gap_1()
             .rounded(px(theme.radius))
             .cursor_pointer()
@@ -1232,8 +1232,12 @@ enum SidebarLine {
     Catalog(crate::sidebar_catalog::CatalogLine),
 }
 
+pub(crate) fn tree_indent(depth: f32) -> f32 {
+    size::SM + size::TREE_INDENT * depth
+}
+
 pub(crate) fn guide_left(level: usize) -> f32 {
-    8.0 + 14.0 * level as f32 + size::ICON / 2.0
+    tree_indent(level as f32) + size::ICON / 2.0
 }
 
 pub(crate) fn indent_guides(depth: usize, theme: Theme) -> impl Iterator<Item = Div> {

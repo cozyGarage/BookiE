@@ -155,7 +155,7 @@ fn tree_line(
         .flex()
         .items_center()
         .h(px(size::TREE_ROW))
-        .pl(px(size::SM + size::LG * depth))
+        .pl(px(crate::chrome::tree_indent(depth)))
         .pr(px(size::SM))
         .gap_1()
         .rounded(px(theme.radius))
@@ -193,7 +193,7 @@ fn object_row(object: &bookie_core::CatalogObject, theme: Theme) -> gpui::AnyEle
         .flex()
         .items_center()
         .h(px(size::TREE_ROW))
-        .pl(px(size::SM + size::LG * 2.0 + size::CHEVRON))
+        .pl(px(crate::chrome::tree_indent(2.0) + size::CHEVRON))
         .pr(px(size::SM))
         .text_size(px(size::TEXT_SMALL))
         .child(
@@ -216,7 +216,7 @@ fn object_row(object: &bookie_core::CatalogObject, theme: Theme) -> gpui::AnyEle
 fn note(text: &str, theme: Theme) -> gpui::AnyElement {
     div()
         .h(px(size::TREE_ROW))
-        .pl(px(size::SM + size::LG * 2.0 + size::CHEVRON))
+        .pl(px(crate::chrome::tree_indent(2.0) + size::CHEVRON))
         .text_size(px(size::TEXT_SMALL))
         .text_color(rgb(theme.muted_foreground))
         .child(text.to_string())

@@ -507,6 +507,7 @@ impl TableDelegate for GridDelegate {
                             .overflow_hidden()
                             .whitespace_nowrap()
                             .text_ellipsis()
+                            .text_color(gpui::rgb(theme.foreground))
                             .child(name),
                     )
                     .when(!kind.is_empty(), |el| {
@@ -517,7 +518,7 @@ impl TableDelegate for GridDelegate {
                                 .overflow_hidden()
                                 .whitespace_nowrap()
                                 .text_ellipsis()
-                                .text_xs()
+                                .text_size(px(bookie_gpui::theme::size::TEXT_SMALL))
                                 .text_color(gpui::rgb(theme.muted_foreground))
                                 .child(kind),
                         )
