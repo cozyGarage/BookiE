@@ -662,7 +662,7 @@ fn keys_do_not_reach_the_grid_behind_the_review(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
-fn the_window_does_not_close_over_pending_edits_or_a_running_save(cx: &mut TestAppContext) {
+fn the_window_blocks_a_running_save_and_confirms_before_discarding_edits(cx: &mut TestAppContext) {
     let path = fixture_copy("close-guard");
     let (view, cx) = saving_view(cx, &path);
     view.read_with(cx, |view, _| assert_eq!(view.close_blocker(), None));
@@ -674,10 +674,8 @@ fn the_window_does_not_close_over_pending_edits_or_a_running_save(cx: &mut TestA
         })
     });
     view.read_with(cx, |view, _| {
-        assert_eq!(
-            view.close_blocker(),
-            Some("Save or discard the pending changes before closing the window")
-        );
+        assert_eq!(view.close_blocker(), None);
+        assert!(view.needs_close_confirmation());
     });
     cx.update(|_, cx| view.update(cx, |view, _| view.save.busy = true));
     view.read_with(cx, |view, _| {
@@ -2589,4 +2587,50 @@ fn paste_into_a_read_only_query_result_does_not_stage_edits(cx: &mut TestAppCont
         assert!(view.status.contains("cannot be edited"), "{}", view.status);
     });
     std::fs::remove_file(path).ok();
+}
+
+#[gpui::test]
+fn closing_over_pending_edits_asks_and_escape_keeps_the_window(cx: &mut TestAppContext) {
+    let path = fixture_copy("close-confirm");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.cell_edit
+                .edits
+                .insert((0, 1), bookie_gpui::model::Cell::Text("Changed".into()));
+        })
+    });
+    assert!(!cx.simulate_close(), "pending edits must not close the window silently");
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    assert!(cx.debug_bounds("close-confirm-dialog").is_some());
+    view.read_with(cx, |view, _| assert!(view.close_confirm));
+    cx.simulate_keystrokes("escape");
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    view.read_with(cx, |view, _| {
+        assert!(!view.close_confirm);
+        assert_eq!(view.cell_edit.edits.len(), 1, "keeping the window keeps the edits");
+        assert_eq!(view.status, "Kept the window open");
+    });
+    assert!(cx.debug_bounds("close-confirm-dialog").is_none());
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn edits_held_by_another_run_tab_also_ask_before_the_window_closes(cx: &mut TestAppContext) {
+    let path = fixture_copy("close-confirm-run-tab");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.add_run(None);
+            view.run_tabs.slots[0]
+                .edits
+                .insert((0, 1), bookie_gpui::model::Cell::Text("In a run tab".into()));
+        })
+    });
+    view.read_with(cx, |view, _| assert!(view.cell_edit.edits.is_empty()));
+    assert!(!cx.simulate_close(), "edits in a run tab must not be dropped silently");
+    view.read_with(cx, |view, _| assert!(view.close_confirm));
+    std::fs::remove_file(&path).ok();
 }
