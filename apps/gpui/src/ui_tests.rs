@@ -15,18 +15,50 @@ mod full_value_editor;
 mod themes;
 
 #[gpui::test]
-fn the_footer_shows_the_total_once_and_leaves_the_page_size_to_the_strip(cx: &mut TestAppContext) {
+fn the_grid_footer_owns_row_counts_and_paging(cx: &mut TestAppContext) {
     let (_view, cx) = open(cx);
     cx.run_until_parked();
-    assert!(cx.debug_bounds("status-count").is_some(), "total count is visible");
+    assert!(
+        cx.debug_bounds("page-summary").is_some(),
+        "row count is visible in the pager"
+    );
     assert!(
         cx.debug_bounds("status-page").is_none(),
         "page size is not repeated in the footer"
     );
     assert!(
         cx.debug_bounds("page-size").is_some(),
-        "the strip carries the page size"
+        "the pager carries the page size"
     );
+}
+
+#[gpui::test]
+fn paging_options_change_the_page_size_and_keep_the_visible_row(cx: &mut TestAppContext) {
+    use gpui_kit::test::{TestQueryExt, TestWindowExt};
+
+    let (view, cx) = open(cx);
+    view.update(cx, |view, cx| {
+        view.pager.next();
+        cx.notify();
+    });
+    cx.run_until_parked();
+    let options = cx.debug_bounds("page-size").expect("paging options are visible");
+    cx.simulate_click(options.center(), Default::default());
+    cx.run_until_parked();
+    let choice = cx
+        .update(|window, cx| {
+            window.render_frame(cx);
+            window
+                .try_find_by_label("1,000 rows per page")
+                .map(|node| node.bounds())
+        })
+        .expect("the menu offers a smaller page size");
+    cx.simulate_click(choice.center(), Default::default());
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.pager.rows, 1_000);
+        assert_eq!(view.pager.range().0, 5_001);
+    });
 }
 
 pub(super) fn open(cx: &mut TestAppContext) -> (gpui::Entity<GridView>, &mut VisualTestContext) {
@@ -65,15 +97,14 @@ fn find_scope_and_grid_controls_fit_at_default_and_compact_widths(cx: &mut TestA
             field.origin.x + field.size.width <= previous.origin.x,
             "Find field should not overlap its navigation control at {width}px"
         );
-        if width == 1100.0 {
-            let pager = cx.debug_bounds("grid-pager").expect("pager is rendered");
-            let actions = cx.debug_bounds("grid-actions").expect("actions are rendered");
-            assert!(
-                pager.origin.y < actions.origin.y + actions.size.height
-                    && actions.origin.y < pager.origin.y + pager.size.height,
-                "pager and grid actions should share a row"
-            );
-        }
+        let pager = cx.debug_bounds("grid-pager").expect("pager is rendered");
+        let actions = cx.debug_bounds("grid-actions").expect("actions are rendered");
+        let grid = cx.debug_bounds("grid-table-viewport").expect("grid is rendered");
+        let filter = cx.debug_bounds("loaded-row-filter").expect("loaded filter is rendered");
+        assert!(actions.bottom() <= filter.top());
+        assert!(filter.bottom() <= grid.top());
+        assert!(grid.bottom() <= pager.top());
+        assert!(pager.right() <= gpui::px(width));
     }
 }
 
