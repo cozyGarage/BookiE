@@ -172,7 +172,7 @@ impl GridView {
             self,
             &[
                 &["first", "last"],
-                &["refresh-table", "compare", "export-csv", "continuous"],
+                &["jump-column", "refresh-table", "compare", "export-csv", "continuous"],
             ],
         );
         div()
@@ -230,6 +230,14 @@ impl GridView {
                             }))
                         })
                     })
+                    .child(
+                        button("jump-column", "Go to column", theme)
+                            .debug_selector(|| "jump-column".into())
+                            .on_click(cx.listener(|this, _, window, cx| {
+                                this.open_picker(crate::palette_state::PaletteMode::Columns, window, cx);
+                                cx.notify();
+                            })),
+                    )
                     .child(
                         button("compare", "Compare", theme)
                             .on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))),
