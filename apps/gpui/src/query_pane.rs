@@ -92,12 +92,36 @@ impl GridView {
             .child(div().flex_1())
             .child(
                 div()
+                    .id("query-connection-chip")
+                    .debug_selector(|| "query-connection-chip".into())
+                    .flex()
+                    .items_center()
+                    .gap_1()
                     .min_w_0()
-                    .overflow_hidden()
-                    .whitespace_nowrap()
-                    .text_ellipsis()
+                    .h(px(size::SMALL_CONTROL))
+                    .px_2()
+                    .rounded(px(theme.radius))
+                    .border_1()
+                    .border_color(rgb(theme.border))
+                    .cursor_pointer()
                     .text_color(rgb(theme.muted_foreground))
-                    .child(self.catalog.connection.clone()),
+                    .hover(move |style| style.bg(rgb(theme.accent)))
+                    .tooltip(|window, cx| {
+                        gpui_component::tooltip::Tooltip::new("Show connection and tunnel status").build(window, cx)
+                    })
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.show_status();
+                        cx.notify();
+                    }))
+                    .child(crate::assets::icon("database", theme.muted_foreground))
+                    .child(
+                        div()
+                            .min_w_0()
+                            .overflow_hidden()
+                            .whitespace_nowrap()
+                            .text_ellipsis()
+                            .child(self.catalog.connection.clone()),
+                    ),
             )
             .child(div().flex_1())
             .child(self.transaction_controls(theme, cx))

@@ -20,6 +20,15 @@ pub struct Editing {
 
 const MAX_FULL_VALUE_EDIT_BYTES: usize = 1024 * 1024;
 
+fn exceeds_full_value_editor_limit(cell: &Cell, mode: crate::binary_mode::BinaryMode) -> bool {
+    match cell {
+        Cell::Text(text) | Cell::JsonText(text) => text.len() > MAX_FULL_VALUE_EDIT_BYTES,
+        Cell::Json(value) => bookie_gpui::preview::bounded_json(value, MAX_FULL_VALUE_EDIT_BYTES, false).1,
+        Cell::Bytes(bytes) => crate::binary_mode::edit_text_len(bytes.len(), mode) > MAX_FULL_VALUE_EDIT_BYTES,
+        _ => false,
+    }
+}
+
 impl GridView {
     pub(crate) fn apply_active_cell_edit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.commit_edit(window, cx);
@@ -128,13 +137,26 @@ impl GridView {
             cx.notify();
             return;
         }
+        if !self.source.editable() {
+            self.status = "This cell cannot be edited".into();
+            cx.notify();
+            return;
+        }
+        if self
+            .cell_ref_at(row, column)
+            .is_some_and(|cell| exceeds_full_value_editor_limit(cell, self.binary_mode_for_column(column)))
+        {
+            self.status = "This value exceeds the 1 MiB full-value editor limit".into();
+            cx.notify();
+            return;
+        }
         let cell = self.cell_at(row, column);
         let allowed = if self.live.is_some() {
             !matches!(cell, Cell::Undecodable(_))
         } else {
             is_editable(column, &cell)
         };
-        if !self.source.editable() || !allowed {
+        if !allowed {
             self.status = "This cell cannot be edited".into();
             cx.notify();
             return;
@@ -210,6 +232,13 @@ impl GridView {
             .get(&(row, column))
             .cloned()
             .unwrap_or_else(|| self.source.row(row).swap_remove(column))
+    }
+
+    pub(crate) fn cell_ref_at(&self, row: u64, column: usize) -> Option<&Cell> {
+        self.cell_edit
+            .edits
+            .get(&(row, column))
+            .or_else(|| self.source.row_ref(row).and_then(|cells| cells.get(column)))
     }
 
     pub(crate) fn edit_clicked_row(

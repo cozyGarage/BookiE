@@ -1,3 +1,7 @@
+use std::sync::{
+    Arc,
+    atomic::{AtomicUsize, Ordering},
+};
 use std::time::Instant;
 
 use gpui::TestAppContext;
@@ -7,7 +11,51 @@ use crate::GridView;
 use crate::text_input;
 use crate::ui_tests::open;
 use bookie_core::TableInfo;
+use bookie_gpui::model::{Cell, ColumnMeta, Diff, FindResult, Predicate};
 use bookie_gpui::shell::table_info;
+use bookie_gpui::source::{ResultSource, Source};
+use tokio_util::sync::CancellationToken;
+
+struct BorrowedDetailSource {
+    columns: Vec<ColumnMeta>,
+    cells: Vec<Cell>,
+    row_copies: Arc<AtomicUsize>,
+}
+
+impl ResultSource for BorrowedDetailSource {
+    fn columns(&self) -> &[ColumnMeta] {
+        &self.columns
+    }
+
+    fn editable(&self) -> bool {
+        true
+    }
+
+    fn total(&self) -> u64 {
+        1
+    }
+
+    fn row(&self, index: u64) -> Vec<Cell> {
+        self.row_copies.fetch_add(1, Ordering::Relaxed);
+        (index == 0).then(|| self.cells.clone()).unwrap_or_default()
+    }
+
+    fn row_ref(&self, index: u64) -> Option<&[Cell]> {
+        (index == 0).then_some(&self.cells)
+    }
+
+    fn find(&self, _: &str, _: usize, _: &CancellationToken) -> Result<FindResult, &'static str> {
+        Err("unused")
+    }
+
+    fn filter(&self, _: &Predicate, _: &CancellationToken) -> Result<Vec<u32>, &'static str> {
+        Err("unused")
+    }
+
+    fn compare(&self, _: bool, _: &CancellationToken) -> Result<Diff, &'static str> {
+        Err("unused")
+    }
+}
 
 fn orders_fixture() -> std::path::PathBuf {
     std::path::PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR"))
@@ -37,6 +85,64 @@ fn f3_toggles_a_detail_panel_that_follows_the_active_cell(cx: &mut TestAppContex
     });
     cx.simulate_keystrokes("f3");
     view.read_with(cx, |view, _| assert!(!view.detail_open));
+}
+
+#[gpui::test]
+fn large_cell_details_stay_bounded_and_reject_over_limit_edits_without_copying_the_row(cx: &mut TestAppContext) {
+    let row_copies = Arc::new(AtomicUsize::new(0));
+    let source: Source = Arc::new(BorrowedDetailSource {
+        columns: vec![ColumnMeta {
+            name: "payload".into(),
+            width: 120.0,
+            numeric: false,
+            data_type: "text".into(),
+            primary_key: false,
+        }],
+        cells: vec![Cell::Text("x".repeat(1024 * 1024 + 1))],
+        row_copies: row_copies.clone(),
+    });
+    cx.update(text_input::bind_keys);
+    let (view, cx) = cx.add_window_view(|window, cx| GridView::with_source(source.clone(), Instant::now(), window, cx));
+    cx.update(|window, cx| {
+        let focus = view.read(cx).focus.clone();
+        window.focus(&focus, cx);
+    });
+    view.update(cx, |view, cx| {
+        view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 0 });
+        view.toggle_detail();
+        cx.notify();
+    });
+    cx.run_until_parked();
+    row_copies.store(0, Ordering::Relaxed);
+
+    cx.update(|window, cx| window.render_frame(cx));
+    let detail = view.read_with(cx, |view, _| view.detail_target().expect("selected cell has detail").1);
+    assert!(matches!(detail, bookie_gpui::detail::Detail::TruncatedText(preview) if preview.chars().count() == 512));
+    assert!(cx.debug_bounds("cell-detail-preview-note").is_some());
+    assert_eq!(
+        row_copies.load(Ordering::Relaxed),
+        0,
+        "rendering the detail must borrow the live row"
+    );
+
+    cx.simulate_keystrokes("alt-enter");
+    cx.run_until_parked();
+    assert_eq!(
+        row_copies.load(Ordering::Relaxed),
+        0,
+        "an oversized editor request must be rejected before cloning the row"
+    );
+    view.read_with(cx, |view, _| {
+        assert!(view.cell_edit.active.is_none());
+        assert!(view.status.contains("1 MiB"));
+    });
+
+    view.update(cx, |view, cx| {
+        view.click_row(0, false);
+        view.copy_selection(false, cx);
+    });
+    let copied = cx.update(|_, cx| cx.read_from_clipboard().and_then(|item| item.text()));
+    assert_eq!(copied.as_deref(), Some("x".repeat(1024 * 1024 + 1).as_str()));
 }
 
 #[gpui::test]
@@ -2181,6 +2287,25 @@ fn switching_connection_expands_every_sidebar_schema_again(cx: &mut TestAppConte
             "a schema collapsed on the old connection stayed collapsed on the new one"
         );
     });
+}
+
+#[gpui::test]
+fn the_labelled_refresh_button_reloads_a_live_table_and_is_absent_without_a_connection(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_resize(gpui::size(gpui::px(1400.0), gpui::px(800.0)));
+    cx.run_until_parked();
+    assert!(
+        cx.debug_bounds("refresh-table").is_none(),
+        "no live table, nothing to refresh"
+    );
+    connect_and_settle(&view, cx, orders_fixture());
+    let button = cx
+        .debug_bounds("refresh-table")
+        .expect("a live table shows the Refresh button");
+    cx.simulate_click(button.center(), Default::default());
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert_eq!(view.status, "Refreshed the table"));
 }
 
 #[gpui::test]

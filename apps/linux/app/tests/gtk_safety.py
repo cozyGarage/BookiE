@@ -3208,6 +3208,7 @@ def imported_socket_urls_connect_to_mysql(_database, base):
                 break
             time.sleep(POLL_SECONDS)
         assert record is not None, f"{scheme} socket connection was not saved"
+        wait_for_socket_password(record, "bookie_test")
         open_saved_connection(record["name"])
         wait_for_frame_containing(f'{record["name"]} — BookiE')
         invoke_accessible_action("win.open-editor")
@@ -3222,7 +3223,7 @@ imported_socket_urls_connect_to_mysql.environment = "local"
 imported_socket_urls_connect_to_mysql.requires_editor = False
 
 
-def wait_for_socket_password(record):
+def wait_for_socket_password(record, expected_password="socket-url-fixture-password"):
     deadline = time.monotonic() + WAIT_SECONDS
     while time.monotonic() < deadline:
         secret = subprocess.run(
@@ -3230,7 +3231,7 @@ def wait_for_socket_password(record):
              "connection-id", record["id"], "kind", "db_password"],
             capture_output=True, text=True, timeout=5,
         )
-        if secret.returncode == 0 and secret.stdout.rstrip("\n") == "socket-url-fixture-password":
+        if secret.returncode == 0 and secret.stdout.rstrip("\n") == expected_password:
             return
         time.sleep(POLL_SECONDS)
     raise AssertionError("socket credential was not stored in Secret Service")

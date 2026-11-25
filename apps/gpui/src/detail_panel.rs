@@ -28,12 +28,12 @@ impl GridView {
         }
         let source = self.source_row(dataset_index);
         let name = self.source.columns().get(cursor.column)?.name.clone();
-        let cell = self.cell_at(source, cursor.column);
-        let detail = match (&cell, self.binary_mode_for_column(cursor.column)) {
-            (bookie_gpui::model::Cell::Bytes(bytes), mode) if mode != crate::binary_mode::BinaryMode::Hex => {
-                Detail::Text(crate::binary_mode::detail_text(bytes, mode))
-            }
-            _ => detail_of(&cell),
+        let mode = self.binary_mode_for_column(cursor.column);
+        let detail = if let Some(cell) = self.cell_ref_at(source, cursor.column) {
+            detail_for_cell(cell, mode)
+        } else {
+            let cell = self.cell_at(source, cursor.column);
+            detail_for_cell(&cell, mode)
         };
         Some((name, detail))
     }
@@ -98,18 +98,39 @@ impl GridView {
         if !self.detail_open {
             return None;
         }
-        let (header, body) = match self.detail_target() {
+        let (header, detail) = match self.detail_target() {
             None => (
                 div().text_color(rgb(theme.muted_foreground)).child("No cell selected"),
-                div()
-                    .text_color(rgb(theme.muted_foreground))
-                    .child("Select a cell to view its contents"),
+                None,
             ),
             Some((name, detail)) => {
                 let header = div().text_color(rgb(theme.muted_foreground)).child(name);
-                (header, detail_body(detail, theme))
+                (header, Some(detail))
             }
         };
+        let truncated = matches!(&detail, Some(Detail::TruncatedText(_)));
+        let body = detail.map_or_else(
+            || {
+                div()
+                    .text_color(rgb(theme.muted_foreground))
+                    .child("Select a cell to view its contents")
+            },
+            |detail| detail_body(detail, theme),
+        );
+        let preview_note = truncated.then(|| {
+            let message = if self.source.editable() {
+                "Previewing first 512 characters · Copy the selected row for the full value · Alt+Enter opens the editor (1 MiB limit)"
+            } else {
+                "Previewing first 512 characters · Copy the selected row for the full value"
+            };
+            div()
+                .id("cell-detail-preview-note")
+                .debug_selector(|| "cell-detail-preview-note".into())
+                .mt_2()
+                .text_size(px(size::TEXT_SMALL))
+                .text_color(rgb(theme.muted_foreground))
+                .child(message)
+        });
         Some(
             div()
                 .id("cell-detail")
@@ -119,7 +140,8 @@ impl GridView {
                 .p_2()
                 .overflow_y_scroll()
                 .child(header)
-                .child(body),
+                .child(body)
+                .children(preview_note),
         )
     }
 
@@ -317,6 +339,7 @@ fn detail_body(detail: Detail, theme: Theme) -> Div {
     match detail {
         Detail::Null => div().child("NULL").italic().text_color(rgb(theme.muted_foreground)),
         Detail::Text(text) => div().child(text),
+        Detail::TruncatedText(text) => div().child(text),
         Detail::Json { pretty } => div().font_family(MONO).child(pretty),
         Detail::Hex {
             lines,
@@ -347,6 +370,15 @@ fn detail_body(detail: Detail, theme: Theme) -> Div {
                         .child(format!("showing {shown} of {total} bytes")),
                 )
             }),
+    }
+}
+
+fn detail_for_cell(cell: &Cell, mode: crate::binary_mode::BinaryMode) -> Detail {
+    match (cell, mode) {
+        (Cell::Bytes(bytes), mode) if mode != crate::binary_mode::BinaryMode::Hex => {
+            Detail::Text(crate::binary_mode::detail_text(bytes, mode))
+        }
+        _ => detail_of(cell),
     }
 }
 
