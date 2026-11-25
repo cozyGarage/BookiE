@@ -159,7 +159,7 @@ async fn a_slow_write_outlives_the_read_deadline_and_a_slow_read_does_not() {
 
     let read = guard
         .query_controlled(
-            "SELECT count(*) FROM n a CROSS JOIN n b CROSS JOIN n c CROSS JOIN n d CROSS JOIN n e",
+            "SELECT count(*) FROM n a CROSS JOIN n b CROSS JOIN n c CROSS JOIN n d WHERE (a.id + b.id * c.id) % d.id = 0",
             &short(),
         )
         .await;
