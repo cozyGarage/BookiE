@@ -245,6 +245,7 @@ impl GridView {
                 cx.background_executor().timer(std::time::Duration::from_secs(30)).await;
                 let open = this
                     .update(cx, |this, cx| {
+                        this.sync_idle_notice(cx);
                         cx.notify();
                         this.transaction.is_some()
                     })
@@ -255,6 +256,23 @@ impl GridView {
             }
         })
         .detach();
+    }
+
+    pub(crate) fn sync_idle_notice(&mut self, cx: &mut Context<Self>) {
+        use crate::notifications::NoticeKind;
+        let present = self
+            .notices
+            .items
+            .iter()
+            .any(|notice| notice.kind == NoticeKind::IdleTransaction);
+        match self.transaction_idle_warning() {
+            Some(text) if !present => self.push_notice(text, NoticeKind::IdleTransaction, cx),
+            None if present => self
+                .notices
+                .items
+                .retain(|notice| notice.kind != NoticeKind::IdleTransaction),
+            _ => {}
+        }
     }
 
     pub(crate) fn transaction_idle_warning(&self) -> Option<String> {

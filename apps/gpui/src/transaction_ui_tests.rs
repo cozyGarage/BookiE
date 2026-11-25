@@ -360,8 +360,28 @@ fn a_transaction_idle_for_five_minutes_shows_the_shared_warning(cx: &mut TestApp
         let warning = view.transaction_idle_warning().expect("an idle warning");
         assert!(warning.starts_with("Idle for 6 min"), "{warning}");
     });
+    cx.update(|_, cx| view.update(cx, |view, cx| view.sync_idle_notice(cx)));
+    cx.update(|_, cx| view.update(cx, |view, cx| view.sync_idle_notice(cx)));
+    view.read_with(cx, |view, _| {
+        let idle: Vec<_> = view
+            .notices
+            .items
+            .iter()
+            .filter(|notice| notice.kind == crate::notifications::NoticeKind::IdleTransaction)
+            .collect();
+        assert_eq!(idle.len(), 1, "one unread notice, not one per refresh");
+        assert!(!idle[0].read);
+    });
+    cx.update(|_, cx| view.update(cx, |view, cx| view.status = "Clicked a cell".into()));
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.notices.unread(), 1, "a status change keeps it")
+    });
     cx.update(|_, cx| view.update(cx, |view, cx| view.end_transaction(false, cx)));
     wait_for(&view, cx, |view| view.status == "Transaction rolled back");
+    cx.update(|_, cx| view.update(cx, |view, cx| view.sync_idle_notice(cx)));
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.notices.unread(), 0, "ending the transaction resolves the notice")
+    });
     std::fs::remove_file(&path).ok();
 }
 
