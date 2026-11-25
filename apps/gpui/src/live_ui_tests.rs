@@ -2620,3 +2620,27 @@ fn canceling_export_file_setup_preserves_the_previous_status(cx: &mut TestAppCon
         assert_eq!(view.status, "Query completed");
     });
 }
+
+#[gpui::test]
+fn switching_to_home_or_settings_does_not_cancel_running_work(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    connect_and_settle(&view, cx, orders_fixture());
+    let (generation, token) = view.read_with(cx, |view, _| (view.loads.generation, view.loads.cancel.clone()));
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.tabs.open_home();
+            view.sync_grid_owner();
+            view.tabs.open_settings();
+            view.sync_grid_owner();
+            view.tabs.open_home();
+            view.sync_grid_owner();
+        })
+    });
+    view.read_with(cx, |view, _| {
+        assert_eq!(
+            view.loads.generation, generation,
+            "a tab switch must not replace the running load"
+        );
+    });
+    assert!(!token.is_cancelled(), "a tab switch must not cancel the running load");
+}
