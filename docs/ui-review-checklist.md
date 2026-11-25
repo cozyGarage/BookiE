@@ -17,7 +17,7 @@ Layout
 State and data
 - [ ] Background work uses the one task spawner. A view holds the session, never a connection.
 - [ ] One request per kind is current per tab; a reply to a replaced request is dropped; closing the tab cancels.
-- [ ] A refresh never clears what it refreshes. Spinner only until the first load, then stale content with a banner and Retry.
+- [ ] A refresh never clears what it refreshes. Spinner only until the first load, then the stale content stays and the failure goes to the notification centre with Retry.
 - [ ] Saving goes through the one save route; Cancel on the review dialog shows nothing.
 
 Interaction
@@ -26,7 +26,8 @@ Interaction
 - [ ] An icon-only control has an accessible name and a tooltip with the shortcut.
 - [ ] Status is never colour alone. Disabled and read-only look different.
 - [ ] High contrast and reduced motion are honoured.
-- [ ] A destructive action is undoable with a toast, or confirmed by a dialog that names the object.
+- [ ] A destructive action is confirmed in a centred dialog that names the object (GTK may also offer undo in a toast).
+- [ ] GPUI: content opens in the surface that [Where content goes](ui-design.md#where-content-goes-gpui) gives it.
 
 Copy
 - [ ] Sentence case, no final period; `…` only where the control opens a dialog or needs more input.

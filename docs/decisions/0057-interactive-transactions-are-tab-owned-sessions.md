@@ -15,7 +15,7 @@ This decision adds no new security model. It says how both frontends present int
 2. **A transaction belongs to one query tab.**
    - Begin opens one dedicated audited session for that tab through `PolicyGuard`. Every run from the tab uses that session until Commit or Roll back.
    - Other tabs, table browsing and grid saves never join it.
-   - Closing the tab, switching its connection or closing the window asks for Commit or Roll back, with no default. Cancelling keeps the transaction open.
+   - Closing the tab, switching its connection or closing the window asks for Commit or Roll back in a dialog, with no default. Cancelling keeps the transaction open.
 3. **Buttons and typed statements take the same guarded path.** Inside the tab's dedicated session, the guard already tracks typed `BEGIN`, `COMMIT` and `ROLLBACK` sent as separate statements (`crates/policy/src/guard/session.rs`). Begin, Commit and Roll back in the toolbar send exactly those through the same session, so both routes record the same audit. The guard keeps refusing:
    - transaction control hidden inside a larger statement batch (`hidden_transaction_control`);
    - a read-write begin on a read-only connection;
@@ -36,7 +36,7 @@ This decision adds no new security model. It says how both frontends present int
 6. **Visibility and idle warning.**
    - The editor toolbar shows Begin transaction, and while a transaction is open, Commit, Roll back and the number of pending governed writes.
    - The tab shows a transaction badge and the elapsed time.
-   - After **5 minutes** without a statement (configurable), a banner says the transaction is still open and may hold locks, with Commit and Roll back buttons. It never ends the transaction by itself.
+   - After **5 minutes** without a statement (configurable), a message says the transaction is still open and may hold locks, with Commit and Roll back buttons. In GPUI it is an unread notification in the notification centre ([where content goes](../ui-design.md#where-content-goes-gpui)). It never ends the transaction by itself.
 7. **Both frontends ship this together.** The Prod commit approval and the idle warning arrive in GTK and GPUI in the same release, through the shared module.
 8. **Agents are unchanged.** Agents and MCP cannot open interactive transactions, and Prod agents stay read-only.
 
