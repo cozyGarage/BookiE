@@ -265,6 +265,12 @@ impl GridView {
     }
 
     fn show_banner(&mut self, text: String, is_error: bool, cx: &mut Context<Self>) {
+        let kind = if is_error {
+            crate::notifications::NoticeKind::Error
+        } else {
+            crate::notifications::NoticeKind::Success
+        };
+        self.notices.push(text.clone(), kind);
         self.save.banner_serial += 1;
         let serial = self.save.banner_serial;
         self.save.banner = Some((text, is_error));
@@ -294,14 +300,11 @@ impl GridView {
                 self.status = format!("{}. {warning}", self.status);
                 self.save.banner_serial += 1;
                 self.save.banner = Some((self.status.clone(), true));
+                self.notices
+                    .push(self.status.clone(), crate::notifications::NoticeKind::Error);
             }
             None => self.status = format!("{}, verified by re-reading the rows", self.status),
         }
-    }
-
-    pub(crate) fn dismiss_save_banner(&mut self, cx: &mut Context<Self>) {
-        self.save.banner = None;
-        cx.notify();
     }
 
     pub(crate) fn cancel_save(&mut self, cx: &mut Context<Self>) {
@@ -416,11 +419,13 @@ impl GridView {
             }
             Err(failure) if failure.outcome_unknown => {
                 let text = format!(
-                    "The save may or may not have been applied ({}). The table was reloaded; check the data before saving again. If writes stay blocked, use 'Resolve unknown write outcome…' in the command palette.",
+                    "The save may or may not have been applied ({}). The table was reloaded; check the data before saving again. If writes stay blocked, use Resolve outcome in its notification.",
                     failure.message
                 );
                 self.save.busy = false;
-                self.show_banner(text.clone(), true, cx);
+                self.save.banner_serial += 1;
+                self.save.banner = Some((text.clone(), true));
+                self.push_notice(text.clone(), crate::notifications::NoticeKind::UnknownOutcome, cx);
                 self.reload_after_save_or_reconnect(connection_id, text, reconnect, cx);
             }
             Err(failure) => {
@@ -430,22 +435,6 @@ impl GridView {
                 self.show_banner(self.status.clone(), true, cx);
             }
         }
-    }
-
-    pub(crate) fn save_banner(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Div> {
-        let (text, is_error) = self.save.banner.clone().filter(|(_, is_error)| *is_error)?;
-        Some(
-            task_bar_frame(theme)
-                .when(is_error, |row| row.text_color(rgb(theme.destructive)))
-                .child(div().flex_1().min_w_0().child(text))
-                .child(
-                    button(ButtonKind::Ghost, "dismiss-save-banner", "Dismiss", theme).on_click(cx.listener(
-                        |this, _, _, cx| {
-                            this.dismiss_save_banner(cx);
-                        },
-                    )),
-                ),
-        )
     }
 
     pub(crate) fn edits_bar(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Div> {

@@ -11,7 +11,7 @@ use gpui_kit::component::scroll::Scrollbar;
 impl GridView {
     fn sync_render_state(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let tab = self.tabs.current();
-        window.set_window_title(&format!("{} — BookiE", self.tab_title(tab, cx)));
+        window.set_window_title(&format!("{} — BookiE", tab.title()));
         self.window_title_tab = Some(tab.clone());
         if self.keystroke_hook.is_none() {
             let view = cx.entity();
@@ -435,10 +435,10 @@ impl GridView {
         &self,
         theme: Theme,
         strip: Stateful<Div>,
-        bars: (Option<Div>, Option<Div>, Option<Div>, Option<Div>, Option<Div>),
+        bars: (Option<Div>, Option<Div>, Option<Div>, Option<Div>),
         cx: &mut Context<Self>,
     ) -> Div {
-        let (filter_row, compare_bar, save_bar, banner, insert_form) = bars;
+        let (filter_row, compare_bar, save_bar, insert_form) = bars;
         let grid = div()
             .flex_1()
             .flex()
@@ -450,7 +450,6 @@ impl GridView {
             .children(compare_bar)
             .children(save_bar)
             .children(insert_form)
-            .children(banner)
             .child(self.data_table(cx));
         div()
             .flex_1()
@@ -562,6 +561,13 @@ impl Render for GridView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.ensure_row_inspector(cx);
         self.sync_render_state(window, cx);
+        if std::mem::take(&mut self.connection_form.focus_on_open) {
+            let name = gpui::Focusable::focus_handle(self.connection_form.name.read(cx), cx);
+            window.focus(&name, cx);
+        }
+        if std::mem::take(&mut self.connection_form.restore_focus) {
+            window.focus(&self.focus, cx);
+        }
         if self.approval.current.is_some() && !self.focus.is_focused(window) {
             window.focus(&self.focus, cx);
         }
@@ -577,12 +583,12 @@ impl Render for GridView {
         let full_value_editor = self.full_value_editor_overlay(theme, cx);
         let approval = self.approval_overlay(theme, cx);
         let host_key = self.host_key_overlay(theme, cx);
+        let connection_dialog = self.connection_form.open.then(|| self.connection_dialog(theme, cx));
         let bar_dialog = self
             .import_bar(theme, cx)
             .or_else(|| self.export_file_bar(theme, cx))
             .map(|bar| bar_dialog(theme, bar));
         let save_bar = self.save_bar(theme, cx).or_else(|| self.edits_bar(theme, cx));
-        let banner = self.save_banner(theme, cx);
         let bundle_bar = self.connection_bundle_bar(theme, cx);
         let insert_form = self
             .insert_form(theme, cx)
@@ -590,16 +596,10 @@ impl Render for GridView {
             .or_else(|| self.structure_info_panel(theme, cx))
             .or_else(|| self.resolve_panel(theme, cx))
             .or_else(|| self.late_bars(theme, cx));
-        let grid = self.grid_pane(
-            theme,
-            strip,
-            (filter_row, compare_bar, save_bar, banner, insert_form),
-            cx,
-        );
+        let grid = self.grid_pane(theme, strip, (filter_row, compare_bar, save_bar, insert_form), cx);
         let content = match self.tabs.current().clone() {
             Tab::Home => self.home_page(theme, cx),
             Tab::Settings => self.settings_page(theme, cx),
-            Tab::NewConnection => self.connection_page(theme, cx),
             Tab::History => self.history_page(theme, cx),
             Tab::AuditLog => self.audit_page(theme, cx),
             Tab::Diagram => self.diagram_page(theme, cx),
@@ -644,6 +644,8 @@ impl Render for GridView {
             .children(palette)
             .children(full_value_editor)
             .children(bar_dialog)
+            .children(self.notifications_list(theme, cx))
+            .children(connection_dialog)
             .children(approval)
             .children(host_key)
     }

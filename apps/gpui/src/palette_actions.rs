@@ -393,6 +393,7 @@ impl GridView {
             ),
             action("collapse-sidebar-sections", "Collapse the sidebar tree", true),
             action("sidebar-active-only", "Show only the active table in the sidebar", true),
+            action("notifications", "Show notifications", true),
             action("sidebar-regex", "Filter the sidebar with a regular expression", true),
             action(
                 "append-pages",
@@ -753,13 +754,14 @@ impl GridView {
             "reveal-sidebar" => self.reveal_in_sidebar(cx),
             "collapse-sidebar-sections" => self.collapse_sidebar_sections(),
             "sidebar-active-only" => self.toggle_sidebar_active_only(),
+            "notifications" => self.toggle_notifications(cx),
             "sidebar-regex" => self.toggle_sidebar_regex(cx),
             "append-pages" => self.pager.append = !self.pager.append,
             "import-connections" => self.pick_connection_import(cx),
             "export-connections" => self.pick_connection_export(cx),
             "new-connection" => {
                 self.connection_form.editing = None;
-                self.tabs.open_new_connection();
+                self.open_connection_dialog(cx);
                 self.sync_grid_owner();
             }
             "audit" => {

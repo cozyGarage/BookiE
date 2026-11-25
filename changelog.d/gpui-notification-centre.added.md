@@ -1,0 +1,1 @@
+GPUI messages go to a notification centre: a bell at the bottom right of the status bar shows how many need attention and opens the list. Failures and unknown save outcomes stay until dismissed and no longer push the grid down; an unknown outcome offers Resolve outcome.

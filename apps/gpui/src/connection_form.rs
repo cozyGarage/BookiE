@@ -42,6 +42,9 @@ pub(crate) struct ConnectionForm {
     pub ssh: crate::ssh_form::SshForm,
     pub security_open: bool,
     pub ssh_open: bool,
+    pub open: bool,
+    pub focus_on_open: bool,
+    pub restore_focus: bool,
 }
 
 impl ConnectionForm {
@@ -95,6 +98,9 @@ impl ConnectionForm {
             tls: TlsMode::default().index(),
             security_open: false,
             ssh_open: false,
+            open: false,
+            focus_on_open: false,
+            restore_focus: false,
             tls_root: input("CA certificate file (optional)", cx),
             tls_cert: input("Client certificate file (optional)", cx),
             tls_key: input("Client key file (optional)", cx),
@@ -279,26 +285,44 @@ pub(crate) fn choice_row(
 }
 
 impl GridView {
-    pub(crate) fn tab_title(&self, tab: &bookie_gpui::shell::Tab, cx: &gpui::App) -> String {
-        if *tab != bookie_gpui::shell::Tab::NewConnection || self.connection_form.editing.is_none() {
-            return tab.title();
+    pub(crate) fn open_connection_dialog(&mut self, cx: &mut Context<Self>) {
+        self.connection_form.open = true;
+        self.connection_form.focus_on_open = true;
+        cx.notify();
+    }
+
+    pub(crate) fn close_connection_dialog(&mut self, cx: &mut Context<Self>) {
+        self.connection_form.open = false;
+        self.connection_form.confirm_delete = false;
+        self.connection_form.focus_on_open = false;
+        self.connection_form.restore_focus = true;
+        cx.notify();
+    }
+
+    pub(crate) fn connection_dialog_title(&self, cx: &gpui::App) -> String {
+        if self.connection_form.editing.is_none() {
+            return "New connection".into();
         }
         let name = self.connection_form.name.read(cx).content().trim().to_string();
         if name.is_empty() {
             "Edit connection".into()
         } else {
-            name
+            format!("Edit {name}")
         }
     }
 
-    pub(crate) fn connection_page(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+    pub(crate) fn connection_dialog(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
+        crate::surfaces::scrim(theme)
+            .id("connection-dialog-scrim")
+            .occlude()
+            .p_4()
+            .child(self.connection_card(theme, cx))
+    }
+
+    fn connection_card(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
         let form = &self.connection_form;
         let file_based = form.selected().is_some_and(|driver| driver.capabilities.is_file_based);
-        let title = if form.editing.is_some() {
-            "Edit connection"
-        } else {
-            "New connection"
-        };
+        let title = self.connection_dialog_title(cx);
         let driver = form
             .selected()
             .map(|driver| driver.label.to_string())
@@ -316,51 +340,44 @@ impl GridView {
             sections.push(self.security_section(theme, cx));
             sections.push(self.ssh_section(theme, cx));
         }
-        div()
-            .relative()
-            .flex_1()
+        crate::surfaces::dialog_surface(size::HOME_WIDTH * 1.5, theme)
+            .id("connection-dialog")
+            .debug_selector(|| "connection-dialog".into())
+            .max_h_full()
             .min_h_0()
-            .flex()
-            .justify_center()
-            .items_start()
-            .p_6()
-            .bg(rgb(theme.background))
-            .child(
-                gpui::svg()
-                    .path("backdrop/contours.svg")
-                    .absolute()
-                    .top_0()
-                    .left_0()
-                    .size_full()
-                    .text_color(rgb(theme.border)),
-            )
+            .on_mouse_down(gpui::MouseButton::Left, |_, _, cx| cx.stop_propagation())
             .child(
                 div()
-                    .relative()
                     .debug_selector(|| "connection-card".into())
-                    .w_full()
-                    .max_w(px(size::HOME_WIDTH * 1.5))
-                    .max_h_full()
+                    .size_full()
                     .min_h_0()
                     .flex()
                     .flex_col()
-                    .rounded(px(size::SURFACE_RADIUS))
-                    .border_1()
-                    .border_color(rgb(theme.border))
-                    .bg(rgb(theme.popover))
                     .child(
                         div()
                             .px_4()
                             .pt_4()
                             .pb_2()
                             .flex()
-                            .flex_col()
-                            .child(div().font_weight(gpui::FontWeight::SEMIBOLD).child(title))
+                            .items_start()
+                            .gap_2()
                             .child(
                                 div()
-                                    .text_size(px(size::TEXT_SMALL))
-                                    .text_color(rgb(theme.muted_foreground))
-                                    .child(driver),
+                                    .flex_1()
+                                    .min_w_0()
+                                    .flex()
+                                    .flex_col()
+                                    .child(div().font_weight(gpui::FontWeight::SEMIBOLD).child(title))
+                                    .child(
+                                        div()
+                                            .text_size(px(size::TEXT_SMALL))
+                                            .text_color(rgb(theme.muted_foreground))
+                                            .child(driver),
+                                    ),
+                            )
+                            .child(
+                                crate::surfaces::icon_button("close-connection", "x", "Close", theme)
+                                    .on_click(cx.listener(|this, _, _, cx| this.close_connection_dialog(cx))),
                             ),
                     )
                     .child(
@@ -517,6 +534,10 @@ impl GridView {
             )
             .children(form.editing.map(|_| self.delete_button(theme, cx)))
             .child(self.save_button(theme, cx))
+            .child(
+                button(ButtonKind::Ghost, "cancel-connection", "Cancel", theme)
+                    .on_click(cx.listener(|this, _, _, cx| this.close_connection_dialog(cx))),
+            )
     }
 
     fn behaviour_fields(&self, theme: Theme, cx: &mut Context<Self>) -> Vec<Div> {
@@ -742,9 +763,7 @@ impl GridView {
                     Ok(None) => this.connection_form.status = "That connection no longer exists".into(),
                     Err(message) => this.connection_form.status = message,
                 }
-                this.tabs.open_new_connection();
-                this.sync_grid_owner();
-                cx.notify();
+                this.open_connection_dialog(cx);
             });
         })
         .detach();
@@ -1017,6 +1036,10 @@ impl GridView {
                 } else {
                     format!("Saved {name}, but the color was not saved. Try saving again")
                 };
+                if color_saved {
+                    self.status = self.connection_form.status.clone();
+                    self.close_connection_dialog(cx);
+                }
                 self.connection_form
                     .password
                     .update(cx, |input, cx| input.set_content("", cx));
