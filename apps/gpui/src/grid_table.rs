@@ -556,7 +556,7 @@ impl TableDelegate for GridDelegate {
                     .when_some(checked, |el, on| {
                         let theme = Theme::current(cx);
                         let (name, color) = if on {
-                            ("square-check", theme.info)
+                            ("square-check", theme.foreground)
                         } else {
                             ("square", theme.muted_foreground)
                         };
