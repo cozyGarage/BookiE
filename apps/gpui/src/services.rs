@@ -127,13 +127,9 @@ impl GridView {
             self.status = "No active database connection".into();
             return;
         };
-        let sql = match live.driver_id.as_str() {
-            "postgres" => format!("SELECT pg_cancel_backend({pid});"),
-            "mysql" => format!("KILL QUERY {pid};"),
-            _ => {
-                self.status = "Canceling processes is not supported for this database engine".into();
-                return;
-            }
+        let Some(sql) = bookie_app_services::server_process::cancel_statement(&live.driver_id, pid) else {
+            self.status = "Canceling processes is not supported for this database engine".into();
+            return;
         };
         self.status = format!("Canceling server process {pid}…");
         self.run_sql(sql, cx);
