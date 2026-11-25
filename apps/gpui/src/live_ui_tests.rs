@@ -2216,6 +2216,44 @@ fn escape_denies_a_pending_approval_and_other_keys_leave_it_open(cx: &mut TestAp
 }
 
 #[gpui::test]
+fn approval_blocks_grid_and_keymap_shortcuts(cx: &mut TestAppContext) {
+    use bookie_app_services::approval_prompt::{ApprovalOutcome, PendingApproval, sample_request};
+    let (view, cx) = open(cx);
+    let table = bookie_gpui::shell::table_info("customers");
+    view.update(cx, |view, cx| {
+        view.catalog.grid_table = table.clone();
+        view.tabs.open_table(&table);
+        view.sync_grid_owner();
+        view.selection = Some(crate::Selection { anchor: 0, focus: 1 });
+        view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 1, column: 0 });
+        cx.notify();
+    });
+    cx.run_until_parked();
+    let selection = view.read_with(cx, |view, _| view.selection);
+    let (respond, mut answer) = tokio::sync::oneshot::channel();
+    let tx = view.read_with(cx, |view, _| view.approval.tx.clone());
+    assert!(
+        tx.send(PendingApproval {
+            request: sample_request("UPDATE t SET a = 1"),
+            respond
+        })
+        .is_ok()
+    );
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    cx.simulate_keystrokes("shift-down ctrl-shift-p");
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.selection, selection);
+        assert!(!view.palette.open, "a keymap action opened behind the approval prompt");
+        assert!(view.approval.current.is_some(), "the approval prompt must remain open");
+    });
+    cx.simulate_keystrokes("escape");
+    cx.run_until_parked();
+    assert_eq!(answer.try_recv().ok(), Some(ApprovalOutcome::Deny));
+}
+
+#[gpui::test]
 fn an_approval_request_shows_a_prompt_and_the_answer_reaches_the_sink(cx: &mut TestAppContext) {
     use bookie_app_services::approval_prompt::{ApprovalOutcome, PendingApproval, sample_request};
     let (view, cx) = open(cx);
