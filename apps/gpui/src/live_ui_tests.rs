@@ -2554,7 +2554,9 @@ fn the_grid_strip_has_one_export_menu_for_files_and_the_clipboard(cx: &mut TestA
     assert_eq!(export.size.height, gpui::px(bookie_gpui::theme::size::COMPACT_CONTROL));
     assert!(cx.debug_bounds("export").is_none(), "no separate export button");
     assert!(cx.debug_bounds("copy-csv").is_none(), "no separate Copy CSV button");
-    let items = view.read_with(cx, |view, _| crate::menus::command_groups(view, crate::menus::EXPORT_GROUPS));
+    let items = view.read_with(cx, |view, _| {
+        crate::menus::command_groups(view, crate::menus::EXPORT_GROUPS)
+    });
     let ids: Vec<&str> = items.iter().flatten().map(|(id, _, _)| *id).collect();
     assert_eq!(ids, ["export-file", "export-csv"]);
     cx.update(|window, cx| view.update(cx, |view, cx| view.run_palette_id("export-file", window, cx)));
