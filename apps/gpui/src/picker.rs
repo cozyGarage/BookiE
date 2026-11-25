@@ -121,10 +121,7 @@ impl GridView {
             .filter_map(|(position, command)| {
                 let score = bookie_gpui::palette::fuzzy_score(needle, command.title());
                 (score > 0).then(|| {
-                    let keys = self
-                        .keymap
-                        .binding(command)
-                        .map_or_else(|| "unbound".into(), Chord::label);
+                    let keys = self.keymap.binding(command).map_or_else(|| "None".into(), Chord::label);
                     let item = PickerItem {
                         title: command.title().into(),
                         subtitle: keys,

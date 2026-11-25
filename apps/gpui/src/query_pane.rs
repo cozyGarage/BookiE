@@ -1,3 +1,4 @@
+use bookie_gpui::keymap::Command;
 use bookie_gpui::messages::MessageKind;
 use gpui::{Context, Div, MouseDownEvent, Stateful, Window, div, prelude::*, px, rgb};
 
@@ -12,7 +13,7 @@ impl GridView {
         if self.panel.explaining {
             self.invalidate_background();
             self.panel.explaining = false;
-            self.status = "Explain cancelled".into();
+            self.status = "Canceled the explain".into();
         }
         self.panel.open = !self.panel.open;
     }
@@ -52,7 +53,7 @@ impl GridView {
             .border_color(rgb(theme.border))
             .child(
                 button(ButtonKind::Primary, "run-statement", "Run", theme)
-                    .tooltip(tip("Run the selection or the statement at the cursor (Ctrl+Enter)"))
+                    .tooltip(tip(self.command_tip(Command::RunAtCursor)))
                     .on_click(cx.listener(|this, _, _, cx| {
                         this.run_at_cursor(cx);
                         cx.notify();
@@ -60,7 +61,7 @@ impl GridView {
             )
             .child(
                 button(ButtonKind::Ghost, "run-query", "Run all", theme)
-                    .tooltip(tip("Run every statement (Ctrl+Shift+Enter)"))
+                    .tooltip(tip(self.command_tip(Command::RunQuery)))
                     .on_click(cx.listener(|this, _, _, cx| {
                         this.run_query(cx);
                         cx.notify();
@@ -81,10 +82,12 @@ impl GridView {
                 )),
             )
             .child(
-                button(ButtonKind::Ghost, "save-query", "Save", theme).on_click(cx.listener(|this, _, _, cx| {
-                    this.save_favorite(cx);
-                    cx.notify();
-                })),
+                button(ButtonKind::Ghost, "save-query", "Save as favorite", theme).on_click(cx.listener(
+                    |this, _, _, cx| {
+                        this.save_favorite(cx);
+                        cx.notify();
+                    },
+                )),
             )
             .child(div().flex_1())
             .child(
@@ -278,7 +281,7 @@ impl GridView {
             .collect::<Vec<_>>();
         let empty = run_tabs.is_empty();
         let mut views = vec![
-            self.result_view_switch("view-table", "Table Data", ResultView::Table, theme, cx),
+            self.result_view_switch("view-table", "Table data", ResultView::Table, theme, cx),
             self.result_view_switch("view-summary", "Summary", ResultView::Summary, theme, cx),
             self.result_view_switch("view-messages", "Messages", ResultView::Messages, theme, cx),
         ];
@@ -481,9 +484,14 @@ impl GridView {
                 .p_4()
                 .text_color(rgb(theme.muted_foreground))
                 .child(div().pb_2().child("Run a query to see results"))
-                .child(shortcut_hint("Run the selection or statement", "Ctrl+Enter", theme))
-                .child(shortcut_hint("Run all statements", "Ctrl+Shift+Enter", theme))
-                .child(shortcut_hint("Command palette", "Ctrl+Shift+P", theme))
+                .children(
+                    [Command::RunAtCursor, Command::RunQuery, Command::Palette]
+                        .into_iter()
+                        .filter_map(|command| {
+                            let keys = self.keymap.binding(command)?.label();
+                            Some(shortcut_hint(command.title(), keys, theme))
+                        }),
+                )
         } else {
             grid
         }
@@ -508,7 +516,8 @@ impl GridView {
     }
 }
 
-fn shortcut_hint(label: &'static str, keys: &'static str, theme: Theme) -> Div {
+fn shortcut_hint(label: &'static str, keys: String, theme: Theme) -> Div {
+    let selector = format!("shortcut-keycap-{keys}");
     div()
         .flex()
         .items_center()
@@ -527,7 +536,7 @@ fn shortcut_hint(label: &'static str, keys: &'static str, theme: Theme) -> Div {
         )
         .child(
             div()
-                .debug_selector(move || format!("shortcut-keycap-{keys}"))
+                .debug_selector(move || selector)
                 .flex_none()
                 .w(px(size::SHORTCUT_KEYCAP_WIDTH))
                 .flex()

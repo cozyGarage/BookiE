@@ -575,6 +575,19 @@ pub(crate) fn progress_text(title: &str, rows: u64, partial: bool, pages: u64) -
 }
 
 impl GridView {
+    pub(crate) fn action_shortcut(&self, id: &str) -> Option<String> {
+        if id == "go-to-last-edit" {
+            return Some(bookie_gpui::keymap::last_edit_chord().label());
+        }
+        bookie_gpui::keymap::Command::for_action(id)
+            .and_then(|command| self.keymap.binding(command))
+            .map(bookie_gpui::keymap::Chord::label)
+    }
+
+    pub(crate) fn command_tip(&self, command: bookie_gpui::keymap::Command) -> String {
+        bookie_gpui::keymap::with_shortcut(command.title(), self.keymap.binding(command))
+    }
+
     fn command_rows(
         &self,
         actions: &[Action],
@@ -589,11 +602,7 @@ impl GridView {
             .zip(range)
             .map(|(index, position)| {
                 let action = &actions[*index];
-                let shortcut = bookie_gpui::keymap::Command::ALL
-                    .into_iter()
-                    .find(|command| command.name() == action.id || command.title() == action.label)
-                    .and_then(|command| self.keymap.binding(command))
-                    .map(bookie_gpui::keymap::Chord::label);
+                let shortcut = self.action_shortcut(action.id);
                 let row = div()
                     .id(("palette-command-row", position))
                     .debug_selector(move || format!("palette-command-row-{position}").into())

@@ -311,7 +311,7 @@ impl GridView {
             connection.extend(self.network_fields(theme, cx));
         }
         connection.push(form.validation_field(theme, if file_based { "File" } else { "Database" }, &form.database, cx));
-        let mut sections = vec![section(theme, "Behaviour", self.behaviour_fields(theme, cx))];
+        let mut sections = vec![section(theme, "Behavior", self.behaviour_fields(theme, cx))];
         if !file_based {
             sections.push(self.security_section(theme, cx));
             sections.push(self.ssh_section(theme, cx));
@@ -452,7 +452,7 @@ impl GridView {
                         .password
                         .update(cx, |input, cx| input.set_content(password.expose_secret(), cx));
                 }
-                self.connection_form.status = "Filled from the connection URL. Review it, then save.".into();
+                self.connection_form.status = "Filled from the connection URL. Review it, then save".into();
             }
             Err(message) => self.connection_form.status = format!("Could not read the connection URL: {message}"),
         }
@@ -472,7 +472,7 @@ impl GridView {
                     |this, _, _, cx| match cx.read_from_clipboard().and_then(|item| item.text()) {
                         Some(text) => this.fill_from_connection_url(&text, cx),
                         None => {
-                            this.connection_form.status = "The clipboard has no connection URL.".into();
+                            this.connection_form.status = "The clipboard has no connection URL".into();
                             cx.notify();
                         }
                     },
@@ -484,9 +484,9 @@ impl GridView {
                         this.connection_form.status = match this.connection_url_for_form(cx) {
                             Some(url) => {
                                 cx.write_to_clipboard(gpui::ClipboardItem::new_string(url));
-                                "Copied the connection URL without its password.".into()
+                                "Copied the connection URL without its password".into()
                             }
-                            None => "This connection type has no URL form.".into(),
+                            None => "This connection type has no URL form".into(),
                         };
                         cx.notify();
                     },
@@ -552,7 +552,7 @@ impl GridView {
         );
         let colour = choice_row(
             theme,
-            "Colour",
+            "Color",
             swatches.enumerate().map(|(index, (name, label))| {
                 let selected = form.color.as_deref() == name;
                 let chip = segment(("connection-colour", index), label, selected, theme);
@@ -739,7 +739,7 @@ impl GridView {
             let _ = this.update(cx, |this, cx| {
                 match draft {
                     Ok(Some(draft)) => this.fill_connection_form(draft, cx),
-                    Ok(None) => this.connection_form.status = "That connection no longer exists.".into(),
+                    Ok(None) => this.connection_form.status = "That connection no longer exists".into(),
                     Err(message) => this.connection_form.status = message,
                 }
                 this.tabs.open_new_connection();
@@ -912,7 +912,7 @@ impl GridView {
         };
         if !std::mem::replace(&mut self.connection_form.confirm_delete, true) {
             self.connection_form.status =
-                "Click Delete again to remove this connection and its stored passwords.".into();
+                "Click Delete again to remove this connection and its stored passwords".into();
             cx.notify();
             return;
         }
@@ -941,9 +941,9 @@ impl GridView {
             Ok(deleted) => {
                 self.connection_form.editing = None;
                 self.connection_form.status = if deleted.credential_failure {
-                    "Deleted; some stored credentials could not be removed.".into()
+                    "Deleted; some stored credentials could not be removed".into()
                 } else {
-                    "Deleted.".into()
+                    "Deleted".into()
                 };
                 if let Ok(list) = bookie_gpui::live::saved_connections() {
                     self.connections = list;
@@ -1015,7 +1015,7 @@ impl GridView {
                 self.connection_form.status = if color_saved {
                     format!("Saved {name}")
                 } else {
-                    format!("Saved {name}, but the colour was not saved. Try saving again.")
+                    format!("Saved {name}, but the color was not saved. Try saving again")
                 };
                 self.connection_form
                     .password

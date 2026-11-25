@@ -91,7 +91,7 @@ fn a_query_tab_without_results_shows_the_connection_not_the_table(cx: &mut TestA
         chip, connection,
         "a query tab shows the connection, not the table's origin"
     );
-    let rows = view.read_with(cx, |view, _| view.status_count_text(false, false));
+    let rows = view.read_with(cx, |view, _| view.status_count_text(false));
     assert!(!rows.contains("rows"), "no row count before a query ran: {rows}");
 }
 

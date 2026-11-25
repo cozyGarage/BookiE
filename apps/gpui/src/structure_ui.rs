@@ -152,7 +152,7 @@ impl GridView {
 
     pub(crate) fn cancel_structure_bar(&mut self, cx: &mut Context<Self>) {
         self.close_structure_bar();
-        self.status = "Cancelled the structure change".into();
+        self.status = "Canceled the structure change".into();
         cx.notify();
     }
 

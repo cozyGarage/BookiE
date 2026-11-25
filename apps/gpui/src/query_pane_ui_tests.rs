@@ -16,12 +16,12 @@ fn hiding_results_cancels_explain_and_drops_its_late_result(cx: &mut TestAppCont
             view.toggle_results();
             assert!(cancel.is_cancelled());
             assert!(!view.panel.explaining);
-            assert_eq!(view.status, "Explain cancelled");
+            assert_eq!(view.status, "Canceled the explain");
             assert!(!view.panel.open);
         })
     });
     cx.run_until_parked();
-    view.read_with(cx, |view, _| assert_eq!(view.status, "Explain cancelled"));
+    view.read_with(cx, |view, _| assert_eq!(view.status, "Canceled the explain"));
 }
 
 #[gpui::test]

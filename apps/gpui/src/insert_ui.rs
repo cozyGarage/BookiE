@@ -102,7 +102,7 @@ impl GridView {
 
     pub(crate) fn cancel_insert_form(&mut self, cx: &mut Context<Self>) {
         self.close_insert_form();
-        self.status = "Cancelled the new row".into();
+        self.status = "Canceled the new row".into();
         cx.notify();
     }
 

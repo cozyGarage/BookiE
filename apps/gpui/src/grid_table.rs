@@ -1189,7 +1189,7 @@ impl GridView {
         }
         let projection = ColumnProjection::new(columns.len(), &hidden);
         if projection.len() <= 1 {
-            self.status = "At least one column must remain visible.".into();
+            self.status = "At least one column must remain visible".into();
             return;
         }
         hidden.insert(source_col);

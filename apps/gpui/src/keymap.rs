@@ -99,19 +99,32 @@ impl Command {
             Command::InsertRow => "Add a row",
             Command::Undo => "Undo edit",
             Command::Redo => "Redo edit",
-            Command::Filter => "Filter rows",
-            Command::CopyCells => "Copy cells",
-            Command::CopyCellsWithHeaders => "Copy cells with headers",
-            Command::PasteCells => "Paste cells",
+            Command::Filter => "Filter loaded rows",
+            Command::CopyCells => "Copy selected rows as TSV",
+            Command::CopyCellsWithHeaders => "Copy selected rows as TSV with headers",
+            Command::PasteCells => "Paste cells at the active cell",
             Command::ToggleSidebar => "Show or hide the sidebar",
-            Command::NewQuery => "New query tab",
-            Command::RunQuery => "Run full query buffer",
+            Command::NewQuery => "New query",
+            Command::RunQuery => "Run all statements",
             Command::RunAtCursor => "Run statement at cursor",
             Command::ToggleDetail => "Show or hide the detail panel",
             Command::CloseTab => "Close the current tab",
             Command::ReopenTab => "Reopen the last closed tab",
             Command::RecentTab => "Switch to the previous tab",
         }
+    }
+
+    pub fn for_action(id: &str) -> Option<Command> {
+        let name = match id {
+            "query" => "new-query",
+            "run" => "run-query",
+            "sidebar" => "toggle-sidebar",
+            "undo-edit" => "undo",
+            "redo-edit" => "redo",
+            "reveal-sidebar" => "reveal-in-sidebar",
+            other => other,
+        };
+        Command::parse(name)
     }
 
     fn parse(name: &str) -> Option<Command> {
@@ -162,7 +175,7 @@ impl Chord {
         Ok(chord)
     }
 
-    pub fn label(&self) -> String {
+    pub fn spec(&self) -> String {
         let mut parts = Vec::new();
         if self.ctrl {
             parts.push("ctrl".to_string());
@@ -176,6 +189,39 @@ impl Chord {
         parts.push(self.key.clone());
         parts.join("-")
     }
+
+    pub fn label(&self) -> String {
+        let modifiers = [(self.ctrl, "Ctrl"), (self.shift, "Shift"), (self.alt, "Alt")];
+        let mut parts: Vec<String> = modifiers
+            .into_iter()
+            .filter(|(held, _)| *held)
+            .map(|(_, name)| name.to_string())
+            .collect();
+        parts.push(key_label(&self.key));
+        parts.join("+")
+    }
+}
+
+fn key_label(key: &str) -> String {
+    match key {
+        "pageup" => "Page Up".into(),
+        "pagedown" => "Page Down".into(),
+        _ => {
+            let mut letters = key.chars();
+            letters
+                .next()
+                .map(|first| first.to_uppercase().chain(letters).collect())
+                .unwrap_or_default()
+        }
+    }
+}
+
+pub fn with_shortcut(label: &str, chord: Option<&Chord>) -> String {
+    chord.map_or_else(|| label.to_string(), |chord| format!("{label} · {}", chord.label()))
+}
+
+pub fn last_edit_chord() -> Chord {
+    Chord::new(true, false, true, "-")
 }
 
 const UNBOUND: &str = "none";
@@ -277,7 +323,7 @@ impl Keymap {
             .into_iter()
             .filter(|command| self.binding(*command) != defaults.binding(*command))
             .map(|command| {
-                let text = self.binding(command).map_or_else(|| UNBOUND.to_string(), Chord::label);
+                let text = self.binding(command).map_or_else(|| UNBOUND.to_string(), Chord::spec);
                 (command.name(), text)
             })
             .collect();
@@ -362,7 +408,21 @@ mod tests {
         assert!(Chord::parse("shift-k").is_err());
         assert!(Chord::parse("ctrl-").is_err());
         assert!(Chord::parse("hyper-k").is_err());
-        assert_eq!(Chord::parse("ctrl-shift-p").unwrap().label(), "ctrl-shift-p");
+        assert_eq!(Chord::parse("ctrl-shift-p").unwrap().spec(), "ctrl-shift-p");
+    }
+
+    #[test]
+    fn shortcut_text_reads_as_capitalised_keys_joined_by_plus() {
+        assert_eq!(Chord::parse("ctrl-shift-p").unwrap().label(), "Ctrl+Shift+P");
+        assert_eq!(Chord::parse("ctrl-enter").unwrap().label(), "Ctrl+Enter");
+        assert_eq!(Chord::parse("f1").unwrap().label(), "F1");
+        assert_eq!(Chord::parse("ctrl-pagedown").unwrap().label(), "Ctrl+Page Down");
+        assert_eq!(last_edit_chord().label(), "Ctrl+Alt+-");
+        assert_eq!(
+            with_shortcut("Command palette", Some(&Chord::parse("ctrl-shift-p").unwrap())),
+            "Command palette · Ctrl+Shift+P"
+        );
+        assert_eq!(with_shortcut("Run", None), "Run");
     }
 
     #[test]

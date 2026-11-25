@@ -4,26 +4,132 @@ pub struct Action {
     pub enabled: bool,
 }
 
+pub const GROUPS: [&str; 5] = ["Table", "Query", "Connection", "View", "App"];
+
 pub fn group(id: &str) -> &'static str {
-    match id {
-        "query" | "run" | "explain" | "favorites" | "save-favorite" | "delete-favorite" => "Query",
-        "add-column" | "rename-column" | "drop-column" | "add-index" | "drop-index" | "rename-table"
-        | "add-foreign-key" | "drop-foreign-key" | "show-structure" | "show-create-table" | "empty-table"
-        | "drop-table" => "Structure",
-        "save-changes"
-        | "undo-edit"
-        | "redo-edit"
-        | "delete-rows"
-        | "insert-row"
-        | "filter"
-        | "find"
-        | "save-filter"
-        | "saved-filters"
-        | "delete-saved-filter"
-        | "where"
-        | "clear-where" => "Data",
-        _ => "Workspace",
+    known_group(id).unwrap_or("App")
+}
+
+pub fn known_group(id: &str) -> Option<&'static str> {
+    if id.starts_with("health-") {
+        return Some("Connection");
     }
+    let group = match id {
+        "query" | "run" | "run-at-cursor" | "explain" | "favorites" | "save-favorite" | "delete-favorite"
+        | "previous-run" | "next-run" | "close-run" | "compare" | "open-sql-file" | "save-sql-file" => "Query",
+        "new-connection"
+        | "reconnect"
+        | "disconnect"
+        | "status"
+        | "sessions"
+        | "activity-console"
+        | "blocking-locks"
+        | "long-running"
+        | "replication-lag"
+        | "server-variables"
+        | "server-status"
+        | "cancel-process"
+        | "check-tcp"
+        | "kafka-topics"
+        | "sample-pubsub"
+        | "follow-pubsub"
+        | "stop-follow"
+        | "backup-database"
+        | "restore-database"
+        | "schema-context"
+        | "data-dictionary"
+        | "search-values"
+        | "show-schema-diagram"
+        | "export-schema-diagram"
+        | "schema-compare"
+        | "export-all-tables" => "Connection",
+        "sidebar"
+        | "results"
+        | "detail"
+        | "show-row-vertically"
+        | "wrap-text"
+        | "continuous"
+        | "font"
+        | "font-choice"
+        | "select-theme"
+        | "theme"
+        | "home"
+        | "history"
+        | "audit"
+        | "recent-tab"
+        | "reopen-tab" => "View",
+        "settings" | "shortcuts" | "keyboard-shortcuts" | "about" | "check-for-updates" | "new-window" => "App",
+        _ => return table_group(id),
+    };
+    Some(group)
+}
+
+fn table_group(id: &str) -> Option<&'static str> {
+    matches!(
+        id,
+        "table"
+            | "quick-switcher"
+            | "jump-column"
+            | "reveal-sidebar"
+            | "refresh-table"
+            | "first"
+            | "previous"
+            | "next"
+            | "last"
+            | "find"
+            | "filter"
+            | "clear-filter"
+            | "filter-rule"
+            | "where"
+            | "clear-where"
+            | "save-filter"
+            | "saved-filters"
+            | "delete-saved-filter"
+            | "count-table-rows"
+            | "go-to-last-edit"
+            | "edit"
+            | "set-cells"
+            | "paste-cells"
+            | "paste-literal-cell"
+            | "save-changes"
+            | "undo-edit"
+            | "redo-edit"
+            | "delete-rows"
+            | "insert-row"
+            | "import-csv"
+            | "resolve-outcome"
+            | "discard-view-edits"
+            | "copy"
+            | "copy-csv"
+            | "copy-json"
+            | "copy-markdown"
+            | "copy-in-list"
+            | "copy-insert"
+            | "clear-selection"
+            | "selection-stats"
+            | "export-csv"
+            | "export-file"
+            | "set-csv-delimiter"
+            | "reset-csv-delimiter"
+            | "set-export-limit"
+            | "reset-export-limit"
+            | "show-structure"
+            | "show-create-table"
+            | "go-to-reference"
+            | "peek-foreign-key"
+            | "show-referencing"
+            | "add-column"
+            | "rename-column"
+            | "drop-column"
+            | "add-index"
+            | "drop-index"
+            | "rename-table"
+            | "add-foreign-key"
+            | "drop-foreign-key"
+            | "empty-table"
+            | "drop-table"
+    )
+    .then_some("Table")
 }
 
 pub fn fuzzy_score(query: &str, text: &str) -> u32 {
@@ -116,6 +222,19 @@ mod tests {
     fn a_prefix_and_consecutive_letters_rank_higher() {
         assert!(fuzzy_score("filter", "Filter rows") > fuzzy_score("filter", "Clear filter now"));
         assert_eq!(fuzzy_score("abc", "xyz"), 0);
+    }
+
+    #[test]
+    fn commands_group_by_the_object_they_act_on() {
+        assert_eq!(group("add-column"), "Table");
+        assert_eq!(group("save-changes"), "Table");
+        assert_eq!(group("run"), "Query");
+        assert_eq!(group("reconnect"), "Connection");
+        assert_eq!(group("health-bloat"), "Connection");
+        assert_eq!(group("sidebar"), "View");
+        assert_eq!(group("settings"), "App");
+        assert_eq!(known_group("not-a-command"), None);
+        assert!(GROUPS.contains(&group("not-a-command")));
     }
 
     #[test]

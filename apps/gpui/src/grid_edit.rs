@@ -87,7 +87,7 @@ impl GridView {
                 self.status = if self.can_save_edits() {
                     format!("{count} change(s) pending; press Ctrl+S to save")
                 } else {
-                    format!("{count} edited in this view only; nothing is saved.")
+                    format!("{count} edited in this view only; nothing is saved")
                 };
                 self.stop_edit(window, cx);
             }

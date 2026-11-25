@@ -285,7 +285,7 @@ impl GridView {
                 self.history_status_chip("history-all", "All", StatusFilter::All, theme, cx),
                 self.history_status_chip("history-ok", "Succeeded", StatusFilter::Succeeded, theme, cx),
                 self.history_status_chip("history-failed", "Failed", StatusFilter::Failed, theme, cx),
-                self.history_status_chip("history-cancelled", "Cancelled", StatusFilter::Cancelled, theme, cx),
+                self.history_status_chip("history-cancelled", "Canceled", StatusFilter::Cancelled, theme, cx),
             ],
         );
         let windows = choice_row(

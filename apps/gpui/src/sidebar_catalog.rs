@@ -138,7 +138,7 @@ fn state_row(state: Option<&ObjectState>, entry: usize, theme: Theme) -> gpui::A
         Some(ObjectState::Failed(message)) => catalog_note(message, theme),
         Some(ObjectState::Loaded(objects)) => match objects.get(entry) {
             Some(object) => object_row(object, theme),
-            None => catalog_note("Nothing of this kind was found.", theme),
+            None => catalog_note("Nothing of this kind was found", theme),
         },
     }
 }

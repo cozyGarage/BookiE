@@ -14,7 +14,7 @@ pub(crate) struct SetCellsState {
 
 pub(crate) fn staged_values(cells: &[(u64, Cell)], text: Option<&str>) -> Result<Vec<(u64, Cell)>, String> {
     if cells.is_empty() {
-        return Err("No cells are selected.".into());
+        return Err("No cells are selected".into());
     }
     if cells.len() > MAX_SET_CELLS {
         return Err("That is too many cells to set at once".into());
@@ -102,7 +102,7 @@ impl GridView {
             return;
         };
         let Some(targets) = self.set_cells_targets() else {
-            self.status = "A selected cell cannot be edited, so no cells were changed.".into();
+            self.status = "A selected cell cannot be edited, so no cells were changed".into();
             cx.notify();
             return;
         };

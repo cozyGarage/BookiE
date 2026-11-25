@@ -157,7 +157,7 @@ impl GridView {
             done: format!("Deleted {count} row(s)"),
             review: format!("Review the {count} row(s) to delete, then delete or cancel"),
             confirm: "Delete",
-            note: Some("Rows that depend on these (foreign keys, triggers) may be affected too."),
+            note: Some("Rows that depend on these (foreign keys, triggers) may be affected too"),
             reconnect: None,
         };
         self.prepare(live, SaveRequest::Deletes(rows), labels, cx);
@@ -306,7 +306,7 @@ impl GridView {
 
     pub(crate) fn cancel_save(&mut self, cx: &mut Context<Self>) {
         if self.save.pending.take().is_some() {
-            self.status = "Save cancelled; the edits are still pending".into();
+            self.status = "Canceled the save; the edits are still pending".into();
             cx.notify();
         }
     }

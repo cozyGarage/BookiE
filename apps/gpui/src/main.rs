@@ -1148,6 +1148,8 @@ fn main() {
 #[cfg(test)]
 mod connection_form_ui_tests;
 #[cfg(test)]
+mod copy_tests;
+#[cfg(test)]
 mod drafts_ui_tests;
 #[cfg(test)]
 mod follow_ui_tests;

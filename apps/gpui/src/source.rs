@@ -67,7 +67,7 @@ impl Synthetic {
 
     fn scan(&self, cancel: &CancellationToken) -> Result<ScanSource, &'static str> {
         if cancel.is_cancelled() {
-            return Err("the operation was cancelled");
+            return Err("canceled the operation");
         }
         let mut scan = self
             .scan
@@ -115,7 +115,7 @@ fn spool_rows_from(
     };
     for row in rows {
         if cancel.is_cancelled() {
-            return Err("the operation was cancelled");
+            return Err("canceled the operation");
         }
         page.push(row);
         count += 1;
@@ -212,7 +212,7 @@ impl ResultSource for Synthetic {
 
     fn compare(&self, keyed: bool, cancel: &CancellationToken) -> Result<Diff, &'static str> {
         if cancel.is_cancelled() {
-            return Err("comparison cancelled");
+            return Err("canceled the comparison");
         }
         let left = self.scan(cancel)?;
         let right = spool_rows_from((0..self.total).filter_map(right_row), cancel)?;
@@ -298,7 +298,7 @@ pub fn filter_in(
         Ok(std::ops::ControlFlow::Continue(()))
     })
     .map_err(|error| match error {
-        bookie_results::result_scan::ScanError::Cancelled => "filter cancelled",
+        bookie_results::result_scan::ScanError::Cancelled => "canceled the filter",
         bookie_results::result_scan::ScanError::PageBudget => {
             "not enough memory to scan this result; close other large results and retry"
         }
@@ -309,7 +309,7 @@ pub fn filter_in(
 
 fn compare_message(error: CompareError) -> &'static str {
     match error {
-        CompareError::Cancelled => "comparison cancelled",
+        CompareError::Cancelled => "canceled the comparison",
         CompareError::PageMemoryBusy => "not enough memory to compare this result; close other large results and retry",
         _ => "the comparison did not finish",
     }
@@ -348,7 +348,7 @@ fn diff_view(report: &CompareReport, keyed: bool) -> Diff {
 fn find_message(error: FindError) -> &'static str {
     match error {
         FindError::Predicate(_) => "invalid search text",
-        FindError::Scan(bookie_results::result_scan::ScanError::Cancelled) => "search cancelled",
+        FindError::Scan(bookie_results::result_scan::ScanError::Cancelled) => "canceled the search",
         FindError::Scan(bookie_results::result_scan::ScanError::PageBudget) => {
             "not enough memory to search this result; close other large results and retry"
         }

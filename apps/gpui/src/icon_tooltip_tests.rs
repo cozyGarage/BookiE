@@ -31,7 +31,7 @@ fn every_icon_only_control_in_the_window_and_sidebar_header_has_a_tooltip(cx: &m
         &[
             ("new-connection", "new-connection tooltip: New connection"),
             ("new-query", "new-query tooltip: New query"),
-            ("palette", "palette tooltip: Command palette (Ctrl+Shift+P)"),
+            ("palette", "palette tooltip: Command palette · Ctrl+Shift+P"),
             ("header-collapse-all", "header-collapse-all tooltip: Collapse all"),
             (
                 "header-refresh",

@@ -129,7 +129,7 @@ impl GridView {
                         (Err(message), Some(cleanup)) => format!(
                             "The statement failed and the transaction session ended: {message}; closing it also failed: {cleanup}"
                         ),
-                        (Ok(_), None) => "The transaction ended.".into(),
+                        (Ok(_), None) => "The transaction ended".into(),
                         (Ok(_), Some(cleanup)) => format!("The transaction ended; closing its session failed: {cleanup}"),
                     };
                     cx.notify();

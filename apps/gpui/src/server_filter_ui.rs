@@ -32,7 +32,7 @@ impl GridView {
         vec![
             Action {
                 id: "where",
-                label: "Filter this table on the server (WHERE)".to_string(),
+                label: "Filter this table on the server with WHERE".to_string(),
                 enabled,
             },
             Action {

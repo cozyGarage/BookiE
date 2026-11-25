@@ -54,7 +54,7 @@ impl GridView {
 
     pub(crate) fn cancel_import_bar(&mut self, cx: &mut Context<Self>) {
         self.close_import_bar();
-        self.status = "Cancelled the import".into();
+        self.status = "Canceled the import".into();
         cx.notify();
     }
 

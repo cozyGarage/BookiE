@@ -50,7 +50,7 @@ impl GridView {
         let enabled = self.live.as_ref().is_some_and(|session| !session.tables.is_empty());
         vec![Action {
             id: "export-schema-diagram",
-            label: "Export schema diagram (Mermaid or DBML)…".to_string(),
+            label: "Export schema diagram as Mermaid or DBML…".to_string(),
             enabled,
         }]
     }

@@ -98,7 +98,7 @@ impl McpState {
                 )
         });
         let mut group = SettingGroup::new()
-            .item(SettingItem::new("MCP server", enabled).description("Use BookiE's governed local MCP endpoint."))
+            .item(SettingItem::new("MCP server", enabled).description("Use BookiE's governed local MCP endpoint"))
             .item(
                 SettingItem::new("Issue token", actions)
                     .layout(gpui::Axis::Vertical)
@@ -133,7 +133,7 @@ fn issue_token_button(
 
 fn token_list(view: Entity<GridView>, theme: Theme, cx: &gpui::App) -> Div {
     let Some(bridge) = view.read(cx).mcp.bridge() else {
-        return div().child("Start the MCP server to manage tokens.");
+        return div().child("Start the MCP server to manage tokens");
     };
     let mut tokens = bridge.tokens().list();
     tokens.sort_by(|left, right| left.name.cmp(&right.name));
@@ -186,7 +186,7 @@ impl GridView {
         }
         if enabled {
             let Some(database) = self.live.as_ref().map(|live| live.database_service().clone()) else {
-                self.mcp.status = Some("Connect to a saved database before enabling MCP.".into());
+                self.mcp.status = Some("Connect to a saved database before enabling MCP".into());
                 cx.notify();
                 return;
             };
@@ -195,15 +195,15 @@ impl GridView {
                 self.mcp.connections.clone(),
             );
             self.mcp.status = Some(if self.mcp.enabled() {
-                "MCP server enabled.".into()
+                "MCP server enabled".into()
             } else {
-                "MCP server could not start; check the audit and policy configuration.".into()
+                "MCP server could not start; check the audit and policy configuration".into()
             });
         } else {
             if let Some(server) = self.mcp.server.take() {
                 server.shutdown();
             }
-            self.mcp.status = Some("MCP server disabled.".into());
+            self.mcp.status = Some("MCP server disabled".into());
         }
         cx.notify();
     }
@@ -223,7 +223,7 @@ impl GridView {
                 if result.is_ok() {
                     this.mcp.plaintext = None;
                 }
-                this.mcp.status = Some(result.map_or_else(|error| error, |_| "Token revoked.".into()));
+                this.mcp.status = Some(result.map_or_else(|error| error, |_| "Token revoked".into()));
                 cx.notify();
             });
         })
@@ -232,7 +232,7 @@ impl GridView {
 
     pub(crate) fn issue_mcp_token(&mut self, permissions: TokenPermissions, cx: &mut Context<Self>) {
         let Some(bridge) = self.mcp.bridge() else {
-            self.mcp.status = Some("Enable the MCP server before issuing a token.".into());
+            self.mcp.status = Some("Enable the MCP server before issuing a token".into());
             cx.notify();
             return;
         };
@@ -242,7 +242,7 @@ impl GridView {
             .and_then(|live| live.saved.as_ref())
             .map(|(id, _)| *id)
         else {
-            self.mcp.status = Some("A saved database connection is required to issue a token.".into());
+            self.mcp.status = Some("A saved database connection is required to issue a token".into());
             cx.notify();
             return;
         };
@@ -270,9 +270,9 @@ impl GridView {
                     Ok(issued) => {
                         this.mcp.plaintext = Some(issued.plaintext);
                         this.mcp.status = Some(if issued.keyring_saved {
-                            "Token issued and saved to the keyring.".into()
+                            "Token issued and saved to the keyring".into()
                         } else {
-                            "Token issued; keyring storage was unavailable.".into()
+                            "Token issued; keyring storage was unavailable".into()
                         });
                     }
                     Err(error) => this.mcp.status = Some(format!("Could not issue token: {error}")),

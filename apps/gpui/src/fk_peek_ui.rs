@@ -46,7 +46,7 @@ impl GridView {
                                     div()
                                         .text_size(px(size::TEXT_SMALL))
                                         .text_color(rgb(theme.muted_foreground))
-                                        .child("Foreign Key Peek:"),
+                                        .child("Foreign key peek"),
                                 )
                                 .child(
                                     div()

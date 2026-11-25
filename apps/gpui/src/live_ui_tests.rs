@@ -537,7 +537,7 @@ fn query_results_do_not_copy_inserts_to_the_previously_browsed_table(cx: &mut Te
     let clipboard = cx.update(|_, cx| cx.read_from_clipboard().and_then(|item| item.text()));
     assert_eq!(clipboard.as_deref(), Some("unchanged"));
     view.read_with(cx, |view, _| {
-        assert_eq!(view.status, "Copy as INSERT is available for table rows only.");
+        assert_eq!(view.status, "Copy as INSERT is available for table rows only");
         assert!(
             !view
                 .palette_actions()
@@ -772,7 +772,7 @@ fn an_empty_database_opens_a_query_without_synthetic_rows(cx: &mut TestAppContex
     let clipboard = cx.update(|_, cx| cx.read_from_clipboard().and_then(|item| item.text()));
     assert_eq!(clipboard.as_deref(), Some("unchanged"));
     view.read_with(cx, |view, _| {
-        assert_eq!(view.status, "Copy as INSERT is available for table rows only.");
+        assert_eq!(view.status, "Copy as INSERT is available for table rows only");
         assert!(
             !view
                 .palette_actions()
@@ -2006,7 +2006,7 @@ fn header_collapse_all_and_feedback_actions(cx: &mut TestAppContext) {
     view.update(cx, |view, _| {
         view.live = None;
         view.show_status();
-        assert_eq!(view.status, "No active database connection.");
+        assert_eq!(view.status, "No active database connection");
     });
 }
 

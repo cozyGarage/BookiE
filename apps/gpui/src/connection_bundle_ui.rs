@@ -162,7 +162,7 @@ impl GridView {
             let Some(path) = selected else {
                 this.update(cx, |this, cx| {
                     this.connection_bundle.busy = false;
-                    this.status = "Cancelled the connection import".into();
+                    this.status = "Canceled the connection import".into();
                     cx.notify();
                 })
                 .ok();
@@ -253,7 +253,7 @@ impl GridView {
         if let Some(passphrase) = &self.connection_bundle.passphrase {
             passphrase.update(cx, |input, cx| input.set_content("", cx));
         }
-        self.status = "Cancelled the connection import".into();
+        self.status = "Canceled the connection import".into();
         cx.notify();
     }
 
@@ -312,7 +312,7 @@ impl GridView {
             let Some(path) = selected else {
                 this.update(cx, |this, cx| {
                     this.connection_bundle.busy = false;
-                    this.status = "Cancelled the connection export".into();
+                    this.status = "Canceled the connection export".into();
                     cx.notify();
                 })
                 .ok();
@@ -457,7 +457,7 @@ fn apply_import(pending: PendingImport) -> Result<usize, String> {
                 None,
             )
             .await
-            .map_err(|_| "The import was cancelled because its audit record could not be saved".to_string())?;
+            .map_err(|_| "Canceled the import because its audit record could not be saved".to_string())?;
         let started = Instant::now();
         let outcome = apply_import_body(pending.body, pending.plan).await;
         let (status, affected) = match &outcome {
@@ -507,7 +507,7 @@ fn export_connections(path: PathBuf) -> Result<usize, String> {
                 None,
             )
             .await
-            .map_err(|_| "The export was cancelled because its audit record could not be saved".to_string())?;
+            .map_err(|_| "Canceled the export because its audit record could not be saved".to_string())?;
         let started = Instant::now();
         let outcome = write_export(path, connections).await;
         let status = if outcome.is_ok() {

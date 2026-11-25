@@ -113,7 +113,7 @@ impl GridView {
         });
         let reset = self.export.limit.map(|limit| Action {
             id: "reset-export-limit",
-            label: format!("Export limit: remove (now {limit} rows)"),
+            label: format!("Remove the export limit of {limit} rows"),
             enabled: true,
         });
         typed.into_iter().chain(reset).collect()
@@ -133,7 +133,7 @@ impl GridView {
         });
         let reset = self.export.csv_delimiter.as_ref().map(|delimiter| Action {
             id: "reset-csv-delimiter",
-            label: format!("CSV delimiter: back to the comma (now {})", delimiter.as_str()),
+            label: format!("Reset the CSV delimiter {} to a comma", delimiter.as_str()),
             enabled: true,
         });
         typed.into_iter().chain(reset).collect()
@@ -185,11 +185,7 @@ impl GridView {
                 self.cell_cursor.is_some() && self.compare.is_none(),
             ),
             action("keyboard-shortcuts", "Edit keyboard shortcuts", true),
-            action(
-                "go-to-last-edit",
-                "Go to last edit (Ctrl+Alt+-)",
-                self.last_edit.is_some(),
-            ),
+            action("go-to-last-edit", "Go to last edit", self.last_edit.is_some()),
             action(
                 "wrap-text",
                 if self.wrap_text {
@@ -234,7 +230,7 @@ impl GridView {
                 self.selection_stats_enabled(),
             ),
             action("export-file", "Export to a file…", self.export_file_enabled()),
-            action("export-csv", "Export current page or selection as CSV", true),
+            action("export-csv", "Export page or selection as CSV", true),
             action("copy-json", "Copy selected rows as JSON", self.selection.is_some()),
             action(
                 "copy-markdown",
@@ -310,12 +306,12 @@ impl GridView {
             ),
             action(
                 "activity-console",
-                "Show activity console (server processes)",
+                "Show activity console",
                 has(bookie_core::ActivityQuery::Sessions),
             ),
             action(
                 "cancel-process",
-                "Cancel selected server process (PolicyGuard governed)",
+                "Cancel selected server process",
                 self.live
                     .as_ref()
                     .is_some_and(|l| l.driver_id == "postgres" || l.driver_id == "mysql")
@@ -423,11 +419,7 @@ impl GridView {
             action("empty-table", "Empty the table…", self.structure_change_enabled()),
             action("drop-table", "Drop the table…", self.structure_change_enabled()),
             action("go-to-reference", "Go to the referenced row", self.fk_nav_enabled()),
-            action(
-                "peek-foreign-key",
-                "Peek referenced row (foreign key preview)",
-                self.fk_nav_enabled(),
-            ),
+            action("peek-foreign-key", "Peek referenced row", self.fk_nav_enabled()),
             action("show-referencing", "Show referencing rows", self.fk_nav_enabled()),
             action("show-structure", "Show table structure", self.structure_info_enabled()),
             action("add-column", "Add a column…", self.structure_change_enabled()),
@@ -460,8 +452,8 @@ impl GridView {
             |schema| format!("Schema context: {schema}"),
         );
         let mut actions = vec![
-            action("query", "New query tab", true),
-            action("run", "Run the query", matches!(self.tabs.current(), Tab::Query)),
+            action("query", "New query", true),
+            action("run", "Run all statements", matches!(self.tabs.current(), Tab::Query)),
             action(
                 "explain",
                 "Explain the query",
@@ -494,7 +486,7 @@ impl GridView {
                 },
                 matches!(self.tabs.current(), Tab::Query),
             ),
-            action("home", "Open Home", true),
+            action("home", "Open home", true),
             action("new-connection", "New connection", true),
             action("history", "Open history", true),
             action("audit", "Open audit log", true),
@@ -532,7 +524,7 @@ impl GridView {
                 true,
             ),
             action("font", "Choose font…", true),
-            action("select-theme", "Choose colour theme…", true),
+            action("select-theme", "Choose color theme…", true),
             action(
                 "theme",
                 if self.dark_mode {

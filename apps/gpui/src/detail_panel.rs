@@ -103,7 +103,7 @@ impl GridView {
                 div().text_color(rgb(theme.muted_foreground)).child("No cell selected"),
                 div()
                     .text_color(rgb(theme.muted_foreground))
-                    .child("Select a cell to view its contents."),
+                    .child("Select a cell to view its contents"),
             ),
             Some((name, detail)) => {
                 let header = div().text_color(rgb(theme.muted_foreground)).child(name);
@@ -134,14 +134,14 @@ impl GridView {
                 || {
                     div()
                         .text_color(rgb(theme.muted_foreground))
-                        .child("Select a row to view its values.")
+                        .child("Select a row to view its values")
                 },
                 |fields| {
                     if fields.is_empty() {
                         return div()
                             .debug_selector(|| "row-detail-empty".into())
                             .text_color(rgb(theme.muted_foreground))
-                            .child("No fields to show. Clear the filter or turn off Hide NULL fields.");
+                            .child("No fields to show. Clear the filter or turn off Hide NULL fields");
                     }
                     div()
                         .flex()
@@ -173,7 +173,7 @@ impl GridView {
                 .whitespace_normal()
                 .child(
                     self.row_detail_json_text()
-                        .unwrap_or_else(|| "Select a row to view its values.".into()),
+                        .unwrap_or_else(|| "Select a row to view its values".into()),
                 )
         });
         let view_switch = div().flex().pb_2().child(segmented(

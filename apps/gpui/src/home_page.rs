@@ -94,7 +94,7 @@ impl GridView {
             ))
             .child(home_stat_card("Connected", "play", &connected.to_string(), theme))
             .child(home_stat_card(
-                "Database Types",
+                "Database types",
                 "package",
                 &unique_drivers.to_string(),
                 theme,
@@ -102,7 +102,7 @@ impl GridView {
     }
 
     pub(crate) fn home_quick_start_card(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
-        card(theme).flex_1().child(card_title("Quick Start", theme)).child(
+        card(theme).flex_1().child(card_title("Quick start", theme)).child(
             div()
                 .p_2()
                 .flex()
@@ -169,7 +169,7 @@ impl GridView {
                     .p_2()
                     .flex()
                     .flex_col()
-                    .child(home_shortcut("s-new", "plus", "New Query", theme).on_click(cx.listener(
+                    .child(home_shortcut("s-new", "plus", "New query", theme).on_click(cx.listener(
                         |this, _, window, cx| {
                             this.tabs.open_query();
                             this.sync_grid_owner();
@@ -182,7 +182,7 @@ impl GridView {
                         },
                     )))
                     .child(
-                        home_shortcut("s-status", "play", "Connection Status", theme).on_click(cx.listener(
+                        home_shortcut("s-status", "play", "Connection status", theme).on_click(cx.listener(
                             |this, _, _, cx| {
                                 this.show_status();
                                 cx.notify();
@@ -190,7 +190,7 @@ impl GridView {
                         )),
                     )
                     .child(
-                        home_shortcut("s-palette", "command", "Command Palette", theme).on_click(cx.listener(
+                        home_shortcut("s-palette", "command", "Command palette", theme).on_click(cx.listener(
                             |this, _, window, cx| {
                                 this.open_palette(window, cx);
                             },
@@ -241,7 +241,7 @@ impl GridView {
                         .child(text)
                 }))
         };
-        card(theme).child(card_title("Query History", theme)).child(content)
+        card(theme).child(card_title("Query history", theme)).child(content)
     }
 
     pub fn placeholder_page(&self, name: &str, theme: Theme) -> Div {
@@ -261,9 +261,9 @@ impl GridView {
             || (self.tabs.current() == &bookie_gpui::shell::Tab::Query && !self.run_tabs.slots.is_empty())
     }
 
-    pub(crate) fn status_count_text(&self, dark: bool, compact: bool) -> String {
+    pub(crate) fn status_count_text(&self, compact: bool) -> String {
         match (self.status_shows_grid(), compact) {
-            (true, false) => footer_counts(self.dataset_count(), self.source.columns().len(), dark),
+            (true, false) => footer_counts(self.dataset_count(), self.source.columns().len()),
             (true, true) => format!("{} rows", thousands(self.dataset_count())),
             (false, _) => String::new(),
         }
@@ -273,7 +273,7 @@ impl GridView {
         let compact = window_width < size::STATUS_COMPACT_WIDTH;
         let table_tab = self.on_table_tab();
         let grid = self.status_shows_grid();
-        let rows = self.status_count_text(theme.dark, compact);
+        let rows = self.status_count_text(compact);
         let sql = (grid && !compact)
             .then(|| self.source.executed_sql())
             .flatten()
@@ -379,13 +379,12 @@ impl GridView {
     }
 }
 
-fn footer_counts(rows: u64, columns: usize, dark: bool) -> String {
+fn footer_counts(rows: u64, columns: usize) -> String {
     format!(
-        "{} rows · {} {} · {}",
+        "{} rows · {} {}",
         thousands(rows),
         columns,
-        if columns == 1 { "column" } else { "columns" },
-        if dark { "dark" } else { "light" }
+        if columns == 1 { "column" } else { "columns" }
     )
 }
 
@@ -394,8 +393,8 @@ mod footer_tests {
     use super::footer_counts;
 
     #[test]
-    fn the_footer_counts_rows_and_columns_and_names_the_theme() {
-        assert_eq!(footer_counts(1234, 8, false), "1,234 rows · 8 columns · light");
-        assert_eq!(footer_counts(0, 1, true), "0 rows · 1 column · dark");
+    fn the_footer_counts_rows_and_columns_without_the_theme_name() {
+        assert_eq!(footer_counts(1234, 8), "1,234 rows · 8 columns");
+        assert_eq!(footer_counts(0, 1), "0 rows · 1 column");
     }
 }

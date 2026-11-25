@@ -172,7 +172,7 @@ impl GridView {
             rows.extend(self.hop_rows(jump, Which::Jump(index), &format!("Jump {}", index + 1), theme, cx));
         }
         if ssh.openssh {
-            rows.push(note("The system OpenSSH client cannot use saved jump hosts.", theme));
+            rows.push(note("The system OpenSSH client cannot use saved jump hosts", theme));
         }
         if !ssh.openssh {
             rows.push(labelled_row(

@@ -1,5 +1,6 @@
 use bookie_core::Environment;
 use bookie_gpui::font_settings;
+use bookie_gpui::keymap::Command;
 use bookie_gpui::shell::{SidebarFilter, Tab, TreeRow, table_label, tree_rows_grouped, tree_rows_in};
 pub(crate) const SQL: [&str; 3] = [
     "SELECT value, label, state, typed",
@@ -21,8 +22,11 @@ pub(crate) const TOOLBAR_HEIGHT: f32 = 36.0;
 pub(crate) const TAB_HEIGHT: f32 = 28.0;
 pub(crate) const STATUS_HEIGHT: f32 = 24.0;
 
-pub(crate) fn tip(label: &'static str) -> impl Fn(&mut gpui::Window, &mut gpui::App) -> gpui::AnyView + 'static {
-    move |window, cx| gpui_component::tooltip::Tooltip::new(label).build(window, cx)
+pub(crate) fn tip(
+    label: impl Into<gpui::SharedString>,
+) -> impl Fn(&mut gpui::Window, &mut gpui::App) -> gpui::AnyView + 'static {
+    let label = label.into();
+    move |window, cx| gpui_component::tooltip::Tooltip::new(label.clone()).build(window, cx)
 }
 
 fn expand_sidebar_button(theme: Theme, cx: &mut Context<GridView>) -> Stateful<Div> {
@@ -233,7 +237,7 @@ impl GridView {
             .gap_1()
             .child(self.overflow_menu(theme, cx))
             .child(
-                icon_button("palette", "command", "Command palette (Ctrl+Shift+P)", theme)
+                icon_button("palette", "command", self.command_tip(Command::Palette), theme)
                     .on_click(cx.listener(|this, _, window, cx| this.open_palette(window, cx))),
             )
             .child(
@@ -472,8 +476,8 @@ impl GridView {
             .children(labelled.then(|| div().child("Import / Export")))
             .dropdown_menu(move |mut menu, _, _| {
                 for (id, label) in [
-                    ("import-connections", "Import Connections…"),
-                    ("export-connections", "Export Connections"),
+                    ("import-connections", "Import connections…"),
+                    ("export-connections", "Export connections"),
                 ] {
                     let owner = owner.clone();
                     menu = menu.item(PopupMenuItem::new(label).on_click(move |_, _, cx| {
@@ -578,9 +582,9 @@ impl GridView {
                 |this, _| {
                     this.sidebar.active_only = !this.sidebar.active_only;
                     this.status = if this.sidebar.active_only {
-                        "Showing only the active table.".into()
+                        "Showing only the active table".into()
                     } else {
-                        "Showing every table.".into()
+                        "Showing every table".into()
                     };
                 },
             ))
@@ -643,14 +647,14 @@ impl GridView {
     pub(crate) fn toggle_sidebar_regex(&mut self, cx: &mut Context<Self>) {
         let search = self.sidebar.search.read(cx).content().to_string();
         if !self.sidebar.regex && !bookie_gpui::shell::sidebar_regex_ok(&search) {
-            self.status = "That search is not a valid regular expression.".into();
+            self.status = "That search is not a valid regular expression".into();
             return;
         }
         self.sidebar.regex = !self.sidebar.regex;
         self.status = if self.sidebar.regex {
-            "Sidebar search uses a regular expression.".into()
+            "Sidebar search uses a regular expression".into()
         } else {
-            "Sidebar search matches plain text.".into()
+            "Sidebar search matches plain text".into()
         };
     }
 
@@ -837,7 +841,7 @@ impl GridView {
                 .group(
                     gpui_kit::component::setting::SettingGroup::new()
                         .item(
-                            gpui_kit::component::setting::SettingItem::new("Colour theme", colour_theme)
+                            gpui_kit::component::setting::SettingItem::new("Color theme", colour_theme)
                                 .description(format!("Current: {chosen}")),
                         )
                         .item(gpui_kit::component::setting::SettingItem::new("Dark theme", dark_mode)),

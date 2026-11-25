@@ -49,7 +49,7 @@ impl GridView {
     pub(crate) fn close_export_file_bar(&mut self) {
         if let Some(cancel) = self.export.file.cancel.as_ref() {
             cancel.cancel();
-            self.status = "Cancelling export…".into();
+            self.status = "Canceling the export…".into();
         }
         self.export.file.open = false;
     }
@@ -221,7 +221,7 @@ impl GridView {
                             format!("Wrote {count} row(s) to {shown}")
                         };
                     }
-                    Err(_) if cancel.is_cancelled() => this.status = "Export cancelled; no file was created".into(),
+                    Err(_) if cancel.is_cancelled() => this.status = "Canceled the export; no file was created".into(),
                     Err(message) => this.status = format!("Could not export: {message}"),
                 }
                 cx.notify();
