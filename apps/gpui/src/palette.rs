@@ -44,6 +44,9 @@ pub fn known_group(id: &str) -> Option<&'static str> {
         | "schema-compare"
         | "export-all-tables" => "Connection",
         "sidebar"
+        | "collapse-sidebar-sections"
+        | "sidebar-active-only"
+        | "sidebar-regex"
         | "results"
         | "detail"
         | "show-row-vertically"
@@ -73,6 +76,7 @@ fn table_group(id: &str) -> Option<&'static str> {
             | "reveal-sidebar"
             | "refresh-table"
             | "first"
+            | "append-pages"
             | "previous"
             | "next"
             | "last"

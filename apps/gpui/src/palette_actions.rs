@@ -391,6 +391,18 @@ impl GridView {
                 "Reveal table in sidebar",
                 matches!(self.tabs.current(), Tab::Table(_)),
             ),
+            action("collapse-sidebar-sections", "Collapse all sidebar sections", true),
+            action("sidebar-active-only", "Show only the active table in the sidebar", true),
+            action("sidebar-regex", "Filter the sidebar with a regular expression", true),
+            action(
+                "append-pages",
+                if self.pager.append {
+                    "Replace the page when paging"
+                } else {
+                    "Append the next page when paging"
+                },
+                true,
+            ),
         ]
     }
 
@@ -737,6 +749,10 @@ impl GridView {
             _ if is_edit_palette_action(id) => self.execute_edit_palette_action(id, cx),
             "delete-favorite" => self.open_picker(PaletteMode::DeleteFavorite, window, cx),
             "reveal-sidebar" => self.reveal_in_sidebar(cx),
+            "collapse-sidebar-sections" => self.collapse_sidebar_sections(),
+            "sidebar-active-only" => self.toggle_sidebar_active_only(),
+            "sidebar-regex" => self.toggle_sidebar_regex(cx),
+            "append-pages" => self.pager.append = !self.pager.append,
             "new-connection" => {
                 self.connection_form.editing = None;
                 self.tabs.open_new_connection();

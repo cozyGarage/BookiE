@@ -504,9 +504,7 @@ impl GridView {
             .child(
                 compact_icon_button("header-collapse-all", "chevrons-down-up", "Collapse all", theme).on_click(
                     cx.listener(|this, _, _, cx| {
-                        let collapse = this.sidebar.connection_open || this.sidebar.database_open;
-                        this.sidebar.connection_open = !collapse;
-                        this.sidebar.database_open = !collapse;
+                        this.collapse_sidebar_sections();
                         cx.notify();
                     }),
                 ),
@@ -579,15 +577,23 @@ impl GridView {
                 self.sidebar.active_only,
                 theme,
                 cx,
-                |this, _| {
-                    this.sidebar.active_only = !this.sidebar.active_only;
-                    this.status = if this.sidebar.active_only {
-                        "Showing only the active table".into()
-                    } else {
-                        "Showing every table".into()
-                    };
-                },
+                |this, _| this.toggle_sidebar_active_only(),
             ))
+    }
+
+    pub(crate) fn toggle_sidebar_active_only(&mut self) {
+        self.sidebar.active_only = !self.sidebar.active_only;
+        self.status = if self.sidebar.active_only {
+            "Showing only the active table".into()
+        } else {
+            "Showing every table".into()
+        };
+    }
+
+    pub(crate) fn collapse_sidebar_sections(&mut self) {
+        let collapse = self.sidebar.connection_open || self.sidebar.database_open;
+        self.sidebar.connection_open = !collapse;
+        self.sidebar.database_open = !collapse;
     }
 
     fn sidebar_resize_handle(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
