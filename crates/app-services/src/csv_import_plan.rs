@@ -12,6 +12,12 @@ use crate::edit_preview::preview_text;
 
 pub const PREVIEWED_ROWS: usize = 2;
 
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ImportChoices {
+    pub delimiter: Option<bookie_core::export::CsvDelimiter>,
+    pub null_marker: String,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct CsvImportPlan {
     pub statements: Vec<EditStatement>,
@@ -41,6 +47,7 @@ pub fn plan_csv_import(
     capabilities: DriverCapabilities,
     path: &Path,
     row_cap: usize,
+    choices: &ImportChoices,
 ) -> Result<CsvImportPlan, CsvImportError> {
     let bytes = read_import_file(path).map_err(|error| CsvImportError::File(error.to_string()))?;
     let bytes = if bookie_core::import::is_xlsx(&bytes) {
@@ -48,7 +55,11 @@ pub fn plan_csv_import(
     } else {
         bytes
     };
-    let options = CsvImportOptions::from(detect_format(&bytes));
+    let mut options = CsvImportOptions::from(detect_format(&bytes));
+    if let Some(delimiter) = choices.delimiter {
+        options.delimiter = delimiter;
+    }
+    options.null_marker = choices.null_marker.clone();
     let mut sheet =
         read_csv(&bytes, &options, Some(row_cap + 1)).map_err(|error| CsvImportError::File(error.to_string()))?;
     let truncated = sheet.rows.len() > row_cap;
@@ -187,7 +198,33 @@ mod tests {
             table: "orders",
             columns,
         };
-        plan_csv_import(target, DriverCapabilities::default(), path, cap)
+        plan_csv_import(
+            target,
+            DriverCapabilities::default(),
+            path,
+            cap,
+            &ImportChoices::default(),
+        )
+    }
+
+    #[test]
+    fn a_chosen_separator_and_null_text_override_what_the_file_looks_like() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = write(&directory, "customer|total\nada|NULL\nbob|2.5\n");
+        let target = SaveTarget {
+            driver_id: "sqlite",
+            schema: None,
+            table: "orders",
+            columns: &orders(),
+        };
+        let choices = ImportChoices {
+            delimiter: Some(bookie_core::export::CsvDelimiter::Pipe),
+            null_marker: "NULL".into(),
+        };
+        let result = plan_csv_import(target, DriverCapabilities::default(), &path, 10, &choices).unwrap();
+        assert_eq!(result.imported_columns, ["customer", "total"]);
+        let (_, values) = &result.statements[0];
+        assert_eq!(values[1], bookie_core::Value::Null, "the chosen NULL text becomes NULL");
     }
 
     #[test]

@@ -2590,3 +2590,73 @@ fn paste_into_a_read_only_query_result_does_not_stage_edits(cx: &mut TestAppCont
     });
     std::fs::remove_file(path).ok();
 }
+
+#[gpui::test]
+fn csv_export_uses_the_chosen_separator_null_text_and_header(cx: &mut TestAppContext) {
+    use bookie_core::export::CsvDelimiter;
+    let path = fixture_copy("export-csv-options");
+    let (view, cx) = saving_view(cx, &path);
+    let directory = std::env::temp_dir().join(format!("bookie-export-csv-{}", std::process::id()));
+    std::fs::create_dir_all(&directory).unwrap();
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_export_file_bar(cx)));
+    set_export_format(&view, cx, bookie_core::export::ResultFormat::Csv);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.export.file.scope = crate::export_file_ui::ExportScope::CurrentPage;
+            view.export.file.csv_delimiter = CsvDelimiter::Semicolon;
+            view.export.file.csv_header = false;
+            if let Some(input) = view.export.file.csv_null.clone() {
+                input.update(cx, |input, cx| input.set_content("NULL", cx));
+            }
+        })
+    });
+    let options = view.read_with(cx, |view, cx| view.export_csv_options(cx));
+    assert_eq!(options.delimiter, CsvDelimiter::Semicolon);
+    assert_eq!(options.null_marker.as_deref(), Some("NULL"));
+    assert!(!options.null_to_empty && !options.header_row);
+    let target = directory.join("page");
+    set_export_path(&view, cx, &target);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.write_export_file(cx)));
+    let csv = directory.join("page.csv");
+    let written = read_when_written(cx, &csv, |text| text.lines().count() >= 6);
+    let first = written.lines().next().unwrap();
+    assert!(
+        first.contains(';') && !first.contains(','),
+        "rows use the chosen separator: {first}"
+    );
+    assert!(!first.starts_with("id"), "the header row was left out: {first}");
+    std::fs::remove_dir_all(&directory).ok();
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn the_import_dialog_offers_a_separator_and_null_text(cx: &mut TestAppContext) {
+    use bookie_core::export::CsvDelimiter;
+    let path = fixture_copy("import-choices");
+    let (view, cx) = saving_view(cx, &path);
+    let write = write_session(&path, false);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            let id = view.live.as_ref().and_then(|live| live.writable).expect("writable");
+            view.save.write = Some((id, write));
+        })
+    });
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_import_bar(cx)));
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    for selector in ["import-form", "import-separator", "import-null"] {
+        assert!(cx.debug_bounds(selector).is_some(), "{selector} is shown");
+    }
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.import.delimiter = Some(CsvDelimiter::Pipe);
+            if let Some(input) = view.import.null_input.clone() {
+                input.update(cx, |input, cx| input.set_content("NULL", cx));
+            }
+        })
+    });
+    let choices = view.read_with(cx, |view, cx| view.import_choices(cx));
+    assert_eq!(choices.delimiter, Some(CsvDelimiter::Pipe));
+    assert_eq!(choices.null_marker, "NULL");
+    std::fs::remove_file(&path).ok();
+}

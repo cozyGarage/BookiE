@@ -6,7 +6,8 @@ use bookie_core::export::{ResultExport, ResultFormat, SqlTarget, offered_formats
 use tokio_util::sync::CancellationToken;
 
 use super::*;
-use crate::surfaces::{ButtonKind, button, task_bar, unavailable_button};
+use crate::connection_form::{field, labelled_row};
+use crate::surfaces::{ButtonKind, button, segment, segmented, unavailable_button};
 
 const EXPORT_PAGE_ROWS: u64 = 128;
 
@@ -15,6 +16,9 @@ pub(crate) struct ExportFileState {
     pub input: Option<Entity<TextInput>>,
     pub scope: ExportScope,
     pub format: ResultFormat,
+    pub csv_delimiter: bookie_core::export::CsvDelimiter,
+    pub csv_null: Option<Entity<TextInput>>,
+    pub csv_header: bool,
     generation: u64,
     cancel: Option<CancellationToken>,
 }
@@ -35,6 +39,9 @@ impl Default for ExportFileState {
             input: None,
             scope: ExportScope::default(),
             format: ResultFormat::Csv,
+            csv_delimiter: bookie_core::export::CsvDelimiter::Comma,
+            csv_null: None,
+            csv_header: true,
             generation: 0,
             cancel: None,
         }
@@ -74,6 +81,10 @@ impl GridView {
             input
         });
         input.update(cx, |input, cx| input.set_content("", cx));
+        if self.export.file.csv_null.is_none() {
+            self.export.file.csv_null =
+                Some(cx.new(|cx| TextInput::new("Leave empty to write NULL as an empty cell", cx)));
+        }
         self.export.file.scope = if self.export_range(ExportScope::Selected).is_some() {
             ExportScope::Selected
         } else if self.export_range(ExportScope::CurrentPage).is_some() {
@@ -84,6 +95,22 @@ impl GridView {
         self.export.file.format = ResultFormat::Csv;
         self.export.file.open = true;
         cx.notify();
+    }
+
+    pub(crate) fn export_csv_options(&self, cx: &App) -> bookie_core::export::CsvOptions {
+        let file = &self.export.file;
+        let null_text = file
+            .csv_null
+            .as_ref()
+            .map(|input| input.read(cx).content().to_string())
+            .unwrap_or_default();
+        bookie_core::export::CsvOptions {
+            delimiter: file.csv_delimiter,
+            header_row: file.csv_header,
+            null_to_empty: null_text.is_empty(),
+            null_marker: (!null_text.is_empty()).then_some(null_text),
+            ..self.csv_options()
+        }
     }
 
     fn export_scope_options(&self) -> Vec<(ExportScope, String)> {
@@ -185,7 +212,7 @@ impl GridView {
         self.export.file.generation = self.export.file.generation.wrapping_add(1);
         let generation = self.export.file.generation;
         self.export.file.cancel = Some(cancel.clone());
-        let csv = self.csv_options();
+        let csv = self.export_csv_options(cx);
         let cut = count < full_count;
         let end = range.start.saturating_add(count).min(range.end);
         self.status = if cut {
@@ -301,14 +328,8 @@ impl GridView {
         use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
         use gpui_kit::component::Sizable as _;
 
-        let scope_owner = cx.entity().downgrade();
         let format_owner = cx.entity().downgrade();
         let scope_options = self.export_scope_options();
-        let scope_label = scope_options
-            .iter()
-            .find(|(scope, _)| *scope == self.export.file.scope)
-            .map_or("Choose rows", |(_, label)| label.as_str())
-            .to_string();
         let has_table = !self.grid_is_query;
         let formats = self.formats_for(self.export_count(self.export.file.scope), has_table);
         let format_label = self.export.file.format.label();
@@ -317,74 +338,166 @@ impl GridView {
         } else {
             format!("table {}", table_label(&self.catalog.grid_table))
         };
+        let rows = self.export_count(self.export.file.scope);
+        let info = format!("{} row(s) · {} column(s)", thousands(rows), self.source.columns().len());
+        let scope_segments = scope_options.iter().cloned().map(|(scope, label)| {
+            segment(
+                ("export-scope", scope as usize),
+                label,
+                scope == self.export.file.scope,
+                theme,
+            )
+            .on_click(cx.listener(move |this, _, _, cx| {
+                if this.export.file.cancel.is_none() {
+                    this.set_export_scope(scope);
+                    cx.notify();
+                }
+            }))
+        });
+        let format_menu = Button::new("export-format")
+            .ghost()
+            .small()
+            .compact()
+            .accessibility_label("Export file format")
+            .child(format_label)
+            .child(crate::assets::icon("chevron-down", theme.muted_foreground))
+            .dropdown_menu(move |mut menu, _, _| {
+                for format in formats.iter().copied() {
+                    let owner = format_owner.clone();
+                    menu = menu.item(PopupMenuItem::new(format.label()).on_click(move |_, _, cx| {
+                        let _ = owner.update(cx, |this, cx| {
+                            if this.export.file.cancel.is_none() {
+                                this.export.file.format = format;
+                                cx.notify();
+                            }
+                        });
+                    }));
+                }
+                menu
+            });
         Some(
-            task_bar(format!("Export {source_label}"), theme)
+            div()
+                .debug_selector(|| "export-form".into())
+                .flex()
+                .flex_col()
+                .gap_3()
+                .p_4()
                 .child(
-                    Button::new("export-scope")
-                        .ghost()
-                        .small()
-                        .compact()
-                        .accessibility_label("Export row scope")
-                        .child(scope_label)
-                        .dropdown_menu(move |mut menu, _, _| {
-                            for (scope, label) in scope_options.iter().cloned() {
-                                let owner = scope_owner.clone();
-                                menu = menu.item(PopupMenuItem::new(label).on_click(move |_, _, cx| {
-                                    let _ = owner.update(cx, |this, cx| {
-                                        if this.export.file.cancel.is_none() {
-                                            this.set_export_scope(scope);
-                                            cx.notify();
-                                        }
-                                    });
-                                }));
-                            }
-                            menu
-                        }),
+                    div()
+                        .flex()
+                        .flex_col()
+                        .child(
+                            div()
+                                .font_weight(gpui::FontWeight::SEMIBOLD)
+                                .child(format!("Export {source_label}")),
+                        )
+                        .child(
+                            div()
+                                .debug_selector(|| "export-info".into())
+                                .text_size(px(size::TEXT_SMALL))
+                                .text_color(rgb(theme.muted_foreground))
+                                .child(info),
+                        ),
                 )
                 .child(
-                    Button::new("export-format")
-                        .ghost()
-                        .small()
-                        .compact()
-                        .accessibility_label("Export file format")
-                        .child(format_label)
-                        .dropdown_menu(move |mut menu, _, _| {
-                            for format in formats.iter().copied() {
-                                let owner = format_owner.clone();
-                                menu = menu.item(PopupMenuItem::new(format.label()).on_click(move |_, _, cx| {
-                                    let _ = owner.update(cx, |this, cx| {
-                                        if this.export.file.cancel.is_none() {
-                                            this.export.file.format = format;
-                                            cx.notify();
-                                        }
-                                    });
-                                }));
-                            }
-                            menu
-                        }),
+                    labelled_row(theme, "Rows", segmented(scope_segments, theme).flex_wrap().h_auto())
+                        .debug_selector(|| "export-rows".into()),
                 )
-                .child(div().flex_1().min_w_0().child(input))
-                .child(if self.export.file.cancel.is_some() {
-                    unavailable_button(
-                        ButtonKind::Primary,
-                        "write-export-file",
-                        "Writing…",
-                        "The export file is being written",
-                        theme,
-                    )
-                } else {
-                    button(ButtonKind::Primary, "write-export-file", "Export", theme)
-                        .on_click(cx.listener(|this, _, _, cx| this.write_export_file(cx)))
-                })
+                .child(labelled_row(theme, "Format", format_menu).debug_selector(|| "export-format-row".into()))
+                .children((self.export.file.format == ResultFormat::Csv).then(|| self.csv_export_rows(theme, cx)))
+                .child(field(theme, "File", &input))
                 .child(
-                    button(ButtonKind::Ghost, "cancel-export-file", "Cancel", theme).on_click(cx.listener(
-                        |this, _, _, cx| {
-                            this.close_export_file_bar();
-                            cx.notify();
-                        },
-                    )),
+                    div()
+                        .flex()
+                        .justify_end()
+                        .gap_2()
+                        .child(if self.export.file.cancel.is_some() {
+                            unavailable_button(
+                                ButtonKind::Primary,
+                                "write-export-file",
+                                "Writing…",
+                                "The export file is being written",
+                                theme,
+                            )
+                        } else {
+                            button(ButtonKind::Primary, "write-export-file", "Export", theme)
+                                .on_click(cx.listener(|this, _, _, cx| this.write_export_file(cx)))
+                        })
+                        .child(
+                            button(ButtonKind::Ghost, "cancel-export-file", "Cancel", theme).on_click(cx.listener(
+                                |this, _, _, cx| {
+                                    this.close_export_file_bar();
+                                    cx.notify();
+                                },
+                            )),
+                        ),
                 ),
         )
+    }
+
+    fn csv_export_rows(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+        use bookie_core::export::CsvDelimiter;
+        let file = &self.export.file;
+        let custom = self
+            .export
+            .csv_delimiter
+            .as_ref()
+            .map(|delimiter| delimiter.as_str().to_string());
+        let custom_active = custom.is_some();
+        let separators: Vec<_> = CsvDelimiter::ALL
+            .into_iter()
+            .map(|delimiter| {
+                let label = match delimiter {
+                    CsvDelimiter::Comma => "Comma",
+                    CsvDelimiter::Semicolon => "Semicolon",
+                    CsvDelimiter::Tab => "Tab",
+                    CsvDelimiter::Pipe => "Pipe",
+                };
+                segment(
+                    ("csv-separator", delimiter as usize),
+                    label,
+                    !custom_active && file.csv_delimiter == delimiter,
+                    theme,
+                )
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    this.export.file.csv_delimiter = delimiter;
+                    if this.export.csv_delimiter.is_some() {
+                        this.set_csv_delimiter_to(None);
+                    }
+                    cx.notify();
+                }))
+            })
+            .collect();
+        let custom_segment =
+            custom.map(|text| segment("csv-separator-custom", format!("Custom “{text}”"), true, theme));
+        let header = [(true, "Include"), (false, "Leave out")].map(|(on, label)| {
+            segment(("csv-header", usize::from(on)), label, file.csv_header == on, theme).on_click(cx.listener(
+                move |this, _, _, cx| {
+                    this.export.file.csv_header = on;
+                    cx.notify();
+                },
+            ))
+        });
+        div()
+            .flex()
+            .flex_col()
+            .gap_3()
+            .child(
+                labelled_row(
+                    theme,
+                    "Separator",
+                    segmented(separators.into_iter().chain(custom_segment), theme)
+                        .flex_wrap()
+                        .h_auto(),
+                )
+                .debug_selector(|| "csv-separator".into()),
+            )
+            .children(
+                file.csv_null
+                    .as_ref()
+                    .map(|input| field(theme, "NULL as", input).debug_selector(|| "csv-null".into())),
+            )
+            .child(labelled_row(theme, "Column names", segmented(header, theme)).debug_selector(|| "csv-header".into()))
     }
 
     fn export_count(&self, scope: ExportScope) -> u64 {

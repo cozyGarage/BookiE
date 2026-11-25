@@ -40,6 +40,28 @@ impl GridView {
         }
     }
 
+    fn query_file_menu(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+        use gpui_component::button::{Button, ButtonVariants};
+        use gpui_component::menu::DropdownMenu;
+        use gpui_kit::component::Sizable as _;
+        let groups = crate::menus::command_groups(self, crate::menus::FILE_GROUPS);
+        div().debug_selector(|| "query-file-menu".into()).child(
+            Button::new("query-file-menu")
+                .ghost()
+                .small()
+                .tooltip("Open or save SQL files, export results or import a file")
+                .accessibility_label("Import / Export")
+                .child(
+                    div()
+                        .whitespace_nowrap()
+                        .text_color(rgb(theme.foreground))
+                        .child("Import / Export"),
+                )
+                .child(crate::assets::icon("chevron-down", theme.muted_foreground))
+                .dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), groups)),
+        )
+    }
+
     pub(crate) fn query_editor_toolbar(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
         div()
             .flex()
@@ -89,6 +111,7 @@ impl GridView {
                     },
                 )),
             )
+            .child(self.query_file_menu(theme, cx))
             .child(div().flex_1())
             .child(
                 div()
