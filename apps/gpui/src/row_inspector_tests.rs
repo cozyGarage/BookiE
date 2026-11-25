@@ -152,3 +152,49 @@ fn helpers_dedupe_key_columns_pretty_print_one_row_and_cap_counts() {
     assert_eq!(count_label(&Ok((1, false))), "1 row");
     assert_eq!(count_label(&Err("denied".into())), "denied");
 }
+
+#[gpui::test]
+fn the_inspector_shows_the_keys_of_the_new_file_when_the_table_name_is_the_same(cx: &mut TestAppContext) {
+    let with_child = fixture_copy("inspector-with-child");
+    add_notes(&with_child);
+    let without_child = fixture_copy("inspector-without-child");
+    let (view, cx) = saving_view(cx, &with_child);
+    view.update(cx, |view, cx| {
+        view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 0 });
+        view.row_detail_open = true;
+        cx.notify();
+    });
+    wait_for(&view, cx, |view| {
+        view.row_inspector
+            .keys
+            .as_ref()
+            .is_some_and(|keys| !keys.referenced_by.is_empty())
+    });
+    view.read_with(cx, |view, _| {
+        let keys = view.row_inspector.keys.as_ref().expect("keys of the first file");
+        assert_eq!(keys.table.name, "orders");
+        assert!(!keys.referenced_by.is_empty());
+    });
+    let orders = bookie_gpui::shell::table_info("orders");
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.connect_preferring(bookie_gpui::live::Origin::File(without_child.clone()), Some(orders), cx)
+        })
+    });
+    wait_for(&view, cx, |view| {
+        view.live
+            .as_ref()
+            .is_some_and(|live| live.tables.iter().all(|table| table.name != "notes"))
+            && view.row_inspector.keys.is_some()
+    });
+    view.read_with(cx, |view, _| {
+        let keys = view.row_inspector.keys.as_ref().expect("keys of the second file");
+        assert_eq!(keys.table.name, "orders");
+        assert!(
+            keys.referenced_by.is_empty(),
+            "the second file has no table that references orders: {keys:?}"
+        );
+    });
+    std::fs::remove_file(with_child).ok();
+    std::fs::remove_file(without_child).ok();
+}
