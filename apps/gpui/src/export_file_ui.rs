@@ -83,7 +83,6 @@ impl GridView {
         };
         self.export.file.format = ResultFormat::Csv;
         self.export.file.open = true;
-        self.status = "Choose which rows and format to export".into();
         cx.notify();
     }
 
