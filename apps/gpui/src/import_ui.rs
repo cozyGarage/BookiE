@@ -33,7 +33,7 @@ impl GridView {
             return;
         }
         let input = self.import.input.get_or_insert_with(|| {
-            let input = cx.new(|cx| TextInput::new("Path of a .csv file", cx));
+            let input = cx.new(|cx| TextInput::new("Path of a .csv or .xlsx file", cx));
             cx.subscribe(&input, |this, _, event: &InputEvent, cx| {
                 if matches!(event, InputEvent::Submit) {
                     this.review_import(cx);
@@ -99,7 +99,7 @@ impl GridView {
                 .bg(rgb(theme.chrome))
                 .border_b_1()
                 .border_color(rgb(theme.border))
-                .child(div().font_weight(gpui::FontWeight::MEDIUM).child("Import CSV"))
+                .child(div().font_weight(gpui::FontWeight::MEDIUM).child("Import file"))
                 .child(div().flex_1().min_w_0().child(input))
                 .child(
                     ghost("review-import", "Review", theme)

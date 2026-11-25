@@ -605,7 +605,7 @@ impl GridView {
             .children(labelled.then(|| div().whitespace_nowrap().child("Import / Export")))
             .dropdown_menu(move |mut menu, _, _| {
                 for (id, label) in [
-                    ("import-csv", "Import CSV into table…"),
+                    ("import-csv", "Import CSV or Excel into table…"),
                     ("export-file", "Export table to file…"),
                     ("import-connections", "Import Connections…"),
                     ("export-connections", "Export Connections"),
