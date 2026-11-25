@@ -3,6 +3,17 @@ use gpui_kit::test::TestWindowExt;
 
 use crate::live_ui_tests::open_live;
 
+#[gpui::test]
+fn sidebar_header_only_shows_available_actions(cx: &mut TestAppContext) {
+    let (_, cx) = open_live(cx);
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    assert!(cx.debug_bounds("header-collapse-all").is_some());
+    assert!(cx.debug_bounds("collapse-sidebar").is_some());
+    assert!(cx.debug_bounds("header-new-folder").is_none());
+    assert!(cx.debug_bounds("header-refresh").is_none());
+}
+
 fn bounds(cx: &mut gpui::VisualTestContext, selector: &'static str) -> gpui::Bounds<gpui::Pixels> {
     cx.debug_bounds(selector)
         .unwrap_or_else(|| panic!("{selector} is rendered"))
@@ -51,6 +62,46 @@ fn the_connection_chip_shows_the_server_version_after_it_loads(cx: &mut TestAppC
     assert!(!chip.contains("sqlite ·"), "{chip}");
     let tooltip = view.read_with(cx, |view, _| view.connection_tooltip());
     assert!(tooltip.contains("Round trip:"), "{tooltip}");
+}
+
+#[gpui::test]
+fn an_empty_query_does_not_display_the_previous_table(cx: &mut TestAppContext) {
+    let (view, cx) = open_live(cx);
+    let table_origin = view.read_with(cx, |view, _| view.source.origin());
+    view.update(cx, |view, cx| {
+        view.tabs.open_query();
+        view.sync_grid_owner();
+        cx.notify();
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.source.origin(), "Query");
+        assert!(view.status.is_empty());
+        assert_eq!(view.dataset_count(), 0);
+    });
+    cx.update(|window, cx| window.render_frame(cx));
+    assert!(cx.debug_bounds("status-page").is_none());
+    view.update(cx, |view, cx| {
+        view.add_run(None);
+        view.close_run(0);
+        cx.notify();
+    });
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.source.origin(), "Query");
+        assert_eq!(view.dataset_count(), 0);
+    });
+    view.update(cx, |view, cx| {
+        let index = view
+            .tabs
+            .items
+            .iter()
+            .position(|tab| matches!(tab, bookie_gpui::shell::Tab::Table(_)))
+            .unwrap();
+        view.tabs.active = index;
+        view.sync_grid_owner();
+        cx.notify();
+    });
+    view.read_with(cx, |view, _| assert_eq!(view.source.origin(), table_origin));
 }
 
 #[gpui::test]
