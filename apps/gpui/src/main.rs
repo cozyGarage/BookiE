@@ -73,8 +73,10 @@ mod sidebar_state;
 mod sql_file_ui;
 mod ssh_form;
 mod structure_ui;
+mod surfaces;
 mod tables_export_ui;
 mod text_input;
+mod theme_settings_ui;
 mod transaction_ui;
 mod ui_theme;
 mod update_ui;
@@ -879,46 +881,6 @@ impl GridView {
     }
 }
 
-fn icon_button(id: &'static str, name: &'static str, tip: &'static str, active: bool, theme: Theme) -> Stateful<Div> {
-    div()
-        .id(id)
-        .tooltip(chrome::tip(tip))
-        .flex()
-        .items_center()
-        .justify_center()
-        .w(px(size::COMPACT_CONTROL))
-        .h(px(size::COMPACT_CONTROL))
-        .rounded(px(size::CONTROL_RADIUS))
-        .cursor_pointer()
-        .when(active, |style| style.bg(rgb(theme.accent)))
-        .hover(move |style| style.bg(rgb(theme.accent)))
-        .child(assets::icon(
-            name,
-            if active {
-                theme.foreground
-            } else {
-                theme.muted_foreground
-            },
-        ))
-}
-
-fn button(id: &'static str, label: impl Into<String>, theme: Theme) -> Stateful<Div> {
-    div()
-        .id(id)
-        .flex()
-        .items_center()
-        .h(px(size::COMPACT_CONTROL))
-        .px_2()
-        .rounded(px(size::CONTROL_RADIUS))
-        .border_1()
-        .border_color(rgb(theme.border))
-        .bg(rgb(theme.background))
-        .text_color(rgb(theme.foreground))
-        .cursor_pointer()
-        .hover(move |style| style.bg(rgb(theme.accent)))
-        .child(label.into())
-}
-
 pub fn flex_cell(width: f32) -> Div {
     div()
         .flex()
@@ -1186,6 +1148,8 @@ fn main() {
 #[cfg(test)]
 mod connection_form_ui_tests;
 #[cfg(test)]
+mod copy_tests;
+#[cfg(test)]
 mod drafts_ui_tests;
 #[cfg(test)]
 mod follow_ui_tests;
@@ -1193,6 +1157,8 @@ mod follow_ui_tests;
 mod grid_pin_tests;
 #[cfg(test)]
 mod host_key_ui_tests;
+#[cfg(test)]
+mod icon_tooltip_tests;
 #[cfg(test)]
 mod keyboard_settings_tests;
 #[cfg(test)]

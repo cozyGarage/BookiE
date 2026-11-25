@@ -2,7 +2,8 @@ use bookie_gpui::messages::MessageKind;
 use gpui::{Context, Div, Stateful, div, prelude::*, px, rgb};
 
 use crate::assets::icon;
-use crate::chrome::{STATUS_HEIGHT, ghost, ghost_icon, one_line};
+use crate::chrome::{STATUS_HEIGHT, one_line, tip};
+use crate::surfaces::{ButtonKind, button, compact_button, icon_button, section_header};
 use crate::{GridView, thousands};
 use bookie_gpui::shell::table_label;
 use bookie_gpui::theme::{Theme, size};
@@ -18,13 +19,11 @@ pub(crate) fn card(theme: Theme) -> Div {
 }
 
 pub(crate) fn card_title(text: &str, theme: Theme) -> Div {
-    div()
+    section_header(text.to_string(), theme)
         .px_4()
         .py_3()
         .border_b_1()
         .border_color(rgb(theme.border))
-        .font_weight(gpui::FontWeight::SEMIBOLD)
-        .child(text.to_string())
 }
 
 pub(crate) fn home_stat_card(label: &str, icon_name: &'static str, value: &str, theme: Theme) -> Div {
@@ -87,7 +86,7 @@ impl GridView {
             ))
             .child(home_stat_card("Connected", "play", &connected.to_string(), theme))
             .child(home_stat_card(
-                "Database Types",
+                "Database types",
                 "package",
                 &database_types.to_string(),
                 theme,
@@ -95,7 +94,7 @@ impl GridView {
     }
 
     pub(crate) fn home_quick_start_card(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
-        card(theme).flex_1().child(card_title("Quick Start", theme)).child(
+        card(theme).flex_1().child(card_title("Quick start", theme)).child(
             div()
                 .p_2()
                 .flex()
@@ -107,7 +106,8 @@ impl GridView {
                         .items_center()
                         .child(
                             div().flex_1().child(
-                                ghost(
+                                button(
+                                    ButtonKind::Ghost,
                                     ("saved-connection", index),
                                     format!("{} · {}", saved.name, saved.driver_id),
                                     theme,
@@ -119,7 +119,7 @@ impl GridView {
                             ),
                         )
                         .child(
-                            ghost_icon(
+                            icon_button(
                                 ("edit-connection", index),
                                 "sliders-horizontal",
                                 "Edit connection",
@@ -132,7 +132,8 @@ impl GridView {
                 }))
                 .when(!self.catalog.tables.is_empty(), |section| {
                     section.child(
-                        ghost(
+                        button(
+                            ButtonKind::Ghost,
                             "quick-open",
                             format!(
                                 "{} → {}",
@@ -160,7 +161,7 @@ impl GridView {
                     .p_2()
                     .flex()
                     .flex_col()
-                    .child(home_shortcut("s-new", "plus", "New Query", theme).on_click(cx.listener(
+                    .child(home_shortcut("s-new", "plus", "New query", theme).on_click(cx.listener(
                         |this, _, window, cx| {
                             this.tabs.open_query();
                             this.sync_grid_owner();
@@ -173,7 +174,7 @@ impl GridView {
                         },
                     )))
                     .child(
-                        home_shortcut("s-status", "play", "Connection Status", theme).on_click(cx.listener(
+                        home_shortcut("s-status", "play", "Connection status", theme).on_click(cx.listener(
                             |this, _, _, cx| {
                                 this.show_status();
                                 cx.notify();
@@ -181,7 +182,7 @@ impl GridView {
                         )),
                     )
                     .child(
-                        home_shortcut("s-palette", "command", "Command Palette", theme).on_click(cx.listener(
+                        home_shortcut("s-palette", "command", "Command palette", theme).on_click(cx.listener(
                             |this, _, window, cx| {
                                 this.open_palette(window, cx);
                             },
@@ -228,11 +229,11 @@ impl GridView {
                         .rounded(px(theme.radius))
                         .text_size(px(size::TEXT_SMALL))
                         .font_family("monospace")
-                        .text_color(rgb(if ok { theme.foreground } else { theme.warning }))
+                        .text_color(rgb(if ok { theme.foreground } else { theme.destructive }))
                         .child(text)
                 }))
         };
-        card(theme).child(card_title("Query History", theme)).child(content)
+        card(theme).child(card_title("Query history", theme)).child(content)
     }
 
     pub fn placeholder_page(&self, name: &str, theme: Theme) -> Div {
@@ -247,16 +248,23 @@ impl GridView {
             ))
     }
 
+    pub(crate) fn status_shows_grid(&self) -> bool {
+        self.on_table_tab()
+            || (self.tabs.current() == &bookie_gpui::shell::Tab::Query && !self.run_tabs.slots.is_empty())
+    }
+
+    pub(crate) fn status_count_text(&self, compact: bool) -> String {
+        match (self.status_shows_grid(), compact) {
+            (true, false) => footer_counts(self.dataset_count(), self.source.columns().len()),
+            (true, true) => format!("{} rows", thousands(self.dataset_count())),
+            (false, _) => String::new(),
+        }
+    }
+
     pub fn status_bar(&self, theme: Theme, window_width: f32, cx: &mut Context<Self>) -> Stateful<Div> {
         let compact = window_width < size::STATUS_COMPACT_WIDTH;
-        let grid = self.tabs.shows_grid_for(&self.catalog.grid_table)
-            && (!self.grid_is_query || !self.run_tabs.slots.is_empty());
-        let theme_name = if theme.dark { "dark" } else { "light" };
-        let rows = match (grid, compact) {
-            (true, false) => footer_counts(self.dataset_count(), self.source.columns().len(), theme.dark),
-            (true, true) => format!("{} rows", thousands(self.dataset_count())),
-            (false, _) => theme_name.to_string(),
-        };
+        let grid = self.status_shows_grid();
+        let rows = self.status_count_text(compact);
         let sql = (grid && !compact)
             .then(|| self.source.executed_sql())
             .flatten()
@@ -266,16 +274,11 @@ impl GridView {
             .flatten()
             .map(bookie_gpui::messages::format_elapsed);
         let count_rows = (grid && !self.grid_is_query && self.source.is_partial()).then(|| {
-            use gpui_component::button::{Button, ButtonVariants};
-            Button::new("count-rows")
-                .ghost()
-                .compact()
-                .label("Count rows")
-                .tooltip("Count the rows of this table in the database")
+            compact_button(ButtonKind::Ghost, "count-rows", "Count rows", theme)
+                .tooltip(tip("Count the rows of this table in the database"))
                 .on_click(cx.listener(|this, _, _, cx| this.count_table_rows(cx)))
         });
         let details = sql.map(|sql| {
-            use gpui_component::button::{Button, ButtonVariants};
             let full = sql.clone();
             div()
                 .flex()
@@ -295,10 +298,7 @@ impl GridView {
                         .child(sql.clone()),
                 )
                 .child(
-                    Button::new("copy-result-sql")
-                        .ghost()
-                        .compact()
-                        .label("Copy SQL")
+                    compact_button(ButtonKind::Ghost, "copy-result-sql", "Copy SQL", theme)
                         .on_click(move |_, _, cx| cx.write_to_clipboard(gpui::ClipboardItem::new_string(sql.clone()))),
                 )
         });
@@ -397,13 +397,12 @@ mod footer_status_tests {
     }
 }
 
-fn footer_counts(rows: u64, columns: usize, dark: bool) -> String {
+fn footer_counts(rows: u64, columns: usize) -> String {
     format!(
-        "{} rows · {} {} · {}",
+        "{} rows · {} {}",
         thousands(rows),
         columns,
-        if columns == 1 { "column" } else { "columns" },
-        if dark { "dark" } else { "light" }
+        if columns == 1 { "column" } else { "columns" }
     )
 }
 
@@ -412,9 +411,9 @@ mod footer_tests {
     use super::{footer_counts, home_stat_counts};
 
     #[test]
-    fn the_footer_counts_rows_and_columns_and_names_the_theme() {
-        assert_eq!(footer_counts(1234, 8, false), "1,234 rows · 8 columns · light");
-        assert_eq!(footer_counts(0, 1, true), "0 rows · 1 column · dark");
+    fn the_footer_counts_rows_and_columns_without_the_theme_name() {
+        assert_eq!(footer_counts(1234, 8), "1,234 rows · 8 columns");
+        assert_eq!(footer_counts(0, 1), "0 rows · 1 column");
     }
 
     #[test]

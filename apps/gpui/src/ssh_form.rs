@@ -3,7 +3,8 @@ use gpui::{Context, Div, Entity, prelude::*};
 use secrecy::SecretString;
 
 use crate::GridView;
-use crate::connection_form::{choice_chip, choice_row, field, note};
+use crate::connection_form::{choice_row, field, labelled_row};
+use crate::surfaces::{ButtonKind, button, note, segment};
 use crate::text_input::TextInput;
 use bookie_gpui::theme::Theme;
 
@@ -141,7 +142,7 @@ impl GridView {
             [("ssh-off", "Off", false), ("ssh-on", "On", true)]
                 .into_iter()
                 .map(|(id, label, on)| {
-                    choice_chip(id, label, ssh.on == on, theme).on_click(cx.listener(move |this, _, _, cx| {
+                    segment(id, label, ssh.on == on, theme).on_click(cx.listener(move |this, _, _, cx| {
                         this.connection_form.ssh.on = on;
                         cx.notify();
                     }))
@@ -161,7 +162,7 @@ impl GridView {
             ]
             .into_iter()
             .map(|(id, label, openssh)| {
-                choice_chip(id, label, ssh.openssh == openssh, theme).on_click(cx.listener(move |this, _, _, cx| {
+                segment(id, label, ssh.openssh == openssh, theme).on_click(cx.listener(move |this, _, _, cx| {
                     this.connection_form.ssh.openssh = openssh;
                     cx.notify();
                 }))
@@ -171,21 +172,19 @@ impl GridView {
             rows.extend(self.hop_rows(jump, Which::Jump(index), &format!("Jump {}", index + 1), theme, cx));
         }
         if ssh.openssh {
-            rows.push(note(theme, "The system OpenSSH client cannot use saved jump hosts."));
+            rows.push(note("The system OpenSSH client cannot use saved jump hosts", theme));
         }
         if !ssh.openssh {
-            rows.push(choice_row(
+            rows.push(labelled_row(
                 theme,
                 "Jump hosts",
-                [
-                    choice_chip("ssh-add-jump", "Add jump host", false, theme).on_click(cx.listener(
-                        |this, _, _, cx| {
-                            let jump = HopForm::new(cx);
-                            this.connection_form.ssh.jumps.push(jump);
-                            cx.notify();
-                        },
-                    )),
-                ],
+                button(ButtonKind::Ghost, "ssh-add-jump", "Add jump host", theme)
+                    .debug_selector(|| "Add jump host".into())
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        let jump = HopForm::new(cx);
+                        this.connection_form.ssh.jumps.push(jump);
+                        cx.notify();
+                    })),
             ));
         }
         rows
@@ -199,17 +198,15 @@ impl GridView {
         let name = |suffix: &str| gpui::SharedString::from(format!("{label} {suffix}"));
         let mut rows = Vec::new();
         if let Some(index) = header {
-            rows.push(choice_row(
+            rows.push(labelled_row(
                 theme,
                 gpui::SharedString::from(label.to_owned()),
-                [
-                    choice_chip(("hop-remove", index), "Remove", false, theme).on_click(cx.listener(
-                        move |this, _, _, cx| {
-                            this.connection_form.ssh.jumps.remove(index);
-                            cx.notify();
-                        },
-                    )),
-                ],
+                button(ButtonKind::Ghost, ("hop-remove", index), "Remove", theme)
+                    .debug_selector(|| "Remove".into())
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        this.connection_form.ssh.jumps.remove(index);
+                        cx.notify();
+                    })),
             ));
         }
         rows.push(
@@ -247,7 +244,7 @@ impl GridView {
         ];
         let chips = kinds.into_iter().enumerate().map(|(index, (kind, text))| {
             let chip_id = gpui::ElementId::from((gpui::SharedString::from(id.to_owned()), index));
-            choice_chip(chip_id, text, current == kind, theme).on_click(cx.listener(move |this, _, _, cx| {
+            segment(chip_id, text, current == kind, theme).on_click(cx.listener(move |this, _, _, cx| {
                 let ssh = &mut this.connection_form.ssh;
                 let hop = match which {
                     Which::Head => &mut ssh.head,

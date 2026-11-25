@@ -20,7 +20,7 @@ pub enum ChartError {
 impl ChartError {
     pub fn message(&self) -> &'static str {
         match self {
-            Self::Cancelled => "Chart preparation was cancelled; choose Chart to try again",
+            Self::Cancelled => "Canceled the chart; choose Chart to try again",
             Self::UnavailableRow => "A result row is no longer available; reload the result before charting it",
         }
     }

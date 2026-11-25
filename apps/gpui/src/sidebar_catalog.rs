@@ -4,6 +4,7 @@ use gpui::{Context, Div, Stateful, div, prelude::*, px, rgb};
 use crate::GridView;
 use crate::assets::icon;
 use crate::sidebar_state::ObjectState;
+use crate::surfaces::note;
 use bookie_gpui::theme::{Theme, size};
 
 pub(crate) fn kind_label(kind: CatalogObjectKind) -> &'static str {
@@ -133,11 +134,11 @@ pub(crate) enum CatalogLine {
 
 fn state_row(state: Option<&ObjectState>, entry: usize, theme: Theme) -> gpui::AnyElement {
     match state {
-        Some(ObjectState::Loading) | None => note("Loading…", theme),
-        Some(ObjectState::Failed(message)) => note(message, theme),
+        Some(ObjectState::Loading) | None => catalog_note("Loading…", theme),
+        Some(ObjectState::Failed(message)) => catalog_note(message, theme),
         Some(ObjectState::Loaded(objects)) => match objects.get(entry) {
             Some(object) => object_row(object, theme),
-            None => note("Nothing of this kind was found.", theme),
+            None => catalog_note("Nothing of this kind was found", theme),
         },
     }
 }
@@ -155,7 +156,7 @@ fn tree_line(
         .flex()
         .items_center()
         .h(px(size::TREE_ROW))
-        .pl(px(size::SM + size::LG * depth))
+        .pl(px(crate::chrome::tree_indent(depth)))
         .pr(px(size::SM))
         .gap_1()
         .rounded(px(theme.radius))
@@ -193,7 +194,7 @@ fn object_row(object: &bookie_core::CatalogObject, theme: Theme) -> gpui::AnyEle
         .flex()
         .items_center()
         .h(px(size::TREE_ROW))
-        .pl(px(size::SM + size::LG * 2.0 + size::CHEVRON))
+        .pl(px(crate::chrome::tree_indent(2.0) + size::CHEVRON))
         .pr(px(size::SM))
         .text_size(px(size::TEXT_SMALL))
         .child(
@@ -213,12 +214,10 @@ fn object_row(object: &bookie_core::CatalogObject, theme: Theme) -> gpui::AnyEle
         .into_any_element()
 }
 
-fn note(text: &str, theme: Theme) -> gpui::AnyElement {
-    div()
+fn catalog_note(text: &str, theme: Theme) -> gpui::AnyElement {
+    note(text.to_string(), theme)
         .h(px(size::TREE_ROW))
-        .pl(px(size::SM + size::LG * 2.0 + size::CHEVRON))
+        .pl(px(crate::chrome::tree_indent(2.0) + size::CHEVRON))
         .text_size(px(size::TEXT_SMALL))
-        .text_color(rgb(theme.muted_foreground))
-        .child(text.to_string())
         .into_any_element()
 }

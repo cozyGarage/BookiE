@@ -29,8 +29,19 @@ impl GridView {
         .detach();
     }
 
+    pub(crate) fn on_table_tab(&self) -> bool {
+        matches!(self.tabs.current(), bookie_gpui::shell::Tab::Table(_))
+    }
+
+    fn status_origin(&self) -> String {
+        if self.on_table_tab() || self.live.is_none() {
+            return self.source.origin();
+        }
+        self.catalog.connection.clone()
+    }
+
     pub(crate) fn connection_chip_text(&self) -> String {
-        let origin = self.source.origin();
+        let origin = self.status_origin();
         let Some(version) = self.connection_version() else {
             return origin;
         };
@@ -42,7 +53,7 @@ impl GridView {
     }
 
     pub(crate) fn connection_tooltip(&self) -> String {
-        let origin = self.source.origin();
+        let origin = self.status_origin();
         let Some(info) = self.connection_info.as_ref() else {
             return origin;
         };

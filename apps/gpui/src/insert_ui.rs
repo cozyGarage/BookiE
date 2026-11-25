@@ -1,8 +1,8 @@
 use bookie_core::ColumnInfo;
 
 use super::*;
-use crate::chrome::ghost;
 use crate::save_ui::{ReviewLabels, SaveRequest};
+use crate::surfaces::{ButtonKind, button, task_bar};
 
 pub(crate) struct InsertField {
     pub name: String,
@@ -102,7 +102,7 @@ impl GridView {
 
     pub(crate) fn cancel_insert_form(&mut self, cx: &mut Context<Self>) {
         self.close_insert_form();
-        self.status = "Cancelled the new row".into();
+        self.status = "Canceled the new row".into();
         cx.notify();
     }
 
@@ -143,33 +143,20 @@ impl GridView {
                 .child(div().w(px(size::FORM_CONTROL * 4.0)).child(field.input.clone()))
         });
         Some(
-            div()
-                .flex()
-                .flex_col()
-                .gap_2()
-                .p_2()
-                .flex_none()
-                .bg(rgb(theme.chrome))
-                .border_b_1()
-                .border_color(rgb(theme.border))
+            task_bar("New row", theme)
+                .flex_wrap()
+                .child(div().flex_1().min_w_0().flex().flex_wrap().gap_3().children(fields))
                 .child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .gap_2()
-                        .child(div().font_weight(gpui::FontWeight::MEDIUM).child("New row"))
-                        .child(
-                            ghost("review-insert", "Review", theme)
-                                .on_click(cx.listener(|this, _, _, cx| this.review_insert(cx))),
-                        )
-                        .child(
-                            ghost("cancel-insert", "Cancel", theme)
-                                .on_click(cx.listener(|this, _, _, cx| this.cancel_insert_form(cx))),
-                        ),
+                    button(ButtonKind::Primary, "review-insert", "Review", theme)
+                        .on_click(cx.listener(|this, _, _, cx| this.review_insert(cx))),
                 )
-                .child(div().flex().flex_wrap().gap_3().children(fields))
+                .child(
+                    button(ButtonKind::Ghost, "cancel-insert", "Cancel", theme)
+                        .on_click(cx.listener(|this, _, _, cx| this.cancel_insert_form(cx))),
+                )
                 .child(
                     div()
+                        .w_full()
                         .text_size(px(size::TEXT_SMALL))
                         .text_color(rgb(theme.muted_foreground))
                         .child("Leave a field empty to let the database fill it in. Press Enter in a field to review."),

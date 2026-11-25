@@ -5,7 +5,7 @@ use std::sync::{
 use std::time::Instant;
 
 use gpui::TestAppContext;
-use gpui_kit::test::TestWindowExt;
+use gpui_kit::test::{TestQueryExt, TestWindowExt};
 
 use crate::GridView;
 use crate::text_input;
@@ -643,7 +643,7 @@ fn query_results_do_not_copy_inserts_to_the_previously_browsed_table(cx: &mut Te
     let clipboard = cx.update(|_, cx| cx.read_from_clipboard().and_then(|item| item.text()));
     assert_eq!(clipboard.as_deref(), Some("unchanged"));
     view.read_with(cx, |view, _| {
-        assert_eq!(view.status, "Copy as INSERT is available for table rows only.");
+        assert_eq!(view.status, "Copy as INSERT is available for table rows only");
         assert!(
             !view
                 .palette_actions()
@@ -878,7 +878,7 @@ fn an_empty_database_opens_a_query_without_synthetic_rows(cx: &mut TestAppContex
     let clipboard = cx.update(|_, cx| cx.read_from_clipboard().and_then(|item| item.text()));
     assert_eq!(clipboard.as_deref(), Some("unchanged"));
     view.read_with(cx, |view, _| {
-        assert_eq!(view.status, "Copy as INSERT is available for table rows only.");
+        assert_eq!(view.status, "Copy as INSERT is available for table rows only");
         assert!(
             !view
                 .palette_actions()
@@ -2112,7 +2112,7 @@ fn header_collapse_all_and_feedback_actions(cx: &mut TestAppContext) {
     view.update(cx, |view, _| {
         view.live = None;
         view.show_status();
-        assert_eq!(view.status, "No active database connection.");
+        assert_eq!(view.status, "No active database connection");
     });
 }
 
@@ -2352,6 +2352,33 @@ fn the_pager_arrows_appear_only_when_there_is_more_than_one_page(cx: &mut TestAp
 }
 
 #[gpui::test]
+fn the_export_bar_opens_as_a_dialog_and_the_grid_does_not_move(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_resize(gpui::size(gpui::px(1400.0), gpui::px(800.0)));
+    cx.run_until_parked();
+    connect_and_settle(&view, cx, orders_fixture());
+    let before = cx.debug_bounds("grid-actions").expect("the strip is drawn");
+    assert!(cx.debug_bounds("bar-dialog").is_none());
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_export_file_bar(cx)));
+    cx.run_until_parked();
+    let dialog = cx.debug_bounds("bar-dialog").expect("the export bar is a dialog");
+    let after = cx.debug_bounds("grid-actions").expect("the strip is still drawn");
+    assert_eq!(
+        before.origin.y, after.origin.y,
+        "opening the export dialog moved the grid"
+    );
+    assert!(dialog.size.width <= gpui::px(1400.0), "the dialog fits the window");
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.close_export_file_bar();
+            cx.notify();
+        })
+    });
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("bar-dialog").is_none(), "closing removes the dialog");
+}
+
+#[gpui::test]
 fn narrow_grid_toolbar_keeps_actions_inside_window(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     view.update(cx, |view, cx| {
@@ -2376,9 +2403,9 @@ fn compact_grid_menu_preserves_grid_commands(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     view.read_with(cx, |view, _| {
         let groups =
-            crate::menus::command_groups(view, &[&["first", "last"], &["compare", "export-csv", "continuous"]]);
+            crate::menus::command_groups(view, &[&["first", "last"], &["compare", "export-file", "continuous"]]);
         let ids: Vec<_> = groups.iter().flatten().map(|(id, _, _)| *id).collect();
-        assert_eq!(ids, ["first", "last", "compare", "export-csv", "continuous"]);
+        assert_eq!(ids, ["first", "last", "compare", "export-file", "continuous"]);
     });
 }
 
@@ -2474,4 +2501,68 @@ fn a_large_sequential_scan_shows_a_full_scan_chip_in_the_plan_view(cx: &mut Test
         cx.debug_bounds("plan-full-scan").is_some(),
         "a 40,000-row sequential scan is flagged"
     );
+}
+
+#[gpui::test]
+fn every_control_in_a_bar_has_the_bar_height(cx: &mut TestAppContext) {
+    use bookie_gpui::theme::size;
+    use gpui::px;
+    let (_view, cx) = open(cx);
+    for width in [1500.0, 760.0] {
+        cx.simulate_resize(gpui::size(px(width), px(800.0)));
+        cx.run_until_parked();
+        let toolbar = cx.debug_bounds("main-toolbar").expect("the toolbar is drawn");
+        assert_eq!(toolbar.size.height, px(crate::chrome::TOOLBAR_HEIGHT));
+        assert_eq!(toolbar.size.height, px(size::SMALL_CONTROL + 2.0 * size::XS));
+        let tabs = cx.debug_bounds("workspace-tabs").expect("the tab strip is drawn");
+        assert_eq!(tabs.size.height, px(crate::chrome::TAB_HEIGHT));
+        for id in [
+            "first",
+            "pager-prev",
+            "load-more",
+            "next",
+            "last",
+            "find-prev",
+            "find-next",
+            "show",
+        ] {
+            if let Some(control) = cx.debug_bounds(id) {
+                assert_eq!(control.size.height, px(size::COMPACT_CONTROL), "{id} at {width}");
+            }
+        }
+        if let Some(more) =
+            cx.update(|window, _| window.try_find_by_label("More grid actions").map(|node| node.bounds()))
+        {
+            assert_eq!(more.size.height, px(size::COMPACT_CONTROL), "More at {width}");
+        }
+    }
+    cx.simulate_keystrokes("ctrl-t ctrl-enter");
+    cx.run_until_parked();
+    let toggle = cx.debug_bounds("toggle-results").expect("the results toggle is drawn");
+    assert_eq!(toggle.size.height, px(size::COMPACT_CONTROL));
+    assert!(cx.debug_bounds("results-header").is_some());
+}
+
+#[gpui::test]
+fn the_grid_strip_has_one_export_menu_for_files_and_the_clipboard(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_resize(gpui::size(gpui::px(1500.0), gpui::px(800.0)));
+    cx.run_until_parked();
+    let export = cx
+        .update(|window, _| window.try_find_by_label("Export").map(|node| node.bounds()))
+        .expect("the Export menu is drawn");
+    assert_eq!(export.size.height, gpui::px(bookie_gpui::theme::size::COMPACT_CONTROL));
+    assert!(cx.debug_bounds("export").is_none(), "no separate export button");
+    assert!(cx.debug_bounds("copy-csv").is_none(), "no separate Copy CSV button");
+    let items = view.read_with(cx, |view, _| {
+        crate::menus::command_groups(view, crate::menus::EXPORT_GROUPS)
+    });
+    let ids: Vec<&str> = items.iter().flatten().map(|(id, _, _)| *id).collect();
+    assert_eq!(ids, ["export-file", "export-csv"]);
+    cx.update(|window, cx| view.update(cx, |view, cx| view.run_palette_id("export-file", window, cx)));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(view.export.file.open, "the export bar opens");
+        assert!(view.formats_for(100, true).len() > 1, "more than one format is offered");
+    });
 }

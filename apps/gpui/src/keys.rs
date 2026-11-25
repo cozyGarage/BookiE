@@ -133,7 +133,7 @@ impl GridView {
         let modifiers = stroke.modifiers;
         let control = control_modifier(modifiers);
         let key = stroke.key.as_str();
-        if control && modifiers.alt && !modifiers.shift && key == "-" {
+        if Chord::new(control, modifiers.shift, modifiers.alt, key) == bookie_gpui::keymap::last_edit_chord() {
             self.go_to_last_edit(window, cx);
             cx.notify();
             return;

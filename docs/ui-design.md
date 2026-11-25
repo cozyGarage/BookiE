@@ -29,4 +29,25 @@ GTK uses libadwaita widgets restyled to these tokens in `apps/linux/data/resourc
 5. **One owner per visible fact.** A fix to a banner, a font or a zoom lands once, in the part that owns it.
 6. **Frontends render, services decide** ([ADR 0041](decisions/0041-frontends-render-services-decide.md)). GTK and GPUI share vocabulary and rules, not widget code.
 
-`scripts/check-ui-patterns.py` holds rules 3 and 4, and hand-built dialog frames, at their current counts in `baselines/ui-pattern-baselines.txt`. Lower a count when you remove one; never raise it.
+## GPUI parts
+
+In `apps/gpui`, these jobs have exactly one constructor in `surfaces.rs`. A view never builds its own, and never calls the library `Button::new` for them.
+
+| Job | Part | Rules |
+| --- | --- | --- |
+| Icon-only button | `icon_button(id, icon, tooltip)` | The tooltip is required and is also the accessible name. Its size follows the bar it sits in. |
+| Text button | `button(kind, id, label)` | Primary, Ghost or Destructive. One line, ending in an ellipsis. Busy and disabled states show the reason as a tooltip. Paired buttons share a minimum width. |
+| One-of-N choice | `segmented(options, selected)` | Selection is a fill, never a ring, never blue. |
+| Dialog and overlay | `dialog_surface(width)` | 6 px radius, a shadow, a scrim from the theme. Pages are flat and cast no shadow. |
+| Inline task bar | `task_bar(title)` | Fields, then the primary action, then Cancel, always in that order. |
+| Section caption | `section_header(caption)` | Sentence case, muted, small. |
+| Empty, loading, failed | `list_state(...)` | One sentence, at most one action. Errors use the destructive colour; warnings use warning. |
+
+- **One primary per bar or dialog**, and it comes before Cancel.
+- **One height per bar.** Every control in a bar has the bar's control height. A bar is its control height plus padding from the scale.
+- **Truncation.** A fixed-width label is one line with an ellipsis and a tooltip holding the full text. Secondary text (host, type) gives way before the primary name.
+- **Colour roles only.** No `rgb(0x…)`, `rgba(0x…)` or `hsla(` outside `theme.rs`. Blue (`info`) marks a link and nothing else.
+- **Contrast.** Text roles reach 4.5:1 and indicators 3:1 on every surface, in both themes (tested in `theme.rs`).
+- **Screenshots.** A pull request that changes GPUI layout attaches light and dark screenshots at 1500 and 760 px.
+
+`scripts/check-ui-patterns.py` holds rules 3 and 4, and hand-built dialog frames, at their current counts in `baselines/ui-pattern-baselines.txt`. For GPUI it also counts literal px sizes, raw colours, `text_xs`/`text_sm`, buttons with an empty label, `theme.info` and shadows outside `surfaces.rs`. Lower a count when you remove one; never raise it.

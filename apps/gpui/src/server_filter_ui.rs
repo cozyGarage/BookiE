@@ -1,6 +1,7 @@
 use bookie_core::TableInfo;
 
 use super::*;
+use crate::surfaces::{ButtonKind, button};
 
 const PLACEHOLDER: &str = "e.g. created_at > now() - interval '1 day'";
 
@@ -31,7 +32,7 @@ impl GridView {
         vec![
             Action {
                 id: "where",
-                label: "Filter this table on the server (WHERE)".to_string(),
+                label: "Filter this table on the server with WHERE".to_string(),
                 enabled,
             },
             Action {
@@ -171,16 +172,20 @@ impl GridView {
                     .child(div().font_family("monospace").child("WHERE"))
                     .child(div().flex_1().min_w_0().font_family("monospace").child(input))
                     .child(
-                        button("apply-where", "Apply", theme).on_click(cx.listener(|this, _, _, cx| {
-                            this.apply_where(cx);
-                            cx.notify();
-                        })),
+                        button(ButtonKind::Primary, "apply-where", "Apply", theme).on_click(cx.listener(
+                            |this, _, _, cx| {
+                                this.apply_where(cx);
+                                cx.notify();
+                            },
+                        )),
                     )
                     .child(
-                        button("clear-where", "Clear", theme).on_click(cx.listener(|this, _, _, cx| {
-                            this.clear_where(cx);
-                            cx.notify();
-                        })),
+                        button(ButtonKind::Ghost, "clear-where", "Clear", theme).on_click(cx.listener(
+                            |this, _, _, cx| {
+                                this.clear_where(cx);
+                                cx.notify();
+                            },
+                        )),
                     )
                     .child(
                         div()

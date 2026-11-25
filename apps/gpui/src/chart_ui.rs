@@ -11,6 +11,7 @@ use gpui_kit::component::ActiveTheme;
 
 use super::*;
 use crate::chart_plot::{CHAR_WIDTH, ResultPlot, ValueAxis, min_width, number};
+use crate::surfaces::{ButtonKind, button, segment, segmented};
 
 const TICKS: usize = 5;
 
@@ -104,7 +105,9 @@ impl GridView {
 
     fn chart_controls(&self, chart: &ChartState, theme: Theme, cx: &mut Context<Self>) -> Div {
         let settings = &chart.settings;
-        let pick = |id: gpui::ElementId, label: &str, on: bool| chip(id, label, on, theme);
+        let pick = |id: gpui::ElementId, label: &str, on: bool| {
+            segment(id, label.to_string(), on, theme).max_w(px(size::CHART_COLUMN_WIDTH))
+        };
         let kinds =
             [("chart-bars", "Bars", Kind::Bars), ("chart-line", "Line", Kind::Line)].map(|(id, label, kind)| {
                 pick(id.into(), label, settings.kind == kind)
@@ -125,7 +128,8 @@ impl GridView {
             .get(settings.label)
             .map(|name| text_preview(name))
             .unwrap_or_default();
-        let label = pick("chart-label".into(), &format!("Label: {label_name}"), false)
+        let label = button(ButtonKind::Ghost, "chart-label", format!("Label: {label_name}"), theme)
+            .max_w(px(size::CHART_COLUMN_WIDTH))
             .on_click(cx.listener(move |this, _, _, cx| this.edit_chart(|s| s.label = (s.label + 1) % columns, cx)));
         let values = settings.picked().map(|(_, column)| {
             let name = chart
@@ -155,19 +159,19 @@ impl GridView {
             .gap_1()
             .px_2()
             .py_1()
-            .children(kinds)
+            .child(segmented(kinds, theme))
             .child(div().w(px(size::SM)))
-            .children(aggregates)
+            .child(segmented(aggregates, theme))
             .child(div().w(px(size::SM)))
             .child(label)
             .child(
-                pick("chart-values".into(), "Values…", false)
+                button(ButtonKind::Ghost, "chart-values", "Values…", theme)
                     .debug_selector(|| "chart-values-picker".into())
                     .on_click(cx.listener(|this, _, window, cx| {
                         this.open_picker(crate::palette_state::PaletteMode::ChartValues, window, cx);
                     })),
             )
-            .children(values)
+            .child(segmented(values, theme).flex_shrink(1.0).flex_wrap().h_auto())
     }
 }
 
@@ -194,27 +198,6 @@ fn chart_coverage(chart: &ChartState, loading: bool) -> String {
         text.push_str(" · Updating chart…");
     }
     text
-}
-
-fn chip(id: gpui::ElementId, label: &str, on: bool, theme: Theme) -> Stateful<Div> {
-    div()
-        .id(id)
-        .flex()
-        .items_center()
-        .h(px(size::COMPACT_CONTROL))
-        .max_w(px(size::CHART_COLUMN_WIDTH))
-        .overflow_hidden()
-        .whitespace_nowrap()
-        .text_ellipsis()
-        .px_2()
-        .rounded(px(size::CONTROL_RADIUS))
-        .border_1()
-        .border_color(rgb(theme.border))
-        .bg(rgb(if on { theme.active_row } else { theme.background }))
-        .text_color(rgb(theme.foreground))
-        .cursor_pointer()
-        .hover(move |style| style.bg(rgb(theme.accent)))
-        .child(label.to_string())
 }
 
 fn chart_plot_area(chart: &ChartState, theme: Theme, cx: &App) -> Div {

@@ -8,6 +8,10 @@ pub mod size {
     pub const XL: f32 = 24.0;
     pub const COMPACT_CONTROL: f32 = 24.0;
     pub const SMALL_CONTROL: f32 = 28.0;
+    pub const SEGMENT: f32 = 20.0;
+    pub const BADGE: f32 = 20.0;
+    pub const BUTTON_MIN_WIDTH: f32 = 80.0;
+    pub const BUTTON_MAX_WIDTH: f32 = 240.0;
     pub const GRID_HEADER: f32 = 32.0;
     pub const FORM_CONTROL: f32 = 32.0;
     pub const CONTROL_RADIUS: f32 = 4.0;
@@ -27,9 +31,12 @@ pub mod size {
     pub const GUTTER_MARKER_WIDTH: f32 = 3.0;
     pub const FULL_VALUE_EDITOR_WIDTH: f32 = 760.0;
     pub const APPROVAL_DIALOG_WIDTH: f32 = 560.0;
-    pub const SHORTCUT_HINT_WIDTH: f32 = 320.0;
+    pub const SHORTCUT_HINT_WIDTH: f32 = 360.0;
     pub const TOOLBAR_LABELS_MIN_WIDTH: f32 = 900.0;
     pub const SHORTCUT_CHORD_WIDTH: f32 = 120.0;
+    pub const FIND_MIN_WIDTH: f32 = 72.0;
+    pub const SHORTCUT_KEYCAP_WIDTH: f32 = 128.0;
+    pub const TREE_INDENT: f32 = 14.0;
     pub const FULL_VALUE_EDITOR_HEIGHT: f32 = 560.0;
     pub const TEXT: f32 = 13.0;
     pub const STAT_TEXT: f32 = 22.0;
@@ -87,19 +94,19 @@ impl Theme {
             background: 0xffffff,
             foreground: 0x0a0a0a,
             muted: 0xf5f5f5,
-            muted_foreground: 0x737373,
+            muted_foreground: 0x6b6b6b,
             chrome: 0xf5f5f5,
             sidebar: 0xfafafa,
             popover: 0xffffff,
             border: 0xe5e5e5,
-            focus_ring: 0xa1a1a1,
+            focus_ring: 0x8a8a8a,
             accent: 0xf5f5f5,
             stripe: 0xf0f0f0,
             active_row: 0xe5e5e5,
             info: 0x2563eb,
             success: 0x16a34a,
-            warning: 0xd97706,
-            destructive: 0xe7000b,
+            warning: 0xb45309,
+            destructive: 0xb91c1c,
             edited: 0xfef3c7,
         }
     }
@@ -144,9 +151,105 @@ impl Theme {
     }
 }
 
+pub fn luminance(colour: u32) -> f64 {
+    let channel = |shift: u32| {
+        let value = f64::from((colour >> shift) & 0xff) / 255.0;
+        if value <= 0.039_28 {
+            value / 12.92
+        } else {
+            ((value + 0.055) / 1.055).powf(2.4)
+        }
+    };
+    0.2126 * channel(16) + 0.7152 * channel(8) + 0.0722 * channel(0)
+}
+
+pub fn contrast(a: u32, b: u32) -> f64 {
+    let (x, y) = (luminance(a), luminance(b));
+    (x.max(y) + 0.05) / (x.min(y) + 0.05)
+}
+
+pub fn readable(colour: u32, toward: u32, surfaces: &[u32], minimum: f64) -> u32 {
+    (0..=20)
+        .map(|step| mix(colour, toward, f64::from(step) / 20.0))
+        .find(|candidate| surfaces.iter().all(|surface| contrast(*candidate, *surface) >= minimum))
+        .unwrap_or(toward)
+}
+
+fn mix(base: u32, other: u32, amount: f64) -> u32 {
+    let blend = |shift: u32| {
+        let a = f64::from((base >> shift) & 0xff);
+        let b = f64::from((other >> shift) & 0xff);
+        ((a + (b - a) * amount).round() as u32) << shift
+    };
+    blend(16) | blend(8) | blend(0)
+}
+
+impl Theme {
+    pub fn with_readable_text(mut self) -> Self {
+        let surfaces = [self.background, self.chrome, self.sidebar, self.popover, self.muted];
+        self.muted_foreground = readable(self.muted_foreground, self.foreground, &surfaces, 4.5);
+        self.destructive = readable(self.destructive, self.foreground, &surfaces, 4.5);
+        self.info = readable(self.info, self.foreground, &surfaces, 4.5);
+        self.warning = readable(self.warning, self.foreground, &surfaces, 3.0);
+        self.success = readable(self.success, self.foreground, &surfaces, 3.0);
+        self.focus_ring = readable(self.focus_ring, self.foreground, &surfaces, 3.0);
+        self.active_row = readable(self.active_row, self.background, &[self.foreground], 4.5);
+        self.stripe = readable(self.stripe, self.background, &[self.foreground], 4.5);
+        self.edited = readable(self.edited, self.background, &[self.foreground], 4.5);
+        self
+    }
+}
+
+pub fn contrast_failures(themes: &[Theme]) -> Vec<String> {
+    let mut failures = Vec::new();
+    for theme in themes.iter().copied() {
+        let surfaces = [
+            ("background", theme.background),
+            ("chrome", theme.chrome),
+            ("sidebar", theme.sidebar),
+            ("popover", theme.popover),
+            ("muted", theme.muted),
+        ];
+        let roles = [
+            ("foreground", theme.foreground, 4.5),
+            ("muted_foreground", theme.muted_foreground, 4.5),
+            ("destructive", theme.destructive, 4.5),
+            ("info", theme.info, 4.5),
+            ("warning", theme.warning, 3.0),
+            ("success", theme.success, 3.0),
+            ("focus_ring", theme.focus_ring, 3.0),
+        ];
+        for (surface, background) in surfaces {
+            for (role, colour, minimum) in roles {
+                let ratio = contrast(colour, background);
+                if ratio < minimum {
+                    failures.push(format!("{} {role} on {surface}: {ratio:.2} < {minimum}", theme.label()));
+                }
+            }
+        }
+        for (fill, colour) in [
+            ("active_row", theme.active_row),
+            ("edited", theme.edited),
+            ("stripe", theme.stripe),
+        ] {
+            let ratio = contrast(theme.foreground, colour);
+            if ratio < 4.5 {
+                failures.push(format!("{} foreground on {fill}: {ratio:.2} < 4.5", theme.label()));
+            }
+        }
+    }
+    failures
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn text_and_indicators_reach_their_contrast_on_every_surface_in_both_themes() {
+        let failures = contrast_failures(&[Theme::light(), Theme::dark()]);
+        assert!(failures.is_empty(), "{failures:#?}");
+    }
 
     #[test]
     fn light_is_the_default_and_uses_the_design_tokens() {
@@ -158,7 +261,7 @@ mod tests {
         );
         assert_eq!(
             (theme.muted_foreground, theme.stripe, theme.active_row),
-            (0x737373, 0xf0f0f0, 0xe5e5e5)
+            (0x6b6b6b, 0xf0f0f0, 0xe5e5e5)
         );
         assert_eq!(theme.radius, size::CONTROL_RADIUS);
     }
@@ -172,7 +275,7 @@ mod tests {
         }
         assert_eq!(
             (Theme::light().destructive, Theme::dark().success),
-            (0xe7000b, 0x4ade80)
+            (0xb91c1c, 0x4ade80)
         );
     }
 

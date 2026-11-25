@@ -98,7 +98,7 @@ impl SaveCheck {
         }
         (self.unseen > 0).then(|| {
             format!(
-                "{} saved row(s) are not in the reloaded rows, so they were not checked.",
+                "{} saved row(s) are not in the reloaded rows, so they were not checked",
                 self.unseen
             )
         })

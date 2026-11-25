@@ -33,5 +33,30 @@ class UiPatternTests(unittest.TestCase):
         self.assertEqual(self.counted("#[cfg(test)]\nmod t { fn f() { thread_local! {} } }"), {})
 
 
+    def test_code_after_a_test_module_still_counts(self):
+        source = "#[cfg(test)]\nmod t {\n    fn f() { thread_local! {} }\n}\nfn g() { thread_local! {} }\n"
+        self.assertEqual(self.counted(source), {"thread_local": 1})
+
+    def test_an_indented_test_item_skips_only_that_item(self):
+        source = "impl X {\n    #[cfg(test)]\n    fn probe() { thread_local! {} }\n    fn real() { thread_local! {} }\n}\n"
+        self.assertEqual(self.counted(source), {"thread_local": 1})
+
+    def test_gpui_colour_text_size_empty_label_info_and_shadow_count(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "apps" / "gpui" / "src" / "view.rs"
+            path.parent.mkdir(parents=True)
+            path.write_text(
+                ".bg(rgba(0x00000088))\n.text_color(hsla(0., 0., 0.7, 0.45))\n.text_xs()\n.text_sm()\n"
+                'ghost("toggle", "", theme)\n.text_color(rgb(theme.info))\n.shadow_lg()\n.px(px(8.0 + 14.0 * depth))\n'
+            )
+            found = checker.count(path)
+        self.assertEqual(found.get("gpui-raw-colour"), 2)
+        self.assertEqual(found.get("gpui-text-size-class"), 2)
+        self.assertEqual(found.get("gpui-empty-label"), 1)
+        self.assertEqual(found.get("gpui-info-colour"), 1)
+        self.assertEqual(found.get("gpui-shadow"), 1)
+        self.assertEqual(found.get("gpui-literal-px"), 1)
+
+
 if __name__ == "__main__":
     unittest.main()
