@@ -347,7 +347,7 @@ async fn a_write_does_not_get_the_read_deadline_but_a_read_does() {
     );
     let write = tokio::spawn(async move {
         guard
-            .query_result_sets_controlled_with_audit("UPDATE t SET a = 1 WHERE id = 1", &[], &control)
+            .query_result_sets_controlled_with_audit("ALTER TABLE t ADD COLUMN b integer", &[], &control)
             .await
     });
     tokio::time::sleep(Duration::from_millis(150)).await;
