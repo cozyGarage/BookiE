@@ -28,13 +28,15 @@ async fn a_simple_select_stays_within_its_server_command_budget() {
         .exec(ExecCommand::new(["chown", "cassandra:cassandra", "/opt/cassandra/logs/audit"]))
         .await
         .expect("set Cassandra audit log directory owner");
+    let owner_output = set_audit_dir_owner.stdout_to_vec().await.expect("audit directory owner output");
+    let owner_error = set_audit_dir_owner.stderr_to_vec().await.expect("audit directory owner error");
     assert_eq!(
         set_audit_dir_owner
             .exit_code()
             .await
             .expect("audit directory owner exit code"),
         Some(0),
-        "set Cassandra audit log directory owner"
+        "set Cassandra audit log directory owner: {owner_output:?}\n{owner_error:?}"
     );
 
     let mut enable = container
