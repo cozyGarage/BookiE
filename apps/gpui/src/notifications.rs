@@ -142,13 +142,13 @@ impl GridView {
                                 .border_b_1()
                                 .border_color(rgb(theme.border))
                                 .child(div().flex_1().child(section_header("Notifications", theme)))
-                                .child(
+                                .children(self.notices.items.iter().any(|notice| notice.read).then(|| {
                                     compact_button(ButtonKind::Ghost, "clear-read-notices", "Clear read", theme)
                                         .on_click(cx.listener(|this, _, _, cx| {
                                             this.notices.clear_read();
                                             cx.notify();
-                                        })),
-                                )
+                                        }))
+                                }))
                                 .child(
                                     compact_icon_button("close-notifications", "x", "Close", theme)
                                         .on_click(cx.listener(|this, _, _, cx| this.toggle_notifications(cx))),
