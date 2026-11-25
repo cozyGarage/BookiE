@@ -2517,12 +2517,20 @@ fn every_control_in_a_bar_has_the_bar_height(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
-fn the_grid_export_button_opens_the_file_export_with_a_format_choice(cx: &mut TestAppContext) {
+fn the_grid_strip_has_one_export_menu_for_files_and_the_clipboard(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.simulate_resize(gpui::size(gpui::px(1500.0), gpui::px(800.0)));
     cx.run_until_parked();
-    let export = cx.debug_bounds("export").expect("the export button is drawn");
-    cx.simulate_click(export.center(), Default::default());
+    let export = cx
+        .update(|window, _| window.try_find_by_label("Export").map(|node| node.bounds()))
+        .expect("the Export menu is drawn");
+    assert_eq!(export.size.height, gpui::px(bookie_gpui::theme::size::COMPACT_CONTROL));
+    assert!(cx.debug_bounds("export").is_none(), "no separate export button");
+    assert!(cx.debug_bounds("copy-csv").is_none(), "no separate Copy CSV button");
+    let items = view.read_with(cx, |view, _| crate::menus::command_groups(view, crate::menus::EXPORT_GROUPS));
+    let ids: Vec<&str> = items.iter().flatten().map(|(id, _, _)| *id).collect();
+    assert_eq!(ids, ["export-file", "export-csv"]);
+    cx.update(|window, cx| view.update(cx, |view, cx| view.run_palette_id("export-file", window, cx)));
     cx.run_until_parked();
     view.read_with(cx, |view, _| {
         assert!(view.export.file.open, "the export bar opens");

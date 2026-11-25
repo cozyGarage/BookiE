@@ -500,6 +500,8 @@ impl GridView {
             ),
             action("home", "Open home", true),
             action("new-connection", "New connection", true),
+            action("import-connections", "Import connections…", true),
+            action("export-connections", "Export connections…", true),
             action("history", "Open history", true),
             action("audit", "Open audit log", true),
             action("settings", "Open settings", true),
@@ -753,6 +755,8 @@ impl GridView {
             "sidebar-active-only" => self.toggle_sidebar_active_only(),
             "sidebar-regex" => self.toggle_sidebar_regex(cx),
             "append-pages" => self.pager.append = !self.pager.append,
+            "import-connections" => self.pick_connection_import(cx),
+            "export-connections" => self.pick_connection_export(cx),
             "new-connection" => {
                 self.connection_form.editing = None;
                 self.tabs.open_new_connection();

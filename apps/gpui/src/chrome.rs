@@ -462,10 +462,11 @@ impl GridView {
 
     fn toolbar_import_export_menu(&self, labelled: bool, theme: Theme, cx: &mut Context<Self>) -> impl IntoElement {
         use gpui_component::button::{Button, ButtonVariants};
-        use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
+        use gpui_component::menu::DropdownMenu as _;
         use gpui_kit::component::Sizable as _;
 
         let owner = cx.entity().downgrade();
+        let groups = crate::menus::command_groups(self, crate::menus::IMPORT_EXPORT_GROUPS);
         Button::new("import-export-menu")
             .ghost()
             .small()
@@ -474,29 +475,7 @@ impl GridView {
             .accessibility_label("Import / Export")
             .child(icon("arrow-down-up", theme.muted_foreground))
             .children(labelled.then(|| div().whitespace_nowrap().child("Import / Export")))
-            .dropdown_menu(move |mut menu, _, _| {
-                for (id, label) in [
-                    ("import-csv", "Import CSV into table…"),
-                    ("export-file", "Export table to file…"),
-                    ("import-connections", "Import connections…"),
-                    ("export-connections", "Export connections"),
-                ] {
-                    let owner = owner.clone();
-                    menu = menu.item(PopupMenuItem::new(label).on_click(move |_, _, cx| {
-                        let _ = owner.update(cx, |this, cx| {
-                            match id {
-                                "import-csv" => this.open_import_bar(cx),
-                                "export-file" => this.open_export_file_bar(cx),
-                                "import-connections" => this.pick_connection_import(cx),
-                                "export-connections" => this.pick_connection_export(cx),
-                                _ => {}
-                            }
-                            cx.notify();
-                        });
-                    }));
-                }
-                menu
-            })
+            .dropdown_menu(crate::menus::command_menu(owner, groups))
     }
 
     fn sidebar_header_action_icons(&self, theme: Theme, cx: &mut Context<Self>) -> Div {

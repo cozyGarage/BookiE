@@ -193,26 +193,22 @@ impl GridView {
         )
     }
 
-    fn copy_csv_button(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
-        compact_button(ButtonKind::Ghost, "copy-csv", "Copy CSV", theme)
-            .tooltip(crate::surfaces::tooltip_view(
-                "Copy the page or selection to the clipboard as CSV".into(),
-            ))
-            .on_click(cx.listener(|this, _, _, cx| {
-                this.export_selection_or_page(cx);
-                cx.notify();
-            }))
-    }
-
-    fn export_button(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
-        compact_button(ButtonKind::Ghost, "export", "Export…", theme)
-            .tooltip(crate::surfaces::tooltip_view(
-                "Export to a file and choose its format".into(),
-            ))
-            .on_click(cx.listener(|this, _, _, cx| {
-                this.open_export_file_bar(cx);
-                cx.notify();
-            }))
+    fn export_menu_button(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+        use gpui_component::button::{Button, ButtonVariants};
+        use gpui_component::menu::DropdownMenu;
+        use gpui_kit::component::Sizable as _;
+        let groups = crate::menus::command_groups(self, crate::menus::EXPORT_GROUPS);
+        div().debug_selector(|| "grid-export".into()).child(
+            Button::new("grid-export")
+                .ghost()
+                .small()
+                .compact()
+                .tooltip("Export to a file or copy as CSV")
+                .accessibility_label("Export")
+                .child(div().whitespace_nowrap().text_color(rgb(theme.foreground)).child("Export"))
+                .child(icon("chevron-down", theme.muted_foreground))
+                .dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), groups)),
+        )
     }
 
     fn grid_action_buttons(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
@@ -305,8 +301,7 @@ impl GridView {
                         compact_button(ButtonKind::Ghost, "compare", "Compare", theme)
                             .on_click(cx.listener(|this, _, _, cx| this.compare(false, cx)))
                     }))
-                    .child(self.export_button(theme, cx))
-                    .child(self.copy_csv_button(theme, cx))
+                    .child(self.export_menu_button(theme, cx))
                     .child(
                         toggle_icon_button(
                             "continuous",

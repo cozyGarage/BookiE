@@ -137,6 +137,26 @@ fn a_command_has_one_name_in_the_palette_and_the_shortcut_list(cx: &mut TestAppC
 }
 
 #[gpui::test]
+fn every_toolbar_menu_item_is_a_palette_command_with_the_same_name(cx: &mut TestAppContext) {
+    let (view, cx) = open_live(cx);
+    let menus = [
+        crate::menus::IMPORT_EXPORT_GROUPS,
+        crate::menus::EXPORT_GROUPS,
+        crate::menus::OVERFLOW_GROUPS,
+        crate::menus::ROW_GROUPS,
+    ];
+    view.read_with(cx, |view, _| {
+        let actions = view.palette_actions();
+        let missing: Vec<&str> = menus
+            .iter()
+            .flat_map(|groups| groups.iter().flat_map(|group| group.iter().copied()))
+            .filter(|id| !actions.iter().any(|action| action.id == *id))
+            .collect();
+        assert!(missing.is_empty(), "menu items without a palette command: {missing:?}");
+    });
+}
+
+#[gpui::test]
 fn the_palette_shows_shortcuts_in_the_same_format_as_the_editor_hints(cx: &mut TestAppContext) {
     let (view, cx) = open_live(cx);
     view.read_with(cx, |view, _| {
