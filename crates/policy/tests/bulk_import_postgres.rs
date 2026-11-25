@@ -223,3 +223,69 @@ async fn a_denied_upsert_changes_nothing_and_leaves_a_denied_audit_record() {
     assert_eq!(events.len(), 1);
     assert_eq!(events[0].terminal_status, AuditTerminalStatus::Denied);
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn an_import_with_explicit_keys_leaves_the_sequence_at_the_largest_key() {
+    let (_container, opts) = start_pg().await;
+    let raw = PgDriver.connect(opts.clone()).await.unwrap();
+    raw.execute("CREATE TABLE import_seq (id bigserial PRIMARY KEY, name text NOT NULL)")
+        .await
+        .unwrap();
+    let mut csv = String::from("id,name\n");
+    for id in 1..=1_200 {
+        csv.push_str(&format!("{id},name {id}\n"));
+    }
+    let options = CsvImportOptions::default();
+    let sheet = read_csv(csv.as_bytes(), &options, None).unwrap();
+    let columns = raw.fetch_columns(None, "import_seq").await.unwrap();
+    let target = ImportTarget {
+        driver_id: "postgres",
+        capabilities: PgDriver.capabilities(),
+        schema: None,
+        table: "import_seq",
+        columns: &columns,
+        mapping: &[Some(0), Some(1)],
+    };
+    let plan = build_insert_plan(&target, &sheet, &options).unwrap();
+    assert!(plan.statement.contains("OVERRIDING SYSTEM VALUE"));
+    let audit = Arc::new(CapturingAudit {
+        events: Mutex::new(Vec::new()),
+    });
+    let guard = guard_for(raw, Environment::Local, Arc::new(AutoApproveSink), audit);
+    let mut scope = guard
+        .begin_bulk_insert(BulkInsertRequest {
+            schema: None,
+            table: "import_seq".into(),
+            statement: plan.statement.clone(),
+            row_budget: plan.row_count(),
+            sequence_columns: vec!["id".into()],
+        })
+        .await
+        .unwrap();
+    for rows in plan.batches(500) {
+        guard
+            .execute_bulk_batch(
+                &mut scope,
+                BulkBatch {
+                    schema: None,
+                    table: "import_seq",
+                    statement: &plan.statement,
+                    rows,
+                },
+                &control(),
+            )
+            .await
+            .unwrap();
+    }
+    guard
+        .finish_bulk_insert(&mut scope, BulkInsertEnd::Completed)
+        .await
+        .unwrap();
+    let checker = PgDriver.connect(opts).await.unwrap();
+    let next = checker
+        .query("INSERT INTO import_seq (name) VALUES ('generated') RETURNING id::text")
+        .await
+        .unwrap();
+    assert_eq!(next.rows, vec![vec![Value::Text("1201".into())]]);
+}
