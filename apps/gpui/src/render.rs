@@ -581,13 +581,13 @@ impl Render for GridView {
             .import_bar(theme, cx)
             .or_else(|| self.export_file_bar(theme, cx))
             .or_else(|| self.save_bar(theme, cx))
+            .or_else(|| self.insert_form(theme, cx))
             .map(|bar| bar_dialog(theme, bar));
         let save_bar = self.save.pending.is_none().then(|| self.edits_bar(theme, cx)).flatten();
         let banner = self.save_banner(theme, cx);
         let bundle_bar = self.connection_bundle_bar(theme, cx);
         let insert_form = self
-            .insert_form(theme, cx)
-            .or_else(|| self.structure_bar(theme, cx))
+            .structure_bar(theme, cx)
             .or_else(|| self.structure_info_panel(theme, cx))
             .or_else(|| self.resolve_panel(theme, cx))
             .or_else(|| self.late_bars(theme, cx));
@@ -656,7 +656,7 @@ fn bar_dialog(theme: Theme, bar: Div) -> Stateful<Div> {
             .id("bar-dialog")
             .debug_selector(|| "bar-dialog".into())
             .max_h(gpui::relative(0.9))
-            .overflow_hidden()
+            .overflow_y_scroll()
             .on_mouse_down(gpui::MouseButton::Left, |_, _, cx| cx.stop_propagation())
             .child(bar),
     )

@@ -760,6 +760,10 @@ fn a_value_that_does_not_fit_stops_the_review_keeps_the_form_and_cells_stay_lock
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| view.update(cx, |view, cx| view.open_insert_form(cx)));
     settle_saving(cx);
+    assert!(
+        cx.debug_bounds("bar-dialog").is_some(),
+        "the new row form opens as a dialog over the grid"
+    );
     fill_insert_field(&view, cx, "total", "not a number");
     cx.update(|_, cx| view.update(cx, |view, cx| view.review_insert(cx)));
     settle_saving(cx);
