@@ -8,6 +8,7 @@ struct BulkConn {
     fails_from_batch: usize,
     failure: fn() -> DriverError,
     rejected_ids: Vec<i64>,
+    rejects_multi_row: bool,
 }
 
 impl BulkConn {
@@ -19,6 +20,7 @@ impl BulkConn {
                 fails_from_batch: usize::MAX,
                 failure: query_error,
                 rejected_ids,
+                rejects_multi_row: false,
             }),
             batches,
         )
@@ -39,6 +41,21 @@ impl BulkConn {
                 fails_from_batch,
                 failure,
                 rejected_ids: Vec::new(),
+                rejects_multi_row: false,
+            }),
+            batches,
+        )
+    }
+
+    fn open_rejecting_multi_row() -> (Arc<dyn Connection>, Arc<Mutex<Vec<usize>>>) {
+        let batches = Arc::new(Mutex::new(Vec::new()));
+        (
+            Arc::new(Self {
+                batches: batches.clone(),
+                fails_from_batch: usize::MAX,
+                failure: query_error,
+                rejected_ids: Vec::new(),
+                rejects_multi_row: true,
             }),
             batches,
         )
@@ -73,6 +90,12 @@ impl Connection for BulkConn {
 
     async fn execute_in_transaction(&self, statements: &[(String, Vec<Value>)]) -> Result<Vec<u64>, DriverError> {
         let mut batches = self.batches.lock().expect("batch lock");
+        if self.rejects_multi_row && statements.len() == 1 && statements[0].0.contains("), (") {
+            return Err(DriverError::Transaction {
+                statement_index: 0,
+                source: Box::new(query_error()),
+            });
+        }
         let rejected = statements
             .iter()
             .position(|(_, params)| matches!(params.first(), Some(Value::Int(id)) if self.rejected_ids.contains(id)));
@@ -1060,4 +1083,25 @@ async fn statements_other_than_one_insert_are_still_refused_for_an_import() {
         assert!(matches!(result, Err(DriverError::PolicyDenied(_))), "{statement}");
         assert!(batches.lock().expect("batch lock").is_empty());
     }
+}
+
+#[tokio::test]
+async fn a_rejected_multi_row_batch_is_retried_row_by_row_so_the_error_names_the_row() {
+    let (connection, batches) = BulkConn::open_rejecting_multi_row();
+    let (guard, _audit, _state) = approved_guard(connection, Uuid::new_v4());
+    let mut scope = guard.begin_bulk_insert(request(3)).await.expect("scope");
+    let rows = rows(3);
+
+    let written = guard
+        .execute_bulk_batch(&mut scope, batch(INSERT, "people", &rows), &control())
+        .await
+        .expect("the per-row retry is accepted");
+
+    assert_eq!(written, 3);
+    assert_eq!(
+        *batches.lock().expect("batch lock"),
+        vec![3],
+        "three statements after the retry"
+    );
+    end_quietly(&guard, &mut scope).await;
 }
