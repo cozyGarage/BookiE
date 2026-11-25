@@ -704,6 +704,18 @@ fn the_columns_button_appears_when_columns_are_hidden_and_restores_them(cx: &mut
 }
 
 #[gpui::test]
+fn the_grid_strip_offers_one_export_menu_instead_of_a_clipboard_button(cx: &mut TestAppContext) {
+    let (_view, cx) = open(cx);
+    cx.simulate_resize(gpui::size(gpui::px(1400.0), gpui::px(800.0)));
+    cx.run_until_parked();
+    assert!(
+        cx.debug_bounds("grid-export").is_some(),
+        "the strip shows an Export menu"
+    );
+    assert!(cx.debug_bounds("export").is_none(), "the old Copy CSV button is gone");
+}
+
+#[gpui::test]
 fn jump_to_column_lists_the_columns_and_moves_the_cursor_to_the_chosen_one(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.simulate_keystrokes("down down");

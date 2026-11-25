@@ -172,6 +172,20 @@ impl GridView {
             })
     }
 
+    fn export_menu_button(&self, cx: &mut Context<Self>) -> Div {
+        use gpui_component::button::{Button, ButtonVariants};
+        use gpui_component::menu::DropdownMenu;
+        let groups = crate::menus::command_groups(self, &[&["export-csv", "export-file"]]);
+        div().debug_selector(|| "grid-export".into()).child(
+            Button::new("grid-export")
+                .ghost()
+                .compact()
+                .label("Export")
+                .tooltip("Copy as CSV or export to a file")
+                .dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), groups)),
+        )
+    }
+
     fn add_row_button(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Stateful<Div>> {
         (self.can_save_edits() && self.cell_edit.edits.is_empty() && self.compare.is_none() && !self.form_open()).then(
             || {
@@ -193,7 +207,13 @@ impl GridView {
             self,
             &[
                 &["first", "last"],
-                &["jump-column", "refresh-table", "export-csv", "continuous"],
+                &[
+                    "jump-column",
+                    "refresh-table",
+                    "export-csv",
+                    "export-file",
+                    "continuous",
+                ],
             ],
         );
         div()
@@ -264,14 +284,7 @@ impl GridView {
                         button("compare", "Compare", theme)
                             .on_click(cx.listener(|this, _, _, cx| this.compare(false, cx)))
                     }))
-                    .child(
-                        button("export", "Copy CSV", theme)
-                            .tooltip(crate::chrome::tip("Copy the page or selection to the clipboard as CSV"))
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                this.export_selection_or_page(cx);
-                                cx.notify();
-                            })),
-                    )
+                    .child(self.export_menu_button(cx))
                     .child(
                         icon_button(
                             "continuous",
