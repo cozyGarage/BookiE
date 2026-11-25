@@ -6,6 +6,7 @@ mod assets;
 mod audit_page;
 mod backup_ui;
 mod binary_mode;
+mod cancel_process_ui;
 mod catalog_nav;
 mod chart_plot;
 mod chart_ui;
@@ -236,6 +237,7 @@ struct GridView {
     counts: Ticket,
     charts: Ticket,
     pending_cancel_process: bool,
+    cancel_confirm: Option<(i64, String)>,
     compare: Option<std::sync::Arc<Diff>>,
     status: String,
     selection: Option<Selection>,
@@ -629,6 +631,7 @@ impl GridView {
             counts: Ticket::new(),
             charts: Ticket::new(),
             pending_cancel_process: false,
+            cancel_confirm: None,
             status: String::new(),
         }
     }

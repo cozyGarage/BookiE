@@ -2620,3 +2620,43 @@ fn canceling_export_file_setup_preserves_the_previous_status(cx: &mut TestAppCon
         assert_eq!(view.status, "Query completed");
     });
 }
+
+#[gpui::test]
+fn cancelling_a_process_asks_first_and_escape_keeps_it_running(cx: &mut TestAppContext) {
+    let (view, cx) = open_live(cx);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.ask_to_cancel_process(1, cx)));
+    view.read_with(cx, |view, _| {
+        assert!(view.cancel_confirm.is_none(), "an engine without cancel never asks");
+        assert!(view.status.contains("not supported"), "{}", view.status);
+    });
+    view.update(cx, |view, _| {
+        let session = view.live.as_ref().unwrap().with_driver_id("postgres");
+        view.live = Some(session);
+    });
+    cx.update(|_, cx| view.update(cx, |view, cx| view.ask_to_cancel_process(4242, cx)));
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    assert!(cx.debug_bounds("cancel-process-dialog").is_some());
+    view.read_with(cx, |view, _| {
+        let (pid, sql) = view.cancel_confirm.as_ref().expect("a pending confirmation");
+        assert_eq!((*pid, sql.as_str()), (4242, "SELECT pg_cancel_backend(4242);"));
+    });
+    cx.simulate_keystrokes("escape");
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    view.read_with(cx, |view, _| {
+        assert!(view.cancel_confirm.is_none());
+        assert_eq!(view.status, "Left the server process running");
+    });
+    assert!(cx.debug_bounds("cancel-process-dialog").is_none());
+    cx.update(|_, cx| view.update(cx, |view, cx| view.ask_to_cancel_process(4242, cx)));
+    cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_cancel_process(cx)));
+    view.read_with(cx, |view, _| {
+        assert!(view.cancel_confirm.is_none());
+        assert!(
+            view.status.starts_with("Canceling server process 4242"),
+            "{}",
+            view.status
+        );
+    });
+}

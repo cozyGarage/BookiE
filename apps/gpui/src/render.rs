@@ -583,6 +583,7 @@ impl Render for GridView {
         let full_value_editor = self.full_value_editor_overlay(theme, cx);
         let approval = self.approval_overlay(theme, cx);
         let host_key = self.host_key_overlay(theme, cx);
+        let cancel_process = self.cancel_process_overlay(theme, cx);
         let connection_dialog = self.connection_form.open.then(|| self.connection_dialog(theme, cx));
         let bar_dialog = self
             .import_bar(theme, cx)
@@ -649,6 +650,7 @@ impl Render for GridView {
             .children(connection_dialog)
             .children(approval)
             .children(host_key)
+            .children(cancel_process)
     }
 }
 
