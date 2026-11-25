@@ -2230,6 +2230,7 @@ fn approval_blocks_grid_and_keymap_shortcuts(cx: &mut TestAppContext) {
     });
     cx.run_until_parked();
     let selection = view.read_with(cx, |view, _| view.selection);
+    let status = view.read_with(cx, |view, _| view.status.clone());
     let (respond, mut answer) = tokio::sync::oneshot::channel();
     let tx = view.read_with(cx, |view, _| view.approval.tx.clone());
     assert!(
@@ -2241,10 +2242,11 @@ fn approval_blocks_grid_and_keymap_shortcuts(cx: &mut TestAppContext) {
     );
     cx.run_until_parked();
     cx.update(|window, cx| window.render_frame(cx));
-    cx.simulate_keystrokes("shift-down ctrl-shift-p");
+    cx.simulate_keystrokes("shift-down ctrl-shift-p ctrl-alt--");
     cx.run_until_parked();
     view.read_with(cx, |view, _| {
         assert_eq!(view.selection, selection);
+        assert_eq!(view.status, status);
         assert!(!view.palette.open, "a keymap action opened behind the approval prompt");
         assert!(view.approval.current.is_some(), "the approval prompt must remain open");
     });
