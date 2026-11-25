@@ -682,6 +682,25 @@ fn the_labelled_go_to_column_button_opens_the_column_picker(cx: &mut TestAppCont
 }
 
 #[gpui::test]
+fn the_columns_button_appears_when_columns_are_hidden_and_restores_them(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_resize(gpui::size(gpui::px(1400.0), gpui::px(800.0)));
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("show-hidden-columns").is_none());
+    cx.update(|window, cx| view.update(cx, |view, cx| view.hide_column(1, "label", window, cx)));
+    cx.run_until_parked();
+    let button = cx
+        .debug_bounds("show-hidden-columns")
+        .expect("hiding a column shows the Columns button");
+    cx.simulate_click(button.center(), Default::default());
+    cx.run_until_parked();
+    assert!(
+        cx.debug_bounds("show-hidden-columns").is_none(),
+        "every column is visible again"
+    );
+}
+
+#[gpui::test]
 fn jump_to_column_lists_the_columns_and_moves_the_cursor_to_the_chosen_one(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.simulate_keystrokes("down down");

@@ -2322,6 +2322,19 @@ fn the_labelled_refresh_button_reloads_a_live_table_and_is_absent_without_a_conn
 }
 
 #[gpui::test]
+fn the_schema_chip_is_offered_only_where_the_engine_has_a_schema_context(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    connect_and_settle(&view, cx, orders_fixture());
+    cx.simulate_keystrokes("ctrl-t");
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("query-connection-chip").is_some());
+    assert!(
+        cx.debug_bounds("query-schema-chip").is_none(),
+        "SQLite has no schema or database context to choose"
+    );
+}
+
+#[gpui::test]
 fn narrow_grid_toolbar_keeps_actions_inside_window(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     view.update(cx, |view, cx| {
