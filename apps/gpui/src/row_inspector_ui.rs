@@ -35,6 +35,16 @@ pub(crate) struct RowInspector {
     work: Ticket,
 }
 
+impl RowInspector {
+    pub(crate) fn reset(&mut self) {
+        self.keys = None;
+        self.keys_requested = None;
+        self.references.clear();
+        self.references_for = None;
+        self.work.invalidate();
+    }
+}
+
 impl GridView {
     pub(crate) fn ensure_row_inspector(&mut self, cx: &mut Context<Self>) {
         self.ensure_table_keys(cx);
