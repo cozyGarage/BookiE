@@ -708,6 +708,7 @@ impl PolicySession {
             approval_outcome: AuditApprovalOutcome::NotRequired,
             preview_state: AuditPreviewState::NotRequested,
             approval_wait: Duration::ZERO,
+            runs_past_the_read_deadline: false,
         };
         let operation = self.guard.operation(
             sql,
