@@ -234,7 +234,7 @@ impl GridView {
                 self.selection_stats_enabled(),
             ),
             action("export-file", "Export to a file…", self.export_file_enabled()),
-            action("export-csv", "Export current page or selection as CSV", true),
+            action("export-csv", "Copy current page or selection as CSV", true),
             action("copy-json", "Copy selected rows as JSON", self.selection.is_some()),
             action(
                 "copy-markdown",
