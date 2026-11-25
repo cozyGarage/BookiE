@@ -7,7 +7,7 @@ fn tab_moves_between_connection_fields_in_order(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
-            view.tabs.open_new_connection();
+            view.open_connection_dialog(cx);
             cx.notify();
             let name = view.connection_form.name.read(cx).focus_handle_for_tests();
             window.focus(&name, cx);
@@ -53,13 +53,13 @@ fn tab_moves_between_connection_fields_in_order(cx: &mut TestAppContext) {
 fn connection_sections_use_space_on_wide_windows_and_wrap_when_narrow(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     view.update(cx, |view, cx| {
-        view.tabs.open_new_connection();
+        view.open_connection_dialog(cx);
         cx.notify();
     });
-    for (width, beside) in [(1896.0, true), (1100.0, false), (900.0, false), (720.0, false)] {
+    for (width, beside) in [(1896.0, true), (1100.0, true), (900.0, false), (720.0, false)] {
         cx.simulate_resize(gpui::size(gpui::px(width), gpui::px(760.0)));
         cx.run_until_parked();
-        if beside {
+        if width > 1500.0 {
             let card = cx.debug_bounds("connection-card").expect("connection form visible");
             assert!(
                 card.size.width > gpui::px(1100.0),
@@ -87,7 +87,7 @@ fn connection_sections_use_space_on_wide_windows_and_wrap_when_narrow(cx: &mut T
 fn connection_form_keeps_actions_visible_at_two_widths(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     view.update(cx, |view, cx| {
-        view.tabs.open_new_connection();
+        view.open_connection_dialog(cx);
         cx.notify();
     });
     for width in [720.0, 1100.0] {
@@ -200,7 +200,7 @@ fn security_and_ssh_start_collapsed_and_open_from_their_headers(cx: &mut TestApp
     let (view, cx) = open(cx);
     cx.simulate_resize(gpui::size(gpui::px(1400.0), gpui::px(900.0)));
     view.update(cx, |view, cx| {
-        view.tabs.open_new_connection();
+        view.open_connection_dialog(cx);
         cx.notify();
     });
     cx.run_until_parked();
@@ -220,7 +220,7 @@ fn a_tls_error_inside_a_collapsed_section_opens_it(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
-            view.tabs.open_new_connection();
+            view.open_connection_dialog(cx);
             let form = &view.connection_form;
             for (input, text) in [
                 (&form.host, "db.example.com"),
@@ -242,7 +242,7 @@ fn a_pasted_url_fills_a_new_connection_and_a_copied_url_has_no_password(cx: &mut
     let (view, cx) = open(cx);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
-            view.tabs.open_new_connection();
+            view.open_connection_dialog(cx);
             view.fill_from_connection_url(
                 &format!(
                     "postgres://alice:{}@db.example.com:5433/sales?sslmode=require",
@@ -327,6 +327,102 @@ fn the_toolbar_labels_its_left_actions_when_wide_and_new_connection_opens_the_fo
     cx.simulate_click(narrow.center(), Default::default());
     cx.run_until_parked();
     view.read_with(cx, |view, _| {
-        assert!(matches!(view.tabs.current(), bookie_gpui::shell::Tab::NewConnection));
+        assert!(view.connection_form.open);
+    });
+}
+
+#[gpui::test]
+fn new_connection_opens_a_centred_dialog_over_the_current_tab(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_resize(gpui::size(gpui::px(1400.0), gpui::px(800.0)));
+    cx.run_until_parked();
+    let tabs_before = view.read_with(cx, |view, _| view.tabs.clone());
+    let button = cx
+        .debug_bounds("new-connection")
+        .expect("the toolbar draws New connection");
+    cx.simulate_click(button.center(), Default::default());
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(view.connection_form.open, "the dialog is open");
+        assert_eq!(view.tabs, tabs_before, "no tab is opened for the form");
+    });
+    let dialog = cx.debug_bounds("connection-dialog").expect("the form is a dialog");
+    let centre = dialog.origin.x + dialog.size.width / 2.0;
+    assert!(
+        (centre - gpui::px(700.0)).abs() <= gpui::px(1.0),
+        "the dialog is centred: {centre:?}"
+    );
+    assert!(dialog.origin.y + dialog.size.height <= gpui::px(800.0));
+    cx.simulate_keystrokes("escape");
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(!view.connection_form.open, "Escape closes the dialog");
+        assert_eq!(view.tabs, tabs_before);
+    });
+    assert!(cx.debug_bounds("connection-dialog").is_none());
+}
+
+#[gpui::test]
+fn cancel_closes_the_connection_dialog(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    view.update(cx, |view, cx| {
+        view.open_connection_dialog(cx);
+    });
+    cx.run_until_parked();
+    let cancel = cx.debug_bounds("cancel-connection").expect("the dialog has Cancel");
+    cx.simulate_click(cancel.center(), Default::default());
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert!(!view.connection_form.open));
+}
+
+#[gpui::test]
+fn a_successful_save_closes_the_dialog_and_reports_in_the_status_line(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    view.update(cx, |view, cx| {
+        view.open_connection_dialog(cx);
+        view.finish_connection_save(Ok((uuid::Uuid::new_v4(), "minipc".into(), Vec::new(), true)), cx);
+    });
+    view.read_with(cx, |view, _| {
+        assert!(!view.connection_form.open, "a full save closes the dialog");
+        assert_eq!(view.status, "Saved minipc");
+    });
+    view.update(cx, |view, cx| {
+        view.open_connection_dialog(cx);
+        view.finish_connection_save(Ok((uuid::Uuid::new_v4(), "minipc".into(), Vec::new(), false)), cx);
+    });
+    view.read_with(cx, |view, _| {
+        assert!(
+            view.connection_form.open,
+            "a partial save keeps the form so the user can retry"
+        );
+        assert!(view.connection_form.status.contains("color"));
+    });
+}
+
+#[gpui::test]
+fn the_edit_dialog_names_the_connection_it_edits(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    view.update(cx, |view, cx| {
+        view.connection_form.editing = Some(uuid::Uuid::new_v4());
+        view.connection_form
+            .name
+            .update(cx, |input, cx| input.set_content("minipc Redis", cx));
+        view.open_connection_dialog(cx);
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, cx| {
+        assert_eq!(view.connection_dialog_title(cx), "Edit minipc Redis");
+    });
+    view.update(cx, |view, cx| {
+        view.connection_form
+            .name
+            .update(cx, |input, cx| input.set_content("", cx));
+    });
+    view.read_with(cx, |view, cx| {
+        assert_eq!(view.connection_dialog_title(cx), "Edit connection")
+    });
+    view.update(cx, |view, _| view.connection_form.editing = None);
+    view.read_with(cx, |view, cx| {
+        assert_eq!(view.connection_dialog_title(cx), "New connection")
     });
 }

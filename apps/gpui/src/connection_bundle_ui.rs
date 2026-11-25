@@ -653,7 +653,7 @@ mod tests {
 
         cx.update(|_, cx| {
             view.update(cx, |this, cx| {
-                this.tabs.open_new_connection();
+                this.open_connection_dialog(cx);
                 this.connection_bundle.pending = Some(pending);
                 cx.notify();
             });
@@ -662,7 +662,7 @@ mod tests {
         view.read_with(cx, |this, _| {
             assert!(this.connection_bundle.pending.is_some());
             assert!(!this.connection_bundle.busy);
-            assert_eq!(this.tabs.current(), &bookie_gpui::shell::Tab::NewConnection);
+            assert!(this.connection_form.open);
         });
         assert!(cx.debug_bounds("connection-page").is_some());
         assert!(

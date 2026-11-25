@@ -177,9 +177,7 @@ impl GridView {
                         })
                         .on_click(cx.listener(|this, _, _, cx| {
                             this.connection_form.editing = None;
-                            this.tabs.open_new_connection();
-                            this.sync_grid_owner();
-                            cx.notify();
+                            this.open_connection_dialog(cx);
                         })),
                     )
                     .child(
@@ -685,7 +683,6 @@ fn tab_icon_name(tab: &Tab) -> &'static str {
     match tab {
         Tab::Home => "house",
         Tab::Settings => "settings",
-        Tab::NewConnection => "database",
         Tab::History => "clock",
         Tab::AuditLog => "shield",
         Tab::Diagram => "database",
@@ -742,7 +739,7 @@ impl GridView {
                     .flatten()
                     .map(|color| connection_dot(color, "tab-connection-colour")),
             )
-            .child(self.tab_title(tab, cx))
+            .child(tab.title())
             .when(dirty, |el| el.child(div().text_color(rgb(theme.warning)).child("•")));
         item = if selected {
             item.bg(rgb(theme.background))

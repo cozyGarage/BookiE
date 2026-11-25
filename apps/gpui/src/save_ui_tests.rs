@@ -167,6 +167,9 @@ fn a_write_the_guard_denies_leaves_the_database_unchanged_and_keeps_the_edit(cx:
         );
         let (text, is_error) = view.save.banner.clone().expect("an error banner");
         assert!(is_error && text.starts_with("Could not save"), "{text}");
+        let notice = &view.notices.items[0];
+        assert_eq!(notice.kind, crate::notifications::NoticeKind::Error);
+        assert!(!notice.read && notice.text.starts_with("Could not save"));
         assert_eq!(view.cell_edit.edits.len(), 1, "the edit is kept so it can be retried");
         assert!(
             view.save.write.is_none(),
@@ -203,6 +206,11 @@ fn a_save_with_an_unknown_outcome_shows_an_error_instead_of_success(cx: &mut Tes
         let (text, is_error) = view.save.banner.as_ref().expect("unknown outcome banner");
         assert!(*is_error && text.contains("may or may not have been applied"), "{text}");
         assert!(!text.starts_with("Saved"), "{text}");
+        assert_eq!(
+            view.notices.items[0].kind,
+            crate::notifications::NoticeKind::UnknownOutcome
+        );
+        assert_eq!(view.notices.unread(), 1);
         assert!(view.save.write.is_none());
     });
     std::fs::remove_file(&path).ok();

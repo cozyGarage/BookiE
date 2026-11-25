@@ -28,6 +28,18 @@ impl GridView {
             }
             return;
         }
+        if self.notices.open && event.keystroke.key == "escape" {
+            self.toggle_notifications(cx);
+            cx.stop_propagation();
+            return;
+        }
+        if self.connection_form.open {
+            if event.keystroke.key == "escape" {
+                self.close_connection_dialog(cx);
+                cx.stop_propagation();
+            }
+            return;
+        }
         if self.save.pending.is_some() {
             if event.keystroke.key == "escape" {
                 self.cancel_save(cx);

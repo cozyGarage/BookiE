@@ -174,7 +174,6 @@ pub enum Tab {
     Table(TableInfo),
     Query,
     Settings,
-    NewConnection,
     History,
     AuditLog,
     Diagram,
@@ -187,7 +186,6 @@ impl Tab {
             Tab::Table(table) => table_label(table),
             Tab::Query => "Query 1".into(),
             Tab::Settings => "Settings".into(),
-            Tab::NewConnection => "New connection".into(),
             Tab::History => "History".into(),
             Tab::AuditLog => "Audit log".into(),
             Tab::Diagram => "Schema diagram".into(),
@@ -271,16 +269,6 @@ impl Tabs {
             Some(index) => index,
             None => {
                 self.items.push(Tab::AuditLog);
-                self.items.len() - 1
-            }
-        };
-    }
-
-    pub fn open_new_connection(&mut self) {
-        self.active = match self.items.iter().position(|item| *item == Tab::NewConnection) {
-            Some(index) => index,
-            None => {
-                self.items.push(Tab::NewConnection);
                 self.items.len() - 1
             }
         };

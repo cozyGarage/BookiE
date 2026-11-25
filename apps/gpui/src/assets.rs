@@ -55,6 +55,7 @@ icons!(
     "square",
     "square-check",
     "shield",
+    "bell",
 );
 
 const BACKDROP: (&str, &[u8]) = (

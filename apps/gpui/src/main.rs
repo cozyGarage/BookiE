@@ -43,6 +43,7 @@ mod mcp_ui;
 mod measure;
 mod menus;
 mod new_window_ui;
+mod notifications;
 mod palette_actions;
 mod palette_state;
 mod panel_state;
@@ -219,6 +220,7 @@ struct GridView {
     sidebar: sidebar_state::SidebarState,
     row_menu: Option<menus::RowMenu>,
     connection_form: connection_form::ConnectionForm,
+    notices: notifications::Notices,
     history: Vec<bookie_app_services::statement_history::RecentStatement>,
     history_page: history_view::HistoryPage,
     audit_page: audit_page::AuditPage,
@@ -568,6 +570,7 @@ impl GridView {
             sidebar: sidebar_state::SidebarState::new(sidebar_search),
             row_menu: None,
             connection_form: connection_form::ConnectionForm::new(cx),
+            notices: notifications::Notices::default(),
             history: Vec::new(),
             history_page: history_view::HistoryPage::new(cx),
             audit_page: audit_page::AuditPage::new(cx),
