@@ -2373,6 +2373,23 @@ fn the_schema_chip_is_offered_only_where_the_engine_has_a_schema_context(cx: &mu
 }
 
 #[gpui::test]
+fn the_pager_arrows_appear_only_when_there_is_more_than_one_page(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_resize(gpui::size(gpui::px(1400.0), gpui::px(800.0)));
+    cx.run_until_parked();
+    assert!(
+        cx.debug_bounds("pager-prev").is_some(),
+        "the synthetic result spans many pages"
+    );
+    connect_and_settle(&view, cx, orders_fixture());
+    assert!(
+        cx.debug_bounds("pager-prev").is_none(),
+        "a one-page table has nothing to page through"
+    );
+    assert!(cx.debug_bounds("page-size").is_some(), "the page size stays reachable");
+}
+
+#[gpui::test]
 fn narrow_grid_toolbar_keeps_actions_inside_window(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     view.update(cx, |view, cx| {
