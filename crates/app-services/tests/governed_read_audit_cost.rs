@@ -37,7 +37,7 @@ impl AuditSink for SyncEveryIntent {
     }
 }
 
-async fn time_reads(sink: impl Fn(Arc<AuditJournal>) -> Arc<dyn AuditSink>) -> Duration {
+async fn time_reads(principal: Principal, sink: impl Fn(Arc<AuditJournal>) -> Arc<dyn AuditSink>) -> Duration {
     let directory = tempfile::TempDir::new().unwrap();
     let database = directory.path().join("reads.db");
     let _ = std::fs::File::create(&database);
@@ -58,7 +58,7 @@ async fn time_reads(sink: impl Fn(Arc<AuditJournal>) -> Arc<dyn AuditSink>) -> D
             driver_id: "sqlite".into(),
             environment: Environment::Local,
             read_only: false,
-            principal: Principal::human_gui(),
+            principal,
             policy: Arc::new(PolicyConfig::default()),
             approval: Arc::new(AutoApproveSink),
             audit: sink(journal),
@@ -93,15 +93,23 @@ async fn time_appends(durable: bool) -> Duration {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "prints the audit cost of governed reads measured for #3736"]
 async fn a_thousand_governed_reads_cost_less_when_read_intents_are_not_synced() {
-    let current = time_reads(|journal| journal).await;
-    let synced = time_reads(|journal| Arc::new(SyncEveryIntent(journal))).await;
+    let agent = || Principal::Agent {
+        token: "bench".into(),
+        client: None,
+        model: None,
+    };
     println!(
         "{READS} journal appends alone: not synced {:.2?}, synced {:.2?}",
         time_appends(false).await,
         time_appends(true).await
     );
+    let person = time_reads(Principal::human_gui(), |journal| journal).await;
+    let person_synced = time_reads(Principal::human_gui(), |journal| Arc::new(SyncEveryIntent(journal))).await;
+    println!("{READS} reads by a person: current {person:.2?}, every intent synced {person_synced:.2?}");
+    let current = time_reads(agent(), |journal| journal).await;
+    let synced = time_reads(agent(), |journal| Arc::new(SyncEveryIntent(journal))).await;
     println!(
-        "{READS} governed reads: read intents not synced {current:.2?}, every intent synced {synced:.2?} ({:.1}x)",
+        "{READS} reads by an agent (MCP): read intents not synced {current:.2?}, every intent synced {synced:.2?} ({:.1}x)",
         synced.as_secs_f64() / current.as_secs_f64()
     );
     assert!(
