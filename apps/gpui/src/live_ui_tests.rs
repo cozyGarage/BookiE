@@ -2368,7 +2368,12 @@ fn the_export_bar_opens_as_a_dialog_and_the_grid_does_not_move(cx: &mut TestAppC
         "opening the export dialog moved the grid"
     );
     assert!(dialog.size.width <= gpui::px(1400.0), "the dialog fits the window");
-    cx.update(|_, cx| view.update(cx, |view, _| view.close_export_file_bar()));
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.close_export_file_bar();
+            cx.notify();
+        })
+    });
     cx.run_until_parked();
     assert!(cx.debug_bounds("bar-dialog").is_none(), "closing removes the dialog");
 }
