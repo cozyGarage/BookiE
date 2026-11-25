@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use bookie_core::{FilterValueKind, QueryResult, QueryRows, Value, filter_value_kind};
 use bookie_results::result_compare::{CompareError, CompareInput, CompareReport, CompareRequest, compare_results};
 use bookie_results::result_find::{FindError, find_matches};
-use bookie_results::result_predicate::{ColumnScope, ResultPredicate};
+use bookie_results::result_predicate::{CellTally, ColumnScope, ResultPredicate};
 use bookie_results::result_scan::{ScanProgress, ScanSource, scan_pages};
 use bookie_results::stream_result_spool::StreamResultSpoolManager;
 use bookie_results::text_match::TextMatchOptions;
@@ -134,9 +134,12 @@ enum Equality {
     Displayed { column: usize, text: String, negate: bool },
 }
 
-fn equality(scan: &ScanSource, predicate: &Predicate) -> Result<Equality, &'static str> {
+fn equality(
+    column_count: usize,
+    kind: Option<FilterValueKind>,
+    predicate: &Predicate,
+) -> Result<Equality, &'static str> {
     let negate = predicate.op == Op::NotEquals;
-    let kind = scan.columns().get(predicate.column).map(filter_value_kind);
     let typed = match kind {
         None | Some(FilterValueKind::Text) => Err(()),
         Some(kind) => {
@@ -157,7 +160,7 @@ fn equality(scan: &ScanSource, predicate: &Predicate) -> Result<Equality, &'stat
                 }
             };
             result
-                .prepare(scan.columns().len())
+                .prepare(column_count)
                 .map(Equality::Typed)
                 .map_err(|_| "this filter cannot be applied exactly")
         }
@@ -226,18 +229,62 @@ impl ResultSource for Synthetic {
     }
 }
 
-pub fn find_in(
-    scan: &ScanSource,
-    query: &str,
-    cap: usize,
-    cancel: &CancellationToken,
-) -> Result<FindResult, &'static str> {
+fn validate_find(query: &str, cap: usize) -> Result<(), &'static str> {
     if cap == 0 || cap > bookie_results::result_find::MAX_FIND_MATCHES {
         return Err("match cap exceeds the prototype limit");
     }
     if query.is_empty() || query.len() > MAX_QUERY_BYTES {
         return Err("invalid search text");
     }
+    Ok(())
+}
+
+pub(crate) fn find_buffered_rows(
+    rows: &QueryRows,
+    column_count: usize,
+    query: &str,
+    cap: usize,
+    cancel: &CancellationToken,
+) -> Result<FindResult, &'static str> {
+    validate_find(query, cap)?;
+    let predicate = contains(None, query)
+        .prepare(column_count)
+        .map_err(|error| find_message(error.into()))?;
+    let mut tally = CellTally::default();
+    let mut matches = Vec::new();
+    for (index, row) in rows.iter().enumerate() {
+        if cancel.is_cancelled() {
+            return Err("canceled the search");
+        }
+        if !predicate.matches(row, &mut tally) {
+            continue;
+        }
+        if matches.len() == cap {
+            return Ok(FindResult {
+                matches,
+                capped: true,
+                scanned: index as u64 + 1,
+            });
+        }
+        matches.push(index as u64);
+    }
+    if cancel.is_cancelled() {
+        return Err("canceled the search");
+    }
+    Ok(FindResult {
+        matches,
+        capped: false,
+        scanned: rows.len() as u64,
+    })
+}
+
+pub fn find_in(
+    scan: &ScanSource,
+    query: &str,
+    cap: usize,
+    cancel: &CancellationToken,
+) -> Result<FindResult, &'static str> {
+    validate_find(query, cap)?;
     let report = find_matches(scan, contains(None, query), cancel, &ScanProgress::default()).map_err(find_message)?;
     let global = |page: usize, row: usize| page as u64 * PAGE_ROWS + row as u64;
     let mut matches: Vec<u64> = report.matches.iter().map(|hit| global(hit.page, hit.row)).collect();
@@ -257,41 +304,64 @@ pub fn find_in(
     })
 }
 
+fn prepare_filter(
+    column_count: usize,
+    kind: Option<FilterValueKind>,
+    predicate: &Predicate,
+) -> Result<impl Fn(&[Value], &mut CellTally) -> bool, &'static str> {
+    let (contains, equality) = match predicate.op {
+        Op::Contains => (
+            Some(
+                contains(Some(predicate.column), &predicate.text)
+                    .prepare(column_count)
+                    .map_err(|_| "this filter cannot be applied exactly")?,
+            ),
+            None,
+        ),
+        Op::Equals | Op::NotEquals => (None, Some(equality(column_count, kind, predicate)?)),
+    };
+    Ok(move |cells: &[Value], tally: &mut CellTally| match &equality {
+        Some(Equality::Typed(prepared)) => prepared.matches(cells, tally),
+        Some(Equality::Displayed { column, text, negate }) => displayed_equals(cells, *column, text, *negate),
+        None => contains.as_ref().is_some_and(|prepared| prepared.matches(cells, tally)),
+    })
+}
+
+pub(crate) fn filter_buffered_rows(
+    result: &QueryResult,
+    predicate: &Predicate,
+    cancel: &CancellationToken,
+) -> Result<Vec<u32>, &'static str> {
+    let kind = result.columns.get(predicate.column).map(filter_value_kind);
+    let matches = prepare_filter(result.columns.len(), kind, predicate)?;
+    let mut tally = CellTally::default();
+    let mut kept = Vec::new();
+    for (index, row) in result.rows.iter().enumerate() {
+        if cancel.is_cancelled() {
+            return Err("canceled the filter");
+        }
+        if matches(row, &mut tally) {
+            kept.push(u32::try_from(index).map_err(|_| "the filter found too many rows")?);
+        }
+    }
+    if cancel.is_cancelled() {
+        return Err("canceled the filter");
+    }
+    Ok(kept)
+}
+
 pub fn filter_in(
     scan: &ScanSource,
     predicate: &Predicate,
     cancel: &CancellationToken,
 ) -> Result<Vec<u32>, &'static str> {
-    let column = predicate.column;
-    let prepared = match predicate.op {
-        Op::Contains => Some(
-            contains(Some(column), &predicate.text)
-                .prepare(scan.columns().len())
-                .map_err(|_| "this filter cannot be applied exactly")?,
-        ),
-        Op::Equals | Op::NotEquals => None,
-    };
-    let equality = match predicate.op {
-        Op::Equals | Op::NotEquals => Some(equality(scan, predicate)?),
-        Op::Contains => None,
-    };
+    let kind = scan.columns().get(predicate.column).map(filter_value_kind);
+    let matches = prepare_filter(scan.columns().len(), kind, predicate)?;
     let mut kept = Vec::new();
     let mut tally = bookie_results::result_predicate::CellTally::default();
     scan_pages(scan, cancel, &ScanProgress::default(), |index, page| {
         for (row, cells) in page.rows.iter().enumerate() {
-            let matches = match predicate.op {
-                Op::Contains => prepared
-                    .as_ref()
-                    .is_some_and(|prepared| prepared.matches(cells, &mut tally)),
-                Op::Equals | Op::NotEquals => match equality.as_ref() {
-                    Some(Equality::Typed(prepared)) => prepared.matches(cells, &mut tally),
-                    Some(Equality::Displayed { column, text, negate }) => {
-                        displayed_equals(cells, *column, text, *negate)
-                    }
-                    None => false,
-                },
-            };
-            if matches {
+            if matches(cells, &mut tally) {
                 kept.push((index as u64 * PAGE_ROWS + row as u64) as u32);
             }
         }

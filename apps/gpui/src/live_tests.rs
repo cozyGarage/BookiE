@@ -39,31 +39,43 @@ fn a_write_session_is_refused_when_the_saved_connection_changed_since_the_table_
 use super::*;
 
 #[test]
-fn spooled_query_pages_preserve_rows_across_page_boundaries() {
+fn buffered_results_find_and_filter_across_page_boundaries() {
+    use crate::model::{Op, Predicate};
     let count = PAGE_ROWS as usize * 2 + 1;
+    let session = LiveSession::open(&fixture()).unwrap();
+    let mut cols = crate::core_bridge::column_infos();
+    cols.truncate(1);
     let result = QueryResult {
-        columns: Vec::new(),
+        columns: cols,
         rows: QueryRows::from_rows((0..count).map(|id| vec![bookie_core::Value::Int(id as i64)]).collect()),
         truncated: false,
     };
-    let runtime = tokio::runtime::Runtime::new().unwrap();
-    runtime.block_on(async {
-        let (_, rows, scan, truncated) = spooled_pages(result, count as u64, &CancellationToken::new())
-            .await
-            .unwrap();
-        assert!(!truncated);
-        assert_eq!(rows.len(), count);
-        assert_eq!(scan.spool().page_count(), 3);
-        for page in 0..3 {
-            let loaded = scan.spool().load_page(page, Vec::new()).await.unwrap();
-            let start = page as usize * PAGE_ROWS as usize;
-            let expected = (count - start).min(PAGE_ROWS as usize);
-            assert_eq!(loaded.rows.len(), expected);
-            for (offset, row) in loaded.rows.iter().enumerate() {
-                assert_eq!(row[0], bookie_core::Value::Int((start + offset) as i64));
-            }
-        }
-    });
+    let cancel = CancellationToken::new();
+    let table = session.table_from_result(result, "SELECT id", &cancel).unwrap();
+    assert_eq!(table.total(), count as u64);
+    assert!(!table.is_partial());
+    assert_eq!(
+        table.row_ref(PAGE_ROWS).unwrap(),
+        &[bookie_core::Value::Int(PAGE_ROWS as i64)]
+    );
+
+    let found = table.find("10000", 1, &cancel).unwrap();
+    assert_eq!(found.matches, [PAGE_ROWS * 2]);
+    assert!(!found.capped);
+    let capped = table.find("1", 1, &cancel).unwrap();
+    assert_eq!(capped.matches, [1]);
+    assert!(capped.capped);
+    assert_eq!(capped.scanned, 11);
+    let predicate = Predicate {
+        column: 0,
+        op: Op::Equals,
+        text: PAGE_ROWS.to_string(),
+    };
+    assert_eq!(table.filter(&predicate, &cancel), Ok(vec![PAGE_ROWS as u32]));
+
+    cancel.cancel();
+    assert_eq!(table.find("10000", 1, &cancel).unwrap_err(), "canceled the search");
+    assert_eq!(table.filter(&predicate, &cancel), Err("canceled the filter"));
 }
 
 #[test]
@@ -156,7 +168,7 @@ fn a_driver_truncated_page_is_reported_as_incomplete() {
     )
     .unwrap();
     assert_eq!(table.total(), 0);
-    assert!(table.truncated);
+    assert!(table.is_partial());
 }
 
 #[test]
@@ -248,7 +260,7 @@ fn decoded_budget_is_shared_across_pages_and_keeps_a_whole_row_prefix() {
 
     let mut second = make_page();
     assert!(bound_page(&mut second, &mut budget));
-    assert!(second.truncated);
+    assert!(second.is_partial());
     assert!((1..40).contains(&second.rows.len()));
     for (index, row) in second.rows.iter().enumerate() {
         assert_eq!(row[0], bookie_core::Value::Int(index as i64));
@@ -362,7 +374,7 @@ fn a_database_file_loads_as_a_live_table_with_real_columns_and_nulls() {
     let keys: Vec<bool> = table.columns().iter().map(|column| column.primary_key).collect();
     assert_eq!(keys, [true, false, false, false, false]);
     assert_eq!(table.total(), 6);
-    assert!(!table.truncated);
+    assert!(!table.is_partial());
     assert_eq!(table.row(1)[1], Cell::Text("Grace".into()));
     assert_eq!(table.row(1)[4], Cell::Null);
     assert_eq!(table.row(2)[4], Cell::Text(String::new()));
@@ -467,7 +479,7 @@ fn a_query_becomes_a_grid_source_with_its_own_columns_and_cap() {
     let cancel = CancellationToken::new();
     assert_eq!(result.find("linus", 5, &cancel).expect("find").matches, vec![1]);
     let capped = session.run_query("SELECT id FROM orders", 2).expect("capped");
-    assert_eq!((capped.total(), capped.truncated), (2, true));
+    assert_eq!((capped.total(), capped.is_partial()), (2, true));
     assert!(session.run_query("DELETE FROM orders", 100).is_err());
     assert!(session.run_query("SELECT nope FROM orders", 100).is_err());
 }
@@ -484,7 +496,7 @@ fn the_row_cap_truncates_and_says_so() {
     )
     .expect("load");
     assert_eq!(table.total(), 4);
-    assert!(table.truncated);
+    assert!(table.is_partial());
     assert_eq!(
         table.origin(),
         "sqlite · orders · read-only · page order may change; rows may be skipped or repeated · 4 rows loaded; result may be incomplete"
