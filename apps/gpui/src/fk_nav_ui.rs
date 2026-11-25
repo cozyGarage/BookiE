@@ -1,6 +1,4 @@
 use bookie_app_services::foreign_key_nav::{ReferencedRowTarget, reference_targets, referencing_targets};
-use bookie_core::filter::build_filter_where;
-use bookie_core::sql_dialect::qualified_table;
 use bookie_core::{TableInfo, Value};
 
 use super::*;
@@ -174,9 +172,6 @@ fn target_statement(
         name: target.table.clone(),
     };
     let columns = live.table_columns(&table)?;
-    let (clause, params) = build_filter_where(&live.driver_id, &columns, &target.filter)
-        .map_err(|error| error.to_string())?
-        .ok_or_else(|| "The foreign key gave no condition".to_string())?;
-    let qualified = qualified_table(&live.driver_id, target.schema.as_deref(), &target.table);
-    Ok((format!("SELECT * FROM {qualified} WHERE {clause}"), params))
+    let statements = target.statements(&live.driver_id, &columns)?;
+    Ok((statements.select, statements.params))
 }
