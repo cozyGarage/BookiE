@@ -94,6 +94,7 @@ fn toggle_icon(
 fn header_icon(id: &'static str, name: &'static str, theme: Theme) -> Stateful<Div> {
     div()
         .id(id)
+        .debug_selector(move || id.into())
         .flex()
         .items_center()
         .justify_center()
@@ -636,18 +637,6 @@ impl GridView {
                         cx.notify();
                     },
                 )),
-            )
-            .child(
-                header_icon("header-new-folder", "folder-plus", theme).on_click(cx.listener(|this, _, _, cx| {
-                    this.status = "Folder organization is coming soon".into();
-                    cx.notify();
-                })),
-            )
-            .child(
-                header_icon("header-refresh", "refresh-cw", theme).on_click(cx.listener(|this, _, _, cx| {
-                    this.status = "Refreshed catalog schema".into();
-                    cx.notify();
-                })),
             )
             .child(
                 header_icon("collapse-sidebar", "chevrons-left", theme).on_click(cx.listener(|this, _, _, cx| {

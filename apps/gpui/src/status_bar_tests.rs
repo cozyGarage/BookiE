@@ -3,6 +3,17 @@ use gpui_kit::test::TestWindowExt;
 
 use crate::live_ui_tests::open_live;
 
+#[gpui::test]
+fn sidebar_header_only_shows_available_actions(cx: &mut TestAppContext) {
+    let (_, cx) = open_live(cx);
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    assert!(cx.debug_bounds("header-collapse-all").is_some());
+    assert!(cx.debug_bounds("collapse-sidebar").is_some());
+    assert!(cx.debug_bounds("header-new-folder").is_none());
+    assert!(cx.debug_bounds("header-refresh").is_none());
+}
+
 fn bounds(cx: &mut gpui::VisualTestContext, selector: &'static str) -> gpui::Bounds<gpui::Pixels> {
     cx.debug_bounds(selector)
         .unwrap_or_else(|| panic!("{selector} is rendered"))
