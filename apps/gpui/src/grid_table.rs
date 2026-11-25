@@ -563,8 +563,6 @@ impl TableDelegate for GridDelegate {
                 div()
                     .w_full()
                     .flex()
-                    .items_center()
-                    .gap_1()
                     .when_some(checked, |el, on| {
                         let theme = Theme::current(cx);
                         let (name, color) = if on {
@@ -572,7 +570,7 @@ impl TableDelegate for GridDelegate {
                         } else {
                             ("square", theme.muted_foreground)
                         };
-                        el.child(crate::assets::icon(name, color))
+                        el.items_center().gap_1().child(crate::assets::icon(name, color))
                     })
                     .when_some(edited_tint, |el, tint| {
                         el.debug_selector(|| "edited-cell".into()).bg(tint)
@@ -607,6 +605,10 @@ impl GridDelegate {
 
     pub(crate) fn clone_projection(&self) -> ColumnProjection {
         self.projection.clone()
+    }
+
+    pub(crate) fn hidden_column_count(&self) -> usize {
+        self.hidden_columns.len()
     }
 
     pub(crate) fn set_hidden_columns(&mut self, column_count: usize, hidden: HashSet<usize>) {
@@ -1208,7 +1210,7 @@ impl GridView {
             )
     }
 
-    fn hide_column(&mut self, source_col: usize, name: &str, _window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn hide_column(&mut self, source_col: usize, name: &str, _window: &mut Window, cx: &mut Context<Self>) {
         let (columns, scope_key) = {
             let delegate = self.table.read(cx).delegate();
             (
@@ -1268,7 +1270,7 @@ impl GridView {
         cx.notify();
     }
 
-    fn show_all_hidden_columns(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn show_all_hidden_columns(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
         let (hidden, columns, scope_key) = {
             let table = self.table.read(cx);
             let delegate = table.delegate();
