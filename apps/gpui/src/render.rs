@@ -205,7 +205,12 @@ impl GridView {
                 .compact()
                 .tooltip("Export to a file or copy as CSV")
                 .accessibility_label("Export")
-                .child(div().whitespace_nowrap().text_color(rgb(theme.foreground)).child("Export"))
+                .child(
+                    div()
+                        .whitespace_nowrap()
+                        .text_color(rgb(theme.foreground))
+                        .child("Export"),
+                )
                 .child(icon("chevron-down", theme.muted_foreground))
                 .dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), groups)),
         )
