@@ -598,10 +598,14 @@ fn cancelling_the_review_keeps_the_edit_and_a_read_only_table_cannot_start_a_sav
     });
 }
 
-fn open_review(
-    cx: &mut TestAppContext,
+fn open_review<'a>(
+    cx: &'a mut TestAppContext,
     name: &str,
-) -> (gpui::Entity<GridView>, &mut gpui::VisualTestContext, std::path::PathBuf) {
+) -> (
+    gpui::Entity<GridView>,
+    &'a mut gpui::VisualTestContext,
+    std::path::PathBuf,
+) {
     let path = fixture_copy(name);
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| {
