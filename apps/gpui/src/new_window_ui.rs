@@ -31,7 +31,7 @@ impl GridView {
     pub(crate) fn disconnect_actions(&self) -> Vec<Action> {
         vec![Action {
             id: "disconnect",
-            label: "Disconnect (close this window and open a clean one)".to_string(),
+            label: "Disconnect".to_string(),
             enabled: self.live.is_some(),
         }]
     }

@@ -3,7 +3,7 @@ use bookie_gpui::edit::{is_editable, parse_edit};
 use bookie_gpui::model::{Cell, CellText};
 
 use super::*;
-use crate::chrome::ghost;
+use crate::surfaces::{ButtonKind, button, task_bar};
 
 #[derive(Default)]
 pub(crate) struct SetCellsState {
@@ -14,7 +14,7 @@ pub(crate) struct SetCellsState {
 
 pub(crate) fn staged_values(cells: &[(u64, Cell)], text: Option<&str>) -> Result<Vec<(u64, Cell)>, String> {
     if cells.is_empty() {
-        return Err("No cells are selected.".into());
+        return Err("No cells are selected".into());
     }
     if cells.len() > MAX_SET_CELLS {
         return Err("That is too many cells to set at once".into());
@@ -102,7 +102,7 @@ impl GridView {
             return;
         };
         let Some(targets) = self.set_cells_targets() else {
-            self.status = "A selected cell cannot be edited, so no cells were changed.".into();
+            self.status = "A selected cell cannot be edited, so no cells were changed".into();
             cx.notify();
             return;
         };
@@ -130,34 +130,23 @@ impl GridView {
         }
         let rows = self.selection.map_or(0, |selection| selection.count());
         Some(
-            div()
-                .flex()
-                .items_center()
-                .gap_3()
-                .p_2()
-                .flex_none()
-                .bg(rgb(theme.chrome))
-                .border_b_1()
-                .border_color(rgb(theme.border))
-                .child(
-                    div()
-                        .font_weight(gpui::FontWeight::MEDIUM)
-                        .child(format!("Set {rows} selected row(s)")),
-                )
+            task_bar(format!("Set {rows} selected row(s)"), theme)
                 .child(div().flex_1().min_w_0().child(input))
                 .child(
-                    ghost("apply-set-cells", "Set value", theme)
+                    button(ButtonKind::Primary, "apply-set-cells", "Set value", theme)
                         .on_click(cx.listener(|this, _, _, cx| this.apply_set_cells(false, cx))),
                 )
                 .child(
-                    ghost("apply-set-null", "Set NULL", theme)
+                    button(ButtonKind::Ghost, "apply-set-null", "Set NULL", theme)
                         .on_click(cx.listener(|this, _, _, cx| this.apply_set_cells(true, cx))),
                 )
                 .child(
-                    ghost("cancel-set-cells", "Cancel", theme).on_click(cx.listener(|this, _, _, cx| {
-                        this.close_set_cells_bar();
-                        cx.notify();
-                    })),
+                    button(ButtonKind::Ghost, "cancel-set-cells", "Cancel", theme).on_click(cx.listener(
+                        |this, _, _, cx| {
+                            this.close_set_cells_bar();
+                            cx.notify();
+                        },
+                    )),
                 ),
         )
     }

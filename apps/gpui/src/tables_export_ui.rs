@@ -5,7 +5,7 @@ use bookie_gpui::messages::MessageKind;
 
 use super::*;
 use crate::backup_ui::absolute_path;
-use crate::chrome::ghost;
+use crate::surfaces::{ButtonKind, button, task_bar};
 
 pub(crate) fn export_folder(typed: &str) -> Result<PathBuf, String> {
     let typed = typed.trim();
@@ -181,27 +181,20 @@ impl GridView {
             return None;
         }
         Some(
-            div()
-                .flex()
-                .items_center()
-                .gap_3()
-                .p_2()
-                .flex_none()
-                .bg(rgb(theme.chrome))
-                .border_b_1()
-                .border_color(rgb(theme.border))
-                .child(div().font_weight(gpui::FontWeight::MEDIUM).child("Export all tables"))
+            task_bar("Export all tables", theme)
                 .child(div().flex_1().min_w_0().child(folder))
                 .child(div().w(px(size::FORM_CONTROL * 3.0)).child(limit))
                 .child(
-                    ghost("run-tables-export", "Export", theme)
+                    button(ButtonKind::Primary, "run-tables-export", "Export", theme)
                         .on_click(cx.listener(|this, _, _, cx| this.start_tables_export(cx))),
                 )
                 .child(
-                    ghost("cancel-tables-export", "Cancel", theme).on_click(cx.listener(|this, _, _, cx| {
-                        this.search.tables_export.open = false;
-                        cx.notify();
-                    })),
+                    button(ButtonKind::Ghost, "cancel-tables-export", "Cancel", theme).on_click(cx.listener(
+                        |this, _, _, cx| {
+                            this.search.tables_export.open = false;
+                            cx.notify();
+                        },
+                    )),
                 ),
         )
     }

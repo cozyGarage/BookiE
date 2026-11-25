@@ -129,7 +129,7 @@ fn the_query_toolbar_connection_chip_opens_the_connection_status(cx: &mut TestAp
     cx.simulate_click(chip.center(), Default::default());
     cx.run_until_parked();
     view.read_with(cx, |view, _| {
-        assert_eq!(view.status, "No active database connection.");
+        assert_eq!(view.status, "No active database connection");
     });
 }
 
@@ -779,7 +779,7 @@ fn the_shortcut_list_shows_every_command_with_its_keys_and_runs_the_chosen_one(c
             .into_iter()
             .map(|item| (item.title, item.subtitle))
             .collect();
-        assert_eq!(rows, [("Jump to column".to_string(), "ctrl-shift-j".to_string())]);
+        assert_eq!(rows, [("Jump to column".to_string(), "Ctrl+Shift+J".to_string())]);
     });
     cx.simulate_keystrokes("enter");
     view.read_with(cx, |view, _| {

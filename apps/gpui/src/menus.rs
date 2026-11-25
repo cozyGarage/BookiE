@@ -20,6 +20,13 @@ pub(crate) const OVERFLOW_GROUPS: &[&[&str]] = &[
     &["status", "server-status"],
 ];
 
+pub(crate) const IMPORT_EXPORT_GROUPS: &[&[&str]] = &[
+    &["import-csv", "export-file"],
+    &["import-connections", "export-connections"],
+];
+
+pub(crate) const EXPORT_GROUPS: &[&[&str]] = &[&["export-file", "export-csv"]];
+
 pub(crate) const ROW_GROUPS: &[&[&str]] = &[
     &[
         "copy",

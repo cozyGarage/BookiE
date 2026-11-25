@@ -1,5 +1,6 @@
 use bookie_core::Environment;
 use bookie_gpui::font_settings;
+use bookie_gpui::keymap::Command;
 use bookie_gpui::shell::{SidebarFilter, Tab, TreeRow, table_label, tree_rows_grouped, tree_rows_in};
 pub(crate) const SQL: [&str; 3] = [
     "SELECT value, label, state, typed",
@@ -13,111 +14,43 @@ use gpui::{
 
 use crate::GridView;
 use crate::assets::icon;
+use crate::surfaces::{Bar, ButtonKind, badge, button, compact_icon_button, icon_button, toggle_icon_button};
 use crate::ui_theme::ThemeExt;
 use bookie_gpui::theme::{Theme, size};
 
-pub(crate) const TOOLBAR_HEIGHT: f32 = 40.0;
-pub(crate) const TAB_HEIGHT: f32 = 32.0;
+pub(crate) const TOOLBAR_HEIGHT: f32 = 36.0;
+pub(crate) const TAB_HEIGHT: f32 = 28.0;
 pub(crate) const STATUS_HEIGHT: f32 = 24.0;
 
-pub(crate) fn ghost(id: impl Into<gpui::ElementId>, label: impl Into<String>, theme: Theme) -> Stateful<Div> {
-    div()
-        .id(id)
-        .flex()
-        .items_center()
-        .h(px(size::SMALL_CONTROL))
-        .px_2()
-        .rounded(px(theme.radius))
-        .cursor_pointer()
-        .text_color(rgb(theme.foreground))
-        .hover(move |style| style.bg(rgb(theme.accent)))
-        .child(label.into())
-}
-
-pub(crate) fn primary_button(
-    id: &'static str,
-    label: &'static str,
-    tip_text: &'static str,
-    theme: Theme,
-) -> Stateful<Div> {
-    div()
-        .id(id)
-        .tooltip(tip(tip_text))
-        .flex()
-        .items_center()
-        .h(px(size::SMALL_CONTROL))
-        .px_3()
-        .rounded(px(theme.radius))
-        .bg(rgb(theme.foreground))
-        .text_color(rgb(theme.background))
-        .cursor_pointer()
-        .child(label)
-}
-
-pub(crate) fn tip(label: &'static str) -> impl Fn(&mut gpui::Window, &mut gpui::App) -> gpui::AnyView + 'static {
-    move |window, cx| gpui_component::tooltip::Tooltip::new(label).build(window, cx)
+pub(crate) fn tip(
+    label: impl Into<gpui::SharedString>,
+) -> impl Fn(&mut gpui::Window, &mut gpui::App) -> gpui::AnyView + 'static {
+    let label = label.into();
+    move |window, cx| gpui_component::tooltip::Tooltip::new(label.clone()).build(window, cx)
 }
 
 fn expand_sidebar_button(theme: Theme, cx: &mut Context<GridView>) -> Stateful<Div> {
-    div()
-        .id("sidebar-open-top-left")
-        .tooltip(tip("Show sidebar"))
-        .flex()
-        .items_center()
-        .justify_center()
-        .w(px(size::FORM_CONTROL))
-        .h(px(size::SMALL_CONTROL))
-        .cursor_pointer()
-        .hover(move |style| style.bg(rgb(theme.accent)))
-        .child(icon("chevrons-right", theme.muted_foreground))
-        .on_click(cx.listener(|this, _, _, cx| {
+    icon_button("sidebar-open-top-left", "chevrons-right", "Show sidebar", theme).on_click(cx.listener(
+        |this, _, _, cx| {
             this.sidebar.open = true;
             cx.notify();
-        }))
+        },
+    ))
 }
 
-fn toggle_icon(
+fn sidebar_toggle(
     id: &'static str,
     name: &'static str,
+    tooltip: &'static str,
     on: bool,
     theme: Theme,
     cx: &mut Context<GridView>,
     on_click: impl Fn(&mut GridView, &mut Context<GridView>) + 'static,
 ) -> Stateful<Div> {
-    let button = header_icon(id, name, theme).on_click(cx.listener(move |this, _, _, cx| {
+    toggle_icon_button(id, name, tooltip, on, Bar::Compact, theme).on_click(cx.listener(move |this, _, _, cx| {
         on_click(this, cx);
         cx.notify();
-    }));
-    if on { button.bg(rgb(theme.accent)) } else { button }
-}
-
-fn header_icon(id: &'static str, name: &'static str, theme: Theme) -> Stateful<Div> {
-    div()
-        .id(id)
-        .debug_selector(move || id.into())
-        .flex()
-        .items_center()
-        .justify_center()
-        .w(px(size::COMPACT_CONTROL))
-        .h(px(size::COMPACT_CONTROL))
-        .cursor_pointer()
-        .hover(move |style| style.bg(rgb(theme.accent)))
-        .child(icon(name, theme.muted_foreground))
-}
-
-fn window_button(id: &'static str, name: &'static str, label: &'static str, theme: Theme) -> Stateful<Div> {
-    div()
-        .id(id)
-        .tooltip(tip(label))
-        .flex()
-        .items_center()
-        .justify_center()
-        .w(px(size::FORM_CONTROL))
-        .h(px(size::SMALL_CONTROL))
-        .cursor_pointer()
-        .text_color(rgb(theme.foreground))
-        .hover(move |style| style.bg(rgb(theme.accent)))
-        .child(icon(name, theme.foreground))
+    }))
 }
 
 #[derive(Debug, Default, Eq, PartialEq)]
@@ -139,77 +72,7 @@ fn toolbar_window_controls(decorations: Decorations, supported: WindowControls) 
     }
 }
 
-pub(crate) fn ghost_icon(
-    id: impl Into<gpui::ElementId>,
-    name: &'static str,
-    label: &'static str,
-    theme: Theme,
-) -> Stateful<Div> {
-    div()
-        .id(id)
-        .tooltip(tip(label))
-        .flex()
-        .items_center()
-        .justify_center()
-        .w(px(size::FORM_CONTROL))
-        .h(px(size::SMALL_CONTROL))
-        .rounded(px(theme.radius))
-        .cursor_pointer()
-        .text_color(rgb(theme.foreground))
-        .hover(move |style| style.bg(rgb(theme.accent)))
-        .child(icon(name, theme.muted_foreground))
-}
-
-fn toolbar_labelled(
-    id: &'static str,
-    name: &'static str,
-    text: &'static str,
-    tooltip: &'static str,
-    theme: Theme,
-) -> Stateful<Div> {
-    div()
-        .id(id)
-        .debug_selector(move || id.into())
-        .tooltip(tip(tooltip))
-        .flex()
-        .flex_none()
-        .whitespace_nowrap()
-        .items_center()
-        .gap_1()
-        .px_2()
-        .h(px(size::SMALL_CONTROL))
-        .rounded(px(theme.radius))
-        .cursor_pointer()
-        .text_color(rgb(theme.foreground))
-        .hover(move |style| style.bg(rgb(theme.accent)))
-        .child(icon(name, theme.muted_foreground))
-        .child(text)
-}
-
-fn toolbar_icon(id: &'static str, name: &'static str, label: &'static str, theme: Theme) -> Stateful<Div> {
-    div()
-        .id(id)
-        .debug_selector(move || id.into())
-        .tooltip(tip(label))
-        .flex()
-        .items_center()
-        .justify_center()
-        .w(px(size::FORM_CONTROL))
-        .h(px(size::SMALL_CONTROL))
-        .rounded(px(theme.radius))
-        .cursor_pointer()
-        .hover(move |style| style.bg(rgb(theme.accent)))
-        .child(icon(name, theme.muted_foreground))
-}
-
-pub(crate) fn environment_color(environment: Environment, theme: Theme) -> Option<u32> {
-    match environment {
-        Environment::Local => None,
-        Environment::Dev => Some(theme.info),
-        Environment::Staging => Some(theme.warning),
-        Environment::Prod => Some(theme.destructive),
-    }
-}
+pub(crate) use crate::surfaces::environment_color;
 
 pub(crate) fn environment_tint(environment: Environment, theme: Theme) -> u32 {
     environment_color(environment, theme).map_or(theme.background, |color| mix(theme.background, color, 0.18))
@@ -217,16 +80,7 @@ pub(crate) fn environment_tint(environment: Environment, theme: Theme) -> u32 {
 
 fn environment_chip(environment: Environment, theme: Theme) -> Option<Div> {
     environment_color(environment, theme).map(|color| {
-        div()
-            .debug_selector(|| "environment-chip".into())
-            .px_2()
-            .rounded(px(theme.radius))
-            .border_1()
-            .border_color(rgb(color))
-            .text_size(px(size::TEXT_SMALL))
-            .font_weight(gpui::FontWeight::SEMIBOLD)
-            .text_color(rgb(color))
-            .child(environment.display_name().to_uppercase())
+        badge(environment.display_name().to_uppercase(), color).debug_selector(|| "environment-chip".into())
     })
 }
 
@@ -292,6 +146,7 @@ impl GridView {
     pub fn toolbar(&self, theme: Theme, window: &Window, cx: &mut Context<Self>) -> Div {
         let labelled = f32::from(window.viewport_size().width) >= size::TOOLBAR_LABELS_MIN_WIDTH;
         div()
+            .debug_selector(|| "main-toolbar".into())
             .flex()
             .items_center()
             .justify_between()
@@ -310,9 +165,15 @@ impl GridView {
                     .children(environment_chip(self.live_environment(), theme))
                     .child(
                         (if labelled {
-                            toolbar_labelled("new-connection", "database", "New connection", "New connection", theme)
+                            crate::surfaces::icon_label_button(
+                                "new-connection",
+                                "database",
+                                "New connection",
+                                "New connection",
+                                theme,
+                            )
                         } else {
-                            toolbar_icon("new-connection", "database", "New connection", theme)
+                            icon_button("new-connection", "database", "New connection", theme)
                         })
                         .on_click(cx.listener(|this, _, _, cx| {
                             this.connection_form.editing = None;
@@ -323,9 +184,15 @@ impl GridView {
                     )
                     .child(
                         (if labelled {
-                            toolbar_labelled("new-query", "file-plus", "New query", "New query", theme)
+                            crate::surfaces::icon_label_button(
+                                "new-query",
+                                "file-plus",
+                                "New query",
+                                "New query",
+                                theme,
+                            )
                         } else {
-                            toolbar_icon("new-query", "file-plus", "New query", theme)
+                            icon_button("new-query", "file-plus", "New query", theme)
                         })
                         .on_click(cx.listener(|this, _, window, cx| {
                             this.tabs.open_query();
@@ -346,9 +213,11 @@ impl GridView {
     fn overflow_menu(&self, theme: Theme, cx: &mut Context<Self>) -> impl IntoElement {
         use gpui_component::button::{Button, ButtonVariants};
         use gpui_component::menu::DropdownMenu;
+        use gpui_kit::component::Sizable as _;
         let groups = crate::menus::command_groups(self, crate::menus::OVERFLOW_GROUPS);
         Button::new("more")
             .ghost()
+            .small()
             .compact()
             .tooltip("More")
             .child(icon("ellipsis", theme.muted_foreground))
@@ -368,11 +237,11 @@ impl GridView {
             .gap_1()
             .child(self.overflow_menu(theme, cx))
             .child(
-                toolbar_icon("palette", "command", "Command palette (Ctrl+Shift+P)", theme)
+                icon_button("palette", "command", self.command_tip(Command::Palette), theme)
                     .on_click(cx.listener(|this, _, window, cx| this.open_palette(window, cx))),
             )
             .child(
-                toolbar_icon(
+                icon_button(
                     "theme-toggle",
                     if theme.dark { "sun" } else { "moon" },
                     if theme.dark {
@@ -389,22 +258,22 @@ impl GridView {
                 })),
             )
             .when(controls.minimize, |this| {
-                this.child(
-                    window_button("win-min", "minus", "Minimize", theme).on_click(cx.listener(|_, _, window, _| {
+                this.child(icon_button("win-min", "minus", "Minimize", theme).on_click(cx.listener(
+                    |_, _, window, _| {
                         window.minimize_window();
-                    })),
-                )
+                    },
+                )))
             })
             .when(controls.maximize, |this| {
                 this.child(
-                    window_button("win-max", "square", "Maximize", theme).on_click(cx.listener(|_, _, window, _| {
+                    icon_button("win-max", "square", "Maximize", theme).on_click(cx.listener(|_, _, window, _| {
                         window.zoom_window();
                     })),
                 )
             })
             .when(controls.close, |this| {
                 this.child(
-                    window_button("win-close", "x", "Close", theme).on_click(cx.listener(|_, _, window, _| {
+                    icon_button("win-close", "x", "Close", theme).on_click(cx.listener(|_, _, window, _| {
                         window.remove_window();
                     })),
                 )
@@ -441,7 +310,7 @@ impl GridView {
             .flex()
             .items_center()
             .h(px(size::TREE_ROW))
-            .pl(px(8.0 + 14.0 * depth as f32))
+            .pl(px(tree_indent(depth as f32)))
             .gap_1()
             .rounded(px(theme.radius))
             .cursor_pointer()
@@ -593,39 +462,20 @@ impl GridView {
 
     fn toolbar_import_export_menu(&self, labelled: bool, theme: Theme, cx: &mut Context<Self>) -> impl IntoElement {
         use gpui_component::button::{Button, ButtonVariants};
-        use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
+        use gpui_component::menu::DropdownMenu as _;
+        use gpui_kit::component::Sizable as _;
 
         let owner = cx.entity().downgrade();
+        let groups = crate::menus::command_groups(self, crate::menus::IMPORT_EXPORT_GROUPS);
         Button::new("import-export-menu")
             .ghost()
+            .small()
             .compact()
             .tooltip("Import and export data and connections")
             .accessibility_label("Import / Export")
             .child(icon("arrow-down-up", theme.muted_foreground))
             .children(labelled.then(|| div().whitespace_nowrap().child("Import / Export")))
-            .dropdown_menu(move |mut menu, _, _| {
-                for (id, label) in [
-                    ("import-csv", "Import CSV or Excel into table…"),
-                    ("export-file", "Export table to file…"),
-                    ("import-connections", "Import Connections…"),
-                    ("export-connections", "Export Connections"),
-                ] {
-                    let owner = owner.clone();
-                    menu = menu.item(PopupMenuItem::new(label).on_click(move |_, _, cx| {
-                        let _ = owner.update(cx, |this, cx| {
-                            match id {
-                                "import-csv" => this.open_import_bar(cx),
-                                "export-file" => this.open_export_file_bar(cx),
-                                "import-connections" => this.pick_connection_import(cx),
-                                "export-connections" => this.pick_connection_export(cx),
-                                _ => {}
-                            }
-                            cx.notify();
-                        });
-                    }));
-                }
-                menu
-            })
+            .dropdown_menu(crate::menus::command_menu(owner, groups))
     }
 
     fn sidebar_header_action_icons(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
@@ -635,20 +485,20 @@ impl GridView {
             .items_center()
             .gap_1()
             .child(
-                header_icon("header-collapse-all", "chevrons-down-up", theme).on_click(cx.listener(
-                    |this, _, _, cx| {
-                        let collapse = this.sidebar.connection_open || this.sidebar.database_open;
-                        this.sidebar.connection_open = !collapse;
-                        this.sidebar.database_open = !collapse;
+                compact_icon_button("header-collapse-all", "chevrons-down-up", "Collapse all", theme).on_click(
+                    cx.listener(|this, _, _, cx| {
+                        this.collapse_sidebar_sections();
                         cx.notify();
-                    },
-                )),
+                    }),
+                ),
             )
             .child(
-                header_icon("collapse-sidebar", "chevrons-left", theme).on_click(cx.listener(|this, _, _, cx| {
-                    this.sidebar.open = false;
-                    cx.notify();
-                })),
+                compact_icon_button("collapse-sidebar", "chevrons-left", "Collapse sidebar", theme).on_click(
+                    cx.listener(|this, _, _, cx| {
+                        this.sidebar.open = false;
+                        cx.notify();
+                    }),
+                ),
             )
     }
 
@@ -673,37 +523,48 @@ impl GridView {
             .items_center()
             .gap_1()
             .child(div().flex_1().min_w_0().child(self.sidebar.search.clone()))
-            .child(toggle_icon(
+            .child(sidebar_toggle(
                 "sidebar-locate",
                 "crosshair",
+                "Locate the open table",
                 false,
                 theme,
                 cx,
                 |this, cx| this.locate_active_table(cx),
             ))
-            .child(toggle_icon(
+            .child(sidebar_toggle(
                 "sidebar-filter",
                 "sliders-horizontal",
+                "Regular expression",
                 self.sidebar.regex,
                 theme,
                 cx,
                 |this, cx| this.toggle_sidebar_regex(cx),
             ))
-            .child(toggle_icon(
+            .child(sidebar_toggle(
                 "sidebar-active-only",
                 "circle",
+                "Show only the active table",
                 self.sidebar.active_only,
                 theme,
                 cx,
-                |this, _| {
-                    this.sidebar.active_only = !this.sidebar.active_only;
-                    this.status = if this.sidebar.active_only {
-                        "Showing only the active table.".into()
-                    } else {
-                        "Showing every table.".into()
-                    };
-                },
+                |this, _| this.toggle_sidebar_active_only(),
             ))
+    }
+
+    pub(crate) fn toggle_sidebar_active_only(&mut self) {
+        self.sidebar.active_only = !self.sidebar.active_only;
+        self.status = if self.sidebar.active_only {
+            "Showing only the active table".into()
+        } else {
+            "Showing every table".into()
+        };
+    }
+
+    pub(crate) fn collapse_sidebar_sections(&mut self) {
+        let collapse = self.sidebar.connection_open || self.sidebar.database_open;
+        self.sidebar.connection_open = !collapse;
+        self.sidebar.database_open = !collapse;
     }
 
     fn sidebar_resize_handle(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
@@ -715,7 +576,7 @@ impl GridView {
             .h_full()
             .w(px(size::SPLITTER))
             .cursor_col_resize()
-            .hover(move |style| style.bg(rgb(theme.info)))
+            .hover(move |style| style.bg(rgb(theme.focus_ring)))
             .on_mouse_down(
                 gpui::MouseButton::Left,
                 cx.listener(|this, _: &MouseDownEvent, _, cx| {
@@ -763,14 +624,14 @@ impl GridView {
     pub(crate) fn toggle_sidebar_regex(&mut self, cx: &mut Context<Self>) {
         let search = self.sidebar.search.read(cx).content().to_string();
         if !self.sidebar.regex && !bookie_gpui::shell::sidebar_regex_ok(&search) {
-            self.status = "That search is not a valid regular expression.".into();
+            self.status = "That search is not a valid regular expression".into();
             return;
         }
         self.sidebar.regex = !self.sidebar.regex;
         self.status = if self.sidebar.regex {
-            "Sidebar search uses a regular expression.".into()
+            "Sidebar search uses a regular expression".into()
         } else {
-            "Sidebar search matches plain text.".into()
+            "Sidebar search matches plain text".into()
         };
     }
 
@@ -796,6 +657,7 @@ impl GridView {
             .map(|(index, tab)| self.render_tab_item(index, tab, active, theme, cx));
         div()
             .id("workspace-tabs")
+            .debug_selector(|| "workspace-tabs".into())
             .flex()
             .items_center()
             .flex_none()
@@ -833,22 +695,15 @@ fn tab_icon_name(tab: &Tab) -> &'static str {
 }
 
 fn tab_close_button(index: usize, theme: Theme, cx: &mut Context<GridView>) -> Stateful<Div> {
-    div()
-        .id(("close", index))
-        .px_1()
-        .rounded(px(theme.radius))
-        .text_color(rgb(theme.muted_foreground))
-        .hover(move |style| style.bg(rgb(theme.muted)))
-        .on_mouse_down(
-            gpui::MouseButton::Left,
-            cx.listener(move |this, _: &MouseDownEvent, window, cx| {
-                this.close_tab(index, cx);
-                this.show_current_table(window, cx);
-                cx.stop_propagation();
-                cx.notify();
-            }),
-        )
-        .child(icon("x", theme.muted_foreground))
+    compact_icon_button(("close", index), "x", "Close tab", theme).on_mouse_down(
+        gpui::MouseButton::Left,
+        cx.listener(move |this, _: &MouseDownEvent, window, cx| {
+            this.close_tab(index, cx);
+            this.show_current_table(window, cx);
+            cx.stop_propagation();
+            cx.notify();
+        }),
+    )
 }
 
 impl GridView {
@@ -875,7 +730,11 @@ impl GridView {
             .cursor_pointer()
             .child(icon(
                 tab_icon_name(tab),
-                if selected { theme.info } else { theme.muted_foreground },
+                if selected {
+                    theme.foreground
+                } else {
+                    theme.muted_foreground
+                },
             ))
             .children(
                 matches!(tab, Tab::Table(_) | Tab::Query)
@@ -889,7 +748,7 @@ impl GridView {
             item.bg(rgb(theme.background))
                 .text_color(rgb(theme.foreground))
                 .border_b_2()
-                .border_color(rgb(theme.info))
+                .border_color(rgb(theme.foreground))
         } else {
             item.text_color(rgb(theme.muted_foreground))
                 .hover(move |style| style.bg(rgb(theme.accent)))
@@ -944,7 +803,7 @@ impl GridView {
         let picker_view = cx.entity();
         let colour_theme = gpui_kit::component::setting::SettingField::render(move |_, _, _| {
             let view = picker_view.clone();
-            ghost("choose-theme", "Choose…", theme).on_click(move |_, window, cx| {
+            button(ButtonKind::Ghost, "choose-theme", "Choose…", theme).on_click(move |_, window, cx| {
                 view.update(cx, |this, cx| {
                     this.open_picker(crate::palette_state::PaletteMode::Themes, window, cx);
                     cx.notify();
@@ -952,17 +811,19 @@ impl GridView {
             })
         });
         let keyboard = self.keyboard_group(cx.entity(), theme);
+        let themes = self.theme_group(cx.entity(), theme, cx);
         let pages = [
             gpui_kit::component::setting::SettingPage::new("Appearance")
                 .default_open(true)
                 .group(
                     gpui_kit::component::setting::SettingGroup::new()
                         .item(
-                            gpui_kit::component::setting::SettingItem::new("Colour theme", colour_theme)
+                            gpui_kit::component::setting::SettingItem::new("Color theme", colour_theme)
                                 .description(format!("Current: {chosen}")),
                         )
                         .item(gpui_kit::component::setting::SettingItem::new("Dark theme", dark_mode)),
-                ),
+                )
+                .group(themes),
             gpui_kit::component::setting::SettingPage::new("Fonts").group(fonts),
             gpui_kit::component::setting::SettingPage::new("Keyboard").group(keyboard),
             gpui_kit::component::setting::SettingPage::new("MCP").group(mcp),
@@ -999,7 +860,6 @@ impl GridView {
                     .border_1()
                     .border_color(rgb(theme.border))
                     .bg(rgb(theme.popover))
-                    .shadow_lg()
                     .child(
                         div()
                             .px_4()
@@ -1225,8 +1085,12 @@ enum SidebarLine {
     Catalog(crate::sidebar_catalog::CatalogLine),
 }
 
+pub(crate) fn tree_indent(depth: f32) -> f32 {
+    size::SM + size::TREE_INDENT * depth
+}
+
 pub(crate) fn guide_left(level: usize) -> f32 {
-    8.0 + 14.0 * level as f32 + size::ICON / 2.0
+    tree_indent(level as f32) + size::ICON / 2.0
 }
 
 pub(crate) fn indent_guides(depth: usize, theme: Theme) -> impl Iterator<Item = Div> {
@@ -1237,7 +1101,7 @@ pub(crate) fn indent_guides(depth: usize, theme: Theme) -> impl Iterator<Item = 
             .top_0()
             .bottom_0()
             .left(px(guide_left(level)))
-            .w(px(1.0))
+            .w(px(size::HAIRLINE))
             .bg(rgb(theme.border))
     })
 }

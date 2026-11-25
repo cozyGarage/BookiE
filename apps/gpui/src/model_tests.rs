@@ -75,10 +75,10 @@ fn cancelled_scans_return_and_a_cancelled_initialization_can_be_retried() {
     let source = Synthetic::new(10);
     let cancel = CancellationToken::new();
     cancel.cancel();
-    assert_eq!(source.find("sample", 10, &cancel), Err("the operation was cancelled"));
+    assert_eq!(source.find("sample", 10, &cancel), Err("canceled the operation"));
     let predicate = parse_predicate("label contains 1", &synthetic_columns()).unwrap();
-    assert_eq!(source.filter(&predicate, &cancel), Err("the operation was cancelled"));
-    assert!(matches!(source.compare(false, &cancel), Err("comparison cancelled")));
+    assert_eq!(source.filter(&predicate, &cancel), Err("canceled the operation"));
+    assert!(matches!(source.compare(false, &cancel), Err("canceled the comparison")));
     assert_eq!(
         source.find("sample 1", 10, &CancellationToken::new()).unwrap().matches,
         vec![1]

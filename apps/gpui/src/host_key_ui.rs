@@ -4,7 +4,8 @@ use std::time::Duration;
 use bookie_app_services::ssh_prompt::{HostKeyInbox, PendingHostKey, host_key_channel};
 
 use super::*;
-use crate::chrome::{ghost, primary_button};
+use crate::chrome::tip;
+use crate::surfaces::{ButtonKind, button, dialog_surface, scrim};
 
 pub(crate) struct HostKeyUi {
     pub tx: tokio::sync::mpsc::UnboundedSender<PendingHostKey>,
@@ -92,25 +93,30 @@ impl GridView {
         self.next_host_key(cx);
     }
 
-    pub(crate) fn host_key_bar(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Div> {
+    pub(crate) fn host_key_overlay(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Stateful<Div>> {
         let open = self.host_key.current.as_ref()?;
         Some(
-            div()
-                .flex()
-                .flex_col()
-                .gap_2()
-                .p_2()
-                .flex_none()
-                .bg(rgb(theme.chrome))
-                .border_b_1()
-                .border_color(rgb(theme.destructive))
-                .child(host_key_actions(theme, cx))
-                .child(
-                    div()
-                        .text_size(px(size::TEXT_SMALL))
-                        .text_color(rgb(theme.muted_foreground))
-                        .child(host_key_detail(open)),
-                ),
+            scrim(theme).id("host-key-overlay").occlude().child(
+                dialog_surface(size::APPROVAL_DIALOG_WIDTH, theme)
+                    .id("host-key-dialog")
+                    .debug_selector(|| "host-key-dialog".into())
+                    .max_w(gpui::relative(0.92))
+                    .gap_2()
+                    .p_3()
+                    .on_mouse_down(gpui::MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .child(
+                        div()
+                            .font_weight(gpui::FontWeight::SEMIBOLD)
+                            .child("Trust this SSH host?"),
+                    )
+                    .child(
+                        div()
+                            .text_size(px(size::TEXT_SMALL))
+                            .text_color(rgb(theme.muted_foreground))
+                            .child(host_key_detail(open)),
+                    )
+                    .child(host_key_actions(theme, cx)),
+            ),
         )
     }
 }
@@ -124,22 +130,20 @@ pub(crate) fn host_key_detail(open: &PendingHostKey) -> String {
 
 fn host_key_actions(theme: Theme, cx: &mut Context<GridView>) -> Div {
     div()
+        .debug_selector(|| "host-key-actions".into())
         .flex()
         .items_center()
+        .justify_end()
         .gap_2()
         .child(
-            div()
-                .font_weight(gpui::FontWeight::MEDIUM)
-                .child("Trust this SSH host?"),
+            button(ButtonKind::Primary, "trust-host-key", "Trust", theme)
+                .debug_selector(|| "trust-host-key".into())
+                .tooltip(tip("Record this host key and connect"))
+                .on_click(cx.listener(|this, _, _, cx| this.answer_host_key(true, cx))),
         )
         .child(
-            ghost("refuse-host-key", "Cancel", theme)
+            button(ButtonKind::Ghost, "refuse-host-key", "Cancel", theme)
                 .debug_selector(|| "refuse-host-key".into())
                 .on_click(cx.listener(|this, _, _, cx| this.answer_host_key(false, cx))),
-        )
-        .child(
-            primary_button("trust-host-key", "Trust", "Record this host key and connect", theme)
-                .debug_selector(|| "trust-host-key".into())
-                .on_click(cx.listener(|this, _, _, cx| this.answer_host_key(true, cx))),
         )
 }

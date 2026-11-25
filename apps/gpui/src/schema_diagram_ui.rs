@@ -5,7 +5,7 @@ use bookie_app_services::er_diagram::SchemaDiagram;
 use bookie_app_services::er_diagram::export::{dbml, mermaid};
 
 use super::*;
-use crate::chrome::ghost;
+use crate::surfaces::{ButtonKind, button, task_bar};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum DiagramFormat {
@@ -50,7 +50,7 @@ impl GridView {
         let enabled = self.live.as_ref().is_some_and(|session| !session.tables.is_empty());
         vec![Action {
             id: "export-schema-diagram",
-            label: "Export schema diagram (Mermaid or DBML)…".to_string(),
+            label: "Export schema diagram as Mermaid or DBML…".to_string(),
             enabled,
         }]
     }
@@ -133,30 +133,19 @@ impl GridView {
             return None;
         }
         Some(
-            div()
-                .flex()
-                .items_center()
-                .gap_3()
-                .p_2()
-                .flex_none()
-                .bg(rgb(theme.chrome))
-                .border_b_1()
-                .border_color(rgb(theme.border))
-                .child(
-                    div()
-                        .font_weight(gpui::FontWeight::MEDIUM)
-                        .child("Export schema diagram"),
-                )
+            task_bar("Export schema diagram", theme)
                 .child(div().flex_1().min_w_0().child(input))
                 .child(
-                    ghost("write-schema-diagram", "Export", theme)
+                    button(ButtonKind::Primary, "write-schema-diagram", "Export", theme)
                         .on_click(cx.listener(|this, _, _, cx| this.write_schema_diagram(cx))),
                 )
                 .child(
-                    ghost("cancel-schema-diagram", "Cancel", theme).on_click(cx.listener(|this, _, _, cx| {
-                        this.search.diagram.open = false;
-                        cx.notify();
-                    })),
+                    button(ButtonKind::Ghost, "cancel-schema-diagram", "Cancel", theme).on_click(cx.listener(
+                        |this, _, _, cx| {
+                            this.search.diagram.open = false;
+                            cx.notify();
+                        },
+                    )),
                 ),
         )
     }
