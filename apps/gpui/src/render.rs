@@ -172,7 +172,7 @@ impl GridView {
             self,
             &[
                 &["first", "last"],
-                &["jump-column", "compare", "export-csv", "continuous"],
+                &["jump-column", "refresh-table", "compare", "export-csv", "continuous"],
             ],
         );
         div()
@@ -206,6 +206,14 @@ impl GridView {
             )
             .when(!compact, |actions| {
                 actions
+                    .children((self.live.is_some() && !self.grid_is_query).then(|| {
+                        button("refresh-table", "Refresh", theme)
+                            .debug_selector(|| "refresh-table".into())
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.refresh_table(cx);
+                                cx.notify();
+                            }))
+                    }))
                     .child(
                         button("jump-column", "Go to column", theme)
                             .debug_selector(|| "jump-column".into())
