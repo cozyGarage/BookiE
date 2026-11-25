@@ -90,7 +90,7 @@ impl Authorization {
     fn rearm(&self, control: &OperationControl) -> OperationControl {
         let deadline = control
             .deadline()
-            .filter(|_| !self.runs_past_the_read_deadline)
+            .filter(|deadline| !self.runs_past_the_read_deadline || *deadline <= tokio::time::Instant::now())
             .map(|deadline| deadline + self.approval_wait);
         OperationControl::new(control.cancellation_token().clone(), deadline)
     }
@@ -310,7 +310,8 @@ impl PolicyGuard {
     ) -> Result<Authorization, DriverError> {
         let facts = &analysis.facts;
         let runs_past_the_read_deadline = !matches!(self.ctx.principal, Principal::Agent { .. })
-            && (facts.writes() || facts.class == StatementClass::Unparseable);
+            && ((facts.writes() && facts.class != StatementClass::Administrative)
+                || facts.class == StatementClass::Unparseable);
         let decision = match decision {
             Decision::RequireApproval { .. }
                 if matches!(self.ctx.principal, Principal::Agent { .. })
