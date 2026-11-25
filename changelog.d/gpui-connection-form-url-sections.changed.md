@@ -1,1 +1,0 @@
-GPUI's connection form keeps TLS and SSH tunnel settings in collapsible sections that open when they hold settings or a field in them needs fixing, and can fill a connection from a pasted URL or copy it as a URL without its password.

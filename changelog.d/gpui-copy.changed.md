@@ -1,1 +1,0 @@
-GPUI uses sentence case and one name per command across the palette, menus, toolbar and buttons, shows every shortcut as Ctrl+Shift+P, groups palette commands by Table, Query, Connection, View and App, and drops final periods from status messages.

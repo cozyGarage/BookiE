@@ -2,6 +2,41 @@
 
 ## [Unreleased]
 
+## [0.2.10] - 2026-11-25
+
+### Added
+
+- A closed query tab's SQL is kept and comes back with Reopen closed tab, even after a restart, and Ctrl+Alt+minus returns the caret to the last edit in the query editor.
+- GPUI's file import accepts an Excel workbook (.xlsx) as well as CSV: the first sheet is converted to rows, reviewed with the same matched-column preview, and imported in one transaction.
+- GPUI's command palette now has Collapse the sidebar tree, Show only the active table, the sidebar regular expression and page appending, so every toolbar and sidebar icon has a keyboard path.
+- GPUI messages go to a notification centre: a bell at the bottom right of the status bar shows how many need attention and opens the list. Failures and unknown save outcomes stay until dismissed and no longer push the grid down; an unknown outcome offers Resolve outcome.
+- GPUI row details can switch to a JSON view and list the rows in other tables that reference the active row, foreign-key values show in a link color and Ctrl+click follows them, Wrap long cell text shows up to three lines a row, and Alt+Enter opens the full value editor.
+- GPUI settings are a sidebar of pages (Appearance, Fonts, Keyboard, MCP), and the Keyboard page records, removes and resets each shortcut, naming the command a taken shortcut came from.
+- GPUI Settings lists every color theme on the Appearance page, and bundled themes keep secondary text, error colors and the selected row readable.
+- The sidebar shows each table's size from catalog statistics on PostgreSQL, MySQL/MariaDB, SQL Server and ClickHouse, and query plans flag whole-table scans of 1,000 rows or more.
+
+### Changed
+
+- GPUI's New connection and Edit connection open as a centred dialog over the current tab instead of a new tab; Escape or Cancel closes it, and a successful save closes it and reports in the status bar.
+- GPUI's connection form keeps TLS and SSH tunnel settings in collapsible sections that open when they hold settings or a field in them needs fixing, and can fill a connection from a pasted URL or copy it as a URL without its password.
+- GPUI buttons, dialogs and action bars look and behave the same everywhere, and every icon button has a tooltip.
+- GPUI uses sentence case and one name per command across the palette, menus, toolbar and buttons, shows every shortcut as Ctrl+Shift+P, groups palette commands by Table, Query, Connection, View and App, and drops final periods from status messages.
+- GPUI shows cell details, row details and the foreign-key peek in a sidebar to the right of the grid, with each field name above its value.
+- GPUI's grid has one Export menu: export to a file and choose CSV, JSON, Excel, SQL or another format, or copy the page or selection as CSV.
+- GPUI's import and export-to-file bars open as a dialog over the window, so the grid no longer moves; Escape in their path field cancels.
+- GPUI's SQL review before saving opens as a dialog over the window, so the grid no longer moves; Escape or Cancel closes it without saving.
+- GPUI's status bar shows the server version, a connection tooltip with address, database, SSH hops, TLS and round trip, and keeps long messages from overlapping its other items in narrow windows.
+
+### Fixed
+
+- GPUI text colors follow one role each: blue marks links and the Dev environment only, errors are red, and the text field selection and placeholder use the theme.
+- GPUI: Canceling export setup preserves the previous status.
+- GPUI: New windows open at a size suited to the available display area.
+- GPUI's toolbar Import / Export menu uses the same names as the command palette, and connection import and export can be run from the palette.
+- GPUI's command palette stops above the status bar, toolbars and tabs use one control height, and History shows loading and error states.
+- Parameterized PostgreSQL queries work through PgBouncer transaction pools without prepared statement tracking.
+- SQLite refuses a statement with fewer values than placeholders instead of writing NULL into the missing ones.
+
 ## [0.2.9] - 2026-11-24
 
 ### Added
@@ -1235,7 +1270,7 @@ Source version **0.2.0** (`Cargo.toml`, inherited by every workspace crate). Thi
 - Agentd session reuse after Secret Service or SSH/CA file rotation.
 - Unbounded PostgreSQL and MongoDB SCRAM iteration counts.
 
-[Unreleased]: https://github.com/cozyGarage/BookiE/compare/linux-v0.2.9...main
+[Unreleased]: https://github.com/cozyGarage/BookiE/compare/linux-v0.2.10...main
 [0.1.5]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.1.5
 [0.2.0]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.0
 [0.2.2]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.2
@@ -1243,3 +1278,4 @@ Source version **0.2.0** (`Cargo.toml`, inherited by every workspace crate). Thi
 [0.2.5]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.5
 [0.2.8]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.8
 [0.2.9]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.9
+[0.2.10]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.10
