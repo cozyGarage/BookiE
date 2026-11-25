@@ -62,10 +62,13 @@ impl GridView {
         }
         let input = self.export.file.input.get_or_insert_with(|| {
             let input = cx.new(|cx| TextInput::new("File name; selected format adds its extension", cx));
-            cx.subscribe(&input, |this, _, event: &InputEvent, cx| {
-                if matches!(event, InputEvent::Submit) {
-                    this.write_export_file(cx);
+            cx.subscribe(&input, |this, _, event: &InputEvent, cx| match event {
+                InputEvent::Submit => this.write_export_file(cx),
+                InputEvent::Cancel => {
+                    this.close_export_file_bar();
+                    cx.notify();
                 }
+                InputEvent::Changed => {}
             })
             .detach();
             input

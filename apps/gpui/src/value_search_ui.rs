@@ -138,8 +138,7 @@ impl GridView {
 
     pub(crate) fn late_bars(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Div> {
         let on_query = matches!(self.tabs.current(), Tab::Query);
-        self.export_file_bar(theme, cx)
-            .or_else(|| self.set_cells_bar(theme, cx))
+        self.set_cells_bar(theme, cx)
             .or_else(|| self.filter_rule_bar(theme, cx))
             .or_else(|| if on_query { None } else { self.tool_bars(theme, cx) })
     }
