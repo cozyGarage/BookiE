@@ -39,10 +39,11 @@ async fn a_simple_select_stays_within_its_server_command_budget() {
         .await
         .expect("enable Cassandra audit log");
     let enable_output = enable.stdout_to_vec().await.expect("audit setup output");
+    let enable_error = enable.stderr_to_vec().await.expect("audit setup error");
     assert_eq!(
         enable.exit_code().await.expect("audit setup exit code"),
         Some(0),
-        "{enable_output:?}"
+        "stdout: {enable_output:?}\nstderr: {enable_error:?}"
     );
 
     let result = connection.query(query).await.expect("run measured SELECT");
