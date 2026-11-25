@@ -507,6 +507,7 @@ impl TableDelegate for GridDelegate {
                             .overflow_hidden()
                             .whitespace_nowrap()
                             .text_ellipsis()
+                            .text_color(gpui::rgb(theme.foreground))
                             .child(name),
                     )
                     .when(!kind.is_empty(), |el| {

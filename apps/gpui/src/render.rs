@@ -172,6 +172,19 @@ impl GridView {
             })
     }
 
+    fn add_row_button(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Stateful<Div>> {
+        (self.can_save_edits() && self.cell_edit.edits.is_empty() && self.compare.is_none() && !self.form_open()).then(
+            || {
+                button("add-row", "Add row", theme)
+                    .debug_selector(|| "add-row".into())
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.execute_edit_palette_action("insert-row", cx);
+                        cx.notify();
+                    }))
+            },
+        )
+    }
+
     fn grid_action_buttons(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
         use gpui_component::button::{Button, ButtonVariants};
         use gpui_component::menu::DropdownMenu;
@@ -238,20 +251,7 @@ impl GridView {
                             }))
                         })
                     })
-                    .children(
-                        (self.can_save_edits()
-                            && self.cell_edit.edits.is_empty()
-                            && self.compare.is_none()
-                            && !self.form_open())
-                        .then(|| {
-                            button("add-row", "Add row", theme)
-                                .debug_selector(|| "add-row".into())
-                                .on_click(cx.listener(|this, _, _, cx| {
-                                    this.execute_edit_palette_action("insert-row", cx);
-                                    cx.notify();
-                                }))
-                        }),
-                    )
+                    .children(self.add_row_button(theme, cx))
                     .child(
                         button("jump-column", "Go to column", theme)
                             .debug_selector(|| "jump-column".into())

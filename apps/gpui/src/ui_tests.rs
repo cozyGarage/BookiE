@@ -1619,6 +1619,7 @@ fn closing_the_last_query_result_keeps_the_synthetic_table_available(cx: &mut Te
             assert_eq!(view.dataset_count(), 0);
             view.tabs
                 .open_table(&bookie_gpui::shell::table_info(bookie_gpui::shell::DATA_TABLE));
+            view.sync_grid_owner();
             assert_eq!(view.dataset_count(), 150_000);
         });
     });
