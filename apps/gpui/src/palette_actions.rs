@@ -702,7 +702,7 @@ impl GridView {
         true
     }
 
-    fn execute_edit_palette_action(&mut self, id: &'static str, cx: &mut Context<Self>) {
+    pub(crate) fn execute_edit_palette_action(&mut self, id: &'static str, cx: &mut Context<Self>) {
         match id {
             "save-changes" => self.request_save(cx),
             "undo-edit" => self.undo_edit(cx),
