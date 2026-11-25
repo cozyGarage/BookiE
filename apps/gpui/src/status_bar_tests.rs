@@ -71,6 +71,15 @@ fn an_empty_query_does_not_display_the_previous_table(cx: &mut TestAppContext) {
     cx.update(|window, cx| window.render_frame(cx));
     assert!(cx.debug_bounds("status-page").is_none());
     view.update(cx, |view, cx| {
+        view.add_run(None);
+        view.close_run(0);
+        cx.notify();
+    });
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.source.origin(), "Query");
+        assert_eq!(view.dataset_count(), 0);
+    });
+    view.update(cx, |view, cx| {
         let index = view
             .tabs
             .items
