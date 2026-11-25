@@ -314,24 +314,26 @@ impl GridView {
         }
         self.clear_fk_peek();
         self.status = "Connecting…".into();
-        self.search.origin = Some(origin.clone());
+        let requested = origin.clone();
         self.begin_background_with_context(
             Work::Load,
             cx,
-            move |cancel| open_first_table(&origin, prefer.as_ref(), &cancel),
-            |this, opened, cx| match opened {
+            move |cancel| open_first_table(&requested, prefer.as_ref(), &cancel),
+            move |this, opened, cx| match opened {
                 Ok(table) => {
-                    this.connect_live(table);
-                    this.request_connection_info(cx);
+                    if this.connect_live(table) {
+                        this.search.origin = Some(origin);
+                        this.request_connection_info(cx);
+                    }
                 }
                 Err(message) => this.status = message,
             },
         );
     }
 
-    fn connect_live(&mut self, opened: Opened) {
+    fn connect_live(&mut self, opened: Opened) -> bool {
         if self.transaction_open() || self.reject_view_edits() {
-            return;
+            return false;
         }
         self.cell_edit.edits.clear();
         self.cell_edit.table.clear();
@@ -361,6 +363,7 @@ impl GridView {
         self.sidebar.connection_open = true;
         self.sidebar.database_open = true;
         self.status = "Connected".into();
+        true
     }
 
     pub(super) fn has_view_edits(&self) -> bool {

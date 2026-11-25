@@ -292,6 +292,9 @@ impl GridView {
     }
 
     pub(crate) fn close_connection_dialog(&mut self, cx: &mut Context<Self>) {
+        if self.connection_form.saving {
+            return;
+        }
         self.connection_form.open = false;
         self.connection_form.confirm_delete = false;
         self.connection_form.focus_on_open = false;
@@ -534,10 +537,19 @@ impl GridView {
             )
             .children(form.editing.map(|_| self.delete_button(theme, cx)))
             .child(self.save_button(theme, cx))
-            .child(
+            .children(form.editing.is_none().then(|| self.connect_button(theme, cx)))
+            .child(if form.saving {
+                unavailable_button(
+                    ButtonKind::Ghost,
+                    "cancel-connection",
+                    "Cancel",
+                    "Saving the connection",
+                    theme,
+                )
+            } else {
                 button(ButtonKind::Ghost, "cancel-connection", "Cancel", theme)
-                    .on_click(cx.listener(|this, _, _, cx| this.close_connection_dialog(cx))),
-            )
+                    .on_click(cx.listener(|this, _, _, cx| this.close_connection_dialog(cx)))
+            })
     }
 
     fn behaviour_fields(&self, theme: Theme, cx: &mut Context<Self>) -> Vec<Div> {
@@ -693,12 +705,40 @@ impl GridView {
                 theme,
             );
         }
-        button(ButtonKind::Primary, "save-connection", "Save", theme).on_click(cx.listener(|this, _, window, cx| {
+        let kind = if self.connection_form.editing.is_none() {
+            ButtonKind::Ghost
+        } else {
+            ButtonKind::Primary
+        };
+        button(kind, "save-connection", "Save", theme).on_click(cx.listener(|this, _, window, cx| {
             this.save_connection(window, cx);
         }))
     }
 
+    fn connect_button(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
+        if self.connection_form.testing || self.connection_form.saving {
+            return unavailable_button(
+                ButtonKind::Primary,
+                "connect-connection",
+                "Connect",
+                "Wait for the current connection action to finish",
+                theme,
+            );
+        }
+        button(ButtonKind::Primary, "connect-connection", "Connect", theme)
+            .on_click(cx.listener(|this, _, window, cx| this.save_connection_with_open(true, window, cx)))
+    }
+
     fn test_button(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
+        if self.connection_form.saving {
+            return unavailable_button(
+                ButtonKind::Ghost,
+                "test-connection",
+                "Test",
+                "Saving the connection",
+                theme,
+            );
+        }
         if self.connection_form.testing {
             return unavailable_button(
                 ButtonKind::Ghost,
@@ -973,7 +1013,11 @@ impl GridView {
     }
 
     pub(crate) fn save_connection(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.connection_form.saving {
+        self.save_connection_with_open(false, window, cx);
+    }
+
+    fn save_connection_with_open(&mut self, open: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if self.connection_form.saving || (open && self.connection_form.testing) {
             return;
         }
         let draft = self.connection_form.draft(cx);
@@ -1009,7 +1053,10 @@ impl GridView {
                 })
                 .await;
             let _ = this.update(cx, |this, cx| {
-                this.finish_connection_save(result, cx);
+                let saved = this.finish_connection_save(result, cx);
+                if let Some(id) = saved.filter(|_| open) {
+                    this.connect(bookie_gpui::live::Origin::Saved(id.to_string()), cx);
+                }
                 cx.notify();
             });
         })
@@ -1020,7 +1067,7 @@ impl GridView {
         &mut self,
         result: Result<(uuid::Uuid, String, Vec<uuid::Uuid>, bool), String>,
         cx: &mut Context<Self>,
-    ) {
+    ) -> Option<uuid::Uuid> {
         self.connection_form.saving = false;
         match result {
             Ok((id, name, hops, color_saved)) => {
@@ -1046,8 +1093,12 @@ impl GridView {
                 if let Ok(list) = bookie_gpui::live::saved_connections() {
                     self.connections = list;
                 }
+                color_saved.then_some(id)
             }
-            Err(message) => self.connection_form.status = message,
+            Err(message) => {
+                self.connection_form.status = message;
+                None
+            }
         }
     }
 }
