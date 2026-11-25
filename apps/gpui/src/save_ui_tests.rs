@@ -874,6 +874,39 @@ fn set_import_path(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestConte
 }
 
 #[gpui::test]
+fn an_excel_file_is_reviewed_like_a_csv_file(cx: &mut TestAppContext) {
+    let path = fixture_copy("import-excel");
+    let workbook = orders_fixture().with_file_name("import_two_rows.xlsx");
+    let (view, cx) = saving_view(cx, &path);
+    let write = write_session(&path, false);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            let id = view.live.as_ref().and_then(|live| live.writable).expect("writable");
+            view.save.write = Some((id, write));
+        })
+    });
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_import_bar(cx)));
+    set_import_path(&view, cx, &workbook);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.review_import(cx)));
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        let pending = view
+            .save
+            .pending
+            .as_ref()
+            .unwrap_or_else(|| panic!("no review: {}", view.status));
+        assert_eq!(pending.title, "Import 2 row(s) into orders?");
+        assert!(
+            pending.plan.preview.contains("customer, total"),
+            "{}",
+            pending.plan.preview
+        );
+    });
+    assert_eq!(order_count(&path), "6", "nothing is imported before the user confirms");
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
 fn a_csv_file_is_reviewed_then_imported_in_one_transaction_and_the_table_shows_the_rows(cx: &mut TestAppContext) {
     let path = fixture_copy("import");
     let file = csv_file("rows", "customer,total,ignored\nCsvOne,1.5,x\nCsvTwo,2.5,y\n");

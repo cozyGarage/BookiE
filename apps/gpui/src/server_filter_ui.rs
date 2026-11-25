@@ -148,11 +148,10 @@ impl GridView {
         );
     }
 
-    fn sort_chip(&self) -> String {
-        match self.table_sort(&self.catalog.grid_table).or(self.local_sort.as_ref()) {
-            Some(sort) => format!("Sort: {} {}", sort.column, if sort.ascending { "ASC" } else { "DESC" }),
-            None => "Sort: none".into(),
-        }
+    fn sort_chip(&self) -> Option<String> {
+        self.table_sort(&self.catalog.grid_table)
+            .or(self.local_sort.as_ref())
+            .map(|sort| sort_chip_text(&sort.column, sort.ascending))
     }
 
     pub(crate) fn filter_rows(&self, local: Option<Div>, theme: Theme, cx: &mut Context<Self>) -> Option<Div> {
@@ -187,16 +186,35 @@ impl GridView {
                             },
                         )),
                     )
-                    .child(
+                    .children(self.sort_chip().map(|text| {
                         div()
+                            .debug_selector(|| "sort-chip".into())
                             .px_2()
                             .rounded(px(size::CONTROL_RADIUS))
                             .border_1()
                             .border_color(rgb(theme.border))
                             .text_color(rgb(theme.muted_foreground))
-                            .child(self.sort_chip()),
-                    )
+                            .child(text)
+                    }))
             });
         (server.is_some() || local.is_some()).then(|| div().flex().flex_col().children(server).children(local))
+    }
+}
+
+fn sort_chip_text(column: &str, ascending: bool) -> String {
+    format!(
+        "Sorted by {column}, {}",
+        if ascending { "ascending" } else { "descending" }
+    )
+}
+
+#[cfg(test)]
+mod sort_chip_tests {
+    use super::sort_chip_text;
+
+    #[test]
+    fn the_chip_names_the_column_and_the_direction_in_words() {
+        assert_eq!(sort_chip_text("name", false), "Sorted by name, descending");
+        assert_eq!(sort_chip_text("id", true), "Sorted by id, ascending");
     }
 }
