@@ -360,6 +360,7 @@ impl GridView {
                     .flex_none()
                     .child(rows),
             )
+            .child(self.notifications_indicator(theme, cx))
     }
 }
 

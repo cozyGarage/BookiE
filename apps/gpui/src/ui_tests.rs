@@ -2168,3 +2168,67 @@ fn a_double_click_on_a_table_row_opens_the_active_column_for_editing(cx: &mut Te
         assert_eq!((editing.row, editing.column), (1, 1));
     });
 }
+
+#[gpui::test]
+fn a_failure_goes_to_the_notification_centre_without_moving_the_grid(cx: &mut TestAppContext) {
+    use crate::notifications::NoticeKind;
+    let (view, cx) = open(cx);
+    cx.simulate_resize(gpui::size(gpui::px(1400.0), gpui::px(800.0)));
+    cx.run_until_parked();
+    let before = cx.debug_bounds("grid-actions").expect("the strip is drawn");
+    assert!(
+        cx.debug_bounds("notifications").is_some(),
+        "the bell is always in the status bar"
+    );
+    assert!(cx.debug_bounds("notifications-count").is_none());
+    view.update(cx, |view, cx| {
+        view.save.banner = Some(("Could not save: denied".into(), true));
+        view.push_notice("Could not save: denied".into(), NoticeKind::Error, cx);
+    });
+    cx.run_until_parked();
+    let after = cx.debug_bounds("grid-actions").expect("the strip is drawn");
+    assert_eq!(before.origin.y, after.origin.y, "a failure must not push the grid down");
+    let bell = cx.debug_bounds("notifications").expect("the bell is drawn");
+    let status = cx.debug_bounds("status-bar").expect("the status bar is drawn");
+    assert!(
+        bell.origin.x + bell.size.width >= status.origin.x + status.size.width - gpui::px(16.0),
+        "the bell sits at the bottom right"
+    );
+    assert!(
+        cx.debug_bounds("notifications-count").is_some(),
+        "the unread count shows"
+    );
+    cx.simulate_click(bell.center(), Default::default());
+    cx.run_until_parked();
+    let list = cx.debug_bounds("notifications-list").expect("the list opens");
+    assert!(
+        list.origin.y + list.size.height <= status.origin.y,
+        "the list sits above the status bar"
+    );
+    assert_eq!(view.read_with(cx, |view, _| view.notices.items[0].id), 1);
+    assert!(cx.debug_bounds("notice-1").is_some());
+    let dismiss = cx
+        .debug_bounds("dismiss-notice-1")
+        .expect("each notice can be dismissed");
+    cx.simulate_click(dismiss.center(), Default::default());
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert_eq!(view.notices.unread(), 0));
+    assert!(cx.debug_bounds("notifications-count").is_none());
+    cx.simulate_keystrokes("escape");
+    cx.run_until_parked();
+    assert!(
+        cx.debug_bounds("notifications-list").is_none(),
+        "Escape closes the list"
+    );
+}
+
+#[gpui::test]
+fn the_palette_opens_the_notification_list(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-shift-p");
+    cx.simulate_input("show notifications");
+    cx.simulate_keystrokes("enter");
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert!(view.notices.open));
+    assert!(cx.debug_bounds("notifications-list").is_some());
+}

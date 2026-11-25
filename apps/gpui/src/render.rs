@@ -435,10 +435,10 @@ impl GridView {
         &self,
         theme: Theme,
         strip: Stateful<Div>,
-        bars: (Option<Div>, Option<Div>, Option<Div>, Option<Div>, Option<Div>),
+        bars: (Option<Div>, Option<Div>, Option<Div>, Option<Div>),
         cx: &mut Context<Self>,
     ) -> Div {
-        let (filter_row, compare_bar, save_bar, banner, insert_form) = bars;
+        let (filter_row, compare_bar, save_bar, insert_form) = bars;
         let grid = div()
             .flex_1()
             .flex()
@@ -450,7 +450,6 @@ impl GridView {
             .children(compare_bar)
             .children(save_bar)
             .children(insert_form)
-            .children(banner)
             .child(self.data_table(cx));
         div()
             .flex_1()
@@ -590,7 +589,6 @@ impl Render for GridView {
             .or_else(|| self.export_file_bar(theme, cx))
             .map(|bar| bar_dialog(theme, bar));
         let save_bar = self.save_bar(theme, cx).or_else(|| self.edits_bar(theme, cx));
-        let banner = self.save_banner(theme, cx);
         let bundle_bar = self.connection_bundle_bar(theme, cx);
         let insert_form = self
             .insert_form(theme, cx)
@@ -598,12 +596,7 @@ impl Render for GridView {
             .or_else(|| self.structure_info_panel(theme, cx))
             .or_else(|| self.resolve_panel(theme, cx))
             .or_else(|| self.late_bars(theme, cx));
-        let grid = self.grid_pane(
-            theme,
-            strip,
-            (filter_row, compare_bar, save_bar, banner, insert_form),
-            cx,
-        );
+        let grid = self.grid_pane(theme, strip, (filter_row, compare_bar, save_bar, insert_form), cx);
         let content = match self.tabs.current().clone() {
             Tab::Home => self.home_page(theme, cx),
             Tab::Settings => self.settings_page(theme, cx),
@@ -651,6 +644,7 @@ impl Render for GridView {
             .children(palette)
             .children(full_value_editor)
             .children(bar_dialog)
+            .children(self.notifications_list(theme, cx))
             .children(connection_dialog)
             .children(approval)
             .children(host_key)

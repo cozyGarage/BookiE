@@ -55,6 +55,8 @@ pub mod size {
     pub const HOME_WIDTH: f32 = 980.0;
     pub const SETTINGS_SIDEBAR_WIDTH: f32 = 160.0;
     pub const HOME_TOP: f32 = 96.0;
+    pub const NOTIFICATIONS_WIDTH: f32 = 380.0;
+    pub const NOTIFICATIONS_MAX_HEIGHT: f32 = 420.0;
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

@@ -48,6 +48,7 @@ pub fn known_group(id: &str) -> Option<&'static str> {
         "sidebar"
         | "collapse-sidebar-sections"
         | "sidebar-active-only"
+        | "notifications"
         | "sidebar-regex"
         | "results"
         | "detail"
