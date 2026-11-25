@@ -627,3 +627,42 @@ async fn a_hundred_thousand_row_import_lands_complete_and_reports_its_time() {
         vec![vec![Value::Int(BASELINE_ROWS as i64)]]
     );
 }
+
+#[tokio::test]
+async fn a_slow_write_outlives_the_read_deadline_and_a_slow_read_does_not() {
+    let fixture = fixture().await;
+    fixture
+        .guard
+        .execute_controlled("CREATE TABLE slow (n INTEGER)", &control())
+        .await
+        .expect("create");
+    let short = || OperationControl::with_timeout(Duration::from_millis(100));
+
+    let read = fixture
+        .guard
+        .query_controlled(
+            "WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM c WHERE x < 50000000) SELECT count(*) FROM c",
+            &short(),
+        )
+        .await;
+    assert!(
+        matches!(read, Err(DriverError::TimedOut)),
+        "a read keeps its deadline: {read:?}"
+    );
+
+    let write = fixture
+        .guard
+        .execute_controlled(
+            "WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM c WHERE x < 3000000) INSERT INTO slow SELECT x FROM c",
+            &short(),
+        )
+        .await;
+    assert!(
+        write.is_ok(),
+        "a write is not cancelled by the read deadline: {write:?}"
+    );
+    assert_eq!(
+        rows_in(&fixture.guard, "SELECT count(*) FROM slow").await,
+        vec![vec![Value::Int(3_000_000)]]
+    );
+}
