@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use bookie_core::import::{CsvImportOptions, ImportTarget, build_insert_plan, read_csv};
-use bookie_core::{ConnectOptions, Connection, DatabaseDriver, Environment, OperationControl, TlsConfig, Value};
+use bookie_core::{ConnectOptions, DatabaseDriver, Environment, OperationControl, TlsConfig, Value};
 use bookie_policy::{
     AuditError, AuditEvent, AuditSink, AuditState, AutoApproveSink, BulkBatch, BulkInsertEnd, BulkInsertRequest,
     GuardContext, PolicyConfig, PolicyGuard, Principal,
