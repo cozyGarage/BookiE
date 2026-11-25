@@ -599,12 +599,14 @@ impl GridView {
         Button::new("import-export-menu")
             .ghost()
             .compact()
-            .tooltip("Import / Export connections")
-            .accessibility_label("Import / Export connections")
+            .tooltip("Import and export data and connections")
+            .accessibility_label("Import / Export")
             .child(icon("arrow-down-up", theme.muted_foreground))
             .children(labelled.then(|| div().whitespace_nowrap().child("Import / Export")))
             .dropdown_menu(move |mut menu, _, _| {
                 for (id, label) in [
+                    ("import-csv", "Import CSV into table…"),
+                    ("export-file", "Export table to file…"),
                     ("import-connections", "Import Connections…"),
                     ("export-connections", "Export Connections"),
                 ] {
@@ -612,6 +614,8 @@ impl GridView {
                     menu = menu.item(PopupMenuItem::new(label).on_click(move |_, _, cx| {
                         let _ = owner.update(cx, |this, cx| {
                             match id {
+                                "import-csv" => this.open_import_bar(cx),
+                                "export-file" => this.open_export_file_bar(cx),
                                 "import-connections" => this.pick_connection_import(cx),
                                 "export-connections" => this.pick_connection_export(cx),
                                 _ => {}

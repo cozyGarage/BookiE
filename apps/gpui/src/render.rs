@@ -257,10 +257,12 @@ impl GridView {
                             .on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))),
                     )
                     .child(
-                        button("export", "Export CSV", theme).on_click(cx.listener(|this, _, _, cx| {
-                            this.export_selection_or_page(cx);
-                            cx.notify();
-                        })),
+                        button("export", "Copy CSV", theme)
+                            .tooltip(crate::chrome::tip("Copy the page or selection to the clipboard as CSV"))
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.export_selection_or_page(cx);
+                                cx.notify();
+                            })),
                     )
                     .child(
                         icon_button(
