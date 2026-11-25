@@ -192,7 +192,10 @@ impl GridView {
                 move |this, (sql, source, mapping, elapsed, result)| match result {
                     Ok(table) => {
                         this.panel.error_location = None;
-                        let (rows, truncated) = (bookie_gpui::source::ResultSource::total(&table), table.truncated);
+                        let (rows, truncated) = (
+                            bookie_gpui::source::ResultSource::total(&table),
+                            bookie_gpui::source::ResultSource::is_partial(&table),
+                        );
                         this.panel.messages.statement_ok(&sql, rows, truncated, elapsed);
                         this.panel.messages.server_messages(&table.messages);
                         this.show_plan_of(&table);

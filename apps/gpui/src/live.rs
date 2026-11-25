@@ -16,12 +16,11 @@ use bookie_app_services::value_search::{
     SearchLimits, SearchOptions, SearchReport, SearchRequest, SearchSource, TableTarget, run_search,
 };
 use bookie_core::{ColumnInfo, DriverError, OperationControl, QueryResult, QueryResultBudget, QueryRows, TableInfo};
-use bookie_results::result_scan::ScanSource;
 use tokio_util::sync::CancellationToken;
 
 use crate::model::{Cell, ColumnMeta, Diff, FindResult, PAGE_ROWS, Predicate};
 use crate::shell::table_label;
-use crate::source::{ResultSource, filter_in, find_in};
+use crate::source::{ResultSource, filter_buffered_rows, find_buffered_rows};
 
 pub fn saved_connections() -> Result<Vec<ConnectionSummary>, String> {
     let runtime = tokio::runtime::Builder::new_current_thread()
@@ -273,7 +272,7 @@ impl LiveSession {
         }
         let epoch = self.next_epoch();
         let started = std::time::Instant::now();
-        let (columns, rows, scan, truncated, messages) = self
+        let (result, messages) = self
             .runtime
             .block_on(query_pages(
                 &self.sessions,
@@ -288,10 +287,8 @@ impl LiveSession {
             .map_err(|failure| self.name_the_read_path(failure))?;
         Ok(LiveTable {
             session: self.clone(),
-            columns,
-            rows,
-            scan,
-            truncated,
+            columns: result.columns.iter().map(column_meta).collect(),
+            result,
             snapshot_consistent: false,
             messages,
             executed_sql: Some(sql.to_owned()),
@@ -307,13 +304,11 @@ impl LiveSession {
         cancellation: &CancellationToken,
     ) -> Result<LiveTable, String> {
         let started = std::time::Instant::now();
-        let (columns, rows, scan, truncated) = self.runtime.block_on(spooled_pages(result, ROW_CAP, cancellation))?;
+        let result = bounded_result(result, ROW_CAP, cancellation)?;
         Ok(LiveTable {
             session: self.clone(),
-            columns,
-            rows,
-            scan,
-            truncated,
+            columns: result.columns.iter().map(column_meta).collect(),
+            result,
             messages: Default::default(),
             snapshot_consistent: false,
             executed_sql: Some(sql.to_owned()),
@@ -329,7 +324,7 @@ impl LiveSession {
     ) -> Result<LiveTable, String> {
         let epoch = self.next_epoch();
         let started = std::time::Instant::now();
-        let (columns, rows, scan, truncated) = self.runtime.block_on(dictionary_pages(
+        let result = self.runtime.block_on(dictionary_pages(
             &self.sessions,
             self.session_id,
             capabilities,
@@ -339,10 +334,8 @@ impl LiveSession {
         ))?;
         Ok(LiveTable {
             session: self.clone(),
-            columns,
-            rows,
-            scan,
-            truncated,
+            columns: result.columns.iter().map(column_meta).collect(),
+            result,
             snapshot_consistent: false,
             messages: Default::default(),
             executed_sql: None,
@@ -582,7 +575,7 @@ impl LiveSession {
         }
         let epoch = self.next_epoch();
         let started = std::time::Instant::now();
-        let (mut columns, rows, scan, truncated) = self.runtime.block_on(read_pages(
+        let result = self.runtime.block_on(read_pages(
             &self.sessions,
             self.session_id,
             &table,
@@ -592,15 +585,14 @@ impl LiveSession {
             epoch,
             &self.epoch,
         ))?;
+        let mut columns: Vec<_> = result.columns.iter().map(column_meta).collect();
         for column in &mut columns {
             column.primary_key = key.contains(&column.name);
         }
         Ok(LiveTable {
             session: self.clone(),
             columns,
-            rows,
-            scan,
-            truncated,
+            result,
             snapshot_consistent: self.supports_snapshot_cursor,
             messages: Default::default(),
             executed_sql: None,
@@ -785,9 +777,7 @@ pub struct ServerInfo {
 pub struct LiveTable {
     session: Arc<LiveSession>,
     columns: Vec<ColumnMeta>,
-    rows: QueryRows,
-    scan: ScanSource,
-    pub truncated: bool,
+    result: QueryResult,
     snapshot_consistent: bool,
     pub messages: bookie_core::ServerMessages,
     executed_sql: Option<String>,
@@ -1170,8 +1160,6 @@ impl SubscriptionSampler for RegistrySubscriptionSampler {
     }
 }
 
-type Pages = (Vec<ColumnMeta>, QueryRows, ScanSource, bool);
-
 async fn read_pages(
     sessions: &ReadSessionStore,
     session_id: SessionId,
@@ -1181,7 +1169,7 @@ async fn read_pages(
     cancellation: &CancellationToken,
     epoch: Epoch,
     current_epoch: &AtomicU64,
-) -> Result<Pages, String> {
+) -> Result<QueryResult, String> {
     let open_control = OperationControl::new(cancellation.clone(), Some(tokio::time::Instant::now() + PAGE_TIMEOUT));
     let mut cursor = sessions
         .open_table_cursor_sorted(session_id, table, sort, &open_control)
@@ -1224,14 +1212,10 @@ async fn collect_pages(
     cursor: &mut Option<bookie_app_services::read_session::PostgresTableCursor>,
     epoch: Epoch,
     current_epoch: &AtomicU64,
-) -> Result<Pages, String> {
-    let spool = crate::source::spool_manager()
-        .create()
-        .map_err(|error| error.to_string())?;
+) -> Result<QueryResult, String> {
     let mut infos: Vec<ColumnInfo> = Vec::new();
     let mut rows = QueryRows::new();
     let mut truncated = false;
-    let mut page_index = 0;
     let mut budget = QueryResultBudget::default();
     while (rows.len() as u64) < max_rows {
         let limit = PAGE_ROWS.min(max_rows - rows.len() as u64);
@@ -1256,17 +1240,12 @@ async fn collect_pages(
         }
         let incomplete = bound_page(&mut page, &mut budget);
         let count = page.rows.len() as u64;
-        for row in page.rows.iter() {
-            rows.push(row.to_vec());
+        for row in page.rows.into_rows() {
+            rows.push(row);
         }
-        spool
-            .append_page(page_index, Arc::new(page))
-            .await
-            .map_err(|error| error.to_string())?;
         if cancellation.is_cancelled() {
             return Err("Canceled the operation".into());
         }
-        page_index += 1;
         if incomplete {
             truncated = true;
             break;
@@ -1276,9 +1255,11 @@ async fn collect_pages(
         }
         truncated = (rows.len() as u64) >= max_rows;
     }
-    let total = rows.len() as u64;
-    let columns = infos.iter().map(column_meta).collect();
-    Ok((columns, rows, ScanSource::new(spool, infos, total), truncated))
+    Ok(QueryResult {
+        columns: infos,
+        rows,
+        truncated,
+    })
 }
 
 async fn next_result_page(
@@ -1326,23 +1307,11 @@ async fn query_pages(
     cancellation: &CancellationToken,
     epoch: Epoch,
     current_epoch: &AtomicU64,
-) -> Result<
-    (
-        Vec<ColumnMeta>,
-        QueryRows,
-        ScanSource,
-        bool,
-        bookie_core::ServerMessages,
-    ),
-    QueryFailure,
-> {
+) -> Result<(QueryResult, bookie_core::ServerMessages), QueryFailure> {
     let control = OperationControl::new(cancellation.clone(), Some(tokio::time::Instant::now() + PAGE_TIMEOUT));
     let mut batch = bridge_query_detailed(sessions, session_id, (sql, params), &control, epoch, current_epoch).await?;
     let messages = std::mem::take(&mut batch.messages);
-    let (columns, rows, scan, truncated) = spooled_pages(batch.into_first(), max_rows, cancellation)
-        .await
-        .map_err(QueryFailure::from)?;
-    Ok((columns, rows, scan, truncated, messages))
+    Ok((bounded_result(batch.into_first(), max_rows, cancellation)?, messages))
 }
 
 async fn dictionary_pages(
@@ -1352,7 +1321,7 @@ async fn dictionary_pages(
     cancellation: &CancellationToken,
     epoch: Epoch,
     current_epoch: &AtomicU64,
-) -> Result<Pages, String> {
+) -> Result<QueryResult, String> {
     let control = OperationControl::new(cancellation.clone(), Some(tokio::time::Instant::now() + PAGE_TIMEOUT));
     let event = dispatch_read(
         DispatchContext::Sessions(sessions),
@@ -1370,41 +1339,23 @@ async fn dictionary_pages(
         return Err("The command bridge returned an unexpected event".into());
     };
     let result = outcome.map_err(|failure| driver_failure_message(&failure))?;
-    spooled_pages(result, ROW_CAP, cancellation).await
+    bounded_result(result, ROW_CAP, cancellation)
 }
 
-async fn spooled_pages(
+fn bounded_result(
     mut result: QueryResult,
     max_rows: u64,
     cancellation: &CancellationToken,
-) -> Result<Pages, String> {
+) -> Result<QueryResult, String> {
     if cancellation.is_cancelled() {
         return Err("Canceled the operation".into());
     }
-    let spool = crate::source::spool_manager()
-        .create()
-        .map_err(|error| error.to_string())?;
-    let infos: Vec<ColumnInfo> = result.columns.clone();
     let cap = usize::try_from(max_rows).unwrap_or(usize::MAX);
-    let mut budget = QueryResultBudget::default();
-    let truncated = bound_query_result(&mut result, cap, &mut budget);
-    let page_size = PAGE_ROWS as usize;
-    let mut rows = result.rows.iter();
-    for page_index in 0..result.rows.len().div_ceil(page_size) {
-        let page_rows = rows.by_ref().take(page_size).map(|row| row.to_vec()).collect();
-        let page = QueryResult {
-            columns: infos.clone(),
-            rows: QueryRows::from_rows(page_rows),
-            truncated: false,
-        };
-        spool
-            .append_page(page_index as u64, Arc::new(page))
-            .await
-            .map_err(|error| error.to_string())?;
+    result.truncated = bound_query_result(&mut result, cap, &mut QueryResultBudget::default());
+    if cancellation.is_cancelled() {
+        return Err("Canceled the operation".into());
     }
-    let total = result.rows.len() as u64;
-    let columns = infos.iter().map(column_meta).collect();
-    Ok((columns, result.rows, ScanSource::new(spool, infos, total), truncated))
+    Ok(result)
 }
 
 async fn bridge_query(
@@ -1733,7 +1684,7 @@ impl ResultSource for LiveTable {
     }
 
     fn is_partial(&self) -> bool {
-        self.truncated
+        self.result.truncated
     }
 
     fn snapshot_consistent(&self) -> bool {
@@ -1741,8 +1692,8 @@ impl ResultSource for LiveTable {
     }
 
     fn origin(&self) -> String {
-        let cap = if self.truncated {
-            format!(" · {} rows loaded; result may be incomplete", self.rows.len())
+        let cap = if self.result.truncated {
+            format!(" · {} rows loaded; result may be incomplete", self.result.rows.len())
         } else {
             String::new()
         };
@@ -1763,27 +1714,29 @@ impl ResultSource for LiveTable {
     }
 
     fn total(&self) -> u64 {
-        self.rows.len() as u64
+        self.result.rows.len() as u64
     }
 
     fn row(&self, index: u64) -> Vec<Cell> {
         usize::try_from(index)
             .ok()
-            .and_then(|index| self.rows.get(index))
+            .and_then(|index| self.result.rows.get(index))
             .map(<[Cell]>::to_vec)
             .unwrap_or_default()
     }
 
     fn row_ref(&self, index: u64) -> Option<&[Cell]> {
-        usize::try_from(index).ok().and_then(|index| self.rows.get(index))
+        usize::try_from(index)
+            .ok()
+            .and_then(|index| self.result.rows.get(index))
     }
 
     fn find(&self, query: &str, cap: usize, cancel: &CancellationToken) -> Result<FindResult, &'static str> {
-        find_in(&self.scan, query, cap, cancel)
+        find_buffered_rows(&self.result.rows, self.columns.len(), query, cap, cancel)
     }
 
     fn filter(&self, predicate: &Predicate, cancel: &CancellationToken) -> Result<Vec<u32>, &'static str> {
-        filter_in(&self.scan, predicate, cancel)
+        filter_buffered_rows(&self.result, predicate, cancel)
     }
 
     fn compare(&self, _keyed: bool, _cancel: &CancellationToken) -> Result<Diff, &'static str> {
