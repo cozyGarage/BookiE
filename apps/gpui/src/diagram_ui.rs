@@ -4,8 +4,8 @@ use bookie_app_services::er_diagram::{DiagramTable, SchemaDiagram};
 use gpui::{PathBuilder, canvas, point};
 
 use super::*;
-use crate::chrome::ghost;
 use crate::diagram_scene::{Scene, build_scene};
+use crate::surfaces::{ButtonKind, button};
 
 const DIAGRAM_EDGE_STROKE_WIDTH: f32 = 1.5;
 
@@ -119,16 +119,16 @@ impl GridView {
             )
             .child(div().flex_1())
             .child(
-                ghost("diagram-zoom-out", "Zoom out", theme)
+                button(ButtonKind::Ghost, "diagram-zoom-out", "Zoom out", theme)
                     .on_click(cx.listener(|this, _, _, cx| this.change_diagram_zoom(|z, _| zoom::step_out(z), cx))),
             )
             .child(div().child(format!("{percent}%")))
             .child(
-                ghost("diagram-zoom-in", "Zoom in", theme)
+                button(ButtonKind::Ghost, "diagram-zoom-in", "Zoom in", theme)
                     .on_click(cx.listener(|this, _, _, cx| this.change_diagram_zoom(|z, _| zoom::step_in(z), cx))),
             )
             .child(
-                ghost("diagram-fit", "Fit", theme).on_click(cx.listener(|this, _, window, cx| {
+                button(ButtonKind::Ghost, "diagram-fit", "Fit", theme).on_click(cx.listener(|this, _, window, cx| {
                     let viewport = this.diagram_viewport(window);
                     this.change_diagram_zoom(|_, extent| fit_zoom(extent, viewport), cx)
                 })),
@@ -224,7 +224,7 @@ fn card_rows(
                         .w(px_at(24.0 * zoom))
                         .flex_none()
                         .whitespace_nowrap()
-                        .text_color(rgb(theme.info))
+                        .text_color(rgb(theme.foreground))
                         .child(marker),
                 )
                 .child(div().flex_1().child(column.name.clone()))

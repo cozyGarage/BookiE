@@ -5,7 +5,7 @@ use bookie_core::export::normalize_duplicate_extension;
 use bookie_gpui::live::WriteSession;
 
 use super::*;
-use crate::chrome::ghost;
+use crate::surfaces::{ButtonKind, button, task_bar};
 
 const CONFIRM_WORD: &str = "RESTORE";
 
@@ -229,34 +229,35 @@ impl GridView {
             return None;
         }
         let restore = self.search.backup.restore;
-        let mut bar = div()
-            .flex()
-            .items_center()
-            .gap_3()
-            .p_2()
-            .flex_none()
-            .bg(rgb(theme.chrome))
-            .border_b_1()
-            .border_color(rgb(theme.border))
-            .child(div().font_weight(gpui::FontWeight::MEDIUM).child(if restore {
+        let mut bar = task_bar(
+            if restore {
                 "Restore database"
             } else {
                 "Back up database"
-            }))
-            .child(div().flex_1().min_w_0().child(path));
+            },
+            theme,
+        )
+        .child(div().flex_1().min_w_0().child(path));
         if restore {
             bar = bar.child(div().w(px(size::FORM_CONTROL * 5.0)).child(confirm));
         }
         Some(
             bar.child(
-                ghost("run-backup-job", if restore { "Restore" } else { "Back up" }, theme)
-                    .on_click(cx.listener(|this, _, _, cx| this.start_backup_job(cx))),
+                button(
+                    ButtonKind::Primary,
+                    "run-backup-job",
+                    if restore { "Restore" } else { "Back up" },
+                    theme,
+                )
+                .on_click(cx.listener(|this, _, _, cx| this.start_backup_job(cx))),
             )
             .child(
-                ghost("cancel-backup-job", "Cancel", theme).on_click(cx.listener(|this, _, _, cx| {
-                    this.search.backup.open = false;
-                    cx.notify();
-                })),
+                button(ButtonKind::Ghost, "cancel-backup-job", "Cancel", theme).on_click(cx.listener(
+                    |this, _, _, cx| {
+                        this.search.backup.open = false;
+                        cx.notify();
+                    },
+                )),
             ),
         )
     }

@@ -97,7 +97,7 @@ impl GridView {
     pub(crate) fn run_cursor_actions(&self) -> Vec<Action> {
         vec![Action {
             id: "run-at-cursor",
-            label: "Run the selection or the statement at the cursor".to_string(),
+            label: "Run statement at cursor".to_string(),
             enabled: matches!(self.tabs.current(), Tab::Query),
         }]
     }

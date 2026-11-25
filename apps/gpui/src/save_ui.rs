@@ -8,7 +8,8 @@ use bookie_gpui::live::{LiveSession, SaveFailure, WriteSession};
 use bookie_gpui::save_check::{CellCheck, cell_checks, key_columns, verify};
 
 use super::*;
-use crate::chrome::{ghost, primary_button};
+use crate::chrome::tip;
+use crate::surfaces::{ButtonKind, button, task_bar_frame, task_title};
 
 type SaveOutcome = Result<(Arc<WriteSession>, Result<Vec<u64>, SaveFailure>), String>;
 
@@ -156,7 +157,7 @@ impl GridView {
             done: format!("Deleted {count} row(s)"),
             review: format!("Review the {count} row(s) to delete, then delete or cancel"),
             confirm: "Delete",
-            note: Some("Rows that depend on these (foreign keys, triggers) may be affected too."),
+            note: Some("Rows that depend on these (foreign keys, triggers) may be affected too"),
             reconnect: None,
         };
         self.prepare(live, SaveRequest::Deletes(rows), labels, cx);
@@ -305,7 +306,7 @@ impl GridView {
 
     pub(crate) fn cancel_save(&mut self, cx: &mut Context<Self>) {
         if self.save.pending.take().is_some() {
-            self.status = "Save cancelled; the edits are still pending".into();
+            self.status = "Canceled the save; the edits are still pending".into();
             cx.notify();
         }
     }
@@ -432,24 +433,17 @@ impl GridView {
     }
 
     pub(crate) fn save_banner(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Div> {
-        let (text, is_error) = self.save.banner.clone()?;
+        let (text, is_error) = self.save.banner.clone().filter(|(_, is_error)| *is_error)?;
         Some(
-            div()
-                .flex()
-                .items_center()
-                .gap_2()
-                .px_2()
-                .py_1()
-                .flex_none()
-                .bg(rgb(theme.chrome))
-                .border_b_1()
-                .border_color(rgb(theme.border))
+            task_bar_frame(theme)
                 .when(is_error, |row| row.text_color(rgb(theme.destructive)))
                 .child(div().flex_1().min_w_0().child(text))
                 .child(
-                    ghost("dismiss-save-banner", "Dismiss", theme).on_click(cx.listener(|this, _, _, cx| {
-                        this.dismiss_save_banner(cx);
-                    })),
+                    button(ButtonKind::Ghost, "dismiss-save-banner", "Dismiss", theme).on_click(cx.listener(
+                        |this, _, _, cx| {
+                            this.dismiss_save_banner(cx);
+                        },
+                    )),
                 ),
         )
     }
@@ -466,34 +460,23 @@ impl GridView {
             format!("{count} edit(s) in this view only; nothing is saved")
         };
         Some(
-            div()
+            task_bar_frame(theme)
                 .debug_selector(|| "pending-edits-bar".into())
-                .flex()
-                .items_center()
-                .gap_2()
-                .px_2()
-                .py_1()
-                .flex_none()
-                .bg(rgb(theme.chrome))
-                .border_b_1()
-                .border_color(rgb(theme.border))
                 .child(div().flex_1().min_w_0().child(label))
                 .when(can_save, |bar| {
                     bar.child(
-                        primary_button(
-                            "preview-pending-sql",
-                            "Preview SQL",
-                            "Review the statements, then save or cancel",
-                            theme,
-                        )
-                        .on_click(cx.listener(|this, _, _, cx| this.request_save(cx))),
+                        button(ButtonKind::Primary, "preview-pending-sql", "Preview SQL", theme)
+                            .tooltip(tip("Review the statements, then save or cancel"))
+                            .on_click(cx.listener(|this, _, _, cx| this.request_save(cx))),
                     )
                 })
                 .child(
-                    ghost("discard-pending-edits", "Discard", theme).on_click(cx.listener(|this, _, _, cx| {
-                        this.discard_view_edits();
-                        cx.notify();
-                    })),
+                    button(ButtonKind::Ghost, "discard-pending-edits", "Discard", theme).on_click(cx.listener(
+                        |this, _, _, cx| {
+                            this.discard_view_edits();
+                            cx.notify();
+                        },
+                    )),
                 ),
         )
     }
@@ -501,32 +484,23 @@ impl GridView {
     pub(crate) fn save_bar(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Div> {
         let pending = self.save.pending.as_ref()?;
         Some(
-            div()
-                .flex()
+            task_bar_frame(theme)
                 .flex_col()
+                .items_stretch()
                 .gap_2()
-                .p_2()
-                .flex_none()
-                .bg(rgb(theme.chrome))
-                .border_b_1()
-                .border_color(rgb(theme.border))
                 .child(
                     div()
                         .flex()
                         .items_center()
-                        .gap_2()
-                        .child(div().font_weight(gpui::FontWeight::MEDIUM).child(pending.title.clone()))
+                        .gap_3()
+                        .child(task_title(pending.title.clone()))
                         .child(
-                            primary_button(
-                                "confirm-save",
-                                pending.confirm,
-                                "Run these statements in one transaction",
-                                theme,
-                            )
-                            .on_click(cx.listener(|this, _, _, cx| this.confirm_save(cx))),
+                            button(ButtonKind::Primary, "confirm-save", pending.confirm, theme)
+                                .tooltip(tip("Run these statements in one transaction"))
+                                .on_click(cx.listener(|this, _, _, cx| this.confirm_save(cx))),
                         )
                         .child(
-                            ghost("cancel-save", "Cancel", theme)
+                            button(ButtonKind::Ghost, "cancel-save", "Cancel", theme)
                                 .on_click(cx.listener(|this, _, _, cx| this.cancel_save(cx))),
                         ),
                 )
@@ -545,8 +519,34 @@ impl GridView {
                         .text_size(px(size::TEXT_SMALL))
                         .text_color(rgb(theme.muted_foreground))
                         .child(pending.plan.preview.clone()),
-                ),
+                )
+                .children(preview_overflows(&pending.plan.preview).then(|| {
+                    div()
+                        .debug_selector(|| "save-preview-more".into())
+                        .text_size(px(size::TEXT_SMALL))
+                        .text_color(rgb(theme.muted_foreground))
+                        .child(format!(
+                            "{} lines; scroll the preview for the rest",
+                            pending.plan.preview.lines().count()
+                        ))
+                })),
         )
+    }
+}
+
+fn preview_overflows(preview: &str) -> bool {
+    preview.lines().count() as f32 * size::SAVE_PREVIEW_LINE_HEIGHT > size::SAVE_PREVIEW_MAX_HEIGHT
+}
+
+#[cfg(test)]
+mod preview_tests {
+    use super::preview_overflows;
+
+    #[test]
+    fn a_short_preview_needs_no_scroll_cue_and_a_long_one_does() {
+        assert!(!preview_overflows("UPDATE t SET a = ? WHERE id = ?"));
+        let long = (0..12).map(|n| format!("{n}: value")).collect::<Vec<_>>().join("\n");
+        assert!(preview_overflows(&long));
     }
 }
 

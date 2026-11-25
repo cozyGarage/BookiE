@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use super::*;
-use crate::chrome::ghost;
+use crate::surfaces::{ButtonKind, button, task_bar_frame};
 use bookie_app_services::connection_bundle as bundles;
 use gpui_component::scroll::ScrollableElement;
 
@@ -162,7 +162,7 @@ impl GridView {
             let Some(path) = selected else {
                 this.update(cx, |this, cx| {
                     this.connection_bundle.busy = false;
-                    this.status = "Cancelled the connection import".into();
+                    this.status = "Canceled the connection import".into();
                     cx.notify();
                 })
                 .ok();
@@ -253,7 +253,7 @@ impl GridView {
         if let Some(passphrase) = &self.connection_bundle.passphrase {
             passphrase.update(cx, |input, cx| input.set_content("", cx));
         }
-        self.status = "Cancelled the connection import".into();
+        self.status = "Canceled the connection import".into();
         cx.notify();
     }
 
@@ -312,7 +312,7 @@ impl GridView {
             let Some(path) = selected else {
                 this.update(cx, |this, cx| {
                     this.connection_bundle.busy = false;
-                    this.status = "Cancelled the connection export".into();
+                    this.status = "Canceled the connection export".into();
                     cx.notify();
                 })
                 .ok();
@@ -362,17 +362,10 @@ impl GridView {
             let count = pending.plan.items.len();
             let skipped = pending.skipped.len();
             return Some(
-                div()
+                task_bar_frame(theme)
                     .w_full()
                     .debug_selector(|| "connection-import-review".into())
-                    .flex()
                     .items_start()
-                    .gap_3()
-                    .p_2()
-                    .flex_none()
-                    .bg(rgb(theme.chrome))
-                    .border_b_1()
-                    .border_color(rgb(theme.border))
                     .child(
                         div()
                             .flex_1()
@@ -406,11 +399,11 @@ impl GridView {
                             }),
                     )
                     .child(
-                        ghost("confirm-connection-import", "Import", theme)
+                        button(ButtonKind::Primary, "confirm-connection-import", "Import", theme)
                             .on_click(cx.listener(|this, _, _, cx| this.apply_connection_import(cx))),
                     )
                     .child(
-                        ghost("cancel-connection-import", "Cancel", theme)
+                        button(ButtonKind::Ghost, "cancel-connection-import", "Cancel", theme)
                             .on_click(cx.listener(|this, _, _, cx| this.cancel_connection_import(cx))),
                     ),
             );
@@ -418,22 +411,14 @@ impl GridView {
         if self.connection_bundle.encrypted.is_some() {
             let input = self.connection_bundle.passphrase.clone()?;
             return Some(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap_3()
-                    .p_2()
-                    .flex_none()
-                    .bg(rgb(theme.chrome))
-                    .border_b_1()
-                    .border_color(rgb(theme.border))
+                task_bar_frame(theme)
                     .child(div().flex_1().child(input))
                     .child(
-                        ghost("unlock-connection-import", "Review", theme)
+                        button(ButtonKind::Primary, "unlock-connection-import", "Review", theme)
                             .on_click(cx.listener(|this, _, _, cx| this.unlock_connection_import(cx))),
                     )
                     .child(
-                        ghost("cancel-connection-import", "Cancel", theme)
+                        button(ButtonKind::Ghost, "cancel-connection-import", "Cancel", theme)
                             .on_click(cx.listener(|this, _, _, cx| this.cancel_connection_import(cx))),
                     ),
             );
@@ -472,7 +457,7 @@ fn apply_import(pending: PendingImport) -> Result<usize, String> {
                 None,
             )
             .await
-            .map_err(|_| "The import was cancelled because its audit record could not be saved".to_string())?;
+            .map_err(|_| "Canceled the import because its audit record could not be saved".to_string())?;
         let started = Instant::now();
         let outcome = apply_import_body(pending.body, pending.plan).await;
         let (status, affected) = match &outcome {
@@ -522,7 +507,7 @@ fn export_connections(path: PathBuf) -> Result<usize, String> {
                 None,
             )
             .await
-            .map_err(|_| "The export was cancelled because its audit record could not be saved".to_string())?;
+            .map_err(|_| "Canceled the export because its audit record could not be saved".to_string())?;
         let started = Instant::now();
         let outcome = write_export(path, connections).await;
         let status = if outcome.is_ok() {

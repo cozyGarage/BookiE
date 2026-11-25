@@ -29,7 +29,7 @@ impl GridView {
                 let mut all_tables = Vec::new();
                 for table in &live.tables {
                     if cancel.is_cancelled() {
-                        return Err("Cancelled".to_string());
+                        return Err("Canceled the schema comparison".to_string());
                     }
                     let columns = live.table_columns(table)?;
                     let foreign_keys =

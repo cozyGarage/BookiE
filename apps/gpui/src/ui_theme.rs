@@ -105,13 +105,29 @@ pub fn install_named(name: &str, cx: &mut App) -> bool {
     let dark = config.mode.is_dark();
     ComponentTheme::change(config.mode, None, cx);
     apply_config(&config, cx);
-    let theme = from_component(dark, cx);
+    let theme = from_component(dark, cx).with_readable_text();
+    apply_readable_colors(&theme, cx);
     if let Some(EditorSize(size)) = cx.try_global::<EditorSize>() {
         let size = *size;
         ComponentTheme::global_mut(cx).mono_font_size = gpui::px(size);
     }
     cx.set_global(Active(theme));
     true
+}
+
+fn apply_readable_colors(theme: &Theme, cx: &mut App) {
+    let color = |value: u32| gpui::Hsla::from(gpui::rgb(value));
+    let colors = &mut ComponentTheme::global_mut(cx).colors;
+    colors.muted_foreground = color(theme.muted_foreground);
+    colors.danger = color(theme.destructive);
+    colors.info = color(theme.info);
+    colors.warning = color(theme.warning);
+    colors.success = color(theme.success);
+    colors.ring = color(theme.focus_ring);
+    colors.table_active = color(theme.active_row);
+    colors.list_active = color(theme.active_row);
+    colors.selection = color(theme.active_row);
+    colors.table_even = color(theme.stripe);
 }
 
 fn apply_config(config: &Rc<ThemeConfig>, cx: &mut App) {
@@ -167,6 +183,24 @@ mod tests {
             Theme::light().install(cx);
             assert_eq!(Theme::current(cx), Theme::light());
             assert!(!ComponentTheme::global(cx).mode.is_dark());
+        });
+    }
+
+    #[gpui::test]
+    fn every_bundled_theme_reaches_text_and_indicator_contrast_once_installed(cx: &mut gpui::TestAppContext) {
+        cx.update(|cx| {
+            gpui_kit::init(cx);
+            load_bundled_themes(cx);
+            let mut failures = Vec::new();
+            for name in bundled_theme_names(cx) {
+                assert!(install_named(&name, cx), "{name}");
+                failures.extend(
+                    bookie_gpui::theme::contrast_failures(&[Theme::current(cx)])
+                        .into_iter()
+                        .map(|failure| format!("{name}: {failure}")),
+                );
+            }
+            assert!(failures.is_empty(), "{failures:#?}");
         });
     }
 

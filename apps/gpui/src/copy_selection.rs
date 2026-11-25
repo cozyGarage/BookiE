@@ -35,7 +35,7 @@ impl GridView {
 
     pub(crate) fn copy_selection_as(&mut self, format: CopyFormat, cx: &mut Context<Self>) {
         if format == CopyFormat::Insert && (self.grid_is_query || self.catalog.tables.is_empty()) {
-            self.status = "Copy as INSERT is available for table rows only.".into();
+            self.status = "Copy as INSERT is available for table rows only".into();
             return;
         }
         let Some(selection) = self.selection else { return };

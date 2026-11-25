@@ -5,7 +5,7 @@ use bookie_core::{
 };
 
 use super::*;
-use crate::chrome::ghost;
+use crate::surfaces::{ButtonKind, button, task_bar};
 
 pub(crate) fn filter_statement(
     driver_id: &str,
@@ -161,22 +161,15 @@ impl GridView {
         }
         let entry = operator(OPERATORS[self.search.rule.operator % OPERATORS.len()].op);
         let needs_value = entry.shape != ValueShape::None;
-        let mut bar = div()
-            .flex()
-            .items_center()
-            .gap_3()
-            .p_2()
-            .flex_none()
-            .bg(rgb(theme.chrome))
-            .border_b_1()
-            .border_color(rgb(theme.border))
-            .child(div().font_weight(gpui::FontWeight::MEDIUM).child("Filter by rule"))
+        let mut bar = task_bar("Filter by rule", theme)
             .child(div().w(px(size::FORM_CONTROL * 3.0)).child(column))
             .child(
-                ghost("filter-rule-operator", entry.label, theme).on_click(cx.listener(|this, _, _, cx| {
-                    this.search.rule.operator = (this.search.rule.operator + 1) % OPERATORS.len();
-                    cx.notify();
-                })),
+                button(ButtonKind::Ghost, "filter-rule-operator", entry.label, theme).on_click(cx.listener(
+                    |this, _, _, cx| {
+                        this.search.rule.operator = (this.search.rule.operator + 1) % OPERATORS.len();
+                        cx.notify();
+                    },
+                )),
             );
         if needs_value {
             bar = bar.child(div().flex_1().min_w_0().child(value));
@@ -185,14 +178,16 @@ impl GridView {
         }
         Some(
             bar.child(
-                ghost("run-filter-rule", "Filter", theme)
+                button(ButtonKind::Primary, "run-filter-rule", "Filter", theme)
                     .on_click(cx.listener(|this, _, _, cx| this.run_filter_rule(cx))),
             )
             .child(
-                ghost("cancel-filter-rule", "Cancel", theme).on_click(cx.listener(|this, _, _, cx| {
-                    this.search.rule.open = false;
-                    cx.notify();
-                })),
+                button(ButtonKind::Ghost, "cancel-filter-rule", "Cancel", theme).on_click(cx.listener(
+                    |this, _, _, cx| {
+                        this.search.rule.open = false;
+                        cx.notify();
+                    },
+                )),
             ),
         )
     }

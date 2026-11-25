@@ -12,7 +12,7 @@ impl GridView {
     pub(crate) fn reconnect_actions(&self) -> Vec<Action> {
         vec![Action {
             id: "reconnect",
-            label: "Reconnect and refresh the table list (closes other tabs)".to_string(),
+            label: "Reconnect and refresh the table list".to_string(),
             enabled: self.live.is_some() && self.search.origin.is_some(),
         }]
     }
