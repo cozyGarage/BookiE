@@ -606,6 +606,61 @@ fn cancelling_the_review_keeps_the_edit_and_a_read_only_table_cannot_start_a_sav
     });
 }
 
+fn open_review<'a>(
+    cx: &'a mut TestAppContext,
+    name: &str,
+) -> (
+    gpui::Entity<GridView>,
+    &'a mut gpui::VisualTestContext,
+    std::path::PathBuf,
+) {
+    let path = fixture_copy(name);
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.selection = Some(crate::Selection { anchor: 0, focus: 0 });
+            view.cell_edit
+                .edits
+                .insert((0, 1), bookie_gpui::model::Cell::Text("Changed".into()));
+            cx.notify();
+        })
+    });
+    cx.simulate_keystrokes("ctrl-s");
+    settle_saving(cx);
+    view.read_with(cx, |view, _| assert!(view.save.pending.is_some(), "{}", view.status));
+    cx.update(|window, cx| window.render_frame(cx));
+    (view, cx, path)
+}
+
+#[gpui::test]
+fn escape_cancels_the_review_and_keeps_the_pending_edit(cx: &mut TestAppContext) {
+    let (view, cx, path) = open_review(cx, "review-escape");
+    assert!(cx.debug_bounds("bar-dialog").is_some());
+    cx.simulate_keystrokes("escape");
+    settle_saving(cx);
+    cx.update(|window, cx| window.render_frame(cx));
+    view.read_with(cx, |view, _| {
+        assert!(view.save.pending.is_none());
+        assert_eq!(view.cell_edit.edits.len(), 1, "cancelling keeps the pending edit");
+    });
+    assert!(cx.debug_bounds("bar-dialog").is_none());
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn keys_do_not_reach_the_grid_behind_the_review(cx: &mut TestAppContext) {
+    let (view, cx, path) = open_review(cx, "review-keys");
+    let selection = view.read_with(cx, |view, _| view.selection);
+    cx.simulate_keystrokes("shift-down delete");
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.selection, selection);
+        assert_eq!(view.cell_edit.edits.len(), 1);
+        assert!(view.save.pending.is_some(), "the review stays open");
+    });
+    std::fs::remove_file(&path).ok();
+}
+
 #[gpui::test]
 fn deleting_is_refused_in_compare_mode_where_rows_are_not_dataset_rows(cx: &mut TestAppContext) {
     let path = fixture_copy("delete-compare");
@@ -768,6 +823,10 @@ fn a_value_that_does_not_fit_stops_the_review_keeps_the_form_and_cells_stay_lock
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| view.update(cx, |view, cx| view.open_insert_form(cx)));
     settle_saving(cx);
+    assert!(
+        cx.debug_bounds("bar-dialog").is_some(),
+        "the new row form opens as a dialog over the grid"
+    );
     fill_insert_field(&view, cx, "total", "not a number");
     cx.update(|_, cx| view.update(cx, |view, cx| view.review_insert(cx)));
     settle_saving(cx);
@@ -910,6 +969,11 @@ fn an_excel_file_is_reviewed_like_a_csv_file(cx: &mut TestAppContext) {
             pending.plan.preview
         );
     });
+    cx.run_until_parked();
+    assert!(
+        cx.debug_bounds("bar-dialog").is_some(),
+        "the review opens as a dialog over the grid"
+    );
     assert_eq!(order_count(&path), "6", "nothing is imported before the user confirms");
     std::fs::remove_file(&path).ok();
 }

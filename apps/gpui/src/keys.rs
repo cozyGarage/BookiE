@@ -40,6 +40,13 @@ impl GridView {
             }
             return;
         }
+        if self.save.pending.is_some() {
+            if event.keystroke.key == "escape" {
+                self.cancel_save(cx);
+            }
+            cx.stop_propagation();
+            return;
+        }
         let modifiers = event.keystroke.modifiers;
         let control = control_modifier(modifiers);
         if !self.grid_key_ready(window, control || modifiers.alt) {
@@ -141,7 +148,7 @@ impl GridView {
     }
 
     pub(super) fn key_down(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
-        if self.approval.current.is_some() {
+        if self.approval.current.is_some() || self.save.pending.is_some() {
             cx.stop_propagation();
             return;
         }
