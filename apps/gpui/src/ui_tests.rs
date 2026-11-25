@@ -126,7 +126,7 @@ fn the_query_toolbar_connection_chip_opens_the_connection_status(cx: &mut TestAp
     cx.simulate_click(chip.center(), Default::default());
     cx.run_until_parked();
     view.read_with(cx, |view, _| {
-        assert_eq!(view.status, "No active database connection.");
+        assert_eq!(view.status, "No active database connection");
     });
 }
 

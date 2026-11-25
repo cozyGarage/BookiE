@@ -391,7 +391,7 @@ impl GridView {
                 "Reveal table in sidebar",
                 matches!(self.tabs.current(), Tab::Table(_)),
             ),
-            action("collapse-sidebar-sections", "Collapse all sidebar sections", true),
+            action("collapse-sidebar-sections", "Collapse the sidebar tree", true),
             action("sidebar-active-only", "Show only the active table in the sidebar", true),
             action("sidebar-regex", "Filter the sidebar with a regular expression", true),
             action(
