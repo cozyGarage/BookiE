@@ -168,8 +168,13 @@ impl GridView {
         use gpui_component::button::{Button, ButtonVariants};
         use gpui_component::menu::DropdownMenu;
         let compact = self.synced_width < 1000.0;
-        let groups =
-            crate::menus::command_groups(self, &[&["first", "last"], &["compare", "export-csv", "continuous"]]);
+        let groups = crate::menus::command_groups(
+            self,
+            &[
+                &["first", "last"],
+                &["refresh-table", "compare", "export-csv", "continuous"],
+            ],
+        );
         div()
             .flex()
             .debug_selector(|| "grid-actions".into())
@@ -201,6 +206,14 @@ impl GridView {
             )
             .when(!compact, |actions| {
                 actions
+                    .children((self.live.is_some() && !self.grid_is_query).then(|| {
+                        button("refresh-table", "Refresh", theme)
+                            .debug_selector(|| "refresh-table".into())
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.refresh_table(cx);
+                                cx.notify();
+                            }))
+                    }))
                     .children({
                         let hidden = self.table.read(cx).delegate().hidden_column_count();
                         (hidden > 0).then(|| {
