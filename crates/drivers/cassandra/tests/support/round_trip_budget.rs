@@ -25,11 +25,21 @@ async fn a_simple_select_stays_within_its_server_command_budget() {
         "create Cassandra audit log directory: {audit_dir_output:?}"
     );
     let mut set_audit_dir_owner = container
-        .exec(ExecCommand::new(["chown", "cassandra:cassandra", "/opt/cassandra/logs/audit"]))
+        .exec(ExecCommand::new([
+            "chown",
+            "cassandra:cassandra",
+            "/opt/cassandra/logs/audit",
+        ]))
         .await
         .expect("set Cassandra audit log directory owner");
-    let owner_output = set_audit_dir_owner.stdout_to_vec().await.expect("audit directory owner output");
-    let owner_error = set_audit_dir_owner.stderr_to_vec().await.expect("audit directory owner error");
+    let owner_output = set_audit_dir_owner
+        .stdout_to_vec()
+        .await
+        .expect("audit directory owner output");
+    let owner_error = set_audit_dir_owner
+        .stderr_to_vec()
+        .await
+        .expect("audit directory owner error");
     assert_eq!(
         set_audit_dir_owner
             .exit_code()
@@ -53,8 +63,8 @@ async fn a_simple_select_stays_within_its_server_command_budget() {
         .await
         .expect("enable Cassandra audit log");
     let enable_output = enable.stdout_to_vec().await.expect("audit setup output");
-    let enable_error = String::from_utf8(enable.stderr_to_vec().await.expect("audit setup error"))
-        .expect("UTF-8 audit setup error");
+    let enable_error =
+        String::from_utf8(enable.stderr_to_vec().await.expect("audit setup error")).expect("UTF-8 audit setup error");
     assert_eq!(
         enable.exit_code().await.expect("audit setup exit code"),
         Some(0),
