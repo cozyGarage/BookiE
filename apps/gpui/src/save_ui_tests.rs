@@ -902,6 +902,11 @@ fn an_excel_file_is_reviewed_like_a_csv_file(cx: &mut TestAppContext) {
             pending.plan.preview
         );
     });
+    cx.run_until_parked();
+    assert!(
+        cx.debug_bounds("bar-dialog").is_some(),
+        "the review opens as a dialog over the grid"
+    );
     assert_eq!(order_count(&path), "6", "nothing is imported before the user confirms");
     std::fs::remove_file(&path).ok();
 }

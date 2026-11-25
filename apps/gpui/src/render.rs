@@ -580,8 +580,9 @@ impl Render for GridView {
         let bar_dialog = self
             .import_bar(theme, cx)
             .or_else(|| self.export_file_bar(theme, cx))
+            .or_else(|| self.save_bar(theme, cx))
             .map(|bar| bar_dialog(theme, bar));
-        let save_bar = self.save_bar(theme, cx).or_else(|| self.edits_bar(theme, cx));
+        let save_bar = self.save.pending.is_none().then(|| self.edits_bar(theme, cx)).flatten();
         let banner = self.save_banner(theme, cx);
         let bundle_bar = self.connection_bundle_bar(theme, cx);
         let insert_form = self
