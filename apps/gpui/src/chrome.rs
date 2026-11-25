@@ -171,6 +171,8 @@ fn toolbar_labelled(
         .debug_selector(move || id.into())
         .tooltip(tip(tooltip))
         .flex()
+        .flex_none()
+        .whitespace_nowrap()
         .items_center()
         .gap_1()
         .px_2()
@@ -599,7 +601,7 @@ impl GridView {
             .tooltip("Import / Export connections")
             .accessibility_label("Import / Export connections")
             .child(icon("arrow-down-up", theme.muted_foreground))
-            .children(labelled.then(|| div().child("Import / Export")))
+            .children(labelled.then(|| div().whitespace_nowrap().child("Import / Export")))
             .dropdown_menu(move |mut menu, _, _| {
                 for (id, label) in [
                     ("import-connections", "Import Connections…"),
