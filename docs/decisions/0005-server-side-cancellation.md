@@ -98,6 +98,7 @@ Status of this section: accepted by merging the proposal for #3910; the guard ch
 - **A deadline that has already passed before dispatch** is kept, so the write is refused before it starts. Nothing ran, so this is safe, and it keeps the existing "expired control refuses the write" behaviour.
 - **Administrative operations** (backup, restore and the other `StatementClass::Administrative` work) keep their deadline and their unknown-outcome handling.
 - **Agents** (MCP and agentd principals) keep the deadline on writes, because no person is watching. This is the conservative answer to the third open question and can be revisited.
+- **The blast radius estimate** that runs before a DML statement is a read, so it keeps the caller's read deadline. If counting the affected rows takes longer than the deadline, the statement is refused before it starts with a timeout. Nothing ran, so this is safe, but a very large `UPDATE` or `INSERT … SELECT` can still fail this way; a DDL statement has no estimate.
 - **The optional write timeout** is not built; Stop is enough for now.
 
 Tests: a read past the deadline is still `TimedOut`, an `ALTER TABLE` past the read deadline keeps running, and Stop still cancels it (`a_write_does_not_get_the_read_deadline_but_a_read_does`). The per-engine slow `UPDATE`/`ALTER` tests from the consequences list are not written yet.
