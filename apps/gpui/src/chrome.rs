@@ -68,38 +68,7 @@ fn toolbar_window_controls(decorations: Decorations, supported: WindowControls) 
     }
 }
 
-fn toolbar_labelled(
-    id: &'static str,
-    name: &'static str,
-    text: &'static str,
-    tooltip: &'static str,
-    theme: Theme,
-) -> Stateful<Div> {
-    div()
-        .id(id)
-        .debug_selector(move || id.into())
-        .tooltip(tip(tooltip))
-        .flex()
-        .items_center()
-        .gap_1()
-        .px_2()
-        .h(px(size::SMALL_CONTROL))
-        .rounded(px(theme.radius))
-        .cursor_pointer()
-        .text_color(rgb(theme.foreground))
-        .hover(move |style| style.bg(rgb(theme.accent)))
-        .child(icon(name, theme.muted_foreground))
-        .child(text)
-}
-
-pub(crate) fn environment_color(environment: Environment, theme: Theme) -> Option<u32> {
-    match environment {
-        Environment::Local => None,
-        Environment::Dev => Some(theme.info),
-        Environment::Staging => Some(theme.warning),
-        Environment::Prod => Some(theme.destructive),
-    }
-}
+pub(crate) use crate::surfaces::environment_color;
 
 pub(crate) fn environment_tint(environment: Environment, theme: Theme) -> u32 {
     environment_color(environment, theme).map_or(theme.background, |color| mix(theme.background, color, 0.18))
@@ -191,7 +160,13 @@ impl GridView {
                     .children(environment_chip(self.live_environment(), theme))
                     .child(
                         (if labelled {
-                            toolbar_labelled("new-connection", "database", "New connection", "New connection", theme)
+                            crate::surfaces::icon_label_button(
+                                "new-connection",
+                                "database",
+                                "New connection",
+                                "New connection",
+                                theme,
+                            )
                         } else {
                             icon_button("new-connection", "database", "New connection", theme)
                         })
@@ -204,7 +179,13 @@ impl GridView {
                     )
                     .child(
                         (if labelled {
-                            toolbar_labelled("new-query", "file-plus", "New query", "New query", theme)
+                            crate::surfaces::icon_label_button(
+                                "new-query",
+                                "file-plus",
+                                "New query",
+                                "New query",
+                                theme,
+                            )
                         } else {
                             icon_button("new-query", "file-plus", "New query", theme)
                         })
@@ -617,7 +598,7 @@ impl GridView {
             .h_full()
             .w(px(size::SPLITTER))
             .cursor_col_resize()
-            .hover(move |style| style.bg(rgb(theme.info)))
+            .hover(move |style| style.bg(rgb(theme.focus_ring)))
             .on_mouse_down(
                 gpui::MouseButton::Left,
                 cx.listener(|this, _: &MouseDownEvent, _, cx| {
@@ -770,7 +751,11 @@ impl GridView {
             .cursor_pointer()
             .child(icon(
                 tab_icon_name(tab),
-                if selected { theme.info } else { theme.muted_foreground },
+                if selected {
+                    theme.foreground
+                } else {
+                    theme.muted_foreground
+                },
             ))
             .children(
                 matches!(tab, Tab::Table(_) | Tab::Query)
@@ -784,7 +769,7 @@ impl GridView {
             item.bg(rgb(theme.background))
                 .text_color(rgb(theme.foreground))
                 .border_b_2()
-                .border_color(rgb(theme.info))
+                .border_color(rgb(theme.foreground))
         } else {
             item.text_color(rgb(theme.muted_foreground))
                 .hover(move |style| style.bg(rgb(theme.accent)))
@@ -1137,7 +1122,7 @@ pub(crate) fn indent_guides(depth: usize, theme: Theme) -> impl Iterator<Item = 
             .top_0()
             .bottom_0()
             .left(px(guide_left(level)))
-            .w(px(1.0))
+            .w(px(size::HAIRLINE))
             .bg(rgb(theme.border))
     })
 }

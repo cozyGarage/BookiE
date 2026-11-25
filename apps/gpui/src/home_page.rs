@@ -237,7 +237,7 @@ impl GridView {
                         .rounded(px(theme.radius))
                         .text_size(px(size::TEXT_SMALL))
                         .font_family("monospace")
-                        .text_color(rgb(if ok { theme.foreground } else { theme.warning }))
+                        .text_color(rgb(if ok { theme.foreground } else { theme.destructive }))
                         .child(text)
                 }))
         };

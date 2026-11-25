@@ -1,9 +1,9 @@
 use bookie_core::Value;
-use gpui::{Context, Div, Stateful, div, prelude::*, rgb};
+use gpui::{Context, Div, Stateful, div, prelude::*, px, rgb};
 
 use crate::GridView;
 use crate::surfaces::{ButtonKind, compact_button, compact_icon_button};
-use bookie_gpui::theme::Theme;
+use bookie_gpui::theme::{Theme, size};
 
 #[derive(Clone, Debug)]
 pub(crate) struct FkPeekState {
@@ -44,13 +44,13 @@ impl GridView {
                                 .gap_2()
                                 .child(
                                     div()
-                                        .text_xs()
+                                        .text_size(px(size::TEXT_SMALL))
                                         .text_color(rgb(theme.muted_foreground))
                                         .child("Foreign Key Peek:"),
                                 )
                                 .child(
                                     div()
-                                        .text_xs()
+                                        .text_size(px(size::TEXT_SMALL))
                                         .font_weight(gpui::FontWeight::SEMIBOLD)
                                         .text_color(rgb(theme.foreground))
                                         .child(table_name),
@@ -87,7 +87,7 @@ impl GridView {
                                 .flex()
                                 .flex_col()
                                 .py_0p5()
-                                .text_xs()
+                                .text_size(px(size::TEXT_SMALL))
                                 .child(div().text_color(rgb(theme.muted_foreground)).child(col))
                                 .child(div().min_w_0().text_color(rgb(theme.foreground)).child(val))
                         })),

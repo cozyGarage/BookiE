@@ -189,7 +189,7 @@ impl GridView {
             .flex_none()
             .cursor_row_resize()
             .bg(rgb(theme.border))
-            .hover(move |style| style.bg(rgb(theme.info)))
+            .hover(move |style| style.bg(rgb(theme.focus_ring)))
             .on_mouse_down(
                 gpui::MouseButton::Left,
                 cx.listener(|this, _: &MouseDownEvent, _, cx| {
@@ -412,7 +412,7 @@ impl GridView {
                         .map(|message| {
                             let line = div().child(message.text.clone());
                             match message.kind {
-                                MessageKind::Error => line.text_color(rgb(theme.warning)),
+                                MessageKind::Error => line.text_color(rgb(theme.destructive)),
                                 MessageKind::Info => line.text_color(rgb(theme.muted_foreground)),
                                 MessageKind::Success => line,
                             }

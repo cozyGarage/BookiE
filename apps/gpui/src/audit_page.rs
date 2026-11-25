@@ -99,7 +99,7 @@ impl GridView {
     fn audit_row(&self, index: usize, row: &OperationRow, theme: Theme) -> Stateful<Div> {
         let attention = audit_view::row_needs_attention(row);
         let (mark, color) = if attention {
-            ("x", theme.warning)
+            ("x", theme.destructive)
         } else {
             ("circle", theme.success)
         };
@@ -142,7 +142,7 @@ impl GridView {
                     .children(row.error.as_ref().map(|error| {
                         div()
                             .text_size(px(size::TEXT_SMALL))
-                            .text_color(rgb(theme.warning))
+                            .text_color(rgb(theme.destructive))
                             .child(one_line(error))
                     })),
             )

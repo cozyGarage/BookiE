@@ -258,7 +258,10 @@ impl GridView {
                         .py_1()
                         .border_b_1()
                         .border_color(rgb(theme.border))
-                        .when(clickable, |row| row.cursor_pointer().text_color(rgb(theme.info)))
+                        .when(clickable, |row| {
+                            row.cursor_pointer()
+                                .text_color(rgb(crate::surfaces::link_colour(theme)))
+                        })
                         .child(
                             div()
                                 .min_w_0()

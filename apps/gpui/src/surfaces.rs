@@ -137,6 +137,45 @@ pub(crate) fn toggle_icon_button(
         )
 }
 
+pub(crate) fn link_colour(theme: Theme) -> u32 {
+    theme.info
+}
+
+pub(crate) fn environment_color(environment: bookie_core::Environment, theme: Theme) -> Option<u32> {
+    match environment {
+        bookie_core::Environment::Local => None,
+        bookie_core::Environment::Dev => Some(theme.info),
+        bookie_core::Environment::Staging => Some(theme.warning),
+        bookie_core::Environment::Prod => Some(theme.destructive),
+    }
+}
+
+pub(crate) fn icon_label_button(
+    id: &'static str,
+    name: &'static str,
+    text: &'static str,
+    tooltip: &'static str,
+    theme: Theme,
+) -> Stateful<Div> {
+    div()
+        .id(id)
+        .debug_selector(move || id.into())
+        .role(Role::Button)
+        .aria_label(tooltip)
+        .tooltip(tooltip_view(tooltip.into()))
+        .flex()
+        .items_center()
+        .gap_1()
+        .px_2()
+        .h(px(Bar::Small.height()))
+        .rounded(px(theme.radius))
+        .cursor_pointer()
+        .text_color(rgb(theme.foreground))
+        .hover(move |style| style.bg(rgb(theme.accent)))
+        .child(icon(name, theme.muted_foreground))
+        .child(text)
+}
+
 pub(crate) fn button(
     kind: ButtonKind,
     id: impl Into<ElementId>,

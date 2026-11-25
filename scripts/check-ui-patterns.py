@@ -24,6 +24,7 @@ EMPTY_LABEL = re.compile(r"\b(?:ghost|button|primary_button)\([^)]*,\s*\"\"")
 SHADOW = re.compile(r"\.shadow_(?:sm|md|lg|xl|2xl)\(\)")
 RAW_COLOUR_ALLOWED = {"type_colors.rs"}
 SHADOW_ALLOWED = {"surfaces.rs"}
+INFO_ALLOWED = {"surfaces.rs", "ui_theme.rs"}
 PATTERNS = {
     "thread_local": lambda line: "thread_local!" in line,
     "literal-spacing": lambda line: any(int(a or b or c) != 0 for a, b, c in SPACING.findall(line)),
@@ -34,7 +35,7 @@ GPUI_PATTERNS = {
     "gpui-raw-colour": lambda line, name: name not in RAW_COLOUR_ALLOWED and bool(RAW_COLOUR.search(line)),
     "gpui-text-size-class": lambda line, name: len(TEXT_SIZE_CLASS.findall(line)),
     "gpui-empty-label": lambda line, name: bool(EMPTY_LABEL.search(line)),
-    "gpui-info-colour": lambda line, name: "theme.info" in line,
+    "gpui-info-colour": lambda line, name: name not in INFO_ALLOWED and "theme.info" in line,
     "gpui-shadow": lambda line, name: name not in SHADOW_ALLOWED and bool(SHADOW.search(line)),
 }
 

@@ -224,7 +224,7 @@ fn card_rows(
                         .w(px_at(24.0 * zoom))
                         .flex_none()
                         .whitespace_nowrap()
-                        .text_color(rgb(theme.info))
+                        .text_color(rgb(theme.foreground))
                         .child(marker),
                 )
                 .child(div().flex_1().child(column.name.clone()))

@@ -555,7 +555,9 @@ impl TableDelegate for GridDelegate {
                             .overflow_hidden()
                             .when(!wrap, |cell| cell.whitespace_nowrap().text_ellipsis())
                             .when(wrap, |cell| cell.line_clamp(bookie_gpui::theme::size::WRAP_LINES))
-                            .when(link, |cell| cell.text_color(gpui::rgb(Theme::current(cx).info)))
+                            .when(link, |cell| {
+                                cell.text_color(gpui::rgb(crate::surfaces::link_colour(Theme::current(cx))))
+                            })
                             .when(right, |cell| cell.text_right())
                             .child(text),
                     )
