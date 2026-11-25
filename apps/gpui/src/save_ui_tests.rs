@@ -874,6 +874,49 @@ fn set_import_path(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestConte
 }
 
 #[gpui::test]
+fn import_and_export_dialogs_cancel_on_escape_without_moving_the_grid(cx: &mut TestAppContext) {
+    let path = fixture_copy("import-export-dialogs");
+    let (view, cx) = saving_view(cx, &path);
+    let write = write_session(&path, false);
+    cx.simulate_resize(gpui::size(gpui::px(1400.0), gpui::px(800.0)));
+    cx.run_until_parked();
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            let id = view.live.as_ref().and_then(|live| live.writable).expect("writable");
+            view.save.write = Some((id, write));
+        })
+    });
+    let before = cx.debug_bounds("grid-actions").expect("the strip is drawn");
+
+    view.update(cx, |view, cx| view.open_import_bar(cx));
+    cx.run_until_parked();
+    let after = cx.debug_bounds("grid-actions").expect("the strip stays drawn");
+    assert_eq!(before.origin.y, after.origin.y, "opening import moved the grid");
+    assert!(cx.debug_bounds("bar-dialog").is_some(), "import opens as a dialog");
+    let focus = view.read_with(cx, |view, cx| {
+        view.import.input.as_ref().expect("import path input").read(cx).focus_handle_for_tests()
+    });
+    cx.update(|window, cx| window.focus(&focus, cx));
+    cx.simulate_keystrokes("escape");
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("bar-dialog").is_none(), "Escape cancels import");
+
+    view.update(cx, |view, cx| view.open_export_file_bar(cx));
+    cx.run_until_parked();
+    let after = cx.debug_bounds("grid-actions").expect("the strip stays drawn");
+    assert_eq!(before.origin.y, after.origin.y, "opening export moved the grid");
+    assert!(cx.debug_bounds("bar-dialog").is_some(), "export opens as a dialog");
+    let focus = view.read_with(cx, |view, cx| {
+        view.export.file.input.as_ref().expect("export path input").read(cx).focus_handle_for_tests()
+    });
+    cx.update(|window, cx| window.focus(&focus, cx));
+    cx.simulate_keystrokes("escape");
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("bar-dialog").is_none(), "Escape cancels export");
+    std::fs::remove_file(path).ok();
+}
+
+#[gpui::test]
 fn a_csv_file_is_reviewed_then_imported_in_one_transaction_and_the_table_shows_the_rows(cx: &mut TestAppContext) {
     let path = fixture_copy("import");
     let file = csv_file("rows", "customer,total,ignored\nCsvOne,1.5,x\nCsvTwo,2.5,y\n");
