@@ -24,6 +24,18 @@ async fn a_simple_select_stays_within_its_server_command_budget() {
         Some(0),
         "create Cassandra audit log directory: {audit_dir_output:?}"
     );
+    let mut set_audit_dir_owner = container
+        .exec(ExecCommand::new(["chown", "cassandra:cassandra", "/opt/cassandra/logs/audit"]))
+        .await
+        .expect("set Cassandra audit log directory owner");
+    assert_eq!(
+        set_audit_dir_owner
+            .exit_code()
+            .await
+            .expect("audit directory owner exit code"),
+        Some(0),
+        "set Cassandra audit log directory owner"
+    );
 
     let mut enable = container
         .exec(ExecCommand::new([
@@ -39,11 +51,12 @@ async fn a_simple_select_stays_within_its_server_command_budget() {
         .await
         .expect("enable Cassandra audit log");
     let enable_output = enable.stdout_to_vec().await.expect("audit setup output");
-    let enable_error = enable.stderr_to_vec().await.expect("audit setup error");
+    let enable_error = String::from_utf8(enable.stderr_to_vec().await.expect("audit setup error"))
+        .expect("UTF-8 audit setup error");
     assert_eq!(
         enable.exit_code().await.expect("audit setup exit code"),
         Some(0),
-        "stdout: {enable_output:?}\nstderr: {enable_error:?}"
+        "stdout: {enable_output:?}\nstderr: {enable_error}"
     );
 
     let result = connection.query(query).await.expect("run measured SELECT");
