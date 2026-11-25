@@ -1751,8 +1751,9 @@ fn closing_query_from_home_discards_its_pending_result(cx: &mut TestAppContext) 
             view.panel.error_location = Some(("SELECT missing".into(), 8, 0, None));
             view.tabs.open_home();
             view.sync_grid_owner();
-            assert!(cancel.is_cancelled());
+            assert!(!cancel.is_cancelled(), "going to Home leaves the work running");
             view.close_tab(query, cx);
+            assert!(cancel.is_cancelled(), "closing the query discards its pending result");
             assert!(view.panel.error_location.is_none());
         })
     });
