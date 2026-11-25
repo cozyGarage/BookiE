@@ -201,6 +201,20 @@ impl GridView {
             )
             .when(!compact, |actions| {
                 actions
+                    .children(
+                        (self.can_save_edits()
+                            && self.cell_edit.edits.is_empty()
+                            && self.compare.is_none()
+                            && !self.form_open())
+                        .then(|| {
+                            button("add-row", "Add row", theme)
+                                .debug_selector(|| "add-row".into())
+                                .on_click(cx.listener(|this, _, _, cx| {
+                                    this.execute_edit_palette_action("insert-row", cx);
+                                    cx.notify();
+                                }))
+                        }),
+                    )
                     .child(
                         button("compare", "Compare", theme)
                             .on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))),

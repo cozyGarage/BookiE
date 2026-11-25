@@ -2290,6 +2290,19 @@ fn switching_connection_expands_every_sidebar_schema_again(cx: &mut TestAppConte
 }
 
 #[gpui::test]
+fn the_labelled_add_row_button_opens_the_row_form_only_for_an_editable_table(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_resize(gpui::size(gpui::px(1400.0), gpui::px(800.0)));
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("add-row").is_none(), "no live table, nothing to add to");
+    connect_and_settle(&view, cx, orders_fixture());
+    let button = cx.debug_bounds("add-row").expect("an editable table shows Add row");
+    cx.simulate_click(button.center(), Default::default());
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert!(view.form_open()));
+}
+
+#[gpui::test]
 fn narrow_grid_toolbar_keeps_actions_inside_window(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     view.update(cx, |view, cx| {
