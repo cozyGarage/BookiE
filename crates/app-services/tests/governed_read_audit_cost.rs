@@ -75,11 +75,31 @@ async fn time_reads(sink: impl Fn(Arc<AuditJournal>) -> Arc<dyn AuditSink>) -> D
     started.elapsed()
 }
 
+async fn time_appends(durable: bool) -> Duration {
+    let directory = tempfile::TempDir::new().unwrap();
+    let journal = AuditJournal::open_validated(directory.path().join("audit.jsonl")).unwrap();
+    let started = Instant::now();
+    for _ in 0..READS {
+        let event = bookie_storage::sample_event(Principal::human_gui());
+        if durable {
+            journal.append_durable(event).await.unwrap();
+        } else {
+            journal.append(event).await.unwrap();
+        }
+    }
+    started.elapsed()
+}
+
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "prints the audit cost of governed reads measured for #3736"]
 async fn a_thousand_governed_reads_cost_less_when_read_intents_are_not_synced() {
     let current = time_reads(|journal| journal).await;
     let synced = time_reads(|journal| Arc::new(SyncEveryIntent(journal))).await;
+    println!(
+        "{READS} journal appends alone: not synced {:.2?}, synced {:.2?}",
+        time_appends(false).await,
+        time_appends(true).await
+    );
     println!(
         "{READS} governed reads: read intents not synced {current:.2?}, every intent synced {synced:.2?} ({:.1}x)",
         synced.as_secs_f64() / current.as_secs_f64()
