@@ -88,13 +88,17 @@ else:
         state = fixture.with_suffix('.polls')
         polls = int(state.read_text()) if state.exists() else 0
         state.write_text(str(polls + 1))
-        run = dict(data['run'], status=data.get('initial_status', 'failure') if polls == 0 else 'success')
+        status = data.get('terminal_status')
+        if status is None:
+            status = data.get('initial_status', 'failure') if polls == 0 else 'success'
+        run = dict(data['run'], status=status)
     print(json.dumps({'workflow_runs': [run]}))
 """
 
 
 def gate(tasks, initial_status='failure', dispatch_capture=None, target='subject', remote_sha=None,
-         timeout_minutes='1', main_push_runs=None, stale_runs=None, cancel_capture=None):
+         timeout_minutes='1', main_push_runs=None, stale_runs=None, cancel_capture=None,
+         terminal_status=None):
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         tools = root / 'bin'
@@ -106,6 +110,8 @@ def gate(tasks, initial_status='failure', dispatch_capture=None, target='subject
         fixture = root / 'fixture.json'
         data = {'run': {'id': 928, 'index_in_repo': 927, 'commit_sha': HEAD, 'workflow_id': 'ci.yml'},
                 'initial_status': initial_status, 'tasks': tasks, 'logs': 'compile failed: fixture error'}
+        if terminal_status is not None:
+            data['terminal_status'] = terminal_status
         if main_push_runs is not None:
             data['main_push_runs'] = main_push_runs
         if stale_runs is not None:
@@ -136,10 +142,19 @@ class ForgejoGateTests(unittest.TestCase):
     def test_failed_run_waits_for_the_final_regression_gate(self):
         result = gate([
             {'id': 101, 'status': 'failure', 'name': 'driver'},
+            {'id': 103, 'status': 'running', 'name': 'unit'},
             {'id': 102, 'status': 'blocked', 'name': 'Forgejo regression gate'},
         ])
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn('passed for ' + HEAD, result.stdout)
+
+    def test_terminal_failure_with_blocked_regression_gate_releases_the_slot(self):
+        result = gate([
+            {'id': 101, 'status': 'failure', 'name': 'driver'},
+            {'id': 102, 'status': 'blocked', 'name': 'Forgejo regression gate'},
+        ], terminal_status='failure')
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn('failure driver (job 101)', result.stdout)
 
     def test_docs_only_gate_uses_the_forgejo_main_branch(self):
         script = (ROOT / "scripts/forgejo-gate.sh").read_text()
@@ -191,16 +206,15 @@ class ForgejoGateTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn('refusing to update protected Forgejo main', result.stderr)
 
-    def test_main_gate_reuses_the_push_run_for_the_same_revision(self):
+    def test_main_gate_dispatches_a_full_run_even_if_the_push_run_succeeded(self):
         run = {'id': 928, 'index_in_repo': 927, 'commit_sha': HEAD, 'workflow_id': 'ci.yml',
-               'prettyref': 'main', 'event': 'push', 'status': 'running'}
+               'prettyref': 'main', 'event': 'push', 'status': 'success'}
         dispatch = {}
         result = gate([], initial_status='success', dispatch_capture=dispatch, target='main', remote_sha=HEAD,
                       main_push_runs=[run])
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn('reusing Forgejo main push run 927', result.stdout)
-        self.assertNotIn('lab-ci', result.stdout)
-        self.assertFalse(dispatch['dispatched'])
+        self.assertEqual(dispatch, {'ref': 'main', 'inputs': {'ref': HEAD}, 'dispatched': True})
+        self.assertNotIn('reusing Forgejo main push run', result.stdout)
 
     def test_main_gate_dispatches_when_no_push_run_appears(self):
         dispatch = {}
