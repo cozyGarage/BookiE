@@ -187,6 +187,17 @@ impl GridView {
         )
     }
 
+    fn copy_csv_button(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
+        compact_button(ButtonKind::Ghost, "copy-csv", "Copy CSV", theme)
+            .tooltip(crate::surfaces::tooltip_view(
+                "Copy the page or selection to the clipboard as CSV".into(),
+            ))
+            .on_click(cx.listener(|this, _, _, cx| {
+                this.export_selection_or_page(cx);
+                cx.notify();
+            }))
+    }
+
     fn export_button(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
         compact_button(ButtonKind::Ghost, "export", "Export…", theme)
             .tooltip(crate::surfaces::tooltip_view(
@@ -283,6 +294,7 @@ impl GridView {
                             .on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))),
                     )
                     .child(self.export_button(theme, cx))
+                    .child(self.copy_csv_button(theme, cx))
                     .child(
                         toggle_icon_button(
                             "continuous",

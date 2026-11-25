@@ -34,7 +34,7 @@ fn palette_outside_click_dismisses_without_opening_the_covered_dropdown(cx: &mut
     cx.simulate_keystrokes("ctrl-shift-p");
     cx.run_until_parked();
 
-    let trigger = cx.update(|window, _| window.find_by_label("Import / Export connections").bounds());
+    let trigger = cx.update(|window, _| window.find_by_label("Import / Export").bounds());
     cx.simulate_click(trigger.center(), Default::default());
     cx.run_until_parked();
 
@@ -52,7 +52,7 @@ fn palette_outside_click_dismisses_without_opening_the_covered_dropdown(cx: &mut
 
     cx.simulate_resize(size(px(800.0), px(760.0)));
     cx.run_until_parked();
-    let trigger = cx.update(|window, _| window.find_by_label("Import / Export connections").bounds());
+    let trigger = cx.update(|window, _| window.find_by_label("Import / Export").bounds());
     cx.simulate_click(trigger.center(), Default::default());
     cx.run_until_parked();
     let item = cx.update(|window, _| window.find_by_label("Import connections…").bounds());

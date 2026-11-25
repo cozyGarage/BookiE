@@ -56,6 +56,8 @@ impl GridView {
 
     pub(crate) fn open_export_file_bar(&mut self, cx: &mut Context<Self>) {
         if !self.export_file_enabled() {
+            self.status = "Open a table or run a query to export it".into();
+            cx.notify();
             return;
         }
         let input = self.export.file.input.get_or_insert_with(|| {
