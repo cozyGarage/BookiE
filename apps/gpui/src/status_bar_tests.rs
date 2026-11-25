@@ -14,6 +14,43 @@ fn sidebar_header_only_shows_available_actions(cx: &mut TestAppContext) {
     assert!(cx.debug_bounds("header-refresh").is_none());
 }
 
+#[gpui::test]
+fn sidebar_connection_menu_offers_saved_profiles_and_uses_the_switch_guard(cx: &mut TestAppContext) {
+    let (view, cx) = open_live(cx);
+    let id = uuid::Uuid::new_v4();
+    view.update(cx, |view, cx| {
+        view.connections = vec![bookie_app_services::read_session::ConnectionSummary {
+            id,
+            name: "Another database".into(),
+            driver_id: "sqlite".into(),
+            read_only: false,
+            environment: bookie_core::Environment::Dev,
+            color: None,
+        }];
+        view.save.busy = true;
+        cx.notify();
+    });
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    let trigger = bounds(cx, "sidebar-connection-switcher");
+    let collapse = bounds(cx, "header-collapse-all");
+    assert!(trigger.origin.x + trigger.size.width <= collapse.origin.x);
+    assert!(cx.debug_bounds("connection-connected").is_some());
+    cx.simulate_click(trigger.center(), Default::default());
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    let entry = cx
+        .debug_bounds("sidebar-connection-entry")
+        .expect("the menu shows the other saved profile");
+    assert!(cx.debug_bounds("connection-disconnected").is_some());
+    cx.simulate_click(entry.center(), Default::default());
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(view.status.contains("A save is running"));
+        assert!(view.live.is_some());
+    });
+}
+
 fn bounds(cx: &mut gpui::VisualTestContext, selector: &'static str) -> gpui::Bounds<gpui::Pixels> {
     cx.debug_bounds(selector)
         .unwrap_or_else(|| panic!("{selector} is rendered"))

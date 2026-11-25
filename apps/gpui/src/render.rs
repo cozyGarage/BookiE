@@ -2,9 +2,7 @@ use super::*;
 use crate::assets::icon;
 use crate::chrome::{STATUS_HEIGHT, TAB_HEIGHT, TOOLBAR_HEIGHT};
 use crate::palette_state::PaletteMode;
-use crate::surfaces::{
-    Bar, ButtonKind, button, compact_button, compact_icon_button, dialog_surface, scrim, toggle_icon_button,
-};
+use crate::surfaces::{ButtonKind, button, compact_button, compact_icon_button, dialog_surface, scrim};
 use gpui::uniform_list;
 use gpui_kit::component::scroll::Scrollbar;
 
@@ -46,28 +44,6 @@ impl GridView {
         }
     }
 
-    fn pager_labels(&self) -> (String, String) {
-        let (first, last) = self.pager.range();
-        let title = match &self.mode {
-            Mode::Filtered { label, .. } => format!("{label} · "),
-            Mode::All => String::new(),
-        };
-        let progress = progress_text(
-            &title,
-            self.dataset_count(),
-            self.source.is_partial(),
-            self.pager.pages(),
-        );
-        let range_label = if self.dataset_count() == 0 {
-            "Rows 0".to_string()
-        } else if self.continuous {
-            format!("Rows 1-{}", thousands(self.dataset_count()))
-        } else {
-            format!("Rows {}-{}", thousands(first), thousands(last))
-        };
-        (progress, range_label)
-    }
-
     fn drag_resize(&mut self, event: &gpui::MouseMoveEvent, window: &mut Window, cx: &mut Context<Self>) {
         if self.sidebar.resizing {
             self.sidebar.width = f32::from(event.position.x).clamp(260.0, 480.0);
@@ -92,92 +68,119 @@ impl GridView {
         })
     }
 
-    fn page_size_button(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
-        compact_button(
-            ButtonKind::Ghost,
-            "page-size",
-            format!("{} / page", thousands(self.pager.rows)),
-            theme,
-        )
-        .tooltip(crate::surfaces::tooltip_view("Rows per page; click to change".into()))
-        .on_click(cx.listener(|this, _, _, cx| {
-            let index = PAGE_SIZES.iter().position(|size| *size == this.pager.rows).unwrap_or(0);
-            this.pager = this.pager.resized(PAGE_SIZES[(index + 1) % PAGE_SIZES.len()]);
-            cx.notify();
-        }))
+    fn page_options(&self, theme: Theme, cx: &mut Context<Self>) -> impl IntoElement {
+        use gpui_component::button::{Button, ButtonVariants};
+        use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
+        use gpui_kit::component::Sizable as _;
+
+        let owner = cx.entity().downgrade();
+        let rows = self.pager.rows;
+        let continuous = self.continuous;
+        let append = self.pager.append;
+        let groups = crate::menus::command_groups(self, &[&["first", "last"]]);
+
+        Button::new("page-size")
+            .debug_selector(|| "page-size".into())
+            .ghost()
+            .small()
+            .compact()
+            .accessibility_label("Paging options")
+            .tooltip("Rows per page and navigation mode")
+            .label(if continuous {
+                "Continuous".into()
+            } else {
+                format!("{} / page", thousands(rows))
+            })
+            .child(icon("chevron-down", theme.muted_foreground))
+            .dropdown_menu_with_anchor(gpui::Anchor::BottomRight, move |mut menu, _, _| {
+                for size in PAGE_SIZES {
+                    let owner = owner.clone();
+                    menu = menu.item(
+                        PopupMenuItem::new(format!("{} rows per page", thousands(size)))
+                            .checked(rows == size && !continuous)
+                            .on_click(move |_, _, cx| {
+                                let _ = owner.update(cx, |this, cx| {
+                                    this.pager = this.pager.resized(size);
+                                    this.continuous = false;
+                                    cx.notify();
+                                });
+                            }),
+                    );
+                }
+                let owner_continuous = owner.clone();
+                let owner_append = owner.clone();
+                menu = menu
+                    .separator()
+                    .item(PopupMenuItem::new("Scroll continuously").checked(continuous).on_click(
+                        move |_, window, cx| {
+                            let _ = owner_continuous.update(cx, |this, cx| {
+                                this.run_palette_id("continuous", window, cx);
+                                cx.notify();
+                            });
+                        },
+                    ))
+                    .item(
+                        PopupMenuItem::new("Append pages")
+                            .checked(append)
+                            .disabled(continuous)
+                            .on_click(move |_, window, cx| {
+                                let _ = owner_append.update(cx, |this, cx| {
+                                    this.run_palette_id("append-pages", window, cx);
+                                    cx.notify();
+                                });
+                            }),
+                    );
+                if continuous {
+                    return menu;
+                }
+                if groups.is_empty() {
+                    menu
+                } else {
+                    crate::menus::fill(menu.separator(), &owner, &groups)
+                }
+            })
     }
 
-    fn grid_pager_buttons(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
-        let (progress, range_label) = self.pager_labels();
-        let compact = self.synced_width < 900.0;
-        let pager = div()
-            .flex()
-            .flex_none()
+    fn grid_pager(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+        let count = self.dataset_count();
+        let range = (!self.continuous && self.pager.pages() > 1).then(|| self.pager.range());
+        let label = page_summary(count, self.source.is_partial(), range);
+        let can_page = range.is_some();
+        let previous = compact_icon_button("pager-prev", "chevron-left", "Previous page", theme).on_click(cx.listener(
+            |this, _, _, cx| {
+                this.pager.previous();
+                cx.notify();
+            },
+        ));
+        let next =
+            compact_icon_button("next", "chevron-right", "Next page", theme).on_click(cx.listener(|this, _, _, cx| {
+                this.pager.next();
+                cx.notify();
+            }));
+        div()
             .debug_selector(|| "grid-pager".into())
+            .flex_none()
+            .flex()
             .items_center()
+            .justify_end()
             .gap_1()
-            .when(!compact, |pager| pager.child(div().child(progress)));
-        if self.continuous {
-            return pager.child(div().child(range_label));
-        }
-        if self.pager.pages() <= 1 {
-            return pager
-                .when(compact, |pager| pager.child(div().child(range_label.clone())))
-                .child(self.page_size_button(theme, cx));
-        }
-        pager
-            .when(!compact, |pager| {
-                pager.child(
-                    compact_icon_button("first", "chevrons-left", "First page", theme).on_click(cx.listener(
-                        |this, _, _, cx| {
-                            this.pager.first();
-                            cx.notify();
-                        },
-                    )),
-                )
-            })
+            .px_2()
+            .py_1()
+            .border_t_1()
+            .border_color(rgb(theme.border))
+            .text_color(rgb(theme.muted_foreground))
+            .children(can_page.then_some(previous))
             .child(
-                compact_icon_button("pager-prev", "chevron-left", "Previous page", theme).on_click(cx.listener(
-                    |this, _, _, cx| {
-                        this.pager.previous();
-                        cx.notify();
-                    },
-                )),
+                div()
+                    .debug_selector(|| "page-summary".into())
+                    .min_w_0()
+                    .truncate()
+                    .id("page-summary")
+                    .tooltip(crate::surfaces::tooltip_view(label.clone().into()))
+                    .child(label),
             )
-            .child(div().child(range_label))
-            .child(self.page_size_button(theme, cx))
-            .child(
-                toggle_icon_button(
-                    "load-more",
-                    "arrow-down-up",
-                    "Append the next page instead of replacing the current one",
-                    self.pager.append,
-                    Bar::Compact,
-                    theme,
-                )
-                .on_click(cx.listener(|this, _, _, cx| {
-                    this.pager.append = !this.pager.append;
-                    cx.notify();
-                })),
-            )
-            .child(
-                compact_icon_button("next", "chevron-right", "Next page", theme).on_click(cx.listener(
-                    |this, _, _, cx| {
-                        this.pager.next();
-                        cx.notify();
-                    },
-                )),
-            )
-            .when(!compact, |pager| {
-                pager.child(
-                    compact_icon_button("last", "chevrons-right", "Last page", theme).on_click(cx.listener(
-                        |this, _, _, cx| {
-                            this.pager.last();
-                            cx.notify();
-                        },
-                    )),
-                )
-            })
+            .children(can_page.then_some(next))
+            .child(self.page_options(theme, cx))
     }
 
     fn add_row_button(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Stateful<Div>> {
@@ -221,19 +224,8 @@ impl GridView {
         use gpui_component::menu::DropdownMenu;
         use gpui_kit::component::Sizable as _;
         let compact = self.synced_width < 1000.0;
-        let groups = crate::menus::command_groups(
-            self,
-            &[
-                &["first", "last"],
-                &[
-                    "jump-column",
-                    "refresh-table",
-                    "export-file",
-                    "export-csv",
-                    "continuous",
-                ],
-            ],
-        );
+        let groups =
+            crate::menus::command_groups(self, &[&["jump-column", "refresh-table", "export-file", "export-csv"]]);
         div()
             .flex()
             .flex_1()
@@ -264,6 +256,21 @@ impl GridView {
                         cx.notify();
                     }),
                 ),
+            )
+            .child(
+                compact_button(ButtonKind::Ghost, "toggle-loaded-filter", "Filter rows", theme)
+                    .ml_auto()
+                    .tooltip(crate::surfaces::tooltip_view("Filter only the loaded rows".into()))
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        if this.search.filter_visible {
+                            this.search.filter_visible = false;
+                            window.focus(&this.focus, cx);
+                            cx.notify();
+                        } else {
+                            this.run_palette_id("filter", window, cx);
+                            cx.notify();
+                        }
+                    })),
             )
             .when(!compact, |actions| {
                 actions
@@ -307,21 +314,6 @@ impl GridView {
                             .on_click(cx.listener(|this, _, _, cx| this.compare(false, cx)))
                     }))
                     .child(self.export_menu_button(theme, cx))
-                    .child(
-                        toggle_icon_button(
-                            "continuous",
-                            "chevrons-down-up",
-                            "Scroll continuously",
-                            self.continuous,
-                            Bar::Compact,
-                            theme,
-                        )
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            this.continuous = !this.continuous;
-                            this.scroll.scroll_to_item_strict(0, ScrollStrategy::Top);
-                            cx.notify();
-                        })),
-                    )
             })
             .when(compact, |actions| {
                 actions.child(
@@ -342,7 +334,6 @@ impl GridView {
             .id("grid-controls")
             .flex()
             .min_w_0()
-            .flex_wrap()
             .items_center()
             .gap_1()
             .px_2()
@@ -350,29 +341,39 @@ impl GridView {
             .bg(rgb(theme.chrome))
             .border_b_1()
             .border_color(rgb(theme.border))
-            .child(self.grid_pager_buttons(theme, cx))
+            .children(self.where_toggle(theme, cx))
             .child(self.grid_action_buttons(theme, cx))
     }
 
     fn grid_filter_row(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Div> {
         self.search.filter_visible.then(|| {
             div()
+                .debug_selector(|| "loaded-row-filter".into())
+                .flex_none()
                 .flex()
                 .items_center()
                 .gap_2()
                 .px_2()
-                .pb_2()
-                .child(div().child("Filter loaded rows"))
-                .child(div().w(px(size::FILTER_WIDTH)).child(self.search.filter.clone()))
+                .py_1()
+                .child(div().flex_none().child("Filter loaded rows"))
                 .child(
-                    button(ButtonKind::Primary, "apply", "Apply", theme)
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .max_w(px(size::FILTER_WIDTH))
+                        .child(self.search.filter.clone()),
+                )
+                .child(
+                    compact_button(ButtonKind::Primary, "apply", "Apply", theme)
                         .on_click(cx.listener(|this, _, _, cx| this.apply_filter(cx))),
                 )
                 .child(
-                    button(ButtonKind::Ghost, "clear", "Clear all", theme).on_click(cx.listener(|this, _, _, cx| {
-                        this.clear_filter();
-                        cx.notify();
-                    })),
+                    compact_button(ButtonKind::Ghost, "clear", "Clear", theme).on_click(cx.listener(
+                        |this, _, _, cx| {
+                            this.clear_filter();
+                            cx.notify();
+                        },
+                    )),
                 )
         })
     }
@@ -450,7 +451,8 @@ impl GridView {
             .children(compare_bar)
             .children(save_bar)
             .children(insert_form)
-            .child(self.data_table(cx));
+            .child(self.data_table(cx))
+            .child(self.grid_pager(theme, cx));
         div()
             .flex_1()
             .flex()
@@ -573,7 +575,14 @@ impl Render for GridView {
         }
         let theme = Theme::current(cx);
         let strip = self.grid_control_strip(theme, cx);
-        let filter_row = self.filter_rows(self.grid_filter_row(theme, cx), theme, cx);
+        let filter_row = Some(
+            div()
+                .flex_none()
+                .flex()
+                .flex_col()
+                .children(self.server_filter_row(theme, cx))
+                .children(self.grid_filter_row(theme, cx)),
+        );
         let compare_bar = self.grid_compare_bar(theme, cx);
         let palette = if self.palette.open {
             Some(self.palette_overlay(window, cx))
@@ -668,13 +677,13 @@ fn bar_dialog(theme: Theme, bar: Div) -> Stateful<Div> {
     )
 }
 
-pub(crate) fn progress_text(title: &str, rows: u64, partial: bool, pages: u64) -> String {
-    let more = if partial { "+" } else { "" };
+pub(crate) fn page_summary(rows: u64, partial: bool, range: Option<(u64, u64)>) -> String {
     let count = thousands(rows);
-    if pages > 1 {
-        format!("{title}{count}{more} rows · {pages} pages")
-    } else {
-        format!("{title}{count}{more} rows")
+    match (range, partial) {
+        (Some((first, last)), true) => format!("Rows {}–{} of ≥ {count}", thousands(first), thousands(last)),
+        (Some((first, last)), false) => format!("Rows {}–{} of {count}", thousands(first), thousands(last)),
+        (None, true) => format!("≥ {count} rows"),
+        (None, false) => format!("{count} rows"),
     }
 }
 
