@@ -206,12 +206,16 @@ impl GridView {
                             Some(error) => format!("{message}; closing the session failed: {error}"),
                             None => message.into(),
                         };
+                        if matches!(outcome, Some(bookie_core::SessionCommitOutcome::RolledBack)) {
+                            this.push_notice(this.status.clone(), crate::notifications::NoticeKind::Error, cx);
+                        }
                     }
                     Err(bookie_core::DriverError::PolicyDenied(message)) if commit && open => {
                         if let Some(transaction) = this.transaction.as_mut() {
                             transaction.finishing = false;
                         }
                         this.status = format!("Commit failed: {message}");
+                        this.push_notice(this.status.clone(), crate::notifications::NoticeKind::Error, cx);
                     }
                     Err(error) => {
                         this.transaction = None;
@@ -221,6 +225,11 @@ impl GridView {
                             this.status
                                 .push_str(&format!("; closing the session failed: {cleanup}"));
                         }
+                        this.push_notice(
+                            this.status.clone(),
+                            crate::notifications::NoticeKind::UnknownOutcome,
+                            cx,
+                        );
                     }
                 }
                 cx.notify();
@@ -236,6 +245,7 @@ impl GridView {
                 cx.background_executor().timer(std::time::Duration::from_secs(30)).await;
                 let open = this
                     .update(cx, |this, cx| {
+                        this.sync_idle_notice(cx);
                         cx.notify();
                         this.transaction.is_some()
                     })
@@ -246,6 +256,23 @@ impl GridView {
             }
         })
         .detach();
+    }
+
+    pub(crate) fn sync_idle_notice(&mut self, cx: &mut Context<Self>) {
+        use crate::notifications::NoticeKind;
+        let present = self
+            .notices
+            .items
+            .iter()
+            .any(|notice| notice.kind == NoticeKind::IdleTransaction);
+        match self.transaction_idle_warning() {
+            Some(text) if !present => self.push_notice(text, NoticeKind::IdleTransaction, cx),
+            None if present => self
+                .notices
+                .items
+                .retain(|notice| notice.kind != NoticeKind::IdleTransaction),
+            _ => {}
+        }
     }
 
     pub(crate) fn transaction_idle_warning(&self) -> Option<String> {
