@@ -161,6 +161,7 @@ impl GridView {
                     .flex()
                     .items_center()
                     .gap_1()
+                    .child(self.home_button(theme, cx))
                     .children((!self.sidebar.open).then(|| expand_sidebar_button(theme, cx)))
                     .children(environment_chip(self.live_environment(), theme))
                     .child(
@@ -645,6 +646,18 @@ impl GridView {
         self.status = format!("Located {label}");
     }
 
+    fn home_button(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
+        let on_home = self.tabs.current() == &Tab::Home;
+        toggle_icon_button("home-button", "house", "Open home", on_home, Bar::Small, theme)
+            .debug_selector(|| "home-button".into())
+            .on_click(cx.listener(|this, _, _, cx| {
+                this.tabs.open_home();
+                this.reload_history(cx);
+                this.sync_grid_owner();
+                cx.notify();
+            }))
+    }
+
     pub fn tab_bar(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
         let active = self.tabs.active;
         let tabs = self
@@ -652,6 +665,7 @@ impl GridView {
             .items
             .iter()
             .enumerate()
+            .filter(|(_, tab)| **tab != Tab::Home)
             .map(|(index, tab)| self.render_tab_item(index, tab, active, theme, cx));
         div()
             .id("workspace-tabs")
@@ -716,6 +730,7 @@ impl GridView {
         let dirty = tab_is_dirty(tab, &self.catalog.grid_table, self.cell_edit.edits.len());
         let mut item = div()
             .id(("tab", index))
+            .debug_selector(move || format!("tab-{index}"))
             .flex()
             .flex_none()
             .items_center()
