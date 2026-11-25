@@ -70,19 +70,11 @@ pub(crate) fn home_shortcut(
 }
 
 impl GridView {
-    pub(crate) fn home_counts(&self) -> (usize, usize, usize) {
-        let unique_drivers = self
-            .connections
-            .iter()
-            .map(|c| c.driver_id.as_str())
-            .chain(self.live.as_ref().map(|l| l.driver_id.as_str()))
-            .collect::<std::collections::HashSet<_>>()
-            .len();
-        (self.connections.len(), usize::from(self.live.is_some()), unique_drivers)
-    }
-
     pub(crate) fn home_stats_row(&self, theme: Theme) -> Div {
-        let (connections, connected, unique_drivers) = self.home_counts();
+        let (connections, connected, database_types) = home_stat_counts(
+            &self.connections,
+            self.live.as_ref().map(|live| live.driver_id.as_str()),
+        );
         div()
             .flex()
             .gap_4()
@@ -96,7 +88,7 @@ impl GridView {
             .child(home_stat_card(
                 "Database types",
                 "package",
-                &unique_drivers.to_string(),
+                &database_types.to_string(),
                 theme,
             ))
     }
@@ -379,6 +371,19 @@ impl GridView {
     }
 }
 
+fn home_stat_counts(
+    connections: &[bookie_app_services::read_session::ConnectionSummary],
+    live_driver: Option<&str>,
+) -> (usize, usize, usize) {
+    let database_types = connections
+        .iter()
+        .map(|connection| connection.driver_id.as_str())
+        .chain(live_driver)
+        .collect::<std::collections::HashSet<_>>()
+        .len();
+    (connections.len(), usize::from(live_driver.is_some()), database_types)
+}
+
 fn footer_counts(rows: u64, columns: usize) -> String {
     format!(
         "{} rows · {} {}",
@@ -390,11 +395,28 @@ fn footer_counts(rows: u64, columns: usize) -> String {
 
 #[cfg(test)]
 mod footer_tests {
-    use super::footer_counts;
+    use super::{footer_counts, home_stat_counts};
 
     #[test]
     fn the_footer_counts_rows_and_columns_without_the_theme_name() {
         assert_eq!(footer_counts(1234, 8), "1,234 rows · 8 columns");
         assert_eq!(footer_counts(0, 1), "0 rows · 1 column");
+    }
+
+    #[test]
+    fn home_stats_count_saved_connections_live_connections_and_database_types() {
+        let saved = ["postgres", "postgres"].map(|driver_id| bookie_app_services::read_session::ConnectionSummary {
+            id: uuid::Uuid::default(),
+            name: String::new(),
+            driver_id: driver_id.into(),
+            read_only: false,
+            environment: bookie_core::Environment::Local,
+            color: None,
+        });
+
+        assert_eq!(home_stat_counts(&[], None), (0, 0, 0));
+        assert_eq!(home_stat_counts(&[], Some("sqlite")), (0, 1, 1));
+        assert_eq!(home_stat_counts(&saved, None), (2, 0, 1));
+        assert_eq!(home_stat_counts(&saved, Some("postgres")), (2, 1, 1));
     }
 }

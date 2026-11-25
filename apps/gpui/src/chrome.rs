@@ -510,18 +510,6 @@ impl GridView {
                 ),
             )
             .child(
-                compact_icon_button(
-                    "header-refresh",
-                    "refresh-cw",
-                    "Reconnect and refresh the table list",
-                    theme,
-                )
-                .on_click(cx.listener(|this, _, _, cx| {
-                    this.reconnect_now(cx);
-                    cx.notify();
-                })),
-            )
-            .child(
                 compact_icon_button("collapse-sidebar", "chevrons-left", "Collapse sidebar", theme).on_click(
                     cx.listener(|this, _, _, cx| {
                         this.sidebar.open = false;

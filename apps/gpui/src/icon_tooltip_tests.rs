@@ -33,10 +33,6 @@ fn every_icon_only_control_in_the_window_and_sidebar_header_has_a_tooltip(cx: &m
             ("new-query", "new-query tooltip: New query"),
             ("palette", "palette tooltip: Command palette · Ctrl+Shift+P"),
             ("header-collapse-all", "header-collapse-all tooltip: Collapse all"),
-            (
-                "header-refresh",
-                "header-refresh tooltip: Reconnect and refresh the table list",
-            ),
             ("collapse-sidebar", "collapse-sidebar tooltip: Collapse sidebar"),
             ("sidebar-locate", "sidebar-locate tooltip: Locate the open table"),
             ("sidebar-filter", "sidebar-filter tooltip: Regular expression"),
@@ -101,7 +97,6 @@ const KEYBOARD_PATHS: &[(&str, &str)] = &[
     ("new-connection", "new-connection"),
     ("new-query", "query"),
     ("header-collapse-all", "collapse-sidebar-sections"),
-    ("header-refresh", "reconnect"),
     ("collapse-sidebar", "sidebar"),
     ("sidebar-locate", "reveal-sidebar"),
     ("sidebar-filter", "sidebar-regex"),

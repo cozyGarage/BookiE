@@ -1616,6 +1616,7 @@ fn closing_the_last_query_result_keeps_the_synthetic_table_available(cx: &mut Te
             assert_eq!(view.dataset_count(), 0);
             view.tabs
                 .open_table(&bookie_gpui::shell::table_info(bookie_gpui::shell::DATA_TABLE));
+            view.sync_grid_owner();
             assert_eq!(view.dataset_count(), 150_000);
         });
     });
@@ -2167,23 +2168,5 @@ fn a_double_click_on_a_table_row_opens_the_active_column_for_editing(cx: &mut Te
             .as_ref()
             .expect("the double-clicked row opens its editor");
         assert_eq!((editing.row, editing.column), (1, 1));
-    });
-}
-
-#[gpui::test]
-fn home_counts_are_zero_without_connections(cx: &mut TestAppContext) {
-    let (view, cx) = open(cx);
-    view.update(cx, |view, _| {
-        view.connections.clear();
-        assert_eq!(view.home_counts(), (0, 0, 0), "nothing saved and nothing connected");
-    });
-}
-
-#[gpui::test]
-fn home_counts_follow_a_live_session(cx: &mut TestAppContext) {
-    let (view, cx) = crate::live_ui_tests::open_live(cx);
-    view.update(cx, |view, _| {
-        view.connections.clear();
-        assert_eq!(view.home_counts(), (0, 1, 1), "one live session of one driver");
     });
 }

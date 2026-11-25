@@ -80,13 +80,3 @@ fn the_palette_stops_above_the_status_bar_in_a_short_window(cx: &mut TestAppCont
         surface.origin.y + surface.size.height
     );
 }
-
-#[gpui::test]
-fn the_sidebar_refresh_reconnects_instead_of_claiming_a_refresh(cx: &mut TestAppContext) {
-    let (view, cx) = crate::ui_tests::open(cx);
-    cx.run_until_parked();
-    assert!(cx.debug_bounds("header-new-folder").is_none());
-    let refresh = cx.debug_bounds("header-refresh").expect("the refresh button is drawn");
-    cx.simulate_click(refresh.center(), Default::default());
-    view.read_with(cx, |view, _| assert_ne!(view.status, "Refreshed catalog schema"));
-}
