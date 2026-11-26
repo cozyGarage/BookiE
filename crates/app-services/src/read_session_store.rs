@@ -100,32 +100,26 @@ impl ReadSessionStore {
     }
 
     pub async fn open_saved(&self, id: Uuid, control: &OperationControl) -> Result<OpenedSession, String> {
-        let saved = bookie_storage::load_connections()
+        let saved = crate::read_session::saved_connection(id)
             .await
             .map_err(|error| error.to_string())?
-            .into_iter()
-            .find(|saved| saved.id == id)
             .ok_or_else(|| format!("connection {id} not found"))?;
         let label = saved.name.clone();
         self.open(saved, label, control).await
     }
 
     pub async fn saved_connection_stamp(id: Uuid) -> Result<String, String> {
-        let saved = bookie_storage::load_connections()
+        let saved = crate::read_session::saved_connection(id)
             .await
             .map_err(|error| error.to_string())?
-            .into_iter()
-            .find(|saved| saved.id == id)
             .ok_or_else(|| format!("connection {id} not found"))?;
         serde_json::to_string(&saved).map_err(|error| error.to_string())
     }
 
     pub async fn open_saved_writable(&self, id: Uuid, control: &OperationControl) -> Result<OpenedSession, String> {
-        let saved = bookie_storage::load_connections()
+        let saved = crate::read_session::saved_connection(id)
             .await
             .map_err(|error| error.to_string())?
-            .into_iter()
-            .find(|saved| saved.id == id)
             .ok_or_else(|| format!("connection {id} not found"))?;
         let label = saved.name.clone();
         self.open_writable(saved, label, control).await
@@ -165,6 +159,27 @@ impl ReadSessionStore {
         let mut saved = crate::open_request::file_connection(&file);
         saved.read_only = true;
         self.open(saved, label, control).await
+    }
+
+    pub async fn read_schema_diagram(
+        &self,
+        id: SessionId,
+        scope: Option<&str>,
+        control: &OperationControl,
+    ) -> Result<crate::er_diagram::read::SchemaRead, DriverError> {
+        let session = self.get(id).ok_or(DriverError::Disconnected)?;
+        let (connection, generation, _) = session.backup_identity();
+        let guard = self
+            .database
+            .guard_for_generation(connection, generation, bookie_policy::Principal::human_gui())
+            .ok_or(DriverError::Disconnected)?;
+        let driver = self
+            .registry
+            .get(&session.driver_id)
+            .ok_or_else(|| DriverError::Unsupported("the database driver is not available".into()))?;
+        let mut tables = crate::catalog::list_tables_excluding(&guard, &[], control).await?;
+        tables.retain(|table| scope.is_none_or(|schema| table.schema.as_deref() == Some(schema)));
+        crate::er_diagram::read::read_schema(&guard, scope, &tables, driver.capabilities(), control, |_, _| {}).await
     }
 
     pub async fn export_tables_to_folder(
@@ -225,11 +240,9 @@ impl ReadSessionStore {
             return Err(DriverError::ReadOnly);
         }
         crate::database_backup::ensure_backup_supported(&session.driver_id)?;
-        let saved = bookie_storage::load_connections()
+        let saved = crate::read_session::saved_connection(connection)
             .await
             .map_err(|error| DriverError::Internal(error.to_string()))?
-            .into_iter()
-            .find(|saved| saved.id == connection)
             .ok_or_else(|| DriverError::Internal("the saved connection is no longer available".into()))?;
         if saved.read_only && matches!(job, crate::database_backup::BackupJob::Restore { .. }) {
             return Err(DriverError::ReadOnly);

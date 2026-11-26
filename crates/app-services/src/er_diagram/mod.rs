@@ -1,6 +1,7 @@
 pub mod export;
 pub mod layout;
 pub mod model;
+pub mod placement;
 pub mod read;
 pub mod scene;
 pub mod zoom;

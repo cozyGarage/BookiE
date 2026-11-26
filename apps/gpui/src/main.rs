@@ -19,6 +19,7 @@ mod connection_form;
 mod connection_info_ui;
 mod copy_selection;
 mod detail_panel;
+mod diagram_relationship;
 mod diagram_scene;
 mod diagram_ui;
 mod drafts_ui;

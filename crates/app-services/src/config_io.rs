@@ -72,25 +72,7 @@ fn write_durably(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 }
 
 fn replace_from_temporary(path: &Path, temp: &Path, bytes: &[u8]) -> std::io::Result<()> {
-    use std::io::Write;
-    use std::os::unix::fs::OpenOptionsExt;
-
-    let parent = path.parent().unwrap_or_else(|| Path::new("."));
-    let mut file = std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .mode(0o600)
-        .open(temp)?;
-    let written = (|| {
-        file.write_all(bytes)?;
-        file.sync_all()?;
-        std::fs::rename(temp, path)?;
-        std::fs::File::open(parent)?.sync_all()
-    })();
-    if written.is_err() {
-        let _ = std::fs::remove_file(temp);
-    }
-    written
+    bookie_core::atomic_file::replace_private_file(path, temp, bytes)
 }
 
 #[cfg(test)]

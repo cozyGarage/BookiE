@@ -302,6 +302,9 @@ impl GridView {
             self.remember_query_draft(cx);
         }
         self.remember_closed_tab(index);
+        if matches!(self.tabs.items.get(index), Some(Tab::Diagram)) {
+            self.reset_diagram();
+        }
         self.tabs.close(index);
         self.sync_grid_owner();
         if !closing_query {

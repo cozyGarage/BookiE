@@ -82,7 +82,20 @@ pub struct ReadSession {
     pub tables: Vec<TableInfo>,
 }
 
+pub(crate) async fn saved_connection(id: Uuid) -> Result<Option<SavedConnection>, bookie_storage::StorageError> {
+    Ok(bookie_storage::load_connections()
+        .await?
+        .into_iter()
+        .find(|saved| saved.id == id))
+}
+
 impl ReadSession {
+    fn guard(&self) -> Result<PolicyGuard, DriverFailurePresentation> {
+        self.database
+            .guard_for_generation(self.id, self.generation, Principal::human_gui())
+            .ok_or(DriverFailurePresentation::Disconnected)
+    }
+
     pub(crate) fn backup_identity(&self) -> (Uuid, Uuid, bool) {
         (self.id, self.generation, self.writable)
     }
@@ -246,11 +259,9 @@ impl ReadSession {
         cancellation: CancellationToken,
     ) -> Result<Self, OpenFailure> {
         check_open_cancellation(&cancellation)?;
-        let saved = bookie_storage::load_connections()
+        let saved = crate::read_session::saved_connection(id)
             .await
             .map_err(|error| OpenFailure::Other(error.to_string()))?
-            .into_iter()
-            .find(|saved| saved.id == id)
             .ok_or_else(|| OpenFailure::Other(format!("connection {id} not found")))?;
         check_open_cancellation(&cancellation)?;
         Self::open_controlled(saved, registry, Arc::new(DatabaseService::new()), cancellation).await
@@ -354,10 +365,7 @@ impl ReadSession {
                 bookie_core::MAX_QUERY_CURSOR_PAGE_ROWS
             )));
         }
-        let guard = self
-            .database
-            .guard_for_generation(self.id, self.generation, Principal::human_gui())
-            .ok_or(DriverFailurePresentation::Disconnected)?;
+        let guard = self.guard()?;
         guard
             .fetch_rows_controlled(table.schema.as_deref(), &table.name, offset, limit, control)
             .await
@@ -369,10 +377,7 @@ impl ReadSession {
         table: &TableInfo,
         control: &OperationControl,
     ) -> Result<Vec<bookie_core::ColumnInfo>, DriverFailurePresentation> {
-        let guard = self
-            .database
-            .guard_for_generation(self.id, self.generation, Principal::human_gui())
-            .ok_or(DriverFailurePresentation::Disconnected)?;
+        let guard = self.guard()?;
         guard
             .fetch_columns_controlled(table.schema.as_deref(), &table.name, control)
             .await
@@ -383,10 +388,7 @@ impl ReadSession {
         &self,
         control: &OperationControl,
     ) -> Result<(Option<String>, std::time::Duration), DriverFailurePresentation> {
-        let guard = self
-            .database
-            .guard_for_generation(self.id, self.generation, Principal::human_gui())
-            .ok_or(DriverFailurePresentation::Disconnected)?;
+        let guard = self.guard()?;
         let started = std::time::Instant::now();
         let version = guard
             .server_version_controlled(control)
@@ -399,10 +401,7 @@ impl ReadSession {
         &self,
         control: &OperationControl,
     ) -> Result<crate::table_sizes::SizeIndex, DriverFailurePresentation> {
-        let guard = self
-            .database
-            .guard_for_generation(self.id, self.generation, Principal::human_gui())
-            .ok_or(DriverFailurePresentation::Disconnected)?;
+        let guard = self.guard()?;
         crate::table_sizes::load_table_sizes(&guard, control)
             .await
             .map_err(|error| classify(&error))
@@ -414,10 +413,7 @@ impl ReadSession {
         capabilities: bookie_core::DriverCapabilities,
         control: &OperationControl,
     ) -> Result<TableStructure, DriverFailurePresentation> {
-        let guard = self
-            .database
-            .guard_for_generation(self.id, self.generation, Principal::human_gui())
-            .ok_or(DriverFailurePresentation::Disconnected)?;
+        let guard = self.guard()?;
         let schema = table.schema.as_deref();
         let indexes = if capabilities.supports_index_metadata {
             guard
@@ -455,10 +451,7 @@ impl ReadSession {
         kind: bookie_core::CatalogObjectKind,
         control: &OperationControl,
     ) -> Result<Vec<bookie_core::CatalogObject>, DriverFailurePresentation> {
-        let guard = self
-            .database
-            .guard_for_generation(self.id, self.generation, Principal::human_gui())
-            .ok_or(DriverFailurePresentation::Disconnected)?;
+        let guard = self.guard()?;
         crate::catalog::list_objects_excluding(&guard, kind, None, &[], control)
             .await
             .map_err(|error| classify(&error))
@@ -469,10 +462,7 @@ impl ReadSession {
         capabilities: bookie_core::DriverCapabilities,
         control: &OperationControl,
     ) -> Result<QueryResult, DriverFailurePresentation> {
-        let guard = self
-            .database
-            .guard_for_generation(self.id, self.generation, Principal::human_gui())
-            .ok_or(DriverFailurePresentation::Disconnected)?;
+        let guard = self.guard()?;
         let tables = crate::catalog::list_tables_excluding(&guard, &[], control)
             .await
             .map_err(|error| classify(&error))?;
@@ -503,10 +493,7 @@ impl ReadSession {
             }
             return Ok(None);
         }
-        let guard = self
-            .database
-            .guard_for_generation(self.id, self.generation, Principal::human_gui())
-            .ok_or(DriverFailurePresentation::Disconnected)?;
+        let guard = self.guard()?;
         PostgresTableCursor::open_sorted(&guard, table, sort, control)
             .await
             .map(Some)
@@ -548,10 +535,7 @@ impl ReadSession {
                 index + 1
             )));
         }
-        let guard = self
-            .database
-            .guard_for_generation(self.id, self.generation, Principal::human_gui())
-            .ok_or(DriverFailurePresentation::Disconnected)?;
+        let guard = self.guard()?;
         guard
             .execute_in_transaction_checked_controlled(statements, expect_one, control)
             .await
@@ -565,10 +549,7 @@ impl ReadSession {
         control: &OperationControl,
     ) -> Result<bookie_core::QueryResultBatch, DriverFailurePresentation> {
         self.refuse_free_form_on_a_writable_session()?;
-        let guard = self
-            .database
-            .guard_for_generation(self.id, self.generation, Principal::human_gui())
-            .ok_or(DriverFailurePresentation::Disconnected)?;
+        let guard = self.guard()?;
         guard
             .query_result_sets_controlled(sql, params, control)
             .await
@@ -578,10 +559,7 @@ impl ReadSession {
     pub async fn open_interactive(
         &self,
     ) -> Result<crate::interactive_session::SharedSession, DriverFailurePresentation> {
-        let guard = self
-            .database
-            .guard_for_generation(self.id, self.generation, Principal::human_gui())
-            .ok_or(DriverFailurePresentation::Disconnected)?;
+        let guard = self.guard()?;
         let session = guard
             .open_session_with_audit()
             .await
@@ -597,10 +575,7 @@ impl ReadSession {
         control: &OperationControl,
     ) -> Result<QueryResult, DriverFailurePresentation> {
         self.refuse_free_form_on_a_writable_session()?;
-        let guard = self
-            .database
-            .guard_for_generation(self.id, self.generation, Principal::human_gui())
-            .ok_or(DriverFailurePresentation::Disconnected)?;
+        let guard = self.guard()?;
         guard
             .query_controlled(sql, control)
             .await
@@ -614,10 +589,7 @@ impl ReadSession {
         control: &OperationControl,
     ) -> Result<QueryResult, DriverFailurePresentation> {
         self.refuse_free_form_on_a_writable_session()?;
-        let guard = self
-            .database
-            .guard_for_generation(self.id, self.generation, Principal::human_gui())
-            .ok_or(DriverFailurePresentation::Disconnected)?;
+        let guard = self.guard()?;
         guard
             .query_params_controlled(sql, params, control)
             .await
@@ -636,15 +608,10 @@ impl ReadSession {
         F: FnOnce(bookie_core::ConnectOptions) -> Fut,
         Fut: std::future::Future<Output = Result<T, bookie_core::DriverError>>,
     {
-        let guard = self
-            .database
-            .guard_for_generation(self.id, self.generation, Principal::human_gui())
-            .ok_or(DriverFailurePresentation::Disconnected)?;
-        let saved = bookie_storage::load_connections()
+        let guard = self.guard()?;
+        let saved = crate::read_session::saved_connection(self.id)
             .await
             .map_err(|error| DriverFailurePresentation::Unsupported(error.to_string()))?
-            .into_iter()
-            .find(|saved| saved.id == self.id)
             .ok_or_else(|| {
                 DriverFailurePresentation::Unsupported("only a saved connection can be subscribed to".into())
             })?;
