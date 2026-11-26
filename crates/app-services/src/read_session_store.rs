@@ -167,6 +167,27 @@ impl ReadSessionStore {
         self.open(saved, label, control).await
     }
 
+    pub async fn read_schema_diagram(
+        &self,
+        id: SessionId,
+        scope: Option<&str>,
+        control: &OperationControl,
+    ) -> Result<crate::er_diagram::read::SchemaRead, DriverError> {
+        let session = self.get(id).ok_or(DriverError::Disconnected)?;
+        let (connection, generation, _) = session.backup_identity();
+        let guard = self
+            .database
+            .guard_for_generation(connection, generation, bookie_policy::Principal::human_gui())
+            .ok_or(DriverError::Disconnected)?;
+        let driver = self
+            .registry
+            .get(&session.driver_id)
+            .ok_or_else(|| DriverError::Unsupported("the database driver is not available".into()))?;
+        let mut tables = crate::catalog::list_tables_excluding(&guard, &[], control).await?;
+        tables.retain(|table| scope.is_none_or(|schema| table.schema.as_deref() == Some(schema)));
+        crate::er_diagram::read::read_schema(&guard, scope, &tables, driver.capabilities(), control, |_, _| {}).await
+    }
+
     pub async fn export_tables_to_folder(
         &self,
         id: SessionId,

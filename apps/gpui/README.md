@@ -47,6 +47,12 @@ There are two themes, light and dark, both with the DBX tokens in [DESIGN.md](..
 
 Visible cell text is limited to 512 Unicode characters before layout. Line breaks, tabs and NULs use visible markers. Byte cells show at most 16 bytes in hexadecimal plus their exact byte count. These previews apply to normal and comparison rows; editing and copying still use full values. Painting requests each visible row once and shares it across its four cells. The synthetic source still constructs an owned row for each request, so this does not bound source allocation or establish real-result performance.
 
+## Schema diagrams
+
+Connect to a database and choose **Show the schema diagram** from Commands. Pick a schema, find a table, or select its card to inspect columns and related tables. **Open data** and **Structure** open the selected table. Drag a card header to move it or drag the handle to change its width. **Layout → Save layout** keeps the arrangement for the current connection and scope. Mermaid and DBML export use the diagram scope.
+
+On a writable connection that supports adding foreign keys, choose **Add relationship** on the source table. Pick the referenced table and add the column pairs in order. **Review SQL** opens the existing save review. BookiE checks the tables again before sending the change through the normal approval and audit path.
+
 ## Renderer boundary
 
 The formatter tests expand the [large-cell inputs](testdata/large-cells.json). They check bounded previews and exact typed-value round trips. They do not measure native rendering or process memory.
