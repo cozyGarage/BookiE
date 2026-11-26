@@ -15,7 +15,7 @@ use duckdb::{
 use bookie_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverMaturity, DriverValueInputCapabilities,
     EnumInputStyle, ExecResult, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBudget, QueryRows, TableInfo,
-    Value, run_server_cancellable,
+    Value, check_pre_dispatch, run_server_cancellable,
 };
 use tempfile::TempDir;
 
@@ -93,6 +93,7 @@ impl DatabaseDriver for DuckdbDriver {
             session: Arc::new(DuckdbSession {
                 interrupt: conn.interrupt_handle(),
                 conn: Mutex::new(conn),
+                turn: Arc::new(tokio::sync::Mutex::new(())),
                 _selected_file: selected_file,
             }),
         }))
@@ -359,6 +360,7 @@ struct DuckdbConnection {
 struct DuckdbSession {
     interrupt: Arc<duckdb::InterruptHandle>,
     conn: Mutex<DuckConnection>,
+    turn: Arc<tokio::sync::Mutex<()>>,
     _selected_file: Option<SelectedFlatFile>,
 }
 
@@ -368,14 +370,36 @@ struct SelectedFlatFile {
 }
 
 impl DuckdbConnection {
-    async fn interruptible<T>(
+    async fn run<T: Send + 'static>(
         &self,
-        operation: impl std::future::Future<Output = Result<T, DriverError>>,
-        control: &OperationControl,
+        control: Option<&OperationControl>,
+        work: impl FnOnce(&DuckdbSession) -> Result<T, DriverError> + Send + 'static,
     ) -> Result<T, DriverError> {
-        let handle = Arc::clone(&self.session.interrupt);
-        run_server_cancellable(
-            operation,
+        let session = Arc::clone(&self.session);
+        let turn = Arc::clone(&session.turn).lock_owned();
+        let Some(control) = control else {
+            let turn = turn.await;
+            return blocking(move || {
+                let _turn = turn;
+                work(&session)
+            })
+            .await;
+        };
+        let turn = tokio::select! {
+            biased;
+            _ = control.cancellation_token().cancelled() => return Err(DriverError::Cancelled),
+            _ = wait_for_turn_deadline(control.deadline()) => return Err(DriverError::TimedOut),
+            turn = turn => Arc::new(turn),
+        };
+        let worker_turn = Arc::clone(&turn);
+        let worker_control = control.clone();
+        let handle = Arc::clone(&session.interrupt);
+        let result = run_server_cancellable(
+            blocking(move || {
+                let _turn = worker_turn;
+                check_pre_dispatch(&worker_control)?;
+                work(&session)
+            }),
             async move {
                 handle.interrupt();
                 Ok(())
@@ -383,12 +407,86 @@ impl DuckdbConnection {
             confirms_interrupt,
             control,
         )
+        .await;
+        drop(turn);
+        result
+    }
+
+    async fn query_with_control(
+        &self,
+        sql: &str,
+        params: &[Value],
+        control: Option<&OperationControl>,
+    ) -> Result<QueryResult, DriverError> {
+        let sql = sql.to_owned();
+        let params = params.to_vec();
+        self.run(control, move |conn| run_query(conn, &sql, &params, MAX_QUERY_ROWS))
+            .await
+    }
+
+    async fn execute_with_control(
+        &self,
+        sql: &str,
+        params: &[Value],
+        control: Option<&OperationControl>,
+    ) -> Result<ExecResult, DriverError> {
+        let sql = sql.to_owned();
+        let params = params.to_vec();
+        self.run(control, move |conn| {
+            let guard = conn
+                .conn
+                .lock()
+                .map_err(|_| DriverError::Internal("duckdb lock poisoned".into()))?;
+            let bind = values_to_duck_params(&params)?;
+            let rows_affected = guard
+                .execute(&sql, params_from_iter(bind.iter()))
+                .map_err(map_duck_error)? as u64;
+            Ok(ExecResult { rows_affected })
+        })
+        .await
+    }
+
+    async fn transaction_with_control(
+        &self,
+        statements: &[(String, Vec<Value>)],
+        expect_one: &[usize],
+        control: Option<&OperationControl>,
+    ) -> Result<Vec<u64>, DriverError> {
+        let statements = statements.to_vec();
+        let expect_one = expect_one.to_vec();
+        self.run(control, move |conn| {
+            let guard = conn
+                .conn
+                .lock()
+                .map_err(|_| DriverError::Internal("duckdb lock poisoned".into()))?;
+            guard.execute_batch("BEGIN").map_err(map_duck_error)?;
+            let mut affected = Vec::with_capacity(statements.len());
+            for (idx, (sql, params)) in statements.iter().enumerate() {
+                let result = if params.is_empty() {
+                    guard.execute(sql, [])
+                } else {
+                    let bind = match values_to_duck_params(params) {
+                        Ok(bind) => bind,
+                        Err(error) => return Err(rolled_back(&guard, idx, error)),
+                    };
+                    guard.execute(sql, params_from_iter(bind.iter()))
+                };
+                match result {
+                    Ok(n) if expect_one.contains(&idx) && n != 1 => {
+                        return Err(rolled_back(&guard, idx, DriverError::ConcurrentModification));
+                    }
+                    Ok(n) => affected.push(n as u64),
+                    Err(e) => return Err(rolled_back(&guard, idx, map_duck_error(e))),
+                }
+            }
+            guard.execute_batch("COMMIT").map_err(map_duck_error)?;
+            Ok(affected)
+        })
         .await
     }
 
     async fn list_catalog_objects(&self, table_type: &'static str) -> Result<Vec<TableInfo>, DriverError> {
-        let conn = Arc::clone(&self.session);
-        blocking(move || {
+        self.run(None, move |conn| {
             let guard = conn
                 .conn
                 .lock()
@@ -430,10 +528,9 @@ impl Connection for DuckdbConnection {
     }
 
     async fn fetch_columns(&self, schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
-        let conn = Arc::clone(&self.session);
         let schema = schema.map(str::to_string);
         let table = table.to_string();
-        blocking(move || {
+        self.run(None, move |conn| {
             let guard = conn
                 .conn
                 .lock()
@@ -519,7 +616,7 @@ impl Connection for DuckdbConnection {
     }
 
     async fn query_controlled(&self, sql: &str, control: &OperationControl) -> Result<QueryResult, DriverError> {
-        self.interruptible(self.query(sql), control).await
+        self.query_with_control(sql, &[], Some(control)).await
     }
 
     async fn query_params_controlled(
@@ -528,11 +625,11 @@ impl Connection for DuckdbConnection {
         params: &[Value],
         control: &OperationControl,
     ) -> Result<QueryResult, DriverError> {
-        self.interruptible(self.query_params(sql, params), control).await
+        self.query_with_control(sql, params, Some(control)).await
     }
 
     async fn execute_controlled(&self, sql: &str, control: &OperationControl) -> Result<ExecResult, DriverError> {
-        self.interruptible(self.execute(sql), control).await
+        self.execute_with_control(sql, &[], Some(control)).await
     }
 
     async fn execute_params_controlled(
@@ -541,55 +638,23 @@ impl Connection for DuckdbConnection {
         params: &[Value],
         control: &OperationControl,
     ) -> Result<ExecResult, DriverError> {
-        self.interruptible(self.execute_params(sql, params), control).await
+        self.execute_with_control(sql, params, Some(control)).await
     }
 
     async fn query(&self, sql: &str) -> Result<QueryResult, DriverError> {
-        let conn = Arc::clone(&self.session);
-        let sql = sql.to_string();
-        blocking(move || run_query(&conn, &sql, &[], MAX_QUERY_ROWS)).await
+        self.query_with_control(sql, &[], None).await
     }
 
     async fn query_params(&self, sql: &str, params: &[Value]) -> Result<QueryResult, DriverError> {
-        let conn = Arc::clone(&self.session);
-        let sql = sql.to_owned();
-        let params = params.to_vec();
-        blocking(move || run_query(&conn, &sql, &params, MAX_QUERY_ROWS)).await
+        self.query_with_control(sql, params, None).await
     }
 
     async fn execute(&self, sql: &str) -> Result<ExecResult, DriverError> {
-        let conn = Arc::clone(&self.session);
-        let sql = sql.to_string();
-        blocking(move || {
-            let guard = conn
-                .conn
-                .lock()
-                .map_err(|_| DriverError::Internal("duckdb lock poisoned".into()))?;
-            let rows_affected = guard.execute(&sql, []).map_err(map_duck_error)? as u64;
-            Ok(ExecResult { rows_affected })
-        })
-        .await
+        self.execute_with_control(sql, &[], None).await
     }
 
     async fn execute_params(&self, sql: &str, params: &[Value]) -> Result<ExecResult, DriverError> {
-        if params.is_empty() {
-            return self.execute(sql).await;
-        }
-        let conn = Arc::clone(&self.session);
-        let sql = sql.to_string();
-        let params = params.to_vec();
-        blocking(move || {
-            let guard = conn
-                .conn
-                .lock()
-                .map_err(|_| DriverError::Internal("duckdb lock poisoned".into()))?;
-            let bind = values_to_duck_params(&params)?;
-            let rows_affected = guard
-                .execute(&sql, params_from_iter(bind.iter()))
-                .map_err(map_duck_error)? as u64;
-            Ok(ExecResult { rows_affected })
-        })
-        .await
+        self.execute_with_control(sql, params, None).await
     }
 
     async fn execute_in_transaction(&self, statements: &[(String, Vec<Value>)]) -> Result<Vec<u64>, DriverError> {
@@ -611,7 +676,7 @@ impl Connection for DuckdbConnection {
         expect_one: &[usize],
         control: &OperationControl,
     ) -> Result<Vec<u64>, DriverError> {
-        self.interruptible(self.execute_in_transaction_checked(statements, expect_one), control)
+        self.transaction_with_control(statements, expect_one, Some(control))
             .await
     }
 
@@ -620,38 +685,7 @@ impl Connection for DuckdbConnection {
         statements: &[(String, Vec<Value>)],
         expect_one: &[usize],
     ) -> Result<Vec<u64>, DriverError> {
-        let conn = Arc::clone(&self.session);
-        let statements = statements.to_vec();
-        let expect_one = expect_one.to_vec();
-        blocking(move || {
-            let guard = conn
-                .conn
-                .lock()
-                .map_err(|_| DriverError::Internal("duckdb lock poisoned".into()))?;
-            guard.execute_batch("BEGIN").map_err(map_duck_error)?;
-            let mut affected = Vec::with_capacity(statements.len());
-            for (idx, (sql, params)) in statements.iter().enumerate() {
-                let result = if params.is_empty() {
-                    guard.execute(sql, [])
-                } else {
-                    let bind = match values_to_duck_params(params) {
-                        Ok(bind) => bind,
-                        Err(error) => return Err(rolled_back(&guard, idx, error)),
-                    };
-                    guard.execute(sql, params_from_iter(bind.iter()))
-                };
-                match result {
-                    Ok(n) if expect_one.contains(&idx) && n != 1 => {
-                        return Err(rolled_back(&guard, idx, DriverError::ConcurrentModification));
-                    }
-                    Ok(n) => affected.push(n as u64),
-                    Err(e) => return Err(rolled_back(&guard, idx, map_duck_error(e))),
-                }
-            }
-            guard.execute_batch("COMMIT").map_err(map_duck_error)?;
-            Ok(affected)
-        })
-        .await
+        self.transaction_with_control(statements, expect_one, None).await
     }
 
     async fn ping(&self) -> Result<(), DriverError> {
@@ -679,8 +713,16 @@ fn rows_page_sql(schema: Option<&str>, table: &str, offset: u64, limit: u64) -> 
     )
 }
 
+async fn wait_for_turn_deadline(deadline: Option<tokio::time::Instant>) {
+    match deadline {
+        Some(deadline) => tokio::time::sleep_until(deadline).await,
+        None => std::future::pending().await,
+    }
+}
+
 fn confirms_interrupt(error: &DriverError) -> bool {
     match error {
+        DriverError::Cancelled | DriverError::TimedOut => true,
         DriverError::Transaction { source, .. } => confirms_interrupt(source),
         DriverError::Query { message, .. } => message.to_lowercase().contains("interrupt"),
         _ => false,
@@ -701,7 +743,7 @@ fn rolled_back(connection: &DuckConnection, statement_index: usize, source: Driv
     }
 }
 
-fn run_query(conn: &Arc<DuckdbSession>, sql: &str, params: &[Value], limit: usize) -> Result<QueryResult, DriverError> {
+fn run_query(conn: &DuckdbSession, sql: &str, params: &[Value], limit: usize) -> Result<QueryResult, DriverError> {
     let guard = conn
         .conn
         .lock()

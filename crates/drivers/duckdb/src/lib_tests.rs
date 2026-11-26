@@ -314,6 +314,7 @@ async fn a_write_that_times_out_while_queued_never_executes() {
     let session = Arc::new(DuckdbSession {
         interrupt: native.interrupt_handle(),
         conn: Mutex::new(native),
+        turn: Arc::new(tokio::sync::Mutex::new(())),
         _selected_file: None,
     });
     let conn = DuckdbConnection {
@@ -322,7 +323,7 @@ async fn a_write_that_times_out_while_queued_never_executes() {
     let (started, held) = tokio::sync::oneshot::channel();
     let (release, released) = tokio::sync::oneshot::channel::<()>();
     let holder = tokio::task::spawn_blocking(move || {
-        let _guard = session.conn.lock().unwrap();
+        let _guard = session.turn.blocking_lock();
         started.send(()).unwrap();
         let _ = released.blocking_recv();
     });
