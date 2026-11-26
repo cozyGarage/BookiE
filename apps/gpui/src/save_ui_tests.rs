@@ -2736,6 +2736,19 @@ fn the_import_dialog_offers_a_separator_and_null_text(cx: &mut TestAppContext) {
     let choices = view.read_with(cx, |view, cx| view.import_choices(cx));
     assert_eq!(choices.delimiter, Some(CsvDelimiter::Pipe));
     assert_eq!(choices.null_marker, "NULL");
+    for (file, separator) in [("orders.XLSX", false), ("orders.xls", false), ("orders.csv", true)] {
+        cx.update(|_, cx| {
+            view.update(cx, |view, cx| {
+                if let Some(input) = view.import.input.clone() {
+                    input.update(cx, |input, cx| input.set_content(file, cx));
+                }
+                cx.notify();
+            })
+        });
+        cx.run_until_parked();
+        cx.update(|window, cx| window.render_frame(cx));
+        assert_eq!(cx.debug_bounds("import-separator").is_some(), separator, "{file}");
+    }
     std::fs::remove_file(&path).ok();
 }
 

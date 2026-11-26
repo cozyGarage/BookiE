@@ -156,10 +156,12 @@ impl GridView {
                         ),
                 )
                 .child(field(theme, "File", &input))
-                .child(
-                    labelled_row(theme, "Separator", segmented(separators, theme).flex_wrap().h_auto())
-                        .debug_selector(|| "import-separator".into()),
-                )
+                .when(!spreadsheet_path(input.read(cx).content()), |form| {
+                    form.child(
+                        labelled_row(theme, "Separator", segmented(separators, theme).flex_wrap().h_auto())
+                            .debug_selector(|| "import-separator".into()),
+                    )
+                })
                 .children(
                     self.import
                         .null_input
@@ -182,4 +184,10 @@ impl GridView {
                 ),
         )
     }
+}
+
+fn spreadsheet_path(path: &str) -> bool {
+    std::path::Path::new(path.trim())
+        .extension()
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("xlsx") || extension.eq_ignore_ascii_case("xls"))
 }
