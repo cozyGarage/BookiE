@@ -1,5 +1,7 @@
 use super::*;
+use crate::ui_theme::ThemeExt;
 use gpui::{Context, TestAppContext, Window};
+use gpui_kit::test::TestQueryExt;
 
 struct Probe;
 
@@ -11,6 +13,44 @@ impl Render for Probe {
             .child(icon_button("probe", "refresh-cw", "Refresh", theme))
             .child(compact_icon_button("probe-compact", "x", "Close tab", theme))
     }
+}
+
+struct MenuProbe;
+
+impl Render for MenuProbe {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
+
+        menu_button(
+            "probe-menu",
+            Some(div().child("Open").into_any_element()),
+            None,
+            "Open menu",
+            "Choose an option",
+            true,
+        )
+        .debug_selector(|| "probe-menu".into())
+        .dropdown_menu(|menu, _, _| menu.item(PopupMenuItem::new("Choice")))
+    }
+}
+
+#[gpui::test]
+fn menu_button_exposes_its_name_tooltip_and_dropdown(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        Theme::light().install(cx);
+    });
+    let (_view, cx) = cx.add_window_view(|_, _| MenuProbe);
+    cx.run_until_parked();
+
+    let control = cx.debug_bounds("probe-menu").expect("menu button is drawn");
+    assert_eq!(control.size.height, px(size::COMPACT_CONTROL));
+    let semantics = cx.update(|window, _| window.find_by_label("Open menu"));
+    assert_eq!(semantics.description(), Some("Choose an option"));
+
+    cx.simulate_click(control.center(), Default::default());
+    cx.run_until_parked();
+    assert!(cx.update(|window, _| window.try_find_by_label("Choice").is_some()));
 }
 
 #[gpui::test]

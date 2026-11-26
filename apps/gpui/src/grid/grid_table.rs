@@ -167,116 +167,118 @@ fn header_menu(
     pin_action: Option<(gpui::Entity<TableState<GridDelegate>>, PinScope, bool)>,
     color: u32,
 ) -> impl IntoElement {
-    use gpui_component::button::{Button, ButtonVariants};
     use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
 
-    Button::new(format!("column-menu-{col_ix}"))
-        .ghost()
-        .small()
-        .compact()
-        .tooltip(format!("Actions for {column_name}"))
-        .accessibility_label(format!("Actions for {column_name}"))
-        .icon(
+    crate::surfaces::menu_button(
+        format!("column-menu-{col_ix}"),
+        None,
+        Some(
             gpui_component::Icon::default()
                 .path("icons/ellipsis.svg")
-                .text_color(gpui::rgb(color)),
-        )
-        .dropdown_menu(move |menu, _, _| {
-            let copy_name = column_name.clone();
-            let mut menu =
-                menu.item(PopupMenuItem::new("Copy column name").on_click(move |_, _, cx| {
-                    cx.write_to_clipboard(gpui::ClipboardItem::new_string(copy_name.clone()))
-                }));
-            if let Some(owner) = owner.clone() {
-                let fit_owner = owner.clone();
+                .text_color(gpui::rgb(color))
+                .into_any_element(),
+        ),
+        format!("Actions for {column_name}"),
+        format!("Actions for {column_name}"),
+        true,
+    )
+    .dropdown_caret(false)
+    .dropdown_menu(move |menu, _, _| {
+        let copy_name = column_name.clone();
+        let mut menu = menu.item(
+            PopupMenuItem::new("Copy column name")
+                .on_click(move |_, _, cx| cx.write_to_clipboard(gpui::ClipboardItem::new_string(copy_name.clone()))),
+        );
+        if let Some(owner) = owner.clone() {
+            let fit_owner = owner.clone();
+            menu = menu.item(
+                PopupMenuItem::new("Fit column to content").on_click(move |_, window, cx| {
+                    let _ = fit_owner.update(cx, |view, cx| {
+                        view.table.update(cx, |table, cx| {
+                            table.fit_col(col_ix, window, cx);
+                        });
+                    });
+                }),
+            );
+            menu = menu.item(
+                PopupMenuItem::new("Reset column widths").on_click(move |_, window, cx| {
+                    let _ = owner.update(cx, |view, cx| view.reset_grid_widths(window, cx));
+                }),
+            );
+        }
+        if let Some(owner) = owner.clone() {
+            let column = column_name.clone();
+            let hide_owner = owner.clone();
+            menu = menu.item(PopupMenuItem::new("Hide column").on_click(move |_, window, cx| {
+                let _ = hide_owner.update(cx, |view, cx| view.hide_column(source_col, &column, window, cx));
+            }));
+            if has_hidden {
                 menu = menu.item(
-                    PopupMenuItem::new("Fit column to content").on_click(move |_, window, cx| {
-                        let _ = fit_owner.update(cx, |view, cx| {
-                            view.table.update(cx, |table, cx| {
-                                table.fit_col(col_ix, window, cx);
-                            });
+                    PopupMenuItem::new("Show all hidden columns").on_click(move |_, window, cx| {
+                        let _ = owner.update(cx, |view, cx| view.show_all_hidden_columns(window, cx));
+                    }),
+                );
+            }
+        }
+        if binary {
+            for mode in [
+                crate::binary_mode::BinaryMode::Hex,
+                crate::binary_mode::BinaryMode::Utf8,
+                crate::binary_mode::BinaryMode::Base64,
+            ] {
+                if let Some(owner) = owner.clone() {
+                    menu = menu.item(PopupMenuItem::new(format!("Display as {}", mode.label())).on_click(
+                        move |_, _, cx| {
+                            let _ = owner.update(cx, |view, cx| view.set_binary_mode(source_col, mode, cx));
+                        },
+                    ));
+                }
+            }
+        }
+        if let Some((table, scope, pinned)) = pin_action
+            .as_ref()
+            .map(|(table, scope, pinned)| (table.clone(), scope.clone(), *pinned))
+        {
+            let label = if pinned {
+                format!("Unpin from {column_name}")
+            } else {
+                format!("Pin through {column_name}")
+            };
+            menu = menu.item(PopupMenuItem::new(label).on_click(move |_, _, cx| {
+                let _ = table.update(cx, |table, cx| {
+                    let delegate = table.delegate_mut();
+                    delegate.pinned_columns =
+                        next_pinned_count(delegate.pinned_columns, col_ix, delegate.columns.len());
+                    delegate.pin_counts.insert(scope.clone(), delegate.pinned_columns);
+                    table.refresh(cx);
+                });
+            }));
+        }
+        let (Some(owner), Some(active_sort)) = (owner.clone(), sort) else {
+            return menu;
+        };
+        for (label, order) in [
+            ("Sort ascending", Some(true)),
+            ("Sort descending", Some(false)),
+            ("Clear sort", None),
+        ] {
+            if order.is_none() && active_sort.is_none() {
+                continue;
+            }
+            let owner = owner.clone();
+            let column = column_name.clone();
+            menu = menu.item(
+                PopupMenuItem::new(label)
+                    .checked(order.is_some() && order == active_sort)
+                    .on_click(move |_, window, cx| {
+                        let _ = owner.update(cx, |view, cx| {
+                            view.sort_current_column(source_col, &column, order, window, cx);
                         });
                     }),
-                );
-                menu = menu.item(
-                    PopupMenuItem::new("Reset column widths").on_click(move |_, window, cx| {
-                        let _ = owner.update(cx, |view, cx| view.reset_grid_widths(window, cx));
-                    }),
-                );
-            }
-            if let Some(owner) = owner.clone() {
-                let column = column_name.clone();
-                let hide_owner = owner.clone();
-                menu = menu.item(PopupMenuItem::new("Hide column").on_click(move |_, window, cx| {
-                    let _ = hide_owner.update(cx, |view, cx| view.hide_column(source_col, &column, window, cx));
-                }));
-                if has_hidden {
-                    menu = menu.item(
-                        PopupMenuItem::new("Show all hidden columns").on_click(move |_, window, cx| {
-                            let _ = owner.update(cx, |view, cx| view.show_all_hidden_columns(window, cx));
-                        }),
-                    );
-                }
-            }
-            if binary {
-                for mode in [
-                    crate::binary_mode::BinaryMode::Hex,
-                    crate::binary_mode::BinaryMode::Utf8,
-                    crate::binary_mode::BinaryMode::Base64,
-                ] {
-                    if let Some(owner) = owner.clone() {
-                        menu = menu.item(PopupMenuItem::new(format!("Display as {}", mode.label())).on_click(
-                            move |_, _, cx| {
-                                let _ = owner.update(cx, |view, cx| view.set_binary_mode(source_col, mode, cx));
-                            },
-                        ));
-                    }
-                }
-            }
-            if let Some((table, scope, pinned)) = pin_action
-                .as_ref()
-                .map(|(table, scope, pinned)| (table.clone(), scope.clone(), *pinned))
-            {
-                let label = if pinned {
-                    format!("Unpin from {column_name}")
-                } else {
-                    format!("Pin through {column_name}")
-                };
-                menu = menu.item(PopupMenuItem::new(label).on_click(move |_, _, cx| {
-                    let _ = table.update(cx, |table, cx| {
-                        let delegate = table.delegate_mut();
-                        delegate.pinned_columns =
-                            next_pinned_count(delegate.pinned_columns, col_ix, delegate.columns.len());
-                        delegate.pin_counts.insert(scope.clone(), delegate.pinned_columns);
-                        table.refresh(cx);
-                    });
-                }));
-            }
-            let (Some(owner), Some(active_sort)) = (owner.clone(), sort) else {
-                return menu;
-            };
-            for (label, order) in [
-                ("Sort ascending", Some(true)),
-                ("Sort descending", Some(false)),
-                ("Clear sort", None),
-            ] {
-                if order.is_none() && active_sort.is_none() {
-                    continue;
-                }
-                let owner = owner.clone();
-                let column = column_name.clone();
-                menu = menu.item(
-                    PopupMenuItem::new(label)
-                        .checked(order.is_some() && order == active_sort)
-                        .on_click(move |_, window, cx| {
-                            let _ = owner.update(cx, |view, cx| {
-                                view.sort_current_column(source_col, &column, order, window, cx);
-                            });
-                        }),
-                );
-            }
-            menu
-        })
+            );
+        }
+        menu
+    })
 }
 
 impl TableDelegate for GridDelegate {

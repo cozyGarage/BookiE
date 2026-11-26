@@ -324,9 +324,7 @@ impl GridView {
         if !self.export.file.open {
             return None;
         }
-        use gpui_component::button::{Button, ButtonVariants};
         use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
-        use gpui_kit::component::Sizable as _;
 
         let format_owner = cx.entity().downgrade();
         let scope_options = self.export_scope_options();
@@ -354,27 +352,28 @@ impl GridView {
                 }
             }))
         });
-        let format_menu = Button::new("export-format")
-            .ghost()
-            .small()
-            .compact()
-            .accessibility_label("Export file format")
-            .child(format_label)
-            .child(crate::assets::icon("chevron-down", theme.muted_foreground))
-            .dropdown_menu(move |mut menu, _, _| {
-                for format in formats.iter().copied() {
-                    let owner = format_owner.clone();
-                    menu = menu.item(PopupMenuItem::new(format.label()).on_click(move |_, _, cx| {
-                        let _ = owner.update(cx, |this, cx| {
-                            if this.export.file.cancel.is_none() {
-                                this.export.file.format = format;
-                                cx.notify();
-                            }
-                        });
-                    }));
-                }
-                menu
-            });
+        let format_menu = crate::surfaces::menu_button(
+            "export-format",
+            Some(div().whitespace_nowrap().child(format_label).into_any_element()),
+            None,
+            "Export file format",
+            "Choose export file format",
+            true,
+        )
+        .dropdown_menu(move |mut menu, _, _| {
+            for format in formats.iter().copied() {
+                let owner = format_owner.clone();
+                menu = menu.item(PopupMenuItem::new(format.label()).on_click(move |_, _, cx| {
+                    let _ = owner.update(cx, |this, cx| {
+                        if this.export.file.cancel.is_none() {
+                            this.export.file.format = format;
+                            cx.notify();
+                        }
+                    });
+                }));
+            }
+            menu
+        });
         Some(
             div()
                 .debug_selector(|| "export-form".into())

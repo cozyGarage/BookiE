@@ -70,10 +70,8 @@ impl GridView {
         })
     }
 
-    fn page_options(&self, theme: Theme, cx: &mut Context<Self>) -> impl IntoElement {
-        use gpui_component::button::{Button, ButtonVariants};
+    fn page_options(&self, cx: &mut Context<Self>) -> impl IntoElement {
         use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
-        use gpui_kit::component::Sizable as _;
 
         let owner = cx.entity().downgrade();
         let rows = self.pager.rows;
@@ -81,38 +79,43 @@ impl GridView {
         let append = self.pager.append;
         let groups = crate::menus::command_groups(self, &[&["first", "last"]]);
 
-        Button::new("page-size")
-            .debug_selector(|| "page-size".into())
-            .ghost()
-            .small()
-            .compact()
-            .accessibility_label("Paging options")
-            .tooltip("Rows per page and navigation mode")
-            .label(if continuous {
-                "Continuous".into()
-            } else {
-                format!("{} / page", thousands(rows))
-            })
-            .child(icon("chevron-down", theme.muted_foreground))
-            .dropdown_menu_with_anchor(gpui::Anchor::BottomRight, move |mut menu, _, _| {
-                for size in PAGE_SIZES {
-                    let owner = owner.clone();
-                    menu = menu.item(
-                        PopupMenuItem::new(format!("{} rows per page", thousands(size)))
-                            .checked(rows == size && !continuous)
-                            .on_click(move |_, _, cx| {
-                                let _ = owner.update(cx, |this, cx| {
-                                    this.pager = this.pager.resized(size);
-                                    this.continuous = false;
-                                    cx.notify();
-                                });
-                            }),
-                    );
-                }
-                let owner_continuous = owner.clone();
-                let owner_append = owner.clone();
-                menu = menu
-                    .separator()
+        crate::surfaces::menu_button(
+            "page-size",
+            Some(
+                div()
+                    .whitespace_nowrap()
+                    .child(if continuous {
+                        "Continuous".to_owned()
+                    } else {
+                        format!("{} / page", thousands(rows))
+                    })
+                    .into_any_element(),
+            ),
+            None,
+            "Paging options",
+            "Rows per page and navigation mode",
+            true,
+        )
+        .debug_selector(|| "page-size".into())
+        .dropdown_menu_with_anchor(gpui::Anchor::BottomRight, move |mut menu, _, _| {
+            for size in PAGE_SIZES {
+                let owner = owner.clone();
+                menu = menu.item(
+                    PopupMenuItem::new(format!("{} rows per page", thousands(size)))
+                        .checked(rows == size && !continuous)
+                        .on_click(move |_, _, cx| {
+                            let _ = owner.update(cx, |this, cx| {
+                                this.pager = this.pager.resized(size);
+                                this.continuous = false;
+                                cx.notify();
+                            });
+                        }),
+                );
+            }
+            let owner_continuous = owner.clone();
+            let owner_append = owner.clone();
+            menu =
+                menu.separator()
                     .item(PopupMenuItem::new("Scroll continuously").checked(continuous).on_click(
                         move |_, window, cx| {
                             let _ = owner_continuous.update(cx, |this, cx| {
@@ -132,15 +135,15 @@ impl GridView {
                                 });
                             }),
                     );
-                if continuous {
-                    return menu;
-                }
-                if groups.is_empty() {
-                    menu
-                } else {
-                    crate::menus::fill(menu.separator(), &owner, &groups)
-                }
-            })
+            if continuous {
+                return menu;
+            }
+            if groups.is_empty() {
+                menu
+            } else {
+                crate::menus::fill(menu.separator(), &owner, &groups)
+            }
+        })
     }
 
     fn grid_pager(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
@@ -182,7 +185,7 @@ impl GridView {
                     .child(label),
             )
             .children(can_page.then_some(next))
-            .child(self.page_options(theme, cx))
+            .child(self.page_options(cx))
     }
 
     fn add_row_button(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Stateful<Div>> {
@@ -199,32 +202,29 @@ impl GridView {
     }
 
     fn export_menu_button(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
-        use gpui_component::button::{Button, ButtonVariants};
         use gpui_component::menu::DropdownMenu;
-        use gpui_kit::component::Sizable as _;
         let groups = crate::menus::command_groups(self, crate::menus::EXPORT_GROUPS);
         div().debug_selector(|| "grid-export".into()).child(
-            Button::new("grid-export")
-                .ghost()
-                .small()
-                .compact()
-                .tooltip("Export to a file or copy as CSV")
-                .accessibility_label("Export")
-                .child(
+            crate::surfaces::menu_button(
+                "grid-export",
+                Some(
                     div()
                         .whitespace_nowrap()
                         .text_color(rgb(theme.foreground))
-                        .child("Export"),
-                )
-                .child(icon("chevron-down", theme.muted_foreground))
-                .dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), groups)),
+                        .child("Export")
+                        .into_any_element(),
+                ),
+                None,
+                "Export",
+                "Export to a file or copy as CSV",
+                true,
+            )
+            .dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), groups)),
         )
     }
 
     fn grid_action_buttons(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
-        use gpui_component::button::{Button, ButtonVariants};
         use gpui_component::menu::DropdownMenu;
-        use gpui_kit::component::Sizable as _;
         let compact = self.synced_width < 1000.0;
         let groups = crate::menus::command_groups(
             self,
@@ -311,12 +311,15 @@ impl GridView {
                     })
                     .children(self.add_row_button(theme, cx))
                     .child(
-                        Button::new("grid-columns-menu")
-                            .ghost()
-                            .small()
-                            .compact()
-                            .label("Columns")
-                            .dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), columns)),
+                        crate::surfaces::menu_button(
+                            "grid-columns-menu",
+                            Some(div().whitespace_nowrap().child("Columns").into_any_element()),
+                            None,
+                            "Columns",
+                            "Choose visible columns",
+                            true,
+                        )
+                        .dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), columns)),
                     )
                     .children(self.live.is_none().then(|| {
                         compact_button(ButtonKind::Ghost, "compare", "Compare", theme)
@@ -326,14 +329,16 @@ impl GridView {
             })
             .when(compact, |actions| {
                 actions.child(
-                    Button::new("grid-more")
-                        .ghost()
-                        .small()
-                        .compact()
-                        .tooltip("More grid actions")
-                        .accessibility_label("More grid actions")
-                        .child(icon("ellipsis", theme.muted_foreground))
-                        .dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), groups)),
+                    crate::surfaces::menu_button(
+                        "grid-more",
+                        None,
+                        Some(icon("ellipsis", theme.muted_foreground).into_any_element()),
+                        "More grid actions",
+                        "More grid actions",
+                        true,
+                    )
+                    .dropdown_caret(false)
+                    .dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), groups)),
                 )
             })
     }

@@ -451,33 +451,33 @@ impl GridView {
 }
 
 fn transaction_actions_menu(theme: Theme, cx: &mut Context<GridView>) -> impl IntoElement {
-    use gpui_component::button::{Button, ButtonVariants as _};
     use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
-    use gpui_kit::component::Sizable as _;
     let owner = cx.entity().downgrade();
     div().debug_selector(|| "transaction-actions".into()).child(
-        Button::new("transaction-actions")
-            .ghost()
-            .small()
-            .compact()
-            .tooltip("Commit or roll back the transaction")
-            .accessibility_label("Transaction actions")
-            .child(crate::assets::icon("chevron-down", theme.muted_foreground))
-            .dropdown_menu(move |menu, _, _| {
-                let commit_owner = owner.clone();
-                let rollback_owner = owner.clone();
-                menu.item(PopupMenuItem::new("Commit").on_click(move |_, _, cx| {
-                    let _ = commit_owner.update(cx, |view, cx| {
-                        view.end_transaction(true, cx);
-                        cx.notify();
-                    });
-                }))
-                .item(PopupMenuItem::new("Roll back").on_click(move |_, _, cx| {
-                    let _ = rollback_owner.update(cx, |view, cx| {
-                        view.end_transaction(false, cx);
-                        cx.notify();
-                    });
-                }))
-            }),
+        crate::surfaces::menu_button(
+            "transaction-actions",
+            None,
+            Some(crate::assets::icon("chevron-down", theme.muted_foreground).into_any_element()),
+            "Transaction actions",
+            "Commit or roll back the transaction",
+            true,
+        )
+        .dropdown_caret(false)
+        .dropdown_menu(move |menu, _, _| {
+            let commit_owner = owner.clone();
+            let rollback_owner = owner.clone();
+            menu.item(PopupMenuItem::new("Commit").on_click(move |_, _, cx| {
+                let _ = commit_owner.update(cx, |view, cx| {
+                    view.end_transaction(true, cx);
+                    cx.notify();
+                });
+            }))
+            .item(PopupMenuItem::new("Roll back").on_click(move |_, _, cx| {
+                let _ = rollback_owner.update(cx, |view, cx| {
+                    view.end_transaction(false, cx);
+                    cx.notify();
+                });
+            }))
+        }),
     )
 }
