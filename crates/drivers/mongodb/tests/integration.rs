@@ -692,9 +692,14 @@ async fn decimal128_csv_round_trip_through_typed_grid_edit_keeps_native_bson() {
     let import_options = bookie_core::import::CsvImportOptions::default();
     let sheet = bookie_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
     let import_columns = [result.columns[id_index].clone(), result.columns[amount_index].clone()];
-    let imported =
-        bookie_core::import::row_to_values(&sheet.rows[0], &[Some(0), Some(1)], &import_columns, &import_options, 2)
-            .unwrap();
+    let imported = bookie_core::import::row_to_values(
+        &sheet.rows.get(0).unwrap(),
+        &[Some(0), Some(1)],
+        &import_columns,
+        &import_options,
+        2,
+    )
+    .unwrap();
     assert!(matches!(imported[1], Value::Decimal(_)), "{:?}", imported[1]);
 
     let mut columns = result.columns.clone();
@@ -761,9 +766,14 @@ async fn negative_decimal128_csv_formula_marker_round_trips_as_native_decimal128
     let import_options = bookie_core::import::CsvImportOptions::default();
     let sheet = bookie_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
     let import_columns = [result.columns[id_index].clone(), result.columns[amount_index].clone()];
-    let imported =
-        bookie_core::import::row_to_values(&sheet.rows[0], &[Some(0), Some(1)], &import_columns, &import_options, 2)
-            .expect("valid formula marker is removed for the typed decimal column");
+    let imported = bookie_core::import::row_to_values(
+        &sheet.rows.get(0).unwrap(),
+        &[Some(0), Some(1)],
+        &import_columns,
+        &import_options,
+        2,
+    )
+    .expect("valid formula marker is removed for the typed decimal column");
     assert!(matches!(imported[1], Value::Decimal(_)), "{:?}", imported[1]);
 
     let mut columns = result.columns.clone();

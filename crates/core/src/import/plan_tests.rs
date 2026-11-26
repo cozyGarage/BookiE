@@ -19,10 +19,7 @@ fn column(name: &str, data_type: &str) -> ColumnInfo {
 fn sheet(rows: &[&[&str]], headers: &[&str]) -> CsvSheet {
     CsvSheet {
         headers: headers.iter().map(|header| (*header).to_owned()).collect(),
-        rows: rows
-            .iter()
-            .map(|row| row.iter().map(|cell| (*cell).to_owned()).collect())
-            .collect(),
+        rows: crate::import::TextRows::from_test_rows(rows.iter().map(|row| row.iter().copied())),
         truncated: false,
     }
 }
@@ -585,7 +582,7 @@ fn only_the_first_failures_are_listed_and_the_rest_are_counted() {
         .collect();
     let sheet = CsvSheet {
         headers: vec!["id".to_owned()],
-        rows,
+        rows: crate::import::TextRows::from_test_rows(rows.iter().map(|row| row.iter().map(String::as_str))),
         truncated: false,
     };
 
@@ -624,7 +621,7 @@ fn the_batches_a_plan_offers_are_bounded_and_cover_every_row() {
     let rows: Vec<Vec<String>> = (0..7).map(|index| vec![index.to_string()]).collect();
     let sheet = CsvSheet {
         headers: vec!["id".to_owned()],
-        rows,
+        rows: crate::import::TextRows::from_test_rows(rows.iter().map(|row| row.iter().map(String::as_str))),
         truncated: false,
     };
     let plan = build_insert_plan(&target(&columns, &mapping), &sheet, &CsvImportOptions::default()).expect("plan");

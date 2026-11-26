@@ -28,13 +28,13 @@ pub fn xlsx_to_csv(bytes: &[u8]) -> Result<Vec<u8>, ImportError> {
 
 pub fn read_xlsx(bytes: &[u8], row_limit: usize) -> Result<CsvSheet, ImportError> {
     let mut headers = None;
-    let mut rows = Vec::new();
+    let mut rows = super::TextRows::default();
     let mut truncated = false;
     visit_xlsx_rows(bytes, |row| {
         if headers.is_none() {
             headers = Some(std::mem::take(row));
         } else if rows.len() < row_limit {
-            rows.push(std::mem::take(row));
+            rows.push(row.iter().map(String::as_str))?;
         } else {
             truncated = true;
         }
@@ -342,10 +342,10 @@ mod tests {
 
         let parsed = read_xlsx(&bytes, 3).unwrap();
         assert_eq!(parsed.headers, ["id", "note"]);
-        assert_eq!(parsed.rows, [["7", "a,b"], ["", ""], ["1.5", ""]]);
+        assert_eq!(parsed.rows.as_test_rows(), [["7", "a,b"], ["", ""], ["1.5", ""]]);
         assert!(!parsed.truncated);
         let preview = read_xlsx(&bytes, 2).unwrap();
-        assert_eq!(preview.rows, [["7", "a,b"], ["", ""]]);
+        assert_eq!(preview.rows.as_test_rows(), [["7", "a,b"], ["", ""]]);
         assert!(preview.truncated);
     }
 

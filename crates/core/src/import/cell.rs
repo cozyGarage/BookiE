@@ -252,12 +252,28 @@ fn parse_bytes(text: &str) -> Result<Value, CellError> {
     Ok(Value::Bytes(out))
 }
 
+pub trait CsvFields {
+    fn field(&self, index: usize) -> Option<&str>;
+}
+
+impl<T: AsRef<[String]> + ?Sized> CsvFields for T {
+    fn field(&self, index: usize) -> Option<&str> {
+        self.as_ref().get(index).map(String::as_str)
+    }
+}
+
+impl CsvFields for super::TextRow<'_> {
+    fn field(&self, index: usize) -> Option<&str> {
+        self.get(index)
+    }
+}
+
 /// Turn one record into the values a bound INSERT takes, one per column in
 /// `columns`. A column with no mapped field, or one whose field is past the
 /// end of a short row, becomes NULL, which the statement builder drops when
 /// the column has a server default.
 pub fn row_to_values(
-    row: &[String],
+    row: &(impl CsvFields + ?Sized),
     mapping: &[Option<usize>],
     columns: &[ColumnInfo],
     options: &CsvImportOptions,
@@ -267,7 +283,7 @@ pub fn row_to_values(
 }
 
 pub(crate) fn row_to_values_for_driver(
-    row: &[String],
+    row: &(impl CsvFields + ?Sized),
     mapping: &[Option<usize>],
     columns: &[ColumnInfo],
     options: &CsvImportOptions,
@@ -278,7 +294,7 @@ pub(crate) fn row_to_values_for_driver(
         .iter()
         .zip(mapping)
         .map(|(column, field)| {
-            let Some(text) = field.and_then(|index| row.get(index)) else {
+            let Some(text) = field.and_then(|index| row.field(index)) else {
                 return Ok(Value::Null);
             };
             value_for(text, column, options, driver_id).map_err(|reason| CsvRowError {
