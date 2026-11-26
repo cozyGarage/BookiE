@@ -4,19 +4,22 @@ use gpui::{TestAppContext, VisualTestContext};
 
 use crate::GridView;
 use crate::text_input;
+use crate::ui_tests::test_kit::orders;
 use bookie_core::TableInfo;
 use bookie_gpui::live::{LiveTable, Origin};
 use bookie_gpui::model::Cell;
 
-fn orders_fixture() -> std::path::PathBuf {
-    std::path::PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/orders.sqlite")
-}
-
-fn open_first_two_orders(cx: &mut TestAppContext) -> (gpui::Entity<GridView>, &mut VisualTestContext) {
+fn open_first_two_orders(
+    cx: &mut TestAppContext,
+) -> (
+    gpui::Entity<GridView>,
+    &mut VisualTestContext,
+    crate::ui_tests::test_kit::Orders,
+) {
+    let orders_copy = orders();
     let table = std::sync::Arc::new(
         LiveTable::load(
-            &Origin::File(orders_fixture()),
+            &Origin::File(orders_copy.to_path_buf()),
             &TableInfo {
                 schema: None,
                 name: "orders".into(),
@@ -26,11 +29,12 @@ fn open_first_two_orders(cx: &mut TestAppContext) -> (gpui::Entity<GridView>, &m
         .expect("load"),
     );
     cx.update(text_input::bind_keys);
-    cx.add_window_view(|window, cx| {
+    let (view, cx) = cx.add_window_view(|window, cx| {
         let mut view = GridView::with_source(table.clone(), Instant::now(), window, cx);
         view.attach_live(table.clone());
         view
-    })
+    });
+    (view, cx, orders_copy)
 }
 
 fn submit_where(view: &gpui::Entity<GridView>, cx: &mut VisualTestContext, text: &str) {
@@ -47,7 +51,7 @@ fn submit_where(view: &gpui::Entity<GridView>, cx: &mut VisualTestContext, text:
 
 #[gpui::test]
 fn where_stays_in_the_table_view_and_opens_on_demand(cx: &mut TestAppContext) {
-    let (view, cx) = open_first_two_orders(cx);
+    let (view, cx, _orders) = open_first_two_orders(cx);
     cx.run_until_parked();
     assert!(cx.debug_bounds("server-filter-row").is_none());
     let toggle = cx.debug_bounds("toggle-where").expect("the table offers WHERE");
@@ -67,7 +71,7 @@ fn where_stays_in_the_table_view_and_opens_on_demand(cx: &mut TestAppContext) {
 
 #[gpui::test]
 fn a_where_filter_runs_on_the_server_not_on_the_loaded_rows(cx: &mut TestAppContext) {
-    let (view, cx) = open_first_two_orders(cx);
+    let (view, cx, _orders) = open_first_two_orders(cx);
     view.read_with(cx, |view, _| assert_eq!(view.source.total(), 2));
 
     submit_where(&view, cx, "id = 6");
@@ -95,7 +99,7 @@ fn a_where_filter_runs_on_the_server_not_on_the_loaded_rows(cx: &mut TestAppCont
 
 #[gpui::test]
 fn the_row_count_respects_the_where_filter(cx: &mut TestAppContext) {
-    let (view, cx) = open_first_two_orders(cx);
+    let (view, cx, _orders) = open_first_two_orders(cx);
     submit_where(&view, cx, "customer = 'Ada'");
     view.read_with(cx, |view, _| assert_eq!(view.source.total(), 2, "{}", view.status));
     cx.update(|window, cx| view.update(cx, |view, cx| view.run_palette_id("count-table-rows", window, cx)));
@@ -108,12 +112,13 @@ fn the_row_count_respects_the_where_filter(cx: &mut TestAppContext) {
 
 #[gpui::test]
 fn changing_connection_clears_where_text_for_the_same_table(cx: &mut TestAppContext) {
-    let (view, cx) = open_first_two_orders(cx);
+    let orders_copy = orders();
+    let (view, cx, _orders) = open_first_two_orders(cx);
     submit_where(&view, cx, "id = 6");
 
     let table = std::sync::Arc::new(
         LiveTable::load(
-            &Origin::File(orders_fixture()),
+            &Origin::File(orders_copy.to_path_buf()),
             &TableInfo {
                 schema: None,
                 name: "orders".into(),

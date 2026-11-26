@@ -100,7 +100,7 @@ fn the_copy_check_catches_each_rule() {
 
 #[gpui::test]
 fn palette_labels_groups_and_shortcut_titles_follow_the_copy_rules(cx: &mut TestAppContext) {
-    let (view, cx) = open_live(cx);
+    let (view, cx, _orders) = open_live(cx);
     let actions = view.read_with(cx, |view, _| view.palette_actions());
     assert!(!actions.is_empty());
     let mut problems: Vec<String> = actions.iter().flat_map(|action| copy_problems(&action.label)).collect();
@@ -126,7 +126,7 @@ fn palette_labels_groups_and_shortcut_titles_follow_the_copy_rules(cx: &mut Test
 
 #[gpui::test]
 fn a_command_has_one_name_in_the_palette_and_the_shortcut_list(cx: &mut TestAppContext) {
-    let (view, cx) = open_live(cx);
+    let (view, cx, _orders) = open_live(cx);
     let actions = view.read_with(cx, |view, _| view.palette_actions());
     let mismatched: Vec<(String, &str)> = actions
         .iter()
@@ -139,7 +139,7 @@ fn a_command_has_one_name_in_the_palette_and_the_shortcut_list(cx: &mut TestAppC
 
 #[gpui::test]
 fn every_toolbar_menu_item_is_a_palette_command_with_the_same_name(cx: &mut TestAppContext) {
-    let (view, cx) = open_live(cx);
+    let (view, cx, _orders) = open_live(cx);
     let menus = [
         crate::menus::IMPORT_EXPORT_GROUPS,
         crate::menus::EXPORT_GROUPS,
@@ -160,7 +160,7 @@ fn every_toolbar_menu_item_is_a_palette_command_with_the_same_name(cx: &mut Test
 
 #[gpui::test]
 fn the_palette_shows_shortcuts_in_the_same_format_as_the_editor_hints(cx: &mut TestAppContext) {
-    let (view, cx) = open_live(cx);
+    let (view, cx, _orders) = open_live(cx);
     view.read_with(cx, |view, _| {
         assert_eq!(view.action_shortcut("filter").as_deref(), Some("Ctrl+F"));
         assert_eq!(view.action_shortcut("run").as_deref(), Some("Ctrl+Shift+Enter"));

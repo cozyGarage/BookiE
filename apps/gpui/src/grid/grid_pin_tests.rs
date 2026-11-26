@@ -687,7 +687,7 @@ fn a_small_result_keeps_fitted_width_and_wide_headers_keep_pin_in_the_menu(cx: &
 
 #[gpui::test]
 fn grid_column_menu_applies_and_clears_sort(cx: &mut TestAppContext) {
-    let (view, cx) = crate::live_ui_tests::open_live(cx);
+    let (view, cx, _orders) = crate::live_ui_tests::open_live(cx);
     cx.run_until_parked();
     let menu = cx.update(|window, _| window.find_by_label("Actions for id").bounds());
     cx.simulate_click(menu.center(), Default::default());

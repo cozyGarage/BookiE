@@ -6,6 +6,7 @@ use gpui_kit::test::{TestQueryExt, TestWindowExt};
 use crate::GridView;
 use crate::live_ui_tests::open_live;
 use crate::text_input;
+use crate::ui_tests::test_kit::{Orders, orders, until};
 use bookie_core::TableInfo;
 
 #[path = "paste_literal_save_tests.rs"]
@@ -29,11 +30,6 @@ impl Drop for TestDirectory {
     fn drop(&mut self) {
         let _ = std::fs::remove_dir_all(&self.0);
     }
-}
-
-fn orders_fixture() -> std::path::PathBuf {
-    std::path::PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/orders.sqlite")
 }
 
 fn writable_table(path: &std::path::Path) -> std::sync::Arc<bookie_gpui::live::LiveTable> {
@@ -113,23 +109,15 @@ pub(crate) fn settle_saving(cx: &mut gpui::VisualTestContext) {
     cx.run_until_parked();
 }
 
-fn read_when_written(cx: &mut gpui::VisualTestContext, path: &std::path::Path, ready: impl Fn(&str) -> bool) -> String {
-    let mut text = String::new();
-    for _ in 0..200 {
-        settle_saving(cx);
-        text = std::fs::read_to_string(path).unwrap_or_default();
-        if ready(&text) {
-            break;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(50));
-    }
-    text
-}
-
-pub(crate) fn fixture_copy(name: &str) -> std::path::PathBuf {
-    let path = std::env::temp_dir().join(format!("bookie-gpui-{name}-{}.sqlite", uuid::Uuid::new_v4()));
-    std::fs::copy(orders_fixture(), &path).unwrap();
-    path
+fn read_when_written(
+    view: &gpui::Entity<GridView>,
+    cx: &mut gpui::VisualTestContext,
+    path: &std::path::Path,
+    ready: impl Fn(&str) -> bool,
+) -> String {
+    let read = || std::fs::read_to_string(path).unwrap_or_default();
+    until(view, cx, &format!("writing {}", path.display()), |_| ready(&read()));
+    read()
 }
 
 fn queue_edit(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext, text: &str) {
@@ -145,7 +133,7 @@ fn queue_edit(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext, t
 
 #[gpui::test]
 fn a_write_the_guard_denies_leaves_the_database_unchanged_and_keeps_the_edit(cx: &mut TestAppContext) {
-    let path = fixture_copy("denied");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     let write = write_session(&path, true);
     cx.update(|_, cx| {
@@ -177,12 +165,11 @@ fn a_write_the_guard_denies_leaves_the_database_unchanged_and_keeps_the_edit(cx:
         );
     });
     assert_eq!(saved_customer(&path, 1), "Ada", "the denied statement did not run");
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn a_save_with_an_unknown_outcome_shows_an_error_instead_of_success(cx: &mut TestAppContext) {
-    let path = fixture_copy("unknown-outcome");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     let write = write_session(&path, false);
     cx.update(|_, cx| {
@@ -213,12 +200,11 @@ fn a_save_with_an_unknown_outcome_shows_an_error_instead_of_success(cx: &mut Tes
         assert_eq!(view.notices.unread(), 1);
         assert!(view.save.write.is_none());
     });
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn save_in_the_pending_marker_opens_the_review_and_saves_nothing_yet(cx: &mut TestAppContext) {
-    let path = fixture_copy("marker-save");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     let write = write_session(&path, false);
     cx.update(|_, cx| {
@@ -240,12 +226,11 @@ fn save_in_the_pending_marker_opens_the_review_and_saves_nothing_yet(cx: &mut Te
         "Ada",
         "nothing is saved before the user confirms"
     );
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn a_plan_prepared_before_the_edits_changed_is_dropped_and_a_stale_review_cannot_be_confirmed(cx: &mut TestAppContext) {
-    let path = fixture_copy("stale");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     let write = write_session(&path, false);
     cx.update(|_, cx| {
@@ -284,12 +269,11 @@ fn a_plan_prepared_before_the_edits_changed_is_dropped_and_a_stale_review_cannot
         );
     });
     assert_eq!(saved_customer(&path, 1), "Ada", "nothing was saved from a stale review");
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn a_grid_switch_is_refused_while_a_save_is_running_so_no_other_tabs_edits_are_touched(cx: &mut TestAppContext) {
-    let path = fixture_copy("switch");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| {
         view.update(cx, |view, _| {
@@ -305,7 +289,6 @@ fn a_grid_switch_is_refused_while_a_save_is_running_so_no_other_tabs_edits_are_t
             "the table grid stays in front while its save runs"
         );
     });
-    std::fs::remove_file(&path).ok();
 }
 
 fn order_count(path: &std::path::Path) -> String {
@@ -318,7 +301,7 @@ fn order_count(path: &std::path::Path) -> String {
 
 #[gpui::test]
 fn selected_rows_are_reviewed_then_deleted_and_the_table_reloads_without_them(cx: &mut TestAppContext) {
-    let path = fixture_copy("delete");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     let write = write_session(&path, false);
     cx.update(|_, cx| {
@@ -361,12 +344,11 @@ fn selected_rows_are_reviewed_then_deleted_and_the_table_reloads_without_them(cx
         assert!(!view.save.busy);
     });
     assert_eq!(order_count(&path), "5");
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn deleting_needs_a_selection_and_no_pending_edits(cx: &mut TestAppContext) {
-    let path = fixture_copy("delete-guards");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
@@ -408,12 +390,11 @@ fn deleting_needs_a_selection_and_no_pending_edits(cx: &mut TestAppContext) {
         assert!(view.save.pending.is_none());
     });
     assert_eq!(order_count(&path), "6");
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn a_cached_write_session_for_another_connection_is_never_used(cx: &mut TestAppContext) {
-    let path = fixture_copy("other-connection");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     let wrong = write_session(&path, false);
     cx.update(|_, cx| {
@@ -438,16 +419,14 @@ fn a_cached_write_session_for_another_connection_is_never_used(cx: &mut TestAppC
         "Ada",
         "the other connection's session did not run it"
     );
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn an_edited_cell_is_reviewed_then_saved_and_the_table_shows_the_saved_value(cx: &mut TestAppContext) {
     use bookie_gpui::model::CellText;
-    let path = std::env::temp_dir().join(format!("bookie-gpui-save-{}.sqlite", uuid::Uuid::new_v4()));
+    let path = orders();
     let staged = format!("draft {}\r\nlast line", "🧪".repeat(160));
     let replacement = "first\tsecond\r\nthird 💾".to_string();
-    std::fs::copy(orders_fixture(), &path).unwrap();
     let table = writable_table(&path);
     cx.update(text_input::bind_keys);
     let (view, cx) = cx.add_window_view(|window, cx| {
@@ -564,13 +543,11 @@ fn an_edited_cell_is_reviewed_then_saved_and_the_table_shows_the_saved_value(cx:
     });
     assert_eq!(saved_customer(&path, 1), replacement);
     assert_eq!(saved_customer(&path, 2), "");
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn cancelling_the_review_keeps_the_edit_and_a_read_only_table_cannot_start_a_save(cx: &mut TestAppContext) {
-    let path = std::env::temp_dir().join(format!("bookie-gpui-cancel-{}.sqlite", uuid::Uuid::new_v4()));
-    std::fs::copy(orders_fixture(), &path).unwrap();
+    let path = orders();
     let table = writable_table(&path);
     cx.update(text_input::bind_keys);
     let (view, cx) = cx.add_window_view(|window, cx| {
@@ -617,9 +594,8 @@ fn cancelling_the_review_keeps_the_edit_and_a_read_only_table_cannot_start_a_sav
         );
         assert!(view.cell_edit.edits.is_empty());
     });
-    std::fs::remove_file(&path).ok();
 
-    let (read_only, cx) = open_live(cx);
+    let (read_only, cx, _orders) = open_live(cx);
     cx.update(|_, cx| {
         read_only.update(cx, |view, cx| {
             view.cell_edit
@@ -637,15 +613,8 @@ fn cancelling_the_review_keeps_the_edit_and_a_read_only_table_cannot_start_a_sav
     });
 }
 
-fn open_review<'a>(
-    cx: &'a mut TestAppContext,
-    name: &str,
-) -> (
-    gpui::Entity<GridView>,
-    &'a mut gpui::VisualTestContext,
-    std::path::PathBuf,
-) {
-    let path = fixture_copy(name);
+fn open_review(cx: &mut TestAppContext) -> (gpui::Entity<GridView>, &mut gpui::VisualTestContext, Orders) {
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
@@ -665,7 +634,7 @@ fn open_review<'a>(
 
 #[gpui::test]
 fn escape_cancels_the_review_and_keeps_the_pending_edit(cx: &mut TestAppContext) {
-    let (view, cx, path) = open_review(cx, "review-escape");
+    let (view, cx, _orders) = open_review(cx);
     assert!(cx.debug_bounds("bar-dialog").is_some());
     cx.simulate_keystrokes("escape");
     settle_saving(cx);
@@ -675,12 +644,11 @@ fn escape_cancels_the_review_and_keeps_the_pending_edit(cx: &mut TestAppContext)
         assert_eq!(view.cell_edit.edits.len(), 1, "cancelling keeps the pending edit");
     });
     assert!(cx.debug_bounds("bar-dialog").is_none());
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn an_edit_review_confirms_with_the_primary_button_and_enter_never_deletes(cx: &mut TestAppContext) {
-    let (view, cx, path) = open_review(cx, "review-kinds");
+    let (view, cx, path) = open_review(cx);
     view.read_with(cx, |view, _| {
         let pending = view.save.pending.as_ref().expect("a review");
         assert_eq!(
@@ -704,12 +672,11 @@ fn an_edit_review_confirms_with_the_primary_button_and_enter_never_deletes(cx: &
         assert!(view.save.pending.is_some(), "enter does not confirm a delete")
     });
     assert_eq!(order_count(&path), "6");
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn keys_do_not_reach_the_grid_behind_the_review(cx: &mut TestAppContext) {
-    let (view, cx, path) = open_review(cx, "review-keys");
+    let (view, cx, _orders) = open_review(cx);
     let selection = view.read_with(cx, |view, _| view.selection);
     cx.simulate_keystrokes("shift-down delete");
     settle_saving(cx);
@@ -718,12 +685,11 @@ fn keys_do_not_reach_the_grid_behind_the_review(cx: &mut TestAppContext) {
         assert_eq!(view.cell_edit.edits.len(), 1);
         assert!(view.save.pending.is_some(), "the review stays open");
     });
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn the_window_blocks_a_running_save_and_confirms_before_discarding_edits(cx: &mut TestAppContext) {
-    let path = fixture_copy("close-guard");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     view.read_with(cx, |view, _| assert_eq!(view.close_blocker(), None));
     cx.update(|_, cx| {
@@ -751,12 +717,11 @@ fn the_window_blocks_a_running_save_and_confirms_before_discarding_edits(cx: &mu
         })
     });
     view.read_with(cx, |view, _| assert_eq!(view.close_blocker(), None));
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn deleting_is_refused_in_compare_mode_where_rows_are_not_dataset_rows(cx: &mut TestAppContext) {
-    let path = fixture_copy("delete-compare");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
@@ -774,12 +739,11 @@ fn deleting_is_refused_in_compare_mode_where_rows_are_not_dataset_rows(cx: &mut 
         assert!(view.save.pending.is_none());
     });
     assert_eq!(order_count(&path), "6");
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn under_a_filter_the_row_you_see_selected_is_the_row_that_is_deleted(cx: &mut TestAppContext) {
-    let path = fixture_copy("delete-filtered");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     let write = write_session(&path, false);
     cx.update(|_, cx| {
@@ -802,12 +766,11 @@ fn under_a_filter_the_row_you_see_selected_is_the_row_that_is_deleted(cx: &mut T
         "1,2,3,5,6",
         "the second visible row is source row 3 (id 4), and only that row is deleted"
     );
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn a_delete_the_guard_denies_leaves_every_row_in_place(cx: &mut TestAppContext) {
-    let path = fixture_copy("delete-denied");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     let write = write_session(&path, true);
     cx.update(|_, cx| {
@@ -829,7 +792,6 @@ fn a_delete_the_guard_denies_leaves_every_row_in_place(cx: &mut TestAppContext) 
         );
     });
     assert_eq!(remaining_ids(&path), "1,2,3,4,5,6");
-    std::fs::remove_file(&path).ok();
 }
 
 fn remaining_ids(path: &std::path::Path) -> String {
@@ -859,7 +821,7 @@ fn fill_insert_field(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestCon
 
 #[gpui::test]
 fn a_new_row_is_filled_in_reviewed_then_inserted_and_the_table_shows_it(cx: &mut TestAppContext) {
-    let path = fixture_copy("insert");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     let write = write_session(&path, false);
     cx.update(|_, cx| {
@@ -907,12 +869,11 @@ fn a_new_row_is_filled_in_reviewed_then_inserted_and_the_table_shows_it(cx: &mut
     });
     assert_eq!(order_count(&path), "7");
     assert_eq!(saved_customer(&path, 7), "Zed");
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn a_value_that_does_not_fit_stops_the_review_keeps_the_form_and_cells_stay_locked(cx: &mut TestAppContext) {
-    let path = fixture_copy("insert-invalid");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| view.update(cx, |view, cx| view.open_insert_form(cx)));
     settle_saving(cx);
@@ -940,12 +901,11 @@ fn a_value_that_does_not_fit_stops_the_review_keeps_the_form_and_cells_stay_lock
         assert!(!view.insert.open && view.insert.fields.is_empty())
     });
     assert_eq!(order_count(&path), "6");
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn a_column_read_that_finishes_after_the_table_changed_does_not_open_a_form_for_the_old_table(cx: &mut TestAppContext) {
-    let path = fixture_copy("insert-race");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| view.update(cx, |view, cx| view.open_insert_form(cx)));
     cx.update(|_, cx| view.update(cx, |view, _| view.edits_changed()));
@@ -954,12 +914,11 @@ fn a_column_read_that_finishes_after_the_table_changed_does_not_open_a_form_for_
         assert!(!view.insert.open, "a form for a table the user has left is never shown");
         assert!(!view.insert.loading);
     });
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn a_denied_insert_keeps_the_form_and_what_was_typed_and_leaves_the_table_alone(cx: &mut TestAppContext) {
-    let path = fixture_copy("insert-denied");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     let write = write_session(&path, true);
     cx.update(|_, cx| {
@@ -991,12 +950,11 @@ fn a_denied_insert_keeps_the_form_and_what_was_typed_and_leaves_the_table_alone(
         assert_eq!(typed.input.read(cx).content(), "Denied", "what was typed is kept");
     });
     assert_eq!(order_count(&path), "6");
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn saving_and_deleting_are_refused_while_the_new_row_form_is_open(cx: &mut TestAppContext) {
-    let path = fixture_copy("insert-locks");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| view.update(cx, |view, cx| view.open_insert_form(cx)));
     settle_saving(cx);
@@ -1010,7 +968,6 @@ fn saving_and_deleting_are_refused_while_the_new_row_form_is_open(cx: &mut TestA
         assert_eq!(view.status, "Finish or cancel the open form first");
         assert!(view.save.pending.is_none());
     });
-    std::fs::remove_file(&path).ok();
 }
 
 fn csv_file(name: &str, text: &str) -> std::path::PathBuf {
@@ -1035,8 +992,8 @@ fn set_import_path(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestConte
 
 #[gpui::test]
 fn an_excel_file_is_reviewed_like_a_csv_file(cx: &mut TestAppContext) {
-    let path = fixture_copy("import-excel");
-    let workbook = orders_fixture().with_file_name("import_two_rows.xlsx");
+    let path = orders();
+    let workbook = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/import_two_rows.xlsx");
     let (view, cx) = saving_view(cx, &path);
     let write = write_session(&path, false);
     cx.update(|_, cx| {
@@ -1068,12 +1025,11 @@ fn an_excel_file_is_reviewed_like_a_csv_file(cx: &mut TestAppContext) {
         "the review opens as a dialog over the grid"
     );
     assert_eq!(order_count(&path), "6", "nothing is imported before the user confirms");
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn a_csv_file_is_reviewed_then_imported_in_one_transaction_and_the_table_shows_the_rows(cx: &mut TestAppContext) {
-    let path = fixture_copy("import");
+    let path = orders();
     let file = csv_file("rows", "customer,total,ignored\nCsvOne,1.5,x\nCsvTwo,2.5,y\n");
     let (view, cx) = saving_view(cx, &path);
     let write = write_session(&path, false);
@@ -1117,13 +1073,12 @@ fn a_csv_file_is_reviewed_then_imported_in_one_transaction_and_the_table_shows_t
         assert_eq!(view.source.total(), 8);
     });
     assert_eq!(order_count(&path), "8");
-    std::fs::remove_file(&path).ok();
     std::fs::remove_file(&file).ok();
 }
 
 #[gpui::test]
 fn a_missing_or_unmatched_file_stops_the_review_keeps_the_bar_and_locks_editing(cx: &mut TestAppContext) {
-    let path = fixture_copy("import-bad");
+    let path = orders();
     let unmatched = csv_file("unmatched", "alpha,beta\n1,2\n");
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| view.update(cx, |view, cx| view.open_import_bar(cx)));
@@ -1155,7 +1110,6 @@ fn a_missing_or_unmatched_file_stops_the_review_keeps_the_bar_and_locks_editing(
     cx.update(|_, cx| view.update(cx, |view, cx| view.cancel_import_bar(cx)));
     view.read_with(cx, |view, _| assert!(!view.import.open));
     assert_eq!(order_count(&path), "6");
-    std::fs::remove_file(&path).ok();
     std::fs::remove_file(&unmatched).ok();
 }
 
@@ -1188,7 +1142,7 @@ fn table_columns_of(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestCont
 #[gpui::test]
 fn a_column_is_added_renamed_and_dropped_only_after_each_change_is_reviewed(cx: &mut TestAppContext) {
     use bookie_app_services::structure_change_plan::StructureChangeKind::{AddColumn, DropColumn, RenameColumn};
-    let path = fixture_copy("structure");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     let write = write_session(&path, false);
     cx.update(|_, cx| {
@@ -1246,13 +1200,12 @@ fn a_column_is_added_renamed_and_dropped_only_after_each_change_is_reviewed(cx: 
             assert!(columns.contains(expected), "{columns}");
         }
     }
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn a_bad_structure_request_is_refused_before_any_review_and_keeps_the_bar(cx: &mut TestAppContext) {
     use bookie_app_services::structure_change_plan::StructureChangeKind::DropColumn;
-    let path = fixture_copy("structure-bad");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| view.update(cx, |view, cx| view.open_structure_bar(DropColumn, cx)));
     set_structure_text(&view, cx, "no_such_column");
@@ -1264,12 +1217,11 @@ fn a_bad_structure_request_is_refused_before_any_review_and_keeps_the_bar(cx: &m
         assert!(view.status.contains("no column named"), "{}", view.status);
         assert!(view.form_open(), "editing stays locked while the bar is open");
     });
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn a_save_that_finishes_after_the_reload_was_cancelled_still_frees_every_write_feature(cx: &mut TestAppContext) {
-    let path = fixture_copy("busy");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     let write = write_session(&path, false);
     cx.update(|_, cx| {
@@ -1288,12 +1240,11 @@ fn a_save_that_finishes_after_the_reload_was_cancelled_still_frees_every_write_f
             view.status
         );
     });
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn opening_a_table_or_running_a_query_is_refused_while_a_save_is_writing(cx: &mut TestAppContext) {
-    let path = fixture_copy("busy-refuse");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
@@ -1303,7 +1254,6 @@ fn opening_a_table_or_running_a_query_is_refused_while_a_save_is_writing(cx: &mu
             assert!(view.status.contains("A save is running"), "{}", view.status);
         })
     });
-    std::fs::remove_file(&path).ok();
 }
 
 fn orders_indexes_of(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext) -> String {
@@ -1317,7 +1267,7 @@ fn orders_indexes_of(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestCon
 #[gpui::test]
 fn a_unique_index_is_reviewed_created_then_dropped_by_its_live_name_only_on_confirm(cx: &mut TestAppContext) {
     use bookie_app_services::structure_change_plan::StructureChangeKind::{AddIndex, DropIndex};
-    let path = fixture_copy("indexes");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     let write = write_session(&path, false);
     cx.update(|_, cx| {
@@ -1380,12 +1330,11 @@ fn a_unique_index_is_reviewed_created_then_dropped_by_its_live_name_only_on_conf
     cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_save(cx)));
     settle_saving(cx);
     assert_eq!(orders_indexes_of(&view, cx), "");
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn the_structure_panel_lists_columns_indexes_and_keys_of_the_open_table_and_closes_on_request(cx: &mut TestAppContext) {
-    let path = fixture_copy("structure-info");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| view.update(cx, |view, cx| view.show_structure(cx)));
     settle_saving(cx);
@@ -1411,13 +1360,12 @@ fn the_structure_panel_lists_columns_indexes_and_keys_of_the_open_table_and_clos
     view.read_with(cx, |view, _| {
         assert!(view.structure.info.is_none(), "a change bar replaces the panel")
     });
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn only_a_table_rename_asks_for_a_reconnect_after_it_is_applied(cx: &mut TestAppContext) {
     use bookie_app_services::structure_change_plan::StructureChangeKind::{AddColumn, RenameTable};
-    let path = fixture_copy("rename-flag");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     for (kind, text, expected) in [(RenameTable, "invoices", true), (AddColumn, "flag INTEGER", false)] {
         cx.update(|_, cx| view.update(cx, |view, cx| view.open_structure_bar(kind, cx)));
@@ -1436,12 +1384,11 @@ fn only_a_table_rename_asks_for_a_reconnect_after_it_is_applied(cx: &mut TestApp
         cx.update(|_, cx| view.update(cx, |view, cx| view.cancel_save(cx)));
         cx.update(|_, cx| view.update(cx, |view, cx| view.cancel_structure_bar(cx)));
     }
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn resolving_an_outcome_is_offered_for_a_writable_connection_and_not_while_the_panel_is_open(cx: &mut TestAppContext) {
-    let path = fixture_copy("resolve-offer");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     view.read_with(cx, |view, _| {
         assert!(view.resolve_enabled());
@@ -1449,7 +1396,6 @@ fn resolving_an_outcome_is_offered_for_a_writable_connection_and_not_while_the_p
     });
     cx.update(|_, cx| view.update(cx, |view, _| view.resolve.open = true));
     view.read_with(cx, |view, _| assert!(!view.resolve_enabled()));
-    std::fs::remove_file(&path).ok();
 }
 
 #[test]
@@ -1485,7 +1431,7 @@ fn set_export_format(
 
 #[gpui::test]
 fn export_uses_the_selected_scope_and_format_and_never_overwrites_a_file(cx: &mut TestAppContext) {
-    let path = fixture_copy("export-file");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     let directory = std::env::temp_dir().join(format!("bookie-export-{}", std::process::id()));
     std::fs::create_dir_all(&directory).unwrap();
@@ -1502,7 +1448,7 @@ fn export_uses_the_selected_scope_and_format_and_never_overwrites_a_file(cx: &mu
     set_export_path(&view, cx, &selected);
     cx.update(|_, cx| view.update(cx, |view, cx| view.write_export_file(cx)));
     let jsonl = directory.join("selected.jsonl");
-    let written = read_when_written(cx, &jsonl, |text| !text.is_empty());
+    let written = read_when_written(&view, cx, &jsonl, |text| !text.is_empty());
     assert_eq!(written.lines().count(), 1, "selected rows only: {written}");
     let value: serde_json::Value = serde_json::from_str(written.lines().next().unwrap()).unwrap();
     assert!(value["id"].is_number(), "JSON keeps the database number type: {value}");
@@ -1521,7 +1467,7 @@ fn export_uses_the_selected_scope_and_format_and_never_overwrites_a_file(cx: &mu
     set_export_path(&view, cx, &page);
     cx.update(|_, cx| view.update(cx, |view, cx| view.write_export_file(cx)));
     let page_path = directory.join("page.jsonl");
-    let written = read_when_written(cx, &page_path, |text| text.lines().count() >= 6);
+    let written = read_when_written(&view, cx, &page_path, |text| text.lines().count() >= 6);
     assert_eq!(written.lines().count(), 6, "{written}");
     assert!(written.lines().next().unwrap().starts_with('{'), "{written}");
     view.read_with(cx, |view, _| {
@@ -1533,7 +1479,7 @@ fn export_uses_the_selected_scope_and_format_and_never_overwrites_a_file(cx: &mu
     let sql = directory.join("rows.sql");
     set_export_path(&view, cx, &sql);
     cx.update(|_, cx| view.update(cx, |view, cx| view.write_export_file(cx)));
-    let inserts = read_when_written(cx, &sql, |text| text.contains("INSERT INTO"));
+    let inserts = read_when_written(&view, cx, &sql, |text| text.contains("INSERT INTO"));
     assert!(inserts.contains("INSERT INTO"), "a table exports as SQL inserts");
 
     cx.update(|_, cx| view.update(cx, |view, cx| view.open_export_file_bar(cx)));
@@ -1549,13 +1495,12 @@ fn export_uses_the_selected_scope_and_format_and_never_overwrites_a_file(cx: &mu
     view.read_with(cx, |view, _| assert!(view.status.contains(".jsonl"), "{}", view.status));
     assert!(!directory.join("rows.txt").exists());
     std::fs::remove_dir_all(&directory).ok();
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn dropping_the_table_needs_its_exact_name_then_reviews_the_statement_and_reconnects(cx: &mut TestAppContext) {
     use bookie_app_services::structure_change_plan::StructureChangeKind::DropTable;
-    let path = fixture_copy("drop-table");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| view.update(cx, |view, cx| view.open_structure_bar(DropTable, cx)));
     set_structure_text(&view, cx, "order");
@@ -1584,12 +1529,11 @@ fn dropping_the_table_needs_its_exact_name_then_reviews_the_statement_and_reconn
         assert!(pending.reconnect.is_some(), "the open table is gone afterwards");
     });
     assert_eq!(order_count(&path), "6", "nothing is dropped before the user confirms");
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn show_create_table_fills_the_panel_with_a_create_statement(cx: &mut TestAppContext) {
-    let path = fixture_copy("create-script");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| view.update(cx, |view, cx| view.show_create_table(cx)));
     settle_saving(cx);
@@ -1602,12 +1546,11 @@ fn show_create_table_fills_the_panel_with_a_create_statement(cx: &mut TestAppCon
         assert!(text.starts_with("CREATE TABLE"), "{text}");
         assert!(text.contains("customer"), "{text}");
     });
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn a_filter_is_saved_by_name_applied_again_and_deleted_and_an_unshowable_one_says_so(cx: &mut TestAppContext) {
-    let path = fixture_copy("saved-filters");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     let directory = TestDirectory::new("saved-filters");
     let store = directory.file("filters.json");
@@ -1675,7 +1618,7 @@ fn a_filter_is_saved_by_name_applied_again_and_deleted_and_an_unshowable_one_say
 
 #[gpui::test]
 fn a_saved_filter_keeps_the_trailing_space_of_its_text(cx: &mut TestAppContext) {
-    let path = fixture_copy("saved-filters-exact");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     let directory = TestDirectory::new("saved-filters-exact");
     let store = directory.file("filters.json");
@@ -1709,12 +1652,11 @@ fn a_saved_filter_keeps_the_trailing_space_of_its_text(cx: &mut TestAppContext) 
         );
     });
     std::fs::remove_file(&store).ok();
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn one_value_is_staged_on_every_selected_row_of_the_active_column(cx: &mut TestAppContext) {
-    let path = fixture_copy("set-cells");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| view.update(cx, |view, cx| view.open_set_cells_bar(cx)));
     view.read_with(cx, |view, _| assert!(!view.cell_edit.set.open, "nothing selected yet"));
@@ -1745,12 +1687,11 @@ fn one_value_is_staged_on_every_selected_row_of_the_active_column(cx: &mut TestA
         );
         assert!((0..3).all(|row| view.cell_edit.edits.contains_key(&(row, 1))));
     });
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn the_selected_rows_are_summarised_per_numeric_column(cx: &mut TestAppContext) {
-    let path = fixture_copy("selection-stats");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| view.update(cx, |view, cx| view.show_selection_stats(cx)));
     view.read_with(cx, |view, _| assert!(!view.selection_stats_enabled()));
@@ -1773,12 +1714,11 @@ fn the_selected_rows_are_summarised_per_numeric_column(cx: &mut TestAppContext) 
             view.status
         );
     });
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn the_status_bar_sums_the_cursor_column_of_the_selected_rows(cx: &mut TestAppContext) {
-    let path = fixture_copy("selection-status-stats");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
@@ -1832,12 +1772,11 @@ fn the_status_bar_sums_the_cursor_column_of_the_selected_rows(cx: &mut TestAppCo
             assert!(view.selection_stat_items().is_empty(), "one row is not summarised");
         })
     });
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn selection_stats_drop_edits_cleared_by_a_reload_after_save(cx: &mut TestAppContext) {
-    let path = fixture_copy("selection-stats-reload");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
@@ -1850,12 +1789,11 @@ fn selection_stats_drop_edits_cleared_by_a_reload_after_save(cx: &mut TestAppCon
             assert_eq!(view.selection_stat_items()[1], ("Sum", "3".to_string()));
         })
     });
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn health_reports_are_offered_only_on_postgres(cx: &mut TestAppContext) {
-    let path = fixture_copy("health-sqlite");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
@@ -1867,12 +1805,11 @@ fn health_reports_are_offered_only_on_postgres(cx: &mut TestAppContext) {
     view.read_with(cx, |view, _| {
         assert!(view.status.contains("PostgreSQL"), "{}", view.status)
     });
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn searching_every_table_for_a_value_reports_the_matching_rows_in_messages(cx: &mut TestAppContext) {
-    let path = fixture_copy("value-search");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
@@ -1904,12 +1841,11 @@ fn searching_every_table_for_a_value_reports_the_matching_rows_in_messages(cx: &
         );
         assert!(!view.search.values.open);
     });
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn the_schema_diagram_is_written_to_a_new_file_in_the_format_of_its_extension(cx: &mut TestAppContext) {
-    let path = fixture_copy("schema-diagram");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     let directory = std::env::temp_dir().join(format!("bookie-diagram-{}", std::process::id()));
     std::fs::create_dir_all(&directory).unwrap();
@@ -1931,7 +1867,7 @@ fn the_schema_diagram_is_written_to_a_new_file_in_the_format_of_its_extension(cx
         });
     };
     type_path(&view, cx, &target);
-    let written = read_when_written(cx, &target, |text| text.starts_with("erDiagram"));
+    let written = read_when_written(&view, cx, &target, |text| text.starts_with("erDiagram"));
     let status = view.read_with(cx, |view, _| view.status.clone());
     assert!(
         written.starts_with("erDiagram") && written.contains("orders") && written.contains("customers"),
@@ -1946,12 +1882,11 @@ fn the_schema_diagram_is_written_to_a_new_file_in_the_format_of_its_extension(cx
     type_path(&view, cx, &directory.join("schema.png"));
     view.read_with(cx, |view, _| assert!(view.status.contains(".mmd"), "{}", view.status));
     std::fs::remove_dir_all(&directory).ok();
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn pasting_clipboard_rows_stages_them_down_the_column_from_the_active_cell(cx: &mut TestAppContext) {
-    let path = fixture_copy("paste-cells");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| {
         cx.write_to_clipboard(gpui::ClipboardItem::new_string("Zed\nYan".into()));
@@ -1982,12 +1917,11 @@ fn pasting_clipboard_rows_stages_them_down_the_column_from_the_active_cell(cx: &
         assert!(view.status.starts_with("Nothing was pasted"), "{}", view.status);
         assert!(view.cell_edit.edits.is_empty());
     });
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn a_structured_rule_filters_the_table_into_a_result(cx: &mut TestAppContext) {
-    let path = fixture_copy("filter-rule");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
@@ -2010,12 +1944,11 @@ fn a_structured_rule_filters_the_table_into_a_result(cx: &mut TestAppContext) {
         assert_eq!(view.run_tabs.slots.len(), 1, "{}", view.status);
         assert_eq!(view.run_tabs.slots[0].run.rows, 2, "two orders belong to Ada");
     });
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn a_refused_switch_to_the_query_grid_starts_no_filter_or_dictionary_read(cx: &mut TestAppContext) {
-    let path = fixture_copy("filter-rule-refused");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
@@ -2035,12 +1968,11 @@ fn a_refused_switch_to_the_query_grid_starts_no_filter_or_dictionary_read(cx: &m
         assert!(std::sync::Arc::ptr_eq(&view.source, &view.table_source));
         assert_eq!(view.status, "Finish or cancel the save before switching grids");
     });
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn the_schema_diagram_opens_in_its_own_tab_with_one_card_per_table(cx: &mut TestAppContext) {
-    let path = fixture_copy("diagram-tab");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| view.update(cx, |view, cx| view.open_schema_diagram(cx)));
     settle_saving(cx);
@@ -2056,12 +1988,11 @@ fn the_schema_diagram_opens_in_its_own_tab_with_one_card_per_table(cx: &mut Test
         assert!(!diagram.needs_fit, "the first frame fits the diagram to the window");
         assert!(diagram.zoom > 0.0 && diagram.zoom <= 1.0, "{}", diagram.zoom);
     });
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn closing_a_loading_schema_diagram_does_not_reopen_its_tab(cx: &mut TestAppContext) {
-    let path = fixture_copy("diagram-close");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     view.update(cx, |view, cx| {
         view.open_schema_diagram(cx);
@@ -2074,12 +2005,11 @@ fn closing_a_loading_schema_diagram_does_not_reopen_its_tab(cx: &mut TestAppCont
         assert!(!view.tabs.items.contains(&bookie_gpui::shell::Tab::Diagram));
         assert!(view.search.diagram.view.is_none());
     });
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn diagram_selection_opens_structure_and_can_open_export_in_place(cx: &mut TestAppContext) {
-    let path = fixture_copy("diagram-actions");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     view.update(cx, |view, cx| view.open_schema_diagram(cx));
     settle_saving(cx);
@@ -2106,12 +2036,11 @@ fn diagram_selection_opens_structure_and_can_open_export_in_place(cx: &mut TestA
         assert_eq!(view.catalog.grid_table.name, "customers");
         assert!(view.structure.info.is_some());
     });
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn backups_are_offered_only_on_postgres_and_a_refused_bar_stays_closed(cx: &mut TestAppContext) {
-    let path = fixture_copy("backup-sqlite");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
@@ -2124,12 +2053,11 @@ fn backups_are_offered_only_on_postgres_and_a_refused_bar_stays_closed(cx: &mut 
         assert!(!view.search.backup.open);
         assert!(view.status.contains("PostgreSQL"), "{}", view.status);
     });
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn refreshing_reloads_the_table_but_never_throws_pending_edits_away(cx: &mut TestAppContext) {
-    let path = fixture_copy("refresh-table");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     queue_edit(&view, cx, "pending");
     cx.update(|_, cx| view.update(cx, |view, cx| view.refresh_table(cx)));
@@ -2148,12 +2076,11 @@ fn refreshing_reloads_the_table_but_never_throws_pending_edits_away(cx: &mut Tes
         assert_eq!(view.status, "Refreshed the table");
         assert_eq!(view.dataset_count(), 6, "the six fixture rows are loaded again");
     });
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn refresh_reuses_the_table_sort_and_keeps_rows_if_reload_fails(cx: &mut TestAppContext) {
-    let path = fixture_copy("refresh-sorted-table");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
@@ -2221,12 +2148,11 @@ fn refresh_reuses_the_table_sort_and_keeps_rows_if_reload_fails(cx: &mut TestApp
         assert_eq!(view.catalog.grid_table, orders);
         assert!(view.table_sort(&orders).is_none());
     });
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn a_sql_file_opens_into_the_editor_and_the_editor_text_saves_to_a_new_file(cx: &mut TestAppContext) {
-    let path = fixture_copy("sql-files");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     let directory = std::env::temp_dir().join(format!("bookie-sqlfiles-{}", std::process::id()));
     std::fs::create_dir_all(&directory).unwrap();
@@ -2266,20 +2192,22 @@ fn a_sql_file_opens_into_the_editor_and_the_editor_text_saves_to_a_new_file(cx: 
     let saved = directory.join("out");
     type_path(&view, cx, true, &saved);
     let out = directory.join("out.sql");
-    assert_eq!(read_when_written(cx, &out, |text| !text.is_empty()), "SELECT 'edited';");
+    assert_eq!(
+        read_when_written(&view, cx, &out, |text| !text.is_empty()),
+        "SELECT 'edited';"
+    );
     type_path(&view, cx, true, &directory.join("out.sql"));
     view.read_with(cx, |view, _| {
         assert!(view.status.contains("already exists"), "{}", view.status)
     });
     std::fs::remove_dir_all(&directory).ok();
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn switching_connections_forgets_the_plan_and_the_tab_history_of_the_old_one(cx: &mut TestAppContext) {
     use bookie_gpui::shell::{ResultView, Tab};
-    let path = fixture_copy("switch-session");
-    let other = fixture_copy("switch-session-other");
+    let path = orders();
+    let other = orders();
     let (view, cx) = saving_view(cx, &path);
     let next = writable_table(&other);
     cx.update(|_, cx| {
@@ -2305,13 +2233,11 @@ fn switching_connections_forgets_the_plan_and_the_tab_history_of_the_old_one(cx:
             assert!(view.search.recent.previous().is_none());
         })
     });
-    std::fs::remove_file(&path).ok();
-    std::fs::remove_file(&other).ok();
 }
 
 #[gpui::test]
 fn clicking_another_table_tab_keeps_the_current_tab_when_the_switch_is_refused(cx: &mut TestAppContext) {
-    let path = fixture_copy("tab-click-refused");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     queue_edit(&view, cx, "Pending");
     cx.update(|window, cx| {
@@ -2325,12 +2251,11 @@ fn clicking_another_table_tab_keeps_the_current_tab_when_the_switch_is_refused(c
             assert_eq!(view.cell_edit.edits.len(), 1);
         })
     });
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn a_closed_tab_can_be_reopened(cx: &mut TestAppContext) {
-    let path = fixture_copy("reopen-tab");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
@@ -2351,12 +2276,11 @@ fn a_closed_tab_can_be_reopened(cx: &mut TestAppContext) {
             "the entry is used up"
         );
     });
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn closing_a_table_tab_loads_the_table_that_becomes_active(cx: &mut TestAppContext) {
-    let path = fixture_copy("close-loads");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     let customers = TableInfo {
         schema: None,
@@ -2385,12 +2309,11 @@ fn closing_a_table_tab_loads_the_table_that_becomes_active(cx: &mut TestAppConte
             "the grid now holds the table whose tab is shown"
         );
     });
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn exporting_every_table_is_refused_without_a_consistent_snapshot(cx: &mut TestAppContext) {
-    let path = fixture_copy("tables-export");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
@@ -2402,12 +2325,11 @@ fn exporting_every_table_is_refused_without_a_consistent_snapshot(cx: &mut TestA
         assert!(!view.search.tables_export.open);
         assert!(view.status.contains("consistent snapshot"), "{}", view.status);
     });
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn reconnecting_refreshes_the_table_list_and_never_with_pending_edits(cx: &mut TestAppContext) {
-    let path = fixture_copy("reconnect");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
@@ -2415,7 +2337,7 @@ fn reconnecting_refreshes_the_table_list_and_never_with_pending_edits(cx: &mut T
                 view.reconnect_actions().iter().all(|action| !action.enabled),
                 "no origin is known yet"
             );
-            view.search.origin = Some(bookie_gpui::live::Origin::File(path.clone()));
+            view.search.origin = Some(bookie_gpui::live::Origin::File(path.to_path_buf()));
             assert!(view.reconnect_actions().iter().all(|action| action.enabled));
         })
     });
@@ -2438,12 +2360,11 @@ fn reconnecting_refreshes_the_table_list_and_never_with_pending_edits(cx: &mut T
         assert_eq!(view.tabs.items.len(), 2, "the extra tab was closed by the reconnect");
         assert_eq!(view.catalog.tables.len(), 2);
     });
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn disconnecting_is_refused_while_edits_are_pending_and_offered_only_when_connected(cx: &mut TestAppContext) {
-    let path = fixture_copy("disconnect");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     view.read_with(cx, |view, _| {
         assert!(
@@ -2461,7 +2382,6 @@ fn disconnecting_is_refused_while_edits_are_pending_and_offered_only_when_connec
             "the edit is kept and the app is still running"
         );
     });
-    std::fs::remove_file(&path).ok();
 }
 
 #[test]
@@ -2486,7 +2406,7 @@ fn a_decision_made_elsewhere_is_reported_as_such_and_other_failures_keep_their_t
 
 #[gpui::test]
 fn showing_referencing_rows_runs_the_child_query_and_a_plain_column_opens_nothing(cx: &mut TestAppContext) {
-    let path = fixture_copy("fk-nav");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     let write = write_session(&path, false);
     let cancel = tokio_util::sync::CancellationToken::new();
@@ -2532,24 +2452,19 @@ fn showing_referencing_rows_runs_the_child_query_and_a_plain_column_opens_nothin
     });
     settle_saving(cx);
     cx.update(|_, cx| view.update(cx, |view, cx| view.show_referencing_rows(cx)));
-    for _ in 0..200 {
-        settle_saving(cx);
-        if view.read_with(cx, |view, _| view.grid_is_query && view.source.total() == 2) {
-            break;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(25));
-    }
+    until(&view, cx, "the referencing rows open", |view| {
+        view.grid_is_query && view.source.total() == 2
+    });
     view.read_with(cx, |view, _| {
         assert!(view.grid_is_query, "the result opens in the query grid");
         assert_eq!(view.source.total(), 2, "the result contains both child rows");
     });
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn paste_skips_a_hidden_middle_column(cx: &mut TestAppContext) {
     use bookie_gpui::source::ResultSource;
-    let path = fixture_copy("paste-hidden");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     let write = write_session(&path, false);
     cx.update(|_, cx| {
@@ -2585,10 +2500,10 @@ fn paste_skips_a_hidden_middle_column(cx: &mut TestAppContext) {
     let saved = writable_table(&path);
     assert_eq!(saved.row(0)[1], bookie_gpui::model::Cell::Text("first".into()));
     assert_eq!(saved.row(0)[4], bookie_gpui::model::Cell::Text("second".into()));
-    let original = writable_table(&orders_fixture());
+    let fixture = orders();
+    let original = writable_table(&fixture);
     assert_eq!(saved.row(0)[2], original.row(0)[2]);
     assert_eq!(saved.row(0)[3], original.row(0)[3]);
-    std::fs::remove_file(path).ok();
 }
 
 #[gpui::test]
@@ -2597,7 +2512,7 @@ fn paste_after_a_hidden_column_uses_the_clicked_pinned_scrolled_column(cx: &mut 
     use bookie_gpui::source::ResultSource;
     use gpui_kit::component::table::{ColumnFixed, TableDelegate};
 
-    let path = fixture_copy("paste-hidden-pinned-scroll");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.simulate_resize(gpui::size(gpui::px(350.0), gpui::px(720.0)));
     cx.run_until_parked();
@@ -2664,16 +2579,16 @@ fn paste_after_a_hidden_column_uses_the_clicked_pinned_scrolled_column(cx: &mut 
     cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_save(cx)));
     settle_saving(cx);
     let saved = writable_table(&path).row(0);
-    let original = writable_table(&orders_fixture()).row(0);
+    let fixture = orders();
+    let original = writable_table(&fixture).row(0);
     assert_eq!(saved[3].display(), "0");
     assert_eq!(saved[4].display(), "pasted note");
     assert_eq!(saved[2], original[2]);
-    std::fs::remove_file(path).ok();
 }
 
 #[gpui::test]
 fn grid_paste_shortcut_stages_clipboard_values(cx: &mut TestAppContext) {
-    let path = fixture_copy("paste-shortcut");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| {
         cx.write_to_clipboard(gpui::ClipboardItem::new_string("Shortcut value".into()));
@@ -2691,13 +2606,12 @@ fn grid_paste_shortcut_stages_clipboard_values(cx: &mut TestAppContext) {
             view.status
         );
     });
-    std::fs::remove_file(path).ok();
 }
 
 #[gpui::test]
 fn paste_shortcut_in_filter_does_not_edit_grid(cx: &mut TestAppContext) {
     use gpui::Focusable;
-    let path = fixture_copy("paste-filter-focus");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|window, cx| {
         cx.write_to_clipboard(gpui::ClipboardItem::new_string("filter text".into()));
@@ -2713,12 +2627,11 @@ fn paste_shortcut_in_filter_does_not_edit_grid(cx: &mut TestAppContext) {
         assert!(view.cell_edit.edits.is_empty());
         assert_eq!(view.search.filter.read(cx).content().to_string(), "filter text");
     });
-    std::fs::remove_file(path).ok();
 }
 
 #[gpui::test]
 fn a_saved_edit_is_verified_by_re_reading_the_row(cx: &mut TestAppContext) {
-    let path = fixture_copy("save-check");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     let write = write_session(&path, false);
     cx.update(|_, cx| {
@@ -2734,15 +2647,9 @@ fn a_saved_edit_is_verified_by_re_reading_the_row(cx: &mut TestAppContext) {
         assert_eq!(view.save.pending.as_ref().map(|p| p.checks.len()), Some(1))
     });
     cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_save(cx)));
-    for _ in 0..200 {
-        settle_saving(cx);
-        if view.read_with(cx, |view, _| {
-            view.status.contains("verified") || view.status.contains("Could not")
-        }) {
-            break;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(50));
-    }
+    until(&view, cx, "the save is verified or fails", |view| {
+        view.status.contains("verified") || view.status.contains("Could not")
+    });
     view.read_with(cx, |view, _| {
         assert!(
             view.status.contains("verified by re-reading the rows"),
@@ -2752,12 +2659,11 @@ fn a_saved_edit_is_verified_by_re_reading_the_row(cx: &mut TestAppContext) {
         assert!(view.save.checks.is_empty(), "the checks are used once");
     });
     assert_eq!(saved_customer(&path, 1), "Verified");
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn a_refused_reload_after_a_save_reports_no_false_verification_error(cx: &mut TestAppContext) {
-    let path = fixture_copy("save-check-refused");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     let write = write_session(&path, false);
     cx.update(|_, cx| {
@@ -2777,13 +2683,7 @@ fn a_refused_reload_after_a_save_reports_no_false_verification_error(cx: &mut Te
             view.confirm_save(cx);
         })
     });
-    for _ in 0..200 {
-        settle_saving(cx);
-        if view.read_with(cx, |view, _| !view.save.busy) {
-            break;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(50));
-    }
+    until(&view, cx, "the save finishes", |view| !view.save.busy);
     view.read_with(cx, |view, _| {
         assert!(!view.save.busy, "{}", view.status);
         assert!(view.status.contains("not reloaded"), "{}", view.status);
@@ -2798,12 +2698,11 @@ fn a_refused_reload_after_a_save_reports_no_false_verification_error(cx: &mut Te
         );
     });
     assert_eq!(saved_customer(&path, 1), "Checked");
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn cells_stay_locked_until_the_table_reloads_after_a_save(cx: &mut TestAppContext) {
-    let path = fixture_copy("save-reload-locked");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     let write = write_session(&path, false);
     cx.update(|window, cx| {
@@ -2818,12 +2717,11 @@ fn cells_stay_locked_until_the_table_reloads_after_a_save(cx: &mut TestAppContex
     });
     settle_saving(cx);
     view.read_with(cx, |view, _| assert!(!view.save.busy, "{}", view.status));
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn failed_save_and_discard_clear_verification_records(cx: &mut TestAppContext) {
-    let path = fixture_copy("failed-save-check");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     let check = bookie_gpui::save_check::CellCheck {
         key: vec![bookie_gpui::model::Cell::Int(1)],
@@ -2844,15 +2742,14 @@ fn failed_save_and_discard_clear_verification_records(cx: &mut TestAppContext) {
         });
     });
     view.read_with(cx, |view, _| assert!(view.save.checks.is_empty()));
-    std::fs::remove_file(path).ok();
 }
 
 #[gpui::test]
 fn paste_into_a_read_only_query_result_does_not_stage_edits(cx: &mut TestAppContext) {
     use bookie_gpui::live::{LiveSession, Origin};
 
-    let path = fixture_copy("paste-read-only-query");
-    let session = LiveSession::open(&Origin::File(path.clone())).expect("open SQLite fixture");
+    let path = orders();
+    let session = LiveSession::open(&Origin::File(path.to_path_buf())).expect("open SQLite fixture");
     let result = std::sync::Arc::new(
         session
             .run_query("SELECT customer FROM orders", 100)
@@ -2874,13 +2771,12 @@ fn paste_into_a_read_only_query_result_does_not_stage_edits(cx: &mut TestAppCont
         assert!(view.cell_edit.edits.is_empty(), "{}", view.status);
         assert!(view.status.contains("cannot be edited"), "{}", view.status);
     });
-    std::fs::remove_file(path).ok();
 }
 
 #[gpui::test]
 fn csv_export_uses_the_chosen_separator_null_text_and_header(cx: &mut TestAppContext) {
     use bookie_core::export::CsvDelimiter;
-    let path = fixture_copy("export-csv-options");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     let directory = std::env::temp_dir().join(format!("bookie-export-csv-{}", std::process::id()));
     std::fs::create_dir_all(&directory).unwrap();
@@ -2904,7 +2800,7 @@ fn csv_export_uses_the_chosen_separator_null_text_and_header(cx: &mut TestAppCon
     set_export_path(&view, cx, &target);
     cx.update(|_, cx| view.update(cx, |view, cx| view.write_export_file(cx)));
     let csv = directory.join("page.csv");
-    let written = read_when_written(cx, &csv, |text| text.lines().count() >= 6);
+    let written = read_when_written(&view, cx, &csv, |text| text.lines().count() >= 6);
     let first = written.lines().next().unwrap();
     assert!(
         first.contains(';') && !first.contains(','),
@@ -2912,13 +2808,12 @@ fn csv_export_uses_the_chosen_separator_null_text_and_header(cx: &mut TestAppCon
     );
     assert!(!first.starts_with("id"), "the header row was left out: {first}");
     std::fs::remove_dir_all(&directory).ok();
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn the_import_dialog_offers_a_separator_and_null_text(cx: &mut TestAppContext) {
     use bookie_core::export::CsvDelimiter;
-    let path = fixture_copy("import-choices");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     let write = write_session(&path, false);
     cx.update(|_, cx| {
@@ -2957,12 +2852,11 @@ fn the_import_dialog_offers_a_separator_and_null_text(cx: &mut TestAppContext) {
         cx.update(|window, cx| window.render_frame(cx));
         assert_eq!(cx.debug_bounds("import-separator").is_some(), separator, "{file}");
     }
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn closing_over_pending_edits_asks_and_escape_keeps_the_window(cx: &mut TestAppContext) {
-    let path = fixture_copy("close-confirm");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| {
         view.update(cx, |view, _| {
@@ -2985,12 +2879,11 @@ fn closing_over_pending_edits_asks_and_escape_keeps_the_window(cx: &mut TestAppC
         assert_eq!(view.status, "Kept the window open");
     });
     assert!(cx.debug_bounds("close-confirm-dialog").is_none());
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn edits_held_by_another_run_tab_also_ask_before_the_window_closes(cx: &mut TestAppContext) {
-    let path = fixture_copy("close-confirm-run-tab");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| {
         view.update(cx, |view, _| {
@@ -3003,5 +2896,4 @@ fn edits_held_by_another_run_tab_also_ask_before_the_window_closes(cx: &mut Test
     view.read_with(cx, |view, _| assert!(view.cell_edit.edits.is_empty()));
     assert!(!cx.simulate_close(), "edits in a run tab must not be dropped silently");
     view.read_with(cx, |view, _| assert!(view.close_confirm));
-    std::fs::remove_file(&path).ok();
 }

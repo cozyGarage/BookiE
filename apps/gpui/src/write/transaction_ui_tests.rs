@@ -3,17 +3,8 @@ use std::time::Instant;
 use gpui::TestAppContext;
 
 use crate::GridView;
-use crate::save_ui_tests::{fixture_copy, saved_customer, saving_view, settle_saving, write_session};
-
-fn wait_for(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext, done: impl Fn(&GridView) -> bool) {
-    for _ in 0..200 {
-        settle_saving(cx);
-        if view.read_with(cx, |view, _| done(view)) {
-            return;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(50));
-    }
-}
+use crate::save_ui_tests::{saved_customer, saving_view, settle_saving, write_session};
+use crate::ui_tests::test_kit::{MEDIUM, NARROW, WIDE, orders, until};
 
 fn open_transaction(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext, path: &std::path::Path) {
     let write = write_session(path, false);
@@ -37,10 +28,10 @@ fn open_transaction(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestCont
 
 #[gpui::test]
 fn compact_query_toolbar_keeps_transaction_controls_visible(cx: &mut TestAppContext) {
-    let path = fixture_copy("compact-query-toolbar-transaction");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     open_transaction(&view, cx, &path);
-    let cases = [(760.0, false), (760.0, true), (900.0, true), (1500.0, true)];
+    let cases = [(NARROW, false), (NARROW, true), (MEDIUM, true), (WIDE, true)];
     for ((width, sidebar_open), idle) in cases.into_iter().flat_map(|case| [(case, false), (case, true)]) {
         cx.update(|_, cx| {
             view.update(cx, |view, cx| {
@@ -79,11 +70,13 @@ fn compact_query_toolbar_keeps_transaction_controls_visible(cx: &mut TestAppCont
 #[gpui::test]
 fn typed_transaction_end_clears_the_toolbar(cx: &mut TestAppContext) {
     for sql in ["COMMIT", "ROLLBACK"] {
-        let path = fixture_copy("typed-transaction-end");
+        let path = orders();
         let (view, cx) = saving_view(cx, &path);
         open_transaction(&view, cx, &path);
         view.update(cx, |view, cx| view.run_in_transaction(sql.into(), cx));
-        wait_for(&view, cx, |view| view.transaction.is_none());
+        until(&view, cx, "the transaction step finishes", |view| {
+            view.transaction.is_none()
+        });
         view.read_with(cx, |view, _| {
             assert!(view.transaction.is_none(), "{sql} left the transaction toolbar open");
             assert!(!view.status.contains("not committed yet"), "{}", view.status);
@@ -93,7 +86,7 @@ fn typed_transaction_end_clears_the_toolbar(cx: &mut TestAppContext) {
 
 #[gpui::test]
 fn a_starting_transaction_blocks_closing_and_a_second_begin(cx: &mut TestAppContext) {
-    let path = fixture_copy("transaction-starting");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
@@ -104,12 +97,11 @@ fn a_starting_transaction_blocks_closing_and_a_second_begin(cx: &mut TestAppCont
             assert!(view.transaction.is_none());
         })
     });
-    std::fs::remove_file(path).ok();
 }
 
 #[gpui::test]
 fn an_in_flight_save_blocks_beginning_a_manual_transaction(cx: &mut TestAppContext) {
-    let path = fixture_copy("transaction-save-busy");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
@@ -120,12 +112,11 @@ fn an_in_flight_save_blocks_beginning_a_manual_transaction(cx: &mut TestAppConte
             assert_eq!(view.status, "Wait for the save to finish before starting a transaction");
         })
     });
-    std::fs::remove_file(path).ok();
 }
 
 #[gpui::test]
 fn a_transaction_rolls_back_or_commits_and_keeps_its_query_tab_open(cx: &mut TestAppContext) {
-    let path = fixture_copy("transaction");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     let original = saved_customer(&path, 1);
 
@@ -135,7 +126,7 @@ fn a_transaction_rolls_back_or_commits_and_keeps_its_query_tab_open(cx: &mut Tes
             view.run_in_transaction("UPDATE orders SET customer = 'Rolled' WHERE id = 1".into(), cx)
         })
     });
-    wait_for(&view, cx, |view| {
+    until(&view, cx, "the transaction step finishes", |view| {
         view.transaction.as_ref().is_some_and(|t| t.statements == 1)
     });
     cx.update(|_, cx| {
@@ -155,7 +146,9 @@ fn a_transaction_rolls_back_or_commits_and_keeps_its_query_tab_open(cx: &mut Tes
         })
     });
     cx.update(|_, cx| view.update(cx, |view, cx| view.end_transaction(false, cx)));
-    wait_for(&view, cx, |view| view.status == "Transaction rolled back");
+    until(&view, cx, "the transaction step finishes", |view| {
+        view.status == "Transaction rolled back"
+    });
     assert_eq!(
         saved_customer(&path, 1),
         original,
@@ -168,18 +161,19 @@ fn a_transaction_rolls_back_or_commits_and_keeps_its_query_tab_open(cx: &mut Tes
             view.run_in_transaction("UPDATE orders SET customer = 'Committed' WHERE id = 1".into(), cx)
         })
     });
-    wait_for(&view, cx, |view| {
+    until(&view, cx, "the transaction step finishes", |view| {
         view.transaction.as_ref().is_some_and(|t| t.statements == 1)
     });
     cx.update(|_, cx| view.update(cx, |view, cx| view.end_transaction(true, cx)));
-    wait_for(&view, cx, |view| view.status == "Transaction committed");
+    until(&view, cx, "the transaction step finishes", |view| {
+        view.status == "Transaction committed"
+    });
     assert_eq!(saved_customer(&path, 1), "Committed");
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn a_read_only_transaction_refuses_the_write_and_changes_nothing(cx: &mut TestAppContext) {
-    let path = fixture_copy("transaction-read-only");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     let original = saved_customer(&path, 1);
     let write = write_session(&path, true);
@@ -201,7 +195,7 @@ fn a_read_only_transaction_refuses_the_write_and_changes_nothing(cx: &mut TestAp
 
 #[gpui::test]
 fn a_transaction_statement_survives_unrelated_load_invalidation(cx: &mut TestAppContext) {
-    let path = fixture_copy("transaction-replaced-load");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     let original = saved_customer(&path, 1);
     open_transaction(&view, cx, &path);
@@ -216,7 +210,7 @@ fn a_transaction_statement_survives_unrelated_load_invalidation(cx: &mut TestApp
             view.invalidate_background();
         })
     });
-    wait_for(&view, cx, |view| {
+    until(&view, cx, "the transaction step finishes", |view| {
         view.transaction
             .as_ref()
             .is_some_and(|transaction| transaction.running.is_none())
@@ -231,14 +225,15 @@ fn a_transaction_statement_survives_unrelated_load_invalidation(cx: &mut TestApp
         assert!(!view.status.contains("cancelled"), "{}", view.status);
     });
     cx.update(|_, cx| view.update(cx, |view, cx| view.end_transaction(false, cx)));
-    wait_for(&view, cx, |view| view.status == "Transaction rolled back");
+    until(&view, cx, "the transaction step finishes", |view| {
+        view.status == "Transaction rolled back"
+    });
     assert_eq!(saved_customer(&path, 1), original);
-    std::fs::remove_file(path).ok();
 }
 
 #[gpui::test]
 fn stop_cancels_the_running_transaction_statement(cx: &mut TestAppContext) {
-    let path = fixture_copy("transaction-stop-statement");
+    let path = orders();
     let original = saved_customer(&path, 1);
     let (view, cx) = saving_view(cx, &path);
     open_transaction(&view, cx, &path);
@@ -254,18 +249,21 @@ fn stop_cancels_the_running_transaction_statement(cx: &mut TestAppContext) {
             assert!(cancel.is_cancelled());
         })
     });
-    wait_for(&view, cx, |view| !view.transaction_statement_running());
+    until(&view, cx, "the transaction step finishes", |view| {
+        !view.transaction_statement_running()
+    });
     if view.read_with(cx, |view, _| view.transaction.is_some()) {
         cx.update(|_, cx| view.update(cx, |view, cx| view.end_transaction(false, cx)));
-        wait_for(&view, cx, |view| view.transaction.is_none());
+        until(&view, cx, "the transaction step finishes", |view| {
+            view.transaction.is_none()
+        });
     }
     assert_eq!(saved_customer(&path, 1), original);
-    std::fs::remove_file(path).ok();
 }
 
 #[gpui::test]
 fn grid_save_requests_are_refused_inside_a_manual_transaction(cx: &mut TestAppContext) {
-    let path = fixture_copy("transaction-blocks-save-request");
+    let path = orders();
     let original = saved_customer(&path, 1);
     let (view, cx) = saving_view(cx, &path);
     open_transaction(&view, cx, &path);
@@ -290,20 +288,21 @@ fn grid_save_requests_are_refused_inside_a_manual_transaction(cx: &mut TestAppCo
             view.request_save(cx);
         })
     });
-    wait_for(&view, cx, |view| !view.save.busy);
+    until(&view, cx, "the transaction step finishes", |view| !view.save.busy);
     view.read_with(cx, |view, _| {
         assert!(view.save.pending.is_none());
         assert!(view.status.contains("transaction"), "{}", view.status);
     });
     assert_eq!(saved_customer(&path, 1), original);
     cx.update(|_, cx| view.update(cx, |view, cx| view.end_transaction(false, cx)));
-    wait_for(&view, cx, |view| view.status == "Transaction rolled back");
-    std::fs::remove_file(path).ok();
+    until(&view, cx, "the transaction step finishes", |view| {
+        view.status == "Transaction rolled back"
+    });
 }
 
 #[gpui::test]
 fn a_reviewed_grid_save_cannot_write_outside_a_transaction_that_opened_later(cx: &mut TestAppContext) {
-    let path = fixture_copy("transaction-blocks-reviewed-save");
+    let path = orders();
     let original = saved_customer(&path, 1);
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| {
@@ -314,7 +313,9 @@ fn a_reviewed_grid_save_cannot_write_outside_a_transaction_that_opened_later(cx:
             view.request_save(cx);
         })
     });
-    wait_for(&view, cx, |view| view.save.pending.is_some());
+    until(&view, cx, "the transaction step finishes", |view| {
+        view.save.pending.is_some()
+    });
 
     let write = write_session(&path, false);
     let shared = write.begin_transaction().expect("begin a transaction");
@@ -332,15 +333,16 @@ fn a_reviewed_grid_save_cannot_write_outside_a_transaction_that_opened_later(cx:
         })
     });
     cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_save(cx)));
-    wait_for(&view, cx, |view| !view.save.busy);
+    until(&view, cx, "the transaction step finishes", |view| !view.save.busy);
     view.read_with(cx, |view, _| {
         assert!(view.save.pending.is_some(), "the reviewed save stays pending");
         assert!(view.status.contains("transaction"), "{}", view.status);
     });
     assert_eq!(saved_customer(&path, 1), original);
     cx.update(|_, cx| view.update(cx, |view, cx| view.end_transaction(false, cx)));
-    wait_for(&view, cx, |view| view.status == "Transaction rolled back");
-    std::fs::remove_file(path).ok();
+    until(&view, cx, "the transaction step finishes", |view| {
+        view.status == "Transaction rolled back"
+    });
 }
 
 #[derive(Clone, Copy)]
@@ -402,7 +404,7 @@ impl bookie_core::Session for DeniedCommit {
 
 #[gpui::test]
 fn a_denied_commit_keeps_the_transaction_available_for_rollback(cx: &mut TestAppContext) {
-    let path = fixture_copy("denied-transaction-commit");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     let rolled_back = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let shared = std::sync::Arc::new(tokio::sync::Mutex::new(Some(
@@ -429,7 +431,9 @@ fn a_denied_commit_keeps_the_transaction_available_for_rollback(cx: &mut TestApp
             view.end_transaction(true, cx);
         })
     });
-    wait_for(&view, cx, |view| view.status.starts_with("Commit failed:"));
+    until(&view, cx, "the transaction step finishes", |view| {
+        view.status.starts_with("Commit failed:")
+    });
     view.read_with(cx, |view, _| {
         assert!(view.transaction_open(), "denied commit must keep rollback available");
         let notice = view.notices.items.first().expect("a failed commit leaves a notice");
@@ -443,15 +447,16 @@ fn a_denied_commit_keeps_the_transaction_available_for_rollback(cx: &mut TestApp
     });
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
-            view.connect(bookie_gpui::live::Origin::File(path.clone()), cx);
+            view.connect(bookie_gpui::live::Origin::File(path.to_path_buf()), cx);
             assert!(view.transaction_open());
             assert!(view.status.contains("before switching connections"));
         })
     });
     cx.update(|_, cx| view.update(cx, |view, cx| view.end_transaction(false, cx)));
-    wait_for(&view, cx, |view| view.status == "Transaction rolled back");
+    until(&view, cx, "the transaction step finishes", |view| {
+        view.status == "Transaction rolled back"
+    });
     assert!(rolled_back.load(std::sync::atomic::Ordering::SeqCst));
-    std::fs::remove_file(path).ok();
 }
 
 #[gpui::test]
@@ -474,7 +479,7 @@ fn terminal_commit_outcomes_are_not_reported_as_successful_retries(cx: &mut Test
             None,
         ),
     ] {
-        let path = fixture_copy("transaction-outcome");
+        let path = orders();
         let (view, cx) = saving_view(cx, &path);
         let shared = std::sync::Arc::new(tokio::sync::Mutex::new(Some(
             bookie_app_services::interactive_session::SessionHandle::plain(Box::new(DeniedCommit {
@@ -498,7 +503,9 @@ fn terminal_commit_outcomes_are_not_reported_as_successful_retries(cx: &mut Test
                 view.end_transaction(false, cx);
             })
         });
-        wait_for(&view, cx, |view| view.status.starts_with(expected));
+        until(&view, cx, "the transaction step finishes", |view| {
+            view.status.starts_with(expected)
+        });
         view.read_with(cx, |view, _| {
             assert!(view.status.starts_with(expected), "{}", view.status);
             assert!(!view.transaction_open());
@@ -509,13 +516,12 @@ fn terminal_commit_outcomes_are_not_reported_as_successful_retries(cx: &mut Test
             shared.try_lock().unwrap().is_none(),
             "terminal operation must release its session"
         );
-        std::fs::remove_file(path).ok();
     }
 }
 
 #[gpui::test]
 fn a_transaction_idle_for_five_minutes_shows_the_shared_warning(cx: &mut TestAppContext) {
-    let path = fixture_copy("transaction-idle");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     open_transaction(&view, cx, &path);
     view.read_with(cx, |view, _| assert_eq!(view.transaction_idle_warning(), None));
@@ -547,17 +553,18 @@ fn a_transaction_idle_for_five_minutes_shows_the_shared_warning(cx: &mut TestApp
         assert_eq!(view.notices.unread(), 1, "a status change keeps it")
     });
     cx.update(|_, cx| view.update(cx, |view, cx| view.end_transaction(false, cx)));
-    wait_for(&view, cx, |view| view.status == "Transaction rolled back");
+    until(&view, cx, "the transaction step finishes", |view| {
+        view.status == "Transaction rolled back"
+    });
     cx.update(|_, cx| view.update(cx, |view, cx| view.sync_idle_notice(cx)));
     view.read_with(cx, |view, _| {
         assert_eq!(view.notices.unread(), 0, "ending the transaction resolves the notice")
     });
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn a_transaction_statement_is_refused_while_a_schema_context_is_set(cx: &mut TestAppContext) {
-    let path = fixture_copy("transaction-schema-context");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     let original = saved_customer(&path, 1);
     open_transaction(&view, cx, &path);
@@ -578,9 +585,10 @@ fn a_transaction_statement_is_refused_while_a_schema_context_is_set(cx: &mut Tes
         })
     });
     cx.update(|_, cx| view.update(cx, |view, cx| view.end_transaction(false, cx)));
-    wait_for(&view, cx, |view| view.status == "Transaction rolled back");
+    until(&view, cx, "the transaction is rolled back", |view| {
+        view.transaction.is_none()
+    });
     assert_eq!(saved_customer(&path, 1), original);
-    std::fs::remove_file(path).ok();
 }
 
 fn hold_transaction(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext, path: &std::path::Path) {
@@ -603,7 +611,7 @@ fn hold_transaction(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestCont
 
 #[gpui::test]
 fn grid_writes_are_refused_while_a_transaction_is_open_and_nothing_is_written(cx: &mut TestAppContext) {
-    let path = fixture_copy("transaction-blocks-save");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
@@ -647,13 +655,14 @@ fn grid_writes_are_refused_while_a_transaction_is_open_and_nothing_is_written(cx
         "nothing was written beside the transaction"
     );
     cx.update(|_, cx| view.update(cx, |view, cx| view.end_transaction(false, cx)));
-    wait_for(&view, cx, |view| view.transaction.is_none());
-    std::fs::remove_file(path).ok();
+    until(&view, cx, "the transaction step finishes", |view| {
+        view.transaction.is_none()
+    });
 }
 
 #[gpui::test]
 fn a_transaction_does_not_start_while_a_save_waits_for_review(cx: &mut TestAppContext) {
-    let path = fixture_copy("review-blocks-transaction");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
@@ -677,12 +686,11 @@ fn a_transaction_does_not_start_while_a_save_waits_for_review(cx: &mut TestAppCo
             view.save.busy = false;
         })
     });
-    std::fs::remove_file(path).ok();
 }
 
 #[gpui::test]
 fn a_statement_sent_while_the_transaction_starts_is_refused_with_a_reason(cx: &mut TestAppContext) {
-    let path = fixture_copy("transaction-starting-run");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
@@ -694,12 +702,11 @@ fn a_statement_sent_while_the_transaction_starts_is_refused_with_a_reason(cx: &m
         })
     });
     assert_eq!(saved_customer(&path, 1), "Ada");
-    std::fs::remove_file(path).ok();
 }
 
 #[gpui::test]
 fn a_transaction_statement_can_be_stopped_and_unrelated_loads_do_not_cancel_or_drop_it(cx: &mut TestAppContext) {
-    let path = fixture_copy("transaction-stop");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     open_transaction(&view, cx, &path);
     cx.update(|_, cx| {
@@ -711,7 +718,9 @@ fn a_transaction_statement_can_be_stopped_and_unrelated_loads_do_not_cancel_or_d
             assert!(!statement.cancel.is_cancelled(), "an unrelated load must not cancel it");
         })
     });
-    wait_for(&view, cx, |view| !view.transaction_statement_running());
+    until(&view, cx, "the transaction step finishes", |view| {
+        !view.transaction_statement_running()
+    });
     view.read_with(cx, |view, _| {
         let transaction = view.transaction.as_ref().expect("still open");
         assert_eq!(transaction.statements, 1, "{}", view.status);
@@ -728,8 +737,11 @@ fn a_transaction_statement_can_be_stopped_and_unrelated_loads_do_not_cancel_or_d
             );
         })
     });
-    wait_for(&view, cx, |view| !view.transaction_statement_running());
+    until(&view, cx, "the transaction step finishes", |view| {
+        !view.transaction_statement_running()
+    });
     cx.update(|_, cx| view.update(cx, |view, cx| view.end_transaction(false, cx)));
-    wait_for(&view, cx, |view| view.transaction.is_none());
-    std::fs::remove_file(path).ok();
+    until(&view, cx, "the transaction step finishes", |view| {
+        view.transaction.is_none()
+    });
 }

@@ -7,6 +7,7 @@ use bookie_results::grid_cursor::Cursor;
 
 use crate::palette_state::PaletteMode;
 use crate::text_input;
+use crate::ui_tests::test_kit::{MEDIUM, NARROW, WIDE};
 use crate::ui_theme::ThemeExt;
 use crate::{GridView, Work};
 
@@ -17,6 +18,7 @@ pub(crate) mod live_ui_tests;
 pub(crate) mod overlay_ui_tests;
 pub(crate) mod status_bar_tests;
 pub(crate) mod test_config;
+pub(crate) mod test_kit;
 mod themes;
 pub(crate) mod window_identity_tests;
 
@@ -195,7 +197,7 @@ fn query_controls_and_result_views_fit_at_narrow_widths_in_both_themes(cx: &mut 
             cx.simulate_keystrokes("enter");
             cx.run_until_parked();
         }
-        for (width, compact, sidebar_open) in [(760.0, true, false), (900.0, true, true), (1500.0, false, true)] {
+        for (width, compact, sidebar_open) in [(NARROW, true, false), (MEDIUM, true, true), (WIDE, false, true)] {
             cx.update(|_, cx| {
                 view.update(cx, |view, cx| {
                     view.sidebar.open = sidebar_open;
