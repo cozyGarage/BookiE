@@ -91,8 +91,9 @@ impl Execution {
             error.position = None;
             outcomes.push(failure(&self.statements[0], error));
         }
+        let total = self.statements.len();
         if outcomes.is_empty() {
-            for sql in self.statements {
+            for (index, sql) in self.statements.into_iter().enumerate() {
                 let (started, clock) = (Instant::now(), SystemTime::now());
                 let result = session.run_editor_batch(shared.as_ref(), &sql, &self.params, &control, &mut budget);
                 let elapsed = started.elapsed();
@@ -103,6 +104,7 @@ impl Execution {
                 let error = result.as_ref().err().map(|error| error.message.clone());
                 session.record_history(&sql, clock, elapsed, rows, error);
                 let failed = result.is_err();
+                let result = result.map_err(|error| name_failed_statement(error, index, total));
                 outcomes.push(Outcome { sql, elapsed, result });
                 if failed {
                     break;
@@ -116,6 +118,13 @@ impl Execution {
         }
         outcomes
     }
+}
+
+fn name_failed_statement(mut error: QueryFailure, index: usize, total: usize) -> QueryFailure {
+    if total > 1 {
+        error.message = format!("Statement {} of {total} failed: {}", index + 1, error.message);
+    }
+    error
 }
 
 fn failure(sql: &str, error: QueryFailure) -> Outcome {
