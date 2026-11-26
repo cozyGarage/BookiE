@@ -400,6 +400,22 @@ class CiWorkflowTests(unittest.TestCase):
             for job in gpui_jobs:
                 self.assertIn("CARGO_TARGET_DIR: apps/gpui/target", job, workflow)
 
+    def test_gpui_macos_always_reports_one_aggregate_check(self):
+        workflow = (ROOT / ".github/workflows/gpui-macos.yml").read_text()
+        trigger, jobs = workflow.split("\njobs:\n", 1)
+        build = re.search(r"(?ms)^  build-and-test:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", jobs).group(1)
+        result = re.search(r"(?ms)^  result:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", jobs).group(1)
+
+        self.assertNotIn("paths:", trigger)
+        self.assertIn("if: needs.changes.outputs.gpui == 'true'", build)
+        self.assertLess(build.index("cargo clippy"), build.index("cargo build"))
+        self.assertLess(build.index("cargo build"), build.index("cargo nextest run"))
+        self.assertNotIn("\n  lint:\n", jobs)
+        self.assertIn("name: GPUI macOS\n", result)
+        self.assertIn("if: always()", result)
+        self.assertIn("needs: [changes, build-and-test]", result)
+        self.assertIn('"$BUILD_RESULT" = "skipped" ] && [ "$GPUI_CHANGED" = "false"', result)
+
     def test_release_appimage_uses_the_arch_candidate_vendor_inputs_offline(self):
         release = (ROOT / ".github/workflows/release.yml").read_text()
         builder = (ROOT / "scripts/build-appimage.sh").read_text()
