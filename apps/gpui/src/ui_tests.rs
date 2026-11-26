@@ -701,14 +701,16 @@ fn the_quick_switcher_lists_favorites_first_and_opens_one_in_the_editor(cx: &mut
 }
 
 #[gpui::test]
-fn the_labelled_go_to_column_button_opens_the_column_picker(cx: &mut TestAppContext) {
+fn go_to_column_in_the_columns_menu_opens_the_column_picker(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.simulate_resize(gpui::size(gpui::px(1400.0), gpui::px(800.0)));
     cx.run_until_parked();
-    let button = cx
-        .debug_bounds("jump-column")
-        .expect("the wide grid strip labels Go to column");
+    use gpui_kit::test::TestQueryExt as _;
+    let button = cx.update(|window, _| window.find_by_label("Columns").bounds());
     cx.simulate_click(button.center(), Default::default());
+    cx.run_until_parked();
+    let jump = cx.update(|window, _| window.find_by_label("Jump to column").bounds());
+    cx.simulate_click(jump.center(), Default::default());
     cx.run_until_parked();
     view.read_with(cx, |view, _| {
         assert!(view.palette.open && view.palette.mode == PaletteMode::Columns);
@@ -1224,7 +1226,7 @@ fn painting_a_row_reads_the_source_once_and_keeps_pending_edits_available(cx: &m
         view.update(cx, |view, cx| {
             view.cell_edit.edits.insert((1, 1), Cell::Text(full.clone()));
             requests.store(0, Ordering::Relaxed);
-            view.sync_table(0.0, window, cx);
+            view.sync_table(window, cx);
             view.table.update(cx, |table, _| {
                 let delegate = table.delegate_mut();
                 let edited = delegate.label_of(1, 1).0;

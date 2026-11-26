@@ -7,7 +7,7 @@ use std::{
 use gpui::{App, Context, IntoElement, WeakEntity, Window, div, prelude::*, px};
 use gpui_kit::component::Sizable;
 use gpui_kit::component::scroll::{Scrollbar, ScrollbarMode};
-use gpui_kit::component::table::{Column, ColumnSort, DataTable, TableDelegate, TableState};
+use gpui_kit::component::table::{Column, DataTable, TableDelegate, TableState};
 use sha2::{Digest, Sha256};
 
 use crate::GridView;
@@ -140,7 +140,6 @@ pub struct GridDelegate {
     hidden_columns: HashSet<usize>,
     content_widths: Vec<f32>,
     visible_rows: Range<usize>,
-    available_width: f32,
     numeric: Vec<bool>,
     kinds: Vec<(String, bool)>,
     binary_modes: Vec<crate::binary_mode::BinaryMode>,
@@ -162,7 +161,7 @@ fn header_menu(
     source_col: usize,
     column_name: String,
     owner: Option<WeakEntity<GridView>>,
-    sortable: bool,
+    sort: Option<Option<bool>>,
     has_hidden: bool,
     binary: bool,
     pin_action: Option<(gpui::Entity<TableState<GridDelegate>>, PinScope, bool)>,
@@ -253,17 +252,28 @@ fn header_menu(
                     });
                 }));
             }
-            let Some(owner) = owner.clone().filter(|_| sortable) else {
+            let (Some(owner), Some(active_sort)) = (owner.clone(), sort) else {
                 return menu;
             };
-            for (label, ascending) in [("Sort ascending", true), ("Sort descending", false)] {
+            for (label, order) in [
+                ("Sort ascending", Some(true)),
+                ("Sort descending", Some(false)),
+                ("Clear sort", None),
+            ] {
+                if order.is_none() && active_sort.is_none() {
+                    continue;
+                }
                 let owner = owner.clone();
                 let column = column_name.clone();
-                menu = menu.item(PopupMenuItem::new(label).on_click(move |_, window, cx| {
-                    let _ = owner.update(cx, |view, cx| {
-                        view.sort_current_column(source_col, &column, Some(ascending), window, cx);
-                    });
-                }));
+                menu = menu.item(
+                    PopupMenuItem::new(label)
+                        .checked(order.is_some() && order == active_sort)
+                        .on_click(move |_, window, cx| {
+                            let _ = owner.update(cx, |view, cx| {
+                                view.sort_current_column(source_col, &column, order, window, cx);
+                            });
+                        }),
+                );
             }
             menu
         })
@@ -282,42 +292,14 @@ impl TableDelegate for GridDelegate {
             source,
             &self.map,
             &self.columns,
-            HeaderSizing::new(&self.kinds, self.pin_scope.is_some()),
+            &self.kinds,
             &self.edits,
-            self.visible_rows.start,
-            self.visible_rows.len(),
+            viewport_sample(self.visible_rows.start, self.visible_rows.len()),
+            MAX_MEASURE_CELLS,
             |text| measure_text(text, window),
         );
         measured.get(source_col).copied().map(px)
     }
-    fn perform_sort(
-        &mut self,
-        col_ix: usize,
-        sort: ColumnSort,
-        window: &mut Window,
-        _cx: &mut Context<TableState<Self>>,
-    ) {
-        if !self.sortable {
-            return;
-        }
-        let Some(source_col) = self.projection.source_index(col_ix) else {
-            return;
-        };
-        let Some((column, _)) = self.columns.get(source_col) else {
-            return;
-        };
-        let column = column.clone();
-        let ascending = match sort {
-            ColumnSort::Ascending => Some(true),
-            ColumnSort::Descending => Some(false),
-            ColumnSort::Default => None,
-        };
-        let Some(owner) = self.owner.clone() else {
-            return;
-        };
-        Self::schedule_sort(owner, source_col, column, ascending, window);
-    }
-
     fn visible_rows_changed(&mut self, visible: Range<usize>, window: &mut Window, cx: &mut Context<TableState<Self>>) {
         self.visible_rows = visible.clone();
         let Some(source) = &self.source else { return };
@@ -335,10 +317,10 @@ impl TableDelegate for GridDelegate {
             source,
             &self.map,
             &self.columns,
-            HeaderSizing::new(&self.kinds, self.pin_scope.is_some()),
+            &self.kinds,
             &self.edits,
-            visible.start,
-            visible.len(),
+            viewport_sample(visible.start, visible.len()),
+            MAX_MEASURE_CELLS,
             |text| measure_text(text, window),
         );
         for (current, measured) in self.content_widths.iter_mut().zip(measured) {
@@ -348,7 +330,6 @@ impl TableDelegate for GridDelegate {
         for ((_, width), measured) in columns.iter_mut().zip(&self.content_widths) {
             *width = *measured;
         }
-        fill_text_columns(&mut columns, &self.numeric, self.available_width);
         if let Some(widths) = self
             .width_scope
             .as_ref()
@@ -431,51 +412,24 @@ impl TableDelegate for GridDelegate {
             .kinds
             .get(source_col)
             .is_some_and(|(kind, _)| crate::binary_mode::is_binary_type(kind));
-        let column_width = self.columns.get(source_col).map_or(0.0, |(_, width)| *width);
-        let show_pin_button = pin_button_visible(column_width);
+        let active_sort = self
+            .sort
+            .as_ref()
+            .filter(|sort| sort.column == name)
+            .map(|sort| sort.ascending);
         let menu = header_menu(
             col_ix,
             source_col,
             name.clone(),
             self.owner.clone(),
-            self.sortable,
+            self.sortable.then_some(active_sort),
             !self.hidden_columns.is_empty(),
             binary,
             self.pin_scope
                 .clone()
-                .filter(|_| !show_pin_button)
                 .map(|scope| (cx.entity(), scope, col_ix < self.pinned_columns)),
             theme.muted_foreground,
         );
-        let pin = self.pin_scope.clone().filter(|_| show_pin_button).map(|scope| {
-            let pinned = col_ix < self.pinned_columns;
-            let action = if pinned { "Unpin from" } else { "Pin through" };
-            use gpui_component::button::{Button, ButtonVariants};
-            let label = format!("{action} {name}");
-            let color = if pinned {
-                theme.foreground
-            } else {
-                theme.muted_foreground
-            };
-            Button::new(format!("pin-column-{col_ix}"))
-                .ghost()
-                .small()
-                .compact()
-                .tooltip(label.clone())
-                .accessibility_label(label)
-                .on_click(cx.listener(move |table, _, _, cx| {
-                    let delegate = table.delegate_mut();
-                    delegate.pinned_columns =
-                        next_pinned_count(delegate.pinned_columns, col_ix, delegate.columns.len());
-                    delegate.pin_counts.insert(scope.clone(), delegate.pinned_columns);
-                    table.refresh(cx);
-                }))
-                .icon(
-                    gpui_component::Icon::default()
-                        .path("icons/pin.svg")
-                        .text_color(gpui::rgb(color)),
-                )
-        });
         div()
             .debug_selector(move || format!("column-header-{col_ix}"))
             .size_full()
@@ -490,6 +444,24 @@ impl TableDelegate for GridDelegate {
                     .items_center()
                     .gap_1()
                     .min_w_0()
+                    .children(active_sort.map(|ascending| {
+                        div()
+                            .id(("column-sort-direction", col_ix))
+                            .debug_selector(move || format!("column-sort-direction-{col_ix}"))
+                            .flex_none()
+                            .tooltip(crate::surfaces::tooltip_view(
+                                if ascending {
+                                    "Sorted ascending"
+                                } else {
+                                    "Sorted descending"
+                                }
+                                .into(),
+                            ))
+                            .child(crate::assets::icon(
+                                if ascending { "chevron-up" } else { "chevron-down" },
+                                theme.foreground,
+                            ))
+                    }))
                     .children(key.then(|| crate::assets::icon("key-round", theme.warning)))
                     .child(
                         div()
@@ -523,8 +495,7 @@ impl TableDelegate for GridDelegate {
                         )
                     }),
             )
-            .child(menu)
-            .children(pin)
+            .child(div().flex_none().child(menu))
     }
 
     fn render_td(
@@ -615,20 +586,6 @@ impl GridDelegate {
     pub(crate) fn set_hidden_columns(&mut self, column_count: usize, hidden: HashSet<usize>) {
         self.projection = ColumnProjection::new(column_count, &hidden);
         self.hidden_columns = hidden;
-    }
-
-    fn schedule_sort(
-        owner: WeakEntity<GridView>,
-        column_index: usize,
-        column: String,
-        ascending: Option<bool>,
-        window: &mut Window,
-    ) {
-        window.on_next_frame(move |_, app| {
-            let _ = owner.update_in(app, |view, window, cx| {
-                view.sort_current_column(column_index, &column, ascending, window, cx);
-            });
-        });
     }
 
     fn is_edited(&self, row_ix: usize, col_ix: usize) -> bool {
@@ -734,7 +691,32 @@ impl GridView {
         saved_widths
     }
 
-    fn reset_grid_widths(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn fit_visible_grid_columns(&mut self, window: &Window, cx: &mut Context<Self>) {
+        let table = self.table.read(cx);
+        let delegate = table.delegate();
+        let Some(source) = &delegate.source else {
+            return;
+        };
+        let start = delegate.visible_rows.start;
+        let (columns, _, _) = self.grid_columns();
+        let widths = measure_visible_columns(
+            source,
+            &delegate.map,
+            &columns,
+            &delegate.kinds,
+            &delegate.edits,
+            start..start.saturating_add(FIT_VISIBLE_ROWS),
+            FIT_VISIBLE_CELLS,
+            |text| measure_text(text, window),
+        );
+        let visible_widths = (0..delegate.projection.len())
+            .filter_map(|index| delegate.projection.source_index(index))
+            .filter_map(|source| widths.get(source).map(|width| px(width.max(MIN_GRID_COLUMN_WIDTH))))
+            .collect::<Vec<_>>();
+        self.remember_grid_widths(&visible_widths, cx);
+    }
+
+    pub(crate) fn reset_grid_widths(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(scope) = self.table.read(cx).delegate().width_scope.clone() else {
             return;
         };
@@ -748,8 +730,7 @@ impl GridView {
         self.table.update(cx, |table, _| {
             table.delegate_mut().manual_widths.remove(&scope);
         });
-        let available_width = self.table.read(cx).delegate().available_width;
-        self.sync_table(available_width, window, cx);
+        self.sync_table(window, cx);
         cx.notify();
     }
     pub(crate) fn remember_grid_widths(&mut self, widths: &[gpui::Pixels], cx: &mut Context<Self>) {
@@ -1013,7 +994,7 @@ impl GridView {
         binary_modes
     }
 
-    pub(crate) fn sync_table(&self, available_width: f32, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn sync_table(&self, window: &mut Window, cx: &mut Context<Self>) {
         let (mut columns, numeric, kinds) = self.grid_columns();
         let map = self.row_map();
         let pin_scope = self.pin_scope();
@@ -1036,17 +1017,16 @@ impl GridView {
                 &self.source,
                 &map,
                 &columns,
-                HeaderSizing::new(&kinds, pin_scope.is_some()),
+                &kinds,
                 &self.cell_edit.edits,
-                start,
-                self.viewport_rows,
+                viewport_sample(start, self.viewport_rows),
+                MAX_MEASURE_CELLS,
                 |text| measure_text(text, window),
             )
         };
         for ((_, width), measured) in columns.iter_mut().zip(&content_widths) {
             *width = *measured;
         }
-        fill_text_columns(&mut columns, &numeric, available_width);
         let saved_widths = self.load_remembered_widths(&mut columns, pin_scope.as_ref());
         if let Some(widths) = width_scope.as_ref().and_then(|scope| delegate.manual_widths.get(scope)) {
             for (name, width) in &mut columns {
@@ -1089,7 +1069,6 @@ impl GridView {
                 }
             }
             delegate.content_widths = content_widths;
-            delegate.available_width = available_width;
             let pinned_columns = pin_scope
                 .as_ref()
                 .and_then(|scope| delegate.pin_counts.get(scope))
@@ -1325,11 +1304,6 @@ impl GridView {
 
 const COMPARE_CHANGE_WIDTH: f32 = 70.0;
 const MIN_GRID_COLUMN_WIDTH: f32 = 72.0;
-const PIN_BUTTON_MIN_COLUMN_WIDTH: f32 = 96.0;
-
-fn pin_button_visible(column_width: f32) -> bool {
-    column_width >= PIN_BUTTON_MIN_COLUMN_WIDTH
-}
 
 fn next_pinned_count(current: usize, clicked: usize, column_count: usize) -> usize {
     if clicked < current {
@@ -1341,7 +1315,7 @@ fn next_pinned_count(current: usize, clicked: usize, column_count: usize) -> usi
 
 #[cfg(test)]
 mod pin_tests {
-    use super::{next_pinned_count, pin_button_visible};
+    use super::next_pinned_count;
 
     #[test]
     fn pin_actions_keep_a_contiguous_leading_prefix() {
@@ -1349,12 +1323,6 @@ mod pin_tests {
         assert_eq!(next_pinned_count(3, 1, 60), 1);
         assert_eq!(next_pinned_count(3, 0, 60), 0);
         assert_eq!(next_pinned_count(3, 99, 60), 60);
-    }
-
-    #[test]
-    fn narrow_headers_move_pin_actions_into_the_menu() {
-        assert!(!pin_button_visible(56.0));
-        assert!(pin_button_visible(96.0));
     }
 }
 
@@ -1369,71 +1337,38 @@ fn header_kind(data_type: &str) -> String {
 const MIN_CONTENT_WIDTH: f32 = 56.0;
 const MAX_CONTENT_WIDTH: f32 = 360.0;
 const MAX_MEASURE_CELLS: usize = 2048;
+const FIT_VISIBLE_ROWS: usize = 128;
+const FIT_VISIBLE_CELLS: usize = 8_192;
 
-struct HeaderSizing<'a> {
-    kinds: &'a [(String, bool)],
-    pinnable: bool,
-}
-
-impl<'a> HeaderSizing<'a> {
-    fn new(kinds: &'a [(String, bool)], pinnable: bool) -> Self {
-        Self { kinds, pinnable }
-    }
-}
-
-fn fill_text_columns(columns: &mut [(String, f32)], numeric: &[bool], available_width: f32) {
-    if !available_width.is_finite() || available_width <= 0.0 {
-        return;
-    }
-    let mut remaining = (available_width - columns.iter().map(|(_, width)| width).sum::<f32>()).max(0.0);
-    while remaining > 0.5 {
-        let flexible: Vec<usize> = columns
-            .iter()
-            .enumerate()
-            .filter_map(|(index, (_, width))| {
-                (!numeric.get(index).copied().unwrap_or(false) && *width < MAX_CONTENT_WIDTH).then_some(index)
-            })
-            .collect();
-        if flexible.is_empty() {
-            break;
-        }
-        let share = remaining / flexible.len() as f32;
-        let mut used = 0.0;
-        for index in flexible {
-            let add = share.min(MAX_CONTENT_WIDTH - columns[index].1);
-            columns[index].1 += add;
-            used += add;
-        }
-        if used <= 0.0 {
-            break;
-        }
-        remaining -= used;
-    }
+fn viewport_sample(start: usize, rows: usize) -> Range<usize> {
+    start..start.saturating_add(rows.max(1).saturating_add(4).min(64))
 }
 
 fn measure_visible_columns(
     source: &Source,
     map: &RowMap,
     columns: &[(String, f32)],
-    header: HeaderSizing<'_>,
+    kinds: &[(String, bool)],
     edits: &Edits,
-    start: usize,
-    viewport_rows: usize,
+    sample: Range<usize>,
+    max_cells: usize,
     mut measure: impl FnMut(&str) -> f32,
 ) -> Vec<f32> {
     let mut widths: Vec<f32> = columns
         .iter()
         .enumerate()
-        .map(|(index, (name, _))| measure_header_width(name, header.kinds.get(index), header.pinnable, &mut measure))
+        .map(|(index, (name, _))| measure_header_width(name, kinds.get(index), &mut measure))
         .collect();
     if columns.is_empty() || map.compare.is_some() {
         return widths;
     }
-    let row_limit = viewport_rows.max(1).saturating_add(4).min(64);
-    let cell_limit_rows = (MAX_MEASURE_CELLS / columns.len().max(1)).max(1);
-    let end = start.saturating_add(row_limit.min(cell_limit_rows)).min(map.count);
+    let cell_limit_rows = (max_cells / columns.len()).max(1);
+    let end = sample
+        .end
+        .min(sample.start.saturating_add(cell_limit_rows))
+        .min(map.count);
     let mut borrowed_row = false;
-    for row in start.min(end)..end {
+    for row in sample.start.min(end)..end {
         let Some(source_row) = map.source_row(row) else {
             continue;
         };
@@ -1454,16 +1389,8 @@ fn measure_visible_columns(
     widths
 }
 
-fn measure_header_width(
-    name: &str,
-    kind: Option<&(String, bool)>,
-    pinnable: bool,
-    measure: &mut impl FnMut(&str) -> f32,
-) -> f32 {
+fn measure_header_width(name: &str, kind: Option<&(String, bool)>, measure: &mut impl FnMut(&str) -> f32) -> f32 {
     let mut width = measure(name) + size::COMPACT_CONTROL;
-    if pinnable {
-        width += size::COMPACT_CONTROL;
-    }
     if let Some((data_type, primary_key)) = kind {
         let kind = header_kind(data_type);
         if !kind.is_empty() {
@@ -1606,9 +1533,9 @@ mod header_kind_tests {
     #[test]
     fn fitted_width_accounts_for_inline_type_and_primary_key_icon() {
         let kind = ("numeric(38,18)".to_owned(), true);
-        let width = measure_header_width("id", Some(&kind), true, &mut |text| text.len() as f32 * 8.0 + 12.0);
+        let width = measure_header_width("id", Some(&kind), &mut |text| text.len() as f32 * 8.0 + 12.0);
 
-        assert_eq!(width, ("id".len() + "NUMERIC(38,18)".len()) as f32 * 8.0 + 82.0);
+        assert_eq!(width, ("id".len() + "NUMERIC(38,18)".len()) as f32 * 8.0 + 58.0);
     }
 }
 
@@ -1720,6 +1647,8 @@ mod tests {
 
     #[gpui::test]
     fn header_sort_indicator_matches_the_applied_sort(cx: &mut gpui::TestAppContext) {
+        use gpui_kit::component::table::ColumnSort;
+
         let (_, cx) = crate::ui_tests::open(cx);
         cx.update(|_, cx| {
             let mut delegate = GridDelegate {
@@ -1858,13 +1787,10 @@ mod tests {
                 ..Default::default()
             },
             &columns,
-            HeaderSizing {
-                kinds: &[],
-                pinnable: false,
-            },
+            &[],
             &Edits::default(),
-            0,
-            20,
+            viewport_sample(0, 20),
+            MAX_MEASURE_CELLS,
             |text| text.chars().count() as f32 * 8.5 + 12.0,
         );
 
@@ -1978,28 +1904,5 @@ mod tests {
         .map(|(_, right)| right)
         .collect();
         assert_eq!(flags, vec![true, true, false]);
-    }
-
-    #[test]
-    fn spare_width_is_shared_by_text_columns_without_widening_numbers() {
-        let mut columns = vec![
-            ("id".into(), 56.0),
-            ("created_at".into(), 200.0),
-            ("name".into(), 100.0),
-        ];
-        fill_text_columns(&mut columns, &[true, false, false], 800.0);
-        assert_eq!(columns[0].1, 56.0);
-        assert_eq!(columns[1].1, MAX_CONTENT_WIDTH);
-        assert_eq!(columns[2].1, MAX_CONTENT_WIDTH);
-
-        fill_text_columns(&mut columns, &[true, false, false], 250.0);
-        assert_eq!(columns[0].1, 56.0);
-        assert_eq!(columns[1].1, MAX_CONTENT_WIDTH);
-        assert_eq!(columns[2].1, MAX_CONTENT_WIDTH);
-    }
-
-    #[test]
-    fn an_empty_result_has_no_column_to_expand() {
-        fill_text_columns(&mut [], &[], 520.0);
     }
 }

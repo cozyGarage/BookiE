@@ -4,7 +4,6 @@ use crate::chrome::{STATUS_HEIGHT, TAB_HEIGHT, TOOLBAR_HEIGHT};
 use crate::palette_state::PaletteMode;
 use crate::surfaces::{ButtonKind, button, compact_button, compact_icon_button, dialog_surface, scrim};
 use gpui::uniform_list;
-use gpui_kit::component::scroll::Scrollbar;
 
 impl GridView {
     fn sync_render_state(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -36,7 +35,7 @@ impl GridView {
         let sidebar_width = if self.sidebar.open { self.sidebar.width } else { 0.0 };
         let content_width = (f32::from(window.viewport_size().width) - sidebar_width).max(0.0);
         let grid_width = (content_width - self.detail_sidebar_width(content_width)).max(0.0);
-        self.sync_table((grid_width - f32::from(Scrollbar::width())).max(0.0), window, cx);
+        self.sync_table(window, cx);
         if self.synced_width != grid_width {
             self.synced_width = grid_width;
             let table = self.table.clone();
@@ -227,8 +226,15 @@ impl GridView {
         use gpui_component::menu::DropdownMenu;
         use gpui_kit::component::Sizable as _;
         let compact = self.synced_width < 1000.0;
-        let groups =
-            crate::menus::command_groups(self, &[&["jump-column", "refresh-table", "export-file", "export-csv"]]);
+        let groups = crate::menus::command_groups(
+            self,
+            &[
+                &["jump-column", "fit-visible-columns", "reset-grid-widths"],
+                &["refresh-table", "export-file", "export-csv"],
+            ],
+        );
+        let columns =
+            crate::menus::command_groups(self, &[&["jump-column", "fit-visible-columns", "reset-grid-widths"]]);
         div()
             .flex()
             .flex_1()
@@ -305,12 +311,12 @@ impl GridView {
                     })
                     .children(self.add_row_button(theme, cx))
                     .child(
-                        compact_button(ButtonKind::Ghost, "jump-column", "Go to column", theme).on_click(cx.listener(
-                            |this, _, window, cx| {
-                                this.open_picker(crate::palette_state::PaletteMode::Columns, window, cx);
-                                cx.notify();
-                            },
-                        )),
+                        Button::new("grid-columns-menu")
+                            .ghost()
+                            .small()
+                            .compact()
+                            .label("Columns")
+                            .dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), columns)),
                     )
                     .children(self.live.is_none().then(|| {
                         compact_button(ButtonKind::Ghost, "compare", "Compare", theme)
