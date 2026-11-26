@@ -44,6 +44,27 @@ pub(crate) const ROW_GROUPS: &[&[&str]] = &[
     &["edit", "set-cells", "delete-rows", "clear-selection"],
 ];
 
+pub(crate) const PAGE_GROUPS: &[&[&str]] = &[&["first", "last"]];
+
+pub(crate) const COLUMN_GROUPS: &[&[&str]] = &[&["jump-column", "fit-visible-columns", "reset-grid-widths"]];
+
+pub(crate) const GRID_MORE_GROUPS: &[&[&str]] = &[
+    &["jump-column", "fit-visible-columns", "reset-grid-widths"],
+    &["refresh-table", "export-file", "export-csv"],
+];
+
+#[cfg(test)]
+pub(crate) const MENUS: &[&[&[&str]]] = &[
+    OVERFLOW_GROUPS,
+    IMPORT_EXPORT_GROUPS,
+    FILE_GROUPS,
+    EXPORT_GROUPS,
+    ROW_GROUPS,
+    PAGE_GROUPS,
+    COLUMN_GROUPS,
+    GRID_MORE_GROUPS,
+];
+
 pub(crate) fn command_groups(view: &GridView, ids: &[&[&str]]) -> Vec<Group> {
     let actions = view.palette_actions();
     ids.iter()

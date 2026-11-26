@@ -79,7 +79,7 @@ impl GridView {
         let rows = self.pager.rows;
         let continuous = self.continuous;
         let append = self.pager.append;
-        let groups = crate::menus::command_groups(self, &[&["first", "last"]]);
+        let groups = crate::menus::command_groups(self, crate::menus::PAGE_GROUPS);
 
         Button::new("page-size")
             .debug_selector(|| "page-size".into())
@@ -226,15 +226,8 @@ impl GridView {
         use gpui_component::menu::DropdownMenu;
         use gpui_kit::component::Sizable as _;
         let compact = self.synced_width < 1000.0;
-        let groups = crate::menus::command_groups(
-            self,
-            &[
-                &["jump-column", "fit-visible-columns", "reset-grid-widths"],
-                &["refresh-table", "export-file", "export-csv"],
-            ],
-        );
-        let columns =
-            crate::menus::command_groups(self, &[&["jump-column", "fit-visible-columns", "reset-grid-widths"]]);
+        let groups = crate::menus::command_groups(self, crate::menus::GRID_MORE_GROUPS);
+        let columns = crate::menus::command_groups(self, crate::menus::COLUMN_GROUPS);
         div()
             .flex()
             .flex_1()
