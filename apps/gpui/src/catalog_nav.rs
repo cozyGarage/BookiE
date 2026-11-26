@@ -477,6 +477,7 @@ impl GridView {
             return;
         };
         self.cell_edit.edits.clear();
+        self.edits_changed();
         let checks = std::mem::take(&mut self.save.checks);
         let wanted = self.catalog.grid_table.clone();
         let sort = self.table_sort(&wanted).cloned();

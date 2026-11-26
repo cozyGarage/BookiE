@@ -1772,6 +1772,24 @@ fn the_status_bar_sums_the_cursor_column_of_the_selected_rows(cx: &mut TestAppCo
 }
 
 #[gpui::test]
+fn selection_stats_drop_edits_cleared_by_a_reload_after_save(cx: &mut TestAppContext) {
+    let path = fixture_copy("selection-stats-reload");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.selection = Some(crate::Selection { anchor: 0, focus: 1 });
+            view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 0 });
+            view.cell_edit.edits.insert((0, 0), bookie_core::Value::Int(10));
+            view.edits_changed();
+            assert_eq!(view.selection_stat_items()[1], ("Sum", "12".to_string()));
+            view.reload_after_save("Saved".into(), cx);
+            assert_eq!(view.selection_stat_items()[1], ("Sum", "3".to_string()));
+        })
+    });
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
 fn health_reports_are_offered_only_on_postgres(cx: &mut TestAppContext) {
     let path = fixture_copy("health-sqlite");
     let (view, cx) = saving_view(cx, &path);
