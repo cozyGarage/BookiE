@@ -1436,6 +1436,7 @@ dependencies = [
 name = "bookie-gpui"
 version = "0.2.10"
 dependencies = [
+ "anyhow",
  "async-trait",
  "base64 0.23.1",
  "bookie-app-services",
@@ -1448,6 +1449,7 @@ dependencies = [
  "gpui-pre",
  "gpui-pre-macros",
  "gpui-pre-platform",
+ "lsp-types",
  "regex",
  "rfd",
  "rust_decimal",

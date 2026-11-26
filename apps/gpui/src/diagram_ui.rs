@@ -69,7 +69,7 @@ fn px_at(value: f64) -> gpui::Pixels {
 
 impl GridView {
     pub(crate) fn diagram_actions(&self) -> Vec<Action> {
-        let enabled = self.live.as_ref().is_some_and(|session| !session.tables.is_empty());
+        let enabled = self.live.is_some();
         vec![Action {
             id: "show-schema-diagram",
             label: "Show the schema diagram".to_string(),
@@ -89,11 +89,12 @@ impl GridView {
         state.loading = false;
         state.failure = None;
         state.find = None;
+        state.ddl = None;
         state.relationship = None;
         state.scroll = Default::default();
     }
 
-    fn load_schema_diagram(&mut self, scope: Option<String>, cx: &mut Context<Self>) {
+    pub(crate) fn load_schema_diagram(&mut self, scope: Option<String>, cx: &mut Context<Self>) {
         let Some(session) = self.live.clone() else {
             self.status = "Connect to a database to draw its schema".into();
             return;
@@ -105,6 +106,7 @@ impl GridView {
             state.view = None;
         }
         state.relationship = None;
+        state.ddl = None;
         state.scope.clone_from(&scope);
         state.loading = true;
         state.failure = None;
@@ -463,6 +465,10 @@ impl GridView {
         }
         toolbar
             .children(state.view.as_ref().map(|_| self.diagram_layout_menu(cx)))
+            .children(self.diagram_can_draft().then(|| {
+                compact_button(ButtonKind::Ghost, "diagram-create-table", "Create table", theme)
+                    .on_click(cx.listener(|this, _, window, cx| this.begin_diagram_ddl(None, window, cx)))
+            }))
             .child(
                 compact_icon_button("diagram-refresh", "refresh-cw", "Refresh schema diagram", theme)
                     .on_click(cx.listener(|this, _, _, cx| this.open_schema_diagram(cx))),
@@ -476,24 +482,28 @@ impl GridView {
     pub(crate) fn diagram_page(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
         let state = &self.search.diagram;
         let message = state.failure.as_deref().or(state.loading.then_some("Loading schema…"));
-        let body = match &state.view {
-            Some(view) => div()
-                .flex()
-                .flex_1()
-                .min_h_0()
-                .child(
-                    div()
-                        .id("diagram-scroll")
-                        .track_scroll(&state.scroll)
-                        .flex_1()
-                        .min_w_0()
-                        .min_h_0()
-                        .overflow_scroll()
-                        .bg(rgb(theme.background))
-                        .child(diagram_canvas(view, theme, cx)),
-                )
-                .child(self.diagram_inspector(view, theme, cx)),
-            None => div().flex_1().min_h_0(),
+        let body = if let Some(form) = self.diagram_ddl_editor(theme, cx) {
+            form
+        } else {
+            match &state.view {
+                Some(view) => div()
+                    .flex()
+                    .flex_1()
+                    .min_h_0()
+                    .child(
+                        div()
+                            .id("diagram-scroll")
+                            .track_scroll(&state.scroll)
+                            .flex_1()
+                            .min_w_0()
+                            .min_h_0()
+                            .overflow_scroll()
+                            .bg(rgb(theme.background))
+                            .child(diagram_canvas(view, theme, cx)),
+                    )
+                    .child(self.diagram_inspector(view, theme, cx)),
+                None => div().flex_1().min_h_0(),
+            }
         };
         div()
             .flex_1()
@@ -622,6 +632,7 @@ impl GridView {
             live.writable.is_some() && bookie_core::sql_dialect::alters_foreign_keys(&live.driver_id)
         });
         let relationship_source = target.clone();
+        let column_target = target.clone();
         div()
             .flex()
             .flex_col()
@@ -649,6 +660,13 @@ impl GridView {
                             }),
                         ),
                     )
+                    .children(self.diagram_can_draft().then(|| {
+                        compact_button(ButtonKind::Ghost, "diagram-add-column", "Add columns", theme).on_click(
+                            cx.listener(move |this, _, window, cx| {
+                                this.begin_diagram_ddl(Some(column_target.clone()), window, cx);
+                            }),
+                        )
+                    }))
                     .children(can_add_relationship.then(|| {
                         compact_button(ButtonKind::Ghost, "diagram-add-relationship", "Add relationship", theme)
                             .on_click(cx.listener(move |this, _, window, cx| {

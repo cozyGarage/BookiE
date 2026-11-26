@@ -44,6 +44,7 @@ pub(crate) struct SchemaDiagramState {
     pub failure: Option<String>,
     pub scope: Option<String>,
     pub relationship: Option<crate::diagram_relationship::RelationshipDraft>,
+    pub ddl: Option<crate::diagram_ddl::DiagramDdl>,
     pub find: Option<Entity<TextInput>>,
     pub scroll: gpui::ScrollHandle,
     pub view: Option<crate::diagram_ui::DiagramView>,

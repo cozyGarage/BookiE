@@ -20,9 +20,11 @@ pub(crate) const OVERFLOW_GROUPS: &[&[&str]] = &[
     &["status", "server-status"],
 ];
 
-pub(crate) const IMPORT_EXPORT_GROUPS: &[&[&str]] = &[
-    &["import-csv", "export-file"],
-    &["import-connections", "export-connections"],
+pub(crate) const IMPORT_EXPORT_GROUPS: &[&[&str]] = &[&["import-connections", "export-connections"]];
+
+pub(crate) const FILE_GROUPS: &[&[&str]] = &[
+    &["open-sql-file", "save-sql-file"],
+    &["export-file", "export-csv", "import-csv"],
 ];
 
 pub(crate) const EXPORT_GROUPS: &[&[&str]] = &[&["export-file", "export-csv"]];

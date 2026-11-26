@@ -1,6 +1,9 @@
 use bookie_gpui::keymap::Command;
 use bookie_gpui::messages::MessageKind;
 use gpui::{Context, Div, MouseDownEvent, Stateful, Window, div, prelude::*, px, rgb};
+use gpui_component::button::{Button, ButtonVariants as _};
+use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
+use gpui_kit::component::Sizable as _;
 
 use crate::chrome::{SQL, TOOLBAR_HEIGHT, tip};
 use crate::surfaces::{ButtonKind, button, compact_icon_button, segment, segmented};
@@ -40,6 +43,25 @@ impl GridView {
         }
     }
 
+    fn query_file_menu(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+        let groups = crate::menus::command_groups(self, crate::menus::FILE_GROUPS);
+        div().debug_selector(|| "query-file-menu".into()).child(
+            Button::new("query-file-menu")
+                .ghost()
+                .small()
+                .tooltip("Open or save SQL files, export results or import a file")
+                .accessibility_label("Import / Export")
+                .child(
+                    div()
+                        .whitespace_nowrap()
+                        .text_color(rgb(theme.foreground))
+                        .child("Import / Export"),
+                )
+                .child(crate::assets::icon("chevron-down", theme.muted_foreground))
+                .dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), groups)),
+        )
+    }
+
     pub(crate) fn query_editor_toolbar(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
         div()
             .flex()
@@ -51,44 +73,9 @@ impl GridView {
             .bg(rgb(theme.chrome))
             .border_b_1()
             .border_color(rgb(theme.border))
-            .child(
-                button(ButtonKind::Primary, "run-statement", "Run", theme)
-                    .tooltip(tip(self.command_tip(Command::RunAtCursor)))
-                    .on_click(cx.listener(|this, _, _, cx| {
-                        this.run_at_cursor(cx);
-                        cx.notify();
-                    })),
-            )
-            .child(
-                button(ButtonKind::Ghost, "run-query", "Run all", theme)
-                    .tooltip(tip(self.command_tip(Command::RunQuery)))
-                    .on_click(cx.listener(|this, _, _, cx| {
-                        this.run_query(cx);
-                        cx.notify();
-                    })),
-            )
-            .child(
-                button(ButtonKind::Ghost, "explain-query", "Explain", theme).on_click(cx.listener(|this, _, _, cx| {
-                    this.explain_query(cx);
-                    cx.notify();
-                })),
-            )
-            .child(
-                button(ButtonKind::Ghost, "format-query", "Format", theme).on_click(cx.listener(
-                    |this, _, window, cx| {
-                        this.format_query(window, cx);
-                        cx.notify();
-                    },
-                )),
-            )
-            .child(
-                button(ButtonKind::Ghost, "save-query", "Save as favorite", theme).on_click(cx.listener(
-                    |this, _, _, cx| {
-                        this.save_favorite(cx);
-                        cx.notify();
-                    },
-                )),
-            )
+            .child(self.query_run_controls(theme, cx))
+            .child(self.query_editor_tools(cx))
+            .child(self.query_file_menu(theme, cx))
             .child(div().flex_1())
             .child(
                 div()
@@ -127,6 +114,108 @@ impl GridView {
             .children(self.schema_context_chip(theme, cx))
             .child(div().flex_1())
             .child(self.transaction_controls(theme, cx))
+    }
+
+    fn query_run_controls(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+        let selected = !self.sql_input.read(cx).selected_range().is_empty();
+        let running = self.panel.running.map(|(_, at)| at.elapsed().as_secs());
+        div()
+            .flex()
+            .gap_1()
+            .items_center()
+            .when(running.is_none(), |bar| {
+                bar.child(
+                    button(
+                        ButtonKind::Primary,
+                        "run-statement",
+                        if selected { "Run selection" } else { "Run statement" },
+                        theme,
+                    )
+                    .tooltip(tip(self.command_tip(Command::RunAtCursor)))
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.run_at_cursor(cx);
+                        cx.notify();
+                    })),
+                )
+                .child(
+                    button(ButtonKind::Ghost, "run-query", "Run all", theme)
+                        .tooltip(tip(self.command_tip(Command::RunQuery)))
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.run_query(cx);
+                            cx.notify();
+                        })),
+                )
+            })
+            .children(running.map(|seconds| {
+                div()
+                    .text_color(rgb(theme.muted_foreground))
+                    .child(format!("{seconds}s"))
+            }))
+            .when(running.is_some(), |bar| {
+                if self.loads.cancel.is_cancelled() {
+                    bar.child(crate::surfaces::unavailable_button(
+                        ButtonKind::Ghost,
+                        "stop-query",
+                        "Stopping…",
+                        "Waiting for the database",
+                        theme,
+                    ))
+                } else {
+                    bar.child(
+                        button(ButtonKind::Destructive, "stop-query", "Stop", theme).on_click(cx.listener(
+                            |this, _, _, cx| {
+                                this.stop_query();
+                                cx.notify();
+                            },
+                        )),
+                    )
+                }
+            })
+    }
+
+    fn query_editor_tools(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let owner = cx.entity().downgrade();
+        Button::new("sql-editor-tools")
+            .ghost()
+            .small()
+            .label("Tools")
+            .dropdown_menu(move |mut menu, _, _| {
+                let explain = owner.clone();
+                let format = owner.clone();
+                let favorite = owner.clone();
+                menu = menu
+                    .item(PopupMenuItem::new("Explain").on_click(move |_, _, cx| {
+                        let _ = explain.update(cx, |view, cx| {
+                            view.explain_query(cx);
+                            cx.notify();
+                        });
+                    }))
+                    .item(PopupMenuItem::new("Format SQL").on_click(move |_, window, cx| {
+                        let _ = format.update(cx, |view, cx| view.format_query(window, cx));
+                    }))
+                    .item(PopupMenuItem::new("Save as favorite").on_click(move |_, _, cx| {
+                        let _ = favorite.update(cx, |view, cx| view.save_favorite(cx));
+                    }))
+                    .separator();
+                for (label, replace) in [("Find in editor", false), ("Replace in editor", true)] {
+                    let owner = owner.clone();
+                    menu = menu.item(PopupMenuItem::new(label).on_click(move |_, _, cx| {
+                        let _ = owner.update(cx, |view, cx| {
+                            view.sql_input.update(cx, |editor, cx| editor.open_search(replace, cx));
+                        });
+                    }));
+                }
+                let complete = owner.clone();
+                menu = menu.item(
+                    PopupMenuItem::new("Suggest SQL (Ctrl+Space)").on_click(move |_, window, cx| {
+                        let _ = complete.update(cx, |view, cx| {
+                            view.sql_input
+                                .update(cx, |editor, cx| editor.show_completions(window, cx));
+                        });
+                    }),
+                );
+                crate::sql_editor::snippet_menu(menu, &owner)
+            })
     }
 
     fn schema_context_chip(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Stateful<Div>> {
@@ -205,40 +294,14 @@ impl GridView {
                         )
                     }))
                     .children(self.live.is_some().then(|| {
-                        let active = {
-                            let driver = self
-                                .live
-                                .as_ref()
-                                .map_or_else(|| "postgres".to_string(), |session| session.driver_id.clone());
-                            let editor = self.sql_input.read(cx);
-                            let (text, cursor, selection) =
-                                (editor.value().to_string(), editor.cursor(), editor.selected_range());
-                            crate::run_cursor_ui::run_source_range(&text, &driver, cursor, selection)
-                        };
                         div()
-                            .flex()
                             .flex_1()
                             .min_w_0()
-                            .gap_1()
-                            .child(
-                                div()
-                                    .w(px(size::GUTTER_MARKER_WIDTH))
-                                    .h_full()
-                                    .rounded_full()
-                                    .when(active.is_some(), |strip| strip.bg(rgb(theme.accent)))
-                                    .when(active.is_none(), |strip| strip.bg(rgb(theme.muted))),
-                            )
-                            .child(
-                                div()
-                                    .flex_1()
-                                    .when(!self.fonts.settings.editor_family.is_empty(), |pane| {
-                                        pane.font_family(self.fonts.settings.editor_family.clone())
-                                    })
-                                    .text_size(px(self.fonts.settings.editor_size))
-                                    .child(
-                                        gpui_kit::component::input::Editor::new(&self.sql_input).h(gpui::relative(1.0)),
-                                    ),
-                            )
+                            .when(!self.fonts.settings.editor_family.is_empty(), |pane| {
+                                pane.font_family(self.fonts.settings.editor_family.clone())
+                            })
+                            .text_size(px(self.fonts.settings.editor_size))
+                            .child(gpui_kit::component::input::Editor::new(&self.sql_input).h(gpui::relative(1.0)))
                     })),
             )
     }

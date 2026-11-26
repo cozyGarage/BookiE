@@ -19,6 +19,7 @@ mod connection_form;
 mod connection_info_ui;
 mod copy_selection;
 mod detail_panel;
+mod diagram_ddl;
 mod diagram_relationship;
 mod diagram_scene;
 mod diagram_ui;
@@ -74,6 +75,8 @@ mod set_cells_ui;
 mod sidebar_catalog;
 mod sidebar_fields;
 mod sidebar_state;
+mod sql_editor;
+mod sql_editor_marks;
 mod sql_file_ui;
 mod ssh_form;
 mod structure_ui;
@@ -357,28 +360,35 @@ impl GridView {
             this.on_editor_event(event, window, cx);
         })
         .detach();
+        let owner = cx.entity().downgrade();
         let sql_input = cx.new(|cx| {
-            EditorState::new(window, cx)
+            let mut editor = EditorState::new(window, cx)
                 .language("sql")
                 .line_number(true)
                 .folding(true)
-                .placeholder("SELECT … (Enter adds a line, Ctrl+Enter runs it)")
+                .searchable(true)
+                .replaceable(true)
+                .placeholder("SELECT … (Ctrl+Enter runs the selection or statement)");
+            Self::install_sql_completion(&mut editor, owner);
+            editor
         });
         cx.subscribe(
             &sql_input,
             |this, input, event: &gpui_kit::component::input::InputEvent, cx| {
                 if matches!(event, gpui_kit::component::input::InputEvent::Change) {
                     this.last_edit = Some(input.read(cx).cursor_position());
+                    input.update(cx, Self::clear_sql_diagnostics);
                 }
                 if matches!(
                     event,
                     gpui_kit::component::input::InputEvent::PressEnter { secondary: true, .. }
                 ) {
-                    this.run_query(cx);
+                    this.run_at_cursor(cx);
                 }
             },
         )
         .detach();
+        Self::observe_sql_marks(&sql_input, cx);
         let value_editor = cx.new(|cx| EditorState::new(window, cx).placeholder("Edit full value"));
         (find, filter, editor, sql_input, value_editor)
     }
@@ -867,6 +877,7 @@ impl GridView {
     fn invalidate_background(&mut self) {
         self.clear_chart();
         self.loads.invalidate();
+        self.panel.running = None;
         self.invalidate_scans();
         self.counts.invalidate();
         self.charts.invalidate();
@@ -1107,6 +1118,11 @@ fn main() {
         .with_assets(assets::Assets)
         .run(move |cx: &mut App| {
             text_input::bind_keys(cx);
+            cx.bind_keys([gpui::KeyBinding::new(
+                "ctrl-space",
+                gpui_component::input::ShowCompletions,
+                Some("Input && mode == editor"),
+            )]);
             ui_theme::load_bundled_themes(cx);
             let settings = font_settings::load();
             ui_theme::apply_editor_size(settings.editor_size, cx);

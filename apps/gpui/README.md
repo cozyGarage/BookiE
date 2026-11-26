@@ -53,6 +53,8 @@ Connect to a database and choose **Show the schema diagram** from Commands. Pick
 
 On a writable connection that supports adding foreign keys, choose **Add relationship** on the source table. Pick the referenced table and add the column pairs in order. **Review SQL** opens the existing save review. BookiE checks the tables again before sending the change through the normal approval and audit path.
 
+On saved writable connections with transactional DDL, use **Create table** or choose **Add columns** on an existing card. A new table can define nullable columns and single-column or composite primary keys. **Review SQL** shows the exact statements to apply. The diagram refreshes after the change.
+
 ## Renderer boundary
 
 The formatter tests expand the [large-cell inputs](testdata/large-cells.json). They check bounded previews and exact typed-value round trips. They do not measure native rendering or process memory.
@@ -71,9 +73,11 @@ The planned modularisation puts application logic in app-services and leaves the
 
 The binary half is the frontend: `main.rs` owns `GridView` state and actions, `render.rs` renders that state, and `chrome.rs`, `grid_edit.rs`, `text_input.rs`, `ui_theme.rs` and `assets.rs` provide the surrounding UI. `GridView` still owns both state and layout decisions; the next step is to move its state fields behind the library types so the renderer reads them and sends intents (a key press, a click) back.
 
-The result area follows DBX's query-tab structure (`src/chrome.rs`, model in `src/shell.rs`): **Ctrl+T** opens a Query tab with a multiline SQL editor on top, a draggable divider (the result keeps 20 to 80 percent of the height, 68 percent by default) and a result pane below. The pane header has closable run tabs (**Ctrl+Enter** adds a run with its own row count: 150,000, then 1,000,000, 5,000, 40, and so on), a **Table Data / Summary** switcher and a chevron that hides the pane. Selecting a run swaps its result in and clears the cursor and selection. Applied edits remain with their run until it is closed, separately from synthetic table edits; an open editor is dismissed when switching. The command palette offers **Close current result**, **Previous result** and **Next result** as keyboard paths; the run strip can scroll horizontally. Enter inserts a line in the SQL editor; Ctrl+Enter runs the statement. Live SQL query tabs are read-only outside the explicit transaction flow; governed data changes use the app-services write path.
+**Ctrl+T** opens a Query tab with the SQL editor above a draggable split and the result pane below. Each run has its own tab. **Ctrl+Enter** executes the selection or the statement at the active caret. **Ctrl+Shift+Enter** executes the whole buffer. A standalone query shows elapsed time and a **Stop** control. Live queries are read-only outside the explicit transaction flow.
 
-The SQL editor edits at several carets. **Shift+Alt+Up** and **Shift+Alt+Down** add a caret on the line above or below, **Alt+click** adds one at the pointer, and typing or deleting applies at every caret as one undo step. **Escape** returns to a single caret. **Ctrl+Enter** runs the whole buffer whatever the carets are. Ctrl+Alt+arrows are left unbound because Linux desktops reserve them.
+The gutter marks the current run target. The editor highlights matching parentheses and occurrences of a selected SQL word. When a database supplies an error position, the editor underlines the token in the submitted text. **Tools** includes Find, Replace, SQL formatting and snippets. Press **Ctrl+Space** to request SQL and catalog suggestions. The editor also suggests names after SQL clauses such as `FROM` and after a qualifier's dot.
+
+**Shift+Alt+Up** and **Shift+Alt+Down** add a caret on the line above or below. **Alt+click** adds one at the pointer. Typing or deleting applies at each caret in one undo step. **Escape** returns to a single caret.
 
 The view reads rows, Find, filter and compare from a `ResultSource` trait (`src/source.rs`); implementations include the synthetic generator and a live table loaded through `bookie-app-services::ReadSession`. A test drives the whole view from a 3-row source that is not the generator. `BOOKIE_PROTOTYPE_START=query` opens the Query tab at start.
 
