@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use bookie_app_services::favorites::{self, Favorite};
+use bookie_app_services::service_runtime::block_on;
 use uuid::Uuid;
 
 use super::*;
@@ -30,7 +31,7 @@ impl GridView {
         cx.spawn(async move |this, cx| {
             let result = cx
                 .background_executor()
-                .spawn(async move { favorites::list(path.as_deref()) })
+                .spawn(async move { block_on(async move { favorites::list(path.as_deref()).await }) })
                 .await;
             this.update(cx, |this, cx| {
                 match result {
@@ -64,7 +65,7 @@ impl GridView {
         cx.spawn(async move |this, cx| {
             let result = cx
                 .background_executor()
-                .spawn(async move { favorites::save(path.as_deref(), &sql, driver) })
+                .spawn(async move { block_on(async move { favorites::save(path.as_deref(), &sql, driver).await }) })
                 .await;
             this.update(cx, |this, cx| {
                 match result {
@@ -97,7 +98,7 @@ impl GridView {
         cx.spawn(async move |this, cx| {
             let result = cx
                 .background_executor()
-                .spawn(async move { favorites::delete(path.as_deref(), id) })
+                .spawn(async move { block_on(async move { favorites::delete(path.as_deref(), id).await }) })
                 .await;
             this.update(cx, |this, cx| {
                 match result {
