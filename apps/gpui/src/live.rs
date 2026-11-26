@@ -20,7 +20,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::model::{Cell, ColumnMeta, Diff, FindResult, PAGE_ROWS, Predicate};
 use crate::shell::table_label;
-use crate::source::{ResultSource, filter_buffered_rows, find_buffered_rows};
+use crate::source::{ResultSource, ViewAccess, filter_buffered_rows, find_buffered_rows};
 
 pub fn saved_connections() -> Result<Vec<ConnectionSummary>, String> {
     let runtime = tokio::runtime::Builder::new_current_thread()
@@ -330,6 +330,7 @@ impl LiveSession {
             executed_sql: Some(sql.to_owned()),
             load_elapsed: started.elapsed(),
             table: None,
+            view_access: ViewAccess::Editable,
         })
     }
 
@@ -423,6 +424,7 @@ impl LiveSession {
                     executed_sql: Some(sql.to_owned()),
                     load_elapsed: started.elapsed(),
                     table: None,
+                    view_access: ViewAccess::Editable,
                 }
             })
             .collect();
@@ -447,6 +449,7 @@ impl LiveSession {
             executed_sql: Some(sql.to_owned()),
             load_elapsed: started.elapsed(),
             table: None,
+            view_access: ViewAccess::Editable,
         })
     }
 
@@ -475,6 +478,7 @@ impl LiveSession {
             executed_sql: None,
             load_elapsed: started.elapsed(),
             table: None,
+            view_access: ViewAccess::Editable,
         })
     }
 
@@ -547,6 +551,21 @@ impl LiveSession {
 
     pub fn table_columns(&self, table: &TableInfo) -> Result<Vec<ColumnInfo>, String> {
         self.read_columns(table, false, Duration::from_secs(10))
+    }
+
+    pub fn edit_columns(&self, table: &TableInfo) -> Result<(Vec<ColumnInfo>, ViewAccess), String> {
+        let editability = self.view_editability(table);
+        Ok(view_plan(self.table_columns(table)?, editability))
+    }
+
+    fn view_editability(&self, table: &TableInfo) -> Result<Option<bookie_core::ViewEditability>, String> {
+        if self.writable.is_none() {
+            return Ok(None);
+        }
+        let control = OperationControl::with_timeout(Duration::from_secs(10));
+        self.runtime
+            .block_on(self.sessions.read_view_editability(self.session_id, table, &control))
+            .map_err(|failure| driver_failure_message(&failure))
     }
 
     pub fn enum_labels(&self, type_name: &bookie_core::QualifiedTypeName) -> Result<Vec<String>, String> {
@@ -743,16 +762,19 @@ impl LiveSession {
             return Err(format!("Row limit must be between 1 and {ROW_CAP}"));
         }
         let table = find_table(&self.tables, table)?.clone();
-        let key: Vec<String> = self
-            .table_columns(&table)
-            .map(|columns| {
-                columns
+        let editability = self.view_editability(&table);
+        let (key, view_access) = match self.table_columns(&table) {
+            Ok(columns) => {
+                let (columns, access) = view_plan(columns, editability);
+                let key: Vec<String> = columns
                     .into_iter()
                     .filter(|column| column.primary_key)
                     .map(|column| column.name)
-                    .collect()
-            })
-            .unwrap_or_default();
+                    .collect();
+                (key, access)
+            }
+            Err(_) => (Vec::new(), view_plan(Vec::new(), editability).1),
+        };
         if sort.is_some() && !self.supports_snapshot_cursor {
             return Err("Server-side table sorting is not available for this connection".into());
         }
@@ -781,6 +803,7 @@ impl LiveSession {
             executed_sql: None,
             load_elapsed: started.elapsed(),
             table: Some(table.clone()),
+            view_access,
         })
     }
 
@@ -799,7 +822,7 @@ impl LiveSession {
             return Err("WHERE filters need a SQL database".into());
         }
         let table = find_table(&self.tables, table)?;
-        let columns = self.table_columns(&table)?;
+        let (columns, view_access) = self.edit_columns(&table)?;
         let sort = match sort {
             Some(sort) => Some((
                 columns
@@ -826,6 +849,7 @@ impl LiveSession {
         }
         loaded.executed_sql = None;
         loaded.table = Some(table);
+        loaded.view_access = view_access;
         Ok(loaded)
     }
 
@@ -975,6 +999,33 @@ pub struct ServerInfo {
     pub details: Option<bookie_app_services::connection_details::ConnectionDetails>,
 }
 
+fn view_plan(
+    columns: Vec<ColumnInfo>,
+    editability: Result<Option<bookie_core::ViewEditability>, String>,
+) -> (Vec<ColumnInfo>, ViewAccess) {
+    use bookie_app_services::view_edit::{ViewEditRestriction, apply_view_editability};
+    let editability = match editability {
+        Ok(Some(editability)) => editability,
+        Ok(None) => return (columns, ViewAccess::Editable),
+        Err(_) => {
+            return (
+                columns,
+                ViewAccess::ReadOnly("its editability could not be read".into()),
+            );
+        }
+    };
+    let plan = apply_view_editability(columns, &editability);
+    let access = match plan.restriction {
+        None => ViewAccess::Editable,
+        Some(restriction @ ViewEditRestriction::InsertUnavailable) => ViewAccess::NoInsert(restriction.insert_reason()),
+        Some(ViewEditRestriction::NotUpdatable) => ViewAccess::ReadOnly("it is not automatically updatable".into()),
+        Some(ViewEditRestriction::KeyNotExposed) => {
+            ViewAccess::ReadOnly("it does not expose every primary-key column of its table".into())
+        }
+    };
+    (plan.columns, access)
+}
+
 pub struct LiveTable {
     session: Arc<LiveSession>,
     columns: Vec<ColumnMeta>,
@@ -985,6 +1036,7 @@ pub struct LiveTable {
     executed_sql: Option<String>,
     load_elapsed: Duration,
     table: Option<TableInfo>,
+    view_access: ViewAccess,
 }
 
 impl LiveTable {
@@ -1863,7 +1915,11 @@ impl ResultSource for LiveTable {
     }
 
     fn editable(&self) -> bool {
-        self.table.is_some() && self.session.writable.is_some()
+        self.table.is_some() && self.session.writable.is_some() && self.view_access.edit_refusal().is_none()
+    }
+
+    fn view_access(&self) -> Option<&ViewAccess> {
+        Some(&self.view_access)
     }
 
     fn is_partial(&self) -> bool {
