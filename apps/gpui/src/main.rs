@@ -160,6 +160,7 @@ struct GridView {
     tab_scroll: ScrollHandle,
     sql_input: Entity<EditorState>,
     sql_mark_revision: std::rc::Rc<editor::sql_editor_marks::SqlMarkRevision>,
+    pub(crate) sql_snippets: Option<Vec<bookie_app_services::snippets::Snippet>>,
     run_tabs: panel_state::RunTabs,
     check_histories: Vec<(String, bookie_app_services::checks::History)>,
     palette: palette_state::PaletteState,
@@ -533,7 +534,7 @@ impl GridView {
         let font_inputs = Self::init_font_inputs(&saved_fonts, cx);
 
         let (approval, host_key) = Self::install_prompts(cx);
-        GridView {
+        let view = GridView {
             table,
             _table_events: table_events,
             column_widths: bookie_app_services::column_widths::ColumnWidthStore::open(),
@@ -611,6 +612,7 @@ impl GridView {
             window_title_tab: None,
             tab_scroll: ScrollHandle::new(),
             scroll: UniformListScrollHandle::new(),
+            sql_snippets: cfg!(test).then(Vec::new),
             run_tabs: panel_state::RunTabs::new(runs::RunSlot::new(first_run(total), None)),
             viewport_rows: 10,
             dark_mode: Theme::current(cx).dark,
@@ -625,7 +627,11 @@ impl GridView {
             close_confirm: false,
             cancel_confirm: None,
             status: String::new(),
+        };
+        if !cfg!(test) {
+            GridView::load_sql_snippets(cx);
         }
+        view
     }
 
     fn install_prompts(cx: &mut Context<Self>) -> (approval_ui::ApprovalUi, host_key_ui::HostKeyUi) {

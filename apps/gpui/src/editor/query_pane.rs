@@ -233,7 +233,7 @@ impl GridView {
         } else {
             button.label("Tools")
         };
-        button.dropdown_menu(move |mut menu, _, _| {
+        button.dropdown_menu(move |mut menu, _, cx| {
             let explain = owner.clone();
             let format = owner.clone();
             let favorite = owner.clone();
@@ -268,7 +268,8 @@ impl GridView {
                     });
                 }),
             );
-            crate::sql_editor::snippet_menu(menu, &owner)
+            let snippets = owner.read_with(cx, |view, _| view.sql_snippets.clone()).ok().flatten();
+            crate::sql_editor::snippet_menu(menu, &owner, snippets)
         })
     }
 

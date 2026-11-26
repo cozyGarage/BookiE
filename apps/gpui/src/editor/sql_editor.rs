@@ -195,6 +195,20 @@ fn completion_item(rank: usize, candidate: Candidate, range: Range, types: &Hash
 }
 
 impl GridView {
+    pub(crate) fn load_sql_snippets(cx: &mut Context<Self>) {
+        cx.spawn(async move |this, cx| {
+            let snippets = cx
+                .background_executor()
+                .spawn(async move { read_saved_snippets() })
+                .await;
+            let _ = this.update(cx, |view, cx| {
+                view.sql_snippets = Some(snippets);
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
     pub(crate) fn set_sql_text(&mut self, text: impl Into<InputContent>, window: &mut Window, cx: &mut Context<Self>) {
         self.sql_input
             .update(cx, |editor, cx| editor.set_value(text, window, cx));
@@ -252,11 +266,16 @@ impl GridView {
 pub(crate) fn snippet_menu(
     mut menu: gpui_component::menu::PopupMenu,
     owner: &WeakEntity<GridView>,
+    snippets: Option<Vec<bookie_app_services::snippets::Snippet>>,
 ) -> gpui_component::menu::PopupMenu {
-    use bookie_app_services::snippets::{Snippet, SnippetStore};
+    use bookie_app_services::snippets::Snippet;
     use gpui_component::menu::PopupMenuItem;
-    let snippets = SnippetStore::open().map_or_else(Vec::new, |store| store.list());
+    let loading = snippets.is_none();
+    let snippets = snippets.unwrap_or_default();
     menu = menu.separator();
+    if loading {
+        menu = menu.item(PopupMenuItem::new("Loading saved snippets…").disabled(true));
+    }
     let examples = [
         ("SELECT template", "SELECT $0\nFROM "),
         (
@@ -278,9 +297,14 @@ pub(crate) fn snippet_menu(
     menu
 }
 
+fn read_saved_snippets() -> Vec<bookie_app_services::snippets::Snippet> {
+    bookie_app_services::snippets::SnippetStore::open().map_or_else(Vec::new, |store| store.list())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use gpui::TestAppContext;
 
     #[test]
     fn a_column_completion_carries_its_kind_type_owner_and_rank() {
@@ -324,5 +348,27 @@ mod tests {
         ] {
             assert_eq!(auto_suggest(&Rope::from(sql), sql.len()), expected, "{sql}");
         }
+    }
+
+    #[gpui::test]
+    fn saved_snippets_are_loaded_into_the_window(cx: &mut TestAppContext) {
+        let (view, cx) = crate::ui_tests::open(cx);
+        let store = bookie_app_services::snippets::SnippetStore::open();
+        assert!(store.is_some(), "the isolated snippet path should exist");
+        let Some(store) = store else { return };
+        let name = format!("background-load-{}", std::process::id());
+        assert!(store.save(&name, "SELECT $0").is_ok());
+        assert!(store.flush().is_ok());
+
+        cx.update(|_, cx| view.update(cx, |_, cx| GridView::load_sql_snippets(cx)));
+        cx.run_until_parked();
+
+        view.read_with(cx, |view, _| {
+            assert!(
+                view.sql_snippets
+                    .as_ref()
+                    .is_some_and(|snippets| snippets.iter().any(|snippet| snippet.name == name))
+            );
+        });
     }
 }
