@@ -319,62 +319,31 @@ impl GridView {
                 )),
             );
         };
-        let elapsed = transaction.started.elapsed().as_secs();
-        let warning = self.transaction_idle_warning();
-        let detail = format!(
-            "Transaction · {}:{:02} · {} run{}{}",
-            elapsed / 60,
-            elapsed % 60,
-            transaction.statements,
-            if transaction.statements == 1 { "" } else { "s" },
-            warning
-                .as_ref()
-                .map_or_else(String::new, |warning| format!(" · {warning}")),
-        );
         div()
             .flex()
+            .min_w_0()
             .items_center()
             .gap_2()
-            .child({
-                let color = if warning.is_some() {
-                    theme.destructive
-                } else {
-                    theme.warning
-                };
-                div()
-                    .id("transaction-badge")
-                    .debug_selector(|| "transaction-badge".into())
-                    .px_2()
-                    .rounded(px(theme.radius))
-                    .border_1()
-                    .border_color(rgb(color))
-                    .text_color(rgb(color))
-                    .tooltip({
-                        let detail = detail.clone();
-                        move |window, cx| gpui_component::tooltip::Tooltip::new(detail.clone()).build(window, cx)
-                    })
-                    .child(if compact {
-                        format!("Tx · {}:{:02}", elapsed / 60, elapsed % 60)
-                    } else {
-                        detail
-                    })
+            .child(self.transaction_badge(transaction, theme, compact))
+            .when(compact, |bar| bar.child(transaction_actions_menu(theme, cx)))
+            .when(!compact, |bar| {
+                bar.child(
+                    button(ButtonKind::Ghost, "commit-transaction", "Commit", theme).on_click(cx.listener(
+                        |this, _, _, cx| {
+                            this.end_transaction(true, cx);
+                            cx.notify();
+                        },
+                    )),
+                )
+                .child(
+                    button(ButtonKind::Ghost, "rollback-transaction", "Roll back", theme).on_click(cx.listener(
+                        |this, _, _, cx| {
+                            this.end_transaction(false, cx);
+                            cx.notify();
+                        },
+                    )),
+                )
             })
-            .child(
-                button(ButtonKind::Ghost, "commit-transaction", "Commit", theme).on_click(cx.listener(
-                    |this, _, _, cx| {
-                        this.end_transaction(true, cx);
-                        cx.notify();
-                    },
-                )),
-            )
-            .child(
-                button(ButtonKind::Ghost, "rollback-transaction", "Roll back", theme).on_click(cx.listener(
-                    |this, _, _, cx| {
-                        this.end_transaction(false, cx);
-                        cx.notify();
-                    },
-                )),
-            )
             .when(transaction.running, |bar| {
                 if transaction
                     .running_cancel
@@ -400,4 +369,79 @@ impl GridView {
                 }
             })
     }
+
+    fn transaction_badge(&self, transaction: &TransactionState, theme: Theme, compact: bool) -> Stateful<Div> {
+        let elapsed = transaction.started.elapsed().as_secs();
+        let warning = self.transaction_idle_warning();
+        let clock = format!("{}:{:02}", elapsed / 60, elapsed % 60);
+        let idle = if warning.is_some() { " · idle" } else { "" };
+        let detail = format!(
+            "Transaction · {clock} · {} run{}{}",
+            transaction.statements,
+            if transaction.statements == 1 { "" } else { "s" },
+            warning
+                .as_ref()
+                .map_or_else(String::new, |warning| format!(" · {warning}")),
+        );
+        let label = if compact {
+            format!("Tx · {clock}{idle}")
+        } else {
+            format!(
+                "Transaction · {clock} · {} run{}{idle}",
+                transaction.statements,
+                if transaction.statements == 1 { "" } else { "s" },
+            )
+        };
+        let color = if warning.is_some() {
+            theme.destructive
+        } else {
+            theme.warning
+        };
+        div()
+            .id("transaction-badge")
+            .debug_selector(|| "transaction-badge".into())
+            .px_2()
+            .min_w_0()
+            .whitespace_nowrap()
+            .overflow_hidden()
+            .text_ellipsis()
+            .rounded(px(theme.radius))
+            .border_1()
+            .border_color(rgb(color))
+            .text_color(rgb(color))
+            .tooltip(move |window, cx| gpui_component::tooltip::Tooltip::new(detail.clone()).build(window, cx))
+            .child(label)
+    }
+}
+
+fn transaction_actions_menu(theme: Theme, cx: &mut Context<GridView>) -> impl IntoElement {
+    use gpui_component::button::{Button, ButtonVariants as _};
+    use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
+    use gpui_kit::component::Sizable as _;
+    let owner = cx.entity().downgrade();
+    div().debug_selector(|| "transaction-actions".into()).child(
+        Button::new("transaction-actions")
+            .ghost()
+            .small()
+            .compact()
+            .tooltip("Commit or roll back the transaction")
+            .accessibility_label("Transaction actions")
+            .child(crate::assets::icon("chevron-down", theme.muted_foreground))
+            .dropdown_menu(move |menu, _, _| {
+                let commit_owner = owner.clone();
+                let rollback_owner = owner.clone();
+                menu.item(PopupMenuItem::new("Commit").on_click(move |_, _, cx| {
+                    let _ = commit_owner.update(cx, |view, cx| {
+                        view.end_transaction(true, cx);
+                        cx.notify();
+                    });
+                }))
+                .item(PopupMenuItem::new("Roll back").on_click(move |_, _, cx| {
+                    let _ = rollback_owner.update(cx, |view, cx| {
+                        view.end_transaction(false, cx);
+                        cx.notify();
+                    });
+                }))
+            }),
+    )
 }

@@ -41,9 +41,14 @@ fn compact_query_toolbar_keeps_transaction_controls_visible(cx: &mut TestAppCont
     let path = fixture_copy("compact-query-toolbar-transaction");
     let (view, cx) = saving_view(cx, &path);
     open_transaction(&view, cx, &path);
-    for (width, sidebar_open) in [(760.0, false), (900.0, true), (1500.0, true)] {
+    let cases = [(760.0, false), (760.0, true), (900.0, true), (1500.0, true)];
+    for ((width, sidebar_open), idle) in cases.into_iter().flat_map(|case| [(case, false), (case, true)]) {
         cx.update(|_, cx| {
             view.update(cx, |view, cx| {
+                if let Some(transaction) = view.transaction.as_mut() {
+                    let quiet = std::time::Duration::from_secs(if idle { 6 * 60 } else { 0 });
+                    transaction.last_activity = Instant::now() - quiet;
+                }
                 view.sidebar.open = sidebar_open;
                 view.panel.open = true;
                 cx.notify();
@@ -52,12 +57,19 @@ fn compact_query_toolbar_keeps_transaction_controls_visible(cx: &mut TestAppCont
         cx.simulate_resize(gpui::size(gpui::px(width), gpui::px(800.0)));
         cx.run_until_parked();
         let toolbar = cx.debug_bounds("query-editor-toolbar").expect("query toolbar is visible");
-        for id in ["commit-transaction", "rollback-transaction"] {
+        let actions: &[&str] = if width < crate::query_pane::COMPACT_QUERY_WIDTH {
+            &["transaction-badge", "transaction-actions"]
+        } else {
+            &["transaction-badge", "commit-transaction", "rollback-transaction"]
+        };
+        for &id in actions {
             let control = cx.debug_bounds(id).expect("transaction action remains visible");
             assert!(
                 control.origin.x >= toolbar.origin.x
-                    && control.origin.x + control.size.width <= toolbar.origin.x + toolbar.size.width,
-                "{id} at {width}px"
+                    && control.origin.x + control.size.width <= toolbar.origin.x + toolbar.size.width
+                    && control.origin.y >= toolbar.origin.y
+                    && control.origin.y + control.size.height <= toolbar.origin.y + toolbar.size.height,
+                "{id} at {width}px, sidebar open {sidebar_open}, idle {idle}: {control:?} in {toolbar:?}"
             );
         }
     }
