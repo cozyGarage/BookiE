@@ -17,10 +17,36 @@ use crate::model::{
     right_row, row_at, synthetic_columns,
 };
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ViewAccess {
+    Editable,
+    NoInsert(String),
+    ReadOnly(String),
+}
+
+impl ViewAccess {
+    pub fn edit_refusal(&self) -> Option<String> {
+        match self {
+            Self::ReadOnly(reason) => Some(format!("This view cannot be edited: {reason}")),
+            Self::Editable | Self::NoInsert(_) => None,
+        }
+    }
+
+    pub fn insert_refusal(&self) -> Option<String> {
+        match self {
+            Self::NoInsert(reason) => Some(reason.clone()),
+            Self::Editable | Self::ReadOnly(_) => self.edit_refusal(),
+        }
+    }
+}
+
 pub trait ResultSource: Send + Sync + 'static {
     fn columns(&self) -> &[ColumnMeta];
     fn editable(&self) -> bool {
         false
+    }
+    fn view_access(&self) -> Option<&ViewAccess> {
+        None
     }
     fn origin(&self) -> String {
         "Synthetic data · no database connection".into()
