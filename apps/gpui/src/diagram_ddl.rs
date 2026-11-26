@@ -12,14 +12,32 @@ pub(crate) struct DiagramDdl {
     table: Option<TableInfo>,
     schema: Entity<TextInput>,
     name: Entity<TextInput>,
-    columns: Vec<(Entity<TextInput>, Entity<TextInput>)>,
+    columns: Vec<DraftFields>,
 }
 
-fn new_column(cx: &mut Context<GridView>) -> (Entity<TextInput>, Entity<TextInput>) {
-    (
-        cx.new(|cx| TextInput::new("Column name", cx)),
-        cx.new(|cx| TextInput::new("SQL data type", cx)),
-    )
+struct DraftFields {
+    name: Entity<TextInput>,
+    data_type: Entity<TextInput>,
+    nullable: bool,
+    primary_key: bool,
+}
+
+impl DraftFields {
+    fn new(cx: &mut Context<GridView>) -> Self {
+        Self {
+            name: cx.new(|cx| TextInput::new("Column name", cx)),
+            data_type: cx.new(|cx| TextInput::new("SQL data type", cx)),
+            nullable: true,
+            primary_key: false,
+        }
+    }
+
+    fn column(&self, cx: &App) -> DraftColumn {
+        let mut column = column(self.name.read(cx).content(), self.data_type.read(cx).content());
+        column.primary_key = self.primary_key;
+        column.nullable = self.nullable && !self.primary_key;
+        column
+    }
 }
 
 fn column(name: &str, data_type: &str) -> DraftColumn {
@@ -75,10 +93,9 @@ impl GridView {
     pub(crate) fn diagram_can_draft(&self) -> bool {
         self.live.as_ref().is_some_and(|live| {
             live.writable.is_some()
-                && matches!(
-                    live.driver_id.as_str(),
-                    "postgres" | "sqlite" | "mysql" | "mssql" | "duckdb"
-                )
+                && drivers_registry::default_registry()
+                    .get(&live.driver_id)
+                    .is_some_and(|driver| driver.capabilities().ddl_is_transactional)
         }) && !self.transaction_open()
             && !self.save.busy
             && self.save.pending.is_none()
@@ -95,8 +112,8 @@ impl GridView {
             input
         });
         let name = cx.new(|cx| TextInput::new("Table name", cx));
-        let columns = vec![new_column(cx)];
-        let field = if table.is_some() { &columns[0].0 } else { &name };
+        let columns = vec![DraftFields::new(cx)];
+        let field = if table.is_some() { &columns[0].name } else { &name };
         window.focus(&field.read(cx).focus_handle(cx), cx);
         self.search.diagram.relationship = None;
         self.search.diagram.ddl = Some(DiagramDdl {
@@ -128,11 +145,7 @@ impl GridView {
             cx.notify();
             return;
         }
-        let columns = draft
-            .columns
-            .iter()
-            .map(|(name, data_type)| column(name.read(cx).content(), data_type.read(cx).content()))
-            .collect();
+        let columns = draft.columns.iter().map(|fields| fields.column(cx)).collect();
         let plan = match plan_ddl(&live.driver_id, &table, columns, create) {
             Ok(plan) => plan,
             Err(message) => {
@@ -192,14 +205,20 @@ impl GridView {
                     )
                 }))
                 .child(div().id("diagram-ddl-columns").overflow_y_scroll().min_h_0().children(
-                    draft.columns.iter().enumerate().map(|(index, (name, data_type))| {
+                    draft.columns.iter().enumerate().map(|(index, fields)| {
                         div()
                             .flex()
                             .items_center()
                             .gap_1()
                             .py_1()
-                            .child(div().flex_1().min_w_0().child(name.clone()))
-                            .child(div().flex_1().min_w_0().child(data_type.clone()))
+                            .child(div().flex_1().min_w_0().child(fields.name.clone()))
+                            .child(div().flex_1().min_w_0().child(fields.data_type.clone()))
+                            .children(
+                                draft
+                                    .table
+                                    .is_none()
+                                    .then(|| self.diagram_column_constraints(index, fields, theme, cx)),
+                            )
                             .children((draft.columns.len() > 1).then(|| {
                                 compact_button(ButtonKind::Ghost, ("remove-draft-column", index), "Remove", theme)
                                     .on_click(cx.listener(move |this, _, _, cx| {
@@ -218,6 +237,63 @@ impl GridView {
         )
     }
 
+    fn diagram_column_constraints(
+        &self,
+        index: usize,
+        fields: &DraftFields,
+        theme: Theme,
+        cx: &mut Context<Self>,
+    ) -> Div {
+        div()
+            .flex()
+            .gap_1()
+            .items_center()
+            .child(
+                compact_button(
+                    if fields.primary_key {
+                        ButtonKind::Primary
+                    } else {
+                        ButtonKind::Ghost
+                    },
+                    ("diagram-draft-primary-key", index),
+                    "Primary key",
+                    theme,
+                )
+                .on_click(cx.listener(move |view, _, _, cx| {
+                    if let Some(fields) = view
+                        .search
+                        .diagram
+                        .ddl
+                        .as_mut()
+                        .and_then(|draft| draft.columns.get_mut(index))
+                    {
+                        fields.primary_key = !fields.primary_key;
+                        cx.notify();
+                    }
+                })),
+            )
+            .children((!fields.primary_key).then(|| {
+                compact_button(
+                    ButtonKind::Ghost,
+                    ("diagram-draft-nullable", index),
+                    if fields.nullable { "Nullable" } else { "Not null" },
+                    theme,
+                )
+                .on_click(cx.listener(move |view, _, _, cx| {
+                    if let Some(fields) = view
+                        .search
+                        .diagram
+                        .ddl
+                        .as_mut()
+                        .and_then(|draft| draft.columns.get_mut(index))
+                    {
+                        fields.nullable = !fields.nullable;
+                        cx.notify();
+                    }
+                }))
+            }))
+    }
+
     fn diagram_ddl_controls(&self, draft: &DiagramDdl, theme: Theme, cx: &mut Context<Self>) -> Div {
         div()
             .flex()
@@ -229,8 +305,8 @@ impl GridView {
                         if let Some(draft) = &mut this.search.diagram.ddl
                             && draft.columns.len() < MAX_DRAFT_COLUMNS
                         {
-                            let fields = new_column(cx);
-                            window.focus(&fields.0.read(cx).focus_handle(cx), cx);
+                            let fields = DraftFields::new(cx);
+                            window.focus(&fields.name.read(cx).focus_handle(cx), cx);
                             draft.columns.push(fields);
                             cx.notify();
                         }
@@ -272,9 +348,11 @@ mod tests {
                 let draft = view.search.diagram.ddl.as_ref().expect("draft");
                 draft.name.update(cx, |input, cx| input.set_content("draft table", cx));
                 draft.columns[0]
-                    .0
+                    .name
                     .update(cx, |input, cx| input.set_content("entry", cx));
-                draft.columns[0].1.update(cx, |input, cx| input.set_content("text", cx));
+                draft.columns[0]
+                    .data_type
+                    .update(cx, |input, cx| input.set_content("text", cx));
                 view.review_diagram_ddl(cx);
             })
         });

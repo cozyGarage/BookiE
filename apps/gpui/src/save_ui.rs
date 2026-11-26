@@ -41,7 +41,7 @@ pub(crate) struct SaveState {
     pub generation: u64,
     pub banner: Option<(String, bool)>,
     pub banner_serial: u64,
-    refresh_diagram: bool,
+    refresh_diagram: Option<Option<String>>,
     pub reconnect_after: Option<bookie_core::TableInfo>,
     pub checks: Vec<CellCheck>,
 }
@@ -424,7 +424,13 @@ impl GridView {
         let approvals = self.approval.tx.clone();
         let opened_with = live.stamp.clone();
         let done = pending.done;
-        self.save.refresh_diagram = pending.diagram.is_some();
+        self.save.refresh_diagram = pending.diagram.as_ref().map(|(_, columns)| {
+            if columns.is_none() {
+                pending.table.schema.clone()
+            } else {
+                self.search.diagram.scope.clone()
+            }
+        });
         let diagram_columns = pending.diagram.and_then(|(_, columns)| columns);
         let table = pending.table;
         let relationship = pending.relationship;
@@ -484,11 +490,11 @@ impl GridView {
         reconnect: Option<bookie_core::TableInfo>,
         cx: &mut Context<Self>,
     ) {
-        if std::mem::take(&mut self.save.refresh_diagram) {
+        if let Some(scope) = self.save.refresh_diagram.take() {
             self.status = text;
             self.search.diagram.ddl = None;
             if matches!(self.tabs.current(), Tab::Diagram) {
-                self.open_schema_diagram(cx);
+                self.load_schema_diagram(scope, cx);
             } else {
                 self.reset_diagram();
             }
@@ -517,7 +523,7 @@ impl GridView {
             Err(message) => {
                 self.save.busy = false;
                 self.save.checks.clear();
-                self.save.refresh_diagram = false;
+                self.save.refresh_diagram = None;
                 self.status = format!("Could not open a connection for saving: {message}");
                 self.show_banner(self.status.clone(), true, cx);
                 return;
@@ -547,7 +553,7 @@ impl GridView {
             Err(failure) => {
                 self.save.busy = false;
                 self.save.checks.clear();
-                self.save.refresh_diagram = false;
+                self.save.refresh_diagram = None;
                 self.status = format!("Could not save: {}", with_resolve_hint(&failure.message));
                 self.show_banner(self.status.clone(), true, cx);
             }
