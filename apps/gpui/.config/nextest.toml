@@ -1,0 +1,26 @@
+nextest-version = { required = "0.9.148" }
+
+[test-groups]
+sqlite-live = { max-threads = 4 }
+
+[profile.default]
+fail-fast = false
+retries = 0
+slow-timeout = { period = "30s", terminate-after = 4 }
+
+[[profile.default.overrides]]
+filter = 'test(/(^|::)(live|live_ui|save_ui|transaction_ui|chart_ui|row_inspector|paste_literal_save|table_menu|server_filter_ui|data_compare_ui|drafts_ui|copy|choice_edit|grid_pin|query_pane_ui|status_bar)_tests::/) | test(/(^|::)(live|chart_ui|data_compare_ui|(diagram_)?ddl|(diagram_)?relationship)::tests::/)'
+test-group = "sqlite-live"
+
+[profile.ci]
+fail-fast = false
+retries = 0
+status-level = "fail"
+final-status-level = "flaky"
+
+[[profile.ci.overrides]]
+filter = 'test(/(^|::)(live|live_ui|save_ui|transaction_ui)_tests::/) | test(/(^|::)live::tests::/)'
+retries = { backoff = "fixed", count = 2, delay = "1s" }
+
+[profile.ci.junit]
+path = "junit.xml"

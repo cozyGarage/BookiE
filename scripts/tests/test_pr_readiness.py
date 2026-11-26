@@ -173,6 +173,94 @@ class PullRequestReadinessTests(unittest.TestCase):
         self.assertEqual(result["state"], "passed")
         self.assertEqual(result["passed"], ["pr-title", "harness"])
 
+    def test_a_successful_forgejo_gate_status_satisfies_the_regression_gate(self):
+        status = {"context": "Forgejo regression gate", "state": "success", "created_at": "2026-01-01T00:00:00Z", "id": 1}
+
+        result = readiness.evaluate_checks(["Linux regression gate"], [], [status])
+
+        self.assertEqual(result["state"], "passed")
+        self.assertEqual(result["passed"], ["Linux regression gate"])
+
+    def test_a_forgejo_gate_status_does_not_satisfy_other_checks(self):
+        status = {"context": "Forgejo regression gate", "state": "success", "id": 1}
+
+        result = readiness.evaluate_checks(["pr-title"], [], [status])
+
+        self.assertEqual(result["state"], "waiting")
+        self.assertEqual(result["waiting"], ["pr-title: missing"])
+
+    def test_a_non_successful_or_superseded_forgejo_status_falls_back_to_the_github_check(self):
+        cases = {
+            "failure": [{"context": "Forgejo regression gate", "state": "failure", "id": 1}],
+            "pending": [{"context": "Forgejo regression gate", "state": "pending", "id": 1}],
+            "error": [{"context": "Forgejo regression gate", "state": "error", "id": 1}],
+            "other context": [{"context": "Forgejo gate", "state": "success", "id": 1}],
+            "newer failure": [
+                {"context": "Forgejo regression gate", "state": "success", "created_at": "2026-01-01T00:00:00Z", "id": 1},
+                {"context": "Forgejo regression gate", "state": "failure", "created_at": "2026-01-01T00:01:00Z", "id": 2},
+            ],
+            "posted by a workflow": [
+                {
+                    "context": "Forgejo regression gate",
+                    "state": "success",
+                    "id": 1,
+                    "creator": {"login": "github-actions[bot]"},
+                }
+            ],
+        }
+        for case, statuses in cases.items():
+            with self.subTest(case=case):
+                result = readiness.evaluate_checks(["Linux regression gate"], [], statuses)
+
+                self.assertEqual(result["state"], "waiting")
+                self.assertEqual(result["waiting"], ["Linux regression gate: missing"])
+
+        failed = [{"name": "Linux regression gate", "status": "completed", "conclusion": "failure", "id": 3}]
+        result = readiness.evaluate_checks(["Linux regression gate"], failed, cases["failure"])
+        self.assertEqual(result["state"], "failed")
+
+    def test_wait_for_checks_reads_exact_head_statuses_when_the_regression_gate_applies(self):
+        head = "a" * 40
+        required = readiness.required_contexts(["crates/core/src/query.rs"])
+
+        class Client:
+            status_reads = []
+
+            def pull_request_paths(self, _pull_number):
+                return ["crates/core/src/query.rs"]
+
+            def check_runs_for_pull_request(self, _pull_number, _head_sha):
+                return [
+                    {"name": name, "status": "completed", "conclusion": "success", "id": index}
+                    for index, name in enumerate(required, start=1)
+                    if name != "Linux regression gate"
+                ]
+
+            def commit_statuses(self, head_sha):
+                self.status_reads.append(head_sha)
+                return [{"context": "Forgejo regression gate", "state": "success", "id": 1}]
+
+        client = Client()
+        result = readiness.wait_for_checks(client, 7, head, monotonic=lambda: 0)
+
+        self.assertEqual(result, 0)
+        self.assertEqual(client.status_reads, [head])
+
+    def test_commit_statuses_read_the_exact_head(self):
+        class Api(readiness.GitHubApi):
+            def __init__(self):
+                super().__init__("cozyGarage/BookiE", "token", "https://api.github.com")
+                self.paths = []
+
+            def pages(self, path, key=None):
+                self.paths.append((path, key))
+                return []
+
+        api = Api()
+        api.commit_statuses("a" * 40)
+
+        self.assertEqual(api.paths, [(f"/repos/cozyGarage/BookiE/commits/{'a' * 40}/statuses", None)])
+
     def test_a_transient_github_api_error_retries_before_reporting_readiness(self):
         class Client:
             attempts = 0
@@ -450,6 +538,7 @@ class PullRequestReadinessTests(unittest.TestCase):
         self.assertIn("  checks: read", workflow)
         self.assertIn("  contents: read", workflow)
         self.assertIn("  pull-requests: read", workflow)
+        self.assertIn("  statuses: read", workflow)
         self.assertNotIn("contents: write", workflow)
 
     def test_rerun_workflow_uses_trusted_code_and_scoped_check_write_permission(self):
@@ -461,11 +550,29 @@ class PullRequestReadinessTests(unittest.TestCase):
         self.assertIn("- Build Linux", workflow)
         self.assertIn("- Linux Security", workflow)
         self.assertIn("- Linux CI contracts", workflow)
+        self.assertIn("- GPUI macOS build", workflow)
+        self.assertNotIn("- Release note", workflow)
+        self.assertIn("      statuses: read", workflow)
         self.assertIn("types: [completed]", workflow)
         self.assertIn("ref: ${{ github.sha }}", checkout)
         self.assertIn("permissions: {}", workflow)
         self.assertIn("      checks: write", workflow)
         self.assertNotIn("contents: write", workflow)
+
+    def test_rerun_workflow_only_follows_workflows_that_exist(self):
+        workflow = (ROOT / ".github/workflows/linux-pr-readiness-rerun.yml").read_text()
+        listed = workflow.split("workflows:\n", 1)[1].split("    types:", 1)[0]
+        followed = [line.strip()[2:] for line in listed.splitlines() if line.strip().startswith("- ")]
+        names = set()
+        for path in (ROOT / ".github/workflows").glob("*.yml"):
+            first = path.read_text().splitlines()[0]
+            if first.startswith("name: "):
+                names.add(first[len("name: "):].strip())
+
+        self.assertTrue(followed)
+        for name in followed:
+            with self.subTest(name=name):
+                self.assertIn(name, names)
 
     def test_workflow_run_recheck_publishes_a_check_on_the_exact_pull_request_head(self):
         class Api(readiness.GitHubApi):

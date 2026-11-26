@@ -5,6 +5,7 @@ use std::sync::{
 use std::time::Duration;
 
 use async_trait::async_trait;
+use bookie_core::sql_dialect::qualified_table;
 use bookie_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverMaturity, ExecResult, MAX_QUERY_ROWS,
     OperationControl, QueryResult, QueryResultBudget, QueryRows, TableInfo, TlsMode, Transport, Value,
@@ -449,7 +450,7 @@ impl Connection for OracleConnection {
     ) -> Result<QueryResult, DriverError> {
         let sql = format!(
             "SELECT * FROM {} OFFSET {offset} ROWS FETCH NEXT {limit} ROWS ONLY",
-            guard::qualified(schema, table)
+            qualified_table("oracle", schema, table)
         );
         let bound = usize::try_from(limit).unwrap_or(MAX_QUERY_ROWS);
         self.read_query(&sql, Vec::new(), bound).await
@@ -465,7 +466,7 @@ impl Connection for OracleConnection {
     ) -> Result<QueryResult, DriverError> {
         let sql = format!(
             "SELECT * FROM {} OFFSET {offset} ROWS FETCH NEXT {limit} ROWS ONLY",
-            guard::qualified(schema, table)
+            qualified_table("oracle", schema, table)
         );
         let bound = usize::try_from(limit).unwrap_or(MAX_QUERY_ROWS);
         self.read_query_with_control(&sql, Vec::new(), bound, Some(control))

@@ -94,16 +94,26 @@ else:
         run = dict(data['run'], status=status)
     print(json.dumps({'workflow_runs': [run]}))
 """
+GH = """import json, os, sys
+with open(os.environ['GATE_TEST_GH_FILE'], 'a') as stream:
+    stream.write(json.dumps(sys.argv[1:]) + '\\n')
+if sys.argv[1:3] == ['auth', 'status']:
+    raise SystemExit(int(os.environ.get('GATE_TEST_GH_AUTH', '0')))
+if sys.argv[1:2] == ['api']:
+    raise SystemExit(int(os.environ.get('GATE_TEST_GH_API', '0')))
+raise SystemExit(92)
+"""
 
 
 def gate(tasks, initial_status='failure', dispatch_capture=None, target='subject', remote_sha=None,
          timeout_minutes='1', main_push_runs=None, stale_runs=None, cancel_capture=None,
-         terminal_status=None):
+         terminal_status=None, gh_calls=None, gh_env=None):
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         tools = root / 'bin'
         tools.mkdir()
-        for name, source in [('git', GIT), ('curl', f'#!{sys.executable}\n' + CURL), ('sleep', '#!/bin/sh\nexit 0\n')]:
+        for name, source in [('git', GIT), ('curl', f'#!{sys.executable}\n' + CURL), ('sleep', '#!/bin/sh\nexit 0\n'),
+                             ('gh', f'#!{sys.executable}\n' + GH)]:
             path = tools / name
             path.write_text(source)
             path.chmod(0o755)
@@ -124,7 +134,9 @@ def gate(tasks, initial_status='failure', dispatch_capture=None, target='subject
                    GATE_TEST_DISPATCH_FILE=str(root / 'dispatch.json'),
                    GATE_TEST_CANCEL_FILE=str(root / 'cancelled.txt'),
                    FORGEJO_GATE_LOCK=str(root / 'gate.lock'), FORGEJO_GATE_LOCK_DIR=str(root / 'locks'),
-                   FORGEJO_GATE_TIMEOUT_MINUTES=timeout_minutes)
+                   FORGEJO_GATE_TIMEOUT_MINUTES=timeout_minutes, FORGEJO_GATE_GITHUB_REPO='cozyGarage/BookiE',
+                   GATE_TEST_GH_FILE=str(root / 'gh.jsonl'))
+        env.update(gh_env or {})
         if remote_sha is not None:
             env['GATE_TEST_REMOTE_SHA'] = remote_sha
         result = subprocess.run(['bash', str(ROOT / 'scripts/forgejo-gate.sh'), 'subject', target],
@@ -135,6 +147,8 @@ def gate(tasks, initial_status='failure', dispatch_capture=None, target='subject
             dispatch_capture['dispatched'] = (root / 'dispatch.json').exists()
         if cancel_capture is not None and (root / 'cancelled.txt').exists():
             cancel_capture.extend((root / 'cancelled.txt').read_text().split())
+        if gh_calls is not None and (root / 'gh.jsonl').exists():
+            gh_calls.extend(json.loads(line) for line in (root / 'gh.jsonl').read_text().splitlines())
         return result
 
 
@@ -266,6 +280,42 @@ class ForgejoGateTests(unittest.TestCase):
         self.assertIn('cancelled cancelled-job (job 101)', result.stdout)
         self.assertNotIn('job logs requested for nonfailure job', result.stdout + result.stderr)
 
+    def test_a_passed_gate_posts_a_success_status_for_the_exact_revision_to_github(self):
+        calls = []
+        result = gate([], initial_status='success', gh_calls=calls)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        post = next(call for call in calls if call[0] == 'api')
+        self.assertIn(f'repos/cozyGarage/BookiE/statuses/{HEAD}', post)
+        self.assertIn('state=success', post)
+        self.assertIn('context=Forgejo regression gate', post)
+        self.assertIn('target_url=https://example.invalid/fixture/repo/actions/runs/928', post)
+
+    def test_a_failed_gate_posts_a_failure_status_to_github(self):
+        calls = []
+        result = gate([{'id': 101, 'status': 'failure', 'name': 'driver'}], terminal_status='failure',
+                      gh_calls=calls)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        post = next(call for call in calls if call[0] == 'api')
+        self.assertIn('state=failure', post)
+        self.assertIn('context=Forgejo regression gate', post)
+
+    def test_github_status_problems_never_change_the_gate_result(self):
+        for name, gh_env in {'signed out': {'GATE_TEST_GH_AUTH': '1'}, 'post fails': {'GATE_TEST_GH_API': '1'}}.items():
+            with self.subTest(name):
+                calls = []
+                result = gate([], initial_status='success', gh_calls=calls, gh_env=gh_env)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn('passed for ' + HEAD, result.stdout)
+                self.assertIn('warning:', result.stderr)
+                if name == 'signed out':
+                    self.assertFalse(any(call[0] == 'api' for call in calls))
+
+    def test_an_empty_github_repository_disables_status_posting(self):
+        calls = []
+        result = gate([], initial_status='success', gh_calls=calls, gh_env={'FORGEJO_GATE_GITHUB_REPO': ''})
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(calls, [])
+
     def test_at_most_two_gates_run_at_once_on_this_host(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -289,7 +339,7 @@ class ForgejoGateTests(unittest.TestCase):
                            GATE_TEST_HEAD=HEAD, GATE_TEST_FIXTURE=str(fixture), FORGEJO_TOKEN_FILE=str(token),
                            GATE_TEST_DISPATCH_FILE=str(run_root / 'dispatch.json'),
                            FORGEJO_GATE_LOCK=str(run_root / 'gate.lock'), FORGEJO_GATE_LOCK_DIR=str(lock_dir),
-                           FORGEJO_GATE_TIMEOUT_MINUTES='1', GATE_TEST_ACTIVE_FILE=str(active), GATE_TEST_CURL_DELAY='0.2')
+                           FORGEJO_GATE_TIMEOUT_MINUTES='1', FORGEJO_GATE_GITHUB_REPO='', GATE_TEST_ACTIVE_FILE=str(active), GATE_TEST_CURL_DELAY='0.2')
                 processes.append(subprocess.Popen(['bash', str(ROOT / 'scripts/forgejo-gate.sh'), 'subject'],
                                                   cwd=run_root, env=env, stdout=subprocess.PIPE,
                                                   stderr=subprocess.PIPE, text=True))
@@ -328,7 +378,7 @@ class ForgejoGateTests(unittest.TestCase):
                        GATE_TEST_HEAD=HEAD, GATE_TEST_FIXTURE=str(fixture), FORGEJO_TOKEN_FILE=str(token),
                        GATE_TEST_DISPATCH_FILE=str(run_root / 'dispatch.json'),
                        FORGEJO_GATE_LOCK=str(run_root / 'gate.lock'), FORGEJO_GATE_LOCK_DIR=str(lock_dir),
-                       FORGEJO_GATE_TIMEOUT_MINUTES='1')
+                       FORGEJO_GATE_TIMEOUT_MINUTES='1', FORGEJO_GATE_GITHUB_REPO='')
             process = subprocess.Popen(
                 ['bash', str(ROOT / 'scripts/forgejo-gate.sh'), 'subject'],
                 cwd=run_root, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,

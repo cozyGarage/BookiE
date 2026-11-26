@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use async_trait::async_trait;
+use bookie_core::sql_dialect::qualified_table;
 use bookie_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverMaturity, ExecResult, MAX_QUERY_ROWS,
     QueryResult, QueryResultBudget, QueryRows, TableInfo, TlsMode, Transport, Value,
@@ -242,7 +243,7 @@ impl Connection for CassandraConnection {
         }
         let skip = usize::try_from(offset).unwrap_or(usize::MAX);
         let take = usize::try_from(limit).unwrap_or(MAX_QUERY_ROWS);
-        let target = guard::qualified(schema.or(self.keyspace.as_deref()), table);
+        let target = qualified_table("cassandra", schema.or(self.keyspace.as_deref()), table);
         let cql = format!("SELECT * FROM {target} LIMIT {}", skip.saturating_add(take));
         self.read_window(&cql, skip, take).await
     }

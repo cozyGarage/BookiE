@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use bookie_core::sql_dialect::qualified_table;
 use bookie_core::{DriverError, Value, ViewEditability};
 
 use crate::{MssqlConnection, as_text, text_param};
@@ -185,7 +186,7 @@ async fn describe_view(
     schema: &str,
     view: &str,
 ) -> Result<Vec<Origin>, DriverError> {
-    let source_query = format!("SELECT * FROM {}.{}", quote_identifier(schema), quote_identifier(view));
+    let source_query = format!("SELECT * FROM {}", qualified_table("mssql", Some(schema), view));
     let result = connection
         .query_result(
             client,
@@ -272,10 +273,6 @@ struct Origin {
 
 fn is_true(value: Option<&Value>) -> bool {
     matches!(value, Some(Value::Bool(true) | Value::Int(1)))
-}
-
-fn quote_identifier(identifier: &str) -> String {
-    format!("[{}]", identifier.replace(']', "]]"))
 }
 
 #[cfg(test)]

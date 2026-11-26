@@ -1,4 +1,4 @@
-use bookie_core::sql_dialect::{IdentError, build_order_and_pagination, quote_ident, validate_ident};
+use bookie_core::sql_dialect::{IdentError, build_order_and_pagination, qualified_table, quote_ident, validate_ident};
 use bookie_core::{ColumnInfo, FilterValueKind, Value, filter_value_kind, search_clause};
 use thiserror::Error;
 
@@ -139,7 +139,7 @@ fn build_plan(
     let statement = format!(
         "SELECT {} FROM {} WHERE {}{}",
         select.join(", "),
-        qualified_table(driver_id, table),
+        qualified_table(driver_id, table.target.schema.as_deref(), &table.target.name),
         conditions.join(" OR "),
         build_order_and_pagination(driver_id, None, MAX_HITS_PER_TABLE + 1, 0)
     );
@@ -150,13 +150,5 @@ fn build_plan(
         searched: candidates.iter().map(|column| column.name.clone()).collect(),
         display: display.iter().map(|column| column.name.clone()).collect(),
         columns_not_searched: unsearched,
-    }
-}
-
-fn qualified_table(driver_id: &str, table: &SearchTable) -> String {
-    let name = quote_ident(driver_id, &table.target.name);
-    match &table.target.schema {
-        Some(schema) => format!("{}.{name}", quote_ident(driver_id, schema)),
-        None => name,
     }
 }
