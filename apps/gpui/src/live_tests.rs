@@ -606,3 +606,30 @@ fn reading_a_tables_columns_does_not_supersede_the_running_request() {
         "a structure read must not move the epoch either"
     );
 }
+
+#[test]
+fn completion_reuses_columns_it_has_read_until_they_are_forgotten() {
+    let Origin::File(source) = fixture() else {
+        panic!("the fixture is a file")
+    };
+    let path = std::env::temp_dir().join(format!("bookie-gpui-column-cache-{}.sqlite", uuid::Uuid::new_v4()));
+    std::fs::copy(source, &path).unwrap();
+    let file = FixtureFile(path);
+    let live = LiveSession::open(&Origin::File(file.0.clone())).unwrap();
+    let table = live.tables[0].clone();
+    assert!(live.cached_columns(&table).is_none());
+
+    let first = live.completion_columns(&table).expect("columns are read");
+    assert_eq!(live.cached_columns(&table), Some(first.clone()), "the read is kept");
+    assert_eq!(
+        live.completion_columns(&table).unwrap(),
+        first,
+        "the next completion reuses it"
+    );
+
+    live.forget_columns();
+    assert!(
+        live.cached_columns(&table).is_none(),
+        "a refresh or a save forgets cached columns"
+    );
+}

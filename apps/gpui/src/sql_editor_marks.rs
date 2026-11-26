@@ -5,7 +5,7 @@ use bookie_app_services::result_editability::grammar_for_driver;
 use bookie_core::sql_syntax::{SqlGrammar, script::ScriptTokenKind};
 use bookie_gpui::theme::size::GUTTER_MARKER_WIDTH;
 use gpui::{Context, Entity, px};
-use gpui_component::input::{EditorState, GutterDecoration, RangeDecoration};
+use gpui_component::input::{EditorState, GutterDecoration, InputEvent, RangeDecoration};
 
 use crate::GridView;
 
@@ -21,23 +21,38 @@ impl GridView {
                 editor.create_range_decorations_collection(Vec::new(), cx),
             )
         });
+        let edits = std::rc::Rc::new(std::cell::Cell::new(0_u64));
+        let counted = edits.clone();
+        cx.subscribe(input, move |_, _, event: &InputEvent, _| {
+            if matches!(event, InputEvent::Change) {
+                counted.set(counted.get().wrapping_add(1));
+            }
+        })
+        .detach();
         let mut last = None;
         cx.observe(input, move |view, input, cx| {
             let editor = input.read(cx);
             let driver = view.live.as_ref().map_or("postgres", |session| &session.driver_id);
-            let text = (editor.text().len() <= MARK_DOCUMENT_BYTES).then(|| editor.value());
-            let key = (text, editor.cursor(), editor.selected_range(), driver.to_owned());
+            let length = editor.text().len();
+            let key = (
+                edits.get(),
+                length,
+                editor.cursor(),
+                editor.selected_range(),
+                driver.to_owned(),
+            );
             if last.as_ref() == Some(&key) {
                 return;
             }
-            let (marks, decorations) = if let Some(text) = key.0.as_ref() {
-                let marks = crate::run_cursor_ui::run_source_range(text, driver, key.1, key.2.clone())
+            let text = (length <= MARK_DOCUMENT_BYTES).then(|| editor.value());
+            let (marks, decorations) = if let Some(text) = text.as_ref() {
+                let marks = crate::run_cursor_ui::run_source_range(text, driver, key.2, key.3.clone())
                     .map(GutterDecoration::new)
                     .into_iter()
                     .collect();
                 let decorations = grammar_for_driver(driver)
                     .into_iter()
-                    .flat_map(|grammar| matching_ranges(text, key.1, &key.2, grammar))
+                    .flat_map(|grammar| matching_ranges(text, key.2, &key.3, grammar))
                     .map(RangeDecoration::new)
                     .collect();
                 (marks, decorations)

@@ -113,7 +113,12 @@ pub struct LiveSession {
     pub writable: Option<uuid::Uuid>,
     pub stamp: Option<String>,
     supports_snapshot_cursor: bool,
+    column_cache: std::sync::Mutex<ColumnCache>,
 }
+
+type ColumnCache = std::collections::HashMap<(Option<String>, String), (std::time::Instant, Vec<ColumnInfo>)>;
+
+const COLUMN_CACHE_TTL: Duration = Duration::from_secs(30);
 
 impl LiveSession {
     pub fn cache_identity(&self) -> String {
@@ -160,6 +165,7 @@ impl LiveSession {
             sessions,
             session_id: opened.session_id,
             epoch: AtomicU64::new(0),
+            column_cache: std::sync::Mutex::new(ColumnCache::new()),
             label: opened.label,
             tables: opened.tables,
             saved,
@@ -210,6 +216,7 @@ impl LiveSession {
             sessions,
             session_id: self.session_id,
             epoch: AtomicU64::new(0),
+            column_cache: std::sync::Mutex::new(ColumnCache::new()),
             driver_id: driver_id.to_string(),
             label: self.label.clone(),
             tables: self.tables.clone(),
@@ -416,7 +423,31 @@ impl LiveSession {
     }
 
     pub fn completion_columns(&self, table: &TableInfo) -> Result<Vec<ColumnInfo>, String> {
+        if let Some(columns) = self.cached_columns(table) {
+            return Ok(columns);
+        }
         self.read_columns(table, true, Duration::from_secs(1))
+    }
+
+    pub fn cached_columns(&self, table: &TableInfo) -> Option<Vec<ColumnInfo>> {
+        let cache = self.column_cache.lock().ok()?;
+        let (read_at, columns) = cache.get(&(table.schema.clone(), table.name.clone()))?;
+        (read_at.elapsed() < COLUMN_CACHE_TTL).then(|| columns.clone())
+    }
+
+    pub fn forget_columns(&self) {
+        if let Ok(mut cache) = self.column_cache.lock() {
+            cache.clear();
+        }
+    }
+
+    fn remember_columns(&self, table: &TableInfo, columns: &[ColumnInfo]) {
+        if let Ok(mut cache) = self.column_cache.lock() {
+            cache.insert(
+                (table.schema.clone(), table.name.clone()),
+                (std::time::Instant::now(), columns.to_vec()),
+            );
+        }
     }
 
     pub fn diagram_columns(&self, table: &TableInfo) -> Result<Vec<ColumnInfo>, String> {
@@ -446,7 +477,9 @@ impl LiveSession {
         let Event::ColumnsRead { outcome, .. } = event else {
             return Err("The command bridge returned an unexpected event".into());
         };
-        outcome.map_err(|failure| driver_failure_message(&failure))
+        let columns = outcome.map_err(|failure| driver_failure_message(&failure))?;
+        self.remember_columns(table, &columns);
+        Ok(columns)
     }
 
     pub fn table_structure(
