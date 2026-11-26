@@ -127,11 +127,13 @@ type ColumnKey = (Option<String>, String);
 #[derive(Default)]
 struct ColumnCache {
     generation: u64,
-    tables: std::collections::HashMap<ColumnKey, (std::time::Instant, Vec<ColumnInfo>)>,
+    tables: std::collections::HashMap<ColumnKey, Vec<ColumnInfo>>,
+    #[cfg(test)]
+    reads: usize,
 }
 
 impl ColumnCache {
-    fn get(&self, key: &ColumnKey) -> Option<&(std::time::Instant, Vec<ColumnInfo>)> {
+    fn get(&self, key: &ColumnKey) -> Option<&Vec<ColumnInfo>> {
         self.tables.get(key)
     }
 
@@ -142,12 +144,10 @@ impl ColumnCache {
 
     fn remember(&mut self, read_generation: u64, key: ColumnKey, columns: &[ColumnInfo]) {
         if read_generation == self.generation {
-            self.tables.insert(key, (std::time::Instant::now(), columns.to_vec()));
+            self.tables.insert(key, columns.to_vec());
         }
     }
 }
-
-const COLUMN_CACHE_TTL: Duration = Duration::from_secs(30);
 
 impl LiveSession {
     pub fn cache_identity(&self) -> String {
@@ -586,8 +586,7 @@ impl LiveSession {
 
     pub fn cached_columns(&self, table: &TableInfo) -> Option<Vec<ColumnInfo>> {
         let cache = self.column_cache.lock().ok()?;
-        let (read_at, columns) = cache.get(&(table.schema.clone(), table.name.clone()))?;
-        (read_at.elapsed() < COLUMN_CACHE_TTL).then(|| columns.clone())
+        cache.get(&(table.schema.clone(), table.name.clone())).cloned()
     }
 
     pub fn forget_columns(&self) {
@@ -616,6 +615,10 @@ impl LiveSession {
         drop_if_superseded: bool,
         timeout: Duration,
     ) -> Result<Vec<ColumnInfo>, String> {
+        #[cfg(test)]
+        if let Ok(mut cache) = self.column_cache.lock() {
+            cache.reads += 1;
+        }
         let control = OperationControl::with_timeout(timeout);
         let generation = self.column_generation();
         let epoch = Epoch(self.epoch.load(Ordering::Relaxed));
@@ -637,6 +640,11 @@ impl LiveSession {
         let columns = outcome.map_err(|failure| driver_failure_message(&failure))?;
         self.remember_columns(generation, table, &columns);
         Ok(columns)
+    }
+
+    #[cfg(test)]
+    pub fn column_read_count(&self) -> usize {
+        self.column_cache.lock().map_or(0, |cache| cache.reads)
     }
 
     pub fn table_structure(
