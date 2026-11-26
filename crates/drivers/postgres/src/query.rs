@@ -387,6 +387,19 @@ pub(super) fn statement_column_origins(columns: &[sqlx::postgres::PgColumn]) -> 
         .collect()
 }
 
+fn integer_array(values: impl Iterator<Item = Option<String>>, cast: &str) -> String {
+    let items: Vec<String> = values.map(|value| value.unwrap_or_else(|| "NULL".into())).collect();
+    format!("ARRAY[{}]::{cast}[]", items.join(","))
+}
+
+fn bigint_array(values: impl Iterator<Item = Option<i64>>) -> String {
+    integer_array(values.map(|value| value.map(|number| number.to_string())), "bigint")
+}
+
+fn smallint_array(values: impl Iterator<Item = Option<i16>>) -> String {
+    integer_array(values.map(|value| value.map(|number| number.to_string())), "smallint")
+}
+
 async fn refresh_domain_column_names(
     connection: &mut PoolConnection<Postgres>,
     columns: &mut [ColumnInfo],
@@ -395,31 +408,28 @@ async fn refresh_domain_column_names(
     if !origins.iter().any(Option::is_some) {
         return Ok(());
     }
-    let relation_ids: Vec<_> = origins
-        .iter()
-        .map(|origin| origin.map(|(relation_id, _)| relation_id))
-        .collect();
-    let attribute_numbers: Vec<_> = origins
-        .iter()
-        .map(|origin| origin.map(|(_, attribute_no)| attribute_no))
-        .collect();
-    let rows = sqlx::query(
+    let relation_ids = bigint_array(origins.iter().map(|origin| origin.map(|(relation_id, _)| relation_id)));
+    let attribute_numbers = smallint_array(
+        origins
+            .iter()
+            .map(|origin| origin.map(|(_, attribute_no)| attribute_no)),
+    );
+    let sql = format!(
         "SELECT origin.ordinality - 1, pg_catalog.format_type(attribute.atttypid, NULL), \
                 namespace.nspname, declared_type.typname \
-         FROM ROWS FROM (pg_catalog.unnest($1::bigint[]), pg_catalog.unnest($2::smallint[])) WITH ORDINALITY \
+         FROM ROWS FROM (pg_catalog.unnest({relation_ids}), pg_catalog.unnest({attribute_numbers})) WITH ORDINALITY \
               AS origin(relation_id, attribute_number, ordinality) \
          JOIN pg_catalog.pg_attribute AS attribute \
            ON attribute.attrelid::bigint = origin.relation_id \
           AND attribute.attnum = origin.attribute_number \
          JOIN pg_catalog.pg_type AS declared_type ON declared_type.oid = attribute.atttypid \
          JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = declared_type.typnamespace \
-         WHERE declared_type.typtype = 'd'",
-    )
-    .bind(&relation_ids)
-    .bind(&attribute_numbers)
-    .fetch_all(&mut **connection)
-    .await
-    .map_err(map_sqlx_error)?;
+         WHERE declared_type.typtype = 'd'"
+    );
+    let rows = sqlx::raw_sql(&sql)
+        .fetch_all(&mut **connection)
+        .await
+        .map_err(map_sqlx_error)?;
     for row in rows {
         let index: i64 = row.try_get(0).map_err(map_sqlx_error)?;
         let name: String = row.try_get(1).map_err(map_sqlx_error)?;
