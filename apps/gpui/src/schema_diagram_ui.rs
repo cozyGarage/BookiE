@@ -47,6 +47,7 @@ pub(crate) struct SchemaDiagramState {
     pub find: Option<Entity<TextInput>>,
     pub scroll: gpui::ScrollHandle,
     pub view: Option<crate::diagram_ui::DiagramView>,
+    export_scope: Option<String>,
     pub open: bool,
     pub focus: bool,
     pub input: Option<Entity<TextInput>>,
@@ -87,9 +88,12 @@ impl GridView {
             input
         });
         input.update(cx, |input, cx| input.set_content("", cx));
+        self.search.diagram.export_scope = (self.tabs.current() == &Tab::Diagram)
+            .then(|| self.search.diagram.scope.clone())
+            .flatten();
         self.search.diagram.open = true;
         self.search.diagram.focus = true;
-        self.status = "Type where to write the diagram of every table and its foreign keys".into();
+        self.status = "Choose a new file for the diagram export".into();
         cx.notify();
     }
 
@@ -115,9 +119,7 @@ impl GridView {
             return;
         };
         self.status = "Reading schema…".into();
-        let scope = (self.tabs.current() == &Tab::Diagram)
-            .then(|| self.search.diagram.scope.clone())
-            .flatten();
+        let scope = self.search.diagram.export_scope.clone();
         let shown = path.display().to_string();
         self.begin_background(
             Work::Load,

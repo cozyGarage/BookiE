@@ -11,6 +11,26 @@ use super::*;
 use crate::chrome::tip;
 use crate::surfaces::{ButtonKind, button, task_bar_frame, task_title};
 
+type PreparedSave = (CellSavePlan, Option<ForeignKeyReview>);
+
+struct ForeignKeyReview {
+    source: bookie_core::TableInfo,
+    target: bookie_core::TableInfo,
+    source_columns: Vec<bookie_core::ColumnInfo>,
+    target_columns: Vec<bookie_core::ColumnInfo>,
+}
+
+impl ForeignKeyReview {
+    fn verify(&self, live: &LiveSession) -> Result<(), String> {
+        if live.table_columns(&self.source)? != self.source_columns
+            || live.table_columns(&self.target)? != self.target_columns
+        {
+            return Err("The relationship tables changed since review. Refresh the diagram and review again".into());
+        }
+        Ok(())
+    }
+}
+
 type SaveOutcome = Result<(Arc<WriteSession>, Result<Vec<u64>, SaveFailure>), String>;
 
 #[derive(Default)]
@@ -26,6 +46,7 @@ pub(crate) struct SaveState {
 }
 
 pub(crate) struct PendingSave {
+    relationship: Option<ForeignKeyReview>,
     pub plan: CellSavePlan,
     pub title: String,
     pub done: String,
@@ -197,7 +218,7 @@ impl GridView {
                         table: &table.name,
                         columns: &columns,
                     };
-                    match request {
+                    let planned = match request {
                         SaveRequest::Edits(changes) => {
                             plan_cell_saves(target, &grid_columns, &changes).map_err(|error| error.to_string())
                         }
@@ -209,18 +230,7 @@ impl GridView {
                         }
                         SaveRequest::Import(file) => plan_file_import(target, &live.driver_id, &file),
                         SaveRequest::DiagramForeignKey(key) => {
-                            let referenced = live.table_columns(&bookie_core::TableInfo {
-                                schema: key.ref_schema.clone(),
-                                name: key.ref_table.clone(),
-                            })?;
-                            let plan =
-                                bookie_app_services::structure_change_plan::plan_foreign_key(target, key, &referenced)
-                                    .map_err(|error| error.to_string())?;
-                            Ok(CellSavePlan {
-                                statements: plan.statements,
-                                expect_one: Vec::new(),
-                                preview: plan.preview,
-                            })
+                            return prepare_diagram_foreign_key(&live, &table, columns, key);
                         }
                         SaveRequest::Structure(kind, text) => {
                             let structure = if kind.needs_structure() {
@@ -230,7 +240,8 @@ impl GridView {
                             };
                             plan_structure(target, kind, &text, &structure)
                         }
-                    }
+                    };
+                    planned.map(|plan| (plan, None))
                 })
                 .await;
             this.update(cx, |this, cx| {
@@ -244,7 +255,7 @@ impl GridView {
 
     fn receive_plan(
         &mut self,
-        planned: Result<CellSavePlan, String>,
+        planned: Result<PreparedSave, String>,
         labels: ReviewLabels,
         (generation, table): (u64, bookie_core::TableInfo),
         checks: Vec<CellCheck>,
@@ -255,15 +266,16 @@ impl GridView {
             return;
         }
         match planned {
-            Ok(plan) if plan.statements.is_empty() => {
+            Ok((plan, _)) if plan.statements.is_empty() => {
                 self.cell_edit.edits.clear();
                 self.reset_edit_history();
                 self.status = "Nothing changed, so there is nothing to save".into();
             }
-            Ok(plan) => {
+            Ok((plan, relationship)) => {
                 let rows = plan.statements.len().to_string();
                 self.status = labels.review;
                 self.save.pending = Some(PendingSave {
+                    relationship,
                     plan,
                     title: labels.title.replace("{n}", &rows),
                     done: labels.done.replace("{n}", &rows),
@@ -359,6 +371,8 @@ impl GridView {
         let approvals = self.approval.tx.clone();
         let opened_with = live.stamp.clone();
         let done = pending.done;
+        let relationship = pending.relationship;
+        let is_relationship = relationship.is_some();
         let (statements, expect_one) = (pending.plan.statements, pending.plan.expect_one);
         cx.spawn(async move |this, cx| {
             let result = cx
@@ -372,11 +386,22 @@ impl GridView {
                             opened_with.as_deref(),
                         )?),
                     };
-                    let applied = write.apply(&statements, &expect_one, &tokio_util::sync::CancellationToken::new());
+                    let precheck = relationship.map_or(Ok(()), |review| review.verify(&live));
+                    let applied = match precheck {
+                        Ok(()) => write.apply(&statements, &expect_one, &tokio_util::sync::CancellationToken::new()),
+                        Err(message) => Err(SaveFailure {
+                            message,
+                            outcome_unknown: false,
+                        }),
+                    };
                     Ok::<_, String>((write, applied))
                 })
                 .await;
             this.update(cx, |this, cx| {
+                if is_relationship && result.as_ref().is_ok_and(|(_, applied)| applied.is_ok()) {
+                    this.search.diagram.relationship = None;
+                    this.search.diagram.failure = Some("Schema changed. Refresh to see the new relationship".into());
+                }
                 this.finish_save(connection_id, done, result, cx);
                 cx.notify();
             })
@@ -552,6 +577,40 @@ mod preview_tests {
         let long = (0..12).map(|n| format!("{n}: value")).collect::<Vec<_>>().join("\n");
         assert!(preview_overflows(&long));
     }
+}
+
+fn prepare_diagram_foreign_key(
+    live: &LiveSession,
+    source: &bookie_core::TableInfo,
+    source_columns: Vec<bookie_core::ColumnInfo>,
+    key: bookie_core::ForeignKeyInfo,
+) -> Result<PreparedSave, String> {
+    let target = bookie_core::TableInfo {
+        schema: key.ref_schema.clone(),
+        name: key.ref_table.clone(),
+    };
+    let target_columns = live.table_columns(&target)?;
+    let target_spec = SaveTarget {
+        driver_id: &live.driver_id,
+        schema: source.schema.as_deref(),
+        table: &source.name,
+        columns: &source_columns,
+    };
+    let plan = bookie_app_services::structure_change_plan::plan_foreign_key(target_spec, key, &target_columns)
+        .map_err(|error| error.to_string())?;
+    Ok((
+        CellSavePlan {
+            statements: plan.statements,
+            expect_one: Vec::new(),
+            preview: plan.preview,
+        },
+        Some(ForeignKeyReview {
+            source: source.clone(),
+            target,
+            source_columns,
+            target_columns,
+        }),
+    ))
 }
 
 fn plan_structure(

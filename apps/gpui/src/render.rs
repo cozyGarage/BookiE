@@ -601,6 +601,7 @@ impl Render for GridView {
         let bar_dialog = self
             .import_bar(theme, cx)
             .or_else(|| self.export_file_bar(theme, cx))
+            .or_else(|| self.schema_diagram_bar(theme, cx))
             .or_else(|| self.save_bar(theme, cx))
             .or_else(|| self.insert_form(theme, cx))
             .map(|bar| bar_dialog(theme, bar));

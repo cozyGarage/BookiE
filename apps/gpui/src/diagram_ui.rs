@@ -368,8 +368,10 @@ impl GridView {
             0.0
         };
         let size = window.viewport_size();
+        let width = (f64::from(f32::from(size.width)) - sidebar).max(0.0);
+        let inspector = (width * 0.42).min(f64::from(size::SIDE_PANEL_WIDTH));
         (
-            (f64::from(f32::from(size.width)) - sidebar - 24.0).max(200.0),
+            (width - inspector).max(200.0),
             (f64::from(f32::from(size.height)) - 150.0).max(200.0),
         )
     }
@@ -512,6 +514,8 @@ impl GridView {
     fn diagram_inspector(&self, view: &DiagramView, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
         let find = self.search.diagram.find.as_ref();
         let input = find.map_or("", |input| input.read(cx).content());
+        let searching = !input.trim().is_empty();
+        let matches = self.diagram_matches(input.trim());
         let selected = view.selected.and_then(|index| view.diagram.tables.get(index));
         let mut inspector = div()
             .id("diagram-inspector")
@@ -532,7 +536,9 @@ impl GridView {
         if let Some(draft) = self.diagram_relationship_editor(view, theme, cx) {
             return inspector.child(draft);
         }
-        let matches = self.diagram_matches(input.trim());
+        if !searching && let Some(table) = selected {
+            return inspector.child(self.diagram_table_details(view, table, theme, cx));
+        }
         inspector.child(
             div()
                 .id("diagram-find-list")
@@ -546,6 +552,58 @@ impl GridView {
                         .on_click(cx.listener(move |this, _, _, cx| this.select_diagram_card(index, true, cx)))
                 })),
         )
+    }
+
+    fn diagram_table_details(
+        &self,
+        view: &DiagramView,
+        table: &DiagramTable,
+        theme: Theme,
+        cx: &mut Context<Self>,
+    ) -> Stateful<Div> {
+        let selected = view.selected;
+        let relations = view.diagram.relations.iter().filter_map(|relation| {
+            let (other, label) = if Some(relation.from) == selected {
+                (relation.to, "References")
+            } else if Some(relation.to) == selected {
+                (relation.from, "Referenced by")
+            } else {
+                return None;
+            };
+            let table = view.diagram.tables.get(other)?;
+            let title = format!("{label} {}", diagram_table_name(table));
+            Some(
+                compact_button(ButtonKind::Ghost, ("diagram-link", other), title, theme)
+                    .tooltip(crate::surfaces::tooltip_view(relation.name.clone().into()))
+                    .on_click(cx.listener(move |this, _, _, cx| this.select_diagram_card(other, true, cx))),
+            )
+        });
+        div()
+            .id("diagram-table-details")
+            .flex_1()
+            .min_h_0()
+            .overflow_y_scroll()
+            .child(crate::surfaces::section_header("Columns", theme))
+            .children(table.columns.iter().map(|column| {
+                div()
+                    .flex()
+                    .gap_1()
+                    .py_1()
+                    .child(div().flex_1().min_w_0().truncate().child(column.name.clone()))
+                    .child(
+                        div()
+                            .min_w_0()
+                            .truncate()
+                            .text_color(rgb(theme.muted_foreground))
+                            .child(column.type_name.clone()),
+                    )
+            }))
+            .child(crate::surfaces::section_header("Relationships", theme))
+            .children(
+                relations
+                    .enumerate()
+                    .map(|(index, control)| div().id(("diagram-link-row", index)).child(control)),
+            )
     }
 
     fn diagram_card_actions(
