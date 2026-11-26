@@ -1,5 +1,5 @@
-use bookie_app_services::enum_input::{declared_member_labels, parse_enum_input};
-use bookie_core::{ColumnInfo, EnumInputStyle};
+use bookie_app_services::enum_input::declared_member_labels;
+use bookie_core::ColumnInfo;
 use bookie_gpui::model::Cell;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -44,9 +44,9 @@ pub(crate) fn choice_for(data_type: &str, info: Option<&ColumnInfo>, cell: &Cell
 }
 
 pub(crate) fn member_cell(label: &str, info: &ColumnInfo) -> Result<Cell, String> {
-    match parse_enum_input(label, Some(info), EnumInputStyle::DeclaredMemberList) {
-        Some(Ok(cell)) => Ok(cell),
-        Some(Err(_)) => Err(format!("{label} is not a declared value of {}", info.name)),
-        None => Ok(Cell::Text(label.to_owned())),
+    if declared_member_labels(info.data_type.trim()).is_some_and(|labels| labels.iter().any(|member| member == label)) {
+        Ok(Cell::Text(label.to_owned()))
+    } else {
+        Err(format!("{label} is not a declared value of {}", info.name))
     }
 }

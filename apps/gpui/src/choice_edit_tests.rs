@@ -59,6 +59,16 @@ fn a_member_is_staged_as_its_declared_text() {
     assert!(member_cell("gone", &status).is_err());
 }
 
+#[test]
+fn a_menu_pick_preserves_two_apostrophes_as_a_literal_member() {
+    let status = column(r"enum('','\'\'')", false);
+    assert_eq!(member_cell("", &status), Ok(Cell::Text(String::new())));
+    assert_eq!(member_cell("''", &status), Ok(Cell::Text("''".into())));
+    let rights = column(r"set('read','write','\'\'')", false);
+    assert_eq!(member_cell("''", &rights), Ok(Cell::Text("''".into())));
+    assert!(member_cell("read,write", &rights).is_err());
+}
+
 fn connect_flags(cx: &mut TestAppContext) -> (gpui::Entity<GridView>, &mut gpui::VisualTestContext, SqliteFixture) {
     use bookie_gpui::live::{LiveSession, Origin};
     let fixture = sqlite_fixture(&[
