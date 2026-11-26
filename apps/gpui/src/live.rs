@@ -295,6 +295,7 @@ impl LiveSession {
         Ok(LiveTable {
             session: self.clone(),
             columns: result.columns.iter().map(column_meta).collect(),
+            estimated_retained_bytes: result.estimated_row_bytes(),
             result,
             snapshot_consistent: false,
             messages,
@@ -387,6 +388,7 @@ impl LiveSession {
                 LiveTable {
                     session: self.clone(),
                     columns: result.columns.iter().map(column_meta).collect(),
+                    estimated_retained_bytes: result.estimated_row_bytes(),
                     result,
                     snapshot_consistent: false,
                     messages: std::mem::take(&mut messages),
@@ -410,6 +412,7 @@ impl LiveSession {
         Ok(LiveTable {
             session: self.clone(),
             columns: result.columns.iter().map(column_meta).collect(),
+            estimated_retained_bytes: result.estimated_row_bytes(),
             result,
             messages: Default::default(),
             snapshot_consistent: false,
@@ -437,6 +440,7 @@ impl LiveSession {
         Ok(LiveTable {
             session: self.clone(),
             columns: result.columns.iter().map(column_meta).collect(),
+            estimated_retained_bytes: result.estimated_row_bytes(),
             result,
             snapshot_consistent: false,
             messages: Default::default(),
@@ -736,6 +740,7 @@ impl LiveSession {
         Ok(LiveTable {
             session: self.clone(),
             columns,
+            estimated_retained_bytes: result.estimated_row_bytes(),
             result,
             snapshot_consistent: self.supports_snapshot_cursor,
             messages: Default::default(),
@@ -926,6 +931,7 @@ pub struct LiveTable {
     session: Arc<LiveSession>,
     columns: Vec<ColumnMeta>,
     result: QueryResult,
+    estimated_retained_bytes: usize,
     snapshot_consistent: bool,
     pub messages: bookie_core::ServerMessages,
     executed_sql: Option<String>,
@@ -1829,7 +1835,7 @@ fn numeric_type(data_type: &str) -> bool {
 
 impl ResultSource for LiveTable {
     fn estimated_retained_bytes(&self) -> usize {
-        self.result.estimated_row_bytes()
+        self.estimated_retained_bytes
     }
 
     fn load_elapsed(&self) -> Option<Duration> {
