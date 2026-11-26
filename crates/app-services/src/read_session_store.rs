@@ -168,11 +168,7 @@ impl ReadSessionStore {
         control: &OperationControl,
     ) -> Result<crate::er_diagram::read::SchemaRead, DriverError> {
         let session = self.get(id).ok_or(DriverError::Disconnected)?;
-        let (connection, generation, _) = session.backup_identity();
-        let guard = self
-            .database
-            .guard_for_generation(connection, generation, bookie_policy::Principal::human_gui())
-            .ok_or(DriverError::Disconnected)?;
+        let guard = session.guard().map_err(|_| DriverError::Disconnected)?;
         let driver = self
             .registry
             .get(&session.driver_id)
@@ -190,11 +186,7 @@ impl ReadSessionStore {
         control: &OperationControl,
     ) -> Result<crate::data_compare::DataCompare, crate::data_compare::DataCompareError> {
         let session = self.get(id).ok_or(DriverError::Disconnected)?;
-        let (connection, generation, _) = session.backup_identity();
-        let guard = self
-            .database
-            .guard_for_generation(connection, generation, bookie_policy::Principal::human_gui())
-            .ok_or(DriverError::Disconnected)?;
+        let guard = session.guard().map_err(|_| DriverError::Disconnected)?;
         let source = crate::data_compare::TableSide {
             connection: &guard,
             schema: source.schema.as_deref(),
@@ -216,19 +208,14 @@ impl ReadSessionStore {
         cancel: &tokio_util::sync::CancellationToken,
     ) -> Result<Vec<crate::export_tables::TableResult>, String> {
         let session = self.get(id).ok_or("The connection is closed")?;
-        let (connection, generation, _) = session.backup_identity();
-        let driver_id = session.driver_id.clone();
         let driver = self
             .registry
-            .get(&driver_id)
+            .get(&session.driver_id)
             .ok_or("The database driver is not available")?;
         if !driver.capabilities().supports_snapshot_export {
             return Err("This connection does not support consistent table export.".into());
         }
-        let guard = self
-            .database
-            .guard_for_generation(connection, generation, bookie_policy::Principal::human_gui())
-            .ok_or("The connection is closed")?;
+        let guard = session.guard().map_err(|_| "The connection is closed")?;
         let control = crate::operation_control::bounded_with(job.timeout_secs, cancel.clone());
         let targets = crate::export_tables::prepare_targets(&guard, tables, &control).await?;
         crate::export_tables::export_tables_to_csv(Arc::new(guard), driver, targets, job, cancel.clone()).await
@@ -242,7 +229,7 @@ impl ReadSessionStore {
         control: &OperationControl,
     ) -> Result<(), DriverError> {
         let session = self.get(id).ok_or(DriverError::Disconnected)?;
-        let (connection, generation, writable) = session.backup_identity();
+        let (connection, writable) = session.backup_identity();
         if matches!(job, crate::database_backup::BackupJob::Restore { .. }) && !writable {
             return Err(DriverError::ReadOnly);
         }
@@ -255,10 +242,7 @@ impl ReadSessionStore {
             return Err(DriverError::ReadOnly);
         }
         let principal = bookie_policy::Principal::human_gui();
-        let guard = self
-            .database
-            .guard_for_generation(connection, generation, principal.clone())
-            .ok_or(DriverError::Disconnected)?;
+        let guard = session.guard().map_err(|_| DriverError::Disconnected)?;
         let driver = self
             .registry
             .get(&saved.driver_id)
