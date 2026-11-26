@@ -412,26 +412,33 @@ impl LiveSession {
     }
 
     pub fn table_columns(&self, table: &TableInfo) -> Result<Vec<ColumnInfo>, String> {
-        self.read_columns(table, self.next_epoch(), Duration::from_secs(10))
+        self.read_columns(table, false, Duration::from_secs(10))
     }
 
     pub fn completion_columns(&self, table: &TableInfo) -> Result<Vec<ColumnInfo>, String> {
-        self.read_columns(table, Epoch(self.epoch.load(Ordering::Relaxed)), Duration::from_secs(1))
+        self.read_columns(table, true, Duration::from_secs(1))
     }
 
-    fn read_columns(&self, table: &TableInfo, epoch: Epoch, timeout: Duration) -> Result<Vec<ColumnInfo>, String> {
+    fn read_columns(
+        &self,
+        table: &TableInfo,
+        drop_if_superseded: bool,
+        timeout: Duration,
+    ) -> Result<Vec<ColumnInfo>, String> {
         let control = OperationControl::with_timeout(timeout);
-        let event = self.runtime.block_on(dispatch_read(
-            DispatchContext::Sessions(&self.sessions),
-            Command::ReadColumns {
-                epoch,
-                session_id: self.session_id,
-                table: table.clone(),
-            },
-            &control,
+        let epoch = Epoch(self.epoch.load(Ordering::Relaxed));
+        let command = Command::ReadColumns {
             epoch,
-            &self.epoch,
-        ))?;
+            session_id: self.session_id,
+            table: table.clone(),
+        };
+        let context = DispatchContext::Sessions(&self.sessions);
+        let event = if drop_if_superseded {
+            self.runtime
+                .block_on(dispatch_read(context, command, &control, epoch, &self.epoch))?
+        } else {
+            self.runtime.block_on(dispatch_once(context, command, &control))?
+        };
         let Event::ColumnsRead { outcome, .. } = event else {
             return Err("The command bridge returned an unexpected event".into());
         };
@@ -1457,6 +1464,19 @@ async fn dispatch_read(
         .map_err(|error| format!("{error:?}"))?;
     let event = receiver.try_recv().map_err(|error| format!("{error:?}"))?;
     keep_current_event(context, event, Epoch(current_epoch.load(Ordering::Relaxed)))
+}
+
+async fn dispatch_once(
+    context: DispatchContext<'_>,
+    command: Command,
+    control: &OperationControl,
+) -> Result<Event, String> {
+    let (sender, mut receiver) = tokio::sync::mpsc::channel(1);
+    let sink = ChannelEventSink::new(sender);
+    dispatch(context, command, control, &sink)
+        .await
+        .map_err(|error| format!("{error:?}"))?;
+    receiver.try_recv().map_err(|error| format!("{error:?}"))
 }
 
 fn keep_current_event(context: DispatchContext<'_>, event: Event, current: Epoch) -> Result<Event, String> {

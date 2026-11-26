@@ -547,3 +547,29 @@ fn a_missing_table_or_file_is_an_error_not_a_panic() {
         .is_err()
     );
 }
+
+#[test]
+fn reading_a_tables_columns_does_not_supersede_the_running_request() {
+    let Origin::File(source) = fixture() else {
+        panic!("the fixture is a file")
+    };
+    let path = std::env::temp_dir().join(format!("bookie-gpui-columns-{}.sqlite", uuid::Uuid::new_v4()));
+    std::fs::copy(source, &path).unwrap();
+    let file = FixtureFile(path);
+    let live = LiveSession::open(&Origin::File(file.0.clone())).unwrap();
+    let table = live.tables[0].clone();
+    let running = live.epoch.load(Ordering::Relaxed);
+
+    let columns = live.table_columns(&table).expect("columns are read");
+
+    assert!(!columns.is_empty());
+    assert_eq!(
+        live.epoch.load(Ordering::Relaxed),
+        running,
+        "a metadata read must not move the epoch that the running query or load was started at"
+    );
+    assert!(
+        live.completion_columns(&table).is_ok(),
+        "a read at the running epoch still applies"
+    );
+}
