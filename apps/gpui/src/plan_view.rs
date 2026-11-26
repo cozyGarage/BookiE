@@ -9,12 +9,19 @@ use bookie_gpui::theme::{Theme, size};
 const PLAN_ROW_CAP: u64 = 2_000;
 
 impl GridView {
-    pub(crate) fn show_plan_of(&mut self, table: &impl ResultSource) {
-        let explaining = std::mem::take(&mut self.panel.explaining) || table.executed_sql().is_some_and(typed_explain);
+    pub(crate) fn show_plan_of(&mut self, table: &(impl ResultSource + ?Sized)) {
+        let explaining = table.executed_sql().is_some_and(typed_explain);
         self.panel.plan = if explaining { plan_nodes(table) } else { Vec::new() };
         if !self.panel.plan.is_empty() {
             self.panel.view = ResultView::Plan;
         } else if self.panel.view == ResultView::Plan {
+            self.panel.view = ResultView::Table;
+        }
+    }
+
+    pub(crate) fn clear_result_plan(&mut self) {
+        self.panel.plan.clear();
+        if self.panel.view == ResultView::Plan {
             self.panel.view = ResultView::Table;
         }
     }
@@ -56,7 +63,7 @@ pub(crate) fn typed_explain(sql: &str) -> bool {
             .is_none_or(|next| !next.is_alphanumeric() && next != '_' && next != '$')
 }
 
-fn plan_nodes(table: &impl ResultSource) -> Vec<PlanNode> {
+fn plan_nodes(table: &(impl ResultSource + ?Sized)) -> Vec<PlanNode> {
     let columns: Vec<String> = table.columns().iter().map(|column| column.name.clone()).collect();
     let rows: Vec<Vec<String>> = (0..table.total().min(PLAN_ROW_CAP))
         .map(|index| table.row(index).iter().map(CellText::display).collect())
