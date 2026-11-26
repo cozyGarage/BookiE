@@ -31,25 +31,25 @@ impl CompletionProvider for SqlCompletion {
         if text.len() > MAX_COMPLETION_BYTES {
             return Task::ready(Ok(CompletionResponse::Array(Vec::new())));
         }
-        let context = self.0.upgrade().and_then(|view| {
-            let view = view.read(cx);
-            Some((view.live.clone()?, view.schema_context.clone()))
-        });
         if trigger.trigger_kind == lsp_types::CompletionTriggerKind::TRIGGER_CHARACTER && !auto_suggest(text, offset) {
             return Task::ready(Ok(CompletionResponse::Array(Vec::new())));
         }
-        let Some((session, schema)) = context else {
-            return Task::ready(Ok(CompletionResponse::Array(Vec::new())));
-        };
         let text = text.clone();
         let view = self.0.clone();
-        let current_session = session.clone();
-        let current_schema = schema.clone();
-        let task = cx
-            .background_executor()
-            .spawn(async move { completion_items(&text, offset, &session, schema.as_deref()) });
         cx.spawn(async move |cx| {
-            let items = task.await;
+            let context = view
+                .read_with(cx, |view, _| Some((view.live.clone()?, view.schema_context.clone())))
+                .ok()
+                .flatten();
+            let Some((session, schema)) = context else {
+                return Ok(CompletionResponse::Array(Vec::new()));
+            };
+            let current_session = session.clone();
+            let current_schema = schema.clone();
+            let items = cx
+                .background_executor()
+                .spawn(async move { completion_items(&text, offset, &session, schema.as_deref()) })
+                .await;
             let still_current = view
                 .read_with(cx, |view, _| {
                     view.live
