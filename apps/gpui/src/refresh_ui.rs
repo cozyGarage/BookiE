@@ -42,6 +42,9 @@ impl GridView {
             return;
         }
         self.status = "Refreshing…".into();
+        if let Some(live) = self.live.as_ref() {
+            live.forget_columns();
+        }
         self.reload_after_save("Refreshed the table".into(), cx);
     }
 }
