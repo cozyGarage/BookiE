@@ -96,14 +96,14 @@ pub(crate) async fn saved_connection(id: Uuid) -> Result<Option<SavedConnection>
 }
 
 impl ReadSession {
-    fn guard(&self) -> Result<PolicyGuard, DriverFailurePresentation> {
+    pub(crate) fn guard(&self) -> Result<PolicyGuard, DriverFailurePresentation> {
         self.database
             .guard_for_generation(self.id, self.generation, Principal::human_gui())
             .ok_or(DriverFailurePresentation::Disconnected)
     }
 
-    pub(crate) fn backup_identity(&self) -> (Uuid, Uuid, bool) {
-        (self.id, self.generation, self.writable)
+    pub(crate) fn backup_identity(&self) -> (Uuid, bool) {
+        (self.id, self.writable)
     }
 }
 
