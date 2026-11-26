@@ -11,8 +11,6 @@ use crate::{GridView, thousands};
 use bookie_gpui::shell::{ResultView, Run, Tab};
 use bookie_gpui::theme::{Theme, size};
 
-pub(crate) const COMPACT_QUERY_WIDTH: f32 = 1_050.0;
-
 impl GridView {
     pub(crate) fn toggle_results(&mut self) {
         if self.panel.explaining {
@@ -508,7 +506,8 @@ impl GridView {
     }
 
     fn result_view_menu(&self, theme: Theme, cx: &mut Context<Self>) -> impl IntoElement {
-        let current = match self.panel.view {
+        let selected = self.panel.view;
+        let current = match selected {
             ResultView::Table => "Table data",
             ResultView::Summary => "Summary",
             ResultView::Messages => "Messages",
@@ -537,7 +536,8 @@ impl GridView {
             .dropdown_menu(move |mut menu, _, _| {
                 for (label, view) in views.iter().copied() {
                     let owner = owner.clone();
-                    menu = menu.item(PopupMenuItem::new(label).on_click(move |_, _, cx| {
+                    let item = PopupMenuItem::new(label).checked(view == selected);
+                    menu = menu.item(item.on_click(move |_, _, cx| {
                         let _ = owner.update(cx, |this, cx| this.select_result_view(view, cx));
                     }));
                 }

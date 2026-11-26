@@ -57,7 +57,7 @@ fn compact_query_toolbar_keeps_transaction_controls_visible(cx: &mut TestAppCont
         cx.simulate_resize(gpui::size(gpui::px(width), gpui::px(800.0)));
         cx.run_until_parked();
         let toolbar = cx.debug_bounds("query-editor-toolbar").expect("query toolbar is visible");
-        let actions: &[&str] = if width < crate::query_pane::COMPACT_QUERY_WIDTH {
+        let actions: &[&str] = if width < bookie_gpui::theme::size::COMPACT_QUERY_WIDTH {
             &["transaction-badge", "transaction-actions"]
         } else {
             &["transaction-badge", "commit-transaction", "rollback-transaction"]

@@ -284,9 +284,9 @@ fn query_controls_and_result_views_fit_at_narrow_widths_in_both_themes(cx: &mut 
                 let view_items = cx.update(|window, cx| {
                     window.render_frame(cx);
                     ["Table data", "Summary", "Messages"]
-                        .map(|label| window.try_find_by_label(label).is_some())
+                        .map(|label| window.try_find_by_label(label).map(|item| item.checked() == Some(true)))
                 });
-                assert_eq!(view_items, [true, true, true]);
+                assert_eq!(view_items, [Some(true), Some(false), Some(false)]);
                 cx.simulate_keystrokes("escape");
             }
         }

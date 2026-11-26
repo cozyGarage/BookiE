@@ -136,8 +136,7 @@ impl ColumnCache {
 
     fn remember(&mut self, read_generation: u64, key: ColumnKey, columns: &[ColumnInfo]) {
         if read_generation == self.generation {
-            self.tables
-                .insert(key, (std::time::Instant::now(), columns.to_vec()));
+            self.tables.insert(key, (std::time::Instant::now(), columns.to_vec()));
         }
     }
 }

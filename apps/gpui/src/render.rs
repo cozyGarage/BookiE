@@ -621,7 +621,7 @@ impl Render for GridView {
         let grid = self.grid_pane(theme, strip, (filter_row, compare_bar, save_bar, insert_form), cx);
         let content_width = f32::from(window.viewport_size().width)
             - if self.sidebar.open { self.sidebar.width } else { 0.0 };
-        let compact_query = content_width < crate::query_pane::COMPACT_QUERY_WIDTH;
+        let compact_query = content_width < size::COMPACT_QUERY_WIDTH;
         let content = match self.tabs.current().clone() {
             Tab::Home => self.home_page(theme, cx),
             Tab::Settings => self.settings_page(theme, cx),

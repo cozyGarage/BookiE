@@ -641,7 +641,10 @@ fn columns_read_before_a_forget_are_not_cached() {
     let before = cache.generation;
     cache.forget();
     cache.remember(before, key.clone(), &[]);
-    assert!(cache.get(&key).is_none(), "a read that started before the forget is dropped");
+    assert!(
+        cache.get(&key).is_none(),
+        "a read that started before the forget is dropped"
+    );
     cache.remember(cache.generation, key.clone(), &[]);
     assert!(cache.get(&key).is_some());
 }
