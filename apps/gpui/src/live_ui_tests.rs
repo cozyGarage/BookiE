@@ -2101,6 +2101,51 @@ fn process_cancellation_is_available_only_for_marked_activity_results(cx: &mut T
 }
 
 #[gpui::test]
+fn following_a_foreign_key_cannot_run_on_a_replacement_connection(cx: &mut TestAppContext) {
+    use bookie_gpui::live::{LiveTable, Origin};
+
+    let (view, cx) = open(cx);
+    let fixture = sqlite_fixture(&[
+        "CREATE TABLE z_parent (id INTEGER PRIMARY KEY, name TEXT)",
+        "CREATE TABLE a_child (id INTEGER PRIMARY KEY, parent_id INTEGER REFERENCES z_parent(id))",
+        "INSERT INTO z_parent VALUES (1, 'original')",
+        "INSERT INTO a_child VALUES (1, 1)",
+    ]);
+    let replacement = sqlite_fixture(&[
+        "CREATE TABLE z_parent (id INTEGER PRIMARY KEY, name TEXT)",
+        "CREATE TABLE a_child (id INTEGER PRIMARY KEY, parent_id INTEGER REFERENCES z_parent(id))",
+        "INSERT INTO z_parent VALUES (1, 'replacement')",
+        "INSERT INTO a_child VALUES (1, 1)",
+    ]);
+    connect_and_settle(&view, cx, fixture.0.clone());
+    let table = table_info("a_child");
+    let next = Arc::new(LiveTable::load(&Origin::File(replacement.0.clone()), &table, 100).expect("replacement table"));
+    view.update(cx, |view, cx| {
+        assert_eq!(view.catalog.grid_table, table);
+        view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 1 });
+        view.go_to_referenced_row(cx);
+        view.attach_live(next);
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(
+            view.run_tabs.slots.is_empty(),
+            "navigation ran against the replacement connection"
+        );
+    });
+
+    view.update(cx, |view, cx| {
+        view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 1 });
+        view.go_to_referenced_row(cx);
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.run_tabs.slots.len(), 1, "{}", view.status);
+        assert_eq!(view.cell_at(0, 1), Cell::Text("replacement".into()));
+    });
+}
+
+#[gpui::test]
 fn clearing_a_foreign_key_peek_cancels_work_and_rejects_stale_context(cx: &mut TestAppContext) {
     let (view, cx) = open_live(cx);
     view.update(cx, |view, _| {
@@ -2108,7 +2153,7 @@ fn clearing_a_foreign_key_peek_cancels_work_and_rejects_stale_context(cx: &mut T
         let table = view.catalog.grid_table.clone();
         let generation = view.fk_peek_work.generation;
         let cancel = view.fk_peek_work.cancel.clone();
-        assert!(view.fk_peek_response_is_current(generation, &session, &table));
+        assert!(view.fk_lookup_is_current(generation, &session, &table));
 
         view.fk_peek = Some(crate::fk_peek_ui::FkPeekState {
             table: "customers".into(),
@@ -2120,12 +2165,12 @@ fn clearing_a_foreign_key_peek_cancels_work_and_rejects_stale_context(cx: &mut T
 
         assert!(cancel.is_cancelled());
         assert!(view.fk_peek.is_none());
-        assert!(!view.fk_peek_response_is_current(generation, &session, &table));
+        assert!(!view.fk_lookup_is_current(generation, &session, &table));
 
         let other_table = table_info("customers");
-        assert!(!view.fk_peek_response_is_current(generation + 1, &session, &other_table));
+        assert!(!view.fk_lookup_is_current(generation + 1, &session, &other_table));
         view.grid_is_query = true;
-        assert!(!view.fk_peek_response_is_current(generation + 1, &session, &table));
+        assert!(!view.fk_lookup_is_current(generation + 1, &session, &table));
     });
 }
 
