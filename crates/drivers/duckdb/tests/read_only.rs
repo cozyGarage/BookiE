@@ -1,11 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use bookie_core::sql_dialect::quote_ident;
 use bookie_core::{ConnectOptions, DatabaseDriver, Value};
 use drivers_duckdb::DuckdbDriver;
-
-fn quote_ident(value: &str) -> String {
-    format!("\"{}\"", value.replace('"', "\"\""))
-}
 
 fn escape_duckdb_literal(value: &str) -> String {
     value.replace('\'', "''")
@@ -64,7 +61,7 @@ async fn a_read_only_flat_file_connection_reads_only_the_selected_file() {
         })
         .await
         .unwrap();
-    let view = quote_ident(&derive_view_name(selected.to_str().unwrap()));
+    let view = quote_ident("duckdb", &derive_view_name(selected.to_str().unwrap()));
     assert_eq!(
         connection
             .query(&format!("SELECT id, label FROM {view}"))
@@ -139,7 +136,7 @@ async fn a_read_only_flat_file_connection_stays_on_the_selected_inode_after_path
         })
         .await
         .unwrap();
-    let view = quote_ident(&derive_view_name(selected.to_str().unwrap()));
+    let view = quote_ident("duckdb", &derive_view_name(selected.to_str().unwrap()));
     assert_eq!(
         connection.query(&format!("SELECT id FROM {view}")).await.unwrap().rows,
         vec![vec![Value::Int(7)]]
@@ -210,7 +207,7 @@ async fn a_read_only_flat_file_connection_accepts_a_symlink_to_the_selected_file
         })
         .await
         .unwrap();
-    let view = quote_ident(&derive_view_name(alias.to_str().unwrap()));
+    let view = quote_ident("duckdb", &derive_view_name(alias.to_str().unwrap()));
     assert_eq!(
         connection.query(&format!("SELECT id FROM {view}")).await.unwrap().rows,
         vec![vec![Value::Int(7)]]

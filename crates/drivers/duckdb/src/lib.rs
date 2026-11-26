@@ -12,6 +12,7 @@ use duckdb::{
     AccessMode, Config, Connection as DuckConnection, core::LogicalTypeId, params_from_iter, types::ValueRef,
 };
 
+use bookie_core::sql_dialect::rows_page_sql;
 use bookie_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverMaturity, DriverValueInputCapabilities,
     EnumInputStyle, ExecResult, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBudget, QueryRows, TableInfo,
@@ -167,7 +168,7 @@ fn open_read_only_flat_file(path: &str, reader_fn: &str) -> Result<(DuckConnecti
          CREATE VIEW {} AS SELECT * FROM {}('{}'); \
          SET lock_configuration = true;",
         escape_duckdb_literal(&stable_path),
-        quote_duckdb_ident(&derive_view_name(path)),
+        quote_ident(&derive_view_name(path)),
         reader_fn,
         escape_duckdb_literal(&stable_path)
     ))
@@ -282,7 +283,7 @@ fn open_path(path: &str) -> Result<DuckConnection, DriverError> {
     let conn = DuckConnection::open_in_memory().map_err(map_duck_error)?;
     let sql = format!(
         "CREATE VIEW {} AS SELECT * FROM {}('{}')",
-        quote_duckdb_ident(&derive_view_name(path)),
+        quote_ident(&derive_view_name(path)),
         reader_fn,
         escape_duckdb_literal(path)
     );
@@ -343,10 +344,6 @@ fn sanitize_ident(name: &str) -> String {
         out.insert(0, '_');
     }
     out
-}
-
-fn quote_duckdb_ident(name: &str) -> String {
-    format!("\"{}\"", name.replace('"', "\"\""))
 }
 
 fn escape_duckdb_literal(value: &str) -> String {
@@ -596,7 +593,7 @@ impl Connection for DuckdbConnection {
         offset: u64,
         limit: u64,
     ) -> Result<QueryResult, DriverError> {
-        self.query(&rows_page_sql(schema, table, offset, limit)).await
+        self.query(&rows_page_sql("duckdb", schema, table, offset, limit)).await
     }
 
     async fn fetch_rows_controlled(
@@ -607,7 +604,7 @@ impl Connection for DuckdbConnection {
         limit: u64,
         control: &OperationControl,
     ) -> Result<QueryResult, DriverError> {
-        self.query_controlled(&rows_page_sql(schema, table, offset, limit), control)
+        self.query_controlled(&rows_page_sql("duckdb", schema, table, offset, limit), control)
             .await
     }
 
@@ -704,13 +701,6 @@ impl Connection for DuckdbConnection {
     async fn close(self: Box<Self>) -> Result<(), DriverError> {
         Ok(())
     }
-}
-
-fn rows_page_sql(schema: Option<&str>, table: &str, offset: u64, limit: u64) -> String {
-    format!(
-        "SELECT * FROM {} LIMIT {limit} OFFSET {offset}",
-        qualified(schema, table)
-    )
 }
 
 async fn wait_for_turn_deadline(deadline: Option<tokio::time::Instant>) {
@@ -989,13 +979,6 @@ fn values_to_duck_params(params: &[Value]) -> Result<Vec<duckdb::types::Value>, 
 
 fn quote_ident(name: &str) -> String {
     bookie_core::sql_dialect::quote_ident("duckdb", name)
-}
-
-fn qualified(schema: Option<&str>, table: &str) -> String {
-    match schema {
-        Some(s) if !s.is_empty() => format!("{}.{}", quote_ident(s), quote_ident(table)),
-        _ => quote_ident(table),
-    }
 }
 
 async fn blocking<T: Send + 'static>(

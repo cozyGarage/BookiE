@@ -446,16 +446,7 @@ pub enum StructureOp {
 }
 
 pub(crate) fn qualified_table(driver_id: &str, schema: Option<&str>, table: &str) -> String {
-    // Trim leading / trailing whitespace before quoting so a user
-    // who typed `" users "` doesn't end up with a literally
-    // space-padded identifier in the generated DDL. The validator
-    // rejects after-trim-empty separately; here we only protect
-    // against accidental padding surviving into the SQL.
-    let table = table.trim();
-    match schema.map(str::trim) {
-        Some(s) if !s.is_empty() => format!("{}.{}", quote_ident(driver_id, s), quote_ident(driver_id, table)),
-        _ => quote_ident(driver_id, table),
-    }
+    crate::sql_dialect::qualified_table(driver_id, schema.map(str::trim), table.trim())
 }
 
 /// Escape a value for inclusion in a SQL string literal. Bracket

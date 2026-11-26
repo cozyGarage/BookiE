@@ -208,8 +208,8 @@ fn quote_ident_brackets_and_escapes() {
 
 #[test]
 fn qualified_uses_bracket_quoting() {
-    assert_eq!(qualified(Some("dbo"), "users"), "[dbo].[users]");
-    assert_eq!(qualified(None, "users"), "[users]");
+    assert_eq!(qualified_table("mssql", Some("dbo"), "users"), "[dbo].[users]");
+    assert_eq!(qualified_table("mssql", None, "users"), "[users]");
 }
 
 #[test]

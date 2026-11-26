@@ -21,20 +21,10 @@ fn strip_leading_comments(cql: &str) -> &str {
     }
 }
 
-pub(crate) fn quote_identifier(name: &str) -> String {
-    format!("\"{}\"", name.replace('"', "\"\""))
-}
-
-pub(crate) fn qualified(keyspace: Option<&str>, table: &str) -> String {
-    match keyspace {
-        Some(keyspace) => format!("{}.{}", quote_identifier(keyspace), quote_identifier(table)),
-        None => quote_identifier(table),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bookie_core::sql_dialect::{qualified_table, quote_ident};
 
     #[test]
     fn a_select_passes_and_loses_its_trailing_semicolon() {
@@ -70,8 +60,8 @@ mod tests {
 
     #[test]
     fn identifiers_are_quoted_and_embedded_quotes_are_doubled() {
-        assert_eq!(quote_identifier("a\"b"), "\"a\"\"b\"");
-        assert_eq!(qualified(Some("ks"), "t"), "\"ks\".\"t\"");
-        assert_eq!(qualified(None, "t"), "\"t\"");
+        assert_eq!(quote_ident("cassandra", "a\"b"), "\"a\"\"b\"");
+        assert_eq!(qualified_table("cassandra", Some("ks"), "t"), "\"ks\".\"t\"");
+        assert_eq!(qualified_table("cassandra", None, "t"), "\"t\"");
     }
 }

@@ -1063,6 +1063,15 @@ fn quoted_identifiers_round_trip_through_qualified_table() {
 }
 
 #[test]
+fn ddl_trims_padded_schema_and_table_names() {
+    let sql = build_drop_table("postgres", Some(" app "), " users ", false, false).unwrap();
+    assert!(sql.contains("\"app\".\"users\""), "got {sql}");
+    let blank_schema = build_drop_table("postgres", Some("  "), "users", false, false).unwrap();
+    assert!(blank_schema.contains(" \"users\""), "got {blank_schema}");
+    assert!(!blank_schema.contains("\"\"."), "got {blank_schema}");
+}
+
+#[test]
 fn materialize_ops_mssql_orders_rename_alter_then_add() {
     let ops = vec![
         StructureOp::RenameTable {

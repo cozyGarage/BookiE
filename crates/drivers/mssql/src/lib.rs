@@ -9,7 +9,7 @@ use tokio::net::TcpStream;
 use tokio::sync::{MappedMutexGuard, Mutex, Notify};
 use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 
-use bookie_core::sql_dialect::build_order_and_pagination;
+use bookie_core::sql_dialect::{build_order_and_pagination, qualified_table};
 use bookie_core::{
     AuthMode, CatalogObject, CatalogObjectKind, ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError,
     DriverValueInputCapabilities, ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS,
@@ -626,7 +626,7 @@ impl Connection for MssqlConnection {
     ) -> Result<QueryResult, DriverError> {
         let sql = format!(
             "SELECT * FROM {}{}",
-            qualified(schema, table),
+            qualified_table("mssql", schema, table),
             build_order_and_pagination("mssql", None, limit, offset)
         );
         let mut client = self.client().await?;
@@ -1119,10 +1119,6 @@ fn boxed_params(params: &[Value]) -> Result<Vec<Box<dyn ToSql>>, DriverError> {
             })
         })
         .collect()
-}
-
-fn qualified(schema: Option<&str>, table: &str) -> String {
-    bookie_core::sql_dialect::qualified_table("mssql", schema, table)
 }
 
 fn text_param(s: &str) -> Value {

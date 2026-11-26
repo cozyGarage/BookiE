@@ -357,7 +357,7 @@ pub fn rows_page_sql(driver_id: &str, schema: Option<&str>, table: &str, offset:
 }
 
 pub fn qualified_table(driver_id: &str, schema: Option<&str>, table: &str) -> String {
-    match schema {
+    match schema.filter(|schema| !schema.is_empty()) {
         Some(s) => format!("{}.{}", quote_ident(driver_id, s), quote_ident(driver_id, table)),
         None => quote_ident(driver_id, table),
     }

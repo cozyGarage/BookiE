@@ -126,20 +126,10 @@ fn strip_leading_comments(sql: &str) -> &str {
     }
 }
 
-pub(crate) fn quote_identifier(name: &str) -> String {
-    format!("\"{}\"", name.replace('"', "\"\""))
-}
-
-pub(crate) fn qualified(schema: Option<&str>, table: &str) -> String {
-    match schema {
-        Some(schema) => format!("{}.{}", quote_identifier(schema), quote_identifier(table)),
-        None => quote_identifier(table),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bookie_core::sql_dialect::{qualified_table, quote_ident};
 
     #[test]
     fn selects_and_with_clauses_pass_and_lose_the_trailing_semicolon() {
@@ -224,8 +214,8 @@ mod tests {
 
     #[test]
     fn identifiers_are_quoted_and_embedded_quotes_are_doubled() {
-        assert_eq!(quote_identifier("A\"B"), "\"A\"\"B\"");
-        assert_eq!(qualified(Some("HR"), "EMP"), "\"HR\".\"EMP\"");
-        assert_eq!(qualified(None, "EMP"), "\"EMP\"");
+        assert_eq!(quote_ident("oracle", "A\"B"), "\"A\"\"B\"");
+        assert_eq!(qualified_table("oracle", Some("HR"), "EMP"), "\"HR\".\"EMP\"");
+        assert_eq!(qualified_table("oracle", None, "EMP"), "\"EMP\"");
     }
 }
