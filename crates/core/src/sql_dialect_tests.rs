@@ -84,6 +84,23 @@ fn quote_ident_mssql() {
 }
 
 #[test]
+fn qualified_table_quotes_schema_and_table_per_dialect() {
+    assert_eq!(
+        qualified_table("postgres", Some("public"), "users"),
+        "\"public\".\"users\""
+    );
+    assert_eq!(qualified_table("mysql", Some("app"), "users"), "`app`.`users`");
+    assert_eq!(qualified_table("mssql", Some("dbo"), "users"), "[dbo].[users]");
+    assert_eq!(qualified_table("sqlite", None, "users"), "\"users\"");
+}
+
+#[test]
+fn qualified_table_treats_an_empty_schema_as_no_schema() {
+    assert_eq!(qualified_table("postgres", Some(""), "users"), "\"users\"");
+    assert_eq!(qualified_table("mssql", Some(""), "users"), "[users]");
+}
+
+#[test]
 fn placeholder_dialect() {
     assert_eq!(placeholder_for("postgres", 0), "$1");
     assert_eq!(placeholder_for("postgres", 2), "$3");
