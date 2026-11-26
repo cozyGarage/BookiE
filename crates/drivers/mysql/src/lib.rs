@@ -1069,10 +1069,11 @@ async fn connection_id_controlled(
 }
 
 async fn connection_id(connection: &mut PoolConnection<MySql>) -> Result<u64, DriverError> {
-    sqlx::query_scalar("SELECT CONNECTION_ID()")
+    let row = sqlx::raw_sql("SELECT CONNECTION_ID()")
         .fetch_one(&mut **connection)
         .await
-        .map_err(map_sqlx_error)
+        .map_err(map_sqlx_error)?;
+    sqlx::Row::try_get(&row, 0).map_err(map_sqlx_error)
 }
 
 /// MySQL has no request-scoped cancel channel, so the statement is
