@@ -82,6 +82,7 @@ mod sql_file_ui;
 mod ssh_form;
 mod structure_ui;
 mod surfaces;
+mod table_menu;
 mod tables_export_ui;
 mod text_input;
 mod theme_settings_ui;
@@ -1254,6 +1255,8 @@ mod save_ui_tests;
 mod server_filter_ui_tests;
 #[cfg(test)]
 mod status_bar_tests;
+#[cfg(test)]
+mod table_menu_tests;
 #[cfg(test)]
 mod test_config;
 #[cfg(test)]
