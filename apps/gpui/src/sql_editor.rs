@@ -1,13 +1,16 @@
+use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex, Weak};
 
 use bookie_app_services::completion::{SchemaIndex, referenced_tables};
-use bookie_app_services::completion_proposals::candidates;
+use bookie_app_services::completion_proposals::{Candidate, CandidateKind, ranked_candidates};
 use bookie_app_services::result_editability::grammar_for_driver;
 use bookie_core::sql_dialect::qualified_table;
 use gpui::{App, Context, SharedString, Task, WeakEntity, Window};
 use gpui_component::input::{CompletionProvider, EditorState, Rope, RopeExt};
-use lsp_types::{CompletionContext, CompletionItem, CompletionResponse, CompletionTextEdit, Range, TextEdit};
+use lsp_types::{
+    CompletionContext, CompletionItem, CompletionItemKind, CompletionResponse, CompletionTextEdit, Range, TextEdit,
+};
 
 use bookie_gpui::live::LiveSession;
 
@@ -137,36 +140,58 @@ fn completion_items(
             if matches.next().is_some() {
                 return None;
             }
-            let columns = session
-                .completion_columns(table)
-                .ok()?
-                .into_iter()
-                .map(|column| column.name)
-                .collect();
-            Some((reference, columns))
+            Some((reference, session.completion_columns(table).ok()?))
         })
         .collect::<Vec<_>>();
+    let types: HashMap<String, String> = columns
+        .iter()
+        .flat_map(|(_, columns)| columns.iter())
+        .map(|column| (column.name.clone(), column.data_type.clone()))
+        .collect();
     let Ok(mut cache) = cache.lock() else { return Vec::new() };
     cache.prepare(session, grammar);
     for (reference, columns) in columns {
-        cache.index.set_columns(&reference, columns);
+        cache
+            .index
+            .set_columns(&reference, columns.into_iter().map(|column| column.name).collect());
     }
-    let result = candidates(&sql, offset, &cache.index);
+    let result = ranked_candidates(&sql, offset, &cache.index);
     drop(cache);
     let range = Range::new(
         text.offset_to_position(result.range.start),
         text.offset_to_position(result.range.end),
     );
     result
-        .values
+        .items
         .into_iter()
         .take(MAX_COMPLETION_ITEMS)
-        .map(|(label, new_text)| CompletionItem {
-            label,
-            text_edit: Some(CompletionTextEdit::Edit(TextEdit::new(range, new_text))),
-            ..CompletionItem::default()
-        })
+        .enumerate()
+        .map(|(rank, candidate)| completion_item(rank, candidate, range, &types))
         .collect()
+}
+
+fn completion_item(rank: usize, candidate: Candidate, range: Range, types: &HashMap<String, String>) -> CompletionItem {
+    let kind = match candidate.kind {
+        CandidateKind::Column => CompletionItemKind::FIELD,
+        CandidateKind::Local => CompletionItemKind::VARIABLE,
+        CandidateKind::Table => CompletionItemKind::CLASS,
+        CandidateKind::Keyword => CompletionItemKind::KEYWORD,
+    };
+    let data_type = (candidate.kind == CandidateKind::Column)
+        .then(|| types.get(&candidate.label))
+        .flatten();
+    let detail = match (data_type, candidate.detail) {
+        (Some(data_type), Some(table)) => Some(format!("{data_type} · {table}")),
+        (_, table) => table,
+    };
+    CompletionItem {
+        label: candidate.label,
+        kind: Some(kind),
+        detail,
+        sort_text: Some(format!("{rank:04}")),
+        text_edit: Some(CompletionTextEdit::Edit(TextEdit::new(range, candidate.insert))),
+        ..CompletionItem::default()
+    }
 }
 
 impl GridView {
@@ -250,6 +275,38 @@ pub(crate) fn snippet_menu(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_column_completion_carries_its_kind_type_owner_and_rank() {
+        let range = Range::default();
+        let types = HashMap::from([("total".to_string(), "REAL".to_string())]);
+        let column = completion_item(
+            0,
+            Candidate {
+                label: "total".into(),
+                insert: "\"total\"".into(),
+                kind: CandidateKind::Column,
+                detail: Some("orders".into()),
+            },
+            range,
+            &types,
+        );
+        assert_eq!(column.kind, Some(CompletionItemKind::FIELD));
+        assert_eq!(column.detail.as_deref(), Some("REAL · orders"));
+        let keyword = completion_item(
+            7,
+            Candidate {
+                label: "SELECT".into(),
+                insert: "SELECT".into(),
+                kind: CandidateKind::Keyword,
+                detail: None,
+            },
+            range,
+            &types,
+        );
+        assert_eq!(keyword.kind, Some(CompletionItemKind::KEYWORD));
+        assert!(column.sort_text < keyword.sort_text);
+    }
 
     #[test]
     fn automatic_completion_is_limited_to_sql_boundaries() {

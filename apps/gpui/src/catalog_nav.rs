@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use bookie_app_services::structure_change_plan::StructureChangeKind;
 use bookie_core::TableInfo;
 use bookie_gpui::live::{LiveSession, LiveTable, Origin, ROW_CAP};
 use bookie_gpui::model::{Cell, ColumnMeta, Diff, FindResult, Predicate};
@@ -18,6 +19,10 @@ fn result_column_index(columns: &[ColumnMeta], index: usize, name: &str) -> Opti
 pub(crate) enum TableOpenAction {
     Data,
     Structure,
+    CreateScript,
+    Export,
+    Empty,
+    Drop,
 }
 
 impl GridView {
@@ -279,6 +284,8 @@ impl GridView {
             self.params.remembered.clear();
             self.schema_context = None;
             self.reset_diagram();
+            self.search.closed = Default::default();
+            self.search.recent = Default::default();
         }
         self.mcp.register(session.database_service());
         self.connection_info = None;
@@ -305,6 +312,7 @@ impl GridView {
         self.run_tabs.slots.clear();
         self.run_tabs.active = 0;
         self.run_tabs.next_number = 1;
+        self.clear_result_plan();
     }
 
     pub(super) fn connect(&mut self, origin: Origin, cx: &mut Context<Self>) {
@@ -461,6 +469,10 @@ impl GridView {
         match action {
             TableOpenAction::Data => {}
             TableOpenAction::Structure => self.show_structure(cx),
+            TableOpenAction::CreateScript => self.show_create_table(cx),
+            TableOpenAction::Export => self.open_export_file_bar(cx),
+            TableOpenAction::Empty => self.open_structure_bar(StructureChangeKind::TruncateTable, cx),
+            TableOpenAction::Drop => self.open_structure_bar(StructureChangeKind::DropTable, cx),
         }
     }
 
@@ -469,32 +481,56 @@ impl GridView {
             self.save.busy = false;
             return;
         };
+        self.save.busy = true;
         self.cell_edit.edits.clear();
         let checks = std::mem::take(&mut self.save.checks);
         let wanted = self.catalog.grid_table.clone();
         let sort = self.table_sort(&wanted).cloned();
         let where_sql = self.table_where(&wanted);
-        self.begin_background(
-            Work::Load,
-            cx,
-            move |cancel| load(&session, &wanted, sort.as_ref(), &where_sql, &cancel),
-            move |this, loaded| {
+        self.invalidate_background();
+        let generation = self.loads.generation;
+        let cancel = CancellationToken::new();
+        self.loads.cancel = cancel.clone();
+        cx.spawn(async move |this, cx| {
+            let loaded = cx
+                .background_executor()
+                .spawn(async move { load(&session, &wanted, sort.as_ref(), &where_sql, &cancel) })
+                .await;
+            this.update(cx, |this, cx| {
                 this.save.busy = false;
-                match loaded {
-                    Ok((name, table)) => {
-                        this.show_loaded_table(name, table);
-                        this.status = done;
-                        this.report_save_check(&checks);
-                    }
-                    Err(message) => this.status = format!("{done}, but the table could not be reloaded: {message}"),
+                if this.loads.generation == generation {
+                    this.show_reload_after_save(done, &checks, loaded);
                 }
-            },
-        );
+                cx.notify();
+            })
+            .ok();
+        })
+        .detach();
     }
 
-    pub(crate) fn show_loaded_table(&mut self, identity: TableInfo, table: Source) {
+    fn show_reload_after_save(
+        &mut self,
+        done: String,
+        checks: &[bookie_gpui::save_check::CellCheck],
+        loaded: Result<(TableInfo, Source), String>,
+    ) {
+        match loaded {
+            Ok((name, table)) => {
+                if !self.show_loaded_table(name, table) {
+                    self.status =
+                        format!("{done}. The table was not reloaded; discard the view-only edits, then refresh it");
+                    return;
+                }
+                self.status = done;
+                self.report_save_check(checks);
+            }
+            Err(message) => self.status = format!("{done}, but the table could not be reloaded: {message}"),
+        }
+    }
+
+    pub(crate) fn show_loaded_table(&mut self, identity: TableInfo, table: Source) -> bool {
         if self.reject_view_edits() {
-            return;
+            return false;
         }
         self.clear_fk_peek();
         self.edits_changed();
@@ -515,6 +551,7 @@ impl GridView {
         self.grid_is_query = false;
         self.sync_grid_owner();
         self.status.clear();
+        true
     }
 }
 

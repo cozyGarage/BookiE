@@ -10,6 +10,8 @@ mod cancel_process_ui;
 mod catalog_nav;
 mod chart_plot;
 mod chart_ui;
+mod choice_edit;
+mod choice_ui;
 mod chrome;
 mod close_confirm_ui;
 mod closed_tabs_ui;
@@ -83,6 +85,7 @@ mod sql_file_ui;
 mod ssh_form;
 mod structure_ui;
 mod surfaces;
+mod table_menu;
 mod tables_export_ui;
 mod text_input;
 mod theme_settings_ui;
@@ -783,7 +786,9 @@ impl GridView {
         }
         match &self.mode {
             Mode::All => dataset_index,
-            Mode::Filtered { kept, .. } => u64::from(kept[dataset_index as usize]),
+            Mode::Filtered { kept, .. } => kept
+                .get(dataset_index as usize)
+                .map_or(dataset_index, |index| u64::from(*index)),
         }
     }
 
@@ -1226,6 +1231,8 @@ fn main() {
 }
 
 #[cfg(test)]
+mod choice_edit_tests;
+#[cfg(test)]
 mod connection_form_ui_tests;
 #[cfg(test)]
 mod copy_tests;
@@ -1255,6 +1262,8 @@ mod save_ui_tests;
 mod server_filter_ui_tests;
 #[cfg(test)]
 mod status_bar_tests;
+#[cfg(test)]
+mod table_menu_tests;
 #[cfg(test)]
 mod test_config;
 #[cfg(test)]

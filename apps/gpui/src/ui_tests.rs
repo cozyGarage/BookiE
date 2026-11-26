@@ -126,17 +126,28 @@ fn a_valid_edit_is_applied_to_the_typed_cell_and_marked(cx: &mut TestAppContext)
 }
 
 #[gpui::test]
-fn a_staged_edit_tints_its_cell_and_shows_the_pending_bar_until_discarded(cx: &mut TestAppContext) {
+fn a_staged_edit_tints_its_cell_and_shows_the_pending_marker_until_discarded(cx: &mut TestAppContext) {
+    use gpui_kit::test::TestWindowExt as _;
     let (view, cx) = open(cx);
-    assert!(cx.debug_bounds("pending-edits-bar").is_none());
+    assert!(cx.debug_bounds("pending-edits-marker").is_none());
     assert!(cx.debug_bounds("edited-cell").is_none());
+    let strip = cx.debug_bounds("grid-actions").expect("the grid strip is drawn");
+    let first_cell = cx.update(|window, _| window.find("table-cell-0:0").bounds());
     cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(2, 3, window, cx)));
     cx.simulate_keystrokes("ctrl-a");
     cx.simulate_input("2026-02-03");
     cx.simulate_keystrokes("enter");
+    let marker = cx
+        .debug_bounds("pending-edits-marker")
+        .expect("the strip offers the count and Discard");
     assert!(
-        cx.debug_bounds("pending-edits-bar").is_some(),
-        "the bar offers Preview SQL and Discard"
+        marker.top() >= strip.top() && marker.bottom() <= strip.bottom(),
+        "the marker sits in the grid strip"
+    );
+    assert_eq!(
+        cx.update(|window, _| window.find("table-cell-0:0").bounds()).top(),
+        first_cell.top(),
+        "the grid does not move down"
     );
     assert!(cx.debug_bounds("edited-cell").is_some(), "the changed cell is tinted");
     cx.update(|_, cx| {
@@ -145,7 +156,7 @@ fn a_staged_edit_tints_its_cell_and_shows_the_pending_bar_until_discarded(cx: &m
             cx.notify();
         })
     });
-    assert!(cx.debug_bounds("pending-edits-bar").is_none());
+    assert!(cx.debug_bounds("pending-edits-marker").is_none());
     assert!(cx.debug_bounds("edited-cell").is_none());
 }
 
@@ -1420,6 +1431,21 @@ fn copying_a_filtered_row_includes_its_full_pending_edit(cx: &mut TestAppContext
 }
 
 #[gpui::test]
+fn a_row_past_the_filtered_rows_maps_to_itself_instead_of_panicking(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.set_mode(crate::Mode::Filtered {
+                kept: std::sync::Arc::new(vec![10, 20]),
+                label: "filtered".into(),
+            });
+            assert_eq!(view.source_row(1), 20);
+            assert_eq!(view.source_row(5), 5);
+        });
+    });
+}
+
+#[gpui::test]
 fn local_sort_keeps_selection_and_pending_edits_attached_to_source_rows(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     let value = "edited source row";
@@ -2023,6 +2049,8 @@ fn closing_the_active_run_restores_the_surviving_runs_edits(cx: &mut TestAppCont
     let (view, cx) = open(cx);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
+            view.tabs.open_query();
+            view.sync_grid_owner();
             view.add_run(None);
             view.cell_edit.edits.insert((1, 1), Cell::Text("second".into()));
             view.begin_background(Work::Load, cx, |_| (), |view, ()| view.status = "stale result".into());
@@ -2045,6 +2073,8 @@ fn a_previous_runs_background_result_cannot_replace_the_current_run(cx: &mut Tes
     let (view, cx) = open(cx);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
+            view.tabs.open_query();
+            view.sync_grid_owner();
             view.begin_background(Work::Load, cx, |_| (), |view, ()| view.status = "stale result".into());
             view.add_run(None);
         });

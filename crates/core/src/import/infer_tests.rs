@@ -3,10 +3,7 @@ use super::*;
 fn sheet(headers: &[&str], rows: &[&[&str]]) -> CsvSheet {
     CsvSheet {
         headers: headers.iter().map(|header| (*header).to_owned()).collect(),
-        rows: rows
-            .iter()
-            .map(|row| row.iter().map(|cell| (*cell).to_owned()).collect())
-            .collect(),
+        rows: crate::import::TextRows::from_test_rows(rows.iter().map(|row| row.iter().copied())),
         truncated: false,
     }
 }
@@ -93,7 +90,7 @@ fn only_the_sample_is_read_so_a_long_file_still_opens_at_once() {
     rows.push(vec!["not a number".to_owned()]);
     let sheet = CsvSheet {
         headers: vec!["id".to_owned()],
-        rows,
+        rows: crate::import::TextRows::from_test_rows(rows.iter().map(|row| row.iter().map(String::as_str))),
         truncated: false,
     };
 

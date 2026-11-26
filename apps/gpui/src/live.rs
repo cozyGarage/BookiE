@@ -40,6 +40,7 @@ pub enum Origin {
 
 #[derive(Clone, Debug)]
 pub struct QueryFailure {
+    pub cancelled: bool,
     pub message: String,
     pub position: Option<usize>,
     pub hint: Option<String>,
@@ -54,6 +55,7 @@ impl From<&str> for QueryFailure {
 impl From<String> for QueryFailure {
     fn from(message: String) -> Self {
         Self {
+            cancelled: false,
             message,
             position: None,
             hint: None,
@@ -76,6 +78,10 @@ impl From<bookie_app_services::driver_error_presentation::DriverFailurePresentat
             _ => None,
         };
         Self {
+            cancelled: matches!(
+                failure,
+                bookie_app_services::driver_error_presentation::DriverFailurePresentation::Cancelled
+            ),
             message: driver_failure_message(&failure),
             position,
             hint,
@@ -311,7 +317,7 @@ impl LiveSession {
         self.runtime.block_on(async {
             tokio::select! {
                 biased;
-                _ = control.cancellation_token().cancelled() => Err(QueryFailure::from("Canceled the operation".to_owned())),
+                _ = control.cancellation_token().cancelled() => Err(QueryFailure::from(bookie_app_services::driver_error_presentation::DriverFailurePresentation::Cancelled)),
                 _ = tokio::time::sleep(PAGE_TIMEOUT) => Err(QueryFailure::from("Opening the query session timed out".to_owned())),
                 result = self.sessions.open_interactive(self.session_id) => result.map_err(QueryFailure::from),
             }
@@ -616,9 +622,9 @@ impl LiveSession {
         &self,
         kind: bookie_core::CatalogObjectKind,
     ) -> Result<Vec<bookie_core::CatalogObject>, String> {
-        let epoch = self.next_epoch();
+        let epoch = Epoch(self.epoch.load(Ordering::Relaxed));
         let control = OperationControl::with_timeout(Duration::from_secs(10));
-        let event = self.runtime.block_on(dispatch_read(
+        let event = self.runtime.block_on(dispatch_once(
             DispatchContext::Sessions(&self.sessions),
             Command::ReadCatalog {
                 epoch,
@@ -626,8 +632,6 @@ impl LiveSession {
                 kind,
             },
             &control,
-            epoch,
-            &self.epoch,
         ))?;
         let Event::CatalogRead { outcome, .. } = event else {
             return Err("The command bridge returned an unexpected event".into());

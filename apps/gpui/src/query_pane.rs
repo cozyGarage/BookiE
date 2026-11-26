@@ -100,7 +100,16 @@ impl GridView {
 
     fn query_run_controls(&self, theme: Theme, compact: bool, cx: &mut Context<Self>) -> Div {
         let selected = !self.sql_input.read(cx).selected_range().is_empty();
-        let running = self.panel.running.map(|(_, at)| at.elapsed().as_secs());
+        let running = self
+            .panel
+            .running
+            .map(|(_, at)| at)
+            .or_else(|| self.transaction_statement().map(|statement| statement.started))
+            .map(|at| at.elapsed().as_secs());
+        let stopping = match self.transaction_statement() {
+            Some(statement) => statement.cancel.is_cancelled(),
+            None => self.queries.cancel.is_cancelled(),
+        };
         div()
             .flex()
             .flex_none()
@@ -150,10 +159,10 @@ impl GridView {
             .children(running.map(|seconds| {
                 div()
                     .text_color(rgb(theme.muted_foreground))
-                    .child(format!("{seconds}s"))
+                    .child(format!("Running · {seconds} s"))
             }))
             .when(running.is_some(), |bar| {
-                if self.queries.cancel.is_cancelled() {
+                if stopping {
                     bar.child(crate::surfaces::unavailable_button(
                         ButtonKind::Ghost,
                         "stop-query",

@@ -326,7 +326,7 @@ fn value_honesty_xlsx_round_trip_keeps_booleans_zoned_time_binary_and_all_null_r
         .iter()
         .enumerate()
         .map(|(index, row)| {
-            crate::import::row_to_values(row, &[Some(0), Some(1), Some(2)], &columns, &options, index + 2).unwrap()
+            crate::import::row_to_values(&row, &[Some(0), Some(1), Some(2)], &columns, &options, index + 2).unwrap()
         })
         .collect();
     assert_eq!(restored, rows);

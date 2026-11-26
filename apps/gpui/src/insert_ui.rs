@@ -124,6 +124,7 @@ impl GridView {
             done: "Inserted 1 row".into(),
             review: "Review the new row, then insert or cancel".into(),
             confirm: "Insert",
+            destructive: false,
             note: None,
             reconnect: None,
         };

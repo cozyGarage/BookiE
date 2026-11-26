@@ -93,6 +93,16 @@ pub(crate) struct RowMenu {
     _dismiss: Subscription,
 }
 
+impl RowMenu {
+    pub(crate) fn new(position: Point<Pixels>, menu: Entity<PopupMenu>, dismiss: Subscription) -> Self {
+        Self {
+            position,
+            menu,
+            _dismiss: dismiss,
+        }
+    }
+}
+
 impl GridView {
     pub(crate) fn open_cell_menu(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let groups = command_groups(self, ROW_GROUPS);
@@ -103,11 +113,7 @@ impl GridView {
             cx.notify();
         });
         window.focus(&gpui::Focusable::focus_handle(menu.read(cx), cx), cx);
-        self.row_menu = Some(RowMenu {
-            position: window.mouse_position(),
-            menu,
-            _dismiss: dismiss,
-        });
+        self.row_menu = Some(RowMenu::new(window.mouse_position(), menu, dismiss));
         cx.notify();
     }
 }

@@ -9,7 +9,7 @@ use bookie_gpui::save_check::{CellCheck, cell_checks, key_columns, verify};
 
 use super::*;
 use crate::chrome::tip;
-use crate::surfaces::{ButtonKind, button, task_bar_frame, task_title};
+use crate::surfaces::{ButtonKind, button, compact_button, task_bar_frame, task_title};
 
 type PreparedSave = (CellSavePlan, Option<ForeignKeyReview>);
 
@@ -53,6 +53,7 @@ pub(crate) struct PendingSave {
     pub title: String,
     pub done: String,
     pub confirm: &'static str,
+    pub destructive: bool,
     pub note: Option<&'static str>,
     pub reconnect: Option<bookie_core::TableInfo>,
     pub generation: u64,
@@ -73,11 +74,14 @@ pub(crate) struct ReviewLabels {
     pub done: String,
     pub review: String,
     pub confirm: &'static str,
+    pub destructive: bool,
     pub note: Option<&'static str>,
     pub reconnect: Option<bookie_core::TableInfo>,
 }
 
 const MAX_DELETE_ROWS: u64 = 500;
+
+pub(crate) const TRANSACTION_BLOCKS_SAVE: &str = "Commit or roll back the open transaction first";
 
 impl GridView {
     pub(crate) fn edits_changed(&mut self) {
@@ -103,7 +107,7 @@ impl GridView {
 
     pub(crate) fn save_session(&mut self) -> Option<Arc<LiveSession>> {
         if self.transaction_open() {
-            self.status = "Commit or roll back the transaction before saving grid changes".into();
+            self.status = TRANSACTION_BLOCKS_SAVE.into();
             return None;
         }
         let Some(live) = self.live.clone().filter(|_| self.can_save_edits()) else {
@@ -140,6 +144,7 @@ impl GridView {
             done: format!("Saved {count} change(s)"),
             review: format!("Review {count} change(s), then save or cancel"),
             confirm: "Save",
+            destructive: false,
             note: None,
             reconnect: None,
         };
@@ -184,6 +189,7 @@ impl GridView {
             done: format!("Deleted {count} row(s)"),
             review: format!("Review the {count} row(s) to delete, then delete or cancel"),
             confirm: "Delete",
+            destructive: true,
             note: Some("Rows that depend on these (foreign keys, triggers) may be affected too"),
             reconnect: None,
         };
@@ -197,6 +203,10 @@ impl GridView {
         labels: ReviewLabels,
         cx: &mut Context<Self>,
     ) {
+        if self.transaction_open() {
+            self.status = TRANSACTION_BLOCKS_SAVE.into();
+            return;
+        }
         self.save.busy = true;
         let generation = self.save.generation;
         let table = self.catalog.grid_table.clone();
@@ -309,6 +319,7 @@ impl GridView {
             done: format!("Added foreign key {} on {name}", key.name),
             review: "Review the relationship change, then apply or cancel".into(),
             confirm: "Add foreign key",
+            destructive: false,
             note: Some("The database checks existing rows and may block writes while validating the new constraint."),
             reconnect: None,
         };
@@ -399,6 +410,7 @@ impl GridView {
                     title: labels.title.replace("{n}", &rows),
                     done: labels.done.replace("{n}", &rows),
                     confirm: labels.confirm,
+                    destructive: labels.destructive,
                     note: labels.note,
                     reconnect: labels.reconnect,
                     generation,
@@ -462,7 +474,7 @@ impl GridView {
 
     pub(crate) fn confirm_save(&mut self, cx: &mut Context<Self>) {
         if self.transaction_open() {
-            self.status = "Commit or roll back the transaction before saving grid changes".into();
+            self.status = TRANSACTION_BLOCKS_SAVE.into();
             cx.notify();
             return;
         }
@@ -635,35 +647,50 @@ impl GridView {
         }
     }
 
-    pub(crate) fn edits_bar(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Div> {
+    pub(crate) fn pending_marker(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Div> {
         let count = self.cell_edit.edits.len();
-        if count == 0 || self.compare.is_some() || self.save.busy {
+        if count == 0 || self.compare.is_some() || self.save.busy || self.save.pending.is_some() {
             return None;
         }
         let can_save = self.can_save_edits();
-        let label = if can_save {
-            format!("{count} change(s) pending")
+        let (label, explanation) = if can_save {
+            (format!("{count} pending"), "Changes not saved to the database yet")
         } else {
-            format!("{count} edit(s) in this view only; nothing is saved")
+            (
+                format!("{count} view only"),
+                "Edits in this view only; nothing is saved",
+            )
         };
         Some(
-            task_bar_frame(theme)
-                .debug_selector(|| "pending-edits-bar".into())
-                .child(div().flex_1().min_w_0().child(label))
-                .when(can_save, |bar| {
-                    bar.child(
-                        button(ButtonKind::Primary, "preview-pending-sql", "Preview SQL", theme)
+            div()
+                .flex()
+                .flex_none()
+                .items_center()
+                .gap_1()
+                .debug_selector(|| "pending-edits-marker".into())
+                .child(
+                    div()
+                        .id("pending-edits-count")
+                        .whitespace_nowrap()
+                        .text_color(rgb(theme.warning))
+                        .tooltip(tip(explanation))
+                        .child(label),
+                )
+                .when(can_save, |marker| {
+                    marker.child(
+                        compact_button(ButtonKind::Ghost, "save-pending-edits", "Save", theme)
+                            .debug_selector(|| "save-pending-edits".into())
                             .tooltip(tip("Review the statements, then save or cancel"))
                             .on_click(cx.listener(|this, _, _, cx| this.request_save(cx))),
                     )
                 })
                 .child(
-                    button(ButtonKind::Ghost, "discard-pending-edits", "Discard", theme).on_click(cx.listener(
-                        |this, _, _, cx| {
+                    compact_button(ButtonKind::Ghost, "discard-pending-edits", "Discard", theme)
+                        .debug_selector(|| "discard-pending-edits".into())
+                        .on_click(cx.listener(|this, _, _, cx| {
                             this.discard_view_edits();
                             cx.notify();
-                        },
-                    )),
+                        })),
                 ),
         )
     }
@@ -682,9 +709,14 @@ impl GridView {
                         .gap_3()
                         .child(task_title(pending.title.clone()))
                         .child(
-                            button(ButtonKind::Primary, "confirm-save", pending.confirm, theme)
-                                .tooltip(tip("Run these statements in one transaction"))
-                                .on_click(cx.listener(|this, _, _, cx| this.confirm_save(cx))),
+                            button(
+                                confirm_kind(pending.destructive),
+                                "confirm-save",
+                                pending.confirm,
+                                theme,
+                            )
+                            .tooltip(tip("Run these statements in one transaction"))
+                            .on_click(cx.listener(|this, _, _, cx| this.confirm_save(cx))),
                         )
                         .child(
                             button(ButtonKind::Ghost, "cancel-save", "Cancel", theme)
@@ -718,6 +750,14 @@ impl GridView {
                         ))
                 })),
         )
+    }
+}
+
+pub(crate) fn confirm_kind(destructive: bool) -> ButtonKind {
+    if destructive {
+        ButtonKind::Destructive
+    } else {
+        ButtonKind::Primary
     }
 }
 

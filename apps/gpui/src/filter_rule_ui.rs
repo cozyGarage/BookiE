@@ -127,9 +127,12 @@ impl GridView {
             }
         };
         let table = self.catalog.grid_table.clone();
-        self.search.rule.open = false;
         self.tabs.open_query();
         self.sync_grid_owner();
+        if !self.grid_is_query {
+            return;
+        }
+        self.search.rule.open = false;
         self.status = "Filtering…".into();
         self.begin_background(
             Work::Load,

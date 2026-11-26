@@ -360,7 +360,19 @@ impl GridView {
         } else {
             line.hover(move |style| style.bg(rgb(theme.accent)))
         };
-        line.on_click(cx.listener(move |this, event: &gpui::ClickEvent, window, cx| {
+        let menu_table = match &row {
+            TreeRow::Table(table) => Some(table.clone()),
+            _ => None,
+        };
+        line.when_some(menu_table, |line, table| {
+            line.on_mouse_down(
+                gpui::MouseButton::Right,
+                cx.listener(move |this, _: &gpui::MouseDownEvent, window, cx| {
+                    this.open_table_menu(&table, window, cx);
+                }),
+            )
+        })
+        .on_click(cx.listener(move |this, event: &gpui::ClickEvent, window, cx| {
             this.click_tree_row(&row, event.click_count(), window, cx);
             cx.notify();
         }))
@@ -838,24 +850,27 @@ impl GridView {
             item = item.child(tab_close_button(index, theme, cx));
         }
         item.on_click(cx.listener(move |this, _, window, cx| {
-            this.tabs.active = index;
-            if index == 0 {
-                this.reload_history(cx);
-            }
-            if let Tab::Table(name) = this.tabs.current().clone()
-                && this.live.is_some()
-                && name != this.catalog.grid_table
-            {
-                this.open_table_named(&name, window, cx);
-                cx.notify();
-                return;
-            }
-            this.sync_grid_owner();
-            if this.tabs.shows_grid_for(&this.catalog.grid_table) {
-                window.focus(&this.focus, cx);
-            }
+            this.select_tab(index, window, cx);
             cx.notify();
         }))
+    }
+
+    pub(crate) fn select_tab(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(Tab::Table(name)) = self.tabs.items.get(index).cloned()
+            && self.live.is_some()
+            && name != self.catalog.grid_table
+        {
+            self.open_table_named(&name, window, cx);
+            return;
+        }
+        self.tabs.active = index;
+        if index == 0 {
+            self.reload_history(cx);
+        }
+        self.sync_grid_owner();
+        if self.tabs.shows_grid_for(&self.catalog.grid_table) {
+            window.focus(&self.focus, cx);
+        }
     }
 
     pub fn settings_page(&self, theme: Theme, cx: &mut Context<Self>) -> Div {

@@ -478,6 +478,7 @@ impl GridView {
         let mut actions = vec![
             action("query", "New query", true),
             action("run", "Run all statements", matches!(self.tabs.current(), Tab::Query)),
+            action("stop-query", "Stop query", self.can_stop_query()),
             action(
                 "explain",
                 "Explain the query",
@@ -802,6 +803,7 @@ impl GridView {
                 window.focus(&self.focus, cx);
             }
             "run" => self.run_query(cx),
+            "stop-query" => self.stop_query(),
             "explain" => self.explain_query(cx),
             "data-dictionary" => self.show_data_dictionary(cx),
             _ if self.execute_tool_palette_action(id, window, cx) => {}
