@@ -853,11 +853,7 @@ impl GridView {
                 .background_executor()
                 .spawn(async move {
                     let registry = drivers_registry::default_registry();
-                    block_on(async {
-                        connection_save::load_draft(&registry, id)
-                            .await
-                            .map_err(|error| error.to_string())
-                    })
+                    block_on(connection_save::load_draft(&registry, id))
                 })
                 .await;
             let _ = this.update(cx, |this, cx| {
@@ -1020,17 +1016,13 @@ impl GridView {
                 .spawn(async move {
                     let registry = drivers_registry::default_registry();
                     let audit = bookie_app_services::database_service::DatabaseService::new().transport_audit_factory();
-                    block_on(async {
-                        connection_save::test(
-                            &registry,
-                            &draft,
-                            tokio_util::sync::CancellationToken::new(),
-                            Some(&audit),
-                            bookie_gpui::host_key::prompter(),
-                        )
-                        .await
-                        .map_err(|error| error.to_string())
-                    })
+                    block_on(connection_save::test(
+                        &registry,
+                        &draft,
+                        tokio_util::sync::CancellationToken::new(),
+                        Some(&audit),
+                        bookie_gpui::host_key::prompter(),
+                    ))
                 })
                 .await;
             let _ = this.update(cx, |this, cx| {
@@ -1056,8 +1048,7 @@ impl GridView {
             let (outcome, connections) = cx
                 .background_executor()
                 .spawn(async move {
-                    let outcome =
-                        block_on(async { connection_save::delete(id).await.map_err(|error| error.to_string()) });
+                    let outcome = block_on(connection_save::delete(id));
                     let connections = outcome.is_ok().then(bookie_gpui::live::saved_connections);
                     (outcome, connections)
                 })
