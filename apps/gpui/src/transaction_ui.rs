@@ -14,7 +14,34 @@ pub(crate) struct TransactionState {
     pub last_activity: Instant,
     pub statements: usize,
     pub finishing: bool,
-    pub running: bool,
+    pub running: Option<RunningStatement>,
+}
+
+pub(crate) struct RunningStatement {
+    pub started: Instant,
+    pub cancel: CancellationToken,
+}
+
+impl RunningStatement {
+    pub(crate) fn start() -> Self {
+        Self {
+            started: Instant::now(),
+            cancel: CancellationToken::new(),
+        }
+    }
+}
+
+fn ended_status(failure: Option<&str>, cleanup: Option<String>) -> String {
+    match (failure, cleanup) {
+        (Some(message), None) => {
+            format!("The statement failed and the transaction session ended, so it was rolled back: {message}")
+        }
+        (Some(message), Some(cleanup)) => format!(
+            "The statement failed and the transaction session ended: {message}; closing it also failed: {cleanup}"
+        ),
+        (None, None) => "The transaction ended".into(),
+        (None, Some(cleanup)) => format!("The transaction ended; closing its session failed: {cleanup}"),
+    }
 }
 
 impl GridView {
@@ -24,6 +51,10 @@ impl GridView {
 
     pub(crate) fn begin_transaction(&mut self, cx: &mut Context<Self>) {
         if self.transaction_open() {
+            return;
+        }
+        if self.save.busy || self.save.pending.is_some() || self.form_open() || self.modal_open() {
+            self.status = "Finish or cancel the save or the open form before starting a transaction".into();
             return;
         }
         let Some((connection_id, opened_with)) = self
@@ -63,7 +94,7 @@ impl GridView {
                             last_activity: Instant::now(),
                             statements: 0,
                             finishing: false,
-                            running: false,
+                            running: None,
                         });
                         this.refresh_while_transaction_open(cx);
                         this.status = "Transaction open: statements run in it until you commit or roll back".into();
@@ -85,82 +116,125 @@ impl GridView {
     }
 
     pub(crate) fn run_in_transaction(&mut self, sql: String, cx: &mut Context<Self>) {
-        let (Some(transaction), Some(live)) = (self.transaction.as_ref(), self.live.clone()) else {
+        if self.transaction_starting {
+            self.status = "Wait for the transaction to start".into();
+            return;
+        }
+        let (Some(transaction), Some(live)) = (self.transaction.as_mut(), self.live.clone()) else {
             return;
         };
         if transaction.finishing {
             self.status = "Wait for the transaction to finish".into();
             return;
         }
-        if transaction.running {
+        if transaction.running.is_some() {
             self.status = "Wait for the transaction statement to finish".into();
             return;
         }
+        let statement = RunningStatement::start();
+        let cancel = statement.cancel.clone();
+        transaction.running = Some(statement);
         let (write, shared) = (transaction.write.clone(), transaction.shared.clone());
-        if let Some(transaction) = self.transaction.as_mut() {
-            transaction.running = true;
-        }
         self.status = "Running in the transaction…".into();
         self.invalidate_background();
-        let generation = self.loads.generation;
-        let cancel = CancellationToken::new();
-        self.loads.cancel = cancel.clone();
         let owner = shared.clone();
         cx.spawn(async move |this, cx| {
-            let (ran, ended, cleanup) = cx.background_executor().spawn(async move {
-                let ran = (|| -> Result<_, String> {
-                    let result = write.run_in_transaction(&shared, &sql, &cancel)?;
-                    live.table_from_result(result, &sql, &cancel)
-                })();
-                let ended = !write.transaction_is_open(&shared);
-                let cleanup = if ended { write.close_transaction(&shared) } else { None };
-                (ran, ended, cleanup)
-            }).await;
+            let (ran, ended, cleanup) = cx
+                .background_executor()
+                .spawn(async move {
+                    let ran = write
+                        .run_in_transaction(&shared, &sql, &cancel)
+                        .and_then(|result| live.table_from_result(result, &sql, &cancel));
+                    let ended = !write.transaction_is_open(&shared);
+                    let cleanup = if ended { write.close_transaction(&shared) } else { None };
+                    (ran, ended, cleanup)
+                })
+                .await;
             this.update(cx, |this, cx| {
-                let Some(transaction) = this.transaction.as_mut().filter(|t| Arc::ptr_eq(&t.shared, &owner)) else {
-                    return;
-                };
-                if ended {
-                    this.transaction = None;
-                    this.status = match (&ran, cleanup) {
-                        (Err(message), None) => format!(
-                            "The statement failed and the transaction session ended, so it was rolled back: {message}"
-                        ),
-                        (Err(message), Some(cleanup)) => format!(
-                            "The statement failed and the transaction session ended: {message}; closing it also failed: {cleanup}"
-                        ),
-                        (Ok(_), None) => "The transaction ended".into(),
-                        (Ok(_), Some(cleanup)) => format!("The transaction ended; closing its session failed: {cleanup}"),
-                    };
-                    cx.notify();
-                    return;
-                }
-                transaction.running = false;
-                if ran.is_ok() {
-                    transaction.statements += 1;
-                    transaction.last_activity = Instant::now();
-                }
-                if this.loads.generation == generation {
-                    match ran {
-                        Ok(table) => {
-                            this.add_run(Some(Arc::new(table)));
-                            if !ended {
-                                this.status = "Ran in the transaction (not committed yet)".into();
-                            }
-                        }
-                        Err(message) => this.status = format!("The statement failed inside the transaction: {message}"),
-                    }
-                }
+                this.finish_transaction_statement(&owner, ran, ended.then_some(cleanup));
                 cx.notify();
-            }).ok();
-        }).detach();
+            })
+            .ok();
+        })
+        .detach();
+        self.tick_transaction_statement(cx);
+    }
+
+    fn finish_transaction_statement(
+        &mut self,
+        owner: &SharedSession,
+        ran: Result<bookie_gpui::live::LiveTable, String>,
+        ended: Option<Option<String>>,
+    ) {
+        let Some(transaction) = self.transaction.as_mut().filter(|t| Arc::ptr_eq(&t.shared, owner)) else {
+            return;
+        };
+        transaction.running = None;
+        if let Some(cleanup) = ended {
+            self.transaction = None;
+            self.status = ended_status(ran.as_ref().err().map(String::as_str), cleanup);
+            return;
+        }
+        if ran.is_ok() {
+            transaction.statements += 1;
+            transaction.last_activity = Instant::now();
+        }
+        match ran {
+            Ok(table) => {
+                self.add_run(Some(Arc::new(table)));
+                self.status = "Ran in the transaction (not committed yet)".into();
+            }
+            Err(message) => self.status = format!("The statement failed inside the transaction: {message}"),
+        }
+    }
+
+    fn tick_transaction_statement(&self, cx: &mut Context<Self>) {
+        cx.spawn(async move |this, cx| {
+            loop {
+                cx.background_executor().timer(std::time::Duration::from_secs(1)).await;
+                let running = this
+                    .update(cx, |view, cx| {
+                        let running = view.transaction_statement_running();
+                        if running && matches!(view.tabs.current(), Tab::Query) {
+                            cx.notify();
+                        }
+                        running
+                    })
+                    .unwrap_or(false);
+                if !running {
+                    break;
+                }
+            }
+        })
+        .detach();
+    }
+
+    pub(crate) fn transaction_statement_running(&self) -> bool {
+        self.transaction
+            .as_ref()
+            .is_some_and(|transaction| transaction.running.is_some())
+    }
+
+    pub(crate) fn transaction_statement(&self) -> Option<&RunningStatement> {
+        self.transaction.as_ref()?.running.as_ref()
+    }
+
+    pub(crate) fn stop_transaction_statement(&mut self) -> bool {
+        let Some(cancel) = self.transaction_statement().map(|statement| statement.cancel.clone()) else {
+            return false;
+        };
+        if !cancel.is_cancelled() {
+            cancel.cancel();
+            self.status = "Cancellation requested…".into();
+        }
+        true
     }
 
     pub(crate) fn end_transaction(&mut self, commit: bool, cx: &mut Context<Self>) {
         let Some(transaction) = self.transaction.as_mut() else {
             return;
         };
-        if transaction.finishing || transaction.running {
+        if transaction.finishing || transaction.running.is_some() {
             self.status = "Wait for the transaction operation to finish".into();
             return;
         }

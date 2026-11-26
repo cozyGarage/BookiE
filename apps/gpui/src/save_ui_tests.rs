@@ -314,6 +314,10 @@ fn selected_rows_are_reviewed_then_deleted_and_the_table_reloads_without_them(cx
         assert_eq!(pending.title, "Delete 1 row(s) from orders?");
         assert_eq!(pending.confirm, "Delete", "the button says what it will do");
         assert_eq!(
+            crate::save_ui::confirm_kind(pending.destructive),
+            crate::surfaces::ButtonKind::Destructive
+        );
+        assert_eq!(
             pending.note,
             Some("Rows that depend on these (foreign keys, triggers) may be affected too"),
             "the note must not claim approvals are unavailable now that the prompt exists"
@@ -644,6 +648,35 @@ fn escape_cancels_the_review_and_keeps_the_pending_edit(cx: &mut TestAppContext)
         assert_eq!(view.cell_edit.edits.len(), 1, "cancelling keeps the pending edit");
     });
     assert!(cx.debug_bounds("bar-dialog").is_none());
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn an_edit_review_confirms_with_the_primary_button_and_enter_never_deletes(cx: &mut TestAppContext) {
+    let (view, cx, path) = open_review(cx, "review-kinds");
+    view.read_with(cx, |view, _| {
+        let pending = view.save.pending.as_ref().expect("a review");
+        assert_eq!(
+            crate::save_ui::confirm_kind(pending.destructive),
+            crate::surfaces::ButtonKind::Primary
+        );
+    });
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.cancel_save(cx);
+            view.discard_view_edits();
+            view.click_row(2, false);
+            view.request_delete(cx);
+        })
+    });
+    settle_saving(cx);
+    view.read_with(cx, |view, _| assert!(view.save.pending.is_some(), "{}", view.status));
+    cx.simulate_keystrokes("enter");
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert!(view.save.pending.is_some(), "enter does not confirm a delete")
+    });
+    assert_eq!(order_count(&path), "6");
     std::fs::remove_file(&path).ok();
 }
 
@@ -1516,6 +1549,10 @@ fn dropping_the_table_needs_its_exact_name_then_reviews_the_statement_and_reconn
             .as_ref()
             .unwrap_or_else(|| panic!("no review: {}", view.status));
         assert_eq!(pending.confirm, "Drop table");
+        assert_eq!(
+            crate::save_ui::confirm_kind(pending.destructive),
+            crate::surfaces::ButtonKind::Destructive
+        );
         assert!(pending.plan.preview.contains("DROP TABLE"), "{}", pending.plan.preview);
         assert!(pending.reconnect.is_some(), "the open table is gone afterwards");
     });
@@ -1923,6 +1960,31 @@ fn a_structured_rule_filters_the_table_into_a_result(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn a_refused_switch_to_the_query_grid_starts_no_filter_or_dictionary_read(cx: &mut TestAppContext) {
+    let path = fixture_copy("filter-rule-refused");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 1 });
+            view.open_filter_rule_bar(cx);
+            let value = view.search.rule.value.clone().expect("value field");
+            value.update(cx, |input, cx| input.set_content("Ada", cx));
+            view.structure.open = true;
+            view.run_filter_rule(cx);
+            view.show_data_dictionary(cx);
+        })
+    });
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert!(!view.grid_is_query);
+        assert!(view.run_tabs.slots.is_empty(), "{}", view.status);
+        assert!(std::sync::Arc::ptr_eq(&view.source, &view.table_source));
+        assert_eq!(view.status, "Finish or cancel the save before switching grids");
+    });
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
 fn the_schema_diagram_opens_in_its_own_tab_with_one_card_per_table(cx: &mut TestAppContext) {
     let path = fixture_copy("diagram-tab");
     let (view, cx) = saving_view(cx, &path);
@@ -2156,6 +2218,59 @@ fn a_sql_file_opens_into_the_editor_and_the_editor_text_saves_to_a_new_file(cx: 
         assert!(view.status.contains("already exists"), "{}", view.status)
     });
     std::fs::remove_dir_all(&directory).ok();
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn switching_connections_forgets_the_plan_and_the_tab_history_of_the_old_one(cx: &mut TestAppContext) {
+    use bookie_gpui::shell::{ResultView, Tab};
+    let path = fixture_copy("switch-session");
+    let other = fixture_copy("switch-session-other");
+    let (view, cx) = saving_view(cx, &path);
+    let next = writable_table(&other);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.search
+                .closed
+                .remember(Tab::Table(bookie_gpui::shell::table_info("customers")));
+            view.search.recent.observe(&Tab::Query);
+            view.search.recent.observe(&Tab::Settings);
+            view.panel.plan = vec![bookie_app_services::explain_plan::PlanNode {
+                depth: 0,
+                title: "Seq Scan on orders".into(),
+                cost: None,
+                rows: None,
+                actual_rows: None,
+                details: Vec::new(),
+            }];
+            view.panel.view = ResultView::Plan;
+            view.attach_live(next);
+            assert!(view.panel.plan.is_empty());
+            assert_ne!(view.panel.view, ResultView::Plan);
+            assert_eq!(view.search.closed.len(), 0);
+            assert!(view.search.recent.previous().is_none());
+        })
+    });
+    std::fs::remove_file(&path).ok();
+    std::fs::remove_file(&other).ok();
+}
+
+#[gpui::test]
+fn clicking_another_table_tab_keeps_the_current_tab_when_the_switch_is_refused(cx: &mut TestAppContext) {
+    let path = fixture_copy("tab-click-refused");
+    let (view, cx) = saving_view(cx, &path);
+    queue_edit(&view, cx, "Pending");
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            let current = view.tabs.active;
+            view.tabs.open_table(&bookie_gpui::shell::table_info("customers"));
+            let other = view.tabs.active;
+            view.tabs.active = current;
+            view.select_tab(other, window, cx);
+            assert_eq!(view.tabs.active, current, "{}", view.status);
+            assert_eq!(view.cell_edit.edits.len(), 1);
+        })
+    });
     std::fs::remove_file(&path).ok();
 }
 
@@ -2583,6 +2698,72 @@ fn a_saved_edit_is_verified_by_re_reading_the_row(cx: &mut TestAppContext) {
         assert!(view.save.checks.is_empty(), "the checks are used once");
     });
     assert_eq!(saved_customer(&path, 1), "Verified");
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn a_refused_reload_after_a_save_reports_no_false_verification_error(cx: &mut TestAppContext) {
+    let path = fixture_copy("save-check-refused");
+    let (view, cx) = saving_view(cx, &path);
+    let write = write_session(&path, false);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            let id = view.live.as_ref().and_then(|live| live.writable).expect("writable");
+            view.save.write = Some((id, write));
+        })
+    });
+    queue_edit(&view, cx, "Checked");
+    cx.simulate_keystrokes("secondary-s");
+    settle_saving(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.cell_edit
+                .table
+                .insert((0, 1), bookie_gpui::model::Cell::Text("query draft".into()));
+            view.confirm_save(cx);
+        })
+    });
+    for _ in 0..200 {
+        settle_saving(cx);
+        if view.read_with(cx, |view, _| !view.save.busy) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    view.read_with(cx, |view, _| {
+        assert!(!view.save.busy, "{}", view.status);
+        assert!(view.status.contains("not reloaded"), "{}", view.status);
+        assert!(
+            !view
+                .notices
+                .items
+                .iter()
+                .any(|notice| notice.kind == crate::notifications::NoticeKind::Error),
+            "the old rows must not be compared with the saved values: {}",
+            view.status
+        );
+    });
+    assert_eq!(saved_customer(&path, 1), "Checked");
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn cells_stay_locked_until_the_table_reloads_after_a_save(cx: &mut TestAppContext) {
+    let path = fixture_copy("save-reload-locked");
+    let (view, cx) = saving_view(cx, &path);
+    let write = write_session(&path, false);
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            let id = view.live.as_ref().and_then(|live| live.writable).expect("writable");
+            view.save.busy = true;
+            view.finish_save(id, "Saved".into(), Ok((write, Ok(vec![1]))), cx);
+            assert!(view.save.busy, "the reload after the save is still running");
+            view.start_edit(0, 1, window, cx);
+            assert!(view.cell_edit.active.is_none(), "{}", view.status);
+        })
+    });
+    settle_saving(cx);
+    view.read_with(cx, |view, _| assert!(!view.save.busy, "{}", view.status));
     std::fs::remove_file(&path).ok();
 }
 

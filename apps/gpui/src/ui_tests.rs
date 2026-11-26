@@ -1291,6 +1291,21 @@ fn copying_a_filtered_row_includes_its_full_pending_edit(cx: &mut TestAppContext
 }
 
 #[gpui::test]
+fn a_row_past_the_filtered_rows_maps_to_itself_instead_of_panicking(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.set_mode(crate::Mode::Filtered {
+                kept: std::sync::Arc::new(vec![10, 20]),
+                label: "filtered".into(),
+            });
+            assert_eq!(view.source_row(1), 20);
+            assert_eq!(view.source_row(5), 5);
+        });
+    });
+}
+
+#[gpui::test]
 fn local_sort_keeps_selection_and_pending_edits_attached_to_source_rows(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     let value = "edited source row";
@@ -1894,6 +1909,8 @@ fn closing_the_active_run_restores_the_surviving_runs_edits(cx: &mut TestAppCont
     let (view, cx) = open(cx);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
+            view.tabs.open_query();
+            view.sync_grid_owner();
             view.add_run(None);
             view.cell_edit.edits.insert((1, 1), Cell::Text("second".into()));
             view.begin_background(Work::Load, cx, |_| (), |view, ()| view.status = "stale result".into());
@@ -1916,6 +1933,8 @@ fn a_previous_runs_background_result_cannot_replace_the_current_run(cx: &mut Tes
     let (view, cx) = open(cx);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
+            view.tabs.open_query();
+            view.sync_grid_owner();
             view.begin_background(Work::Load, cx, |_| (), |view, ()| view.status = "stale result".into());
             view.add_run(None);
         });

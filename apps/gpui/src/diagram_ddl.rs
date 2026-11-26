@@ -168,6 +168,7 @@ impl GridView {
             },
             review: "Review the generated SQL before applying it".into(),
             confirm: "Apply",
+            destructive: false,
             note: None,
             reconnect: None,
         };

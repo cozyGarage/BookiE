@@ -780,7 +780,9 @@ impl GridView {
         }
         match &self.mode {
             Mode::All => dataset_index,
-            Mode::Filtered { kept, .. } => u64::from(kept[dataset_index as usize]),
+            Mode::Filtered { kept, .. } => kept
+                .get(dataset_index as usize)
+                .map_or(dataset_index, |index| u64::from(*index)),
         }
     }
 

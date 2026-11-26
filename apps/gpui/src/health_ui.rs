@@ -89,6 +89,9 @@ impl GridView {
         };
         self.tabs.open_query();
         self.sync_grid_owner();
+        if !self.grid_is_query {
+            return;
+        }
         self.status = format!("Reading {}…", report_label(report).to_lowercase());
         self.begin_background(
             Work::Load,

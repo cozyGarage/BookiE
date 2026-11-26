@@ -86,7 +86,14 @@ fn a_result_charts_its_totals_and_keeps_the_latest_picks_when_reopened(cx: &mut 
 #[gpui::test]
 fn replacing_and_closing_results_release_their_chart_rows_and_data(cx: &mut TestAppContext) {
     let (view, cx) = open_live(cx);
-    cx.update(|_, cx| view.update(cx, |view, _| view.add_run(Some(view.source.clone()))));
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            let table = view.source.clone();
+            view.tabs.open_query();
+            view.sync_grid_owner();
+            view.add_run(Some(table));
+        })
+    });
     for closing in [false, true] {
         cx.update(|_, cx| view.update(cx, |view, cx| view.show_chart(cx)));
         wait_for(&view, cx, |view| {

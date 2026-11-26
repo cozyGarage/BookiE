@@ -298,6 +298,9 @@ impl GridView {
     }
 
     pub(crate) fn stop_query(&mut self) {
+        if self.stop_transaction_statement() {
+            return;
+        }
         if self
             .panel
             .running
@@ -321,6 +324,9 @@ impl GridView {
         let capabilities = driver.capabilities();
         self.tabs.open_query();
         self.sync_grid_owner();
+        if !self.grid_is_query {
+            return;
+        }
         self.status = "Reading the data dictionary…".into();
         self.begin_background(
             Work::Load,
@@ -332,7 +338,8 @@ impl GridView {
             },
             |this, (elapsed, result)| match result {
                 Ok(table) => {
-                    if let Some(slot) = this.append_run(Some(std::sync::Arc::new(table)), false, true) {
+                    let activate = this.grid_is_query;
+                    if let Some(slot) = this.append_run(Some(std::sync::Arc::new(table)), false, activate) {
                         slot.run.elapsed_ms = Some(u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX));
                     }
                 }
@@ -342,7 +349,7 @@ impl GridView {
     }
 
     pub(crate) fn add_run(&mut self, source: Option<Source>) {
-        self.append_run(source, false, true);
+        self.append_run(source, false, self.grid_is_query);
     }
 
     fn can_activate_query_result(&self, selected: Option<usize>) -> bool {
