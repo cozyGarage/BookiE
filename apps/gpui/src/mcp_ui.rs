@@ -1,3 +1,4 @@
+use bookie_app_services::service_runtime::block_on;
 use std::sync::Arc;
 
 use bookie_app_services::mcp_service::{
@@ -214,9 +215,7 @@ impl GridView {
             let result = cx
                 .background_executor()
                 .spawn(async move {
-                    crate::resolve_ui::blocking(async move {
-                        bookie_app_services::mcp_service::revoke_token(Some(&bridge), id).await
-                    })
+                    block_on(async move { bookie_app_services::mcp_service::revoke_token(Some(&bridge), id).await })
                 })
                 .await;
             view.update(cx, |this, cx| {
@@ -252,7 +251,7 @@ impl GridView {
             let result = cx
                 .background_executor()
                 .spawn(async move {
-                    crate::resolve_ui::blocking(async move {
+                    block_on(async move {
                         bookie_app_services::mcp_service::issue_token(
                             Some(&bridge),
                             "GPUI client".into(),

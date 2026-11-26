@@ -84,6 +84,7 @@ pub mod selection_stats;
 pub mod sequence_value;
 pub mod server_messages_view;
 pub mod server_process;
+pub mod service_runtime;
 pub mod set_cells;
 pub mod single_flight;
 pub mod snapshot_export;

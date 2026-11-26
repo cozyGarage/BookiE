@@ -1,3 +1,4 @@
+use bookie_app_services::service_runtime::block_on;
 use bookie_app_services::unknown_outcomes::{
     OutcomeDecision, UnknownOutcome, UnknownOutcomeError, list_unknown_outcomes, resolve_unknown_outcome,
 };
@@ -13,16 +14,6 @@ pub(crate) struct ResolveState {
     pub choice: Option<OutcomeDecision>,
     pub checked: bool,
     pub reason: Option<Entity<TextInput>>,
-}
-
-pub(crate) fn blocking<T: Send + 'static>(
-    future: impl std::future::Future<Output = Result<T, String>> + Send + 'static,
-) -> Result<T, String> {
-    tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .map_err(|error| error.to_string())?
-        .block_on(future)
 }
 
 pub(crate) fn decision_status(decided: &Result<(), UnknownOutcomeError>, decision: OutcomeDecision) -> String {
@@ -68,7 +59,7 @@ impl GridView {
             let listed = cx
                 .background_executor()
                 .spawn(async move {
-                    blocking(async move {
+                    block_on(async move {
                         list_unknown_outcomes(Some(connection_id))
                             .await
                             .map_err(|error| error.to_string())
@@ -115,7 +106,7 @@ impl GridView {
             let outcome = cx
                 .background_executor()
                 .spawn(async move {
-                    blocking(async move {
+                    block_on(async move {
                         let decided = resolve_unknown_outcome(item.operation_id, decision, &text, checked).await;
                         let left = list_unknown_outcomes(Some(connection_id))
                             .await
