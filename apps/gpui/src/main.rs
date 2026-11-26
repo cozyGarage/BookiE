@@ -879,6 +879,7 @@ impl GridView {
         self.clear_chart();
         self.loads.invalidate();
         self.panel.running = None;
+        self.panel.explaining = false;
         self.invalidate_scans();
         self.counts.invalidate();
         self.charts.invalidate();

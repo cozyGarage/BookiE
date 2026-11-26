@@ -62,11 +62,7 @@ impl GridView {
             return;
         }
         match bookie_core::sql_dialect::explain_statement(&session.driver_id, &sql) {
-            Some(statement) => {
-                self.panel.explaining = true;
-                self.panel.plan.clear();
-                self.run_sql(statement, cx)
-            }
+            Some(statement) => self.run_sql(statement, cx),
             None => self.status = "This database cannot explain a query".into(),
         }
     }
@@ -147,6 +143,7 @@ impl GridView {
             self.panel.error_location = None;
             self.sql_input.update(cx, Self::clear_sql_diagnostics);
             self.status = "Running…".into();
+            let explaining = crate::plan_view::typed_explain(&sql);
             self.begin_background_with_context(
                 Work::Load,
                 cx,
@@ -226,6 +223,7 @@ impl GridView {
                     }
                 },
             );
+            self.panel.explaining = explaining;
             self.track_running_query(cx);
             return;
         }

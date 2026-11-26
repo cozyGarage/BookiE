@@ -15,7 +15,6 @@ impl GridView {
     pub(crate) fn toggle_results(&mut self) {
         if self.panel.explaining {
             self.invalidate_background();
-            self.panel.explaining = false;
             self.status = "Canceled the explain".into();
         }
         self.panel.open = !self.panel.open;
