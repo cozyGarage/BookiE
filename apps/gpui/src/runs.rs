@@ -167,6 +167,13 @@ impl GridView {
                     return;
                 }
             };
+            if !matches!(self.tabs.current(), Tab::Query) {
+                self.tabs.open_query();
+                self.sync_grid_owner();
+                if !matches!(self.tabs.current(), Tab::Query) {
+                    return;
+                }
+            }
             self.panel.error_location = None;
             self.sql_input.update(cx, Self::clear_sql_diagnostics);
             self.status = "Running…".into();
