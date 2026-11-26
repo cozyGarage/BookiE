@@ -102,6 +102,10 @@ impl GridView {
     }
 
     pub(crate) fn save_session(&mut self) -> Option<Arc<LiveSession>> {
+        if self.transaction_open() {
+            self.status = "Commit or roll back the transaction before saving grid changes".into();
+            return None;
+        }
         let Some(live) = self.live.clone().filter(|_| self.can_save_edits()) else {
             self.status = "Saving needs a table from a saved connection that is not read-only".into();
             return None;
@@ -457,6 +461,11 @@ impl GridView {
     }
 
     pub(crate) fn confirm_save(&mut self, cx: &mut Context<Self>) {
+        if self.transaction_open() {
+            self.status = "Commit or roll back the transaction before saving grid changes".into();
+            cx.notify();
+            return;
+        }
         let (Some(pending), Some(live)) = (self.save.pending.take(), self.live.clone()) else {
             return;
         };
