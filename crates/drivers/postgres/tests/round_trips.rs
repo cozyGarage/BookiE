@@ -134,8 +134,11 @@ async fn the_round_trips_each_statement_costs_are_counted() {
         connection.query("SELECT id, name FROM trips").await.unwrap();
     }
 
-    let per_statement =
-        |label: &str, bursts: u64| println!("round trips per {label}: {:.2}", bursts as f64 / RUNS as f64);
+    let per_statement = |label: &str, bursts: u64| {
+        let trips = bursts as f64 / RUNS as f64;
+        println!("round trips per {label}: {trips:.2}");
+        trips
+    };
 
     if std::env::var_os("ROUND_TRIP_TRACE").is_some() {
         proxy.reset();
